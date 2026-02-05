@@ -1,0 +1,79 @@
+/**
+ * Configuration and credential management for Crate CLI
+ */
+
+import { homedir } from 'os';
+import { join } from 'path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { OAuthTokens } from './cloudflare/oauth.js';
+
+const CONFIG_DIR = join(homedir(), '.crate');
+const CREDENTIALS_FILE = join(CONFIG_DIR, 'credentials.json');
+
+export interface StoredCredentials {
+	accountId: string;
+	accessToken: string;
+	refreshToken?: string;
+	expiresAt?: number;
+}
+
+function ensureConfigDir(): void {
+	if (!existsSync(CONFIG_DIR)) {
+		mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+	}
+}
+
+export function loadCredentials(): StoredCredentials | null {
+	try {
+		if (!existsSync(CREDENTIALS_FILE)) {
+			return null;
+		}
+
+		const content = readFileSync(CREDENTIALS_FILE, 'utf-8');
+		const data = JSON.parse(content) as StoredCredentials;
+
+		// Validate required fields
+		if (!data.accountId || !data.accessToken) {
+			return null;
+		}
+
+		return data;
+	} catch {
+		return null;
+	}
+}
+
+export function saveCredentials(accountId: string, tokens: OAuthTokens): void {
+	ensureConfigDir();
+
+	const credentials: StoredCredentials = {
+		accountId,
+		accessToken: tokens.accessToken,
+		refreshToken: tokens.refreshToken,
+		expiresAt: tokens.expiresAt,
+	};
+
+	writeFileSync(CREDENTIALS_FILE, JSON.stringify(credentials, null, 2), {
+		mode: 0o600,
+	});
+}
+
+export function clearCredentials(): boolean {
+	try {
+		if (existsSync(CREDENTIALS_FILE)) {
+			unlinkSync(CREDENTIALS_FILE);
+			return true;
+		}
+		return false;
+	} catch {
+		return false;
+	}
+}
+
+export function getConfigDir(): string {
+	return CONFIG_DIR;
+}
+
+export function getCredentialsPath(): string {
+	return CREDENTIALS_FILE;
+}

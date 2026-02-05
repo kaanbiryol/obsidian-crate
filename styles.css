@@ -1,8 +1,83 @@
-/*
+/**
+ * Obsidian Crate - Styles
+ */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+/* Status bar */
+.crate-status-bar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	cursor: default;
+}
 
-If your plugin does not need CSS, delete this file.
+.crate-status-icon {
+	font-size: 12px;
+}
 
-*/
+.crate-status-text {
+	font-size: 11px;
+	opacity: 0.8;
+}
+
+/* Syncing animation */
+.crate-status-bar[data-status="syncing"] .crate-status-icon {
+	animation: crate-spin 1s linear infinite;
+	color: var(--text-warning);
+}
+
+@keyframes crate-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Error state */
+.crate-status-bar[data-status="error"] .crate-status-icon {
+	color: var(--text-error);
+}
+
+.crate-status-bar[data-status="syncing"] .crate-status-text {
+	color: var(--text-warning);
+	opacity: 1;
+}
+
+/* Settings tab */
+.crate-settings h3 {
+	margin-top: 24px;
+	margin-bottom: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	padding-bottom: 6px;
+}
+
+.crate-settings h3:first-child {
+	margin-top: 0;
+}
+
+/* Settings tab - sync progress bar */
+.crate-sync-progress {
+	margin-top: 8px;
+}
+
+.crate-sync-progress-label {
+	font-size: 12px;
+	color: var(--text-muted);
+	margin-bottom: 4px;
+}
+
+.crate-sync-progress-bar {
+	width: 100%;
+	height: 6px;
+	background: var(--background-modifier-border);
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.crate-sync-progress-fill {
+	height: 100%;
+	background: var(--interactive-accent);
+	border-radius: 3px;
+	transition: width 0.2s ease;
+}
