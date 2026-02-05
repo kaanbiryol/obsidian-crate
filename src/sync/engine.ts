@@ -293,6 +293,7 @@ export class SyncEngine {
 
 		// Check if file actually changed
 		if (this.localManifest.hashMatches(file.path, hash)) {
+			logger.debug('Skipping unchanged file:', file.path);
 			return null;
 		}
 
@@ -410,6 +411,8 @@ export class SyncEngine {
 				since = response.changes[response.changes.length - 1]!.seq;
 			}
 
+			logger.info(`Incremental sync: ${allChanges.length} remote changes since seq ${this.settings.lastSeq}`);
+
 			if (allChanges.length === 0) {
 				// Check for local-only changes
 				const localUploads = await this.getLocalChanges();
@@ -443,6 +446,7 @@ export class SyncEngine {
 
 			// Find locally modified files
 			const localChanges = await this.getLocalChanges();
+			logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
 			const localChangedPaths = new Set(localChanges.map(f => f.path));
 
 			// Process remote changes
@@ -672,7 +676,11 @@ export class SyncEngine {
 
 			// Process differences — parallelize uploads, keep others sequential
 			const uploadDiffs = diffs.filter(d => d.action === 'upload');
+			const downloadDiffs = diffs.filter(d => d.action === 'download');
+			const conflictDiffs = diffs.filter(d => d.action === 'conflict');
+			const deleteDiffs = diffs.filter(d => d.action === 'delete');
 			const otherDiffs = diffs.filter(d => d.action !== 'upload');
+			logger.info(`Full sync diffs: ${uploadDiffs.length} upload, ${downloadDiffs.length} download, ${conflictDiffs.length} conflict, ${deleteDiffs.length} delete`);
 
 			// Run upload diffs concurrently
 			if (uploadDiffs.length > 0) {
@@ -894,8 +902,11 @@ export class SyncEngine {
 				progressCallback?.(current, total);
 			}
 
+			logger.info(`Prepared ${prepared.length}/${total} files for upload (${total - prepared.length} unchanged)`);
+
 			// Second pass: upload concurrently
 			const uploadTasks = prepared.map(upload => async () => {
+				logger.info('Uploading:', upload.path, `(${upload.size} bytes)`);
 				const response = await this.api.uploadFiles([upload]);
 				const uploadResult = response.results[0];
 				if (uploadResult?.success) {

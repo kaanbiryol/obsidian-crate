@@ -9,6 +9,7 @@ import { deployCommand } from './commands/deploy.js';
 import { doctorCommand } from './commands/doctor.js';
 import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
+import { resetCommand } from './commands/reset.js';
 
 const program = new Command();
 
@@ -75,6 +76,20 @@ program
 	.description('Clear stored Cloudflare credentials')
 	.action(async () => {
 		await logoutCommand();
+	});
+
+program
+	.command('reset')
+	.description('Tear down all Crate Cloudflare infrastructure (R2, Workers, D1)')
+	.option('--account-id <id>', 'Cloudflare Account ID')
+	.option('--api-token <token>', 'Cloudflare API Token')
+	.option('-y, --yes', 'Skip confirmation prompt')
+	.action(async (options) => {
+		await resetCommand({
+			accountId: options.accountId,
+			apiToken: options.apiToken,
+			yes: options.yes,
+		});
 	});
 
 program.parse();

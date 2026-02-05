@@ -48,6 +48,7 @@ export class SyncApiClient {
 		options: RequestInit = {}
 	): Promise<T> {
 		const url = `${this.workerUrl}${path}`;
+		logger.info(`${options.method ?? 'GET'} ${path}`);
 
 		const response = await fetch(url, {
 			...options,
@@ -71,6 +72,7 @@ export class SyncApiClient {
 			throw new Error(errorMessage);
 		}
 
+		logger.info(`${options.method ?? 'GET'} ${path} → ${response.status}`);
 		return response.json() as Promise<T>;
 	}
 

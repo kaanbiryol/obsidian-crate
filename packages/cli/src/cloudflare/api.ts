@@ -12,6 +12,15 @@ export interface R2Bucket {
 	creation_date: string;
 }
 
+export interface WorkerScript {
+	id: string;
+}
+
+export interface D1Database {
+	uuid: string;
+	name: string;
+}
+
 export interface WorkerDeployment {
 	id: string;
 	url: string;
@@ -222,4 +231,43 @@ export function generateAuthToken(): string {
 export function generateBucketName(prefix: string = 'crate'): string {
 	const randomSuffix = Math.random().toString(36).substring(2, 10);
 	return `${prefix}-${randomSuffix}`;
+}
+
+export async function listWorkers(credentials: CloudflareCredentials): Promise<WorkerScript[]> {
+	return cfFetch<WorkerScript[]>(
+		credentials,
+		`/accounts/${credentials.accountId}/workers/scripts`
+	);
+}
+
+export async function deleteWorker(credentials: CloudflareCredentials, name: string): Promise<void> {
+	await cfFetch<unknown>(
+		credentials,
+		`/accounts/${credentials.accountId}/workers/scripts/${name}`,
+		{ method: 'DELETE' }
+	);
+}
+
+export async function listD1Databases(credentials: CloudflareCredentials): Promise<D1Database[]> {
+	const result = await cfFetch<D1Database[]>(
+		credentials,
+		`/accounts/${credentials.accountId}/d1/database`
+	);
+	return result;
+}
+
+export async function deleteD1Database(credentials: CloudflareCredentials, uuid: string): Promise<void> {
+	await cfFetch<unknown>(
+		credentials,
+		`/accounts/${credentials.accountId}/d1/database/${uuid}`,
+		{ method: 'DELETE' }
+	);
+}
+
+export async function deleteR2Bucket(credentials: CloudflareCredentials, name: string): Promise<void> {
+	await cfFetch<unknown>(
+		credentials,
+		`/accounts/${credentials.accountId}/r2/buckets/${name}`,
+		{ method: 'DELETE' }
+	);
 }

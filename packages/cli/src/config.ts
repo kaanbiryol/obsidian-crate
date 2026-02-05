@@ -96,6 +96,18 @@ export function saveDeploymentConfig(config: DeploymentConfig): void {
 	});
 }
 
+export function clearDeploymentConfig(): boolean {
+	try {
+		if (existsSync(DEPLOYMENT_FILE)) {
+			unlinkSync(DEPLOYMENT_FILE);
+			return true;
+		}
+		return false;
+	} catch {
+		return false;
+	}
+}
+
 export function loadDeploymentConfig(): DeploymentConfig | null {
 	try {
 		if (!existsSync(DEPLOYMENT_FILE)) {
