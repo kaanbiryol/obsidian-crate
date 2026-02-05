@@ -147,7 +147,11 @@ export interface CrateConfig {
 // Constants
 // ============================================================================
 
-export const CRATE_SECRET_KEY = 'crate-auth-token';
+export const SECRET_KEYS = {
+	AUTH_TOKEN: 'crate-auth-token',
+} as const;
+
+export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
 export const DEBOUNCE_DELAY_MS = 2000;
 export const TOMBSTONE_TTL_DAYS = 30;
 export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB

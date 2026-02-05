@@ -6,5 +6,5 @@
 export {
 	type CrateSettings,
 	DEFAULT_SETTINGS,
-	CRATE_SECRET_KEY,
+	SECRET_KEYS,
 } from './types';

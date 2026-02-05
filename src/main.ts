@@ -3,9 +3,10 @@
  */
 
 import { Plugin, Notice, TAbstractFile } from 'obsidian';
-import { CrateSettings, DEFAULT_SETTINGS, CRATE_SECRET_KEY } from './settings';
+import { CrateSettings, DEFAULT_SETTINGS, SECRET_KEYS } from './settings';
 import { SyncEngine } from './sync/engine';
 import { SyncApiClient } from './sync/api';
+import { SecretStorageService } from './secret-storage';
 import { StatusBarManager } from './ui/status';
 import { CrateSettingTab } from './ui/settings-tab';
 import { createLogger } from './logger';
@@ -18,10 +19,11 @@ export default class CratePlugin extends Plugin {
 	private syncEngine: SyncEngine | null = null;
 	private apiClient: SyncApiClient | null = null;
 	private statusBar: StatusBarManager | null = null;
-	private authToken: string = '';
+	secretStorage: SecretStorageService;
 
 	async onload(): Promise<void> {
 		logger.info('Plugin loaded');
+		this.secretStorage = new SecretStorageService(this.app);
 		await this.loadSettings();
 
 		// Generate device ID if not set
@@ -29,9 +31,6 @@ export default class CratePlugin extends Plugin {
 			this.settings.deviceId = this.generateDeviceId();
 			await this.saveSettings();
 		}
-
-		// Load auth token from secure storage
-		await this.loadAuthToken();
 
 		// Add settings tab
 		this.addSettingTab(new CrateSettingTab(this.app, this));
@@ -83,71 +82,10 @@ export default class CratePlugin extends Plugin {
 	}
 
 	/**
-	 * Load auth token from secure storage
-	 */
-	private async loadAuthToken(): Promise<void> {
-		try {
-			// Use Obsidian's secret storage API if available
-			// @ts-expect-error - SecretStorage API may not be typed
-			if (this.app.vault.adapter.secureRead) {
-				// @ts-expect-error
-				this.authToken = await this.app.vault.adapter.secureRead(CRATE_SECRET_KEY) || '';
-			} else {
-				// Fallback: store in plugin data (less secure)
-				const data = await this.loadData() as Record<string, unknown> | null;
-				this.authToken = (data?.['_authToken'] as string) || '';
-			}
-		} catch {
-			this.authToken = '';
-		}
-	}
-
-	/**
-	 * Set auth token in secure storage
-	 */
-	async setAuthToken(token: string): Promise<void> {
-		this.authToken = token;
-		try {
-			// @ts-expect-error - SecretStorage API may not be typed
-			if (this.app.vault.adapter.secureWrite) {
-				// @ts-expect-error
-				await this.app.vault.adapter.secureWrite(CRATE_SECRET_KEY, token);
-			} else {
-				// Fallback: store in plugin data
-				const data = (await this.loadData() as Record<string, unknown>) || {};
-				data['_authToken'] = token;
-				await this.saveData(data);
-			}
-		} catch (e) {
-			logger.error('Failed to save auth token:', e);
-		}
-	}
-
-	/**
-	 * Clear auth token
-	 */
-	async clearAuthToken(): Promise<void> {
-		this.authToken = '';
-		try {
-			// @ts-expect-error
-			if (this.app.vault.adapter.secureDelete) {
-				// @ts-expect-error
-				await this.app.vault.adapter.secureDelete(CRATE_SECRET_KEY);
-			} else {
-				const data = (await this.loadData() as Record<string, unknown>) || {};
-				delete data['_authToken'];
-				await this.saveData(data);
-			}
-		} catch {
-			// Ignore errors on cleanup
-		}
-	}
-
-	/**
 	 * Check if plugin is configured
 	 */
 	isConfigured(): boolean {
-		return this.settings.workerUrl.length > 0 && this.authToken.length > 0;
+		return this.settings.workerUrl.length > 0 && this.secretStorage.has(SECRET_KEYS.AUTH_TOKEN);
 	}
 
 	/**
@@ -160,7 +98,7 @@ export default class CratePlugin extends Plugin {
 		this.statusBar?.destroy();
 
 		// Create API client
-		this.apiClient = new SyncApiClient(this.settings.workerUrl, this.authToken);
+		this.apiClient = new SyncApiClient(this.settings.workerUrl, this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '');
 
 		// Create sync engine
 		this.syncEngine = new SyncEngine(this, this.apiClient, this.settings);

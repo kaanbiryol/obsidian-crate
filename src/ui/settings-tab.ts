@@ -4,6 +4,7 @@
 
 import { App, PluginSettingTab, Setting, Notice, TextAreaComponent } from 'obsidian';
 import type CratePlugin from '../main';
+import { SECRET_KEYS } from '../types';
 import type { CrateConfig } from '../types';
 
 export class CrateSettingTab extends PluginSettingTab {
@@ -74,7 +75,7 @@ export class CrateSettingTab extends PluginSettingTab {
 							// Save configuration
 							this.plugin.settings.workerUrl = config.workerUrl;
 							await this.plugin.saveSettings();
-							await this.plugin.setAuthToken(config.token);
+							this.plugin.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, config.token);
 
 							// Reinitialize plugin
 							await this.plugin.initializeSync();
@@ -103,7 +104,7 @@ export class CrateSettingTab extends PluginSettingTab {
 						if (confirm('Are you sure you want to reset the configuration?')) {
 							this.plugin.settings.workerUrl = '';
 							await this.plugin.saveSettings();
-							await this.plugin.clearAuthToken();
+							this.plugin.secretStorage.delete(SECRET_KEYS.AUTH_TOKEN);
 							new Notice('Configuration cleared');
 							this.display();
 						}
