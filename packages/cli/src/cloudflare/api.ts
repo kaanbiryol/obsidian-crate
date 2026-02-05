@@ -75,27 +75,48 @@ export async function createR2Bucket(
 	);
 }
 
+export async function createD1Database(
+	credentials: CloudflareCredentials,
+	name: string
+): Promise<{ uuid: string }> {
+	return cfFetch<{ uuid: string }>(
+		credentials,
+		`/accounts/${credentials.accountId}/d1/database`,
+		{ method: 'POST', body: JSON.stringify({ name }) }
+	);
+}
+
 export async function deployWorker(
 	credentials: CloudflareCredentials,
 	workerName: string,
 	workerScript: string,
-	bindings: { r2Bucket: string; authToken: string }
+	bindings: { r2Bucket: string; authToken: string; d1DatabaseId?: string }
 ): Promise<WorkerDeployment> {
 	// Create the worker script with R2 binding
+	const bindingsArray: Record<string, string>[] = [
+		{
+			type: 'r2_bucket',
+			name: 'BUCKET',
+			bucket_name: bindings.r2Bucket,
+		},
+		{
+			type: 'secret_text',
+			name: 'AUTH_TOKEN',
+			text: bindings.authToken,
+		},
+	];
+
+	if (bindings.d1DatabaseId) {
+		bindingsArray.push({
+			type: 'd1',
+			name: 'DB',
+			id: bindings.d1DatabaseId,
+		});
+	}
+
 	const metadata = {
 		main_module: 'index.js',
-		bindings: [
-			{
-				type: 'r2_bucket',
-				name: 'BUCKET',
-				bucket_name: bindings.r2Bucket,
-			},
-			{
-				type: 'secret_text',
-				name: 'AUTH_TOKEN',
-				text: bindings.authToken,
-			},
-		],
+		bindings: bindingsArray,
 	};
 
 	// Deploy using multipart form data
@@ -145,6 +166,43 @@ export async function deployWorker(
 		id: data.result.id,
 		url: `https://${workerName}.${subdomainResult.subdomain}.workers.dev`,
 	};
+}
+
+export async function redeployWorker(
+	credentials: CloudflareCredentials,
+	workerName: string,
+	workerScript: string
+): Promise<void> {
+	const metadata = {
+		main_module: 'index.js',
+		keep_bindings: ['r2_bucket', 'secret_text', 'd1'],
+	};
+
+	const formData = new FormData();
+	formData.append('metadata', JSON.stringify(metadata));
+	formData.append(
+		'index.js',
+		new Blob([workerScript], { type: 'application/javascript+module' }),
+		'index.js'
+	);
+
+	const response = await fetch(
+		`${CF_API_BASE}/accounts/${credentials.accountId}/workers/scripts/${workerName}`,
+		{
+			method: 'PUT',
+			headers: {
+				'Authorization': `Bearer ${credentials.apiToken}`,
+			},
+			body: formData,
+		}
+	);
+
+	const data = await response.json() as { success: boolean; errors: Array<{ message: string }> };
+
+	if (!data.success) {
+		const errorMessage = data.errors?.map(e => e.message).join(', ') || 'Unknown error';
+		throw new Error(`Failed to deploy worker: ${errorMessage}`);
+	}
 }
 
 export async function getWorkerSubdomain(credentials: CloudflareCredentials): Promise<string> {

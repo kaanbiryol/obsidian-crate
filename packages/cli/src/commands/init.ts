@@ -8,13 +8,14 @@ import {
 	verifyCredentials,
 	listR2Buckets,
 	createR2Bucket,
+	createD1Database,
 	deployWorker,
 	generateAuthToken,
 	generateBucketName,
 } from '../cloudflare/api.js';
 import { getWorkerScript } from '../worker-template.js';
-import { loadCredentials, saveCredentials } from '../config.js';
-import { performOAuthFlow } from '../cloudflare/oauth.js';
+import { loadCredentials, saveCredentials, saveDeploymentConfig } from '../config.js';
+import { performOAuthFlow, refreshAccessToken } from '../cloudflare/oauth.js';
 
 export interface InitOptions {
 	accountId?: string;
@@ -61,12 +62,18 @@ export async function initCommand(options: InitOptions): Promise<void> {
 		// Generate auth token
 		const authToken = generateAuthToken();
 
+		// Create D1 database
+		console.log('🗄️  Creating D1 database...');
+		const d1 = await createD1Database(credentials, `crate-${config.workerName}`);
+		console.log('✅ D1 database created!\n');
+
 		// Deploy worker
 		console.log(`⚙️  Deploying Worker: ${config.workerName}...`);
 		const workerScript = getWorkerScript();
 		const deployment = await deployWorker(credentials, config.workerName, workerScript, {
 			r2Bucket: config.bucketName,
 			authToken: authToken,
+			d1DatabaseId: d1.uuid,
 		});
 		console.log('✅ Worker deployed!\n');
 
@@ -77,6 +84,14 @@ export async function initCommand(options: InitOptions): Promise<void> {
 			bucketName: config.bucketName,
 			workerName: config.workerName,
 		};
+
+		// Save deployment config for future `crate deploy`
+		saveDeploymentConfig({
+			workerName: config.workerName,
+			bucketName: config.bucketName,
+			workerUrl: result.workerUrl,
+			databaseId: d1.uuid,
+		});
 
 		outputResult(result);
 	} catch (error) {
@@ -144,10 +159,33 @@ async function gatherCredentials(options: InitOptions): Promise<CloudflareCreden
 	const stored = loadCredentials();
 	if (stored) {
 		console.log('Using stored credentials from `crate login`.\n');
-		return {
+
+		let credentials: CloudflareCredentials = {
 			accountId: stored.accountId,
 			apiToken: stored.accessToken,
 		};
+
+		const valid = await verifyCredentials(credentials);
+		if (valid) return credentials;
+
+		// Token expired — try refreshing
+		if (stored.refreshToken) {
+			console.log('🔄 Access token expired, refreshing...');
+			try {
+				const newTokens = await refreshAccessToken(stored.refreshToken);
+				saveCredentials(stored.accountId, {
+					accessToken: newTokens.accessToken,
+					refreshToken: newTokens.refreshToken,
+					expiresAt: newTokens.expiresAt,
+				});
+				console.log('✅ Token refreshed!\n');
+				return { accountId: stored.accountId, apiToken: newTokens.accessToken };
+			} catch (error) {
+				console.log('⚠️  Token refresh failed, falling back to re-authentication.\n');
+			}
+		} else {
+			console.log('⚠️  Stored token expired, falling back to re-authentication.\n');
+		}
 	}
 
 	// No credentials found - offer options

@@ -11,6 +11,7 @@ import type {
 	DownloadResponse,
 	BatchDownloadResponse,
 	HealthResponse,
+	ChangesResponse,
 } from '../types';
 
 const logger = createLogger('ApiClient');
@@ -145,5 +146,12 @@ export class SyncApiClient {
 	 */
 	async getTombstones(): Promise<TombstoneStore> {
 		return this.request<TombstoneStore>('/sync/tombstones');
+	}
+
+	/**
+	 * Get changelog entries since a given sequence number
+	 */
+	async getChanges(since: number): Promise<ChangesResponse> {
+		return this.request<ChangesResponse>(`/sync/changes?since=${since}`);
 	}
 }

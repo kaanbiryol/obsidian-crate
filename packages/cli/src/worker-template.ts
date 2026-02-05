@@ -6,10 +6,30 @@
 
 export function getWorkerScript(): string {
 	return `
-const MANIFEST_KEY = '.crate/manifest.json';
 const TOMBSTONES_KEY = '.crate/tombstones.json';
 const FILES_PREFIX = 'files/';
 const TOMBSTONE_TTL_DAYS = 30;
+
+let dbReady = false;
+
+async function initDb(db) {
+	if (dbReady) return;
+	await db.exec(\`CREATE TABLE IF NOT EXISTS changelog (
+		seq INTEGER PRIMARY KEY AUTOINCREMENT,
+		path TEXT NOT NULL,
+		action TEXT NOT NULL,
+		hash TEXT NOT NULL DEFAULT '',
+		size INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)\`);
+	dbReady = true;
+}
+
+async function appendChangelog(db, path, action, hash, size) {
+	await db.prepare(
+		'INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)'
+	).bind(path, action, hash || '', size || 0).run();
+}
 
 function json(data, status = 200) {
 	return new Response(JSON.stringify(data), {
@@ -36,18 +56,6 @@ function corsResponse(body, status = 200) {
 	});
 }
 
-async function getManifest(bucket) {
-	const obj = await bucket.get(MANIFEST_KEY);
-	if (!obj) return { version: 1, files: {} };
-	return await obj.json();
-}
-
-async function putManifest(bucket, manifest) {
-	await bucket.put(MANIFEST_KEY, JSON.stringify(manifest), {
-		httpMetadata: { contentType: 'application/json' },
-	});
-}
-
 async function getTombstones(bucket) {
 	const obj = await bucket.get(TOMBSTONES_KEY);
 	if (!obj) return { deleted: [] };
@@ -58,19 +66,69 @@ async function handleHealth() {
 	return corsResponse({ status: 'ok', timestamp: new Date().toISOString() });
 }
 
-async function handleGetManifest(bucket) {
-	const manifest = await getManifest(bucket);
-	return corsResponse(manifest);
+async function handleGetChanges(request, db) {
+	if (!db) return corsResponse({ error: 'Changelog not available' }, 404);
+
+	const url = new URL(request.url);
+	const since = parseInt(url.searchParams.get('since') || '0', 10);
+	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
+
+	await initDb(db);
+	const result = await db.prepare(
+		'SELECT seq, path, action, hash, size, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000'
+	).bind(since).all();
+
+	const maxRow = await db.prepare('SELECT MAX(seq) as lastSeq FROM changelog').first();
+
+	return corsResponse({
+		changes: result.results,
+		lastSeq: maxRow?.lastSeq || 0,
+		hasMore: result.results.length === 5000,
+	});
 }
 
-async function handleUpload(request, bucket) {
+async function handleGetManifest(bucket, db) {
+	const files = {};
+	let cursor = undefined;
+	let truncated = true;
+
+	while (truncated) {
+		const opts = { prefix: FILES_PREFIX, include: ['customMetadata'] };
+		if (cursor) opts.cursor = cursor;
+		const listed = await bucket.list(opts);
+
+		for (const object of listed.objects) {
+			const path = object.key.slice(FILES_PREFIX.length);
+			files[path] = {
+				hash: object.customMetadata?.hash || '',
+				size: object.size,
+				modified: object.uploaded.toISOString(),
+			};
+		}
+
+		truncated = listed.truncated;
+		cursor = listed.cursor;
+	}
+
+	let lastSeq = 0;
+	if (db) {
+		try {
+			await initDb(db);
+			const row = await db.prepare('SELECT MAX(seq) as lastSeq FROM changelog').first();
+			lastSeq = row?.lastSeq || 0;
+		} catch (e) { /* ignore */ }
+	}
+
+	return corsResponse({ version: 1, files, lastSeq });
+}
+
+async function handleUpload(request, bucket, db) {
 	const body = await request.json();
 
 	if (!body.files || !Array.isArray(body.files)) {
 		return corsResponse({ error: 'Invalid request: files array required' }, 400);
 	}
 
-	const manifest = await getManifest(bucket);
 	const results = [];
 
 	for (const file of body.files) {
@@ -80,29 +138,38 @@ async function handleUpload(request, bucket) {
 		}
 
 		try {
-			const content = file.binary
-				? Uint8Array.from(atob(file.content), c => c.charCodeAt(0))
-				: file.content;
+			let content;
+			if (file.binary) {
+				const binaryStr = atob(file.content);
+				const bytes = new Uint8Array(binaryStr.length);
+				for (let i = 0; i < binaryStr.length; i++) {
+					bytes[i] = binaryStr.charCodeAt(i);
+				}
+				content = bytes;
+			} else {
+				content = file.content;
+			}
 
 			await bucket.put(FILES_PREFIX + file.path, content, {
 				httpMetadata: {
 					contentType: file.contentType || 'text/plain',
 				},
+				customMetadata: { hash: file.hash },
 			});
 
-			manifest.files[file.path] = {
-				hash: file.hash,
-				size: file.size,
-				modified: new Date().toISOString(),
-			};
-
 			results.push({ path: file.path, success: true });
+
+			if (db) {
+				try {
+					await initDb(db);
+					await appendChangelog(db, file.path, 'put', file.hash, file.size || 0);
+				} catch (e) { /* D1 failure is non-fatal */ }
+			}
 		} catch (err) {
 			results.push({ path: file.path, error: err.message });
 		}
 	}
 
-	await putManifest(bucket, manifest);
 	return corsResponse({ success: true, results });
 }
 
@@ -131,7 +198,7 @@ async function handleDownload(request, bucket) {
 	});
 }
 
-async function handleDelete(request, bucket) {
+async function handleDelete(request, bucket, db) {
 	const body = await request.json();
 
 	if (!body.path) {
@@ -139,10 +206,6 @@ async function handleDelete(request, bucket) {
 	}
 
 	await bucket.delete(FILES_PREFIX + body.path);
-
-	const manifest = await getManifest(bucket);
-	delete manifest.files[body.path];
-	await putManifest(bucket, manifest);
 
 	const tombstones = await getTombstones(bucket);
 	const now = new Date();
@@ -161,6 +224,13 @@ async function handleDelete(request, bucket) {
 	await bucket.put(TOMBSTONES_KEY, JSON.stringify(tombstones), {
 		httpMetadata: { contentType: 'application/json' },
 	});
+
+	if (db) {
+		try {
+			await initDb(db);
+			await appendChangelog(db, body.path, 'delete', '', 0);
+		} catch (e) { /* D1 failure is non-fatal */ }
+	}
 
 	return corsResponse({ success: true, path: body.path });
 }
@@ -224,13 +294,15 @@ export default {
 		const path = url.pathname;
 		const method = request.method;
 		const bucket = env.BUCKET;
+		const db = env.DB || null;
 
 		try {
 			if (path === '/health' && method === 'GET') return await handleHealth();
-			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(bucket);
-			if (path === '/sync/upload' && method === 'POST') return await handleUpload(request, bucket);
+			if (path === '/sync/changes' && method === 'GET') return await handleGetChanges(request, db);
+			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(bucket, db);
+			if (path === '/sync/upload' && method === 'POST') return await handleUpload(request, bucket, db);
 			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket);
-			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket);
+			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
 			if (path === '/sync/tombstones' && method === 'GET') return await handleGetTombstones(bucket);
 			if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket);
 

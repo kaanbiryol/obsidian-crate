@@ -59,6 +59,24 @@ export default class CratePlugin extends Plugin {
 				}
 			},
 		});
+
+		this.addCommand({
+			id: 'force-full-sync',
+			name: 'Force full sync (overwrite remote)',
+			callback: async () => {
+				if (!confirm('This will overwrite ALL remote files with your local vault and delete remote-only files. Continue?')) {
+					return;
+				}
+
+				new Notice('Force full sync started...');
+				const result = await this.forceFullSync();
+				if (result.success) {
+					new Notice(`Force sync complete: ${result.uploaded} uploaded, ${result.deleted} deleted`);
+				} else {
+					new Notice(`Force sync completed with errors: ${result.errors.join(', ')}`);
+				}
+			},
+		});
 	}
 
 	onunload(): void {
@@ -226,6 +244,38 @@ export default class CratePlugin extends Plugin {
 
 		try {
 			const result = await this.syncEngine.initialSync(wrappedCallback);
+
+			// Save updated settings
+			await this.saveSettings();
+
+			return result;
+		} finally {
+			this.statusBar?.clearSyncProgress();
+		}
+	}
+
+	/**
+	 * Force full sync (overwrite all remote files with local vault)
+	 */
+	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
+		if (!this.syncEngine) {
+			return {
+				success: false,
+				uploaded: 0,
+				downloaded: 0,
+				deleted: 0,
+				conflicts: [],
+				errors: ['Not configured'],
+			};
+		}
+
+		const wrappedCallback = (current: number, total: number) => {
+			this.statusBar?.setSyncProgress(current, total);
+			progressCallback?.(current, total);
+		};
+
+		try {
+			const result = await this.syncEngine.forceFullSync(wrappedCallback);
 
 			// Save updated settings
 			await this.saveSettings();

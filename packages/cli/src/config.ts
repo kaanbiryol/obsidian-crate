@@ -77,3 +77,37 @@ export function getConfigDir(): string {
 export function getCredentialsPath(): string {
 	return CREDENTIALS_FILE;
 }
+
+// --- Deployment config (worker name, bucket, etc.) ---
+
+const DEPLOYMENT_FILE = join(CONFIG_DIR, 'deployment.json');
+
+export interface DeploymentConfig {
+	workerName: string;
+	bucketName: string;
+	workerUrl: string;
+	databaseId?: string;
+}
+
+export function saveDeploymentConfig(config: DeploymentConfig): void {
+	ensureConfigDir();
+	writeFileSync(DEPLOYMENT_FILE, JSON.stringify(config, null, 2), {
+		mode: 0o600,
+	});
+}
+
+export function loadDeploymentConfig(): DeploymentConfig | null {
+	try {
+		if (!existsSync(DEPLOYMENT_FILE)) {
+			return null;
+		}
+		const content = readFileSync(DEPLOYMENT_FILE, 'utf-8');
+		const data = JSON.parse(content) as DeploymentConfig;
+		if (!data.workerName || !data.bucketName) {
+			return null;
+		}
+		return data;
+	} catch {
+		return null;
+	}
+}

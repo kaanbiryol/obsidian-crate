@@ -9,6 +9,7 @@
 export interface FileManifest {
 	version: number;
 	files: Record<string, FileEntry>;
+	lastSeq?: number;
 }
 
 export interface FileEntry {
@@ -58,6 +59,25 @@ export interface FileDiff {
 	action: 'upload' | 'download' | 'delete' | 'conflict';
 	localHash?: string;
 	remoteHash?: string;
+}
+
+// ============================================================================
+// Changelog Types
+// ============================================================================
+
+export interface ChangelogEntry {
+	seq: number;
+	path: string;
+	action: 'put' | 'delete';
+	hash: string;
+	size: number;
+	created_at: string;
+}
+
+export interface ChangesResponse {
+	changes: ChangelogEntry[];
+	lastSeq: number;
+	hasMore: boolean;
 }
 
 // ============================================================================
@@ -112,6 +132,7 @@ export interface HealthResponse {
 export interface CrateSettings {
 	workerUrl: string;
 	lastSync: string | null;
+	lastSeq: number;
 	deviceId: string;
 	ignorePatterns: string[];
 	syncOnStartup: boolean;
@@ -122,6 +143,7 @@ export interface CrateSettings {
 export const DEFAULT_SETTINGS: CrateSettings = {
 	workerUrl: '',
 	lastSync: null,
+	lastSeq: 0,
 	deviceId: '',
 	ignorePatterns: [
 		'.obsidian/workspace*',

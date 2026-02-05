@@ -290,5 +290,52 @@ export class CrateSettingTab extends PluginSettingTab {
 		const progressLabel = progressContainer.createDiv({ cls: 'crate-sync-progress-label' });
 		const progressBar = progressContainer.createDiv({ cls: 'crate-sync-progress-bar' });
 		const progressFill = progressBar.createDiv({ cls: 'crate-sync-progress-fill' });
+
+		// Force Full Sync
+		const forceSyncSetting = new Setting(containerEl)
+			.setName('Force Full Sync')
+			.setDesc('Overwrite all remote files with local vault and remove remote-only files')
+			.addButton(button => button
+				.setButtonText('Force Full Update')
+				.setWarning()
+				.onClick(async () => {
+					if (!confirm('This will overwrite ALL remote files with your local vault and delete remote-only files. This cannot be undone. Continue?')) {
+						return;
+					}
+
+					button.setDisabled(true);
+					button.setButtonText('Syncing...');
+					forceProgressContainer.style.display = 'block';
+					forceProgressFill.style.width = '0%';
+
+					try {
+						const result = await this.plugin.forceFullSync((current, total) => {
+							button.setButtonText(`Syncing... ${current}/${total}`);
+							const pct = Math.round((current / total) * 100);
+							forceProgressFill.style.width = `${pct}%`;
+							forceProgressLabel.textContent = `${current} / ${total} files`;
+						});
+
+						if (result.success) {
+							new Notice(`Force sync complete: ${result.uploaded} uploaded, ${result.deleted} deleted`);
+						} else {
+							new Notice(`Force sync completed with errors`);
+						}
+					} catch (e) {
+						new Notice('Force full sync failed');
+					} finally {
+						button.setDisabled(false);
+						button.setButtonText('Force Full Update');
+						forceProgressContainer.style.display = 'none';
+						forceProgressFill.style.width = '0%';
+						this.display();
+					}
+				}));
+
+		const forceProgressContainer = forceSyncSetting.settingEl.createDiv({ cls: 'crate-sync-progress' });
+		forceProgressContainer.style.display = 'none';
+		const forceProgressLabel = forceProgressContainer.createDiv({ cls: 'crate-sync-progress-label' });
+		const forceProgressBar = forceProgressContainer.createDiv({ cls: 'crate-sync-progress-bar' });
+		const forceProgressFill = forceProgressBar.createDiv({ cls: 'crate-sync-progress-fill' });
 	}
 }

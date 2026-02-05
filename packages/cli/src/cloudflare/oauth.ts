@@ -115,6 +115,37 @@ async function fetchAccountId(accessToken: string): Promise<string> {
 	return data.result[0].id;
 }
 
+export async function refreshAccessToken(refreshToken: string): Promise<OAuthTokens> {
+	const response = await fetch(TOKEN_URL, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/x-www-form-urlencoded',
+		},
+		body: new URLSearchParams({
+			grant_type: 'refresh_token',
+			client_id: CLIENT_ID,
+			refresh_token: refreshToken,
+		}),
+	});
+
+	if (!response.ok) {
+		const text = await response.text();
+		throw new Error(`Token refresh failed: ${text}`);
+	}
+
+	const data = await response.json() as {
+		access_token: string;
+		refresh_token?: string;
+		expires_in?: number;
+	};
+
+	return {
+		accessToken: data.access_token,
+		refreshToken: data.refresh_token,
+		expiresAt: data.expires_in ? Date.now() + data.expires_in * 1000 : undefined,
+	};
+}
+
 export async function performOAuthFlow(openBrowser: (url: string) => Promise<void>): Promise<OAuthResult> {
 	const state = generateState();
 	const codeVerifier = generateCodeVerifier();

@@ -5,6 +5,7 @@
 
 import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
+import { deployCommand } from './commands/deploy.js';
 import { doctorCommand } from './commands/doctor.js';
 import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
@@ -29,6 +30,20 @@ program
 			apiToken: options.apiToken,
 			bucketName: options.bucketName,
 			workerName: options.workerName,
+		});
+	});
+
+program
+	.command('deploy')
+	.description('Redeploy the worker script to an existing worker')
+	.option('--worker-name <name>', 'Worker name to deploy to')
+	.option('--account-id <id>', 'Cloudflare Account ID')
+	.option('--api-token <token>', 'Cloudflare API Token')
+	.action(async (options) => {
+		await deployCommand({
+			workerName: options.workerName,
+			accountId: options.accountId,
+			apiToken: options.apiToken,
 		});
 	});
 
