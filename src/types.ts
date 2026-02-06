@@ -203,6 +203,7 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	ignorePatterns: [
 		'.obsidian/workspace*',
 		'.obsidian/cache',
+		'.git/',
 		'.trash/',
 		'*.tmp',
 		'.DS_Store',
