@@ -5,7 +5,7 @@
 import { App, PluginSettingTab, Setting, Notice, TextAreaComponent } from 'obsidian';
 import type CratePlugin from '../main';
 import { SECRET_KEYS } from '../types';
-import type { CrateConfig } from '../types';
+import type { CrateConfig, UsageMetric, UsageResponse } from '../types';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
@@ -27,6 +27,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		// Only show remaining sections if configured
 		if (this.plugin.isConfigured()) {
 			this.renderConnectionSection(containerEl);
+			this.renderUsageSection(containerEl);
 			this.renderSyncSection(containerEl);
 			this.renderAdvancedSection(containerEl);
 		}
@@ -139,6 +140,16 @@ export class CrateSettingTab extends PluginSettingTab {
 					}
 				}));
 
+		new Setting(containerEl)
+			.setName('Analytics Token')
+			.setDesc('Optional. Create a read-only token with "Account Analytics Read" in the Cloudflare dashboard.')
+			.addText(text => {
+				text.inputEl.type = 'password';
+				text
+					.setValue(this.plugin.secretStorage.get(SECRET_KEYS.ANALYTICS_TOKEN) || '')
+					.onChange(value => this.plugin.secretStorage.set(SECRET_KEYS.ANALYTICS_TOKEN, value));
+			});
+
 		const lastSync = this.plugin.settings.lastSync;
 		new Setting(containerEl)
 			.setName('Last Sync')
@@ -212,6 +223,129 @@ export class CrateSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 					this.plugin.updateStatusBar(value);
 				}));
+	}
+
+	private renderUsageSection(containerEl: HTMLElement): void {
+		containerEl.createEl('h3', { text: 'Usage' });
+
+		const usageContainer = containerEl.createDiv({ cls: 'crate-usage-container' });
+
+		new Setting(containerEl)
+			.setName('Refresh Usage')
+			.setDesc('Fetch the latest usage metrics from Cloudflare')
+			.addButton(button => button
+				.setButtonText('Refresh')
+				.onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText('Loading...');
+					try {
+						await this.loadUsageData(usageContainer);
+					} finally {
+						button.setDisabled(false);
+						button.setButtonText('Refresh');
+					}
+				}));
+
+		this.loadUsageData(usageContainer);
+	}
+
+	private async loadUsageData(container: HTMLElement): Promise<void> {
+		container.empty();
+		container.createEl('p', { text: 'Loading usage data...', cls: 'setting-item-description' });
+
+		const data = await this.plugin.getUsage();
+		container.empty();
+
+		if (!data.available) {
+			container.createEl('p', {
+				text: data.error || 'Add an analytics token in the Connection section above to view usage metrics.',
+				cls: 'setting-item-description',
+			});
+			return;
+		}
+
+		if (data.error) {
+			container.createEl('p', {
+				text: `Error: ${data.error}`,
+				cls: 'setting-item-description',
+			});
+			return;
+		}
+
+		if (data.workers) {
+			this.renderServiceUsage(container, 'Workers (Daily)', [
+				{ label: 'Requests', metric: data.workers.requests },
+			]);
+		}
+
+		if (data.r2) {
+			this.renderServiceUsage(container, 'R2 Storage', [
+				{ label: 'Storage', metric: data.r2.storageBytes },
+				{ label: 'Class A Ops (Monthly)', metric: data.r2.classAOps },
+				{ label: 'Class B Ops (Monthly)', metric: data.r2.classBOps },
+			]);
+		}
+
+		if (data.d1) {
+			this.renderServiceUsage(container, 'D1 Database (Daily)', [
+				{ label: 'Rows Read', metric: data.d1.rowsRead },
+				{ label: 'Rows Written', metric: data.d1.rowsWritten },
+				{ label: 'Storage', metric: data.d1.storageBytes },
+			]);
+		}
+
+		if (data.queriedAt) {
+			container.createEl('p', {
+				text: `Last updated: ${new Date(data.queriedAt).toLocaleString()}`,
+				cls: 'setting-item-description',
+			});
+		}
+	}
+
+	private renderServiceUsage(
+		container: HTMLElement,
+		serviceName: string,
+		metrics: Array<{ label: string; metric: UsageMetric }>
+	): void {
+		const section = container.createDiv({ cls: 'crate-usage-service' });
+		section.createEl('h4', { text: serviceName });
+
+		for (const { label, metric } of metrics) {
+			const row = section.createDiv({ cls: 'crate-usage-row' });
+			const pct = metric.limit > 0 ? (metric.current / metric.limit) * 100 : 0;
+
+			const header = row.createDiv({ cls: 'crate-usage-header' });
+			header.createSpan({ text: label, cls: 'crate-usage-label' });
+			header.createSpan({
+				text: this.formatMetric(metric),
+				cls: 'crate-usage-value',
+			});
+
+			const bar = row.createDiv({ cls: 'crate-usage-bar' });
+			const fill = bar.createDiv({ cls: 'crate-usage-bar-fill' });
+			fill.style.width = `${Math.min(pct, 100)}%`;
+
+			if (pct >= 90) {
+				fill.addClass('crate-usage-bar-critical');
+			} else if (pct >= 70) {
+				fill.addClass('crate-usage-bar-warning');
+			}
+		}
+	}
+
+	private formatMetric(metric: UsageMetric): string {
+		if (metric.unit === 'bytes') {
+			return `${this.formatBytes(metric.current)} / ${this.formatBytes(metric.limit)}`;
+		}
+		return `${metric.current.toLocaleString()} / ${metric.limit.toLocaleString()}`;
+	}
+
+	private formatBytes(bytes: number): string {
+		if (bytes === 0) return '0 B';
+		const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+		const i = Math.floor(Math.log(bytes) / Math.log(1024));
+		const value = bytes / Math.pow(1024, i);
+		return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
 	}
 
 	private renderAdvancedSection(containerEl: HTMLElement): void {

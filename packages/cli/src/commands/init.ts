@@ -74,6 +74,9 @@ export async function initCommand(options: InitOptions): Promise<void> {
 			r2Bucket: config.bucketName,
 			authToken: authToken,
 			d1DatabaseId: d1.uuid,
+			accountId: credentials.accountId,
+			workerName: config.workerName,
+			bucketName: config.bucketName,
 		});
 		console.log('✅ Worker deployed!\n');
 

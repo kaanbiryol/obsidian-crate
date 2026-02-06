@@ -6,10 +6,12 @@
 import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
 import { deployCommand } from './commands/deploy.js';
+import { updateCommand } from './commands/update.js';
 import { doctorCommand } from './commands/doctor.js';
 import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
 import { resetCommand } from './commands/reset.js';
+import { analyticsCommand } from './commands/analytics.js';
 
 const program = new Command();
 
@@ -49,6 +51,20 @@ program
 	});
 
 program
+	.command('update')
+	.description('Update an existing worker with new code and bindings')
+	.option('--worker-name <name>', 'Worker name to update')
+	.option('--account-id <id>', 'Cloudflare Account ID')
+	.option('--api-token <token>', 'Cloudflare API Token')
+	.action(async (options) => {
+		await updateCommand({
+			workerName: options.workerName,
+			accountId: options.accountId,
+			apiToken: options.apiToken,
+		});
+	});
+
+program
 	.command('doctor')
 	.description('Diagnose and verify your Obsidian Crate setup')
 	.option('--worker-url <url>', 'Worker URL to test')
@@ -76,6 +92,13 @@ program
 	.description('Clear stored Cloudflare credentials')
 	.action(async () => {
 		await logoutCommand();
+	});
+
+program
+	.command('analytics')
+	.description('Show how to set up analytics in Obsidian')
+	.action(async () => {
+		await analyticsCommand();
 	});
 
 program

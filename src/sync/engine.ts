@@ -455,7 +455,7 @@ export class SyncEngine {
 	 * Incremental sync using changelog.
 	 * Returns SyncResult on success, or null to fall back to full sync.
 	 */
-	private async incrementalSync(): Promise<SyncResult | null> {
+	private async incrementalSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult | null> {
 		if (this.settings.lastSeq <= 0) return null;
 
 		try {
@@ -508,6 +508,11 @@ export class SyncEngine {
 				errors: [],
 			};
 			const localChangedPaths = new Set(localChanges.map(f => f.path));
+
+			// Count local changes that won't be skipped (not already in remote changeset)
+			const localOnlyChanges = localChanges.filter(f => !changesByPath.has(f.path) && !this.shouldIgnore(f.path));
+			const total = changesByPath.size + localOnlyChanges.length;
+			let current = 0;
 
 			// Process remote changes
 			for (const [path, entry] of changesByPath) {
@@ -566,6 +571,8 @@ export class SyncEngine {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 					result.errors.push(`${path}: ${errorMessage}`);
 				}
+				current++;
+				progressCallback?.(current, total);
 			}
 
 			// Upload local-only changes (modified locally but not in remote changeset)
@@ -605,6 +612,8 @@ export class SyncEngine {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 					result.errors.push(`${file.path}: ${errorMessage}`);
 				}
+				current++;
+				progressCallback?.(current, total);
 			}
 
 			await this.localManifest.save();
@@ -696,7 +705,7 @@ export class SyncEngine {
 	/**
 	 * Full sync - compare manifests and sync all differences
 	 */
-	async sync(): Promise<SyncResult> {
+	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		if (!this.api.isConfigured()) {
 			return {
 				success: false,
@@ -723,7 +732,7 @@ export class SyncEngine {
 		this.updateState({ status: 'syncing' });
 
 		// Try incremental sync first
-		const incrementalResult = await this.incrementalSync();
+		const incrementalResult = await this.incrementalSync(progressCallback);
 		if (incrementalResult) {
 			const lastSync = new Date().toISOString();
 			this.updateState({ status: 'idle', lastSync, lastError: null });
@@ -778,6 +787,9 @@ export class SyncEngine {
 			const otherDiffs = diffs.filter(d => d.action !== 'upload');
 			logger.info(`Full sync diffs: ${uploadDiffs.length} upload, ${downloadDiffs.length} download, ${conflictDiffs.length} conflict, ${deleteDiffs.length} delete`);
 
+			const total = diffs.length;
+			let current = 0;
+
 			// Run upload diffs concurrently
 			if (uploadDiffs.length > 0) {
 				const uploadTasks = uploadDiffs.map(diff => async () => {
@@ -787,6 +799,8 @@ export class SyncEngine {
 						const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 						result.errors.push(`${diff.path}: ${errorMessage}`);
 					}
+					current++;
+					progressCallback?.(current, total);
 				});
 				await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
 			}
@@ -799,6 +813,8 @@ export class SyncEngine {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 					result.errors.push(`${diff.path}: ${errorMessage}`);
 				}
+				current++;
+				progressCallback?.(current, total);
 			}
 
 			// Get and process tombstones

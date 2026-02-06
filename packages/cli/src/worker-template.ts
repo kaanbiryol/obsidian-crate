@@ -283,6 +283,15 @@ async function handleBatchDownload(request, bucket) {
 	return corsResponse({ files: results });
 }
 
+async function handleGetConfig(env) {
+	return corsResponse({
+		accountId: env.CF_ACCOUNT_ID || null,
+		workerName: env.CF_WORKER_NAME || null,
+		bucketName: env.CF_BUCKET_NAME || null,
+		databaseId: env.CF_DATABASE_ID || null,
+	});
+}
+
 export default {
 	async fetch(request, env) {
 		// Handle CORS preflight
@@ -316,6 +325,7 @@ export default {
 			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
 			if (path === '/sync/tombstones' && method === 'GET') return await handleGetTombstones(bucket);
 			if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket);
+			if (path === '/sync/config' && method === 'GET') return await handleGetConfig(env);
 
 			return corsResponse({ error: 'Not found' }, 404);
 		} catch (err) {

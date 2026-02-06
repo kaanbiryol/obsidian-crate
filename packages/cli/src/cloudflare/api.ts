@@ -95,11 +95,20 @@ export async function createD1Database(
 	);
 }
 
+export interface DeployWorkerBindings {
+	r2Bucket: string;
+	authToken: string;
+	d1DatabaseId?: string;
+	accountId?: string;
+	workerName?: string;
+	bucketName?: string;
+}
+
 export async function deployWorker(
 	credentials: CloudflareCredentials,
 	workerName: string,
 	workerScript: string,
-	bindings: { r2Bucket: string; authToken: string; d1DatabaseId?: string }
+	bindings: DeployWorkerBindings
 ): Promise<WorkerDeployment> {
 	// Create the worker script with R2 binding
 	const bindingsArray: Record<string, string>[] = [
@@ -120,6 +129,35 @@ export async function deployWorker(
 			type: 'd1',
 			name: 'DB',
 			id: bindings.d1DatabaseId,
+		});
+		bindingsArray.push({
+			type: 'plain_text',
+			name: 'CF_DATABASE_ID',
+			text: bindings.d1DatabaseId,
+		});
+	}
+
+	if (bindings.accountId) {
+		bindingsArray.push({
+			type: 'plain_text',
+			name: 'CF_ACCOUNT_ID',
+			text: bindings.accountId,
+		});
+	}
+
+	if (bindings.workerName) {
+		bindingsArray.push({
+			type: 'plain_text',
+			name: 'CF_WORKER_NAME',
+			text: bindings.workerName,
+		});
+	}
+
+	if (bindings.bucketName) {
+		bindingsArray.push({
+			type: 'plain_text',
+			name: 'CF_BUCKET_NAME',
+			text: bindings.bucketName,
 		});
 	}
 
@@ -184,7 +222,7 @@ export async function redeployWorker(
 ): Promise<void> {
 	const metadata = {
 		main_module: 'index.js',
-		keep_bindings: ['r2_bucket', 'secret_text', 'd1'],
+		keep_bindings: ['r2_bucket', 'secret_text', 'd1', 'plain_text'],
 	};
 
 	const formData = new FormData();
@@ -271,3 +309,4 @@ export async function deleteR2Bucket(credentials: CloudflareCredentials, name: s
 		{ method: 'DELETE' }
 	);
 }
+

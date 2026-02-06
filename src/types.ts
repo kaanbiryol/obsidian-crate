@@ -131,6 +131,46 @@ export interface HealthResponse {
 }
 
 // ============================================================================
+// Usage Types
+// ============================================================================
+
+export interface UsageMetric {
+	current: number;
+	limit: number;
+	unit: string;
+}
+
+export interface UsageResponse {
+	available: boolean;
+	workers?: {
+		requests: UsageMetric;
+	};
+	r2?: {
+		storageBytes: UsageMetric;
+		classAOps: UsageMetric;
+		classBOps: UsageMetric;
+	};
+	d1?: {
+		rowsRead: UsageMetric;
+		rowsWritten: UsageMetric;
+		storageBytes: UsageMetric;
+	};
+	queriedAt?: string;
+	error?: string;
+}
+
+// ============================================================================
+// Worker Config Types
+// ============================================================================
+
+export interface WorkerConfig {
+	accountId: string | null;
+	workerName: string | null;
+	bucketName: string | null;
+	databaseId: string | null;
+}
+
+// ============================================================================
 // Settings Types
 // ============================================================================
 
@@ -177,6 +217,7 @@ export interface CrateConfig {
 
 export const SECRET_KEYS = {
 	AUTH_TOKEN: 'crate-auth-token',
+	ANALYTICS_TOKEN: 'crate-analytics-token',
 } as const;
 
 export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];

@@ -13,6 +13,7 @@ import type {
 	HealthResponse,
 	ChangesResponse,
 	CheckResponse,
+	WorkerConfig,
 } from '../types';
 
 const logger = createLogger('ApiClient');
@@ -163,5 +164,12 @@ export class SyncApiClient {
 	 */
 	async getChanges(since: number): Promise<ChangesResponse> {
 		return this.request<ChangesResponse>(`/sync/changes?since=${since}`);
+	}
+
+	/**
+	 * Get worker configuration (account/bucket/worker metadata)
+	 */
+	async getConfig(): Promise<WorkerConfig> {
+		return this.request<WorkerConfig>('/sync/config');
 	}
 }
