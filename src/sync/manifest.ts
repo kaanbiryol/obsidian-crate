@@ -1,43 +1,80 @@
 /**
- * Local manifest management for tracking file state
+ * Local manifest management for tracking file state.
+ * Stored in its own file (file-manifest.json) in the plugin directory,
+ * separate from Obsidian's data.json to avoid write amplification
+ * and prevent settings saves from erasing manifest data.
  */
 
-import type { Plugin } from 'obsidian';
+import type { App, PluginManifest } from 'obsidian';
 import { createLogger } from '../logger';
 import type { FileManifest, FileEntry } from '../types';
 
 const logger = createLogger('Manifest');
 
-const LOCAL_MANIFEST_KEY = 'crate-local-manifest';
+const MANIFEST_FILENAME = 'file-manifest.json';
+const LEGACY_MANIFEST_KEY = 'crate-local-manifest';
 
 export class LocalManifest {
-	private plugin: Plugin;
+	private app: App;
+	private manifestPath: string;
+	private dataPath: string;
 	private manifest: FileManifest;
+	private dirty: boolean;
 
-	constructor(plugin: Plugin) {
-		this.plugin = plugin;
+	constructor(app: App, pluginManifest: PluginManifest) {
+		this.app = app;
+		this.manifestPath = `${pluginManifest.dir}/${MANIFEST_FILENAME}`;
+		this.dataPath = `${pluginManifest.dir}/data.json`;
 		this.manifest = { version: 1, files: {} };
+		this.dirty = false;
 	}
 
 	/**
-	 * Load manifest from plugin data
+	 * Load manifest from its dedicated file, migrating from data.json if needed.
 	 */
 	async load(): Promise<void> {
-		const data = await this.plugin.loadData() as Record<string, unknown> | null;
-		const stored = data?.[LOCAL_MANIFEST_KEY] as FileManifest | undefined;
-		if (stored && typeof stored === 'object' && 'version' in stored && 'files' in stored) {
-			this.manifest = stored;
+		const adapter = this.app.vault.adapter;
+
+		if (await adapter.exists(this.manifestPath)) {
+			// New file exists — read it directly
+			const raw = await adapter.read(this.manifestPath);
+			const parsed = JSON.parse(raw) as FileManifest;
+			if (parsed && typeof parsed === 'object' && 'version' in parsed && 'files' in parsed) {
+				this.manifest = parsed;
+			}
+		} else if (await adapter.exists(this.dataPath)) {
+			// Attempt migration from legacy location in data.json
+			const raw = await adapter.read(this.dataPath);
+			const data = JSON.parse(raw) as Record<string, unknown>;
+			const stored = data?.[LEGACY_MANIFEST_KEY] as FileManifest | undefined;
+
+			if (stored && typeof stored === 'object' && 'version' in stored && 'files' in stored) {
+				this.manifest = stored;
+				this.dirty = true;
+
+				// Write to new location immediately
+				await this.save();
+
+				// Remove the legacy key from data.json
+				delete data[LEGACY_MANIFEST_KEY];
+				await adapter.write(this.dataPath, JSON.stringify(data));
+				logger.info('Migrated manifest from data.json to file-manifest.json');
+			}
 		}
+
 		logger.info(`Manifest loaded with ${this.getFileCount()} files`);
 	}
 
 	/**
-	 * Save manifest to plugin data
+	 * Save manifest to its dedicated file. Skips write if nothing changed.
 	 */
 	async save(): Promise<void> {
-		const data = await this.plugin.loadData() as Record<string, unknown> | null || {};
-		data[LOCAL_MANIFEST_KEY] = this.manifest;
-		await this.plugin.saveData(data);
+		if (!this.dirty) return;
+		await this.app.vault.adapter.write(
+			this.manifestPath,
+			JSON.stringify(this.manifest)
+		);
+		this.dirty = false;
 	}
 
 	/**
@@ -52,6 +89,7 @@ export class LocalManifest {
 	 */
 	setEntry(path: string, entry: FileEntry): void {
 		this.manifest.files[path] = entry;
+		this.dirty = true;
 	}
 
 	/**
@@ -59,6 +97,7 @@ export class LocalManifest {
 	 */
 	removeEntry(path: string): void {
 		delete this.manifest.files[path];
+		this.dirty = true;
 	}
 
 	/**
@@ -80,6 +119,7 @@ export class LocalManifest {
 	 */
 	replaceManifest(manifest: FileManifest): void {
 		this.manifest = manifest;
+		this.dirty = true;
 	}
 
 	/**
@@ -109,5 +149,6 @@ export class LocalManifest {
 	 */
 	clear(): void {
 		this.manifest = { version: 1, files: {} };
+		this.dirty = true;
 	}
 }

@@ -53,7 +53,7 @@ export class SyncEngine {
 		this.vault = plugin.app.vault;
 		this.api = api;
 		this.settings = settings;
-		this.localManifest = new LocalManifest(plugin);
+		this.localManifest = new LocalManifest(plugin.app, plugin.manifest);
 		this.baseCache = new BaseCache(plugin.app.vault.adapter);
 		this.state = {
 			status: 'idle',
