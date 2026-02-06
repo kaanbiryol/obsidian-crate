@@ -7,9 +7,7 @@ import { Notice } from 'obsidian';
 import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
-import { detectConflicts, createConflictCopy, isConflictFile, isMergeableFile } from './conflict';
-import { BaseCache } from './base-cache';
-import { merge3 } from './merge';
+import { detectConflicts, createConflictCopy, isConflictFile } from './conflict';
 import { getAllVaultFiles, isHiddenPath, getExtensionFromPath, tfileToVaultFile } from './file-discovery';
 import type { VaultFile } from './file-discovery';
 import { createLogger } from '../logger';
@@ -46,7 +44,6 @@ export class SyncEngine {
 	private pendingPaths: Set<string> = new Set();
 	private syncInterval: ReturnType<typeof setInterval> | null = null;
 	private onStateChange: ((state: SyncState) => void) | null = null;
-	private baseCache: BaseCache;
 
 	constructor(
 		plugin: Plugin,
@@ -58,7 +55,6 @@ export class SyncEngine {
 		this.api = api;
 		this.settings = settings;
 		this.localManifest = new LocalManifest(plugin.app, plugin.manifest);
-		this.baseCache = new BaseCache(plugin.app.vault.adapter);
 		this.state = {
 			status: 'idle',
 			lastSync: settings.lastSync,
@@ -308,7 +304,6 @@ export class SyncEngine {
 							size: upload.size,
 							modified: new Date().toISOString(),
 						});
-						await this.saveBaseFromUpload(upload);
 					}
 				});
 				await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
@@ -318,7 +313,6 @@ export class SyncEngine {
 			for (const path of deletes) {
 				await this.api.deleteFile(path);
 				this.localManifest.removeEntry(path);
-				await this.baseCache.removeBase(path);
 			}
 
 			await this.localManifest.save();
@@ -531,7 +525,6 @@ export class SyncEngine {
 							await this.vault.adapter.remove(path);
 						}
 						this.localManifest.removeEntry(path);
-						await this.baseCache.removeBase(path);
 						result.deleted++;
 					} else if (entry.action === 'put') {
 						const localFile = this.vault.getAbstractFileByPath(path);
@@ -607,7 +600,6 @@ export class SyncEngine {
 							size: uploadFile.size,
 							modified: new Date().toISOString(),
 						});
-						await this.saveBaseFromUpload(uploadFile);
 						result.uploaded++;
 					}
 				} catch (error) {
@@ -699,7 +691,6 @@ export class SyncEngine {
 			size: content.byteLength,
 			modified: new Date().toISOString(),
 		});
-		await this.baseCache.saveBase(path, content);
 
 		result.downloaded++;
 	}
@@ -898,7 +889,6 @@ export class SyncEngine {
 				}
 				if (uploadFile) {
 					await this.api.uploadFiles([uploadFile]);
-					await this.saveBaseFromUpload(uploadFile);
 					result.uploaded++;
 				}
 				break;
@@ -915,7 +905,6 @@ export class SyncEngine {
 					size: content.byteLength,
 					modified: new Date().toISOString(),
 				};
-				await this.baseCache.saveBase(diff.path, content);
 				break;
 			}
 
@@ -931,55 +920,7 @@ export class SyncEngine {
 
 				if (hasLocalFile || hasHiddenFile) {
 					const localContent = await this.vault.adapter.readBinary(diff.path);
-
-					// Attempt 3-way merge for text files
-					if (isMergeableFile(diff.path)) {
-						const baseContent = await this.baseCache.getBase(diff.path);
-						if (baseContent) {
-							const decoder = new TextDecoder();
-							const mergeResult = merge3(
-								decoder.decode(baseContent),
-								decoder.decode(localContent),
-								decoder.decode(remoteContent)
-							);
-							if (mergeResult.success && mergeResult.merged !== undefined) {
-								// Auto-merge succeeded
-								const encoder = new TextEncoder();
-								const mergedBuffer = encoder.encode(mergeResult.merged).buffer as ArrayBuffer;
-
-								// Write merged content locally
-								if (hasLocalFile) {
-									await this.vault.modifyBinary(localFile as TFile, mergedBuffer);
-								} else {
-									await this.vault.adapter.writeBinary(diff.path, mergedBuffer);
-								}
-
-								// Upload merged content to remote
-								const mergedHash = await computeHash(mergedBuffer);
-								const uploadFile: UploadFile = {
-									path: diff.path,
-									content: mergeResult.merged,
-									hash: mergedHash,
-									size: mergedBuffer.byteLength,
-									binary: false,
-								};
-								await this.api.uploadFiles([uploadFile]);
-
-								// Update manifest and base cache
-								localFiles[diff.path] = {
-									hash: mergedHash,
-									size: mergedBuffer.byteLength,
-									modified: new Date().toISOString(),
-								};
-								await this.baseCache.saveBase(diff.path, mergedBuffer);
-
-								logger.info('Auto-merged:', diff.path);
-								break;
-							}
-						}
-					}
-
-					// Fallback: create conflict copy of local version
+					// Create conflict copy of local version and keep remote at original path.
 					const conflictPath = await createConflictCopy(
 						this.vault,
 						diff.path,
@@ -995,14 +936,13 @@ export class SyncEngine {
 
 					result.conflicts.push(conflictPath);
 
-					// Update local files record and save remote as new base
+					// Update local files record to the remote replacement.
 					const hash = await computeHash(remoteContent);
 					localFiles[diff.path] = {
 						hash,
 						size: remoteContent.byteLength,
 						modified: new Date().toISOString(),
 					};
-					await this.baseCache.saveBase(diff.path, remoteContent);
 				}
 				break;
 			}
@@ -1010,7 +950,6 @@ export class SyncEngine {
 			case 'delete': {
 				await this.api.deleteFile(diff.path);
 				delete localFiles[diff.path];
-				await this.baseCache.removeBase(diff.path);
 				result.deleted++;
 				break;
 			}
@@ -1027,19 +966,6 @@ export class SyncEngine {
 			bytes[i] = binaryString.charCodeAt(i);
 		}
 		return bytes.buffer as ArrayBuffer;
-	}
-
-	/**
-	 * Persist base cache from already prepared upload payload.
-	 * Avoids re-reading the file from disk after upload.
-	 */
-	private async saveBaseFromUpload(upload: UploadFile): Promise<void> {
-		if (!isMergeableFile(upload.path)) return;
-
-		const content = upload.binary
-			? this.decodeContent(upload.content, upload.contentType ?? 'application/octet-stream')
-			: new TextEncoder().encode(upload.content).buffer as ArrayBuffer;
-		await this.baseCache.saveBase(upload.path, content);
 	}
 
 	/**
@@ -1152,7 +1078,6 @@ export class SyncEngine {
 					size: upload.size,
 					modified: new Date().toISOString(),
 				});
-				await this.saveBaseFromUpload(upload);
 			} else if (uploadResult?.error) {
 				result.errors.push(`${upload.path}: ${uploadResult.error}`);
 			} else {
@@ -1300,9 +1225,8 @@ export class SyncEngine {
 			const total = files.length + remoteOnlyPaths.length;
 			let current = 0;
 
-			// Clear local manifest and base cache so prepareUpload won't skip any file
+			// Clear local manifest so prepareUpload won't skip any file
 			this.localManifest.clear();
-			await this.baseCache.clear();
 
 			// First pass: prepare uploads with bounded concurrency (local I/O)
 			const prepared = await this.prepareUploadsFromVaultFiles(files, completed => {

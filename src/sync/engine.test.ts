@@ -43,12 +43,6 @@ type Harness = {
 		removeEntry: ReturnType<typeof vi.fn>;
 		clear: ReturnType<typeof vi.fn>;
 	};
-	baseCache: {
-		saveBase: ReturnType<typeof vi.fn>;
-		removeBase: ReturnType<typeof vi.fn>;
-		getBase: ReturnType<typeof vi.fn>;
-		clear: ReturnType<typeof vi.fn>;
-	};
 };
 
 function createSettings(): CrateSettings {
@@ -127,17 +121,9 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 		clear: vi.fn(),
 	};
 
-	const baseCache = {
-		saveBase: vi.fn(),
-		removeBase: vi.fn(),
-		getBase: vi.fn(),
-		clear: vi.fn(),
-	};
-
 	(engine as any).localManifest = localManifest;
-	(engine as any).baseCache = baseCache;
 
-	return { engine, settings, api, vault, localManifest, baseCache };
+	return { engine, settings, api, vault, localManifest };
 }
 
 describe('SyncEngine pattern/ignore behavior', () => {
@@ -295,7 +281,6 @@ describe('SyncEngine incrementalSync', () => {
 		expect(result?.deleted).toBe(1);
 		expect(harness.vault.delete).toHaveBeenCalledWith({ path: 'notes/old.md' });
 		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/old.md');
-		expect(harness.baseCache.removeBase).toHaveBeenCalledWith('notes/old.md');
 		expect(harness.settings.lastSeq).toBe(6);
 	});
 
@@ -372,10 +357,6 @@ describe('SyncEngine incrementalSync', () => {
 				size: 11,
 			}),
 		);
-		expect(harness.baseCache.saveBase).toHaveBeenCalledWith(
-			'notes/new.md',
-			expect.any(ArrayBuffer),
-		);
 		expect(harness.localManifest.save).toHaveBeenCalledTimes(1);
 		expect(harness.settings.lastSeq).toBe(9);
 	});
@@ -386,17 +367,15 @@ describe('SyncEngine processDiff conflict handling', () => {
 		vi.useRealTimers();
 	});
 
-	it('auto-merges mergeable conflicts and uploads merged content', async () => {
+	it('creates conflict copy and replaces main file with remote content', async () => {
 		const harness = createHarness();
 		const path = 'notes/merge.md';
-		const base = 'line1\nline2\nline3';
 		const local = 'LOCAL\nline2\nline3';
 		const remote = 'line1\nline2\nREMOTE';
 
 		const localFile = { path, extension: 'md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(localFile);
 		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer(local));
-		harness.baseCache.getBase.mockResolvedValue(toArrayBuffer(base));
 		harness.api.downloadFile.mockResolvedValue({
 			path,
 			content: Buffer.from(remote).toString('base64'),
@@ -424,22 +403,15 @@ describe('SyncEngine processDiff conflict handling', () => {
 			result,
 		);
 
-		expect(result.conflicts).toEqual([]);
-		expect(harness.api.uploadFiles).toHaveBeenCalledTimes(1);
+		expect(result.conflicts).toHaveLength(1);
+		expect(result.conflicts[0]).toMatch(/^notes\/merge \(conflict .+\)\.md$/);
+		expect(harness.api.uploadFiles).not.toHaveBeenCalled();
 		expect(harness.vault.modifyBinary).toHaveBeenCalledTimes(1);
-
-		const uploaded = harness.api.uploadFiles.mock.calls[0]?.[0]?.[0];
-		expect(uploaded).toEqual(
-			expect.objectContaining({
-				path,
-				binary: false,
-				content: 'LOCAL\nline2\nREMOTE',
-			}),
-		);
+		expect(harness.vault.createFolder).toHaveBeenCalledWith('notes');
+		expect(harness.vault.createBinary).toHaveBeenCalledTimes(1);
 
 		const mergedWritten = harness.vault.modifyBinary.mock.calls[0]?.[1] as ArrayBuffer;
-		expect(fromArrayBuffer(mergedWritten)).toBe('LOCAL\nline2\nREMOTE');
-		expect(harness.baseCache.saveBase).toHaveBeenCalledWith(path, expect.any(ArrayBuffer));
+		expect(fromArrayBuffer(mergedWritten)).toBe(remote);
 		expect(localFiles[path]).toEqual(
 			expect.objectContaining({
 				hash: await computeHash(mergedWritten),
@@ -448,20 +420,18 @@ describe('SyncEngine processDiff conflict handling', () => {
 		);
 	});
 
-	it('falls back to conflict copy and remote replacement when merge fails', async () => {
+	it('creates conflict copy and remote replacement for overlapping edits', async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
 
 		const harness = createHarness();
 		const path = 'notes/conflict.md';
-		const base = 'line1\nline2\nline3';
 		const local = 'line1\nLOCAL\nline3';
 		const remote = 'line1\nREMOTE\nline3';
 
 		const localFile = { path, extension: 'md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(localFile);
 		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer(local));
-		harness.baseCache.getBase.mockResolvedValue(toArrayBuffer(base));
 		harness.api.downloadFile.mockResolvedValue({
 			path,
 			content: Buffer.from(remote).toString('base64'),
@@ -503,8 +473,5 @@ describe('SyncEngine processDiff conflict handling', () => {
 				size: mainWritten.byteLength,
 			}),
 		);
-
-		const baseSaved = harness.baseCache.saveBase.mock.calls[0]?.[1] as ArrayBuffer;
-		expect(fromArrayBuffer(baseSaved)).toBe(remote);
 	});
 });
