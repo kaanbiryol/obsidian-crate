@@ -52,8 +52,13 @@ type Harness = {
 };
 
 function createSettings(): CrateSettings {
-	return {
-		workerUrl: 'https://worker.example',
+		return {
+			workerUrl: 'https://worker.example',
+			cloudflareAccountId: '',
+			cloudflareTokenExpiresAt: null,
+			workerName: '',
+			bucketName: '',
+			databaseId: '',
 		lastSync: null,
 		lastSeq: 0,
 		deviceId: 'dev-1',

@@ -10,6 +10,7 @@ import { SecretStorageService } from './secret-storage';
 import { StatusBarManager } from './ui/status';
 import { CrateSettingTab } from './ui/settings-tab';
 import { createLogger } from './logger';
+import { performOAuthLogin, refreshAccessToken } from './cloudflare/oauth';
 import type { SyncResult, SyncState, UsageResponse, WorkerConfig } from './types';
 
 const logger = createLogger('Plugin');
@@ -104,6 +105,127 @@ export default class CratePlugin extends Plugin {
 	 */
 	isConfigured(): boolean {
 		return this.settings.workerUrl.length > 0 && this.secretStorage.has(SECRET_KEYS.AUTH_TOKEN);
+	}
+
+	hasCloudflareCredentials(): boolean {
+		return this.settings.cloudflareAccountId.length > 0 && this.secretStorage.has(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
+	}
+
+	getCloudflareCredentials(): { accountId: string; apiToken: string } | null {
+		const accountId = this.settings.cloudflareAccountId.trim();
+		const apiToken = (this.secretStorage.get(SECRET_KEYS.CLOUDFLARE_API_TOKEN) || '').trim();
+		if (!accountId || !apiToken) {
+			return null;
+		}
+		return { accountId, apiToken };
+	}
+
+	async resolveCloudflareCredentials(): Promise<{ accountId: string; apiToken: string } | null> {
+		const accountId = this.settings.cloudflareAccountId.trim();
+		let apiToken = (this.secretStorage.get(SECRET_KEYS.CLOUDFLARE_API_TOKEN) || '').trim();
+		const refreshToken = (this.secretStorage.get(SECRET_KEYS.CLOUDFLARE_REFRESH_TOKEN) || '').trim();
+
+		if (!accountId || !apiToken) {
+			return null;
+		}
+
+		const expiresAt = this.settings.cloudflareTokenExpiresAt;
+		const shouldRefresh = !!refreshToken && !!expiresAt && Date.now() > expiresAt - 60_000;
+		if (shouldRefresh) {
+			const refreshed = await refreshAccessToken(refreshToken);
+			apiToken = refreshed.accessToken;
+			await this.saveCloudflareCredentials(accountId, apiToken, {
+				refreshToken: refreshed.refreshToken || refreshToken,
+				expiresAt: refreshed.expiresAt ?? null,
+			});
+		}
+
+		return { accountId, apiToken };
+	}
+
+	async loginWithCloudflare(): Promise<{ accountId: string }> {
+		const result = await performOAuthLogin(async (url: string) => {
+			window.open(url, '_blank', 'noopener,noreferrer');
+		});
+
+		await this.saveCloudflareCredentials(result.accountId, result.tokens.accessToken, {
+			refreshToken: result.tokens.refreshToken,
+			expiresAt: result.tokens.expiresAt ?? null,
+		});
+
+		return { accountId: result.accountId };
+	}
+
+	async saveCloudflareCredentials(
+		accountId: string,
+		apiToken: string,
+		options?: { refreshToken?: string; expiresAt?: number | null }
+	): Promise<void> {
+		this.settings.cloudflareAccountId = accountId.trim();
+		this.settings.cloudflareTokenExpiresAt = options?.expiresAt ?? null;
+		this.secretStorage.set(SECRET_KEYS.CLOUDFLARE_API_TOKEN, apiToken.trim());
+		if (options && Object.prototype.hasOwnProperty.call(options, 'refreshToken')) {
+			const refreshToken = options.refreshToken?.trim() || '';
+			if (refreshToken) {
+				this.secretStorage.set(SECRET_KEYS.CLOUDFLARE_REFRESH_TOKEN, refreshToken);
+			} else {
+				this.secretStorage.delete(SECRET_KEYS.CLOUDFLARE_REFRESH_TOKEN);
+			}
+		} else if (!options) {
+			this.secretStorage.delete(SECRET_KEYS.CLOUDFLARE_REFRESH_TOKEN);
+		}
+		await this.saveSettings();
+	}
+
+	async clearCloudflareCredentials(): Promise<void> {
+		this.settings.cloudflareAccountId = '';
+		this.settings.cloudflareTokenExpiresAt = null;
+		this.secretStorage.delete(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
+		this.secretStorage.delete(SECRET_KEYS.CLOUDFLARE_REFRESH_TOKEN);
+		await this.saveSettings();
+	}
+
+	async applyInfrastructureConfig(config: {
+		workerUrl: string;
+		authToken: string;
+		workerName: string;
+		bucketName: string;
+		databaseId: string;
+		accountId?: string;
+	}): Promise<void> {
+		this.settings.workerUrl = config.workerUrl.trim();
+		this.settings.workerName = config.workerName.trim();
+		this.settings.bucketName = config.bucketName.trim();
+		this.settings.databaseId = config.databaseId.trim();
+		if (config.accountId !== undefined) {
+			this.settings.cloudflareAccountId = config.accountId.trim();
+		}
+		this.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, config.authToken.trim());
+		await this.saveSettings();
+		await this.initializeSync();
+	}
+
+	async clearSyncConfiguration(options?: { clearCloudflareCredentials?: boolean }): Promise<void> {
+		this.syncEngine?.destroy();
+		this.syncEngine = null;
+		this.apiClient = null;
+		this.statusBar?.destroy();
+		this.statusBar = null;
+
+		this.settings.workerUrl = '';
+		this.settings.workerName = '';
+		this.settings.bucketName = '';
+		this.settings.databaseId = '';
+		this.secretStorage.delete(SECRET_KEYS.AUTH_TOKEN);
+
+		if (options?.clearCloudflareCredentials) {
+			this.settings.cloudflareAccountId = '';
+			this.settings.cloudflareTokenExpiresAt = null;
+			this.secretStorage.delete(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
+			this.secretStorage.delete(SECRET_KEYS.CLOUDFLARE_REFRESH_TOKEN);
+		}
+
+		await this.saveSettings();
 	}
 
 	/**

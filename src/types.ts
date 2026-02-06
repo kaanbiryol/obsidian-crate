@@ -176,6 +176,11 @@ export interface WorkerConfig {
 
 export interface CrateSettings {
 	workerUrl: string;
+	cloudflareAccountId: string;
+	cloudflareTokenExpiresAt: number | null;
+	workerName: string;
+	bucketName: string;
+	databaseId: string;
 	lastSync: string | null;
 	lastSeq: number;
 	deviceId: string;
@@ -187,6 +192,11 @@ export interface CrateSettings {
 
 export const DEFAULT_SETTINGS: CrateSettings = {
 	workerUrl: '',
+	cloudflareAccountId: '',
+	cloudflareTokenExpiresAt: null,
+	workerName: '',
+	bucketName: '',
+	databaseId: '',
 	lastSync: null,
 	lastSeq: 0,
 	deviceId: '',
@@ -218,6 +228,8 @@ export interface CrateConfig {
 export const SECRET_KEYS = {
 	AUTH_TOKEN: 'crate-auth-token',
 	ANALYTICS_TOKEN: 'crate-analytics-token',
+	CLOUDFLARE_API_TOKEN: 'crate-cloudflare-api-token',
+	CLOUDFLARE_REFRESH_TOKEN: 'crate-cloudflare-refresh-token',
 } as const;
 
 export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
