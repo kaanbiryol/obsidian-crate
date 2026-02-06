@@ -105,6 +105,7 @@ export interface UploadResponse {
 		path: string;
 		success?: boolean;
 		error?: string;
+		hash?: string;
 	}>;
 }
 
@@ -239,3 +240,4 @@ export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
 export const DEBOUNCE_DELAY_MS = 10000;
 export const TOMBSTONE_TTL_DAYS = 30;
 export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+

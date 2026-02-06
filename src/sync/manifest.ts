@@ -11,32 +11,67 @@ import type { FileManifest, FileEntry } from '../types';
 const logger = createLogger('Manifest');
 
 const MANIFEST_FILENAME = 'file-manifest.json';
+const MANIFEST_TMP_FILENAME = 'file-manifest.json.tmp';
 
 export class LocalManifest {
 	private app: App;
 	private manifestPath: string;
+	private tmpPath: string;
 	private manifest: FileManifest;
 	private dirty: boolean;
 
 	constructor(app: App, pluginManifest: PluginManifest) {
 		this.app = app;
 		this.manifestPath = `${pluginManifest.dir}/${MANIFEST_FILENAME}`;
+		this.tmpPath = `${pluginManifest.dir}/${MANIFEST_TMP_FILENAME}`;
 		this.manifest = { version: 1, files: {} };
 		this.dirty = false;
 	}
 
 	/**
 	 * Load manifest from its dedicated file.
+	 * If the main file is corrupt/missing but a .tmp file exists,
+	 * recover from the temp file (crash during previous save).
 	 */
 	async load(): Promise<void> {
 		const adapter = this.app.vault.adapter;
 
+		let loaded = false;
+
 		if (await adapter.exists(this.manifestPath)) {
-			const raw = await adapter.read(this.manifestPath);
-			const parsed = JSON.parse(raw) as FileManifest;
-			if (parsed && typeof parsed === 'object' && 'version' in parsed && 'files' in parsed) {
-				this.manifest = parsed;
+			try {
+				const raw = await adapter.read(this.manifestPath);
+				const parsed = JSON.parse(raw) as FileManifest;
+				if (parsed && typeof parsed === 'object' && 'version' in parsed && 'files' in parsed) {
+					this.manifest = parsed;
+					loaded = true;
+				}
+			} catch {
+				logger.warn('Main manifest corrupt, attempting recovery from tmp');
 			}
+		}
+
+		if (!loaded && await adapter.exists(this.tmpPath)) {
+			try {
+				const raw = await adapter.read(this.tmpPath);
+				const parsed = JSON.parse(raw) as FileManifest;
+				if (parsed && typeof parsed === 'object' && 'version' in parsed && 'files' in parsed) {
+					this.manifest = parsed;
+					// Promote recovered tmp to main file
+					await adapter.write(this.manifestPath, JSON.stringify(this.manifest));
+					loaded = true;
+					logger.info('Recovered manifest from tmp file');
+				}
+			} catch {
+				logger.warn('Tmp manifest also corrupt, starting fresh');
+			}
+		}
+
+		// Clean up leftover tmp file
+		if (await adapter.exists(this.tmpPath)) {
+			try {
+				await adapter.remove(this.tmpPath);
+			} catch { /* best effort */ }
 		}
 
 		logger.info(`Manifest loaded with ${this.getFileCount()} files`);
@@ -44,13 +79,21 @@ export class LocalManifest {
 
 	/**
 	 * Save manifest to its dedicated file. Skips write if nothing changed.
+	 * Writes to a .tmp file first for crash safety — if the process dies
+	 * mid-write, the next load() recovers from the tmp file.
 	 */
 	async save(): Promise<void> {
 		if (!this.dirty) return;
-		await this.app.vault.adapter.write(
-			this.manifestPath,
-			JSON.stringify(this.manifest)
-		);
+		const data = JSON.stringify(this.manifest);
+		const adapter = this.app.vault.adapter;
+		// Write to tmp first
+		await adapter.write(this.tmpPath, data);
+		// Write to main
+		await adapter.write(this.manifestPath, data);
+		// Clean up tmp
+		try {
+			await adapter.remove(this.tmpPath);
+		} catch { /* best effort */ }
 		this.dirty = false;
 	}
 

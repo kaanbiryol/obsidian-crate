@@ -156,6 +156,11 @@ describe('SyncEngine pattern/ignore behavior', () => {
 	});
 
 	it('always ignores conflict files', () => {
+		// New format (with seconds + random suffix)
+		expect(
+			(harness.engine as any).shouldIgnore('notes/a (conflict 2026-01-02 03-04-05 a1b2).md'),
+		).toBe(true);
+		// Old format (backward compat)
 		expect(
 			(harness.engine as any).shouldIgnore('notes/a (conflict 2026-01-02 03-04).md'),
 		).toBe(true);
@@ -525,15 +530,14 @@ describe('SyncEngine processDiff conflict handling', () => {
 			result,
 		);
 
-		const expectedConflictPath = 'notes/conflict (conflict 2026-01-02 03-04).md';
-
 		expect(harness.api.uploadFiles).not.toHaveBeenCalled();
 		expect(harness.vault.createFolder).toHaveBeenCalledWith('notes');
 		expect(harness.vault.createBinary).toHaveBeenCalledWith(
-			expectedConflictPath,
+			expect.stringMatching(/^notes\/conflict \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)\.md$/),
 			expect.any(ArrayBuffer),
 		);
-		expect(result.conflicts).toEqual([expectedConflictPath]);
+		expect(result.conflicts).toHaveLength(1);
+		expect(result.conflicts[0]).toMatch(/^notes\/conflict \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)\.md$/);
 
 		const mainWritten = harness.vault.modifyBinary.mock.calls[0]?.[1] as ArrayBuffer;
 		expect(fromArrayBuffer(mainWritten)).toBe(remote);

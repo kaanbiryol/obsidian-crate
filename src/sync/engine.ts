@@ -45,6 +45,7 @@ export class SyncEngine {
 	private syncInterval: ReturnType<typeof setInterval> | null = null;
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private patternCache = new Map<string, RegExp>();
+	private ignoredDirPrefixes: string[] = [];
 
 	constructor(
 		plugin: Plugin,
@@ -56,6 +57,7 @@ export class SyncEngine {
 		this.api = api;
 		this.settings = settings;
 		this.localManifest = new LocalManifest(plugin.app, plugin.manifest);
+		this.ignoredDirPrefixes = settings.ignorePatterns.filter(p => p.endsWith('/'));
 		this.state = {
 			status: 'idle',
 			lastSync: settings.lastSync,
@@ -90,6 +92,7 @@ export class SyncEngine {
 	updateSettings(settings: CrateSettings): void {
 		this.patternCache.clear();
 		this.settings = settings;
+		this.ignoredDirPrefixes = settings.ignorePatterns.filter(p => p.endsWith('/'));
 
 		// Restart periodic sync with new interval
 		this.stopPeriodicSync();
@@ -172,7 +175,16 @@ export class SyncEngine {
 			return true;
 		}
 
+		// Fast-path: check pre-computed directory prefixes with startsWith
+		for (const prefix of this.ignoredDirPrefixes) {
+			if (path.startsWith(prefix) || path === prefix.slice(0, -1)) {
+				return true;
+			}
+		}
+
 		for (const pattern of this.settings.ignorePatterns) {
+			// Skip directory patterns already handled above
+			if (pattern.endsWith('/')) continue;
 			if (this.matchPattern(path, pattern)) {
 					return true;
 			}
@@ -300,8 +312,12 @@ export class SyncEngine {
 				if (uploads.length > 0) {
 					const uploadTasks = uploads.map(upload => async () => {
 						const response = await this.api.uploadFiles([upload]);
-						const uploadResult = response.results[0];
+						const uploadResult = response.results.find(r => r.path === upload.path);
 						if (uploadResult?.success) {
+							if (uploadResult.hash && uploadResult.hash !== upload.hash) {
+								logger.warn(`Hash mismatch after upload for ${upload.path}`);
+								return;
+							}
 							this.localManifest.setEntry(upload.path, {
 								hash: upload.hash,
 								size: upload.size,
@@ -1312,11 +1328,20 @@ export class SyncEngine {
 		response: UploadResponse,
 		result: SyncResult,
 	): Promise<void> {
+		if (response.results.length !== batch.length) {
+			logger.warn(`Upload batch result count mismatch: expected ${batch.length}, got ${response.results.length}`);
+		}
+
 		const resultsByPath = new Map(response.results.map(entry => [entry.path, entry]));
 
 			for (const upload of batch) {
 				const uploadResult = resultsByPath.get(upload.path);
 				if (uploadResult?.success) {
+					// Verify echoed hash if the worker returned one
+					if (uploadResult.hash && uploadResult.hash !== upload.hash) {
+						result.errors.push(`${upload.path}: Hash mismatch after upload (expected ${upload.hash}, got ${uploadResult.hash})`);
+						continue;
+					}
 					result.uploaded++;
 					this.localManifest.setEntry(upload.path, {
 						hash: upload.hash,

@@ -147,8 +147,11 @@ async function walkHiddenFolder(
 	}
 }
 
+const MAX_NESTED_WALK_DEPTH = 5;
+
 /**
  * Walk non-hidden folders and recurse into hidden descendants only.
+ * Depth-limited to avoid excessive recursion into deep visible folder trees.
  */
 async function walkForNestedHiddenFolders(
 	vault: Vault,
@@ -156,7 +159,10 @@ async function walkForNestedHiddenFolders(
 	shouldIgnore: (path: string) => boolean,
 	seen: Set<string>,
 	result: VaultFile[],
+	depth = 0,
 ): Promise<void> {
+	if (depth >= MAX_NESTED_WALK_DEPTH) return;
+
 	const listing = await vault.adapter.list(folderPath);
 
 	for (const subfolder of listing.folders) {
@@ -165,7 +171,7 @@ async function walkForNestedHiddenFolders(
 		if (name.startsWith('.')) {
 			await walkHiddenFolder(vault, subfolder, shouldIgnore, seen, result);
 		} else {
-			await walkForNestedHiddenFolders(vault, subfolder, shouldIgnore, seen, result);
+			await walkForNestedHiddenFolders(vault, subfolder, shouldIgnore, seen, result, depth + 1);
 		}
 	}
 }

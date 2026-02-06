@@ -72,8 +72,9 @@ describe('conflict naming helpers', () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
 
-		expect(getConflictFileName('notes/test.md')).toBe(
-			'notes/test (conflict 2026-01-02 03-04).md',
+		const name = getConflictFileName('notes/test.md');
+		expect(name).toMatch(
+			/^notes\/test \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)\.md$/,
 		);
 	});
 
@@ -81,16 +82,33 @@ describe('conflict naming helpers', () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
 
-		expect(getConflictFileName('README')).toBe(
-			'README (conflict 2026-01-02 03-04)',
+		const name = getConflictFileName('README');
+		expect(name).toMatch(
+			/^README \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)$/,
 		);
 	});
 
-	it('recognizes conflict file names', () => {
-		expect(isConflictFile('notes/test (conflict 2026-01-02 03-04).md')).toBe(
+	it('generates unique names on consecutive calls', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
+
+		const a = getConflictFileName('notes/test.md');
+		const b = getConflictFileName('notes/test.md');
+		// Random suffix makes collision extremely unlikely
+		expect(a).not.toBe(b);
+	});
+
+	it('recognizes new conflict file names', () => {
+		expect(isConflictFile('notes/test (conflict 2026-01-02 03-04-05 a1b2).md')).toBe(
 			true,
 		);
 		expect(isConflictFile('notes/test.md')).toBe(false);
+	});
+
+	it('recognizes old conflict file names (backward compat)', () => {
+		expect(isConflictFile('notes/test (conflict 2026-01-02 03-04).md')).toBe(
+			true,
+		);
 	});
 });
 
@@ -115,7 +133,7 @@ describe('createConflictCopy', () => {
 
 		const path = await createConflictCopy(vault, '.obsidian/config.json', content);
 
-		expect(path).toBe('.obsidian/config (conflict 2026-01-02 03-04).json');
+		expect(path).toMatch(/^\.obsidian\/config \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)\.json$/);
 		expect(vault.adapter.mkdir).toHaveBeenCalledWith('.obsidian');
 		expect(vault.adapter.writeBinary).toHaveBeenCalledWith(path, content);
 		expect(vault.createBinary).not.toHaveBeenCalled();
@@ -137,7 +155,7 @@ describe('createConflictCopy', () => {
 
 		const path = await createConflictCopy(vault, 'notes/test.md', content);
 
-		expect(path).toBe('notes/test (conflict 2026-01-02 03-04).md');
+		expect(path).toMatch(/^notes\/test \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)\.md$/);
 		expect(vault.createFolder).toHaveBeenCalledWith('notes');
 		expect(vault.createBinary).toHaveBeenCalledWith(path, content);
 		expect(vault.adapter.writeBinary).not.toHaveBeenCalled();

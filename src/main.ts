@@ -283,8 +283,7 @@ export default class CratePlugin extends Plugin {
 
 		// Sync on startup if enabled
 		if (this.settings.syncOnStartup) {
-			// Delay initial sync to let Obsidian fully load
-			setTimeout(() => this.sync(), 3000);
+			this.sync();
 		}
 	}
 

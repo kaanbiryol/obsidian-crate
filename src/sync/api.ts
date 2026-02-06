@@ -73,6 +73,7 @@ export class SyncApiClient {
 
 		const response = await fetch(url, {
 			...options,
+			signal: AbortSignal.timeout(30_000),
 			headers: {
 				'Authorization': `Bearer ${this.authToken}`,
 				'Content-Type': 'application/json',

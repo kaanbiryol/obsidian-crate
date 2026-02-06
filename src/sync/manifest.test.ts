@@ -7,6 +7,7 @@ function createMockAdapter() {
 		exists: vi.fn().mockResolvedValue(false),
 		read: vi.fn(),
 		write: vi.fn().mockResolvedValue(undefined),
+		remove: vi.fn().mockResolvedValue(undefined),
 	};
 }
 
@@ -32,7 +33,9 @@ describe('LocalManifest', () => {
 	});
 
 	it('loads persisted manifest data when file exists', async () => {
-		adapter.exists.mockResolvedValue(true);
+		adapter.exists.mockImplementation((path: string) =>
+			Promise.resolve(path.endsWith('file-manifest.json') && !path.endsWith('.tmp')),
+		);
 		adapter.read.mockResolvedValue(
 			JSON.stringify({
 				version: 1,
@@ -58,12 +61,35 @@ describe('LocalManifest', () => {
 	});
 
 	it('ignores malformed persisted shape and keeps defaults', async () => {
-		adapter.exists.mockResolvedValue(true);
+		adapter.exists.mockImplementation((path: string) =>
+			Promise.resolve(path.endsWith('file-manifest.json') && !path.endsWith('.tmp')),
+		);
 		adapter.read.mockResolvedValue(JSON.stringify({ invalid: true }));
 
 		await manifest.load();
 
 		expect(manifest.getManifest()).toEqual({ version: 1, files: {} });
+	});
+
+	it('recovers from tmp file when main file is corrupt', async () => {
+		const validManifest = JSON.stringify({
+			version: 1,
+			files: { 'a.md': { hash: 'h', size: 5, modified: '2026-01-01T00:00:00.000Z' } },
+		});
+		adapter.exists.mockImplementation((path: string) => Promise.resolve(true));
+		adapter.read.mockImplementation((path: string) => {
+			if (path.endsWith('.tmp')) return Promise.resolve(validManifest);
+			return Promise.resolve('{corrupt');
+		});
+
+		await manifest.load();
+
+		expect(manifest.getEntry('a.md')).toEqual({ hash: 'h', size: 5, modified: '2026-01-01T00:00:00.000Z' });
+		// Verify it promoted tmp to main
+		expect(adapter.write).toHaveBeenCalledWith(
+			'.obsidian/plugins/obsidian-crate/file-manifest.json',
+			expect.any(String),
+		);
 	});
 
 	it('does not write when manifest is not dirty', async () => {
@@ -81,7 +107,12 @@ describe('LocalManifest', () => {
 		await manifest.save();
 		await manifest.save();
 
-		expect(adapter.write).toHaveBeenCalledTimes(1);
+		// save writes tmp then main (2 writes per save), plus remove of tmp
+		expect(adapter.write).toHaveBeenCalledTimes(2);
+		expect(adapter.write).toHaveBeenCalledWith(
+			'.obsidian/plugins/obsidian-crate/file-manifest.json.tmp',
+			expect.any(String),
+		);
 		expect(adapter.write).toHaveBeenCalledWith(
 			'.obsidian/plugins/obsidian-crate/file-manifest.json',
 			expect.any(String),
@@ -99,8 +130,11 @@ describe('LocalManifest', () => {
 		manifest.removeEntry('note.md');
 		await manifest.save();
 
-		const writes = adapter.write.mock.calls;
-		const lastPayload = writes[writes.length - 1]?.[1];
+		// Find the last write to the main manifest path (not tmp)
+		const mainWrites = adapter.write.mock.calls.filter(
+			(call: [string, string]) => call[0].endsWith('file-manifest.json') && !call[0].endsWith('.tmp'),
+		);
+		const lastPayload = mainWrites[mainWrites.length - 1]?.[1];
 		expect(JSON.parse(lastPayload as string)).toEqual({
 			version: 1,
 			files: {},

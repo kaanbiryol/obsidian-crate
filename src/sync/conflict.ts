@@ -11,23 +11,27 @@ const logger = createLogger('Conflict');
 
 /**
  * Generate conflict file name
- * Format: filename (conflict YYYY-MM-DD HH-mm).ext
+ * Format: filename (conflict YYYY-MM-DD HH-mm-ss xxxx).ext
+ * Includes seconds and a 4-char random suffix to avoid collisions.
  */
 export function getConflictFileName(originalPath: string): string {
 	const now = new Date();
 	const timestamp = now.toISOString()
 		.replace('T', ' ')
 		.replace(/:/g, '-')
-		.substring(0, 16); // YYYY-MM-DD HH-mm
+		.substring(0, 19); // YYYY-MM-DD HH-mm-ss
+
+	const suffix = Math.random().toString(36).substring(2, 6);
+	const tag = `conflict ${timestamp} ${suffix}`;
 
 	const lastDot = originalPath.lastIndexOf('.');
 	if (lastDot === -1) {
-		return `${originalPath} (conflict ${timestamp})`;
+		return `${originalPath} (${tag})`;
 	}
 
 	const name = originalPath.substring(0, lastDot);
 	const ext = originalPath.substring(lastDot);
-	return `${name} (conflict ${timestamp})${ext}`;
+	return `${name} (${tag})${ext}`;
 }
 
 /**
@@ -145,5 +149,5 @@ export async function createConflictCopy(
  * Check if a file is a conflict copy
  */
 export function isConflictFile(path: string): boolean {
-	return /\(conflict \d{4}-\d{2}-\d{2} \d{2}-\d{2}\)/.test(path);
+	return /\(conflict \d{4}-\d{2}-\d{2} \d{2}-\d{2}(-\d{2}( [a-z0-9]{4})?)?\)/.test(path);
 }
