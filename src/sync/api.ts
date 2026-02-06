@@ -12,6 +12,7 @@ import type {
 	BatchDownloadResponse,
 	HealthResponse,
 	ChangesResponse,
+	CheckResponse,
 } from '../types';
 
 const logger = createLogger('ApiClient');
@@ -148,6 +149,13 @@ export class SyncApiClient {
 	 */
 	async getTombstones(): Promise<TombstoneStore> {
 		return this.request<TombstoneStore>('/sync/tombstones');
+	}
+
+	/**
+	 * Lightweight check for remote changes (returns only seq, no row data)
+	 */
+	async checkForChanges(since: number): Promise<CheckResponse> {
+		return this.request<CheckResponse>(`/sync/check?since=${since}`);
 	}
 
 	/**

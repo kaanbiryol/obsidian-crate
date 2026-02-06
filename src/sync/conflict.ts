@@ -5,6 +5,7 @@
 import type { Vault, TFile } from 'obsidian';
 import { createLogger } from '../logger';
 import type { FileEntry, FileDiff } from '../types';
+import { isHiddenPath } from './file-discovery';
 
 const logger = createLogger('Conflict');
 
@@ -106,7 +107,9 @@ export function detectConflicts(
 }
 
 /**
- * Create a conflict copy of a file
+ * Create a conflict copy of a file.
+ * Uses the low-level adapter for hidden paths (dot-prefixed) since
+ * Obsidian's vault API doesn't handle them.
  */
 export async function createConflictCopy(
 	vault: Vault,
@@ -118,14 +121,26 @@ export async function createConflictCopy(
 	// Create parent folders if needed
 	const folderPath = conflictPath.substring(0, conflictPath.lastIndexOf('/'));
 	if (folderPath) {
-		try {
-			await vault.createFolder(folderPath);
-		} catch {
-			// Folder might already exist
+		if (isHiddenPath(conflictPath)) {
+			try {
+				await vault.adapter.mkdir(folderPath);
+			} catch {
+				// Folder might already exist
+			}
+		} else {
+			try {
+				await vault.createFolder(folderPath);
+			} catch {
+				// Folder might already exist
+			}
 		}
 	}
 
-	await vault.createBinary(conflictPath, content);
+	if (isHiddenPath(conflictPath)) {
+		await vault.adapter.writeBinary(conflictPath, content);
+	} else {
+		await vault.createBinary(conflictPath, content);
+	}
 	logger.info('Created conflict copy:', conflictPath);
 	return conflictPath;
 }

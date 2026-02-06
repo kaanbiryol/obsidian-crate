@@ -66,6 +66,16 @@ async function handleHealth() {
 	return corsResponse({ status: 'ok', timestamp: new Date().toISOString() });
 }
 
+async function handleCheckChanges(request, db) {
+	if (!db) return corsResponse({ error: 'Changelog not available' }, 404);
+	await initDb(db);
+	const url = new URL(request.url);
+	const since = parseInt(url.searchParams.get('since') || '0', 10);
+	const row = await db.prepare('SELECT MAX(seq) as lastSeq FROM changelog').first();
+	const lastSeq = row?.lastSeq || 0;
+	return corsResponse({ lastSeq, hasChanges: lastSeq > since });
+}
+
 async function handleGetChanges(request, db) {
 	if (!db) return corsResponse({ error: 'Changelog not available' }, 404);
 
@@ -298,6 +308,7 @@ export default {
 
 		try {
 			if (path === '/health' && method === 'GET') return await handleHealth();
+			if (path === '/sync/check' && method === 'GET') return await handleCheckChanges(request, db);
 			if (path === '/sync/changes' && method === 'GET') return await handleGetChanges(request, db);
 			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(bucket, db);
 			if (path === '/sync/upload' && method === 'POST') return await handleUpload(request, bucket, db);

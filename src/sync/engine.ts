@@ -8,6 +8,8 @@ import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
 import { detectConflicts, createConflictCopy, isConflictFile } from './conflict';
+import { getAllVaultFiles, isHiddenPath, getExtensionFromPath, tfileToVaultFile } from './file-discovery';
+import type { VaultFile } from './file-discovery';
 import { createLogger } from '../logger';
 import type {
 	SyncState,
@@ -105,9 +107,31 @@ export class SyncEngine {
 			clearInterval(this.syncInterval);
 		}
 		this.syncInterval = setInterval(
-			() => this.sync(),
+			() => this.periodicCheck(),
 			this.settings.syncInterval * 1000
 		);
+	}
+
+	/**
+	 * Lightweight periodic check — only triggers full sync if remote has changes
+	 */
+	private async periodicCheck(): Promise<void> {
+		if (this.state.status === 'syncing') return;
+		if (!this.api.isConfigured()) return;
+
+		try {
+			const { hasChanges } = await this.api.checkForChanges(this.settings.lastSeq);
+
+			if (!hasChanges && this.pendingPaths.size === 0) {
+				logger.debug('Periodic check: no changes');
+				return;
+			}
+
+			logger.info('Periodic check: changes detected, running sync');
+			await this.sync();
+		} catch (error) {
+			logger.warn('Periodic check failed:', error instanceof Error ? error.message : 'Unknown error');
+		}
 	}
 
 	/**
@@ -147,8 +171,14 @@ export class SyncEngine {
 
 	/**
 	 * Simple glob pattern matching
+	 * Trailing-slash patterns (e.g. `.trash/`) match everything under that prefix.
 	 */
 	private matchPattern(path: string, pattern: string): boolean {
+		// Trailing-slash pattern: match the prefix and anything beneath it
+		if (pattern.endsWith('/')) {
+			return path.startsWith(pattern) || path === pattern.slice(0, -1);
+		}
+
 		// Convert glob pattern to regex
 		const regexPattern = pattern
 			.replace(/\./g, '\\.')
@@ -205,7 +235,7 @@ export class SyncEngine {
 
 		this.debounceTimer = setTimeout(() => {
 			this.processPendingChanges();
-		}, 2000); // DEBOUNCE_DELAY_MS
+		}, 10000); // DEBOUNCE_DELAY_MS
 	}
 
 	/**
@@ -232,10 +262,23 @@ export class SyncEngine {
 				} else {
 					const file = this.vault.getAbstractFileByPath(path);
 					if (file && 'extension' in file) {
-						const tfile = file as TFile;
-						const uploadFile = await this.prepareUpload(tfile);
+						const uploadFile = await this.prepareUpload(file as TFile);
 						if (uploadFile) {
 							uploads.push(uploadFile);
+						}
+					} else if (isHiddenPath(path)) {
+						// Hidden file not in Obsidian index — use adapter
+						const stat = await this.vault.adapter.stat(path);
+						if (stat && stat.type === 'file') {
+							const uploadFile = await this.prepareUploadFromVaultFile({
+								path,
+								size: stat.size,
+								mtime: stat.mtime,
+								extension: getExtensionFromPath(path),
+							});
+							if (uploadFile) {
+								uploads.push(uploadFile);
+							}
 						}
 					}
 				}
@@ -279,16 +322,24 @@ export class SyncEngine {
 	}
 
 	/**
-	 * Prepare a file for upload
+	 * Prepare a TFile for upload (delegates to VaultFile variant)
 	 */
 	private async prepareUpload(file: TFile): Promise<UploadFile | null> {
+		return this.prepareUploadFromVaultFile(tfileToVaultFile(file));
+	}
+
+	/**
+	 * Prepare a VaultFile for upload — works for both indexed and hidden files.
+	 * Reads content via the low-level adapter so hidden files are supported.
+	 */
+	private async prepareUploadFromVaultFile(file: VaultFile): Promise<UploadFile | null> {
 		// Check file size
-		if (file.stat.size > 5 * 1024 * 1024) { // MAX_FILE_SIZE_BYTES
+		if (file.size > 5 * 1024 * 1024) { // MAX_FILE_SIZE_BYTES
 			logger.warn('Skipping large file:', file.path);
 			return null;
 		}
 
-		const content = await this.vault.readBinary(file);
+		const content = await this.vault.adapter.readBinary(file.path);
 		const hash = await computeHash(content);
 
 		// Check if file actually changed
@@ -299,7 +350,8 @@ export class SyncEngine {
 
 		// Determine if binary
 		const textExtensions = ['md', 'txt', 'json', 'css', 'js', 'ts', 'html', 'xml', 'yaml', 'yml'];
-		const isBinary = !textExtensions.includes(file.extension.toLowerCase());
+		const ext = file.extension.toLowerCase();
+		const isBinary = !textExtensions.includes(ext);
 
 		let contentStr: string;
 		if (isBinary) {
@@ -320,7 +372,7 @@ export class SyncEngine {
 			path: file.path,
 			content: contentStr,
 			hash,
-			size: file.stat.size,
+			size: file.size,
 			binary: isBinary,
 			contentType: this.getContentType(file.extension),
 		};
@@ -413,20 +465,20 @@ export class SyncEngine {
 
 			logger.info(`Incremental sync: ${allChanges.length} remote changes since seq ${this.settings.lastSeq}`);
 
-			if (allChanges.length === 0) {
-				// Check for local-only changes
-				const localUploads = await this.getLocalChanges();
-				if (localUploads.length === 0) {
-					this.settings.lastSeq = latestSeq;
-					return {
-						success: true,
-						uploaded: 0,
-						downloaded: 0,
-						deleted: 0,
-						conflicts: [],
-						errors: [],
-					};
-				}
+			// Get local changes once, reuse for early-exit check and main logic
+			const localChanges = await this.getLocalChanges();
+			logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
+
+			if (allChanges.length === 0 && localChanges.length === 0) {
+				this.settings.lastSeq = latestSeq;
+				return {
+					success: true,
+					uploaded: 0,
+					downloaded: 0,
+					deleted: 0,
+					conflicts: [],
+					errors: [],
+				};
 			}
 
 			// Deduplicate: last entry per path wins
@@ -443,10 +495,6 @@ export class SyncEngine {
 				conflicts: [],
 				errors: [],
 			};
-
-			// Find locally modified files
-			const localChanges = await this.getLocalChanges();
-			logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
 			const localChangedPaths = new Set(localChanges.map(f => f.path));
 
 			// Process remote changes
@@ -458,26 +506,32 @@ export class SyncEngine {
 						const file = this.vault.getAbstractFileByPath(path);
 						if (file) {
 							await this.vault.delete(file);
-							this.localManifest.removeEntry(path);
-							result.deleted++;
+						} else if (await this.vault.adapter.exists(path)) {
+							// Hidden file not in index — remove via adapter
+							await this.vault.adapter.remove(path);
 						}
+						this.localManifest.removeEntry(path);
+						result.deleted++;
 					} else if (entry.action === 'put') {
 						const localFile = this.vault.getAbstractFileByPath(path);
 
-						if (!localFile) {
+						if (!localFile && !(isHiddenPath(path) && await this.vault.adapter.exists(path))) {
 							// No local file — download
 							await this.downloadAndSaveFile(path, result);
-						} else if ('extension' in localFile) {
-							const tfile = localFile as TFile;
-							const content = await this.vault.readBinary(tfile);
+						} else {
+							// File exists — read via adapter (works for both indexed and hidden)
+							const content = await this.vault.adapter.readBinary(path);
 							const localHash = await computeHash(content);
+							const stat = localFile && 'stat' in localFile
+								? (localFile as TFile).stat
+								: await this.vault.adapter.stat(path);
 
 							if (localHash === entry.hash) {
 								// Already matches — skip
 								this.localManifest.setEntry(path, {
 									hash: localHash,
-									size: tfile.stat.size,
-									modified: new Date(tfile.stat.mtime).toISOString(),
+									size: stat?.size ?? 0,
+									modified: new Date(stat?.mtime ?? Date.now()).toISOString(),
 								});
 							} else if (localChangedPaths.has(path)) {
 								// Conflict: both sides changed
@@ -508,17 +562,29 @@ export class SyncEngine {
 
 				try {
 					const tfile = this.vault.getAbstractFileByPath(file.path);
+					let uploadFile: UploadFile | null = null;
 					if (tfile && 'extension' in tfile) {
-						const uploadFile = await this.prepareUpload(tfile as TFile);
-						if (uploadFile) {
-							await this.api.uploadFiles([uploadFile]);
-							this.localManifest.setEntry(uploadFile.path, {
-								hash: uploadFile.hash,
-								size: uploadFile.size,
-								modified: new Date().toISOString(),
+						uploadFile = await this.prepareUpload(tfile as TFile);
+					} else if (isHiddenPath(file.path)) {
+						// Hidden file — use adapter
+						const stat = await this.vault.adapter.stat(file.path);
+						if (stat && stat.type === 'file') {
+							uploadFile = await this.prepareUploadFromVaultFile({
+								path: file.path,
+								size: stat.size,
+								mtime: stat.mtime,
+								extension: getExtensionFromPath(file.path),
 							});
-							result.uploaded++;
 						}
+					}
+					if (uploadFile) {
+						await this.api.uploadFiles([uploadFile]);
+						this.localManifest.setEntry(uploadFile.path, {
+							hash: uploadFile.hash,
+							size: uploadFile.size,
+							modified: new Date().toISOString(),
+						});
+						result.uploaded++;
 					}
 				} catch (error) {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -545,12 +611,13 @@ export class SyncEngine {
 		const changes: { path: string; hash: string }[] = [];
 		const lastSyncTime = this.settings.lastSync ? new Date(this.settings.lastSync).getTime() : 0;
 
-		for (const file of this.vault.getFiles()) {
-			if (this.shouldIgnore(file.path)) continue;
-			if (file.stat.size > 5 * 1024 * 1024) continue; // MAX_FILE_SIZE_BYTES
+		const allFiles = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
 
-			if (file.stat.mtime > lastSyncTime) {
-				const content = await this.vault.readBinary(file);
+		for (const file of allFiles) {
+			if (file.size > 5 * 1024 * 1024) continue; // MAX_FILE_SIZE_BYTES
+
+			if (file.mtime > lastSyncTime) {
+				const content = await this.vault.adapter.readBinary(file.path);
 				const hash = await computeHash(content);
 
 				if (!this.localManifest.hashMatches(file.path, hash)) {
@@ -572,18 +639,32 @@ export class SyncEngine {
 		// Create parent folders if needed
 		const folderPath = path.substring(0, path.lastIndexOf('/'));
 		if (folderPath) {
-			try {
-				await this.vault.createFolder(folderPath);
-			} catch {
-				// Folder might already exist
+			if (isHiddenPath(path)) {
+				// Use adapter.mkdir for hidden paths (vault.createFolder rejects dot-prefixed names)
+				try {
+					await this.vault.adapter.mkdir(folderPath);
+				} catch {
+					// Folder might already exist
+				}
+			} else {
+				try {
+					await this.vault.createFolder(folderPath);
+				} catch {
+					// Folder might already exist
+				}
 			}
 		}
 
-		const existingFile = this.vault.getAbstractFileByPath(path);
-		if (existingFile) {
-			await this.vault.modifyBinary(existingFile as TFile, content);
+		if (isHiddenPath(path)) {
+			// Hidden files: always use adapter
+			await this.vault.adapter.writeBinary(path, content);
 		} else {
-			await this.vault.createBinary(path, content);
+			const existingFile = this.vault.getAbstractFileByPath(path);
+			if (existingFile) {
+				await this.vault.modifyBinary(existingFile as TFile, content);
+			} else {
+				await this.vault.createBinary(path, content);
+			}
 		}
 
 		const hash = await computeHash(content);
@@ -651,19 +732,18 @@ export class SyncEngine {
 
 			// Build local manifest from current vault state
 			const localFiles: Record<string, FileEntry> = {};
-			const files = this.vault.getFiles();
+			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
 
 			for (const file of files) {
-				if (this.shouldIgnore(file.path)) continue;
-				if (file.stat.size > 5 * 1024 * 1024) continue; // MAX_FILE_SIZE_BYTES
+				if (file.size > 5 * 1024 * 1024) continue; // MAX_FILE_SIZE_BYTES
 
-				const content = await this.vault.readBinary(file);
+				const content = await this.vault.adapter.readBinary(file.path);
 				const hash = await computeHash(content);
 
 				localFiles[file.path] = {
 					hash,
-					size: file.stat.size,
-					modified: new Date(file.stat.mtime).toISOString(),
+					size: file.size,
+					modified: new Date(file.mtime).toISOString(),
 				};
 			}
 
@@ -713,6 +793,10 @@ export class SyncEngine {
 					await this.vault.delete(file);
 					this.localManifest.removeEntry(tombstone.path);
 					result.deleted++;
+				} else if (await this.vault.adapter.exists(tombstone.path)) {
+					await this.vault.adapter.remove(tombstone.path);
+					this.localManifest.removeEntry(tombstone.path);
+					result.deleted++;
 				}
 			}
 
@@ -759,49 +843,43 @@ export class SyncEngine {
 		localFiles: Record<string, FileEntry>,
 		result: SyncResult
 	): Promise<void> {
+		const hidden = isHiddenPath(diff.path);
+
 		switch (diff.action) {
 			case 'upload': {
 				const file = this.vault.getAbstractFileByPath(diff.path);
+				let uploadFile: UploadFile | null = null;
 				if (file && 'extension' in file) {
-					const uploadFile = await this.prepareUpload(file as TFile);
-					if (uploadFile) {
-						await this.api.uploadFiles([uploadFile]);
-						result.uploaded++;
+					uploadFile = await this.prepareUpload(file as TFile);
+				} else if (hidden) {
+					const stat = await this.vault.adapter.stat(diff.path);
+					if (stat && stat.type === 'file') {
+						uploadFile = await this.prepareUploadFromVaultFile({
+							path: diff.path,
+							size: stat.size,
+							mtime: stat.mtime,
+							extension: getExtensionFromPath(diff.path),
+						});
 					}
+				}
+				if (uploadFile) {
+					await this.api.uploadFiles([uploadFile]);
+					result.uploaded++;
 				}
 				break;
 			}
 
 			case 'download': {
-				const response = await this.api.downloadFile(diff.path);
-				const content = this.decodeContent(response.content, response.contentType);
-
-				// Create parent folders if needed
-				const folderPath = diff.path.substring(0, diff.path.lastIndexOf('/'));
-				if (folderPath) {
-					try {
-						await this.vault.createFolder(folderPath);
-					} catch {
-						// Folder might already exist
-					}
-				}
-
-				const existingFile = this.vault.getAbstractFileByPath(diff.path);
-				if (existingFile) {
-					await this.vault.modifyBinary(existingFile as TFile, content);
-				} else {
-					await this.vault.createBinary(diff.path, content);
-				}
+				await this.downloadAndSaveFile(diff.path, result);
 
 				// Update local files record
+				const content = await this.vault.adapter.readBinary(diff.path);
 				const hash = await computeHash(content);
 				localFiles[diff.path] = {
 					hash,
 					size: content.byteLength,
 					modified: new Date().toISOString(),
 				};
-
-				result.downloaded++;
 				break;
 			}
 
@@ -812,8 +890,11 @@ export class SyncEngine {
 
 				// Read local content
 				const localFile = this.vault.getAbstractFileByPath(diff.path);
-				if (localFile && 'extension' in localFile) {
-					const localContent = await this.vault.readBinary(localFile as TFile);
+				const hasLocalFile = localFile && 'extension' in localFile;
+				const hasHiddenFile = hidden && await this.vault.adapter.exists(diff.path);
+
+				if (hasLocalFile || hasHiddenFile) {
+					const localContent = await this.vault.adapter.readBinary(diff.path);
 
 					// Create conflict copy of local version
 					const conflictPath = await createConflictCopy(
@@ -823,7 +904,11 @@ export class SyncEngine {
 					);
 
 					// Replace main file with remote version
-					await this.vault.modifyBinary(localFile as TFile, remoteContent);
+					if (hasLocalFile) {
+						await this.vault.modifyBinary(localFile as TFile, remoteContent);
+					} else {
+						await this.vault.adapter.writeBinary(diff.path, remoteContent);
+					}
 
 					result.conflicts.push(conflictPath);
 
@@ -886,7 +971,7 @@ export class SyncEngine {
 		};
 
 		try {
-			const files = this.vault.getFiles().filter(f => !this.shouldIgnore(f.path));
+			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
 			logger.info(`Initial sync started with ${files.length} files`);
 			const total = files.length;
 			let current = 0;
@@ -894,7 +979,7 @@ export class SyncEngine {
 			// First pass: prepare all uploads sequentially (local I/O)
 			const prepared: UploadFile[] = [];
 			for (const file of files) {
-				const uploadFile = await this.prepareUpload(file);
+				const uploadFile = await this.prepareUploadFromVaultFile(file);
 				if (uploadFile) {
 					prepared.push(uploadFile);
 				}
@@ -993,7 +1078,7 @@ export class SyncEngine {
 			const remotePaths = new Set(Object.keys(remoteManifest.files));
 
 			// Get local files
-			const files = this.vault.getFiles().filter(f => !this.shouldIgnore(f.path));
+			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
 			const localPaths = new Set(files.map(f => f.path));
 
 			// Find remote-only paths (to be deleted)
@@ -1008,7 +1093,7 @@ export class SyncEngine {
 			// First pass: prepare all uploads sequentially (local I/O)
 			const prepared: UploadFile[] = [];
 			for (const file of files) {
-				const uploadFile = await this.prepareUpload(file);
+				const uploadFile = await this.prepareUploadFromVaultFile(file);
 				if (uploadFile) {
 					prepared.push(uploadFile);
 				}

@@ -80,6 +80,11 @@ export interface ChangesResponse {
 	hasMore: boolean;
 }
 
+export interface CheckResponse {
+	lastSeq: number;
+	hasChanges: boolean;
+}
+
 // ============================================================================
 // API Types
 // ============================================================================
@@ -150,9 +155,10 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 		'.obsidian/cache',
 		'.trash/',
 		'*.tmp',
+		'.DS_Store',
 	],
 	syncOnStartup: true,
-	syncInterval: 60,
+	syncInterval: 300,
 	showStatusBar: true,
 };
 
@@ -174,6 +180,6 @@ export const SECRET_KEYS = {
 } as const;
 
 export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
-export const DEBOUNCE_DELAY_MS = 2000;
+export const DEBOUNCE_DELAY_MS = 10000;
 export const TOMBSTONE_TTL_DAYS = 30;
 export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
