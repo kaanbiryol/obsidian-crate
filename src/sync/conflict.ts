@@ -37,7 +37,6 @@ export function detectConflicts(
 	localFiles: Record<string, FileEntry>,
 	remoteFiles: Record<string, FileEntry>,
 	lastSyncTime: string | null,
-	baseFiles?: Record<string, FileEntry>,
 ): FileDiff[] {
 	const diffs: FileDiff[] = [];
 	const allPaths = new Set([
@@ -52,64 +51,34 @@ export function detectConflicts(
 		if (local && remote) {
 			// Both exist - check for conflict or sync needed
 			if (local.hash !== remote.hash) {
-				const base = baseFiles?.[path];
-				if (base) {
-					const localChangedFromBase = local.hash !== base.hash;
-					const remoteChangedFromBase = remote.hash !== base.hash;
+				const localModified = new Date(local.modified);
+				const remoteModified = new Date(remote.modified);
+				const lastSync = lastSyncTime ? new Date(lastSyncTime) : new Date(0);
 
-					if (localChangedFromBase && remoteChangedFromBase) {
-						diffs.push({
-							path,
-							action: 'conflict',
-							localHash: local.hash,
-							remoteHash: remote.hash,
-						});
-					} else if (localChangedFromBase) {
-						diffs.push({
-							path,
-							action: 'upload',
-							localHash: local.hash,
-							remoteHash: remote.hash,
-						});
-					} else {
-						diffs.push({
-							path,
-							action: 'download',
-							localHash: local.hash,
-							remoteHash: remote.hash,
-						});
-					}
+				const localChangedAfterSync = localModified > lastSync;
+				const remoteChangedAfterSync = remoteModified > lastSync;
+
+				if (localChangedAfterSync && remoteChangedAfterSync) {
+					diffs.push({
+						path,
+						action: 'conflict',
+						localHash: local.hash,
+						remoteHash: remote.hash,
+					});
+				} else if (localChangedAfterSync) {
+					diffs.push({
+						path,
+						action: 'upload',
+						localHash: local.hash,
+						remoteHash: remote.hash,
+					});
 				} else {
-					// Fallback for first sync / missing base state.
-					const localModified = new Date(local.modified);
-					const remoteModified = new Date(remote.modified);
-					const lastSync = lastSyncTime ? new Date(lastSyncTime) : new Date(0);
-
-					const localChangedAfterSync = localModified > lastSync;
-					const remoteChangedAfterSync = remoteModified > lastSync;
-
-					if (localChangedAfterSync && remoteChangedAfterSync) {
-						diffs.push({
-							path,
-							action: 'conflict',
-							localHash: local.hash,
-							remoteHash: remote.hash,
-						});
-					} else if (localChangedAfterSync) {
-						diffs.push({
-							path,
-							action: 'upload',
-							localHash: local.hash,
-							remoteHash: remote.hash,
-						});
-					} else {
-						diffs.push({
-							path,
-							action: 'download',
-							localHash: local.hash,
-							remoteHash: remote.hash,
-						});
-					}
+					diffs.push({
+						path,
+						action: 'download',
+						localHash: local.hash,
+						remoteHash: remote.hash,
+					});
 				}
 			}
 			// If hashes match, files are in sync - no action needed

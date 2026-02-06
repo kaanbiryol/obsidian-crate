@@ -61,37 +61,6 @@ describe('detectConflicts', () => {
 		});
 	});
 
-	it('uses base hash to classify remote-only changes even with skewed timestamps', () => {
-		const diffs = detectConflicts(
-			{ 'note.md': entry('base', '2026-02-06T23:59:59.000Z') },
-			{ 'note.md': entry('remote', '2026-02-06T00:00:01.000Z') },
-			'2026-02-06T12:00:00.000Z',
-			{ 'note.md': entry('base', '2026-02-06T12:00:00.000Z') },
-		);
-
-		expect(diffs).toContainEqual({
-			path: 'note.md',
-			action: 'download',
-			localHash: 'base',
-			remoteHash: 'remote',
-		});
-	});
-
-	it('uses base hash to classify concurrent edits as conflict', () => {
-		const diffs = detectConflicts(
-			{ 'note.md': entry('local', '2026-02-06T10:00:00.000Z') },
-			{ 'note.md': entry('remote', '2026-02-06T10:00:00.000Z') },
-			'2026-02-06T09:00:00.000Z',
-			{ 'note.md': entry('base', '2026-02-06T08:00:00.000Z') },
-		);
-
-		expect(diffs).toContainEqual({
-			path: 'note.md',
-			action: 'conflict',
-			localHash: 'local',
-			remoteHash: 'remote',
-		});
-	});
 });
 
 describe('conflict naming helpers', () => {

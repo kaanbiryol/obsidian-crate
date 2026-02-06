@@ -8,6 +8,7 @@ export function getWorkerScript(): string {
 const TOMBSTONES_KEY = '.crate/tombstones.json';
 const FILES_PREFIX = 'files/';
 const TOMBSTONE_TTL_DAYS = 30;
+const UPLOAD_CONCURRENCY = 4;
 
 let dbReady = false;
 
@@ -28,6 +29,19 @@ async function appendChangelog(db, path, action, hash, size) {
 	await db.prepare(
 		'INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)'
 	).bind(path, action, hash || '', size || 0).run();
+}
+
+async function runConcurrent(items, concurrency, worker) {
+	const results = new Array(items.length);
+	let index = 0;
+	async function next() {
+		while (index < items.length) {
+			const i = index++;
+			results[i] = await worker(items[i], i);
+		}
+	}
+	await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => next()));
+	return results;
 }
 
 function corsHeaders() {
@@ -166,13 +180,18 @@ async function handleUpload(request, bucket, db) {
 		return corsResponse({ error: 'Invalid request: files array required' }, 400);
 	}
 
-	const results = [];
-	const uploadedPaths = [];
+	let changelogEnabled = Boolean(db);
+	if (changelogEnabled) {
+		try {
+			await initDb(db);
+		} catch (e) {
+			changelogEnabled = false;
+		}
+	}
 
-	for (const file of body.files) {
+	const outcomes = await runConcurrent(body.files, UPLOAD_CONCURRENCY, async file => {
 		if (!file.path || file.content === undefined) {
-			results.push({ path: file.path, error: 'Missing path or content' });
-			continue;
+			return { path: file.path, error: 'Missing path or content' };
 		}
 
 		try {
@@ -195,19 +214,23 @@ async function handleUpload(request, bucket, db) {
 				customMetadata: { hash: file.hash },
 			});
 
-			results.push({ path: file.path, success: true });
-			uploadedPaths.push(file.path);
-
-			if (db) {
+			if (changelogEnabled) {
 				try {
-					await initDb(db);
 					await appendChangelog(db, file.path, 'put', file.hash, file.size || 0);
 				} catch (e) { /* D1 failure is non-fatal */ }
 			}
+
+			return { path: file.path, success: true, uploaded: true };
 		} catch (err) {
-			results.push({ path: file.path, error: err.message });
+			const message = err && typeof err.message === 'string' ? err.message : String(err);
+			return { path: file.path, error: message };
 		}
-	}
+	});
+
+	const results = outcomes.map(({ uploaded, ...entry }) => entry);
+	const uploadedPaths = outcomes
+		.filter(entry => entry.uploaded && typeof entry.path === 'string')
+		.map(entry => entry.path);
 
 	await clearTombstonesForPaths(bucket, uploadedPaths);
 

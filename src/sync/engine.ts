@@ -26,7 +26,8 @@ import { DEBOUNCE_DELAY_MS, MAX_FILE_SIZE_BYTES } from '../types';
 const logger = createLogger('SyncEngine');
 const UPLOAD_CONCURRENCY = 5;
 const FORCE_SYNC_CONCURRENCY = 2;
-const PREPARE_CONCURRENCY = 3;
+const PREPARE_CONCURRENCY = 5;
+const INITIAL_SYNC_PIPELINE_CHUNK_FILES = 120;
 const MAX_UPLOAD_BATCH_FILES = 10;
 const MAX_UPLOAD_BATCH_BYTES = 5 * 1024 * 1024; // Keep well below Cloudflare request limits
 const MAX_RETRIES = 3;
@@ -922,13 +923,12 @@ export class SyncEngine {
 				};
 			}
 
-			// Detect differences using last synced hashes as the base (less clock-sensitive).
+			// Detect differences
 			const diffMap = new Map<string, FileDiff>();
 			for (const diff of detectConflicts(
 				localFiles,
 				remoteManifest.files,
 				this.state.lastSync,
-				this.localManifest.getManifest().files,
 			)) {
 				diffMap.set(diff.path, diff);
 			}
@@ -1349,6 +1349,15 @@ export class SyncEngine {
 		await this.runConcurrent(tasks, options.concurrency);
 	}
 
+	private createVaultFileChunks(files: VaultFile[], chunkSize: number): VaultFile[][] {
+		if (files.length === 0) return [];
+		const chunks: VaultFile[][] = [];
+		for (let i = 0; i < files.length; i += chunkSize) {
+			chunks.push(files.slice(i, i + chunkSize));
+		}
+		return chunks;
+	}
+
 	/**
 	 * Initial sync - upload all local files
 	 */
@@ -1379,17 +1388,36 @@ export class SyncEngine {
 			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
 			logger.info(`Initial sync started with ${files.length} files`);
 			const total = files.length;
-			const prepared = await this.prepareUploadsFromVaultFiles(files, current => {
-				progressCallback?.(current, total);
+			let preparedCount = 0;
+			let uploadCandidates = 0;
+
+			const chunks = this.createVaultFileChunks(files, INITIAL_SYNC_PIPELINE_CHUNK_FILES);
+			const prepareChunk = (chunk: VaultFile[]) => this.prepareUploadsFromVaultFiles(chunk, () => {
+				preparedCount++;
+				progressCallback?.(preparedCount, total);
 			});
 
-			logger.info(`Prepared ${prepared.length}/${total} files for upload (${total - prepared.length} unchanged)`);
+			let chunkIndex = 0;
+			let currentPrepare = chunks.length > 0 ? prepareChunk(chunks[0]!) : null;
+			while (currentPrepare) {
+				const preparedChunk = await currentPrepare;
+				uploadCandidates += preparedChunk.length;
 
-			// Second pass: upload in adaptive batches
-			await this.uploadPreparedFiles(prepared, result, {
-				concurrency: UPLOAD_CONCURRENCY,
-				retry: false,
-			});
+				chunkIndex++;
+				const nextChunk = chunkIndex < chunks.length ? chunks[chunkIndex]! : null;
+				const nextPrepare = nextChunk ? prepareChunk(nextChunk) : null;
+
+				if (preparedChunk.length > 0) {
+					await this.uploadPreparedFiles(preparedChunk, result, {
+						concurrency: UPLOAD_CONCURRENCY,
+						retry: true,
+					});
+				}
+
+				currentPrepare = nextPrepare;
+			}
+
+			logger.info(`Prepared ${uploadCandidates}/${total} files for upload (${total - uploadCandidates} unchanged)`);
 
 			await this.localManifest.save();
 
