@@ -89,4 +89,51 @@ describe('getAllVaultFiles', () => {
 		expect(files.find(f => f.path === '.gitignore')?.extension).toBe('');
 		expect(stat).not.toHaveBeenCalledWith('.obsidian/plugins/cache.db');
 	});
+
+	it('discovers hidden folders nested under non-hidden paths', async () => {
+		const indexedFiles = [
+			{
+				path: 'notes/a.md',
+				stat: { size: 100, mtime: 11 },
+				extension: 'md',
+			},
+		] as unknown as TFile[];
+
+		const list = vi.fn(async (folderPath: string) => {
+			if (folderPath === '') {
+				return {
+					files: [],
+					folders: ['notes'],
+				};
+			}
+			if (folderPath === 'notes') {
+				return {
+					files: ['notes/a.md'],
+					folders: ['notes/.config'],
+				};
+			}
+			if (folderPath === 'notes/.config') {
+				return {
+					files: ['notes/.config/local.json'],
+					folders: [],
+				};
+			}
+			return { files: [], folders: [] };
+		});
+
+		const stat = vi.fn(async (path: string) => {
+			if (path === 'notes/.config/local.json') {
+				return { type: 'file', size: 50, mtime: 44 };
+			}
+			return null;
+		});
+
+		const vault = {
+			getFiles: vi.fn(() => indexedFiles),
+			adapter: { list, stat },
+		} as unknown as Vault;
+
+		const files = await getAllVaultFiles(vault, () => false);
+		expect(files.map(f => f.path)).toContain('notes/.config/local.json');
+	});
 });

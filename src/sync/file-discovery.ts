@@ -83,6 +83,16 @@ export async function getAllVaultFiles(
 		await walkHiddenFolder(vault, folder, shouldIgnore, seen, result);
 	}
 
+	// Discover hidden subfolders nested under non-hidden roots (e.g. notes/.config/)
+	const visibleRootFolders = root.folders.filter(folder => {
+		const name = folder.split('/').pop() ?? '';
+		return !name.startsWith('.');
+	});
+	for (const folder of visibleRootFolders) {
+		if (shouldIgnore(folder) || shouldIgnore(folder + '/')) continue;
+		await walkForNestedHiddenFolders(vault, folder, shouldIgnore, seen, result);
+	}
+
 	// Include hidden files at the root level (e.g. `.gitignore`)
 	for (const filePath of root.files) {
 		const name = filePath.split('/').pop() ?? '';
@@ -134,5 +144,28 @@ async function walkHiddenFolder(
 	for (const subfolder of listing.folders) {
 		if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
 		await walkHiddenFolder(vault, subfolder, shouldIgnore, seen, result);
+	}
+}
+
+/**
+ * Walk non-hidden folders and recurse into hidden descendants only.
+ */
+async function walkForNestedHiddenFolders(
+	vault: Vault,
+	folderPath: string,
+	shouldIgnore: (path: string) => boolean,
+	seen: Set<string>,
+	result: VaultFile[],
+): Promise<void> {
+	const listing = await vault.adapter.list(folderPath);
+
+	for (const subfolder of listing.folders) {
+		if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
+		const name = subfolder.split('/').pop() ?? '';
+		if (name.startsWith('.')) {
+			await walkHiddenFolder(vault, subfolder, shouldIgnore, seen, result);
+		} else {
+			await walkForNestedHiddenFolders(vault, subfolder, shouldIgnore, seen, result);
+		}
 	}
 }

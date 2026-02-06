@@ -94,6 +94,7 @@ export interface UploadFile {
 	content: string;
 	hash: string;
 	size: number;
+	mtime?: number;
 	binary?: boolean;
 	contentType?: string;
 }
@@ -234,12 +235,6 @@ export const SECRET_KEYS = {
 } as const;
 
 export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
-export interface MergeResult {
-	success: boolean;
-	merged?: string;
-}
-
-export const MERGEABLE_EXTENSIONS = ['md', 'txt'] as const;
 
 export const DEBOUNCE_DELAY_MS = 10000;
 export const TOMBSTONE_TTL_DAYS = 30;

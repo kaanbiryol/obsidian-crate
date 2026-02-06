@@ -3,7 +3,7 @@
  */
 
 import type { Plugin, TFile, TAbstractFile, Vault } from 'obsidian';
-import { Notice, TFolder } from 'obsidian';
+import { TFolder } from 'obsidian';
 import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
@@ -20,9 +20,8 @@ import type {
 	FileEntry,
 	CrateSettings,
 	ChangelogEntry,
-	DEBOUNCE_DELAY_MS,
-	MAX_FILE_SIZE_BYTES,
 } from '../types';
+import { DEBOUNCE_DELAY_MS, MAX_FILE_SIZE_BYTES } from '../types';
 
 const logger = createLogger('SyncEngine');
 const UPLOAD_CONCURRENCY = 5;
@@ -167,14 +166,14 @@ export class SyncEngine {
 			return true;
 		}
 
-		// Ignore base cache files
+		// Ignore legacy merge cache artifacts if present.
 		if (path.startsWith('.obsidian/plugins/obsidian-crate/bases/')) {
 			return true;
 		}
 
 		for (const pattern of this.settings.ignorePatterns) {
 			if (this.matchPattern(path, pattern)) {
-				return true;
+					return true;
 			}
 		}
 		return false;
@@ -247,7 +246,7 @@ export class SyncEngine {
 
 		this.debounceTimer = setTimeout(() => {
 			this.processPendingChanges();
-		}, 10000); // DEBOUNCE_DELAY_MS
+		}, DEBOUNCE_DELAY_MS);
 	}
 
 	/**
@@ -296,27 +295,27 @@ export class SyncEngine {
 				}
 			}
 
-			// Upload changed files concurrently
-			if (uploads.length > 0) {
-				const uploadTasks = uploads.map(upload => async () => {
-					const response = await this.api.uploadFiles([upload]);
-					const uploadResult = response.results[0];
-					if (uploadResult?.success) {
-						this.localManifest.setEntry(upload.path, {
-							hash: upload.hash,
-							size: upload.size,
-							modified: new Date().toISOString(),
-						});
-					}
-				});
-				await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
-			}
+				// Upload changed files concurrently
+				if (uploads.length > 0) {
+					const uploadTasks = uploads.map(upload => async () => {
+						const response = await this.api.uploadFiles([upload]);
+						const uploadResult = response.results[0];
+						if (uploadResult?.success) {
+							this.localManifest.setEntry(upload.path, {
+								hash: upload.hash,
+								size: upload.size,
+								modified: await this.getModifiedIso(upload.path, upload.mtime),
+							});
+						}
+					});
+					await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
+				}
 
-			// Process deletes
-			for (const path of deletes) {
-				await this.api.deleteFile(path);
-				this.localManifest.removeEntry(path);
-			}
+				// Process deletes
+				for (const path of deletes) {
+					await this.api.deleteFile(path);
+					this.localManifest.removeEntry(path);
+				}
 
 			await this.localManifest.save();
 			this.updateState({
@@ -346,7 +345,7 @@ export class SyncEngine {
 	 */
 	private async prepareUploadFromVaultFile(file: VaultFile): Promise<UploadFile | null> {
 		// Check file size
-		if (file.size > 5 * 1024 * 1024) { // MAX_FILE_SIZE_BYTES
+		if (file.size > MAX_FILE_SIZE_BYTES) {
 			logger.warn('Skipping large file:', file.path);
 			return null;
 		}
@@ -385,6 +384,7 @@ export class SyncEngine {
 			content: contentStr,
 			hash,
 			size: file.size,
+			mtime: file.mtime,
 			binary: isBinary,
 			contentType: this.getContentType(file.extension),
 		};
@@ -451,6 +451,25 @@ export class SyncEngine {
 		return types[extension.toLowerCase()] || 'application/octet-stream';
 	}
 
+	private async getModifiedIso(path: string, fallbackMtime?: number): Promise<string> {
+		const stat = await this.vault.adapter.stat(path);
+		return new Date(stat?.mtime ?? fallbackMtime ?? Date.now()).toISOString();
+	}
+
+	private async getLocalDeletes(): Promise<string[]> {
+		const knownPaths = this.localManifest
+			.getAllPaths()
+			.filter(path => !this.shouldIgnore(path));
+
+		const tasks = knownPaths.map(path => async () => {
+			const exists = await this.vault.adapter.exists(path);
+			return exists ? null : path;
+		});
+
+		const results = await this.runConcurrent(tasks, PREPARE_CONCURRENCY);
+		return results.filter((path): path is string => path !== null);
+	}
+
 	/**
 	 * Incremental sync using changelog.
 	 * Returns SyncResult on success, or null to fall back to full sync.
@@ -471,17 +490,20 @@ export class SyncEngine {
 				latestSeq = response.lastSeq;
 
 				if (!response.hasMore) break;
+				if (response.changes.length === 0) break;
 				// Move cursor to last fetched seq for next page
 				since = response.changes[response.changes.length - 1]!.seq;
 			}
 
 			logger.info(`Incremental sync: ${allChanges.length} remote changes since seq ${this.settings.lastSeq}`);
 
-			// Get local changes once, reuse for early-exit check and main logic
+			// Get local changes/deletes once, reuse for early-exit check and main logic
 			const localChanges = await this.getLocalChanges();
+			const localDeletes = await this.getLocalDeletes();
 			logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
+			logger.info(`Incremental sync: ${localDeletes.length} local deletes detected`);
 
-			if (allChanges.length === 0 && localChanges.length === 0) {
+			if (allChanges.length === 0 && localChanges.length === 0 && localDeletes.length === 0) {
 				this.settings.lastSeq = latestSeq;
 				return {
 					success: true,
@@ -508,11 +530,8 @@ export class SyncEngine {
 				errors: [],
 			};
 			const localChangedPaths = new Set(localChanges.map(f => f.path));
-
-			// Count local changes that won't be skipped (not already in remote changeset)
-			const localOnlyChanges = localChanges.filter(f => !changesByPath.has(f.path) && !this.shouldIgnore(f.path));
-			const total = changesByPath.size + localOnlyChanges.length;
-			let current = 0;
+			const localDeletedPaths = new Set(localDeletes);
+			const resurrectPaths = new Set<string>();
 
 			// Categorize remote changes
 			const downloadPaths: string[] = [];
@@ -523,33 +542,64 @@ export class SyncEngine {
 
 				try {
 					if (entry.action === 'delete') {
+						// Keep local edits and resurrect remotely later rather than losing data.
+						if (localChangedPaths.has(path)) {
+							resurrectPaths.add(path);
+							result.conflicts.push(path);
+							continue;
+						}
+
 						const file = this.vault.getAbstractFileByPath(path);
+						let deletedLocally = false;
 						if (file) {
 							await this.vault.delete(file);
+							deletedLocally = true;
 						} else if (await this.vault.adapter.exists(path)) {
 							await this.vault.adapter.remove(path);
+							deletedLocally = true;
 						}
-						this.localManifest.removeEntry(path);
-						result.deleted++;
+							this.localManifest.removeEntry(path);
+						if (deletedLocally) {
+							result.deleted++;
+						}
 					} else if (entry.action === 'put') {
+						if (entry.size > MAX_FILE_SIZE_BYTES) {
+							result.errors.push(`${path}: Skipped remote file larger than 5MB`);
+							continue;
+						}
+
+						// Preserve local delete intent by writing incoming remote content as a conflict copy.
+						if (localDeletedPaths.has(path)) {
+							const response = await this.api.downloadFile(path);
+							const remoteContent = this.decodeContent(response.content, response.contentType);
+							const conflictPath = await createConflictCopy(this.vault, path, remoteContent);
+							result.conflicts.push(conflictPath);
+							continue;
+						}
+
 						const localFile = this.vault.getAbstractFileByPath(path);
 
 						if (!localFile && !(isHiddenPath(path) && await this.vault.adapter.exists(path))) {
 							downloadPaths.push(path);
 						} else {
-							const content = await this.vault.adapter.readBinary(path);
-							const localHash = await computeHash(content);
 							const stat = localFile && 'stat' in localFile
 								? (localFile as TFile).stat
 								: await this.vault.adapter.stat(path);
+							if ((stat?.size ?? 0) > MAX_FILE_SIZE_BYTES) {
+								result.errors.push(`${path}: Skipped local file larger than 5MB`);
+								continue;
+							}
+
+							const content = await this.vault.adapter.readBinary(path);
+							const localHash = await computeHash(content);
 
 							if (localHash === entry.hash) {
-								this.localManifest.setEntry(path, {
-									hash: localHash,
-									size: stat?.size ?? 0,
-									modified: new Date(stat?.mtime ?? Date.now()).toISOString(),
-								});
-							} else if (localChangedPaths.has(path)) {
+									this.localManifest.setEntry(path, {
+										hash: localHash,
+										size: stat?.size ?? 0,
+										modified: new Date(stat?.mtime ?? Date.now()).toISOString(),
+									});
+								} else if (localChangedPaths.has(path)) {
 								conflicts.push({
 									path,
 									action: 'conflict',
@@ -566,6 +616,16 @@ export class SyncEngine {
 					result.errors.push(`${path}: ${errorMessage}`);
 				}
 			}
+
+			// Count local changes/deletes that won't be skipped
+			const localOnlyChanges = localChanges.filter(
+				f => (!changesByPath.has(f.path) || resurrectPaths.has(f.path)) && !this.shouldIgnore(f.path),
+			);
+			const localOnlyDeletes = localDeletes.filter(
+				path => !changesByPath.has(path) && !this.shouldIgnore(path),
+			);
+			const total = changesByPath.size + localOnlyChanges.length + localOnlyDeletes.length;
+			let current = 0;
 
 			// Batch download remote files
 			if (downloadPaths.length > 0) {
@@ -619,6 +679,20 @@ export class SyncEngine {
 				retry: false,
 			});
 
+			// Propagate local deletions missed while offline/unloaded.
+			for (const path of localOnlyDeletes) {
+				try {
+					await this.api.deleteFile(path);
+					this.localManifest.removeEntry(path);
+					result.deleted++;
+				} catch (error) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					result.errors.push(`${path}: ${errorMessage}`);
+				}
+				current++;
+				progressCallback?.(current, total);
+			}
+
 			await this.localManifest.save();
 			this.settings.lastSeq = latestSeq;
 			result.success = result.errors.length === 0;
@@ -636,18 +710,22 @@ export class SyncEngine {
 	 */
 	private async getLocalChanges(): Promise<{ path: string; hash: string }[]> {
 		const changes: { path: string; hash: string }[] = [];
-		const lastSyncTime = this.settings.lastSync ? new Date(this.settings.lastSync).getTime() : 0;
-
 		const allFiles = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
 
-		const candidates = allFiles.filter(
-			file => file.size <= 5 * 1024 * 1024 && file.mtime > lastSyncTime
-		);
+		const candidates = allFiles.filter(file => {
+			if (file.size > MAX_FILE_SIZE_BYTES) return false;
+			const existing = this.localManifest.getEntry(file.path);
+			if (!existing) return true;
+			if (existing.size !== file.size) return true;
+			const manifestMtime = new Date(existing.modified).getTime();
+			return Number.isNaN(manifestMtime) || manifestMtime !== file.mtime;
+		});
 
 		const tasks = candidates.map(file => async () => {
 			const content = await this.vault.adapter.readBinary(file.path);
 			const hash = await computeHash(content);
-			if (!this.localManifest.hashMatches(file.path, hash)) {
+			const existing = this.localManifest.getEntry(file.path);
+			if (!existing || existing.hash !== hash) {
 				return { path: file.path, hash };
 			}
 			return null;
@@ -667,6 +745,10 @@ export class SyncEngine {
 	private async downloadAndSaveFile(path: string, result: SyncResult): Promise<void> {
 		const response = await this.api.downloadFile(path);
 		const content = this.decodeContent(response.content, response.contentType);
+		if (content.byteLength > MAX_FILE_SIZE_BYTES) {
+			result.errors.push(`${path}: Skipped remote file larger than 5MB`);
+			return;
+		}
 
 		// Create parent folders if needed
 		const folderPath = path.substring(0, path.lastIndexOf('/'));
@@ -703,13 +785,17 @@ export class SyncEngine {
 		this.localManifest.setEntry(path, {
 			hash,
 			size: content.byteLength,
-			modified: new Date().toISOString(),
+			modified: await this.getModifiedIso(path),
 		});
 
 		result.downloaded++;
 	}
 
 	private async saveDownloadedContent(path: string, content: ArrayBuffer): Promise<void> {
+		if (content.byteLength > MAX_FILE_SIZE_BYTES) {
+			throw new Error('Skipped remote file larger than 5MB');
+		}
+
 		const folderPath = path.substring(0, path.lastIndexOf('/'));
 		if (folderPath) {
 			if (isHiddenPath(path)) {
@@ -734,7 +820,7 @@ export class SyncEngine {
 		this.localManifest.setEntry(path, {
 			hash,
 			size: content.byteLength,
-			modified: new Date().toISOString(),
+			modified: await this.getModifiedIso(path),
 		});
 	}
 
@@ -743,17 +829,22 @@ export class SyncEngine {
 		for (let i = 0; i < paths.length; i += MAX_DOWNLOAD_BATCH) {
 			const batch = paths.slice(i, i + MAX_DOWNLOAD_BATCH);
 			const response = await this.api.batchDownload(batch);
-			for (const file of response.files) {
-				if (file.error || !file.content) {
-					result.errors.push(`${file.path}: ${file.error || 'Download failed'}`);
-					continue;
+				for (const file of response.files) {
+					if (file.error || !file.content) {
+						result.errors.push(`${file.path}: ${file.error || 'Download failed'}`);
+						continue;
+					}
+					try {
+						const content = this.decodeContent(file.content, file.contentType || 'application/octet-stream');
+						await this.saveDownloadedContent(file.path, content);
+						result.downloaded++;
+					} catch (error) {
+						const errorMessage = error instanceof Error ? error.message : 'Download failed';
+						result.errors.push(`${file.path}: ${errorMessage}`);
+					}
 				}
-				const content = this.decodeContent(file.content, file.contentType || 'application/octet-stream');
-				await this.saveDownloadedContent(file.path, content);
-				result.downloaded++;
 			}
 		}
-	}
 
 	/**
 	 * Full sync - compare manifests and sync all differences
@@ -811,9 +902,12 @@ export class SyncEngine {
 			// Build local manifest from current vault state
 			const localFiles: Record<string, FileEntry> = {};
 			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
+			const largeLocalPaths = new Set(
+				files.filter(file => file.size > MAX_FILE_SIZE_BYTES).map(file => file.path),
+			);
 
 			const hashTasks = files
-				.filter(file => file.size <= 5 * 1024 * 1024)
+				.filter(file => file.size <= MAX_FILE_SIZE_BYTES)
 				.map(file => async () => {
 					const content = await this.vault.adapter.readBinary(file.path);
 					const hash = await computeHash(content);
@@ -828,12 +922,51 @@ export class SyncEngine {
 				};
 			}
 
-			// Detect differences
-			const diffs = detectConflicts(
+			// Detect differences using last synced hashes as the base (less clock-sensitive).
+			const diffMap = new Map<string, FileDiff>();
+			for (const diff of detectConflicts(
 				localFiles,
 				remoteManifest.files,
-				this.state.lastSync
-			);
+				this.state.lastSync,
+				this.localManifest.getManifest().files,
+			)) {
+				diffMap.set(diff.path, diff);
+			}
+
+			// Reconcile local deletions that happened while the plugin was offline/unloaded.
+			const localDeletes = await this.getLocalDeletes();
+			const lastSyncTime = this.state.lastSync ? new Date(this.state.lastSync).getTime() : 0;
+			for (const path of localDeletes) {
+				const remoteEntry = remoteManifest.files[path];
+				if (!remoteEntry) {
+					this.localManifest.removeEntry(path);
+					continue;
+				}
+				const remoteModified = new Date(remoteEntry.modified).getTime();
+				if (!Number.isNaN(remoteModified) && remoteModified <= lastSyncTime) {
+					diffMap.set(path, { path, action: 'delete', remoteHash: remoteEntry.hash });
+				}
+			}
+
+			// Enforce size limits defensively to avoid accidental overwrites of unsupported files.
+			for (const [path, diff] of [...diffMap.entries()]) {
+				const remoteEntry = remoteManifest.files[path];
+				if (largeLocalPaths.has(path)) {
+					result.errors.push(`${path}: Skipped local file larger than 5MB`);
+					diffMap.delete(path);
+					continue;
+				}
+				if (remoteEntry && remoteEntry.size > MAX_FILE_SIZE_BYTES) {
+					result.errors.push(`${path}: Skipped remote file larger than 5MB`);
+					diffMap.delete(path);
+					continue;
+				}
+				if (diff.action === 'download' && !remoteEntry) {
+					diffMap.delete(path);
+				}
+			}
+
+			const diffs = [...diffMap.values()];
 
 			// Process differences — uploads concurrent, downloads batched, rest sequential
 			const uploadDiffs = diffs.filter(d => d.action === 'upload');
@@ -861,28 +994,28 @@ export class SyncEngine {
 			}
 
 			// Batch download diffs
-			if (downloadDiffs.length > 0) {
-				await this.batchDownloadAndSaveFiles(
-					downloadDiffs.map(d => d.path),
-					result,
-				);
-				// Update localFiles record for downloaded files
-				for (const diff of downloadDiffs) {
-					try {
-						const content = await this.vault.adapter.readBinary(diff.path);
-						const hash = await computeHash(content);
-						localFiles[diff.path] = {
-							hash,
-							size: content.byteLength,
-							modified: new Date().toISOString(),
-						};
-					} catch {
-						// File may have failed to download; error already recorded
+				if (downloadDiffs.length > 0) {
+					await this.batchDownloadAndSaveFiles(
+						downloadDiffs.map(d => d.path),
+						result,
+					);
+					// Update localFiles record for downloaded files
+					for (const diff of downloadDiffs) {
+						try {
+							const content = await this.vault.adapter.readBinary(diff.path);
+							const hash = await computeHash(content);
+							localFiles[diff.path] = {
+								hash,
+								size: content.byteLength,
+								modified: await this.getModifiedIso(diff.path),
+							};
+						} catch {
+							// File may have failed to download; error already recorded
+						}
 					}
+					current += downloadDiffs.length;
+					progressCallback?.(current, total);
 				}
-				current += downloadDiffs.length;
-				progressCallback?.(current, total);
-			}
 
 			// Process conflict and delete diffs sequentially
 			const remainingDiffs = diffs.filter(d => d.action === 'conflict' || d.action === 'delete');
@@ -900,17 +1033,22 @@ export class SyncEngine {
 			// Get and process tombstones
 			const tombstones = await this.api.getTombstones();
 			for (const tombstone of tombstones.deleted) {
+				// Ignore stale tombstones for paths that currently exist remotely.
+				if (remoteManifest.files[tombstone.path]) {
+					continue;
+				}
+
 				const file = this.vault.getAbstractFileByPath(tombstone.path);
 				if (file) {
 					await this.vault.delete(file);
-					this.localManifest.removeEntry(tombstone.path);
-					result.deleted++;
-				} else if (await this.vault.adapter.exists(tombstone.path)) {
-					await this.vault.adapter.remove(tombstone.path);
-					this.localManifest.removeEntry(tombstone.path);
-					result.deleted++;
+						this.localManifest.removeEntry(tombstone.path);
+						result.deleted++;
+					} else if (await this.vault.adapter.exists(tombstone.path)) {
+						await this.vault.adapter.remove(tombstone.path);
+						this.localManifest.removeEntry(tombstone.path);
+						result.deleted++;
+					}
 				}
-			}
 
 			// Update local manifest
 			for (const [path, entry] of Object.entries(localFiles)) {
@@ -975,8 +1113,21 @@ export class SyncEngine {
 					}
 				}
 				if (uploadFile) {
-					await this.api.uploadFiles([uploadFile]);
+					const response = await this.api.uploadFiles([uploadFile]);
+					const uploadResult = response.results.find(entry => entry.path === uploadFile.path);
+					if (!uploadResult?.success) {
+						throw new Error(uploadResult?.error || 'Upload failed');
+					}
+
 					result.uploaded++;
+					const modified = await this.getModifiedIso(uploadFile.path, uploadFile.mtime);
+					const entry: FileEntry = {
+						hash: uploadFile.hash,
+						size: uploadFile.size,
+						modified,
+					};
+					this.localManifest.setEntry(uploadFile.path, entry);
+					localFiles[uploadFile.path] = entry;
 				}
 				break;
 			}
@@ -990,7 +1141,7 @@ export class SyncEngine {
 				localFiles[diff.path] = {
 					hash,
 					size: content.byteLength,
-					modified: new Date().toISOString(),
+					modified: await this.getModifiedIso(diff.path),
 				};
 				break;
 			}
@@ -999,6 +1150,9 @@ export class SyncEngine {
 				// Download remote version
 				const response = await this.api.downloadFile(diff.path);
 				const remoteContent = this.decodeContent(response.content, response.contentType);
+				if (remoteContent.byteLength > MAX_FILE_SIZE_BYTES) {
+					throw new Error('Skipped remote file larger than 5MB');
+				}
 
 				// Read local content
 				const localFile = this.vault.getAbstractFileByPath(diff.path);
@@ -1007,6 +1161,7 @@ export class SyncEngine {
 
 				if (hasLocalFile || hasHiddenFile) {
 					const localContent = await this.vault.adapter.readBinary(diff.path);
+
 					// Create conflict copy of local version and keep remote at original path.
 					const conflictPath = await createConflictCopy(
 						this.vault,
@@ -1025,21 +1180,24 @@ export class SyncEngine {
 
 					// Update local files record to the remote replacement.
 					const hash = await computeHash(remoteContent);
-					localFiles[diff.path] = {
-						hash,
-						size: remoteContent.byteLength,
-						modified: new Date().toISOString(),
-					};
+						const entry: FileEntry = {
+							hash,
+							size: remoteContent.byteLength,
+							modified: await this.getModifiedIso(diff.path),
+						};
+						localFiles[diff.path] = entry;
+						this.localManifest.setEntry(diff.path, entry);
+					}
+					break;
 				}
-				break;
-			}
 
-			case 'delete': {
-				await this.api.deleteFile(diff.path);
-				delete localFiles[diff.path];
-				result.deleted++;
-				break;
-			}
+				case 'delete': {
+					await this.api.deleteFile(diff.path);
+					delete localFiles[diff.path];
+					this.localManifest.removeEntry(diff.path);
+					result.deleted++;
+					break;
+				}
 		}
 	}
 
@@ -1156,18 +1314,18 @@ export class SyncEngine {
 	): Promise<void> {
 		const resultsByPath = new Map(response.results.map(entry => [entry.path, entry]));
 
-		for (const upload of batch) {
-			const uploadResult = resultsByPath.get(upload.path);
-			if (uploadResult?.success) {
-				result.uploaded++;
-				this.localManifest.setEntry(upload.path, {
-					hash: upload.hash,
-					size: upload.size,
-					modified: new Date().toISOString(),
-				});
-			} else if (uploadResult?.error) {
-				result.errors.push(`${upload.path}: ${uploadResult.error}`);
-			} else {
+			for (const upload of batch) {
+				const uploadResult = resultsByPath.get(upload.path);
+				if (uploadResult?.success) {
+					result.uploaded++;
+					this.localManifest.setEntry(upload.path, {
+						hash: upload.hash,
+						size: upload.size,
+						modified: await this.getModifiedIso(upload.path, upload.mtime),
+					});
+				} else if (uploadResult?.error) {
+					result.errors.push(`${upload.path}: ${uploadResult.error}`);
+				} else {
 				result.errors.push(`${upload.path}: Upload failed`);
 			}
 		}
@@ -1327,18 +1485,19 @@ export class SyncEngine {
 				retry: true,
 			});
 
-			// Delete remote-only files
-			for (const path of remoteOnlyPaths) {
-				try {
-					await this.api.deleteFile(path);
-					result.deleted++;
-				} catch (error) {
-					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-					result.errors.push(`delete ${path}: ${errorMessage}`);
+				// Delete remote-only files
+				for (const path of remoteOnlyPaths) {
+					try {
+						await this.api.deleteFile(path);
+						this.localManifest.removeEntry(path);
+						result.deleted++;
+					} catch (error) {
+						const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+						result.errors.push(`delete ${path}: ${errorMessage}`);
+					}
+					current++;
+					progressCallback?.(current, total);
 				}
-				current++;
-				progressCallback?.(current, total);
-			}
 
 			await this.localManifest.save();
 

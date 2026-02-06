@@ -15,13 +15,8 @@ const SCOPES = [
 	'account:read',
 	'user:read',
 	'workers:write',
-	'workers_kv:write',
-	'workers_routes:write',
 	'workers_scripts:write',
-	'workers_tail:read',
 	'd1:write',
-	'pages:write',
-	'zone:read',
 	'offline_access',
 ];
 
@@ -252,7 +247,7 @@ export async function performOAuthLogin(openBrowser: (url: string) => Promise<vo
 			reject(new Error(`Failed to start OAuth callback server: ${error.message}`));
 		});
 
-		server.listen(REDIRECT_PORT, async () => {
+		server.listen(REDIRECT_PORT, '127.0.0.1', async () => {
 			try {
 				await openBrowser(authUrl);
 			} catch {

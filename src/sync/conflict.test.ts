@@ -5,7 +5,6 @@ import {
 	detectConflicts,
 	getConflictFileName,
 	isConflictFile,
-	isMergeableFile,
 } from './conflict';
 
 function entry(hash: string, modified: string) {
@@ -15,28 +14,6 @@ function entry(hash: string, modified: string) {
 		modified,
 	};
 }
-
-describe('isMergeableFile', () => {
-	it('returns true for .md files', () => {
-		expect(isMergeableFile('notes/test.md')).toBe(true);
-	});
-
-	it('returns true for .txt files', () => {
-		expect(isMergeableFile('notes/test.txt')).toBe(true);
-	});
-
-	it('returns false for .png files', () => {
-		expect(isMergeableFile('images/photo.png')).toBe(false);
-	});
-
-	it('returns false for .json files', () => {
-		expect(isMergeableFile('data.json')).toBe(false);
-	});
-
-	it('returns false for files without extension', () => {
-		expect(isMergeableFile('no-extension')).toBe(false);
-	});
-});
 
 describe('detectConflicts', () => {
 	it('returns conflict when local and remote changed after last sync', () => {
@@ -79,6 +56,38 @@ describe('detectConflicts', () => {
 		expect(diffs).toContainEqual({
 			path: 'note.md',
 			action: 'download',
+			localHash: 'local',
+			remoteHash: 'remote',
+		});
+	});
+
+	it('uses base hash to classify remote-only changes even with skewed timestamps', () => {
+		const diffs = detectConflicts(
+			{ 'note.md': entry('base', '2026-02-06T23:59:59.000Z') },
+			{ 'note.md': entry('remote', '2026-02-06T00:00:01.000Z') },
+			'2026-02-06T12:00:00.000Z',
+			{ 'note.md': entry('base', '2026-02-06T12:00:00.000Z') },
+		);
+
+		expect(diffs).toContainEqual({
+			path: 'note.md',
+			action: 'download',
+			localHash: 'base',
+			remoteHash: 'remote',
+		});
+	});
+
+	it('uses base hash to classify concurrent edits as conflict', () => {
+		const diffs = detectConflicts(
+			{ 'note.md': entry('local', '2026-02-06T10:00:00.000Z') },
+			{ 'note.md': entry('remote', '2026-02-06T10:00:00.000Z') },
+			'2026-02-06T09:00:00.000Z',
+			{ 'note.md': entry('base', '2026-02-06T08:00:00.000Z') },
+		);
+
+		expect(diffs).toContainEqual({
+			path: 'note.md',
+			action: 'conflict',
 			localHash: 'local',
 			remoteHash: 'remote',
 		});

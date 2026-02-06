@@ -100,4 +100,9 @@ describe('SyncApiClient', () => {
 			error: 'HTTP 500: boom',
 		});
 	});
+
+	it('rejects insecure non-local worker URLs', () => {
+		const client = new SyncApiClient('http://worker.example', 'token');
+		expect(client.isConfigured()).toBe(false);
+	});
 });

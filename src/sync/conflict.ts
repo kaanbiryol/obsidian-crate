@@ -5,7 +5,6 @@
 import type { Vault, TFile } from 'obsidian';
 import { createLogger } from '../logger';
 import type { FileEntry, FileDiff } from '../types';
-import { MERGEABLE_EXTENSIONS } from '../types';
 import { isHiddenPath } from './file-discovery';
 
 const logger = createLogger('Conflict');
@@ -37,7 +36,8 @@ export function getConflictFileName(originalPath: string): string {
 export function detectConflicts(
 	localFiles: Record<string, FileEntry>,
 	remoteFiles: Record<string, FileEntry>,
-	lastSyncTime: string | null
+	lastSyncTime: string | null,
+	baseFiles?: Record<string, FileEntry>,
 ): FileDiff[] {
 	const diffs: FileDiff[] = [];
 	const allPaths = new Set([
@@ -52,38 +52,64 @@ export function detectConflicts(
 		if (local && remote) {
 			// Both exist - check for conflict or sync needed
 			if (local.hash !== remote.hash) {
-				// Hashes differ - determine if conflict or one-way sync
-				const localModified = new Date(local.modified);
-				const remoteModified = new Date(remote.modified);
-				const lastSync = lastSyncTime ? new Date(lastSyncTime) : new Date(0);
+				const base = baseFiles?.[path];
+				if (base) {
+					const localChangedFromBase = local.hash !== base.hash;
+					const remoteChangedFromBase = remote.hash !== base.hash;
 
-				const localChangedAfterSync = localModified > lastSync;
-				const remoteChangedAfterSync = remoteModified > lastSync;
-
-				if (localChangedAfterSync && remoteChangedAfterSync) {
-					// Both changed since last sync - conflict
-					diffs.push({
-						path,
-						action: 'conflict',
-						localHash: local.hash,
-						remoteHash: remote.hash,
-					});
-				} else if (localChangedAfterSync) {
-					// Only local changed - upload
-					diffs.push({
-						path,
-						action: 'upload',
-						localHash: local.hash,
-						remoteHash: remote.hash,
-					});
+					if (localChangedFromBase && remoteChangedFromBase) {
+						diffs.push({
+							path,
+							action: 'conflict',
+							localHash: local.hash,
+							remoteHash: remote.hash,
+						});
+					} else if (localChangedFromBase) {
+						diffs.push({
+							path,
+							action: 'upload',
+							localHash: local.hash,
+							remoteHash: remote.hash,
+						});
+					} else {
+						diffs.push({
+							path,
+							action: 'download',
+							localHash: local.hash,
+							remoteHash: remote.hash,
+						});
+					}
 				} else {
-					// Remote is newer or both unchanged (trust remote)
-					diffs.push({
-						path,
-						action: 'download',
-						localHash: local.hash,
-						remoteHash: remote.hash,
-					});
+					// Fallback for first sync / missing base state.
+					const localModified = new Date(local.modified);
+					const remoteModified = new Date(remote.modified);
+					const lastSync = lastSyncTime ? new Date(lastSyncTime) : new Date(0);
+
+					const localChangedAfterSync = localModified > lastSync;
+					const remoteChangedAfterSync = remoteModified > lastSync;
+
+					if (localChangedAfterSync && remoteChangedAfterSync) {
+						diffs.push({
+							path,
+							action: 'conflict',
+							localHash: local.hash,
+							remoteHash: remote.hash,
+						});
+					} else if (localChangedAfterSync) {
+						diffs.push({
+							path,
+							action: 'upload',
+							localHash: local.hash,
+							remoteHash: remote.hash,
+						});
+					} else {
+						diffs.push({
+							path,
+							action: 'download',
+							localHash: local.hash,
+							remoteHash: remote.hash,
+						});
+					}
 				}
 			}
 			// If hashes match, files are in sync - no action needed
@@ -151,12 +177,4 @@ export async function createConflictCopy(
  */
 export function isConflictFile(path: string): boolean {
 	return /\(conflict \d{4}-\d{2}-\d{2} \d{2}-\d{2}\)/.test(path);
-}
-
-/**
- * Check if a file's extension supports 3-way text merge
- */
-export function isMergeableFile(path: string): boolean {
-	const ext = path.split('.').pop()?.toLowerCase() ?? '';
-	return (MERGEABLE_EXTENSIONS as readonly string[]).includes(ext);
 }

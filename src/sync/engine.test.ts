@@ -39,6 +39,9 @@ type Harness = {
 		load: ReturnType<typeof vi.fn>;
 		save: ReturnType<typeof vi.fn>;
 		hashMatches: ReturnType<typeof vi.fn>;
+		getEntry: ReturnType<typeof vi.fn>;
+		getAllPaths: ReturnType<typeof vi.fn>;
+		getManifest: ReturnType<typeof vi.fn>;
 		setEntry: ReturnType<typeof vi.fn>;
 		removeEntry: ReturnType<typeof vi.fn>;
 		clear: ReturnType<typeof vi.fn>;
@@ -112,13 +115,25 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 
 	const engine = new SyncEngine(plugin as never, api as never, settings);
 
+	const manifestFiles: Record<string, { hash: string; size: number; modified: string }> = {};
 	const localManifest = {
 		load: vi.fn(),
 		save: vi.fn(),
-		hashMatches: vi.fn().mockReturnValue(false),
-		setEntry: vi.fn(),
-		removeEntry: vi.fn(),
-		clear: vi.fn(),
+		hashMatches: vi.fn((path: string, hash: string) => manifestFiles[path]?.hash === hash),
+		getEntry: vi.fn((path: string) => manifestFiles[path]),
+		getAllPaths: vi.fn(() => Object.keys(manifestFiles)),
+		getManifest: vi.fn(() => ({ version: 1, files: { ...manifestFiles } })),
+		setEntry: vi.fn((path: string, entry: { hash: string; size: number; modified: string }) => {
+			manifestFiles[path] = entry;
+		}),
+		removeEntry: vi.fn((path: string) => {
+			delete manifestFiles[path];
+		}),
+		clear: vi.fn(() => {
+			for (const path of Object.keys(manifestFiles)) {
+				delete manifestFiles[path];
+			}
+		}),
 	};
 
 	(engine as any).localManifest = localManifest;
@@ -140,14 +155,9 @@ describe('SyncEngine pattern/ignore behavior', () => {
 		expect((harness.engine as any).matchPattern('notes/file.md', '*.tmp')).toBe(false);
 	});
 
-	it('always ignores conflict files and base-cache paths', () => {
+	it('always ignores conflict files', () => {
 		expect(
 			(harness.engine as any).shouldIgnore('notes/a (conflict 2026-01-02 03-04).md'),
-		).toBe(true);
-		expect(
-			(harness.engine as any).shouldIgnore(
-				'.obsidian/plugins/obsidian-crate/bases/notes/a.md',
-			),
 		).toBe(true);
 		expect((harness.engine as any).shouldIgnore('notes/file.tmp')).toBe(true);
 		expect((harness.engine as any).shouldIgnore('notes/file.md')).toBe(false);
@@ -359,6 +369,66 @@ describe('SyncEngine incrementalSync', () => {
 		);
 		expect(harness.localManifest.save).toHaveBeenCalledTimes(1);
 		expect(harness.settings.lastSeq).toBe(9);
+	});
+
+	it('keeps local edits when remote delete arrives and re-uploads the path', async () => {
+		const harness = createHarness({ lastSeq: 10 });
+		harness.api.getChanges.mockResolvedValue({
+			changes: [
+				{
+					seq: 11,
+					path: 'notes/live.md',
+					action: 'delete',
+					hash: '',
+					size: 0,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 11,
+			hasMore: false,
+		});
+		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([
+			{ path: 'notes/live.md', hash: 'local-hash' },
+		]);
+		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		harness.vault.getAbstractFileByPath.mockReturnValue({
+			path: 'notes/live.md',
+			extension: 'md',
+			stat: { size: 9, mtime: 1700000000000 },
+		});
+		harness.vault.adapter.readBinary.mockResolvedValue(
+			new TextEncoder().encode('keep local').buffer as ArrayBuffer,
+		);
+		harness.api.uploadFiles.mockResolvedValue({
+			success: true,
+			results: [{ path: 'notes/live.md', success: true }],
+		});
+
+		const result = await (harness.engine as any).incrementalSync();
+
+		expect(harness.api.deleteFile).not.toHaveBeenCalled();
+		expect(harness.api.uploadFiles).toHaveBeenCalledTimes(1);
+		expect(result?.conflicts).toContain('notes/live.md');
+		expect(result?.uploaded).toBe(1);
+	});
+
+	it('propagates locally deleted files even when no remote changes exist', async () => {
+		const harness = createHarness({ lastSeq: 5 });
+		harness.api.getChanges.mockResolvedValue({
+			changes: [],
+			lastSeq: 6,
+			hasMore: false,
+		});
+		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
+		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue(['notes/deleted.md']);
+		harness.api.deleteFile.mockResolvedValue({ success: true, path: 'notes/deleted.md' });
+
+		const result = await (harness.engine as any).incrementalSync();
+
+		expect(harness.api.deleteFile).toHaveBeenCalledWith('notes/deleted.md');
+		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/deleted.md');
+		expect(result?.deleted).toBe(1);
+		expect(harness.settings.lastSeq).toBe(6);
 	});
 });
 

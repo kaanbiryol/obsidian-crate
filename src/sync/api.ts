@@ -23,7 +23,7 @@ export class SyncApiClient {
 	private authToken: string;
 
 	constructor(workerUrl: string, authToken: string) {
-		this.workerUrl = workerUrl.replace(/\/$/, ''); // Remove trailing slash
+		this.workerUrl = this.normalizeWorkerUrl(workerUrl);
 		this.authToken = authToken;
 	}
 
@@ -31,8 +31,27 @@ export class SyncApiClient {
 	 * Update credentials (e.g., after settings change)
 	 */
 	updateCredentials(workerUrl: string, authToken: string): void {
-		this.workerUrl = workerUrl.replace(/\/$/, '');
+		this.workerUrl = this.normalizeWorkerUrl(workerUrl);
 		this.authToken = authToken;
+	}
+
+	private normalizeWorkerUrl(workerUrl: string): string {
+		const raw = workerUrl.trim();
+		if (!raw) return '';
+
+		try {
+			const parsed = new URL(raw);
+			const isLocalhost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(parsed.hostname);
+			const isSecure = parsed.protocol === 'https:' || (parsed.protocol === 'http:' && isLocalhost);
+			if (!isSecure) {
+				logger.warn(`Rejected worker URL with insecure protocol: ${parsed.protocol}`);
+				return '';
+			}
+			return parsed.toString().replace(/\/$/, '');
+		} catch {
+			logger.warn('Rejected invalid worker URL');
+			return '';
+		}
 	}
 
 	/**

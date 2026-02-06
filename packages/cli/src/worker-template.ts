@@ -71,6 +71,31 @@ async function getTombstones(bucket) {
 	return await obj.json();
 }
 
+function pruneTombstones(tombstones, now) {
+	tombstones.deleted = tombstones.deleted.filter(
+		t => new Date(t.expiresAt) > now
+	);
+}
+
+async function saveTombstones(bucket, tombstones) {
+	await bucket.put(TOMBSTONES_KEY, JSON.stringify(tombstones), {
+		httpMetadata: { contentType: 'application/json' },
+	});
+}
+
+async function clearTombstonesForPaths(bucket, paths) {
+	if (!paths.length) return;
+	const tombstones = await getTombstones(bucket);
+	const now = new Date();
+	pruneTombstones(tombstones, now);
+	const pathSet = new Set(paths);
+	const before = tombstones.deleted.length;
+	tombstones.deleted = tombstones.deleted.filter(t => !pathSet.has(t.path));
+	if (tombstones.deleted.length !== before) {
+		await saveTombstones(bucket, tombstones);
+	}
+}
+
 async function handleHealth() {
 	return corsResponse({ status: 'ok', timestamp: new Date().toISOString() });
 }
@@ -80,6 +105,7 @@ async function handleCheckChanges(request, db) {
 	await initDb(db);
 	const url = new URL(request.url);
 	const since = parseInt(url.searchParams.get('since') || '0', 10);
+	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
 	const row = await db.prepare('SELECT MAX(seq) as lastSeq FROM changelog').first();
 	const lastSeq = row?.lastSeq || 0;
 	return corsResponse({ lastSeq, hasChanges: lastSeq > since });
@@ -149,6 +175,7 @@ async function handleUpload(request, bucket, db) {
 	}
 
 	const results = [];
+	const uploadedPaths = [];
 
 	for (const file of body.files) {
 		if (!file.path || file.content === undefined) {
@@ -177,6 +204,7 @@ async function handleUpload(request, bucket, db) {
 			});
 
 			results.push({ path: file.path, success: true });
+			uploadedPaths.push(file.path);
 
 			if (db) {
 				try {
@@ -188,6 +216,8 @@ async function handleUpload(request, bucket, db) {
 			results.push({ path: file.path, error: err.message });
 		}
 	}
+
+	await clearTombstonesForPaths(bucket, uploadedPaths);
 
 	return corsResponse({ success: true, results });
 }
@@ -229,20 +259,18 @@ async function handleDelete(request, bucket, db) {
 	const tombstones = await getTombstones(bucket);
 	const now = new Date();
 	const expiresAt = new Date(now.getTime() + TOMBSTONE_TTL_DAYS * 24 * 60 * 60 * 1000);
-
-	tombstones.deleted.push({
+	pruneTombstones(tombstones, now);
+	const byPath = new Map();
+	for (const tombstone of tombstones.deleted) {
+		byPath.set(tombstone.path, tombstone);
+	}
+	byPath.set(body.path, {
 		path: body.path,
 		deletedAt: now.toISOString(),
 		expiresAt: expiresAt.toISOString(),
 	});
-
-	tombstones.deleted = tombstones.deleted.filter(
-		t => new Date(t.expiresAt) > now
-	);
-
-	await bucket.put(TOMBSTONES_KEY, JSON.stringify(tombstones), {
-		httpMetadata: { contentType: 'application/json' },
-	});
+	tombstones.deleted = [...byPath.values()];
+	await saveTombstones(bucket, tombstones);
 
 	if (db) {
 		try {
@@ -257,9 +285,7 @@ async function handleDelete(request, bucket, db) {
 async function handleGetTombstones(bucket) {
 	const tombstones = await getTombstones(bucket);
 	const now = new Date();
-	tombstones.deleted = tombstones.deleted.filter(
-		t => new Date(t.expiresAt) > now
-	);
+	pruneTombstones(tombstones, now);
 	return corsResponse(tombstones);
 }
 
