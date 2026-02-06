@@ -1,8 +1,7 @@
 /**
  * Local manifest management for tracking file state.
  * Stored in its own file (file-manifest.json) in the plugin directory,
- * separate from Obsidian's data.json to avoid write amplification
- * and prevent settings saves from erasing manifest data.
+ * separate from settings data to avoid write amplification.
  */
 
 import type { App, PluginManifest } from 'obsidian';
@@ -12,53 +11,31 @@ import type { FileManifest, FileEntry } from '../types';
 const logger = createLogger('Manifest');
 
 const MANIFEST_FILENAME = 'file-manifest.json';
-const LEGACY_MANIFEST_KEY = 'crate-local-manifest';
 
 export class LocalManifest {
 	private app: App;
 	private manifestPath: string;
-	private dataPath: string;
 	private manifest: FileManifest;
 	private dirty: boolean;
 
 	constructor(app: App, pluginManifest: PluginManifest) {
 		this.app = app;
 		this.manifestPath = `${pluginManifest.dir}/${MANIFEST_FILENAME}`;
-		this.dataPath = `${pluginManifest.dir}/data.json`;
 		this.manifest = { version: 1, files: {} };
 		this.dirty = false;
 	}
 
 	/**
-	 * Load manifest from its dedicated file, migrating from data.json if needed.
+	 * Load manifest from its dedicated file.
 	 */
 	async load(): Promise<void> {
 		const adapter = this.app.vault.adapter;
 
 		if (await adapter.exists(this.manifestPath)) {
-			// New file exists — read it directly
 			const raw = await adapter.read(this.manifestPath);
 			const parsed = JSON.parse(raw) as FileManifest;
 			if (parsed && typeof parsed === 'object' && 'version' in parsed && 'files' in parsed) {
 				this.manifest = parsed;
-			}
-		} else if (await adapter.exists(this.dataPath)) {
-			// Attempt migration from legacy location in data.json
-			const raw = await adapter.read(this.dataPath);
-			const data = JSON.parse(raw) as Record<string, unknown>;
-			const stored = data?.[LEGACY_MANIFEST_KEY] as FileManifest | undefined;
-
-			if (stored && typeof stored === 'object' && 'version' in stored && 'files' in stored) {
-				this.manifest = stored;
-				this.dirty = true;
-
-				// Write to new location immediately
-				await this.save();
-
-				// Remove the legacy key from data.json
-				delete data[LEGACY_MANIFEST_KEY];
-				await adapter.write(this.dataPath, JSON.stringify(data));
-				logger.info('Migrated manifest from data.json to file-manifest.json');
 			}
 		}
 

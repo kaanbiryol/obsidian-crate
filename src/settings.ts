@@ -1,6 +1,6 @@
 /**
  * Settings interface for Obsidian Crate
- * Re-exported from types for backward compatibility with plugin template
+ * Re-exported from types for plugin modules
  */
 
 export {

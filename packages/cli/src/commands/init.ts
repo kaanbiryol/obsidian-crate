@@ -300,15 +300,13 @@ async function gatherConfiguration(options: InitOptions): Promise<{ bucketName: 
 function outputResult(result: InitResult): void {
 	console.log('═'.repeat(60));
 	console.log('\n🎉 Setup complete!\n');
-	console.log('Copy the following configuration and paste it into Obsidian Crate settings:\n');
+	console.log('Copy these values into Obsidian Crate settings:\n');
 	console.log('─'.repeat(60));
-
-	const config = JSON.stringify({
-		workerUrl: result.workerUrl,
-		token: result.authToken,
-	}, null, 2);
-
-	console.log(config);
+	console.log('Worker URL');
+	console.log(result.workerUrl);
+	console.log('');
+	console.log('Auth token');
+	console.log(result.authToken);
 
 	console.log('─'.repeat(60));
 	console.log('\n📝 Details:');

@@ -18,6 +18,7 @@ import type {
 	SyncResult,
 	FileDiff,
 	UploadFile,
+	UploadResponse,
 	FileEntry,
 	CrateSettings,
 	ChangelogEntry,
@@ -28,6 +29,9 @@ import type {
 const logger = createLogger('SyncEngine');
 const UPLOAD_CONCURRENCY = 5;
 const FORCE_SYNC_CONCURRENCY = 2;
+const PREPARE_CONCURRENCY = 3;
+const MAX_UPLOAD_BATCH_FILES = 10;
+const MAX_UPLOAD_BATCH_BYTES = 5 * 1024 * 1024; // Keep well below Cloudflare request limits
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
 
@@ -304,8 +308,7 @@ export class SyncEngine {
 							size: upload.size,
 							modified: new Date().toISOString(),
 						});
-						const content = await this.vault.adapter.readBinary(upload.path);
-						await this.baseCache.saveBase(upload.path, content);
+						await this.saveBaseFromUpload(upload);
 					}
 				});
 				await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
@@ -604,8 +607,7 @@ export class SyncEngine {
 							size: uploadFile.size,
 							modified: new Date().toISOString(),
 						});
-						const uploadContent = await this.vault.adapter.readBinary(uploadFile.path);
-						await this.baseCache.saveBase(uploadFile.path, uploadContent);
+						await this.saveBaseFromUpload(uploadFile);
 						result.uploaded++;
 					}
 				} catch (error) {
@@ -896,8 +898,7 @@ export class SyncEngine {
 				}
 				if (uploadFile) {
 					await this.api.uploadFiles([uploadFile]);
-					const content = await this.vault.adapter.readBinary(diff.path);
-					await this.baseCache.saveBase(diff.path, content);
+					await this.saveBaseFromUpload(uploadFile);
 					result.uploaded++;
 				}
 				break;
@@ -1029,6 +1030,156 @@ export class SyncEngine {
 	}
 
 	/**
+	 * Persist base cache from already prepared upload payload.
+	 * Avoids re-reading the file from disk after upload.
+	 */
+	private async saveBaseFromUpload(upload: UploadFile): Promise<void> {
+		if (!isMergeableFile(upload.path)) return;
+
+		const content = upload.binary
+			? this.decodeContent(upload.content, upload.contentType ?? 'application/octet-stream')
+			: new TextEncoder().encode(upload.content).buffer as ArrayBuffer;
+		await this.baseCache.saveBase(upload.path, content);
+	}
+
+	/**
+	 * Prepare uploads with bounded concurrency to reduce initial sync wall time.
+	 */
+	private async prepareUploadsFromVaultFiles(
+		files: VaultFile[],
+		onPrepared?: (completed: number) => void,
+	): Promise<UploadFile[]> {
+		let completed = 0;
+
+		const tasks = files.map(file => async () => {
+			const uploadFile = await this.prepareUploadFromVaultFile(file);
+			completed++;
+			onPrepared?.(completed);
+			return uploadFile;
+		});
+
+		const prepared = await this.runConcurrent(tasks, PREPARE_CONCURRENCY);
+		return prepared.filter((upload): upload is UploadFile => upload !== null);
+	}
+
+	private estimateUploadPayloadBytes(upload: UploadFile): number {
+		// Base64 payloads are ASCII; text can contain multibyte chars.
+		const contentBytes = upload.binary ? upload.content.length : upload.content.length * 2;
+		const metadataBytes = upload.path.length + upload.hash.length + (upload.contentType?.length ?? 0) + 256;
+		return contentBytes + metadataBytes;
+	}
+
+	private createUploadBatches(uploads: UploadFile[]): UploadFile[][] {
+		const batches: UploadFile[][] = [];
+		let currentBatch: UploadFile[] = [];
+		let currentBytes = 32; // JSON envelope overhead
+
+		for (const upload of uploads) {
+			const uploadBytes = this.estimateUploadPayloadBytes(upload);
+			const exceedsFileLimit = currentBatch.length >= MAX_UPLOAD_BATCH_FILES;
+			const exceedsByteLimit = currentBatch.length > 0 && (currentBytes + uploadBytes) > MAX_UPLOAD_BATCH_BYTES;
+
+			if (exceedsFileLimit || exceedsByteLimit) {
+				batches.push(currentBatch);
+				currentBatch = [];
+				currentBytes = 32;
+			}
+
+			currentBatch.push(upload);
+			currentBytes += uploadBytes;
+		}
+
+		if (currentBatch.length > 0) {
+			batches.push(currentBatch);
+		}
+
+		return batches;
+	}
+
+	private shouldSplitUploadBatch(error: unknown): boolean {
+		if (!(error instanceof Error)) return false;
+		const message = error.message.toLowerCase();
+		return (
+			message.includes('http 413') ||
+			message.includes('payload') ||
+			message.includes('too large') ||
+			message.includes('request body') ||
+			message.includes('http 429') ||
+			message.includes('rate') ||
+			message.includes('cpu') ||
+			message.includes('1102')
+		);
+	}
+
+	private async uploadBatchWithAdaptiveSplit(batch: UploadFile[], retry: boolean): Promise<UploadResponse> {
+		const upload = () => this.api.uploadFiles(batch);
+
+		try {
+			return retry ? await this.retryWithBackoff(upload) : await upload();
+		} catch (error) {
+			if (batch.length <= 1 || !this.shouldSplitUploadBatch(error)) {
+				throw error;
+			}
+
+			const mid = Math.ceil(batch.length / 2);
+			const leftBatch = batch.slice(0, mid);
+			const rightBatch = batch.slice(mid);
+			logger.warn(`Batch upload failed for ${batch.length} files, retrying as ${leftBatch.length}+${rightBatch.length}`);
+
+			const left = await this.uploadBatchWithAdaptiveSplit(leftBatch, retry);
+			const right = await this.uploadBatchWithAdaptiveSplit(rightBatch, retry);
+
+			return {
+				success: left.success && right.success,
+				results: [...left.results, ...right.results],
+			};
+		}
+	}
+
+	private async applyUploadBatchResults(
+		batch: UploadFile[],
+		response: UploadResponse,
+		result: SyncResult,
+	): Promise<void> {
+		const resultsByPath = new Map(response.results.map(entry => [entry.path, entry]));
+
+		for (const upload of batch) {
+			const uploadResult = resultsByPath.get(upload.path);
+			if (uploadResult?.success) {
+				result.uploaded++;
+				this.localManifest.setEntry(upload.path, {
+					hash: upload.hash,
+					size: upload.size,
+					modified: new Date().toISOString(),
+				});
+				await this.saveBaseFromUpload(upload);
+			} else if (uploadResult?.error) {
+				result.errors.push(`${upload.path}: ${uploadResult.error}`);
+			} else {
+				result.errors.push(`${upload.path}: Upload failed`);
+			}
+		}
+	}
+
+	private async uploadPreparedFiles(
+		prepared: UploadFile[],
+		result: SyncResult,
+		options: { concurrency: number; retry: boolean },
+	): Promise<void> {
+		if (prepared.length === 0) return;
+
+		const batches = this.createUploadBatches(prepared);
+		logger.info(`Uploading ${prepared.length} files in ${batches.length} batch(es)`);
+
+		const tasks = batches.map(batch => async () => {
+			const response = await this.uploadBatchWithAdaptiveSplit(batch, options.retry);
+			await this.applyUploadBatchResults(batch, response, result);
+		});
+
+		await this.runConcurrent(tasks, options.concurrency);
+	}
+
+	/**
 	 * Initial sync - upload all local files
 	 */
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
@@ -1058,41 +1209,17 @@ export class SyncEngine {
 			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
 			logger.info(`Initial sync started with ${files.length} files`);
 			const total = files.length;
-			let current = 0;
-
-			// First pass: prepare all uploads sequentially (local I/O)
-			const prepared: UploadFile[] = [];
-			for (const file of files) {
-				const uploadFile = await this.prepareUploadFromVaultFile(file);
-				if (uploadFile) {
-					prepared.push(uploadFile);
-				}
-				current++;
+			const prepared = await this.prepareUploadsFromVaultFiles(files, current => {
 				progressCallback?.(current, total);
-			}
+			});
 
 			logger.info(`Prepared ${prepared.length}/${total} files for upload (${total - prepared.length} unchanged)`);
 
-			// Second pass: upload concurrently
-			const uploadTasks = prepared.map(upload => async () => {
-				logger.info('Uploading:', upload.path, `(${upload.size} bytes)`);
-				const response = await this.api.uploadFiles([upload]);
-				const uploadResult = response.results[0];
-				if (uploadResult?.success) {
-					result.uploaded++;
-					this.localManifest.setEntry(upload.path, {
-						hash: upload.hash,
-						size: upload.size,
-						modified: new Date().toISOString(),
-					});
-					const uploadContent = await this.vault.adapter.readBinary(upload.path);
-					await this.baseCache.saveBase(upload.path, uploadContent);
-				} else if (uploadResult?.error) {
-					result.errors.push(`${upload.path}: ${uploadResult.error}`);
-				}
+			// Second pass: upload in adaptive batches
+			await this.uploadPreparedFiles(prepared, result, {
+				concurrency: UPLOAD_CONCURRENCY,
+				retry: false,
 			});
-
-			await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
 
 			await this.localManifest.save();
 
@@ -1177,36 +1304,17 @@ export class SyncEngine {
 			this.localManifest.clear();
 			await this.baseCache.clear();
 
-			// First pass: prepare all uploads sequentially (local I/O)
-			const prepared: UploadFile[] = [];
-			for (const file of files) {
-				const uploadFile = await this.prepareUploadFromVaultFile(file);
-				if (uploadFile) {
-					prepared.push(uploadFile);
-				}
-				current++;
+			// First pass: prepare uploads with bounded concurrency (local I/O)
+			const prepared = await this.prepareUploadsFromVaultFiles(files, completed => {
+				current = completed;
 				progressCallback?.(current, total);
-			}
-
-			// Second pass: upload with lower concurrency and retry
-			const uploadTasks = prepared.map(upload => async () => {
-				const response = await this.retryWithBackoff(() => this.api.uploadFiles([upload]));
-				const uploadResult = response.results[0];
-				if (uploadResult?.success) {
-					result.uploaded++;
-					this.localManifest.setEntry(upload.path, {
-						hash: upload.hash,
-						size: upload.size,
-						modified: new Date().toISOString(),
-					});
-					const uploadContent = await this.vault.adapter.readBinary(upload.path);
-					await this.baseCache.saveBase(upload.path, uploadContent);
-				} else if (uploadResult?.error) {
-					result.errors.push(`${upload.path}: ${uploadResult.error}`);
-				}
 			});
 
-			await this.runConcurrent(uploadTasks, FORCE_SYNC_CONCURRENCY);
+			// Second pass: upload in adaptive batches with retry
+			await this.uploadPreparedFiles(prepared, result, {
+				concurrency: FORCE_SYNC_CONCURRENCY,
+				retry: true,
+			});
 
 			// Delete remote-only files
 			for (const path of remoteOnlyPaths) {

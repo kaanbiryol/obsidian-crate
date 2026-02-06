@@ -2,10 +2,10 @@
  * Settings tab for Obsidian Crate configuration
  */
 
-import { App, PluginSettingTab, Setting, Notice, TextAreaComponent } from 'obsidian';
+import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type CratePlugin from '../main';
 import { SECRET_KEYS } from '../types';
-import type { CrateConfig, UsageMetric, UsageResponse } from '../types';
+import type { UsageMetric } from '../types';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
@@ -38,54 +38,65 @@ export class CrateSettingTab extends PluginSettingTab {
 
 		if (!this.plugin.isConfigured()) {
 			containerEl.createEl('p', {
-				text: 'Paste the configuration from the CLI tool to get started.',
+				text: 'Enter the Worker URL and auth token from the CLI tool to get started.',
 				cls: 'setting-item-description',
 			});
 
-			let configInput: TextAreaComponent;
+			let workerUrlInput = this.plugin.settings.workerUrl.trim();
+			let authTokenInput = (this.plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '').trim();
 
 			new Setting(containerEl)
-				.setName('Configuration')
-				.setDesc('Paste the JSON output from "crate init" here')
-				.addTextArea(text => {
-					configInput = text;
+				.setName('Worker URL')
+				.setDesc('Paste the Worker URL shown by "crate init"')
+				.addText(text => {
 					text
-						.setPlaceholder('{"workerUrl": "...", "token": "..."}')
-						.setValue('');
-					text.inputEl.rows = 4;
-					text.inputEl.cols = 50;
-				})
+						.setPlaceholder('https://your-worker.your-subdomain.workers.dev')
+						.setValue(workerUrlInput)
+						.onChange(value => {
+							workerUrlInput = value.trim();
+						});
+					text.inputEl.size = 50;
+				});
+
+			new Setting(containerEl)
+				.setName('Auth token')
+				.setDesc('Paste the auth token shown by "crate init"')
+				.addText(text => {
+					text.inputEl.type = 'password';
+					text
+						.setPlaceholder('Paste your auth token')
+						.setValue(authTokenInput)
+						.onChange(value => {
+							authTokenInput = value.trim();
+						});
+					text.inputEl.size = 50;
+				});
+
+			new Setting(containerEl)
+				.setName('Apply configuration')
+				.setDesc('Save these values and connect to your sync server')
 				.addButton(button => button
 					.setButtonText('Apply')
 					.setCta()
 					.onClick(async () => {
-						const value = configInput.getValue().trim();
-						if (!value) {
-							new Notice('Please paste the configuration first');
+						const workerUrl = workerUrlInput.trim();
+						const token = authTokenInput.trim();
+
+						if (!workerUrl || !token) {
+							new Notice('Please enter both Worker URL and auth token');
 							return;
 						}
 
-						try {
-							const config = JSON.parse(value) as CrateConfig;
+						// Save configuration
+						this.plugin.settings.workerUrl = workerUrl;
+						await this.plugin.saveSettings();
+						this.plugin.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, token);
 
-							if (!config.workerUrl || !config.token) {
-								new Notice('Invalid configuration: missing workerUrl or token');
-								return;
-							}
+						// Reinitialize plugin
+						await this.plugin.initializeSync();
 
-							// Save configuration
-							this.plugin.settings.workerUrl = config.workerUrl;
-							await this.plugin.saveSettings();
-							this.plugin.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, config.token);
-
-							// Reinitialize plugin
-							await this.plugin.initializeSync();
-
-							new Notice('Configuration saved successfully!');
-							this.display(); // Refresh the settings view
-						} catch (e) {
-							new Notice('Invalid JSON configuration');
-						}
+						new Notice('Configuration saved successfully!');
+						this.display(); // Refresh the settings view
 					}));
 		} else {
 			new Setting(containerEl)
