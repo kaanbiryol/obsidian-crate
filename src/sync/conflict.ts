@@ -5,6 +5,7 @@
 import type { Vault, TFile } from 'obsidian';
 import { createLogger } from '../logger';
 import type { FileEntry, FileDiff } from '../types';
+import { MERGEABLE_EXTENSIONS } from '../types';
 import { isHiddenPath } from './file-discovery';
 
 const logger = createLogger('Conflict');
@@ -150,4 +151,12 @@ export async function createConflictCopy(
  */
 export function isConflictFile(path: string): boolean {
 	return /\(conflict \d{4}-\d{2}-\d{2} \d{2}-\d{2}\)/.test(path);
+}
+
+/**
+ * Check if a file's extension supports 3-way text merge
+ */
+export function isMergeableFile(path: string): boolean {
+	const ext = path.split('.').pop()?.toLowerCase() ?? '';
+	return (MERGEABLE_EXTENSIONS as readonly string[]).includes(ext);
 }
