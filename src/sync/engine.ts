@@ -3,7 +3,7 @@
  */
 
 import type { Plugin, TFile, TAbstractFile, Vault } from 'obsidian';
-import { Notice } from 'obsidian';
+import { Notice, TFolder } from 'obsidian';
 import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
@@ -44,6 +44,7 @@ export class SyncEngine {
 	private pendingPaths: Set<string> = new Set();
 	private syncInterval: ReturnType<typeof setInterval> | null = null;
 	private onStateChange: ((state: SyncState) => void) | null = null;
+	private patternCache = new Map<string, RegExp>();
 
 	constructor(
 		plugin: Plugin,
@@ -87,6 +88,7 @@ export class SyncEngine {
 	 * Update settings
 	 */
 	updateSettings(settings: CrateSettings): void {
+		this.patternCache.clear();
 		this.settings = settings;
 
 		// Restart periodic sync with new interval
@@ -188,13 +190,15 @@ export class SyncEngine {
 			return path.startsWith(pattern) || path === pattern.slice(0, -1);
 		}
 
-		// Convert glob pattern to regex
-		const regexPattern = pattern
-			.replace(/\./g, '\\.')
-			.replace(/\*/g, '.*')
-			.replace(/\?/g, '.');
-
-		const regex = new RegExp(`^${regexPattern}$`);
+		let regex = this.patternCache.get(pattern);
+		if (!regex) {
+			const regexPattern = pattern
+				.replace(/\./g, '\\.')
+				.replace(/\*/g, '.*')
+				.replace(/\?/g, '.');
+			regex = new RegExp(`^${regexPattern}$`);
+			this.patternCache.set(pattern, regex);
+		}
 		return regex.test(path);
 	}
 
@@ -202,8 +206,7 @@ export class SyncEngine {
 	 * Handle file change (create, modify)
 	 */
 	onFileChange(file: TAbstractFile): void {
-		if (!(file instanceof this.plugin.app.vault.adapter.constructor)) {
-			// It's a file, not a folder
+		if (!(file instanceof TFolder)) {
 			if (!this.shouldIgnore(file.path)) {
 				this.pendingPaths.add(file.path);
 				this.debouncedSync();
@@ -366,11 +369,11 @@ export class SyncEngine {
 		if (isBinary) {
 			// Base64 encode binary content
 			const bytes = new Uint8Array(content);
-			let binary = '';
-			for (let i = 0; i < bytes.byteLength; i++) {
-				binary += String.fromCharCode(bytes[i]!);
+			const chunks: string[] = [];
+			for (let i = 0; i < bytes.byteLength; i += 8192) {
+				chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
 			}
-			contentStr = btoa(binary);
+			contentStr = btoa(chunks.join(''));
 		} else {
 			// Text content as-is
 			const decoder = new TextDecoder();
@@ -511,7 +514,10 @@ export class SyncEngine {
 			const total = changesByPath.size + localOnlyChanges.length;
 			let current = 0;
 
-			// Process remote changes
+			// Categorize remote changes
+			const downloadPaths: string[] = [];
+			const conflicts: FileDiff[] = [];
+
 			for (const [path, entry] of changesByPath) {
 				if (this.shouldIgnore(path)) continue;
 
@@ -521,7 +527,6 @@ export class SyncEngine {
 						if (file) {
 							await this.vault.delete(file);
 						} else if (await this.vault.adapter.exists(path)) {
-							// Hidden file not in index — remove via adapter
 							await this.vault.adapter.remove(path);
 						}
 						this.localManifest.removeEntry(path);
@@ -530,10 +535,8 @@ export class SyncEngine {
 						const localFile = this.vault.getAbstractFileByPath(path);
 
 						if (!localFile && !(isHiddenPath(path) && await this.vault.adapter.exists(path))) {
-							// No local file — download
-							await this.downloadAndSaveFile(path, result);
+							downloadPaths.push(path);
 						} else {
-							// File exists — read via adapter (works for both indexed and hidden)
 							const content = await this.vault.adapter.readBinary(path);
 							const localHash = await computeHash(content);
 							const stat = localFile && 'stat' in localFile
@@ -541,25 +544,20 @@ export class SyncEngine {
 								: await this.vault.adapter.stat(path);
 
 							if (localHash === entry.hash) {
-								// Already matches — skip
 								this.localManifest.setEntry(path, {
 									hash: localHash,
 									size: stat?.size ?? 0,
 									modified: new Date(stat?.mtime ?? Date.now()).toISOString(),
 								});
 							} else if (localChangedPaths.has(path)) {
-								// Conflict: both sides changed
-								const diff: FileDiff = {
+								conflicts.push({
 									path,
 									action: 'conflict',
 									localHash,
 									remoteHash: entry.hash,
-								};
-								const localFiles: Record<string, FileEntry> = {};
-								await this.processDiff(diff, localFiles, result);
+								});
 							} else {
-								// Remote changed, local didn't — download
-								await this.downloadAndSaveFile(path, result);
+								downloadPaths.push(path);
 							}
 						}
 					}
@@ -567,22 +565,35 @@ export class SyncEngine {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 					result.errors.push(`${path}: ${errorMessage}`);
 				}
-				current++;
-				progressCallback?.(current, total);
+			}
+
+			// Batch download remote files
+			if (downloadPaths.length > 0) {
+				await this.batchDownloadAndSaveFiles(downloadPaths, result);
+			}
+			current += changesByPath.size;
+			progressCallback?.(current, total);
+
+			// Process conflicts sequentially
+			for (const diff of conflicts) {
+				try {
+					const localFiles: Record<string, FileEntry> = {};
+					await this.processDiff(diff, localFiles, result);
+				} catch (error) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					result.errors.push(`${diff.path}: ${errorMessage}`);
+				}
 			}
 
 			// Upload local-only changes (modified locally but not in remote changeset)
-			for (const file of localChanges) {
-				if (changesByPath.has(file.path)) continue;
-				if (this.shouldIgnore(file.path)) continue;
-
+			const localOnlyUploads: UploadFile[] = [];
+			for (const file of localOnlyChanges) {
 				try {
 					const tfile = this.vault.getAbstractFileByPath(file.path);
 					let uploadFile: UploadFile | null = null;
 					if (tfile && 'extension' in tfile) {
 						uploadFile = await this.prepareUpload(tfile as TFile);
 					} else if (isHiddenPath(file.path)) {
-						// Hidden file — use adapter
 						const stat = await this.vault.adapter.stat(file.path);
 						if (stat && stat.type === 'file') {
 							uploadFile = await this.prepareUploadFromVaultFile({
@@ -594,13 +605,7 @@ export class SyncEngine {
 						}
 					}
 					if (uploadFile) {
-						await this.api.uploadFiles([uploadFile]);
-						this.localManifest.setEntry(uploadFile.path, {
-							hash: uploadFile.hash,
-							size: uploadFile.size,
-							modified: new Date().toISOString(),
-						});
-						result.uploaded++;
+						localOnlyUploads.push(uploadFile);
 					}
 				} catch (error) {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -609,6 +614,10 @@ export class SyncEngine {
 				current++;
 				progressCallback?.(current, total);
 			}
+			await this.uploadPreparedFiles(localOnlyUploads, result, {
+				concurrency: UPLOAD_CONCURRENCY,
+				retry: false,
+			});
 
 			await this.localManifest.save();
 			this.settings.lastSeq = latestSeq;
@@ -631,17 +640,22 @@ export class SyncEngine {
 
 		const allFiles = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
 
-		for (const file of allFiles) {
-			if (file.size > 5 * 1024 * 1024) continue; // MAX_FILE_SIZE_BYTES
+		const candidates = allFiles.filter(
+			file => file.size <= 5 * 1024 * 1024 && file.mtime > lastSyncTime
+		);
 
-			if (file.mtime > lastSyncTime) {
-				const content = await this.vault.adapter.readBinary(file.path);
-				const hash = await computeHash(content);
-
-				if (!this.localManifest.hashMatches(file.path, hash)) {
-					changes.push({ path: file.path, hash });
-				}
+		const tasks = candidates.map(file => async () => {
+			const content = await this.vault.adapter.readBinary(file.path);
+			const hash = await computeHash(content);
+			if (!this.localManifest.hashMatches(file.path, hash)) {
+				return { path: file.path, hash };
 			}
+			return null;
+		});
+
+		const results = await this.runConcurrent(tasks, PREPARE_CONCURRENCY);
+		for (const result of results) {
+			if (result) changes.push(result);
 		}
 
 		return changes;
@@ -693,6 +707,52 @@ export class SyncEngine {
 		});
 
 		result.downloaded++;
+	}
+
+	private async saveDownloadedContent(path: string, content: ArrayBuffer): Promise<void> {
+		const folderPath = path.substring(0, path.lastIndexOf('/'));
+		if (folderPath) {
+			if (isHiddenPath(path)) {
+				try { await this.vault.adapter.mkdir(folderPath); } catch { /* exists */ }
+			} else {
+				try { await this.vault.createFolder(folderPath); } catch { /* exists */ }
+			}
+		}
+
+		if (isHiddenPath(path)) {
+			await this.vault.adapter.writeBinary(path, content);
+		} else {
+			const existingFile = this.vault.getAbstractFileByPath(path);
+			if (existingFile) {
+				await this.vault.modifyBinary(existingFile as TFile, content);
+			} else {
+				await this.vault.createBinary(path, content);
+			}
+		}
+
+		const hash = await computeHash(content);
+		this.localManifest.setEntry(path, {
+			hash,
+			size: content.byteLength,
+			modified: new Date().toISOString(),
+		});
+	}
+
+	private async batchDownloadAndSaveFiles(paths: string[], result: SyncResult): Promise<void> {
+		const MAX_DOWNLOAD_BATCH = 20;
+		for (let i = 0; i < paths.length; i += MAX_DOWNLOAD_BATCH) {
+			const batch = paths.slice(i, i + MAX_DOWNLOAD_BATCH);
+			const response = await this.api.batchDownload(batch);
+			for (const file of response.files) {
+				if (file.error || !file.content) {
+					result.errors.push(`${file.path}: ${file.error || 'Download failed'}`);
+					continue;
+				}
+				const content = this.decodeContent(file.content, file.contentType || 'application/octet-stream');
+				await this.saveDownloadedContent(file.path, content);
+				result.downloaded++;
+			}
+		}
 	}
 
 	/**
@@ -752,16 +812,19 @@ export class SyncEngine {
 			const localFiles: Record<string, FileEntry> = {};
 			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
 
-			for (const file of files) {
-				if (file.size > 5 * 1024 * 1024) continue; // MAX_FILE_SIZE_BYTES
-
-				const content = await this.vault.adapter.readBinary(file.path);
-				const hash = await computeHash(content);
-
-				localFiles[file.path] = {
-					hash,
-					size: file.size,
-					modified: new Date(file.mtime).toISOString(),
+			const hashTasks = files
+				.filter(file => file.size <= 5 * 1024 * 1024)
+				.map(file => async () => {
+					const content = await this.vault.adapter.readBinary(file.path);
+					const hash = await computeHash(content);
+					return { path: file.path, hash, size: file.size, mtime: file.mtime };
+				});
+			const hashed = await this.runConcurrent(hashTasks, PREPARE_CONCURRENCY);
+			for (const entry of hashed) {
+				localFiles[entry.path] = {
+					hash: entry.hash,
+					size: entry.size,
+					modified: new Date(entry.mtime).toISOString(),
 				};
 			}
 
@@ -772,12 +835,11 @@ export class SyncEngine {
 				this.state.lastSync
 			);
 
-			// Process differences — parallelize uploads, keep others sequential
+			// Process differences — uploads concurrent, downloads batched, rest sequential
 			const uploadDiffs = diffs.filter(d => d.action === 'upload');
 			const downloadDiffs = diffs.filter(d => d.action === 'download');
 			const conflictDiffs = diffs.filter(d => d.action === 'conflict');
 			const deleteDiffs = diffs.filter(d => d.action === 'delete');
-			const otherDiffs = diffs.filter(d => d.action !== 'upload');
 			logger.info(`Full sync diffs: ${uploadDiffs.length} upload, ${downloadDiffs.length} download, ${conflictDiffs.length} conflict, ${deleteDiffs.length} delete`);
 
 			const total = diffs.length;
@@ -798,8 +860,33 @@ export class SyncEngine {
 				await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
 			}
 
-			// Run download/delete/conflict diffs sequentially
-			for (const diff of otherDiffs) {
+			// Batch download diffs
+			if (downloadDiffs.length > 0) {
+				await this.batchDownloadAndSaveFiles(
+					downloadDiffs.map(d => d.path),
+					result,
+				);
+				// Update localFiles record for downloaded files
+				for (const diff of downloadDiffs) {
+					try {
+						const content = await this.vault.adapter.readBinary(diff.path);
+						const hash = await computeHash(content);
+						localFiles[diff.path] = {
+							hash,
+							size: content.byteLength,
+							modified: new Date().toISOString(),
+						};
+					} catch {
+						// File may have failed to download; error already recorded
+					}
+				}
+				current += downloadDiffs.length;
+				progressCallback?.(current, total);
+			}
+
+			// Process conflict and delete diffs sequentially
+			const remainingDiffs = diffs.filter(d => d.action === 'conflict' || d.action === 'delete');
+			for (const diff of remainingDiffs) {
 				try {
 					await this.processDiff(diff, localFiles, result);
 				} catch (error) {

@@ -38,6 +38,15 @@ function json(data, status = 200) {
 	});
 }
 
+function arrayBufferToBase64(buffer) {
+	const bytes = new Uint8Array(buffer);
+	const chunks = [];
+	for (let i = 0; i < bytes.byteLength; i += 8192) {
+		chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
+	}
+	return btoa(chunks.join(''));
+}
+
 function corsHeaders(origin) {
 	return {
 		'Access-Control-Allow-Origin': '*',
@@ -198,7 +207,7 @@ async function handleDownload(request, bucket) {
 	}
 
 	const content = await obj.arrayBuffer();
-	const base64 = btoa(String.fromCharCode(...new Uint8Array(content)));
+	const base64 = arrayBufferToBase64(content);
 
 	return corsResponse({
 		path,
@@ -268,7 +277,7 @@ async function handleBatchDownload(request, bucket) {
 
 		if (obj) {
 			const content = await obj.arrayBuffer();
-			const base64 = btoa(String.fromCharCode(...new Uint8Array(content)));
+			const base64 = arrayBufferToBase64(content);
 			results.push({
 				path,
 				content: base64,
