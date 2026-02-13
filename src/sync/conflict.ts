@@ -35,12 +35,14 @@ export function getConflictFileName(originalPath: string): string {
 }
 
 /**
- * Detect conflicts between local and remote manifests
+ * Detect conflicts between local and remote manifests using 3-way hash comparison.
+ * The manifestEntries parameter provides the common ancestor (last known synced state)
+ * to determine which side changed, avoiding timestamp-based decisions that break under clock skew.
  */
 export function detectConflicts(
 	localFiles: Record<string, FileEntry>,
 	remoteFiles: Record<string, FileEntry>,
-	lastSyncTime: string | null,
+	manifestEntries: Record<string, FileEntry>,
 ): FileDiff[] {
 	const diffs: FileDiff[] = [];
 	const allPaths = new Set([
@@ -53,39 +55,23 @@ export function detectConflicts(
 		const remote = remoteFiles[path];
 
 		if (local && remote) {
-			// Both exist - check for conflict or sync needed
-			if (local.hash !== remote.hash) {
-				const localModified = new Date(local.modified);
-				const remoteModified = new Date(remote.modified);
-				const lastSync = lastSyncTime ? new Date(lastSyncTime) : new Date(0);
+			if (local.hash === remote.hash) continue; // in sync
 
-				const localChangedAfterSync = localModified > lastSync;
-				const remoteChangedAfterSync = remoteModified > lastSync;
+			const manifestHash = manifestEntries[path]?.hash;
 
-				if (localChangedAfterSync && remoteChangedAfterSync) {
-					diffs.push({
-						path,
-						action: 'conflict',
-						localHash: local.hash,
-						remoteHash: remote.hash,
-					});
-				} else if (localChangedAfterSync) {
-					diffs.push({
-						path,
-						action: 'upload',
-						localHash: local.hash,
-						remoteHash: remote.hash,
-					});
-				} else {
-					diffs.push({
-						path,
-						action: 'download',
-						localHash: local.hash,
-						remoteHash: remote.hash,
-					});
-				}
+			if (!manifestHash) {
+				// New file on both sides with different content → conflict
+				diffs.push({ path, action: 'conflict', localHash: local.hash, remoteHash: remote.hash });
+			} else if (local.hash !== manifestHash && remote.hash !== manifestHash) {
+				// Both sides changed since last sync → conflict
+				diffs.push({ path, action: 'conflict', localHash: local.hash, remoteHash: remote.hash });
+			} else if (local.hash !== manifestHash) {
+				// Only local changed → upload
+				diffs.push({ path, action: 'upload', localHash: local.hash, remoteHash: remote.hash });
+			} else {
+				// Only remote changed (or local unchanged) → download
+				diffs.push({ path, action: 'download', localHash: local.hash, remoteHash: remote.hash });
 			}
-			// If hashes match, files are in sync - no action needed
 		} else if (local && !remote) {
 			// Local only - needs upload (new file)
 			diffs.push({

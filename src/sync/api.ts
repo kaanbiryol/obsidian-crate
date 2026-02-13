@@ -6,10 +6,7 @@ import { createLogger } from '../logger';
 import type {
 	FileManifest,
 	TombstoneStore,
-	UploadFile,
-	UploadResponse,
-	DownloadResponse,
-	BatchDownloadResponse,
+	UploadResult,
 	HealthResponse,
 	ChangesResponse,
 	CheckResponse,
@@ -62,21 +59,30 @@ export class SyncApiClient {
 	}
 
 	/**
-	 * Make authenticated request to worker
+	 * Make authenticated JSON request to worker
 	 */
-	private async request<T>(
+	private async requestJson<T>(
 		path: string,
 		options: RequestInit = {}
 	): Promise<T> {
 		const url = `${this.workerUrl}${path}`;
 		logger.info(`${options.method ?? 'GET'} ${path}`);
 
+		const headers: Record<string, string> = {
+			'Authorization': `Bearer ${this.authToken}`,
+		};
+
+		// Only set Content-Type to JSON if caller didn't provide explicit headers with Content-Type
+		const callerHeaders = options.headers as Record<string, string> | undefined;
+		if (!callerHeaders?.['Content-Type']) {
+			headers['Content-Type'] = 'application/json';
+		}
+
 		const response = await fetch(url, {
 			...options,
 			signal: AbortSignal.timeout(30_000),
 			headers: {
-				'Authorization': `Bearer ${this.authToken}`,
-				'Content-Type': 'application/json',
+				...headers,
 				...options.headers,
 			},
 		});
@@ -99,10 +105,46 @@ export class SyncApiClient {
 	}
 
 	/**
+	 * Make authenticated binary request to worker — returns raw ArrayBuffer + headers
+	 */
+	private async requestBinary(
+		path: string,
+		options: RequestInit = {}
+	): Promise<{ body: ArrayBuffer; headers: Headers }> {
+		const url = `${this.workerUrl}${path}`;
+		logger.info(`${options.method ?? 'GET'} ${path} (binary)`);
+
+		const response = await fetch(url, {
+			...options,
+			signal: AbortSignal.timeout(30_000),
+			headers: {
+				'Authorization': `Bearer ${this.authToken}`,
+				...options.headers,
+			},
+		});
+
+		if (!response.ok) {
+			const errorBody = await response.text();
+			let errorMessage: string;
+			try {
+				const errorJson = JSON.parse(errorBody) as { error?: string };
+				errorMessage = errorJson.error || `HTTP ${response.status}`;
+			} catch {
+				errorMessage = `HTTP ${response.status}: ${errorBody}`;
+			}
+			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} — ${errorMessage}`);
+			throw new Error(errorMessage);
+		}
+
+		logger.info(`${options.method ?? 'GET'} ${path} → ${response.status} (binary)`);
+		return { body: await response.arrayBuffer(), headers: response.headers };
+	}
+
+	/**
 	 * Health check
 	 */
 	async health(): Promise<HealthResponse> {
-		return this.request<HealthResponse>('/health');
+		return this.requestJson<HealthResponse>('/health');
 	}
 
 	/**
@@ -124,42 +166,49 @@ export class SyncApiClient {
 	 * Get remote manifest
 	 */
 	async getManifest(): Promise<FileManifest> {
-		return this.request<FileManifest>('/sync/manifest');
+		return this.requestJson<FileManifest>('/sync/manifest');
 	}
 
 	/**
-	 * Upload files to remote
+	 * Upload a single file via binary PUT
 	 */
-	async uploadFiles(files: UploadFile[]): Promise<UploadResponse> {
-		return this.request<UploadResponse>('/sync/upload', {
-			method: 'POST',
-			body: JSON.stringify({ files }),
-		});
-	}
-
-	/**
-	 * Download single file
-	 */
-	async downloadFile(path: string): Promise<DownloadResponse> {
+	async uploadFile(
+		path: string,
+		content: ArrayBuffer,
+		hash: string,
+		size: number,
+		contentType: string,
+	): Promise<UploadResult> {
 		const encodedPath = encodeURIComponent(path);
-		return this.request<DownloadResponse>(`/sync/download?path=${encodedPath}`);
+		return this.requestJson<UploadResult>(`/sync/upload?path=${encodedPath}`, {
+			method: 'PUT',
+			body: content,
+			headers: {
+				'Content-Type': contentType,
+				'X-File-Hash': hash,
+				'X-File-Size': String(size),
+			},
+		});
 	}
 
 	/**
-	 * Download multiple files
+	 * Download single file — returns raw binary
 	 */
-	async batchDownload(paths: string[]): Promise<BatchDownloadResponse> {
-		return this.request<BatchDownloadResponse>('/sync/batch-download', {
-			method: 'POST',
-			body: JSON.stringify({ paths }),
-		});
+	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number }> {
+		const encodedPath = encodeURIComponent(path);
+		const { body, headers } = await this.requestBinary(`/sync/download?path=${encodedPath}`);
+		return {
+			content: body,
+			contentType: headers.get('Content-Type') || 'application/octet-stream',
+			size: body.byteLength,
+		};
 	}
 
 	/**
 	 * Delete file (creates tombstone)
 	 */
 	async deleteFile(path: string): Promise<{ success: boolean; path: string }> {
-		return this.request<{ success: boolean; path: string }>('/sync/delete', {
+		return this.requestJson<{ success: boolean; path: string }>('/sync/delete', {
 			method: 'POST',
 			body: JSON.stringify({ path }),
 		});
@@ -169,27 +218,27 @@ export class SyncApiClient {
 	 * Get tombstones
 	 */
 	async getTombstones(): Promise<TombstoneStore> {
-		return this.request<TombstoneStore>('/sync/tombstones');
+		return this.requestJson<TombstoneStore>('/sync/tombstones');
 	}
 
 	/**
 	 * Lightweight check for remote changes (returns only seq, no row data)
 	 */
 	async checkForChanges(since: number): Promise<CheckResponse> {
-		return this.request<CheckResponse>(`/sync/check?since=${since}`);
+		return this.requestJson<CheckResponse>(`/sync/check?since=${since}`);
 	}
 
 	/**
 	 * Get changelog entries since a given sequence number
 	 */
 	async getChanges(since: number): Promise<ChangesResponse> {
-		return this.request<ChangesResponse>(`/sync/changes?since=${since}`);
+		return this.requestJson<ChangesResponse>(`/sync/changes?since=${since}`);
 	}
 
 	/**
 	 * Get worker configuration (account/bucket/worker metadata)
 	 */
 	async getConfig(): Promise<WorkerConfig> {
-		return this.request<WorkerConfig>('/sync/config');
+		return this.requestJson<WorkerConfig>('/sync/config');
 	}
 }

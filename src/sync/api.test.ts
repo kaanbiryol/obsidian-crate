@@ -13,15 +13,16 @@ describe('SyncApiClient', () => {
 
 	it('uses encoded paths and auth headers for requests', async () => {
 		const fetchMock = vi.mocked(fetch);
+		const body = new ArrayBuffer(1);
+		const headers = new Headers({
+			'Content-Type': 'text/plain',
+			'Content-Length': '1',
+		});
 		fetchMock.mockResolvedValue({
 			ok: true,
 			status: 200,
-			json: vi.fn().mockResolvedValue({
-				path: 'folder/a b#.md',
-				content: 'x',
-				contentType: 'text/plain',
-				size: 1,
-			}),
+			arrayBuffer: vi.fn().mockResolvedValue(body),
+			headers,
 		} as unknown as Response);
 
 		const client = new SyncApiClient('https://worker.example/', 'token-1');
@@ -32,7 +33,6 @@ describe('SyncApiClient', () => {
 			expect.objectContaining({
 				headers: expect.objectContaining({
 					Authorization: 'Bearer token-1',
-					'Content-Type': 'application/json',
 				}),
 			}),
 		);

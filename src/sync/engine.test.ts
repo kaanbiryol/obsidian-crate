@@ -19,7 +19,7 @@ type Harness = {
 	api: {
 		isConfigured: ReturnType<typeof vi.fn>;
 		getChanges: ReturnType<typeof vi.fn>;
-		uploadFiles: ReturnType<typeof vi.fn>;
+		uploadFile: ReturnType<typeof vi.fn>;
 		deleteFile: ReturnType<typeof vi.fn>;
 		downloadFile: ReturnType<typeof vi.fn>;
 		getManifest: ReturnType<typeof vi.fn>;
@@ -100,7 +100,7 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 	const api = {
 		isConfigured: vi.fn().mockReturnValue(true),
 		getChanges: vi.fn(),
-		uploadFiles: vi.fn(),
+		uploadFile: vi.fn(),
 		deleteFile: vi.fn(),
 		downloadFile: vi.fn(),
 		getManifest: vi.fn(),
@@ -179,7 +179,7 @@ describe('SyncEngine prepareUploadFromVaultFile', () => {
 	it('skips oversized files', async () => {
 		const result = await (harness.engine as any).prepareUploadFromVaultFile({
 			path: 'big.bin',
-			size: 5 * 1024 * 1024 + 1,
+			size: 25 * 1024 * 1024 + 1,
 			mtime: Date.now(),
 			extension: 'bin',
 		});
@@ -204,7 +204,7 @@ describe('SyncEngine prepareUploadFromVaultFile', () => {
 		expect(harness.localManifest.hashMatches).toHaveBeenCalled();
 	});
 
-	it('prepares text files without base64 encoding', async () => {
+	it('prepares files with ArrayBuffer content', async () => {
 		const content = new TextEncoder().encode('hello world').buffer as ArrayBuffer;
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 
@@ -218,15 +218,16 @@ describe('SyncEngine prepareUploadFromVaultFile', () => {
 		expect(result).toEqual(
 			expect.objectContaining({
 				path: 'notes/a.md',
-				content: 'hello world',
-				binary: false,
+				content: expect.any(ArrayBuffer),
 				contentType: 'text/markdown',
 			}),
 		);
 		expect(result?.hash).toHaveLength(64);
+		// No 'binary' field anymore
+		expect(result).not.toHaveProperty('binary');
 	});
 
-	it('prepares binary files using base64 encoding', async () => {
+	it('prepares binary files with ArrayBuffer content', async () => {
 		const bytes = new Uint8Array([0, 255, 1]);
 		harness.vault.adapter.readBinary.mockResolvedValue(bytes.buffer as ArrayBuffer);
 
@@ -240,11 +241,13 @@ describe('SyncEngine prepareUploadFromVaultFile', () => {
 		expect(result).toEqual(
 			expect.objectContaining({
 				path: 'images/pixel.png',
-				content: Buffer.from(bytes).toString('base64'),
-				binary: true,
+				content: expect.any(ArrayBuffer),
 				contentType: 'image/png',
 			}),
 		);
+		// Content is raw ArrayBuffer, not base64
+		expect(result.content.byteLength).toBe(3);
+		expect(result).not.toHaveProperty('binary');
 	});
 });
 
@@ -357,15 +360,15 @@ describe('SyncEngine incrementalSync', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(
 			new TextEncoder().encode('hello world').buffer as ArrayBuffer,
 		);
-		harness.api.uploadFiles.mockResolvedValue({
+		harness.api.uploadFile.mockResolvedValue({
 			success: true,
-			results: [{ path: 'notes/new.md', success: true }],
+			path: 'notes/new.md',
 		});
 
 		const result = await (harness.engine as any).incrementalSync();
 
 		expect(result?.uploaded).toBe(1);
-		expect(harness.api.uploadFiles).toHaveBeenCalledTimes(1);
+		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
 		expect(harness.localManifest.setEntry).toHaveBeenCalledWith(
 			'notes/new.md',
 			expect.objectContaining({
@@ -404,15 +407,15 @@ describe('SyncEngine incrementalSync', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(
 			new TextEncoder().encode('keep local').buffer as ArrayBuffer,
 		);
-		harness.api.uploadFiles.mockResolvedValue({
+		harness.api.uploadFile.mockResolvedValue({
 			success: true,
-			results: [{ path: 'notes/live.md', success: true }],
+			path: 'notes/live.md',
 		});
 
 		const result = await (harness.engine as any).incrementalSync();
 
 		expect(harness.api.deleteFile).not.toHaveBeenCalled();
-		expect(harness.api.uploadFiles).toHaveBeenCalledTimes(1);
+		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
 		expect(result?.conflicts).toContain('notes/live.md');
 		expect(result?.uploaded).toBe(1);
 	});
@@ -451,15 +454,11 @@ describe('SyncEngine processDiff conflict handling', () => {
 		const localFile = { path, extension: 'md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(localFile);
 		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer(local));
+		// downloadFile now returns ArrayBuffer directly
 		harness.api.downloadFile.mockResolvedValue({
-			path,
-			content: Buffer.from(remote).toString('base64'),
+			content: toArrayBuffer(remote),
 			contentType: 'text/markdown',
 			size: remote.length,
-		});
-		harness.api.uploadFiles.mockResolvedValue({
-			success: true,
-			results: [{ path, success: true }],
 		});
 
 		const localFiles: Record<string, { hash: string; size: number; modified: string }> = {};
@@ -480,7 +479,7 @@ describe('SyncEngine processDiff conflict handling', () => {
 
 		expect(result.conflicts).toHaveLength(1);
 		expect(result.conflicts[0]).toMatch(/^notes\/merge \(conflict .+\)\.md$/);
-		expect(harness.api.uploadFiles).not.toHaveBeenCalled();
+		expect(harness.api.uploadFile).not.toHaveBeenCalled();
 		expect(harness.vault.modifyBinary).toHaveBeenCalledTimes(1);
 		expect(harness.vault.createFolder).toHaveBeenCalledWith('notes');
 		expect(harness.vault.createBinary).toHaveBeenCalledTimes(1);
@@ -507,9 +506,9 @@ describe('SyncEngine processDiff conflict handling', () => {
 		const localFile = { path, extension: 'md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(localFile);
 		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer(local));
+		// downloadFile now returns ArrayBuffer directly
 		harness.api.downloadFile.mockResolvedValue({
-			path,
-			content: Buffer.from(remote).toString('base64'),
+			content: toArrayBuffer(remote),
 			contentType: 'text/markdown',
 			size: remote.length,
 		});
@@ -530,7 +529,7 @@ describe('SyncEngine processDiff conflict handling', () => {
 			result,
 		);
 
-		expect(harness.api.uploadFiles).not.toHaveBeenCalled();
+		expect(harness.api.uploadFile).not.toHaveBeenCalled();
 		expect(harness.vault.createFolder).toHaveBeenCalledWith('notes');
 		expect(harness.vault.createBinary).toHaveBeenCalledWith(
 			expect.stringMatching(/^notes\/conflict \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)\.md$/),

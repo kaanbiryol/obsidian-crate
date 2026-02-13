@@ -15,52 +15,119 @@ function entry(hash: string, modified: string) {
 	};
 }
 
-describe('detectConflicts', () => {
-	it('returns conflict when local and remote changed after last sync', () => {
+describe('detectConflicts (3-way hash)', () => {
+	it('skips files with matching hashes', () => {
 		const diffs = detectConflicts(
-			{ 'note.md': entry('local', '2026-02-06T12:00:00.000Z') },
-			{ 'note.md': entry('remote', '2026-02-06T12:01:00.000Z') },
-			'2026-02-06T11:00:00.000Z',
+			{ 'note.md': entry('same', '2026-02-06T12:00:00.000Z') },
+			{ 'note.md': entry('same', '2026-02-06T12:01:00.000Z') },
+			{},
+		);
+
+		expect(diffs).toHaveLength(0);
+	});
+
+	it('returns conflict when both sides changed since manifest', () => {
+		const diffs = detectConflicts(
+			{ 'note.md': entry('local-v2', '2026-02-06T12:00:00.000Z') },
+			{ 'note.md': entry('remote-v2', '2026-02-06T12:01:00.000Z') },
+			{ 'note.md': entry('base-v1', '2026-02-06T10:00:00.000Z') },
 		);
 
 		expect(diffs).toContainEqual({
 			path: 'note.md',
+			action: 'conflict',
+			localHash: 'local-v2',
+			remoteHash: 'remote-v2',
+		});
+	});
+
+	it('returns conflict when new file on both sides with different content', () => {
+		const diffs = detectConflicts(
+			{ 'new.md': entry('local', '2026-02-06T12:00:00.000Z') },
+			{ 'new.md': entry('remote', '2026-02-06T12:01:00.000Z') },
+			{}, // no manifest entry
+		);
+
+		expect(diffs).toContainEqual({
+			path: 'new.md',
 			action: 'conflict',
 			localHash: 'local',
 			remoteHash: 'remote',
 		});
 	});
 
-	it('returns upload when only local changed after last sync', () => {
+	it('returns upload when only local changed since manifest', () => {
 		const diffs = detectConflicts(
-			{ 'note.md': entry('local', '2026-02-06T12:00:00.000Z') },
-			{ 'note.md': entry('remote', '2026-02-06T10:00:00.000Z') },
-			'2026-02-06T11:00:00.000Z',
+			{ 'note.md': entry('local-v2', '2026-02-06T12:00:00.000Z') },
+			{ 'note.md': entry('base-v1', '2026-02-06T10:00:00.000Z') },
+			{ 'note.md': entry('base-v1', '2026-02-06T10:00:00.000Z') },
 		);
 
 		expect(diffs).toContainEqual({
 			path: 'note.md',
 			action: 'upload',
-			localHash: 'local',
-			remoteHash: 'remote',
+			localHash: 'local-v2',
+			remoteHash: 'base-v1',
 		});
 	});
 
-	it('returns download when only remote changed after last sync', () => {
+	it('returns download when only remote changed since manifest', () => {
 		const diffs = detectConflicts(
-			{ 'note.md': entry('local', '2026-02-06T10:00:00.000Z') },
-			{ 'note.md': entry('remote', '2026-02-06T12:00:00.000Z') },
-			'2026-02-06T11:00:00.000Z',
+			{ 'note.md': entry('base-v1', '2026-02-06T10:00:00.000Z') },
+			{ 'note.md': entry('remote-v2', '2026-02-06T12:00:00.000Z') },
+			{ 'note.md': entry('base-v1', '2026-02-06T10:00:00.000Z') },
 		);
 
 		expect(diffs).toContainEqual({
 			path: 'note.md',
 			action: 'download',
-			localHash: 'local',
+			localHash: 'base-v1',
+			remoteHash: 'remote-v2',
+		});
+	});
+
+	it('returns download when local matches manifest but remote differs', () => {
+		const diffs = detectConflicts(
+			{ 'note.md': entry('base', '2026-02-06T10:00:00.000Z') },
+			{ 'note.md': entry('remote', '2026-02-06T12:00:00.000Z') },
+			{ 'note.md': entry('base', '2026-02-06T10:00:00.000Z') },
+		);
+
+		expect(diffs).toContainEqual({
+			path: 'note.md',
+			action: 'download',
+			localHash: 'base',
 			remoteHash: 'remote',
 		});
 	});
 
+	it('returns upload for local-only files', () => {
+		const diffs = detectConflicts(
+			{ 'local.md': entry('abc', '2026-02-06T12:00:00.000Z') },
+			{},
+			{},
+		);
+
+		expect(diffs).toContainEqual({
+			path: 'local.md',
+			action: 'upload',
+			localHash: 'abc',
+		});
+	});
+
+	it('returns download for remote-only files', () => {
+		const diffs = detectConflicts(
+			{},
+			{ 'remote.md': entry('xyz', '2026-02-06T12:00:00.000Z') },
+			{},
+		);
+
+		expect(diffs).toContainEqual({
+			path: 'remote.md',
+			action: 'download',
+			remoteHash: 'xyz',
+		});
+	});
 });
 
 describe('conflict naming helpers', () => {

@@ -89,41 +89,20 @@ export interface CheckResponse {
 // API Types
 // ============================================================================
 
-export interface UploadFile {
+export interface PreparedUpload {
 	path: string;
-	content: string;
+	content: ArrayBuffer;
 	hash: string;
 	size: number;
 	mtime?: number;
-	binary?: boolean;
 	contentType?: string;
 }
 
-export interface UploadResponse {
+export interface UploadResult {
 	success: boolean;
-	results: Array<{
-		path: string;
-		success?: boolean;
-		error?: string;
-		hash?: string;
-	}>;
-}
-
-export interface DownloadResponse {
 	path: string;
-	content: string;
-	contentType: string;
-	size: number;
-}
-
-export interface BatchDownloadResponse {
-	files: Array<{
-		path: string;
-		content?: string;
-		contentType?: string;
-		size?: number;
-		error?: string;
-	}>;
+	hash?: string;
+	error?: string;
 }
 
 export interface HealthResponse {
@@ -239,5 +218,5 @@ export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
 
 export const DEBOUNCE_DELAY_MS = 10000;
 export const TOMBSTONE_TTL_DAYS = 30;
-export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
 

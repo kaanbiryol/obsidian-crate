@@ -15,8 +15,7 @@ import type {
 	SyncState,
 	SyncResult,
 	FileDiff,
-	UploadFile,
-	UploadResponse,
+	PreparedUpload,
 	FileEntry,
 	CrateSettings,
 	ChangelogEntry,
@@ -25,11 +24,10 @@ import { DEBOUNCE_DELAY_MS, MAX_FILE_SIZE_BYTES } from '../types';
 
 const logger = createLogger('SyncEngine');
 const UPLOAD_CONCURRENCY = 5;
+const DOWNLOAD_CONCURRENCY = 5;
 const FORCE_SYNC_CONCURRENCY = 2;
 const PREPARE_CONCURRENCY = 5;
 const INITIAL_SYNC_PIPELINE_CHUNK_FILES = 120;
-const MAX_UPLOAD_BATCH_FILES = 10;
-const MAX_UPLOAD_BATCH_BYTES = 5 * 1024 * 1024; // Keep well below Cloudflare request limits
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
 
@@ -272,12 +270,11 @@ export class SyncEngine {
 
 		logger.info(`Processing ${this.pendingPaths.size} pending changes`);
 		const paths = Array.from(this.pendingPaths);
-		this.pendingPaths.clear();
 
 		this.updateState({ status: 'syncing', pendingChanges: 0 });
 
 		try {
-			const uploads: UploadFile[] = [];
+			const uploads: PreparedUpload[] = [];
 			const deletes: string[] = [];
 
 			for (const path of paths) {
@@ -311,10 +308,15 @@ export class SyncEngine {
 				// Upload changed files concurrently
 				if (uploads.length > 0) {
 					const uploadTasks = uploads.map(upload => async () => {
-						const response = await this.api.uploadFiles([upload]);
-						const uploadResult = response.results.find(r => r.path === upload.path);
-						if (uploadResult?.success) {
-							if (uploadResult.hash && uploadResult.hash !== upload.hash) {
+						const result = await this.api.uploadFile(
+							upload.path,
+							upload.content,
+							upload.hash,
+							upload.size,
+							upload.contentType || 'application/octet-stream',
+						);
+						if (result.success) {
+							if (result.hash && result.hash !== upload.hash) {
 								logger.warn(`Hash mismatch after upload for ${upload.path}`);
 								return;
 							}
@@ -335,12 +337,20 @@ export class SyncEngine {
 				}
 
 			await this.localManifest.save();
+
+			// Fix 1: Clear pending paths only after successful sync
+			this.pendingPaths.clear();
+
 			this.updateState({
 				status: 'idle',
 				lastSync: new Date().toISOString(),
 				lastError: null,
 			});
 		} catch (error) {
+			// Fix 1: Re-add paths back on failure so they're retried
+			for (const p of paths) {
+				this.pendingPaths.add(p);
+			}
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			this.updateState({
 				status: 'error',
@@ -352,15 +362,16 @@ export class SyncEngine {
 	/**
 	 * Prepare a TFile for upload (delegates to VaultFile variant)
 	 */
-	private async prepareUpload(file: TFile): Promise<UploadFile | null> {
+	private async prepareUpload(file: TFile): Promise<PreparedUpload | null> {
 		return this.prepareUploadFromVaultFile(tfileToVaultFile(file));
 	}
 
 	/**
 	 * Prepare a VaultFile for upload — works for both indexed and hidden files.
 	 * Reads content via the low-level adapter so hidden files are supported.
+	 * Returns ArrayBuffer content directly (no base64 encoding).
 	 */
-	private async prepareUploadFromVaultFile(file: VaultFile): Promise<UploadFile | null> {
+	private async prepareUploadFromVaultFile(file: VaultFile): Promise<PreparedUpload | null> {
 		// Check file size
 		if (file.size > MAX_FILE_SIZE_BYTES) {
 			logger.warn('Skipping large file:', file.path);
@@ -376,33 +387,12 @@ export class SyncEngine {
 			return null;
 		}
 
-		// Determine if binary
-		const textExtensions = ['md', 'txt', 'json', 'css', 'js', 'ts', 'html', 'xml', 'yaml', 'yml'];
-		const ext = file.extension.toLowerCase();
-		const isBinary = !textExtensions.includes(ext);
-
-		let contentStr: string;
-		if (isBinary) {
-			// Base64 encode binary content
-			const bytes = new Uint8Array(content);
-			const chunks: string[] = [];
-			for (let i = 0; i < bytes.byteLength; i += 8192) {
-				chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
-			}
-			contentStr = btoa(chunks.join(''));
-		} else {
-			// Text content as-is
-			const decoder = new TextDecoder();
-			contentStr = decoder.decode(content);
-		}
-
 		return {
 			path: file.path,
-			content: contentStr,
+			content,
 			hash,
 			size: file.size,
 			mtime: file.mtime,
-			binary: isBinary,
 			contentType: this.getContentType(file.extension),
 		};
 	}
@@ -581,15 +571,14 @@ export class SyncEngine {
 						}
 					} else if (entry.action === 'put') {
 						if (entry.size > MAX_FILE_SIZE_BYTES) {
-							result.errors.push(`${path}: Skipped remote file larger than 5MB`);
+							result.errors.push(`${path}: Skipped remote file larger than 25MB`);
 							continue;
 						}
 
 						// Preserve local delete intent by writing incoming remote content as a conflict copy.
 						if (localDeletedPaths.has(path)) {
 							const response = await this.api.downloadFile(path);
-							const remoteContent = this.decodeContent(response.content, response.contentType);
-							const conflictPath = await createConflictCopy(this.vault, path, remoteContent);
+							const conflictPath = await createConflictCopy(this.vault, path, response.content);
 							result.conflicts.push(conflictPath);
 							continue;
 						}
@@ -603,7 +592,7 @@ export class SyncEngine {
 								? (localFile as TFile).stat
 								: await this.vault.adapter.stat(path);
 							if ((stat?.size ?? 0) > MAX_FILE_SIZE_BYTES) {
-								result.errors.push(`${path}: Skipped local file larger than 5MB`);
+								result.errors.push(`${path}: Skipped local file larger than 25MB`);
 								continue;
 							}
 
@@ -644,9 +633,9 @@ export class SyncEngine {
 			const total = changesByPath.size + localOnlyChanges.length + localOnlyDeletes.length;
 			let current = 0;
 
-			// Batch download remote files
+			// Download remote files in parallel
 			if (downloadPaths.length > 0) {
-				await this.batchDownloadAndSaveFiles(downloadPaths, result);
+				await this.parallelDownloadAndSaveFiles(downloadPaths, result);
 			}
 			current += changesByPath.size;
 			progressCallback?.(current, total);
@@ -663,11 +652,11 @@ export class SyncEngine {
 			}
 
 			// Upload local-only changes (modified locally but not in remote changeset)
-			const localOnlyUploads: UploadFile[] = [];
+			const localOnlyUploads: PreparedUpload[] = [];
 			for (const file of localOnlyChanges) {
 				try {
 					const tfile = this.vault.getAbstractFileByPath(file.path);
-					let uploadFile: UploadFile | null = null;
+					let uploadFile: PreparedUpload | null = null;
 					if (tfile && 'extension' in tfile) {
 						uploadFile = await this.prepareUpload(tfile as TFile);
 					} else if (isHiddenPath(file.path)) {
@@ -761,56 +750,19 @@ export class SyncEngine {
 	 */
 	private async downloadAndSaveFile(path: string, result: SyncResult): Promise<void> {
 		const response = await this.api.downloadFile(path);
-		const content = this.decodeContent(response.content, response.contentType);
+		const content = response.content;
 		if (content.byteLength > MAX_FILE_SIZE_BYTES) {
-			result.errors.push(`${path}: Skipped remote file larger than 5MB`);
+			result.errors.push(`${path}: Skipped remote file larger than 25MB`);
 			return;
 		}
 
-		// Create parent folders if needed
-		const folderPath = path.substring(0, path.lastIndexOf('/'));
-		if (folderPath) {
-			if (isHiddenPath(path)) {
-				// Use adapter.mkdir for hidden paths (vault.createFolder rejects dot-prefixed names)
-				try {
-					await this.vault.adapter.mkdir(folderPath);
-				} catch {
-					// Folder might already exist
-				}
-			} else {
-				try {
-					await this.vault.createFolder(folderPath);
-				} catch {
-					// Folder might already exist
-				}
-			}
-		}
-
-		if (isHiddenPath(path)) {
-			// Hidden files: always use adapter
-			await this.vault.adapter.writeBinary(path, content);
-		} else {
-			const existingFile = this.vault.getAbstractFileByPath(path);
-			if (existingFile) {
-				await this.vault.modifyBinary(existingFile as TFile, content);
-			} else {
-				await this.vault.createBinary(path, content);
-			}
-		}
-
-		const hash = await computeHash(content);
-		this.localManifest.setEntry(path, {
-			hash,
-			size: content.byteLength,
-			modified: await this.getModifiedIso(path),
-		});
-
+		await this.saveDownloadedContent(path, content);
 		result.downloaded++;
 	}
 
 	private async saveDownloadedContent(path: string, content: ArrayBuffer): Promise<void> {
 		if (content.byteLength > MAX_FILE_SIZE_BYTES) {
-			throw new Error('Skipped remote file larger than 5MB');
+			throw new Error('Skipped remote file larger than 25MB');
 		}
 
 		const folderPath = path.substring(0, path.lastIndexOf('/'));
@@ -841,27 +793,20 @@ export class SyncEngine {
 		});
 	}
 
-	private async batchDownloadAndSaveFiles(paths: string[], result: SyncResult): Promise<void> {
-		const MAX_DOWNLOAD_BATCH = 20;
-		for (let i = 0; i < paths.length; i += MAX_DOWNLOAD_BATCH) {
-			const batch = paths.slice(i, i + MAX_DOWNLOAD_BATCH);
-			const response = await this.api.batchDownload(batch);
-				for (const file of response.files) {
-					if (file.error || !file.content) {
-						result.errors.push(`${file.path}: ${file.error || 'Download failed'}`);
-						continue;
-					}
-					try {
-						const content = this.decodeContent(file.content, file.contentType || 'application/octet-stream');
-						await this.saveDownloadedContent(file.path, content);
-						result.downloaded++;
-					} catch (error) {
-						const errorMessage = error instanceof Error ? error.message : 'Download failed';
-						result.errors.push(`${file.path}: ${errorMessage}`);
-					}
-				}
+	/**
+	 * Download files in parallel using individual binary requests
+	 */
+	private async parallelDownloadAndSaveFiles(paths: string[], result: SyncResult): Promise<void> {
+		const tasks = paths.map(path => async () => {
+			try {
+				await this.downloadAndSaveFile(path, result);
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : 'Download failed';
+				result.errors.push(`${path}: ${errorMessage}`);
 			}
-		}
+		});
+		await this.runConcurrent(tasks, DOWNLOAD_CONCURRENCY);
+	}
 
 	/**
 	 * Full sync - compare manifests and sync all differences
@@ -939,27 +884,30 @@ export class SyncEngine {
 				};
 			}
 
-			// Detect differences
+			// Get manifest entries for 3-way conflict detection
+			const manifestEntries = this.localManifest.getManifest().files;
+
+			// Detect differences using 3-way hash comparison
 			const diffMap = new Map<string, FileDiff>();
 			for (const diff of detectConflicts(
 				localFiles,
 				remoteManifest.files,
-				this.state.lastSync,
+				manifestEntries,
 			)) {
 				diffMap.set(diff.path, diff);
 			}
 
 			// Reconcile local deletions that happened while the plugin was offline/unloaded.
 			const localDeletes = await this.getLocalDeletes();
-			const lastSyncTime = this.state.lastSync ? new Date(this.state.lastSync).getTime() : 0;
 			for (const path of localDeletes) {
 				const remoteEntry = remoteManifest.files[path];
 				if (!remoteEntry) {
 					this.localManifest.removeEntry(path);
 					continue;
 				}
-				const remoteModified = new Date(remoteEntry.modified).getTime();
-				if (!Number.isNaN(remoteModified) && remoteModified <= lastSyncTime) {
+				// If manifest has the entry and remote hash matches manifest, local deleted since last sync → delete remote
+				const manifestEntry = manifestEntries[path];
+				if (manifestEntry && remoteEntry.hash === manifestEntry.hash) {
 					diffMap.set(path, { path, action: 'delete', remoteHash: remoteEntry.hash });
 				}
 			}
@@ -968,12 +916,12 @@ export class SyncEngine {
 			for (const [path, diff] of [...diffMap.entries()]) {
 				const remoteEntry = remoteManifest.files[path];
 				if (largeLocalPaths.has(path)) {
-					result.errors.push(`${path}: Skipped local file larger than 5MB`);
+					result.errors.push(`${path}: Skipped local file larger than 25MB`);
 					diffMap.delete(path);
 					continue;
 				}
 				if (remoteEntry && remoteEntry.size > MAX_FILE_SIZE_BYTES) {
-					result.errors.push(`${path}: Skipped remote file larger than 5MB`);
+					result.errors.push(`${path}: Skipped remote file larger than 25MB`);
 					diffMap.delete(path);
 					continue;
 				}
@@ -984,7 +932,7 @@ export class SyncEngine {
 
 			const diffs = [...diffMap.values()];
 
-			// Process differences — uploads concurrent, downloads batched, rest sequential
+			// Process differences — uploads concurrent, downloads parallel, rest sequential
 			const uploadDiffs = diffs.filter(d => d.action === 'upload');
 			const downloadDiffs = diffs.filter(d => d.action === 'download');
 			const conflictDiffs = diffs.filter(d => d.action === 'conflict');
@@ -1009,9 +957,9 @@ export class SyncEngine {
 				await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
 			}
 
-			// Batch download diffs
+			// Download files in parallel
 				if (downloadDiffs.length > 0) {
-					await this.batchDownloadAndSaveFiles(
+					await this.parallelDownloadAndSaveFiles(
 						downloadDiffs.map(d => d.path),
 						result,
 					);
@@ -1114,7 +1062,7 @@ export class SyncEngine {
 		switch (diff.action) {
 			case 'upload': {
 				const file = this.vault.getAbstractFileByPath(diff.path);
-				let uploadFile: UploadFile | null = null;
+				let uploadFile: PreparedUpload | null = null;
 				if (file && 'extension' in file) {
 					uploadFile = await this.prepareUpload(file as TFile);
 				} else if (hidden) {
@@ -1129,10 +1077,15 @@ export class SyncEngine {
 					}
 				}
 				if (uploadFile) {
-					const response = await this.api.uploadFiles([uploadFile]);
-					const uploadResult = response.results.find(entry => entry.path === uploadFile.path);
-					if (!uploadResult?.success) {
-						throw new Error(uploadResult?.error || 'Upload failed');
+					const uploadResult = await this.api.uploadFile(
+						uploadFile.path,
+						uploadFile.content,
+						uploadFile.hash,
+						uploadFile.size,
+						uploadFile.contentType || 'application/octet-stream',
+					);
+					if (!uploadResult.success) {
+						throw new Error(uploadResult.error || 'Upload failed');
 					}
 
 					result.uploaded++;
@@ -1163,11 +1116,11 @@ export class SyncEngine {
 			}
 
 			case 'conflict': {
-				// Download remote version
+				// Download remote version — already ArrayBuffer
 				const response = await this.api.downloadFile(diff.path);
-				const remoteContent = this.decodeContent(response.content, response.contentType);
+				const remoteContent = response.content;
 				if (remoteContent.byteLength > MAX_FILE_SIZE_BYTES) {
-					throw new Error('Skipped remote file larger than 5MB');
+					throw new Error('Skipped remote file larger than 25MB');
 				}
 
 				// Read local content
@@ -1218,24 +1171,12 @@ export class SyncEngine {
 	}
 
 	/**
-	 * Decode content from base64
-	 */
-	private decodeContent(base64: string, contentType: string): ArrayBuffer {
-		const binaryString = atob(base64);
-		const bytes = new Uint8Array(binaryString.length);
-		for (let i = 0; i < binaryString.length; i++) {
-			bytes[i] = binaryString.charCodeAt(i);
-		}
-		return bytes.buffer as ArrayBuffer;
-	}
-
-	/**
 	 * Prepare uploads with bounded concurrency to reduce initial sync wall time.
 	 */
 	private async prepareUploadsFromVaultFiles(
 		files: VaultFile[],
 		onPrepared?: (completed: number) => void,
-	): Promise<UploadFile[]> {
+	): Promise<PreparedUpload[]> {
 		let completed = 0;
 
 		const tasks = files.map(file => async () => {
@@ -1246,101 +1187,38 @@ export class SyncEngine {
 		});
 
 		const prepared = await this.runConcurrent(tasks, PREPARE_CONCURRENCY);
-		return prepared.filter((upload): upload is UploadFile => upload !== null);
+		return prepared.filter((upload): upload is PreparedUpload => upload !== null);
 	}
 
-	private estimateUploadPayloadBytes(upload: UploadFile): number {
-		// Base64 payloads are ASCII; text can contain multibyte chars.
-		const contentBytes = upload.binary ? upload.content.length : upload.content.length * 2;
-		const metadataBytes = upload.path.length + upload.hash.length + (upload.contentType?.length ?? 0) + 256;
-		return contentBytes + metadataBytes;
-	}
-
-	private createUploadBatches(uploads: UploadFile[]): UploadFile[][] {
-		const batches: UploadFile[][] = [];
-		let currentBatch: UploadFile[] = [];
-		let currentBytes = 32; // JSON envelope overhead
-
-		for (const upload of uploads) {
-			const uploadBytes = this.estimateUploadPayloadBytes(upload);
-			const exceedsFileLimit = currentBatch.length >= MAX_UPLOAD_BATCH_FILES;
-			const exceedsByteLimit = currentBatch.length > 0 && (currentBytes + uploadBytes) > MAX_UPLOAD_BATCH_BYTES;
-
-			if (exceedsFileLimit || exceedsByteLimit) {
-				batches.push(currentBatch);
-				currentBatch = [];
-				currentBytes = 32;
-			}
-
-			currentBatch.push(upload);
-			currentBytes += uploadBytes;
-		}
-
-		if (currentBatch.length > 0) {
-			batches.push(currentBatch);
-		}
-
-		return batches;
-	}
-
-	private shouldSplitUploadBatch(error: unknown): boolean {
-		if (!(error instanceof Error)) return false;
-		const message = error.message.toLowerCase();
-		return (
-			message.includes('http 413') ||
-			message.includes('payload') ||
-			message.includes('too large') ||
-			message.includes('request body') ||
-			message.includes('http 429') ||
-			message.includes('rate') ||
-			message.includes('cpu') ||
-			message.includes('1102')
-		);
-	}
-
-	private async uploadBatchWithAdaptiveSplit(batch: UploadFile[], retry: boolean): Promise<UploadResponse> {
-		const upload = () => this.api.uploadFiles(batch);
-
-		try {
-			return retry ? await this.retryWithBackoff(upload) : await upload();
-		} catch (error) {
-			if (batch.length <= 1 || !this.shouldSplitUploadBatch(error)) {
-				throw error;
-			}
-
-			const mid = Math.ceil(batch.length / 2);
-			const leftBatch = batch.slice(0, mid);
-			const rightBatch = batch.slice(mid);
-			logger.warn(`Batch upload failed for ${batch.length} files, retrying as ${leftBatch.length}+${rightBatch.length}`);
-
-			const left = await this.uploadBatchWithAdaptiveSplit(leftBatch, retry);
-			const right = await this.uploadBatchWithAdaptiveSplit(rightBatch, retry);
-
-			return {
-				success: left.success && right.success,
-				results: [...left.results, ...right.results],
-			};
-		}
-	}
-
-	private async applyUploadBatchResults(
-		batch: UploadFile[],
-		response: UploadResponse,
+	/**
+	 * Upload prepared files as parallel individual binary uploads
+	 */
+	private async uploadPreparedFiles(
+		prepared: PreparedUpload[],
 		result: SyncResult,
+		options: { concurrency: number; retry: boolean },
 	): Promise<void> {
-		if (response.results.length !== batch.length) {
-			logger.warn(`Upload batch result count mismatch: expected ${batch.length}, got ${response.results.length}`);
-		}
+		if (prepared.length === 0) return;
 
-		const resultsByPath = new Map(response.results.map(entry => [entry.path, entry]));
+		logger.info(`Uploading ${prepared.length} files`);
 
-			for (const upload of batch) {
-				const uploadResult = resultsByPath.get(upload.path);
-				if (uploadResult?.success) {
-					// Verify echoed hash if the worker returned one
+		const tasks = prepared.map(upload => async () => {
+			try {
+				const doUpload = () => this.api.uploadFile(
+					upload.path,
+					upload.content,
+					upload.hash,
+					upload.size,
+					upload.contentType || 'application/octet-stream',
+				);
+				const uploadResult = options.retry
+					? await this.retryWithBackoff(doUpload)
+					: await doUpload();
+
+				if (uploadResult.success) {
 					if (uploadResult.hash && uploadResult.hash !== upload.hash) {
 						result.errors.push(`${upload.path}: Hash mismatch after upload (expected ${upload.hash}, got ${uploadResult.hash})`);
-						continue;
+						return;
 					}
 					result.uploaded++;
 					this.localManifest.setEntry(upload.path, {
@@ -1348,27 +1226,13 @@ export class SyncEngine {
 						size: upload.size,
 						modified: await this.getModifiedIso(upload.path, upload.mtime),
 					});
-				} else if (uploadResult?.error) {
-					result.errors.push(`${upload.path}: ${uploadResult.error}`);
 				} else {
-				result.errors.push(`${upload.path}: Upload failed`);
+					result.errors.push(`${upload.path}: ${uploadResult.error || 'Upload failed'}`);
+				}
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+				result.errors.push(`${upload.path}: ${errorMessage}`);
 			}
-		}
-	}
-
-	private async uploadPreparedFiles(
-		prepared: UploadFile[],
-		result: SyncResult,
-		options: { concurrency: number; retry: boolean },
-	): Promise<void> {
-		if (prepared.length === 0) return;
-
-		const batches = this.createUploadBatches(prepared);
-		logger.info(`Uploading ${prepared.length} files in ${batches.length} batch(es)`);
-
-		const tasks = batches.map(batch => async () => {
-			const response = await this.uploadBatchWithAdaptiveSplit(batch, options.retry);
-			await this.applyUploadBatchResults(batch, response, result);
 		});
 
 		await this.runConcurrent(tasks, options.concurrency);
@@ -1532,7 +1396,7 @@ export class SyncEngine {
 				progressCallback?.(current, total);
 			});
 
-			// Second pass: upload in adaptive batches with retry
+			// Second pass: upload individually with retry
 			await this.uploadPreparedFiles(prepared, result, {
 				concurrency: FORCE_SYNC_CONCURRENCY,
 				retry: true,

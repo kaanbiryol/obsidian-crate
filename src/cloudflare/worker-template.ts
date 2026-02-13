@@ -6,11 +6,24 @@
 export function getWorkerScript(): string {
 	return `
 const TOMBSTONES_KEY = '.crate/tombstones.json';
+const MANIFEST_CACHE_KEY = '.crate/manifest-cache.json';
 const FILES_PREFIX = 'files/';
 const TOMBSTONE_TTL_DAYS = 30;
-const UPLOAD_CONCURRENCY = 4;
+const CHANGELOG_RETENTION_DAYS = 30;
 
 let dbReady = false;
+
+function sanitizePath(path) {
+	if (!path || typeof path !== 'string') return null;
+	if (path.includes('\\0')) return null;
+	const segments = path.split('/').reduce((acc, seg) => {
+		if (seg === '..') { acc.pop(); }
+		else if (seg !== '.' && seg !== '') { acc.push(seg); }
+		return acc;
+	}, []);
+	if (segments.length === 0) return null;
+	return segments.join('/');
+}
 
 async function initDb(db) {
 	if (dbReady) return;
@@ -31,24 +44,21 @@ async function appendChangelog(db, path, action, hash, size) {
 	).bind(path, action, hash || '', size || 0).run();
 }
 
-async function runConcurrent(items, concurrency, worker) {
-	const results = new Array(items.length);
-	let index = 0;
-	async function next() {
-		while (index < items.length) {
-			const i = index++;
-			results[i] = await worker(items[i], i);
-		}
-	}
-	await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => next()));
-	return results;
+async function maybePruneChangelog(db) {
+	if (Math.random() > 0.05) return;
+	try {
+		await db.prepare(
+			"DELETE FROM changelog WHERE created_at < datetime('now', '-' || ? || ' days')"
+		).bind(CHANGELOG_RETENTION_DAYS).run();
+	} catch (e) { /* non-fatal */ }
 }
 
 function corsHeaders() {
 	return {
 		'Access-Control-Allow-Origin': '*',
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-		'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+		'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-File-Hash, X-File-Size',
+		'Access-Control-Expose-Headers': 'X-File-Hash, X-File-Size, Content-Type, Content-Length',
 	};
 }
 
@@ -66,15 +76,6 @@ async function getTombstones(bucket) {
 	const obj = await bucket.get(TOMBSTONES_KEY);
 	if (!obj) return { deleted: [] };
 	return await obj.json();
-}
-
-function arrayBufferToBase64(buffer) {
-	const bytes = new Uint8Array(buffer);
-	const chunks = [];
-	for (let i = 0; i < bytes.byteLength; i += 8192) {
-		chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
-	}
-	return btoa(chunks.join(''));
 }
 
 function pruneTombstones(tombstones, now) {
@@ -100,6 +101,12 @@ async function clearTombstonesForPaths(bucket, paths) {
 	if (tombstones.deleted.length !== before) {
 		await saveTombstones(bucket, tombstones);
 	}
+}
+
+async function invalidateManifestCache(bucket) {
+	try {
+		await bucket.delete(MANIFEST_CACHE_KEY);
+	} catch (e) { /* non-fatal */ }
 }
 
 async function handleHealth() {
@@ -138,27 +145,56 @@ async function handleGetChanges(request, db) {
 	});
 }
 
+async function getManifestCache(bucket) {
+	try {
+		const obj = await bucket.get(MANIFEST_CACHE_KEY);
+		if (!obj) return null;
+		const cache = await obj.json();
+		if (cache && typeof cache === 'object' && cache.files) return cache;
+		return null;
+	} catch (e) {
+		return null;
+	}
+}
+
+async function saveManifestCache(bucket, files) {
+	try {
+		await bucket.put(MANIFEST_CACHE_KEY, JSON.stringify({ files }), {
+			httpMetadata: { contentType: 'application/json' },
+		});
+	} catch (e) { /* non-fatal */ }
+}
+
 async function handleGetManifest(bucket, db) {
-	const files = {};
-	let cursor = undefined;
-	let truncated = true;
+	let files;
+	const cache = await getManifestCache(bucket);
+	if (cache) {
+		files = cache.files;
+	} else {
+		const allFiles = {};
+		let cursor = undefined;
+		let truncated = true;
 
-	while (truncated) {
-		const opts = { prefix: FILES_PREFIX, include: ['customMetadata'] };
-		if (cursor) opts.cursor = cursor;
-		const listed = await bucket.list(opts);
+		while (truncated) {
+			const opts = { prefix: FILES_PREFIX, include: ['customMetadata'] };
+			if (cursor) opts.cursor = cursor;
+			const listed = await bucket.list(opts);
 
-		for (const object of listed.objects) {
-			const path = object.key.slice(FILES_PREFIX.length);
-			files[path] = {
-				hash: object.customMetadata?.hash || '',
-				size: object.size,
-				modified: object.uploaded.toISOString(),
-			};
+			for (const object of listed.objects) {
+				const path = object.key.slice(FILES_PREFIX.length);
+				allFiles[path] = {
+					hash: object.customMetadata?.hash || '',
+					size: object.size,
+					modified: object.uploaded.toISOString(),
+				};
+			}
+
+			truncated = listed.truncated;
+			cursor = listed.cursor;
 		}
 
-		truncated = listed.truncated;
-		cursor = listed.cursor;
+		files = allFiles;
+		await saveManifestCache(bucket, files);
 	}
 
 	let lastSeq = 0;
@@ -174,75 +210,61 @@ async function handleGetManifest(bucket, db) {
 }
 
 async function handleUpload(request, bucket, db) {
-	const body = await request.json();
+	const url = new URL(request.url);
+	const rawPath = url.searchParams.get('path');
 
-	if (!body.files || !Array.isArray(body.files)) {
-		return corsResponse({ error: 'Invalid request: files array required' }, 400);
+	if (!rawPath) {
+		return corsResponse({ error: 'Path query parameter required' }, 400);
 	}
 
-	let changelogEnabled = Boolean(db);
-	if (changelogEnabled) {
-		try {
-			await initDb(db);
-		} catch (e) {
-			changelogEnabled = false;
-		}
+	const safePath = sanitizePath(rawPath);
+	if (!safePath) {
+		return corsResponse({ error: 'Invalid path' }, 400);
 	}
 
-	const outcomes = await runConcurrent(body.files, UPLOAD_CONCURRENCY, async file => {
-		if (!file.path || file.content === undefined) {
-			return { path: file.path, error: 'Missing path or content' };
+	const hash = request.headers.get('X-File-Hash') || '';
+	const size = parseInt(request.headers.get('X-File-Size') || '0', 10);
+	const contentType = request.headers.get('Content-Type') || 'application/octet-stream';
+
+	try {
+		// Stream request body directly to R2 — zero memory buffering
+		await bucket.put(FILES_PREFIX + safePath, request.body, {
+			httpMetadata: { contentType },
+			customMetadata: { hash },
+		});
+
+		let changelogEnabled = Boolean(db);
+		if (changelogEnabled) {
+			try {
+				await initDb(db);
+				await appendChangelog(db, safePath, 'put', hash, size);
+				await maybePruneChangelog(db);
+			} catch (e) { /* D1 failure is non-fatal */ }
 		}
 
-		try {
-			let content;
-			if (file.binary) {
-				const binaryStr = atob(file.content);
-				const bytes = new Uint8Array(binaryStr.length);
-				for (let i = 0; i < binaryStr.length; i++) {
-					bytes[i] = binaryStr.charCodeAt(i);
-				}
-				content = bytes;
-			} else {
-				content = file.content;
-			}
+		await clearTombstonesForPaths(bucket, [safePath]);
 
-			await bucket.put(FILES_PREFIX + file.path, content, {
-				httpMetadata: {
-					contentType: file.contentType || 'text/plain',
-				},
-				customMetadata: { hash: file.hash },
-			});
+		// Invalidate manifest cache instead of read-modify-write (fixes race condition)
+		await invalidateManifestCache(bucket);
 
-			if (changelogEnabled) {
-				try {
-					await appendChangelog(db, file.path, 'put', file.hash, file.size || 0);
-				} catch (e) { /* D1 failure is non-fatal */ }
-			}
-
-			return { path: file.path, success: true, uploaded: true };
-		} catch (err) {
-			const message = err && typeof err.message === 'string' ? err.message : String(err);
-			return { path: file.path, error: message };
-		}
-	});
-
-	const results = outcomes.map(({ uploaded, ...entry }) => entry);
-	const uploadedPaths = outcomes
-		.filter(entry => entry.uploaded && typeof entry.path === 'string')
-		.map(entry => entry.path);
-
-	await clearTombstonesForPaths(bucket, uploadedPaths);
-
-	return corsResponse({ success: true, results });
+		return corsResponse({ success: true, path: safePath, hash });
+	} catch (err) {
+		const message = err && typeof err.message === 'string' ? err.message : String(err);
+		return corsResponse({ success: false, path: safePath, error: message }, 500);
+	}
 }
 
 async function handleDownload(request, bucket) {
 	const url = new URL(request.url);
-	const path = url.searchParams.get('path');
+	const rawPath = url.searchParams.get('path');
 
-	if (!path) {
+	if (!rawPath) {
 		return corsResponse({ error: 'Path query parameter required' }, 400);
+	}
+
+	const path = sanitizePath(rawPath);
+	if (!path) {
+		return corsResponse({ error: 'Invalid path' }, 400);
 	}
 
 	const obj = await bucket.get(FILES_PREFIX + path);
@@ -251,14 +273,15 @@ async function handleDownload(request, bucket) {
 		return corsResponse({ error: 'File not found' }, 404);
 	}
 
-	const content = await obj.arrayBuffer();
-	const base64 = arrayBufferToBase64(content);
-
-	return corsResponse({
-		path,
-		content: base64,
-		contentType: obj.httpMetadata?.contentType || 'application/octet-stream',
-		size: content.byteLength,
+	// Stream R2 body directly to response — zero memory buffering
+	return new Response(obj.body, {
+		status: 200,
+		headers: {
+			'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+			'Content-Length': String(obj.size),
+			'X-File-Hash': obj.customMetadata?.hash || '',
+			...corsHeaders(),
+		},
 	});
 }
 
@@ -269,7 +292,12 @@ async function handleDelete(request, bucket, db) {
 		return corsResponse({ error: 'Path required' }, 400);
 	}
 
-	await bucket.delete(FILES_PREFIX + body.path);
+	const safePath = sanitizePath(body.path);
+	if (!safePath) {
+		return corsResponse({ error: 'Invalid path' }, 400);
+	}
+
+	await bucket.delete(FILES_PREFIX + safePath);
 
 	const tombstones = await getTombstones(bucket);
 	const now = new Date();
@@ -279,8 +307,8 @@ async function handleDelete(request, bucket, db) {
 	for (const tombstone of tombstones.deleted) {
 		byPath.set(tombstone.path, tombstone);
 	}
-	byPath.set(body.path, {
-		path: body.path,
+	byPath.set(safePath, {
+		path: safePath,
 		deletedAt: now.toISOString(),
 		expiresAt: expiresAt.toISOString(),
 	});
@@ -290,11 +318,15 @@ async function handleDelete(request, bucket, db) {
 	if (db) {
 		try {
 			await initDb(db);
-			await appendChangelog(db, body.path, 'delete', '', 0);
+			await appendChangelog(db, safePath, 'delete', '', 0);
+			await maybePruneChangelog(db);
 		} catch (e) { /* D1 failure is non-fatal */ }
 	}
 
-	return corsResponse({ success: true, path: body.path });
+	// Invalidate manifest cache instead of read-modify-write (fixes race condition)
+	await invalidateManifestCache(bucket);
+
+	return corsResponse({ success: true, path: safePath });
 }
 
 async function handleGetTombstones(bucket) {
@@ -302,35 +334,6 @@ async function handleGetTombstones(bucket) {
 	const now = new Date();
 	pruneTombstones(tombstones, now);
 	return corsResponse(tombstones);
-}
-
-async function handleBatchDownload(request, bucket) {
-	const body = await request.json();
-
-	if (!body.paths || !Array.isArray(body.paths)) {
-		return corsResponse({ error: 'Paths array required' }, 400);
-	}
-
-	const results = [];
-
-	for (const path of body.paths) {
-		const obj = await bucket.get(FILES_PREFIX + path);
-
-		if (obj) {
-			const content = await obj.arrayBuffer();
-			const base64 = arrayBufferToBase64(content);
-			results.push({
-				path,
-				content: base64,
-				contentType: obj.httpMetadata?.contentType || 'application/octet-stream',
-				size: content.byteLength,
-			});
-		} else {
-			results.push({ path, error: 'Not found' });
-		}
-	}
-
-	return corsResponse({ files: results });
 }
 
 async function handleGetConfig(env) {
@@ -368,11 +371,10 @@ export default {
 			if (path === '/sync/check' && method === 'GET') return await handleCheckChanges(request, db);
 			if (path === '/sync/changes' && method === 'GET') return await handleGetChanges(request, db);
 			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(bucket, db);
-			if (path === '/sync/upload' && method === 'POST') return await handleUpload(request, bucket, db);
+			if (path === '/sync/upload' && method === 'PUT') return await handleUpload(request, bucket, db);
 			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket);
 			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
 			if (path === '/sync/tombstones' && method === 'GET') return await handleGetTombstones(bucket);
-			if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket);
 			if (path === '/sync/config' && method === 'GET') return await handleGetConfig(env);
 
 			return corsResponse({ error: 'Not found' }, 404);

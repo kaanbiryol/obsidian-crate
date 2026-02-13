@@ -11,7 +11,6 @@ const MANIFEST_CACHE_KEY = '.crate/manifest-cache.json';
 const FILES_PREFIX = 'files/';
 const TOMBSTONE_TTL_DAYS = 30;
 const CHANGELOG_RETENTION_DAYS = 30;
-const UPLOAD_CONCURRENCY = 4;
 
 let dbReady = false;
 
@@ -67,19 +66,6 @@ async function maybePruneChangelog(db) {
 	} catch (e) { /* non-fatal */ }
 }
 
-async function runConcurrent(items, concurrency, worker) {
-	const results = new Array(items.length);
-	let index = 0;
-	async function next() {
-		while (index < items.length) {
-			const i = index++;
-			results[i] = await worker(items[i], i);
-		}
-	}
-	await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => next()));
-	return results;
-}
-
 function json(data, status = 200) {
 	return new Response(JSON.stringify(data), {
 		status,
@@ -87,20 +73,12 @@ function json(data, status = 200) {
 	});
 }
 
-function arrayBufferToBase64(buffer) {
-	const bytes = new Uint8Array(buffer);
-	const chunks = [];
-	for (let i = 0; i < bytes.byteLength; i += 8192) {
-		chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
-	}
-	return btoa(chunks.join(''));
-}
-
-function corsHeaders(origin) {
+function corsHeaders() {
 	return {
 		'Access-Control-Allow-Origin': '*',
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-		'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+		'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-File-Hash, X-File-Size',
+		'Access-Control-Expose-Headers': 'X-File-Hash, X-File-Size, Content-Type, Content-Length',
 	};
 }
 
@@ -143,6 +121,12 @@ async function clearTombstonesForPaths(bucket, paths) {
 	if (tombstones.deleted.length !== before) {
 		await saveTombstones(bucket, tombstones);
 	}
+}
+
+async function invalidateManifestCache(bucket) {
+	try {
+		await bucket.delete(MANIFEST_CACHE_KEY);
+	} catch (e) { /* non-fatal */ }
 }
 
 async function handleHealth() {
@@ -250,88 +234,48 @@ async function handleGetManifest(bucket, db) {
 }
 
 async function handleUpload(request, bucket, db) {
-	const body = await request.json();
+	const url = new URL(request.url);
+	const rawPath = url.searchParams.get('path');
 
-	if (!body.files || !Array.isArray(body.files)) {
-		return corsResponse({ error: 'Invalid request: files array required' }, 400);
+	if (!rawPath) {
+		return corsResponse({ error: 'Path query parameter required' }, 400);
 	}
 
-	let changelogEnabled = Boolean(db);
-	if (changelogEnabled) {
-		try {
-			await initDb(db);
-		} catch (e) {
-			changelogEnabled = false;
-		}
+	const safePath = sanitizePath(rawPath);
+	if (!safePath) {
+		return corsResponse({ error: 'Invalid path' }, 400);
 	}
 
-	const outcomes = await runConcurrent(body.files, UPLOAD_CONCURRENCY, async file => {
-		if (!file.path || file.content === undefined) {
-			return { path: file.path, error: 'Missing path or content' };
+	const hash = request.headers.get('X-File-Hash') || '';
+	const size = parseInt(request.headers.get('X-File-Size') || '0', 10);
+	const contentType = request.headers.get('Content-Type') || 'application/octet-stream';
+
+	try {
+		// Stream request body directly to R2 — zero memory buffering
+		await bucket.put(FILES_PREFIX + safePath, request.body, {
+			httpMetadata: { contentType },
+			customMetadata: { hash },
+		});
+
+		let changelogEnabled = Boolean(db);
+		if (changelogEnabled) {
+			try {
+				await initDb(db);
+				await appendChangelog(db, safePath, 'put', hash, size);
+				await maybePruneChangelog(db);
+			} catch (e) { /* D1 failure is non-fatal */ }
 		}
 
-		const safePath = sanitizePath(file.path);
-		if (!safePath) {
-			return { path: file.path, error: 'Invalid path' };
-		}
+		await clearTombstonesForPaths(bucket, [safePath]);
 
-		try {
-			let content;
-			if (file.binary) {
-				const binaryStr = atob(file.content);
-				const bytes = new Uint8Array(binaryStr.length);
-				for (let i = 0; i < binaryStr.length; i++) {
-					bytes[i] = binaryStr.charCodeAt(i);
-				}
-				content = bytes;
-			} else {
-				content = file.content;
-			}
+		// Invalidate manifest cache instead of read-modify-write (fixes race condition)
+		await invalidateManifestCache(bucket);
 
-			await bucket.put(FILES_PREFIX + safePath, content, {
-				httpMetadata: {
-					contentType: file.contentType || 'text/plain',
-				},
-				customMetadata: { hash: file.hash },
-			});
-
-			if (changelogEnabled) {
-				try {
-					await appendChangelog(db, safePath, 'put', file.hash, file.size || 0);
-					await maybePruneChangelog(db);
-				} catch (e) { /* D1 failure is non-fatal */ }
-			}
-
-			return { path: safePath, success: true, uploaded: true, hash: file.hash };
-		} catch (err) {
-			const message = err && typeof err.message === 'string' ? err.message : String(err);
-			return { path: safePath, error: message };
-		}
-	});
-
-	const results = outcomes.map(({ uploaded, ...entry }) => entry);
-	const uploadedPaths = outcomes
-		.filter(entry => entry.uploaded && typeof entry.path === 'string')
-		.map(entry => entry.path);
-
-	await clearTombstonesForPaths(bucket, uploadedPaths);
-
-	// Update manifest cache with newly uploaded files
-	const cache = await getManifestCache(bucket);
-	if (cache) {
-		for (const outcome of outcomes) {
-			if (outcome.uploaded && outcome.path) {
-				cache.files[outcome.path] = {
-					hash: outcome.hash || '',
-					size: outcome.size || 0,
-					modified: new Date().toISOString(),
-				};
-			}
-		}
-		await saveManifestCache(bucket, cache.files);
+		return corsResponse({ success: true, path: safePath, hash });
+	} catch (err) {
+		const message = err && typeof err.message === 'string' ? err.message : String(err);
+		return corsResponse({ success: false, path: safePath, error: message }, 500);
 	}
-
-	return corsResponse({ success: true, results });
 }
 
 async function handleDownload(request, bucket) {
@@ -353,14 +297,15 @@ async function handleDownload(request, bucket) {
 		return corsResponse({ error: 'File not found' }, 404);
 	}
 
-	const content = await obj.arrayBuffer();
-	const base64 = arrayBufferToBase64(content);
-
-	return corsResponse({
-		path,
-		content: base64,
-		contentType: obj.httpMetadata?.contentType || 'application/octet-stream',
-		size: content.byteLength,
+	// Stream R2 body directly to response — zero memory buffering
+	return new Response(obj.body, {
+		status: 200,
+		headers: {
+			'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+			'Content-Length': String(obj.size),
+			'X-File-Hash': obj.customMetadata?.hash || '',
+			...corsHeaders(),
+		},
 	});
 }
 
@@ -402,12 +347,8 @@ async function handleDelete(request, bucket, db) {
 		} catch (e) { /* D1 failure is non-fatal */ }
 	}
 
-	// Remove from manifest cache
-	const cache = await getManifestCache(bucket);
-	if (cache && cache.files[safePath]) {
-		delete cache.files[safePath];
-		await saveManifestCache(bucket, cache.files);
-	}
+	// Invalidate manifest cache instead of read-modify-write (fixes race condition)
+	await invalidateManifestCache(bucket);
 
 	return corsResponse({ success: true, path: safePath });
 }
@@ -417,41 +358,6 @@ async function handleGetTombstones(bucket) {
 	const now = new Date();
 	pruneTombstones(tombstones, now);
 	return corsResponse(tombstones);
-}
-
-async function handleBatchDownload(request, bucket) {
-	const body = await request.json();
-
-	if (!body.paths || !Array.isArray(body.paths)) {
-		return corsResponse({ error: 'Paths array required' }, 400);
-	}
-
-	const results = [];
-
-	for (const rawPath of body.paths) {
-		const path = sanitizePath(rawPath);
-		if (!path) {
-			results.push({ path: rawPath, error: 'Invalid path' });
-			continue;
-		}
-
-		const obj = await bucket.get(FILES_PREFIX + path);
-
-		if (obj) {
-			const content = await obj.arrayBuffer();
-			const base64 = arrayBufferToBase64(content);
-			results.push({
-				path,
-				content: base64,
-				contentType: obj.httpMetadata?.contentType || 'application/octet-stream',
-				size: content.byteLength,
-			});
-		} else {
-			results.push({ path, error: 'Not found' });
-		}
-	}
-
-	return corsResponse({ files: results });
 }
 
 async function handleGetConfig(env) {
@@ -491,11 +397,10 @@ export default {
 			if (path === '/sync/check' && method === 'GET') return await handleCheckChanges(request, db);
 			if (path === '/sync/changes' && method === 'GET') return await handleGetChanges(request, db);
 			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(bucket, db);
-			if (path === '/sync/upload' && method === 'POST') return await handleUpload(request, bucket, db);
+			if (path === '/sync/upload' && method === 'PUT') return await handleUpload(request, bucket, db);
 			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket);
 			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
 			if (path === '/sync/tombstones' && method === 'GET') return await handleGetTombstones(bucket);
-			if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket);
 			if (path === '/sync/config' && method === 'GET') return await handleGetConfig(env);
 
 			return corsResponse({ error: 'Not found' }, 404);
