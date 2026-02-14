@@ -6,10 +6,8 @@
 
 export function getWorkerScript(): string {
 	return `
-const TOMBSTONES_KEY = '.crate/tombstones.json';
 const MANIFEST_CACHE_KEY = '.crate/manifest-cache.json';
 const FILES_PREFIX = 'files/';
-const TOMBSTONE_TTL_DAYS = 30;
 const CHANGELOG_RETENTION_DAYS = 30;
 
 let dbReady = false;
@@ -92,40 +90,38 @@ function corsResponse(body, status = 200) {
 	});
 }
 
-async function getTombstones(bucket) {
-	const obj = await bucket.get(TOMBSTONES_KEY);
-	if (!obj) return { deleted: [] };
-	return await obj.json();
-}
-
-function pruneTombstones(tombstones, now) {
-	tombstones.deleted = tombstones.deleted.filter(
-		t => new Date(t.expiresAt) > now
-	);
-}
-
-async function saveTombstones(bucket, tombstones) {
-	await bucket.put(TOMBSTONES_KEY, JSON.stringify(tombstones), {
-		httpMetadata: { contentType: 'application/json' },
+async function compressedCorsResponse(body, request, status = 200) {
+	const json = JSON.stringify(body);
+	const acceptEncoding = request.headers.get('Accept-Encoding') || '';
+	if (!acceptEncoding.includes('gzip')) {
+		return new Response(json, {
+			status,
+			headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+		});
+	}
+	const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+	const compressed = await new Response(stream).arrayBuffer();
+	return new Response(compressed, {
+		status,
+		headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', ...corsHeaders() },
 	});
 }
 
-async function clearTombstonesForPaths(bucket, paths) {
-	if (!paths.length) return;
-	const tombstones = await getTombstones(bucket);
-	const now = new Date();
-	pruneTombstones(tombstones, now);
-	const pathSet = new Set(paths);
-	const before = tombstones.deleted.length;
-	tombstones.deleted = tombstones.deleted.filter(t => !pathSet.has(t.path));
-	if (tombstones.deleted.length !== before) {
-		await saveTombstones(bucket, tombstones);
-	}
+async function updateManifestCacheEntry(bucket, path, hash, size) {
+	try {
+		const cache = await getManifestCache(bucket);
+		if (!cache) return;
+		cache.files[path] = { hash, size, modified: new Date().toISOString() };
+		await saveManifestCache(bucket, cache.files);
+	} catch (e) { /* non-fatal */ }
 }
 
-async function invalidateManifestCache(bucket) {
+async function removeManifestCacheEntry(bucket, path) {
 	try {
-		await bucket.delete(MANIFEST_CACHE_KEY);
+		const cache = await getManifestCache(bucket);
+		if (!cache) return;
+		delete cache.files[path];
+		await saveManifestCache(bucket, cache.files);
 	} catch (e) { /* non-fatal */ }
 }
 
@@ -211,7 +207,7 @@ async function saveManifestCache(bucket, files) {
 	} catch (e) { /* non-fatal */ }
 }
 
-async function handleGetManifest(bucket, db) {
+async function handleGetManifest(request, bucket, db) {
 	let files;
 	const cache = await getManifestCache(bucket);
 	if (cache) {
@@ -230,7 +226,7 @@ async function handleGetManifest(bucket, db) {
 		} catch (e) { /* ignore */ }
 	}
 
-	return corsResponse({ version: 1, files, lastSeq });
+	return compressedCorsResponse({ version: 1, files, lastSeq }, request);
 }
 
 async function handleUpload(request, bucket, db) {
@@ -266,10 +262,7 @@ async function handleUpload(request, bucket, db) {
 			} catch (e) { /* D1 failure is non-fatal */ }
 		}
 
-		await clearTombstonesForPaths(bucket, [safePath]);
-
-		// Invalidate manifest cache instead of read-modify-write (fixes race condition)
-		await invalidateManifestCache(bucket);
+		await updateManifestCacheEntry(bucket, safePath, hash, size);
 
 		return corsResponse({ success: true, path: safePath, hash });
 	} catch (err) {
@@ -323,22 +316,6 @@ async function handleDelete(request, bucket, db) {
 
 	await bucket.delete(FILES_PREFIX + safePath);
 
-	const tombstones = await getTombstones(bucket);
-	const now = new Date();
-	const expiresAt = new Date(now.getTime() + TOMBSTONE_TTL_DAYS * 24 * 60 * 60 * 1000);
-	pruneTombstones(tombstones, now);
-	const byPath = new Map();
-	for (const tombstone of tombstones.deleted) {
-		byPath.set(tombstone.path, tombstone);
-	}
-	byPath.set(safePath, {
-		path: safePath,
-		deletedAt: now.toISOString(),
-		expiresAt: expiresAt.toISOString(),
-	});
-	tombstones.deleted = [...byPath.values()];
-	await saveTombstones(bucket, tombstones);
-
 	if (db) {
 		try {
 			await initDb(db);
@@ -347,17 +324,9 @@ async function handleDelete(request, bucket, db) {
 		} catch (e) { /* D1 failure is non-fatal */ }
 	}
 
-	// Invalidate manifest cache instead of read-modify-write (fixes race condition)
-	await invalidateManifestCache(bucket);
+	await removeManifestCacheEntry(bucket, safePath);
 
 	return corsResponse({ success: true, path: safePath });
-}
-
-async function handleGetTombstones(bucket) {
-	const tombstones = await getTombstones(bucket);
-	const now = new Date();
-	pruneTombstones(tombstones, now);
-	return corsResponse(tombstones);
 }
 
 async function handleGetConfig(env) {
@@ -396,11 +365,10 @@ export default {
 			if (path === '/health' && method === 'GET') return await handleHealth();
 			if (path === '/sync/check' && method === 'GET') return await handleCheckChanges(request, db);
 			if (path === '/sync/changes' && method === 'GET') return await handleGetChanges(request, db);
-			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(bucket, db);
+			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(request, bucket, db);
 			if (path === '/sync/upload' && method === 'PUT') return await handleUpload(request, bucket, db);
 			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket);
 			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
-			if (path === '/sync/tombstones' && method === 'GET') return await handleGetTombstones(bucket);
 			if (path === '/sync/config' && method === 'GET') return await handleGetConfig(env);
 
 			return corsResponse({ error: 'Not found' }, 404);

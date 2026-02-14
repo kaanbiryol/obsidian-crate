@@ -994,26 +994,6 @@ export class SyncEngine {
 				progressCallback?.(current, total);
 			}
 
-			// Get and process tombstones
-			const tombstones = await this.api.getTombstones();
-			for (const tombstone of tombstones.deleted) {
-				// Ignore stale tombstones for paths that currently exist remotely.
-				if (remoteManifest.files[tombstone.path]) {
-					continue;
-				}
-
-				const file = this.vault.getAbstractFileByPath(tombstone.path);
-				if (file) {
-					await this.vault.delete(file);
-						this.localManifest.removeEntry(tombstone.path);
-						result.deleted++;
-					} else if (await this.vault.adapter.exists(tombstone.path)) {
-						await this.vault.adapter.remove(tombstone.path);
-						this.localManifest.removeEntry(tombstone.path);
-						result.deleted++;
-					}
-				}
-
 			// Update local manifest
 			for (const [path, entry] of Object.entries(localFiles)) {
 				this.localManifest.setEntry(path, entry);

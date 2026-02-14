@@ -23,7 +23,6 @@ type Harness = {
 		deleteFile: ReturnType<typeof vi.fn>;
 		downloadFile: ReturnType<typeof vi.fn>;
 		getManifest: ReturnType<typeof vi.fn>;
-		getTombstones: ReturnType<typeof vi.fn>;
 		checkForChanges: ReturnType<typeof vi.fn>;
 	};
 	vault: {
@@ -104,7 +103,6 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 		deleteFile: vi.fn(),
 		downloadFile: vi.fn(),
 		getManifest: vi.fn(),
-		getTombstones: vi.fn(),
 		checkForChanges: vi.fn(),
 	};
 

@@ -5,7 +5,6 @@
 import { createLogger } from '../logger';
 import type {
 	FileManifest,
-	TombstoneStore,
 	UploadResult,
 	HealthResponse,
 	ChangesResponse,
@@ -205,20 +204,13 @@ export class SyncApiClient {
 	}
 
 	/**
-	 * Delete file (creates tombstone)
+	 * Delete file
 	 */
 	async deleteFile(path: string): Promise<{ success: boolean; path: string }> {
 		return this.requestJson<{ success: boolean; path: string }>('/sync/delete', {
 			method: 'POST',
 			body: JSON.stringify({ path }),
 		});
-	}
-
-	/**
-	 * Get tombstones
-	 */
-	async getTombstones(): Promise<TombstoneStore> {
-		return this.requestJson<TombstoneStore>('/sync/tombstones');
 	}
 
 	/**
