@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { computeHash } from './hasher';
+import { prepareUploadFromVaultFile } from './transfer';
 import type { CrateSettings } from '../types';
 import { MAX_FILE_SIZE_BYTES } from '../types';
 
@@ -270,15 +271,26 @@ describe('SyncEngine event queue behavior', () => {
 	});
 });
 
-describe('SyncEngine prepareUploadFromVaultFile', () => {
+describe('prepareUploadFromVaultFile', () => {
 	let harness: Harness;
+
+	function transferContext() {
+		return {
+			vault: harness.vault as any,
+			api: harness.api as any,
+			localManifest: harness.localManifest as any,
+			runConcurrent: vi.fn(),
+			retryWithBackoff: vi.fn(),
+			getModifiedIso: vi.fn().mockResolvedValue(new Date().toISOString()),
+		};
+	}
 
 	beforeEach(() => {
 		harness = createHarness();
 	});
 
 	it('skips oversized files', async () => {
-		const result = await (harness.engine as any).prepareUploadFromVaultFile({
+		const result = await prepareUploadFromVaultFile(transferContext(), {
 			path: 'big.bin',
 			size: 25 * 1024 * 1024 + 1,
 			mtime: Date.now(),
@@ -294,7 +306,7 @@ describe('SyncEngine prepareUploadFromVaultFile', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 		harness.localManifest.hashMatches.mockReturnValue(true);
 
-		const result = await (harness.engine as any).prepareUploadFromVaultFile({
+		const result = await prepareUploadFromVaultFile(transferContext(), {
 			path: 'notes/same.md',
 			size: 4,
 			mtime: Date.now(),
@@ -309,7 +321,7 @@ describe('SyncEngine prepareUploadFromVaultFile', () => {
 		const content = new TextEncoder().encode('hello world').buffer as ArrayBuffer;
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 
-		const result = await (harness.engine as any).prepareUploadFromVaultFile({
+		const result = await prepareUploadFromVaultFile(transferContext(), {
 			path: 'notes/a.md',
 			size: 11,
 			mtime: Date.now(),
@@ -332,7 +344,7 @@ describe('SyncEngine prepareUploadFromVaultFile', () => {
 		const bytes = new Uint8Array([0, 255, 1]);
 		harness.vault.adapter.readBinary.mockResolvedValue(bytes.buffer as ArrayBuffer);
 
-		const result = await (harness.engine as any).prepareUploadFromVaultFile({
+		const result = await prepareUploadFromVaultFile(transferContext(), {
 			path: 'images/pixel.png',
 			size: 3,
 			mtime: Date.now(),
@@ -347,7 +359,7 @@ describe('SyncEngine prepareUploadFromVaultFile', () => {
 			}),
 		);
 		// Content is raw ArrayBuffer, not base64
-		expect(result.content.byteLength).toBe(3);
+		expect(result!.content.byteLength).toBe(3);
 		expect(result).not.toHaveProperty('binary');
 	});
 });

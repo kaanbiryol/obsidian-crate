@@ -2,7 +2,7 @@
  * Core sync engine - orchestrates synchronization between local vault and remote storage
  */
 
-import type { Plugin, TFile, TAbstractFile, Vault } from 'obsidian';
+import type { Plugin, TAbstractFile, Vault } from 'obsidian';
 import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
@@ -23,11 +23,8 @@ import {
 	createFullSyncPlan,
 } from './planner';
 import {
-	prepareUpload as prepareTransferUpload,
-	prepareUploadFromVaultFile as prepareTransferUploadFromVaultFile,
 	prepareUploadFromPath as prepareTransferUploadFromPath,
 	downloadAndSaveFile as transferDownloadAndSaveFile,
-	saveDownloadedContent as transferSaveDownloadedContent,
 	parallelDownloadAndSaveFiles as transferParallelDownloadAndSaveFiles,
 	processDiff as transferProcessDiff,
 	prepareUploadsFromVaultFiles as transferPrepareUploadsFromVaultFiles,
@@ -327,24 +324,8 @@ export class SyncEngine {
 		await flushPendingQueueChanges(this.getQueueFlushContext(), UPLOAD_CONCURRENCY);
 	}
 
-	/**
-	 * Prepare a TFile for upload (delegates to VaultFile variant)
-	 */
-	private async prepareUpload(file: TFile): Promise<PreparedUpload | null> {
-		return prepareTransferUpload(this.getTransferContext(), file);
-	}
-
 	private async prepareUploadFromPath(path: string): Promise<PreparedUpload | null> {
 		return prepareTransferUploadFromPath(this.getTransferContext(), path);
-	}
-
-	/**
-	 * Prepare a VaultFile for upload — works for both indexed and hidden files.
-	 * Reads content via the low-level adapter so hidden files are supported.
-	 * Returns ArrayBuffer content directly (no base64 encoding).
-	 */
-	private async prepareUploadFromVaultFile(file: VaultFile): Promise<PreparedUpload | null> {
-		return prepareTransferUploadFromVaultFile(this.getTransferContext(), file);
 	}
 
 	/**
@@ -459,10 +440,6 @@ export class SyncEngine {
 	 */
 	private async downloadAndSaveFile(path: string, result: SyncResult): Promise<void> {
 		await transferDownloadAndSaveFile(this.getTransferContext(), path, result);
-	}
-
-	private async saveDownloadedContent(path: string, content: ArrayBuffer): Promise<void> {
-		await transferSaveDownloadedContent(this.getTransferContext(), path, content);
 	}
 
 	/**

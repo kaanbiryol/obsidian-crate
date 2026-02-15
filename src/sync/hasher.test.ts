@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { computeHash, computeStringHash, verifyHash } from './hasher';
+import { computeHash } from './hasher';
+
+async function computeStringHash(content: string): Promise<string> {
+	const encoder = new TextEncoder();
+	const data = encoder.encode(content);
+	return computeHash(data.buffer as ArrayBuffer);
+}
+
+async function verifyHash(content: ArrayBuffer, expectedHash: string): Promise<boolean> {
+	const actualHash = await computeHash(content);
+	return actualHash === expectedHash;
+}
 
 describe('hasher', () => {
 	it('computes a stable SHA-256 hash for known bytes', async () => {

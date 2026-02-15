@@ -13,19 +13,3 @@ export async function computeHash(content: ArrayBuffer): Promise<string> {
 	return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/**
- * Compute hash from string content
- */
-export async function computeStringHash(content: string): Promise<string> {
-	const encoder = new TextEncoder();
-	const data = encoder.encode(content);
-	return computeHash(data.buffer as ArrayBuffer);
-}
-
-/**
- * Check if content matches expected hash
- */
-export async function verifyHash(content: ArrayBuffer, expectedHash: string): Promise<boolean> {
-	const actualHash = await computeHash(content);
-	return actualHash === expectedHash;
-}
