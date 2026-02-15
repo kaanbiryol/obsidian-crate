@@ -1,0 +1,414 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { computeHash } from './hasher';
+import type { CrateSettings, FileEntry, PreparedUpload, SyncResult } from '../types';
+import { MAX_FILE_SIZE_BYTES } from '../types';
+
+const fileDiscoveryMocks = vi.hoisted(() => ({
+	getAllVaultFiles: vi.fn(),
+	isHiddenPath: vi.fn((path: string) => path.split('/').some(segment => segment.startsWith('.'))),
+}));
+
+const conflictMocks = vi.hoisted(() => ({
+	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
+	detectConflicts: vi.fn(),
+}));
+
+vi.mock('./file-discovery', () => ({
+	getAllVaultFiles: fileDiscoveryMocks.getAllVaultFiles,
+	isHiddenPath: fileDiscoveryMocks.isHiddenPath,
+}));
+
+vi.mock('./conflict', () => ({
+	createConflictCopy: conflictMocks.createConflictCopy,
+	detectConflicts: conflictMocks.detectConflicts,
+}));
+
+import { createFullSyncPlan, getLocalChanges, getLocalDeletes, runIncrementalSync } from './planner';
+
+function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
+	return {
+		workerUrl: 'https://worker.example',
+		cloudflareAccountId: '',
+		cloudflareTokenExpiresAt: null,
+		workerName: '',
+		bucketName: '',
+		databaseId: '',
+		lastSync: null,
+		lastSeq: 10,
+		deviceId: 'dev-1',
+		ignorePatterns: [],
+		syncOnStartup: false,
+		syncInterval: 0,
+		showStatusBar: true,
+		...overrides,
+	};
+}
+
+describe('planner local diff helpers', () => {
+	beforeEach(() => {
+		fileDiscoveryMocks.getAllVaultFiles.mockReset();
+		conflictMocks.detectConflicts.mockReset();
+	});
+
+	it('finds local deletes for non-ignored manifest paths', async () => {
+		const adapter = {
+			exists: vi.fn(async (path: string) => path !== 'notes/missing.md'),
+		};
+
+		const result = await getLocalDeletes(
+			{
+				vault: { adapter } as never,
+				localManifest: {
+					getAllPaths: () => ['notes/missing.md', '.trash/ignore.md'],
+				} as never,
+				shouldIgnore: (path: string) => path.startsWith('.trash/'),
+				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+			},
+			5,
+		);
+
+		expect(result).toEqual(['notes/missing.md']);
+		expect(adapter.exists).toHaveBeenCalledTimes(1);
+	});
+
+	it('detects changed local files by hash and skips unchanged ones', async () => {
+		const unchangedContent = new TextEncoder().encode('same').buffer as ArrayBuffer;
+		const changedContent = new TextEncoder().encode('changed').buffer as ArrayBuffer;
+		const unchangedHash = await computeHash(unchangedContent);
+
+		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue([
+			{ path: 'notes/changed.md', size: 7, mtime: 100, extension: 'md' },
+			{ path: 'notes/unchanged.md', size: 4, mtime: 100, extension: 'md' },
+			{ path: 'notes/large.bin', size: MAX_FILE_SIZE_BYTES + 1, mtime: 100, extension: 'bin' },
+		]);
+
+		const adapter = {
+			readBinary: vi.fn(async (path: string) =>
+				path === 'notes/unchanged.md' ? unchangedContent : changedContent,
+			),
+		};
+
+		const entries: Record<string, FileEntry> = {
+			'notes/changed.md': {
+				hash: 'old-hash',
+				size: 7,
+				modified: new Date(0).toISOString(),
+			},
+			'notes/unchanged.md': {
+				hash: unchangedHash,
+				size: 4,
+				modified: new Date(0).toISOString(),
+			},
+		};
+
+		const result = await getLocalChanges(
+			{
+				vault: { adapter } as never,
+				localManifest: {
+					getEntry: (path: string) => entries[path],
+				} as never,
+				shouldIgnore: () => false,
+				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+			},
+			5,
+		);
+
+		expect(result).toHaveLength(1);
+		expect(result[0]?.path).toBe('notes/changed.md');
+		expect(result[0]?.hash).toHaveLength(64);
+		expect(adapter.readBinary).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('runIncrementalSync', () => {
+	it('returns fast success and advances cursor when nothing changed', async () => {
+		const settings = createSettings({ lastSeq: 5 });
+		const localManifest = {
+			save: vi.fn(async () => {}),
+			setEntry: vi.fn(),
+			removeEntry: vi.fn(),
+			getEntry: vi.fn(),
+			getAllPaths: vi.fn(() => []),
+			getManifest: vi.fn(() => ({ version: 1, files: {} })),
+		};
+		const context = {
+			settings,
+			vault: {
+				getAbstractFileByPath: vi.fn(),
+				delete: vi.fn(),
+				adapter: {
+					exists: vi.fn(),
+					remove: vi.fn(),
+					stat: vi.fn(),
+					readBinary: vi.fn(),
+				},
+			} as never,
+			api: {
+				getChanges: vi.fn(async () => ({ changes: [], lastSeq: 8, hasMore: false })),
+				downloadFile: vi.fn(),
+				deleteFile: vi.fn(),
+			},
+			localManifest,
+			shouldIgnore: vi.fn(() => false),
+			getLocalChanges: vi.fn(async () => []),
+			getLocalDeletes: vi.fn(async () => []),
+			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
+			processDiff: vi.fn(async () => {}),
+			prepareUploadFromPath: vi.fn(async () => null),
+			uploadPreparedFiles: vi.fn(async () => {}),
+		};
+
+		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+
+		expect(result).toEqual({
+			success: true,
+			uploaded: 0,
+			downloaded: 0,
+			deleted: 0,
+			conflicts: [],
+			errors: [],
+		});
+		expect(settings.lastSeq).toBe(8);
+		expect(localManifest.save).not.toHaveBeenCalled();
+	});
+
+	it('applies remote downloads and local deletes during incremental planning', async () => {
+		const settings = createSettings({ lastSeq: 7 });
+		const localManifest = {
+			save: vi.fn(async () => {}),
+			setEntry: vi.fn(),
+			removeEntry: vi.fn(),
+			getEntry: vi.fn(),
+			getAllPaths: vi.fn(() => []),
+			getManifest: vi.fn(() => ({ version: 1, files: {} })),
+		};
+		const deleteFile = vi.fn(async (path: string) => ({ success: true, path }));
+		const parallelDownloadAndSaveFiles = vi.fn(async (paths: string[], result: SyncResult) => {
+			result.downloaded += paths.length;
+		});
+		const uploadPreparedFiles = vi.fn(async (prepared: PreparedUpload[], _result: SyncResult) => {
+			expect(prepared).toEqual([]);
+		});
+
+		const context = {
+			settings,
+			vault: {
+				getAbstractFileByPath: vi.fn(() => null),
+				delete: vi.fn(),
+				adapter: {
+					exists: vi.fn(async () => false),
+					remove: vi.fn(),
+					stat: vi.fn(),
+					readBinary: vi.fn(),
+				},
+			} as never,
+			api: {
+				getChanges: vi.fn(async () => ({
+					changes: [
+						{
+							seq: 8,
+							path: 'notes/remote.md',
+							action: 'put' as const,
+							hash: 'remote-hash',
+							size: 12,
+							created_at: '2026-02-15T00:00:00.000Z',
+						},
+					],
+					lastSeq: 8,
+					hasMore: false,
+				})),
+				downloadFile: vi.fn(),
+				deleteFile,
+			},
+			localManifest,
+			shouldIgnore: vi.fn(() => false),
+			getLocalChanges: vi.fn(async () => []),
+			getLocalDeletes: vi.fn(async () => ['notes/local-delete.md']),
+			parallelDownloadAndSaveFiles,
+			processDiff: vi.fn(async () => {}),
+			prepareUploadFromPath: vi.fn(async () => null),
+			uploadPreparedFiles,
+		};
+
+		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+
+		expect(parallelDownloadAndSaveFiles).toHaveBeenCalledWith(['notes/remote.md'], expect.any(Object));
+		expect(deleteFile).toHaveBeenCalledWith('notes/local-delete.md');
+		expect(localManifest.removeEntry).toHaveBeenCalledWith('notes/local-delete.md');
+		expect(result?.success).toBe(true);
+		expect(result?.downloaded).toBe(1);
+		expect(result?.deleted).toBe(1);
+		expect(settings.lastSeq).toBe(8);
+		expect(localManifest.save).toHaveBeenCalledTimes(1);
+	});
+
+	it('keeps cursor unchanged when incremental sync finishes with errors', async () => {
+		const settings = createSettings({ lastSeq: 11 });
+		const localManifest = {
+			save: vi.fn(async () => {}),
+			setEntry: vi.fn(),
+			removeEntry: vi.fn(),
+			getEntry: vi.fn(),
+			getAllPaths: vi.fn(() => []),
+			getManifest: vi.fn(() => ({ version: 1, files: {} })),
+		};
+		const context = {
+			settings,
+			vault: {
+				getAbstractFileByPath: vi.fn(),
+				delete: vi.fn(),
+				adapter: {
+					exists: vi.fn(),
+					remove: vi.fn(),
+					stat: vi.fn(),
+					readBinary: vi.fn(),
+				},
+			} as never,
+			api: {
+				getChanges: vi.fn(async () => ({
+					changes: [
+						{
+							seq: 12,
+							path: 'notes/too-big.bin',
+							action: 'put' as const,
+							hash: 'hash',
+							size: MAX_FILE_SIZE_BYTES + 1,
+							created_at: '2026-02-15T00:00:00.000Z',
+						},
+					],
+					lastSeq: 12,
+					hasMore: false,
+				})),
+				downloadFile: vi.fn(),
+				deleteFile: vi.fn(),
+			},
+			localManifest,
+			shouldIgnore: vi.fn(() => false),
+			getLocalChanges: vi.fn(async () => []),
+			getLocalDeletes: vi.fn(async () => []),
+			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
+			processDiff: vi.fn(async () => {}),
+			prepareUploadFromPath: vi.fn(async () => null),
+			uploadPreparedFiles: vi.fn(async () => {}),
+		};
+
+		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+
+		expect(result?.success).toBe(false);
+		expect(result?.errors).toContain('notes/too-big.bin: Skipped remote file larger than 25MB');
+		expect(settings.lastSeq).toBe(11);
+		expect(localManifest.save).toHaveBeenCalledTimes(1);
+	});
+
+	it('falls back to full sync when changelog request throws', async () => {
+		const context = {
+			settings: createSettings({ lastSeq: 2 }),
+			vault: {
+				getAbstractFileByPath: vi.fn(),
+				delete: vi.fn(),
+				adapter: {
+					exists: vi.fn(),
+					remove: vi.fn(),
+					stat: vi.fn(),
+					readBinary: vi.fn(),
+				},
+			} as never,
+			api: {
+				getChanges: vi.fn(async () => {
+					throw new Error('network down');
+				}),
+				downloadFile: vi.fn(),
+				deleteFile: vi.fn(),
+			},
+			localManifest: {
+				save: vi.fn(),
+				setEntry: vi.fn(),
+				removeEntry: vi.fn(),
+				getEntry: vi.fn(),
+				getAllPaths: vi.fn(() => []),
+				getManifest: vi.fn(() => ({ version: 1, files: {} })),
+			},
+			shouldIgnore: vi.fn(() => false),
+			getLocalChanges: vi.fn(async () => []),
+			getLocalDeletes: vi.fn(async () => []),
+			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
+			processDiff: vi.fn(async () => {}),
+			prepareUploadFromPath: vi.fn(async () => null),
+			uploadPreparedFiles: vi.fn(async () => {}),
+		};
+
+		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+		expect(result).toBeNull();
+	});
+});
+
+describe('createFullSyncPlan', () => {
+	beforeEach(() => {
+		fileDiscoveryMocks.getAllVaultFiles.mockReset();
+		conflictMocks.detectConflicts.mockReset();
+	});
+
+	it('filters ignored/missing/oversized diffs and classifies remaining work', async () => {
+		fileDiscoveryMocks.getAllVaultFiles.mockResolvedValue([
+			{ path: 'notes/upload.md', size: 2, mtime: 100, extension: 'md' },
+			{ path: 'notes/conflict.md', size: 3, mtime: 100, extension: 'md' },
+			{ path: 'notes/local-big.bin', size: MAX_FILE_SIZE_BYTES + 1, mtime: 100, extension: 'bin' },
+		]);
+		conflictMocks.detectConflicts.mockReturnValue([
+			{ path: 'notes/upload.md', action: 'upload' },
+			{ path: 'notes/download-missing.md', action: 'download' },
+			{ path: 'notes/remote-big.md', action: 'download' },
+			{ path: 'notes/local-big.bin', action: 'upload' },
+			{ path: 'ignored/path.md', action: 'upload' },
+			{ path: 'notes/conflict.md', action: 'conflict' },
+		]);
+
+		const removeEntry = vi.fn();
+		const plan = await createFullSyncPlan(
+			{
+				vault: {
+					adapter: {
+						readBinary: vi.fn(async (path: string) =>
+							new TextEncoder().encode(path.includes('conflict') ? 'c' : 'u').buffer as ArrayBuffer,
+						),
+					},
+				} as never,
+				localManifest: {
+					getManifest: () => ({
+						version: 1,
+						files: {
+							'notes/deleted.md': {
+								hash: 'same-hash',
+								size: 1,
+								modified: new Date(0).toISOString(),
+							},
+						},
+					}),
+					removeEntry,
+				} as never,
+				shouldIgnore: (path: string) => path.startsWith('ignored/'),
+				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+				getLocalDeletes: async () => ['notes/deleted.md', 'notes/orphan.md'],
+			},
+			{
+				'notes/deleted.md': { hash: 'same-hash', size: 1, modified: new Date(0).toISOString() },
+				'notes/remote-big.md': {
+					hash: 'remote-big',
+					size: MAX_FILE_SIZE_BYTES + 1,
+					modified: new Date(0).toISOString(),
+				},
+			},
+			5,
+		);
+
+		expect(plan.uploadDiffs).toEqual([{ path: 'notes/upload.md', action: 'upload' }]);
+		expect(plan.downloadDiffs).toEqual([]);
+		expect(plan.remainingDiffs).toEqual([
+			{ path: 'notes/conflict.md', action: 'conflict' },
+			{ path: 'notes/deleted.md', action: 'delete', remoteHash: 'same-hash' },
+		]);
+		expect(plan.errors).toContain('notes/local-big.bin: Skipped local file larger than 25MB');
+		expect(plan.errors).toContain('notes/remote-big.md: Skipped remote file larger than 25MB');
+		expect(removeEntry).toHaveBeenCalledWith('notes/orphan.md');
+	});
+});
