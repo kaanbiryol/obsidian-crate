@@ -5,7 +5,6 @@
 
 export function getWorkerScript(): string {
 	return `
-const MANIFEST_CACHE_KEY = '.crate/manifest-cache.json';
 const FILES_PREFIX = 'files/';
 const CHANGELOG_RETENTION_DAYS = 30;
 
@@ -32,14 +31,14 @@ async function initDb(db) {
 		hash TEXT NOT NULL DEFAULT '',
 		size INTEGER NOT NULL DEFAULT 0,
 		created_at TEXT NOT NULL DEFAULT (datetime('now'))
+	);
+	CREATE TABLE IF NOT EXISTS files (
+		path TEXT PRIMARY KEY,
+		hash TEXT NOT NULL DEFAULT '',
+		size INTEGER NOT NULL DEFAULT 0,
+		modified TEXT NOT NULL DEFAULT (datetime('now'))
 	)\`);
 	dbReady = true;
-}
-
-async function appendChangelog(db, path, action, hash, size) {
-	await db.prepare(
-		'INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)'
-	).bind(path, action, hash || '', size || 0).run();
 }
 
 async function maybePruneChangelog(db) {
@@ -85,24 +84,6 @@ async function compressedCorsResponse(body, request, status = 200) {
 		status,
 		headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', ...corsHeaders() },
 	});
-}
-
-async function updateManifestCacheEntry(bucket, path, hash, size) {
-	try {
-		const cache = await getManifestCache(bucket);
-		if (!cache) return;
-		cache.files[path] = { hash, size, modified: new Date().toISOString() };
-		await saveManifestCache(bucket, cache.files);
-	} catch (e) { /* non-fatal */ }
-}
-
-async function removeManifestCacheEntry(bucket, path) {
-	try {
-		const cache = await getManifestCache(bucket);
-		if (!cache) return;
-		delete cache.files[path];
-		await saveManifestCache(bucket, cache.files);
-	} catch (e) { /* non-fatal */ }
 }
 
 async function handleHealth() {
@@ -151,66 +132,20 @@ async function handleGetChanges(request, db) {
 	});
 }
 
-async function getManifestCache(bucket) {
-	try {
-		const obj = await bucket.get(MANIFEST_CACHE_KEY);
-		if (!obj) return null;
-		const cache = await obj.json();
-		if (cache && typeof cache === 'object' && cache.files) return cache;
-		return null;
-	} catch (e) {
-		return null;
+async function handleGetManifest(request, db) {
+	if (!db) return corsResponse({ error: 'Database not available' }, 404);
+	await initDb(db);
+
+	const [filesResult, seqResult] = await db.batch([
+		db.prepare('SELECT path, hash, size, modified FROM files'),
+		db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'),
+	]);
+
+	const files = {};
+	for (const row of filesResult.results) {
+		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified };
 	}
-}
-
-async function saveManifestCache(bucket, files) {
-	try {
-		await bucket.put(MANIFEST_CACHE_KEY, JSON.stringify({ files }), {
-			httpMetadata: { contentType: 'application/json' },
-		});
-	} catch (e) { /* non-fatal */ }
-}
-
-async function handleGetManifest(request, bucket, db) {
-	let files;
-	const cache = await getManifestCache(bucket);
-	if (cache) {
-		files = cache.files;
-	} else {
-		const allFiles = {};
-		let cursor = undefined;
-		let truncated = true;
-
-		while (truncated) {
-			const opts = { prefix: FILES_PREFIX, include: ['customMetadata'] };
-			if (cursor) opts.cursor = cursor;
-			const listed = await bucket.list(opts);
-
-			for (const object of listed.objects) {
-				const path = object.key.slice(FILES_PREFIX.length);
-				allFiles[path] = {
-					hash: object.customMetadata?.hash || '',
-					size: object.size,
-					modified: object.uploaded.toISOString(),
-				};
-			}
-
-			truncated = listed.truncated;
-			cursor = listed.cursor;
-		}
-
-		files = allFiles;
-		await saveManifestCache(bucket, files);
-	}
-
-	let lastSeq = 0;
-	if (db) {
-		try {
-			await initDb(db);
-			const row = await db.prepare('SELECT MAX(seq) as lastSeq FROM changelog').first();
-			lastSeq = row?.lastSeq || 0;
-		} catch (e) { /* ignore */ }
-	}
+	const lastSeq = seqResult.results[0]?.lastSeq || 0;
 
 	return compressedCorsResponse({ version: 1, files, lastSeq }, request);
 }
@@ -233,22 +168,22 @@ async function handleUpload(request, bucket, db) {
 	const contentType = request.headers.get('Content-Type') || 'application/octet-stream';
 
 	try {
-		// Stream request body directly to R2 — zero memory buffering
+		// Stream request body directly to R2 - zero memory buffering
 		await bucket.put(FILES_PREFIX + safePath, request.body, {
 			httpMetadata: { contentType },
 			customMetadata: { hash },
 		});
 
-		let changelogEnabled = Boolean(db);
-		if (changelogEnabled) {
+		if (db) {
 			try {
 				await initDb(db);
-				await appendChangelog(db, safePath, 'put', hash, size);
+				await db.batch([
+					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'put', hash || '', size || 0),
+					db.prepare('INSERT OR REPLACE INTO files (path, hash, size, modified) VALUES (?, ?, ?, datetime(\\'now\\'))').bind(safePath, hash || '', size || 0),
+				]);
 				await maybePruneChangelog(db);
 			} catch (e) { /* D1 failure is non-fatal */ }
 		}
-
-		await updateManifestCacheEntry(bucket, safePath, hash, size);
 
 		return corsResponse({ success: true, path: safePath, hash });
 	} catch (err) {
@@ -305,12 +240,13 @@ async function handleDelete(request, bucket, db) {
 	if (db) {
 		try {
 			await initDb(db);
-			await appendChangelog(db, safePath, 'delete', '', 0);
+			await db.batch([
+				db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'delete', '', 0),
+				db.prepare('DELETE FROM files WHERE path = ?').bind(safePath),
+			]);
 			await maybePruneChangelog(db);
 		} catch (e) { /* D1 failure is non-fatal */ }
 	}
-
-	await removeManifestCacheEntry(bucket, safePath);
 
 	return corsResponse({ success: true, path: safePath });
 }
@@ -349,7 +285,7 @@ export default {
 			if (path === '/health' && method === 'GET') return await handleHealth();
 			if (path === '/sync/check' && method === 'GET') return await handleCheckChanges(request, db);
 			if (path === '/sync/changes' && method === 'GET') return await handleGetChanges(request, db);
-			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(request, bucket, db);
+			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(request, db);
 			if (path === '/sync/upload' && method === 'PUT') return await handleUpload(request, bucket, db);
 			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket);
 			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
