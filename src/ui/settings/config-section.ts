@@ -1,4 +1,4 @@
-import { Notice, Setting } from 'obsidian';
+import { Notice, Platform, Setting } from 'obsidian';
 import { verifyCredentials } from '../../cloudflare/api';
 import { quickSetup } from '../../cloudflare/infrastructure';
 import type CratePlugin from '../../main';
@@ -28,6 +28,7 @@ export interface ConfigSectionContext {
 export function renderConfigSection(context: ConfigSectionContext): void {
 	const { containerEl, plugin, manualState, rerender } = context;
 	seedManualState(plugin, manualState);
+	const isDesktop = Platform.isDesktopApp;
 
 	const hasCloudflareCredentials = plugin.cloudflareSession.hasCredentials();
 	if (hasCloudflareCredentials) {
@@ -36,7 +37,9 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 
 	containerEl.createEl('h3', { text: 'Configuration' });
 	containerEl.createEl('p', {
-		text: 'Sign in with Cloudflare to enable one-click setup and infrastructure management.',
+		text: isDesktop
+			? 'Sign in with Cloudflare to enable one-click setup and infrastructure management.'
+			: 'Cloudflare sign-in is desktop-only. On mobile, use manual entry or sign in on desktop first.',
 		cls: 'setting-item-description',
 	});
 
@@ -46,15 +49,24 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 	setupProgress.style.display = 'none';
 
 	if (!hasCloudflareCredentials) {
-		renderQuickSetupGuide(containerEl);
+		renderQuickSetupGuide(containerEl, isDesktop);
 
 		new Setting(containerEl)
 			.setName('Cloudflare sign in')
-			.setDesc('Authorize directly in browser and auto-create infrastructure (desktop)')
-			.addButton(button => button
-				.setButtonText('Sign in with Cloudflare')
-				.setCta()
-				.onClick(async () => {
+			.setDesc(
+				isDesktop
+					? 'Authorize directly in browser and auto-create infrastructure'
+					: 'Desktop only. Use desktop to sign in, or use manual entry on mobile.'
+			)
+			.addButton(button => {
+				button.setButtonText('Sign in with Cloudflare').setCta();
+				if (!isDesktop) {
+					button.setDisabled(true);
+					button.setTooltip('Cloudflare sign-in is only available on desktop');
+					return button;
+				}
+
+				button.onClick(async () => {
 					let loggedIn = false;
 					await runButtonTask({
 						button,
@@ -85,14 +97,27 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 							}
 						},
 					});
-				}));
+				});
+
+				return button;
+			});
 	} else {
 		new Setting(containerEl)
 			.setName('Cloudflare account')
-			.setDesc(plugin.settings.cloudflareAccountId)
-			.addButton(button => button
-				.setButtonText('Re-authenticate')
-				.onClick(async () => {
+			.setDesc(
+				isDesktop
+					? plugin.settings.cloudflareAccountId
+					: `${plugin.settings.cloudflareAccountId} (re-authentication requires desktop)`
+			)
+			.addButton(button => {
+				button.setButtonText('Re-authenticate');
+				if (!isDesktop) {
+					button.setDisabled(true);
+					button.setTooltip('Cloudflare re-authentication is only available on desktop');
+					return button;
+				}
+
+				button.onClick(async () => {
 					const shouldSetup = !plugin.syncRuntime.isConfigured();
 					await runButtonTask({
 						button,
@@ -122,7 +147,10 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 							new Notice(`Cloudflare login failed: ${getErrorMessage(error)}`);
 						},
 					});
-				}))
+				});
+
+				return button;
+			})
 			.addExtraButton(button => button
 				.setIcon('x')
 				.setTooltip('Sign out from Cloudflare')
@@ -196,18 +224,22 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 	}
 }
 
-function renderQuickSetupGuide(containerEl: HTMLElement): void {
+function renderQuickSetupGuide(containerEl: HTMLElement, isDesktop: boolean): void {
 	const quickGuide = containerEl.createDiv({ cls: 'crate-quick-guide' });
 	quickGuide.createEl('h4', { text: 'Quick setup guide' });
 	const quickGuideList = quickGuide.createEl('ol');
 	quickGuideList.createEl('li', {
-		text: 'Select Sign in with Cloudflare and approve access in your browser.',
+		text: isDesktop
+			? 'Select Sign in with Cloudflare and approve access in your browser.'
+			: 'Use desktop to select Sign in with Cloudflare and approve access in your browser.',
 	});
 	quickGuideList.createEl('li', {
-		text: 'Infrastructure setup runs automatically right after sign-in.',
+		text: isDesktop
+			? 'Infrastructure setup runs automatically right after sign-in.'
+			: 'On mobile, use manual entry for account ID and API token.',
 	});
 	quickGuideList.createEl('li', {
-		text: 'If setup fails, use Create infrastructure. Then run Test connection and Sync now.',
+		text: 'After credentials are available, use Create infrastructure. Then run Test connection and Sync now.',
 	});
 }
 
@@ -341,7 +373,11 @@ async function resolveCredentialsForSetup(
 
 	const creds = await plugin.cloudflareSession.resolveCredentials();
 	if (!creds) {
-		throw new Error('Please sign in with Cloudflare first');
+		throw new Error(
+			Platform.isDesktopApp
+				? 'Please sign in with Cloudflare first'
+				: 'Please sign in with Cloudflare on desktop first, or use manual entry mode'
+		);
 	}
 
 	return creds;
