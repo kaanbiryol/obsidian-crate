@@ -135,9 +135,14 @@ async function handleCheckChanges(request, db) {
 	const url = new URL(request.url);
 	const since = parseInt(url.searchParams.get('since') || '0', 10);
 	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
-	const row = await db.prepare('SELECT MAX(seq) as lastSeq FROM changelog').first();
-	const lastSeq = row?.lastSeq || 0;
-	return corsResponse({ lastSeq, hasChanges: lastSeq > since });
+	const [maxRow, minRow] = await db.batch([
+		db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'),
+		db.prepare('SELECT MIN(seq) as minSeq FROM changelog'),
+	]);
+	const lastSeq = maxRow.results[0]?.lastSeq || 0;
+	const minSeq = minRow.results[0]?.minSeq;
+	const cursorExpired = since > 0 && (minSeq === null || since < minSeq);
+	return corsResponse({ lastSeq, hasChanges: lastSeq > since, ...(cursorExpired && { cursorExpired: true }) });
 }
 
 async function handleGetChanges(request, db) {
@@ -148,16 +153,21 @@ async function handleGetChanges(request, db) {
 	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
 
 	await initDb(db);
-	const result = await db.prepare(
-		'SELECT seq, path, action, hash, size, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000'
-	).bind(since).all();
+	const [result, maxRow, minRow] = await db.batch([
+		db.prepare('SELECT seq, path, action, hash, size, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since),
+		db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'),
+		db.prepare('SELECT MIN(seq) as minSeq FROM changelog'),
+	]);
 
-	const maxRow = await db.prepare('SELECT MAX(seq) as lastSeq FROM changelog').first();
+	const lastSeq = maxRow.results[0]?.lastSeq || 0;
+	const minSeq = minRow.results[0]?.minSeq;
+	const cursorExpired = since > 0 && (minSeq === null || since < minSeq);
 
 	return corsResponse({
 		changes: result.results,
-		lastSeq: maxRow?.lastSeq || 0,
+		lastSeq,
 		hasMore: result.results.length === 5000,
+		...(cursorExpired && { cursorExpired: true }),
 	});
 }
 

@@ -64,11 +64,13 @@ export interface ChangesResponse {
 	changes: ChangelogEntry[];
 	lastSeq: number;
 	hasMore: boolean;
+	cursorExpired?: boolean;
 }
 
 export interface CheckResponse {
 	lastSeq: number;
 	hasChanges: boolean;
+	cursorExpired?: boolean;
 }
 
 // ============================================================================

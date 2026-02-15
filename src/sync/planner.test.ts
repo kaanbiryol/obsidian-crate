@@ -300,6 +300,54 @@ describe('runIncrementalSync', () => {
 		expect(localManifest.save).toHaveBeenCalledTimes(1);
 	});
 
+	it('falls back to full sync when cursor is expired', async () => {
+		const settings = createSettings({ lastSeq: 5 });
+		const context = {
+			settings,
+			vault: {
+				getAbstractFileByPath: vi.fn(),
+				delete: vi.fn(),
+				adapter: {
+					exists: vi.fn(),
+					remove: vi.fn(),
+					stat: vi.fn(),
+					readBinary: vi.fn(),
+				},
+			} as never,
+			api: {
+				getChanges: vi.fn(async () => ({
+					changes: [],
+					lastSeq: 20,
+					hasMore: false,
+					cursorExpired: true,
+				})),
+				downloadFile: vi.fn(),
+				deleteFile: vi.fn(),
+			},
+			localManifest: {
+				save: vi.fn(),
+				setEntry: vi.fn(),
+				removeEntry: vi.fn(),
+				getEntry: vi.fn(),
+				getAllPaths: vi.fn(() => []),
+				getManifest: vi.fn(() => ({ version: 1, files: {} })),
+			},
+			shouldIgnore: vi.fn(() => false),
+			getLocalChanges: vi.fn(async () => []),
+			getLocalDeletes: vi.fn(async () => []),
+			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
+			processDiff: vi.fn(async () => {}),
+			prepareUploadFromPath: vi.fn(async () => null),
+			uploadPreparedFiles: vi.fn(async () => {}),
+		};
+
+		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+
+		expect(result).toBeNull();
+		expect(settings.lastSeq).toBe(5);
+		expect(context.getLocalChanges).not.toHaveBeenCalled();
+	});
+
 	it('falls back to full sync when changelog request throws', async () => {
 		const context = {
 			settings: createSettings({ lastSeq: 2 }),

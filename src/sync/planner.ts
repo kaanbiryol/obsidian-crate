@@ -20,7 +20,7 @@ export interface PlannerManifest {
 }
 
 export interface PlannerApi {
-	getChanges(since: number): Promise<{ changes: ChangelogEntry[]; lastSeq: number; hasMore: boolean }>;
+	getChanges(since: number): Promise<{ changes: ChangelogEntry[]; lastSeq: number; hasMore: boolean; cursorExpired?: boolean }>;
 	downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number }>;
 	deleteFile(path: string): Promise<{ success: boolean; path: string }>;
 }
@@ -139,6 +139,12 @@ export async function runIncrementalSync(
 		// eslint-disable-next-line no-constant-condition
 		while (true) {
 			const response = await context.api.getChanges(since);
+
+			if (response.cursorExpired) {
+				logger.warn('Changelog cursor expired - pruned entries detected, falling back to full sync');
+				return null;
+			}
+
 			allChanges.push(...response.changes);
 			latestSeq = response.lastSeq;
 
