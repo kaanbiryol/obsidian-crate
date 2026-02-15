@@ -21,6 +21,10 @@ When adding new worker bindings, you must update **two** places:
 - `crate update` — Code-only redeploy (same as deploy), preserves all existing bindings via `keep_bindings`
 - `crate analytics` — Optional. Prompts for an API token with Analytics Read + User API Tokens Edit, creates a scoped sub-token, and adds it as `CF_ANALYTICS_TOKEN` worker binding
 
+## Worker API
+
+See `docs/worker-api.md` for endpoint details and D1 schema.
+
 ## Analytics
 
 Usage analytics are handled entirely by the Obsidian plugin, not the CLI or worker. The plugin queries the Cloudflare GraphQL Analytics API directly using the analytics token fetched from the worker's `/sync/config` endpoint. The `CF_ANALYTICS_TOKEN` binding is set up via `crate analytics` (optional, separate from init).
