@@ -20,6 +20,7 @@ export default class CratePlugin extends Plugin {
 	private syncEngine: SyncEngine | null = null;
 	private apiClient: SyncApiClient | null = null;
 	private statusBar: StatusBarManager | null = null;
+	private vaultEventsRegistered = false;
 	secretStorage: SecretStorageService;
 
 	async onload(): Promise<void> {
@@ -35,6 +36,7 @@ export default class CratePlugin extends Plugin {
 
 		// Add settings tab
 		this.addSettingTab(new CrateSettingTab(this.app, this));
+		this.registerVaultEventHandlers();
 
 		// Initialize sync if configured
 		if (this.isConfigured()) {
@@ -83,6 +85,40 @@ export default class CratePlugin extends Plugin {
 	onunload(): void {
 		this.syncEngine?.destroy();
 		this.statusBar?.destroy();
+	}
+
+	/**
+	 * Register vault change handlers once for plugin lifetime.
+	 */
+	private registerVaultEventHandlers(): void {
+		if (this.vaultEventsRegistered) {
+			return;
+		}
+		this.vaultEventsRegistered = true;
+
+		this.registerEvent(
+			this.app.vault.on('create', (file: TAbstractFile) => {
+				this.syncEngine?.onFileChange(file);
+			})
+		);
+
+		this.registerEvent(
+			this.app.vault.on('modify', (file: TAbstractFile) => {
+				this.syncEngine?.onFileChange(file);
+			})
+		);
+
+		this.registerEvent(
+			this.app.vault.on('delete', (file: TAbstractFile) => {
+				this.syncEngine?.onFileDelete(file);
+			})
+		);
+
+		this.registerEvent(
+			this.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
+				this.syncEngine?.onFileRename(file, oldPath);
+			})
+		);
 	}
 
 	/**
@@ -255,31 +291,7 @@ export default class CratePlugin extends Plugin {
 
 		// Initialize engine
 		await this.syncEngine.initialize();
-
-		// Register file event handlers
-		this.registerEvent(
-			this.app.vault.on('create', (file: TAbstractFile) => {
-				this.syncEngine?.onFileChange(file);
-			})
-		);
-
-		this.registerEvent(
-			this.app.vault.on('modify', (file: TAbstractFile) => {
-				this.syncEngine?.onFileChange(file);
-			})
-		);
-
-		this.registerEvent(
-			this.app.vault.on('delete', (file: TAbstractFile) => {
-				this.syncEngine?.onFileDelete(file);
-			})
-		);
-
-		this.registerEvent(
-			this.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
-				this.syncEngine?.onFileRename(file, oldPath);
-			})
-		);
+		this.statusBar?.update(this.syncEngine.getState());
 
 		// Sync on startup if enabled
 		if (this.settings.syncOnStartup) {
