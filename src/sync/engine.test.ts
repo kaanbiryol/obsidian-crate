@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { computeHash } from './hasher';
 import type { CrateSettings } from '../types';
+import { MAX_FILE_SIZE_BYTES } from '../types';
 
 type MockAdapter = {
 	readBinary: ReturnType<typeof vi.fn>;
@@ -639,5 +640,113 @@ describe('SyncEngine processDiff conflict handling', () => {
 				size: mainWritten.byteLength,
 			}),
 		);
+	});
+});
+
+describe('SyncEngine incremental sync cursor/state safeguards', () => {
+	it('does not advance lastSeq when incremental sync has per-file errors', async () => {
+		const harness = createHarness({ lastSeq: 1 });
+		harness.api.getChanges.mockResolvedValue({
+			changes: [
+				{
+					seq: 2,
+					path: 'notes/remote.md',
+					action: 'put',
+					hash: 'remote-hash',
+					size: 10,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 2,
+			hasMore: false,
+		});
+		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
+		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		harness.api.downloadFile.mockRejectedValue(new Error('network down'));
+
+		const result = await (harness.engine as any).incrementalSync();
+
+		expect(result?.success).toBe(false);
+		expect(result?.errors).toContain('notes/remote.md: network down');
+		expect(harness.settings.lastSeq).toBe(1);
+	});
+
+	it('sets state to error when incremental sync returns errors', async () => {
+		const harness = createHarness({ lastSeq: 1 });
+		harness.api.getChanges.mockResolvedValue({
+			changes: [
+				{
+					seq: 2,
+					path: 'notes/remote.md',
+					action: 'put',
+					hash: 'remote-hash',
+					size: 10,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 2,
+			hasMore: false,
+		});
+		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
+		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		harness.api.downloadFile.mockRejectedValue(new Error('network down'));
+
+		const result = await harness.engine.sync();
+		const state = harness.engine.getState();
+
+		expect(result.success).toBe(false);
+		expect(state.status).toBe('error');
+		expect(state.lastError).toBe('notes/remote.md: network down');
+	});
+});
+
+describe('SyncEngine full sync safeguards', () => {
+	it('skips ignored remote paths during full sync reconciliation', async () => {
+		const harness = createHarness({ lastSeq: 0 });
+		harness.api.getManifest.mockResolvedValue({
+			version: 1,
+			files: {
+				'.trash/remote.md': {
+					hash: 'remote-hash',
+					size: 10,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+			},
+			lastSeq: 3,
+		});
+		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: ['.trash'] });
+
+		const result = await harness.engine.sync();
+
+		expect(result.success).toBe(true);
+		expect(result.downloaded).toBe(0);
+		expect(harness.api.downloadFile).not.toHaveBeenCalled();
+	});
+
+	it('does not advance lastSeq when full sync has non-fatal errors', async () => {
+		const harness = createHarness({ lastSeq: 5 });
+		vi.spyOn(harness.engine as any, 'incrementalSync').mockResolvedValue(null);
+		harness.api.getManifest.mockResolvedValue({
+			version: 1,
+			files: {
+				'notes/big.bin': {
+					hash: 'remote-big',
+					size: MAX_FILE_SIZE_BYTES + 1,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+			},
+			lastSeq: 9,
+		});
+		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+
+		const result = await harness.engine.sync();
+
+		expect(result.success).toBe(false);
+		expect(result.errors).toContain('notes/big.bin: Skipped remote file larger than 25MB');
+		expect(harness.settings.lastSeq).toBe(5);
 	});
 });

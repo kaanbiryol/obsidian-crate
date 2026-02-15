@@ -738,8 +738,10 @@ export class SyncEngine {
 			}
 
 			await this.localManifest.save();
-			this.settings.lastSeq = latestSeq;
 			result.success = result.errors.length === 0;
+			if (result.success) {
+				this.settings.lastSeq = latestSeq;
+			}
 
 			logger.info(`Incremental sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.deleted} del, ${result.conflicts.length} conflicts`);
 			return result;
@@ -878,9 +880,14 @@ export class SyncEngine {
 		// Try incremental sync first
 		const incrementalResult = await this.incrementalSync(progressCallback);
 		if (incrementalResult) {
-			const lastSync = new Date().toISOString();
-			this.updateState({ status: 'idle', lastSync, lastError: null });
-			this.settings.lastSync = lastSync;
+			if (incrementalResult.success) {
+				const lastSync = new Date().toISOString();
+				this.updateState({ status: 'idle', lastSync, lastError: null });
+				this.settings.lastSync = lastSync;
+			} else {
+				const lastError = incrementalResult.errors[0] ?? 'Incremental sync completed with errors';
+				this.updateState({ status: 'error', lastError });
+			}
 			return incrementalResult;
 		}
 
@@ -953,6 +960,10 @@ export class SyncEngine {
 			// Enforce size limits defensively to avoid accidental overwrites of unsupported files.
 			for (const [path, diff] of [...diffMap.entries()]) {
 				const remoteEntry = remoteManifest.files[path];
+				if (this.shouldIgnore(path)) {
+					diffMap.delete(path);
+					continue;
+				}
 				if (largeLocalPaths.has(path)) {
 					result.errors.push(`${path}: Skipped local file larger than 25MB`);
 					diffMap.delete(path);
@@ -1047,7 +1058,11 @@ export class SyncEngine {
 
 			// Save last sync time and seq cursor to settings
 			this.settings.lastSync = lastSync;
-			if (remoteManifest.lastSeq !== undefined && remoteManifest.lastSeq > 0) {
+			if (
+				result.errors.length === 0 &&
+				remoteManifest.lastSeq !== undefined &&
+				remoteManifest.lastSeq > 0
+			) {
 				this.settings.lastSeq = remoteManifest.lastSeq;
 			}
 
