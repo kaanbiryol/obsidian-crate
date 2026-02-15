@@ -37,20 +37,20 @@ async function timingSafeEqual(a, b) {
 
 async function initDb(db) {
 	if (dbReady) return;
-	await db.exec(\`CREATE TABLE IF NOT EXISTS changelog (
+	await db.prepare(\`CREATE TABLE IF NOT EXISTS changelog (
 		seq INTEGER PRIMARY KEY AUTOINCREMENT,
 		path TEXT NOT NULL,
 		action TEXT NOT NULL,
 		hash TEXT NOT NULL DEFAULT '',
 		size INTEGER NOT NULL DEFAULT 0,
 		created_at TEXT NOT NULL DEFAULT (datetime('now'))
-	);
-	CREATE TABLE IF NOT EXISTS files (
+	)\`).run();
+	await db.prepare(\`CREATE TABLE IF NOT EXISTS files (
 		path TEXT PRIMARY KEY,
 		hash TEXT NOT NULL DEFAULT '',
 		size INTEGER NOT NULL DEFAULT 0,
 		modified TEXT NOT NULL DEFAULT (datetime('now'))
-	)\`);
+	)\`).run();
 	dbReady = true;
 }
 
@@ -84,23 +84,19 @@ function corsResponse(body, status = 200) {
 
 async function compressedCorsResponse(body, request, status = 200) {
 	const json = JSON.stringify(body);
-	const acceptEncoding = request.headers.get('Accept-Encoding') || '';
-	if (!acceptEncoding.includes('gzip')) {
-		return new Response(json, {
-			status,
-			headers: { 'Content-Type': 'application/json', ...corsHeaders() },
-		});
-	}
-	const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
-	const compressed = await new Response(stream).arrayBuffer();
-	return new Response(compressed, {
+	return new Response(json, {
 		status,
-		headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', ...corsHeaders() },
+		headers: { 'Content-Type': 'application/json', ...corsHeaders() },
 	});
 }
 
 async function handleHealth() {
 	return corsResponse({ status: 'ok', timestamp: new Date().toISOString() });
+}
+
+async function queryRows(statement) {
+	const result = await statement.all();
+	return Array.isArray(result && result.results) ? result.results : [];
 }
 
 async function handleCheckChanges(request, db) {
@@ -109,12 +105,10 @@ async function handleCheckChanges(request, db) {
 	const url = new URL(request.url);
 	const since = parseInt(url.searchParams.get('since') || '0', 10);
 	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
-	const [maxRow, minRow] = await db.batch([
-		db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'),
-		db.prepare('SELECT MIN(seq) as minSeq FROM changelog'),
-	]);
-	const lastSeq = maxRow.results[0]?.lastSeq || 0;
-	const minSeq = minRow.results[0]?.minSeq;
+	const maxRows = await queryRows(db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'));
+	const minRows = await queryRows(db.prepare('SELECT MIN(seq) as minSeq FROM changelog'));
+	const lastSeq = (maxRows[0] && maxRows[0].lastSeq) || 0;
+	const minSeq = minRows[0] ? minRows[0].minSeq : null;
 	const cursorExpired = since > 0 && (minSeq === null || since < minSeq);
 	return corsResponse({ lastSeq, hasChanges: lastSeq > since, ...(cursorExpired && { cursorExpired: true }) });
 }
@@ -127,20 +121,19 @@ async function handleGetChanges(request, db) {
 	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
 
 	await initDb(db);
-	const [result, maxRow, minRow] = await db.batch([
-		db.prepare('SELECT seq, path, action, hash, size, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since),
-		db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'),
-		db.prepare('SELECT MIN(seq) as minSeq FROM changelog'),
-	]);
-
-	const lastSeq = maxRow.results[0]?.lastSeq || 0;
-	const minSeq = minRow.results[0]?.minSeq;
+	const changeRows = await queryRows(
+		db.prepare('SELECT seq, path, action, hash, size, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since)
+	);
+	const maxRows = await queryRows(db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'));
+	const minRows = await queryRows(db.prepare('SELECT MIN(seq) as minSeq FROM changelog'));
+	const lastSeq = (maxRows[0] && maxRows[0].lastSeq) || 0;
+	const minSeq = minRows[0] ? minRows[0].minSeq : null;
 	const cursorExpired = since > 0 && (minSeq === null || since < minSeq);
 
 	return corsResponse({
-		changes: result.results,
+		changes: changeRows,
 		lastSeq,
-		hasMore: result.results.length === 5000,
+		hasMore: changeRows.length === 5000,
 		...(cursorExpired && { cursorExpired: true }),
 	});
 }
@@ -150,18 +143,17 @@ async function handleGetManifest(request, db) {
 	await initDb(db);
 
 	const MAX_MANIFEST_FILES = 200000;
-	const [filesResult, seqResult] = await db.batch([
-		db.prepare('SELECT path, hash, size, modified FROM files LIMIT ?').bind(MAX_MANIFEST_FILES + 1),
-		db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'),
-	]);
-
-	const truncated = filesResult.results.length > MAX_MANIFEST_FILES;
-	const rows = truncated ? filesResult.results.slice(0, MAX_MANIFEST_FILES) : filesResult.results;
+	const filesRows = await queryRows(
+		db.prepare('SELECT path, hash, size, modified FROM files LIMIT 200001')
+	);
+	const seqRows = await queryRows(db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'));
+	const truncated = filesRows.length > MAX_MANIFEST_FILES;
+	const rows = truncated ? filesRows.slice(0, MAX_MANIFEST_FILES) : filesRows;
 	const files = {};
 	for (const row of rows) {
 		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified };
 	}
-	const lastSeq = seqResult.results[0]?.lastSeq || 0;
+	const lastSeq = (seqRows[0] && seqRows[0].lastSeq) || 0;
 
 	return compressedCorsResponse({ version: 1, files, lastSeq, ...(truncated && { truncated: true }) }, request);
 }

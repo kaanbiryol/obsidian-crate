@@ -161,7 +161,7 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 	containerEl.createEl('h4', { text: 'Infrastructure management' });
 
 	const managementProgress = containerEl.createEl('p', {
-		cls: 'setting-item-description crate-action-progress',
+		cls: 'crate-action-progress',
 	});
 	managementProgress.style.display = 'none';
 

@@ -145,6 +145,18 @@
 /* Settings tab - setup and diagnostics */
 .crate-action-progress {
 	margin: 6px 0 12px;
+	padding: 8px 10px;
+	border-left: 3px solid var(--interactive-accent);
+	background: var(--background-secondary);
+	border-radius: 4px;
+	color: var(--text-normal);
+	font-size: 13px;
+	animation: crate-fade-in 0.2s ease;
+}
+
+@keyframes crate-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
 }
 
 .crate-diagnostics {
@@ -175,24 +187,3 @@
 	color: var(--text-error);
 }
 
-.crate-quick-guide {
-	margin: 8px 0 14px;
-	padding: 8px 10px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
-}
-
-.crate-quick-guide h4 {
-	margin: 0 0 6px;
-	font-size: 13px;
-}
-
-.crate-quick-guide ol {
-	margin: 0;
-	padding-left: 20px;
-}
-
-.crate-quick-guide li {
-	margin: 4px 0;
-	color: var(--text-muted);
-}

@@ -265,10 +265,17 @@ export async function runDiagnostics(input: DiagnosticsInput): Promise<Diagnosti
 							message: `Manifest is reachable (${Object.keys(files).length} files).`,
 						});
 					} else {
+						const manifestError = (
+							manifest.body && typeof manifest.body === 'object' && 'error' in manifest.body
+								? (manifest.body as { error?: string }).error
+								: null
+						);
 						results.push({
 							name: 'Manifest access',
 							status: 'fail',
-							message: `Manifest request failed with status ${manifest.status}.`,
+							message: manifestError
+								? `Manifest request failed with status ${manifest.status}: ${manifestError}`
+								: `Manifest request failed with status ${manifest.status}.`,
 						});
 					}
 				} else if (health.status === 401) {

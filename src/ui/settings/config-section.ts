@@ -36,26 +36,18 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 	}
 
 	containerEl.createEl('h3', { text: 'Configuration' });
-	containerEl.createEl('p', {
-		text: isDesktop
-			? 'Sign in with Cloudflare to enable one-click setup and infrastructure management.'
-			: 'Cloudflare sign-in is desktop-only. On mobile, use manual entry or sign in on desktop first.',
-		cls: 'setting-item-description',
-	});
 
 	const setupProgress = containerEl.createEl('p', {
-		cls: 'setting-item-description crate-action-progress',
+		cls: 'crate-action-progress',
 	});
 	setupProgress.style.display = 'none';
 
 	if (!hasCloudflareCredentials) {
-		renderQuickSetupGuide(containerEl, isDesktop);
-
 		new Setting(containerEl)
 			.setName('Cloudflare sign in')
 			.setDesc(
 				isDesktop
-					? 'Authorize directly in browser and auto-create infrastructure'
+					? 'Sign in via browser. Infrastructure is created automatically after authorization.'
 					: 'Desktop only. Use desktop to sign in, or use manual entry on mobile.'
 			)
 			.addButton(button => {
@@ -222,25 +214,6 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 					rerender();
 				}));
 	}
-}
-
-function renderQuickSetupGuide(containerEl: HTMLElement, isDesktop: boolean): void {
-	const quickGuide = containerEl.createDiv({ cls: 'crate-quick-guide' });
-	quickGuide.createEl('h4', { text: 'Quick setup guide' });
-	const quickGuideList = quickGuide.createEl('ol');
-	quickGuideList.createEl('li', {
-		text: isDesktop
-			? 'Select Sign in with Cloudflare and approve access in your browser.'
-			: 'Use desktop to select Sign in with Cloudflare and approve access in your browser.',
-	});
-	quickGuideList.createEl('li', {
-		text: isDesktop
-			? 'Infrastructure setup runs automatically right after sign-in.'
-			: 'On mobile, use manual entry for account ID and API token.',
-	});
-	quickGuideList.createEl('li', {
-		text: 'After credentials are available, use Create infrastructure. Then run Test connection and Sync now.',
-	});
 }
 
 function renderManualEntryFields(
