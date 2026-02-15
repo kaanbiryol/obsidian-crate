@@ -202,11 +202,18 @@ export class SyncEngine {
 
 		let regex = this.patternCache.get(pattern);
 		if (!regex) {
-			const regexPattern = pattern
-				.replace(/\./g, '\\.')
-				.replace(/\*/g, '.*')
-				.replace(/\?/g, '.');
-			regex = new RegExp(`^${regexPattern}$`);
+			const regexPattern = Array.from(pattern).map(char => {
+				if (char === '*') return '.*';
+				if (char === '?') return '.';
+				return char.replace(/[\\^$+.|(){}\[\]]/g, '\\$&');
+			}).join('');
+			try {
+				regex = new RegExp(`^${regexPattern}$`);
+			} catch (error) {
+				logger.warn(`Invalid ignore pattern "${pattern}":`, error instanceof Error ? error.message : 'Unknown error');
+				// Never match on invalid patterns to avoid sync crashes.
+				regex = /^$/;
+			}
 			this.patternCache.set(pattern, regex);
 		}
 		return regex.test(path);
@@ -238,11 +245,21 @@ export class SyncEngine {
 	 * Handle file rename
 	 */
 	onFileRename(file: TAbstractFile, oldPath: string): void {
-		if (!this.shouldIgnore(oldPath) && !this.shouldIgnore(file.path)) {
+		if (file instanceof TFolder) return;
+
+		const oldIgnored = this.shouldIgnore(oldPath);
+		const newIgnored = this.shouldIgnore(file.path);
+		if (oldIgnored && newIgnored) return;
+
+		// Rename into ignored area => remove old remote path.
+		if (!oldIgnored) {
 			this.pendingPaths.add(`delete:${oldPath}`);
-			this.pendingPaths.add(file.path);
-			this.debouncedSync();
 		}
+		// Rename out of ignored area => upload new path.
+		if (!newIgnored) {
+			this.pendingPaths.add(file.path);
+		}
+		this.debouncedSync();
 	}
 
 	/**
@@ -256,7 +273,8 @@ export class SyncEngine {
 		}
 
 		this.debounceTimer = setTimeout(() => {
-			this.processPendingChanges();
+			this.debounceTimer = null;
+			void this.processPendingChanges();
 		}, DEBOUNCE_DELAY_MS);
 	}
 
@@ -264,14 +282,27 @@ export class SyncEngine {
 	 * Process pending file changes
 	 */
 	private async processPendingChanges(): Promise<void> {
-		if (this.pendingPaths.size === 0) return;
-		if (this.state.status === 'syncing') return;
-		if (!this.api.isConfigured()) return;
+		if (this.pendingPaths.size === 0) {
+			this.updateState({ pendingChanges: 0 });
+			return;
+		}
+		if (this.state.status === 'syncing') {
+			this.updateState({ pendingChanges: this.pendingPaths.size });
+			this.debouncedSync();
+			return;
+		}
+		if (!this.api.isConfigured()) {
+			this.updateState({ pendingChanges: this.pendingPaths.size });
+			return;
+		}
 
-		logger.info(`Processing ${this.pendingPaths.size} pending changes`);
 		const paths = Array.from(this.pendingPaths);
+		for (const path of paths) {
+			this.pendingPaths.delete(path);
+		}
 
-		this.updateState({ status: 'syncing', pendingChanges: 0 });
+		logger.info(`Processing ${paths.length} pending changes`);
+		this.updateState({ status: 'syncing', pendingChanges: this.pendingPaths.size });
 
 		try {
 			const uploads: PreparedUpload[] = [];
@@ -305,49 +336,51 @@ export class SyncEngine {
 				}
 			}
 
-				// Upload changed files concurrently
-				if (uploads.length > 0) {
-					const uploadTasks = uploads.map(upload => async () => {
-						const result = await this.api.uploadFile(
-							upload.path,
-							upload.content,
-							upload.hash,
-							upload.size,
-							upload.contentType || 'application/octet-stream',
-						);
-						if (result.success) {
-							if (result.hash && result.hash !== upload.hash) {
-								logger.warn(`Hash mismatch after upload for ${upload.path}`);
-								return;
-							}
-							this.localManifest.setEntry(upload.path, {
-								hash: upload.hash,
-								size: upload.size,
-								modified: await this.getModifiedIso(upload.path, upload.mtime),
-							});
-						}
+			// Upload changed files concurrently
+			if (uploads.length > 0) {
+				const uploadTasks = uploads.map(upload => async () => {
+					const result = await this.api.uploadFile(
+						upload.path,
+						upload.content,
+						upload.hash,
+						upload.size,
+						upload.contentType || 'application/octet-stream',
+					);
+					if (!result.success) {
+						throw new Error(result.error || `Upload failed: ${upload.path}`);
+					}
+					if (result.hash && result.hash !== upload.hash) {
+						logger.warn(`Hash mismatch after upload for ${upload.path}`);
+						return;
+					}
+					this.localManifest.setEntry(upload.path, {
+						hash: upload.hash,
+						size: upload.size,
+						modified: await this.getModifiedIso(upload.path, upload.mtime),
 					});
-					await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
-				}
+				});
+				await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
+			}
 
-				// Process deletes
-				for (const path of deletes) {
-					await this.api.deleteFile(path);
-					this.localManifest.removeEntry(path);
+			// Process deletes
+			for (const path of deletes) {
+				const deleteResult = await this.api.deleteFile(path);
+				if (!deleteResult.success) {
+					throw new Error(`Delete failed: ${path}`);
 				}
+				this.localManifest.removeEntry(path);
+			}
 
 			await this.localManifest.save();
-
-			// Fix 1: Clear pending paths only after successful sync
-			this.pendingPaths.clear();
 
 			this.updateState({
 				status: 'idle',
 				lastSync: new Date().toISOString(),
 				lastError: null,
+				pendingChanges: this.pendingPaths.size,
 			});
 		} catch (error) {
-			// Fix 1: Re-add paths back on failure so they're retried
+			// Re-add current batch back on failure so they're retried.
 			for (const p of paths) {
 				this.pendingPaths.add(p);
 			}
@@ -355,7 +388,12 @@ export class SyncEngine {
 			this.updateState({
 				status: 'error',
 				lastError: errorMessage,
+				pendingChanges: this.pendingPaths.size,
 			});
+		} finally {
+			if (this.pendingPaths.size > 0) {
+				this.debouncedSync();
+			}
 		}
 	}
 
@@ -1429,6 +1467,7 @@ export class SyncEngine {
 		this.stopPeriodicSync();
 		if (this.debounceTimer) {
 			clearTimeout(this.debounceTimer);
+			this.debounceTimer = null;
 		}
 	}
 }

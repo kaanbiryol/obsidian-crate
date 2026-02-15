@@ -165,6 +165,101 @@ describe('SyncEngine pattern/ignore behavior', () => {
 		expect((harness.engine as any).shouldIgnore('notes/file.tmp')).toBe(true);
 		expect((harness.engine as any).shouldIgnore('notes/file.md')).toBe(false);
 	});
+
+	it('treats regex metacharacters as literal text in patterns', () => {
+		expect((harness.engine as any).matchPattern('notes[2026].md', 'notes[2026].md')).toBe(true);
+		expect((harness.engine as any).matchPattern('notes2.md', 'notes[2026].md')).toBe(false);
+		expect((harness.engine as any).matchPattern('[', '[')).toBe(true);
+	});
+});
+
+describe('SyncEngine event queue behavior', () => {
+	let harness: Harness;
+
+	beforeEach(() => {
+		harness = createHarness();
+		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: 1, mtime: 1700000000000 });
+	});
+
+	it('queues remote delete when renaming from syncable path into ignored path', () => {
+		const debouncedSync = vi
+			.spyOn(harness.engine as any, 'debouncedSync')
+			.mockImplementation(() => {});
+
+		harness.engine.onFileRename({ path: '.trash/note.md' } as never, 'notes/note.md');
+
+		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		expect(pendingPaths.has('delete:notes/note.md')).toBe(true);
+		expect(pendingPaths.has('.trash/note.md')).toBe(false);
+		expect(debouncedSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('queues upload when renaming from ignored path into syncable path', () => {
+		const debouncedSync = vi
+			.spyOn(harness.engine as any, 'debouncedSync')
+			.mockImplementation(() => {});
+
+		harness.engine.onFileRename({ path: 'notes/note.md' } as never, '.trash/note.md');
+
+		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		expect(pendingPaths.has('delete:.trash/note.md')).toBe(false);
+		expect(pendingPaths.has('notes/note.md')).toBe(true);
+		expect(debouncedSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('keeps new paths queued when they arrive during pending flush', async () => {
+		const content = toArrayBuffer('A');
+		harness.vault.getAbstractFileByPath.mockImplementation((path: string) => {
+			if (path === 'notes/a.md') {
+				return {
+					path,
+					extension: 'md',
+					stat: { size: 1, mtime: 1700000000000 },
+				};
+			}
+			return null;
+		});
+		harness.vault.adapter.readBinary.mockResolvedValue(content);
+		const debouncedSync = vi
+			.spyOn(harness.engine as any, 'debouncedSync')
+			.mockImplementation(() => {});
+		harness.api.uploadFile.mockImplementation(async () => {
+			(harness.engine as any).pendingPaths.add('notes/b.md');
+			return { success: true, path: 'notes/a.md' };
+		});
+
+		(harness.engine as any).pendingPaths.add('notes/a.md');
+		await (harness.engine as any).processPendingChanges();
+
+		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		expect(pendingPaths.has('notes/a.md')).toBe(false);
+		expect(pendingPaths.has('notes/b.md')).toBe(true);
+		expect(debouncedSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('re-queues pending path when upload returns success false', async () => {
+		const content = toArrayBuffer('A');
+		harness.vault.getAbstractFileByPath.mockReturnValue({
+			path: 'notes/a.md',
+			extension: 'md',
+			stat: { size: 1, mtime: 1700000000000 },
+		});
+		harness.vault.adapter.readBinary.mockResolvedValue(content);
+		vi.spyOn(harness.engine as any, 'debouncedSync').mockImplementation(() => {});
+		harness.api.uploadFile.mockResolvedValue({
+			success: false,
+			path: 'notes/a.md',
+			error: 'quota exceeded',
+		});
+
+		(harness.engine as any).pendingPaths.add('notes/a.md');
+		await (harness.engine as any).processPendingChanges();
+
+		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		expect(pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.engine.getState().status).toBe('error');
+		expect(harness.engine.getState().lastError).toContain('quota exceeded');
+	});
 });
 
 describe('SyncEngine prepareUploadFromVaultFile', () => {

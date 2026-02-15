@@ -1,9 +1,9 @@
 /**
- * File hashing utilities using MD5 for change detection
+ * File hashing utilities using SHA-256 for change detection
  */
 
 /**
- * Compute MD5 hash of content
+ * Compute SHA-256 hash of content
  * Using a simple implementation suitable for change detection (not security)
  */
 export async function computeHash(content: ArrayBuffer): Promise<string> {
