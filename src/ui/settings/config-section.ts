@@ -155,8 +155,8 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				.setIcon('x')
 				.setTooltip('Sign out from Cloudflare')
 				.onClick(async () => {
-					await plugin.cloudflareSession.clearCredentials();
-					new Notice('Cloudflare credentials cleared');
+					await plugin.syncRuntime.clearSyncConfiguration({ clearCloudflareCredentials: true });
+					new Notice('Signed out and configuration cleared');
 					rerender();
 				}));
 	}
