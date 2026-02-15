@@ -750,3 +750,143 @@ describe('SyncEngine full sync safeguards', () => {
 		expect(harness.settings.lastSeq).toBe(5);
 	});
 });
+
+describe('SyncEngine slice 5 safeguards', () => {
+	it('rejects initial sync while another sync is in progress', async () => {
+		const harness = createHarness();
+		(harness.engine as any).state.status = 'syncing';
+
+		const result = await harness.engine.initialSync();
+
+		expect(result.success).toBe(false);
+		expect(result.errors).toEqual(['Sync already in progress']);
+		expect(harness.vault.getFiles).not.toHaveBeenCalled();
+	});
+
+	it('sets state to error when initial sync finishes with per-file errors', async () => {
+		const harness = createHarness();
+		const file = {
+			path: 'notes/a.md',
+			extension: 'md',
+			stat: { size: 1, mtime: 1700000000000 },
+		};
+		harness.vault.getFiles.mockReturnValue([file]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+		harness.api.uploadFile.mockResolvedValue({
+			success: false,
+			path: 'notes/a.md',
+			error: 'quota exceeded',
+		});
+
+		const result = await harness.engine.initialSync();
+		const state = harness.engine.getState();
+
+		expect(result.success).toBe(false);
+		expect(result.errors).toContain('notes/a.md: quota exceeded');
+		expect(state.status).toBe('error');
+		expect(state.lastError).toBe('notes/a.md: quota exceeded');
+		expect(harness.settings.lastSync).toBeNull();
+	});
+
+	it('sets state to error when force full sync finishes with non-fatal errors', async () => {
+		const harness = createHarness();
+		harness.api.getManifest.mockResolvedValue({
+			version: 1,
+			files: {
+				'notes/remote-only.md': {
+					hash: 'remote-hash',
+					size: 3,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+			},
+		});
+		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.api.deleteFile.mockRejectedValue(new Error('remote locked'));
+
+		const result = await harness.engine.forceFullSync();
+		const state = harness.engine.getState();
+
+		expect(result.success).toBe(false);
+		expect(result.errors).toContain('delete notes/remote-only.md: remote locked');
+		expect(state.status).toBe('error');
+		expect(state.lastError).toBe('delete notes/remote-only.md: remote locked');
+		expect(harness.settings.lastSync).toBeNull();
+	});
+
+	it('does not delete ignored remote-only paths during force full sync', async () => {
+		const harness = createHarness();
+		harness.api.getManifest.mockResolvedValue({
+			version: 1,
+			files: {
+				'.trash/old.md': {
+					hash: 'ignored-hash',
+					size: 10,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+				'notes/remote-only.md': {
+					hash: 'remote-hash',
+					size: 3,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+			},
+		});
+		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.api.deleteFile.mockResolvedValue({ success: true, path: 'notes/remote-only.md' });
+
+		const result = await harness.engine.forceFullSync();
+
+		expect(result.success).toBe(true);
+		expect(result.deleted).toBe(1);
+		expect(harness.api.deleteFile).toHaveBeenCalledTimes(1);
+		expect(harness.api.deleteFile).toHaveBeenCalledWith('notes/remote-only.md');
+		expect(harness.api.deleteFile).not.toHaveBeenCalledWith('.trash/old.md');
+	});
+
+	it('does not reschedule debounced sync after destroy during a pending flush', async () => {
+		const harness = createHarness();
+		const content = toArrayBuffer('A');
+		let releaseUpload!: () => void;
+		let signalUploadStarted!: () => void;
+		const uploadGate = new Promise<void>(resolve => {
+			releaseUpload = () => resolve();
+		});
+		const uploadStarted = new Promise<void>(resolve => {
+			signalUploadStarted = () => resolve();
+		});
+
+		harness.vault.getAbstractFileByPath.mockImplementation((path: string) => {
+			if (path === 'notes/a.md') {
+				return {
+					path,
+					extension: 'md',
+					stat: { size: 1, mtime: 1700000000000 },
+				};
+			}
+			return null;
+		});
+		harness.vault.adapter.readBinary.mockResolvedValue(content);
+		harness.api.uploadFile.mockImplementation(async () => {
+			signalUploadStarted();
+			(harness.engine as any).pendingPaths.add('notes/b.md');
+			await uploadGate;
+			return { success: true, path: 'notes/a.md' };
+		});
+		const debouncedSync = vi
+			.spyOn(harness.engine as any, 'debouncedSync')
+			.mockImplementation(() => {});
+
+		(harness.engine as any).pendingPaths.add('notes/a.md');
+		const processing = (harness.engine as any).processPendingChanges();
+		await uploadStarted;
+
+		harness.engine.destroy();
+		releaseUpload();
+		await processing;
+
+		expect(debouncedSync).not.toHaveBeenCalled();
+		expect((harness.engine as any).pendingPaths.size).toBe(0);
+	});
+});

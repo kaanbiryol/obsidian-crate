@@ -44,6 +44,7 @@ export class SyncEngine {
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
+	private destroyed = false;
 
 	constructor(
 		plugin: Plugin,
@@ -266,6 +267,8 @@ export class SyncEngine {
 	 * Debounced sync trigger
 	 */
 	private debouncedSync(): void {
+		if (this.destroyed) return;
+
 		this.updateState({ pendingChanges: this.pendingPaths.size });
 
 		if (this.debounceTimer) {
@@ -282,6 +285,8 @@ export class SyncEngine {
 	 * Process pending file changes
 	 */
 	private async processPendingChanges(): Promise<void> {
+		if (this.destroyed) return;
+
 		if (this.pendingPaths.size === 0) {
 			this.updateState({ pendingChanges: 0 });
 			return;
@@ -391,7 +396,7 @@ export class SyncEngine {
 				pendingChanges: this.pendingPaths.size,
 			});
 		} finally {
-			if (this.pendingPaths.size > 0) {
+			if (!this.destroyed && this.pendingPaths.size > 0) {
 				this.debouncedSync();
 			}
 		}
@@ -1295,6 +1300,17 @@ export class SyncEngine {
 			};
 		}
 
+		if (this.state.status === 'syncing') {
+			return {
+				success: false,
+				uploaded: 0,
+				downloaded: 0,
+				deleted: 0,
+				conflicts: [],
+				errors: ['Sync already in progress'],
+			};
+		}
+
 		this.updateState({ status: 'syncing' });
 
 		const result: SyncResult = {
@@ -1343,16 +1359,22 @@ export class SyncEngine {
 
 			await this.localManifest.save();
 
-			const lastSync = new Date().toISOString();
-			this.updateState({
-				status: 'idle',
-				lastSync,
-				lastError: null,
-			});
-			this.settings.lastSync = lastSync;
-
 			logger.info(`Initial sync completed: ${result.uploaded} uploaded`);
 			result.success = result.errors.length === 0;
+			if (result.success) {
+				const lastSync = new Date().toISOString();
+				this.updateState({
+					status: 'idle',
+					lastSync,
+					lastError: null,
+				});
+				this.settings.lastSync = lastSync;
+			} else {
+				this.updateState({
+					status: 'error',
+					lastError: result.errors[0] ?? 'Initial sync completed with errors',
+				});
+			}
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			result.errors.push(errorMessage);
@@ -1414,8 +1436,10 @@ export class SyncEngine {
 			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
 			const localPaths = new Set(files.map(f => f.path));
 
-			// Find remote-only paths (to be deleted)
-			const remoteOnlyPaths = [...remotePaths].filter(p => !localPaths.has(p));
+			// Find remote-only paths (to be deleted), excluding ignored paths.
+			const remoteOnlyPaths = [...remotePaths].filter(
+				p => !localPaths.has(p) && !this.shouldIgnore(p),
+			);
 
 			const total = files.length + remoteOnlyPaths.length;
 			let current = 0;
@@ -1435,32 +1459,38 @@ export class SyncEngine {
 				retry: true,
 			});
 
-				// Delete remote-only files
-				for (const path of remoteOnlyPaths) {
-					try {
-						await this.api.deleteFile(path);
-						this.localManifest.removeEntry(path);
-						result.deleted++;
-					} catch (error) {
-						const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-						result.errors.push(`delete ${path}: ${errorMessage}`);
-					}
-					current++;
-					progressCallback?.(current, total);
+			// Delete remote-only files
+			for (const path of remoteOnlyPaths) {
+				try {
+					await this.api.deleteFile(path);
+					this.localManifest.removeEntry(path);
+					result.deleted++;
+				} catch (error) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					result.errors.push(`delete ${path}: ${errorMessage}`);
 				}
+				current++;
+				progressCallback?.(current, total);
+			}
 
 			await this.localManifest.save();
 
 			const lastSync = new Date().toISOString();
-			this.updateState({
-				status: 'idle',
-				lastSync,
-				lastError: null,
-			});
-			this.settings.lastSync = lastSync;
-
 			logger.info(`Force full sync completed: ${result.uploaded} uploaded, ${result.deleted} remote-only deleted`);
 			result.success = result.errors.length === 0;
+			if (result.success) {
+				this.updateState({
+					status: 'idle',
+					lastSync,
+					lastError: null,
+				});
+				this.settings.lastSync = lastSync;
+			} else {
+				this.updateState({
+					status: 'error',
+					lastError: result.errors[0] ?? 'Force full sync completed with errors',
+				});
+			}
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			result.errors.push(errorMessage);
@@ -1479,10 +1509,12 @@ export class SyncEngine {
 	 * Cleanup on unload
 	 */
 	destroy(): void {
+		this.destroyed = true;
 		this.stopPeriodicSync();
 		if (this.debounceTimer) {
 			clearTimeout(this.debounceTimer);
 			this.debounceTimer = null;
 		}
+		this.pendingPaths.clear();
 	}
 }
