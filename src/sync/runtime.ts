@@ -5,6 +5,7 @@ import { SECRET_KEYS, type CrateSettings, type SyncResult, type SyncState } from
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { SyncEngine } from './engine';
+import { guardSyncConfigured } from './sync-guards';
 
 const logger = createLogger('SyncRuntime');
 
@@ -145,9 +146,11 @@ export class SyncRuntime {
 	}
 
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		if (!this.syncEngine) {
-			return this.notConfiguredResult();
+		const guardResult = guardSyncConfigured(this.syncEngine !== null);
+		if (guardResult) {
+			return guardResult;
 		}
+		const syncEngine = this.syncEngine as SyncEngine;
 
 		logger.info('Sync triggered');
 		const wrappedCallback = (current: number, total: number) => {
@@ -156,7 +159,7 @@ export class SyncRuntime {
 		};
 
 		try {
-			const result = await this.syncEngine.sync(wrappedCallback);
+			const result = await syncEngine.sync(wrappedCallback);
 			await this.persistSettings();
 			return result;
 		} finally {
@@ -165,9 +168,11 @@ export class SyncRuntime {
 	}
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		if (!this.syncEngine) {
-			return this.notConfiguredResult();
+		const guardResult = guardSyncConfigured(this.syncEngine !== null);
+		if (guardResult) {
+			return guardResult;
 		}
+		const syncEngine = this.syncEngine as SyncEngine;
 
 		const wrappedCallback = (current: number, total: number) => {
 			this.statusBar?.setSyncProgress(current, total);
@@ -175,7 +180,7 @@ export class SyncRuntime {
 		};
 
 		try {
-			const result = await this.syncEngine.initialSync(wrappedCallback);
+			const result = await syncEngine.initialSync(wrappedCallback);
 			await this.persistSettings();
 			return result;
 		} finally {
@@ -184,9 +189,11 @@ export class SyncRuntime {
 	}
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		if (!this.syncEngine) {
-			return this.notConfiguredResult();
+		const guardResult = guardSyncConfigured(this.syncEngine !== null);
+		if (guardResult) {
+			return guardResult;
 		}
+		const syncEngine = this.syncEngine as SyncEngine;
 
 		const wrappedCallback = (current: number, total: number) => {
 			this.statusBar?.setSyncProgress(current, total);
@@ -194,22 +201,11 @@ export class SyncRuntime {
 		};
 
 		try {
-			const result = await this.syncEngine.forceFullSync(wrappedCallback);
+			const result = await syncEngine.forceFullSync(wrappedCallback);
 			await this.persistSettings();
 			return result;
 		} finally {
 			this.statusBar?.clearSyncProgress();
 		}
-	}
-
-	private notConfiguredResult(): SyncResult {
-		return {
-			success: false,
-			uploaded: 0,
-			downloaded: 0,
-			deleted: 0,
-			conflicts: [],
-			errors: ['Not configured'],
-		};
 	}
 }

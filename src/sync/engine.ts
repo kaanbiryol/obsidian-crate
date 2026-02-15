@@ -34,6 +34,12 @@ import {
 	uploadPreparedFiles as transferUploadPreparedFiles,
 	createVaultFileChunks as transferCreateVaultFileChunks,
 } from './transfer';
+import { guardSyncStart } from './sync-guards';
+import {
+	createEmptySyncResult,
+	finalizeSyncResult,
+	getSyncResultError,
+} from './sync-result';
 import { createLogger } from '../logger';
 import type {
 	SyncState,
@@ -480,26 +486,12 @@ export class SyncEngine {
 	 * Full sync - compare manifests and sync all differences
 	 */
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		if (!this.api.isConfigured()) {
-			return {
-				success: false,
-				uploaded: 0,
-				downloaded: 0,
-				deleted: 0,
-				conflicts: [],
-				errors: ['Not configured'],
-			};
-		}
-
-		if (this.state.status === 'syncing') {
-			return {
-				success: false,
-				uploaded: 0,
-				downloaded: 0,
-				deleted: 0,
-				conflicts: [],
-				errors: ['Sync already in progress'],
-			};
+		const guardResult = guardSyncStart({
+			isConfigured: this.api.isConfigured(),
+			status: this.state.status,
+		});
+		if (guardResult) {
+			return guardResult;
 		}
 
 		logger.info('Sync started');
@@ -513,7 +505,7 @@ export class SyncEngine {
 				this.updateState({ status: 'idle', lastSync, lastError: null });
 				this.settings.lastSync = lastSync;
 			} else {
-				const lastError = incrementalResult.errors[0] ?? 'Incremental sync completed with errors';
+				const lastError = getSyncResultError(incrementalResult, 'Incremental sync completed with errors');
 				this.updateState({ status: 'error', lastError });
 			}
 			return incrementalResult;
@@ -521,81 +513,36 @@ export class SyncEngine {
 
 		logger.info('Running full sync');
 
-		const result: SyncResult = {
-			success: true,
-			uploaded: 0,
-			downloaded: 0,
-			deleted: 0,
-			conflicts: [],
-			errors: [],
-		};
+		const result: SyncResult = createEmptySyncResult();
 
-			try {
-				const remoteManifest = await this.api.getManifest();
-				const plan = await createFullSyncPlan(
-					this.getFullSyncPlannerContext(),
-					remoteManifest.files,
-					PREPARE_CONCURRENCY,
-				);
+		try {
+			const remoteManifest = await this.api.getManifest();
+			const plan = await createFullSyncPlan(
+				this.getFullSyncPlannerContext(),
+				remoteManifest.files,
+				PREPARE_CONCURRENCY,
+			);
 
-				const {
-					localFiles,
-					diffs,
-					uploadDiffs,
-					downloadDiffs,
-					remainingDiffs,
-					errors,
-				} = plan;
-				result.errors.push(...errors);
+			const {
+				localFiles,
+				diffs,
+				uploadDiffs,
+				downloadDiffs,
+				remainingDiffs,
+				errors,
+			} = plan;
+			result.errors.push(...errors);
 
-				const conflictDiffs = diffs.filter(d => d.action === 'conflict');
-				const deleteDiffs = diffs.filter(d => d.action === 'delete');
-				logger.info(`Full sync diffs: ${uploadDiffs.length} upload, ${downloadDiffs.length} download, ${conflictDiffs.length} conflict, ${deleteDiffs.length} delete`);
+			const conflictDiffs = diffs.filter(d => d.action === 'conflict');
+			const deleteDiffs = diffs.filter(d => d.action === 'delete');
+			logger.info(`Full sync diffs: ${uploadDiffs.length} upload, ${downloadDiffs.length} download, ${conflictDiffs.length} conflict, ${deleteDiffs.length} delete`);
 
-				const total = diffs.length;
-				let current = 0;
+			const total = diffs.length;
+			let current = 0;
 
-				// Run upload diffs concurrently
-				if (uploadDiffs.length > 0) {
-					const uploadTasks = uploadDiffs.map(diff => async () => {
-						try {
-							await this.processDiff(diff, localFiles, result);
-						} catch (error) {
-							const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-							result.errors.push(`${diff.path}: ${errorMessage}`);
-						}
-						current++;
-						progressCallback?.(current, total);
-					});
-					await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
-				}
-
-				// Download files in parallel
-				if (downloadDiffs.length > 0) {
-					await this.parallelDownloadAndSaveFiles(
-						downloadDiffs.map(d => d.path),
-						result,
-					);
-					// Update localFiles record for downloaded files
-					for (const diff of downloadDiffs) {
-						try {
-							const content = await this.vault.adapter.readBinary(diff.path);
-							const hash = await computeHash(content);
-							localFiles[diff.path] = {
-								hash,
-								size: content.byteLength,
-								modified: await this.getModifiedIso(diff.path),
-							};
-						} catch {
-							// File may have failed to download; error already recorded
-						}
-					}
-					current += downloadDiffs.length;
-					progressCallback?.(current, total);
-				}
-
-				// Process conflict and delete diffs sequentially
-				for (const diff of remainingDiffs) {
+			// Run upload diffs concurrently
+			if (uploadDiffs.length > 0) {
+				const uploadTasks = uploadDiffs.map(diff => async () => {
 					try {
 						await this.processDiff(diff, localFiles, result);
 					} catch (error) {
@@ -604,37 +551,73 @@ export class SyncEngine {
 					}
 					current++;
 					progressCallback?.(current, total);
-				}
-
-				// Update local manifest
-				for (const [path, entry] of Object.entries(localFiles)) {
-					this.localManifest.setEntry(path, entry);
-				}
-				await this.localManifest.save();
-
-				const lastSync = new Date().toISOString();
-				this.updateState({
-					status: 'idle',
-					lastSync,
-					lastError: result.errors.length > 0 ? result.errors[0] ?? null : null,
 				});
+				await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
+			}
 
-				// Save last sync time and seq cursor to settings
-				this.settings.lastSync = lastSync;
-				if (
-					result.errors.length === 0 &&
-					remoteManifest.lastSeq !== undefined &&
-					remoteManifest.lastSeq > 0
-				) {
-					this.settings.lastSeq = remoteManifest.lastSeq;
+			// Download files in parallel
+			if (downloadDiffs.length > 0) {
+				await this.parallelDownloadAndSaveFiles(
+					downloadDiffs.map(d => d.path),
+					result,
+				);
+				// Update localFiles record for downloaded files
+				for (const diff of downloadDiffs) {
+					try {
+						const content = await this.vault.adapter.readBinary(diff.path);
+						const hash = await computeHash(content);
+						localFiles[diff.path] = {
+							hash,
+							size: content.byteLength,
+							modified: await this.getModifiedIso(diff.path),
+						};
+					} catch {
+						// File may have failed to download; error already recorded
+					}
 				}
+				current += downloadDiffs.length;
+				progressCallback?.(current, total);
+			}
 
-				logger.info(`Full sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.conflicts.length} conflicts`);
-				result.success = result.errors.length === 0;
+			// Process conflict and delete diffs sequentially
+			for (const diff of remainingDiffs) {
+				try {
+					await this.processDiff(diff, localFiles, result);
+				} catch (error) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					result.errors.push(`${diff.path}: ${errorMessage}`);
+				}
+				current++;
+				progressCallback?.(current, total);
+			}
+
+			// Update local manifest
+			for (const [path, entry] of Object.entries(localFiles)) {
+				this.localManifest.setEntry(path, entry);
+			}
+			await this.localManifest.save();
+
+			const lastSync = new Date().toISOString();
+			this.updateState({
+				status: 'idle',
+				lastSync,
+				lastError: result.errors.length > 0 ? result.errors[0] ?? null : null,
+			});
+
+			// Save last sync time and seq cursor to settings
+			this.settings.lastSync = lastSync;
+			if (
+				result.errors.length === 0 &&
+				remoteManifest.lastSeq !== undefined &&
+				remoteManifest.lastSeq > 0
+			) {
+				this.settings.lastSeq = remoteManifest.lastSeq;
+			}
+
+			logger.info(`Full sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.conflicts.length} conflicts`);
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			result.errors.push(errorMessage);
-			result.success = false;
 			logger.error('Full sync failed:', errorMessage);
 			this.updateState({
 				status: 'error',
@@ -642,6 +625,7 @@ export class SyncEngine {
 			});
 		}
 
+		finalizeSyncResult(result);
 		return result;
 	}
 
@@ -690,38 +674,17 @@ export class SyncEngine {
 	 * Initial sync - upload all local files
 	 */
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		if (!this.api.isConfigured()) {
-			return {
-				success: false,
-				uploaded: 0,
-				downloaded: 0,
-				deleted: 0,
-				conflicts: [],
-				errors: ['Not configured'],
-			};
-		}
-
-		if (this.state.status === 'syncing') {
-			return {
-				success: false,
-				uploaded: 0,
-				downloaded: 0,
-				deleted: 0,
-				conflicts: [],
-				errors: ['Sync already in progress'],
-			};
+		const guardResult = guardSyncStart({
+			isConfigured: this.api.isConfigured(),
+			status: this.state.status,
+		});
+		if (guardResult) {
+			return guardResult;
 		}
 
 		this.updateState({ status: 'syncing' });
 
-		const result: SyncResult = {
-			success: true,
-			uploaded: 0,
-			downloaded: 0,
-			deleted: 0,
-			conflicts: [],
-			errors: [],
-		};
+		const result: SyncResult = createEmptySyncResult();
 
 		try {
 			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
@@ -761,8 +724,7 @@ export class SyncEngine {
 			await this.localManifest.save();
 
 			logger.info(`Initial sync completed: ${result.uploaded} uploaded`);
-			result.success = result.errors.length === 0;
-			if (result.success) {
+			if (finalizeSyncResult(result)) {
 				const lastSync = new Date().toISOString();
 				this.updateState({
 					status: 'idle',
@@ -773,19 +735,19 @@ export class SyncEngine {
 			} else {
 				this.updateState({
 					status: 'error',
-					lastError: result.errors[0] ?? 'Initial sync completed with errors',
+					lastError: getSyncResultError(result, 'Initial sync completed with errors'),
 				});
 			}
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			result.errors.push(errorMessage);
-			result.success = false;
 			this.updateState({
 				status: 'error',
 				lastError: errorMessage,
 			});
 		}
 
+		finalizeSyncResult(result);
 		return result;
 	}
 
@@ -795,38 +757,17 @@ export class SyncEngine {
 	 * and deletes remote-only files.
 	 */
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		if (!this.api.isConfigured()) {
-			return {
-				success: false,
-				uploaded: 0,
-				downloaded: 0,
-				deleted: 0,
-				conflicts: [],
-				errors: ['Not configured'],
-			};
-		}
-
-		if (this.state.status === 'syncing') {
-			return {
-				success: false,
-				uploaded: 0,
-				downloaded: 0,
-				deleted: 0,
-				conflicts: [],
-				errors: ['Sync already in progress'],
-			};
+		const guardResult = guardSyncStart({
+			isConfigured: this.api.isConfigured(),
+			status: this.state.status,
+		});
+		if (guardResult) {
+			return guardResult;
 		}
 
 		this.updateState({ status: 'syncing' });
 
-		const result: SyncResult = {
-			success: true,
-			uploaded: 0,
-			downloaded: 0,
-			deleted: 0,
-			conflicts: [],
-			errors: [],
-		};
+		const result: SyncResult = createEmptySyncResult();
 
 		try {
 			// Fetch remote manifest to find remote-only files
@@ -878,8 +819,7 @@ export class SyncEngine {
 
 			const lastSync = new Date().toISOString();
 			logger.info(`Force full sync completed: ${result.uploaded} uploaded, ${result.deleted} remote-only deleted`);
-			result.success = result.errors.length === 0;
-			if (result.success) {
+			if (finalizeSyncResult(result)) {
 				this.updateState({
 					status: 'idle',
 					lastSync,
@@ -889,13 +829,12 @@ export class SyncEngine {
 			} else {
 				this.updateState({
 					status: 'error',
-					lastError: result.errors[0] ?? 'Force full sync completed with errors',
+					lastError: getSyncResultError(result, 'Force full sync completed with errors'),
 				});
 			}
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			result.errors.push(errorMessage);
-			result.success = false;
 			logger.error('Force full sync failed:', errorMessage);
 			this.updateState({
 				status: 'error',
@@ -903,6 +842,7 @@ export class SyncEngine {
 			});
 		}
 
+		finalizeSyncResult(result);
 		return result;
 	}
 

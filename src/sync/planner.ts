@@ -3,6 +3,7 @@ import { computeHash } from './hasher';
 import { createConflictCopy } from './conflict';
 import { detectConflicts } from './conflict';
 import { getAllVaultFiles, isHiddenPath } from './file-discovery';
+import { createEmptySyncResult, finalizeSyncResult } from './sync-result';
 import { createLogger } from '../logger';
 import type { ChangelogEntry, CrateSettings, FileDiff, FileEntry, PreparedUpload, SyncResult } from '../types';
 import { MAX_FILE_SIZE_BYTES } from '../types';
@@ -155,14 +156,7 @@ export async function runIncrementalSync(
 
 		if (allChanges.length === 0 && localChanges.length === 0 && localDeletes.length === 0) {
 			context.settings.lastSeq = latestSeq;
-			return {
-				success: true,
-				uploaded: 0,
-				downloaded: 0,
-				deleted: 0,
-				conflicts: [],
-				errors: [],
-			};
+			return createEmptySyncResult();
 		}
 
 		const changesByPath = new Map<string, ChangelogEntry>();
@@ -170,14 +164,7 @@ export async function runIncrementalSync(
 			changesByPath.set(entry.path, entry);
 		}
 
-		const result: SyncResult = {
-			success: true,
-			uploaded: 0,
-			downloaded: 0,
-			deleted: 0,
-			conflicts: [],
-			errors: [],
-		};
+		const result: SyncResult = createEmptySyncResult();
 		const localChangedPaths = new Set(localChanges.map(f => f.path));
 		const localDeletedPaths = new Set(localDeletes);
 		const resurrectPaths = new Set<string>();
@@ -320,8 +307,7 @@ export async function runIncrementalSync(
 		}
 
 		await context.localManifest.save();
-		result.success = result.errors.length === 0;
-		if (result.success) {
+		if (finalizeSyncResult(result)) {
 			context.settings.lastSeq = latestSeq;
 		}
 
