@@ -399,6 +399,25 @@ export async function redeployWorker(
 	}
 }
 
+export interface WorkerBinding {
+	type: string;
+	name: string;
+	text?: string;
+	bucket_name?: string;
+	id?: string;
+}
+
+export async function getWorkerBindings(
+	credentials: CloudflareCredentials,
+	workerName: string
+): Promise<WorkerBinding[]> {
+	const result = await cfRequest<{ bindings: WorkerBinding[] }>(
+		credentials,
+		`/accounts/${credentials.accountId}/workers/scripts/${workerName}/settings`
+	);
+	return result.bindings;
+}
+
 export function generateAuthToken(): string {
 	const array = new Uint8Array(32);
 	crypto.getRandomValues(array);

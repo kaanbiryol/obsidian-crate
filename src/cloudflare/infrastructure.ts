@@ -7,6 +7,7 @@ import {
 	type CloudflareCredentials,
 	type D1Database,
 	type R2Bucket,
+	type WorkerBinding,
 	type WorkerScript,
 	createD1Database,
 	createR2Bucket,
@@ -17,6 +18,7 @@ import {
 	generateAuthToken,
 	generateBucketName,
 	generateWorkerName,
+	getWorkerBindings,
 	listD1Databases,
 	listR2Buckets,
 	listWorkers,
@@ -132,6 +134,23 @@ function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function resolveConfigFromBindings(bindings: WorkerBinding[]): { bucketName: string; databaseId: string } | null {
+	let bucketName: string | undefined;
+	let databaseId: string | undefined;
+
+	for (const binding of bindings) {
+		if (binding.type === 'plain_text' && binding.name === 'CF_BUCKET_NAME' && binding.text) {
+			bucketName = binding.text;
+		}
+		if (binding.type === 'plain_text' && binding.name === 'CF_DATABASE_ID' && binding.text) {
+			databaseId = binding.text;
+		}
+	}
+
+	if (!bucketName || !databaseId) return null;
+	return { bucketName, databaseId };
+}
+
 export async function quickSetup(input: QuickSetupInput, onProgress?: ProgressCallback): Promise<QuickSetupResult> {
 	const credentials = toCredentials(input.accountId, input.apiToken);
 	if (!credentials.accountId || !credentials.apiToken) {
@@ -142,6 +161,16 @@ export async function quickSetup(input: QuickSetupInput, onProgress?: ProgressCa
 	const valid = await verifyCredentials(credentials);
 	if (!valid) {
 		throw new Error('Invalid Cloudflare credentials');
+	}
+
+	// Try to reconnect to existing crate infrastructure (only when no manual names provided)
+	if (!input.workerName?.trim() && !input.bucketName?.trim()) {
+		try {
+			const reconnectResult = await tryReconnectExisting(credentials, onProgress);
+			if (reconnectResult) return reconnectResult;
+		} catch {
+			// Fall through to create-new logic
+		}
 	}
 
 	onProgress?.('Checking R2 access...');
@@ -189,6 +218,54 @@ export async function quickSetup(input: QuickSetupInput, onProgress?: ProgressCa
 		workerName: requestedWorker,
 		databaseId: d1.uuid,
 		bucketCreated,
+	};
+}
+
+async function tryReconnectExisting(
+	credentials: CloudflareCredentials,
+	onProgress?: ProgressCallback
+): Promise<QuickSetupResult | null> {
+	onProgress?.('Checking for existing crate infrastructure...');
+	const workers = await listWorkers(credentials);
+	const crateWorker = workers.find((w) => w.id.startsWith('crate-sync-'));
+	if (!crateWorker) return null;
+
+	onProgress?.(`Found existing worker ${crateWorker.id}, reading bindings...`);
+	const bindings = await getWorkerBindings(credentials, crateWorker.id);
+	const config = resolveConfigFromBindings(bindings);
+	if (!config) return null;
+
+	// Verify bucket and database still exist
+	onProgress?.('Verifying existing resources...');
+	const [buckets, databases] = await Promise.all([
+		listR2Buckets(credentials),
+		listD1Databases(credentials),
+	]);
+
+	const bucketExists = buckets.some((b) => b.name === config.bucketName);
+	const databaseExists = databases.some((d) => d.uuid === config.databaseId);
+	if (!bucketExists || !databaseExists) return null;
+
+	// Redeploy with new auth token
+	const authToken = generateAuthToken();
+	onProgress?.(`Reconnecting to worker ${crateWorker.id}...`);
+	const workerScript = getWorkerScript();
+	const deployment = await deployWorker(credentials, crateWorker.id, workerScript, {
+		r2Bucket: config.bucketName,
+		authToken,
+		d1DatabaseId: config.databaseId,
+		accountId: credentials.accountId,
+		workerName: crateWorker.id,
+		bucketName: config.bucketName,
+	});
+
+	return {
+		workerUrl: deployment.url,
+		authToken,
+		bucketName: config.bucketName,
+		workerName: crateWorker.id,
+		databaseId: config.databaseId,
+		bucketCreated: false,
 	};
 }
 
