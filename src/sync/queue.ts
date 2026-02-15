@@ -217,15 +217,19 @@ export async function processPendingChanges(
 			pendingChanges: context.pendingPaths.size,
 		});
 	} catch (error) {
-		for (const path of paths) {
-			context.pendingPaths.add(path);
+		if (error instanceof DOMException && error.name === 'AbortError') {
+			logger.info('Queue processing aborted');
+		} else {
+			for (const path of paths) {
+				context.pendingPaths.add(path);
+			}
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			context.updateState({
+				status: 'error',
+				lastError: errorMessage,
+				pendingChanges: context.pendingPaths.size,
+			});
 		}
-		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-		context.updateState({
-			status: 'error',
-			lastError: errorMessage,
-			pendingChanges: context.pendingPaths.size,
-		});
 	} finally {
 		if (!context.isDestroyed() && context.pendingPaths.size > 0) {
 			context.triggerDebouncedSync();

@@ -1,6 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
-import { runButtonTask } from './action-helpers';
+import type { SyncState } from '../../types';
+import { createFileSyncProgress, hideFileSyncProgress, runButtonTask, showFileSyncProgress, updateFileSyncProgress } from './action-helpers';
 
 export interface SyncSectionContext {
 	containerEl: HTMLElement;
@@ -8,28 +9,41 @@ export interface SyncSectionContext {
 	rerender: () => void;
 }
 
-export function renderSyncSection(context: SyncSectionContext): void {
+export function renderSyncSection(context: SyncSectionContext): () => void {
 	const { containerEl, plugin, rerender } = context;
+	const isSyncing = plugin.syncRuntime.getState().status === 'syncing';
 
 	containerEl.createEl('h3', { text: 'Sync' });
 
 	const lastSync = plugin.settings.lastSync;
-	new Setting(containerEl)
+	const lastSyncSetting = new Setting(containerEl)
 		.setName('Last sync')
 		.setDesc(lastSync ? new Date(lastSync).toLocaleString() : 'Never');
 
-	new Setting(containerEl)
+	if (isSyncing) {
+		lastSyncSetting.setDesc('Sync in progress...');
+	}
+
+	const syncSetting = new Setting(containerEl)
 		.setName('Sync now')
 		.setDesc('Manually trigger a full sync')
-		.addButton(button => button
-			.setButtonText('Sync now')
-			.setCta()
-			.onClick(async () => {
+		.addButton(button => {
+			if (isSyncing) {
+				button.setButtonText('Syncing...');
+				button.setDisabled(true);
+			} else {
+				button.setButtonText('Sync now');
+				button.setCta();
+			}
+			button.onClick(async () => {
 				await runButtonTask({
 					button,
 					idleText: 'Sync now',
 					runningText: 'Syncing...',
-					task: async () => plugin.syncRuntime.sync(),
+					task: async () => {
+						showFileSyncProgress(syncProgress);
+						return plugin.syncRuntime.sync();
+					},
 					onSuccess: (result) => {
 						if (result.success) {
 							new Notice(`Sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded`);
@@ -48,7 +62,33 @@ export function renderSyncSection(context: SyncSectionContext): void {
 						rerender();
 					},
 				});
-			}));
+			});
+		});
+	const syncProgress = createFileSyncProgress(syncSetting);
+
+	// Show progress bar and subscribe to updates for any running sync
+	const onProgress = (current: number, total: number) => {
+		updateFileSyncProgress(syncProgress, current, total);
+	};
+	const onStateChange = (state: SyncState) => {
+		if (state.status === 'syncing') {
+			showFileSyncProgress(syncProgress);
+		} else {
+			hideFileSyncProgress(syncProgress);
+			rerender();
+		}
+	};
+	plugin.syncRuntime.addProgressListener(onProgress);
+	plugin.syncRuntime.addStateChangeListener(onStateChange);
+
+	if (isSyncing) {
+		showFileSyncProgress(syncProgress);
+	}
+
+	const cleanup = () => {
+		plugin.syncRuntime.removeProgressListener(onProgress);
+		plugin.syncRuntime.removeStateChangeListener(onStateChange);
+	};
 
 	new Setting(containerEl)
 		.setName('Sync on startup')
@@ -102,4 +142,6 @@ export function renderSyncSection(context: SyncSectionContext): void {
 				await plugin.saveSettings();
 				plugin.syncRuntime.updateStatusBar(value);
 			}));
+
+	return cleanup;
 }

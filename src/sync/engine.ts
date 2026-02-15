@@ -72,6 +72,7 @@ export class SyncEngine {
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
 	private destroyed = false;
+	private abortController = new AbortController();
 
 	constructor(
 		plugin: Plugin,
@@ -84,6 +85,7 @@ export class SyncEngine {
 		this.settings = settings;
 		this.localManifest = new LocalManifest(plugin.app, plugin.manifest);
 		this.ignoredDirPrefixes = settings.ignorePatterns.filter(p => p.endsWith('/'));
+		this.api.setAbortSignal(this.abortController.signal);
 		this.state = {
 			status: 'idle',
 			lastSync: settings.lastSync,
@@ -242,6 +244,16 @@ export class SyncEngine {
 		return regex.test(path);
 	}
 
+	private throwIfDestroyed(): void {
+		if (this.destroyed) {
+			throw new DOMException('Sync engine destroyed', 'AbortError');
+		}
+	}
+
+	private isAbortError(error: unknown): boolean {
+		return error instanceof DOMException && error.name === 'AbortError';
+	}
+
 	private getTransferContext() {
 		return {
 			vault: this.vault,
@@ -342,8 +354,10 @@ export class SyncEngine {
 	): Promise<T[]> {
 		const results: T[] = [];
 		let index = 0;
+		const destroyed = () => this.destroyed;
 		async function next(): Promise<void> {
 			while (index < tasks.length) {
+				if (destroyed()) break;
 				const i = index++;
 				results[i] = await tasks[i]!();
 			}
@@ -360,6 +374,7 @@ export class SyncEngine {
 			try {
 				return await fn();
 			} catch (error) {
+				if (this.isAbortError(error) || this.destroyed) throw error;
 				if (attempt === MAX_RETRIES) throw error;
 				let delay: number;
 				if (error instanceof HttpError && error.retryAfter !== null) {
@@ -495,6 +510,7 @@ export class SyncEngine {
 		const result: SyncResult = createEmptySyncResult();
 
 		try {
+			this.throwIfDestroyed();
 			const remoteManifest = await this.api.getManifest();
 			const plan = await createFullSyncPlan(
 				this.getFullSyncPlannerContext(),
@@ -534,6 +550,8 @@ export class SyncEngine {
 				await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
 			}
 
+			this.throwIfDestroyed();
+
 			// Download files in parallel
 			if (downloadDiffs.length > 0) {
 				await this.parallelDownloadAndSaveFiles(
@@ -558,8 +576,11 @@ export class SyncEngine {
 				progressCallback?.(current, total);
 			}
 
+			this.throwIfDestroyed();
+
 			// Process conflict and delete diffs sequentially
 			for (const diff of remainingDiffs) {
+				if (this.destroyed) break;
 				try {
 					await this.processDiff(diff, localFiles, result);
 				} catch (error) {
@@ -595,13 +616,17 @@ export class SyncEngine {
 
 			logger.info(`Full sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.conflicts.length} conflicts`);
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-			result.errors.push(errorMessage);
-			logger.error('Full sync failed:', errorMessage);
-			this.updateState({
-				status: 'error',
-				lastError: errorMessage,
-			});
+			if (this.isAbortError(error)) {
+				logger.info('Full sync aborted');
+			} else {
+				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+				result.errors.push(errorMessage);
+				logger.error('Full sync failed:', errorMessage);
+				this.updateState({
+					status: 'error',
+					lastError: errorMessage,
+				});
+			}
 		}
 
 		finalizeSyncResult(result);
@@ -678,6 +703,7 @@ export class SyncEngine {
 			let currentPrepare = chunks.length > 0 ? prepareChunk(chunks[0]!) : null;
 			while (currentPrepare) {
 				const preparedChunk = await currentPrepare;
+				this.throwIfDestroyed();
 				uploadCandidates += preparedChunk.length;
 
 				chunkIndex++;
@@ -714,12 +740,16 @@ export class SyncEngine {
 				});
 			}
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-			result.errors.push(errorMessage);
-			this.updateState({
-				status: 'error',
-				lastError: errorMessage,
-			});
+			if (this.isAbortError(error)) {
+				logger.info('Initial sync aborted');
+			} else {
+				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+				result.errors.push(errorMessage);
+				this.updateState({
+					status: 'error',
+					lastError: errorMessage,
+				});
+			}
 		}
 
 		finalizeSyncResult(result);
@@ -766,14 +796,19 @@ export class SyncEngine {
 				progressCallback?.(current, total);
 			});
 
+			this.throwIfDestroyed();
+
 			// Second pass: upload individually with retry
 			await this.uploadPreparedFiles(prepared, result, {
 				concurrency: FORCE_SYNC_CONCURRENCY,
 				retry: true,
 			});
 
+			this.throwIfDestroyed();
+
 			// Delete remote-only files
 			for (const path of remoteOnlyPaths) {
+				if (this.destroyed) break;
 				try {
 					await this.api.deleteFile(path);
 					this.localManifest.removeEntry(path);
@@ -804,13 +839,17 @@ export class SyncEngine {
 				});
 			}
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-			result.errors.push(errorMessage);
-			logger.error('Force full sync failed:', errorMessage);
-			this.updateState({
-				status: 'error',
-				lastError: errorMessage,
-			});
+			if (this.isAbortError(error)) {
+				logger.info('Force full sync aborted');
+			} else {
+				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+				result.errors.push(errorMessage);
+				logger.error('Force full sync failed:', errorMessage);
+				this.updateState({
+					status: 'error',
+					lastError: errorMessage,
+				});
+			}
 		}
 
 		finalizeSyncResult(result);
@@ -822,6 +861,7 @@ export class SyncEngine {
 	 */
 	destroy(): void {
 		this.destroyed = true;
+		this.abortController.abort();
 		this.stopPeriodicSync();
 		if (this.debounceTimer) {
 			clearTimeout(this.debounceTimer);

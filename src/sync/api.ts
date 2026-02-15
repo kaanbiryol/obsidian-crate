@@ -37,10 +37,18 @@ const TRANSFER_TIMEOUT_MS = 120_000;
 export class SyncApiClient {
 	private workerUrl: string;
 	private authToken: string;
+	private externalSignal: AbortSignal | undefined;
 
 	constructor(workerUrl: string, authToken: string) {
 		this.workerUrl = this.normalizeWorkerUrl(workerUrl);
 		this.authToken = authToken;
+	}
+
+	/**
+	 * Set an external abort signal to cancel all in-flight requests
+	 */
+	setAbortSignal(signal: AbortSignal): void {
+		this.externalSignal = signal;
 	}
 
 	/**
@@ -100,7 +108,9 @@ export class SyncApiClient {
 
 		const response = await fetch(url, {
 			...options,
-			signal: AbortSignal.timeout(timeout),
+			signal: this.externalSignal
+				? AbortSignal.any([AbortSignal.timeout(timeout), this.externalSignal])
+				: AbortSignal.timeout(timeout),
 			headers: {
 				...headers,
 				...options.headers,
@@ -137,7 +147,9 @@ export class SyncApiClient {
 
 		const response = await fetch(url, {
 			...options,
-			signal: AbortSignal.timeout(timeout),
+			signal: this.externalSignal
+				? AbortSignal.any([AbortSignal.timeout(timeout), this.externalSignal])
+				: AbortSignal.timeout(timeout),
 			headers: {
 				'Authorization': `Bearer ${this.authToken}`,
 				...options.headers,

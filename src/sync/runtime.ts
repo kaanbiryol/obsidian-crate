@@ -26,6 +26,8 @@ export class SyncRuntime {
 	private syncEngine: SyncEngine | null = null;
 	private apiClient: SyncApiClient | null = null;
 	private statusBar: StatusBarManager | null = null;
+	private stateChangeListeners = new Set<(state: SyncState) => void>();
+	private progressListeners = new Set<(current: number, total: number) => void>();
 
 	constructor(
 		private plugin: Plugin,
@@ -33,6 +35,29 @@ export class SyncRuntime {
 		private secretStorage: SecretStorageService,
 		private persistSettings: () => Promise<void>
 	) {}
+
+	getState(): SyncState {
+		if (this.syncEngine) {
+			return this.syncEngine.getState();
+		}
+		return { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0 };
+	}
+
+	addStateChangeListener(listener: (state: SyncState) => void): void {
+		this.stateChangeListeners.add(listener);
+	}
+
+	removeStateChangeListener(listener: (state: SyncState) => void): void {
+		this.stateChangeListeners.delete(listener);
+	}
+
+	addProgressListener(listener: (current: number, total: number) => void): void {
+		this.progressListeners.add(listener);
+	}
+
+	removeProgressListener(listener: (current: number, total: number) => void): void {
+		this.progressListeners.delete(listener);
+	}
 
 	isConfigured(): boolean {
 		return this.settings.workerUrl.length > 0 && this.secretStorage.has(SECRET_KEYS.AUTH_TOKEN);
@@ -60,6 +85,9 @@ export class SyncRuntime {
 
 		this.syncEngine.setStateChangeCallback((state: SyncState) => {
 			this.statusBar?.update(state);
+			for (const listener of this.stateChangeListeners) {
+				listener(state);
+			}
 		});
 
 		await this.syncEngine.initialize();
@@ -158,6 +186,9 @@ export class SyncRuntime {
 		const wrappedCallback = (current: number, total: number) => {
 			this.statusBar?.setSyncProgress(current, total);
 			progressCallback?.(current, total);
+			for (const listener of this.progressListeners) {
+				listener(current, total);
+			}
 		};
 
 		try {
@@ -179,6 +210,9 @@ export class SyncRuntime {
 		const wrappedCallback = (current: number, total: number) => {
 			this.statusBar?.setSyncProgress(current, total);
 			progressCallback?.(current, total);
+			for (const listener of this.progressListeners) {
+				listener(current, total);
+			}
 		};
 
 		try {
@@ -200,6 +234,9 @@ export class SyncRuntime {
 		const wrappedCallback = (current: number, total: number) => {
 			this.statusBar?.setSyncProgress(current, total);
 			progressCallback?.(current, total);
+			for (const listener of this.progressListeners) {
+				listener(current, total);
+			}
 		};
 
 		try {

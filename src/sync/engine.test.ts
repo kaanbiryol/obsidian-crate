@@ -20,6 +20,7 @@ type Harness = {
 	settings: CrateSettings;
 	api: {
 		isConfigured: ReturnType<typeof vi.fn>;
+		setAbortSignal: ReturnType<typeof vi.fn>;
 		getChanges: ReturnType<typeof vi.fn>;
 		uploadFile: ReturnType<typeof vi.fn>;
 		deleteFile: ReturnType<typeof vi.fn>;
@@ -103,6 +104,7 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 
 	const api = {
 		isConfigured: vi.fn().mockReturnValue(true),
+		setAbortSignal: vi.fn(),
 		getChanges: vi.fn(),
 		uploadFile: vi.fn(),
 		deleteFile: vi.fn(),
@@ -898,5 +900,118 @@ describe('SyncEngine slice 5 safeguards', () => {
 
 		expect(debouncedSync).not.toHaveBeenCalled();
 		expect((harness.engine as any).pendingPaths.size).toBe(0);
+	});
+});
+
+describe('SyncEngine abort-on-destroy', () => {
+	it('aborts in-flight sync when destroyed and does not set error state', async () => {
+		const harness = createHarness({ lastSeq: 0 });
+		// Make incremental sync fall through to full sync
+		vi.spyOn(harness.engine as any, 'incrementalSync').mockResolvedValue(null);
+		// getManifest will hang until we signal it
+		let rejectManifest!: (error: Error) => void;
+		const manifestCalled = new Promise<void>(resolve => {
+			harness.api.getManifest.mockImplementation(() => new Promise((_res, rej) => {
+				rejectManifest = rej;
+				resolve();
+			}));
+		});
+
+		const syncPromise = harness.engine.sync();
+		await manifestCalled;
+
+		// Destroy mid-flight - this aborts the controller
+		harness.engine.destroy();
+		// Simulate the fetch abort that would happen
+		rejectManifest(new DOMException('The operation was aborted', 'AbortError'));
+
+		const result = await syncPromise;
+
+		// Should not have set error state (abort is not an error)
+		expect(result.errors).toHaveLength(0);
+		expect(harness.engine.getState().status).not.toBe('error');
+	});
+
+	it('stops launching new concurrent tasks after destroy', async () => {
+		const harness = createHarness();
+		const callOrder: number[] = [];
+
+		const tasks = [
+			async () => { callOrder.push(1); return 1; },
+			async () => {
+				callOrder.push(2);
+				harness.engine.destroy();
+				return 2;
+			},
+			async () => { callOrder.push(3); return 3; },
+			async () => { callOrder.push(4); return 4; },
+		];
+
+		await (harness.engine as any).runConcurrent(tasks, 1);
+
+		// Task 3 and 4 should not run because destroy was called during task 2
+		expect(callOrder).toEqual([1, 2]);
+	});
+
+	it('retryWithBackoff does not retry after destroy', async () => {
+		const harness = createHarness();
+		let callCount = 0;
+
+		const fn = async () => {
+			callCount++;
+			if (callCount === 1) {
+				harness.engine.destroy();
+				throw new Error('first failure');
+			}
+			return 'done';
+		};
+
+		await expect(
+			(harness.engine as any).retryWithBackoff(fn),
+		).rejects.toThrow('first failure');
+
+		expect(callCount).toBe(1);
+	});
+
+	it('initialSync aborts cleanly when destroyed during chunk processing', async () => {
+		const harness = createHarness();
+		const file = {
+			path: 'notes/a.md',
+			extension: 'md',
+			stat: { size: 1, mtime: 1700000000000 },
+		};
+		harness.vault.getFiles.mockReturnValue([file]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+
+		// Destroy during prepare phase
+		vi.spyOn(harness.engine as any, 'prepareUploadsFromVaultFiles').mockImplementation(async () => {
+			harness.engine.destroy();
+			return [{ path: 'notes/a.md', content: toArrayBuffer('A'), hash: 'h', size: 1 }];
+		});
+
+		const result = await harness.engine.initialSync();
+
+		// Should not have set error state
+		expect(result.errors).toHaveLength(0);
+		expect(harness.engine.getState().status).not.toBe('error');
+	});
+
+	it('forceFullSync aborts cleanly when destroyed after prepare', async () => {
+		const harness = createHarness();
+		harness.api.getManifest.mockResolvedValue({ version: 1, files: {} });
+		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+
+		// Destroy after prepareUploadsFromVaultFiles
+		vi.spyOn(harness.engine as any, 'prepareUploadsFromVaultFiles').mockImplementation(async () => {
+			harness.engine.destroy();
+			return [];
+		});
+
+		const result = await harness.engine.forceFullSync();
+
+		expect(result.errors).toHaveLength(0);
+		expect(harness.engine.getState().status).not.toBe('error');
 	});
 });

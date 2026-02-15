@@ -18,6 +18,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		manualBucketName: '',
 		manualWorkerName: '',
 	};
+	private cleanupFns: (() => void)[] = [];
 
 	constructor(app: App, plugin: CratePlugin) {
 		super(app, plugin);
@@ -25,6 +26,8 @@ export class CrateSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
+		this.cleanup();
+
 		const { containerEl } = this;
 		containerEl.empty();
 		containerEl.addClass('crate-settings');
@@ -39,11 +42,13 @@ export class CrateSettingTab extends PluginSettingTab {
 		});
 
 		if (this.plugin.syncRuntime.isConfigured()) {
-			renderSyncSection({
+			const syncCleanup = renderSyncSection({
 				containerEl,
 				plugin: this.plugin,
 				rerender: () => this.display(),
 			});
+			this.cleanupFns.push(syncCleanup);
+
 			renderInfrastructureSection({
 				containerEl,
 				plugin: this.plugin,
@@ -54,5 +59,16 @@ export class CrateSettingTab extends PluginSettingTab {
 				plugin: this.plugin,
 			});
 		}
+	}
+
+	hide(): void {
+		this.cleanup();
+	}
+
+	private cleanup(): void {
+		for (const fn of this.cleanupFns) {
+			fn();
+		}
+		this.cleanupFns = [];
 	}
 }
