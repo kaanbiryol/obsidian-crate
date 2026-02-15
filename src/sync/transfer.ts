@@ -4,8 +4,9 @@ import { createConflictCopy } from './conflict';
 import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from './file-discovery';
 import type { VaultFile } from './file-discovery';
 import { createLogger } from '../logger';
-import type { FileDiff, FileEntry, PreparedUpload, SyncResult, UploadResult } from '../types';
-import { MAX_FILE_SIZE_BYTES } from '../types';
+import { arrayBufferToBase64, base64ToArrayBuffer } from './encoding';
+import type { BatchUploadFile, BatchUploadResponse, BatchDownloadResponse, FileDiff, FileEntry, PreparedUpload, SyncResult, UploadResult } from '../types';
+import { BATCH_FILE_SIZE_LIMIT, BATCH_MAX_BYTES, BATCH_MAX_FILES, MAX_FILE_SIZE_BYTES } from '../types';
 
 const logger = createLogger('SyncTransfer');
 
@@ -25,6 +26,8 @@ export interface TransferApi {
 	): Promise<UploadResult>;
 	downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number }>;
 	deleteFile(path: string): Promise<{ success: boolean; path: string }>;
+	batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
+	batchDownload(paths: string[]): Promise<BatchDownloadResponse>;
 }
 
 export interface TransferContext {
@@ -157,7 +160,7 @@ export async function saveDownloadedContent(
 	});
 }
 
-export async function parallelDownloadAndSaveFiles(
+async function downloadFilesIndividually(
 	context: TransferContext,
 	paths: string[],
 	result: SyncResult,
@@ -172,6 +175,57 @@ export async function parallelDownloadAndSaveFiles(
 		}
 	});
 	await context.runConcurrent(tasks, concurrency);
+}
+
+export async function parallelDownloadAndSaveFiles(
+	context: TransferContext,
+	paths: string[],
+	result: SyncResult,
+	concurrency: number,
+): Promise<void> {
+	const batchable: string[] = [];
+	const individual: string[] = [];
+
+	for (const path of paths) {
+		// We don't know remote sizes yet, so batch all and let the worker handle it.
+		// Files that exceed limits will be caught on save.
+		batchable.push(path);
+	}
+
+	if (batchable.length > 0) {
+		const chunks: string[][] = [];
+		for (let i = 0; i < batchable.length; i += BATCH_MAX_FILES) {
+			chunks.push(batchable.slice(i, i + BATCH_MAX_FILES));
+		}
+
+		for (const chunk of chunks) {
+			try {
+				const response = await context.api.batchDownload(chunk);
+				for (const file of response.files) {
+					try {
+						if (file.error) {
+							result.errors.push(`${file.path}: ${file.error}`);
+							continue;
+						}
+						const content = base64ToArrayBuffer(file.content);
+						await saveDownloadedContent(context, file.path, content);
+						result.downloaded++;
+					} catch (error) {
+						const errorMessage = error instanceof Error ? error.message : 'Download failed';
+						result.errors.push(`${file.path}: ${errorMessage}`);
+					}
+				}
+			} catch (error) {
+				// Batch failed entirely, fall back to individual downloads for this chunk
+				logger.warn('Batch download failed, falling back to individual downloads:', error instanceof Error ? error.message : 'Unknown error');
+				individual.push(...chunk);
+			}
+		}
+	}
+
+	if (individual.length > 0) {
+		await downloadFilesIndividually(context, individual, result, concurrency);
+	}
 }
 
 export async function processDiff(
@@ -286,16 +340,34 @@ export async function prepareUploadsFromVaultFiles(
 	return prepared.filter((upload): upload is PreparedUpload => upload !== null);
 }
 
-export async function uploadPreparedFiles(
+export function createBatchUploadChunks(prepared: PreparedUpload[]): PreparedUpload[][] {
+	const chunks: PreparedUpload[][] = [];
+	let currentChunk: PreparedUpload[] = [];
+	let currentBytes = 0;
+
+	for (const upload of prepared) {
+		if (currentChunk.length >= BATCH_MAX_FILES || (currentChunk.length > 0 && currentBytes + upload.size > BATCH_MAX_BYTES)) {
+			chunks.push(currentChunk);
+			currentChunk = [];
+			currentBytes = 0;
+		}
+		currentChunk.push(upload);
+		currentBytes += upload.size;
+	}
+
+	if (currentChunk.length > 0) {
+		chunks.push(currentChunk);
+	}
+
+	return chunks;
+}
+
+async function uploadPreparedFilesIndividually(
 	context: TransferContext,
 	prepared: PreparedUpload[],
 	result: SyncResult,
 	options: { concurrency: number; retry: boolean },
 ): Promise<void> {
-	if (prepared.length === 0) return;
-
-	logger.info(`Uploading ${prepared.length} files`);
-
 	const tasks = prepared.map(upload => async () => {
 		try {
 			const doUpload = () => context.api.uploadFile(
@@ -330,6 +402,69 @@ export async function uploadPreparedFiles(
 	});
 
 	await context.runConcurrent(tasks, options.concurrency);
+}
+
+export async function uploadPreparedFiles(
+	context: TransferContext,
+	prepared: PreparedUpload[],
+	result: SyncResult,
+	options: { concurrency: number; retry: boolean },
+): Promise<void> {
+	if (prepared.length === 0) return;
+
+	logger.info(`Uploading ${prepared.length} files`);
+
+	const batchable = prepared.filter(f => f.size < BATCH_FILE_SIZE_LIMIT);
+	const individual = prepared.filter(f => f.size >= BATCH_FILE_SIZE_LIMIT);
+
+	if (batchable.length > 0) {
+		const chunks = createBatchUploadChunks(batchable);
+		for (const chunk of chunks) {
+			try {
+				const files: BatchUploadFile[] = chunk.map(upload => ({
+					path: upload.path,
+					content: arrayBufferToBase64(upload.content),
+					hash: upload.hash,
+					size: upload.size,
+					contentType: upload.contentType || 'application/octet-stream',
+				}));
+
+				const doBatch = () => context.api.batchUpload(files);
+				const response = options.retry
+					? await context.retryWithBackoff(doBatch)
+					: await doBatch();
+
+				for (const fileResult of response.results) {
+					const upload = chunk.find(u => u.path === fileResult.path);
+					if (!upload) continue;
+
+					if (fileResult.success) {
+						if (fileResult.hash && fileResult.hash !== upload.hash) {
+							result.errors.push(`${upload.path}: Hash mismatch after upload (expected ${upload.hash}, got ${fileResult.hash})`);
+							continue;
+						}
+						result.uploaded++;
+						context.localManifest.setEntry(upload.path, {
+							hash: upload.hash,
+							size: upload.size,
+							modified: await context.getModifiedIso(upload.path, upload.mtime),
+						});
+					} else {
+						result.errors.push(`${upload.path}: ${fileResult.error || 'Upload failed'}`);
+					}
+				}
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : 'Batch upload failed';
+				for (const upload of chunk) {
+					result.errors.push(`${upload.path}: ${errorMessage}`);
+				}
+			}
+		}
+	}
+
+	if (individual.length > 0) {
+		await uploadPreparedFilesIndividually(context, individual, result, options);
+	}
 }
 
 export function createVaultFileChunks(files: VaultFile[], chunkSize: number): VaultFile[][] {

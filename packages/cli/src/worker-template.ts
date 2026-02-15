@@ -271,6 +271,159 @@ async function handleDelete(request, bucket, db) {
 	return corsResponse({ success: true, path: safePath });
 }
 
+async function handleBatchUpload(request, bucket, db) {
+	const body = await request.json();
+	const files = body.files;
+	if (!Array.isArray(files) || files.length === 0) {
+		return corsResponse({ error: 'files array required' }, 400);
+	}
+	if (files.length > 50) {
+		return corsResponse({ error: 'Maximum 50 files per batch' }, 400);
+	}
+
+	let totalBytes = 0;
+	for (const f of files) {
+		totalBytes += f.size || 0;
+	}
+	if (totalBytes > 10 * 1024 * 1024) {
+		return corsResponse({ error: 'Total content exceeds 10MB limit' }, 400);
+	}
+
+	const results = [];
+	const dbOps = [];
+
+	for (const file of files) {
+		const safePath = sanitizePath(file.path);
+		if (!safePath) {
+			results.push({ path: file.path, success: false, error: 'Invalid path' });
+			continue;
+		}
+
+		try {
+			const raw = atob(file.content);
+			const bytes = new Uint8Array(raw.length);
+			for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+
+			await bucket.put(FILES_PREFIX + safePath, bytes.buffer, {
+				httpMetadata: { contentType: file.contentType || 'application/octet-stream' },
+				customMetadata: { hash: file.hash || '' },
+			});
+
+			results.push({ path: safePath, success: true, hash: file.hash || '' });
+
+			if (db) {
+				dbOps.push(
+					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'put', file.hash || '', file.size || 0),
+					db.prepare('INSERT OR REPLACE INTO files (path, hash, size, modified) VALUES (?, ?, ?, datetime(\\'now\\'))').bind(safePath, file.hash || '', file.size || 0),
+				);
+			}
+		} catch (err) {
+			results.push({ path: safePath, success: false, error: err.message || String(err) });
+		}
+	}
+
+	if (db && dbOps.length > 0) {
+		try {
+			await initDb(db);
+			await db.batch(dbOps);
+			await maybePruneChangelog(db);
+		} catch (e) { /* D1 failure is non-fatal */ }
+	}
+
+	return corsResponse({ success: results.every(r => r.success), results });
+}
+
+async function handleBatchDownload(request, bucket) {
+	const body = await request.json();
+	const paths = body.paths;
+	if (!Array.isArray(paths) || paths.length === 0) {
+		return corsResponse({ error: 'paths array required' }, 400);
+	}
+	if (paths.length > 50) {
+		return corsResponse({ error: 'Maximum 50 files per batch' }, 400);
+	}
+
+	const files = [];
+	for (const rawPath of paths) {
+		const safePath = sanitizePath(rawPath);
+		if (!safePath) {
+			files.push({ path: rawPath, content: '', hash: '', size: 0, contentType: '', error: 'Invalid path' });
+			continue;
+		}
+
+		try {
+			const obj = await bucket.get(FILES_PREFIX + safePath);
+			if (!obj) {
+				files.push({ path: safePath, content: '', hash: '', size: 0, contentType: '', error: 'File not found' });
+				continue;
+			}
+
+			const arrayBuffer = await obj.arrayBuffer();
+			const bytes = new Uint8Array(arrayBuffer);
+			const chunkSize = 8192;
+			let binary = '';
+			for (let i = 0; i < bytes.length; i += chunkSize) {
+				const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+				binary += String.fromCharCode(...chunk);
+			}
+			const b64 = btoa(binary);
+
+			files.push({
+				path: safePath,
+				content: b64,
+				hash: obj.customMetadata?.hash || '',
+				size: obj.size,
+				contentType: obj.httpMetadata?.contentType || 'application/octet-stream',
+			});
+		} catch (err) {
+			files.push({ path: safePath, content: '', hash: '', size: 0, contentType: '', error: err.message || String(err) });
+		}
+	}
+
+	return corsResponse({ files });
+}
+
+async function handleBatchDelete(request, bucket, db) {
+	const body = await request.json();
+	const paths = body.paths;
+	if (!Array.isArray(paths) || paths.length === 0) {
+		return corsResponse({ error: 'paths array required' }, 400);
+	}
+	if (paths.length > 50) {
+		return corsResponse({ error: 'Maximum 50 files per batch' }, 400);
+	}
+
+	const deleted = [];
+	const dbOps = [];
+
+	for (const rawPath of paths) {
+		const safePath = sanitizePath(rawPath);
+		if (!safePath) continue;
+
+		try {
+			await bucket.delete(FILES_PREFIX + safePath);
+			deleted.push(safePath);
+
+			if (db) {
+				dbOps.push(
+					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'delete', '', 0),
+					db.prepare('DELETE FROM files WHERE path = ?').bind(safePath),
+				);
+			}
+		} catch (e) { /* skip failed deletes */ }
+	}
+
+	if (db && dbOps.length > 0) {
+		try {
+			await initDb(db);
+			await db.batch(dbOps);
+			await maybePruneChangelog(db);
+		} catch (e) { /* D1 failure is non-fatal */ }
+	}
+
+	return corsResponse({ success: true, deleted });
+}
+
 async function handleGetConfig(env) {
 	return corsResponse({
 		accountId: env.CF_ACCOUNT_ID || null,
@@ -311,6 +464,9 @@ export default {
 			if (path === '/sync/upload' && method === 'PUT') return await handleUpload(request, bucket, db);
 			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket);
 			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
+			if (path === '/sync/batch-upload' && method === 'POST') return await handleBatchUpload(request, bucket, db);
+			if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket);
+			if (path === '/sync/batch-delete' && method === 'POST') return await handleBatchDelete(request, bucket, db);
 			if (path === '/sync/config' && method === 'GET') return await handleGetConfig(env);
 
 			return corsResponse({ error: 'Not found' }, 404);

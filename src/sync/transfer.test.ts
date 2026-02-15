@@ -10,6 +10,7 @@ vi.mock('./conflict', () => ({
 }));
 
 import {
+	createBatchUploadChunks,
 	createVaultFileChunks,
 	parallelDownloadAndSaveFiles,
 	prepareUploadFromPath,
@@ -38,6 +39,8 @@ function createTransferHarness() {
 		uploadFile: vi.fn(),
 		downloadFile: vi.fn(),
 		deleteFile: vi.fn(),
+		batchUpload: vi.fn(),
+		batchDownload: vi.fn(),
 	};
 	const localManifest = {
 		hashMatches: vi.fn(() => false),
@@ -160,35 +163,51 @@ describe('transfer download/process helpers', () => {
 		);
 	});
 
-	it('aggregates per-path download errors during parallel downloads', async () => {
+	it('aggregates per-path download errors during batch downloads', async () => {
 		const harness = createTransferHarness();
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
-		harness.api.downloadFile.mockImplementation(async (path: string) => {
-			if (path === 'bad.md') {
-				throw new Error('network down');
-			}
-			return {
-				content: new TextEncoder().encode('ok').buffer as ArrayBuffer,
-				contentType: 'text/plain',
-				size: 2,
-			};
+
+		const okContent = new TextEncoder().encode('ok');
+		const b64 = btoa(String.fromCharCode(...okContent));
+
+		harness.api.batchDownload.mockResolvedValue({
+			files: [
+				{ path: 'good.md', content: b64, hash: 'h1', size: 2, contentType: 'text/plain' },
+				{ path: 'bad.md', content: '', hash: '', size: 0, contentType: '', error: 'File not found' },
+			],
 		});
 
 		const result = emptyResult();
 		await parallelDownloadAndSaveFiles(harness.context, ['good.md', 'bad.md'], result, 5);
 
 		expect(result.downloaded).toBe(1);
-		expect(result.errors).toContain('bad.md: network down');
+		expect(result.errors).toContain('bad.md: File not found');
+	});
+
+	it('falls back to individual downloads when batch fails', async () => {
+		const harness = createTransferHarness();
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		harness.api.batchDownload.mockRejectedValue(new Error('batch endpoint not available'));
+		harness.api.downloadFile.mockResolvedValue({
+			content: new TextEncoder().encode('ok').buffer as ArrayBuffer,
+			contentType: 'text/plain',
+			size: 2,
+		});
+
+		const result = emptyResult();
+		await parallelDownloadAndSaveFiles(harness.context, ['fallback.md'], result, 5);
+
+		expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md');
+		expect(result.downloaded).toBe(1);
 	});
 });
 
 describe('transfer upload helpers', () => {
-	it('uses retry wrapper and records hash mismatch errors', async () => {
+	it('uses retry wrapper and records hash mismatch errors via batch upload', async () => {
 		const harness = createTransferHarness();
-		harness.api.uploadFile.mockResolvedValue({
+		harness.api.batchUpload.mockResolvedValue({
 			success: true,
-			path: 'notes/a.md',
-			hash: 'different-hash',
+			results: [{ path: 'notes/a.md', success: true, hash: 'different-hash' }],
 		});
 
 		const prepared: PreparedUpload[] = [
@@ -211,6 +230,33 @@ describe('transfer upload helpers', () => {
 		);
 	});
 
+	it('falls back to individual upload for large files', async () => {
+		const harness = createTransferHarness();
+		const largeContent = new ArrayBuffer(1024 * 1024); // exactly 1MB
+		harness.api.uploadFile.mockResolvedValue({
+			success: true,
+			path: 'large.bin',
+			hash: 'large-hash',
+		});
+
+		const prepared: PreparedUpload[] = [
+			{
+				path: 'large.bin',
+				content: largeContent,
+				hash: 'large-hash',
+				size: 1024 * 1024,
+				contentType: 'application/octet-stream',
+			},
+		];
+		const result = emptyResult();
+
+		await uploadPreparedFiles(harness.context, prepared, result, { concurrency: 2, retry: false });
+
+		expect(harness.api.batchUpload).not.toHaveBeenCalled();
+		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
+		expect(result.uploaded).toBe(1);
+	});
+
 	it('chunks files for initial sync pipelining', () => {
 		const files = [
 			{ path: 'a.md', size: 1, mtime: 1, extension: 'md' },
@@ -223,5 +269,46 @@ describe('transfer upload helpers', () => {
 		expect(chunks).toHaveLength(2);
 		expect(chunks[0]).toHaveLength(2);
 		expect(chunks[1]).toHaveLength(1);
+	});
+});
+
+describe('batch upload chunking', () => {
+	it('respects file count limit', () => {
+		const prepared: PreparedUpload[] = Array.from({ length: 120 }, (_, i) => ({
+			path: `file-${i}.md`,
+			content: new ArrayBuffer(100),
+			hash: `hash-${i}`,
+			size: 100,
+			contentType: 'text/plain',
+		}));
+
+		const chunks = createBatchUploadChunks(prepared);
+
+		expect(chunks).toHaveLength(3);
+		expect(chunks[0]).toHaveLength(50);
+		expect(chunks[1]).toHaveLength(50);
+		expect(chunks[2]).toHaveLength(20);
+	});
+
+	it('respects byte size limit', () => {
+		const prepared: PreparedUpload[] = [
+			{ path: 'a.md', content: new ArrayBuffer(6_000_000), hash: 'a', size: 6_000_000, contentType: 'text/plain' },
+			{ path: 'b.md', content: new ArrayBuffer(6_000_000), hash: 'b', size: 6_000_000, contentType: 'text/plain' },
+			{ path: 'c.md', content: new ArrayBuffer(100), hash: 'c', size: 100, contentType: 'text/plain' },
+		];
+
+		const chunks = createBatchUploadChunks(prepared);
+
+		// a.md = 6MB (first chunk), b.md = 6MB won't fit with a.md (new chunk), c.md fits with b.md
+		expect(chunks).toHaveLength(2);
+		expect(chunks[0]).toHaveLength(1);
+		expect(chunks[0]![0]!.path).toBe('a.md');
+		expect(chunks[1]).toHaveLength(2);
+		expect(chunks[1]![0]!.path).toBe('b.md');
+		expect(chunks[1]![1]!.path).toBe('c.md');
+	});
+
+	it('returns empty array for empty input', () => {
+		expect(createBatchUploadChunks([])).toEqual([]);
 	});
 });

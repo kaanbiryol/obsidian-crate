@@ -10,6 +10,10 @@ import type {
 	ChangesResponse,
 	CheckResponse,
 	WorkerConfig,
+	BatchUploadFile,
+	BatchUploadResponse,
+	BatchDownloadResponse,
+	BatchDeleteResponse,
 } from '../types';
 
 const logger = createLogger('ApiClient');
@@ -232,5 +236,35 @@ export class SyncApiClient {
 	 */
 	async getConfig(): Promise<WorkerConfig> {
 		return this.requestJson<WorkerConfig>('/sync/config');
+	}
+
+	/**
+	 * Batch upload multiple files (base64-encoded content)
+	 */
+	async batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
+		return this.requestJson<BatchUploadResponse>('/sync/batch-upload', {
+			method: 'POST',
+			body: JSON.stringify({ files }),
+		});
+	}
+
+	/**
+	 * Batch download multiple files (returns base64-encoded content)
+	 */
+	async batchDownload(paths: string[]): Promise<BatchDownloadResponse> {
+		return this.requestJson<BatchDownloadResponse>('/sync/batch-download', {
+			method: 'POST',
+			body: JSON.stringify({ paths }),
+		});
+	}
+
+	/**
+	 * Batch delete multiple files
+	 */
+	async batchDelete(paths: string[]): Promise<BatchDeleteResponse> {
+		return this.requestJson<BatchDeleteResponse>('/sync/batch-delete', {
+			method: 'POST',
+			body: JSON.stringify({ paths }),
+		});
 	}
 }

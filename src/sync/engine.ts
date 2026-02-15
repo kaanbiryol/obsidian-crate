@@ -198,11 +198,6 @@ export class SyncEngine {
 			return true;
 		}
 
-		// Ignore legacy merge cache artifacts if present.
-		if (path.startsWith('.obsidian/plugins/obsidian-crate/bases/')) {
-			return true;
-		}
-
 		// Fast-path: check pre-computed directory prefixes with startsWith
 		for (const prefix of this.ignoredDirPrefixes) {
 			if (path.startsWith(prefix) || path === prefix.slice(0, -1)) {

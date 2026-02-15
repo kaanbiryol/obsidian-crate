@@ -147,6 +147,7 @@ describe('runIncrementalSync', () => {
 				getChanges: vi.fn(async () => ({ changes: [], lastSeq: 8, hasMore: false })),
 				downloadFile: vi.fn(),
 				deleteFile: vi.fn(),
+				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest,
 			shouldIgnore: vi.fn(() => false),
@@ -182,7 +183,7 @@ describe('runIncrementalSync', () => {
 			getAllPaths: vi.fn(() => []),
 			getManifest: vi.fn(() => ({ version: 1, files: {} })),
 		};
-		const deleteFile = vi.fn(async (path: string) => ({ success: true, path }));
+		const batchDelete = vi.fn(async (paths: string[]) => ({ success: true, deleted: paths }));
 		const parallelDownloadAndSaveFiles = vi.fn(async (paths: string[], result: SyncResult) => {
 			result.downloaded += paths.length;
 		});
@@ -218,7 +219,8 @@ describe('runIncrementalSync', () => {
 					hasMore: false,
 				})),
 				downloadFile: vi.fn(),
-				deleteFile,
+				deleteFile: vi.fn(),
+				batchDelete,
 			},
 			localManifest,
 			shouldIgnore: vi.fn(() => false),
@@ -233,7 +235,7 @@ describe('runIncrementalSync', () => {
 		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
 
 		expect(parallelDownloadAndSaveFiles).toHaveBeenCalledWith(['notes/remote.md'], expect.any(Object));
-		expect(deleteFile).toHaveBeenCalledWith('notes/local-delete.md');
+		expect(batchDelete).toHaveBeenCalledWith(['notes/local-delete.md']);
 		expect(localManifest.removeEntry).toHaveBeenCalledWith('notes/local-delete.md');
 		expect(result?.success).toBe(true);
 		expect(result?.downloaded).toBe(1);
@@ -281,6 +283,7 @@ describe('runIncrementalSync', () => {
 				})),
 				downloadFile: vi.fn(),
 				deleteFile: vi.fn(),
+				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest,
 			shouldIgnore: vi.fn(() => false),
@@ -323,6 +326,7 @@ describe('runIncrementalSync', () => {
 				})),
 				downloadFile: vi.fn(),
 				deleteFile: vi.fn(),
+				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest: {
 				save: vi.fn(),
@@ -367,6 +371,7 @@ describe('runIncrementalSync', () => {
 				}),
 				downloadFile: vi.fn(),
 				deleteFile: vi.fn(),
+				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
 			},
 			localManifest: {
 				save: vi.fn(),

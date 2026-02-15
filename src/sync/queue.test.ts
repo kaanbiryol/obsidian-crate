@@ -27,6 +27,7 @@ function createFlushHarness(overrides: Partial<{
 		contentType: string;
 	}) => Promise<{ success: boolean; path: string; hash?: string; error?: string }>;
 	deleteFile: (path: string) => Promise<{ success: boolean; path: string }>;
+	batchDelete: (paths: string[]) => Promise<{ success: boolean; deleted: string[] }>;
 }> = {}) {
 	const pendingPaths = new Set<string>();
 	const state: QueueState = {
@@ -53,6 +54,10 @@ function createFlushHarness(overrides: Partial<{
 		overrides.deleteFile ??
 			(async path => ({ success: true, path })),
 	);
+	const batchDelete = vi.fn(
+		overrides.batchDelete ??
+			(async (paths: string[]) => ({ success: true, deleted: paths })),
+	);
 	const setEntry = vi.fn();
 	const removeEntry = vi.fn();
 	const save = vi.fn(async () => {});
@@ -67,6 +72,7 @@ function createFlushHarness(overrides: Partial<{
 		prepareUploadFromPath,
 		uploadFile,
 		deleteFile,
+		batchDelete,
 		setEntry,
 		removeEntry,
 		save,
@@ -79,6 +85,7 @@ function createFlushHarness(overrides: Partial<{
 				uploadFile: (path: string, content: ArrayBuffer, hash: string, size: number, contentType: string) =>
 					uploadFile({ path, content, hash, size, contentType }),
 				deleteFile,
+				batchDelete,
 			},
 			localManifest: {
 				setEntry,
@@ -202,7 +209,7 @@ describe('processPendingChanges', () => {
 		await processPendingChanges(harness.context, 4);
 
 		expect(harness.uploadFile).toHaveBeenCalledTimes(1);
-		expect(harness.deleteFile).toHaveBeenCalledWith('notes/old.md');
+		expect(harness.batchDelete).toHaveBeenCalledWith(['notes/old.md']);
 		expect(harness.setEntry).toHaveBeenCalledWith(
 			'notes/a.md',
 			expect.objectContaining({ hash: 'abc123', size: 5, modified: '2026-02-15T00:00:00.000Z' }),

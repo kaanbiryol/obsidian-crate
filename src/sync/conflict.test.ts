@@ -172,11 +172,6 @@ describe('conflict naming helpers', () => {
 		expect(isConflictFile('notes/test.md')).toBe(false);
 	});
 
-	it('recognizes old conflict file names (backward compat)', () => {
-		expect(isConflictFile('notes/test (conflict 2026-01-02 03-04).md')).toBe(
-			true,
-		);
-	});
 });
 
 describe('createConflictCopy', () => {

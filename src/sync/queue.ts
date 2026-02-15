@@ -15,6 +15,7 @@ export interface QueueApi {
 		contentType: string,
 	): Promise<{ success: boolean; path: string; hash?: string; error?: string }>;
 	deleteFile(path: string): Promise<{ success: boolean; path: string }>;
+	batchDelete(paths: string[]): Promise<{ success: boolean; deleted: string[] }>;
 }
 
 export interface QueueManifest {
@@ -175,12 +176,14 @@ export async function processPendingChanges(
 			await context.runConcurrent(uploadTasks, uploadConcurrency);
 		}
 
-		for (const path of deletes) {
-			const deleteResult = await context.api.deleteFile(path);
+		if (deletes.length > 0) {
+			const deleteResult = await context.api.batchDelete(deletes);
 			if (!deleteResult.success) {
-				throw new Error(`Delete failed: ${path}`);
+				throw new Error(`Batch delete failed`);
 			}
-			context.localManifest.removeEntry(path);
+			for (const path of deleteResult.deleted) {
+				context.localManifest.removeEntry(path);
+			}
 		}
 
 		await context.localManifest.save();

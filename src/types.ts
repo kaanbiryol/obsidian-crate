@@ -100,6 +100,41 @@ export interface HealthResponse {
 }
 
 // ============================================================================
+// Batch API Types
+// ============================================================================
+
+export interface BatchUploadFile {
+	path: string;
+	content: string; // base64 encoded
+	hash: string;
+	size: number;
+	contentType: string;
+}
+
+export interface BatchUploadResponse {
+	success: boolean;
+	results: Array<{ path: string; success: boolean; hash?: string; error?: string }>;
+}
+
+export interface BatchDownloadFile {
+	path: string;
+	content: string; // base64 encoded
+	hash: string;
+	size: number;
+	contentType: string;
+	error?: string;
+}
+
+export interface BatchDownloadResponse {
+	files: BatchDownloadFile[];
+}
+
+export interface BatchDeleteResponse {
+	success: boolean;
+	deleted: string[];
+}
+
+// ============================================================================
 // Usage Types
 // ============================================================================
 
@@ -205,3 +240,6 @@ export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
 
 export const DEBOUNCE_DELAY_MS = 10000;
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
+export const BATCH_MAX_FILES = 50;
+export const BATCH_MAX_BYTES = 10 * 1024 * 1024; // 10MB total decoded content per batch upload
+export const BATCH_FILE_SIZE_LIMIT = 1 * 1024 * 1024; // 1MB - files >= this fall back to individual uploads

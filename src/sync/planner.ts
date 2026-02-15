@@ -23,6 +23,7 @@ export interface PlannerApi {
 	getChanges(since: number): Promise<{ changes: ChangelogEntry[]; lastSeq: number; hasMore: boolean; cursorExpired?: boolean }>;
 	downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number }>;
 	deleteFile(path: string): Promise<{ success: boolean; path: string }>;
+	batchDelete(paths: string[]): Promise<{ success: boolean; deleted: string[] }>;
 }
 
 export interface LocalDiffPlannerContext {
@@ -299,16 +300,20 @@ export async function runIncrementalSync(
 			retry: false,
 		});
 
-		for (const path of localOnlyDeletes) {
+		if (localOnlyDeletes.length > 0) {
 			try {
-				await context.api.deleteFile(path);
-				context.localManifest.removeEntry(path);
-				result.deleted++;
+				const deleteResult = await context.api.batchDelete(localOnlyDeletes);
+				for (const path of deleteResult.deleted) {
+					context.localManifest.removeEntry(path);
+					result.deleted++;
+				}
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-				result.errors.push(`${path}: ${errorMessage}`);
+				for (const path of localOnlyDeletes) {
+					result.errors.push(`${path}: ${errorMessage}`);
+				}
 			}
-			current++;
+			current += localOnlyDeletes.length;
 			options.progressCallback?.(current, total);
 		}
 

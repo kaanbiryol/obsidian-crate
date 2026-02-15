@@ -25,6 +25,9 @@ type Harness = {
 		downloadFile: ReturnType<typeof vi.fn>;
 		getManifest: ReturnType<typeof vi.fn>;
 		checkForChanges: ReturnType<typeof vi.fn>;
+		batchUpload: ReturnType<typeof vi.fn>;
+		batchDownload: ReturnType<typeof vi.fn>;
+		batchDelete: ReturnType<typeof vi.fn>;
 	};
 	vault: {
 		adapter: MockAdapter;
@@ -105,6 +108,15 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 		downloadFile: vi.fn(),
 		getManifest: vi.fn(),
 		checkForChanges: vi.fn(),
+		batchUpload: vi.fn().mockImplementation(async (files: Array<{ path: string; hash: string; size: number }>) => ({
+			success: true,
+			results: files.map(f => ({ path: f.path, success: true, hash: f.hash })),
+		})),
+		batchDownload: vi.fn().mockResolvedValue({ files: [] }),
+		batchDelete: vi.fn().mockImplementation(async (paths: string[]) => ({
+			success: true,
+			deleted: paths,
+		})),
 	};
 
 	const plugin = {
@@ -155,13 +167,8 @@ describe('SyncEngine pattern/ignore behavior', () => {
 	});
 
 	it('always ignores conflict files', () => {
-		// New format (with seconds + random suffix)
 		expect(
 			(harness.engine as any).shouldIgnore('notes/a (conflict 2026-01-02 03-04-05 a1b2).md'),
-		).toBe(true);
-		// Old format (backward compat)
-		expect(
-			(harness.engine as any).shouldIgnore('notes/a (conflict 2026-01-02 03-04).md'),
 		).toBe(true);
 		expect((harness.engine as any).shouldIgnore('notes/file.tmp')).toBe(true);
 		expect((harness.engine as any).shouldIgnore('notes/file.md')).toBe(false);
@@ -454,15 +461,10 @@ describe('SyncEngine incrementalSync', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(
 			new TextEncoder().encode('hello world').buffer as ArrayBuffer,
 		);
-		harness.api.uploadFile.mockResolvedValue({
-			success: true,
-			path: 'notes/new.md',
-		});
-
 		const result = await (harness.engine as any).incrementalSync();
 
 		expect(result?.uploaded).toBe(1);
-		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
+		expect(harness.api.batchUpload).toHaveBeenCalledTimes(1);
 		expect(harness.localManifest.setEntry).toHaveBeenCalledWith(
 			'notes/new.md',
 			expect.objectContaining({
@@ -501,15 +503,11 @@ describe('SyncEngine incrementalSync', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(
 			new TextEncoder().encode('keep local').buffer as ArrayBuffer,
 		);
-		harness.api.uploadFile.mockResolvedValue({
-			success: true,
-			path: 'notes/live.md',
-		});
 
 		const result = await (harness.engine as any).incrementalSync();
 
 		expect(harness.api.deleteFile).not.toHaveBeenCalled();
-		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
+		expect(harness.api.batchUpload).toHaveBeenCalledTimes(1);
 		expect(result?.conflicts).toContain('notes/live.md');
 		expect(result?.uploaded).toBe(1);
 	});
@@ -523,11 +521,10 @@ describe('SyncEngine incrementalSync', () => {
 		});
 		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
 		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue(['notes/deleted.md']);
-		harness.api.deleteFile.mockResolvedValue({ success: true, path: 'notes/deleted.md' });
 
 		const result = await (harness.engine as any).incrementalSync();
 
-		expect(harness.api.deleteFile).toHaveBeenCalledWith('notes/deleted.md');
+		expect(harness.api.batchDelete).toHaveBeenCalledWith(['notes/deleted.md']);
 		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/deleted.md');
 		expect(result?.deleted).toBe(1);
 		expect(harness.settings.lastSeq).toBe(6);
@@ -663,6 +660,7 @@ describe('SyncEngine incremental sync cursor/state safeguards', () => {
 		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
 		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		harness.api.batchDownload.mockRejectedValue(new Error('network down'));
 		harness.api.downloadFile.mockRejectedValue(new Error('network down'));
 
 		const result = await (harness.engine as any).incrementalSync();
@@ -691,6 +689,7 @@ describe('SyncEngine incremental sync cursor/state safeguards', () => {
 		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
 		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		harness.api.batchDownload.mockRejectedValue(new Error('network down'));
 		harness.api.downloadFile.mockRejectedValue(new Error('network down'));
 
 		const result = await harness.engine.sync();
@@ -773,10 +772,9 @@ describe('SyncEngine slice 5 safeguards', () => {
 		harness.vault.getFiles.mockReturnValue([file]);
 		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
 		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
-		harness.api.uploadFile.mockResolvedValue({
+		harness.api.batchUpload.mockResolvedValue({
 			success: false,
-			path: 'notes/a.md',
-			error: 'quota exceeded',
+			results: [{ path: 'notes/a.md', success: false, error: 'quota exceeded' }],
 		});
 
 		const result = await harness.engine.initialSync();
