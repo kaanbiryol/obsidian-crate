@@ -51,7 +51,7 @@ export interface IncrementalSyncPlannerContext {
 	uploadPreparedFiles(
 		prepared: PreparedUpload[],
 		result: SyncResult,
-		options: { concurrency: number; retry: boolean },
+		options: { concurrency: number; retry: boolean; batchConcurrency?: number },
 	): Promise<void>;
 }
 

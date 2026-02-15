@@ -408,7 +408,7 @@ export async function uploadPreparedFiles(
 	context: TransferContext,
 	prepared: PreparedUpload[],
 	result: SyncResult,
-	options: { concurrency: number; retry: boolean },
+	options: { concurrency: number; retry: boolean; batchConcurrency?: number },
 ): Promise<void> {
 	if (prepared.length === 0) return;
 
@@ -419,7 +419,7 @@ export async function uploadPreparedFiles(
 
 	if (batchable.length > 0) {
 		const chunks = createBatchUploadChunks(batchable);
-		for (const chunk of chunks) {
+		const batchTasks = chunks.map(chunk => async () => {
 			try {
 				const files: BatchUploadFile[] = chunk.map(upload => ({
 					path: upload.path,
@@ -459,7 +459,8 @@ export async function uploadPreparedFiles(
 					result.errors.push(`${upload.path}: ${errorMessage}`);
 				}
 			}
-		}
+		});
+		await context.runConcurrent(batchTasks, options.batchConcurrency ?? 1);
 	}
 
 	if (individual.length > 0) {

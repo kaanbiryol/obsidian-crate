@@ -230,6 +230,40 @@ describe('transfer upload helpers', () => {
 		);
 	});
 
+	it('runs batch uploads concurrently when batchConcurrency > 1', async () => {
+		const harness = createTransferHarness();
+		let concurrentCalls = 0;
+		let maxConcurrentCalls = 0;
+
+		harness.api.batchUpload.mockImplementation(async () => {
+			concurrentCalls++;
+			maxConcurrentCalls = Math.max(maxConcurrentCalls, concurrentCalls);
+			await new Promise(resolve => setTimeout(resolve, 10));
+			const results = [{ path: 'file.md', success: true, hash: 'h' }];
+			concurrentCalls--;
+			return { success: true, results };
+		});
+
+		// Create 3 batches of small files (3 files, each in its own batch of 1 via count limit)
+		const prepared: PreparedUpload[] = Array.from({ length: 150 }, (_, i) => ({
+			path: `file-${i}.md`,
+			content: new TextEncoder().encode('x').buffer as ArrayBuffer,
+			hash: `hash-${i}`,
+			size: 1,
+			contentType: 'text/plain',
+		}));
+		const result = emptyResult();
+
+		await uploadPreparedFiles(harness.context, prepared, result, {
+			concurrency: 2,
+			retry: false,
+			batchConcurrency: 3,
+		});
+
+		expect(harness.api.batchUpload).toHaveBeenCalledTimes(3); // 150 files / 50 per batch = 3 batches
+		expect(maxConcurrentCalls).toBeGreaterThan(1);
+	});
+
 	it('falls back to individual upload for large files', async () => {
 		const harness = createTransferHarness();
 		const largeContent = new ArrayBuffer(1024 * 1024); // exactly 1MB

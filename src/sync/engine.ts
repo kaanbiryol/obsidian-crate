@@ -49,11 +49,12 @@ import type {
 import { DEBOUNCE_DELAY_MS, MAX_DEBOUNCE_WAIT_MS } from '../types';
 
 const logger = createLogger('SyncEngine');
-const UPLOAD_CONCURRENCY = 5;
+const UPLOAD_CONCURRENCY = 10;
 const DOWNLOAD_CONCURRENCY = 5;
 const FORCE_SYNC_CONCURRENCY = 2;
-const PREPARE_CONCURRENCY = 5;
-const INITIAL_SYNC_PIPELINE_CHUNK_FILES = 120;
+const PREPARE_CONCURRENCY = 20;
+const INITIAL_SYNC_PIPELINE_CHUNK_FILES = 500;
+const BATCH_UPLOAD_CONCURRENCY = 3;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
 
@@ -665,7 +666,7 @@ export class SyncEngine {
 	private async uploadPreparedFiles(
 		prepared: PreparedUpload[],
 		result: SyncResult,
-		options: { concurrency: number; retry: boolean },
+		options: { concurrency: number; retry: boolean; batchConcurrency?: number },
 	): Promise<void> {
 		await transferUploadPreparedFiles(this.getTransferContext(), prepared, result, options);
 	}
@@ -714,6 +715,7 @@ export class SyncEngine {
 					await this.uploadPreparedFiles(preparedChunk, result, {
 						concurrency: UPLOAD_CONCURRENCY,
 						retry: true,
+						batchConcurrency: BATCH_UPLOAD_CONCURRENCY,
 					});
 				}
 
