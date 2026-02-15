@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SyncApiClient } from './api';
+import { HttpError, SyncApiClient } from './api';
 
 describe('SyncApiClient', () => {
 	beforeEach(() => {
@@ -43,6 +43,7 @@ describe('SyncApiClient', () => {
 		fetchMock.mockResolvedValue({
 			ok: false,
 			status: 401,
+			headers: new Headers(),
 			text: vi.fn().mockResolvedValue('{"error":"Unauthorized"}'),
 		} as unknown as Response);
 
@@ -55,6 +56,7 @@ describe('SyncApiClient', () => {
 		fetchMock.mockResolvedValue({
 			ok: false,
 			status: 503,
+			headers: new Headers(),
 			text: vi.fn().mockResolvedValue('Service unavailable'),
 		} as unknown as Response);
 
@@ -91,6 +93,7 @@ describe('SyncApiClient', () => {
 		fetchMock.mockResolvedValue({
 			ok: false,
 			status: 500,
+			headers: new Headers(),
 			text: vi.fn().mockResolvedValue('boom'),
 		} as unknown as Response);
 
@@ -104,5 +107,48 @@ describe('SyncApiClient', () => {
 	it('rejects insecure non-local worker URLs', () => {
 		const client = new SyncApiClient('http://worker.example', 'token');
 		expect(client.isConfigured()).toBe(false);
+	});
+
+	it('throws HttpError with retryAfter on 429 with Retry-After header', async () => {
+		const fetchMock = vi.mocked(fetch);
+		fetchMock.mockResolvedValue({
+			ok: false,
+			status: 429,
+			headers: new Headers({ 'Retry-After': '30' }),
+			text: vi.fn().mockResolvedValue('{"error":"Too many requests"}'),
+		} as unknown as Response);
+
+		const client = new SyncApiClient('https://worker.example', 'token');
+		try {
+			await client.health();
+			expect.unreachable('Should have thrown');
+		} catch (error) {
+			expect(error).toBeInstanceOf(HttpError);
+			const httpError = error as HttpError;
+			expect(httpError.status).toBe(429);
+			expect(httpError.retryAfter).toBe(30_000);
+			expect(httpError.message).toBe('Too many requests');
+		}
+	});
+
+	it('throws HttpError with null retryAfter when no Retry-After header', async () => {
+		const fetchMock = vi.mocked(fetch);
+		fetchMock.mockResolvedValue({
+			ok: false,
+			status: 500,
+			headers: new Headers(),
+			text: vi.fn().mockResolvedValue('{"error":"Server error"}'),
+		} as unknown as Response);
+
+		const client = new SyncApiClient('https://worker.example', 'token');
+		try {
+			await client.health();
+			expect.unreachable('Should have thrown');
+		} catch (error) {
+			expect(error).toBeInstanceOf(HttpError);
+			const httpError = error as HttpError;
+			expect(httpError.status).toBe(500);
+			expect(httpError.retryAfter).toBeNull();
+		}
 	});
 });

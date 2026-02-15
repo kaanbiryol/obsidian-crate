@@ -29,6 +29,8 @@ export interface QueueDebounceContext {
 	isDestroyed(): boolean;
 	getDebounceTimer(): ReturnType<typeof setTimeout> | null;
 	setDebounceTimer(timer: ReturnType<typeof setTimeout> | null): void;
+	getMaxWaitStart(): number | null;
+	setMaxWaitStart(time: number | null): void;
 	updateState(updates: Partial<SyncState>): void;
 	processPendingChanges(): Promise<void>;
 }
@@ -90,18 +92,38 @@ export function onFileRename(
 export function debouncedSync(
 	context: QueueDebounceContext,
 	debounceDelayMs: number,
+	maxWaitMs?: number,
 ): void {
 	if (context.isDestroyed()) return;
 
 	context.updateState({ pendingChanges: context.pendingPaths.size });
 
 	const existingTimer = context.getDebounceTimer();
+
+	// Track when the first debounce call arrived (before any timer existed)
+	if (!existingTimer && context.getMaxWaitStart() === null) {
+		context.setMaxWaitStart(Date.now());
+	}
+
+	// If max wait exceeded, fire immediately
+	const maxWaitStart = context.getMaxWaitStart();
+	if (maxWaitMs !== undefined && maxWaitStart !== null && Date.now() - maxWaitStart >= maxWaitMs) {
+		if (existingTimer) {
+			clearTimeout(existingTimer);
+		}
+		context.setDebounceTimer(null);
+		context.setMaxWaitStart(null);
+		void context.processPendingChanges();
+		return;
+	}
+
 	if (existingTimer) {
 		clearTimeout(existingTimer);
 	}
 
 	const timer = setTimeout(() => {
 		context.setDebounceTimer(null);
+		context.setMaxWaitStart(null);
 		void context.processPendingChanges();
 	}, debounceDelayMs);
 	context.setDebounceTimer(timer);

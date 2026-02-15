@@ -3,7 +3,7 @@
  */
 
 import type { Plugin, TAbstractFile, Vault } from 'obsidian';
-import { SyncApiClient } from './api';
+import { HttpError, SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
 import { isConflictFile } from './conflict';
@@ -31,7 +31,7 @@ import {
 	uploadPreparedFiles as transferUploadPreparedFiles,
 	createVaultFileChunks as transferCreateVaultFileChunks,
 } from './transfer';
-import { guardSyncStart } from './sync-guards';
+import { acquireSyncLock } from './sync-guards';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
@@ -46,7 +46,7 @@ import type {
 	FileEntry,
 	CrateSettings,
 } from '../types';
-import { DEBOUNCE_DELAY_MS } from '../types';
+import { DEBOUNCE_DELAY_MS, MAX_DEBOUNCE_WAIT_MS } from '../types';
 
 const logger = createLogger('SyncEngine');
 const UPLOAD_CONCURRENCY = 5;
@@ -65,6 +65,7 @@ export class SyncEngine {
 	private settings: CrateSettings;
 	private state: SyncState;
 	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	private maxWaitStart: number | null = null;
 	private pendingPaths: Set<string> = new Set();
 	private syncInterval: ReturnType<typeof setInterval> | null = null;
 	private onStateChange: ((state: SyncState) => void) | null = null;
@@ -268,6 +269,10 @@ export class SyncEngine {
 			setDebounceTimer: (timer: ReturnType<typeof setTimeout> | null) => {
 				this.debounceTimer = timer;
 			},
+			getMaxWaitStart: () => this.maxWaitStart,
+			setMaxWaitStart: (time: number | null) => {
+				this.maxWaitStart = time;
+			},
 			updateState: this.updateState.bind(this),
 			processPendingChanges: () => this.processPendingChanges(),
 		};
@@ -314,7 +319,7 @@ export class SyncEngine {
 	 * Debounced sync trigger
 	 */
 	private debouncedSync(): void {
-		runDebouncedQueueSync(this.getQueueDebounceContext(), DEBOUNCE_DELAY_MS);
+		runDebouncedQueueSync(this.getQueueDebounceContext(), DEBOUNCE_DELAY_MS, MAX_DEBOUNCE_WAIT_MS);
 	}
 
 	/**
@@ -356,7 +361,12 @@ export class SyncEngine {
 				return await fn();
 			} catch (error) {
 				if (attempt === MAX_RETRIES) throw error;
-				const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+				let delay: number;
+				if (error instanceof HttpError && error.retryAfter !== null) {
+					delay = error.retryAfter;
+				} else {
+					delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+				}
 				logger.warn(`Retry ${attempt + 1}/${MAX_RETRIES} after ${delay}ms`);
 				await new Promise(resolve => setTimeout(resolve, delay));
 			}
@@ -458,16 +468,13 @@ export class SyncEngine {
 	 * Full sync - compare manifests and sync all differences
 	 */
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const guardResult = guardSyncStart({
-			isConfigured: this.api.isConfigured(),
-			status: this.state.status,
-		});
-		if (guardResult) {
-			return guardResult;
-		}
+		const guardResult = acquireSyncLock(
+			{ isConfigured: this.api.isConfigured(), status: this.state.status },
+			() => this.updateState({ status: 'syncing' }),
+		);
+		if (guardResult) return guardResult;
 
 		logger.info('Sync started');
-		this.updateState({ status: 'syncing' });
 
 		// Try incremental sync first
 		const incrementalResult = await this.incrementalSync(progressCallback);
@@ -646,15 +653,11 @@ export class SyncEngine {
 	 * Initial sync - upload all local files
 	 */
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const guardResult = guardSyncStart({
-			isConfigured: this.api.isConfigured(),
-			status: this.state.status,
-		});
-		if (guardResult) {
-			return guardResult;
-		}
-
-		this.updateState({ status: 'syncing' });
+		const guardResult = acquireSyncLock(
+			{ isConfigured: this.api.isConfigured(), status: this.state.status },
+			() => this.updateState({ status: 'syncing' }),
+		);
+		if (guardResult) return guardResult;
 
 		const result: SyncResult = createEmptySyncResult();
 
@@ -729,15 +732,11 @@ export class SyncEngine {
 	 * and deletes remote-only files.
 	 */
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const guardResult = guardSyncStart({
-			isConfigured: this.api.isConfigured(),
-			status: this.state.status,
-		});
-		if (guardResult) {
-			return guardResult;
-		}
-
-		this.updateState({ status: 'syncing' });
+		const guardResult = acquireSyncLock(
+			{ isConfigured: this.api.isConfigured(), status: this.state.status },
+			() => this.updateState({ status: 'syncing' }),
+		);
+		if (guardResult) return guardResult;
 
 		const result: SyncResult = createEmptySyncResult();
 
@@ -828,6 +827,7 @@ export class SyncEngine {
 			clearTimeout(this.debounceTimer);
 			this.debounceTimer = null;
 		}
+		this.maxWaitStart = null;
 		this.pendingPaths.clear();
 	}
 }

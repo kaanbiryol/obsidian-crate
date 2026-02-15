@@ -168,10 +168,26 @@ async function exchangeCodeForToken(code: string, codeVerifier: string): Promise
 	};
 }
 
+let activeServer: ReturnType<typeof createServer> | null = null;
+let activeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+export function abortOAuthLogin(): void {
+	if (activeTimeout) {
+		clearTimeout(activeTimeout);
+		activeTimeout = null;
+	}
+	if (activeServer) {
+		activeServer.close();
+		activeServer = null;
+	}
+}
+
 export async function performOAuthLogin(openBrowser: (url: string) => Promise<void>): Promise<OAuthResult> {
 	if (!Platform.isDesktopApp) {
 		throw new Error('Cloudflare sign-in is currently supported on desktop only');
 	}
+
+	abortOAuthLogin();
 
 	const state = createRandomHex(16);
 	const codeVerifier = createCodeVerifier();
@@ -179,8 +195,14 @@ export async function performOAuthLogin(openBrowser: (url: string) => Promise<vo
 	const authUrl = getAuthorizationUrl(state, codeChallenge);
 
 	return new Promise((resolve, reject) => {
+		const cleanup = () => {
+			activeServer = null;
+			activeTimeout = null;
+		};
+
 		const timeoutHandle = setTimeout(() => {
 			server.close();
+			cleanup();
 			reject(new Error('OAuth login timed out after 5 minutes'));
 		}, 5 * 60 * 1000);
 
@@ -202,6 +224,7 @@ export async function performOAuthLogin(openBrowser: (url: string) => Promise<vo
 					res.end('<html><body><h2>Cloudflare authorization failed.</h2><p>You can close this tab.</p></body></html>');
 					clearTimeout(timeoutHandle);
 					server.close();
+					cleanup();
 					reject(new Error(`OAuth error: ${oauthError}`));
 					return;
 				}
@@ -211,6 +234,7 @@ export async function performOAuthLogin(openBrowser: (url: string) => Promise<vo
 					res.end('<html><body><h2>State mismatch.</h2><p>You can close this tab.</p></body></html>');
 					clearTimeout(timeoutHandle);
 					server.close();
+					cleanup();
 					reject(new Error('OAuth state mismatch'));
 					return;
 				}
@@ -220,6 +244,7 @@ export async function performOAuthLogin(openBrowser: (url: string) => Promise<vo
 					res.end('<html><body><h2>No authorization code.</h2><p>You can close this tab.</p></body></html>');
 					clearTimeout(timeoutHandle);
 					server.close();
+					cleanup();
 					reject(new Error('No authorization code returned by Cloudflare'));
 					return;
 				}
@@ -232,20 +257,26 @@ export async function performOAuthLogin(openBrowser: (url: string) => Promise<vo
 
 				clearTimeout(timeoutHandle);
 				server.close();
+				cleanup();
 				resolve({ accountId, tokens });
 			} catch (error) {
 				res.writeHead(500, { 'Content-Type': 'text/html' });
 				res.end('<html><body><h2>Authorization failed.</h2><p>You can close this tab.</p></body></html>');
 				clearTimeout(timeoutHandle);
 				server.close();
+				cleanup();
 				reject(error instanceof Error ? error : new Error(String(error)));
 			}
 		});
 
 		server.on('error', (error) => {
 			clearTimeout(timeoutHandle);
+			cleanup();
 			reject(new Error(`Failed to start OAuth callback server: ${error.message}`));
 		});
+
+		activeServer = server;
+		activeTimeout = timeoutHandle;
 
 		server.listen(REDIRECT_PORT, '127.0.0.1', async () => {
 			try {

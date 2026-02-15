@@ -2,7 +2,7 @@
  * Conflict detection and resolution
  */
 
-import type { Vault, TFile } from 'obsidian';
+import { Notice, type Vault, type TFile } from 'obsidian';
 import { createLogger } from '../logger';
 import type { FileEntry, FileDiff } from '../types';
 import { isHiddenPath } from './file-discovery';
@@ -128,6 +128,7 @@ export async function createConflictCopy(
 		await vault.createBinary(conflictPath, content);
 	}
 	logger.info('Created conflict copy:', conflictPath);
+	new Notice(`Sync conflict: ${originalPath}`);
 	return conflictPath;
 }
 

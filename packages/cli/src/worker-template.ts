@@ -149,18 +149,21 @@ async function handleGetManifest(request, db) {
 	if (!db) return corsResponse({ error: 'Database not available' }, 404);
 	await initDb(db);
 
+	const MAX_MANIFEST_FILES = 200000;
 	const [filesResult, seqResult] = await db.batch([
-		db.prepare('SELECT path, hash, size, modified FROM files'),
+		db.prepare('SELECT path, hash, size, modified FROM files LIMIT ?').bind(MAX_MANIFEST_FILES + 1),
 		db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'),
 	]);
 
+	const truncated = filesResult.results.length > MAX_MANIFEST_FILES;
+	const rows = truncated ? filesResult.results.slice(0, MAX_MANIFEST_FILES) : filesResult.results;
 	const files = {};
-	for (const row of filesResult.results) {
+	for (const row of rows) {
 		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified };
 	}
 	const lastSeq = seqResult.results[0]?.lastSeq || 0;
 
-	return compressedCorsResponse({ version: 1, files, lastSeq }, request);
+	return compressedCorsResponse({ version: 1, files, lastSeq, ...(truncated && { truncated: true }) }, request);
 }
 
 async function handleUpload(request, bucket, db) {

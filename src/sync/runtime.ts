@@ -66,7 +66,9 @@ export class SyncRuntime {
 		this.statusBar?.update(this.syncEngine.getState());
 
 		if (this.settings.syncOnStartup) {
-			void this.sync();
+			this.sync().catch(error => {
+				logger.error('Startup sync failed:', error);
+			});
 		}
 	}
 

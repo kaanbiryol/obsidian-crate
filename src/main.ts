@@ -3,6 +3,7 @@
  */
 
 import { Notice, Plugin, TAbstractFile } from 'obsidian';
+import { abortOAuthLogin } from './cloudflare/oauth';
 import { CloudflareSessionManager } from './cloudflare/session-manager';
 import { CloudflareUsageService } from './cloudflare/usage-service';
 import { createLogger } from './logger';
@@ -25,16 +26,29 @@ export default class CratePlugin extends Plugin {
 	async onload(): Promise<void> {
 		logger.info('Plugin loaded');
 
-		this.secretStorage = new SecretStorageService(this.app);
-		await this.loadSettings();
-		this.initializeManagers();
-		await this.ensureDeviceId();
+		try {
+			this.secretStorage = new SecretStorageService(this.app);
+			await this.loadSettings();
+			this.initializeManagers();
+			await this.ensureDeviceId();
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : 'Unknown error';
+			logger.error('Plugin initialization failed:', msg);
+			new Notice(`Crate failed to initialize: ${msg}`);
+			return;
+		}
 
 		this.addSettingTab(new CrateSettingTab(this.app, this));
 		this.registerVaultEventHandlers();
 
-		if (this.syncRuntime.isConfigured()) {
-			await this.syncRuntime.initialize();
+		try {
+			if (this.syncRuntime.isConfigured()) {
+				await this.syncRuntime.initialize();
+			}
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : 'Unknown error';
+			logger.error('Sync initialization failed:', msg);
+			new Notice(`Crate sync failed to start: ${msg}`);
 		}
 
 		this.registerCommands();
@@ -42,6 +56,7 @@ export default class CratePlugin extends Plugin {
 
 	onunload(): void {
 		this.syncRuntime.destroy();
+		abortOAuthLogin();
 	}
 
 	async loadSettings(): Promise<void> {

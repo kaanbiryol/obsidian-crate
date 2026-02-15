@@ -10,6 +10,7 @@ export interface FileManifest {
 	version: number;
 	files: Record<string, FileEntry>;
 	lastSeq?: number;
+	truncated?: boolean;
 }
 
 export interface FileEntry {
@@ -230,6 +231,7 @@ export const SECRET_KEYS = {
 export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
 
 export const DEBOUNCE_DELAY_MS = 10000;
+export const MAX_DEBOUNCE_WAIT_MS = 30_000;
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
 export const BATCH_MAX_FILES = 50;
 export const BATCH_MAX_BYTES = 10 * 1024 * 1024; // 10MB total decoded content per batch upload

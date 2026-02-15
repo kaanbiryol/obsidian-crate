@@ -144,6 +144,7 @@ describe('debouncedSync', () => {
 		vi.useFakeTimers();
 		const pendingPaths = new Set(['notes/a.md']);
 		let timer: ReturnType<typeof setTimeout> | null = null;
+		let maxWaitStart: number | null = null;
 		const updateState = vi.fn();
 		const processPending = vi.fn(async () => {});
 
@@ -154,6 +155,10 @@ describe('debouncedSync', () => {
 				getDebounceTimer: () => timer,
 				setDebounceTimer: value => {
 					timer = value;
+				},
+				getMaxWaitStart: () => maxWaitStart,
+				setMaxWaitStart: value => {
+					maxWaitStart = value;
 				},
 				updateState,
 				processPendingChanges: processPending,
@@ -168,6 +173,7 @@ describe('debouncedSync', () => {
 
 		expect(processPending).toHaveBeenCalledTimes(1);
 		expect(timer).toBeNull();
+		expect(maxWaitStart).toBeNull();
 	});
 
 	it('no-ops when queue is destroyed', () => {
@@ -180,6 +186,8 @@ describe('debouncedSync', () => {
 				isDestroyed: () => true,
 				getDebounceTimer: () => null,
 				setDebounceTimer: vi.fn(),
+				getMaxWaitStart: () => null,
+				setMaxWaitStart: vi.fn(),
 				updateState,
 				processPendingChanges: processPending,
 			},
@@ -188,6 +196,39 @@ describe('debouncedSync', () => {
 
 		expect(updateState).not.toHaveBeenCalled();
 		expect(processPending).not.toHaveBeenCalled();
+	});
+
+	it('fires immediately when max-wait is exceeded', () => {
+		vi.useFakeTimers();
+		const pendingPaths = new Set(['notes/a.md']);
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		let maxWaitStart: number | null = Date.now() - 100; // started 100ms ago
+		const updateState = vi.fn();
+		const processPending = vi.fn(async () => {});
+
+		const context = {
+			pendingPaths,
+			isDestroyed: () => false,
+			getDebounceTimer: () => timer,
+			setDebounceTimer: (value: ReturnType<typeof setTimeout> | null) => {
+				timer = value;
+			},
+			getMaxWaitStart: () => maxWaitStart,
+			setMaxWaitStart: (value: number | null) => {
+				maxWaitStart = value;
+			},
+			updateState,
+			processPendingChanges: processPending,
+		};
+
+		// Simulate an existing timer (debounce in progress)
+		timer = setTimeout(() => {}, 10000);
+
+		debouncedSync(context, 25, 50); // maxWait=50ms, but we're already 100ms in
+
+		expect(processPending).toHaveBeenCalledTimes(1);
+		expect(timer).toBeNull();
+		expect(maxWaitStart).toBeNull();
 	});
 });
 

@@ -18,6 +18,22 @@ import type {
 
 const logger = createLogger('ApiClient');
 
+export class HttpError extends Error {
+	constructor(message: string, readonly status: number, readonly retryAfter: number | null = null) {
+		super(message);
+		this.name = 'HttpError';
+	}
+}
+
+function parseRetryAfter(response: Response): number | null {
+	const header = response.headers.get('Retry-After');
+	if (!header) return null;
+	const seconds = parseInt(header, 10);
+	return !isNaN(seconds) && seconds > 0 ? seconds * 1000 : null;
+}
+
+const TRANSFER_TIMEOUT_MS = 120_000;
+
 export class SyncApiClient {
 	private workerUrl: string;
 	private authToken: string;
@@ -66,7 +82,8 @@ export class SyncApiClient {
 	 */
 	private async requestJson<T>(
 		path: string,
-		options: RequestInit = {}
+		options: RequestInit = {},
+		timeout: number = 30_000,
 	): Promise<T> {
 		const url = `${this.workerUrl}${path}`;
 		logger.info(`${options.method ?? 'GET'} ${path}`);
@@ -83,7 +100,7 @@ export class SyncApiClient {
 
 		const response = await fetch(url, {
 			...options,
-			signal: AbortSignal.timeout(30_000),
+			signal: AbortSignal.timeout(timeout),
 			headers: {
 				...headers,
 				...options.headers,
@@ -100,7 +117,7 @@ export class SyncApiClient {
 				errorMessage = `HTTP ${response.status}: ${errorBody}`;
 			}
 			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} — ${errorMessage}`);
-			throw new Error(errorMessage);
+			throw new HttpError(errorMessage, response.status, parseRetryAfter(response));
 		}
 
 		logger.info(`${options.method ?? 'GET'} ${path} → ${response.status}`);
@@ -112,14 +129,15 @@ export class SyncApiClient {
 	 */
 	private async requestBinary(
 		path: string,
-		options: RequestInit = {}
+		options: RequestInit = {},
+		timeout: number = 30_000,
 	): Promise<{ body: ArrayBuffer; headers: Headers }> {
 		const url = `${this.workerUrl}${path}`;
 		logger.info(`${options.method ?? 'GET'} ${path} (binary)`);
 
 		const response = await fetch(url, {
 			...options,
-			signal: AbortSignal.timeout(30_000),
+			signal: AbortSignal.timeout(timeout),
 			headers: {
 				'Authorization': `Bearer ${this.authToken}`,
 				...options.headers,
@@ -136,7 +154,7 @@ export class SyncApiClient {
 				errorMessage = `HTTP ${response.status}: ${errorBody}`;
 			}
 			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} — ${errorMessage}`);
-			throw new Error(errorMessage);
+			throw new HttpError(errorMessage, response.status, parseRetryAfter(response));
 		}
 
 		logger.info(`${options.method ?? 'GET'} ${path} → ${response.status} (binary)`);
@@ -191,7 +209,7 @@ export class SyncApiClient {
 				'X-File-Hash': hash,
 				'X-File-Size': String(size),
 			},
-		});
+		}, TRANSFER_TIMEOUT_MS);
 	}
 
 	/**
@@ -199,7 +217,7 @@ export class SyncApiClient {
 	 */
 	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number }> {
 		const encodedPath = encodeURIComponent(path);
-		const { body, headers } = await this.requestBinary(`/sync/download?path=${encodedPath}`);
+		const { body, headers } = await this.requestBinary(`/sync/download?path=${encodedPath}`, {}, TRANSFER_TIMEOUT_MS);
 		return {
 			content: body,
 			contentType: headers.get('Content-Type') || 'application/octet-stream',
@@ -245,7 +263,7 @@ export class SyncApiClient {
 		return this.requestJson<BatchUploadResponse>('/sync/batch-upload', {
 			method: 'POST',
 			body: JSON.stringify({ files }),
-		});
+		}, TRANSFER_TIMEOUT_MS);
 	}
 
 	/**
@@ -255,7 +273,7 @@ export class SyncApiClient {
 		return this.requestJson<BatchDownloadResponse>('/sync/batch-download', {
 			method: 'POST',
 			body: JSON.stringify({ paths }),
-		});
+		}, TRANSFER_TIMEOUT_MS);
 	}
 
 	/**

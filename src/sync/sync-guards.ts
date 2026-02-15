@@ -18,3 +18,13 @@ export function guardSyncIdle(status: SyncStatus): SyncResult | null {
 export function guardSyncStart(options: { isConfigured: boolean; status: SyncStatus }): SyncResult | null {
 	return guardSyncConfigured(options.isConfigured) ?? guardSyncIdle(options.status);
 }
+
+export function acquireSyncLock(
+	options: { isConfigured: boolean; status: SyncStatus },
+	setStatus: () => void,
+): SyncResult | null {
+	const guard = guardSyncStart(options);
+	if (guard) return guard;
+	setStatus();
+	return null;
+}
