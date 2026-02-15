@@ -2,7 +2,7 @@
  * Settings tab for Obsidian Crate configuration
  */
 
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab } from 'obsidian';
 import type CratePlugin from '../main';
 import { renderConfigSection, type ManualSetupState } from './settings/config-section';
 import { renderInfrastructureSection } from './settings/infrastructure-section';
@@ -39,11 +39,6 @@ export class CrateSettingTab extends PluginSettingTab {
 		});
 
 		if (this.plugin.syncRuntime.isConfigured()) {
-			this.renderConnectionSection(containerEl);
-			renderUsageSection({
-				containerEl,
-				plugin: this.plugin,
-			});
 			renderSyncSection({
 				containerEl,
 				plugin: this.plugin,
@@ -54,15 +49,10 @@ export class CrateSettingTab extends PluginSettingTab {
 				plugin: this.plugin,
 				rerender: () => this.display(),
 			});
+			renderUsageSection({
+				containerEl,
+				plugin: this.plugin,
+			});
 		}
-	}
-
-	private renderConnectionSection(containerEl: HTMLElement): void {
-		containerEl.createEl('h3', { text: 'Connection' });
-
-		const lastSync = this.plugin.settings.lastSync;
-		new Setting(containerEl)
-			.setName('Last sync')
-			.setDesc(lastSync ? new Date(lastSync).toLocaleString() : 'Never');
 	}
 }

@@ -13,6 +13,11 @@ export function renderSyncSection(context: SyncSectionContext): void {
 
 	containerEl.createEl('h3', { text: 'Sync' });
 
+	const lastSync = plugin.settings.lastSync;
+	new Setting(containerEl)
+		.setName('Last sync')
+		.setDesc(lastSync ? new Date(lastSync).toLocaleString() : 'Never');
+
 	new Setting(containerEl)
 		.setName('Sync now')
 		.setDesc('Manually trigger a full sync')
@@ -68,6 +73,24 @@ export function renderSyncSection(context: SyncSectionContext): void {
 					plugin.syncRuntime.updateSyncSettings();
 				}
 			}));
+
+	new Setting(containerEl)
+		.setName('Ignore patterns')
+		.setDesc('Files matching these patterns will not be synced (one per line)')
+		.addTextArea(text => {
+			text
+				.setValue(plugin.settings.ignorePatterns.join('\n'))
+				.onChange(async (value) => {
+					plugin.settings.ignorePatterns = value
+						.split('\n')
+						.map(p => p.trim())
+						.filter(p => p.length > 0);
+					await plugin.saveSettings();
+					plugin.syncRuntime.updateSyncSettings();
+				});
+			text.inputEl.rows = 6;
+			text.inputEl.cols = 40;
+		});
 
 	new Setting(containerEl)
 		.setName('Show status bar')
