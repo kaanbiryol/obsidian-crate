@@ -102,11 +102,12 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
 | `BATCH_MAX_FILES` | 50 | `types.ts` |
 | `BATCH_MAX_BYTES` | 10 MB | `types.ts` |
 | `BATCH_FILE_SIZE_LIMIT` | 1 MB | `types.ts` |
-| `UPLOAD_CONCURRENCY` | 5 | `engine.ts` |
+| `UPLOAD_CONCURRENCY` | 10 | `engine.ts` |
 | `DOWNLOAD_CONCURRENCY` | 5 | `engine.ts` |
 | `FORCE_SYNC_CONCURRENCY` | 2 | `engine.ts` |
-| `PREPARE_CONCURRENCY` | 5 | `engine.ts` |
-| `INITIAL_SYNC_PIPELINE_CHUNK_FILES` | 120 | `engine.ts` |
+| `PREPARE_CONCURRENCY` | 20 | `engine.ts` |
+| `INITIAL_SYNC_PIPELINE_CHUNK_FILES` | 500 | `engine.ts` |
+| `BATCH_UPLOAD_CONCURRENCY` | 3 | `engine.ts` |
 | `MAX_RETRIES` | 3 | `engine.ts` |
 | `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine.ts` |
 

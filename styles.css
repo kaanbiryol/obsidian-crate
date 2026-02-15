@@ -12,6 +12,13 @@
 
 .crate-status-icon {
 	font-size: 12px;
+	display: flex;
+	align-items: center;
+}
+
+.crate-status-icon svg {
+	width: 14px;
+	height: 14px;
 }
 
 .crate-status-text {
@@ -20,7 +27,7 @@
 }
 
 /* Syncing animation */
-.crate-status-bar[data-status="syncing"] .crate-status-icon {
+.crate-status-bar[data-status="syncing"] .crate-status-icon svg {
 	animation: crate-spin 1s linear infinite;
 	color: var(--text-warning);
 }

@@ -2,7 +2,7 @@
  * Status bar component for sync status display
  */
 
-import type { Plugin } from 'obsidian';
+import { setIcon, type Plugin } from 'obsidian';
 import type { SyncState, SyncStatus } from '../types';
 
 export class StatusBarManager {
@@ -10,6 +10,9 @@ export class StatusBarManager {
 	private statusBarEl: HTMLElement | null = null;
 	private enabled: boolean;
 	private syncProgress: { current: number; total: number } | null = null;
+	private currentStatus: SyncStatus | null = null;
+	private iconEl: HTMLSpanElement | null = null;
+	private textEl: HTMLSpanElement | null = null;
 
 	constructor(plugin: Plugin, enabled: boolean) {
 		this.plugin = plugin;
@@ -66,11 +69,23 @@ export class StatusBarManager {
 		if (!this.statusBarEl) return;
 
 		const { icon, text, tooltip } = this.getDisplayInfo(state);
+		const statusChanged = this.currentStatus !== state.status;
 
-		this.statusBarEl.empty();
-		this.statusBarEl.setAttribute('data-status', state.status);
-		this.statusBarEl.createSpan({ text: icon, cls: 'crate-status-icon' });
-		this.statusBarEl.createSpan({ text: ` ${text}`, cls: 'crate-status-text' });
+		if (statusChanged || !this.iconEl || !this.textEl) {
+			this.statusBarEl.empty();
+			this.statusBarEl.setAttribute('data-status', state.status);
+			this.iconEl = this.statusBarEl.createSpan({ cls: 'crate-status-icon' });
+			if (icon) {
+				this.iconEl.textContent = icon;
+			} else {
+				setIcon(this.iconEl, 'loader');
+			}
+			this.textEl = this.statusBarEl.createSpan({ text: ` ${text}`, cls: 'crate-status-text' });
+			this.currentStatus = state.status;
+		} else {
+			this.textEl.textContent = ` ${text}`;
+		}
+
 		this.statusBarEl.setAttribute('aria-label', tooltip);
 		this.statusBarEl.setAttribute('data-tooltip-position', 'top');
 	}
@@ -78,11 +93,11 @@ export class StatusBarManager {
 	/**
 	 * Get display information for state
 	 */
-	private getDisplayInfo(state: SyncState): { icon: string; text: string; tooltip: string } {
+	private getDisplayInfo(state: SyncState): { icon: string | null; text: string; tooltip: string } {
 		switch (state.status) {
 			case 'syncing':
 				return {
-					icon: '↻',
+					icon: null,
 					text: this.syncProgress
 					? `Syncing ${this.syncProgress.current}/${this.syncProgress.total}`
 					: state.pendingChanges > 0 ? `Syncing (${state.pendingChanges})` : 'Syncing...',
@@ -160,6 +175,9 @@ export class StatusBarManager {
 		if (this.statusBarEl) {
 			this.statusBarEl.remove();
 			this.statusBarEl = null;
+			this.iconEl = null;
+			this.textEl = null;
+			this.currentStatus = null;
 		}
 	}
 }
