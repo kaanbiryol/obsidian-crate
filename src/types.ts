@@ -169,7 +169,6 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	deviceId: '',
 	ignorePatterns: [
 		'.obsidian/workspace*',
-		'.obsidian/cache',
 		'.git/',
 		'.trash/',
 		'*.tmp',
@@ -204,4 +203,3 @@ export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
 
 export const DEBOUNCE_DELAY_MS = 10000;
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
-
