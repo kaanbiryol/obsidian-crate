@@ -36,7 +36,7 @@ export class CrateSettingTab extends PluginSettingTab {
 
 		this.renderConfigSection(containerEl);
 
-		if (this.plugin.isConfigured()) {
+		if (this.plugin.syncRuntime.isConfigured()) {
 			this.renderConnectionSection(containerEl);
 			this.renderUsageSection(containerEl);
 			this.renderSyncSection(containerEl);
@@ -58,7 +58,7 @@ export class CrateSettingTab extends PluginSettingTab {
 			this.manualWorkerName = this.plugin.settings.workerName.trim();
 		}
 
-		const hasCloudflareCredentials = this.plugin.hasCloudflareCredentials();
+		const hasCloudflareCredentials = this.plugin.cloudflareSession.hasCredentials();
 		if (hasCloudflareCredentials) {
 			this.manualEntryEnabled = false;
 		}
@@ -101,9 +101,9 @@ export class CrateSettingTab extends PluginSettingTab {
 						setupProgress.style.display = 'block';
 						setupProgress.textContent = 'Waiting for Cloudflare authorization...';
 						try {
-							await this.plugin.loginWithCloudflare();
+							await this.plugin.cloudflareSession.loginWithCloudflare();
 							loggedIn = true;
-							const creds = await this.plugin.resolveCloudflareCredentials();
+							const creds = await this.plugin.cloudflareSession.resolveCredentials();
 							if (!creds) {
 								throw new Error('Cloudflare credentials are unavailable after login');
 							}
@@ -136,11 +136,11 @@ export class CrateSettingTab extends PluginSettingTab {
 						button.setDisabled(true);
 						button.setButtonText('Waiting...');
 						try {
-							await this.plugin.loginWithCloudflare();
-							if (!this.plugin.isConfigured()) {
+							await this.plugin.cloudflareSession.loginWithCloudflare();
+							if (!this.plugin.syncRuntime.isConfigured()) {
 								setupProgress.style.display = 'block';
 								setupProgress.textContent = 'Creating infrastructure...';
-								const creds = await this.plugin.resolveCloudflareCredentials();
+								const creds = await this.plugin.cloudflareSession.resolveCredentials();
 								if (!creds) {
 									throw new Error('Cloudflare credentials are unavailable after login');
 								}
@@ -162,7 +162,7 @@ export class CrateSettingTab extends PluginSettingTab {
 					.setIcon('x')
 					.setTooltip('Sign out from Cloudflare')
 					.onClick(async () => {
-						await this.plugin.clearCloudflareCredentials();
+						await this.plugin.cloudflareSession.clearCredentials();
 						new Notice('Cloudflare credentials cleared');
 						this.display();
 					}));
@@ -254,7 +254,7 @@ export class CrateSettingTab extends PluginSettingTab {
 									new Notice('Cloudflare credentials are invalid');
 									return;
 								}
-								await this.plugin.saveCloudflareCredentials(accountId, apiToken);
+								await this.plugin.cloudflareSession.saveCredentials(accountId, apiToken);
 								new Notice('Manual Cloudflare credentials saved');
 								this.display();
 							} catch (error) {
@@ -267,7 +267,7 @@ export class CrateSettingTab extends PluginSettingTab {
 			}
 		}
 
-		if (!this.plugin.isConfigured() && (hasCloudflareCredentials || this.manualEntryEnabled)) {
+		if (!this.plugin.syncRuntime.isConfigured() && (hasCloudflareCredentials || this.manualEntryEnabled)) {
 			new Setting(containerEl)
 				.setName('Quick setup')
 				.setDesc('Create R2 + D1 + Worker and configure this plugin automatically')
@@ -306,7 +306,7 @@ export class CrateSettingTab extends PluginSettingTab {
 						if (!confirm('Clear local plugin configuration? Cloudflare resources will not be deleted.')) {
 							return;
 						}
-						await this.plugin.clearSyncConfiguration();
+						await this.plugin.syncRuntime.clearSyncConfiguration();
 						new Notice('Local plugin configuration cleared');
 						this.display();
 					}));
@@ -326,11 +326,11 @@ export class CrateSettingTab extends PluginSettingTab {
 				throw new Error('Cloudflare credentials are invalid');
 			}
 
-			await this.plugin.saveCloudflareCredentials(accountId, apiToken);
+			await this.plugin.cloudflareSession.saveCredentials(accountId, apiToken);
 			return { accountId, apiToken };
 		}
 
-		const creds = await this.plugin.resolveCloudflareCredentials();
+		const creds = await this.plugin.cloudflareSession.resolveCredentials();
 		if (!creds) {
 			throw new Error('Please sign in with Cloudflare first');
 		}
@@ -358,7 +358,7 @@ export class CrateSettingTab extends PluginSettingTab {
 			}
 		);
 
-		await this.plugin.applyInfrastructureConfig({
+		await this.plugin.syncRuntime.applyInfrastructureConfig({
 			workerUrl: result.workerUrl,
 			authToken: result.authToken,
 			workerName: result.workerName,
@@ -422,7 +422,7 @@ export class CrateSettingTab extends PluginSettingTab {
 				.onClick(async () => {
 					let creds: { accountId: string; apiToken: string } | null = null;
 					try {
-						creds = await this.plugin.resolveCloudflareCredentials();
+						creds = await this.plugin.cloudflareSession.resolveCredentials();
 					} catch (error) {
 						new Notice(`Cloudflare session refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
 						return;
@@ -470,7 +470,7 @@ export class CrateSettingTab extends PluginSettingTab {
 				.onClick(async () => {
 					let creds: { accountId: string; apiToken: string } | null = null;
 					try {
-						creds = await this.plugin.resolveCloudflareCredentials();
+						creds = await this.plugin.cloudflareSession.resolveCredentials();
 					} catch (error) {
 						new Notice(`Cloudflare session refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
 						return;
@@ -517,7 +517,7 @@ export class CrateSettingTab extends PluginSettingTab {
 				.onClick(async () => {
 					let creds: { accountId: string; apiToken: string } | null = null;
 					try {
-						creds = await this.plugin.resolveCloudflareCredentials();
+						creds = await this.plugin.cloudflareSession.resolveCredentials();
 					} catch (error) {
 						new Notice(`Cloudflare session refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
 						return;
@@ -555,7 +555,7 @@ export class CrateSettingTab extends PluginSettingTab {
 						);
 
 						if (result.failed.length === 0) {
-							await this.plugin.clearSyncConfiguration();
+							await this.plugin.syncRuntime.clearSyncConfiguration();
 							new Notice(`Infrastructure reset complete (${result.deleted.length} deleted)`);
 							this.display();
 						} else {
@@ -601,7 +601,7 @@ export class CrateSettingTab extends PluginSettingTab {
 					button.setButtonText('Syncing...');
 
 					try {
-						const result = await this.plugin.sync();
+						const result = await this.plugin.syncRuntime.sync();
 						if (result.success) {
 							new Notice(`Sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded`);
 						} else {
@@ -640,7 +640,7 @@ export class CrateSettingTab extends PluginSettingTab {
 					if (!isNaN(interval) && interval >= 0) {
 						this.plugin.settings.syncInterval = interval;
 						await this.plugin.saveSettings();
-						this.plugin.updateSyncSettings();
+						this.plugin.syncRuntime.updateSyncSettings();
 					}
 				}));
 
@@ -652,7 +652,7 @@ export class CrateSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.showStatusBar = value;
 					await this.plugin.saveSettings();
-					this.plugin.updateStatusBar(value);
+					this.plugin.syncRuntime.updateStatusBar(value);
 				}));
 	}
 
@@ -705,7 +705,10 @@ export class CrateSettingTab extends PluginSettingTab {
 		container.empty();
 		container.createEl('p', { text: 'Loading usage data...', cls: 'setting-item-description' });
 
-		const data = await this.plugin.getUsage();
+		const data = await this.plugin.usageService.getUsage(
+			this.plugin.secretStorage.get(SECRET_KEYS.ANALYTICS_TOKEN),
+			this.plugin.syncRuntime.getApiClient()
+		);
 		container.empty();
 
 		if (!data.available) {
@@ -813,7 +816,7 @@ export class CrateSettingTab extends PluginSettingTab {
 					button.setButtonText('Testing...');
 
 					try {
-						const result = await this.plugin.testConnection();
+						const result = await this.plugin.syncRuntime.testConnection();
 						if (result.success) {
 							new Notice('Connection successful');
 						} else {
@@ -849,7 +852,7 @@ export class CrateSettingTab extends PluginSettingTab {
 							.map(p => p.trim())
 							.filter(p => p.length > 0);
 						await this.plugin.saveSettings();
-						this.plugin.updateSyncSettings();
+						this.plugin.syncRuntime.updateSyncSettings();
 					});
 				text.inputEl.rows = 6;
 				text.inputEl.cols = 40;
@@ -872,7 +875,7 @@ export class CrateSettingTab extends PluginSettingTab {
 					progressFill.style.width = '0%';
 
 					try {
-						const result = await this.plugin.initialSync((current, total) => {
+						const result = await this.plugin.syncRuntime.initialSync((current, total) => {
 							button.setButtonText(`Uploading... ${current}/${total}`);
 							const pct = Math.round((current / total) * 100);
 							progressFill.style.width = `${pct}%`;
@@ -918,7 +921,7 @@ export class CrateSettingTab extends PluginSettingTab {
 					forceProgressFill.style.width = '0%';
 
 					try {
-						const result = await this.plugin.forceFullSync((current, total) => {
+						const result = await this.plugin.syncRuntime.forceFullSync((current, total) => {
 							button.setButtonText(`Syncing... ${current}/${total}`);
 							const pct = Math.round((current / total) * 100);
 							forceProgressFill.style.width = `${pct}%`;
@@ -947,7 +950,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		const forceProgressBar = forceProgressContainer.createDiv({ cls: 'crate-sync-progress-bar' });
 		const forceProgressFill = forceProgressBar.createDiv({ cls: 'crate-sync-progress-fill' });
 
-		if (this.plugin.isConfigured()) {
+		if (this.plugin.syncRuntime.isConfigured()) {
 			this.renderInfrastructureManagementSection(containerEl);
 		}
 	}
