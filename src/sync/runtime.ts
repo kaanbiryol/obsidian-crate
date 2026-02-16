@@ -28,6 +28,7 @@ export class SyncRuntime {
 	private statusBar: StatusBarManager | null = null;
 	private stateChangeListeners = new Set<(state: SyncState) => void>();
 	private progressListeners = new Set<(current: number, total: number) => void>();
+	private acceptingEvents = false;
 
 	constructor(
 		private plugin: Plugin,
@@ -70,6 +71,8 @@ export class SyncRuntime {
 	async initialize(): Promise<void> {
 		logger.info('Initializing sync engine');
 
+		this.acceptingEvents = false;
+
 		this.syncEngine?.destroy();
 		this.statusBar?.destroy();
 
@@ -94,9 +97,15 @@ export class SyncRuntime {
 		this.statusBar?.update(this.syncEngine.getState());
 
 		if (this.settings.syncOnStartup) {
-			this.sync().catch(error => {
-				logger.error('Startup sync failed:', error);
-			});
+			this.sync()
+				.catch(error => {
+					logger.error('Startup sync failed:', error);
+				})
+				.finally(() => {
+					this.acceptingEvents = true;
+				});
+		} else {
+			this.acceptingEvents = true;
 		}
 	}
 
@@ -109,14 +118,17 @@ export class SyncRuntime {
 	}
 
 	onFileChange(file: TAbstractFile): void {
+		if (!this.acceptingEvents) return;
 		this.syncEngine?.onFileChange(file);
 	}
 
 	onFileDelete(file: TAbstractFile): void {
+		if (!this.acceptingEvents) return;
 		this.syncEngine?.onFileDelete(file);
 	}
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
+		if (!this.acceptingEvents) return;
 		this.syncEngine?.onFileRename(file, oldPath);
 	}
 
