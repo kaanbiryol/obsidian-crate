@@ -904,6 +904,37 @@ describe('SyncEngine slice 5 safeguards', () => {
 });
 
 describe('SyncEngine abort-on-destroy', () => {
+	it('does not advance lastSeq when incremental sync is aborted', async () => {
+		const harness = createHarness({ lastSeq: 5 });
+		harness.api.getChanges.mockResolvedValue({
+			changes: [
+				{
+					seq: 8,
+					path: 'notes/remote.md',
+					action: 'put',
+					hash: 'remote-hash',
+					size: 10,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 8,
+			hasMore: false,
+		});
+		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
+		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		// batchDownload throws AbortError (simulating destroy during download)
+		harness.api.batchDownload.mockRejectedValue(
+			new DOMException('signal is aborted without reason', 'AbortError'),
+		);
+
+		const result = await harness.engine.sync();
+
+		expect(result.errors).toHaveLength(0);
+		expect(harness.settings.lastSeq).toBe(5);
+		expect(harness.engine.getState().status).not.toBe('error');
+	});
+
 	it('aborts in-flight sync when destroyed and does not set error state', async () => {
 		const harness = createHarness({ lastSeq: 0 });
 		// Make incremental sync fall through to full sync

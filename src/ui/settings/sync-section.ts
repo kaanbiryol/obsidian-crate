@@ -16,17 +16,13 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 	containerEl.createEl('h3', { text: 'Sync' });
 
 	const lastSync = plugin.settings.lastSync;
-	const lastSyncSetting = new Setting(containerEl)
-		.setName('Last sync')
-		.setDesc(lastSync ? new Date(lastSync).toLocaleString() : 'Never');
-
-	if (isSyncing) {
-		lastSyncSetting.setDesc('Sync in progress...');
-	}
+	const lastSyncDesc = isSyncing
+		? 'Sync in progress...'
+		: lastSync ? `Last synced: ${new Date(lastSync).toLocaleString()}` : 'Never synced';
 
 	const syncSetting = new Setting(containerEl)
 		.setName('Sync now')
-		.setDesc('Manually trigger a full sync')
+		.setDesc(lastSyncDesc)
 		.addButton(button => {
 			if (isSyncing) {
 				button.setButtonText('Syncing...');

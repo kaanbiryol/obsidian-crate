@@ -95,6 +95,14 @@ async function cfRawRequest(
 	return response.json as unknown;
 }
 
+async function cfRequestVoid(
+	credentials: CloudflareCredentials,
+	path: string,
+	options: RawRequestOptions = {}
+): Promise<void> {
+	await cfRawRequest(credentials, path, options);
+}
+
 async function cfRequest<T>(
 	credentials: CloudflareCredentials,
 	path: string,
@@ -181,7 +189,7 @@ export async function createR2Bucket(credentials: CloudflareCredentials, bucketN
 }
 
 export async function deleteR2Bucket(credentials: CloudflareCredentials, name: string): Promise<void> {
-	await cfRequest<unknown>(
+	await cfRequestVoid(
 		credentials,
 		`/accounts/${credentials.accountId}/r2/buckets/${name}`,
 		{ method: 'DELETE' }
@@ -210,7 +218,7 @@ export async function listD1Databases(credentials: CloudflareCredentials): Promi
 }
 
 export async function deleteD1Database(credentials: CloudflareCredentials, uuid: string): Promise<void> {
-	await cfRequest<unknown>(
+	await cfRequestVoid(
 		credentials,
 		`/accounts/${credentials.accountId}/d1/database/${uuid}`,
 		{ method: 'DELETE' }
@@ -225,7 +233,7 @@ export async function listWorkers(credentials: CloudflareCredentials): Promise<W
 }
 
 export async function deleteWorker(credentials: CloudflareCredentials, name: string): Promise<void> {
-	await cfRequest<unknown>(
+	await cfRequestVoid(
 		credentials,
 		`/accounts/${credentials.accountId}/workers/scripts/${name}`,
 		{ method: 'DELETE' }

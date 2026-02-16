@@ -155,15 +155,32 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 	}
 }
 
+function inferWorkerNameFromUrl(workerUrl: string): string | null {
+	const normalized = workerUrl.trim();
+	if (!normalized) {
+		return null;
+	}
+
+	try {
+		const parsed = new URL(normalized);
+		const hostname = parsed.hostname.toLowerCase();
+		if (!hostname.endsWith('.workers.dev')) {
+			return null;
+		}
+		const parts = hostname.split('.');
+		if (parts.length < 3) {
+			return null;
+		}
+		return parts[0] ?? null;
+	} catch {
+		return null;
+	}
+}
+
 function renderInfrastructureManagementSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin, rerender } = context;
 
 	containerEl.createEl('h4', { text: 'Infrastructure management' });
-
-	const managementProgress = containerEl.createEl('p', {
-		cls: 'crate-action-progress',
-	});
-	managementProgress.style.display = 'none';
 
 	const diagnosticsContainer = containerEl.createDiv();
 	diagnosticsContainer.style.display = 'none';
@@ -187,7 +204,7 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 		.setName('D1 database ID')
 		.setDesc(plugin.settings.databaseId || 'Not set');
 
-	new Setting(containerEl)
+	const redeploySetting = new Setting(containerEl)
 		.setName('Redeploy worker code')
 		.setDesc('Equivalent to CLI deploy/update using stored worker name')
 		.addButton(button => button
@@ -206,12 +223,13 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 					return;
 				}
 				const credentials = resolved.credentials;
+				const originalDesc = redeploySetting.descEl.textContent || '';
 
 				await runButtonTask({
 					button,
 					idleText: 'Redeploy',
 					runningText: 'Deploying...',
-					progressEl: managementProgress,
+					progressEl: redeploySetting.descEl,
 					progressMessage: 'Redeploying worker...',
 					task: async ({ setProgress }) => redeployFromPlugin(
 						{
@@ -227,10 +245,14 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 					onError: (error) => {
 						new Notice(`Redeploy failed: ${getErrorMessage(error)}`);
 					},
+					onFinally: () => {
+						redeploySetting.descEl.style.display = '';
+						redeploySetting.descEl.textContent = originalDesc;
+					},
 				});
 			}));
 
-	new Setting(containerEl)
+	const diagnosticsSetting = new Setting(containerEl)
 		.setName('Run diagnostics')
 		.setDesc('Check worker connectivity and Cloudflare resource visibility')
 		.addButton(button => button
@@ -240,12 +262,13 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 				if (resolved.hadError) {
 					return;
 				}
+				const originalDesc = diagnosticsSetting.descEl.textContent || '';
 
 				await runButtonTask({
 					button,
 					idleText: 'Run',
 					runningText: 'Running...',
-					progressEl: managementProgress,
+					progressEl: diagnosticsSetting.descEl,
 					progressMessage: 'Running diagnostics...',
 					task: async () => runDiagnostics({
 						workerUrl: plugin.settings.workerUrl,
@@ -270,16 +293,27 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 					onError: (error) => {
 						new Notice(`Diagnostics failed: ${getErrorMessage(error)}`);
 					},
+					onFinally: () => {
+						diagnosticsSetting.descEl.style.display = '';
+						diagnosticsSetting.descEl.textContent = originalDesc;
+					},
 				});
 			}));
 
-	new Setting(containerEl)
+	const deleteSetting = new Setting(containerEl)
 		.setName('Delete infrastructure')
 		.setDesc('Deletes worker, R2 bucket objects, and D1 database. This removes all synced data.')
 		.addButton(button => button
 			.setButtonText('Delete infrastructure')
 			.setWarning()
 			.onClick(async () => {
+				const confirmed = confirm(
+					'This will permanently delete infrastructure and all synced data (R2, Worker, D1). This cannot be undone. Continue?'
+				);
+				if (!confirmed) {
+					return;
+				}
+
 				const resolved = await resolveCloudflareCredentials(plugin);
 				if (resolved.hadError) {
 					return;
@@ -290,24 +324,28 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 				}
 				const credentials = resolved.credentials;
 
-				const confirmed = confirm(
-					'This will permanently delete infrastructure and all synced data (R2, Worker, D1). This cannot be undone. Continue?'
-				);
-				if (!confirmed) {
-					return;
-				}
+				const shouldSuspendSync = plugin.syncRuntime.isConfigured();
+				let shouldResumeSync = false;
+				const originalDesc = deleteSetting.descEl.textContent || '';
 
 				await runButtonTask({
 					button,
 					idleText: 'Delete infrastructure',
 					runningText: 'Resetting...',
-					progressEl: managementProgress,
+					progressEl: deleteSetting.descEl,
 					progressMessage: 'Deleting resources...',
+					onStart: async () => {
+						// Ensure no worker sync requests are triggered while reset is running.
+						if (shouldSuspendSync) {
+							plugin.syncRuntime.destroy();
+							shouldResumeSync = true;
+						}
+					},
 					task: async ({ setProgress }) => resetInfrastructure(
 						{
 							accountId: credentials.accountId,
 							apiToken: credentials.apiToken,
-							workerName: plugin.settings.workerName || undefined,
+							workerName: plugin.settings.workerName || inferWorkerNameFromUrl(plugin.settings.workerUrl) || undefined,
 							bucketName: plugin.settings.bucketName || undefined,
 							databaseId: plugin.settings.databaseId || undefined,
 							includeCratePrefixed: true,
@@ -316,6 +354,11 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 					),
 					onSuccess: async (result) => {
 						if (result.failed.length === 0) {
+							if (result.deleted.length === 0) {
+								new Notice('No Cloudflare resources were found to delete. Local configuration was kept.');
+								return;
+							}
+							shouldResumeSync = false;
 							await plugin.syncRuntime.clearSyncConfiguration();
 							new Notice(`Infrastructure reset complete (${result.deleted.length} deleted)`);
 							rerender();
@@ -336,6 +379,24 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 					},
 					onError: (error) => {
 						new Notice(`Reset failed: ${getErrorMessage(error)}`);
+					},
+					onFinally: async () => {
+						deleteSetting.descEl.style.display = '';
+						deleteSetting.descEl.textContent = originalDesc;
+
+						if (!shouldResumeSync || !plugin.syncRuntime.isConfigured()) {
+							return;
+						}
+
+						const previousSyncOnStartup = plugin.settings.syncOnStartup;
+						plugin.settings.syncOnStartup = false;
+						try {
+							await plugin.syncRuntime.initialize();
+						} catch (error) {
+							new Notice(`Reset finished, but sync could not be resumed: ${getErrorMessage(error)}`);
+						} finally {
+							plugin.settings.syncOnStartup = previousSyncOnStartup;
+						}
 					},
 				});
 			}));

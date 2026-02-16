@@ -151,6 +151,27 @@ function resolveConfigFromBindings(bindings: WorkerBinding[]): { bucketName: str
 	return { bucketName, databaseId };
 }
 
+function collectResourcesFromWorkerBindings(
+	bindings: WorkerBinding[],
+	bucketNames: Set<string>,
+	databaseIds: Set<string>
+): void {
+	for (const binding of bindings) {
+		if (binding.type === 'plain_text' && binding.name === 'CF_BUCKET_NAME' && binding.text?.trim()) {
+			bucketNames.add(binding.text.trim());
+		}
+		if (binding.type === 'plain_text' && binding.name === 'CF_DATABASE_ID' && binding.text?.trim()) {
+			databaseIds.add(binding.text.trim());
+		}
+		if (binding.type === 'r2_bucket' && binding.bucket_name?.trim()) {
+			bucketNames.add(binding.bucket_name.trim());
+		}
+		if (binding.type === 'd1' && binding.id?.trim()) {
+			databaseIds.add(binding.id.trim());
+		}
+	}
+}
+
 export async function quickSetup(input: QuickSetupInput, onProgress?: ProgressCallback): Promise<QuickSetupResult> {
 	const credentials = toCredentials(input.accountId, input.apiToken);
 	if (!credentials.accountId || !credentials.apiToken) {
@@ -517,6 +538,18 @@ export async function discoverCrateResources(input: {
 		databaseIds.add(input.databaseId);
 	}
 
+	const matchedWorkers = allWorkers.filter((worker) => workerNames.has(worker.id));
+	if (matchedWorkers.length > 0) {
+		await Promise.all(matchedWorkers.map(async (worker) => {
+			try {
+				const bindings = await getWorkerBindings(credentials, worker.id);
+				collectResourcesFromWorkerBindings(bindings, bucketNames, databaseIds);
+			} catch {
+				// Best effort. We can still proceed with known names.
+			}
+		}));
+	}
+
 	return {
 		buckets: allBuckets.filter((bucket) => bucketNames.has(bucket.name)),
 		workers: allWorkers.filter((worker) => workerNames.has(worker.id)),
@@ -524,22 +557,27 @@ export async function discoverCrateResources(input: {
 	};
 }
 
+interface PurgeResult {
+	purgedCount: number;
+	tempWorkerName: string;
+}
+
 async function emptyBucketWithPurgeWorker(
 	credentials: CloudflareCredentials,
 	bucketName: string
-): Promise<number> {
+): Promise<PurgeResult> {
 	const tempWorkerName = `crate-purge-${Math.random().toString(36).slice(2, 8)}`;
 	const authToken = generateAuthToken();
 
-	try {
-		const deployment = await deployWorker(credentials, tempWorkerName, PURGE_WORKER_SCRIPT, {
-			r2Bucket: bucketName,
-			authToken,
-		});
+	const deployment = await deployWorker(credentials, tempWorkerName, PURGE_WORKER_SCRIPT, {
+		r2Bucket: bucketName,
+		authToken,
+	});
 
-		for (let attempt = 0; attempt < 5; attempt++) {
-			await sleep(1200 * (attempt + 1));
+	for (let attempt = 0; attempt < 5; attempt++) {
+		await sleep(2000 * (attempt + 1));
 
+		try {
 			const response = await requestUrl({
 				url: deployment.url,
 				method: 'GET',
@@ -551,18 +589,14 @@ async function emptyBucketWithPurgeWorker(
 
 			if (response.status >= 200 && response.status < 300 && response.json && typeof response.json === 'object') {
 				const deleted = (response.json as { deleted?: number }).deleted;
-				return typeof deleted === 'number' ? deleted : 0;
+				return { purgedCount: typeof deleted === 'number' ? deleted : 0, tempWorkerName };
 			}
-		}
-
-		throw new Error('Temporary purge worker did not respond in time.');
-	} finally {
-		try {
-			await deleteWorker(credentials, tempWorkerName);
 		} catch {
-			// Best effort cleanup.
+			// Worker propagation can take a few attempts.
 		}
 	}
+
+	throw new Error('Purge worker did not respond after multiple attempts.');
 }
 
 export async function resetInfrastructure(input: ResetInput, onProgress?: ProgressCallback): Promise<ResetResult> {
@@ -579,30 +613,6 @@ export async function resetInfrastructure(input: ResetInput, onProgress?: Progre
 		bucketName: input.bucketName,
 		databaseId: input.databaseId,
 	});
-
-	for (const bucket of resources.buckets) {
-		onProgress?.(`Deleting bucket ${bucket.name}...`);
-		try {
-			await deleteR2Bucket(credentials, bucket.name);
-			deleted.push(`R2 bucket ${bucket.name}`);
-		} catch (error) {
-			if (isBucketNotEmptyError(error)) {
-				try {
-					onProgress?.(`Emptying bucket ${bucket.name}...`);
-					const purgedCount = await emptyBucketWithPurgeWorker(credentials, bucket.name);
-					onProgress?.(`Deleted ${purgedCount} object(s) from ${bucket.name}; retrying bucket delete...`);
-					await deleteR2Bucket(credentials, bucket.name);
-					deleted.push(`R2 bucket ${bucket.name}`);
-				} catch (purgeError) {
-					failed.push(
-						`R2 bucket ${bucket.name}: ${purgeError instanceof Error ? purgeError.message : String(purgeError)}`
-					);
-				}
-			} else {
-				failed.push(`R2 bucket ${bucket.name}: ${error instanceof Error ? error.message : String(error)}`);
-			}
-		}
-	}
 
 	for (const worker of resources.workers) {
 		onProgress?.(`Deleting worker ${worker.id}...`);
@@ -621,6 +631,41 @@ export async function resetInfrastructure(input: ResetInput, onProgress?: Progre
 			deleted.push(`D1 database ${database.name}`);
 		} catch (error) {
 			failed.push(`D1 database ${database.name}: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	const tempWorkerNames: string[] = [];
+
+	for (const bucket of resources.buckets) {
+		onProgress?.(`Deleting bucket ${bucket.name}...`);
+		try {
+			await deleteR2Bucket(credentials, bucket.name);
+			deleted.push(`R2 bucket ${bucket.name}`);
+		} catch (error) {
+			if (isBucketNotEmptyError(error)) {
+				try {
+					onProgress?.(`Emptying bucket ${bucket.name}...`);
+					const { purgedCount, tempWorkerName } = await emptyBucketWithPurgeWorker(credentials, bucket.name);
+					tempWorkerNames.push(tempWorkerName);
+					onProgress?.(`Deleted ${purgedCount} object(s) from ${bucket.name}; retrying bucket delete...`);
+					await deleteR2Bucket(credentials, bucket.name);
+					deleted.push(`R2 bucket ${bucket.name}`);
+				} catch (purgeError) {
+					failed.push(
+						`R2 bucket ${bucket.name}: ${purgeError instanceof Error ? purgeError.message : String(purgeError)}`
+					);
+				}
+			} else {
+				failed.push(`R2 bucket ${bucket.name}: ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
+	}
+
+	for (const tempName of tempWorkerNames) {
+		try {
+			await deleteWorker(credentials, tempName);
+		} catch {
+			// Best effort cleanup of temporary purge workers.
 		}
 	}
 

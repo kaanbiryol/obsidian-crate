@@ -325,6 +325,7 @@ export async function runIncrementalSync(
 		logger.info(`Incremental sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.deleted} del, ${result.conflicts.length} conflicts`);
 		return result;
 	} catch (error) {
+		if (error instanceof DOMException && error.name === 'AbortError') throw error;
 		logger.warn('Incremental sync failed, falling back to full sync:', error instanceof Error ? error.message : 'Unknown error');
 		return null;
 	}

@@ -216,6 +216,7 @@ export async function parallelDownloadAndSaveFiles(
 					}
 				}
 			} catch (error) {
+				if (error instanceof DOMException && error.name === 'AbortError') throw error;
 				// Batch failed entirely, fall back to individual downloads for this chunk
 				logger.warn('Batch download failed, falling back to individual downloads:', error instanceof Error ? error.message : 'Unknown error');
 				individual.push(...chunk);

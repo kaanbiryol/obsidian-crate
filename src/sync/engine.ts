@@ -493,17 +493,25 @@ export class SyncEngine {
 		logger.info('Sync started');
 
 		// Try incremental sync first
-		const incrementalResult = await this.incrementalSync(progressCallback);
-		if (incrementalResult) {
-			if (incrementalResult.success) {
-				const lastSync = new Date().toISOString();
-				this.updateState({ status: 'idle', lastSync, lastError: null });
-				this.settings.lastSync = lastSync;
-			} else {
-				const lastError = getSyncResultError(incrementalResult, 'Incremental sync completed with errors');
-				this.updateState({ status: 'error', lastError });
+		try {
+			const incrementalResult = await this.incrementalSync(progressCallback);
+			if (incrementalResult) {
+				if (incrementalResult.success) {
+					const lastSync = new Date().toISOString();
+					this.updateState({ status: 'idle', lastSync, lastError: null });
+					this.settings.lastSync = lastSync;
+				} else {
+					const lastError = getSyncResultError(incrementalResult, 'Incremental sync completed with errors');
+					this.updateState({ status: 'error', lastError });
+				}
+				return incrementalResult;
 			}
-			return incrementalResult;
+		} catch (error) {
+			if (this.isAbortError(error)) {
+				logger.info('Incremental sync aborted');
+				return createEmptySyncResult();
+			}
+			throw error;
 		}
 
 		logger.info('Running full sync');
