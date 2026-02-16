@@ -35,6 +35,7 @@ function createFlushHarness(overrides: Partial<{
 		lastSync: null,
 		lastError: null,
 		pendingChanges: 0,
+		conflictCount: 0,
 	};
 	const updateStateCalls: Partial<QueueState>[] = [];
 	const updateState = vi.fn((updates: Partial<QueueState>) => {

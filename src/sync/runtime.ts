@@ -4,6 +4,7 @@ import type { SecretStorageService } from '../secret-storage';
 import { MAX_SYNC_HISTORY, SECRET_KEYS, type CrateSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../types';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
+import { notifyConflicts } from './conflict';
 import { SyncEngine } from './engine';
 import { guardSyncConfigured } from './sync-guards';
 
@@ -41,7 +42,7 @@ export class SyncRuntime {
 		if (this.syncEngine) {
 			return this.syncEngine.getState();
 		}
-		return { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0 };
+		return { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
 	}
 
 	addStateChangeListener(listener: (state: SyncState) => void): void {
@@ -98,6 +99,9 @@ export class SyncRuntime {
 
 		if (this.settings.syncOnStartup) {
 			this.sync()
+				.then(result => {
+					notifyConflicts(result.conflicts);
+				})
 				.catch(error => {
 					logger.error('Startup sync failed:', error);
 				})

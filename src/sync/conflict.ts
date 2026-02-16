@@ -128,7 +128,7 @@ export async function createConflictCopy(
 		await vault.createBinary(conflictPath, content);
 	}
 	logger.info('Created conflict copy:', conflictPath);
-	new Notice(`Sync conflict: ${originalPath}`);
+	new Notice(`Sync conflict: ${originalPath}\nLocal version saved as conflict copy, remote version kept as original.`);
 	return conflictPath;
 }
 
@@ -137,4 +137,18 @@ export async function createConflictCopy(
  */
 export function isConflictFile(path: string): boolean {
 	return /\(conflict \d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} [a-z0-9]{4}\)/.test(path);
+}
+
+/**
+ * Show a persistent notice summarizing conflicts from a background sync.
+ * Duration 0 = user must dismiss manually.
+ */
+export function notifyConflicts(conflictPaths: string[]): void {
+	if (conflictPaths.length === 0) return;
+
+	const message = conflictPaths.length === 1
+		? `Sync conflict: ${conflictPaths[0]}\nLocal version saved as conflict copy.`
+		: `${conflictPaths.length} sync conflicts detected.\nSearch your vault for "conflict" to find the copies.`;
+
+	new Notice(message, 0);
 }

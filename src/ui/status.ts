@@ -29,7 +29,7 @@ export class StatusBarManager {
 	private create(): void {
 		this.statusBarEl = this.plugin.addStatusBarItem();
 		this.statusBarEl.addClass('crate-status-bar');
-		this.update({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0 });
+		this.update({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
 	}
 
 	/**
@@ -52,7 +52,7 @@ export class StatusBarManager {
 	 */
 	setSyncProgress(current: number, total: number): void {
 		this.syncProgress = { current, total };
-		this.update({ status: 'syncing', lastSync: null, lastError: null, pendingChanges: 0 });
+		this.update({ status: 'syncing', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
 	}
 
 	/**
@@ -84,8 +84,12 @@ export class StatusBarManager {
 			this.currentStatus = state.status;
 		} else {
 			this.textEl.textContent = ` ${text}`;
+			if (icon) {
+				this.iconEl.textContent = icon;
+			}
 		}
 
+		this.statusBarEl.toggleClass('crate-has-conflicts', state.conflictCount > 0);
 		this.statusBarEl.setAttribute('aria-label', tooltip);
 		this.statusBarEl.setAttribute('data-tooltip-position', 'top');
 	}
@@ -120,6 +124,14 @@ export class StatusBarManager {
 
 			case 'idle':
 			default:
+				if (state.conflictCount > 0) {
+					return {
+						icon: '⚠',
+						text: state.conflictCount === 1 ? '1 conflict' : `${state.conflictCount} conflicts`,
+						tooltip: 'Conflict copies were created during sync. Search your vault for "conflict" to find them.',
+					};
+				}
+
 				if (state.pendingChanges > 0) {
 					return {
 						icon: '◐',

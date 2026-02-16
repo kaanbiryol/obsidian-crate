@@ -6,7 +6,7 @@ import type { Plugin, TAbstractFile, Vault } from 'obsidian';
 import { HttpError, SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
-import { isConflictFile } from './conflict';
+import { isConflictFile, notifyConflicts } from './conflict';
 import { getAllVaultFiles } from './file-discovery';
 import type { VaultFile } from './file-discovery';
 import {
@@ -98,6 +98,7 @@ export class SyncEngine {
 			lastSync: settings.lastSync,
 			lastError: null,
 			pendingChanges: 0,
+			conflictCount: 0,
 		};
 	}
 
@@ -172,7 +173,8 @@ export class SyncEngine {
 			}
 
 			logger.info('Periodic check: changes detected, running sync');
-			await this.sync();
+			const result = await this.sync();
+			notifyConflicts(result.conflicts);
 		} catch (error) {
 			logger.warn('Periodic check failed:', error instanceof Error ? error.message : 'Unknown error');
 		}
@@ -509,11 +511,11 @@ export class SyncEngine {
 			if (incrementalResult) {
 				if (incrementalResult.success) {
 					const lastSync = new Date().toISOString();
-					this.updateState({ status: 'idle', lastSync, lastError: null });
+					this.updateState({ status: 'idle', lastSync, lastError: null, conflictCount: incrementalResult.conflicts.length });
 					this.settings.lastSync = lastSync;
 				} else {
 					const lastError = getSyncResultError(incrementalResult, 'Incremental sync completed with errors');
-					this.updateState({ status: 'error', lastError });
+					this.updateState({ status: 'error', lastError, conflictCount: incrementalResult.conflicts.length });
 				}
 				return incrementalResult;
 			}
@@ -622,6 +624,7 @@ export class SyncEngine {
 				status: 'idle',
 				lastSync,
 				lastError: result.errors.length > 0 ? result.errors[0] ?? null : null,
+				conflictCount: result.conflicts.length,
 			});
 
 			// Save last sync time and seq cursor to settings

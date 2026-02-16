@@ -41,6 +41,11 @@
 	}
 }
 
+/* Conflict state */
+.crate-status-bar.crate-has-conflicts .crate-status-icon {
+	color: var(--text-warning);
+}
+
 /* Error state */
 .crate-status-bar[data-status="error"] .crate-status-icon {
 	color: var(--text-error);

@@ -30,6 +30,7 @@ export interface SyncState {
 	lastSync: string | null;
 	lastError: string | null;
 	pendingChanges: number;
+	conflictCount: number;
 }
 
 export interface SyncResult {

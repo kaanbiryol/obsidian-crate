@@ -9,6 +9,7 @@ import { CloudflareUsageService } from './cloudflare/usage-service';
 import { createLogger } from './logger';
 import { SecretStorageService } from './secret-storage';
 import { DEFAULT_SETTINGS, type CrateSettings } from './settings';
+import { notifyConflicts } from './sync/conflict';
 import { SyncRuntime } from './sync/runtime';
 import { CrateSettingTab } from './ui/settings-tab';
 
@@ -98,7 +99,10 @@ export default class CratePlugin extends Plugin {
 		this.addCommand({
 			id: 'sync-now',
 			name: 'Sync now',
-			callback: () => this.syncRuntime.sync(),
+			callback: async () => {
+				const result = await this.syncRuntime.sync();
+				notifyConflicts(result.conflicts);
+			},
 		});
 
 		this.addCommand({
