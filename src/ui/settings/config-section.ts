@@ -48,7 +48,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 			.setDesc(
 				isDesktop
 					? 'Sign in via browser. Infrastructure is created automatically after authorization.'
-					: 'Desktop only. Use desktop to sign in, or use manual entry on mobile.'
+					: 'Desktop only. Set up on desktop first, then use "Set up another device" to copy a setup link.'
 			)
 			.addButton(button => {
 				button.setButtonText('Sign in with Cloudflare').setCta();
@@ -195,6 +195,45 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 							new Notice(`Setup failed: ${getErrorMessage(error)}`);
 						},
 					});
+				}));
+	}
+
+	if (plugin.syncRuntime.isConfigured()) {
+		new Setting(containerEl)
+			.setName('Set up another device')
+			.setDesc('Copy a setup link to configure Crate on another device. The link contains your sync credentials - share it securely.')
+			.addButton(button => button
+				.setButtonText('Copy setup link')
+				.onClick(async () => {
+					const authToken = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
+					if (!authToken) {
+						new Notice('Auth token not found');
+						return;
+					}
+
+					const params = new URLSearchParams();
+					params.set('workerUrl', plugin.settings.workerUrl);
+					params.set('authToken', authToken);
+					if (plugin.settings.workerName) {
+						params.set('workerName', plugin.settings.workerName);
+					}
+					if (plugin.settings.bucketName) {
+						params.set('bucketName', plugin.settings.bucketName);
+					}
+					if (plugin.settings.databaseId) {
+						params.set('databaseId', plugin.settings.databaseId);
+					}
+					if (plugin.settings.cloudflareAccountId) {
+						params.set('accountId', plugin.settings.cloudflareAccountId);
+					}
+					params.set('ignorePatterns', JSON.stringify(plugin.settings.ignorePatterns));
+					params.set('syncOnStartup', String(plugin.settings.syncOnStartup));
+					params.set('syncInterval', String(plugin.settings.syncInterval));
+					params.set('showStatusBar', String(plugin.settings.showStatusBar));
+
+					const link = `obsidian://crate-setup?${params.toString()}`;
+					await navigator.clipboard.writeText(link);
+					new Notice('Setup link copied to clipboard');
 				}));
 	}
 
