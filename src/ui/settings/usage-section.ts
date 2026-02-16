@@ -34,6 +34,10 @@ export function renderUsageSection(context: UsageSectionContext): void {
 		});
 
 	const usageContainer = containerEl.createDiv({ cls: 'crate-usage-container' });
+	usageContainer.createEl('p', {
+		text: 'Select Refresh to load usage metrics.',
+		cls: 'setting-item-description',
+	});
 
 	new Setting(containerEl)
 		.setName('Refresh usage')
@@ -60,14 +64,6 @@ export function renderUsageSection(context: UsageSectionContext): void {
 				});
 			}));
 
-	void loadUsageData(context, usageContainer).catch((error) => {
-		const message = getErrorMessage(error);
-		usageContainer.empty();
-		usageContainer.createEl('p', {
-			text: `Error: ${message}`,
-			cls: 'setting-item-description',
-		});
-	});
 }
 
 async function loadUsageData(context: UsageSectionContext, container: HTMLElement): Promise<void> {

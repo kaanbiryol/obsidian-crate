@@ -70,13 +70,17 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 	const onProgress = (current: number, total: number) => {
 		updateFileSyncProgress(syncProgress, current, total);
 	};
+	let previousStatus: SyncState['status'] = plugin.syncRuntime.getState().status;
 	const onStateChange = (state: SyncState) => {
 		if (state.status === 'syncing') {
 			showFileSyncProgress(syncProgress);
 		} else {
 			hideFileSyncProgress(syncProgress);
-			rerender();
+			if (previousStatus === 'syncing') {
+				rerender();
+			}
 		}
+		previousStatus = state.status;
 	};
 	plugin.syncRuntime.addProgressListener(onProgress);
 	plugin.syncRuntime.addStateChangeListener(onStateChange);
