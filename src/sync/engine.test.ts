@@ -169,6 +169,14 @@ describe('SyncEngine pattern/ignore behavior', () => {
 		expect((harness.engine as any).matchPattern('notes/file.md', '*.tmp')).toBe(false);
 	});
 
+	it('ignores plugin state files (data.json and file-manifest.json)', () => {
+		const shouldIgnore = (harness.engine as any).shouldIgnore.bind(harness.engine);
+		expect(shouldIgnore('.obsidian/plugins/obsidian-crate/data.json')).toBe(true);
+		expect(shouldIgnore('.obsidian/plugins/obsidian-crate/file-manifest.json')).toBe(true);
+		// Other files in the plugin dir should not be ignored
+		expect(shouldIgnore('.obsidian/plugins/obsidian-crate/main.js')).toBe(false);
+	});
+
 	it('always ignores conflict files', () => {
 		expect(
 			(harness.engine as any).shouldIgnore('notes/a (conflict 2026-01-02 03-04-05 a1b2).md'),

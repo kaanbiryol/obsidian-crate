@@ -72,6 +72,7 @@ export class SyncEngine {
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
+	private pluginIgnorePaths: Set<string>;
 	private destroyed = false;
 	private abortController = new AbortController();
 
@@ -86,6 +87,11 @@ export class SyncEngine {
 		this.settings = settings;
 		this.localManifest = new LocalManifest(plugin.app, plugin.manifest);
 		this.ignoredDirPrefixes = settings.ignorePatterns.filter(p => p.endsWith('/'));
+		const dir = plugin.manifest.dir ?? '';
+		this.pluginIgnorePaths = new Set([
+			`${dir}/data.json`,
+			`${dir}/file-manifest.json`,
+		]);
 		this.api.setAbortSignal(this.abortController.signal);
 		this.state = {
 			status: 'idle',
@@ -194,6 +200,11 @@ export class SyncEngine {
 	 * Check if path should be ignored
 	 */
 	private shouldIgnore(path: string): boolean {
+		// Always ignore plugin's own state files (device-specific)
+		if (this.pluginIgnorePaths.has(path)) {
+			return true;
+		}
+
 		// Always ignore conflict files to prevent loops
 		if (isConflictFile(path)) {
 			return true;
