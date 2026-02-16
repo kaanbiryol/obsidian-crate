@@ -280,11 +280,11 @@ async function handleBatchUpload(request, bucket, db) {
 	const results = [];
 	const dbOps = [];
 
-	for (const file of files) {
+	await Promise.all(files.map(async (file) => {
 		const safePath = sanitizePath(file.path);
 		if (!safePath) {
 			results.push({ path: file.path, success: false, error: 'Invalid path' });
-			continue;
+			return;
 		}
 
 		try {
@@ -308,7 +308,7 @@ async function handleBatchUpload(request, bucket, db) {
 		} catch (err) {
 			results.push({ path: safePath, success: false, error: err.message || String(err) });
 		}
-	}
+	}));
 
 	if (db && dbOps.length > 0) {
 		try {
