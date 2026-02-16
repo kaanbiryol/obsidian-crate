@@ -68,6 +68,7 @@ function createSettings(): CrateSettings {
 		syncOnStartup: false,
 		syncInterval: 0,
 		showStatusBar: true,
+		syncHistory: [],
 	};
 }
 

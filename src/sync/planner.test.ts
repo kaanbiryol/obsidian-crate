@@ -40,6 +40,7 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 		syncOnStartup: false,
 		syncInterval: 0,
 		showStatusBar: true,
+		syncHistory: [],
 		...overrides,
 	};
 }

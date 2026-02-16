@@ -1,7 +1,7 @@
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger } from '../logger';
 import type { SecretStorageService } from '../secret-storage';
-import { SECRET_KEYS, type CrateSettings, type SyncResult, type SyncState } from '../types';
+import { MAX_SYNC_HISTORY, SECRET_KEYS, type CrateSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../types';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { SyncEngine } from './engine';
@@ -187,6 +187,23 @@ export class SyncRuntime {
 		return this.apiClient.testConnection();
 	}
 
+	private recordSyncResult(type: SyncHistoryEntry['type'], result: SyncResult): void {
+		const entry: SyncHistoryEntry = {
+			timestamp: new Date().toISOString(),
+			type,
+			success: result.success,
+			uploaded: result.uploaded,
+			downloaded: result.downloaded,
+			deleted: result.deleted,
+			errorCount: result.errors.length,
+			conflictCount: result.conflicts.length,
+		};
+		this.settings.syncHistory.unshift(entry);
+		if (this.settings.syncHistory.length > MAX_SYNC_HISTORY) {
+			this.settings.syncHistory.length = MAX_SYNC_HISTORY;
+		}
+	}
+
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const guardResult = guardSyncConfigured(this.syncEngine !== null);
 		if (guardResult) {
@@ -205,6 +222,7 @@ export class SyncRuntime {
 
 		try {
 			const result = await syncEngine.sync(wrappedCallback);
+			this.recordSyncResult('sync', result);
 			await this.persistSettings();
 			return result;
 		} finally {
@@ -229,6 +247,7 @@ export class SyncRuntime {
 
 		try {
 			const result = await syncEngine.initialSync(wrappedCallback);
+			this.recordSyncResult('initial', result);
 			await this.persistSettings();
 			return result;
 		} finally {
@@ -253,6 +272,7 @@ export class SyncRuntime {
 
 		try {
 			const result = await syncEngine.forceFullSync(wrappedCallback);
+			this.recordSyncResult('force', result);
 			await this.persistSettings();
 			return result;
 		} finally {

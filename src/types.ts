@@ -41,6 +41,17 @@ export interface SyncResult {
 	errors: string[];
 }
 
+export interface SyncHistoryEntry {
+	timestamp: string; // ISO 8601
+	type: 'sync' | 'initial' | 'force';
+	success: boolean;
+	uploaded: number;
+	downloaded: number;
+	deleted: number;
+	errorCount: number;
+	conflictCount: number;
+}
+
 export interface FileDiff {
 	path: string;
 	action: 'upload' | 'download' | 'delete' | 'conflict';
@@ -193,6 +204,7 @@ export interface CrateSettings {
 	syncOnStartup: boolean;
 	syncInterval: number; // in seconds, 0 = disabled
 	showStatusBar: boolean;
+	syncHistory: SyncHistoryEntry[];
 }
 
 export const DEFAULT_SETTINGS: CrateSettings = {
@@ -215,6 +227,7 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	syncOnStartup: true,
 	syncInterval: 300,
 	showStatusBar: true,
+	syncHistory: [],
 };
 
 // ============================================================================
@@ -230,6 +243,7 @@ export const SECRET_KEYS = {
 
 export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
 
+export const MAX_SYNC_HISTORY = 20;
 export const DEBOUNCE_DELAY_MS = 10000;
 export const MAX_DEBOUNCE_WAIT_MS = 30_000;
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB

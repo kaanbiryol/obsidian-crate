@@ -123,6 +123,26 @@
 	background: var(--text-error);
 }
 
+/* Settings tab - recent activity */
+.crate-activity-list {
+	margin-bottom: 12px;
+}
+
+.crate-activity-row {
+	font-size: 12px;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	padding: 2px 0;
+}
+
+.crate-activity-time {
+	color: var(--text-muted);
+}
+
+.crate-activity-error {
+	color: var(--text-error);
+}
+
 /* Settings tab - sync progress bar */
 .crate-sync-progress {
 	margin-top: 8px;

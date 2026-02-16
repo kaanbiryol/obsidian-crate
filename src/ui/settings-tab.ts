@@ -4,6 +4,7 @@
 
 import { App, PluginSettingTab } from 'obsidian';
 import type CratePlugin from '../main';
+import { renderActivitySection } from './settings/activity-section';
 import { renderConfigSection, type ManualSetupState } from './settings/config-section';
 import { renderInfrastructureSection } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
@@ -48,6 +49,11 @@ export class CrateSettingTab extends PluginSettingTab {
 				rerender: () => this.display(),
 			});
 			this.cleanupFns.push(syncCleanup);
+
+			renderActivitySection({
+				containerEl,
+				plugin: this.plugin,
+			});
 
 			renderInfrastructureSection({
 				containerEl,
