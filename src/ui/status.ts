@@ -78,7 +78,7 @@ export class StatusBarManager {
 			if (icon) {
 				this.iconEl.textContent = icon;
 			} else {
-				setIcon(this.iconEl, 'loader');
+				setIcon(this.iconEl, 'loader-circle');
 			}
 			this.textEl = this.statusBarEl.createSpan({ text: ` ${text}`, cls: 'crate-status-text' });
 			this.currentStatus = state.status;
