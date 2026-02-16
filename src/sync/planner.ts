@@ -175,6 +175,7 @@ export async function runIncrementalSync(
 		const localChangedPaths = new Set(localChanges.map(f => f.path));
 		const localDeletedPaths = new Set(localDeletes);
 		const resurrectPaths = new Set<string>();
+		const reclassifiedPaths = new Set<string>();
 
 		const downloadPaths: string[] = [];
 		const conflicts: FileDiff[] = [];
@@ -239,12 +240,17 @@ export async function runIncrementalSync(
 								modified: new Date(stat?.mtime ?? Date.now()).toISOString(),
 							});
 						} else if (localChangedPaths.has(path)) {
-							conflicts.push({
-								path,
-								action: 'conflict',
-								localHash,
-								remoteHash: entry.hash,
-							});
+							const manifestEntry = context.localManifest.getEntry(path);
+							if (manifestEntry && entry.hash === manifestEntry.hash) {
+								reclassifiedPaths.add(path);
+							} else {
+								conflicts.push({
+									path,
+									action: 'conflict',
+									localHash,
+									remoteHash: entry.hash,
+								});
+							}
 						} else {
 							downloadPaths.push(path);
 						}
@@ -257,7 +263,7 @@ export async function runIncrementalSync(
 		}
 
 		const localOnlyChanges = localChanges.filter(
-			f => (!changesByPath.has(f.path) || resurrectPaths.has(f.path)) && !context.shouldIgnore(f.path),
+			f => (!changesByPath.has(f.path) || resurrectPaths.has(f.path) || reclassifiedPaths.has(f.path)) && !context.shouldIgnore(f.path),
 		);
 		const localOnlyDeletes = localDeletes.filter(
 			path => !changesByPath.has(path) && !context.shouldIgnore(path),

@@ -353,6 +353,160 @@ describe('runIncrementalSync', () => {
 		expect(context.getLocalChanges).not.toHaveBeenCalled();
 	});
 
+	it('reclassifies own queue uploads as local changes instead of conflicts', async () => {
+		const queueUploadHash = 'abc123';
+		const newLocalContent = new TextEncoder().encode('edited-after-queue').buffer as ArrayBuffer;
+		const newLocalHash = await computeHash(newLocalContent);
+		const settings = createSettings({ lastSeq: 10 });
+		const localManifest = {
+			save: vi.fn(async () => {}),
+			setEntry: vi.fn(),
+			removeEntry: vi.fn(),
+			getEntry: vi.fn((path: string) =>
+				path === 'notes/queued.md'
+					? { hash: queueUploadHash, size: 10, modified: new Date(100).toISOString() }
+					: undefined,
+			),
+			getAllPaths: vi.fn(() => []),
+			getManifest: vi.fn(() => ({ version: 1, files: {} })),
+		};
+		const preparedUpload: PreparedUpload = {
+			path: 'notes/queued.md',
+			content: newLocalContent,
+			hash: newLocalHash,
+			size: newLocalContent.byteLength,
+		};
+		const uploadPreparedFiles = vi.fn(async () => {});
+
+		const context = {
+			settings,
+			vault: {
+				getAbstractFileByPath: vi.fn(() => ({ stat: { size: 18, mtime: 200 } })),
+				delete: vi.fn(),
+				adapter: {
+					exists: vi.fn(async () => true),
+					remove: vi.fn(),
+					stat: vi.fn(async () => ({ size: 18, mtime: 200 })),
+					readBinary: vi.fn(async () => newLocalContent),
+				},
+			} as never,
+			api: {
+				getChanges: vi.fn(async () => ({
+					changes: [
+						{
+							seq: 11,
+							path: 'notes/queued.md',
+							action: 'put' as const,
+							hash: queueUploadHash,
+							size: 10,
+							created_at: '2026-02-15T00:00:00.000Z',
+						},
+					],
+					lastSeq: 11,
+					hasMore: false,
+				})),
+				downloadFile: vi.fn(),
+				deleteFile: vi.fn(),
+				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
+			},
+			localManifest,
+			shouldIgnore: vi.fn(() => false),
+			getLocalChanges: vi.fn(async () => [{ path: 'notes/queued.md', hash: newLocalHash }]),
+			getLocalDeletes: vi.fn(async () => []),
+			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
+			processDiff: vi.fn(async () => {}),
+			prepareUploadFromPath: vi.fn(async () => preparedUpload),
+			uploadPreparedFiles,
+		};
+
+		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+
+		expect(result?.conflicts).toEqual([]);
+		expect(uploadPreparedFiles).toHaveBeenCalledWith(
+			[preparedUpload],
+			expect.any(Object),
+			expect.objectContaining({ concurrency: 5 }),
+		);
+		expect(context.processDiff).not.toHaveBeenCalled();
+		expect(settings.lastSeq).toBe(11);
+	});
+
+	it('still detects true conflicts when changelog hash differs from manifest', async () => {
+		const manifestHash = 'manifest-hash';
+		const remoteHash = 'other-device-hash';
+		const localContent = new TextEncoder().encode('local-edit').buffer as ArrayBuffer;
+		const localHash = await computeHash(localContent);
+		const settings = createSettings({ lastSeq: 10 });
+		const localManifest = {
+			save: vi.fn(async () => {}),
+			setEntry: vi.fn(),
+			removeEntry: vi.fn(),
+			getEntry: vi.fn((path: string) =>
+				path === 'notes/shared.md'
+					? { hash: manifestHash, size: 5, modified: new Date(100).toISOString() }
+					: undefined,
+			),
+			getAllPaths: vi.fn(() => []),
+			getManifest: vi.fn(() => ({ version: 1, files: {} })),
+		};
+		const processDiff = vi.fn(async () => {});
+
+		const context = {
+			settings,
+			vault: {
+				getAbstractFileByPath: vi.fn(() => ({ stat: { size: 10, mtime: 200 } })),
+				delete: vi.fn(),
+				adapter: {
+					exists: vi.fn(async () => true),
+					remove: vi.fn(),
+					stat: vi.fn(async () => ({ size: 10, mtime: 200 })),
+					readBinary: vi.fn(async () => localContent),
+				},
+			} as never,
+			api: {
+				getChanges: vi.fn(async () => ({
+					changes: [
+						{
+							seq: 11,
+							path: 'notes/shared.md',
+							action: 'put' as const,
+							hash: remoteHash,
+							size: 8,
+							created_at: '2026-02-15T00:00:00.000Z',
+						},
+					],
+					lastSeq: 11,
+					hasMore: false,
+				})),
+				downloadFile: vi.fn(),
+				deleteFile: vi.fn(),
+				batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
+			},
+			localManifest,
+			shouldIgnore: vi.fn(() => false),
+			getLocalChanges: vi.fn(async () => [{ path: 'notes/shared.md', hash: localHash }]),
+			getLocalDeletes: vi.fn(async () => []),
+			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
+			processDiff,
+			prepareUploadFromPath: vi.fn(async () => null),
+			uploadPreparedFiles: vi.fn(async () => {}),
+		};
+
+		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+
+		expect(processDiff).toHaveBeenCalledWith(
+			expect.objectContaining({
+				path: 'notes/shared.md',
+				action: 'conflict',
+				localHash,
+				remoteHash,
+			}),
+			expect.any(Object),
+			expect.any(Object),
+		);
+		expect(result?.conflicts).not.toContain('notes/shared.md');
+	});
+
 	it('falls back to full sync when changelog request throws', async () => {
 		const context = {
 			settings: createSettings({ lastSeq: 2 }),
