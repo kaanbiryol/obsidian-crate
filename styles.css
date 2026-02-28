@@ -177,7 +177,7 @@ body.is-mobile .crate-activity-panel {
 
 .crate-activity-modal .modal-content h2 {
 	margin-top: 0;
-	margin-bottom: 4px;
+	margin-bottom: 8px;
 }
 
 .crate-activity-empty {
@@ -243,6 +243,11 @@ body.is-mobile .crate-activity-panel {
 
 .crate-file-delete .crate-file-prefix {
 	color: var(--text-error);
+}
+
+.crate-file-conflict .crate-file-prefix {
+	color: var(--text-warning);
+	font-weight: 600;
 }
 
 /* Settings tab - sync progress bar */

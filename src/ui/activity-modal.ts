@@ -3,6 +3,7 @@ import type { CrateSettings, SyncHistoryEntry, SyncState } from '../types';
 
 export interface ActivityModalDeps {
 	getPendingPaths(): string[];
+	getConflictFiles(): string[];
 	addStateChangeListener(listener: (state: SyncState) => void): void;
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
 }
@@ -11,8 +12,12 @@ export class ActivityModal extends Modal {
 	private readonly settings: CrateSettings;
 	private readonly deps: ActivityModalDeps;
 	private pendingTab!: HTMLButtonElement;
+	private conflictsTab!: HTMLButtonElement;
 	private pendingPanel!: HTMLDivElement;
-	private readonly onStateChange = () => this.refreshPending();
+	private conflictsPanel!: HTMLDivElement;
+	private allTabs: HTMLButtonElement[] = [];
+	private allPanels: HTMLDivElement[] = [];
+	private readonly onStateChange = () => this.refresh();
 
 	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps) {
 		super(app);
@@ -30,42 +35,63 @@ export class ActivityModal extends Modal {
 			text: this.pendingTabLabel(),
 			cls: 'crate-activity-tab crate-activity-tab-active',
 		});
+		this.conflictsTab = tabs.createEl('button', {
+			text: this.conflictsTabLabel(),
+			cls: 'crate-activity-tab',
+		});
 		const historyTab = tabs.createEl('button', {
 			text: 'History',
 			cls: 'crate-activity-tab',
 		});
 
 		this.pendingPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
+		this.conflictsPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
 		const historyPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
+		this.conflictsPanel.hide();
 		historyPanel.hide();
 
+		this.allTabs = [this.pendingTab, this.conflictsTab, historyTab];
+		this.allPanels = [this.pendingPanel, this.conflictsPanel, historyPanel];
+
 		this.renderPending();
+		this.renderConflicts();
 		this.renderHistory(historyPanel);
 
-		this.pendingTab.addEventListener('click', () => {
-			this.pendingTab.addClass('crate-activity-tab-active');
-			historyTab.removeClass('crate-activity-tab-active');
-			this.pendingPanel.show();
-			historyPanel.hide();
-		});
-		historyTab.addEventListener('click', () => {
-			historyTab.addClass('crate-activity-tab-active');
-			this.pendingTab.removeClass('crate-activity-tab-active');
-			historyPanel.show();
-			this.pendingPanel.hide();
-		});
+		for (let i = 0; i < this.allTabs.length; i++) {
+			const idx = i;
+			this.allTabs[idx]!.addEventListener('click', () => this.switchTab(idx));
+		}
 
 		this.deps.addStateChangeListener(this.onStateChange);
+	}
+
+	private switchTab(index: number): void {
+		for (let i = 0; i < this.allTabs.length; i++) {
+			if (i === index) {
+				this.allTabs[i]!.addClass('crate-activity-tab-active');
+				this.allPanels[i]!.show();
+			} else {
+				this.allTabs[i]!.removeClass('crate-activity-tab-active');
+				this.allPanels[i]!.hide();
+			}
+		}
 	}
 
 	private pendingTabLabel(): string {
 		return `Pending (${this.deps.getPendingPaths().length})`;
 	}
 
-	private refreshPending(): void {
+	private conflictsTabLabel(): string {
+		return `Conflicts (${this.deps.getConflictFiles().length})`;
+	}
+
+	private refresh(): void {
 		this.pendingTab.setText(this.pendingTabLabel());
 		this.pendingPanel.empty();
 		this.renderPending();
+		this.conflictsTab.setText(this.conflictsTabLabel());
+		this.conflictsPanel.empty();
+		this.renderConflicts();
 	}
 
 	private renderPending(): void {
@@ -96,6 +122,21 @@ export class ActivityModal extends Modal {
 				row.createSpan({ text: group.prefix, cls: 'crate-file-prefix' });
 				row.createSpan({ text: filePath });
 			}
+		}
+	}
+
+	private renderConflicts(): void {
+		const paths = this.deps.getConflictFiles();
+		if (paths.length === 0) {
+			this.conflictsPanel.createEl('p', { text: 'No conflicts.', cls: 'crate-activity-empty' });
+			return;
+		}
+
+		const list = this.conflictsPanel.createDiv({ cls: 'crate-activity-list' });
+		for (const filePath of paths) {
+			const row = list.createDiv({ cls: 'crate-activity-file crate-file-conflict' });
+			row.createSpan({ text: '!', cls: 'crate-file-prefix' });
+			row.createSpan({ text: filePath });
 		}
 	}
 

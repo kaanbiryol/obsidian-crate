@@ -4,7 +4,7 @@ import type { SecretStorageService } from '../secret-storage';
 import { MAX_SYNC_HISTORY, SECRET_KEYS, type CrateSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../types';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
-import { notifyConflicts } from './conflict';
+import { isConflictFile, notifyConflicts } from './conflict';
 import { SyncEngine } from './engine';
 import { guardSyncConfigured } from './sync-guards';
 
@@ -53,6 +53,12 @@ export class SyncRuntime {
 
 	getPendingPaths(): string[] {
 		return this.syncEngine?.getPendingPaths() ?? [];
+	}
+
+	getConflictFiles(): string[] {
+		return this.plugin.app.vault.getFiles()
+			.filter(f => isConflictFile(f.path))
+			.map(f => f.path);
 	}
 
 	addStateChangeListener(listener: (state: SyncState) => void): void {
