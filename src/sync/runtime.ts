@@ -31,12 +31,18 @@ export class SyncRuntime {
 	private progressListeners = new Set<(current: number, total: number) => void>();
 	private acceptingEvents = false;
 
+	private onStatusBarClick: (() => void) | undefined;
+
 	constructor(
 		private plugin: Plugin,
 		private settings: CrateSettings,
 		private secretStorage: SecretStorageService,
 		private persistSettings: () => Promise<void>
 	) {}
+
+	setStatusBarClickHandler(handler: () => void): void {
+		this.onStatusBarClick = handler;
+	}
 
 	getState(): SyncState {
 		if (this.syncEngine) {
@@ -84,7 +90,7 @@ export class SyncRuntime {
 		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, this.settings);
 
 		if (this.settings.showStatusBar) {
-			this.statusBar = new StatusBarManager(this.plugin, true);
+			this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
 		}
 
 		this.syncEngine.setStateChangeCallback((state: SyncState) => {
@@ -174,7 +180,7 @@ export class SyncRuntime {
 
 	updateStatusBar(enabled: boolean): void {
 		if (enabled && !this.statusBar) {
-			this.statusBar = new StatusBarManager(this.plugin, true);
+			this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
 			if (this.syncEngine) {
 				this.statusBar.update(this.syncEngine.getState());
 			}

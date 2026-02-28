@@ -85,6 +85,9 @@ export default class CratePlugin extends Plugin {
 			this.secretStorage,
 			() => this.saveSettings()
 		);
+		this.syncRuntime.setStatusBarClickHandler(() => {
+			new ActivityModal(this.app, this.settings).open();
+		});
 	}
 
 	private async ensureDeviceId(): Promise<void> {

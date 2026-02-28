@@ -13,10 +13,12 @@ export class StatusBarManager {
 	private currentStatus: SyncStatus | null = null;
 	private iconEl: HTMLSpanElement | null = null;
 	private textEl: HTMLSpanElement | null = null;
+	private onClick: (() => void) | null;
 
-	constructor(plugin: Plugin, enabled: boolean) {
+	constructor(plugin: Plugin, enabled: boolean, onClick?: () => void) {
 		this.plugin = plugin;
 		this.enabled = enabled;
+		this.onClick = onClick ?? null;
 
 		if (enabled) {
 			this.create();
@@ -29,6 +31,9 @@ export class StatusBarManager {
 	private create(): void {
 		this.statusBarEl = this.plugin.addStatusBarItem();
 		this.statusBarEl.addClass('crate-status-bar');
+		if (this.onClick) {
+			this.statusBarEl.addEventListener('click', this.onClick);
+		}
 		this.update({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
 	}
 

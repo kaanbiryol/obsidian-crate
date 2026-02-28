@@ -7,7 +7,7 @@
 	display: flex;
 	align-items: center;
 	gap: 4px;
-	cursor: default;
+	cursor: pointer;
 }
 
 .crate-status-icon {
