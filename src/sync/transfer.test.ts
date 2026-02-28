@@ -78,6 +78,9 @@ function emptyResult(): SyncResult {
 		deleted: 0,
 		conflicts: [],
 		errors: [],
+		uploadedPaths: [],
+		downloadedPaths: [],
+		deletedPaths: [],
 	};
 }
 

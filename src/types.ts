@@ -40,6 +40,9 @@ export interface SyncResult {
 	deleted: number;
 	conflicts: string[];
 	errors: string[];
+	uploadedPaths: string[];
+	downloadedPaths: string[];
+	deletedPaths: string[];
 }
 
 export interface SyncHistoryEntry {
@@ -51,6 +54,9 @@ export interface SyncHistoryEntry {
 	deleted: number;
 	errorCount: number;
 	conflictCount: number;
+	uploadedPaths?: string[];
+	downloadedPaths?: string[];
+	deletedPaths?: string[];
 }
 
 export interface FileDiff {

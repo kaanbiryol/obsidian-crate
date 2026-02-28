@@ -837,6 +837,7 @@ export class SyncEngine {
 					await this.api.deleteFile(path);
 					this.localManifest.removeEntry(path);
 					result.deleted++;
+					result.deletedPaths.push(path);
 				} catch (error) {
 					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 					result.errors.push(`delete ${path}: ${errorMessage}`);

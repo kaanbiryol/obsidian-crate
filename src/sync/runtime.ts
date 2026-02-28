@@ -201,6 +201,9 @@ export class SyncRuntime {
 			deleted: result.deleted,
 			errorCount: result.errors.length,
 			conflictCount: result.conflicts.length,
+			uploadedPaths: result.uploadedPaths,
+			downloadedPaths: result.downloadedPaths,
+			deletedPaths: result.deletedPaths,
 		};
 		this.settings.syncHistory.unshift(entry);
 		if (this.settings.syncHistory.length > MAX_SYNC_HISTORY) {

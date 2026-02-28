@@ -11,6 +11,7 @@ import { SecretStorageService } from './secret-storage';
 import { DEFAULT_SETTINGS, type CrateSettings } from './settings';
 import { notifyConflicts } from './sync/conflict';
 import { SyncRuntime } from './sync/runtime';
+import { ActivityModal } from './ui/activity-modal';
 import { CrateSettingTab } from './ui/settings-tab';
 
 const logger = createLogger('Plugin');
@@ -115,6 +116,14 @@ export default class CratePlugin extends Plugin {
 				} else {
 					new Notice(`Connection failed: ${result.error}`);
 				}
+			},
+		});
+
+		this.addCommand({
+			id: 'show-activity',
+			name: 'Show sync activity',
+			callback: () => {
+				new ActivityModal(this.app, this.settings).open();
 			},
 		});
 

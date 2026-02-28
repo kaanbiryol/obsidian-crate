@@ -394,6 +394,9 @@ describe('SyncEngine incrementalSync', () => {
 			deleted: 0,
 			conflicts: [],
 			errors: [],
+			uploadedPaths: [],
+			downloadedPaths: [],
+			deletedPaths: [],
 		});
 		expect(harness.settings.lastSeq).toBe(8);
 		expect(harness.localManifest.save).not.toHaveBeenCalled();

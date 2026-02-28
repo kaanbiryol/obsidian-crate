@@ -128,9 +128,24 @@
 	background: var(--text-error);
 }
 
-/* Settings tab - recent activity */
+/* Activity modal */
+.crate-activity-modal {
+	max-width: 500px;
+	padding-top: 12px;
+}
+
+.crate-activity-empty {
+	color: var(--text-muted);
+}
+
 .crate-activity-list {
+	max-height: 300px;
+	overflow-y: auto;
 	margin-bottom: 12px;
+}
+
+body.is-mobile .crate-activity-list {
+	max-height: 50vh;
 }
 
 .crate-activity-row {
@@ -145,6 +160,48 @@
 }
 
 .crate-activity-error {
+	color: var(--text-error);
+}
+
+.crate-activity-details > summary {
+	cursor: pointer;
+	list-style: disclosure-closed;
+}
+
+.crate-activity-details[open] > summary {
+	list-style: disclosure-open;
+}
+
+.crate-activity-files {
+	padding-left: 16px;
+	padding-bottom: 4px;
+}
+
+.crate-activity-file {
+	font-size: 11px;
+	color: var(--text-muted);
+	padding: 1px 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.crate-file-prefix {
+	display: inline-block;
+	width: 14px;
+	text-align: center;
+	margin-right: 4px;
+}
+
+.crate-file-upload .crate-file-prefix {
+	color: var(--text-success);
+}
+
+.crate-file-download .crate-file-prefix {
+	color: var(--interactive-accent);
+}
+
+.crate-file-delete .crate-file-prefix {
 	color: var(--text-error);
 }
 

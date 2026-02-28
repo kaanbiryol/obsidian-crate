@@ -203,6 +203,7 @@ export async function runIncrementalSync(
 					context.localManifest.removeEntry(path);
 					if (deletedLocally) {
 						result.deleted++;
+						result.deletedPaths.push(path);
 					}
 				} else if (entry.action === 'put') {
 					if (entry.size > MAX_FILE_SIZE_BYTES) {
@@ -312,6 +313,7 @@ export async function runIncrementalSync(
 				for (const path of deleteResult.deleted) {
 					context.localManifest.removeEntry(path);
 					result.deleted++;
+					result.deletedPaths.push(path);
 				}
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : 'Unknown error';

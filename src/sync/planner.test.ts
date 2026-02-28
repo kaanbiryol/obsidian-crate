@@ -169,6 +169,9 @@ describe('runIncrementalSync', () => {
 			deleted: 0,
 			conflicts: [],
 			errors: [],
+			uploadedPaths: [],
+			downloadedPaths: [],
+			deletedPaths: [],
 		});
 		expect(settings.lastSeq).toBe(8);
 		expect(localManifest.save).not.toHaveBeenCalled();

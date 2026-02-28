@@ -113,6 +113,7 @@ export async function downloadAndSaveFile(
 
 	await saveDownloadedContent(context, path, content);
 	result.downloaded++;
+	result.downloadedPaths.push(path);
 }
 
 export async function saveDownloadedContent(
@@ -210,6 +211,7 @@ export async function parallelDownloadAndSaveFiles(
 						const content = base64ToArrayBuffer(file.content);
 						await saveDownloadedContent(context, file.path, content);
 						result.downloaded++;
+						result.downloadedPaths.push(file.path);
 					} catch (error) {
 						const errorMessage = error instanceof Error ? error.message : 'Download failed';
 						result.errors.push(`${file.path}: ${errorMessage}`);
@@ -253,6 +255,7 @@ export async function processDiff(
 				}
 
 				result.uploaded++;
+				result.uploadedPaths.push(uploadFile.path);
 				const modified = await context.getModifiedIso(uploadFile.path, uploadFile.mtime);
 				const entry: FileEntry = {
 					hash: uploadFile.hash,
@@ -317,6 +320,7 @@ export async function processDiff(
 			delete localFiles[diff.path];
 			context.localManifest.removeEntry(diff.path);
 			result.deleted++;
+			result.deletedPaths.push(diff.path);
 			break;
 		}
 	}
@@ -388,6 +392,7 @@ async function uploadPreparedFilesIndividually(
 					return;
 				}
 				result.uploaded++;
+				result.uploadedPaths.push(upload.path);
 				context.localManifest.setEntry(upload.path, {
 					hash: upload.hash,
 					size: upload.size,
@@ -445,6 +450,7 @@ export async function uploadPreparedFiles(
 							continue;
 						}
 						result.uploaded++;
+						result.uploadedPaths.push(upload.path);
 						context.localManifest.setEntry(upload.path, {
 							hash: upload.hash,
 							size: upload.size,
