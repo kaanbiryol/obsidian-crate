@@ -239,6 +239,7 @@ export async function processPendingChanges(
 		}
 
 		await context.localManifest.save();
+		context.inFlightPaths.clear();
 
 		context.updateState({
 			status: 'idle',
@@ -253,6 +254,7 @@ export async function processPendingChanges(
 			for (const path of paths) {
 				context.pendingPaths.add(path);
 			}
+			context.inFlightPaths.clear();
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			context.updateState({
 				status: 'error',

@@ -263,6 +263,29 @@ describe('SyncEngine event queue behavior', () => {
 		expect(debouncedSync).toHaveBeenCalledTimes(1);
 	});
 
+	it('emits idle state after flush with no pending paths left', async () => {
+		const content = toArrayBuffer('A');
+		harness.vault.getAbstractFileByPath.mockReturnValue({
+			path: 'notes/a.md',
+			extension: 'md',
+			stat: { size: 1, mtime: 1700000000000 },
+		});
+		harness.vault.adapter.readBinary.mockResolvedValue(content);
+		harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
+
+		const idlePendingCounts: number[] = [];
+		harness.engine.setStateChangeCallback((state) => {
+			if (state.status === 'idle') {
+				idlePendingCounts.push(harness.engine.getPendingPaths().length);
+			}
+		});
+
+		(harness.engine as any).pendingPaths.add('notes/a.md');
+		await (harness.engine as any).processPendingChanges();
+
+		expect(idlePendingCounts.at(-1)).toBe(0);
+	});
+
 	it('keeps new paths queued when they arrive during pending flush', async () => {
 		const content = toArrayBuffer('A');
 		harness.vault.getAbstractFileByPath.mockImplementation((path: string) => {
