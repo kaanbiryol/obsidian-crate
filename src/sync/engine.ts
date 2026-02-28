@@ -10,11 +10,13 @@ import { isConflictFile, notifyConflicts } from './conflict';
 import { getAllVaultFiles } from './file-discovery';
 import type { VaultFile } from './file-discovery';
 import {
+	onRawPathChange as queueOnRawPathChange,
 	onFileChange as queueOnFileChange,
 	onFileDelete as queueOnFileDelete,
 	onFileRename as queueOnFileRename,
 	debouncedSync as runDebouncedQueueSync,
 	processPendingChanges as flushPendingQueueChanges,
+	type RawPathKind,
 } from './queue';
 import {
 	getLocalChanges as planLocalChanges,
@@ -68,6 +70,7 @@ export class SyncEngine {
 	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	private maxWaitStart: number | null = null;
 	private pendingPaths: Set<string> = new Set();
+	private inFlightPaths: Set<string> = new Set();
 	private syncInterval: ReturnType<typeof setInterval> | null = null;
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private patternCache = new Map<string, RegExp>();
@@ -142,6 +145,12 @@ export class SyncEngine {
 	 */
 	getState(): SyncState {
 		return { ...this.state };
+	}
+
+	getPendingPaths(): string[] {
+		const combined = new Set(this.pendingPaths);
+		for (const p of this.inFlightPaths) combined.add(p);
+		return Array.from(combined);
 	}
 
 	/**
@@ -307,6 +316,7 @@ export class SyncEngine {
 	private getQueueFlushContext() {
 		return {
 			pendingPaths: this.pendingPaths,
+			inFlightPaths: this.inFlightPaths,
 			vault: this.vault,
 			api: this.api,
 			localManifest: this.localManifest,
@@ -318,6 +328,35 @@ export class SyncEngine {
 			getModifiedIso: this.getModifiedIso.bind(this),
 			triggerDebouncedSync: () => this.debouncedSync(),
 		};
+	}
+
+	/**
+	 * Handle raw filesystem event (for hidden paths not covered by typed vault events)
+	 */
+	onRawFileEvent(path: string): void {
+		void this.handleRawFileEvent(path);
+	}
+
+	private async handleRawFileEvent(path: string): Promise<void> {
+		if (this.destroyed) return;
+		const kind = await this.getRawPathKind(path);
+		const wasTracked = kind === 'missing' ? this.localManifest.hasFile(path) : false;
+		queueOnRawPathChange(this.getQueueEventContext(), path, { kind, wasTracked });
+	}
+
+	private async getRawPathKind(path: string): Promise<RawPathKind> {
+		try {
+			const stat = await this.vault.adapter.stat(path);
+			if (stat?.type === 'file') return 'file';
+			if (stat?.type === 'folder') return 'folder';
+			return 'missing';
+		} catch (error) {
+			logger.warn(
+				`Raw event stat failed for ${path}:`,
+				error instanceof Error ? error.message : 'Unknown error',
+			);
+			return 'missing';
+		}
 	}
 
 	/**

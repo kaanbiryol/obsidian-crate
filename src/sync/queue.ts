@@ -41,8 +41,16 @@ export interface QueueEventContext {
 	triggerDebouncedSync(): void;
 }
 
+export type RawPathKind = 'file' | 'folder' | 'missing';
+
+interface RawPathChangeOptions {
+	kind?: RawPathKind;
+	wasTracked?: boolean;
+}
+
 export interface QueueFlushContext {
 	pendingPaths: Set<string>;
+	inFlightPaths: Set<string>;
 	vault: Vault;
 	api: QueueApi;
 	localManifest: QueueManifest;
@@ -53,6 +61,27 @@ export interface QueueFlushContext {
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	triggerDebouncedSync(): void;
+}
+
+export function onRawPathChange(
+	context: QueueEventContext,
+	path: string,
+	options: RawPathChangeOptions = {},
+): void {
+	if (context.shouldIgnore(path)) return;
+
+	const kind = options.kind ?? 'file';
+	if (kind === 'folder') return;
+
+	if (kind === 'missing') {
+		if (!options.wasTracked) return;
+		context.pendingPaths.add(`delete:${path}`);
+		context.triggerDebouncedSync();
+		return;
+	}
+
+	context.pendingPaths.add(path);
+	context.triggerDebouncedSync();
 }
 
 export function onFileChange(context: QueueEventContext, file: TAbstractFile): void {
@@ -152,6 +181,7 @@ export async function processPendingChanges(
 	const paths = Array.from(context.pendingPaths);
 	for (const path of paths) {
 		context.pendingPaths.delete(path);
+		context.inFlightPaths.add(path);
 	}
 
 	logger.info(`Processing ${paths.length} pending changes`);
@@ -231,6 +261,7 @@ export async function processPendingChanges(
 			});
 		}
 	} finally {
+		context.inFlightPaths.clear();
 		if (!context.isDestroyed() && context.pendingPaths.size > 0) {
 			context.triggerDebouncedSync();
 		}

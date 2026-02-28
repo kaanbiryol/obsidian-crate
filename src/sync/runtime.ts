@@ -51,6 +51,10 @@ export class SyncRuntime {
 		return { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
 	}
 
+	getPendingPaths(): string[] {
+		return this.syncEngine?.getPendingPaths() ?? [];
+	}
+
 	addStateChangeListener(listener: (state: SyncState) => void): void {
 		this.stateChangeListeners.add(listener);
 	}
@@ -125,6 +129,11 @@ export class SyncRuntime {
 		this.syncEngine = null;
 		this.apiClient = null;
 		this.statusBar = null;
+	}
+
+	onRawFileEvent(path: string): void {
+		if (!this.acceptingEvents) return;
+		this.syncEngine?.onRawFileEvent(path);
 	}
 
 	onFileChange(file: TAbstractFile): void {

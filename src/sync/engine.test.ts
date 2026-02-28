@@ -44,6 +44,7 @@ type Harness = {
 		load: ReturnType<typeof vi.fn>;
 		save: ReturnType<typeof vi.fn>;
 		hashMatches: ReturnType<typeof vi.fn>;
+		hasFile: ReturnType<typeof vi.fn>;
 		getEntry: ReturnType<typeof vi.fn>;
 		getAllPaths: ReturnType<typeof vi.fn>;
 		getManifest: ReturnType<typeof vi.fn>;
@@ -78,6 +79,11 @@ function toArrayBuffer(text: string): ArrayBuffer {
 
 function fromArrayBuffer(buffer: ArrayBuffer): string {
 	return new TextDecoder().decode(new Uint8Array(buffer));
+}
+
+async function flushMicrotasks(): Promise<void> {
+	await Promise.resolve();
+	await Promise.resolve();
 }
 
 function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness {
@@ -135,6 +141,7 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 		load: vi.fn(),
 		save: vi.fn(),
 		hashMatches: vi.fn((path: string, hash: string) => manifestFiles[path]?.hash === hash),
+		hasFile: vi.fn((path: string) => path in manifestFiles),
 		getEntry: vi.fn((path: string) => manifestFiles[path]),
 		getAllPaths: vi.fn(() => Object.keys(manifestFiles)),
 		getManifest: vi.fn(() => ({ version: 1, files: { ...manifestFiles } })),
@@ -224,6 +231,35 @@ describe('SyncEngine event queue behavior', () => {
 		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
 		expect(pendingPaths.has('delete:.trash/note.md')).toBe(false);
 		expect(pendingPaths.has('notes/note.md')).toBe(true);
+		expect(debouncedSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('ignores raw folder events', async () => {
+		const debouncedSync = vi
+			.spyOn(harness.engine as any, 'debouncedSync')
+			.mockImplementation(() => {});
+		harness.vault.adapter.stat.mockResolvedValueOnce({ type: 'folder', size: 0, mtime: 1700000000000 });
+
+		harness.engine.onRawFileEvent('.obsidian/plugins');
+		await flushMicrotasks();
+
+		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		expect(pendingPaths.size).toBe(0);
+		expect(debouncedSync).not.toHaveBeenCalled();
+	});
+
+	it('queues delete marker for missing tracked raw paths', async () => {
+		const debouncedSync = vi
+			.spyOn(harness.engine as any, 'debouncedSync')
+			.mockImplementation(() => {});
+		harness.vault.adapter.stat.mockResolvedValueOnce(null);
+		harness.localManifest.hasFile.mockReturnValueOnce(true);
+
+		harness.engine.onRawFileEvent('.obsidian/plugins/foo/main.js');
+		await flushMicrotasks();
+
+		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		expect(pendingPaths.has('delete:.obsidian/plugins/foo/main.js')).toBe(true);
 		expect(debouncedSync).toHaveBeenCalledTimes(1);
 	});
 

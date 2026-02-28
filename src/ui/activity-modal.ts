@@ -1,12 +1,23 @@
 import { Modal, type App } from 'obsidian';
-import type { CrateSettings, SyncHistoryEntry } from '../types';
+import type { CrateSettings, SyncHistoryEntry, SyncState } from '../types';
+
+export interface ActivityModalDeps {
+	getPendingPaths(): string[];
+	addStateChangeListener(listener: (state: SyncState) => void): void;
+	removeStateChangeListener(listener: (state: SyncState) => void): void;
+}
 
 export class ActivityModal extends Modal {
 	private readonly settings: CrateSettings;
+	private readonly deps: ActivityModalDeps;
+	private pendingTab!: HTMLButtonElement;
+	private pendingPanel!: HTMLDivElement;
+	private readonly onStateChange = () => this.refreshPending();
 
-	constructor(app: App, settings: CrateSettings) {
+	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps) {
 		super(app);
 		this.settings = settings;
+		this.deps = deps;
 	}
 
 	onOpen(): void {
@@ -14,14 +25,89 @@ export class ActivityModal extends Modal {
 		modalEl.addClass('crate-activity-modal');
 		contentEl.createEl('h2', { text: 'Sync activity' });
 
-		const history = this.settings.syncHistory ?? [];
+		const tabs = contentEl.createDiv({ cls: 'crate-activity-tabs' });
+		this.pendingTab = tabs.createEl('button', {
+			text: this.pendingTabLabel(),
+			cls: 'crate-activity-tab crate-activity-tab-active',
+		});
+		const historyTab = tabs.createEl('button', {
+			text: 'History',
+			cls: 'crate-activity-tab',
+		});
 
-		if (history.length === 0) {
-			contentEl.createEl('p', { text: 'No sync activity yet.', cls: 'crate-activity-empty' });
+		this.pendingPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
+		const historyPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
+		historyPanel.hide();
+
+		this.renderPending();
+		this.renderHistory(historyPanel);
+
+		this.pendingTab.addEventListener('click', () => {
+			this.pendingTab.addClass('crate-activity-tab-active');
+			historyTab.removeClass('crate-activity-tab-active');
+			this.pendingPanel.show();
+			historyPanel.hide();
+		});
+		historyTab.addEventListener('click', () => {
+			historyTab.addClass('crate-activity-tab-active');
+			this.pendingTab.removeClass('crate-activity-tab-active');
+			historyPanel.show();
+			this.pendingPanel.hide();
+		});
+
+		this.deps.addStateChangeListener(this.onStateChange);
+	}
+
+	private pendingTabLabel(): string {
+		return `Pending (${this.deps.getPendingPaths().length})`;
+	}
+
+	private refreshPending(): void {
+		this.pendingTab.setText(this.pendingTabLabel());
+		this.pendingPanel.empty();
+		this.renderPending();
+	}
+
+	private renderPending(): void {
+		const paths = this.deps.getPendingPaths();
+		if (paths.length === 0) {
+			this.pendingPanel.createEl('p', { text: 'No pending changes.', cls: 'crate-activity-empty' });
 			return;
 		}
 
-		const list = contentEl.createDiv({ cls: 'crate-activity-list' });
+		const uploads: string[] = [];
+		const deletes: string[] = [];
+		for (const raw of paths) {
+			if (raw.startsWith('delete:')) {
+				deletes.push(raw.substring(7));
+			} else {
+				uploads.push(raw);
+			}
+		}
+
+		const list = this.pendingPanel.createDiv({ cls: 'crate-activity-list' });
+		const groups: Array<{ paths: string[]; cls: string; prefix: string }> = [
+			{ paths: uploads, cls: 'crate-file-upload', prefix: '\u2191' },
+			{ paths: deletes, cls: 'crate-file-delete', prefix: '\u00d7' },
+		];
+		for (const group of groups) {
+			for (const filePath of group.paths) {
+				const row = list.createDiv({ cls: `crate-activity-file ${group.cls}` });
+				row.createSpan({ text: group.prefix, cls: 'crate-file-prefix' });
+				row.createSpan({ text: filePath });
+			}
+		}
+	}
+
+	private renderHistory(container: HTMLElement): void {
+		const history = this.settings.syncHistory ?? [];
+
+		if (history.length === 0) {
+			container.createEl('p', { text: 'No sync activity yet.', cls: 'crate-activity-empty' });
+			return;
+		}
+
+		const list = container.createDiv({ cls: 'crate-activity-list' });
 
 		for (const entry of history) {
 			const hasPaths = hasFilePaths(entry);
@@ -39,6 +125,7 @@ export class ActivityModal extends Modal {
 	}
 
 	onClose(): void {
+		this.deps.removeStateChangeListener(this.onStateChange);
 		this.contentEl.empty();
 	}
 }

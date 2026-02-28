@@ -10,6 +10,7 @@ import { createLogger } from './logger';
 import { SecretStorageService } from './secret-storage';
 import { DEFAULT_SETTINGS, type CrateSettings } from './settings';
 import { notifyConflicts } from './sync/conflict';
+import { isHiddenPath } from './sync/file-discovery';
 import { SyncRuntime } from './sync/runtime';
 import { ActivityModal } from './ui/activity-modal';
 import { CrateSettingTab } from './ui/settings-tab';
@@ -86,7 +87,7 @@ export default class CratePlugin extends Plugin {
 			() => this.saveSettings()
 		);
 		this.syncRuntime.setStatusBarClickHandler(() => {
-			new ActivityModal(this.app, this.settings).open();
+			new ActivityModal(this.app, this.settings, this.syncRuntime).open();
 		});
 	}
 
@@ -126,7 +127,7 @@ export default class CratePlugin extends Plugin {
 			id: 'show-activity',
 			name: 'Show sync activity',
 			callback: () => {
-				new ActivityModal(this.app, this.settings).open();
+				new ActivityModal(this.app, this.settings, this.syncRuntime).open();
 			},
 		});
 
@@ -180,6 +181,21 @@ export default class CratePlugin extends Plugin {
 			this.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
 				this.syncRuntime.onFileRename(file, oldPath);
 			})
+		);
+
+		// 'raw' fires for all filesystem changes including .obsidian/ paths
+		// that typed vault events (create/modify/delete/rename) miss.
+		// No typed overload exists, so we cast through the base Events.on signature.
+		type RawOn = (name: 'raw', callback: (path: string) => void) => import('obsidian').EventRef;
+		this.registerEvent(
+			(this.app.vault.on as unknown as RawOn)(
+				'raw',
+				(path: string) => {
+					if (isHiddenPath(path)) {
+						this.syncRuntime.onRawFileEvent(path);
+					}
+				},
+			)
 		);
 	}
 

@@ -128,6 +128,47 @@
 	background: var(--text-error);
 }
 
+/* Activity modal - tabs */
+.crate-activity-tabs {
+	display: flex;
+	gap: 0;
+	border-bottom: 1px solid var(--tab-divider-color);
+	margin-bottom: 8px;
+}
+
+.crate-activity-tab {
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	padding: var(--size-4-2) var(--size-4-3);
+	font-size: var(--tab-font-size);
+	font-weight: var(--tab-font-weight);
+	color: var(--tab-text-color-focused);
+	cursor: pointer;
+	border-radius: var(--tab-radius) var(--tab-radius) 0 0;
+	box-shadow: none;
+}
+
+.crate-activity-tab:hover {
+	color: var(--tab-text-color-focused-active);
+	background: var(--tab-background-active);
+}
+
+.crate-activity-tab.crate-activity-tab-active {
+	color: var(--tab-text-color-focused-active-current);
+	border-bottom-color: var(--interactive-accent);
+}
+
+/* Activity modal - content panels */
+.crate-activity-panel {
+	height: 300px;
+	overflow-y: auto;
+}
+
+body.is-mobile .crate-activity-panel {
+	height: 50vh;
+}
+
 /* Activity modal */
 .crate-activity-modal {
 	max-width: 500px;
@@ -136,6 +177,7 @@
 
 .crate-activity-modal .modal-content h2 {
 	margin-top: 0;
+	margin-bottom: 4px;
 }
 
 .crate-activity-empty {
@@ -143,13 +185,7 @@
 }
 
 .crate-activity-list {
-	max-height: 300px;
-	overflow-y: auto;
 	margin-bottom: 12px;
-}
-
-body.is-mobile .crate-activity-list {
-	max-height: 50vh;
 }
 
 .crate-activity-row {

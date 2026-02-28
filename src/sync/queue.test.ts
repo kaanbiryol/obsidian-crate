@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { debouncedSync, onFileChange, onFileDelete, onFileRename, processPendingChanges } from './queue';
+import { debouncedSync, onFileChange, onFileDelete, onFileRename, onRawPathChange, processPendingChanges } from './queue';
 import type { PreparedUpload, SyncState } from '../types';
 
 type QueueState = SyncState;
@@ -30,6 +30,7 @@ function createFlushHarness(overrides: Partial<{
 	batchDelete: (paths: string[]) => Promise<{ success: boolean; deleted: string[] }>;
 }> = {}) {
 	const pendingPaths = new Set<string>();
+	const inFlightPaths = new Set<string>();
 	const state: QueueState = {
 		status: overrides.status ?? 'idle',
 		lastSync: null,
@@ -80,6 +81,7 @@ function createFlushHarness(overrides: Partial<{
 		getModifiedIso,
 		context: {
 			pendingPaths,
+			inFlightPaths,
 			vault: {} as never,
 			api: {
 				isConfigured: vi.fn(() => overrides.configured ?? true),
@@ -133,6 +135,53 @@ describe('queue event handlers', () => {
 		expect(pendingPaths.has('notes/b.md')).toBe(true);
 		expect(pendingPaths.has('.trash/b.md')).toBe(false);
 		expect(triggerDebouncedSync).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('onRawPathChange', () => {
+	it('enqueues non-ignored paths and triggers debounced sync', () => {
+		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
+
+		onRawPathChange(context, '.obsidian/plugins/some-plugin/main.js');
+
+		expect(pendingPaths.has('.obsidian/plugins/some-plugin/main.js')).toBe(true);
+		expect(triggerDebouncedSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('skips ignored paths', () => {
+		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
+
+		onRawPathChange(context, '.trash/deleted.md');
+
+		expect(pendingPaths.size).toBe(0);
+		expect(triggerDebouncedSync).not.toHaveBeenCalled();
+	});
+
+	it('ignores raw folder paths', () => {
+		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
+
+		onRawPathChange(context, '.obsidian/plugins', { kind: 'folder' });
+
+		expect(pendingPaths.size).toBe(0);
+		expect(triggerDebouncedSync).not.toHaveBeenCalled();
+	});
+
+	it('queues delete marker for missing tracked paths', () => {
+		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
+
+		onRawPathChange(context, '.obsidian/plugins/foo/main.js', { kind: 'missing', wasTracked: true });
+
+		expect(pendingPaths.has('delete:.obsidian/plugins/foo/main.js')).toBe(true);
+		expect(triggerDebouncedSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('ignores missing untracked paths', () => {
+		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
+
+		onRawPathChange(context, '.obsidian/plugins/foo/main.js', { kind: 'missing', wasTracked: false });
+
+		expect(pendingPaths.size).toBe(0);
+		expect(triggerDebouncedSync).not.toHaveBeenCalled();
 	});
 });
 
