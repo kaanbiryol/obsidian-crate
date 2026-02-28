@@ -131,7 +131,11 @@
 /* Activity modal */
 .crate-activity-modal {
 	max-width: 500px;
-	padding-top: 12px;
+	padding: 12px 20px 20px;
+}
+
+.crate-activity-modal .modal-content h2 {
+	margin-top: 0;
 }
 
 .crate-activity-empty {
