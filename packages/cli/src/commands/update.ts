@@ -18,7 +18,7 @@ export interface UpdateOptions {
 }
 
 export async function updateCommand(options: UpdateOptions): Promise<void> {
-	console.log('\n⚙️  Obsidian Crate - Update Worker\n');
+	console.log('\n⚙️  Crate - Update Worker\n');
 
 	// Load deployment config (must exist)
 	const deploymentConfig = loadDeploymentConfig();

@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-crate",
 	"version": "1.0.0",
-	"description": "Obsidian Crate plugin - Sync your vault to Cloudflare R2",
+	"description": "Crate plugin - Sync your vault to Cloudflare R2",
 	"main": "main.js",
 	"type": "module",
 	"workspaces": [

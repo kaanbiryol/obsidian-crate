@@ -1,5 +1,5 @@
 /**
- * Shared types for Obsidian Crate plugin
+ * Shared types for Crate plugin
  */
 
 // ============================================================================

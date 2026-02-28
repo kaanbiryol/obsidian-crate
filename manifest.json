@@ -1,6 +1,6 @@
 {
 	"id": "obsidian-crate",
-	"name": "Obsidian Crate",
+	"name": "Crate",
 	"version": "1.0.0",
 	"minAppVersion": "1.11.4",
 	"description": "Sync your vault to Cloudflare R2 storage",

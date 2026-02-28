@@ -1,5 +1,5 @@
 /**
- * `crate init` command - Sets up Cloudflare infrastructure for Obsidian Crate
+ * `crate init` command - Sets up Cloudflare infrastructure for Crate
  */
 
 import inquirer from 'inquirer';
@@ -32,7 +32,7 @@ export interface InitResult {
 }
 
 export async function initCommand(options: InitOptions): Promise<void> {
-	console.log('\n🚀 Obsidian Crate - Setup\n');
+	console.log('\n🚀 Crate - Setup\n');
 	console.log('This will create the Cloudflare infrastructure for syncing your vault.\n');
 
 	// Gather credentials
@@ -300,7 +300,7 @@ async function gatherConfiguration(options: InitOptions): Promise<{ bucketName: 
 function outputResult(result: InitResult): void {
 	console.log('═'.repeat(60));
 	console.log('\n🎉 Setup complete!\n');
-	console.log('Copy these values into Obsidian Crate settings:\n');
+	console.log('Copy these values into Crate settings:\n');
 	console.log('─'.repeat(60));
 	console.log('Worker URL');
 	console.log(result.workerUrl);

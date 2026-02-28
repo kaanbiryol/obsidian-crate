@@ -1,7 +1,7 @@
 {
 	"name": "@obsidian-crate/cli",
 	"version": "1.0.0",
-	"description": "CLI tool to set up Cloudflare infrastructure for Obsidian Crate",
+	"description": "CLI tool to set up Cloudflare infrastructure for Crate",
 	"bin": {
 		"crate": "./dist/index.js"
 	},

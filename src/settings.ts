@@ -1,5 +1,5 @@
 /**
- * Settings interface for Obsidian Crate
+ * Settings interface for Crate
  * Re-exported from types for plugin modules
  */
 

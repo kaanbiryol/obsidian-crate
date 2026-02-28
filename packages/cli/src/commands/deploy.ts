@@ -18,7 +18,7 @@ export interface DeployOptions {
 }
 
 export async function deployCommand(options: DeployOptions): Promise<void> {
-	console.log('\n⚙️  Obsidian Crate - Deploy Worker\n');
+	console.log('\n⚙️  Crate - Deploy Worker\n');
 
 	// Resolve worker name
 	const deploymentConfig = loadDeploymentConfig();

@@ -1,5 +1,5 @@
 /**
- * Obsidian Crate CLI
+ * Crate CLI
  * Setup and manage Cloudflare infrastructure for vault syncing
  */
 
@@ -17,7 +17,7 @@ const program = new Command();
 
 program
 	.name('crate')
-	.description('CLI tool for setting up Obsidian Crate sync infrastructure')
+	.description('CLI tool for setting up Crate sync infrastructure')
 	.version('1.0.0');
 
 program
@@ -66,7 +66,7 @@ program
 
 program
 	.command('doctor')
-	.description('Diagnose and verify your Obsidian Crate setup')
+	.description('Diagnose and verify your Crate setup')
 	.option('--worker-url <url>', 'Worker URL to test')
 	.option('--token <token>', 'Auth token')
 	.option('--account-id <id>', 'Cloudflare Account ID (for advanced checks)')

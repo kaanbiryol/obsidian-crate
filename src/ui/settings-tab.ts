@@ -1,5 +1,5 @@
 /**
- * Settings tab for Obsidian Crate configuration
+ * Settings tab for Crate configuration
  */
 
 import { App, PluginSettingTab } from 'obsidian';
@@ -32,7 +32,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass('crate-settings');
 
-		containerEl.createEl('h2', { text: 'Obsidian Crate settings' });
+		containerEl.createEl('h2', { text: 'Crate settings' });
 
 		renderConfigSection({
 			containerEl,

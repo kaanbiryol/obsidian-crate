@@ -1,5 +1,5 @@
 /**
- * Obsidian Crate - Sync your vault to Cloudflare R2
+ * Crate - Sync your vault to Cloudflare R2
  */
 
 import { Notice, Plugin, TAbstractFile } from 'obsidian';

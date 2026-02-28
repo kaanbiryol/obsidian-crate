@@ -26,7 +26,7 @@ export interface ResetOptions {
 }
 
 export async function resetCommand(options: ResetOptions): Promise<void> {
-	console.log('\n🗑️  Obsidian Crate - Reset Infrastructure\n');
+	console.log('\n🗑️  Crate - Reset Infrastructure\n');
 
 	const credentials = await resolveCredentials(options);
 

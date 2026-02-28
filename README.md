@@ -1,4 +1,4 @@
-# Obsidian Crate
+# Crate
 
 Sync your Obsidian vault to Cloudflare R2 storage via a Cloudflare Worker.
 
@@ -28,7 +28,7 @@ npx crate login
 npx crate init
 ```
 
-After init completes, copy the worker URL and auth token into the Obsidian Crate plugin settings.
+After init completes, copy the worker URL and auth token into the Crate plugin settings.
 
 ## Development
 

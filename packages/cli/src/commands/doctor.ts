@@ -1,5 +1,5 @@
 /**
- * `crate doctor` command - Diagnostic tool for Obsidian Crate setup
+ * `crate doctor` command - Diagnostic tool for Crate setup
  */
 
 import inquirer from 'inquirer';
@@ -19,7 +19,7 @@ interface DiagnosticResult {
 }
 
 export async function doctorCommand(options: DoctorOptions): Promise<void> {
-	console.log('\n🩺 Obsidian Crate - Diagnostics\n');
+	console.log('\n🩺 Crate - Diagnostics\n');
 
 	const results: DiagnosticResult[] = [];
 
