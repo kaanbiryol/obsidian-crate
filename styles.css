@@ -128,12 +128,31 @@
 	background: var(--text-error);
 }
 
-/* Activity modal - tabs */
+/* Activity modal */
+.crate-activity-modal {
+	max-width: 500px;
+	padding: 12px 20px 20px;
+}
+
+.crate-activity-modal .modal-content h2 {
+	margin: 0 0 10px;
+	font-size: var(--h2-size);
+	font-weight: var(--h2-weight);
+	line-height: var(--h2-line-height);
+}
+
+/* Tab bar: tabs left, sync button right */
+.crate-activity-tab-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: 12px;
+}
+
 .crate-activity-tabs {
 	display: flex;
 	gap: 0;
-	border-bottom: 1px solid var(--tab-divider-color);
-	margin-bottom: 8px;
 }
 
 .crate-activity-tab {
@@ -159,7 +178,32 @@
 	border-bottom-color: var(--interactive-accent);
 }
 
-/* Activity modal - content panels */
+/* Sync now - text link style, sits in the tab bar */
+.crate-sync-now-btn {
+	background: none;
+	border: none;
+	box-shadow: none;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	cursor: pointer;
+	padding: 4px 16px;
+	margin-right: 2px;
+	white-space: nowrap;
+	min-width: 80px;
+	text-align: center;
+	transition: color 0.15s ease;
+}
+
+.crate-sync-now-btn:hover {
+	color: var(--interactive-accent);
+}
+
+.crate-sync-now-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+/* Content panels */
 .crate-activity-panel {
 	height: 300px;
 	overflow-y: auto;
@@ -169,19 +213,9 @@ body.is-mobile .crate-activity-panel {
 	height: 50vh;
 }
 
-/* Activity modal */
-.crate-activity-modal {
-	max-width: 500px;
-	padding: 12px 20px 20px;
-}
-
-.crate-activity-modal .modal-content h2 {
-	margin-top: 0;
-	margin-bottom: 8px;
-}
-
 .crate-activity-empty {
-	color: var(--text-muted);
+	color: var(--text-faint);
+	font-size: var(--font-ui-small);
 }
 
 .crate-activity-list {

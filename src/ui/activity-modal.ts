@@ -4,6 +4,8 @@ import type { CrateSettings, SyncHistoryEntry, SyncState } from '../types';
 export interface ActivityModalDeps {
 	getPendingPaths(): string[];
 	getConflictFiles(): string[];
+	getState(): SyncState;
+	sync(): Promise<unknown>;
 	addStateChangeListener(listener: (state: SyncState) => void): void;
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
 }
@@ -13,6 +15,7 @@ export class ActivityModal extends Modal {
 	private readonly deps: ActivityModalDeps;
 	private pendingTab!: HTMLButtonElement;
 	private conflictsTab!: HTMLButtonElement;
+	private syncBtn!: HTMLButtonElement;
 	private pendingPanel!: HTMLDivElement;
 	private conflictsPanel!: HTMLDivElement;
 	private allTabs: HTMLButtonElement[] = [];
@@ -30,7 +33,8 @@ export class ActivityModal extends Modal {
 		modalEl.addClass('crate-activity-modal');
 		contentEl.createEl('h2', { text: 'Sync activity' });
 
-		const tabs = contentEl.createDiv({ cls: 'crate-activity-tabs' });
+		const tabBar = contentEl.createDiv({ cls: 'crate-activity-tab-bar' });
+		const tabs = tabBar.createDiv({ cls: 'crate-activity-tabs' });
 		this.pendingTab = tabs.createEl('button', {
 			text: this.pendingTabLabel(),
 			cls: 'crate-activity-tab crate-activity-tab-active',
@@ -43,6 +47,15 @@ export class ActivityModal extends Modal {
 			text: 'History',
 			cls: 'crate-activity-tab',
 		});
+
+		this.syncBtn = tabBar.createEl('button', {
+			text: 'Sync now',
+			cls: 'crate-sync-now-btn',
+		});
+		this.syncBtn.addEventListener('click', () => {
+			void this.deps.sync();
+		});
+		this.updateSyncBtn();
 
 		this.pendingPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
 		this.conflictsPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
@@ -85,7 +98,14 @@ export class ActivityModal extends Modal {
 		return `Conflicts (${this.deps.getConflictFiles().length})`;
 	}
 
+	private updateSyncBtn(): void {
+		const syncing = this.deps.getState().status === 'syncing';
+		this.syncBtn.disabled = syncing;
+		this.syncBtn.setText(syncing ? 'Syncing...' : 'Sync now');
+	}
+
 	private refresh(): void {
+		this.updateSyncBtn();
 		this.pendingTab.setText(this.pendingTabLabel());
 		this.pendingPanel.empty();
 		this.renderPending();
