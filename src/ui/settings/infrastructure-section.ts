@@ -204,53 +204,55 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 		.setName('D1 database ID')
 		.setDesc(plugin.settings.databaseId || 'Not set');
 
-	const redeploySetting = new Setting(containerEl)
-		.setName('Redeploy worker code')
-		.setDesc('Equivalent to CLI deploy/update using stored worker name')
-		.addButton(button => button
-			.setButtonText('Redeploy')
-			.onClick(async () => {
-				const resolved = await resolveCloudflareCredentials(plugin);
-				if (resolved.hadError) {
-					return;
-				}
-				if (!resolved.credentials) {
-					new Notice('Please sign in with Cloudflare first');
-					return;
-				}
-				if (!plugin.settings.workerName) {
-					new Notice('Worker name is missing in settings');
-					return;
-				}
-				const credentials = resolved.credentials;
-				const originalDesc = redeploySetting.descEl.textContent || '';
+	if (plugin.cloudflareSession.hasCredentials()) {
+		const redeploySetting = new Setting(containerEl)
+			.setName('Redeploy worker code')
+			.setDesc('Equivalent to CLI deploy/update using stored worker name')
+			.addButton(button => button
+				.setButtonText('Redeploy')
+				.onClick(async () => {
+					const resolved = await resolveCloudflareCredentials(plugin);
+					if (resolved.hadError) {
+						return;
+					}
+					if (!resolved.credentials) {
+						new Notice('Please sign in with Cloudflare first');
+						return;
+					}
+					if (!plugin.settings.workerName) {
+						new Notice('Worker name is missing in settings');
+						return;
+					}
+					const credentials = resolved.credentials;
+					const originalDesc = redeploySetting.descEl.textContent || '';
 
-				await runButtonTask({
-					button,
-					idleText: 'Redeploy',
-					runningText: 'Deploying...',
-					progressEl: redeploySetting.descEl,
-					progressMessage: 'Redeploying worker...',
-					task: async ({ setProgress }) => redeployFromPlugin(
-						{
-							accountId: credentials.accountId,
-							apiToken: credentials.apiToken,
-							workerName: plugin.settings.workerName,
+					await runButtonTask({
+						button,
+						idleText: 'Redeploy',
+						runningText: 'Deploying...',
+						progressEl: redeploySetting.descEl,
+						progressMessage: 'Redeploying worker...',
+						task: async ({ setProgress }) => redeployFromPlugin(
+							{
+								accountId: credentials.accountId,
+								apiToken: credentials.apiToken,
+								workerName: plugin.settings.workerName,
+							},
+							setProgress
+						),
+						onSuccess: () => {
+							new Notice('Worker redeployed successfully');
 						},
-						setProgress
-					),
-					onSuccess: () => {
-						new Notice('Worker redeployed successfully');
-					},
-					onError: (error) => {
-						new Notice(`Redeploy failed: ${getErrorMessage(error)}`);
-					},
-					onFinally: () => {
-						redeploySetting.descEl.style.display = '';
-						redeploySetting.descEl.textContent = originalDesc;
-					},
-				});
-			}));
+						onError: (error) => {
+							new Notice(`Redeploy failed: ${getErrorMessage(error)}`);
+						},
+						onFinally: () => {
+							redeploySetting.descEl.style.display = '';
+							redeploySetting.descEl.textContent = originalDesc;
+						},
+					});
+				}));
+	}
 
 	const diagnosticsSetting = new Setting(containerEl)
 		.setName('Run diagnostics')
@@ -300,106 +302,108 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 				});
 			}));
 
-	const deleteSetting = new Setting(containerEl)
-		.setName('Delete infrastructure')
-		.setDesc('Deletes worker, R2 bucket objects, and D1 database. This removes all synced data.')
-		.addButton(button => button
-			.setButtonText('Delete infrastructure')
-			.setWarning()
-			.onClick(async () => {
-				const confirmed = confirm(
-					'This will permanently delete infrastructure and all synced data (R2, Worker, D1). This cannot be undone. Continue?'
-				);
-				if (!confirmed) {
-					return;
-				}
+	if (plugin.cloudflareSession.hasCredentials()) {
+		const deleteSetting = new Setting(containerEl)
+			.setName('Delete infrastructure')
+			.setDesc('Deletes worker, R2 bucket objects, and D1 database. This removes all synced data.')
+			.addButton(button => button
+				.setButtonText('Delete infrastructure')
+				.setWarning()
+				.onClick(async () => {
+					const confirmed = confirm(
+						'This will permanently delete infrastructure and all synced data (R2, Worker, D1). This cannot be undone. Continue?'
+					);
+					if (!confirmed) {
+						return;
+					}
 
-				const resolved = await resolveCloudflareCredentials(plugin);
-				if (resolved.hadError) {
-					return;
-				}
-				if (!resolved.credentials) {
-					new Notice('Please sign in with Cloudflare first');
-					return;
-				}
-				const credentials = resolved.credentials;
+					const resolved = await resolveCloudflareCredentials(plugin);
+					if (resolved.hadError) {
+						return;
+					}
+					if (!resolved.credentials) {
+						new Notice('Please sign in with Cloudflare first');
+						return;
+					}
+					const credentials = resolved.credentials;
 
-				const shouldSuspendSync = plugin.syncRuntime.isConfigured();
-				let shouldResumeSync = false;
-				const originalDesc = deleteSetting.descEl.textContent || '';
+					const shouldSuspendSync = plugin.syncRuntime.isConfigured();
+					let shouldResumeSync = false;
+					const originalDesc = deleteSetting.descEl.textContent || '';
 
-				await runButtonTask({
-					button,
-					idleText: 'Delete infrastructure',
-					runningText: 'Resetting...',
-					progressEl: deleteSetting.descEl,
-					progressMessage: 'Deleting resources...',
-					onStart: async () => {
-						// Ensure no worker sync requests are triggered while reset is running.
-						if (shouldSuspendSync) {
-							plugin.syncRuntime.destroy();
-							shouldResumeSync = true;
-						}
-					},
-					task: async ({ setProgress }) => resetInfrastructure(
-						{
-							accountId: credentials.accountId,
-							apiToken: credentials.apiToken,
-							workerName: plugin.settings.workerName || inferWorkerNameFromUrl(plugin.settings.workerUrl) || undefined,
-							bucketName: plugin.settings.bucketName || undefined,
-							databaseId: plugin.settings.databaseId || undefined,
-							includeCratePrefixed: true,
+					await runButtonTask({
+						button,
+						idleText: 'Delete infrastructure',
+						runningText: 'Resetting...',
+						progressEl: deleteSetting.descEl,
+						progressMessage: 'Deleting resources...',
+						onStart: async () => {
+							// Ensure no worker sync requests are triggered while reset is running.
+							if (shouldSuspendSync) {
+								plugin.syncRuntime.destroy();
+								shouldResumeSync = true;
+							}
 						},
-						setProgress
-					),
-					onSuccess: async (result) => {
-						if (result.failed.length === 0) {
-							if (result.deleted.length === 0) {
-								new Notice('No Cloudflare resources were found to delete. Local configuration was kept.');
+						task: async ({ setProgress }) => resetInfrastructure(
+							{
+								accountId: credentials.accountId,
+								apiToken: credentials.apiToken,
+								workerName: plugin.settings.workerName || inferWorkerNameFromUrl(plugin.settings.workerUrl) || undefined,
+								bucketName: plugin.settings.bucketName || undefined,
+								databaseId: plugin.settings.databaseId || undefined,
+								includeCratePrefixed: true,
+							},
+							setProgress
+						),
+						onSuccess: async (result) => {
+							if (result.failed.length === 0) {
+								if (result.deleted.length === 0) {
+									new Notice('No Cloudflare resources were found to delete. Local configuration was kept.');
+									return;
+								}
+								shouldResumeSync = false;
+								await plugin.syncRuntime.clearSyncConfiguration();
+								new Notice(`Infrastructure reset complete (${result.deleted.length} deleted)`);
+								rerender();
 								return;
 							}
-							shouldResumeSync = false;
-							await plugin.syncRuntime.clearSyncConfiguration();
-							new Notice(`Infrastructure reset complete (${result.deleted.length} deleted)`);
-							rerender();
-							return;
-						}
 
-						new Notice(`Reset finished with errors (${result.failed.length} failed)`);
-						diagnosticsContainer.style.display = 'block';
-						diagnosticsContainer.addClass('crate-diagnostics');
-						diagnosticsContainer.empty();
-						diagnosticsContainer.createEl('h4', { text: 'Reset errors' });
-						for (const message of result.failed) {
-							diagnosticsContainer.createEl('p', {
-								text: `- ${message}`,
-								cls: 'setting-item-description',
-							});
-						}
-					},
-					onError: (error) => {
-						new Notice(`Reset failed: ${getErrorMessage(error)}`);
-					},
-					onFinally: async () => {
-						deleteSetting.descEl.style.display = '';
-						deleteSetting.descEl.textContent = originalDesc;
+							new Notice(`Reset finished with errors (${result.failed.length} failed)`);
+							diagnosticsContainer.style.display = 'block';
+							diagnosticsContainer.addClass('crate-diagnostics');
+							diagnosticsContainer.empty();
+							diagnosticsContainer.createEl('h4', { text: 'Reset errors' });
+							for (const message of result.failed) {
+								diagnosticsContainer.createEl('p', {
+									text: `- ${message}`,
+									cls: 'setting-item-description',
+								});
+							}
+						},
+						onError: (error) => {
+							new Notice(`Reset failed: ${getErrorMessage(error)}`);
+						},
+						onFinally: async () => {
+							deleteSetting.descEl.style.display = '';
+							deleteSetting.descEl.textContent = originalDesc;
 
-						if (!shouldResumeSync || !plugin.syncRuntime.isConfigured()) {
-							return;
-						}
+							if (!shouldResumeSync || !plugin.syncRuntime.isConfigured()) {
+								return;
+							}
 
-						const previousSyncOnStartup = plugin.settings.syncOnStartup;
-						plugin.settings.syncOnStartup = false;
-						try {
-							await plugin.syncRuntime.initialize();
-						} catch (error) {
-							new Notice(`Reset finished, but sync could not be resumed: ${getErrorMessage(error)}`);
-						} finally {
-							plugin.settings.syncOnStartup = previousSyncOnStartup;
-						}
-					},
-				});
-			}));
+							const previousSyncOnStartup = plugin.settings.syncOnStartup;
+							plugin.settings.syncOnStartup = false;
+							try {
+								await plugin.syncRuntime.initialize();
+							} catch (error) {
+								new Notice(`Reset finished, but sync could not be resumed: ${getErrorMessage(error)}`);
+							} finally {
+								plugin.settings.syncOnStartup = previousSyncOnStartup;
+							}
+						},
+					});
+				}));
+	}
 }
 
 function renderDiagnostics(containerEl: HTMLElement, results: DiagnosticResult[]): void {
