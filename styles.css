@@ -327,6 +327,32 @@ body.is-mobile .crate-activity-panel {
 	to { opacity: 1; }
 }
 
+/* QR code modal */
+.crate-qr-modal {
+	max-width: 360px;
+}
+
+.crate-qr-modal .modal-content h2 {
+	margin: 0 0 4px;
+}
+
+.crate-qr-desc {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin: 0 0 16px;
+}
+
+.crate-qr-wrapper {
+	display: flex;
+	justify-content: center;
+}
+
+.crate-qr-wrapper svg {
+	width: 280px;
+	height: 280px;
+	border-radius: 8px;
+}
+
 .crate-diagnostics {
 	margin: 8px 0 16px;
 	padding: 8px 10px;

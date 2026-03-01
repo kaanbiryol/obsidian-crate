@@ -3,6 +3,7 @@ import { verifyCredentials } from '../../cloudflare/api';
 import { quickSetup } from '../../cloudflare/infrastructure';
 import type CratePlugin from '../../main';
 import { SECRET_KEYS } from '../../types';
+import { QRModal } from '../qr-modal';
 import { getErrorMessage, runButtonTask } from './action-helpers';
 
 interface CloudflareCredentials {
@@ -42,7 +43,9 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 	});
 	setupProgress.style.display = 'none';
 
-	if (!hasCloudflareCredentials) {
+	const isConfigured = plugin.syncRuntime.isConfigured();
+
+	if (!hasCloudflareCredentials && !isConfigured) {
 		new Setting(containerEl)
 			.setName('Cloudflare sign in')
 			.setDesc(
@@ -93,7 +96,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 
 				return button;
 			});
-	} else {
+	} else if (hasCloudflareCredentials) {
 		new Setting(containerEl)
 			.setName('Cloudflare account')
 			.setDesc(
@@ -153,7 +156,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				}));
 	}
 
-	if (!hasCloudflareCredentials) {
+	if (!hasCloudflareCredentials && !isConfigured) {
 		new Setting(containerEl)
 			.setName('Manual entry')
 			.setDesc('Show advanced fields for account, API token, bucket, and worker names')
@@ -169,7 +172,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 		}
 	}
 
-	if (!plugin.syncRuntime.isConfigured() && (hasCloudflareCredentials || manualState.manualEntryEnabled)) {
+	if (!isConfigured && (hasCloudflareCredentials || manualState.manualEntryEnabled)) {
 		new Setting(containerEl)
 			.setName('Quick setup')
 			.setDesc('Create R2 + D1 + Worker and configure this plugin automatically')
@@ -198,46 +201,28 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				}));
 	}
 
-	if (plugin.syncRuntime.isConfigured()) {
+	if (isConfigured) {
 		new Setting(containerEl)
 			.setName('Set up another device')
-			.setDesc('Copy a setup link to configure Crate on another device. The link contains your sync credentials - share it securely.')
+			.setDesc('Share a setup link to configure Crate on another device. The link contains your sync credentials - share it securely.')
 			.addButton(button => button
-				.setButtonText('Copy setup link')
+				.setButtonText('Copy link')
 				.onClick(async () => {
-					const authToken = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
-					if (!authToken) {
-						new Notice('Auth token not found');
-						return;
-					}
-
-					const params = new URLSearchParams();
-					params.set('workerUrl', plugin.settings.workerUrl);
-					params.set('authToken', authToken);
-					if (plugin.settings.workerName) {
-						params.set('workerName', plugin.settings.workerName);
-					}
-					if (plugin.settings.bucketName) {
-						params.set('bucketName', plugin.settings.bucketName);
-					}
-					if (plugin.settings.databaseId) {
-						params.set('databaseId', plugin.settings.databaseId);
-					}
-					if (plugin.settings.cloudflareAccountId) {
-						params.set('accountId', plugin.settings.cloudflareAccountId);
-					}
-					params.set('ignorePatterns', JSON.stringify(plugin.settings.ignorePatterns));
-					params.set('syncOnStartup', String(plugin.settings.syncOnStartup));
-					params.set('syncInterval', String(plugin.settings.syncInterval));
-					params.set('showStatusBar', String(plugin.settings.showStatusBar));
-
-					const link = `obsidian://crate-setup?${params.toString()}`;
+					const link = buildSetupLink(plugin);
+					if (!link) return;
 					await navigator.clipboard.writeText(link);
 					new Notice('Setup link copied to clipboard');
+				}))
+			.addButton(button => button
+				.setButtonText('Show QR')
+				.onClick(() => {
+					const link = buildSetupLink(plugin);
+					if (!link) return;
+					new QRModal(plugin.app, link).open();
 				}));
 	}
 
-	if (hasCloudflareCredentials) {
+	if (hasCloudflareCredentials || isConfigured) {
 		new Setting(containerEl)
 			.setName('Reset local plugin configuration')
 			.setDesc('Clears worker URL/auth token and local infrastructure metadata')
@@ -426,4 +411,38 @@ async function createInfrastructureFromCredentials(
 		databaseId: result.databaseId,
 		accountId: creds.accountId,
 	});
+}
+
+function buildSetupLink(plugin: CratePlugin): string | null {
+	const authToken = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
+	if (!authToken) {
+		new Notice('Auth token not found');
+		return null;
+	}
+
+	const params = new URLSearchParams();
+	params.set('workerUrl', plugin.settings.workerUrl);
+	params.set('authToken', authToken);
+	if (plugin.settings.workerName) {
+		params.set('workerName', plugin.settings.workerName);
+	}
+	if (plugin.settings.bucketName) {
+		params.set('bucketName', plugin.settings.bucketName);
+	}
+	if (plugin.settings.databaseId) {
+		params.set('databaseId', plugin.settings.databaseId);
+	}
+	if (plugin.settings.cloudflareAccountId) {
+		params.set('accountId', plugin.settings.cloudflareAccountId);
+	}
+	const analyticsToken = plugin.secretStorage.get(SECRET_KEYS.ANALYTICS_TOKEN);
+	if (analyticsToken) {
+		params.set('analyticsToken', analyticsToken);
+	}
+	params.set('ignorePatterns', JSON.stringify(plugin.settings.ignorePatterns));
+	params.set('syncOnStartup', String(plugin.settings.syncOnStartup));
+	params.set('syncInterval', String(plugin.settings.syncInterval));
+	params.set('showStatusBar', String(plugin.settings.showStatusBar));
+
+	return `obsidian://crate-setup?${params.toString()}`;
 }

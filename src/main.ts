@@ -9,6 +9,7 @@ import { CloudflareUsageService } from './cloudflare/usage-service';
 import { createLogger } from './logger';
 import { SecretStorageService } from './secret-storage';
 import { DEFAULT_SETTINGS, type CrateSettings } from './settings';
+import { SECRET_KEYS } from './types';
 import { notifyConflicts } from './sync/conflict';
 import { isHiddenPath } from './sync/file-discovery';
 import { SyncRuntime } from './sync/runtime';
@@ -231,6 +232,10 @@ export default class CratePlugin extends Plugin {
 			}
 			if (params['showStatusBar'] !== undefined) {
 				this.settings.showStatusBar = params['showStatusBar'] === 'true';
+			}
+
+			if (params['analyticsToken']) {
+				this.secretStorage.set(SECRET_KEYS.ANALYTICS_TOKEN, params['analyticsToken']);
 			}
 
 			await this.syncRuntime.applyInfrastructureConfig({
