@@ -14,6 +14,7 @@ import type {
 	BatchUploadResponse,
 	BatchDownloadResponse,
 	BatchDeleteResponse,
+	SharedSettings,
 } from '../types';
 
 const logger = createLogger('ApiClient');
@@ -295,6 +296,50 @@ export class SyncApiClient {
 		return this.requestJson<BatchDeleteResponse>('/sync/batch-delete', {
 			method: 'POST',
 			body: JSON.stringify({ paths }),
+		});
+	}
+
+	/**
+	 * Register a per-device auth token in D1
+	 */
+	async registerToken(tokenHash: string, deviceName?: string): Promise<{ id: string }> {
+		return this.requestJson<{ id: string }>('/auth/tokens', {
+			method: 'POST',
+			body: JSON.stringify({ token_hash: tokenHash, device_name: deviceName }),
+		});
+	}
+
+	/**
+	 * Revoke an auth token by ID
+	 */
+	async revokeToken(id: string): Promise<{ success: boolean }> {
+		return this.requestJson<{ success: boolean }>('/auth/tokens', {
+			method: 'DELETE',
+			body: JSON.stringify({ id }),
+		});
+	}
+
+	/**
+	 * List all registered auth tokens
+	 */
+	async listTokens(): Promise<{ tokens: Array<{ id: string; device_name: string | null; created_at: string }> }> {
+		return this.requestJson<{ tokens: Array<{ id: string; device_name: string | null; created_at: string }> }>('/auth/tokens');
+	}
+
+	/**
+	 * Get shared settings from R2
+	 */
+	async getSharedSettings(): Promise<{ settings: SharedSettings | null }> {
+		return this.requestJson<{ settings: SharedSettings | null }>('/settings');
+	}
+
+	/**
+	 * Put shared settings to R2
+	 */
+	async putSharedSettings(settings: SharedSettings): Promise<{ success: boolean }> {
+		return this.requestJson<{ success: boolean }>('/settings', {
+			method: 'PUT',
+			body: JSON.stringify({ settings }),
 		});
 	}
 }

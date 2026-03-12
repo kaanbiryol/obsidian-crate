@@ -4,7 +4,12 @@ The worker is deployed via the Cloudflare API (not Wrangler). Source is embedded
 
 ## Authentication
 
-All endpoints require `Authorization: Bearer <token>` header. The worker validates against its `AUTH_TOKEN` secret binding. CORS headers are included on all responses.
+All endpoints require `Authorization: Bearer <token>` header. The worker validates the token in two steps:
+
+1. Hash the bearer token with SHA-256 and look up the hash in the `auth_tokens` D1 table
+2. If not found, fall back to timing-safe comparison against the `AUTH_TOKEN` secret binding
+
+This allows multiple devices to have independent tokens stored in D1, while maintaining backward compatibility with the single-token binding. CORS headers are included on all responses.
 
 ## Endpoints
 
@@ -21,6 +26,11 @@ All endpoints require `Authorization: Bearer <token>` header. The worker validat
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths) |
 | `POST` | `/sync/batch-delete` | Batch delete `{ paths: [...] }` (max 50 paths) |
 | `GET` | `/sync/config` | Returns `{ accountId, workerName, bucketName, databaseId }` |
+| `POST` | `/auth/tokens` | Register a per-device auth token `{ token_hash, device_name? }` |
+| `DELETE` | `/auth/tokens` | Revoke an auth token `{ id }` |
+| `GET` | `/auth/tokens` | List all registered auth tokens |
+| `GET` | `/settings` | Get shared settings from R2 |
+| `PUT` | `/settings` | Store shared settings to R2 |
 
 ## Request/Response Details
 
@@ -100,9 +110,45 @@ Response (gzip-compressed when `Accept-Encoding: gzip`):
 }
 ```
 
+### POST /auth/tokens
+
+Register a per-device auth token. The token hash (SHA-256 hex) is stored in D1 - the plaintext token is never persisted.
+
+Request: `{ token_hash: "<sha256-hex>", device_name?: "optional label" }`
+
+Response: `{ id: "<uuid>" }`
+
+### DELETE /auth/tokens
+
+Revoke a token by its ID.
+
+Request: `{ id: "<uuid>" }`
+
+Response: `{ success: true }`
+
+### GET /auth/tokens
+
+List all registered tokens (does not expose hashes).
+
+Response: `{ tokens: [{ id, device_name, created_at }] }`
+
+### GET /settings
+
+Returns shared plugin preferences stored in R2 as `__crate__/settings.json`. Used by second devices to inherit settings during setup.
+
+Response: `{ settings: { ignorePatterns, syncOnStartup, syncInterval, showStatusBar } }` or `{ settings: null }` if not yet stored.
+
+### PUT /settings
+
+Stores shared plugin preferences to R2.
+
+Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncInterval: 300, showStatusBar: true } }`
+
+Response: `{ success: true }`
+
 ## D1 Database Schema
 
-Two tables, created lazily via `initDb()`:
+Three tables, created lazily via `initDb()`:
 
 ### changelog
 
@@ -131,6 +177,19 @@ CREATE TABLE IF NOT EXISTS files (
 ```
 
 D1-backed remote manifest. Updated atomically with changelog entries via `db.batch()`.
+
+### auth_tokens
+
+```sql
+CREATE TABLE IF NOT EXISTS auth_tokens (
+  id         TEXT PRIMARY KEY,
+  token_hash TEXT NOT NULL UNIQUE,
+  device_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+Per-device auth tokens. Token hashes are SHA-256 hex of the bearer token. Used for multi-device support - each device gets its own token that can be independently revoked.
 
 ## R2 Key Convention
 

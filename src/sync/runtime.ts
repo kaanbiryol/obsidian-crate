@@ -1,7 +1,7 @@
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger } from '../logger';
 import type { SecretStorageService } from '../secret-storage';
-import { MAX_SYNC_HISTORY, SECRET_KEYS, type CrateSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../types';
+import { MAX_SYNC_HISTORY, SECRET_KEYS, type CrateSettings, type SharedSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../types';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
@@ -191,6 +191,21 @@ export class SyncRuntime {
 
 	updateSyncSettings(): void {
 		this.syncEngine?.updateSettings(this.settings);
+	}
+
+	async pushSharedSettings(): Promise<void> {
+		if (!this.apiClient) return;
+		const shared: SharedSettings = {
+			ignorePatterns: this.settings.ignorePatterns,
+			syncOnStartup: this.settings.syncOnStartup,
+			syncInterval: this.settings.syncInterval,
+			showStatusBar: this.settings.showStatusBar,
+		};
+		try {
+			await this.apiClient.putSharedSettings(shared);
+		} catch (error) {
+			logger.error('Failed to push shared settings:', error);
+		}
 	}
 
 	updateStatusBar(enabled: boolean): void {

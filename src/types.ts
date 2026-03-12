@@ -214,6 +214,13 @@ export interface CrateSettings {
 	syncHistory: SyncHistoryEntry[];
 }
 
+export interface SharedSettings {
+	ignorePatterns: string[];
+	syncOnStartup: boolean;
+	syncInterval: number;
+	showStatusBar: boolean;
+}
+
 export const DEFAULT_SETTINGS: CrateSettings = {
 	workerUrl: '',
 	cloudflareAccountId: '',

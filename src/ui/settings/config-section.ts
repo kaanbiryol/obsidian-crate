@@ -1,8 +1,9 @@
-import { Notice, Platform, Setting } from 'obsidian';
-import { verifyCredentials } from '../../cloudflare/api';
-import { quickSetup } from '../../cloudflare/infrastructure';
+import { Notice, Platform, requestUrl, Setting } from 'obsidian';
+import { generateAuthToken, verifyCredentials } from '../../cloudflare/api';
+import { computeTokenHash, quickSetup, refreshWorkerAuthToken } from '../../cloudflare/infrastructure';
 import type CratePlugin from '../../main';
 import { SECRET_KEYS } from '../../types';
+import { SyncApiClient } from '../../sync/api';
 import { QRModal } from '../qr-modal';
 import { getErrorMessage, runButtonTask } from './action-helpers';
 
@@ -128,6 +129,27 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 									throw new Error('Cloudflare credentials are unavailable after login');
 								}
 								await createInfrastructureFromCredentials(plugin, manualState, creds, setProgress);
+							} else {
+								const connTest = await plugin.syncRuntime.testConnection();
+								if (!connTest.success) {
+									const creds = await plugin.cloudflareSession.resolveCredentials();
+									if (!creds) {
+										throw new Error('Cloudflare credentials are unavailable after login');
+									}
+									const newToken = await refreshWorkerAuthToken(creds, {
+										workerUrl: plugin.settings.workerUrl,
+										workerName: plugin.settings.workerName,
+										bucketName: plugin.settings.bucketName,
+										databaseId: plugin.settings.databaseId,
+									});
+									await plugin.syncRuntime.applyInfrastructureConfig({
+										workerUrl: plugin.settings.workerUrl,
+										authToken: newToken,
+										workerName: plugin.settings.workerName,
+										bucketName: plugin.settings.bucketName,
+										databaseId: plugin.settings.databaseId,
+									});
+								}
 							}
 						},
 						onSuccess: () => {
@@ -208,15 +230,15 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 			.addButton(button => button
 				.setButtonText('Copy link')
 				.onClick(async () => {
-					const link = buildSetupLink(plugin);
+					const link = await buildSetupLink(plugin);
 					if (!link) return;
 					await navigator.clipboard.writeText(link);
 					new Notice('Setup link copied to clipboard');
 				}))
 			.addButton(button => button
 				.setButtonText('Show QR')
-				.onClick(() => {
-					const link = buildSetupLink(plugin);
+				.onClick(async () => {
+					const link = await buildSetupLink(plugin);
 					if (!link) return;
 					new QRModal(plugin.app, link).open();
 				}));
@@ -403,6 +425,17 @@ async function createInfrastructureFromCredentials(
 		onProgress
 	);
 
+	try {
+		const tempClient = new SyncApiClient(result.workerUrl, result.authToken);
+		const { settings: shared } = await tempClient.getSharedSettings();
+		if (shared) {
+			plugin.settings.ignorePatterns = shared.ignorePatterns;
+			plugin.settings.syncOnStartup = shared.syncOnStartup;
+			plugin.settings.syncInterval = shared.syncInterval;
+			plugin.settings.showStatusBar = shared.showStatusBar;
+		}
+	} catch { /* best-effort */ }
+
 	await plugin.syncRuntime.applyInfrastructureConfig({
 		workerUrl: result.workerUrl,
 		authToken: result.authToken,
@@ -411,18 +444,39 @@ async function createInfrastructureFromCredentials(
 		databaseId: result.databaseId,
 		accountId: creds.accountId,
 	});
+
+	plugin.syncRuntime.pushSharedSettings().catch(() => {});
 }
 
-function buildSetupLink(plugin: CratePlugin): string | null {
-	const authToken = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
-	if (!authToken) {
+async function buildSetupLink(plugin: CratePlugin): Promise<string | null> {
+	const currentAuthToken = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
+	if (!currentAuthToken) {
 		new Notice('Auth token not found');
+		return null;
+	}
+
+	const newToken = generateAuthToken();
+	const tokenHash = await computeTokenHash(newToken);
+	const workerUrl = plugin.settings.workerUrl.replace(/\/$/, '');
+
+	try {
+		await requestUrl({
+			url: `${workerUrl}/auth/tokens`,
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${currentAuthToken}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ token_hash: tokenHash, device_name: 'setup-link' }),
+		});
+	} catch {
+		new Notice('Failed to register token for new device');
 		return null;
 	}
 
 	const params = new URLSearchParams();
 	params.set('workerUrl', plugin.settings.workerUrl);
-	params.set('authToken', authToken);
+	params.set('authToken', newToken);
 	if (plugin.settings.workerName) {
 		params.set('workerName', plugin.settings.workerName);
 	}

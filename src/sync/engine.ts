@@ -2,7 +2,7 @@
  * Core sync engine - orchestrates synchronization between local vault and remote storage
  */
 
-import type { Plugin, TAbstractFile, Vault } from 'obsidian';
+import { Notice, type Plugin, type TAbstractFile, type Vault } from 'obsidian';
 import { HttpError, SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { computeHash } from './hasher';
@@ -51,6 +51,12 @@ import type {
 import { DEBOUNCE_DELAY_MS, MAX_DEBOUNCE_WAIT_MS } from '../types';
 
 const logger = createLogger('SyncEngine');
+
+const AUTH_ERROR_MESSAGE = 'Authentication expired - please sign in again in plugin settings';
+
+function isAuthError(error: unknown): boolean {
+	return error instanceof HttpError && error.status === 401;
+}
 const UPLOAD_CONCURRENCY = 10;
 const DOWNLOAD_CONCURRENCY = 5;
 const FORCE_SYNC_CONCURRENCY = 2;
@@ -680,6 +686,11 @@ export class SyncEngine {
 		} catch (error) {
 			if (this.isAbortError(error)) {
 				logger.info('Full sync aborted');
+			} else if (isAuthError(error)) {
+				result.errors.push(AUTH_ERROR_MESSAGE);
+				logger.error('Full sync failed: auth error (401)');
+				new Notice(AUTH_ERROR_MESSAGE);
+				this.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
 			} else {
 				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 				result.errors.push(errorMessage);
@@ -805,6 +816,11 @@ export class SyncEngine {
 		} catch (error) {
 			if (this.isAbortError(error)) {
 				logger.info('Initial sync aborted');
+			} else if (isAuthError(error)) {
+				result.errors.push(AUTH_ERROR_MESSAGE);
+				logger.error('Initial sync failed: auth error (401)');
+				new Notice(AUTH_ERROR_MESSAGE);
+				this.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
 			} else {
 				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 				result.errors.push(errorMessage);
@@ -905,6 +921,11 @@ export class SyncEngine {
 		} catch (error) {
 			if (this.isAbortError(error)) {
 				logger.info('Force full sync aborted');
+			} else if (isAuthError(error)) {
+				result.errors.push(AUTH_ERROR_MESSAGE);
+				logger.error('Force full sync failed: auth error (401)');
+				new Notice(AUTH_ERROR_MESSAGE);
+				this.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
 			} else {
 				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 				result.errors.push(errorMessage);

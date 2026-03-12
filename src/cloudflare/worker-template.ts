@@ -22,6 +22,13 @@ function sanitizePath(path) {
 	return segments.join('/');
 }
 
+async function sha256Hex(text) {
+	const data = new TextEncoder().encode(text);
+	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+	const hashArray = new Uint8Array(hashBuffer);
+	return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function timingSafeEqual(a, b) {
 	const encoder = new TextEncoder();
 	const aBytes = encoder.encode(a);
@@ -49,6 +56,12 @@ async function initDb(db) {
 		hash TEXT NOT NULL DEFAULT '',
 		size INTEGER NOT NULL DEFAULT 0,
 		modified TEXT NOT NULL DEFAULT (datetime('now'))
+	)\`).run();
+	await db.prepare(\`CREATE TABLE IF NOT EXISTS auth_tokens (
+		id TEXT PRIMARY KEY,
+		token_hash TEXT NOT NULL UNIQUE,
+		device_name TEXT,
+		created_at TEXT NOT NULL DEFAULT (datetime('now'))
 	)\`).run();
 	dbReady = true;
 }
@@ -411,6 +424,50 @@ async function handleBatchDelete(request, bucket, db) {
 	return corsResponse({ success: true, deleted });
 }
 
+async function handleRegisterToken(request, db) {
+	if (!db) return corsResponse({ error: 'Database not available' }, 404);
+	await initDb(db);
+	const body = await request.json();
+	if (!body.token_hash || typeof body.token_hash !== 'string') {
+		return corsResponse({ error: 'token_hash required' }, 400);
+	}
+	const id = crypto.randomUUID();
+	await db.prepare('INSERT INTO auth_tokens (id, token_hash, device_name) VALUES (?, ?, ?)')
+		.bind(id, body.token_hash, body.device_name || null).run();
+	return corsResponse({ id });
+}
+
+async function handleRevokeToken(request, db) {
+	if (!db) return corsResponse({ error: 'Database not available' }, 404);
+	await initDb(db);
+	const body = await request.json();
+	if (!body.id || typeof body.id !== 'string') {
+		return corsResponse({ error: 'id required' }, 400);
+	}
+	await db.prepare('DELETE FROM auth_tokens WHERE id = ?').bind(body.id).run();
+	return corsResponse({ success: true });
+}
+
+async function handleListTokens(db) {
+	if (!db) return corsResponse({ error: 'Database not available' }, 404);
+	await initDb(db);
+	const rows = await queryRows(db.prepare('SELECT id, device_name, created_at FROM auth_tokens ORDER BY created_at DESC'));
+	return corsResponse({ tokens: rows });
+}
+
+async function handleGetSettings(bucket) {
+	const obj = await bucket.get('__crate__/settings.json');
+	if (!obj) return corsResponse({ settings: null });
+	const body = await obj.text();
+	return corsResponse({ settings: JSON.parse(body) });
+}
+
+async function handlePutSettings(request, bucket) {
+	const body = await request.json();
+	await bucket.put('__crate__/settings.json', JSON.stringify(body.settings));
+	return corsResponse({ success: true });
+}
+
 async function handleGetConfig(env) {
 	return corsResponse({
 		accountId: env.CF_ACCOUNT_ID || null,
@@ -431,7 +488,18 @@ export default {
 			return corsResponse({ error: 'Unauthorized' }, 401);
 		}
 		const token = authHeader.substring(7);
-		if (!await timingSafeEqual(token, env.AUTH_TOKEN)) {
+		const db = env.DB || null;
+
+		let authenticated = false;
+		if (db) {
+			try {
+				await initDb(db);
+				const tokenHash = await sha256Hex(token);
+				const row = await db.prepare('SELECT id FROM auth_tokens WHERE token_hash = ?').bind(tokenHash).first();
+				if (row) authenticated = true;
+			} catch (e) { /* D1 failure falls through to binding check */ }
+		}
+		if (!authenticated && !await timingSafeEqual(token, env.AUTH_TOKEN)) {
 			return corsResponse({ error: 'Invalid token' }, 401);
 		}
 
@@ -439,7 +507,6 @@ export default {
 		const path = url.pathname;
 		const method = request.method;
 		const bucket = env.BUCKET;
-		const db = env.DB || null;
 
 		try {
 			if (path === '/health' && method === 'GET') return await handleHealth();
@@ -453,6 +520,11 @@ export default {
 			if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket);
 			if (path === '/sync/batch-delete' && method === 'POST') return await handleBatchDelete(request, bucket, db);
 			if (path === '/sync/config' && method === 'GET') return await handleGetConfig(env);
+			if (path === '/auth/tokens' && method === 'POST') return await handleRegisterToken(request, db);
+			if (path === '/auth/tokens' && method === 'DELETE') return await handleRevokeToken(request, db);
+			if (path === '/auth/tokens' && method === 'GET') return await handleListTokens(db);
+			if (path === '/settings' && method === 'GET') return await handleGetSettings(bucket);
+			if (path === '/settings' && method === 'PUT') return await handlePutSettings(request, bucket);
 
 			return corsResponse({ error: 'Not found' }, 404);
 		} catch (err) {

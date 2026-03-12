@@ -62,6 +62,7 @@ export class CrateSettingTab extends PluginSettingTab {
 	}
 
 	hide(): void {
+		this.plugin.syncRuntime?.pushSharedSettings().catch(() => {});
 		this.cleanup();
 	}
 

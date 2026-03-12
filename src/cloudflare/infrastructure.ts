@@ -112,6 +112,34 @@ export interface CrateResources {
 
 type ProgressCallback = (message: string) => void;
 
+export async function computeTokenHash(token: string): Promise<string> {
+	const data = new TextEncoder().encode(token);
+	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+	const hashArray = new Uint8Array(hashBuffer);
+	return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function registerTokenWithWorker(
+	workerUrl: string,
+	authToken: string,
+	deviceName?: string
+): Promise<void> {
+	const tokenHash = await computeTokenHash(authToken);
+	try {
+		await requestUrl({
+			url: `${workerUrl.replace(/\/$/, '')}/auth/tokens`,
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${authToken}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ token_hash: tokenHash, device_name: deviceName }),
+		});
+	} catch {
+		// Best effort - AUTH_TOKEN binding provides fallback
+	}
+}
+
 function toCredentials(accountId: string, apiToken: string): CloudflareCredentials {
 	return { accountId: accountId.trim(), apiToken: apiToken.trim() };
 }
@@ -232,6 +260,8 @@ export async function quickSetup(input: QuickSetupInput, onProgress?: ProgressCa
 		bucketName: requestedBucket,
 	});
 
+	await registerTokenWithWorker(deployment.url, authToken);
+
 	return {
 		workerUrl: deployment.url,
 		authToken,
@@ -280,6 +310,8 @@ async function tryReconnectExisting(
 		bucketName: config.bucketName,
 	});
 
+	await registerTokenWithWorker(deployment.url, authToken);
+
 	return {
 		workerUrl: deployment.url,
 		authToken,
@@ -304,6 +336,24 @@ export async function redeployFromPlugin(input: RedeployInput, onProgress?: Prog
 
 	onProgress?.(`Redeploying worker ${input.workerName}...`);
 	await redeployWorker(credentials, input.workerName.trim(), getWorkerScript());
+}
+
+export async function refreshWorkerAuthToken(
+	credentials: CloudflareCredentials,
+	config: { workerUrl: string; workerName: string; bucketName: string; databaseId: string },
+): Promise<string> {
+	const authToken = generateAuthToken();
+	const workerScript = getWorkerScript();
+	await deployWorker(credentials, config.workerName, workerScript, {
+		r2Bucket: config.bucketName,
+		authToken,
+		d1DatabaseId: config.databaseId,
+		accountId: credentials.accountId,
+		workerName: config.workerName,
+		bucketName: config.bucketName,
+	});
+	await registerTokenWithWorker(config.workerUrl, authToken);
+	return authToken;
 }
 
 async function requestWorkerJson(

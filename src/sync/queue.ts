@@ -241,10 +241,10 @@ export async function processPendingChanges(
 		await context.localManifest.save();
 		context.inFlightPaths.clear();
 
+		const didWork = uploads.length > 0 || deletes.length > 0;
 		context.updateState({
 			status: 'idle',
-			lastSync: new Date().toISOString(),
-			lastError: null,
+			...(didWork ? { lastSync: new Date().toISOString(), lastError: null } : {}),
 			pendingChanges: context.pendingPaths.size,
 		});
 	} catch (error) {
