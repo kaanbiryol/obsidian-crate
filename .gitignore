@@ -21,5 +21,8 @@ data.json
 # Build output
 dist
 
+# Deploy config (local vault path)
+deploy.yml
+
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
