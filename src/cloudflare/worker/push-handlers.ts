@@ -1,7 +1,7 @@
 import { corsHeaders, corsResponse } from './cors';
 import { initDb, queryRows } from './db';
 import { getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
-import { PWA_HTML, SERVICE_WORKER_JS, MANIFEST_JSON, ICON_SVG } from './pwa';
+import { PWA_HTML, SERVICE_WORKER_JS, MANIFEST_JSON, ICON_SVG, OPEN_OBSIDIAN_HTML } from './pwa';
 
 export function handleNotificationsPage(url: URL): Response {
 	return new Response(PWA_HTML, {
@@ -28,6 +28,12 @@ export function handleManifest(): Response {
 			'Content-Type': 'application/manifest+json',
 			...corsHeaders(),
 		},
+	});
+}
+
+export function handleOpenObsidian(): Response {
+	return new Response(OPEN_OBSIDIAN_HTML, {
+		headers: { 'Content-Type': 'text/html; charset=utf-8' },
 	});
 }
 

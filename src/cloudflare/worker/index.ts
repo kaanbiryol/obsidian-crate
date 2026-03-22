@@ -13,7 +13,7 @@ import {
 } from './reminder-handlers';
 import {
 	handleNotificationsPage, handleServiceWorker, handleManifest, handleIcon,
-	handleVapidPublicKey, handleSubscribe, handleUnsubscribe,
+	handleOpenObsidian, handleVapidPublicKey, handleSubscribe, handleUnsubscribe,
 	handleListSubscriptions, handleTestPush,
 } from './push-handlers';
 import type { Env } from './types';
@@ -35,6 +35,7 @@ export default {
 		if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
 		if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest();
 		if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon();
+		if (path === '/notifications/open-obsidian' && method === 'GET') return handleOpenObsidian();
 		if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(env.DB);
 
 		// Auth check

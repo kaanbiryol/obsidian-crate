@@ -164,12 +164,14 @@ export function openReminderEditModal(
  */
 class FullScreenReminderModal extends Modal {
   private readonly plugin: CratePlugin;
+  private readonly initialProject: string | undefined;
   private root: Root | undefined;
   private shadowRoot: ShadowRoot | null = null;
 
-  constructor(plugin: CratePlugin) {
+  constructor(plugin: CratePlugin, initialProject?: string) {
     super(plugin.app);
     this.plugin = plugin;
+    this.initialProject = initialProject;
   }
 
   async onOpen() {
@@ -220,6 +222,7 @@ class FullScreenReminderModal extends Modal {
           isFullScreen={true}
           onClose={close}
           initialTab={this.plugin.remindersSettings.fullscreenDefaultTab}
+          initialProject={this.initialProject}
         />
       </PluginContext.Provider>
     );
@@ -231,6 +234,6 @@ class FullScreenReminderModal extends Modal {
   }
 }
 
-export function openFullScreenReminderModal(plugin: CratePlugin) {
-  new FullScreenReminderModal(plugin).open();
+export function openFullScreenReminderModal(plugin: CratePlugin, initialProject?: string) {
+  new FullScreenReminderModal(plugin, initialProject).open();
 }

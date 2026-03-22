@@ -86,6 +86,9 @@ export default class CratePlugin extends Plugin {
 		this.registerObsidianProtocolHandler('crate-setup', (params) => {
 			this.handleSetupProtocol(params);
 		});
+		this.registerObsidianProtocolHandler('crate-reminders', (params) => {
+			openFullScreenReminderModal(this, params.project || undefined);
+		});
 
 		// Initialize reminders after sync is ready
 		try {

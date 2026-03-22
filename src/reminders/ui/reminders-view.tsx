@@ -149,11 +149,12 @@ interface RemindersViewContentProps {
     isFullScreen?: boolean;
     onClose?: () => void;
     initialTab?: TabId;
+    initialProject?: string;
 }
 
-export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, shadowRoot, isFullScreen = false, onClose, initialTab }) => {
+export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, shadowRoot, isFullScreen = false, onClose, initialTab, initialProject }) => {
     const isDarkMode = useObsidianDarkMode();
-    const [viewMode, setViewMode] = useState<ViewMode>(initialTab ?? "inbox");
+    const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? "browse" : (initialTab ?? "inbox"));
     const [isTransitioning, setIsTransitioning] = useState(false);
     const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -167,7 +168,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     const glassButtonHoverBg = isDarkMode
         ? 'rgba(255, 255, 255, 0.08)'
         : 'rgba(0, 0, 0, 0.06)';
-    const [selectedProject, setSelectedProject] = useState<string | null>(null);
+    const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
 

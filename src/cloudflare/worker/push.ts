@@ -42,7 +42,7 @@ export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVa
 
 export async function sendToAllSubscriptions(
 	db: D1Database,
-	payload: { title: string; body: string; tag?: string },
+	payload: { title: string; body: string; tag?: string; project?: string },
 ): Promise<{ sent: number; failed: number; pruned: number; errors: string[] }> {
 	await initDb(db);
 
