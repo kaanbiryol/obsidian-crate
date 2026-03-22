@@ -342,4 +342,35 @@ export class SyncApiClient {
 			body: JSON.stringify({ settings }),
 		});
 	}
+
+	async scheduleReminder(data: {
+		reminderId: string;
+		content: string;
+		project?: string;
+		dueDatetime: string;
+		ntfyTopic: string;
+		priority?: number;
+	}): Promise<{ success: boolean }> {
+		return this.requestJson<{ success: boolean }>('/reminders/schedule', {
+			method: 'POST',
+			body: JSON.stringify(data),
+		});
+	}
+
+	async cancelReminder(reminderId: string): Promise<{ success: boolean }> {
+		return this.requestJson<{ success: boolean }>('/reminders/cancel', {
+			method: 'DELETE',
+			body: JSON.stringify({ reminderId }),
+		});
+	}
+
+	async getScheduledReminders(): Promise<{ scheduled: Array<{
+		reminder_id: string;
+		content: string;
+		project: string | null;
+		due_datetime: string;
+		ntfy_topic: string;
+	}> }> {
+		return this.requestJson('/reminders/scheduled');
+	}
 }

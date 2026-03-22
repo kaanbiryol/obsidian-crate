@@ -8,6 +8,7 @@ import { renderConfigSection, type ManualSetupState } from './settings/config-se
 import { renderInfrastructureSection } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
 import { renderUsageSection } from './settings/usage-section';
+import { renderNotificationsSection } from './settings/notifications-section';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
@@ -59,6 +60,12 @@ export class CrateSettingTab extends PluginSettingTab {
 				plugin: this.plugin,
 			});
 		}
+
+		renderNotificationsSection({
+			containerEl,
+			plugin: this.plugin,
+			rerender: () => this.display(),
+		});
 	}
 
 	hide(): void {

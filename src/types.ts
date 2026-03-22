@@ -212,6 +212,8 @@ export interface CrateSettings {
 	syncInterval: number; // in seconds, 0 = disabled
 	showStatusBar: boolean;
 	syncHistory: SyncHistoryEntry[];
+	ntfyEnabled: boolean;
+	ntfyTopic: string;
 }
 
 export interface SharedSettings {
@@ -219,6 +221,8 @@ export interface SharedSettings {
 	syncOnStartup: boolean;
 	syncInterval: number;
 	showStatusBar: boolean;
+	ntfyEnabled: boolean;
+	ntfyTopic: string;
 }
 
 export const DEFAULT_SETTINGS: CrateSettings = {
@@ -242,6 +246,8 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	syncInterval: 300,
 	showStatusBar: true,
 	syncHistory: [],
+	ntfyEnabled: false,
+	ntfyTopic: '',
 };
 
 // ============================================================================

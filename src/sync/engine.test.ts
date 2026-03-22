@@ -70,6 +70,8 @@ function createSettings(): CrateSettings {
 		syncInterval: 0,
 		showStatusBar: true,
 		syncHistory: [],
+		ntfyEnabled: false,
+		ntfyTopic: '',
 	};
 }
 

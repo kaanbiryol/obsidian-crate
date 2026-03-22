@@ -200,6 +200,8 @@ export class SyncRuntime {
 			syncOnStartup: this.settings.syncOnStartup,
 			syncInterval: this.settings.syncInterval,
 			showStatusBar: this.settings.showStatusBar,
+			ntfyEnabled: this.settings.ntfyEnabled,
+			ntfyTopic: this.settings.ntfyTopic,
 		};
 		try {
 			await this.apiClient.putSharedSettings(shared);

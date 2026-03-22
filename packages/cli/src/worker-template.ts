@@ -64,6 +64,14 @@ async function initDb(db) {
 		device_name TEXT,
 		created_at TEXT NOT NULL DEFAULT (datetime('now'))
 	)\`).run();
+	await db.prepare(\`CREATE TABLE IF NOT EXISTS scheduled_reminders (
+		reminder_id TEXT PRIMARY KEY,
+		content TEXT NOT NULL,
+		project TEXT,
+		due_datetime TEXT NOT NULL,
+		ntfy_topic TEXT NOT NULL,
+		created_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)\`).run();
 	dbReady = true;
 }
 
@@ -478,6 +486,112 @@ async function handleGetConfig(env) {
 	});
 }
 
+async function handleScheduleReminder(request, env, db) {
+	const body = await request.json();
+	if (!body.reminderId || !body.content || !body.dueDatetime || !body.ntfyTopic) {
+		return corsResponse({ error: 'reminderId, content, dueDatetime, and ntfyTopic required' }, 400);
+	}
+
+	const id = env.REMINDER_ALARMS.idFromName(body.reminderId);
+	const stub = env.REMINDER_ALARMS.get(id);
+	const doResponse = await stub.fetch(new Request('https://do/schedule', {
+		method: 'PUT',
+		body: JSON.stringify(body),
+	}));
+	const result = await doResponse.json();
+
+	if (db) {
+		try {
+			await initDb(db);
+			await db.prepare(
+				'INSERT OR REPLACE INTO scheduled_reminders (reminder_id, content, project, due_datetime, ntfy_topic) VALUES (?, ?, ?, ?, ?)'
+			).bind(body.reminderId, body.content, body.project || null, body.dueDatetime, body.ntfyTopic).run();
+		} catch (e) { /* non-fatal */ }
+	}
+
+	return corsResponse(result);
+}
+
+async function handleCancelReminder(request, env, db) {
+	const body = await request.json();
+	if (!body.reminderId) {
+		return corsResponse({ error: 'reminderId required' }, 400);
+	}
+
+	const id = env.REMINDER_ALARMS.idFromName(body.reminderId);
+	const stub = env.REMINDER_ALARMS.get(id);
+	const doResponse = await stub.fetch(new Request('https://do/cancel', { method: 'DELETE' }));
+	const result = await doResponse.json();
+
+	if (db) {
+		try {
+			await initDb(db);
+			await db.prepare('DELETE FROM scheduled_reminders WHERE reminder_id = ?').bind(body.reminderId).run();
+		} catch (e) { /* non-fatal */ }
+	}
+
+	return corsResponse(result);
+}
+
+async function handleListScheduled(db) {
+	if (!db) return corsResponse({ scheduled: [] });
+	await initDb(db);
+	const rows = await queryRows(
+		db.prepare('SELECT reminder_id, content, project, due_datetime, ntfy_topic, created_at FROM scheduled_reminders ORDER BY due_datetime ASC')
+	);
+	return corsResponse({ scheduled: rows });
+}
+
+export class ReminderAlarm {
+	constructor(state, env) {
+		this.state = state;
+		this.env = env;
+	}
+
+	async fetch(request) {
+		if (request.method === 'PUT') {
+			const body = await request.json();
+			await this.state.storage.put('reminder', body);
+			const alarmTime = new Date(body.dueDatetime);
+			await this.state.storage.setAlarm(alarmTime);
+			return new Response(JSON.stringify({ success: true }));
+		}
+		if (request.method === 'DELETE') {
+			await this.state.storage.deleteAlarm();
+			await this.state.storage.deleteAll();
+			return new Response(JSON.stringify({ success: true }));
+		}
+		if (request.method === 'GET') {
+			const reminder = await this.state.storage.get('reminder');
+			const alarm = await this.state.storage.getAlarm();
+			return new Response(JSON.stringify({ reminder, alarmTime: alarm }));
+		}
+		return new Response('Not found', { status: 404 });
+	}
+
+	async alarm() {
+		const reminder = await this.state.storage.get('reminder');
+		if (!reminder) return;
+
+		try {
+			const title = reminder.project
+				? reminder.project + ': ' + reminder.content
+				: reminder.content;
+			await fetch('https://ntfy.sh/' + reminder.ntfyTopic, {
+				method: 'POST',
+				headers: {
+					'Title': title,
+					'Priority': reminder.priority === 1 ? 'high' : 'default',
+					'Tags': 'bell',
+				},
+				body: reminder.content,
+			});
+		} catch (e) { /* non-fatal */ }
+
+		await this.state.storage.deleteAll();
+	}
+}
+
 export default {
 	async fetch(request, env) {
 		// Handle CORS preflight
@@ -528,6 +642,9 @@ export default {
 			if (path === '/auth/tokens' && method === 'GET') return await handleListTokens(db);
 			if (path === '/settings' && method === 'GET') return await handleGetSettings(bucket);
 			if (path === '/settings' && method === 'PUT') return await handlePutSettings(request, bucket);
+			if (path === '/reminders/schedule' && method === 'POST') return await handleScheduleReminder(request, env, db);
+			if (path === '/reminders/cancel' && method === 'DELETE') return await handleCancelReminder(request, env, db);
+			if (path === '/reminders/scheduled' && method === 'GET') return await handleListScheduled(db);
 
 			return corsResponse({ error: 'Not found' }, 404);
 		} catch (err) {

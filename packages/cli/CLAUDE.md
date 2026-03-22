@@ -7,6 +7,7 @@ The worker uses these binding types:
 - **secret_text** — `AUTH_TOKEN` (auth secret), `CF_ANALYTICS_TOKEN` (analytics sub-token, optional)
 - **d1** — `DB` (changelog database)
 - **plain_text** — `CF_ACCOUNT_ID`, `CF_WORKER_NAME`, `CF_BUCKET_NAME`, `CF_DATABASE_ID` (config vars exposed via `/sync/config`)
+- **durable_object_namespace** — `REMINDER_ALARMS` (reminder alarm DOs)
 
 When adding new worker bindings, you must update **two** places:
 

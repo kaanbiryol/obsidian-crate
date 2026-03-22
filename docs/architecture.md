@@ -52,6 +52,7 @@
 | `CF_WORKER_NAME` | Plain Text | Worker name (exposed via `/sync/config`) |
 | `CF_BUCKET_NAME` | Plain Text | Bucket name (exposed via `/sync/config`) |
 | `CF_DATABASE_ID` | Plain Text | Database UUID (exposed via `/sync/config`) |
+| `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
 
 Optional: `CF_ANALYTICS_TOKEN` (secret, set up via `crate analytics` CLI command).
 
@@ -68,6 +69,9 @@ CratePlugin (main.ts)
         │     uses: planner, transfer, queue, file-discovery, manifest
         ├── SyncApiClient (sync/api.ts) - HTTP calls to worker
         └── StatusBarManager (ui/status.ts) - status bar rendering
+  ├── ReminderScanner (reminders/scanner.ts) - vault file scanner for reminder metadata
+  ├── ReminderIndex (reminders/index.ts) - in-memory reminder index
+  └── ReminderWriter (reminders/writer.ts) - markdown CRUD for reminder fields
 ```
 
 ## Authentication
@@ -115,3 +119,12 @@ Four keys stored in OS keychain via `SecretStorageService`:
 | Offline | ○ | "Offline" |
 
 Styling driven by `data-status` attribute on the status bar element, which CSS selectors use for spin animation and color changes.
+
+## Reminders and Notifications
+
+The plugin scans vault files for reminder metadata, maintains an in-memory index, and syncs due dates to the worker. Notifications are delivered via ntfy.sh:
+
+1. Plugin schedules a reminder by POSTing due date + ntfy.sh topic to the worker
+2. Worker creates a Durable Object alarm (`ReminderAlarm`) set to fire at the due time
+3. When the alarm fires, the DO sends a POST to `ntfy.sh/{topic}` with the reminder content
+4. Cancelled or updated reminders delete the existing DO alarm and reschedule if needed

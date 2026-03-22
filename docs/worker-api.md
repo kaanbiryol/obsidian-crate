@@ -31,6 +31,9 @@ This allows multiple devices to have independent tokens stored in D1, while main
 | `GET` | `/auth/tokens` | List all registered auth tokens |
 | `GET` | `/settings` | Get shared settings from R2 |
 | `PUT` | `/settings` | Store shared settings to R2 |
+| `POST` | `/reminders/schedule` | Schedule a DO alarm for a reminder |
+| `DELETE` | `/reminders/cancel` | Cancel a DO alarm |
+| `GET` | `/reminders/scheduled` | List scheduled reminders from D1 |
 
 ## Request/Response Details
 
@@ -146,9 +149,49 @@ Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncInterval
 
 Response: `{ success: true }`
 
+### POST /reminders/schedule
+
+Schedule a Durable Object alarm for a reminder. Creates or updates the alarm and stores metadata in D1.
+
+Request:
+```json
+{
+  "reminderId": "unique-id",
+  "content": "Reminder text",
+  "project": "optional project name",
+  "dueDatetime": "2026-03-22T14:00:00Z",
+  "ntfyTopic": "my-topic",
+  "priority": 3
+}
+```
+
+`project` and `priority` are optional. `priority` maps to ntfy.sh priority levels (1-5, default 3).
+
+Response: `{ success: true }`
+
+### DELETE /reminders/cancel
+
+Cancel a scheduled reminder's DO alarm and remove from D1.
+
+Request: `{ "reminderId": "unique-id" }`
+
+Response: `{ success: true }`
+
+### GET /reminders/scheduled
+
+List all currently scheduled reminders.
+
+Response: `{ scheduled: [{ reminder_id, content, project, due_datetime, ntfy_topic, created_at }] }`
+
+## ReminderAlarm Durable Object
+
+Exported class `ReminderAlarm` from the worker template. Each reminder gets its own DO instance keyed by `reminderId`. When the alarm fires, the DO POSTs to `ntfy.sh/{topic}` with the reminder content and priority, then deletes itself from D1.
+
+Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and migration metadata on deploy.
+
 ## D1 Database Schema
 
-Three tables, created lazily via `initDb()`:
+Four tables, created lazily via `initDb()`:
 
 ### changelog
 
@@ -190,6 +233,21 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
 ```
 
 Per-device auth tokens. Token hashes are SHA-256 hex of the bearer token. Used for multi-device support - each device gets its own token that can be independently revoked.
+
+### scheduled_reminders
+
+```sql
+CREATE TABLE IF NOT EXISTS scheduled_reminders (
+  reminder_id TEXT PRIMARY KEY,
+  content TEXT NOT NULL,
+  project TEXT,
+  due_datetime TEXT NOT NULL,
+  ntfy_topic TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+Stores metadata for scheduled reminder alarms. Rows are inserted on `POST /reminders/schedule` and deleted when the DO alarm fires or `DELETE /reminders/cancel` is called.
 
 ## R2 Key Convention
 
