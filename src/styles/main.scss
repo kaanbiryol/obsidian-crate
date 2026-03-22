@@ -1,0 +1,522 @@
+@use "tailwindcss";
+@use "colors";
+@use "crate";
+@config "../../tailwind.config.js";
+
+body {
+  @each $name, $color in colors.$reminder-colors {
+    --reminder-#{$name}: #{$color};
+  }
+}
+
+/*
+ * Typography variables - semantic abstraction layer
+ * Maps to Obsidian's CSS variables for consistent theming
+ */
+.reminders-view-container,
+.reminders-list-container {
+  /* Font sizes - mapped to Obsidian variables */
+  --reminder-font-base: var(--font-text-size);
+  --reminder-font-sm: var(--font-small);
+  --reminder-font-xs: var(--font-smaller);
+  --reminder-font-xxs: var(--font-smallest);
+
+  /* Font families */
+  --reminder-font-ui: var(--font-interface);
+  --reminder-font-text: var(--font-text);
+
+  /* Font weights */
+  --reminder-font-weight-normal: 400;
+  --reminder-font-weight-medium: 500;
+  --reminder-font-weight-semibold: var(--font-semibold);
+
+  /* Line heights */
+  --reminder-line-height-tight: 1.2;
+  --reminder-line-height-normal: 1.4;
+  --reminder-line-height-relaxed: 1.6;
+}
+
+/*
+ * Plugin theme mapping to shared Tailwind theme
+ * HeroUI generates CSS variables like --heroui-danger, --heroui-warning, etc.
+ * We map Obsidian's theme classes to reference these shared theme values
+ */
+
+.theme-dark,
+.dark {
+  /* HeroUI semantic content colors - map to Obsidian theme */
+  --heroui-content1: var(--background-primary);
+  --heroui-content2: var(--background-secondary);
+  --heroui-content3: var(--background-modifier-hover);
+  --heroui-content4: var(--background-modifier-border);
+  --heroui-default-100: var(--background-secondary);
+  --heroui-default-200: var(--background-modifier-border);
+
+  /* HeroUI text color - ensure text is visible in dark mode */
+  --heroui-foreground: var(--text-normal);
+  color: var(--text-normal);
+
+  /* Priority colors - reference shared theme (danger = P1, warning = P2, secondary = P3) */
+  --reminder-p1-border: hsl(var(--heroui-danger-600) / 1);
+  --reminder-p1-border-hover: hsl(var(--heroui-danger-600) / 0.5);
+  --reminder-p1-background: hsl(var(--heroui-danger-600) / 0.1);
+
+  --reminder-p2-border: hsl(var(--heroui-warning-600) / 1);
+  --reminder-p2-border-hover: hsl(var(--heroui-warning-600) / 0.5);
+  --reminder-p2-background: hsl(var(--heroui-warning-600) / 0.1);
+
+  --reminder-p3-border: hsl(var(--heroui-secondary-600) / 1);
+  --reminder-p3-border-hover: hsl(var(--heroui-secondary-600) / 0.5);
+  --reminder-p3-background: hsl(var(--heroui-secondary-600) / 0.1);
+
+  --reminder-p4-border: var(--color-base-50);
+  --reminder-p4-border-hover: var(--color-base-50);
+  --reminder-p4-background: unset;
+
+  --reminder-red: hsl(var(--heroui-danger-600) / 1);
+  --reminder-task-separator-color: var(--color-base-30);
+
+  /* RichTextInput chip colors - reference shared theme */
+  --color-p1-bg: hsl(var(--heroui-danger-50) / 1);
+  --color-p1-border: hsl(var(--heroui-danger-600) / 1);
+  --color-p2-bg: hsl(var(--heroui-warning-50) / 1);
+  --color-p2-border: hsl(var(--heroui-warning-600) / 1);
+  --color-p3-bg: hsl(var(--heroui-secondary-50) / 1);
+  --color-p3-border: hsl(var(--heroui-secondary-600) / 1);
+  --color-p4-bg: hsl(var(--heroui-default-100) / 1);
+  --color-p4-border: hsl(var(--heroui-default-400) / 1);
+  --color-primary: hsl(var(--heroui-primary-500) / 1);
+  --color-primary-hover: hsl(var(--heroui-primary-600) / 1);
+  --color-reminder-red: hsl(var(--heroui-danger-600) / 1);
+}
+
+.theme-light {
+  /* HeroUI semantic content colors - map to Obsidian theme */
+  --heroui-content1: var(--background-primary);
+  --heroui-content2: var(--background-secondary);
+  --heroui-content3: var(--background-modifier-hover);
+  --heroui-content4: var(--background-modifier-border);
+  --heroui-default-100: var(--background-secondary);
+  --heroui-default-200: var(--background-modifier-border);
+
+  /* Priority colors - reference shared theme (danger = P1, warning = P2, secondary = P3) */
+  --reminder-p1-border: hsl(var(--heroui-danger) / 1);
+  --reminder-p1-border-hover: hsl(var(--heroui-danger) / 0.5);
+  --reminder-p1-background: hsl(var(--heroui-danger) / 0.1);
+
+  --reminder-p2-border: hsl(var(--heroui-warning) / 1);
+  --reminder-p2-border-hover: hsl(var(--heroui-warning) / 0.5);
+  --reminder-p2-background: hsl(var(--heroui-warning) / 0.1);
+
+  --reminder-p3-border: hsl(var(--heroui-secondary) / 1);
+  --reminder-p3-border-hover: hsl(var(--heroui-secondary) / 0.5);
+  --reminder-p3-background: hsl(var(--heroui-secondary) / 0.1);
+
+  --reminder-p4-border: var(--color-base-50);
+  --reminder-p4-border-hover: var(--color-base-50);
+  --reminder-p4-background: unset;
+
+  --reminder-red: hsl(var(--heroui-danger) / 1);
+  --reminder-task-separator-color: var(--color-base-25);
+
+  /* RichTextInput chip colors - reference shared theme */
+  --color-p1-bg: hsl(var(--heroui-danger-50) / 1);
+  --color-p1-border: hsl(var(--heroui-danger) / 1);
+  --color-p2-bg: hsl(var(--heroui-warning-50) / 1);
+  --color-p2-border: hsl(var(--heroui-warning) / 1);
+  --color-p3-bg: hsl(var(--heroui-secondary-50) / 1);
+  --color-p3-border: hsl(var(--heroui-secondary) / 1);
+  --color-p4-bg: hsl(var(--heroui-default-100) / 1);
+  --color-p4-border: hsl(var(--heroui-default-400) / 1);
+  --color-primary: hsl(var(--heroui-primary) / 1);
+  --color-primary-hover: hsl(var(--heroui-primary-600) / 1);
+  --color-reminder-red: hsl(var(--heroui-danger) / 1);
+}
+
+/* Fix HeroUI Popover positioning and visibility in Obsidian modals */
+/* Target popovers specifically using HeroUI's data attributes */
+[data-slot="base"][data-open="true"] {
+  z-index: 10000 !important;
+  position: fixed !important;
+}
+
+/* Ensure popover trigger is clickable */
+[data-slot="trigger"] {
+  cursor: pointer !important;
+}
+
+/* Make sure popover content appears above modal */
+.heroui-popover,
+[role="dialog"][data-slot="base"],
+[aria-modal="true"][data-slot="base"] {
+  z-index: 10000 !important;
+  position: fixed !important;
+}
+
+/* Ensure HeroUI overlays and backdrops don't block interactions */
+[data-slot="backdrop"] {
+  z-index: 9998 !important;
+}
+
+/* Make sure popover content container is properly positioned */
+[data-slot="content"][role="dialog"],
+.heroui-popover-content {
+  position: relative !important;
+  z-index: 10001 !important;
+}
+
+/* Scale up delete and close buttons in modal header */
+/* Target all buttons in the header row */
+.flex.justify-between.items-center button {
+  min-width: 2.5rem !important;
+  min-height: 2.5rem !important;
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  padding: 0.5rem !important;
+}
+
+/* Target icons inside header buttons */
+.flex.justify-between.items-center button svg {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  min-width: 1.25rem !important;
+  min-height: 1.25rem !important;
+}
+
+/* Also target the wrapper divs to ensure they don't constrain button size */
+.flex.justify-between.items-center .w-10 {
+  width: auto !important;
+  min-width: 2.5rem !important;
+}
+
+/* React Day Picker styling to match theme */
+.rdp {
+  --rdp-accent-color: hsl(var(--heroui-primary) / 1);
+  --rdp-accent-background-color: hsl(var(--heroui-primary) / 0.1);
+  --rdp-day-height: 36px;
+  --rdp-day-width: 36px;
+  --rdp-selected-font: inherit;
+
+  margin: 0;
+  font-family: inherit;
+}
+
+/* Fixed height for calendar weeks grid to prevent layout shift when changing months */
+/* 6 rows × 36px = 216px ensures space for max rows */
+.rdp-weeks {
+  min-height: 216px;
+}
+
+.rdp-root {
+  --rdp-accent-color: hsl(var(--heroui-primary) / 1);
+  --rdp-accent-background-color: hsl(var(--heroui-primary) / 0.1);
+}
+
+.rdp-month_caption {
+  font-weight: var(--reminder-font-weight-semibold);
+  font-size: var(--reminder-font-sm);
+  padding: 0.5rem 0;
+}
+
+.rdp-nav {
+  gap: 0.25rem;
+}
+
+.rdp-button_previous,
+.rdp-button_next {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s;
+}
+
+/* Custom chevron SVGs inside nav buttons */
+.rdp-button_previous svg,
+.rdp-button_next svg {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+}
+
+.rdp-weekday {
+  font-size: var(--reminder-font-xs);
+  font-weight: var(--reminder-font-weight-medium);
+  opacity: 0.6;
+  width: 36px;
+  height: 28px;
+}
+
+.rdp-day {
+  width: 36px;
+  height: 36px;
+}
+
+.rdp-day_button {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-normal);
+  transition: all 0.15s;
+}
+
+.rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled) {
+  background-color: hsl(var(--heroui-default-100) / 1);
+}
+
+.rdp-selected .rdp-day_button {
+  background-color: hsl(var(--heroui-primary) / 1) !important;
+  color: white !important;
+  font-weight: var(--reminder-font-weight-medium);
+}
+
+.rdp-today:not(.rdp-selected) .rdp-day_button {
+  font-weight: var(--reminder-font-weight-semibold);
+  color: hsl(var(--heroui-primary) / 1);
+}
+
+.rdp-outside .rdp-day_button {
+  opacity: 0.4;
+}
+
+.rdp-disabled .rdp-day_button {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Dark theme adjustments */
+.theme-dark .rdp {
+  --rdp-accent-color: hsl(var(--heroui-primary-500) / 1);
+  color: var(--text-normal);
+}
+
+.theme-dark .rdp-button_previous,
+.theme-dark .rdp-button_next {
+  color: var(--text-muted);
+}
+
+.theme-dark .rdp-button_previous:hover,
+.theme-dark .rdp-button_next:hover {
+  background-color: hsl(var(--heroui-default-100) / 0.5);
+  color: var(--text-normal);
+}
+
+.theme-dark .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled) {
+  background-color: hsl(var(--heroui-default-200) / 0.3);
+}
+
+.theme-dark .rdp-button_previous svg,
+.theme-dark .rdp-button_next svg {
+  stroke: currentColor;
+}
+
+/* Light theme adjustments */
+.theme-light .rdp {
+  --rdp-accent-color: hsl(var(--heroui-primary) / 1);
+  color: var(--text-normal);
+}
+
+.theme-light .rdp-button_previous,
+.theme-light .rdp-button_next {
+  color: var(--text-muted);
+}
+
+.theme-light .rdp-button_previous:hover,
+.theme-light .rdp-button_next:hover {
+  background-color: hsl(var(--heroui-default-100) / 1);
+  color: var(--text-normal);
+}
+
+.theme-light .rdp-button_previous svg,
+.theme-light .rdp-button_next svg {
+  stroke: currentColor;
+}
+
+/* HeroUI Calendar styling for Obsidian theme */
+/* Base calendar styling */
+[data-slot="grid"] {
+  width: 100%;
+}
+
+[data-slot="cell"] {
+  width: 36px;
+  height: 36px;
+}
+
+[data-slot="cell"] button {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-normal);
+  transition: all 0.15s;
+}
+
+/* Calendar header styling */
+[data-slot="header"] {
+  padding: 0.5rem 0;
+}
+
+[data-slot="title"] {
+  font-weight: var(--reminder-font-weight-semibold);
+  font-size: var(--reminder-font-sm);
+}
+
+/* Navigation buttons */
+[data-slot="prev-button"],
+[data-slot="next-button"] {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s;
+}
+
+/* Weekday header styling */
+[data-slot="grid-header-cell"] {
+  font-size: var(--reminder-font-xs);
+  font-weight: var(--reminder-font-weight-medium);
+  opacity: 0.6;
+  width: 36px;
+  height: 28px;
+}
+
+/* Dark theme for HeroUI Calendar */
+.theme-dark [data-slot="cell"] button,
+.dark [data-slot="cell"] button {
+  color: var(--text-normal);
+}
+
+.theme-dark [data-slot="cell"] button:hover:not([data-selected]):not([data-disabled]),
+.dark [data-slot="cell"] button:hover:not([data-selected]):not([data-disabled]) {
+  background-color: hsl(var(--heroui-default-200) / 0.3);
+}
+
+.theme-dark [data-slot="cell"] button[data-selected],
+.dark [data-slot="cell"] button[data-selected] {
+  background-color: hsl(var(--heroui-primary-500) / 1) !important;
+  color: white !important;
+  font-weight: var(--reminder-font-weight-medium);
+}
+
+.theme-dark [data-slot="cell"] button[data-today]:not([data-selected]),
+.dark [data-slot="cell"] button[data-today]:not([data-selected]) {
+  font-weight: var(--reminder-font-weight-semibold);
+  color: hsl(var(--heroui-primary-500) / 1);
+}
+
+.theme-dark [data-slot="cell"] button[data-outside-month],
+.dark [data-slot="cell"] button[data-outside-month] {
+  opacity: 0.4;
+}
+
+.theme-dark [data-slot="cell"] button[data-disabled],
+.dark [data-slot="cell"] button[data-disabled] {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.theme-dark [data-slot="prev-button"],
+.theme-dark [data-slot="next-button"],
+.dark [data-slot="prev-button"],
+.dark [data-slot="next-button"] {
+  color: var(--text-muted);
+}
+
+.theme-dark [data-slot="prev-button"]:hover,
+.theme-dark [data-slot="next-button"]:hover,
+.dark [data-slot="prev-button"]:hover,
+.dark [data-slot="next-button"]:hover {
+  background-color: hsl(var(--heroui-default-100) / 0.5);
+  color: var(--text-normal);
+}
+
+.theme-dark [data-slot="title"],
+.dark [data-slot="title"] {
+  color: var(--text-normal);
+}
+
+.theme-dark [data-slot="grid-header-cell"],
+.dark [data-slot="grid-header-cell"] {
+  color: var(--text-muted);
+}
+
+/* Light theme for HeroUI Calendar */
+.theme-light [data-slot="cell"] button {
+  color: var(--text-normal);
+}
+
+.theme-light [data-slot="cell"] button:hover:not([data-selected]):not([data-disabled]) {
+  background-color: hsl(var(--heroui-default-100) / 1);
+}
+
+.theme-light [data-slot="cell"] button[data-selected] {
+  background-color: hsl(var(--heroui-primary) / 1) !important;
+  color: white !important;
+  font-weight: var(--reminder-font-weight-medium);
+}
+
+.theme-light [data-slot="cell"] button[data-today]:not([data-selected]) {
+  font-weight: var(--reminder-font-weight-semibold);
+  color: hsl(var(--heroui-primary) / 1);
+}
+
+.theme-light [data-slot="cell"] button[data-outside-month] {
+  opacity: 0.4;
+}
+
+.theme-light [data-slot="cell"] button[data-disabled] {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.theme-light [data-slot="prev-button"],
+.theme-light [data-slot="next-button"] {
+  color: var(--text-muted);
+}
+
+.theme-light [data-slot="prev-button"]:hover,
+.theme-light [data-slot="next-button"]:hover {
+  background-color: hsl(var(--heroui-default-100) / 1);
+  color: var(--text-normal);
+}
+
+.theme-light [data-slot="title"] {
+  color: var(--text-normal);
+}
+
+.theme-light [data-slot="grid-header-cell"] {
+  color: var(--text-muted);
+}
+
+/* Force dark background on HeroUI TimeInput in dark mode */
+.theme-dark [data-slot="input-wrapper"],
+.dark [data-slot="input-wrapper"] {
+  background-color: #3f3f46 !important; /* zinc-700 */
+}
+
+/* Settings tab alignment fix */
+.vertical-tab-content .setting-item {
+  display: flex;
+  align-items: center;
+}
+
+.vertical-tab-content .setting-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.vertical-tab-content .setting-item-control {
+  flex-shrink: 0;
+}
+
+.vertical-tab-content .setting-item-name {
+  padding-left: 0;
+  margin-left: 0;
+}

@@ -1,8 +1,10 @@
 /**
- * Crate - Sync your vault to Cloudflare R2
+ * Crate - Sync your vault to Cloudflare R2 + Reminders
  */
 
-import { Notice, Plugin, TAbstractFile } from 'obsidian';
+import './styles/main.scss';
+
+import { MarkdownPostProcessorContext, Notice, Plugin, TAbstractFile } from 'obsidian';
 import { abortOAuthLogin } from './cloudflare/oauth';
 import { CloudflareSessionManager } from './cloudflare/session-manager';
 import { CloudflareUsageService } from './cloudflare/usage-service';
@@ -16,7 +18,23 @@ import { SyncRuntime } from './sync/runtime';
 import { ActivityModal } from './ui/activity-modal';
 import { CrateSettingTab } from './ui/settings-tab';
 
+// Reminders imports
+import { configureLogger } from './reminders/utils/logger';
+import { createReminderIndex, type ReminderIndex } from './reminders/data/reminderIndex';
+import { createMarkdownWriter, type MarkdownWriter } from './reminders/data/markdownWriter';
+import { createStorageCompat, type StorageCompat } from './reminders/data/storageCompat';
+import { VaultWatcher } from './reminders/services/vaultWatcher';
+import { FileRenameHandler } from './reminders/services/fileRenameHandler';
+import { ReminderQueryInjector } from './reminders/query/injector';
+import { createRemindersBlockExtension } from './reminders/query/remindersBlockLivePreview';
+import { createInlineTodoExtension } from './reminders/query/inlineTodoLivePreview';
+import { registerReminderCommands } from './reminders/commands';
+import { type RemindersSettings, useRemindersSettingsStore } from './reminders/settings';
+import { RemindersView, VIEW_TYPE_REMINDERS } from './reminders/ui/reminders-view';
+import { openFullScreenReminderModal } from './reminders/ui/modals';
+
 const logger = createLogger('Plugin');
+const remindersLogger = createLogger('Reminders');
 
 export default class CratePlugin extends Plugin {
 	settings!: CrateSettings;
@@ -24,6 +42,14 @@ export default class CratePlugin extends Plugin {
 	cloudflareSession!: CloudflareSessionManager;
 	syncRuntime!: SyncRuntime;
 	readonly usageService = new CloudflareUsageService();
+
+	// Reminders
+	reminderIndex!: ReminderIndex;
+	markdownWriter!: MarkdownWriter;
+	storage!: StorageCompat;
+	remindersSettings!: RemindersSettings;
+	private remindersVaultWatcher?: VaultWatcher;
+	private cachedStyles: string | null = null;
 
 	private vaultEventsRegistered = false;
 
@@ -59,11 +85,22 @@ export default class CratePlugin extends Plugin {
 		this.registerObsidianProtocolHandler('crate-setup', (params) => {
 			this.handleSetupProtocol(params);
 		});
+
+		// Initialize reminders after sync is ready
+		try {
+			await this.initializeReminders();
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : 'Unknown error';
+			remindersLogger.error('Reminders initialization failed:', msg);
+			new Notice(`Reminders failed to initialize: ${msg}`);
+		}
 	}
 
 	onunload(): void {
 		this.syncRuntime.destroy();
 		abortOAuthLogin();
+		this.remindersVaultWatcher?.unregister();
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_REMINDERS);
 	}
 
 	async loadSettings(): Promise<void> {
@@ -74,6 +111,203 @@ export default class CratePlugin extends Plugin {
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
 	}
+
+	// --- Reminders settings (stored in separate file) ---
+
+	async loadRemindersSettings(): Promise<void> {
+		const settingsData = await this.loadRemindersSettingsData();
+
+		if (settingsData) {
+			const loaded = settingsData as Record<string, unknown>;
+			// Migrate old setting name
+			if ('autoOpenSidebarOnMobile' in loaded) {
+				if (loaded.autoOpenSidebarOnMobile === true) {
+					loaded.autoOpenView = 'sidebar';
+				}
+				delete loaded.autoOpenSidebarOnMobile;
+			}
+			// Drop CalDAV syncMethod
+			delete loaded.syncMethod;
+
+			useRemindersSettingsStore.setState((old) => ({
+				...old,
+				...settingsData,
+			}), true);
+		}
+
+		this.remindersSettings = useRemindersSettingsStore.getState();
+		await this.saveRemindersSettingsData(this.remindersSettings);
+	}
+
+	async writeRemindersSettings(update: Partial<RemindersSettings>): Promise<void> {
+		useRemindersSettingsStore.setState(update);
+		this.remindersSettings = useRemindersSettingsStore.getState();
+		await this.saveRemindersSettingsData(this.remindersSettings);
+	}
+
+	private async loadRemindersSettingsData(): Promise<Partial<RemindersSettings> | null> {
+		try {
+			const adapter = this.app.vault.adapter;
+			const settingsPath = this.getPluginDataPath('reminders-settings.json');
+			if (await adapter.exists(settingsPath)) {
+				const content = await adapter.read(settingsPath);
+				return JSON.parse(content);
+			}
+		} catch (error) {
+			remindersLogger.error('Failed to load reminders settings:', error);
+		}
+		return null;
+	}
+
+	private async saveRemindersSettingsData(settings: RemindersSettings): Promise<void> {
+		try {
+			const adapter = this.app.vault.adapter;
+			const settingsPath = this.getPluginDataPath('reminders-settings.json');
+			await adapter.write(settingsPath, JSON.stringify(settings, null, 2));
+		} catch (error) {
+			remindersLogger.error('Failed to save reminders settings:', error);
+		}
+	}
+
+	private getPluginDataPath(filename: string): string {
+		const configDir = this.app.vault.configDir;
+		const pluginId = this.manifest.id;
+		return `${configDir}/plugins/${pluginId}/${filename}`;
+	}
+
+	// --- Reminders initialization ---
+
+	private async initializeReminders(): Promise<void> {
+		await this.loadRemindersSettings();
+
+		configureLogger({ prefix: 'Crate', enabled: this.remindersSettings.debugLogging });
+
+		remindersLogger.info(`Initializing reminders for folder: ${this.remindersSettings.remindersFolderPath}`);
+		this.reminderIndex = createReminderIndex(this.app, this.remindersSettings.remindersFolderPath);
+		await this.reminderIndex.load();
+		remindersLogger.info(`Index loaded: ${this.reminderIndex.getAll().length} reminders`);
+
+		this.markdownWriter = createMarkdownWriter(this.app, this.reminderIndex);
+		this.storage = createStorageCompat(this.reminderIndex, this.markdownWriter);
+
+		this.remindersVaultWatcher = new VaultWatcher(this, this.reminderIndex);
+		this.remindersVaultWatcher.register();
+
+		this.markdownWriter.setOnFileWritten(async (file) => {
+			await this.reminderIndex.rescanFile(file, true);
+		});
+
+		const fileRenameHandler = new FileRenameHandler(this);
+		fileRenameHandler.register();
+
+		// Code block processors
+		const queryProcessor = new ReminderQueryInjector(this);
+		this.registerMarkdownCodeBlockProcessor(
+			'reminders',
+			(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onNewBlock(source, el, ctx),
+		);
+		this.registerMarkdownCodeBlockProcessor(
+			'reminders-tasks',
+			(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onNewBlock(source, el, ctx),
+		);
+		this.registerMarkdownCodeBlockProcessor(
+			'reminders-today',
+			(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onTodayBlock(source, el, ctx),
+		);
+		this.registerMarkdownCodeBlockProcessor(
+			'reminders-upcoming',
+			(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => queryProcessor.onUpcomingBlock(source, el, ctx),
+		);
+
+		// Editor extensions
+		try {
+			this.registerEditorExtension(createRemindersBlockExtension(this));
+		} catch (error) {
+			remindersLogger.error('Failed to register reminder block extension:', error);
+		}
+		try {
+			this.registerEditorExtension(createInlineTodoExtension(this));
+		} catch (error) {
+			remindersLogger.error('Failed to register inline todo extension:', error);
+		}
+
+		// Sidebar view
+		this.registerView(
+			VIEW_TYPE_REMINDERS,
+			(leaf) => new RemindersView(leaf, this),
+		);
+		this.addRibbonIcon('check-circle', 'Open Reminders', () => this.activateRemindersView());
+
+		// Reminders commands
+		registerReminderCommands(this);
+
+		this.addCommand({
+			id: 'open-reminders-view',
+			name: 'Open Reminders sidebar',
+			callback: () => this.activateRemindersView(),
+		});
+		this.addCommand({
+			id: 'open-reminders-fullscreen',
+			name: 'Open Reminders (Full Screen)',
+			callback: () => openFullScreenReminderModal(this),
+		});
+
+		// Auto-open view
+		if (this.remindersSettings.autoOpenView !== 'none') {
+			this.app.workspace.onLayoutReady(() => {
+				if (this.remindersSettings.autoOpenView === 'sidebar') {
+					this.activateRemindersView();
+				} else if (this.remindersSettings.autoOpenView === 'fullscreen') {
+					openFullScreenReminderModal(this);
+				}
+			});
+		}
+	}
+
+	async activateRemindersView(): Promise<void> {
+		const { workspace } = this.app;
+		let leaf = workspace.getLeavesOfType(VIEW_TYPE_REMINDERS)[0];
+
+		if (!leaf) {
+			const rightLeaf = workspace.getRightLeaf(false);
+			if (rightLeaf) {
+				leaf = rightLeaf;
+				await leaf.setViewState({ type: VIEW_TYPE_REMINDERS, active: true });
+			}
+		}
+
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
+	}
+
+	async reinitializeWithFolder(newFolderPath: string): Promise<void> {
+		remindersLogger.info(`Reinitializing with new folder: ${newFolderPath}`);
+		this.remindersVaultWatcher?.unregister();
+
+		this.reminderIndex = createReminderIndex(this.app, newFolderPath);
+		await this.reminderIndex.load();
+		this.markdownWriter = createMarkdownWriter(this.app, this.reminderIndex);
+		this.storage = createStorageCompat(this.reminderIndex, this.markdownWriter);
+
+		this.remindersVaultWatcher = new VaultWatcher(this, this.reminderIndex);
+		this.remindersVaultWatcher.register();
+		remindersLogger.info('Reinitialization complete');
+	}
+
+	async loadStyles(): Promise<string> {
+		if (this.cachedStyles) return this.cachedStyles;
+		try {
+			const stylesPath = `${this.manifest.dir}/styles.css`;
+			this.cachedStyles = await this.app.vault.adapter.read(stylesPath);
+			return this.cachedStyles;
+		} catch (error) {
+			remindersLogger.error('Failed to load styles.css:', error);
+			return '';
+		}
+	}
+
+	// --- Sync ---
 
 	private initializeManagers(): void {
 		this.cloudflareSession = new CloudflareSessionManager(
@@ -93,10 +327,7 @@ export default class CratePlugin extends Plugin {
 	}
 
 	private async ensureDeviceId(): Promise<void> {
-		if (this.settings.deviceId) {
-			return;
-		}
-
+		if (this.settings.deviceId) return;
 		this.settings.deviceId = this.generateDeviceId();
 		await this.saveSettings();
 	}
@@ -151,13 +382,8 @@ export default class CratePlugin extends Plugin {
 		});
 	}
 
-	/**
-	 * Register vault change handlers once for plugin lifetime.
-	 */
 	private registerVaultEventHandlers(): void {
-		if (this.vaultEventsRegistered) {
-			return;
-		}
+		if (this.vaultEventsRegistered) return;
 		this.vaultEventsRegistered = true;
 
 		this.registerEvent(
@@ -184,9 +410,6 @@ export default class CratePlugin extends Plugin {
 			})
 		);
 
-		// 'raw' fires for all filesystem changes including .obsidian/ paths
-		// that typed vault events (create/modify/delete/rename) miss.
-		// No typed overload exists, so we cast through the base Events.on signature.
 		type RawOn = (name: 'raw', callback: (path: string) => void) => import('obsidian').EventRef;
 		this.registerEvent(
 			(this.app.vault.on as unknown as RawOn)(

@@ -161,19 +161,9 @@ export async function deployWorker(
 		});
 	}
 
-	bindingsArray.push({
-		type: 'durable_object_namespace',
-		name: 'REMINDER_ALARMS',
-		class_name: 'ReminderAlarm',
-	});
-
 	const metadata = {
 		main_module: 'index.js',
 		bindings: bindingsArray,
-		migrations: {
-			tag: 'v2',
-			new_sqlite_classes: ['ReminderAlarm'],
-		},
 	};
 
 	// Deploy using multipart form data
@@ -233,17 +223,6 @@ export async function redeployWorker(
 	const metadata = {
 		main_module: 'index.js',
 		keep_bindings: ['r2_bucket', 'secret_text', 'd1', 'plain_text'],
-		bindings: [
-			{
-				type: 'durable_object_namespace',
-				name: 'REMINDER_ALARMS',
-				class_name: 'ReminderAlarm',
-			},
-		],
-		migrations: {
-			tag: 'v2',
-			new_sqlite_classes: ['ReminderAlarm'],
-		},
 	};
 
 	const formData = new FormData();

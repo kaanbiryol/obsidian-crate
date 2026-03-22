@@ -1,0 +1,230 @@
+import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
+import { buildHTML, getPlainText } from '../utils/richTextParsing';
+import { saveCursorPosition, restoreCursorPosition, moveCursorToEnd } from '../utils/cursorPosition';
+
+export interface RichTextInputHandle {
+    /** Focus the input */
+    focus: () => void;
+    /** Blur the input (dismiss keyboard on mobile) */
+    blur: () => void;
+    /** Get the underlying DOM element */
+    getElement: () => HTMLDivElement | null;
+}
+
+interface RichTextInputProps {
+    value: string;
+    onChange: (value: string) => void;
+    onKeyDown?: (e: React.KeyboardEvent) => void;
+    onFocus?: (e: React.FocusEvent) => void;
+    onBlur?: (e: React.FocusEvent) => void;
+    placeholder?: string;
+    inputRef?: React.RefObject<HTMLDivElement | null>;
+    className?: string;
+    style?: React.CSSProperties;
+    autoFocus?: boolean;
+    /** Preserve cursor position when value is updated externally */
+    preserveSelection?: boolean;
+    /** Known project names for multi-word project highlighting */
+    knownProjects?: string[];
+}
+
+export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>(({
+    value,
+    onChange,
+    onKeyDown,
+    onFocus,
+    onBlur,
+    placeholder,
+    inputRef,
+    className,
+    style,
+    autoFocus = false,
+    preserveSelection = true,
+    knownProjects
+}, ref) => {
+    const editableRef = useRef<HTMLDivElement>(null);
+    const hasInitializedRef = useRef(false);
+    const knownProjectsKeyRef = useRef<string | null>(null);
+
+    // Use provided ref or internal one
+    const actualRef = inputRef || editableRef;
+
+    // Ref callback to update refs when element attaches to DOM
+    const refCallback = useCallback((el: HTMLDivElement | null) => {
+        if (inputRef) {
+            (inputRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+        } else {
+            editableRef.current = el;
+        }
+    }, [inputRef]);
+
+    // Expose methods to parent via ref
+    useImperativeHandle(ref, () => ({
+        focus: () => {
+            if (actualRef.current) {
+                actualRef.current.focus();
+                // Delay cursor positioning to allow focus to stabilize
+                requestAnimationFrame(() => {
+                    if (actualRef.current) {
+                        moveCursorToEnd(actualRef.current);
+                    }
+                });
+            }
+        },
+        blur: () => {
+            if (actualRef.current) {
+                actualRef.current.blur();
+            }
+        },
+        getElement: () => actualRef.current,
+    }));
+
+    // Handle input changes
+    const handleInput = () => {
+        if (!actualRef.current) return;
+
+        const cursorPos = saveCursorPosition(actualRef.current);
+        const plainText = getPlainText(actualRef.current);
+
+        // Build and render HTML with chips
+        const html = buildHTML(plainText, knownProjects);
+        if (actualRef.current.innerHTML !== html) {
+            actualRef.current.innerHTML = html || '';
+        }
+
+        // Call onChange with plain text
+        onChange(plainText);
+
+        // Restore cursor
+        requestAnimationFrame(() => {
+            restoreCursorPosition(actualRef.current, cursorPos);
+        });
+    };
+
+    // Update content when value changes externally (e.g., from parent reset)
+    useEffect(() => {
+        if (!actualRef.current) return;
+
+        const currentPlainText = getPlainText(actualRef.current);
+        const knownProjectsKey = knownProjects ? knownProjects.join('\u0000') : '';
+        const knownProjectsChanged = knownProjectsKey !== knownProjectsKeyRef.current;
+        knownProjectsKeyRef.current = knownProjectsKey;
+
+        if (currentPlainText === value && !knownProjectsChanged) {
+            return;
+        }
+
+        const html = buildHTML(value, knownProjects);
+        const normalizedHtml = html || '';
+
+        if (actualRef.current.innerHTML === normalizedHtml) {
+            return;
+        }
+
+        const isFocused = document.activeElement === actualRef.current;
+        const shouldPreserveCursor = preserveSelection && isFocused;
+        const cursorPos = shouldPreserveCursor ? saveCursorPosition(actualRef.current) : null;
+
+        actualRef.current.innerHTML = normalizedHtml;
+
+        // If autoFocus is enabled and this is initial content, move cursor to end
+        if (autoFocus && !hasInitializedRef.current && value) {
+            hasInitializedRef.current = true;
+            requestAnimationFrame(() => {
+                if (actualRef.current) {
+                    moveCursorToEnd(actualRef.current);
+                }
+            });
+            return;
+        }
+
+        if (shouldPreserveCursor) {
+            requestAnimationFrame(() => {
+                restoreCursorPosition(actualRef.current, cursorPos);
+            });
+        }
+    }, [value, autoFocus, knownProjects, preserveSelection]);
+
+    // Handle auto-focus on mount (more reliable than HTML autoFocus for contentEditable)
+    useEffect(() => {
+        if (autoFocus && actualRef.current) {
+            // Small delay to ensure modal is fully rendered
+            const timer = setTimeout(() => {
+                if (!actualRef.current) return;
+                if (document.activeElement !== actualRef.current) {
+                    actualRef.current.focus();
+                }
+                // If there's no content, still need to set cursor position
+                if (!getPlainText(actualRef.current)) {
+                    moveCursorToEnd(actualRef.current);
+                }
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [autoFocus]);
+
+    // Handle keydown
+    const handleKeyDownInternal = (e: React.KeyboardEvent) => {
+        if (onKeyDown) {
+            onKeyDown(e);
+        }
+    };
+
+    // Handle paste - strip formatting
+    const handlePaste = (e: React.ClipboardEvent) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        document.execCommand('insertText', false, text);
+    };
+
+    // Prevent focus loss when clicking interactive elements (buttons, pills) inside the modal
+    // This fixes iOS issue where contentEditable loses focus when tapping buttons
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        const target = e.target as HTMLElement;
+        // If clicking on an interactive element, prevent default blur behavior
+        if (target.closest('button, [role="button"], .pill, [data-slot="base"]')) {
+            e.preventDefault();
+        }
+    }, []);
+
+    // Same for touch events on iOS
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('button, [role="button"], .pill, [data-slot="base"]')) {
+            // Don't prevent default here as it would break button interaction
+            // Instead, we'll restore focus in the button's onPress handler
+        }
+    }, []);
+
+    return (
+        <div
+            onMouseDown={handleMouseDown}
+            onTouchStart={handleTouchStart}
+            style={{ position: 'relative' }}
+        >
+            <div
+                ref={refCallback}
+                contentEditable
+                inputMode="text"
+                autoFocus={autoFocus}
+                onInput={handleInput}
+                onKeyDown={handleKeyDownInternal}
+                onPaste={handlePaste}
+                onFocus={onFocus}
+                onBlur={onBlur}
+                className={className}
+                data-placeholder={!value ? placeholder : ''}
+                suppressContentEditableWarning
+                style={{
+                    minHeight: '1.5rem',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    paddingTop: '0.25rem',
+                    paddingBottom: '0.25rem',
+                    lineHeight: '1.65',
+                    ...style
+                }}
+            />
+        </div>
+    );
+});

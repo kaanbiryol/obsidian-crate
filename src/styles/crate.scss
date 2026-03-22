@@ -1,0 +1,383 @@
+/**
+ * Crate - Styles
+ */
+
+/* Status bar */
+.crate-status-bar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	cursor: pointer;
+}
+
+.crate-status-icon {
+	font-size: 12px;
+	display: flex;
+	align-items: center;
+}
+
+.crate-status-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.crate-status-text {
+	font-size: 11px;
+	opacity: 0.8;
+}
+
+/* Syncing animation */
+.crate-status-bar[data-status="syncing"] .crate-status-icon svg {
+	animation: crate-spin 1s linear infinite;
+	color: var(--text-warning);
+}
+
+@keyframes crate-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Conflict state */
+.crate-status-bar.crate-has-conflicts .crate-status-icon {
+	color: var(--text-warning);
+}
+
+/* Error state */
+.crate-status-bar[data-status="error"] .crate-status-icon {
+	color: var(--text-error);
+}
+
+.crate-status-bar[data-status="syncing"] .crate-status-text {
+	color: var(--text-warning);
+	opacity: 1;
+}
+
+/* Settings tab */
+.crate-settings h3 {
+	margin-top: 24px;
+	margin-bottom: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	padding-bottom: 6px;
+}
+
+.crate-settings h3:first-child {
+	margin-top: 0;
+}
+
+/* Settings tab - usage metrics */
+.crate-usage-container {
+	margin-bottom: 12px;
+}
+
+.crate-usage-service {
+	margin-bottom: 16px;
+}
+
+.crate-usage-service h4 {
+	margin: 0 0 8px;
+	font-size: 13px;
+	color: var(--text-normal);
+}
+
+.crate-usage-row {
+	margin-bottom: 8px;
+}
+
+.crate-usage-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 4px;
+}
+
+.crate-usage-label {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.crate-usage-value {
+	font-size: 12px;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.crate-usage-bar {
+	width: 100%;
+	height: 6px;
+	background: var(--background-modifier-border);
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.crate-usage-bar-fill {
+	height: 100%;
+	background: var(--interactive-accent);
+	border-radius: 3px;
+	transition: width 0.3s ease;
+}
+
+.crate-usage-bar-fill.crate-usage-bar-warning {
+	background: var(--text-warning);
+}
+
+.crate-usage-bar-fill.crate-usage-bar-critical {
+	background: var(--text-error);
+}
+
+/* Activity modal */
+.crate-activity-modal {
+	max-width: 500px;
+	padding: 12px 20px 20px;
+}
+
+.crate-activity-modal .modal-content h2 {
+	margin: 0 0 10px;
+	font-size: var(--h2-size);
+	font-weight: var(--h2-weight);
+	line-height: var(--h2-line-height);
+}
+
+/* Tab bar: tabs left, sync button right */
+.crate-activity-tab-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: 12px;
+}
+
+.crate-activity-tabs {
+	display: flex;
+	gap: 0;
+}
+
+.crate-activity-tab {
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	padding: var(--size-4-2) var(--size-4-3);
+	font-size: var(--tab-font-size);
+	font-weight: var(--tab-font-weight);
+	color: var(--tab-text-color-focused);
+	cursor: pointer;
+	border-radius: var(--tab-radius) var(--tab-radius) 0 0;
+	box-shadow: none;
+}
+
+.crate-activity-tab:hover {
+	color: var(--tab-text-color-focused-active);
+	background: var(--tab-background-active);
+}
+
+.crate-activity-tab.crate-activity-tab-active {
+	color: var(--tab-text-color-focused-active-current);
+	border-bottom-color: var(--interactive-accent);
+}
+
+/* Sync now - text link style, sits in the tab bar */
+.crate-sync-now-btn {
+	background: none;
+	border: none;
+	box-shadow: none;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	cursor: pointer;
+	padding: 4px 16px;
+	margin-right: 2px;
+	white-space: nowrap;
+	min-width: 80px;
+	text-align: center;
+	transition: color 0.15s ease;
+}
+
+.crate-sync-now-btn:hover {
+	color: var(--interactive-accent);
+}
+
+.crate-sync-now-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+/* Content panels */
+.crate-activity-panel {
+	height: 300px;
+	overflow-y: auto;
+}
+
+body.is-mobile .crate-activity-panel {
+	height: 50vh;
+}
+
+.crate-activity-empty {
+	color: var(--text-faint);
+	font-size: var(--font-ui-small);
+}
+
+.crate-activity-list {
+	margin-bottom: 12px;
+}
+
+.crate-activity-row {
+	font-size: 12px;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	padding: 2px 0;
+}
+
+.crate-activity-time {
+	color: var(--text-muted);
+}
+
+.crate-activity-error {
+	color: var(--text-error);
+}
+
+.crate-activity-details > summary {
+	cursor: pointer;
+	list-style: disclosure-closed;
+}
+
+.crate-activity-details[open] > summary {
+	list-style: disclosure-open;
+}
+
+.crate-activity-files {
+	padding-left: 16px;
+	padding-bottom: 4px;
+}
+
+.crate-activity-file {
+	font-size: 11px;
+	color: var(--text-muted);
+	padding: 1px 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.crate-file-prefix {
+	display: inline-block;
+	width: 14px;
+	text-align: center;
+	margin-right: 4px;
+}
+
+.crate-file-upload .crate-file-prefix {
+	color: var(--text-success);
+}
+
+.crate-file-download .crate-file-prefix {
+	color: var(--interactive-accent);
+}
+
+.crate-file-delete .crate-file-prefix {
+	color: var(--text-error);
+}
+
+.crate-file-conflict .crate-file-prefix {
+	color: var(--text-warning);
+	font-weight: 600;
+}
+
+/* Settings tab - sync progress bar */
+.crate-sync-progress {
+	margin-top: 8px;
+}
+
+.crate-sync-progress-label {
+	font-size: 12px;
+	color: var(--text-muted);
+	margin-bottom: 4px;
+}
+
+.crate-sync-progress-bar {
+	width: 100%;
+	height: 6px;
+	background: var(--background-modifier-border);
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.crate-sync-progress-fill {
+	height: 100%;
+	background: var(--interactive-accent);
+	border-radius: 3px;
+	transition: width 0.2s ease;
+}
+
+/* Settings tab - setup and diagnostics */
+.crate-action-progress {
+	margin: 6px 0 12px;
+	padding: 8px 10px;
+	border-left: 3px solid var(--interactive-accent);
+	background: var(--background-secondary);
+	border-radius: 4px;
+	color: var(--text-normal);
+	font-size: 13px;
+	animation: crate-fade-in 0.2s ease;
+}
+
+@keyframes crate-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+/* QR code modal */
+.crate-qr-modal {
+	max-width: 360px;
+}
+
+.crate-qr-modal .modal-content h2 {
+	margin: 0 0 4px;
+}
+
+.crate-qr-desc {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin: 0 0 16px;
+}
+
+.crate-qr-wrapper {
+	display: flex;
+	justify-content: center;
+}
+
+.crate-qr-wrapper svg {
+	width: 280px;
+	height: 280px;
+	border-radius: 8px;
+}
+
+.crate-diagnostics {
+	margin: 8px 0 16px;
+	padding: 8px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+}
+
+.crate-diagnostics h4 {
+	margin: 0 0 8px;
+	font-size: 13px;
+}
+
+.crate-diagnostic-row p {
+	margin: 0 0 4px;
+}
+
+.crate-diagnostic-pass {
+	color: var(--text-success);
+}
+
+.crate-diagnostic-warn {
+	color: var(--text-warning);
+}
+
+.crate-diagnostic-fail {
+	color: var(--text-error);
+}
+

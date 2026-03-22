@@ -41,8 +41,6 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 		syncInterval: 0,
 		showStatusBar: true,
 		syncHistory: [],
-		ntfyEnabled: false,
-		ntfyTopic: '',
 		...overrides,
 	};
 }

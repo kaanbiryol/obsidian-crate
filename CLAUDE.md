@@ -1,11 +1,11 @@
 # Obsidian Crate
 
-Obsidian plugin that syncs vault files to Cloudflare R2 via a CF Worker. Includes a CLI (`packages/cli`) for provisioning.
+Obsidian plugin that syncs vault files to Cloudflare R2 via a CF Worker, with integrated reminders and push notifications. Includes a CLI (`packages/cli`) for provisioning.
 
 ## Commands
 
 ```bash
-npm run build        # tsc + esbuild
+npm run build        # tsc + vite build
 npm test             # vitest run (all tests)
 npx vitest run src/sync/planner.test.ts  # single test file
 npm run lint         # eslint
@@ -24,8 +24,11 @@ npm run build:cli    # build the CLI package
 | Sync execution | `sync/transfer.ts`, `sync/queue.ts` | Upload/download/delete, debounced queue |
 | Sync support | `sync/api.ts`, `sync/manifest.ts`, `sync/file-discovery.ts`, `sync/hasher.ts` | HTTP client, local manifest, file discovery, hashing |
 | UI | `ui/status.ts`, `ui/settings-tab.ts`, `ui/settings/` | Status bar, settings sections |
-| Reminders | `reminders/scanner.ts`, `reminders/index.ts`, `reminders/writer.ts` | Vault scanner, in-memory index, markdown CRUD |
-| Reminders UI | `ui/reminders-view.tsx`, `ui/reminders-context.ts` | React sidebar view (Shadow DOM), context provider |
+| Reminders core | `reminders/data/`, `reminders/services/`, `reminders/settings.ts` | Index, markdown writer, vault watcher, notification service |
+| Reminders shared | `reminders/types/`, `reminders/utils/`, `reminders/components/` | Types, parsing, React components |
+| Reminders UI | `ui/reminders-view.tsx`, `ui/reminders-context.ts`, `ui/modals.tsx` | React sidebar view (Shadow DOM), modals, context |
+| Reminders query | `reminders/query/` | Code block processors, inline todo editor extension |
+| Styles | `styles/main.scss`, `styles/colors.scss`, `styles/crate.scss` | Tailwind + SCSS pipeline |
 | Cloudflare | `cloudflare/worker-template.ts`, `cloudflare/api.ts`, `cloudflare/session-manager.ts` | Worker source, CF API, OAuth PKCE |
 | CLI | `packages/cli/` | Infrastructure provisioning (see `packages/cli/CLAUDE.md`) |
 
@@ -38,8 +41,9 @@ npm run build:cli    # build the CLI package
 5. **Batch constants must match worker validation** - `BATCH_MAX_FILES` (50) and `BATCH_MAX_BYTES` (10 MB) in `types.ts` must match limits in worker template
 6. **D1 schema changes need two updates** - worker template `initDb()` for the tables + plugin-side readers that query the data
 7. **Files >= `BATCH_FILE_SIZE_LIMIT` (1 MB) bypass batch upload** - sent as individual binary PUT requests
-8. **Reminders deps require pre-build** - `@obsidian-reminders/core` and `@obsidian-reminders/ui` are local file deps; build them first in the reminders repo
-9. **Worker DO class `ReminderAlarm`** - exported from worker template; needs `durable_object_namespace` binding and migration metadata on deploy
+8. **Worker DO class `ReminderAlarm`** - exported from worker template; needs `durable_object_namespace` binding and migration metadata on deploy
+9. **Reminders settings separate** - stored in `reminders-settings.json`, not `data.json`; accessed via `plugin.remindersSettings`
+10. **Build system** - Vite (not esbuild) for the plugin; CLI retains its own esbuild config
 
 ## Testing
 
