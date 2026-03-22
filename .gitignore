@@ -24,5 +24,8 @@ dist
 # Deploy config (local vault path)
 deploy.yml
 
+# Generated files
+*.gen.ts
+
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store

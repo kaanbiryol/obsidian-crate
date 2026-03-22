@@ -32,6 +32,7 @@ import { registerReminderCommands } from './reminders/commands';
 import { type RemindersSettings, useRemindersSettingsStore } from './reminders/settings';
 import { RemindersView, VIEW_TYPE_REMINDERS } from './reminders/ui/reminders-view';
 import { openFullScreenReminderModal } from './reminders/ui/modals';
+import { ReminderNotificationService } from './reminders/services/notificationService';
 
 const logger = createLogger('Plugin');
 const remindersLogger = createLogger('Reminders');
@@ -195,6 +196,19 @@ export default class CratePlugin extends Plugin {
 
 		this.markdownWriter.setOnFileWritten(async (file) => {
 			await this.reminderIndex.rescanFile(file, true);
+		});
+
+		// Wire push notifications for reminder changes
+		const notificationService = new ReminderNotificationService(
+			() => this.settings,
+			() => this.syncRuntime.getApiClient(),
+		);
+		this.markdownWriter.setOnReminderChange(async (reminder, operation) => {
+			const result = await notificationService.onReminderChange(reminder, operation);
+			if (!result.success) {
+				new Notice(`Reminder saved but notification sync failed:\n${result.error}`, 5000);
+			}
+			return result;
 		});
 
 		const fileRenameHandler = new FileRenameHandler(this);

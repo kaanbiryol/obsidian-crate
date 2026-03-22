@@ -70,6 +70,7 @@ function createSettings(): CrateSettings {
 		syncInterval: 0,
 		showStatusBar: true,
 		syncHistory: [],
+		pushEnabled: false,
 	};
 }
 

@@ -9,6 +9,7 @@ import { renderInfrastructureSection } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
 import { renderUsageSection } from './settings/usage-section';
 import { renderRemindersSection } from './settings/reminders-section';
+import { renderNotificationsSection } from './settings/notifications-section';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
@@ -61,11 +62,19 @@ export class CrateSettingTab extends PluginSettingTab {
 			});
 		}
 
-		renderRemindersSection({
+		renderNotificationsSection({
 			containerEl,
 			plugin: this.plugin,
 			rerender: () => this.display(),
 		});
+
+		if (this.plugin.settings.pushEnabled) {
+			renderRemindersSection({
+				containerEl,
+				plugin: this.plugin,
+				rerender: () => this.display(),
+			});
+		}
 	}
 
 	hide(): void {

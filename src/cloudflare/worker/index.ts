@@ -1,0 +1,105 @@
+import { corsHeaders, corsResponse } from './cors';
+import { initDb } from './db';
+import { sha256Hex, timingSafeEqual } from './auth';
+import {
+	handleHealth, handleCheckChanges, handleGetChanges, handleGetManifest,
+	handleUpload, handleDownload, handleDelete,
+	handleBatchUpload, handleBatchDownload, handleBatchDelete,
+	handleGetConfig, handleGetSettings, handlePutSettings,
+} from './sync-handlers';
+import { handleRegisterToken, handleRevokeToken, handleListTokens } from './auth-handlers';
+import {
+	handleScheduleReminder, handleCancelReminder, handleListScheduled,
+} from './reminder-handlers';
+import {
+	handleNotificationsPage, handleServiceWorker, handleManifest, handleIcon,
+	handleVapidPublicKey, handleSubscribe, handleUnsubscribe,
+	handleListSubscriptions, handleTestPush,
+} from './push-handlers';
+import type { Env } from './types';
+
+export { ReminderAlarm } from './reminder-alarm';
+
+export default {
+	async fetch(request: Request, env: Env): Promise<Response> {
+		if (request.method === 'OPTIONS') {
+			return new Response(null, { status: 204, headers: corsHeaders() });
+		}
+
+		const url = new URL(request.url);
+		const path = url.pathname;
+		const method = request.method;
+
+		// Unauthenticated PWA routes
+		if (path === '/notifications' && method === 'GET') return handleNotificationsPage(url);
+		if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
+		if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest();
+		if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon();
+		if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(env.DB);
+
+		// Auth check
+		const authHeader = request.headers.get('Authorization');
+		if (!authHeader || !authHeader.startsWith('Bearer ')) {
+			return corsResponse({ error: 'Unauthorized' }, 401);
+		}
+		const token = authHeader.substring(7);
+		const db = env.DB || null;
+
+		let authenticated = false;
+		if (db) {
+			try {
+				await initDb(db);
+				const tokenHash = await sha256Hex(token);
+				const row = await db.prepare('SELECT id FROM auth_tokens WHERE token_hash = ?').bind(tokenHash).first();
+				if (row) authenticated = true;
+			} catch { /* D1 failure falls through to binding check */ }
+		}
+		if (!authenticated && !await timingSafeEqual(token, env.AUTH_TOKEN)) {
+			return corsResponse({ error: 'Invalid token' }, 401);
+		}
+
+		const bucket = env.BUCKET;
+
+		try {
+			// Sync routes
+			if (path === '/health' && method === 'GET') return await handleHealth();
+			if (path === '/sync/check' && method === 'GET') return await handleCheckChanges(request, db!);
+			if (path === '/sync/changes' && method === 'GET') return await handleGetChanges(request, db!);
+			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(request, db!);
+			if (path === '/sync/upload' && method === 'PUT') return await handleUpload(request, bucket, db);
+			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket);
+			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
+			if (path === '/sync/batch-upload' && method === 'POST') return await handleBatchUpload(request, bucket, db);
+			if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket);
+			if (path === '/sync/batch-delete' && method === 'POST') return await handleBatchDelete(request, bucket, db);
+			if (path === '/sync/config' && method === 'GET') return await handleGetConfig(env);
+
+			// Auth token routes
+			if (db) {
+				if (path === '/auth/tokens' && method === 'POST') return await handleRegisterToken(request, db);
+				if (path === '/auth/tokens' && method === 'DELETE') return await handleRevokeToken(request, db);
+				if (path === '/auth/tokens' && method === 'GET') return await handleListTokens(db);
+			}
+
+			// Settings routes
+			if (path === '/settings' && method === 'GET') return await handleGetSettings(bucket);
+			if (path === '/settings' && method === 'PUT') return await handlePutSettings(request, bucket);
+
+			// Reminder routes
+			if (path === '/reminders/schedule' && method === 'POST') return await handleScheduleReminder(request, env);
+			if (path === '/reminders/cancel' && method === 'DELETE') return await handleCancelReminder(request, env);
+			if (path === '/reminders/scheduled' && method === 'GET') return await handleListScheduled(db!);
+
+			// Push subscription routes (authenticated)
+			if (path === '/notifications/subscribe' && method === 'POST') return await handleSubscribe(request, db!);
+			if (path === '/notifications/subscribe' && method === 'DELETE') return await handleUnsubscribe(request, db!);
+			if (path === '/notifications/subscriptions' && method === 'GET') return await handleListSubscriptions(db!);
+			if (path === '/notifications/test' && method === 'POST') return await handleTestPush(db!);
+
+			return corsResponse({ error: 'Not found' }, 404);
+		} catch (err: unknown) {
+			const message = err instanceof Error ? err.message : 'Internal server error';
+			return corsResponse({ error: message }, 500);
+		}
+	},
+};

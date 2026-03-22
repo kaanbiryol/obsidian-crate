@@ -343,4 +343,56 @@ export class SyncApiClient {
 		});
 	}
 
+	// ---- Reminder scheduling ----
+
+	async scheduleReminder(data: {
+		reminderId: string;
+		content: string;
+		project?: string;
+		dueDatetime: string;
+		priority?: number;
+	}): Promise<{ success: boolean }> {
+		return this.requestJson<{ success: boolean }>('/reminders/schedule', {
+			method: 'POST',
+			body: JSON.stringify(data),
+		});
+	}
+
+	async cancelReminder(reminderId: string): Promise<{ success: boolean }> {
+		return this.requestJson<{ success: boolean }>('/reminders/cancel', {
+			method: 'DELETE',
+			body: JSON.stringify({ reminderId }),
+		});
+	}
+
+	async getScheduledReminders(): Promise<{ scheduled: Array<{
+		reminder_id: string;
+		content: string;
+		project: string | null;
+		due_datetime: string;
+	}> }> {
+		return this.requestJson('/reminders/scheduled');
+	}
+
+	// ---- Push subscriptions ----
+
+	async getPushSubscriptions(): Promise<{ subscriptions: Array<{
+		id: string;
+		device_name: string | null;
+		created_at: string;
+	}> }> {
+		return this.requestJson('/notifications/subscriptions');
+	}
+
+	async deletePushSubscription(id: string): Promise<{ success: boolean }> {
+		return this.requestJson<{ success: boolean }>('/notifications/subscribe', {
+			method: 'DELETE',
+			body: JSON.stringify({ id }),
+		});
+	}
+
+	async testPush(): Promise<{ sent: number; failed: number; pruned: number; errors: string[] }> {
+		return this.requestJson('/notifications/test', { method: 'POST' });
+	}
+
 }

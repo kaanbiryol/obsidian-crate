@@ -122,9 +122,11 @@ Styling driven by `data-status` attribute on the status bar element, which CSS s
 
 ## Reminders and Notifications
 
-The plugin scans vault files for reminder metadata, maintains an in-memory index, and syncs due dates to the worker. Notifications are delivered via ntfy.sh:
+The plugin scans vault files for reminder metadata, maintains an in-memory index, and syncs due dates to the worker. Notifications are delivered via Web Push:
 
-1. Plugin schedules a reminder by POSTing due date + ntfy.sh topic to the worker
+1. Plugin schedules a reminder by POSTing due date to the worker
 2. Worker creates a Durable Object alarm (`ReminderAlarm`) set to fire at the due time
-3. When the alarm fires, the DO sends a POST to `ntfy.sh/{topic}` with the reminder content
+3. When the alarm fires, the DO sends Web Push notifications to all subscribed devices (using `web-push-browser` library)
 4. Cancelled or updated reminders delete the existing DO alarm and reschedule if needed
+5. Users subscribe devices by opening `{workerUrl}/notifications#{authToken}` - a minimal PWA served by the worker
+6. Push subscriptions are stored in D1; expired subscriptions (404/410) are pruned automatically

@@ -8,8 +8,9 @@
 		"packages/*"
 	],
 	"scripts": {
-		"dev": "vite build --watch --mode development",
-		"build": "tsc -noEmit -skipLibCheck && vite build",
+		"build:worker": "node scripts/build-worker.mjs",
+		"dev": "npm run build:worker && vite build --watch --mode development",
+		"build": "npm run build:worker && tsc -noEmit -skipLibCheck && vite build",
 		"build:cli": "npm run build --workspace=@obsidian-crate/cli",
 		"deploy": "if [ -z \"$OBSIDIAN_VAULT\" ]; then echo 'Error: OBSIDIAN_VAULT env var is not set. Export it to your vault path.'; exit 1; fi && npm run build && mkdir -p \"$OBSIDIAN_VAULT/.obsidian/plugins/obsidian-crate\" && cp dist/main.js manifest.json dist/styles.css \"$OBSIDIAN_VAULT/.obsidian/plugins/obsidian-crate/\"",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
@@ -28,6 +29,7 @@
 		"@types/react": "^19.2.5",
 		"@types/react-dom": "^19.2.3",
 		"autoprefixer": "^10.4.22",
+		"esbuild": "^0.27.4",
 		"eslint-plugin-obsidianmd": "0.1.9",
 		"globals": "14.0.0",
 		"jiti": "2.6.1",
@@ -54,6 +56,7 @@
 		"lucide-react": "^0.562.0",
 		"obsidian": "latest",
 		"qrcode-generator": "^2.0.4",
+		"web-push-browser": "^1.4.2",
 		"zustand": "^5.0.6"
 	}
 }

@@ -5,7 +5,8 @@ Obsidian plugin that syncs vault files to Cloudflare R2 via a CF Worker, with in
 ## Commands
 
 ```bash
-npm run build        # tsc + vite build
+npm run build:worker # esbuild worker from src/cloudflare/worker/ -> worker-bundle.gen.ts
+npm run build        # build:worker + tsc + vite build
 npm test             # vitest run (all tests)
 npx vitest run src/sync/planner.test.ts  # single test file
 npm run lint         # eslint
@@ -29,13 +30,14 @@ npm run build:cli    # build the CLI package
 | Reminders UI | `ui/reminders-view.tsx`, `ui/reminders-context.ts`, `ui/modals.tsx` | React sidebar view (Shadow DOM), modals, context |
 | Reminders query | `reminders/query/` | Code block processors, inline todo editor extension |
 | Styles | `styles/main.scss`, `styles/colors.scss`, `styles/crate.scss` | Tailwind + SCSS pipeline |
-| Cloudflare | `cloudflare/worker-template.ts`, `cloudflare/api.ts`, `cloudflare/session-manager.ts` | Worker source, CF API, OAuth PKCE |
+| Cloudflare worker | `cloudflare/worker/` | Worker source (bundled by esbuild into `worker-bundle.gen.ts`) |
+| Cloudflare infra | `cloudflare/api.ts`, `cloudflare/session-manager.ts`, `cloudflare/infrastructure.ts` | CF API, OAuth PKCE, deploy helpers |
 | CLI | `packages/cli/` | Infrastructure provisioning (see `packages/cli/CLAUDE.md`) |
 
 ## Critical Invariants
 
-1. **Worker template duplication** - `src/cloudflare/worker-template.ts` (plugin) and `packages/cli/src/worker-template.ts` (CLI) must stay in sync
-2. **Worker binding 3-place update** - new bindings must be added in plugin `cloudflare/api.ts:deployWorker()`, CLI `commands/init.ts:deployWorker()`, AND `cloudflare/api.ts:redeployWorker() keep_bindings` (includes `durable_object_namespace` for `REMINDER_ALARMS`)
+1. **Worker source** - real TypeScript in `src/cloudflare/worker/`, bundled to `worker-bundle.gen.ts` by `scripts/build-worker.mjs`. Both plugin and CLI import from the generated bundle (no duplication)
+2. **Worker binding 3-place update** - new bindings must be added in plugin `cloudflare/api.ts:deployWorker()`, CLI `cloudflare/api.ts:deployWorker()`, AND both `redeployWorker() keep_bindings` (includes `durable_object_namespace` for `REMINDER_ALARMS`)
 3. **Hidden files require adapter API** - `vault.getFiles()` excludes hidden files; use `file-discovery.ts:getAllVaultFiles()` which also walks via `vault.adapter.list()`
 4. **SecretStorageService empty-string-as-null** - Obsidian has no `deleteSecret`; empty string = deleted
 5. **Batch constants must match worker validation** - `BATCH_MAX_FILES` (50) and `BATCH_MAX_BYTES` (10 MB) in `types.ts` must match limits in worker template
@@ -43,7 +45,7 @@ npm run build:cli    # build the CLI package
 7. **Files >= `BATCH_FILE_SIZE_LIMIT` (1 MB) bypass batch upload** - sent as individual binary PUT requests
 8. **Worker DO class `ReminderAlarm`** - exported from worker template; needs `durable_object_namespace` binding and migration metadata on deploy
 9. **Reminders settings separate** - stored in `reminders-settings.json`, not `data.json`; accessed via `plugin.remindersSettings`
-10. **Build system** - Vite (not esbuild) for the plugin; CLI retains its own esbuild config
+10. **Build system** - Vite for the plugin, esbuild for the worker bundle and CLI. `npm run build` runs worker bundle first, then tsc + vite
 
 ## Testing
 

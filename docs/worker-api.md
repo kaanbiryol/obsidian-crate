@@ -160,12 +160,11 @@ Request:
   "content": "Reminder text",
   "project": "optional project name",
   "dueDatetime": "2026-03-22T14:00:00Z",
-  "ntfyTopic": "my-topic",
   "priority": 3
 }
 ```
 
-`project` and `priority` are optional. `priority` maps to ntfy.sh priority levels (1-5, default 3).
+`project` and `priority` are optional.
 
 Response: `{ success: true }`
 
@@ -181,11 +180,45 @@ Response: `{ success: true }`
 
 List all currently scheduled reminders.
 
-Response: `{ scheduled: [{ reminder_id, content, project, due_datetime, ntfy_topic, created_at }] }`
+Response: `{ scheduled: [{ reminder_id, content, project, due_datetime, created_at }] }`
+
+## Push Notification Endpoints
+
+### GET /notifications (unauthenticated)
+
+Serves the PWA HTML page for subscribing to push notifications. Pass auth token as URL hash fragment: `{workerUrl}/notifications#{authToken}`.
+
+### GET /notifications/sw.js (unauthenticated)
+
+Service worker JS for handling push events.
+
+### GET /notifications/manifest.json (unauthenticated)
+
+PWA manifest.
+
+### GET /notifications/vapid-public-key (unauthenticated)
+
+Returns the VAPID public key (lazily generated, stored in D1). Response: `{ publicKey: "base64url-encoded-key" }`
+
+### POST /notifications/subscribe
+
+Save a push subscription. Request: `{ endpoint, keys: { p256dh, auth }, deviceName }`. Response: `{ id }`
+
+### DELETE /notifications/subscribe
+
+Remove a push subscription. Request: `{ id }`. Response: `{ success: true }`
+
+### GET /notifications/subscriptions
+
+List all push subscriptions. Response: `{ subscriptions: [{ id, device_name, created_at }] }`
+
+### POST /notifications/test
+
+Send a test push to all subscriptions. Response: `{ sent, failed, pruned }`
 
 ## ReminderAlarm Durable Object
 
-Exported class `ReminderAlarm` from the worker template. Each reminder gets its own DO instance keyed by `reminderId`. When the alarm fires, the DO POSTs to `ntfy.sh/{topic}` with the reminder content and priority, then deletes itself from D1.
+Exported class `ReminderAlarm` from the worker. Each reminder gets its own DO instance keyed by `reminderId`. When the alarm fires, the DO sends Web Push notifications to all subscribed devices via `web-push-browser`, then deletes itself from D1.
 
 Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and migration metadata on deploy.
 
@@ -242,12 +275,39 @@ CREATE TABLE IF NOT EXISTS scheduled_reminders (
   content TEXT NOT NULL,
   project TEXT,
   due_datetime TEXT NOT NULL,
-  ntfy_topic TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
 
 Stores metadata for scheduled reminder alarms. Rows are inserted on `POST /reminders/schedule` and deleted when the DO alarm fires or `DELETE /reminders/cancel` is called.
+
+### vapid_keys
+
+```sql
+CREATE TABLE IF NOT EXISTS vapid_keys (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  public_key TEXT NOT NULL,
+  private_key TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+Single-row table storing the VAPID ECDSA P-256 key pair (base64url-encoded). Lazily generated on first push subscription.
+
+### push_subscriptions
+
+```sql
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id TEXT PRIMARY KEY,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  device_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+Web Push subscriptions. Each subscribed device gets a row. Expired subscriptions (404/410 on push send) are automatically pruned.
 
 ## R2 Key Convention
 

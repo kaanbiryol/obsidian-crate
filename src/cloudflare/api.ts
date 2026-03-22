@@ -304,9 +304,19 @@ export async function deployWorker(
 		});
 	}
 
+	bindingsArray.push({
+		type: 'durable_object_namespace',
+		name: 'REMINDER_ALARMS',
+		class_name: 'ReminderAlarm',
+	});
+
 	const metadata = {
 		main_module: 'index.js',
 		bindings: bindingsArray,
+		migrations: {
+			tag: 'v1',
+			new_sqlite_classes: ['ReminderAlarm'],
+		},
 	};
 
 	const multipart = createMultipartBody([
@@ -368,7 +378,7 @@ export async function redeployWorker(
 ): Promise<void> {
 	const metadata = {
 		main_module: 'index.js',
-		keep_bindings: ['r2_bucket', 'secret_text', 'd1', 'plain_text'],
+		keep_bindings: ['r2_bucket', 'secret_text', 'd1', 'plain_text', 'durable_object_namespace'],
 	};
 
 	const multipart = createMultipartBody([

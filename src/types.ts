@@ -212,6 +212,7 @@ export interface CrateSettings {
 	syncInterval: number; // in seconds, 0 = disabled
 	showStatusBar: boolean;
 	syncHistory: SyncHistoryEntry[];
+	pushEnabled: boolean;
 }
 
 export interface SharedSettings {
@@ -219,6 +220,7 @@ export interface SharedSettings {
 	syncOnStartup: boolean;
 	syncInterval: number;
 	showStatusBar: boolean;
+	pushEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: CrateSettings = {
@@ -242,6 +244,7 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	syncInterval: 300,
 	showStatusBar: true,
 	syncHistory: [],
+	pushEnabled: false,
 };
 
 // ============================================================================

@@ -9,10 +9,14 @@ The worker uses these binding types:
 - **plain_text** — `CF_ACCOUNT_ID`, `CF_WORKER_NAME`, `CF_BUCKET_NAME`, `CF_DATABASE_ID` (config vars exposed via `/sync/config`)
 - **durable_object_namespace** — `REMINDER_ALARMS` (reminder alarm DOs)
 
-When adding new worker bindings, you must update **two** places:
+When adding new worker bindings, you must update **four** places (2 in CLI + 2 in plugin):
 
-1. **`commands/init.ts`** — `deployWorker()` call sets all bindings for fresh installs
-2. **`cloudflare/api.ts` → `redeployWorker()`** — ensure `keep_bindings` preserves the binding type so `crate deploy` / `crate update` don't strip it
+1. **CLI `cloudflare/api.ts:deployWorker()`** — sets all bindings for fresh installs
+2. **CLI `cloudflare/api.ts:redeployWorker()`** — ensure `keep_bindings` preserves the binding type
+3. **Plugin `src/cloudflare/api.ts:deployWorker()`** — same bindings for plugin-side deploys
+4. **Plugin `src/cloudflare/api.ts:redeployWorker()`** — same `keep_bindings`
+
+The worker source is shared - both CLI and plugin import from `src/cloudflare/worker-bundle.gen.ts` (built by `scripts/build-worker.mjs`).
 
 ## Command Roles
 

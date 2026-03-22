@@ -200,6 +200,7 @@ export class SyncRuntime {
 			syncOnStartup: this.settings.syncOnStartup,
 			syncInterval: this.settings.syncInterval,
 			showStatusBar: this.settings.showStatusBar,
+			pushEnabled: this.settings.pushEnabled,
 		};
 		try {
 			await this.apiClient.putSharedSettings(shared);
