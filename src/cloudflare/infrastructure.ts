@@ -19,9 +19,11 @@ import {
 	generateBucketName,
 	generateWorkerName,
 	getWorkerBindings,
+	getWorkerSubdomain,
 	listD1Databases,
 	listR2Buckets,
 	listWorkers,
+	queryD1,
 	redeployWorker,
 	verifyCredentials,
 } from './api';
@@ -322,24 +324,28 @@ async function tryReconnectExisting(
 	const databaseExists = databases.some((d) => d.uuid === config.databaseId);
 	if (!bucketExists || !databaseExists) return null;
 
-	// Redeploy with new auth token
+	// Register a new device token via D1 API (preserves existing tokens)
 	const authToken = generateAuthToken();
-	onProgress?.(`Reconnecting to worker ${crateWorker.id}...`);
-	const workerScript = getWorkerScript();
-	const deployment = await deployWorker(credentials, crateWorker.id, workerScript, {
-		r2Bucket: config.bucketName,
-		authToken,
-		d1DatabaseId: config.databaseId,
-		accountId: credentials.accountId,
-		workerName: crateWorker.id,
-		bucketName: config.bucketName,
-	});
+	const tokenHash = await computeTokenHash(authToken);
+	const tokenId = crypto.randomUUID();
+	onProgress?.(`Registering device token...`);
+	await queryD1(
+		credentials,
+		config.databaseId,
+		"INSERT INTO auth_tokens (id, token_hash, device_name) VALUES (?, ?, ?)",
+		[tokenId, tokenHash, 'plugin-reconnect']
+	);
 
-	await waitForWorkerReady(deployment.url, authToken, onProgress);
-	await registerTokenWithWorker(deployment.url, authToken);
+	// Code-only redeploy to ensure worker version matches plugin
+	onProgress?.(`Updating worker ${crateWorker.id}...`);
+	const workerScript = getWorkerScript();
+	await redeployWorker(credentials, crateWorker.id, workerScript);
+
+	const subdomain = await getWorkerSubdomain(credentials);
+	const workerUrl = `https://${crateWorker.id}.${subdomain}.workers.dev`;
 
 	return {
-		workerUrl: deployment.url,
+		workerUrl,
 		authToken,
 		bucketName: config.bucketName,
 		workerName: crateWorker.id,

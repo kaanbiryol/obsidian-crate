@@ -326,3 +326,55 @@ export async function deleteR2Bucket(credentials: CloudflareCredentials, name: s
 	);
 }
 
+export interface WorkerBinding {
+	type: string;
+	name: string;
+	text?: string;
+	bucket_name?: string;
+	id?: string;
+	class_name?: string;
+}
+
+export async function getWorkerBindings(
+	credentials: CloudflareCredentials,
+	workerName: string
+): Promise<WorkerBinding[]> {
+	const result = await cfFetch<{ bindings: WorkerBinding[] }>(
+		credentials,
+		`/accounts/${credentials.accountId}/workers/scripts/${workerName}/settings`
+	);
+	return result.bindings;
+}
+
+export async function queryD1(
+	credentials: CloudflareCredentials,
+	databaseId: string,
+	sql: string,
+	params?: string[]
+): Promise<void> {
+	await cfFetch<unknown>(
+		credentials,
+		`/accounts/${credentials.accountId}/d1/database/${databaseId}/query`,
+		{ method: 'POST', body: JSON.stringify({ sql, params }) }
+	);
+}
+
+export function resolveConfigFromBindings(
+	bindings: WorkerBinding[]
+): { bucketName: string; databaseId: string } | null {
+	let bucketName: string | undefined;
+	let databaseId: string | undefined;
+
+	for (const binding of bindings) {
+		if (binding.type === 'plain_text' && binding.name === 'CF_BUCKET_NAME' && binding.text) {
+			bucketName = binding.text;
+		}
+		if (binding.type === 'plain_text' && binding.name === 'CF_DATABASE_ID' && binding.text) {
+			databaseId = binding.text;
+		}
+	}
+
+	if (!bucketName || !databaseId) return null;
+	return { bucketName, databaseId };
+}
+

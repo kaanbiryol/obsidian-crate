@@ -2,6 +2,7 @@
  * `crate init` command - Sets up Cloudflare infrastructure for Crate
  */
 
+import { createHash, randomUUID } from 'crypto';
 import inquirer from 'inquirer';
 import {
 	CloudflareCredentials,
@@ -12,6 +13,13 @@ import {
 	deployWorker,
 	generateAuthToken,
 	generateBucketName,
+	listWorkers,
+	listD1Databases,
+	getWorkerBindings,
+	getWorkerSubdomain,
+	resolveConfigFromBindings,
+	redeployWorker,
+	queryD1,
 } from '../cloudflare/api.js';
 import { getWorkerScript } from '../worker-template.js';
 import { loadCredentials, saveCredentials, saveDeploymentConfig } from '../config.js';
@@ -46,6 +54,12 @@ export async function initCommand(options: InitOptions): Promise<void> {
 		process.exit(1);
 	}
 	console.log('✅ Credentials verified!\n');
+
+	// Check for existing infrastructure before creating new resources
+	if (!options.bucketName && !options.workerName) {
+		const reconnected = await tryReconnectExisting(credentials);
+		if (reconnected) return;
+	}
 
 	// Check if R2 is enabled
 	await ensureR2Enabled(credentials);
@@ -100,6 +114,87 @@ export async function initCommand(options: InitOptions): Promise<void> {
 	} catch (error) {
 		console.error('\n❌ Setup failed:', error instanceof Error ? error.message : error);
 		process.exit(1);
+	}
+}
+
+async function tryReconnectExisting(credentials: CloudflareCredentials): Promise<boolean> {
+	console.log('🔍 Checking for existing crate infrastructure...');
+
+	try {
+		const workers = await listWorkers(credentials);
+		const crateWorker = workers.find((w) => w.id.startsWith('crate-sync-'));
+		if (!crateWorker) return false;
+
+		const bindings = await getWorkerBindings(credentials, crateWorker.id);
+		const config = resolveConfigFromBindings(bindings);
+		if (!config) return false;
+
+		// Verify bucket and database still exist
+		const [buckets, databases] = await Promise.all([
+			listR2Buckets(credentials),
+			listD1Databases(credentials),
+		]);
+
+		const bucketExists = buckets.some((b) => b.name === config.bucketName);
+		const databaseExists = databases.some((d) => d.uuid === config.databaseId);
+		if (!bucketExists || !databaseExists) return false;
+
+		console.log(`\n   Found existing infrastructure:`);
+		console.log(`   Worker:   ${crateWorker.id}`);
+		console.log(`   Bucket:   ${config.bucketName}`);
+		console.log(`   Database: ${config.databaseId}\n`);
+
+		const { reconnect } = await inquirer.prompt<{ reconnect: boolean }>([
+			{
+				type: 'confirm',
+				name: 'reconnect',
+				message: 'Use existing infrastructure?',
+				default: true,
+			},
+		]);
+
+		if (!reconnect) return false;
+
+		// Register a new device token via D1 API (preserves existing tokens)
+		const authToken = generateAuthToken();
+		const tokenHash = createHash('sha256').update(authToken).digest('hex');
+		const tokenId = randomUUID();
+		console.log('\n🔑 Registering device token...');
+		await queryD1(
+			credentials,
+			config.databaseId,
+			"INSERT INTO auth_tokens (id, token_hash, device_name) VALUES (?, ?, ?)",
+			[tokenId, tokenHash, 'cli-reconnect']
+		);
+
+		// Code-only redeploy to ensure worker version matches
+		console.log(`⚙️  Updating worker ${crateWorker.id}...`);
+		const workerScript = getWorkerScript();
+		await redeployWorker(credentials, crateWorker.id, workerScript);
+		console.log('✅ Worker updated!\n');
+
+		const subdomain = await getWorkerSubdomain(credentials);
+		const workerUrl = `https://${crateWorker.id}.${subdomain}.workers.dev`;
+
+		const result: InitResult = {
+			workerUrl,
+			authToken,
+			bucketName: config.bucketName,
+			workerName: crateWorker.id,
+		};
+
+		saveDeploymentConfig({
+			workerName: crateWorker.id,
+			bucketName: config.bucketName,
+			workerUrl,
+			databaseId: config.databaseId,
+		});
+
+		outputResult(result);
+		return true;
+	} catch {
+		// Fall through to create-new flow
+		return false;
 	}
 }
 

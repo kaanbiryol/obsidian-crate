@@ -442,6 +442,19 @@ export async function getWorkerBindings(
 	return result.bindings;
 }
 
+export async function queryD1(
+	credentials: CloudflareCredentials,
+	databaseId: string,
+	sql: string,
+	params?: string[]
+): Promise<void> {
+	await cfRequest<unknown>(
+		credentials,
+		`/accounts/${credentials.accountId}/d1/database/${databaseId}/query`,
+		{ method: 'POST', body: JSON.stringify({ sql, params }) }
+	);
+}
+
 export function generateAuthToken(): string {
 	const array = new Uint8Array(32);
 	crypto.getRandomValues(array);
