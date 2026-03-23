@@ -449,8 +449,12 @@ export class SyncEngine {
 	}
 
 	private async getModifiedIso(path: string, fallbackMtime?: number): Promise<string> {
+		if (typeof fallbackMtime === 'number' && Number.isFinite(fallbackMtime)) {
+			return new Date(fallbackMtime).toISOString();
+		}
+
 		const stat = await this.vault.adapter.stat(path);
-		return new Date(stat?.mtime ?? fallbackMtime ?? Date.now()).toISOString();
+		return new Date(stat?.mtime ?? Date.now()).toISOString();
 	}
 
 	private getLocalDiffPlannerContext() {

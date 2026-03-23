@@ -873,6 +873,29 @@ describe('SyncEngine slice 5 safeguards', () => {
 		expect(harness.settings.lastSync).toBeNull();
 	});
 
+	it('reuses discovered mtimes during initial sync uploads', async () => {
+		const harness = createHarness();
+		const mtime = 1700000000000;
+		const file = {
+			path: 'notes/a.md',
+			extension: 'md',
+			stat: { size: 1, mtime },
+		};
+		harness.vault.getFiles.mockReturnValue([file]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
+		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: 1, mtime: mtime + 5000 });
+
+		const result = await harness.engine.initialSync();
+
+		expect(result.success).toBe(true);
+		expect(harness.vault.adapter.stat).not.toHaveBeenCalled();
+		expect(harness.localManifest.setEntry).toHaveBeenCalledWith(
+			'notes/a.md',
+			expect.objectContaining({ modified: new Date(mtime).toISOString() }),
+		);
+	});
+
 	it('sets state to error when force full sync finishes with non-fatal errors', async () => {
 		const harness = createHarness();
 		harness.api.getManifest.mockResolvedValue({
