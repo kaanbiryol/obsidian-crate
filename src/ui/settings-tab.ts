@@ -43,19 +43,28 @@ export class CrateSettingTab extends PluginSettingTab {
 			rerender: () => this.display(),
 		});
 
-		if (this.plugin.syncRuntime.isConfigured()) {
+		const isConfigured = this.plugin.syncRuntime.isConfigured();
+		const hasCloudflareCredentials = this.plugin.cloudflareSession.hasCredentials();
+
+		if (isConfigured) {
 			const syncCleanup = renderSyncSection({
 				containerEl,
 				plugin: this.plugin,
 				rerender: () => this.display(),
 			});
 			this.cleanupFns.push(syncCleanup);
+		}
 
+		if (isConfigured || hasCloudflareCredentials) {
 			renderInfrastructureSection({
 				containerEl,
 				plugin: this.plugin,
+				isConfigured,
 				rerender: () => this.display(),
 			});
+		}
+
+		if (isConfigured) {
 			renderUsageSection({
 				containerEl,
 				plugin: this.plugin,

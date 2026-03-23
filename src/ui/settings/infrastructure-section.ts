@@ -29,130 +29,131 @@ interface ResolveCredentialResult {
 export interface InfrastructureSectionContext {
 	containerEl: HTMLElement;
 	plugin: CratePlugin;
+	isConfigured: boolean;
 	rerender: () => void;
 }
 
 export function renderInfrastructureSection(context: InfrastructureSectionContext): void {
-	const { containerEl, plugin, rerender } = context;
+	const { containerEl, plugin, isConfigured, rerender } = context;
 	containerEl.createEl('h3', { text: 'Advanced' });
 
-	new Setting(containerEl)
-		.setName('Test connection')
-		.setDesc('Verify that the plugin can connect to your sync server')
-		.addButton(button => button
-			.setButtonText('Test')
-			.onClick(async () => {
-				await runButtonTask({
-					button,
-					idleText: 'Test',
-					runningText: 'Testing...',
-					task: async () => plugin.syncRuntime.testConnection(),
-					onSuccess: (result) => {
-						if (result.success) {
-							new Notice('Connection successful');
-						} else {
-							new Notice(`Connection failed: ${result.error}`);
-						}
-					},
-					onError: () => {
-						new Notice('Connection test failed');
-					},
-				});
-			}));
+	if (isConfigured) {
+		new Setting(containerEl)
+			.setName('Test connection')
+			.setDesc('Verify that the plugin can connect to your sync server')
+			.addButton(button => button
+				.setButtonText('Test')
+				.onClick(async () => {
+					await runButtonTask({
+						button,
+						idleText: 'Test',
+						runningText: 'Testing...',
+						task: async () => plugin.syncRuntime.testConnection(),
+						onSuccess: (result) => {
+							if (result.success) {
+								new Notice('Connection successful');
+							} else {
+								new Notice(`Connection failed: ${result.error}`);
+							}
+						},
+						onError: () => {
+							new Notice('Connection test failed');
+						},
+					});
+				}));
 
-	new Setting(containerEl)
-		.setName('Device ID')
-		.setDesc('Unique identifier for this device')
-		.addText(text => text
-			.setValue(plugin.settings.deviceId)
-			.onChange(async (value) => {
-				plugin.settings.deviceId = value;
-				await plugin.saveSettings();
-			}));
+		new Setting(containerEl)
+			.setName('Device ID')
+			.setDesc('Unique identifier for this device')
+			.addText(text => text
+				.setValue(plugin.settings.deviceId)
+				.onChange(async (value) => {
+					plugin.settings.deviceId = value;
+					await plugin.saveSettings();
+				}));
 
-	const initialSyncSetting = new Setting(containerEl)
-		.setName('Initial sync')
-		.setDesc('Upload all local files to the server (use for first-time setup)')
-		.addButton(button => button
-			.setButtonText('Upload all')
-			.setWarning()
-			.onClick(async () => {
-				if (!confirm('This will upload all files in your vault to the server. Continue?')) {
-					return;
-				}
+		const initialSyncSetting = new Setting(containerEl)
+			.setName('Initial sync')
+			.setDesc('Upload all local files to the server (use for first-time setup)')
+			.addButton(button => button
+				.setButtonText('Upload all')
+				.setWarning()
+				.onClick(async () => {
+					if (!confirm('This will upload all files in your vault to the server. Continue?')) {
+						return;
+					}
 
-				await runButtonTask({
-					button,
-					idleText: 'Upload all',
-					runningText: 'Uploading...',
-					onStart: () => {
-						showFileSyncProgress(initialProgress);
-					},
-					task: async ({ setButtonText }) => plugin.syncRuntime.initialSync((current, total) => {
-						setButtonText(`Uploading... ${current}/${total}`);
-						updateFileSyncProgress(initialProgress, current, total);
-					}),
-					onSuccess: (result) => {
-						if (result.success) {
-							new Notice(`Initial sync complete: ${result.uploaded} files uploaded`);
-						} else {
-							new Notice('Initial sync completed with errors');
-						}
-					},
-					onError: () => {
-						new Notice('Initial sync failed');
-					},
-					onFinally: () => {
-						hideFileSyncProgress(initialProgress);
-						rerender();
-					},
-				});
-			}));
-	const initialProgress = createFileSyncProgress(initialSyncSetting);
+					await runButtonTask({
+						button,
+						idleText: 'Upload all',
+						runningText: 'Uploading...',
+						onStart: () => {
+							showFileSyncProgress(initialProgress);
+						},
+						task: async ({ setButtonText }) => plugin.syncRuntime.initialSync((current, total) => {
+							setButtonText(`Uploading... ${current}/${total}`);
+							updateFileSyncProgress(initialProgress, current, total);
+						}),
+						onSuccess: (result) => {
+							if (result.success) {
+								new Notice(`Initial sync complete: ${result.uploaded} files uploaded`);
+							} else {
+								new Notice('Initial sync completed with errors');
+							}
+						},
+						onError: () => {
+							new Notice('Initial sync failed');
+						},
+						onFinally: () => {
+							hideFileSyncProgress(initialProgress);
+							rerender();
+						},
+					});
+				}));
+		const initialProgress = createFileSyncProgress(initialSyncSetting);
 
-	const forceSyncSetting = new Setting(containerEl)
-		.setName('Force full sync')
-		.setDesc('Overwrite all remote files with local vault and remove remote-only files')
-		.addButton(button => button
-			.setButtonText('Force full update')
-			.setWarning()
-			.onClick(async () => {
-				if (!confirm('This will overwrite ALL remote files with your local vault and delete remote-only files. This cannot be undone. Continue?')) {
-					return;
-				}
+		const forceSyncSetting = new Setting(containerEl)
+			.setName('Force full sync')
+			.setDesc('Overwrite all remote files with local vault and remove remote-only files')
+			.addButton(button => button
+				.setButtonText('Force full update')
+				.setWarning()
+				.onClick(async () => {
+					if (!confirm('This will overwrite ALL remote files with your local vault and delete remote-only files. This cannot be undone. Continue?')) {
+						return;
+					}
 
-				await runButtonTask({
-					button,
-					idleText: 'Force full update',
-					runningText: 'Syncing...',
-					onStart: () => {
-						showFileSyncProgress(forceProgress);
-					},
-					task: async ({ setButtonText }) => plugin.syncRuntime.forceFullSync((current, total) => {
-						setButtonText(`Syncing... ${current}/${total}`);
-						updateFileSyncProgress(forceProgress, current, total);
-					}),
-					onSuccess: (result) => {
-						if (result.success) {
-							new Notice(`Force sync complete: ${result.uploaded} uploaded, ${result.deleted} deleted`);
-						} else {
-							new Notice('Force sync completed with errors');
-						}
-					},
-					onError: () => {
-						new Notice('Force full sync failed');
-					},
-					onFinally: () => {
-						hideFileSyncProgress(forceProgress);
-						rerender();
-					},
-				});
-			}));
-	const forceProgress = createFileSyncProgress(forceSyncSetting);
-
-	if (plugin.syncRuntime.isConfigured()) {
-		renderInfrastructureManagementSection(context);
+					await runButtonTask({
+						button,
+						idleText: 'Force full update',
+						runningText: 'Syncing...',
+						onStart: () => {
+							showFileSyncProgress(forceProgress);
+						},
+						task: async ({ setButtonText }) => plugin.syncRuntime.forceFullSync((current, total) => {
+							setButtonText(`Syncing... ${current}/${total}`);
+							updateFileSyncProgress(forceProgress, current, total);
+						}),
+						onSuccess: (result) => {
+							if (result.success) {
+								new Notice(`Force sync complete: ${result.uploaded} uploaded, ${result.deleted} deleted`);
+							} else {
+								new Notice('Force sync completed with errors');
+							}
+						},
+						onError: () => {
+							new Notice('Force full sync failed');
+						},
+						onFinally: () => {
+							hideFileSyncProgress(forceProgress);
+							rerender();
+						},
+					});
+				}));
+		const forceProgress = createFileSyncProgress(forceSyncSetting);
 	}
+
+	renderInfrastructureManagementSection(context);
 }
 
 function inferWorkerNameFromUrl(workerUrl: string): string | null {
@@ -178,33 +179,35 @@ function inferWorkerNameFromUrl(workerUrl: string): string | null {
 }
 
 function renderInfrastructureManagementSection(context: InfrastructureSectionContext): void {
-	const { containerEl, plugin, rerender } = context;
+	const { containerEl, plugin, isConfigured, rerender } = context;
 
 	containerEl.createEl('h4', { text: 'Infrastructure management' });
 
 	const diagnosticsContainer = containerEl.createDiv();
 	diagnosticsContainer.style.display = 'none';
 
-	new Setting(containerEl)
-		.setName('Worker URL')
-		.setDesc('Current sync endpoint')
-		.addText(text => text
-			.setValue(plugin.settings.workerUrl)
-			.setDisabled(true));
+	if (isConfigured) {
+		new Setting(containerEl)
+			.setName('Worker URL')
+			.setDesc('Current sync endpoint')
+			.addText(text => text
+				.setValue(plugin.settings.workerUrl)
+				.setDisabled(true));
 
-	new Setting(containerEl)
-		.setName('Worker name')
-		.setDesc(plugin.settings.workerName || 'Not set');
+		new Setting(containerEl)
+			.setName('Worker name')
+			.setDesc(plugin.settings.workerName || 'Not set');
 
-	new Setting(containerEl)
-		.setName('R2 bucket')
-		.setDesc(plugin.settings.bucketName || 'Not set');
+		new Setting(containerEl)
+			.setName('R2 bucket')
+			.setDesc(plugin.settings.bucketName || 'Not set');
 
-	new Setting(containerEl)
-		.setName('D1 database ID')
-		.setDesc(plugin.settings.databaseId || 'Not set');
+		new Setting(containerEl)
+			.setName('D1 database ID')
+			.setDesc(plugin.settings.databaseId || 'Not set');
+	}
 
-	if (plugin.cloudflareSession.hasCredentials()) {
+	if (isConfigured && plugin.cloudflareSession.hasCredentials()) {
 		const redeploySetting = new Setting(containerEl)
 			.setName('Redeploy worker code')
 			.setDesc('Equivalent to CLI deploy/update using stored worker name')
@@ -254,53 +257,55 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 				}));
 	}
 
-	const diagnosticsSetting = new Setting(containerEl)
-		.setName('Run diagnostics')
-		.setDesc('Check worker connectivity and Cloudflare resource visibility')
-		.addButton(button => button
-			.setButtonText('Run')
-			.onClick(async () => {
-				const resolved = await resolveCloudflareCredentials(plugin);
-				if (resolved.hadError) {
-					return;
-				}
-				const originalDesc = diagnosticsSetting.descEl.textContent || '';
+	if (isConfigured) {
+		const diagnosticsSetting = new Setting(containerEl)
+			.setName('Run diagnostics')
+			.setDesc('Check worker connectivity and Cloudflare resource visibility')
+			.addButton(button => button
+				.setButtonText('Run')
+				.onClick(async () => {
+					const resolved = await resolveCloudflareCredentials(plugin);
+					if (resolved.hadError) {
+						return;
+					}
+					const originalDesc = diagnosticsSetting.descEl.textContent || '';
 
-				await runButtonTask({
-					button,
-					idleText: 'Run',
-					runningText: 'Running...',
-					progressEl: diagnosticsSetting.descEl,
-					progressMessage: 'Running diagnostics...',
-					task: async () => runDiagnostics({
-						workerUrl: plugin.settings.workerUrl,
-						authToken: plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || undefined,
-						accountId: resolved.credentials?.accountId,
-						apiToken: resolved.credentials?.apiToken,
-						workerName: plugin.settings.workerName || undefined,
-						bucketName: plugin.settings.bucketName || undefined,
-						databaseId: plugin.settings.databaseId || undefined,
-					}),
-					onSuccess: (results) => {
-						renderDiagnostics(diagnosticsContainer, results);
+					await runButtonTask({
+						button,
+						idleText: 'Run',
+						runningText: 'Running...',
+						progressEl: diagnosticsSetting.descEl,
+						progressMessage: 'Running diagnostics...',
+						task: async () => runDiagnostics({
+							workerUrl: plugin.settings.workerUrl,
+							authToken: plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || undefined,
+							accountId: resolved.credentials?.accountId,
+							apiToken: resolved.credentials?.apiToken,
+							workerName: plugin.settings.workerName || undefined,
+							bucketName: plugin.settings.bucketName || undefined,
+							databaseId: plugin.settings.databaseId || undefined,
+						}),
+						onSuccess: (results) => {
+							renderDiagnostics(diagnosticsContainer, results);
 
-						const failures = results.filter(r => r.status === 'fail').length;
-						const warnings = results.filter(r => r.status === 'warn').length;
-						if (failures === 0 && warnings === 0) {
-							new Notice('Diagnostics passed');
-						} else {
-							new Notice(`Diagnostics complete: ${failures} fail, ${warnings} warn`);
-						}
-					},
-					onError: (error) => {
-						new Notice(`Diagnostics failed: ${getErrorMessage(error)}`);
-					},
-					onFinally: () => {
-						diagnosticsSetting.descEl.style.display = '';
-						diagnosticsSetting.descEl.textContent = originalDesc;
-					},
-				});
-			}));
+							const failures = results.filter(r => r.status === 'fail').length;
+							const warnings = results.filter(r => r.status === 'warn').length;
+							if (failures === 0 && warnings === 0) {
+								new Notice('Diagnostics passed');
+							} else {
+								new Notice(`Diagnostics complete: ${failures} fail, ${warnings} warn`);
+							}
+						},
+						onError: (error) => {
+							new Notice(`Diagnostics failed: ${getErrorMessage(error)}`);
+						},
+						onFinally: () => {
+							diagnosticsSetting.descEl.style.display = '';
+							diagnosticsSetting.descEl.textContent = originalDesc;
+						},
+					});
+				}));
+	}
 
 	if (plugin.cloudflareSession.hasCredentials()) {
 		const deleteSetting = new Setting(containerEl)
