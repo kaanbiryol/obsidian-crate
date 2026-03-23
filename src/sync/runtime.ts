@@ -137,6 +137,16 @@ export class SyncRuntime {
 		this.statusBar = null;
 	}
 
+	private async deleteManifestFile(): Promise<void> {
+		const path = `${this.plugin.manifest.dir}/file-manifest.json`;
+		const adapter = this.plugin.app.vault.adapter;
+		try {
+			if (await adapter.exists(path)) {
+				await adapter.remove(path);
+			}
+		} catch { /* best effort */ }
+	}
+
 	onRawFileEvent(path: string): void {
 		if (!this.acceptingEvents) return;
 		this.syncEngine?.onRawFileEvent(path);
@@ -166,13 +176,17 @@ export class SyncRuntime {
 			this.settings.cloudflareAccountId = config.accountId.trim();
 		}
 		this.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, config.authToken.trim());
+		await this.deleteManifestFile();
+		this.settings.lastSeq = 0;
 		await this.persistSettings();
 		await this.initialize();
 	}
 
 	async clearSyncConfiguration(options?: ClearSyncConfigurationOptions): Promise<void> {
 		this.destroy();
+		await this.deleteManifestFile();
 
+		this.settings.lastSeq = 0;
 		this.settings.workerUrl = '';
 		this.settings.workerName = '';
 		this.settings.bucketName = '';

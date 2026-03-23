@@ -221,6 +221,7 @@ async function emptyR2Bucket(
 		const deployment = await deployWorker(credentials, tempName, PURGE_WORKER_SCRIPT, {
 			r2Bucket: bucketName,
 			authToken,
+			skipDurableObjects: true,
 		});
 
 		// Retry — worker may take a moment to be available on workers.dev

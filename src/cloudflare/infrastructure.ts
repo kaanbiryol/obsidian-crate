@@ -119,6 +119,30 @@ export async function computeTokenHash(token: string): Promise<string> {
 	return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function waitForWorkerReady(
+	workerUrl: string,
+	authToken: string,
+	onProgress?: ProgressCallback
+): Promise<void> {
+	const url = `${workerUrl.replace(/\/$/, '')}/health`;
+	for (let attempt = 0; attempt < 10; attempt++) {
+		try {
+			const response = await requestUrl({
+				url,
+				method: 'GET',
+				headers: { 'Authorization': `Bearer ${authToken}` },
+				throw: false,
+			});
+			if (response.status === 200) return;
+		} catch {
+			// Worker not ready yet
+		}
+		onProgress?.(`Waiting for worker to become available (${attempt + 1}/10)...`);
+		await sleep(2000);
+	}
+	// Don't throw - let the caller proceed and handle errors naturally
+}
+
 async function registerTokenWithWorker(
 	workerUrl: string,
 	authToken: string,
@@ -260,6 +284,7 @@ export async function quickSetup(input: QuickSetupInput, onProgress?: ProgressCa
 		bucketName: requestedBucket,
 	});
 
+	await waitForWorkerReady(deployment.url, authToken, onProgress);
 	await registerTokenWithWorker(deployment.url, authToken);
 
 	return {
@@ -310,6 +335,7 @@ async function tryReconnectExisting(
 		bucketName: config.bucketName,
 	});
 
+	await waitForWorkerReady(deployment.url, authToken, onProgress);
 	await registerTokenWithWorker(deployment.url, authToken);
 
 	return {
@@ -622,6 +648,7 @@ async function emptyBucketWithPurgeWorker(
 	const deployment = await deployWorker(credentials, tempWorkerName, PURGE_WORKER_SCRIPT, {
 		r2Bucket: bucketName,
 		authToken,
+		skipDurableObjects: true,
 	});
 
 	for (let attempt = 0; attempt < 5; attempt++) {

@@ -102,6 +102,7 @@ export interface DeployWorkerBindings {
 	accountId?: string;
 	workerName?: string;
 	bucketName?: string;
+	skipDurableObjects?: boolean;
 }
 
 export async function deployWorker(
@@ -161,20 +162,25 @@ export async function deployWorker(
 		});
 	}
 
-	bindingsArray.push({
-		type: 'durable_object_namespace',
-		name: 'REMINDER_ALARMS',
-		class_name: 'ReminderAlarm',
-	});
+	if (!bindings.skipDurableObjects) {
+		bindingsArray.push({
+			type: 'durable_object_namespace',
+			name: 'REMINDER_ALARMS',
+			class_name: 'ReminderAlarm',
+		});
+	}
 
-	const metadata = {
+	const metadata: Record<string, unknown> = {
 		main_module: 'index.js',
 		bindings: bindingsArray,
-		migrations: {
+	};
+
+	if (!bindings.skipDurableObjects) {
+		metadata.migrations = {
 			tag: 'v1',
 			new_sqlite_classes: ['ReminderAlarm'],
-		},
-	};
+		};
+	}
 
 	// Deploy using multipart form data
 	const formData = new FormData();
