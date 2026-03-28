@@ -357,11 +357,11 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         const detectedProject = parsed.project;
 
         if (detectedProject && detectedProject !== project) {
-            // Found a project in content that differs from current state
             setProject(detectedProject);
+        } else if (!detectedProject && project !== defaultProject) {
+            // Reset to default when user removes the #tag from text
+            setProject(defaultProject || 'Inbox');
         }
-        // Note: We intentionally don't reset project when # is removed
-        // The user can use the project picker to change it if needed
 
         // Handle recurrence: set if detected, but don't auto-clear
         // (user must explicitly delete the recurrence text or use the clear button)
