@@ -29,7 +29,7 @@ export const getChipStyle = (type: string, _text: string): string => {
     const fontWeight = getFontWeight('medium');
     const baseStyle = `
         padding: 1px 6px;
-        border-radius: 4px;
+        border-radius: 6px;
         display: inline;
         font-size: inherit;
         font-weight: ${fontWeight};

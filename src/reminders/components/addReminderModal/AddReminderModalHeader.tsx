@@ -55,9 +55,9 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                     onPress={onClose}
                     className="min-w-9 w-9 h-9 rounded-xl"
                     style={{
-                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)',
-                        border: isDark ? '1px solid rgba(255, 255, 255, 0.06)' : '1px solid rgba(0, 0, 0, 0.04)',
-                        color: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.4)',
+                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+                        border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.06)',
+                        color: isDark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.5)',
                         transition: 'all 0.35s ease-out',
                     }}
                 >
@@ -86,17 +86,20 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                 isIconOnly
                 size="sm"
                 color="primary"
-                onPress={onSubmit}
-                isDisabled={!canSubmit}
+                onPress={canSubmit ? onSubmit : () => {}}
                 className="w-9 h-9 min-w-9 rounded-xl"
+                disableAnimation={!canSubmit}
                 style={canSubmit ? {
                     background: 'hsl(var(--heroui-primary))',
                     boxShadow: '0 2px 8px hsl(var(--heroui-primary) / 0.2)',
                     color: 'white',
+                    cursor: 'pointer',
                     transition: 'all 0.35s ease-out',
                 } : {
-                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
-                    color: isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.2)',
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                    color: isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.35)',
+                    cursor: 'default',
+                    opacity: 1,
                     transition: 'all 0.35s ease-out',
                 }}
             >

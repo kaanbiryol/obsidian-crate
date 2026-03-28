@@ -25,7 +25,7 @@ const getPillStyle = (
         height: '36px',
         display: 'inline-flex',
         alignItems: 'center',
-        borderRadius: '10px',
+        borderRadius: '12px',
         fontSize: '13px',
         fontWeight: 500,
         letterSpacing: '0.005em',
@@ -125,7 +125,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
         {/* Text Input - wrapped in subtle glass container */}
         <div
             ref={containerRef}
-            className="relative rounded-xl"
+            className="relative rounded-lg"
             style={{
                 backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
                 border: isDark ? '1px solid rgba(255, 255, 255, 0.04)' : '1px solid rgba(0, 0, 0, 0.03)',

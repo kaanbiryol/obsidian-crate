@@ -69,9 +69,6 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     const glassBackButtonHoverBg = isDark
         ? 'rgba(255, 255, 255, 0.08)'
         : 'rgba(0, 0, 0, 0.06)';
-    const dividerGradient = isDark
-        ? 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 20%, rgba(255, 255, 255, 0.08) 80%, transparent 100%)'
-        : 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.06) 20%, rgba(0, 0, 0, 0.06) 80%, transparent 100%)';
     const glassBackground = isDark
         ? 'rgba(255, 255, 255, 0.03)'
         : 'rgba(0, 0, 0, 0.02)';
@@ -176,15 +173,6 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                     <div className="w-9" />
                 </div>
 
-                {/* Header divider - Gradient fade */}
-                <div
-                    style={{
-                        height: '1px',
-                        margin: '0 20px 8px',
-                        background: dividerGradient,
-                    }}
-                />
-
                 {/* Content */}
                 <div style={{ padding: '0 16px 16px' }}>
                     {/* Segmented Control - Minimal Pill Buttons */}
@@ -201,7 +189,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                                     style={{
                                         flex: 1,
                                         height: 36,
-                                        borderRadius: 18,
+                                        borderRadius: 12,
                                         border: 'none',
                                         background: isSelected
                                             ? colors.accent
@@ -264,7 +252,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                                                             flex: 1,
                                                             aspectRatio: '1',
                                                             maxWidth: 38,
-                                                            borderRadius: 10,
+                                                            borderRadius: 12,
                                                             border: 'none',
                                                             background: isSelected ? colors.accent : colors.surface,
                                                             color: isSelected ? 'white' : colors.textSecondary,
@@ -309,7 +297,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                                             style={{
                                                 width: 56,
                                                 height: 36,
-                                                borderRadius: 8,
+                                                borderRadius: 12,
                                                 border: `1px solid ${colors.border}`,
                                                 background: 'transparent',
                                                 color: colors.textPrimary,
@@ -341,7 +329,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                         style={{
                             background: glassBackground,
                             border: `1px solid ${glassBorder}`,
-                            borderRadius: '14px',
+                            borderRadius: '12px',
                             padding: '14px 16px',
                             marginTop: 16,
                         }}

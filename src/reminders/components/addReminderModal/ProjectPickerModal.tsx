@@ -92,7 +92,7 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
                 onClick={onSelect}
                 className="w-full flex items-center gap-3 px-4 min-h-[52px] focus:outline-none"
                 style={{
-                    borderRadius: '14px',
+                    borderRadius: '12px',
                     border: isSelected
                         ? `1px solid var(--interactive-accent)`
                         : `1px solid ${glassBorder}`,
@@ -195,13 +195,6 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
     const glassBackButtonHoverBg = isDark
         ? 'rgba(255, 255, 255, 0.08)'
         : 'rgba(0, 0, 0, 0.06)';
-    const dividerGradient = isDark
-        ? 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 20%, rgba(255, 255, 255, 0.08) 80%, transparent 100%)'
-        : 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.06) 20%, rgba(0, 0, 0, 0.06) 80%, transparent 100%)';
-    const scrollFadeColor = isDark
-        ? 'var(--background-primary, #1e1e1e)'
-        : 'var(--background-primary, #ffffff)';
-
     return (
         <BaseModal
             isOpen={isOpen}
@@ -213,7 +206,7 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
             showDragHandle={pickerMode !== 'overlay'}
             zIndex={pickerMode === 'overlay' ? 70 : 60}
         >
-            <div>
+            <div className={isDark ? 'dark text-foreground' : ''}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 pt-2 pb-3">
                     {/* Back button - Glass styling */}
@@ -255,80 +248,30 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
                     <div className="w-9" />
                 </div>
 
-                {/* Header divider - Gradient fade */}
+                {/* Scrollable project list */}
                 <div
+                    ref={scrollContainerRef}
+                    className="project-picker-scroll overflow-y-auto py-3"
                     style={{
-                        height: '1px',
-                        margin: '0 20px 8px',
-                        background: dividerGradient,
-                    }}
-                />
-
-                {/* Scrollable project list with depth effects */}
-                <div
-                    style={{
-                        position: 'relative',
                         maxHeight: 'calc(70vh - 100px)',
+                        WebkitOverflowScrolling: 'touch',
+                        touchAction: 'pan-y',
                     }}
                 >
-                    {/* Top fade overlay */}
                     <div
-                        style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            height: '20px',
-                            background: `linear-gradient(to bottom, ${scrollFadeColor}, transparent)`,
-                            pointerEvents: 'none',
-                            zIndex: 1,
-                            opacity: 0.8,
-                        }}
-                    />
-
-                    {/* Scroll container */}
-                    <div
-                        ref={scrollContainerRef}
-                        className="project-picker-scroll overflow-y-auto py-3"
-                        style={{
-                            maxHeight: 'calc(70vh - 100px)',
-                            WebkitOverflowScrolling: 'touch',
-                            touchAction: 'pan-y',
-                            boxShadow: isDark
-                                ? 'inset 0 2px 8px rgba(0, 0, 0, 0.15)'
-                                : 'inset 0 2px 8px rgba(0, 0, 0, 0.04)',
-                        }}
+                        role="listbox"
+                        aria-label="Project selection"
                     >
-                        <div
-                            role="listbox"
-                            aria-label="Project selection"
-                        >
-                            {projects.map((p) => (
-                                <ProjectRow
-                                    key={p}
-                                    projectName={p}
-                                    isSelected={p === selectedProject}
-                                    onSelect={() => handleSelectProject(p)}
-                                    isDark={isDark}
-                                />
-                            ))}
-                        </div>
+                        {projects.map((p) => (
+                            <ProjectRow
+                                key={p}
+                                projectName={p}
+                                isSelected={p === selectedProject}
+                                onSelect={() => handleSelectProject(p)}
+                                isDark={isDark}
+                            />
+                        ))}
                     </div>
-
-                    {/* Bottom fade overlay */}
-                    <div
-                        style={{
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            height: '20px',
-                            background: `linear-gradient(to top, ${scrollFadeColor}, transparent)`,
-                            pointerEvents: 'none',
-                            zIndex: 1,
-                            opacity: 0.8,
-                        }}
-                    />
                 </div>
             </div>
         </BaseModal>

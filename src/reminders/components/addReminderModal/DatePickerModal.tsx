@@ -71,9 +71,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
     const glassBorder = isDark
         ? 'rgba(255, 255, 255, 0.06)'
         : 'rgba(0, 0, 0, 0.05)';
-    const dividerGradient = isDark
-        ? 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 20%, rgba(255, 255, 255, 0.08) 80%, transparent 100%)'
-        : 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.06) 20%, rgba(0, 0, 0, 0.06) 80%, transparent 100%)';
+
 
     // Track calendar month for navigation animation
     const [calendarDirection, setCalendarDirection] = useState(0);
@@ -176,15 +174,6 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                     <div className="w-9" />
                 </div>
 
-                {/* Header divider - Gradient fade */}
-                <div
-                    style={{
-                        height: '1px',
-                        margin: '0 20px 8px',
-                        background: dividerGradient,
-                    }}
-                />
-
                 {/* Calendar Section */}
                 <div className="px-4 pt-2">
                     {/* Custom Month Navigation - Glass styled */}
@@ -200,7 +189,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                                 height: '34px',
                                 background: glassBackground,
                                 border: `1px solid ${glassBorder}`,
-                                borderRadius: '10px',
+                                borderRadius: '12px',
                                 cursor: 'pointer',
                                 padding: 0,
                                 transition: 'transform 200ms ease-out',
@@ -257,7 +246,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                                 height: '34px',
                                 background: glassBackground,
                                 border: `1px solid ${glassBorder}`,
-                                borderRadius: '10px',
+                                borderRadius: '12px',
                                 cursor: 'pointer',
                                 padding: 0,
                                 transition: 'transform 200ms ease-out',
@@ -354,7 +343,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                     style={{
                         background: glassBackground,
                         border: `1px solid ${glassBorder}`,
-                        borderRadius: '14px',
+                        borderRadius: '12px',
                         padding: '14px 16px',
                         margin: '16px 16px 0',
                     }}

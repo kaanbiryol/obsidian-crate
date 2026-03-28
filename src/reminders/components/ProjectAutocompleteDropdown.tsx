@@ -53,7 +53,7 @@ export const ProjectAutocompleteDropdown: React.FC<ProjectAutocompleteDropdownPr
                 borderBottom: `1px solid ${separatorColor}`,
                 borderLeft: `1px solid ${separatorColor}`,
                 borderRight: `1px solid ${separatorColor}`,
-                borderRadius: '0 0 8px 8px',
+                borderRadius: '0 0 12px 12px',
                 boxShadow: isDark
                     ? '0 4px 12px rgba(0, 0, 0, 0.3)'
                     : '0 4px 12px rgba(0, 0, 0, 0.08)',
