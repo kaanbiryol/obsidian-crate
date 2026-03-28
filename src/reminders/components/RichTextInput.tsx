@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { buildHTML, getPlainText } from '../utils/richTextParsing';
 import { saveCursorPosition, restoreCursorPosition, moveCursorToEnd } from '../utils/cursorPosition';
+import { extractHashtagQuery } from '../utils/projectSearch';
 
 export interface RichTextInputHandle {
     /** Focus the input */
@@ -9,6 +10,8 @@ export interface RichTextInputHandle {
     blur: () => void;
     /** Get the underlying DOM element */
     getElement: () => HTMLDivElement | null;
+    /** Set a pending cursor position to be applied on next content update */
+    setCursorPosition: (pos: number) => void;
 }
 
 interface RichTextInputProps {
@@ -26,6 +29,10 @@ interface RichTextInputProps {
     preserveSelection?: boolean;
     /** Known project names for multi-word project highlighting */
     knownProjects?: string[];
+    /** Callback when a # autocomplete query changes. null = no active autocomplete. */
+    onAutocompleteQuery?: (query: string | null, rect: DOMRect | null) => void;
+    /** Handler for autocomplete keyboard navigation. Return true if handled. */
+    onAutocompleteKeyDown?: (e: React.KeyboardEvent) => boolean;
 }
 
 export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>(({
@@ -40,11 +47,14 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     style,
     autoFocus = false,
     preserveSelection = true,
-    knownProjects
+    knownProjects,
+    onAutocompleteQuery,
+    onAutocompleteKeyDown
 }, ref) => {
     const editableRef = useRef<HTMLDivElement>(null);
     const hasInitializedRef = useRef(false);
     const knownProjectsKeyRef = useRef<string | null>(null);
+    const pendingCursorRef = useRef<number | null>(null);
 
     // Use provided ref or internal one
     const actualRef = inputRef || editableRef;
@@ -77,6 +87,9 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             }
         },
         getElement: () => actualRef.current,
+        setCursorPosition: (pos: number) => {
+            pendingCursorRef.current = pos;
+        },
     }));
 
     // Handle input changes
@@ -95,9 +108,20 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         // Call onChange with plain text
         onChange(plainText);
 
-        // Restore cursor
+        // Restore cursor, then detect autocomplete query
         requestAnimationFrame(() => {
             restoreCursorPosition(actualRef.current, cursorPos);
+
+            if (onAutocompleteQuery && cursorPos !== null) {
+                const hashInfo = extractHashtagQuery(plainText, cursorPos);
+                if (hashInfo) {
+                    const sel = window.getSelection();
+                    const rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
+                    onAutocompleteQuery(hashInfo.query, rect ?? null);
+                } else {
+                    onAutocompleteQuery(null, null);
+                }
+            }
         });
     };
 
@@ -138,7 +162,13 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             return;
         }
 
-        if (shouldPreserveCursor) {
+        if (pendingCursorRef.current !== null) {
+            const pendingPos = pendingCursorRef.current;
+            pendingCursorRef.current = null;
+            requestAnimationFrame(() => {
+                restoreCursorPosition(actualRef.current, pendingPos);
+            });
+        } else if (shouldPreserveCursor) {
             requestAnimationFrame(() => {
                 restoreCursorPosition(actualRef.current, cursorPos);
             });
@@ -163,8 +193,9 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         }
     }, [autoFocus]);
 
-    // Handle keydown
+    // Handle keydown - autocomplete gets first chance to consume the event
     const handleKeyDownInternal = (e: React.KeyboardEvent) => {
+        if (onAutocompleteKeyDown?.(e)) return;
         if (onKeyDown) {
             onKeyDown(e);
         }

@@ -20,7 +20,7 @@ interface ProjectPickerModalProps {
 }
 
 // Color dot component for project indicator with glow halo
-const ProjectDot: React.FC<{ projectName: string; isDark: boolean }> = ({ projectName, isDark }) => {
+export const ProjectDot: React.FC<{ projectName: string; isDark: boolean }> = ({ projectName, isDark }) => {
     const colors = getProjectColor(projectName);
     // Use theme-aware color from the 50-color palette
     const currentColor = isDark ? colors.dark.accent : colors.light.accent;

@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Calendar as CalendarIcon, Flag, Hash, Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { RichTextInput, RichTextInputHandle } from '../RichTextInput';
 import { ShadowDOMButton, ShadowDOMMotionButton } from '../ShadowDOMButton';
+import { ProjectAutocompleteDropdown } from '../ProjectAutocompleteDropdown';
+import { useProjectAutocomplete } from '../useProjectAutocomplete';
 import { formatRecurrence } from '../../utils/rruleConverter';
 import { getFontSize } from '../../ui/themes';
 import { RecurrenceRule } from '../../types';
@@ -104,10 +106,25 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     onOpenProjectPicker,
     onOpenRecurrencePicker,
     onTogglePriority,
-}) => (
+}) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const autocomplete = useProjectAutocomplete({
+        content,
+        projects,
+        onContentChange,
+        richTextInputRef,
+    });
+
+    const handleAutocompleteQuery = useCallback((query: string | null, rect: DOMRect | null) => {
+        autocomplete.updateAutocomplete(query, rect);
+    }, [autocomplete.updateAutocomplete]);
+
+    return (
     <div className="px-5 pt-3 pb-3" onTouchEnd={onTouchEnd}>
         {/* Text Input - wrapped in subtle glass container */}
         <div
+            ref={containerRef}
             className="relative rounded-xl"
             style={{
                 backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
@@ -125,9 +142,21 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                 autoFocus={allowAutoFocus}
                 preserveSelection={preserveSelection}
                 knownProjects={projects}
+                onAutocompleteQuery={handleAutocompleteQuery}
+                onAutocompleteKeyDown={autocomplete.handleKeyDown}
                 className="w-full px-0 py-0 bg-transparent border-none outline-none resize-none min-h-[32px]"
                 style={{ fontSize: getFontSize('lg'), color: textColor }}
             />
+            {autocomplete.isOpen && (
+                <ProjectAutocompleteDropdown
+                    filteredProjects={autocomplete.filteredProjects}
+                    highlightedIndex={autocomplete.highlightedIndex}
+                    anchorRect={autocomplete.rect}
+                    containerRef={containerRef}
+                    isDark={isDark}
+                    onSelect={autocomplete.selectProject}
+                />
+            )}
         </div>
 
         {/* Action Buttons - Compact Inline Chips */}
@@ -261,4 +290,5 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
             </ShadowDOMMotionButton>
         </div>
     </div>
-);
+    );
+};
