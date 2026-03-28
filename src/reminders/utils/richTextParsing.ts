@@ -30,8 +30,7 @@ export const getChipStyle = (type: string, _text: string): string => {
     const baseStyle = `
         padding: 1px 6px;
         border-radius: 4px;
-        display: inline-flex;
-        align-items: center;
+        display: inline;
         font-size: inherit;
         font-weight: ${fontWeight};
         letter-spacing: 0.01em;
