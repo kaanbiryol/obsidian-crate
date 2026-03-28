@@ -11,7 +11,7 @@ import {
   CONTENT_PADDING_TOP,
   SCROLL_PADDING_WITHOUT_FAB_CSS
 } from '../../ui/layoutConstants';
-import { softRadialGlow } from '../../ui/gradients';
+
 
 export interface ProjectStats {
   active: number;
@@ -96,14 +96,6 @@ const ProjectCard = memo(function ProjectCard({
       transition={{ duration: 0 }}
       whileTap={{ scale: 0.98 }}
     >
-      {/* Subtle glow on hover - rendered via CSS */}
-      <div
-        className="premium-project-glow"
-        style={{
-          ['--reminders-glow' as string]: softRadialGlow(accentColor, { shape: 'ellipse', strength: 0.07 }),
-        } as React.CSSProperties}
-      />
-
       {/* Card content */}
       <div className="premium-project-content">
         {/* Left section: Accent + Info */}

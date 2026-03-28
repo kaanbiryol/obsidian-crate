@@ -15,7 +15,7 @@ import {
   SCROLL_PADDING_WITH_FAB_CSS,
   CARD_ANIMATION,
 } from '../../ui/layoutConstants';
-import { softRadialGlow } from '../../ui/gradients';
+
 
 export interface ProjectDetailViewProps {
   project: string;
@@ -61,14 +61,6 @@ const RingProgress = memo(function RingProgress({
 
   return (
     <div className="premium-ring-container" style={{ width: size, height: size }}>
-      {/* Glow backdrop */}
-      <div
-        className="premium-ring-glow"
-        style={{
-          ['--reminders-glow' as string]: softRadialGlow(accentColor, { shape: 'circle', strength: 0.1 }),
-        } as React.CSSProperties}
-      />
-
       {/* SVG Ring */}
       <svg
         viewBox="0 0 100 100"
@@ -206,14 +198,6 @@ export const ProjectDetailView = memo(function ProjectDetailView({
 
       {/* Premium Hero Header Card */}
       <div className="premium-hero-card">
-        {/* Glow backdrop */}
-        <div
-          className="premium-hero-glow"
-          style={{
-            ['--reminders-glow' as string]: softRadialGlow(accentColor, { shape: 'ellipse', strength: 0.08 }),
-          } as React.CSSProperties}
-        />
-
         {/* Glass content */}
         <div className="premium-hero-content">
           {/* Left: Title */}

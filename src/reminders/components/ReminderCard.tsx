@@ -5,7 +5,7 @@ import { getProjectColor } from '../utils/projectColors';
 import { formatDueDate, isReminderOverdue } from '../utils/dateFormatting';
 import type { AnimationConfig } from '../types/componentAdapter';
 import type { RecurrenceRule } from '../types/reminder';
-import { softRadialGlow } from '../ui/gradients';
+
 
 interface ReminderData {
     id: string;
@@ -82,14 +82,6 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
             className={`premium-reminder-card ${reminder.completed ? 'is-completed' : ''} ${className}`}
             {...wrapperProps}
         >
-            {/* Hover glow effect */}
-            <div
-                className="premium-reminder-glow"
-                style={{
-                    ['--reminders-glow' as string]: softRadialGlow(accentColor, { shape: 'ellipse', strength: 0.06 }),
-                } as React.CSSProperties}
-            />
-
             {/* Card content */}
             <div className="premium-reminder-content">
                 {/* Custom checkbox */}
