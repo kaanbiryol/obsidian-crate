@@ -112,6 +112,7 @@ export class SyncRuntime {
 
 		await this.syncEngine.initialize();
 		this.statusBar?.update(this.syncEngine.getState());
+		this.acceptingEvents = true;
 
 		if (this.settings.syncOnStartup) {
 			this.sync()
@@ -120,12 +121,7 @@ export class SyncRuntime {
 				})
 				.catch(error => {
 					logger.error('Startup sync failed:', error);
-				})
-				.finally(() => {
-					this.acceptingEvents = true;
 				});
-		} else {
-			this.acceptingEvents = true;
 		}
 	}
 
