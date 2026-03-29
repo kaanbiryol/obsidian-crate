@@ -40,6 +40,7 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 	const apiClient = plugin.syncRuntime.getApiClient();
 	if (apiClient) {
 		const subscribeUrl = `${plugin.settings.workerUrl}/notifications`;
+		const authToken = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '';
 
 		new Setting(containerEl)
 			.setName('Subscribe a device')
@@ -47,8 +48,7 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 			.addButton(button => {
 				button.setButtonText('Copy link');
 				button.onClick(async () => {
-					const token = await plugin.app.secretStorage?.getSecret(SECRET_KEYS.AUTH_TOKEN) ?? '';
-					const url = `${subscribeUrl}?token=${token}`;
+					const url = `${subscribeUrl}?token=${authToken}`;
 					await navigator.clipboard.writeText(url);
 					new Notice('Subscribe link copied to clipboard');
 				});
@@ -56,15 +56,14 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 			.addButton(button => {
 				button.setButtonText('Show QR');
 				button.onClick(async () => {
-					const token = await plugin.app.secretStorage?.getSecret(SECRET_KEYS.AUTH_TOKEN) ?? '';
-					const url = `${subscribeUrl}?token=${token}`;
+					const url = `${subscribeUrl}?token=${authToken}`;
 					new QRModal(plugin.app, url).open();
 				});
 			});
 
 		// Subscriptions list
 		const listContainer = containerEl.createDiv({ cls: 'crate-push-subscriptions' });
-		loadSubscriptions(listContainer, plugin);
+		void loadSubscriptions(listContainer, plugin);
 
 		// Test button
 		new Setting(containerEl)

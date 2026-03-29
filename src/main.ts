@@ -29,7 +29,11 @@ import { ReminderQueryInjector } from './reminders/query/injector';
 import { createRemindersBlockExtension } from './reminders/query/remindersBlockLivePreview';
 import { createInlineTodoExtension } from './reminders/query/inlineTodoLivePreview';
 import { registerReminderCommands } from './reminders/commands';
-import { type RemindersSettings, useRemindersSettingsStore } from './reminders/settings';
+import {
+	type RemindersSettings,
+	normalizeRemindersFolderPath,
+	useRemindersSettingsStore,
+} from './reminders/settings';
 import { RemindersView, VIEW_TYPE_REMINDERS } from './reminders/ui/reminders-view';
 import { openFullScreenReminderModal } from './reminders/ui/modals';
 import { ReminderNotificationService } from './reminders/services/notificationService';
@@ -48,7 +52,7 @@ export default class CratePlugin extends Plugin {
 	reminderIndex!: ReminderIndex;
 	markdownWriter!: MarkdownWriter;
 	storage!: StorageCompat;
-	remindersSettings!: RemindersSettings;
+	remindersSettings: RemindersSettings = useRemindersSettingsStore.getState();
 	private remindersVaultWatcher?: VaultWatcher;
 	private cachedStyles: string | null = null;
 
@@ -132,10 +136,16 @@ export default class CratePlugin extends Plugin {
 			}
 			// Drop CalDAV syncMethod
 			delete loaded.syncMethod;
+			const normalizedSettingsData: Partial<RemindersSettings> = {
+				...settingsData,
+				remindersFolderPath: normalizeRemindersFolderPath(
+					typeof loaded.remindersFolderPath === 'string' ? loaded.remindersFolderPath : undefined,
+				),
+			};
 
 			useRemindersSettingsStore.setState((old) => ({
 				...old,
-				...settingsData,
+				...normalizedSettingsData,
 			}), true);
 		}
 
@@ -144,7 +154,11 @@ export default class CratePlugin extends Plugin {
 	}
 
 	async writeRemindersSettings(update: Partial<RemindersSettings>): Promise<void> {
-		useRemindersSettingsStore.setState(update);
+		const normalizedUpdate = { ...update };
+		if (Object.prototype.hasOwnProperty.call(normalizedUpdate, 'remindersFolderPath')) {
+			normalizedUpdate.remindersFolderPath = normalizeRemindersFolderPath(normalizedUpdate.remindersFolderPath);
+		}
+		useRemindersSettingsStore.setState(normalizedUpdate);
 		this.remindersSettings = useRemindersSettingsStore.getState();
 		await this.saveRemindersSettingsData(this.remindersSettings);
 	}
@@ -193,26 +207,10 @@ export default class CratePlugin extends Plugin {
 
 		this.markdownWriter = createMarkdownWriter(this.app, this.reminderIndex);
 		this.storage = createStorageCompat(this.reminderIndex, this.markdownWriter);
+		this.configureReminderWriterCallbacks();
 
 		this.remindersVaultWatcher = new VaultWatcher(this, this.reminderIndex);
 		this.remindersVaultWatcher.register();
-
-		this.markdownWriter.setOnFileWritten(async (file) => {
-			await this.reminderIndex.rescanFile(file, true);
-		});
-
-		// Wire push notifications for reminder changes
-		const notificationService = new ReminderNotificationService(
-			() => this.settings,
-			() => this.syncRuntime.getApiClient(),
-		);
-		this.markdownWriter.setOnReminderChange(async (reminder, operation) => {
-			const result = await notificationService.onReminderChange(reminder, operation);
-			if (!result.success) {
-				new Notice(`Reminder saved but notification sync failed:\n${result.error}`, 5000);
-			}
-			return result;
-		});
 
 		const fileRenameHandler = new FileRenameHandler(this);
 		fileRenameHandler.register();
@@ -299,13 +297,15 @@ export default class CratePlugin extends Plugin {
 	}
 
 	async reinitializeWithFolder(newFolderPath: string): Promise<void> {
-		remindersLogger.info(`Reinitializing with new folder: ${newFolderPath}`);
+		const normalizedFolderPath = normalizeRemindersFolderPath(newFolderPath);
+		remindersLogger.info(`Reinitializing with new folder: ${normalizedFolderPath}`);
 		this.remindersVaultWatcher?.unregister();
 
-		this.reminderIndex = createReminderIndex(this.app, newFolderPath);
+		this.reminderIndex = createReminderIndex(this.app, normalizedFolderPath);
 		await this.reminderIndex.load();
 		this.markdownWriter = createMarkdownWriter(this.app, this.reminderIndex);
 		this.storage = createStorageCompat(this.reminderIndex, this.markdownWriter);
+		this.configureReminderWriterCallbacks();
 
 		this.remindersVaultWatcher = new VaultWatcher(this, this.reminderIndex);
 		this.remindersVaultWatcher.register();
@@ -347,6 +347,24 @@ export default class CratePlugin extends Plugin {
 		if (this.settings.deviceId) return;
 		this.settings.deviceId = this.generateDeviceId();
 		await this.saveSettings();
+	}
+
+	private configureReminderWriterCallbacks(): void {
+		this.markdownWriter.setOnFileWritten(async (file) => {
+			await this.reminderIndex.rescanFile(file, true);
+		});
+
+		const notificationService = new ReminderNotificationService(
+			() => this.settings,
+			() => this.syncRuntime.getApiClient(),
+		);
+		this.markdownWriter.setOnReminderChange(async (reminder, operation) => {
+			const result = await notificationService.onReminderChange(reminder, operation);
+			if (!result.success) {
+				new Notice(`Reminder saved but notification sync failed:\n${result.error}`, 5000);
+			}
+			return result;
+		});
 	}
 
 	private registerCommands(): void {

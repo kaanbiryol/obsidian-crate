@@ -1,6 +1,10 @@
-import { Setting } from 'obsidian';
+import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
-import type { AutoOpenSetting, DueDateDefaultSetting } from '../../reminders/settings';
+import {
+	normalizeRemindersFolderPath,
+	type AutoOpenSetting,
+	type DueDateDefaultSetting,
+} from '../../reminders/settings';
 import type { TabId } from '../../reminders/ui/layoutConstants';
 
 export interface RemindersSectionContext {
@@ -19,12 +23,40 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 		.setName('Reminders folder')
 		.setDesc('Folder where reminder markdown files are stored')
 		.addText(text => {
+			let draftValue = settings.remindersFolderPath;
+
+			const commitFolderPath = async (): Promise<void> => {
+				const normalizedPath = normalizeRemindersFolderPath(draftValue);
+				const currentPath = plugin.remindersSettings.remindersFolderPath;
+				text.setValue(normalizedPath);
+
+				if (normalizedPath === currentPath) {
+					return;
+				}
+
+				await plugin.writeRemindersSettings({ remindersFolderPath: normalizedPath });
+				await plugin.reinitializeWithFolder(normalizedPath);
+				new Notice(`Reminders folder updated to "${normalizedPath}"`);
+			};
+
 			text.setPlaceholder('Reminders')
 				.setValue(settings.remindersFolderPath)
-				.onChange(async (value) => {
-					await plugin.writeRemindersSettings({ remindersFolderPath: value });
-					await plugin.reinitializeWithFolder(value);
+				.onChange((value) => {
+					draftValue = value;
 				});
+			text.inputEl.addEventListener('blur', () => {
+				void commitFolderPath().catch((error: unknown) => {
+					const message = error instanceof Error ? error.message : 'Unknown error';
+					new Notice(`Failed to update reminders folder: ${message}`);
+					text.setValue(plugin.remindersSettings.remindersFolderPath);
+				});
+			});
+			text.inputEl.addEventListener('keydown', (event: KeyboardEvent) => {
+				if (event.key === 'Enter') {
+					event.preventDefault();
+					text.inputEl.blur();
+				}
+			});
 		});
 
 	new Setting(containerEl)

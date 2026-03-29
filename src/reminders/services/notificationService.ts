@@ -1,6 +1,9 @@
 import type { CrateSettings } from '../../types';
 import type { SyncApiClient } from '../../sync/api';
 import type { Reminder } from '../types/reminder';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('ReminderNotificationService');
 
 export class ReminderNotificationService {
 	constructor(
@@ -65,7 +68,7 @@ export class ReminderNotificationService {
 			return { success: true };
 		} catch (error) {
 			const msg = error instanceof Error ? error.message : String(error);
-			console.error(`Notification sync failed (${operation}):`, error);
+			log.error(`Notification sync failed (${operation}):`, error);
 			return { success: false, error: msg };
 		}
 	}
@@ -83,48 +86,51 @@ export class ReminderNotificationService {
 				r => !r.completed && r.dueDatetime && new Date(r.dueDatetime) > now,
 			);
 			const shouldBeScheduledIds = new Set(shouldBeScheduled.map(r => r.id));
+			const operations: Promise<{ success: boolean }>[] = [];
 
 			for (const s of scheduled) {
 				if (!shouldBeScheduledIds.has(s.reminder_id)) {
-					this.cancel(s.reminder_id);
+					operations.push(this.cancel(s.reminder_id));
 				}
 			}
 
 			for (const r of shouldBeScheduled) {
 				if (!scheduledIds.has(r.id)) {
-					this.schedule(r);
+					operations.push(this.schedule(r));
 				}
 			}
+
+			const results = await Promise.allSettled(operations);
+			const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+			if (failures.length > 0) {
+				throw failures[0].reason;
+			}
 		} catch (err) {
-			console.error('Failed to reconcile reminders:', err);
+			log.error('Failed to reconcile reminders:', err);
 		}
 	}
 
-	private async schedule(reminder: Reminder): Promise<void> {
+	private async schedule(reminder: Reminder): Promise<{ success: boolean }> {
 		const api = this.getApiClient();
-		if (!api) return;
-
-		try {
-			await api.scheduleReminder({
-				reminderId: reminder.id,
-				content: reminder.content,
-				project: reminder.project,
-				dueDatetime: reminder.dueDatetime!,
-				priority: reminder.priority,
-			});
-		} catch (err) {
-			console.error(`Failed to schedule reminder ${reminder.id}:`, err);
+		if (!api) {
+			throw new Error('Reminder notifications are unavailable');
 		}
+
+		return api.scheduleReminder({
+			reminderId: reminder.id,
+			content: reminder.content,
+			project: reminder.project,
+			dueDatetime: reminder.dueDatetime!,
+			priority: reminder.priority,
+		});
 	}
 
-	private async cancel(reminderId: string): Promise<void> {
+	private async cancel(reminderId: string): Promise<{ success: boolean }> {
 		const api = this.getApiClient();
-		if (!api) return;
-
-		try {
-			await api.cancelReminder(reminderId);
-		} catch (err) {
-			console.error(`Failed to cancel reminder ${reminderId}:`, err);
+		if (!api) {
+			throw new Error('Reminder notifications are unavailable');
 		}
+
+		return api.cancelReminder(reminderId);
 	}
 }

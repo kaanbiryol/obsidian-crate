@@ -5,6 +5,13 @@ export type DueDateDefaultSetting = "none" | "today" | "tomorrow";
 
 export type AutoOpenSetting = "none" | "sidebar" | "fullscreen";
 
+export const DEFAULT_REMINDERS_FOLDER_PATH = "Reminders";
+
+export function normalizeRemindersFolderPath(rawPath: string | null | undefined): string {
+  const trimmed = rawPath?.trim().replace(/^\/+|\/+$/g, "");
+  return trimmed || DEFAULT_REMINDERS_FOLDER_PATH;
+}
+
 type QueryViewPreference = {
   showCompleted?: boolean;
 };
@@ -12,7 +19,7 @@ type QueryViewPreference = {
 const defaultSettings: RemindersSettings = {
   debugLogging: true,
   taskCreationDefaultDueDate: "none",
-  remindersFolderPath: "Reminders",
+  remindersFolderPath: DEFAULT_REMINDERS_FOLDER_PATH,
   queryViewPreferences: {},
   upcomingDaysDefault: 7,
   autoOpenView: "none",

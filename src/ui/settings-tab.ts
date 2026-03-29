@@ -77,13 +77,11 @@ export class CrateSettingTab extends PluginSettingTab {
 			rerender: () => this.display(),
 		});
 
-		if (this.plugin.settings.pushEnabled) {
-			renderRemindersSection({
-				containerEl,
-				plugin: this.plugin,
-				rerender: () => this.display(),
-			});
-		}
+		renderRemindersSection({
+			containerEl,
+			plugin: this.plugin,
+			rerender: () => this.display(),
+		});
 	}
 
 	hide(): void {

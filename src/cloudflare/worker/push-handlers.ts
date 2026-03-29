@@ -66,9 +66,12 @@ export async function handleSubscribe(request: Request, db: D1Database): Promise
 	}
 
 	const id = crypto.randomUUID();
-	await db.prepare(
-		'INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name) VALUES (?, ?, ?, ?, ?)'
-	).bind(id, body.endpoint, body.keys.p256dh, body.keys.auth, body.deviceName || null).run();
+	await db.batch([
+		db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(body.endpoint),
+		db.prepare(
+			'INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name) VALUES (?, ?, ?, ?, ?)'
+		).bind(id, body.endpoint, body.keys.p256dh, body.keys.auth, body.deviceName || null),
+	]);
 
 	return corsResponse({ id });
 }
