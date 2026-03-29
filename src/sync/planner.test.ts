@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
-import type { CrateSettings, FileEntry, PreparedUpload, SyncResult } from '../types';
-import { MAX_FILE_SIZE_BYTES } from '../types';
+import type { CrateSettings, FileEntry, PreparedUpload, SyncResult } from '../plugin/types';
+import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
 
 const fileDiscoveryMocks = vi.hoisted(() => ({
 	getAllVaultFiles: vi.fn(),

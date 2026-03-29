@@ -1,4 +1,4 @@
-import { createLogger } from '../logger';
+import { createLogger } from '../plugin/logger';
 
 const logger = createLogger('WorkerUrl');
 

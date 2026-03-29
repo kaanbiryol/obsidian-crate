@@ -2,7 +2,7 @@
  * Worker API client for sync operations
  */
 
-import { createLogger } from '../logger';
+import { createLogger } from '../plugin/logger';
 import { normalizeWorkerUrl } from './worker-url';
 import type {
 	FileManifest,
@@ -16,7 +16,7 @@ import type {
 	BatchDownloadResponse,
 	BatchDeleteResponse,
 	SharedSettings,
-} from '../types';
+} from '../plugin/types';
 
 const logger = createLogger('ApiClient');
 

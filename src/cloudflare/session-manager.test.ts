@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SecretStorageService } from '../secret-storage';
-import { DEFAULT_SETTINGS, SECRET_KEYS } from '../types';
+import type { SecretStorageService } from '../plugin/secret-storage';
+import { DEFAULT_SETTINGS, SECRET_KEYS } from '../plugin/types';
 
 const oauthMocks = vi.hoisted(() => ({
 	performOAuthLogin: vi.fn(),

@@ -1,7 +1,7 @@
 import type { TAbstractFile, Vault } from 'obsidian';
 import { TFolder } from 'obsidian';
-import { createLogger } from '../logger';
-import type { PreparedUpload, SyncState } from '../types';
+import { createLogger } from '../plugin/logger';
+import type { PreparedUpload, SyncState } from '../plugin/types';
 
 const logger = createLogger('SyncQueue');
 

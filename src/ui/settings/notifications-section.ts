@@ -1,7 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { QRModal } from '../qr-modal';
-import { SECRET_KEYS } from '../../types';
+import { SECRET_KEYS } from '../../plugin/types';
 import { createSettingsSectionHeading } from './section-helpers';
 
 export interface NotificationsSectionContext {

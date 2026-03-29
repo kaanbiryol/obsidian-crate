@@ -4,9 +4,9 @@ import { createConflictCopy } from './conflict';
 import { detectConflicts } from './conflict';
 import { getAllVaultFiles, isHiddenPath } from './file-discovery';
 import { createEmptySyncResult, finalizeSyncResult } from './sync-result';
-import { createLogger } from '../logger';
-import type { ChangelogEntry, CrateSettings, FileDiff, FileEntry, PreparedUpload, SyncResult } from '../types';
-import { MAX_FILE_SIZE_BYTES } from '../types';
+import { createLogger } from '../plugin/logger';
+import type { ChangelogEntry, CrateSettings, FileDiff, FileEntry, PreparedUpload, SyncResult } from '../plugin/types';
+import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
 
 const logger = createLogger('SyncPlanner');
 

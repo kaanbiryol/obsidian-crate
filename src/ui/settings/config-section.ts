@@ -2,7 +2,7 @@ import { Notice, Platform, requestUrl, Setting } from 'obsidian';
 import { generateAuthToken, verifyCredentials } from '../../cloudflare/api';
 import { computeTokenHash, quickSetup, refreshWorkerAuthToken } from '../../cloudflare/infrastructure';
 import type CratePlugin from '../../main';
-import { SECRET_KEYS } from '../../types';
+import { SECRET_KEYS } from '../../plugin/types';
 import { SyncApiClient } from '../../sync/api';
 import { openConfirmationModal } from '../confirmation-modal';
 import { QRModal } from '../qr-modal';

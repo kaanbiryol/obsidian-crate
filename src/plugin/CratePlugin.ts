@@ -1,0 +1,188 @@
+/**
+ * Crate - Sync your vault to Cloudflare R2 + Reminders
+ */
+
+import { Notice, Plugin } from 'obsidian';
+import { abortOAuthLogin } from '../cloudflare/oauth';
+import { CloudflareSessionManager } from '../cloudflare/session-manager';
+import { CloudflareUsageService } from '../cloudflare/usage-service';
+import { type ReminderIndex } from '../reminders/data/reminderIndex';
+import { type MarkdownWriter } from '../reminders/data/markdownWriter';
+import { type StorageCompat } from '../reminders/data/storageCompat';
+import { initializeReminders, reinitializeReminders } from '../reminders/plugin-integration';
+import {
+	type RemindersSettings,
+	useRemindersSettingsStore,
+} from '../reminders/settings';
+import {
+	loadRemindersSettings as loadReminderSettingsState,
+	writeRemindersSettings as writeReminderSettingsState,
+} from '../reminders/settings-storage';
+import { type VaultWatcher } from '../reminders/services/vaultWatcher';
+import { openFullScreenReminderModal } from '../reminders/ui/modals';
+import { activateOrRevealRemindersLeaf } from '../reminders/ui/workspaceLayout';
+import {
+	handleSyncSetupProtocol,
+	initializeSyncManagers,
+	registerSyncCommands,
+	registerVaultSyncEventHandlers,
+} from '../sync/plugin-integration';
+import { SyncRuntime } from '../sync/runtime';
+import { normalizeWorkerUrl } from '../sync/worker-url';
+import { CrateSettingTab } from '../ui/settings-tab';
+import { createLogger } from './logger';
+import { SecretStorageService } from './secret-storage';
+import { DEFAULT_SETTINGS, type CrateSettings } from './settings';
+
+const logger = createLogger('Plugin');
+
+function ensureStringArray(value: unknown, fallback: string[]): string[] {
+	if (!Array.isArray(value)) {
+		return [...fallback];
+	}
+
+	return value.filter((item): item is string => typeof item === 'string');
+}
+
+function ensureConfigDirWorkspaceIgnorePattern(ignorePatterns: string[], configDir: string): string[] {
+	const normalizedConfigDir = configDir.replace(/^\/+|\/+$/g, '');
+	if (!normalizedConfigDir) {
+		return ignorePatterns;
+	}
+
+	const workspacePattern = `${normalizedConfigDir}/workspace*`;
+	if (ignorePatterns.includes(workspacePattern)) {
+		return ignorePatterns;
+	}
+
+	return [...ignorePatterns, workspacePattern];
+}
+
+export default class CratePlugin extends Plugin {
+	settings!: CrateSettings;
+	secretStorage!: SecretStorageService;
+	cloudflareSession!: CloudflareSessionManager;
+	syncRuntime!: SyncRuntime;
+	readonly usageService = new CloudflareUsageService();
+
+	// Reminders
+	reminderIndex!: ReminderIndex;
+	markdownWriter!: MarkdownWriter;
+	storage!: StorageCompat;
+	remindersSettings: RemindersSettings = useRemindersSettingsStore.getState();
+	remindersVaultWatcher?: VaultWatcher;
+	private cachedStyles: string | null = null;
+
+	async onload(): Promise<void> {
+		logger.info('Plugin loaded');
+
+		try {
+			this.secretStorage = new SecretStorageService(this.app);
+			await this.loadSettings();
+			initializeSyncManagers(this);
+			await this.ensureDeviceId();
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : 'Unknown error';
+			logger.error('Plugin initialization failed:', msg);
+			new Notice(`Crate failed to initialize: ${msg}`);
+			return;
+		}
+
+		this.addSettingTab(new CrateSettingTab(this.app, this));
+		registerVaultSyncEventHandlers(this);
+
+		try {
+			if (this.syncRuntime.isConfigured()) {
+				await this.syncRuntime.initialize();
+			}
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : 'Unknown error';
+			logger.error('Sync initialization failed:', msg);
+			new Notice(`Crate sync failed to start: ${msg}`);
+		}
+
+		registerSyncCommands(this);
+		this.registerObsidianProtocolHandler('crate-setup', (params) => {
+			void handleSyncSetupProtocol(this, params);
+		});
+		this.registerObsidianProtocolHandler('crate-reminders', (params) => {
+			openFullScreenReminderModal(this, params.project || undefined);
+		});
+
+		try {
+			await initializeReminders(this);
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : 'Unknown error';
+			logger.error('Reminders initialization failed:', msg);
+			new Notice(`Reminders failed to initialize: ${msg}`);
+		}
+	}
+
+	onunload(): void {
+		this.syncRuntime.destroy();
+		abortOAuthLogin();
+		this.remindersVaultWatcher?.unregister();
+		// Preserve reminders leaves so Obsidian restores the pane in place on reload.
+	}
+
+	async loadSettings(): Promise<void> {
+		const data = await this.loadData() as Partial<CrateSettings> | null;
+		const merged = Object.assign({}, DEFAULT_SETTINGS, data);
+		merged.workerUrl = normalizeWorkerUrl(typeof merged.workerUrl === 'string' ? merged.workerUrl : '');
+		merged.deviceId = typeof merged.deviceId === 'string' ? merged.deviceId.trim() : '';
+		merged.ignorePatterns = ensureConfigDirWorkspaceIgnorePattern(
+			ensureStringArray(merged.ignorePatterns, DEFAULT_SETTINGS.ignorePatterns),
+			this.app.vault.configDir,
+		);
+		this.settings = merged;
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.saveData(this.settings);
+	}
+
+	async loadRemindersSettings(): Promise<void> {
+		await loadReminderSettingsState(this);
+	}
+
+	async writeRemindersSettings(update: Partial<RemindersSettings>): Promise<void> {
+		await writeReminderSettingsState(this, update);
+	}
+
+	async activateRemindersView(): Promise<void> {
+		await activateOrRevealRemindersLeaf(this.app.workspace, 'reminders-view');
+	}
+
+	async reinitializeWithFolder(newFolderPath: string): Promise<void> {
+		await reinitializeReminders(this, newFolderPath);
+	}
+
+	async loadStyles(): Promise<string> {
+		if (this.cachedStyles) return this.cachedStyles;
+		try {
+			const stylesPath = `${this.manifest.dir}/styles.css`;
+			this.cachedStyles = await this.app.vault.adapter.read(stylesPath);
+			return this.cachedStyles;
+		} catch (error) {
+			logger.error('Failed to load styles.css:', error);
+			return '';
+		}
+	}
+
+	private async ensureDeviceId(): Promise<void> {
+		if (this.settings.deviceId) return;
+		this.settings.deviceId = this.generateDeviceId();
+		await this.saveSettings();
+	}
+
+	private generateDeviceId(): string {
+		const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+		const bytes = new Uint8Array(8);
+		crypto.getRandomValues(bytes);
+		let id = 'device-';
+		for (const value of bytes) {
+			id += chars.charAt(value % chars.length);
+		}
+		return id;
+	}
+}

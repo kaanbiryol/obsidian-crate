@@ -39,7 +39,7 @@ import {
 	finalizeSyncResult,
 	getSyncResultError,
 } from './sync-result';
-import { createLogger } from '../logger';
+import { createLogger } from '../plugin/logger';
 import type {
 	SyncState,
 	SyncResult,
@@ -47,8 +47,8 @@ import type {
 	PreparedUpload,
 	FileEntry,
 	CrateSettings,
-} from '../types';
-import { DEBOUNCE_DELAY_MS, MAX_DEBOUNCE_WAIT_MS } from '../types';
+} from '../plugin/types';
+import { DEBOUNCE_DELAY_MS, MAX_DEBOUNCE_WAIT_MS } from '../plugin/types';
 
 const logger = createLogger('SyncEngine');
 

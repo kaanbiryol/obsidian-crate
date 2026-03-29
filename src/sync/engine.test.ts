@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { computeHash } from './hasher';
 import { prepareUploadFromVaultFile } from './transfer';
-import type { CrateSettings } from '../types';
-import { MAX_FILE_SIZE_BYTES } from '../types';
+import type { CrateSettings } from '../plugin/types';
+import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
 
 type MockAdapter = {
 	readBinary: ReturnType<typeof vi.fn>;

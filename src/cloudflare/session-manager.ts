@@ -1,5 +1,5 @@
-import { SECRET_KEYS, type CrateSettings } from '../types';
-import type { SecretStorageService } from '../secret-storage';
+import { SECRET_KEYS, type CrateSettings } from '../plugin/types';
+import type { SecretStorageService } from '../plugin/secret-storage';
 import { performOAuthLogin, refreshAccessToken } from './oauth';
 
 export interface CloudflareCredentials {

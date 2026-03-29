@@ -1,4 +1,4 @@
-import type { CrateSettings } from '../../types';
+import type { CrateSettings } from '../../plugin/types';
 import type { SyncApiClient } from '../../sync/api';
 import type { Reminder } from '../types/reminder';
 import { createLogger } from '../utils/logger';

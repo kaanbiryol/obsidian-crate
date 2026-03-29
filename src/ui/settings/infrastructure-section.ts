@@ -6,7 +6,7 @@ import {
 	type DiagnosticResult,
 } from '../../cloudflare/infrastructure';
 import type CratePlugin from '../../main';
-import { SECRET_KEYS } from '../../types';
+import { SECRET_KEYS } from '../../plugin/types';
 import {
 	createFileSyncProgress,
 	getErrorMessage,

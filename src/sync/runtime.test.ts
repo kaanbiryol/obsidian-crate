@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { createEmptySyncResult } from './sync-result';
 import { SyncRuntime } from './runtime';
-import type { CrateSettings, SyncResult } from '../types';
+import type { CrateSettings, SyncResult } from '../plugin/types';
 
 type Deferred<T> = {
 	promise: Promise<T>;
@@ -149,14 +149,65 @@ describe('SyncRuntime startup event handling', () => {
 		expect((runtime as any).acceptingEvents).toBe(false);
 
 		startupSync.resolve(createEmptySyncResult());
-		await flushMicrotasks();
-		await flushMicrotasks();
-
-		expect((runtime as any).acceptingEvents).toBe(true);
+		await vi.waitFor(() => {
+			expect((runtime as any).acceptingEvents).toBe(true);
+		});
 
 		runtime.onFileChange({ path: 'notes/existing.md' } as never);
 		runtime.onFileChange({ path: 'notes/existing.md' } as never);
 
 		expect(runtime.getPendingPaths()).toEqual(['notes/existing.md']);
+	});
+});
+
+describe('SyncRuntime operation wrappers', () => {
+	it.each([
+		{ method: (runtime: SyncRuntime, callback: (current: number, total: number) => void) => runtime.sync(callback), historyType: 'sync' as const },
+		{ method: (runtime: SyncRuntime, callback: (current: number, total: number) => void) => runtime.initialSync(callback), historyType: 'initial' as const },
+		{ method: (runtime: SyncRuntime, callback: (current: number, total: number) => void) => runtime.forceFullSync(callback), historyType: 'force' as const },
+	])('records history, persists settings, and clears progress for $method', async ({ method, historyType }) => {
+		const { runtime, persistSettings, settings } = createRuntimeHarness();
+		const result: SyncResult = {
+			...createEmptySyncResult(),
+			success: true,
+			uploaded: 2,
+			uploadedPaths: ['notes/a.md'],
+		};
+		const progressCallback = vi.fn();
+		const listener = vi.fn();
+		const clearSyncProgress = vi.fn();
+		const setSyncProgress = vi.fn();
+
+		(runtime as any).statusBar = {
+			setSyncProgress,
+			clearSyncProgress,
+		};
+		(runtime as any).syncEngine = {
+			sync: vi.fn(async (callback: (current: number, total: number) => void) => {
+				callback(1, 2);
+				return result;
+			}),
+			initialSync: vi.fn(async (callback: (current: number, total: number) => void) => {
+				callback(1, 2);
+				return result;
+			}),
+			forceFullSync: vi.fn(async (callback: (current: number, total: number) => void) => {
+				callback(1, 2);
+				return result;
+			}),
+		};
+
+		runtime.addProgressListener(listener);
+
+		const methodResult = await method(runtime, progressCallback);
+
+		expect(methodResult).toBe(result);
+		expect(progressCallback).toHaveBeenCalledWith(1, 2);
+		expect(listener).toHaveBeenCalledWith(1, 2);
+		expect(setSyncProgress).toHaveBeenCalledWith(1, 2);
+		expect(clearSyncProgress).toHaveBeenCalledTimes(1);
+		expect(persistSettings).toHaveBeenCalledTimes(1);
+		expect(settings.syncHistory[0]?.type).toBe(historyType);
+		expect(settings.syncHistory[0]?.uploaded).toBe(2);
 	});
 });

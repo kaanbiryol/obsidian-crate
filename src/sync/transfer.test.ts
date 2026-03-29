@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PreparedUpload, SyncResult } from '../types';
+import type { PreparedUpload, SyncResult } from '../plugin/types';
 
 const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),

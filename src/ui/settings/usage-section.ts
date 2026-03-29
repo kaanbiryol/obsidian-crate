@@ -1,6 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
-import { SECRET_KEYS, type UsageMetric } from '../../types';
+import { SECRET_KEYS, type UsageMetric } from '../../plugin/types';
 import { getErrorMessage, runButtonTask } from './action-helpers';
 import { createSettingsSectionHeading } from './section-helpers';
 

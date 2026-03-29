@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { debouncedSync, onFileChange, onFileDelete, onFileRename, onRawPathChange, processPendingChanges } from './queue';
-import type { PreparedUpload, SyncState } from '../types';
+import type { PreparedUpload, SyncState } from '../plugin/types';
 
 type QueueState = SyncState;
 

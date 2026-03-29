@@ -5,8 +5,8 @@
  */
 
 import type { App, PluginManifest } from 'obsidian';
-import { createLogger } from '../logger';
-import type { FileManifest, FileEntry } from '../types';
+import { createLogger } from '../plugin/logger';
+import type { FileManifest, FileEntry } from '../plugin/types';
 
 const logger = createLogger('Manifest');
 

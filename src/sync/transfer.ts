@@ -3,10 +3,10 @@ import { computeHash } from './hasher';
 import { createConflictCopy } from './conflict';
 import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from './file-discovery';
 import type { VaultFile } from './file-discovery';
-import { createLogger } from '../logger';
+import { createLogger } from '../plugin/logger';
 import { arrayBufferToBase64, base64ToArrayBuffer } from './encoding';
-import type { BatchUploadFile, BatchUploadResponse, BatchDownloadResponse, FileDiff, FileEntry, PreparedUpload, SyncResult, UploadResult } from '../types';
-import { BATCH_FILE_SIZE_LIMIT, BATCH_MAX_BYTES, BATCH_MAX_FILES, MAX_FILE_SIZE_BYTES } from '../types';
+import type { BatchUploadFile, BatchUploadResponse, BatchDownloadResponse, FileDiff, FileEntry, PreparedUpload, SyncResult, UploadResult } from '../plugin/types';
+import { BATCH_FILE_SIZE_LIMIT, BATCH_MAX_BYTES, BATCH_MAX_FILES, MAX_FILE_SIZE_BYTES } from '../plugin/types';
 
 const logger = createLogger('SyncTransfer');
 

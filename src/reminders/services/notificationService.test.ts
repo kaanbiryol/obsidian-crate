@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReminderNotificationService } from './notificationService';
-import type { CrateSettings } from '../../types';
+import type { CrateSettings } from '../../plugin/types';
 import type { Reminder } from '../types/reminder';
 
 function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {

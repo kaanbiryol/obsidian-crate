@@ -1,7 +1,7 @@
 import type { Plugin, TAbstractFile } from 'obsidian';
-import { createLogger } from '../logger';
-import type { SecretStorageService } from '../secret-storage';
-import { MAX_SYNC_HISTORY, SECRET_KEYS, type CrateSettings, type SharedSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../types';
+import { createLogger } from '../plugin/logger';
+import type { SecretStorageService } from '../plugin/secret-storage';
+import { MAX_SYNC_HISTORY, SECRET_KEYS, type CrateSettings, type SharedSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../plugin/types';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
@@ -264,79 +264,73 @@ export class SyncRuntime {
 		}
 	}
 
-	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
+	private getConfiguredSyncEngine(): SyncEngine | SyncResult {
 		const guardResult = guardSyncConfigured(this.syncEngine !== null);
 		if (guardResult) {
 			return guardResult;
 		}
-		const syncEngine = this.syncEngine as SyncEngine;
+		return this.syncEngine as SyncEngine;
+	}
 
-		logger.info('Sync triggered');
-		const wrappedCallback = (current: number, total: number) => {
+	private createProgressReporter(progressCallback?: (current: number, total: number) => void) {
+		return (current: number, total: number) => {
 			this.statusBar?.setSyncProgress(current, total);
 			progressCallback?.(current, total);
 			for (const listener of this.progressListeners) {
 				listener(current, total);
 			}
 		};
+	}
 
+	private async runSyncOperation(
+		type: SyncHistoryEntry['type'],
+		operation: (engine: SyncEngine, progress: (current: number, total: number) => void) => Promise<SyncResult>,
+		progressCallback?: (current: number, total: number) => void,
+		logMessage?: string,
+	): Promise<SyncResult> {
+		const syncEngineOrGuard = this.getConfiguredSyncEngine();
+		if ('success' in syncEngineOrGuard) {
+			return syncEngineOrGuard;
+		}
+		const syncEngine = syncEngineOrGuard;
+
+		if (logMessage) {
+			logger.info(logMessage);
+		}
+
+		const wrappedCallback = this.createProgressReporter(progressCallback);
 		try {
-			const result = await syncEngine.sync(wrappedCallback);
-			this.recordSyncResult('sync', result);
+			const result = await operation(syncEngine, wrappedCallback);
+			this.recordSyncResult(type, result);
 			await this.persistSettings();
 			return result;
 		} finally {
 			this.statusBar?.clearSyncProgress();
 		}
+	}
+
+	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
+		return this.runSyncOperation(
+			'sync',
+			(syncEngine, wrappedCallback) => syncEngine.sync(wrappedCallback),
+			progressCallback,
+			'Sync triggered',
+		);
 	}
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const guardResult = guardSyncConfigured(this.syncEngine !== null);
-		if (guardResult) {
-			return guardResult;
-		}
-		const syncEngine = this.syncEngine as SyncEngine;
-
-		const wrappedCallback = (current: number, total: number) => {
-			this.statusBar?.setSyncProgress(current, total);
-			progressCallback?.(current, total);
-			for (const listener of this.progressListeners) {
-				listener(current, total);
-			}
-		};
-
-		try {
-			const result = await syncEngine.initialSync(wrappedCallback);
-			this.recordSyncResult('initial', result);
-			await this.persistSettings();
-			return result;
-		} finally {
-			this.statusBar?.clearSyncProgress();
-		}
+		return this.runSyncOperation(
+			'initial',
+			(syncEngine, wrappedCallback) => syncEngine.initialSync(wrappedCallback),
+			progressCallback,
+		);
 	}
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const guardResult = guardSyncConfigured(this.syncEngine !== null);
-		if (guardResult) {
-			return guardResult;
-		}
-		const syncEngine = this.syncEngine as SyncEngine;
-
-		const wrappedCallback = (current: number, total: number) => {
-			this.statusBar?.setSyncProgress(current, total);
-			progressCallback?.(current, total);
-			for (const listener of this.progressListeners) {
-				listener(current, total);
-			}
-		};
-
-		try {
-			const result = await syncEngine.forceFullSync(wrappedCallback);
-			this.recordSyncResult('force', result);
-			await this.persistSettings();
-			return result;
-		} finally {
-			this.statusBar?.clearSyncProgress();
-		}
+		return this.runSyncOperation(
+			'force',
+			(syncEngine, wrappedCallback) => syncEngine.forceFullSync(wrappedCallback),
+			progressCallback,
+		);
 	}
 }

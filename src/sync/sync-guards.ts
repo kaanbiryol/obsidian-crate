@@ -1,4 +1,4 @@
-import type { SyncResult, SyncStatus } from '../types';
+import type { SyncResult, SyncStatus } from '../plugin/types';
 import { createNotConfiguredSyncResult, createSyncInProgressResult } from './sync-result';
 
 export function guardSyncConfigured(isConfigured: boolean): SyncResult | null {

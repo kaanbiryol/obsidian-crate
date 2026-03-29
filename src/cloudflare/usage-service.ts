@@ -1,6 +1,6 @@
 import { requestUrl } from 'obsidian';
+import type { UsageResponse, WorkerConfig } from '../plugin/types';
 import type { SyncApiClient } from '../sync/api';
-import type { UsageResponse, WorkerConfig } from '../types';
 
 const CLASS_A_ACTIONS = [
 	'PutObject', 'CopyObject', 'CompleteMultipartUpload', 'CreateMultipartUpload',

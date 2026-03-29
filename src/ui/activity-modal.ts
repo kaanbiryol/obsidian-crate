@@ -1,5 +1,5 @@
 import { Modal, type App } from 'obsidian';
-import type { CrateSettings, SyncHistoryEntry, SyncState } from '../types';
+import type { CrateSettings, SyncHistoryEntry, SyncState } from '../plugin/types';
 
 export interface ActivityModalDeps {
 	getPendingPaths(): string[];

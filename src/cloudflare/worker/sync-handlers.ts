@@ -12,7 +12,7 @@ import {
 	parseStringArray,
 } from './utils';
 import type { Env } from './types';
-import type { SharedSettings } from '../../types';
+import type { SharedSettings } from '../../plugin/types';
 
 const MAX_BATCH_FILES = 50;
 const MAX_BATCH_TOTAL_BYTES = 10 * 1024 * 1024;
