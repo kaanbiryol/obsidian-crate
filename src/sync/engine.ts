@@ -470,6 +470,7 @@ export class SyncEngine {
 		return {
 			settings: this.settings,
 			vault: this.vault,
+			fileManager: this.plugin.app.fileManager,
 			api: this.api,
 			localManifest: this.localManifest,
 			shouldIgnore: this.shouldIgnore.bind(this),

@@ -18,6 +18,9 @@ type MockAdapter = {
 type Harness = {
 	engine: SyncEngine;
 	settings: CrateSettings;
+	fileManager: {
+		trashFile: ReturnType<typeof vi.fn>;
+	};
 	api: {
 		isConfigured: ReturnType<typeof vi.fn>;
 		setAbortSignal: ReturnType<typeof vi.fn>;
@@ -130,8 +133,12 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 		})),
 	};
 
+	const fileManager = {
+		trashFile: vi.fn(),
+	};
+
 	const plugin = {
-		app: { vault },
+		app: { vault, fileManager },
 		manifest: { dir: '.obsidian/plugins/obsidian-crate' },
 	};
 
@@ -161,7 +168,7 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 
 	(engine as any).localManifest = localManifest;
 
-	return { engine, settings, api, vault, localManifest };
+	return { engine, settings, fileManager, api, vault, localManifest };
 }
 
 describe('SyncEngine pattern/ignore behavior', () => {
@@ -464,6 +471,7 @@ describe('SyncEngine incrementalSync', () => {
 
 	it('applies remote delete changes to local state', async () => {
 		const harness = createHarness({ lastSeq: 4 });
+		const note = { path: 'notes/old.md' };
 		harness.api.getChanges.mockResolvedValue({
 			changes: [
 				{
@@ -479,13 +487,78 @@ describe('SyncEngine incrementalSync', () => {
 			hasMore: false,
 		});
 		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
-		harness.vault.getAbstractFileByPath.mockReturnValue({ path: 'notes/old.md' });
+		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		harness.vault.getAbstractFileByPath.mockReturnValue(note);
 
 		const result = await (harness.engine as any).incrementalSync();
 
 		expect(result?.deleted).toBe(1);
-		expect(harness.vault.delete).toHaveBeenCalledWith({ path: 'notes/old.md' });
+		expect(harness.fileManager.trashFile).toHaveBeenCalledWith(note);
+		expect(harness.vault.delete).not.toHaveBeenCalled();
+		expect(harness.vault.adapter.remove).not.toHaveBeenCalled();
 		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/old.md');
+		expect(harness.settings.lastSeq).toBe(6);
+	});
+
+	it('hard deletes hidden files for remote delete changes', async () => {
+		const harness = createHarness({ lastSeq: 4 });
+		harness.api.getChanges.mockResolvedValue({
+			changes: [
+				{
+					seq: 6,
+					path: '.obsidian/workspace.json',
+					action: 'delete',
+					hash: '',
+					size: 0,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 6,
+			hasMore: false,
+		});
+		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
+		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		harness.vault.adapter.exists.mockResolvedValue(true);
+
+		const result = await (harness.engine as any).incrementalSync();
+
+		expect(result?.deleted).toBe(1);
+		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
+		expect(harness.vault.delete).not.toHaveBeenCalled();
+		expect(harness.vault.adapter.remove).toHaveBeenCalledWith('.obsidian/workspace.json');
+		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('.obsidian/workspace.json');
+		expect(harness.settings.lastSeq).toBe(6);
+	});
+
+	it('cleans manifest state when a remote delete targets an already missing file', async () => {
+		const harness = createHarness({ lastSeq: 4 });
+		harness.api.getChanges.mockResolvedValue({
+			changes: [
+				{
+					seq: 6,
+					path: 'notes/missing.md',
+					action: 'delete',
+					hash: '',
+					size: 0,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 6,
+			hasMore: false,
+		});
+		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
+		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		harness.vault.adapter.exists.mockResolvedValue(false);
+
+		const result = await (harness.engine as any).incrementalSync();
+
+		expect(result?.deleted).toBe(0);
+		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
+		expect(harness.vault.delete).not.toHaveBeenCalled();
+		expect(harness.vault.adapter.remove).not.toHaveBeenCalled();
+		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/missing.md');
 		expect(harness.settings.lastSeq).toBe(6);
 	});
 

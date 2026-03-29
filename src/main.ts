@@ -35,6 +35,7 @@ import {
 	useRemindersSettingsStore,
 } from './reminders/settings';
 import { RemindersView, VIEW_TYPE_REMINDERS } from './reminders/ui/reminders-view';
+import { activateOrRevealRemindersLeaf } from './reminders/ui/workspaceLayout';
 import { openFullScreenReminderModal } from './reminders/ui/modals';
 import { ReminderNotificationService } from './reminders/services/notificationService';
 
@@ -108,7 +109,7 @@ export default class CratePlugin extends Plugin {
 		this.syncRuntime.destroy();
 		abortOAuthLogin();
 		this.remindersVaultWatcher?.unregister();
-		this.app.workspace.detachLeavesOfType(VIEW_TYPE_REMINDERS);
+		// Preserve reminders leaves so Obsidian restores the pane in place on reload.
 	}
 
 	async loadSettings(): Promise<void> {
@@ -280,20 +281,7 @@ export default class CratePlugin extends Plugin {
 	}
 
 	async activateRemindersView(): Promise<void> {
-		const { workspace } = this.app;
-		let leaf = workspace.getLeavesOfType(VIEW_TYPE_REMINDERS)[0];
-
-		if (!leaf) {
-			const rightLeaf = workspace.getRightLeaf(false);
-			if (rightLeaf) {
-				leaf = rightLeaf;
-				await leaf.setViewState({ type: VIEW_TYPE_REMINDERS, active: true });
-			}
-		}
-
-		if (leaf) {
-			workspace.revealLeaf(leaf);
-		}
+		await activateOrRevealRemindersLeaf(this.app.workspace, VIEW_TYPE_REMINDERS);
 	}
 
 	async reinitializeWithFolder(newFolderPath: string): Promise<void> {

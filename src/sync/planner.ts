@@ -1,4 +1,4 @@
-import type { TFile, Vault } from 'obsidian';
+import type { TAbstractFile, TFile, Vault } from 'obsidian';
 import { computeHash } from './hasher';
 import { createConflictCopy } from './conflict';
 import { detectConflicts } from './conflict';
@@ -36,6 +36,9 @@ export interface LocalDiffPlannerContext {
 export interface IncrementalSyncPlannerContext {
 	settings: CrateSettings;
 	vault: Vault;
+	fileManager?: {
+		trashFile(file: TAbstractFile): Promise<void>;
+	};
 	api: PlannerApi;
 	localManifest: PlannerManifest;
 	shouldIgnore(path: string): boolean;
@@ -70,6 +73,36 @@ export interface FullSyncPlan {
 	downloadDiffs: FileDiff[];
 	remainingDiffs: FileDiff[];
 	errors: string[];
+}
+
+async function deleteRemotePathLocally(
+	context: IncrementalSyncPlannerContext,
+	path: string,
+): Promise<boolean> {
+	if (isHiddenPath(path)) {
+		if (!await context.vault.adapter.exists(path)) {
+			return false;
+		}
+		await context.vault.adapter.remove(path);
+		return true;
+	}
+
+	const file = context.vault.getAbstractFileByPath(path);
+	if (file) {
+		if (context.fileManager) {
+			await context.fileManager.trashFile(file);
+		} else {
+			await context.vault.delete(file);
+		}
+		return true;
+	}
+
+	if (!await context.vault.adapter.exists(path)) {
+		return false;
+	}
+
+	await context.vault.adapter.remove(path);
+	return true;
 }
 
 export async function getLocalDeletes(
@@ -191,15 +224,7 @@ export async function runIncrementalSync(
 						continue;
 					}
 
-					const file = context.vault.getAbstractFileByPath(path);
-					let deletedLocally = false;
-					if (file) {
-						await context.vault.delete(file);
-						deletedLocally = true;
-					} else if (await context.vault.adapter.exists(path)) {
-						await context.vault.adapter.remove(path);
-						deletedLocally = true;
-					}
+					const deletedLocally = await deleteRemotePathLocally(context, path);
 					context.localManifest.removeEntry(path);
 					if (deletedLocally) {
 						result.deleted++;
