@@ -4,6 +4,7 @@ import { computeTokenHash, quickSetup, refreshWorkerAuthToken } from '../../clou
 import type CratePlugin from '../../main';
 import { SECRET_KEYS } from '../../plugin/types';
 import { SyncApiClient } from '../../sync/api';
+import { applySharedSettings } from '../../sync/shared-settings';
 import { openConfirmationModal } from '../confirmation-modal';
 import { QRModal } from '../qr-modal';
 import { getErrorMessage, runButtonTask } from './action-helpers';
@@ -436,10 +437,7 @@ async function createInfrastructureFromCredentials(
 		const tempClient = new SyncApiClient(result.workerUrl, result.authToken);
 		const { settings: shared } = await tempClient.getSharedSettings();
 		if (shared) {
-			plugin.settings.ignorePatterns = shared.ignorePatterns;
-			plugin.settings.syncOnStartup = shared.syncOnStartup;
-			plugin.settings.syncInterval = shared.syncInterval;
-			plugin.settings.showStatusBar = shared.showStatusBar;
+			applySharedSettings(plugin.settings, shared);
 		}
 	} catch { /* best-effort */ }
 
@@ -496,14 +494,11 @@ async function buildSetupLink(plugin: CratePlugin): Promise<string | null> {
 	if (plugin.settings.cloudflareAccountId) {
 		params.set('accountId', plugin.settings.cloudflareAccountId);
 	}
-	const analyticsToken = plugin.secretStorage.get(SECRET_KEYS.ANALYTICS_TOKEN);
-	if (analyticsToken) {
-		params.set('analyticsToken', analyticsToken);
-	}
 	params.set('ignorePatterns', JSON.stringify(plugin.settings.ignorePatterns));
 	params.set('syncOnStartup', String(plugin.settings.syncOnStartup));
 	params.set('syncInterval', String(plugin.settings.syncInterval));
 	params.set('showStatusBar', String(plugin.settings.showStatusBar));
+	params.set('pushEnabled', String(plugin.settings.pushEnabled));
 
 	return `obsidian://crate-setup?${params.toString()}`;
 }

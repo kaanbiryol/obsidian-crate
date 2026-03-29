@@ -4,15 +4,14 @@ import { initDb, maybePruneChangelog, queryRows } from './db';
 import {
 	sanitizePath,
 	FILES_PREFIX,
-	isRecord,
 	isSha256Hex,
 	parseJsonObject,
 	parseNonNegativeInteger,
 	parseOptionalString,
-	parseStringArray,
 } from './utils';
 import type { Env } from './types';
 import type { SharedSettings } from '../../plugin/types';
+import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
 
 const MAX_BATCH_FILES = 50;
 const MAX_BATCH_TOTAL_BYTES = 10 * 1024 * 1024;
@@ -24,32 +23,6 @@ function parseDeclaredSize(headerValue: string | null): number | null {
 
 	const size = Number.parseInt(headerValue, 10);
 	return Number.isInteger(size) && size >= 0 ? size : null;
-}
-
-function normalizeSharedSettings(value: unknown): SharedSettings | null {
-	if (!isRecord(value)) {
-		return null;
-	}
-
-	const ignorePatterns = parseStringArray(value.ignorePatterns);
-	const syncInterval = parseNonNegativeInteger(value.syncInterval);
-	if (
-		ignorePatterns === null ||
-		typeof value.syncOnStartup !== 'boolean' ||
-		syncInterval === null ||
-		typeof value.showStatusBar !== 'boolean' ||
-		typeof value.pushEnabled !== 'boolean'
-	) {
-		return null;
-	}
-
-	return {
-		ignorePatterns,
-		syncOnStartup: value.syncOnStartup,
-		syncInterval,
-		showStatusBar: value.showStatusBar,
-		pushEnabled: value.pushEnabled,
-	};
 }
 
 export async function handleHealth(): Promise<Response> {
@@ -243,6 +216,11 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 	let totalBytes = 0;
 
 	for (const file of files as BatchFile[]) {
+		if (typeof file?.content !== 'string') {
+			results.push({ path: typeof file?.path === 'string' ? file.path : '', success: false, error: 'Invalid file payload' });
+			continue;
+		}
+
 		const safePath = sanitizePath(file.path);
 		if (!safePath) {
 			results.push({ path: file.path, success: false, error: 'Invalid path' });
@@ -254,14 +232,27 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 			const bytes = new Uint8Array(raw.length);
 			for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
 			const size = bytes.byteLength;
+			if (file.size !== undefined && parseNonNegativeInteger(file.size) === null) {
+				results.push({ path: safePath, success: false, error: 'Invalid declared file size' });
+				continue;
+			}
 			if (typeof file.size === 'number' && file.size !== size) {
 				results.push({ path: safePath, success: false, error: 'Declared file size does not match content' });
 				continue;
 			}
 
+			if (file.hash !== undefined && typeof file.hash !== 'string') {
+				results.push({ path: safePath, success: false, error: 'Invalid file hash' });
+				continue;
+			}
 			const providedHash = file.hash?.trim().toLowerCase() || '';
 			if (providedHash && !isSha256Hex(providedHash)) {
 				results.push({ path: safePath, success: false, error: 'Invalid file hash' });
+				continue;
+			}
+
+			if (file.contentType !== undefined && typeof file.contentType !== 'string') {
+				results.push({ path: safePath, success: false, error: 'Invalid content type' });
 				continue;
 			}
 
@@ -281,7 +272,7 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 				bytes: bytes.buffer,
 				hash: providedHash || computedHash,
 				size,
-				contentType: file.contentType || 'application/octet-stream',
+				contentType: parseOptionalString(file.contentType, 255) || 'application/octet-stream',
 			});
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : String(err);
@@ -425,7 +416,7 @@ export async function handleGetSettings(bucket: R2Bucket): Promise<Response> {
 	if (!obj) return corsResponse({ settings: null });
 	try {
 		const body = await obj.text();
-		return corsResponse({ settings: normalizeSharedSettings(JSON.parse(body)) });
+		return corsResponse({ settings: normalizeSharedSettingsValue(JSON.parse(body)) });
 	} catch {
 		return corsResponse({ settings: null });
 	}
@@ -437,7 +428,7 @@ export async function handlePutSettings(request: Request, bucket: R2Bucket): Pro
 		return parsedBody.response;
 	}
 
-	const settings = normalizeSharedSettings(parsedBody.value.settings);
+	const settings = normalizeSharedSettingsValue(parsedBody.value.settings);
 	if (!settings) {
 		return corsResponse({ error: 'Invalid shared settings payload' }, 400);
 	}

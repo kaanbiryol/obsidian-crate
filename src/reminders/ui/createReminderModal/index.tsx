@@ -119,6 +119,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
           project: updatedReminder.project,
           dueDate: updatedReminder.dueDate,
           dueDatetime: updatedReminder.dueDatetime,
+          recurrence: updatedReminder.recurrence ?? null,
         });
         new Notice("Reminder updated!");
 

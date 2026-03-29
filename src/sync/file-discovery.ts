@@ -4,6 +4,9 @@
  */
 
 import type { Vault, TFile } from 'obsidian';
+import { createLogger } from '../plugin/logger';
+
+const logger = createLogger('FileDiscovery');
 
 /**
  * Normalised file descriptor that works for both indexed and hidden files.
@@ -13,6 +16,11 @@ export interface VaultFile {
 	size: number;
 	mtime: number;
 	extension: string;
+}
+
+interface AdapterListing {
+	files: string[];
+	folders: string[];
 }
 
 /**
@@ -70,7 +78,7 @@ export async function getAllVaultFiles(
 	const seen = new Set(result.map(f => f.path));
 
 	// Discover hidden files by walking dot-prefixed entries at root
-	const root = await vault.adapter.list('');
+	const root = await safeList(vault, '');
 
 	// Recurse into hidden folders
 	const hiddenFolders = root.folders.filter(f => {
@@ -99,7 +107,7 @@ export async function getAllVaultFiles(
 		if (!name.startsWith('.')) continue;
 		if (seen.has(filePath) || shouldIgnore(filePath)) continue;
 
-		const stat = await vault.adapter.stat(filePath);
+		const stat = await safeStat(vault, filePath);
 		if (!stat || stat.type !== 'file') continue;
 
 		seen.add(filePath);
@@ -124,12 +132,12 @@ async function walkHiddenFolder(
 	seen: Set<string>,
 	result: VaultFile[],
 ): Promise<void> {
-	const listing = await vault.adapter.list(folderPath);
+	const listing = await safeList(vault, folderPath);
 
 	for (const filePath of listing.files) {
 		if (seen.has(filePath) || shouldIgnore(filePath)) continue;
 
-		const stat = await vault.adapter.stat(filePath);
+		const stat = await safeStat(vault, filePath);
 		if (!stat || stat.type !== 'file') continue;
 
 		seen.add(filePath);
@@ -163,7 +171,7 @@ async function walkForNestedHiddenFolders(
 ): Promise<void> {
 	if (depth >= MAX_NESTED_WALK_DEPTH) return;
 
-	const listing = await vault.adapter.list(folderPath);
+	const listing = await safeList(vault, folderPath);
 
 	for (const subfolder of listing.folders) {
 		if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
@@ -173,5 +181,23 @@ async function walkForNestedHiddenFolders(
 		} else {
 			await walkForNestedHiddenFolders(vault, subfolder, shouldIgnore, seen, result, depth + 1);
 		}
+	}
+}
+
+async function safeList(vault: Vault, folderPath: string): Promise<AdapterListing> {
+	try {
+		return await vault.adapter.list(folderPath);
+	} catch (error) {
+		logger.warn(`Failed to list vault folder: ${folderPath || '/'}`, error);
+		return { files: [], folders: [] };
+	}
+}
+
+async function safeStat(vault: Vault, filePath: string): Promise<{ type: string; size: number; mtime: number } | null> {
+	try {
+		return await vault.adapter.stat(filePath);
+	} catch (error) {
+		logger.warn(`Failed to stat vault file: ${filePath}`, error);
+		return null;
 	}
 }

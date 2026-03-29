@@ -132,6 +132,7 @@ export class SyncRuntime {
 	}
 
 	destroy(): void {
+		this.acceptingEvents = false;
 		this.syncEngine?.destroy();
 		this.statusBar?.destroy();
 		this.syncEngine = null;
@@ -179,9 +180,7 @@ export class SyncRuntime {
 		this.settings.workerName = config.workerName.trim();
 		this.settings.bucketName = config.bucketName.trim();
 		this.settings.databaseId = config.databaseId.trim();
-		if (config.accountId !== undefined) {
-			this.settings.cloudflareAccountId = config.accountId.trim();
-		}
+		this.settings.cloudflareAccountId = config.accountId?.trim() || '';
 		this.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, authToken);
 		await this.deleteManifestFile();
 		this.settings.lastSeq = 0;

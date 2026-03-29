@@ -7,24 +7,9 @@ import { notifyConflicts } from './conflict';
 import { isHiddenPath } from './file-discovery';
 import { ActivityModal } from '../ui/activity-modal';
 import { openConfirmationModal } from '../ui/confirmation-modal';
+import { applySharedSettings, parseSharedSettingsFromSetupParams } from './shared-settings';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
-
-function parseStringArray(raw: string): string[] | null {
-	const parsed: unknown = JSON.parse(raw);
-	if (!Array.isArray(parsed)) {
-		return null;
-	}
-
-	const values: string[] = [];
-	for (const item of parsed) {
-		if (typeof item !== 'string') {
-			return null;
-		}
-		values.push(item);
-	}
-	return values;
-}
 
 export function initializeSyncManagers(plugin: CratePlugin): void {
 	plugin.cloudflareSession = new CloudflareSessionManager(
@@ -172,27 +157,15 @@ export async function handleSyncSetupProtocol(
 	}
 
 	try {
-		if (params['ignorePatterns']) {
-			try {
-				const parsedIgnorePatterns = parseStringArray(params['ignorePatterns']);
-				if (parsedIgnorePatterns) {
-					plugin.settings.ignorePatterns = parsedIgnorePatterns;
-				}
-			} catch {
-				// Keep existing ignore patterns if parsing fails.
-			}
-		}
-		if (params['syncOnStartup'] !== undefined) {
-			plugin.settings.syncOnStartup = params['syncOnStartup'] === 'true';
-		}
-		if (params['syncInterval'] !== undefined) {
-			const interval = parseInt(params['syncInterval'], 10);
-			if (!isNaN(interval)) {
-				plugin.settings.syncInterval = interval;
-			}
-		}
-		if (params['showStatusBar'] !== undefined) {
-			plugin.settings.showStatusBar = params['showStatusBar'] === 'true';
+		const sharedSettingsUpdate = parseSharedSettingsFromSetupParams(params);
+		if (Object.keys(sharedSettingsUpdate).length > 0) {
+			applySharedSettings(plugin.settings, {
+				ignorePatterns: sharedSettingsUpdate.ignorePatterns ?? plugin.settings.ignorePatterns,
+				syncOnStartup: sharedSettingsUpdate.syncOnStartup ?? plugin.settings.syncOnStartup,
+				syncInterval: sharedSettingsUpdate.syncInterval ?? plugin.settings.syncInterval,
+				showStatusBar: sharedSettingsUpdate.showStatusBar ?? plugin.settings.showStatusBar,
+				pushEnabled: sharedSettingsUpdate.pushEnabled ?? plugin.settings.pushEnabled,
+			});
 		}
 
 		if (params['analyticsToken']) {

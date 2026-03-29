@@ -23,15 +23,14 @@ export async function parseJsonObject(
 
 export function sanitizePath(path: string): string | null {
 	if (typeof path !== 'string') return null;
-	const trimmed = path.trim();
-	if (!trimmed || trimmed.startsWith('/') || trimmed.endsWith('/') || trimmed.includes('\\')) {
+	if (!path || path !== path.trim() || path.startsWith('/') || path.endsWith('/') || path.includes('\\')) {
 		return null;
 	}
-	if (CONTROL_CHARS_REGEX.test(trimmed)) {
+	if (CONTROL_CHARS_REGEX.test(path)) {
 		return null;
 	}
 
-	const segments = trimmed.split('/');
+	const segments = path.split('/');
 	if (segments.length === 0 || segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
 		return null;
 	}

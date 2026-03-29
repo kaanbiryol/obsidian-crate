@@ -96,7 +96,7 @@ export default class CratePlugin extends Plugin {
 	}
 
 	onunload(): void {
-		this.syncRuntime.destroy();
+		this.syncRuntime?.destroy();
 		abortOAuthLogin();
 		this.remindersVaultWatcher?.unregister();
 		// Preserve reminders leaves so Obsidian restores the pane in place on reload.

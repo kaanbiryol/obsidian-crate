@@ -29,7 +29,7 @@ describe('getAllVaultFiles', () => {
 				extension: 'md',
 			},
 			{
-				path: '.obsidian/config.json',
+				path: '.config-hidden/config.json',
 				stat: { size: 200, mtime: 12 },
 				extension: 'json',
 			},
@@ -39,18 +39,18 @@ describe('getAllVaultFiles', () => {
 			if (folderPath === '') {
 				return {
 					files: ['.gitignore', 'notes/a.md'],
-					folders: ['.obsidian', 'notes'],
+					folders: ['.config-hidden', 'notes'],
 				};
 			}
-			if (folderPath === '.obsidian') {
+			if (folderPath === '.config-hidden') {
 				return {
-					files: ['.obsidian/config.json'],
-					folders: ['.obsidian/plugins'],
+					files: ['.config-hidden/config.json'],
+					folders: ['.config-hidden/plugins'],
 				};
 			}
-			if (folderPath === '.obsidian/plugins') {
+			if (folderPath === '.config-hidden/plugins') {
 				return {
-					files: ['.obsidian/plugins/cache.db'],
+					files: ['.config-hidden/plugins/cache.db'],
 					folders: [],
 				};
 			}
@@ -61,10 +61,10 @@ describe('getAllVaultFiles', () => {
 			if (path === '.gitignore') {
 				return { type: 'file', size: 15, mtime: 1000 };
 			}
-			if (path === '.obsidian/config.json') {
+			if (path === '.config-hidden/config.json') {
 				return { type: 'file', size: 200, mtime: 12 };
 			}
-			if (path === '.obsidian/plugins/cache.db') {
+			if (path === '.config-hidden/plugins/cache.db') {
 				return { type: 'file', size: 300, mtime: 13 };
 			}
 			return null;
@@ -77,17 +77,17 @@ describe('getAllVaultFiles', () => {
 
 		const files = await getAllVaultFiles(
 			vault,
-			path => path === '.obsidian/plugins' || path === '.obsidian/plugins/',
+			path => path === '.config-hidden/plugins' || path === '.config-hidden/plugins/',
 		);
 
 		expect(files.map(f => f.path)).toEqual([
 			'notes/a.md',
-			'.obsidian/config.json',
+			'.config-hidden/config.json',
 			'.gitignore',
 		]);
-		expect(files.filter(f => f.path === '.obsidian/config.json')).toHaveLength(1);
+		expect(files.filter(f => f.path === '.config-hidden/config.json')).toHaveLength(1);
 		expect(files.find(f => f.path === '.gitignore')?.extension).toBe('');
-		expect(stat).not.toHaveBeenCalledWith('.obsidian/plugins/cache.db');
+		expect(stat).not.toHaveBeenCalledWith('.config-hidden/plugins/cache.db');
 	});
 
 	it('discovers hidden folders nested under non-hidden paths', async () => {
@@ -135,5 +135,70 @@ describe('getAllVaultFiles', () => {
 
 		const files = await getAllVaultFiles(vault, () => false);
 		expect(files.map(f => f.path)).toContain('notes/.config/local.json');
+	});
+
+	it('keeps indexed files when adapter listing the root fails', async () => {
+		const indexedFiles = [
+			{
+				path: 'notes/a.md',
+				stat: { size: 100, mtime: 11 },
+				extension: 'md',
+			},
+		] as unknown as TFile[];
+
+		const vault = {
+			getFiles: vi.fn(() => indexedFiles),
+			adapter: {
+				list: vi.fn(async () => {
+					throw new Error('adapter down');
+				}),
+				stat: vi.fn(),
+			},
+		} as unknown as Vault;
+
+		await expect(getAllVaultFiles(vault, () => false)).resolves.toEqual([
+			{
+				path: 'notes/a.md',
+				size: 100,
+				mtime: 11,
+				extension: 'md',
+			},
+		]);
+	});
+
+	it('skips hidden files whose stat calls fail', async () => {
+		const list = vi.fn(async (folderPath: string) => {
+			if (folderPath === '') {
+				return {
+					files: ['.gitignore'],
+					folders: ['.config-hidden'],
+				};
+			}
+			if (folderPath === '.config-hidden') {
+				return {
+					files: ['.config-hidden/config.json'],
+					folders: [],
+				};
+			}
+			return { files: [], folders: [] };
+		});
+
+		const stat = vi.fn(async (path: string) => {
+			if (path === '.gitignore') {
+				return { type: 'file', size: 15, mtime: 1000 };
+			}
+			if (path === '.config-hidden/config.json') {
+				throw new Error('permission denied');
+			}
+			return null;
+		});
+
+		const vault = {
+			getFiles: vi.fn(() => []),
+			adapter: { list, stat },
+		} as unknown as Vault;
+
+		const files = await getAllVaultFiles(vault, () => false);
+		expect(files.map(f => f.path)).toEqual(['.gitignore']);
 	});
 });

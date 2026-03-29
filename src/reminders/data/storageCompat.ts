@@ -92,6 +92,15 @@ export function createStorageCompat(
       for (const r of [...todayReminders, ...overdueReminders]) {
         combined.set(r.id, r);
       }
+      if (_includeCompleted) {
+        const today = new Date().toISOString().split('T')[0];
+        for (const reminder of index.getCompleted()) {
+          const dueDate = reminder.dueDatetime || reminder.dueDate;
+          if (dueDate?.startsWith(today)) {
+            combined.set(reminder.id, reminder);
+          }
+        }
+      }
       return Array.from(combined.values()).map(toReminder);
     },
 
@@ -136,12 +145,14 @@ export function createStorageCompat(
         : params.dueDate
         ? new Date(params.dueDate)
         : undefined;
+      const priority: Priority = params.priority ?? 4;
 
       await writer.createReminder(
         project,
         params.content,
         dueDate,
-        (params.priority || 4) as Priority
+        priority,
+        params.recurrence,
       );
 
       // VaultWatcher will handle rescanning after file modify event
@@ -156,9 +167,10 @@ export function createStorageCompat(
         content: params.content,
         dueDate: params.dueDate,
         dueDatetime: params.dueDatetime,
-        priority: params.priority || 4,
+        priority,
         completed: false,
         project,
+        recurrence: params.recurrence,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -179,6 +191,9 @@ export function createStorageCompat(
         dueDate,
         priority: params.priority,
         project: params.project,
+        ...(Object.prototype.hasOwnProperty.call(params, 'recurrence')
+          ? { recurrence: params.recurrence ?? null }
+          : {}),
       });
 
       // VaultWatcher will handle rescanning after file modify event

@@ -68,4 +68,12 @@ describe('normalizeCrateSettings', () => {
 
 		expect(settings.ignorePatterns).toEqual(['custom-config/workspace*']);
 	});
+
+	it('rejects worker URLs with credentials, query strings, and fragments', () => {
+		const configDir = 'vault-config';
+		expect(normalizeCrateSettings({ workerUrl: 'https://user:pass@worker.example' }, configDir).workerUrl).toBe('');
+		expect(normalizeCrateSettings({ workerUrl: 'https://worker.example?token=1' }, configDir).workerUrl).toBe('');
+		expect(normalizeCrateSettings({ workerUrl: 'https://worker.example/#frag' }, configDir).workerUrl).toBe('');
+		expect(normalizeCrateSettings({ workerUrl: 'https://worker.example/api/' }, configDir).workerUrl).toBe('https://worker.example/api');
+	});
 });

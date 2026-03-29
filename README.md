@@ -19,6 +19,8 @@ npm install
 
 Use the plugin settings UI to set up Cloudflare infrastructure (R2 bucket, D1 database, Worker). The setup flow is accessible from the Crate settings tab in Obsidian.
 
+Cross-device setup links copy sync credentials and sync preferences. Optional Cloudflare analytics tokens are not included and must be entered separately on the new device.
+
 ## Development
 
 ### Build the plugin
@@ -28,6 +30,12 @@ npm run build
 ```
 
 This runs the worker bundle step, TypeScript checks, and the Vite build.
+
+Run just the TypeScript check with:
+
+```bash
+npm run typecheck
+```
 
 Build artifacts are written to `dist/`:
 

@@ -188,4 +188,65 @@ describe('markdownWriter', () => {
     expect(oldContent).not.toContain('Task Move');
     expect(newContent).toContain('Task Move');
   });
+
+  it('removes recurrence when update explicitly clears it', async () => {
+    const dueDate = new Date(2026, 0, 1, 9, 0);
+    const initial = '# Work\n\n- [ ] Task Repeat every day Jan 1, 2026 09:00\n';
+    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    folders.add('Reminders');
+
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    const reminder = makeIndexedReminder({
+      id: 'r-clear-recurrence',
+      content: 'Task Repeat',
+      filePath: 'Reminders/Work.md',
+      lineNumber: 2,
+      rawLine: '- [ ] Task Repeat every day Jan 1, 2026 09:00',
+      dueDatetime: dueDate.toISOString(),
+      dueDate: dueDate.toISOString().split('T')[0],
+      recurrence: { frequency: 'daily' },
+    });
+
+    await writer.updateReminder(reminder, {
+      recurrence: null,
+      dueDate,
+    });
+
+    const content = files.get('Reminders/Work.md') || '';
+    expect(content).toContain('Task Repeat');
+    expect(content).toContain('Jan 1, 2026 09:00');
+    expect(content).not.toContain('every day');
+  });
+
+  it('preserves recurrence when moving a reminder to a new project file', async () => {
+    const dueDate = new Date(2026, 0, 1, 9, 0);
+    const initial = '# Work\n\n- [ ] Task Move every day Jan 1, 2026 09:00\n';
+    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    folders.add('Reminders');
+
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    const reminder = makeIndexedReminder({
+      id: 'r-move-recurring',
+      content: 'Task Move',
+      filePath: 'Reminders/Work.md',
+      lineNumber: 2,
+      rawLine: '- [ ] Task Move every day Jan 1, 2026 09:00',
+      dueDatetime: dueDate.toISOString(),
+      dueDate: dueDate.toISOString().split('T')[0],
+      recurrence: { frequency: 'daily' },
+    });
+
+    await writer.updateReminder(reminder, {
+      project: 'Personal',
+      dueDate,
+    });
+
+    const newContent = files.get('Reminders/Personal.md') || '';
+    expect(newContent).toContain('Task Move');
+    expect(newContent).toContain('daily');
+  });
 });

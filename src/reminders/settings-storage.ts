@@ -1,10 +1,11 @@
 import type CratePlugin from '../main';
 import {
 	type RemindersSettings,
+	normalizeRemindersSettings,
 	normalizeRemindersFolderPath,
 	useRemindersSettingsStore,
 } from './settings';
-import { createLogger } from './utils/logger';
+import { configureLogger, createLogger } from './utils/logger';
 
 const remindersLogger = createLogger('Reminders');
 
@@ -75,20 +76,18 @@ export async function loadRemindersSettings(plugin: CratePlugin): Promise<void> 
 		}
 
 		delete loaded.syncMethod;
-		const normalizedSettingsData: Partial<RemindersSettings> = {
+		const normalizedSettings = normalizeRemindersSettings({
 			...settingsData,
 			remindersFolderPath: normalizeRemindersFolderPath(
 				typeof loaded.remindersFolderPath === 'string' ? loaded.remindersFolderPath : undefined,
 			),
-		};
+		} satisfies Partial<RemindersSettings>);
 
-		useRemindersSettingsStore.setState((old) => ({
-			...old,
-			...normalizedSettingsData,
-		}), true);
+		useRemindersSettingsStore.setState(normalizedSettings, true);
 	}
 
 	plugin.remindersSettings = useRemindersSettingsStore.getState();
+	configureLogger({ prefix: 'Crate', enabled: plugin.remindersSettings.debugLogging });
 	await saveRemindersSettingsData(plugin, plugin.remindersSettings);
 }
 
@@ -100,7 +99,14 @@ export async function writeRemindersSettings(
 	if (Object.prototype.hasOwnProperty.call(normalizedUpdate, 'remindersFolderPath')) {
 		normalizedUpdate.remindersFolderPath = normalizeRemindersFolderPath(normalizedUpdate.remindersFolderPath);
 	}
-	useRemindersSettingsStore.setState(normalizedUpdate);
+	useRemindersSettingsStore.setState(
+		normalizeRemindersSettings({
+			...useRemindersSettingsStore.getState(),
+			...normalizedUpdate,
+		}),
+		true,
+	);
 	plugin.remindersSettings = useRemindersSettingsStore.getState();
+	configureLogger({ prefix: 'Crate', enabled: plugin.remindersSettings.debugLogging });
 	await saveRemindersSettingsData(plugin, plugin.remindersSettings);
 }

@@ -27,6 +27,7 @@ import {
 	redeployWorker,
 	verifyCredentials,
 } from './api';
+import { normalizeWorkerUrl } from '../sync/worker-url';
 import { getWorkerScript } from './worker-template';
 
 const PURGE_WORKER_SCRIPT = `
@@ -114,6 +115,14 @@ export interface CrateResources {
 
 type ProgressCallback = (message: string) => void;
 
+function requireWorkerUrl(value: string): string {
+	const normalized = normalizeWorkerUrl(value);
+	if (!normalized) {
+		throw new Error('Worker URL is invalid.');
+	}
+	return normalized;
+}
+
 export async function computeTokenHash(token: string): Promise<string> {
 	const data = new TextEncoder().encode(token);
 	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -126,7 +135,8 @@ async function waitForWorkerReady(
 	authToken: string,
 	onProgress?: ProgressCallback
 ): Promise<void> {
-	const url = `${workerUrl.replace(/\/$/, '')}/health`;
+	const baseUrl = requireWorkerUrl(workerUrl);
+	const url = `${baseUrl}/health`;
 	for (let attempt = 0; attempt < 10; attempt++) {
 		try {
 			const response = await requestUrl({
@@ -150,10 +160,11 @@ async function registerTokenWithWorker(
 	authToken: string,
 	deviceName?: string
 ): Promise<void> {
+	const baseUrl = requireWorkerUrl(workerUrl);
 	const tokenHash = await computeTokenHash(authToken);
 	try {
 		await requestUrl({
-			url: `${workerUrl.replace(/\/$/, '')}/auth/tokens`,
+			url: `${baseUrl}/auth/tokens`,
 			method: 'POST',
 			headers: {
 				'Authorization': `Bearer ${authToken}`,
@@ -168,15 +179,6 @@ async function registerTokenWithWorker(
 
 function toCredentials(accountId: string, apiToken: string): CloudflareCredentials {
 	return { accountId: accountId.trim(), apiToken: apiToken.trim() };
-}
-
-function isValidUrl(value: string): boolean {
-	try {
-		new URL(value);
-		return true;
-	} catch {
-		return false;
-	}
 }
 
 function isBucketNotEmptyError(error: unknown): boolean {
@@ -420,63 +422,66 @@ export async function runDiagnostics(input: DiagnosticsInput): Promise<Diagnosti
 				status: 'warn',
 				message: 'Worker URL and auth token must both be provided for worker diagnostics.',
 			});
-		} else if (!isValidUrl(workerUrl)) {
-			results.push({
-				name: 'Worker URL',
-				status: 'fail',
-				message: 'Worker URL is invalid.',
-			});
 		} else {
-			try {
-				const health = await requestWorkerJson(`${workerUrl.replace(/\/$/, '')}/health`, workerToken);
-				if (health.status === 200) {
-					results.push({
-						name: 'Worker health',
-						status: 'pass',
-						message: 'Worker is responding.',
-					});
-
-					const manifest = await requestWorkerJson(`${workerUrl.replace(/\/$/, '')}/sync/manifest`, workerToken);
-					if (manifest.status === 200 && manifest.body && typeof manifest.body === 'object') {
-						const files = (manifest.body as { files?: Record<string, unknown> }).files || {};
+			const normalizedWorkerUrl = normalizeWorkerUrl(workerUrl);
+			if (!normalizedWorkerUrl) {
+				results.push({
+					name: 'Worker URL',
+					status: 'fail',
+					message: 'Worker URL must use HTTPS (or localhost over HTTP) and must not include credentials, query parameters, or fragments.',
+				});
+			} else {
+				try {
+					const health = await requestWorkerJson(`${normalizedWorkerUrl}/health`, workerToken);
+					if (health.status === 200) {
 						results.push({
-							name: 'Manifest access',
+							name: 'Worker health',
 							status: 'pass',
-							message: `Manifest is reachable (${Object.keys(files).length} files).`,
+							message: 'Worker is responding.',
+						});
+
+						const manifest = await requestWorkerJson(`${normalizedWorkerUrl}/sync/manifest`, workerToken);
+						if (manifest.status === 200 && manifest.body && typeof manifest.body === 'object') {
+							const files = (manifest.body as { files?: Record<string, unknown> }).files || {};
+							results.push({
+								name: 'Manifest access',
+								status: 'pass',
+								message: `Manifest is reachable (${Object.keys(files).length} files).`,
+							});
+						} else {
+							const manifestError = (
+								manifest.body && typeof manifest.body === 'object' && 'error' in manifest.body
+									? (manifest.body as { error?: string }).error
+									: null
+							);
+							results.push({
+								name: 'Manifest access',
+								status: 'fail',
+								message: manifestError
+									? `Manifest request failed with status ${manifest.status}: ${manifestError}`
+									: `Manifest request failed with status ${manifest.status}.`,
+							});
+						}
+					} else if (health.status === 401) {
+						results.push({
+							name: 'Worker health',
+							status: 'fail',
+							message: 'Authentication failed. Check the worker auth token.',
 						});
 					} else {
-						const manifestError = (
-							manifest.body && typeof manifest.body === 'object' && 'error' in manifest.body
-								? (manifest.body as { error?: string }).error
-								: null
-						);
 						results.push({
-							name: 'Manifest access',
+							name: 'Worker health',
 							status: 'fail',
-							message: manifestError
-								? `Manifest request failed with status ${manifest.status}: ${manifestError}`
-								: `Manifest request failed with status ${manifest.status}.`,
+							message: `Health check failed with status ${health.status}.`,
 						});
 					}
-				} else if (health.status === 401) {
+				} catch (error) {
 					results.push({
 						name: 'Worker health',
 						status: 'fail',
-						message: 'Authentication failed. Check the worker auth token.',
-					});
-				} else {
-					results.push({
-						name: 'Worker health',
-						status: 'fail',
-						message: `Health check failed with status ${health.status}.`,
+						message: `Unable to reach worker: ${error instanceof Error ? error.message : String(error)}`,
 					});
 				}
-			} catch (error) {
-				results.push({
-					name: 'Worker health',
-					status: 'fail',
-					message: `Unable to reach worker: ${error instanceof Error ? error.message : String(error)}`,
-				});
 			}
 		}
 	}

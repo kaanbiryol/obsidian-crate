@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleDelete, handleGetSettings, handlePutSettings, handleUpload } from './sync-handlers';
+import { handleBatchUpload, handleDelete, handleGetSettings, handlePutSettings, handleUpload } from './sync-handlers';
 
 type StoredObject = {
 	body: ArrayBuffer;
@@ -148,6 +148,26 @@ describe('worker sync handlers', () => {
 		expect(getResponse.status).toBe(200);
 		expect(await responseJson(getResponse)).toEqual({ settings: null });
 
+		await bucket.put(
+			'__crate__/settings.json',
+			new TextEncoder().encode(JSON.stringify({
+				ignorePatterns: ['.git/'],
+				syncOnStartup: true,
+				syncInterval: 30,
+				showStatusBar: true,
+			})).buffer,
+		);
+		const legacyGetResponse = await handleGetSettings(bucket as never);
+		expect(await responseJson(legacyGetResponse)).toEqual({
+			settings: {
+				ignorePatterns: ['.git/'],
+				syncOnStartup: true,
+				syncInterval: 30,
+				showStatusBar: true,
+				pushEnabled: false,
+			},
+		});
+
 		const badPutResponse = await handlePutSettings(
 			new Request('https://worker.test/settings', {
 				method: 'PUT',
@@ -183,5 +203,39 @@ describe('worker sync handlers', () => {
 			bucket as never,
 		);
 		expect(goodPutResponse.status).toBe(200);
+	});
+
+	it('rejects malformed batch upload entries without writing them', async () => {
+		const { bucket } = createBucket();
+
+		const response = await handleBatchUpload(
+			new Request('https://worker.test/sync/batch-upload', {
+				method: 'POST',
+				body: JSON.stringify({
+					files: [
+						{
+							path: 'notes/test.md',
+							content: 123,
+						},
+					],
+				}),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket as never,
+			null,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await responseJson(response)).toEqual({
+			success: false,
+			results: [
+				{
+					path: 'notes/test.md',
+					success: false,
+					error: 'Invalid file payload',
+				},
+			],
+		});
+		expect(bucket.put).not.toHaveBeenCalled();
 	});
 });

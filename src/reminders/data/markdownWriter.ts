@@ -86,7 +86,7 @@ export interface MarkdownWriter {
       dueDate?: Date;
       priority?: Priority;
       project?: string;
-      recurrence?: RecurrenceRule;
+      recurrence?: RecurrenceRule | null;
     }
   ): Promise<void>;
 
@@ -268,11 +268,14 @@ export function createMarkdownWriter(
         dueDate?: Date;
         priority?: Priority;
         project?: string;
-        recurrence?: RecurrenceRule;
+        recurrence?: RecurrenceRule | null;
       }
     ): Promise<void> {
       const newProject = updates.project ?? reminder.project;
       const oldProject = reminder.project || 'Inbox';
+      const newRecurrence = Object.prototype.hasOwnProperty.call(updates, 'recurrence')
+        ? updates.recurrence ?? undefined
+        : reminder.recurrence;
 
       // If project changed, move the reminder to the new file
       if (newProject && newProject !== oldProject) {
@@ -290,7 +293,7 @@ export function createMarkdownWriter(
         await this.deleteReminder(reminder);
 
         // 2. Create in new file (without project tag since project = file name)
-        await this.createReminder(newProject, newContent, newDueDate, newPriority);
+        await this.createReminder(newProject, newContent, newDueDate, newPriority, newRecurrence);
 
         return;
       }
@@ -331,8 +334,6 @@ export function createMarkdownWriter(
         ? updates.dueDate
         : (reminder.dueDatetime ? new Date(reminder.dueDatetime) : undefined);
       const newPriority = updates.priority ?? reminder.priority;
-      const newRecurrence = updates.recurrence ?? reminder.recurrence;
-
       // Apply optimistic update immediately (UI updates)
       index.applyOptimisticUpdate(reminder.id, {
         content: newContent,

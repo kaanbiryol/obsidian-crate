@@ -189,6 +189,7 @@ export function createInlineTodoController(
 				dueDatetime,
 				priority: parsed.parsed.priority,
 				project: parsed.parsed.project || undefined,
+				recurrence: parsed.parsed.recurrence ?? null,
 				completed: parsed.isCompleted,
 			});
 
