@@ -2,7 +2,7 @@
  * Conflict detection and resolution
  */
 
-import { Notice, type Vault, type TFile } from 'obsidian';
+import { Notice, type Vault } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import type { FileEntry, FileDiff } from '../plugin/types';
 import { isHiddenPath } from './file-discovery';

@@ -20,6 +20,9 @@ import {
 	uploadPreparedFiles,
 } from './transfer';
 
+const CONFIG_DIR = '.vault-config';
+const HIDDEN_CONFIG_PATH = `${CONFIG_DIR}/config.json`;
+
 function createTransferHarness() {
 	const adapter = {
 		readBinary: vi.fn(),
@@ -107,11 +110,11 @@ describe('transfer prepare helpers', () => {
 		harness.adapter.stat.mockResolvedValue({ type: 'file', size: 5, mtime: 123 });
 		harness.adapter.readBinary.mockResolvedValue(new TextEncoder().encode('{"a":1}').buffer as ArrayBuffer);
 
-		const result = await prepareUploadFromPath(harness.context, '.obsidian/config.json');
+		const result = await prepareUploadFromPath(harness.context, HIDDEN_CONFIG_PATH);
 
 		expect(result).toEqual(
 			expect.objectContaining({
-				path: '.obsidian/config.json',
+				path: HIDDEN_CONFIG_PATH,
 				contentType: 'application/json',
 			}),
 		);
@@ -376,10 +379,10 @@ describe('batch upload chunking', () => {
 		// a.md = 6MB (first chunk), b.md = 6MB won't fit with a.md (new chunk), c.md fits with b.md
 		expect(chunks).toHaveLength(2);
 		expect(chunks[0]).toHaveLength(1);
-		expect(chunks[0]![0]!.path).toBe('a.md');
+		expect(chunks[0]?.[0]?.path).toBe('a.md');
 		expect(chunks[1]).toHaveLength(2);
-		expect(chunks[1]![0]!.path).toBe('b.md');
-		expect(chunks[1]![1]!.path).toBe('c.md');
+		expect(chunks[1]?.[0]?.path).toBe('b.md');
+		expect(chunks[1]?.[1]?.path).toBe('c.md');
 	});
 
 	it('returns empty array for empty input', () => {

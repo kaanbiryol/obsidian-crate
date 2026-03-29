@@ -177,11 +177,43 @@ function installDomHelpers(): void {
 
 installDomHelpers();
 
-export class TFolder {
+export class TAbstractFile {
 	path: string;
+	name: string;
+	parent: TFolder | null;
 
 	constructor(path = '') {
 		this.path = path;
+		this.name = path.split('/').pop() ?? path;
+		this.parent = null;
+	}
+}
+
+export class TFile extends TAbstractFile {
+	basename: string;
+	extension: string;
+	stat: { size: number; mtime: number; ctime: number };
+
+	constructor(path = '', stat?: Partial<{ size: number; mtime: number; ctime: number }>) {
+		super(path);
+		const lastDot = this.name.lastIndexOf('.');
+		this.basename = lastDot >= 0 ? this.name.slice(0, lastDot) : this.name;
+		this.extension = lastDot >= 0 ? this.name.slice(lastDot + 1) : '';
+		this.stat = {
+			size: 0,
+			mtime: 0,
+			ctime: 0,
+			...stat,
+		};
+	}
+}
+
+export class TFolder extends TAbstractFile {
+	children: TAbstractFile[];
+
+	constructor(path = '') {
+		super(path);
+		this.children = [];
 	}
 }
 

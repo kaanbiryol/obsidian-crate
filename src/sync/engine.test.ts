@@ -1,9 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { computeHash } from './hasher';
-import { prepareUploadFromVaultFile } from './transfer';
-import type { CrateSettings } from '../plugin/types';
+import { createEmptySyncResult } from './sync-result';
+import { prepareUploadFromVaultFile, type TransferContext } from './transfer';
+import type { CrateSettings, FileDiff, PreparedUpload, SyncResult } from '../plugin/types';
 import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
+
+const CONFIG_DIR = '.vault-config';
+const PLUGIN_DIR = `${CONFIG_DIR}/plugins/obsidian-crate`;
+const CONFIG_PLUGINS_DIR = `${CONFIG_DIR}/plugins`;
+const TRACKED_PLUGIN_MAIN_PATH = `${CONFIG_DIR}/plugins/foo/main.js`;
+const HIDDEN_WORKSPACE_PATH = `${CONFIG_DIR}/workspace.json`;
+
+type ManifestEntry = {
+	hash: string;
+	size: number;
+	modified: string;
+};
 
 type MockAdapter = {
 	readBinary: ReturnType<typeof vi.fn>;
@@ -57,14 +70,120 @@ type Harness = {
 	};
 };
 
+function setEngineLocalManifest(
+	engine: SyncEngine,
+	localManifest: Harness['localManifest'],
+): void {
+	(engine as unknown as { localManifest: Harness['localManifest'] }).localManifest = localManifest;
+}
+
+function getPendingPaths(engine: SyncEngine): Set<string> {
+	return (engine as unknown as { pendingPaths: Set<string> }).pendingPaths;
+}
+
+function spyOnDebouncedSync(engine: SyncEngine) {
+	return vi.spyOn(engine as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
+}
+
+function matchPattern(engine: SyncEngine, path: string, pattern: string): boolean {
+	return (engine as unknown as {
+		matchPattern(pathToCheck: string, patternToCheck: string): boolean;
+	}).matchPattern(path, pattern);
+}
+
+function shouldIgnorePath(engine: SyncEngine, path: string): boolean {
+	return (engine as unknown as { shouldIgnore(pathToCheck: string): boolean }).shouldIgnore(path);
+}
+
+async function runIncrementalSync(engine: SyncEngine): Promise<SyncResult | null> {
+	return (engine as unknown as { incrementalSync(): Promise<SyncResult | null> }).incrementalSync();
+}
+
+async function flushPendingChanges(engine: SyncEngine): Promise<void> {
+	await (engine as unknown as { processPendingChanges(): Promise<void> }).processPendingChanges();
+}
+
+function setSyncStatus(engine: SyncEngine, status: 'idle' | 'syncing' | 'error'): void {
+	(engine as unknown as { state: { status: 'idle' | 'syncing' | 'error' } }).state.status = status;
+}
+
+function createSyncResult(): SyncResult {
+	return createEmptySyncResult();
+}
+
+function spyOnLocalChanges(
+	engine: SyncEngine,
+	changes: Array<{ path: string; hash: string }>,
+) {
+	return vi.spyOn(
+		engine as unknown as { getLocalChanges(): Promise<Array<{ path: string; hash: string }>> },
+		'getLocalChanges',
+	).mockResolvedValue(changes);
+}
+
+function spyOnLocalDeletes(engine: SyncEngine, deletes: string[]) {
+	return vi.spyOn(
+		engine as unknown as { getLocalDeletes(): Promise<string[]> },
+		'getLocalDeletes',
+	).mockResolvedValue(deletes);
+}
+
+function spyOnIncrementalSync(engine: SyncEngine, result: SyncResult | null) {
+	return vi.spyOn(
+		engine as unknown as { incrementalSync(): Promise<SyncResult | null> },
+		'incrementalSync',
+	).mockResolvedValue(result);
+}
+
+function runProcessDiff(
+	engine: SyncEngine,
+	diff: FileDiff,
+	localFiles: Record<string, ManifestEntry>,
+	result: SyncResult,
+): Promise<void> {
+	return (engine as unknown as {
+		processDiff(
+			diffToProcess: FileDiff,
+			knownLocalFiles: Record<string, ManifestEntry>,
+			syncResult: SyncResult,
+		): Promise<void>;
+	}).processDiff(diff, localFiles, result);
+}
+
+function runConcurrentTasks<T>(
+	engine: SyncEngine,
+	tasks: Array<() => Promise<T>>,
+	concurrency: number,
+): Promise<T[]> {
+	return (engine as unknown as {
+		runConcurrent(taskQueue: Array<() => Promise<T>>, limit: number): Promise<T[]>;
+	}).runConcurrent(tasks, concurrency);
+}
+
+function retryWithBackoff<T>(engine: SyncEngine, fn: () => Promise<T>): Promise<T> {
+	return (engine as unknown as {
+		retryWithBackoff(task: () => Promise<T>): Promise<T>;
+	}).retryWithBackoff(fn);
+}
+
+function spyOnPrepareUploadsFromVaultFiles(
+	engine: SyncEngine,
+	implementation: () => Promise<PreparedUpload[]>,
+) {
+	return vi.spyOn(
+		engine as unknown as { prepareUploadsFromVaultFiles(): Promise<PreparedUpload[]> },
+		'prepareUploadsFromVaultFiles',
+	).mockImplementation(implementation);
+}
+
 function createSettings(): CrateSettings {
-		return {
-			workerUrl: 'https://worker.example',
-			cloudflareAccountId: '',
-			cloudflareTokenExpiresAt: null,
-			workerName: '',
-			bucketName: '',
-			databaseId: '',
+	return {
+		workerUrl: 'https://worker.example',
+		cloudflareAccountId: '',
+		cloudflareTokenExpiresAt: null,
+		workerName: '',
+		bucketName: '',
+		databaseId: '',
 		lastSync: null,
 		lastSeq: 0,
 		deviceId: 'dev-1',
@@ -139,12 +258,12 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 
 	const plugin = {
 		app: { vault, fileManager },
-		manifest: { dir: '.obsidian/plugins/obsidian-crate' },
+		manifest: { dir: PLUGIN_DIR },
 	};
 
 	const engine = new SyncEngine(plugin as never, api as never, settings);
 
-	const manifestFiles: Record<string, { hash: string; size: number; modified: string }> = {};
+	const manifestFiles: Record<string, ManifestEntry> = {};
 	const localManifest = {
 		load: vi.fn(),
 		save: vi.fn(),
@@ -163,10 +282,10 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 			for (const path of Object.keys(manifestFiles)) {
 				delete manifestFiles[path];
 			}
-		}),
-	};
+			}),
+		};
 
-	(engine as any).localManifest = localManifest;
+	setEngineLocalManifest(engine, localManifest);
 
 	return { engine, settings, fileManager, api, vault, localManifest };
 }
@@ -179,33 +298,32 @@ describe('SyncEngine pattern/ignore behavior', () => {
 	});
 
 	it('matches trailing-slash patterns and wildcard patterns', () => {
-		expect((harness.engine as any).matchPattern('.trash', '.trash/')).toBe(true);
-		expect((harness.engine as any).matchPattern('.trash/file.md', '.trash/')).toBe(true);
-		expect((harness.engine as any).matchPattern('notes/file.tmp', '*.tmp')).toBe(true);
-		expect((harness.engine as any).matchPattern('notes/file.md', '*.tmp')).toBe(false);
+		expect(matchPattern(harness.engine, '.trash', '.trash/')).toBe(true);
+		expect(matchPattern(harness.engine, '.trash/file.md', '.trash/')).toBe(true);
+		expect(matchPattern(harness.engine, 'notes/file.tmp', '*.tmp')).toBe(true);
+		expect(matchPattern(harness.engine, 'notes/file.md', '*.tmp')).toBe(false);
 	});
 
 	it('ignores plugin state files (data.json and file-manifest.json)', () => {
-		const shouldIgnore = (harness.engine as any).shouldIgnore.bind(harness.engine);
-		expect(shouldIgnore('.obsidian/plugins/obsidian-crate/data.json')).toBe(true);
-		expect(shouldIgnore('.obsidian/plugins/obsidian-crate/file-manifest.json')).toBe(true);
-		expect(shouldIgnore('.obsidian/plugins/obsidian-crate/reminders-settings.json')).toBe(true);
+		expect(shouldIgnorePath(harness.engine, `${PLUGIN_DIR}/data.json`)).toBe(true);
+		expect(shouldIgnorePath(harness.engine, `${PLUGIN_DIR}/file-manifest.json`)).toBe(true);
+		expect(shouldIgnorePath(harness.engine, `${PLUGIN_DIR}/reminders-settings.json`)).toBe(true);
 		// Other files in the plugin dir should not be ignored
-		expect(shouldIgnore('.obsidian/plugins/obsidian-crate/main.js')).toBe(false);
+		expect(shouldIgnorePath(harness.engine, `${PLUGIN_DIR}/main.js`)).toBe(false);
 	});
 
 	it('always ignores conflict files', () => {
 		expect(
-			(harness.engine as any).shouldIgnore('notes/a (conflict 2026-01-02 03-04-05 a1b2).md'),
+			shouldIgnorePath(harness.engine, 'notes/a (conflict 2026-01-02 03-04-05 a1b2).md'),
 		).toBe(true);
-		expect((harness.engine as any).shouldIgnore('notes/file.tmp')).toBe(true);
-		expect((harness.engine as any).shouldIgnore('notes/file.md')).toBe(false);
+		expect(shouldIgnorePath(harness.engine, 'notes/file.tmp')).toBe(true);
+		expect(shouldIgnorePath(harness.engine, 'notes/file.md')).toBe(false);
 	});
 
 	it('treats regex metacharacters as literal text in patterns', () => {
-		expect((harness.engine as any).matchPattern('notes[2026].md', 'notes[2026].md')).toBe(true);
-		expect((harness.engine as any).matchPattern('notes2.md', 'notes[2026].md')).toBe(false);
-		expect((harness.engine as any).matchPattern('[', '[')).toBe(true);
+		expect(matchPattern(harness.engine, 'notes[2026].md', 'notes[2026].md')).toBe(true);
+		expect(matchPattern(harness.engine, 'notes2.md', 'notes[2026].md')).toBe(false);
+		expect(matchPattern(harness.engine, '[', '[')).toBe(true);
 	});
 });
 
@@ -218,57 +336,49 @@ describe('SyncEngine event queue behavior', () => {
 	});
 
 	it('queues remote delete when renaming from syncable path into ignored path', () => {
-		const debouncedSync = vi
-			.spyOn(harness.engine as any, 'debouncedSync')
-			.mockImplementation(() => {});
+		const debouncedSync = spyOnDebouncedSync(harness.engine);
 
 		harness.engine.onFileRename({ path: '.trash/note.md' } as never, 'notes/note.md');
 
-		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		const pendingPaths = getPendingPaths(harness.engine);
 		expect(pendingPaths.has('delete:notes/note.md')).toBe(true);
 		expect(pendingPaths.has('.trash/note.md')).toBe(false);
 		expect(debouncedSync).toHaveBeenCalledTimes(1);
 	});
 
 	it('queues upload when renaming from ignored path into syncable path', () => {
-		const debouncedSync = vi
-			.spyOn(harness.engine as any, 'debouncedSync')
-			.mockImplementation(() => {});
+		const debouncedSync = spyOnDebouncedSync(harness.engine);
 
 		harness.engine.onFileRename({ path: 'notes/note.md' } as never, '.trash/note.md');
 
-		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		const pendingPaths = getPendingPaths(harness.engine);
 		expect(pendingPaths.has('delete:.trash/note.md')).toBe(false);
 		expect(pendingPaths.has('notes/note.md')).toBe(true);
 		expect(debouncedSync).toHaveBeenCalledTimes(1);
 	});
 
 	it('ignores raw folder events', async () => {
-		const debouncedSync = vi
-			.spyOn(harness.engine as any, 'debouncedSync')
-			.mockImplementation(() => {});
+		const debouncedSync = spyOnDebouncedSync(harness.engine);
 		harness.vault.adapter.stat.mockResolvedValueOnce({ type: 'folder', size: 0, mtime: 1700000000000 });
 
-		harness.engine.onRawFileEvent('.obsidian/plugins');
+		harness.engine.onRawFileEvent(CONFIG_PLUGINS_DIR);
 		await flushMicrotasks();
 
-		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		const pendingPaths = getPendingPaths(harness.engine);
 		expect(pendingPaths.size).toBe(0);
 		expect(debouncedSync).not.toHaveBeenCalled();
 	});
 
 	it('queues delete marker for missing tracked raw paths', async () => {
-		const debouncedSync = vi
-			.spyOn(harness.engine as any, 'debouncedSync')
-			.mockImplementation(() => {});
+		const debouncedSync = spyOnDebouncedSync(harness.engine);
 		harness.vault.adapter.stat.mockResolvedValueOnce(null);
 		harness.localManifest.hasFile.mockReturnValueOnce(true);
 
-		harness.engine.onRawFileEvent('.obsidian/plugins/foo/main.js');
+		harness.engine.onRawFileEvent(TRACKED_PLUGIN_MAIN_PATH);
 		await flushMicrotasks();
 
-		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
-		expect(pendingPaths.has('delete:.obsidian/plugins/foo/main.js')).toBe(true);
+		const pendingPaths = getPendingPaths(harness.engine);
+		expect(pendingPaths.has(`delete:${TRACKED_PLUGIN_MAIN_PATH}`)).toBe(true);
 		expect(debouncedSync).toHaveBeenCalledTimes(1);
 	});
 
@@ -289,8 +399,8 @@ describe('SyncEngine event queue behavior', () => {
 			}
 		});
 
-		(harness.engine as any).pendingPaths.add('notes/a.md');
-		await (harness.engine as any).processPendingChanges();
+		getPendingPaths(harness.engine).add('notes/a.md');
+		await flushPendingChanges(harness.engine);
 
 		expect(idlePendingCounts.at(-1)).toBe(0);
 	});
@@ -308,18 +418,16 @@ describe('SyncEngine event queue behavior', () => {
 			return null;
 		});
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
-		const debouncedSync = vi
-			.spyOn(harness.engine as any, 'debouncedSync')
-			.mockImplementation(() => {});
+		const debouncedSync = spyOnDebouncedSync(harness.engine);
 		harness.api.uploadFile.mockImplementation(async () => {
-			(harness.engine as any).pendingPaths.add('notes/b.md');
+			getPendingPaths(harness.engine).add('notes/b.md');
 			return { success: true, path: 'notes/a.md' };
 		});
 
-		(harness.engine as any).pendingPaths.add('notes/a.md');
-		await (harness.engine as any).processPendingChanges();
+		getPendingPaths(harness.engine).add('notes/a.md');
+		await flushPendingChanges(harness.engine);
 
-		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		const pendingPaths = getPendingPaths(harness.engine);
 		expect(pendingPaths.has('notes/a.md')).toBe(false);
 		expect(pendingPaths.has('notes/b.md')).toBe(true);
 		expect(debouncedSync).toHaveBeenCalledTimes(1);
@@ -333,17 +441,17 @@ describe('SyncEngine event queue behavior', () => {
 			stat: { size: 1, mtime: 1700000000000 },
 		});
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
-		vi.spyOn(harness.engine as any, 'debouncedSync').mockImplementation(() => {});
+		spyOnDebouncedSync(harness.engine);
 		harness.api.uploadFile.mockResolvedValue({
 			success: false,
 			path: 'notes/a.md',
 			error: 'quota exceeded',
 		});
 
-		(harness.engine as any).pendingPaths.add('notes/a.md');
-		await (harness.engine as any).processPendingChanges();
+		getPendingPaths(harness.engine).add('notes/a.md');
+		await flushPendingChanges(harness.engine);
 
-		const pendingPaths = (harness.engine as any).pendingPaths as Set<string>;
+		const pendingPaths = getPendingPaths(harness.engine);
 		expect(pendingPaths.has('notes/a.md')).toBe(true);
 		expect(harness.engine.getState().status).toBe('error');
 		expect(harness.engine.getState().lastError).toContain('quota exceeded');
@@ -353,13 +461,13 @@ describe('SyncEngine event queue behavior', () => {
 describe('prepareUploadFromVaultFile', () => {
 	let harness: Harness;
 
-	function transferContext() {
+	function transferContext(): TransferContext {
 		return {
-			vault: harness.vault as any,
-			api: harness.api as any,
-			localManifest: harness.localManifest as any,
-			runConcurrent: vi.fn(),
-			retryWithBackoff: vi.fn(),
+			vault: harness.vault as never,
+			api: harness.api as never,
+			localManifest: harness.localManifest as never,
+			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+			retryWithBackoff: async <T>(fn: () => Promise<T>) => fn(),
 			getModifiedIso: vi.fn().mockResolvedValue(new Date().toISOString()),
 		};
 	}
@@ -407,13 +515,9 @@ describe('prepareUploadFromVaultFile', () => {
 			extension: 'md',
 		});
 
-		expect(result).toEqual(
-			expect.objectContaining({
-				path: 'notes/a.md',
-				content: expect.any(ArrayBuffer),
-				contentType: 'text/markdown',
-			}),
-		);
+		expect(result?.path).toBe('notes/a.md');
+		expect(result?.content).toBeInstanceOf(ArrayBuffer);
+		expect(result?.contentType).toBe('text/markdown');
 		expect(result?.hash).toHaveLength(64);
 		// No 'binary' field anymore
 		expect(result).not.toHaveProperty('binary');
@@ -421,7 +525,7 @@ describe('prepareUploadFromVaultFile', () => {
 
 	it('prepares binary files with ArrayBuffer content', async () => {
 		const bytes = new Uint8Array([0, 255, 1]);
-		harness.vault.adapter.readBinary.mockResolvedValue(bytes.buffer as ArrayBuffer);
+		harness.vault.adapter.readBinary.mockResolvedValue(bytes.buffer);
 
 		const result = await prepareUploadFromVaultFile(transferContext(), {
 			path: 'images/pixel.png',
@@ -430,13 +534,9 @@ describe('prepareUploadFromVaultFile', () => {
 			extension: 'png',
 		});
 
-		expect(result).toEqual(
-			expect.objectContaining({
-				path: 'images/pixel.png',
-				content: expect.any(ArrayBuffer),
-				contentType: 'image/png',
-			}),
-		);
+		expect(result?.path).toBe('images/pixel.png');
+		expect(result?.content).toBeInstanceOf(ArrayBuffer);
+		expect(result?.contentType).toBe('image/png');
 		// Content is raw ArrayBuffer, not base64
 		expect(result!.content.byteLength).toBe(3);
 		expect(result).not.toHaveProperty('binary');
@@ -451,9 +551,9 @@ describe('SyncEngine incrementalSync', () => {
 			lastSeq: 8,
 			hasMore: false,
 		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
+		spyOnLocalChanges(harness.engine, []);
 
-		const result = await (harness.engine as any).incrementalSync();
+		const result = await runIncrementalSync(harness.engine);
 
 		expect(result).toEqual({
 			success: true,
@@ -487,11 +587,11 @@ describe('SyncEngine incrementalSync', () => {
 			lastSeq: 6,
 			hasMore: false,
 		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
-		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		spyOnLocalChanges(harness.engine, []);
+		spyOnLocalDeletes(harness.engine, []);
 		harness.vault.getAbstractFileByPath.mockReturnValue(note);
 
-		const result = await (harness.engine as any).incrementalSync();
+		const result = await runIncrementalSync(harness.engine);
 
 		expect(result?.deleted).toBe(1);
 		expect(harness.fileManager.trashFile).toHaveBeenCalledWith(note);
@@ -507,7 +607,7 @@ describe('SyncEngine incrementalSync', () => {
 			changes: [
 				{
 					seq: 6,
-					path: '.obsidian/workspace.json',
+					path: HIDDEN_WORKSPACE_PATH,
 					action: 'delete',
 					hash: '',
 					size: 0,
@@ -517,18 +617,18 @@ describe('SyncEngine incrementalSync', () => {
 			lastSeq: 6,
 			hasMore: false,
 		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
-		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		spyOnLocalChanges(harness.engine, []);
+		spyOnLocalDeletes(harness.engine, []);
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		harness.vault.adapter.exists.mockResolvedValue(true);
 
-		const result = await (harness.engine as any).incrementalSync();
+		const result = await runIncrementalSync(harness.engine);
 
 		expect(result?.deleted).toBe(1);
 		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
 		expect(harness.vault.delete).not.toHaveBeenCalled();
-		expect(harness.vault.adapter.remove).toHaveBeenCalledWith('.obsidian/workspace.json');
-		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('.obsidian/workspace.json');
+		expect(harness.vault.adapter.remove).toHaveBeenCalledWith(HIDDEN_WORKSPACE_PATH);
+		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith(HIDDEN_WORKSPACE_PATH);
 		expect(harness.settings.lastSeq).toBe(6);
 	});
 
@@ -548,12 +648,12 @@ describe('SyncEngine incrementalSync', () => {
 			lastSeq: 6,
 			hasMore: false,
 		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
-		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		spyOnLocalChanges(harness.engine, []);
+		spyOnLocalDeletes(harness.engine, []);
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		harness.vault.adapter.exists.mockResolvedValue(false);
 
-		const result = await (harness.engine as any).incrementalSync();
+		const result = await runIncrementalSync(harness.engine);
 
 		expect(result?.deleted).toBe(0);
 		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
@@ -579,10 +679,10 @@ describe('SyncEngine incrementalSync', () => {
 					created_at: '2026-02-06T12:00:00.000Z',
 				},
 			],
-			lastSeq: 3,
-			hasMore: false,
-		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
+				lastSeq: 3,
+				hasMore: false,
+			});
+		spyOnLocalChanges(harness.engine, []);
 		harness.vault.getAbstractFileByPath.mockReturnValue({
 			path: 'notes/same.md',
 			extension: 'md',
@@ -590,7 +690,7 @@ describe('SyncEngine incrementalSync', () => {
 		});
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 
-		const result = await (harness.engine as any).incrementalSync();
+		const result = await runIncrementalSync(harness.engine);
 
 		expect(result?.downloaded).toBe(0);
 		expect(harness.api.downloadFile).not.toHaveBeenCalled();
@@ -610,7 +710,7 @@ describe('SyncEngine incrementalSync', () => {
 			lastSeq: 9,
 			hasMore: false,
 		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([
+		spyOnLocalChanges(harness.engine, [
 			{ path: 'notes/new.md', hash: 'local-hash' },
 		]);
 		harness.vault.getAbstractFileByPath.mockReturnValue({
@@ -621,7 +721,7 @@ describe('SyncEngine incrementalSync', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(
 			new TextEncoder().encode('hello world').buffer as ArrayBuffer,
 		);
-		const result = await (harness.engine as any).incrementalSync();
+		const result = await runIncrementalSync(harness.engine);
 
 		expect(result?.uploaded).toBe(1);
 		expect(harness.api.batchUpload).toHaveBeenCalledTimes(1);
@@ -651,10 +751,10 @@ describe('SyncEngine incrementalSync', () => {
 			lastSeq: 11,
 			hasMore: false,
 		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([
+		spyOnLocalChanges(harness.engine, [
 			{ path: 'notes/live.md', hash: 'local-hash' },
 		]);
-		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		spyOnLocalDeletes(harness.engine, []);
 		harness.vault.getAbstractFileByPath.mockReturnValue({
 			path: 'notes/live.md',
 			extension: 'md',
@@ -664,7 +764,7 @@ describe('SyncEngine incrementalSync', () => {
 			new TextEncoder().encode('keep local').buffer as ArrayBuffer,
 		);
 
-		const result = await (harness.engine as any).incrementalSync();
+		const result = await runIncrementalSync(harness.engine);
 
 		expect(harness.api.deleteFile).not.toHaveBeenCalled();
 		expect(harness.api.batchUpload).toHaveBeenCalledTimes(1);
@@ -679,10 +779,10 @@ describe('SyncEngine incrementalSync', () => {
 			lastSeq: 6,
 			hasMore: false,
 		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
-		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue(['notes/deleted.md']);
+		spyOnLocalChanges(harness.engine, []);
+		spyOnLocalDeletes(harness.engine, ['notes/deleted.md']);
 
-		const result = await (harness.engine as any).incrementalSync();
+		const result = await runIncrementalSync(harness.engine);
 
 		expect(harness.api.batchDelete).toHaveBeenCalledWith(['notes/deleted.md']);
 		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/deleted.md');
@@ -712,17 +812,11 @@ describe('SyncEngine processDiff conflict handling', () => {
 			size: remote.length,
 		});
 
-		const localFiles: Record<string, { hash: string; size: number; modified: string }> = {};
-		const result = {
-			success: true,
-			uploaded: 0,
-			downloaded: 0,
-			deleted: 0,
-			conflicts: [] as string[],
-			errors: [] as string[],
-		};
+		const localFiles: Record<string, ManifestEntry> = {};
+		const result = createSyncResult();
 
-		await (harness.engine as any).processDiff(
+		await runProcessDiff(
+			harness.engine,
 			{ path, action: 'conflict', localHash: 'l', remoteHash: 'r' },
 			localFiles,
 			result,
@@ -764,17 +858,11 @@ describe('SyncEngine processDiff conflict handling', () => {
 			size: remote.length,
 		});
 
-		const localFiles: Record<string, { hash: string; size: number; modified: string }> = {};
-		const result = {
-			success: true,
-			uploaded: 0,
-			downloaded: 0,
-			deleted: 0,
-			conflicts: [] as string[],
-			errors: [] as string[],
-		};
+		const localFiles: Record<string, ManifestEntry> = {};
+		const result = createSyncResult();
 
-		await (harness.engine as any).processDiff(
+		await runProcessDiff(
+			harness.engine,
 			{ path, action: 'conflict', localHash: 'l', remoteHash: 'r' },
 			localFiles,
 			result,
@@ -817,13 +905,13 @@ describe('SyncEngine incremental sync cursor/state safeguards', () => {
 			lastSeq: 2,
 			hasMore: false,
 		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
-		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		spyOnLocalChanges(harness.engine, []);
+		spyOnLocalDeletes(harness.engine, []);
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		harness.api.batchDownload.mockRejectedValue(new Error('network down'));
 		harness.api.downloadFile.mockRejectedValue(new Error('network down'));
 
-		const result = await (harness.engine as any).incrementalSync();
+		const result = await runIncrementalSync(harness.engine);
 
 		expect(result?.success).toBe(false);
 		expect(result?.errors).toContain('notes/remote.md: network down');
@@ -846,8 +934,8 @@ describe('SyncEngine incremental sync cursor/state safeguards', () => {
 			lastSeq: 2,
 			hasMore: false,
 		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
-		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		spyOnLocalChanges(harness.engine, []);
+		spyOnLocalDeletes(harness.engine, []);
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		harness.api.batchDownload.mockRejectedValue(new Error('network down'));
 		harness.api.downloadFile.mockRejectedValue(new Error('network down'));
@@ -887,7 +975,7 @@ describe('SyncEngine full sync safeguards', () => {
 
 	it('does not advance lastSeq when full sync has non-fatal errors', async () => {
 		const harness = createHarness({ lastSeq: 5 });
-		vi.spyOn(harness.engine as any, 'incrementalSync').mockResolvedValue(null);
+		spyOnIncrementalSync(harness.engine, null);
 		harness.api.getManifest.mockResolvedValue({
 			version: 1,
 			files: {
@@ -913,7 +1001,7 @@ describe('SyncEngine full sync safeguards', () => {
 describe('SyncEngine slice 5 safeguards', () => {
 	it('rejects initial sync while another sync is in progress', async () => {
 		const harness = createHarness();
-		(harness.engine as any).state.status = 'syncing';
+		setSyncStatus(harness.engine, 'syncing');
 
 		const result = await harness.engine.initialSync();
 
@@ -1051,16 +1139,14 @@ describe('SyncEngine slice 5 safeguards', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 		harness.api.uploadFile.mockImplementation(async () => {
 			signalUploadStarted();
-			(harness.engine as any).pendingPaths.add('notes/b.md');
+			getPendingPaths(harness.engine).add('notes/b.md');
 			await uploadGate;
 			return { success: true, path: 'notes/a.md' };
 		});
-		const debouncedSync = vi
-			.spyOn(harness.engine as any, 'debouncedSync')
-			.mockImplementation(() => {});
+		const debouncedSync = spyOnDebouncedSync(harness.engine);
 
-		(harness.engine as any).pendingPaths.add('notes/a.md');
-		const processing = (harness.engine as any).processPendingChanges();
+		getPendingPaths(harness.engine).add('notes/a.md');
+		const processing = flushPendingChanges(harness.engine);
 		await uploadStarted;
 
 		harness.engine.destroy();
@@ -1068,7 +1154,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 		await processing;
 
 		expect(debouncedSync).not.toHaveBeenCalled();
-		expect((harness.engine as any).pendingPaths.size).toBe(0);
+		expect(getPendingPaths(harness.engine).size).toBe(0);
 	});
 });
 
@@ -1089,8 +1175,8 @@ describe('SyncEngine abort-on-destroy', () => {
 			lastSeq: 8,
 			hasMore: false,
 		});
-		vi.spyOn(harness.engine as any, 'getLocalChanges').mockResolvedValue([]);
-		vi.spyOn(harness.engine as any, 'getLocalDeletes').mockResolvedValue([]);
+		spyOnLocalChanges(harness.engine, []);
+		spyOnLocalDeletes(harness.engine, []);
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		// batchDownload throws AbortError (simulating destroy during download)
 		harness.api.batchDownload.mockRejectedValue(
@@ -1107,7 +1193,7 @@ describe('SyncEngine abort-on-destroy', () => {
 	it('aborts in-flight sync when destroyed and does not set error state', async () => {
 		const harness = createHarness({ lastSeq: 0 });
 		// Make incremental sync fall through to full sync
-		vi.spyOn(harness.engine as any, 'incrementalSync').mockResolvedValue(null);
+		spyOnIncrementalSync(harness.engine, null);
 		// getManifest will hang until we signal it
 		let rejectManifest!: (error: Error) => void;
 		const manifestCalled = new Promise<void>(resolve => {
@@ -1147,7 +1233,7 @@ describe('SyncEngine abort-on-destroy', () => {
 			async () => { callOrder.push(4); return 4; },
 		];
 
-		await (harness.engine as any).runConcurrent(tasks, 1);
+		await runConcurrentTasks(harness.engine, tasks, 1);
 
 		// Task 3 and 4 should not run because destroy was called during task 2
 		expect(callOrder).toEqual([1, 2]);
@@ -1167,7 +1253,7 @@ describe('SyncEngine abort-on-destroy', () => {
 		};
 
 		await expect(
-			(harness.engine as any).retryWithBackoff(fn),
+			retryWithBackoff(harness.engine, fn),
 		).rejects.toThrow('first failure');
 
 		expect(callCount).toBe(1);
@@ -1185,7 +1271,7 @@ describe('SyncEngine abort-on-destroy', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(toArrayBuffer('A'));
 
 		// Destroy during prepare phase
-		vi.spyOn(harness.engine as any, 'prepareUploadsFromVaultFiles').mockImplementation(async () => {
+		spyOnPrepareUploadsFromVaultFiles(harness.engine, async () => {
 			harness.engine.destroy();
 			return [{ path: 'notes/a.md', content: toArrayBuffer('A'), hash: 'h', size: 1 }];
 		});
@@ -1204,7 +1290,7 @@ describe('SyncEngine abort-on-destroy', () => {
 		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
 
 		// Destroy after prepareUploadsFromVaultFiles
-		vi.spyOn(harness.engine as any, 'prepareUploadsFromVaultFiles').mockImplementation(async () => {
+		spyOnPrepareUploadsFromVaultFiles(harness.engine, async () => {
 			harness.engine.destroy();
 			return [];
 		});

@@ -39,6 +39,15 @@ export interface TransferContext {
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 }
 
+function isVaultTFileLike(file: unknown): file is TFile {
+	return typeof file === 'object'
+		&& file !== null
+		&& 'path' in file
+		&& typeof file.path === 'string'
+		&& 'extension' in file
+		&& typeof file.extension === 'string';
+}
+
 export async function prepareUpload(
 	context: TransferContext,
 	file: TFile,
@@ -80,8 +89,8 @@ export async function prepareUploadFromPath(
 	options?: { force?: boolean },
 ): Promise<PreparedUpload | null> {
 	const file = context.vault.getAbstractFileByPath(path);
-	if (file && 'extension' in file) {
-		return prepareUploadFromVaultFile(context, tfileToVaultFile(file as TFile), options);
+	if (isVaultTFileLike(file)) {
+		return prepareUploadFromVaultFile(context, tfileToVaultFile(file), options);
 	}
 
 	if (!isHiddenPath(path)) {
@@ -148,8 +157,11 @@ export async function saveDownloadedContent(
 		await context.vault.adapter.writeBinary(path, content);
 	} else {
 		const existingFile = context.vault.getAbstractFileByPath(path);
+		if (existingFile && !isVaultTFileLike(existingFile)) {
+			throw new Error(`Cannot overwrite non-file path: ${path}`);
+		}
 		if (existingFile) {
-			await context.vault.modifyBinary(existingFile as TFile, content);
+			await context.vault.modifyBinary(existingFile, content);
 		} else {
 			await context.vault.createBinary(path, content);
 		}
@@ -293,15 +305,16 @@ export async function processDiff(
 			}
 
 			const localFile = context.vault.getAbstractFileByPath(diff.path);
-			const hasLocalFile = localFile && 'extension' in localFile;
+			const visibleFile = isVaultTFileLike(localFile) ? localFile : null;
+			const hasLocalFile = visibleFile !== null;
 			const hasHiddenFile = hidden && await context.vault.adapter.exists(diff.path);
 
 			if (hasLocalFile || hasHiddenFile) {
 				const localContent = await context.vault.adapter.readBinary(diff.path);
 				const conflictPath = await createConflictCopy(context.vault, diff.path, localContent);
 
-				if (hasLocalFile) {
-					await context.vault.modifyBinary(localFile as TFile, remoteContent);
+				if (visibleFile) {
+					await context.vault.modifyBinary(visibleFile, remoteContent);
 				} else {
 					await context.vault.adapter.writeBinary(diff.path, remoteContent);
 				}

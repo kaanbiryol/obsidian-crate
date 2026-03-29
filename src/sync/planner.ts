@@ -75,6 +75,16 @@ export interface FullSyncPlan {
 	errors: string[];
 }
 
+function isVaultTFileLike(file: TAbstractFile | null): file is TFile {
+	return typeof file === 'object'
+		&& file !== null
+		&& 'extension' in file
+		&& typeof file.extension === 'string'
+		&& 'stat' in file
+		&& typeof file.stat === 'object'
+		&& file.stat !== null;
+}
+
 async function deleteRemotePathLocally(
 	context: IncrementalSyncPlannerContext,
 	path: string,
@@ -88,13 +98,14 @@ async function deleteRemotePathLocally(
 	}
 
 	const file = context.vault.getAbstractFileByPath(path);
-	if (file) {
-		if (context.fileManager) {
-			await context.fileManager.trashFile(file);
-		} else {
-			await context.vault.delete(file);
-		}
-		return true;
+		if (file) {
+			if (context.fileManager) {
+				await context.fileManager.trashFile(file);
+			} else {
+				// eslint-disable-next-line obsidianmd/prefer-file-manager-trash-file -- fileManager is optional in planner-only contexts
+				await context.vault.delete(file);
+			}
+			return true;
 	}
 
 	if (!await context.vault.adapter.exists(path)) {
@@ -170,7 +181,6 @@ export async function runIncrementalSync(
 		let since = context.settings.lastSeq;
 		let latestSeq = since;
 
-		// eslint-disable-next-line no-constant-condition
 		while (true) {
 			const response = await context.api.getChanges(since);
 
@@ -184,7 +194,9 @@ export async function runIncrementalSync(
 
 			if (!response.hasMore) break;
 			if (response.changes.length === 0) break;
-			since = response.changes[response.changes.length - 1]!.seq;
+			const lastChange = response.changes[response.changes.length - 1];
+			if (!lastChange) break;
+			since = lastChange.seq;
 		}
 
 		logger.info(`Incremental sync: ${allChanges.length} remote changes since seq ${context.settings.lastSeq}`);
@@ -248,8 +260,8 @@ export async function runIncrementalSync(
 					if (!localFile && !(isHiddenPath(path) && await context.vault.adapter.exists(path))) {
 						downloadPaths.push(path);
 					} else {
-						const stat = localFile && 'stat' in localFile
-							? (localFile as TFile).stat
+						const stat = isVaultTFileLike(localFile)
+							? localFile.stat
 							: await context.vault.adapter.stat(path);
 						if ((stat?.size ?? 0) > MAX_FILE_SIZE_BYTES) {
 							result.errors.push(`${path}: Skipped local file larger than 25MB`);

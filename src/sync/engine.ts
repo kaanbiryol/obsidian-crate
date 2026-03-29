@@ -168,7 +168,7 @@ export class SyncEngine {
 			clearInterval(this.syncInterval);
 		}
 		this.syncInterval = setInterval(
-			() => this.periodicCheck(),
+			() => { void this.periodicCheck(); },
 			this.settings.syncInterval * 1000
 		);
 	}
@@ -255,15 +255,15 @@ export class SyncEngine {
 			return path.startsWith(pattern) || path === pattern.slice(0, -1);
 		}
 
-		let regex = this.patternCache.get(pattern);
-		if (!regex) {
-			const regexPattern = Array.from(pattern).map(char => {
-				if (char === '*') return '.*';
-				if (char === '?') return '.';
-				return char.replace(/[\\^$+.|(){}\[\]]/g, '\\$&');
-			}).join('');
-			try {
-				regex = new RegExp(`^${regexPattern}$`);
+			let regex = this.patternCache.get(pattern);
+			if (!regex) {
+				const regexPattern = Array.from(pattern).map(char => {
+					if (char === '*') return '.*';
+					if (char === '?') return '.';
+					return char.replace(/[\\^$+.|(){}[\]]/g, '\\$&');
+				}).join('');
+				try {
+					regex = new RegExp(`^${regexPattern}$`);
 			} catch (error) {
 				logger.warn(`Invalid ignore pattern "${pattern}":`, error instanceof Error ? error.message : 'Unknown error');
 				// Never match on invalid patterns to avoid sync crashes.
@@ -415,13 +415,17 @@ export class SyncEngine {
 		const results: T[] = [];
 		let index = 0;
 		const destroyed = () => this.destroyed;
-		async function next(): Promise<void> {
-			while (index < tasks.length) {
-				if (destroyed()) break;
-				const i = index++;
-				results[i] = await tasks[i]!();
+			async function next(): Promise<void> {
+				while (index < tasks.length) {
+					if (destroyed()) break;
+					const i = index++;
+					const task = tasks[i];
+					if (!task) {
+						break;
+					}
+					results[i] = await task();
+				}
 			}
-		}
 		await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, () => next()));
 		return results;
 	}
@@ -778,16 +782,17 @@ export class SyncEngine {
 				progressCallback?.(preparedCount, total);
 			});
 
-			let chunkIndex = 0;
-			let currentPrepare = chunks.length > 0 ? prepareChunk(chunks[0]!) : null;
-			while (currentPrepare) {
-				const preparedChunk = await currentPrepare;
-				this.throwIfDestroyed();
-				uploadCandidates += preparedChunk.length;
+				let chunkIndex = 0;
+				const firstChunk = chunks[0];
+				let currentPrepare = firstChunk ? prepareChunk(firstChunk) : null;
+				while (currentPrepare) {
+					const preparedChunk = await currentPrepare;
+					this.throwIfDestroyed();
+					uploadCandidates += preparedChunk.length;
 
-				chunkIndex++;
-				const nextChunk = chunkIndex < chunks.length ? chunks[chunkIndex]! : null;
-				const nextPrepare = nextChunk ? prepareChunk(nextChunk) : null;
+					chunkIndex++;
+					const nextChunk = chunks[chunkIndex];
+					const nextPrepare = nextChunk ? prepareChunk(nextChunk) : null;
 
 				if (preparedChunk.length > 0) {
 					await this.uploadPreparedFiles(preparedChunk, result, {

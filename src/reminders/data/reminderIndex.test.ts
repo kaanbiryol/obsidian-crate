@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { TFile, type App } from 'obsidian';
 
 vi.mock('@/reminders/data/vaultScanner', () => ({
   scanVault: vi.fn(),
@@ -9,14 +10,29 @@ vi.mock('@/reminders/data/vaultScanner', () => ({
 
 import { createReminderIndex, type IndexedReminder } from '@/reminders/data/reminderIndex';
 import * as vaultScanner from '@/reminders/data/vaultScanner';
+import type { ScanResult } from '@/reminders/data/vaultScanner';
 
-type ScanResult = {
+type ScanFileResult = {
+  filePath: string;
   reminders: IndexedReminder[];
-  filesScanned: number;
-  totalLines: number;
-  scanDurationMs: number;
-  discoveredProjects: string[];
+  lineCount: number;
 };
+
+function makeMockFile(path: string): TFile {
+  const file = new TFile();
+  const name = path.split('/').pop() ?? path;
+  const dotIndex = name.lastIndexOf('.');
+
+  file.vault = {} as never;
+  file.path = path;
+  file.name = name;
+  file.parent = null;
+  file.basename = dotIndex >= 0 ? name.slice(0, dotIndex) : name;
+  file.extension = dotIndex >= 0 ? name.slice(dotIndex + 1) : '';
+  file.stat = { ctime: 0, mtime: 0, size: 0 };
+
+  return file;
+}
 
 function makeReminder(overrides: Partial<IndexedReminder>): IndexedReminder {
   return {
@@ -36,7 +52,7 @@ function makeReminder(overrides: Partial<IndexedReminder>): IndexedReminder {
 }
 
 describe('reminderIndex', () => {
-  const app = {} as any;
+  const app = { vault: {} } as unknown as App;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,7 +81,7 @@ describe('reminderIndex', () => {
       discoveredProjects: ['Work'],
     };
 
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult as any);
+    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
 
     const index = createReminderIndex(app, 'Reminders');
     await index.load();
@@ -89,7 +105,7 @@ describe('reminderIndex', () => {
       discoveredProjects: ['Old'],
     };
 
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult as any);
+    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
     vi.mocked(vaultScanner.getProjectFromPath)
       .mockImplementation((path: string) => (path.includes('Old') ? 'Old' : 'New'));
 
@@ -110,14 +126,15 @@ describe('reminderIndex', () => {
 
     vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
     vi.mocked(vaultScanner.getProjectFromPath).mockReturnValue('Work');
-    vi.mocked(vaultScanner.scanFile).mockResolvedValue({
+    const scanFileResult: ScanFileResult = {
       filePath: 'Reminders/Work.md',
       reminders: [makeReminder({ id: 'r1' })],
       lineCount: 1,
-    } as any);
+    };
+    vi.mocked(vaultScanner.scanFile).mockResolvedValue(scanFileResult);
 
     const index = createReminderIndex(app, 'Reminders');
-    const file = { path: 'Reminders/Work.md' } as any;
+    const file = makeMockFile('Reminders/Work.md');
 
     await index.rescanFile(file);
     await index.rescanFile(file);
@@ -139,7 +156,7 @@ describe('reminderIndex', () => {
       discoveredProjects: ['Work', 'Home'],
     };
 
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult as any);
+    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
     vi.mocked(vaultScanner.getProjectFromPath)
       .mockImplementation((path: string) => (path.includes('Work') ? 'Work' : 'Home'));
 
@@ -166,7 +183,7 @@ describe('reminderIndex', () => {
       discoveredProjects: ['Work'],
     };
 
-    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult as any);
+    vi.mocked(vaultScanner.scanVault).mockResolvedValue(scanResult);
     vi.mocked(vaultScanner.getProjectFromPath).mockReturnValue('Work');
 
     const index = createReminderIndex(app, 'Reminders');
@@ -187,14 +204,15 @@ describe('reminderIndex', () => {
 
     vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
     vi.mocked(vaultScanner.getProjectFromPath).mockReturnValue('Work');
-    vi.mocked(vaultScanner.scanFile).mockResolvedValue({
+    const scanFileResult: ScanFileResult = {
       filePath: 'Reminders/Work.md',
       reminders: [makeReminder({ id: 'r1' })],
       lineCount: 1,
-    } as any);
+    };
+    vi.mocked(vaultScanner.scanFile).mockResolvedValue(scanFileResult);
 
     const index = createReminderIndex(app, 'Reminders');
-    const file = { path: 'Reminders/Work.md' } as any;
+    const file = makeMockFile('Reminders/Work.md');
 
     await index.rescanFile(file);
     vi.advanceTimersByTime(1600);

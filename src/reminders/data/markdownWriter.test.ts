@@ -1,18 +1,55 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createMarkdownWriter } from '@/reminders/data/markdownWriter';
+import type { MarkdownWriter } from '@/reminders/data/markdownWriter';
 import type { ReminderIndex, IndexedReminder } from '@/reminders/data/reminderIndex';
-import type { SyncResult } from '@/reminders/data/markdownWriter';
+import { TFile, type App } from 'obsidian';
 
-function createMockApp(initialFiles: Record<string, string> = {}) {
+type MockVault = {
+  adapter: {
+    exists: ReturnType<typeof vi.fn<(path: string) => Promise<boolean>>>;
+  };
+  getAbstractFileByPath: ReturnType<typeof vi.fn<(path: string) => TFile | null>>;
+  createFolder: ReturnType<typeof vi.fn<(path: string) => Promise<void>>>;
+  create: ReturnType<typeof vi.fn<(path: string, content: string) => Promise<void>>>;
+  read: ReturnType<typeof vi.fn<(file: TFile) => Promise<string>>>;
+  modify: ReturnType<typeof vi.fn<(file: TFile, content: string) => Promise<void>>>;
+};
+
+type MockAppResult = {
+  app: App;
+  files: Map<string, string>;
+  folders: Set<string>;
+  vault: MockVault;
+};
+
+type ReminderChangeCallback = Parameters<MarkdownWriter['setOnReminderChange']>[0];
+
+function makeMockFile(path: string): TFile {
+  const file = new TFile();
+  const name = path.split('/').pop() ?? path;
+  const dotIndex = name.lastIndexOf('.');
+
+  file.vault = {} as never;
+  file.path = path;
+  file.name = name;
+  file.parent = null;
+  file.basename = dotIndex >= 0 ? name.slice(0, dotIndex) : name;
+  file.extension = dotIndex >= 0 ? name.slice(dotIndex + 1) : '';
+  file.stat = { ctime: 0, mtime: 0, size: 0 };
+
+  return file;
+}
+
+function createMockApp(initialFiles: Record<string, string> = {}): MockAppResult {
   const files = new Map(Object.entries(initialFiles));
   const folders = new Set<string>();
 
-  const vault = {
+  const vault: MockVault = {
     adapter: {
       exists: vi.fn(async (path: string) => folders.has(path) || files.has(path)),
     },
     getAbstractFileByPath: vi.fn((path: string) =>
-      files.has(path) ? ({ path, extension: 'md' } as any) : null
+      files.has(path) ? makeMockFile(path) : null
     ),
     createFolder: vi.fn(async (path: string) => {
       folders.add(path);
@@ -26,7 +63,7 @@ function createMockApp(initialFiles: Record<string, string> = {}) {
     }),
   };
 
-  return { app: { vault } as any, files, folders, vault };
+  return { app: { vault } as unknown as App, files, folders, vault };
 }
 
 function createMockIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
@@ -62,7 +99,7 @@ describe('markdownWriter', () => {
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
-    const onChange = vi.fn(async () => ({ success: true } as SyncResult));
+    const onChange = vi.fn<ReminderChangeCallback>(async () => ({ success: true }));
     writer.setOnReminderChange(onChange);
 
     const dueDate = new Date(2026, 0, 13, 12, 0);
@@ -108,7 +145,7 @@ describe('markdownWriter', () => {
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
-    const onChange = vi.fn(async () => ({ success: true } as SyncResult));
+    const onChange = vi.fn<ReminderChangeCallback>(async () => ({ success: true }));
     writer.setOnReminderChange(onChange);
 
     const reminder = makeIndexedReminder({
@@ -131,7 +168,8 @@ describe('markdownWriter', () => {
     expect(content).toContain('Jan 2, 2026');
 
     expect(onChange).toHaveBeenCalledTimes(1);
-    const updated = (onChange.mock.calls as any[][])[0]![0];
+    const updated = onChange.mock.calls[0]?.[0];
+    expect(updated).toBeDefined();
     expect(updated.completed).toBe(false);
     expect(updated.dueDate).toBe('2026-01-02');
   });
@@ -140,11 +178,11 @@ describe('markdownWriter', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 10, 9, 0, 0));
 
-    const { app, files, folders } = createMockApp();
+    const { app, files } = createMockApp();
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
-    const onChange = vi.fn(async () => ({ success: true } as SyncResult));
+    const onChange = vi.fn<ReminderChangeCallback>(async () => ({ success: true }));
     writer.setOnReminderChange(onChange);
 
     await writer.createReminder('Work', 'Task D', undefined, 4, {

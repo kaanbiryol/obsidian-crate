@@ -2,7 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App, PluginManifest } from 'obsidian';
 import { LocalManifest } from './manifest';
 
-function createMockAdapter() {
+const CONFIG_DIR = '.vault-config';
+const PLUGIN_DIR = `${CONFIG_DIR}/plugins/obsidian-crate`;
+
+type MockAdapter = {
+	exists: ReturnType<typeof vi.fn<(path: string) => Promise<boolean>>>;
+	read: ReturnType<typeof vi.fn<(path: string) => Promise<string>>>;
+	write: ReturnType<typeof vi.fn<(path: string, data: string) => Promise<void>>>;
+	remove: ReturnType<typeof vi.fn<(path: string) => Promise<void>>>;
+};
+
+function createMockAdapter(): MockAdapter {
 	return {
 		exists: vi.fn().mockResolvedValue(false),
 		read: vi.fn(),
@@ -11,20 +21,20 @@ function createMockAdapter() {
 	};
 }
 
-function createLocalManifest(adapter: ReturnType<typeof createMockAdapter>): LocalManifest {
+function createLocalManifest(adapter: MockAdapter): LocalManifest {
 	const app = {
 		vault: { adapter },
 	} as unknown as App;
 
 	const pluginManifest = {
-		dir: '.obsidian/plugins/obsidian-crate',
-	} as PluginManifest;
+		dir: PLUGIN_DIR,
+	} as unknown as PluginManifest;
 
 	return new LocalManifest(app, pluginManifest);
 }
 
 describe('LocalManifest', () => {
-	let adapter: ReturnType<typeof createMockAdapter>;
+	let adapter: MockAdapter;
 	let manifest: LocalManifest;
 
 	beforeEach(() => {
@@ -87,7 +97,7 @@ describe('LocalManifest', () => {
 		expect(manifest.getEntry('a.md')).toEqual({ hash: 'h', size: 5, modified: '2026-01-01T00:00:00.000Z' });
 		// Verify it promoted tmp to main
 		expect(adapter.write).toHaveBeenCalledWith(
-			'.obsidian/plugins/obsidian-crate/file-manifest.json',
+			`${PLUGIN_DIR}/file-manifest.json`,
 			expect.any(String),
 		);
 	});
@@ -110,11 +120,11 @@ describe('LocalManifest', () => {
 		// save writes tmp then main (2 writes per save), plus remove of tmp
 		expect(adapter.write).toHaveBeenCalledTimes(2);
 		expect(adapter.write).toHaveBeenCalledWith(
-			'.obsidian/plugins/obsidian-crate/file-manifest.json.tmp',
+			`${PLUGIN_DIR}/file-manifest.json.tmp`,
 			expect.any(String),
 		);
 		expect(adapter.write).toHaveBeenCalledWith(
-			'.obsidian/plugins/obsidian-crate/file-manifest.json',
+			`${PLUGIN_DIR}/file-manifest.json`,
 			expect.any(String),
 		);
 	});
@@ -134,8 +144,10 @@ describe('LocalManifest', () => {
 		const mainWrites = adapter.write.mock.calls.filter(
 			(call: [string, string]) => call[0].endsWith('file-manifest.json') && !call[0].endsWith('.tmp'),
 		);
-		const lastPayload = mainWrites[mainWrites.length - 1]?.[1];
-		expect(JSON.parse(lastPayload as string)).toEqual({
+		const lastWrite = mainWrites.at(-1);
+		expect(lastWrite).toBeDefined();
+		const [, lastPayload] = lastWrite!;
+		expect(JSON.parse(lastPayload)).toEqual({
 			version: 1,
 			files: {},
 		});

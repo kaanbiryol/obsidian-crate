@@ -7,6 +7,8 @@ import {
 	isConflictFile,
 } from './conflict';
 
+const CONFIG_DIR = '.vault-config';
+
 function entry(hash: string, modified: string) {
 	return {
 		hash,
@@ -184,21 +186,25 @@ describe('createConflictCopy', () => {
 		vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
 
 		const content = new TextEncoder().encode('hidden').buffer;
+		const mkdir = vi.fn().mockResolvedValue(undefined);
+		const writeBinary = vi.fn().mockResolvedValue(undefined);
+		const createFolder = vi.fn().mockResolvedValue(undefined);
+		const createBinary = vi.fn().mockResolvedValue(undefined);
 		const vault = {
 			adapter: {
-				mkdir: vi.fn().mockResolvedValue(undefined),
-				writeBinary: vi.fn().mockResolvedValue(undefined),
+				mkdir,
+				writeBinary,
 			},
-			createFolder: vi.fn().mockResolvedValue(undefined),
-			createBinary: vi.fn().mockResolvedValue(undefined),
+			createFolder,
+			createBinary,
 		} as unknown as Vault;
 
-		const path = await createConflictCopy(vault, '.obsidian/config.json', content);
+		const path = await createConflictCopy(vault, `${CONFIG_DIR}/config.json`, content);
 
-		expect(path).toMatch(/^\.obsidian\/config \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)\.json$/);
-		expect(vault.adapter.mkdir).toHaveBeenCalledWith('.obsidian');
-		expect(vault.adapter.writeBinary).toHaveBeenCalledWith(path, content);
-		expect(vault.createBinary).not.toHaveBeenCalled();
+		expect(path).toMatch(/^[.]vault-config\/config \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)\.json$/);
+		expect(mkdir).toHaveBeenCalledWith(CONFIG_DIR);
+		expect(writeBinary).toHaveBeenCalledWith(path, content);
+		expect(createBinary).not.toHaveBeenCalled();
 	});
 
 	it('writes regular conflict copies through vault API', async () => {
@@ -206,20 +212,24 @@ describe('createConflictCopy', () => {
 		vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
 
 		const content = new TextEncoder().encode('regular').buffer;
+		const mkdir = vi.fn().mockResolvedValue(undefined);
+		const writeBinary = vi.fn().mockResolvedValue(undefined);
+		const createFolder = vi.fn().mockResolvedValue(undefined);
+		const createBinary = vi.fn().mockResolvedValue(undefined);
 		const vault = {
 			adapter: {
-				mkdir: vi.fn().mockResolvedValue(undefined),
-				writeBinary: vi.fn().mockResolvedValue(undefined),
+				mkdir,
+				writeBinary,
 			},
-			createFolder: vi.fn().mockResolvedValue(undefined),
-			createBinary: vi.fn().mockResolvedValue(undefined),
+			createFolder,
+			createBinary,
 		} as unknown as Vault;
 
 		const path = await createConflictCopy(vault, 'notes/test.md', content);
 
 		expect(path).toMatch(/^notes\/test \(conflict 2026-01-02 03-04-05 [a-z0-9]{4}\)\.md$/);
-		expect(vault.createFolder).toHaveBeenCalledWith('notes');
-		expect(vault.createBinary).toHaveBeenCalledWith(path, content);
-		expect(vault.adapter.writeBinary).not.toHaveBeenCalled();
+		expect(createFolder).toHaveBeenCalledWith('notes');
+		expect(createBinary).toHaveBeenCalledWith(path, content);
+		expect(writeBinary).not.toHaveBeenCalled();
 	});
 });

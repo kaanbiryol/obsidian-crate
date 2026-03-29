@@ -4,11 +4,37 @@ import { createEmptySyncResult } from './sync-result';
 import { SyncRuntime } from './runtime';
 import type { CrateSettings, SyncResult } from '../plugin/types';
 
+const CONFIG_DIR = '.vault-config';
+const PLUGIN_DIR = `${CONFIG_DIR}/plugins/obsidian-crate`;
+
 type Deferred<T> = {
 	promise: Promise<T>;
 	resolve: (value: T) => void;
 	reject: (reason?: unknown) => void;
 };
+
+type RuntimeSyncEngineStub = {
+	sync(callback: (current: number, total: number) => void): Promise<SyncResult>;
+	initialSync(callback: (current: number, total: number) => void): Promise<SyncResult>;
+	forceFullSync(callback: (current: number, total: number) => void): Promise<SyncResult>;
+};
+
+type RuntimeStatusBarStub = {
+	setSyncProgress(current: number, total: number): void;
+	clearSyncProgress(): void;
+};
+
+function isAcceptingEvents(runtime: SyncRuntime): boolean {
+	return (runtime as unknown as { acceptingEvents: boolean }).acceptingEvents;
+}
+
+function setStatusBar(runtime: SyncRuntime, statusBar: RuntimeStatusBarStub): void {
+	(runtime as unknown as { statusBar: RuntimeStatusBarStub | null }).statusBar = statusBar;
+}
+
+function setSyncEngine(runtime: SyncRuntime, syncEngine: RuntimeSyncEngineStub): void {
+	(runtime as unknown as { syncEngine: RuntimeSyncEngineStub | null }).syncEngine = syncEngine;
+}
 
 function createDeferred<T>(): Deferred<T> {
 	let resolve!: (value: T) => void;
@@ -56,11 +82,11 @@ function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 				},
 				getFiles: vi.fn(() => []),
 			},
-		},
-		manifest: {
-			dir: '.obsidian/plugins/obsidian-crate',
-		},
-	};
+			},
+			manifest: {
+				dir: PLUGIN_DIR,
+			},
+		};
 	const secretStorage = {
 		has: vi.fn(() => true),
 		get: vi.fn(() => 'auth-token'),
@@ -93,14 +119,8 @@ describe('SyncRuntime startup event handling', () => {
 		startupSync = createDeferred<SyncResult>();
 
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
-		vi.spyOn(SyncEngine.prototype, 'sync').mockImplementation(function (this: SyncEngine) {
-			(this as any).updateState({ status: 'syncing' });
-			return startupSync.promise.then(result => {
-				(this as any).updateState({ status: 'idle' });
-				return result;
-			});
-		});
-		vi.spyOn(SyncEngine.prototype as any, 'debouncedSync').mockImplementation(() => {});
+		vi.spyOn(SyncEngine.prototype, 'sync').mockImplementation(async () => startupSync.promise);
+		vi.spyOn(SyncEngine.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 	});
 
 	afterEach(async () => {
@@ -134,7 +154,7 @@ describe('SyncRuntime startup event handling', () => {
 
 		await runtime.initialize();
 
-		expect((runtime as any).acceptingEvents).toBe(false);
+		expect(isAcceptingEvents(runtime)).toBe(false);
 
 		invoke(runtime);
 
@@ -146,11 +166,11 @@ describe('SyncRuntime startup event handling', () => {
 
 		await runtime.initialize();
 
-		expect((runtime as any).acceptingEvents).toBe(false);
+		expect(isAcceptingEvents(runtime)).toBe(false);
 
 		startupSync.resolve(createEmptySyncResult());
 		await vi.waitFor(() => {
-			expect((runtime as any).acceptingEvents).toBe(true);
+			expect(isAcceptingEvents(runtime)).toBe(true);
 		});
 
 		runtime.onFileChange({ path: 'notes/existing.md' } as never);
@@ -178,11 +198,11 @@ describe('SyncRuntime operation wrappers', () => {
 		const clearSyncProgress = vi.fn();
 		const setSyncProgress = vi.fn();
 
-		(runtime as any).statusBar = {
+		setStatusBar(runtime, {
 			setSyncProgress,
 			clearSyncProgress,
-		};
-		(runtime as any).syncEngine = {
+		});
+		setSyncEngine(runtime, {
 			sync: vi.fn(async (callback: (current: number, total: number) => void) => {
 				callback(1, 2);
 				return result;
@@ -195,7 +215,7 @@ describe('SyncRuntime operation wrappers', () => {
 				callback(1, 2);
 				return result;
 			}),
-		};
+		});
 
 		runtime.addProgressListener(listener);
 

@@ -1,5 +1,22 @@
 import { describe, it, expect, vi } from 'vitest';
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault } from '@/reminders/data/vaultScanner';
+import { TFile, type App } from 'obsidian';
+
+function makeMockFile(path: string): TFile {
+  const file = new TFile();
+  const name = path.split('/').pop() ?? path;
+  const dotIndex = name.lastIndexOf('.');
+
+  file.vault = {} as never;
+  file.path = path;
+  file.name = name;
+  file.parent = null;
+  file.basename = dotIndex >= 0 ? name.slice(0, dotIndex) : name;
+  file.extension = dotIndex >= 0 ? name.slice(dotIndex + 1) : '';
+  file.stat = { ctime: 0, mtime: 0, size: 0 };
+
+  return file;
+}
 
 describe('vaultScanner', () => {
   it('derives project from path with nested folders and case-insensitive folder', () => {
@@ -19,9 +36,9 @@ describe('vaultScanner', () => {
       vault: {
         cachedRead: vi.fn().mockResolvedValue('- [ ] Task A\n- [ ] \n- [x] Done task'),
       },
-    } as any;
+    } as unknown as App;
 
-    const file = { path: 'Reminders/Work.md' } as any;
+    const file = makeMockFile('Reminders/Work.md');
     const result = await scanFile(app, file, 'Reminders');
 
     expect(result.reminders).toHaveLength(2);
@@ -31,9 +48,9 @@ describe('vaultScanner', () => {
 
   it('scans the vault and collects discovered projects', async () => {
     const files = [
-      { path: 'Reminders/Work.md' },
-      { path: 'Reminders/Empty.md' },
-      { path: 'Notes/Other.md' },
+      makeMockFile('Reminders/Work.md'),
+      makeMockFile('Reminders/Empty.md'),
+      makeMockFile('Notes/Other.md'),
     ];
 
     const contentByPath: Record<string, string> = {
@@ -45,9 +62,9 @@ describe('vaultScanner', () => {
     const app = {
       vault: {
         getMarkdownFiles: vi.fn().mockReturnValue(files),
-        cachedRead: vi.fn((file: { path: string }) => Promise.resolve(contentByPath[file.path] || '')),
+        cachedRead: vi.fn((file: TFile) => Promise.resolve(contentByPath[file.path] || '')),
       },
-    } as any;
+    } as unknown as App;
 
     const result = await scanVault(app, 'Reminders');
 
@@ -58,8 +75,8 @@ describe('vaultScanner', () => {
 
   it('falls back to getMarkdownFiles when getAbstractFileByPath is unavailable', async () => {
     const files = [
-      { path: 'Reminders/Work.md' },
-      { path: 'Notes/Other.md' },
+      makeMockFile('Reminders/Work.md'),
+      makeMockFile('Notes/Other.md'),
     ];
 
     const contentByPath: Record<string, string> = {
@@ -70,9 +87,9 @@ describe('vaultScanner', () => {
     const app = {
       vault: {
         getMarkdownFiles: vi.fn().mockReturnValue(files),
-        cachedRead: vi.fn((file: { path: string }) => Promise.resolve(contentByPath[file.path] || '')),
+        cachedRead: vi.fn((file: TFile) => Promise.resolve(contentByPath[file.path] || '')),
       },
-    } as any;
+    } as unknown as App;
 
     const result = await scanVault(app, 'Reminders');
 
