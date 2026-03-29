@@ -100,6 +100,7 @@ export class SyncEngine {
 		this.pluginIgnorePaths = new Set([
 			`${dir}/data.json`,
 			`${dir}/file-manifest.json`,
+			`${dir}/reminders-settings.json`,
 		]);
 		this.api.setAbortSignal(this.abortController.signal);
 		this.state = {

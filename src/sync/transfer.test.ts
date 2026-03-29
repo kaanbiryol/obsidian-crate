@@ -166,6 +166,43 @@ describe('transfer download/process helpers', () => {
 		);
 	});
 
+	it('uploads planned full-sync diffs even when the local manifest hash already matches', async () => {
+		const harness = createTransferHarness();
+		const content = new TextEncoder().encode('local').buffer as ArrayBuffer;
+		harness.vault.getAbstractFileByPath.mockReturnValue({
+			path: 'notes/a.md',
+			extension: 'md',
+			stat: { size: 5, mtime: 1700000000000 },
+		});
+		harness.adapter.readBinary.mockResolvedValue(content);
+		harness.localManifest.hashMatches.mockReturnValue(true);
+		harness.api.uploadFile.mockResolvedValue({
+			success: true,
+			path: 'notes/a.md',
+			hash: 'expected-hash',
+		});
+
+		const result = emptyResult();
+		const localFiles: Record<string, { hash: string; size: number; modified: string }> = {};
+
+		await processDiff(
+			harness.context,
+			{ path: 'notes/a.md', action: 'upload', localHash: 'l' },
+			localFiles,
+			result,
+		);
+
+		expect(harness.api.uploadFile).toHaveBeenCalledWith(
+			'notes/a.md',
+			content,
+			expect.any(String),
+			5,
+			'text/markdown',
+		);
+		expect(result.uploaded).toBe(1);
+		expect(result.uploadedPaths).toEqual(['notes/a.md']);
+	});
+
 	it('aggregates per-path download errors during batch downloads', async () => {
 		const harness = createTransferHarness();
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);

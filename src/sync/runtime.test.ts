@@ -113,17 +113,14 @@ describe('SyncRuntime startup event handling', () => {
 		{
 			name: 'create',
 			invoke: (runtime: SyncRuntime) => runtime.onFileChange({ path: 'notes/new.md' } as never),
-			expectedPendingPaths: ['notes/new.md'],
 		},
 		{
 			name: 'edit',
 			invoke: (runtime: SyncRuntime) => runtime.onFileChange({ path: 'notes/existing.md' } as never),
-			expectedPendingPaths: ['notes/existing.md'],
 		},
 		{
 			name: 'delete',
 			invoke: (runtime: SyncRuntime) => runtime.onFileDelete({ path: 'notes/removed.md' } as never),
-			expectedPendingPaths: ['delete:notes/removed.md'],
 		},
 		{
 			name: 'rename',
@@ -131,32 +128,34 @@ describe('SyncRuntime startup event handling', () => {
 				{ path: 'notes/renamed.md' } as never,
 				'notes/original.md',
 			),
-			expectedPendingPaths: ['delete:notes/original.md', 'notes/renamed.md'],
 		},
-	])('captures $name events while startup sync is in flight', async ({ invoke, expectedPendingPaths }) => {
+	])('ignores $name events while startup sync is in flight', async ({ invoke }) => {
 		const { runtime } = createRuntimeHarness();
 
 		await runtime.initialize();
 
-		expect((runtime as any).acceptingEvents).toBe(true);
+		expect((runtime as any).acceptingEvents).toBe(false);
 
 		invoke(runtime);
 
-		expect(runtime.getPendingPaths().sort()).toEqual(expectedPendingPaths.slice().sort());
+		expect(runtime.getPendingPaths()).toEqual([]);
 	});
 
-	it('keeps a single queued upload for repeated edits during startup sync', async () => {
+	it('starts accepting events after startup sync finishes', async () => {
 		const { runtime } = createRuntimeHarness();
 
 		await runtime.initialize();
 
-		runtime.onFileChange({ path: 'notes/existing.md' } as never);
-		runtime.onFileChange({ path: 'notes/existing.md' } as never);
-
-		expect(runtime.getPendingPaths()).toEqual(['notes/existing.md']);
+		expect((runtime as any).acceptingEvents).toBe(false);
 
 		startupSync.resolve(createEmptySyncResult());
 		await flushMicrotasks();
+		await flushMicrotasks();
+
+		expect((runtime as any).acceptingEvents).toBe(true);
+
+		runtime.onFileChange({ path: 'notes/existing.md' } as never);
+		runtime.onFileChange({ path: 'notes/existing.md' } as never);
 
 		expect(runtime.getPendingPaths()).toEqual(['notes/existing.md']);
 	});

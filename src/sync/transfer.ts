@@ -49,6 +49,7 @@ export async function prepareUpload(
 export async function prepareUploadFromVaultFile(
 	context: TransferContext,
 	file: VaultFile,
+	options?: { force?: boolean },
 ): Promise<PreparedUpload | null> {
 	if (file.size > MAX_FILE_SIZE_BYTES) {
 		logger.warn('Skipping large file:', file.path);
@@ -58,7 +59,7 @@ export async function prepareUploadFromVaultFile(
 	const content = await context.vault.adapter.readBinary(file.path);
 	const hash = await computeHash(content);
 
-	if (context.localManifest.hashMatches(file.path, hash)) {
+	if (!options?.force && context.localManifest.hashMatches(file.path, hash)) {
 		logger.debug('Skipping unchanged file:', file.path);
 		return null;
 	}
@@ -76,10 +77,11 @@ export async function prepareUploadFromVaultFile(
 export async function prepareUploadFromPath(
 	context: TransferContext,
 	path: string,
+	options?: { force?: boolean },
 ): Promise<PreparedUpload | null> {
 	const file = context.vault.getAbstractFileByPath(path);
 	if (file && 'extension' in file) {
-		return prepareUpload(context, file as TFile);
+		return prepareUploadFromVaultFile(context, tfileToVaultFile(file as TFile), options);
 	}
 
 	if (!isHiddenPath(path)) {
@@ -96,7 +98,7 @@ export async function prepareUploadFromPath(
 		size: stat.size,
 		mtime: stat.mtime,
 		extension: getExtensionFromPath(path),
-	});
+	}, options);
 }
 
 export async function downloadAndSaveFile(
@@ -241,7 +243,10 @@ export async function processDiff(
 
 	switch (diff.action) {
 		case 'upload': {
-			const uploadFile = await prepareUploadFromPath(context, diff.path);
+			// Full-sync planners already determined the remote side needs this path.
+			// Do not short-circuit on the local manifest here, or remote-missing files
+			// will never be repaired after a stale/empty manifest response.
+			const uploadFile = await prepareUploadFromPath(context, diff.path, { force: true });
 			if (uploadFile) {
 				const uploadResult = await context.api.uploadFile(
 					uploadFile.path,
