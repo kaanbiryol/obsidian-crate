@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Clock } from 'lucide-react';
-import { TimeInput } from '@heroui/react';
-import { Time } from '@internationalized/date';
 
 import { BaseModal } from '../BaseModal';
 import { AnimationConfig, prefersReducedMotion } from '../../ui/animations';
 import { RecurrenceRule } from '../../types';
 import { ShadowDOMNativeButton } from '../ShadowDOMButton';
+import { getGlassColors, getPickerModalProps } from '../../ui/glassStyles';
+import { PickerHeader } from './PickerHeader';
+import { PickerTimeCard } from './PickerTimeCard';
+import { PickerDoneButton } from './PickerDoneButton';
 
 interface RecurrencePickerModalProps {
     isOpen: boolean;
@@ -30,6 +31,12 @@ const getOrdinalSuffix = (n: number): string => {
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
 
+const FREQUENCY_LABELS: Record<string, string> = {
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+};
+
 export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     isOpen,
     onClose,
@@ -40,45 +47,20 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     onApply,
 }) => {
     const animationsEnabled = animationConfig.enabled && !prefersReducedMotion();
+    const glass = getGlassColors(isDark);
+    const modalProps = getPickerModalProps(pickerMode);
 
     const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>(recurrence?.frequency || 'daily');
+    const [interval, setInterval] = useState<number>(recurrence?.interval || 1);
     const [selectedDays, setSelectedDays] = useState<number[]>(recurrence?.daysOfWeek || []);
     const [dayOfMonth, setDayOfMonth] = useState<number>(recurrence?.dayOfMonth || 1);
     const [hour, setHour] = useState<number>(recurrence?.hour ?? 9);
     const [minute, setMinute] = useState<number>(recurrence?.minute ?? 0);
 
-    // Minimal color palette
-    const colors = {
-        surface: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
-        surfaceHover: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.07)',
-        border: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-        textPrimary: 'var(--text-normal)',
-        textSecondary: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.45)',
-        textTertiary: isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.3)',
-        accent: 'hsl(var(--heroui-primary))',
-        accentMuted: 'hsl(var(--heroui-primary) / 0.15)',
-    };
-
-    // Glass styling for header (matching ProjectPickerModal)
-    const glassBackButtonBg = isDark
-        ? 'rgba(255, 255, 255, 0.04)'
-        : 'rgba(0, 0, 0, 0.03)';
-    const glassBackButtonBorder = isDark
-        ? 'rgba(255, 255, 255, 0.08)'
-        : 'rgba(0, 0, 0, 0.06)';
-    const glassBackButtonHoverBg = isDark
-        ? 'rgba(255, 255, 255, 0.08)'
-        : 'rgba(0, 0, 0, 0.06)';
-    const glassBackground = isDark
-        ? 'rgba(255, 255, 255, 0.03)'
-        : 'rgba(0, 0, 0, 0.02)';
-    const glassBorder = isDark
-        ? 'rgba(255, 255, 255, 0.06)'
-        : 'rgba(0, 0, 0, 0.05)';
-
     useEffect(() => {
         if (!isOpen) return;
         setFrequency(recurrence?.frequency || 'daily');
+        setInterval(recurrence?.interval || 1);
         setSelectedDays(recurrence?.daysOfWeek || []);
         setDayOfMonth(recurrence?.dayOfMonth || 1);
         setHour(recurrence?.hour ?? 9);
@@ -89,19 +71,22 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
         const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
         switch (frequency) {
             case 'daily':
+                if (interval > 1) return `Every ${interval} days at ${timeStr}`;
                 return `Daily at ${timeStr}`;
-            case 'weekly':
+            case 'weekly': {
                 if (selectedDays.length === 0) return `Weekly at ${timeStr}`;
                 if (selectedDays.length === 7) return `Every day at ${timeStr}`;
                 const dayNames = selectedDays.map(d => DAY_FULL_NAMES[d]).join(', ');
                 return `${dayNames} at ${timeStr}`;
+            }
             case 'monthly':
                 return `${getOrdinalSuffix(dayOfMonth)} of month at ${timeStr}`;
         }
-    }, [frequency, selectedDays, dayOfMonth, hour, minute]);
+    }, [frequency, interval, selectedDays, dayOfMonth, hour, minute]);
 
     const handleDone = () => {
         const rule: RecurrenceRule = { frequency, hour, minute };
+        if (interval > 1) rule.interval = interval;
         if (frequency === 'weekly' && selectedDays.length > 0) {
             rule.daysOfWeek = selectedDays;
         }
@@ -120,66 +105,51 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
         );
     };
 
+    const frequencyIndex = FREQUENCIES.indexOf(frequency);
+
     return (
         <BaseModal
             isOpen={isOpen}
             onClose={onClose}
             animationConfig={animationConfig}
-            variant={pickerMode === 'overlay' ? 'centered' : 'bottom-sheet'}
-            performanceMode={pickerMode === 'overlay' ? 'standard' : 'reduced-effects'}
-            showBackdrop={false}
-            showDragHandle={pickerMode !== 'overlay'}
-            zIndex={pickerMode === 'overlay' ? 70 : 60}
+            {...modalProps}
         >
             <div className={isDark ? 'dark text-foreground' : ''}>
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 pt-2 pb-3">
-                    {/* Back button - Glass styling */}
-                    <ShadowDOMNativeButton
-                        onClick={onClose}
-                        className="flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 active:scale-95"
+                <PickerHeader
+                    onBack={onClose}
+                    isDark={isDark}
+                    title={summaryText}
+                />
+
+                <div style={{ padding: '0 16px 0' }}>
+                    {/* Segmented Control with sliding indicator */}
+                    <div
+                        className="relative"
                         style={{
-                            background: glassBackButtonBg,
-                            border: `1px solid ${glassBackButtonBorder}`,
-                            color: 'var(--text-muted)',
-                            boxShadow: `0 2px 8px ${isDark ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)'}`,
-                            transition: 'transform 200ms ease-out',
-                        }}
-                        onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                            e.currentTarget.style.background = glassBackButtonHoverBg;
-                            e.currentTarget.style.boxShadow = `0 0 12px ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)'}`;
-                        }}
-                        onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                            e.currentTarget.style.background = glassBackButtonBg;
-                            e.currentTarget.style.boxShadow = `0 2px 8px ${isDark ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)'}`;
+                            display: 'flex',
+                            padding: 4,
+                            borderRadius: 14,
+                            background: glass.surface.bg,
+                            border: `1px solid ${glass.surface.border}`,
                         }}
                     >
-                        <ChevronLeft size={20} strokeWidth={2} />
-                    </ShadowDOMNativeButton>
-
-                    {/* Title - Premium typography */}
-                    <span
-                        style={{
-                            fontSize: '20px',
-                            fontWeight: 700,
-                            color: 'var(--text-normal)',
-                            letterSpacing: '-0.02em',
-                        }}
-                    >
-                        {summaryText}
-                    </span>
-
-                    {/* Spacer for balance */}
-                    <div className="w-9" />
-                </div>
-
-                {/* Content */}
-                <div style={{ padding: '0 16px 16px' }}>
-                    {/* Segmented Control - Minimal Pill Buttons */}
-                    <div style={{
-                        display: 'flex',
-                        gap: 8,
-                    }}>
+                        {/* Sliding indicator */}
+                        <motion.div
+                            layout
+                            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                            style={{
+                                position: 'absolute',
+                                top: 4,
+                                bottom: 4,
+                                left: `calc(${frequencyIndex * (100 / 3)}% + 4px)`,
+                                width: `calc(${100 / 3}% - 8px)`,
+                                borderRadius: 10,
+                                background: glass.accent,
+                                boxShadow: isDark
+                                    ? '0 2px 8px hsl(var(--heroui-primary) / 0.3)'
+                                    : '0 2px 8px hsl(var(--heroui-primary) / 0.2)',
+                            }}
+                        />
                         {FREQUENCIES.map((freq) => {
                             const isSelected = frequency === freq;
                             return (
@@ -189,59 +159,116 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                                     style={{
                                         flex: 1,
                                         height: 36,
-                                        borderRadius: 12,
+                                        borderRadius: 10,
                                         border: 'none',
-                                        background: isSelected
-                                            ? colors.accent
-                                            : colors.surface,
-                                        color: isSelected
-                                            ? 'white'
-                                            : colors.textSecondary,
+                                        background: 'transparent',
+                                        color: isSelected ? 'white' : glass.text.secondary,
                                         fontSize: 13,
-                                        fontWeight: 500,
+                                        fontWeight: isSelected ? 600 : 500,
                                         cursor: 'pointer',
-                                        transition: 'all 150ms ease',
+                                        position: 'relative',
+                                        zIndex: 1,
+                                        transition: 'color 150ms ease',
                                     }}
                                 >
-                                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                                    {FREQUENCY_LABELS[freq]}
                                 </ShadowDOMNativeButton>
                             );
                         })}
                     </div>
 
-                    {/* Frequency-specific options - Fixed height container to prevent modal jumping */}
-                    <div style={{ minHeight: 75, marginTop: 16 }}>
+                    {/* Frequency-specific options */}
+                    <div style={{ minHeight: 90, marginTop: 16 }}>
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={frequency}
-                                initial={{ opacity: 0 }}
+                                initial={animationsEnabled ? { opacity: 0 } : false}
                                 animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
+                                exit={animationsEnabled ? { opacity: 0 } : undefined}
                                 transition={{ duration: 0.15 }}
                                 style={{
-                                    minHeight: 75,
+                                    minHeight: 90,
                                     display: 'flex',
                                     flexDirection: 'column',
                                     justifyContent: 'center',
                                 }}
                             >
+                                {/* Daily: Interval stepper */}
+                                {frequency === 'daily' && (
+                                    <div
+                                        className="flex items-center justify-center gap-3"
+                                        style={{
+                                            padding: '12px 16px',
+                                            borderRadius: 12,
+                                            background: glass.surface.bg,
+                                            border: `1px solid ${glass.surface.border}`,
+                                        }}
+                                    >
+                                        <span style={{ fontSize: 14, color: glass.text.secondary }}>
+                                            Every
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <ShadowDOMNativeButton
+                                                onClick={() => setInterval(prev => Math.max(1, prev - 1))}
+                                                className="flex items-center justify-center w-9 h-9 rounded-lg active:scale-95"
+                                                style={{
+                                                    background: glass.surfaceHover.bg,
+                                                    border: `1px solid ${glass.surface.border}`,
+                                                    color: glass.text.primary,
+                                                    fontSize: 16,
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                    opacity: interval <= 1 ? 0.3 : 1,
+                                                }}
+                                            >
+                                                -
+                                            </ShadowDOMNativeButton>
+                                            <span
+                                                style={{
+                                                    minWidth: 32,
+                                                    textAlign: 'center',
+                                                    fontSize: 16,
+                                                    fontWeight: 700,
+                                                    color: glass.text.primary,
+                                                }}
+                                            >
+                                                {interval}
+                                            </span>
+                                            <ShadowDOMNativeButton
+                                                onClick={() => setInterval(prev => Math.min(30, prev + 1))}
+                                                className="flex items-center justify-center w-9 h-9 rounded-lg active:scale-95"
+                                                style={{
+                                                    background: glass.surfaceHover.bg,
+                                                    border: `1px solid ${glass.surface.border}`,
+                                                    color: glass.text.primary,
+                                                    fontSize: 16,
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                +
+                                            </ShadowDOMNativeButton>
+                                        </div>
+                                        <span style={{ fontSize: 14, color: glass.text.secondary }}>
+                                            {interval === 1 ? 'day' : 'days'}
+                                        </span>
+                                    </div>
+                                )}
+
                                 {/* Weekly: Day selector */}
                                 {frequency === 'weekly' && (
                                     <div>
                                         <div style={{
                                             fontSize: 11,
                                             fontWeight: 500,
-                                            color: colors.textTertiary,
+                                            color: glass.text.tertiary,
                                             textTransform: 'uppercase',
                                             letterSpacing: '0.04em',
                                             marginBottom: 10,
                                         }}>
                                             Repeat on
                                         </div>
-                                        <div style={{
-                                            display: 'flex',
-                                            gap: 6,
-                                        }}>
+                                        <div style={{ display: 'flex', gap: 6 }}>
                                             {DAY_LABELS.map((label, idx) => {
                                                 const isSelected = selectedDays.includes(idx);
                                                 return (
@@ -251,11 +278,11 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                                                         style={{
                                                             flex: 1,
                                                             aspectRatio: '1',
-                                                            maxWidth: 38,
+                                                            maxWidth: 44,
                                                             borderRadius: 12,
                                                             border: 'none',
-                                                            background: isSelected ? colors.accent : colors.surface,
-                                                            color: isSelected ? 'white' : colors.textSecondary,
+                                                            background: isSelected ? glass.accent : glass.surface.bg,
+                                                            color: isSelected ? 'white' : glass.text.secondary,
                                                             fontSize: 12,
                                                             fontWeight: 600,
                                                             cursor: 'pointer',
@@ -270,137 +297,84 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                                     </div>
                                 )}
 
-                                {/* Monthly: Day of month */}
+                                {/* Monthly: Day stepper */}
                                 {frequency === 'monthly' && (
-                                    <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 10,
-                                    }}>
-                                        <span style={{
-                                            fontSize: 14,
-                                            color: colors.textSecondary,
-                                        }}>
-                                            Day of month
+                                    <div
+                                        className="flex items-center justify-center gap-3"
+                                        style={{
+                                            padding: '12px 16px',
+                                            borderRadius: 12,
+                                            background: glass.surface.bg,
+                                            border: `1px solid ${glass.surface.border}`,
+                                        }}
+                                    >
+                                        <span style={{ fontSize: 14, color: glass.text.secondary }}>
+                                            Day
                                         </span>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            max={31}
-                                            value={dayOfMonth}
-                                            onChange={(e) => {
-                                                const val = parseInt(e.target.value, 10);
-                                                if (!isNaN(val) && val >= 1 && val <= 31) {
-                                                    setDayOfMonth(val);
-                                                }
-                                            }}
-                                            style={{
-                                                width: 56,
-                                                height: 36,
-                                                borderRadius: 12,
-                                                border: `1px solid ${colors.border}`,
-                                                background: 'transparent',
-                                                color: colors.textPrimary,
-                                                fontSize: 14,
-                                                fontWeight: 600,
-                                                textAlign: 'center',
-                                                outline: 'none',
-                                            }}
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Daily: Simple text */}
-                                {frequency === 'daily' && (
-                                    <div style={{
-                                        fontSize: 13,
-                                        color: colors.textTertiary,
-                                        textAlign: 'center',
-                                    }}>
-                                        Repeats every day
+                                        <div className="flex items-center gap-1">
+                                            <ShadowDOMNativeButton
+                                                onClick={() => setDayOfMonth(prev => Math.max(1, prev - 1))}
+                                                className="flex items-center justify-center w-9 h-9 rounded-lg active:scale-95"
+                                                style={{
+                                                    background: glass.surfaceHover.bg,
+                                                    border: `1px solid ${glass.surface.border}`,
+                                                    color: glass.text.primary,
+                                                    fontSize: 16,
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                    opacity: dayOfMonth <= 1 ? 0.3 : 1,
+                                                }}
+                                            >
+                                                -
+                                            </ShadowDOMNativeButton>
+                                            <span
+                                                style={{
+                                                    minWidth: 40,
+                                                    textAlign: 'center',
+                                                    fontSize: 16,
+                                                    fontWeight: 700,
+                                                    color: glass.text.primary,
+                                                }}
+                                            >
+                                                {getOrdinalSuffix(dayOfMonth)}
+                                            </span>
+                                            <ShadowDOMNativeButton
+                                                onClick={() => setDayOfMonth(prev => Math.min(31, prev + 1))}
+                                                className="flex items-center justify-center w-9 h-9 rounded-lg active:scale-95"
+                                                style={{
+                                                    background: glass.surfaceHover.bg,
+                                                    border: `1px solid ${glass.surface.border}`,
+                                                    color: glass.text.primary,
+                                                    fontSize: 16,
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                    opacity: dayOfMonth >= 31 ? 0.3 : 1,
+                                                }}
+                                            >
+                                                +
+                                            </ShadowDOMNativeButton>
+                                        </div>
+                                        <span style={{ fontSize: 14, color: glass.text.secondary }}>
+                                            of each month
+                                        </span>
                                     </div>
                                 )}
                             </motion.div>
                         </AnimatePresence>
                     </div>
 
-                    {/* Time picker - Glass card (outside animated section for stability) */}
-                    <div
-                        style={{
-                            background: glassBackground,
-                            border: `1px solid ${glassBorder}`,
-                            borderRadius: '12px',
-                            padding: '14px 16px',
-                            marginTop: 16,
-                        }}
-                    >
-                        <div className="flex items-center gap-3">
-                            <Clock
-                                size={16}
-                                strokeWidth={1.75}
-                                style={{
-                                    color: 'var(--interactive-accent)',
-                                    filter: isDark ? 'drop-shadow(0 0 4px var(--interactive-accent))' : 'none',
-                                }}
-                            />
-                            <span
-                                style={{
-                                    fontSize: '14px',
-                                    fontWeight: 600,
-                                    color: 'var(--text-normal)',
-                                }}
-                            >
-                                Time
-                            </span>
-                            <div className={`ml-auto ${isDark ? 'dark text-foreground' : ''}`}>
-                                <TimeInput
-                                    aria-label="Time"
-                                    size="sm"
-                                    granularity="minute"
-                                    hourCycle={24}
-                                    value={new Time(hour, minute)}
-                                    onChange={(time) => {
-                                        if (time) {
-                                            setHour(time.hour);
-                                            setMinute(time.minute);
-                                        }
-                                    }}
-                                    classNames={{
-                                        base: 'w-auto',
-                                        inputWrapper: [
-                                            'shadow-none',
-                                            'h-9 min-h-9 px-3 rounded-xl',
-                                            `bg-[${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'}]`,
-                                            `border border-[${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}]`,
-                                        ].join(' '),
-                                        input: 'text-[14px] font-semibold text-[var(--text-normal)]',
-                                        segment: 'text-[14px] font-semibold data-[placeholder=true]:text-[var(--text-muted)]',
-                                    }}
-                                />
-                            </div>
-                        </div>
+                    {/* Time picker */}
+                    <div style={{ marginTop: 16 }}>
+                        <PickerTimeCard
+                            isDark={isDark}
+                            hour={hour}
+                            minute={minute}
+                            onChange={(h, m) => { setHour(h); setMinute(m); }}
+                        />
                     </div>
-
-                    {/* Done button */}
-                    <ShadowDOMNativeButton
-                        onClick={handleDone}
-                        style={{
-                            width: '100%',
-                            height: 44,
-                            marginTop: 20,
-                            borderRadius: 12,
-                            border: 'none',
-                            background: colors.accent,
-                            color: 'white',
-                            fontSize: 15,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            transition: 'opacity 150ms ease',
-                        }}
-                    >
-                        Done
-                    </ShadowDOMNativeButton>
                 </div>
+
+                <PickerDoneButton onClick={handleDone} />
             </div>
         </BaseModal>
     );
