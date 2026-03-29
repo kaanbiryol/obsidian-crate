@@ -16,6 +16,7 @@ import { notifyConflicts } from './sync/conflict';
 import { isHiddenPath } from './sync/file-discovery';
 import { SyncRuntime } from './sync/runtime';
 import { ActivityModal } from './ui/activity-modal';
+import { openConfirmationModal } from './ui/confirmation-modal';
 import { CrateSettingTab } from './ui/settings-tab';
 
 // Reminders imports
@@ -41,6 +42,31 @@ import { ReminderNotificationService } from './reminders/services/notificationSe
 
 const logger = createLogger('Plugin');
 const remindersLogger = createLogger('Reminders');
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
+
+function parseJsonRecord(raw: string): Record<string, unknown> | null {
+	const parsed: unknown = JSON.parse(raw);
+	return isRecord(parsed) ? parsed : null;
+}
+
+function parseStringArray(raw: string): string[] | null {
+	const parsed: unknown = JSON.parse(raw);
+	if (!Array.isArray(parsed)) {
+		return null;
+	}
+
+	const values: string[] = [];
+	for (const item of parsed) {
+		if (typeof item !== 'string') {
+			return null;
+		}
+		values.push(item);
+	}
+	return values;
+}
 
 export default class CratePlugin extends Plugin {
 	settings!: CrateSettings;
@@ -87,12 +113,12 @@ export default class CratePlugin extends Plugin {
 			new Notice(`Crate sync failed to start: ${msg}`);
 		}
 
-		this.registerCommands();
-		this.registerObsidianProtocolHandler('crate-setup', (params) => {
-			this.handleSetupProtocol(params);
-		});
-		this.registerObsidianProtocolHandler('crate-reminders', (params) => {
-			openFullScreenReminderModal(this, params.project || undefined);
+			this.registerCommands();
+			this.registerObsidianProtocolHandler('crate-setup', (params) => {
+				void this.handleSetupProtocol(params);
+			});
+			this.registerObsidianProtocolHandler('crate-reminders', (params) => {
+				openFullScreenReminderModal(this, params.project || undefined);
 		});
 
 		// Initialize reminders after sync is ready
@@ -166,14 +192,14 @@ export default class CratePlugin extends Plugin {
 
 	private async loadRemindersSettingsData(): Promise<Partial<RemindersSettings> | null> {
 		try {
-			const adapter = this.app.vault.adapter;
-			const settingsPath = this.getPluginDataPath('reminders-settings.json');
-			if (await adapter.exists(settingsPath)) {
-				const content = await adapter.read(settingsPath);
-				return JSON.parse(content);
-			}
-		} catch (error) {
-			remindersLogger.error('Failed to load reminders settings:', error);
+				const adapter = this.app.vault.adapter;
+				const settingsPath = this.getPluginDataPath('reminders-settings.json');
+				if (await adapter.exists(settingsPath)) {
+					const content = await adapter.read(settingsPath);
+					return parseJsonRecord(content);
+				}
+			} catch (error) {
+				remindersLogger.error('Failed to load reminders settings:', error);
 		}
 		return null;
 	}
@@ -248,34 +274,36 @@ export default class CratePlugin extends Plugin {
 		}
 
 		// Sidebar view
-		this.registerView(
-			VIEW_TYPE_REMINDERS,
-			(leaf) => new RemindersView(leaf, this),
-		);
-		this.addRibbonIcon('check-circle', 'Open Reminders', () => this.activateRemindersView());
+			this.registerView(
+				VIEW_TYPE_REMINDERS,
+				(leaf) => new RemindersView(leaf, this),
+			);
+			this.addRibbonIcon('check-circle', 'Open reminders', () => {
+				void this.activateRemindersView();
+			});
 
 		// Reminders commands
 		registerReminderCommands(this);
 
-		this.addCommand({
-			id: 'open-reminders-view',
-			name: 'Open Reminders sidebar',
-			callback: () => this.activateRemindersView(),
-		});
-		this.addCommand({
-			id: 'open-reminders-fullscreen',
-			name: 'Open Reminders (Full Screen)',
-			callback: () => openFullScreenReminderModal(this),
-		});
+			this.addCommand({
+				id: 'open-reminders-view',
+				name: 'Open reminders sidebar',
+				callback: () => this.activateRemindersView(),
+			});
+			this.addCommand({
+				id: 'open-reminders-fullscreen',
+				name: 'Open reminders full screen',
+				callback: () => openFullScreenReminderModal(this),
+			});
 
 		// Auto-open view
-		if (this.remindersSettings.autoOpenView !== 'none') {
-			this.app.workspace.onLayoutReady(() => {
-				if (this.remindersSettings.autoOpenView === 'sidebar') {
-					this.activateRemindersView();
-				} else if (this.remindersSettings.autoOpenView === 'fullscreen') {
-					openFullScreenReminderModal(this);
-				}
+			if (this.remindersSettings.autoOpenView !== 'none') {
+				this.app.workspace.onLayoutReady(() => {
+					if (this.remindersSettings.autoOpenView === 'sidebar') {
+						void this.activateRemindersView();
+					} else if (this.remindersSettings.autoOpenView === 'fullscreen') {
+						openFullScreenReminderModal(this);
+					}
 			});
 		}
 	}
@@ -390,7 +418,17 @@ export default class CratePlugin extends Plugin {
 			id: 'force-full-sync',
 			name: 'Force full sync (overwrite remote)',
 			callback: async () => {
-				if (!confirm('This will overwrite ALL remote files with your local vault and delete remote-only files. Continue?')) {
+				const confirmed = await openConfirmationModal(this.app, {
+					title: 'Force full sync',
+					message: 'Overwrite the remote vault with local files?',
+					details: [
+						'Remote-only files will be deleted.',
+						'This action cannot be undone.',
+					],
+					confirmText: 'Force full sync',
+					warning: true,
+				});
+				if (!confirmed) {
 					return;
 				}
 
@@ -451,12 +489,19 @@ export default class CratePlugin extends Plugin {
 		const authToken = params['authToken'];
 
 		if (!workerUrl || !authToken) {
-			new Notice('Setup link is missing required parameters (workerUrl, authToken)');
+			new Notice('Setup link is missing required parameters.');
 			return;
 		}
 
 		if (this.syncRuntime.isConfigured()) {
-			if (!confirm('Crate is already configured. Overwrite with new credentials from setup link?')) {
+			const confirmed = await openConfirmationModal(this.app, {
+				title: 'Overwrite existing configuration',
+				message: 'Crate is already configured on this device.',
+				details: ['Applying the setup link will replace the current sync credentials.'],
+				confirmText: 'Overwrite configuration',
+				warning: true,
+			});
+			if (!confirmed) {
 				return;
 			}
 		}
@@ -464,7 +509,10 @@ export default class CratePlugin extends Plugin {
 		try {
 			if (params['ignorePatterns']) {
 				try {
-					this.settings.ignorePatterns = JSON.parse(params['ignorePatterns']);
+					const parsedIgnorePatterns = parseStringArray(params['ignorePatterns']);
+					if (parsedIgnorePatterns) {
+						this.settings.ignorePatterns = parsedIgnorePatterns;
+					}
 				} catch { /* keep existing */ }
 			}
 			if (params['syncOnStartup'] !== undefined) {

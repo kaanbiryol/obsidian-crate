@@ -6,6 +6,7 @@ import {
 	type DueDateDefaultSetting,
 } from '../../reminders/settings';
 import type { TabId } from '../../reminders/ui/layoutConstants';
+import { createSettingsSectionHeading } from './section-helpers';
 
 export interface RemindersSectionContext {
 	containerEl: HTMLElement;
@@ -17,11 +18,11 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 	const { containerEl, plugin } = context;
 	const settings = plugin.remindersSettings;
 
-	containerEl.createEl('h3', { text: 'Reminders' });
+	createSettingsSectionHeading(containerEl, 'Reminders');
 
 	new Setting(containerEl)
 		.setName('Reminders folder')
-		.setDesc('Folder where reminder markdown files are stored')
+		.setDesc('Folder where reminder Markdown files are stored')
 		.addText(text => {
 			let draftValue = settings.remindersFolderPath;
 
@@ -61,7 +62,7 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 
 	new Setting(containerEl)
 		.setName('Default due date')
-		.setDesc('Pre-fill due date when creating new reminders')
+		.setDesc('Fill in a due date when creating new reminders')
 		.addDropdown(dropdown => {
 			dropdown.addOption('none', 'None');
 			dropdown.addOption('today', 'Today');

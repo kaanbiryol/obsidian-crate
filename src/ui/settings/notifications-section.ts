@@ -2,6 +2,7 @@ import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { QRModal } from '../qr-modal';
 import { SECRET_KEYS } from '../../types';
+import { createSettingsSectionHeading } from './section-helpers';
 
 export interface NotificationsSectionContext {
 	containerEl: HTMLElement;
@@ -12,11 +13,11 @@ export interface NotificationsSectionContext {
 export function renderNotificationsSection(context: NotificationsSectionContext): void {
 	const { containerEl, plugin } = context;
 
-	containerEl.createEl('h3', { text: 'Push notifications' });
+	createSettingsSectionHeading(containerEl, 'Push notifications');
 
 	new Setting(containerEl)
 		.setName('Enable push notifications')
-		.setDesc('Send push notifications for reminders via Web Push')
+		.setDesc('Send push notifications for reminders')
 		.addToggle(toggle => {
 			toggle.setValue(plugin.settings.pushEnabled)
 				.onChange(async (value) => {
@@ -30,7 +31,7 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 
 	if (!plugin.syncRuntime.isConfigured()) {
 		containerEl.createEl('p', {
-			text: 'Set up Cloudflare sync first to enable push notifications.',
+			text: 'Set up sync first to enable push notifications.',
 			cls: 'setting-item-description',
 		});
 		return;
@@ -44,7 +45,7 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 
 		new Setting(containerEl)
 			.setName('Subscribe a device')
-			.setDesc('Open this link on your phone (or scan QR code) to enable notifications on that device.')
+			.setDesc('Open this link on your phone or scan the code to enable notifications on that device.')
 			.addButton(button => {
 				button.setButtonText('Copy link');
 				button.onClick(async () => {
@@ -54,7 +55,7 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 				});
 			})
 			.addButton(button => {
-				button.setButtonText('Show QR');
+				button.setButtonText('Show code');
 				button.onClick(async () => {
 					const url = `${subscribeUrl}?token=${authToken}`;
 					new QRModal(plugin.app, url).open();

@@ -15,6 +15,8 @@ import {
 	showFileSyncProgress,
 	updateFileSyncProgress,
 } from './action-helpers';
+import { openConfirmationModal } from '../confirmation-modal';
+import { createSettingsSectionHeading, createSettingsSubsectionHeading } from './section-helpers';
 
 interface CloudflareCredentials {
 	accountId: string;
@@ -35,7 +37,7 @@ export interface InfrastructureSectionContext {
 
 export function renderInfrastructureSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin, isConfigured, rerender } = context;
-	containerEl.createEl('h3', { text: 'Advanced' });
+	createSettingsSectionHeading(containerEl, 'Advanced');
 
 	if (isConfigured) {
 		new Setting(containerEl)
@@ -72,16 +74,23 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 					await plugin.saveSettings();
 				}));
 
-		const initialSyncSetting = new Setting(containerEl)
-			.setName('Initial sync')
-			.setDesc('Upload all local files to the server (use for first-time setup)')
-			.addButton(button => button
-				.setButtonText('Upload all')
-				.setWarning()
-				.onClick(async () => {
-					if (!confirm('This will upload all files in your vault to the server. Continue?')) {
-						return;
-					}
+			const initialSyncSetting = new Setting(containerEl)
+				.setName('Initial sync')
+				.setDesc('Upload all local files to the server (use for first-time setup)')
+				.addButton(button => button
+					.setButtonText('Upload all')
+					.setWarning()
+					.onClick(async () => {
+						const confirmed = await openConfirmationModal(plugin.app, {
+							title: 'Upload all local files',
+							message: 'Upload all local files in this vault to the sync server?',
+							details: ['Use this for first-time setup on a new remote.'],
+							confirmText: 'Upload all',
+							warning: true,
+						});
+						if (!confirmed) {
+							return;
+						}
 
 					await runButtonTask({
 						button,
@@ -112,16 +121,26 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 				}));
 		const initialProgress = createFileSyncProgress(initialSyncSetting);
 
-		const forceSyncSetting = new Setting(containerEl)
-			.setName('Force full sync')
-			.setDesc('Overwrite all remote files with local vault and remove remote-only files')
-			.addButton(button => button
-				.setButtonText('Force full update')
-				.setWarning()
-				.onClick(async () => {
-					if (!confirm('This will overwrite ALL remote files with your local vault and delete remote-only files. This cannot be undone. Continue?')) {
-						return;
-					}
+			const forceSyncSetting = new Setting(containerEl)
+				.setName('Force full sync')
+				.setDesc('Overwrite all remote files with local vault and remove remote-only files')
+				.addButton(button => button
+					.setButtonText('Force full update')
+					.setWarning()
+					.onClick(async () => {
+						const confirmed = await openConfirmationModal(plugin.app, {
+							title: 'Force full sync',
+							message: 'Overwrite the remote vault with local files?',
+							details: [
+								'Remote-only files will be deleted.',
+								'This action cannot be undone.',
+							],
+							confirmText: 'Force full update',
+							warning: true,
+						});
+						if (!confirmed) {
+							return;
+						}
 
 					await runButtonTask({
 						button,
@@ -181,10 +200,10 @@ function inferWorkerNameFromUrl(workerUrl: string): string | null {
 function renderInfrastructureManagementSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin, isConfigured, rerender } = context;
 
-	containerEl.createEl('h4', { text: 'Infrastructure management' });
+	createSettingsSubsectionHeading(containerEl, 'Infrastructure management');
 
-	const diagnosticsContainer = containerEl.createDiv();
-	diagnosticsContainer.style.display = 'none';
+	const diagnosticsContainer = containerEl.createDiv({ cls: 'crate-diagnostics' });
+	diagnosticsContainer.hide();
 
 	if (isConfigured) {
 		new Setting(containerEl)
@@ -199,11 +218,11 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 			.setDesc(plugin.settings.workerName || 'Not set');
 
 		new Setting(containerEl)
-			.setName('R2 bucket')
+			.setName('Bucket')
 			.setDesc(plugin.settings.bucketName || 'Not set');
 
 		new Setting(containerEl)
-			.setName('D1 database ID')
+			.setName('Database ID')
 			.setDesc(plugin.settings.databaseId || 'Not set');
 	}
 
@@ -213,17 +232,17 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 			.setDesc('Equivalent to CLI deploy/update using stored worker name')
 			.addButton(button => button
 				.setButtonText('Redeploy')
-				.onClick(async () => {
-					const resolved = await resolveCloudflareCredentials(plugin);
-					if (resolved.hadError) {
-						return;
-					}
-					if (!resolved.credentials) {
-						new Notice('Please sign in with Cloudflare first');
-						return;
-					}
-					if (!plugin.settings.workerName) {
-						new Notice('Worker name is missing in settings');
+					.onClick(async () => {
+						const resolved = await resolveCloudflareCredentials(plugin);
+						if (resolved.hadError) {
+							return;
+						}
+						if (!resolved.credentials) {
+							new Notice('Please sign in first');
+							return;
+						}
+						if (!plugin.settings.workerName) {
+							new Notice('Worker name is missing in settings');
 						return;
 					}
 					const credentials = resolved.credentials;
@@ -250,7 +269,7 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 							new Notice(`Redeploy failed: ${getErrorMessage(error)}`);
 						},
 						onFinally: () => {
-							redeploySetting.descEl.style.display = '';
+							redeploySetting.descEl.show();
 							redeploySetting.descEl.textContent = originalDesc;
 						},
 					});
@@ -260,7 +279,7 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 	if (isConfigured) {
 		const diagnosticsSetting = new Setting(containerEl)
 			.setName('Run diagnostics')
-			.setDesc('Check worker connectivity and Cloudflare resource visibility')
+			.setDesc('Check worker connectivity and resource visibility')
 			.addButton(button => button
 				.setButtonText('Run')
 				.onClick(async () => {
@@ -300,7 +319,7 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 							new Notice(`Diagnostics failed: ${getErrorMessage(error)}`);
 						},
 						onFinally: () => {
-							diagnosticsSetting.descEl.style.display = '';
+							diagnosticsSetting.descEl.show();
 							diagnosticsSetting.descEl.textContent = originalDesc;
 						},
 					});
@@ -310,26 +329,33 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 	if (plugin.cloudflareSession.hasCredentials()) {
 		const deleteSetting = new Setting(containerEl)
 			.setName('Delete infrastructure')
-			.setDesc('Deletes worker, R2 bucket objects, and D1 database. This removes all synced data.')
+			.setDesc('Delete the worker, stored bucket objects, and database. This removes all synced data.')
 			.addButton(button => button
 				.setButtonText('Delete infrastructure')
 				.setWarning()
 				.onClick(async () => {
-					const confirmed = confirm(
-						'This will permanently delete infrastructure and all synced data (R2, Worker, D1). This cannot be undone. Continue?'
-					);
+					const confirmed = await openConfirmationModal(plugin.app, {
+						title: 'Delete infrastructure',
+						message: 'Permanently delete the sync infrastructure and all synced data?',
+						details: [
+							'This removes the worker, bucket objects, and database.',
+							'This action cannot be undone.',
+						],
+						confirmText: 'Delete infrastructure',
+						warning: true,
+					});
 					if (!confirmed) {
 						return;
 					}
 
 					const resolved = await resolveCloudflareCredentials(plugin);
-					if (resolved.hadError) {
-						return;
-					}
-					if (!resolved.credentials) {
-						new Notice('Please sign in with Cloudflare first');
-						return;
-					}
+						if (resolved.hadError) {
+							return;
+						}
+						if (!resolved.credentials) {
+							new Notice('Please sign in first');
+							return;
+						}
 					const credentials = resolved.credentials;
 
 					const shouldSuspendSync = plugin.syncRuntime.isConfigured();
@@ -363,7 +389,7 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 						onSuccess: async (result) => {
 							if (result.failed.length === 0) {
 								if (result.deleted.length === 0) {
-									new Notice('No Cloudflare resources were found to delete. Local configuration was kept.');
+									new Notice('No remote resources were found to delete. Local configuration was kept.');
 									return;
 								}
 								shouldResumeSync = false;
@@ -373,14 +399,13 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 								return;
 							}
 
-							new Notice(`Reset finished with errors (${result.failed.length} failed)`);
-							diagnosticsContainer.style.display = 'block';
-							diagnosticsContainer.addClass('crate-diagnostics');
-							diagnosticsContainer.empty();
-							diagnosticsContainer.createEl('h4', { text: 'Reset errors' });
-							for (const message of result.failed) {
-								diagnosticsContainer.createEl('p', {
-									text: `- ${message}`,
+								new Notice(`Reset finished with errors (${result.failed.length} failed)`);
+								diagnosticsContainer.show();
+								diagnosticsContainer.empty();
+								createSettingsSubsectionHeading(diagnosticsContainer, 'Reset errors');
+								for (const message of result.failed) {
+									diagnosticsContainer.createEl('p', {
+										text: `- ${message}`,
 									cls: 'setting-item-description',
 								});
 							}
@@ -389,7 +414,7 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 							new Notice(`Reset failed: ${getErrorMessage(error)}`);
 						},
 						onFinally: async () => {
-							deleteSetting.descEl.style.display = '';
+							deleteSetting.descEl.show();
 							deleteSetting.descEl.textContent = originalDesc;
 
 							if (!shouldResumeSync || !plugin.syncRuntime.isConfigured()) {
@@ -412,10 +437,9 @@ function renderInfrastructureManagementSection(context: InfrastructureSectionCon
 }
 
 function renderDiagnostics(containerEl: HTMLElement, results: DiagnosticResult[]): void {
-	containerEl.style.display = 'block';
-	containerEl.addClass('crate-diagnostics');
+	containerEl.show();
 	containerEl.empty();
-	containerEl.createEl('h4', { text: 'Diagnostics' });
+	createSettingsSubsectionHeading(containerEl, 'Diagnostics');
 
 	for (const result of results) {
 		const row = containerEl.createDiv({ cls: 'crate-diagnostic-row' });

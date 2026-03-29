@@ -2,6 +2,7 @@ import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { SECRET_KEYS, type UsageMetric } from '../../types';
 import { getErrorMessage, runButtonTask } from './action-helpers';
+import { createSettingsSectionHeading } from './section-helpers';
 
 export interface UsageSectionContext {
 	containerEl: HTMLElement;
@@ -10,14 +11,12 @@ export interface UsageSectionContext {
 
 export function renderUsageSection(context: UsageSectionContext): void {
 	const { containerEl, plugin } = context;
-	containerEl.createEl('h3', { text: 'Usage' });
+	createSettingsSectionHeading(containerEl, 'Usage');
 
 	const usageHelp = containerEl.createDiv({ cls: 'setting-item-description' });
-	usageHelp.appendText('To enable usage metrics, create a Cloudflare API token with ');
-	usageHelp.createEl('strong', { text: 'Account > Account Analytics > Read' });
-	usageHelp.appendText(' permission and paste it below. ');
+	usageHelp.appendText('To enable usage metrics, create a read-only analytics token and paste it below. ');
 	const tokenLink = usageHelp.createEl('a', {
-		text: 'Create token in Cloudflare dashboard',
+		text: 'Open token page',
 		href: 'https://dash.cloudflare.com/profile/api-tokens',
 	});
 	tokenLink.target = '_blank';
@@ -25,7 +24,7 @@ export function renderUsageSection(context: UsageSectionContext): void {
 
 	new Setting(containerEl)
 		.setName('Analytics token')
-		.setDesc('Optional. Create a read-only token with Account Analytics Read in Cloudflare')
+		.setDesc('Optional. Create a read-only token for analytics access')
 		.addText(text => {
 			text.inputEl.type = 'password';
 			text
@@ -35,13 +34,13 @@ export function renderUsageSection(context: UsageSectionContext): void {
 
 	const usageContainer = containerEl.createDiv({ cls: 'crate-usage-container' });
 	usageContainer.createEl('p', {
-		text: 'Select Refresh to load usage metrics.',
+		text: 'Select refresh to load usage metrics.',
 		cls: 'setting-item-description',
 	});
 
 	new Setting(containerEl)
-		.setName('Refresh usage')
-		.setDesc('Fetch latest usage metrics from Cloudflare')
+		.setName('Refresh metrics')
+		.setDesc('Fetch the latest usage metrics')
 		.addButton(button => button
 			.setButtonText('Refresh')
 			.onClick(async () => {
@@ -144,7 +143,7 @@ function renderServiceUsage(
 
 		const bar = row.createDiv({ cls: 'crate-usage-bar' });
 		const fill = bar.createDiv({ cls: 'crate-usage-bar-fill' });
-		fill.style.width = `${Math.min(pct, 100)}%`;
+		fill.setCssProps({ width: `${Math.min(pct, 100)}%` });
 
 		if (pct >= 90) {
 			fill.addClass('crate-usage-bar-critical');

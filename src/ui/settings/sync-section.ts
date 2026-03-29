@@ -2,6 +2,7 @@ import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import type { SyncState } from '../../types';
 import { createFileSyncProgress, hideFileSyncProgress, runButtonTask, showFileSyncProgress, updateFileSyncProgress } from './action-helpers';
+import { createSettingsSectionHeading } from './section-helpers';
 
 export interface SyncSectionContext {
 	containerEl: HTMLElement;
@@ -13,7 +14,7 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 	const { containerEl, plugin, rerender } = context;
 	const isSyncing = plugin.syncRuntime.getState().status === 'syncing';
 
-	containerEl.createEl('h3', { text: 'Sync' });
+	createSettingsSectionHeading(containerEl, 'Sync');
 
 	const lastSync = plugin.settings.lastSync;
 	const lastSyncDesc = isSyncing

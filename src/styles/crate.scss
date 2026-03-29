@@ -57,15 +57,32 @@
 }
 
 /* Settings tab */
-.crate-settings h3 {
+.crate-settings .crate-settings-root-heading {
+	margin-top: 0;
+	padding-top: 0;
+}
+
+.crate-settings .crate-settings-root-heading .setting-item-name {
+	font-size: var(--h2-size);
+	font-weight: var(--h2-weight);
+	line-height: var(--h2-line-height);
+}
+
+.crate-settings .crate-settings-section-heading {
 	margin-top: 24px;
 	margin-bottom: 12px;
 	border-bottom: 1px solid var(--background-modifier-border);
 	padding-bottom: 6px;
 }
 
-.crate-settings h3:first-child {
-	margin-top: 0;
+.crate-settings .crate-settings-subsection-heading {
+	margin-top: 18px;
+	margin-bottom: 8px;
+}
+
+.crate-settings .crate-settings-subsection-heading .setting-item-name {
+	font-size: var(--font-ui-medium);
+	color: var(--text-normal);
 }
 
 /* Settings tab - usage metrics */
@@ -139,6 +156,23 @@
 	font-size: var(--h2-size);
 	font-weight: var(--h2-weight);
 	line-height: var(--h2-line-height);
+}
+
+.crate-confirmation-modal {
+	max-width: 520px;
+}
+
+.crate-confirmation-message {
+	margin-top: 0;
+}
+
+.crate-confirmation-details {
+	margin: 0 0 16px 20px;
+	color: var(--text-muted);
+}
+
+.crate-confirmation-actions .setting-item-control {
+	gap: 8px;
 }
 
 /* Tab bar: tabs left, sync button right */
@@ -360,11 +394,6 @@ body.is-mobile .crate-activity-panel {
 	border-radius: 6px;
 }
 
-.crate-diagnostics h4 {
-	margin: 0 0 8px;
-	font-size: 13px;
-}
-
 .crate-diagnostic-row p {
 	margin: 0 0 4px;
 }
@@ -380,4 +409,3 @@ body.is-mobile .crate-activity-panel {
 .crate-diagnostic-fail {
 	color: var(--text-error);
 }
-

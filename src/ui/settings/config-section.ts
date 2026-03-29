@@ -4,8 +4,10 @@ import { computeTokenHash, quickSetup, refreshWorkerAuthToken } from '../../clou
 import type CratePlugin from '../../main';
 import { SECRET_KEYS } from '../../types';
 import { SyncApiClient } from '../../sync/api';
+import { openConfirmationModal } from '../confirmation-modal';
 import { QRModal } from '../qr-modal';
 import { getErrorMessage, runButtonTask } from './action-helpers';
+import { createSettingsSectionHeading } from './section-helpers';
 
 interface CloudflareCredentials {
 	accountId: string;
@@ -37,12 +39,12 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 		manualState.manualEntryEnabled = false;
 	}
 
-	containerEl.createEl('h3', { text: 'Configuration' });
+	createSettingsSectionHeading(containerEl, 'Configuration');
 
 	const setupProgress = containerEl.createEl('p', {
 		cls: 'crate-action-progress',
 	});
-	setupProgress.style.display = 'none';
+	setupProgress.hide();
 
 	const isConfigured = plugin.syncRuntime.isConfigured();
 
@@ -55,7 +57,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 					: 'Desktop only. Set up on desktop first, then use "Set up another device" to copy a setup link.'
 			)
 			.addButton(button => {
-				button.setButtonText('Sign in with Cloudflare').setCta();
+				button.setButtonText('Sign in').setCta();
 				if (!isDesktop) {
 					button.setDisabled(true);
 					button.setTooltip('Cloudflare sign-in is only available on desktop');
@@ -66,7 +68,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 					let loggedIn = false;
 					await runButtonTask({
 						button,
-						idleText: 'Sign in with Cloudflare',
+						idleText: 'Sign in',
 						runningText: 'Waiting...',
 						progressEl: setupProgress,
 						progressMessage: 'Waiting for Cloudflare authorization...',
@@ -97,9 +99,9 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 
 				return button;
 			});
-	} else if (hasCloudflareCredentials) {
+		} else if (hasCloudflareCredentials) {
 		new Setting(containerEl)
-			.setName('Cloudflare account')
+			.setName('Signed-in account')
 			.setDesc(
 				isDesktop
 					? plugin.settings.cloudflareAccountId
@@ -167,13 +169,13 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				});
 
 				return button;
-			})
-			.addExtraButton(button => button
-				.setIcon('x')
-				.setTooltip('Sign out from Cloudflare')
-				.onClick(async () => {
-					await plugin.syncRuntime.clearSyncConfiguration({ clearCloudflareCredentials: true });
-					new Notice('Signed out and configuration cleared');
+				})
+				.addExtraButton(button => button
+					.setIcon('x')
+					.setTooltip('Sign out')
+					.onClick(async () => {
+						await plugin.syncRuntime.clearSyncConfiguration({ clearCloudflareCredentials: true });
+						new Notice('Signed out and configuration cleared');
 					rerender();
 				}));
 	}
@@ -197,7 +199,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 	if (!isConfigured && (hasCloudflareCredentials || manualState.manualEntryEnabled)) {
 		new Setting(containerEl)
 			.setName('Quick setup')
-			.setDesc('Create R2 + D1 + Worker and configure this plugin automatically')
+			.setDesc('Create the sync infrastructure and configure this plugin automatically')
 			.addButton(button => button
 				.setButtonText('Create infrastructure')
 				.setCta()
@@ -226,7 +228,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 	if (isConfigured) {
 		new Setting(containerEl)
 			.setName('Set up another device')
-			.setDesc('Share a setup link to configure Crate on another device. The link contains your sync credentials - share it securely.')
+			.setDesc('Share a setup link for another device. The link contains sync credentials, so share it securely.')
 			.addButton(button => button
 				.setButtonText('Copy link')
 				.onClick(async () => {
@@ -234,25 +236,32 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 					if (!link) return;
 					await navigator.clipboard.writeText(link);
 					new Notice('Setup link copied to clipboard');
-				}))
-			.addButton(button => button
-				.setButtonText('Show QR')
-				.onClick(async () => {
-					const link = await buildSetupLink(plugin);
-					if (!link) return;
-					new QRModal(plugin.app, link).open();
-				}));
+					}))
+				.addButton(button => button
+					.setButtonText('Show code')
+					.onClick(async () => {
+						const link = await buildSetupLink(plugin);
+						if (!link) return;
+						new QRModal(plugin.app, link).open();
+					}));
 	}
 
 	if (hasCloudflareCredentials || isConfigured) {
 		new Setting(containerEl)
-			.setName('Reset local plugin configuration')
+			.setName('Reset local configuration')
 			.setDesc('Clears worker URL/auth token and local infrastructure metadata')
 			.addButton(button => button
-				.setButtonText('Reset local')
+				.setButtonText('Reset local data')
 				.setWarning()
 				.onClick(async () => {
-					if (!confirm('Clear local plugin configuration? Cloudflare resources will not be deleted.')) {
+					const confirmed = await openConfirmationModal(plugin.app, {
+						title: 'Reset local configuration',
+						message: 'Clear this device\'s Crate configuration?',
+						details: ['Remote Cloudflare resources will not be deleted.'],
+						confirmText: 'Reset local data',
+						warning: true,
+					});
+					if (!confirmed) {
 						return;
 					}
 					await plugin.syncRuntime.clearSyncConfiguration();
@@ -269,11 +278,11 @@ function renderManualEntryFields(
 	rerender: () => void
 ): void {
 	new Setting(containerEl)
-		.setName('Cloudflare account ID')
+		.setName('Account ID')
 		.setDesc('Used for manual setup mode')
 		.addText(text => {
 			text
-				.setPlaceholder('Cloudflare account ID')
+				.setPlaceholder('Paste account ID')
 				.setValue(manualState.manualAccountId)
 				.onChange(value => {
 					manualState.manualAccountId = value.trim();
@@ -282,12 +291,12 @@ function renderManualEntryFields(
 		});
 
 	new Setting(containerEl)
-		.setName('Cloudflare API token')
+		.setName('API token')
 		.setDesc('Used for manual setup mode')
 		.addText(text => {
 			text.inputEl.type = 'password';
 			text
-				.setPlaceholder('Paste Cloudflare API token')
+				.setPlaceholder('Paste API token')
 				.setValue(manualState.manualApiToken)
 				.onChange(value => {
 					manualState.manualApiToken = value.trim();
@@ -296,11 +305,10 @@ function renderManualEntryFields(
 		});
 
 	new Setting(containerEl)
-		.setName('R2 bucket name')
+		.setName('Bucket name')
 		.setDesc('Optional for setup. Leave empty to auto-generate')
 		.addText(text => {
 			text
-				.setPlaceholder('crate-xxxxxxxx')
 				.setValue(manualState.manualBucketName)
 				.onChange(value => {
 					manualState.manualBucketName = value.trim();
@@ -313,7 +321,6 @@ function renderManualEntryFields(
 		.setDesc('Optional for setup. Leave empty to auto-generate')
 		.addText(text => {
 			text
-				.setPlaceholder('crate-sync-xxxxxx')
 				.setValue(manualState.manualWorkerName)
 				.onChange(value => {
 					manualState.manualWorkerName = value.trim();
@@ -323,7 +330,7 @@ function renderManualEntryFields(
 
 	new Setting(containerEl)
 		.setName('Save manual credentials')
-		.setDesc('Validate and save account ID and API token from manual entry fields')
+		.setDesc('Validate and save the account ID and API token from the manual entry fields')
 		.addButton(button => button
 			.setButtonText('Save')
 			.onClick(async () => {
@@ -345,7 +352,7 @@ function renderManualEntryFields(
 						await plugin.cloudflareSession.saveCredentials(accountId, apiToken);
 					},
 					onSuccess: () => {
-						new Notice('Manual Cloudflare credentials saved');
+						new Notice('Manual credentials saved');
 						rerender();
 					},
 					onError: (error) => {

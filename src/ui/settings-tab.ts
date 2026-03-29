@@ -10,6 +10,7 @@ import { renderSyncSection } from './settings/sync-section';
 import { renderUsageSection } from './settings/usage-section';
 import { renderRemindersSection } from './settings/reminders-section';
 import { renderNotificationsSection } from './settings/notifications-section';
+import { createSettingsRootHeading } from './settings/section-helpers';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
@@ -34,7 +35,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass('crate-settings');
 
-		containerEl.createEl('h2', { text: 'Crate settings' });
+		createSettingsRootHeading(containerEl, 'Crate settings');
 
 		renderConfigSection({
 			containerEl,
