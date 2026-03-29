@@ -13,6 +13,7 @@ import { TAbstractFile, TFile, TFolder, type App } from "obsidian";
 import { createLogger } from "@/reminders";
 import { parseCheckboxLine, generateContentHash } from "@/reminders/utils/checkboxParser";
 import type { IndexedReminder } from "./reminderIndex";
+import { generateReminderId } from "./reminderIdentity";
 
 const log = createLogger('VaultScanner');
 
@@ -28,17 +29,6 @@ interface FileScanResult {
   filePath: string;
   reminders: IndexedReminder[];
   lineCount: number;
-}
-
-/**
- * Generate a unique ID from file path, line number, and content
- * Uses content hash so ID stays stable if line moves but content is same
- */
-function generateReminderId(filePath: string, content: string): string {
-  const contentHash = generateContentHash(content);
-  // Include file path hash for uniqueness across files with same content
-  const fileHash = generateContentHash(filePath);
-  return `${fileHash}-${contentHash}`;
 }
 
 /**

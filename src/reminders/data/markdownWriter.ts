@@ -11,6 +11,7 @@
 import type { App, TFile } from "obsidian";
 import { createLogger, type Priority, type Reminder, type RecurrenceRule, calculateNextOccurrence, calculateFirstOccurrence, generateContentHash } from "@/reminders";
 import type { IndexedReminder, ReminderIndex } from "./reminderIndex";
+import { generateReminderId } from "./reminderIdentity";
 import { rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
 
 export type ReminderOperation = "create" | "update" | "delete";
@@ -109,15 +110,6 @@ export interface MarkdownWriter {
    * This bypasses VaultWatcher's debounce for instant UI refresh.
    */
   setOnFileWritten(callback: OnFileWrittenCallback): void;
-}
-
-/**
- * Generate a stable reminder ID that matches vault scanning
- */
-function generateReminderId(filePath: string, content: string): string {
-  const contentHash = generateContentHash(content);
-  const fileHash = generateContentHash(filePath);
-  return `${fileHash}-${contentHash}`;
 }
 
 /**

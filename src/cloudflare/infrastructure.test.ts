@@ -14,7 +14,7 @@ const apiMocks = vi.hoisted(() => ({
 	redeployWorker: vi.fn(),
 	generateAuthToken: vi.fn(() => 'purge-token'),
 	generateBucketName: vi.fn(() => 'crate-bucket-test'),
-	generateWorkerName: vi.fn(() => 'crate-sync-test'),
+	generateWorkerName: vi.fn((prefix = 'crate-sync') => `${prefix}-test`),
 	getWorkerBindings: vi.fn(),
 	deleteR2Bucket: vi.fn(),
 }));

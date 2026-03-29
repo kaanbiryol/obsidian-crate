@@ -15,6 +15,7 @@ import { SECRET_KEYS } from './types';
 import { notifyConflicts } from './sync/conflict';
 import { isHiddenPath } from './sync/file-discovery';
 import { SyncRuntime } from './sync/runtime';
+import { normalizeWorkerUrl } from './sync/worker-url';
 import { ActivityModal } from './ui/activity-modal';
 import { openConfirmationModal } from './ui/confirmation-modal';
 import { CrateSettingTab } from './ui/settings-tab';
@@ -66,6 +67,28 @@ function parseStringArray(raw: string): string[] | null {
 		values.push(item);
 	}
 	return values;
+}
+
+function ensureStringArray(value: unknown, fallback: string[]): string[] {
+	if (!Array.isArray(value)) {
+		return [...fallback];
+	}
+
+	return value.filter((item): item is string => typeof item === 'string');
+}
+
+function ensureConfigDirWorkspaceIgnorePattern(ignorePatterns: string[], configDir: string): string[] {
+	const normalizedConfigDir = configDir.replace(/^\/+|\/+$/g, '');
+	if (!normalizedConfigDir) {
+		return ignorePatterns;
+	}
+
+	const workspacePattern = `${normalizedConfigDir}/workspace*`;
+	if (ignorePatterns.includes(workspacePattern)) {
+		return ignorePatterns;
+	}
+
+	return [...ignorePatterns, workspacePattern];
 }
 
 export default class CratePlugin extends Plugin {
@@ -140,7 +163,14 @@ export default class CratePlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		const data = await this.loadData() as Partial<CrateSettings> | null;
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+		const merged = Object.assign({}, DEFAULT_SETTINGS, data);
+		merged.workerUrl = normalizeWorkerUrl(typeof merged.workerUrl === 'string' ? merged.workerUrl : '');
+		merged.deviceId = typeof merged.deviceId === 'string' ? merged.deviceId.trim() : '';
+		merged.ignorePatterns = ensureConfigDirWorkspaceIgnorePattern(
+			ensureStringArray(merged.ignorePatterns, DEFAULT_SETTINGS.ignorePatterns),
+			this.app.vault.configDir,
+		);
+		this.settings = merged;
 	}
 
 	async saveSettings(): Promise<void> {
@@ -207,10 +237,25 @@ export default class CratePlugin extends Plugin {
 	private async saveRemindersSettingsData(settings: RemindersSettings): Promise<void> {
 		try {
 			const adapter = this.app.vault.adapter;
+			await this.ensurePluginDataDir();
 			const settingsPath = this.getPluginDataPath('reminders-settings.json');
 			await adapter.write(settingsPath, JSON.stringify(settings, null, 2));
 		} catch (error) {
 			remindersLogger.error('Failed to save reminders settings:', error);
+		}
+	}
+
+	private async ensurePluginDataDir(): Promise<void> {
+		const adapter = this.app.vault.adapter;
+		const pluginDir = `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
+		if (await adapter.exists(pluginDir)) {
+			return;
+		}
+
+		try {
+			await adapter.mkdir(pluginDir);
+		} catch {
+			// Best effort: the directory may have been created concurrently.
 		}
 	}
 
@@ -556,9 +601,11 @@ export default class CratePlugin extends Plugin {
 
 	private generateDeviceId(): string {
 		const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+		const bytes = new Uint8Array(8);
+		crypto.getRandomValues(bytes);
 		let id = 'device-';
-		for (let i = 0; i < 8; i++) {
-			id += chars.charAt(Math.floor(Math.random() * chars.length));
+		for (const value of bytes) {
+			id += chars.charAt(value % chars.length);
 		}
 		return id;
 	}

@@ -1,7 +1,56 @@
 import { corsResponse } from './cors';
+import { sha256HexBytes } from './auth';
 import { initDb, maybePruneChangelog, queryRows } from './db';
-import { sanitizePath, FILES_PREFIX } from './utils';
+import {
+	sanitizePath,
+	FILES_PREFIX,
+	isRecord,
+	isSha256Hex,
+	parseJsonObject,
+	parseNonNegativeInteger,
+	parseOptionalString,
+	parseStringArray,
+} from './utils';
 import type { Env } from './types';
+import type { SharedSettings } from '../../types';
+
+const MAX_BATCH_FILES = 50;
+const MAX_BATCH_TOTAL_BYTES = 10 * 1024 * 1024;
+
+function parseDeclaredSize(headerValue: string | null): number | null {
+	if (headerValue === null) {
+		return null;
+	}
+
+	const size = Number.parseInt(headerValue, 10);
+	return Number.isInteger(size) && size >= 0 ? size : null;
+}
+
+function normalizeSharedSettings(value: unknown): SharedSettings | null {
+	if (!isRecord(value)) {
+		return null;
+	}
+
+	const ignorePatterns = parseStringArray(value.ignorePatterns);
+	const syncInterval = parseNonNegativeInteger(value.syncInterval);
+	if (
+		ignorePatterns === null ||
+		typeof value.syncOnStartup !== 'boolean' ||
+		syncInterval === null ||
+		typeof value.showStatusBar !== 'boolean' ||
+		typeof value.pushEnabled !== 'boolean'
+	) {
+		return null;
+	}
+
+	return {
+		ignorePatterns,
+		syncOnStartup: value.syncOnStartup,
+		syncInterval,
+		showStatusBar: value.showStatusBar,
+		pushEnabled: value.pushEnabled,
+	};
+}
 
 export async function handleHealth(): Promise<Response> {
 	return corsResponse({ status: 'ok', timestamp: new Date().toISOString() });
@@ -70,12 +119,33 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 	const safePath = sanitizePath(rawPath);
 	if (!safePath) return corsResponse({ error: 'Invalid path' }, 400);
 
-	const hash = request.headers.get('X-File-Hash') || '';
-	const size = parseInt(request.headers.get('X-File-Size') || '0', 10);
+	const hashHeader = request.headers.get('X-File-Hash')?.trim().toLowerCase() || '';
+	if (hashHeader && !isSha256Hex(hashHeader)) {
+		return corsResponse({ error: 'Invalid X-File-Hash header' }, 400);
+	}
+
+	const declaredSize = parseDeclaredSize(request.headers.get('X-File-Size'));
+	if (request.headers.has('X-File-Size') && declaredSize === null) {
+		return corsResponse({ error: 'Invalid X-File-Size header' }, 400);
+	}
+
 	const contentType = request.headers.get('Content-Type') || 'application/octet-stream';
 
 	try {
-		await bucket.put(FILES_PREFIX + safePath, request.body, {
+		const body = await request.arrayBuffer();
+		const computedSize = body.byteLength;
+		if (declaredSize !== null && declaredSize !== computedSize) {
+			return corsResponse({ error: 'File size does not match X-File-Size header' }, 400);
+		}
+
+		const computedHash = await sha256HexBytes(body);
+		if (hashHeader && hashHeader !== computedHash) {
+			return corsResponse({ error: 'File hash does not match X-File-Hash header' }, 400);
+		}
+
+		const hash = hashHeader || computedHash;
+		const size = declaredSize ?? computedSize;
+		await bucket.put(FILES_PREFIX + safePath, body, {
 			httpMetadata: { contentType },
 			customMetadata: { hash },
 		});
@@ -122,10 +192,15 @@ export async function handleDownload(request: Request, bucket: R2Bucket): Promis
 }
 
 export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
-	const body = await request.json() as { path?: string };
-	if (!body.path) return corsResponse({ error: 'Path required' }, 400);
+	const parsedBody = await parseJsonObject(request);
+	if (!parsedBody.ok) {
+		return parsedBody.response;
+	}
 
-	const safePath = sanitizePath(body.path);
+	const rawPath = parseOptionalString(parsedBody.value.path, 1024);
+	if (!rawPath) return corsResponse({ error: 'Path required' }, 400);
+
+	const safePath = sanitizePath(rawPath);
 	if (!safePath) return corsResponse({ error: 'Invalid path' }, 400);
 
 	await bucket.delete(FILES_PREFIX + safePath);
@@ -153,46 +228,85 @@ interface BatchFile {
 }
 
 export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
-	const body = await request.json() as { files?: BatchFile[] };
-	const files = body.files;
-	if (!Array.isArray(files) || files.length === 0) return corsResponse({ error: 'files array required' }, 400);
-	if (files.length > 50) return corsResponse({ error: 'Maximum 50 files per batch' }, 400);
+	const parsedBody = await parseJsonObject(request);
+	if (!parsedBody.ok) {
+		return parsedBody.response;
+	}
 
-	let totalBytes = 0;
-	for (const f of files) totalBytes += f.size || 0;
-	if (totalBytes > 10 * 1024 * 1024) return corsResponse({ error: 'Total content exceeds 10MB limit' }, 400);
+	const files = parsedBody.value.files;
+	if (!Array.isArray(files) || files.length === 0) return corsResponse({ error: 'files array required' }, 400);
+	if (files.length > MAX_BATCH_FILES) return corsResponse({ error: `Maximum ${MAX_BATCH_FILES} files per batch` }, 400);
 
 	const results: Array<{ path: string; success: boolean; hash?: string; error?: string }> = [];
 	const dbOps: D1PreparedStatement[] = [];
+	const uploads: Array<{ safePath: string; bytes: ArrayBuffer; hash: string; size: number; contentType: string }> = [];
+	let totalBytes = 0;
 
-	await Promise.all(files.map(async (file) => {
+	for (const file of files as BatchFile[]) {
 		const safePath = sanitizePath(file.path);
 		if (!safePath) {
 			results.push({ path: file.path, success: false, error: 'Invalid path' });
-			return;
+			continue;
 		}
 
 		try {
 			const raw = atob(file.content);
 			const bytes = new Uint8Array(raw.length);
 			for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+			const size = bytes.byteLength;
+			if (typeof file.size === 'number' && file.size !== size) {
+				results.push({ path: safePath, success: false, error: 'Declared file size does not match content' });
+				continue;
+			}
 
-			await bucket.put(FILES_PREFIX + safePath, bytes.buffer, {
-				httpMetadata: { contentType: file.contentType || 'application/octet-stream' },
-				customMetadata: { hash: file.hash || '' },
+			const providedHash = file.hash?.trim().toLowerCase() || '';
+			if (providedHash && !isSha256Hex(providedHash)) {
+				results.push({ path: safePath, success: false, error: 'Invalid file hash' });
+				continue;
+			}
+
+			const computedHash = await sha256HexBytes(bytes);
+			if (providedHash && providedHash !== computedHash) {
+				results.push({ path: safePath, success: false, error: 'Declared file hash does not match content' });
+				continue;
+			}
+
+			totalBytes += size;
+			if (totalBytes > MAX_BATCH_TOTAL_BYTES) {
+				return corsResponse({ error: 'Total content exceeds 10MB limit' }, 400);
+			}
+
+			uploads.push({
+				safePath,
+				bytes: bytes.buffer,
+				hash: providedHash || computedHash,
+				size,
+				contentType: file.contentType || 'application/octet-stream',
+			});
+		} catch (err: unknown) {
+			const message = err instanceof Error ? err.message : String(err);
+			results.push({ path: safePath, success: false, error: message });
+		}
+	}
+
+	await Promise.all(uploads.map(async (file) => {
+		try {
+			await bucket.put(FILES_PREFIX + file.safePath, file.bytes, {
+				httpMetadata: { contentType: file.contentType },
+				customMetadata: { hash: file.hash },
 			});
 
-			results.push({ path: safePath, success: true, hash: file.hash || '' });
+			results.push({ path: file.safePath, success: true, hash: file.hash });
 
 			if (db) {
 				dbOps.push(
-					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'put', file.hash || '', file.size || 0),
-					db.prepare("INSERT OR REPLACE INTO files (path, hash, size, modified) VALUES (?, ?, ?, datetime('now'))").bind(safePath, file.hash || '', file.size || 0),
+					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(file.safePath, 'put', file.hash, file.size),
+					db.prepare("INSERT OR REPLACE INTO files (path, hash, size, modified) VALUES (?, ?, ?, datetime('now'))").bind(file.safePath, file.hash, file.size),
 				);
 			}
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : String(err);
-			results.push({ path: safePath, success: false, error: message });
+			results.push({ path: file.safePath, success: false, error: message });
 		}
 	}));
 
@@ -208,10 +322,13 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 }
 
 export async function handleBatchDownload(request: Request, bucket: R2Bucket): Promise<Response> {
-	const body = await request.json() as { paths?: string[] };
-	const paths = body.paths;
+	const parsedBody = await parseJsonObject(request);
+	if (!parsedBody.ok) {
+		return parsedBody.response;
+	}
+	const paths = parsedBody.value.paths;
 	if (!Array.isArray(paths) || paths.length === 0) return corsResponse({ error: 'paths array required' }, 400);
-	if (paths.length > 50) return corsResponse({ error: 'Maximum 50 files per batch' }, 400);
+	if (paths.length > MAX_BATCH_FILES) return corsResponse({ error: `Maximum ${MAX_BATCH_FILES} files per batch` }, 400);
 
 	const files: Array<{ path: string; content: string; hash: string; size: number; contentType: string; error?: string }> = [];
 	for (const rawPath of paths) {
@@ -255,10 +372,13 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket): P
 }
 
 export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
-	const body = await request.json() as { paths?: string[] };
-	const paths = body.paths;
+	const parsedBody = await parseJsonObject(request);
+	if (!parsedBody.ok) {
+		return parsedBody.response;
+	}
+	const paths = parsedBody.value.paths;
 	if (!Array.isArray(paths) || paths.length === 0) return corsResponse({ error: 'paths array required' }, 400);
-	if (paths.length > 50) return corsResponse({ error: 'Maximum 50 files per batch' }, 400);
+	if (paths.length > MAX_BATCH_FILES) return corsResponse({ error: `Maximum ${MAX_BATCH_FILES} files per batch` }, 400);
 
 	const deleted: string[] = [];
 	const dbOps: D1PreparedStatement[] = [];
@@ -303,12 +423,25 @@ export async function handleGetConfig(env: Env): Promise<Response> {
 export async function handleGetSettings(bucket: R2Bucket): Promise<Response> {
 	const obj = await bucket.get('__crate__/settings.json');
 	if (!obj) return corsResponse({ settings: null });
-	const body = await obj.text();
-	return corsResponse({ settings: JSON.parse(body) });
+	try {
+		const body = await obj.text();
+		return corsResponse({ settings: normalizeSharedSettings(JSON.parse(body)) });
+	} catch {
+		return corsResponse({ settings: null });
+	}
 }
 
 export async function handlePutSettings(request: Request, bucket: R2Bucket): Promise<Response> {
-	const body = await request.json() as { settings: unknown };
-	await bucket.put('__crate__/settings.json', JSON.stringify(body.settings));
+	const parsedBody = await parseJsonObject(request);
+	if (!parsedBody.ok) {
+		return parsedBody.response;
+	}
+
+	const settings = normalizeSharedSettings(parsedBody.value.settings);
+	if (!settings) {
+		return corsResponse({ error: 'Invalid shared settings payload' }, 400);
+	}
+
+	await bucket.put('__crate__/settings.json', JSON.stringify(settings));
 	return corsResponse({ success: true });
 }

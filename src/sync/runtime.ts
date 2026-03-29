@@ -7,6 +7,7 @@ import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
 import { SyncEngine } from './engine';
 import { guardSyncConfigured } from './sync-guards';
+import { requireNormalizedWorkerUrl } from './worker-url';
 
 const logger = createLogger('SyncRuntime');
 
@@ -164,7 +165,7 @@ export class SyncRuntime {
 	}
 
 	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput): Promise<void> {
-		this.settings.workerUrl = config.workerUrl.trim();
+		this.settings.workerUrl = requireNormalizedWorkerUrl(config.workerUrl);
 		this.settings.workerName = config.workerName.trim();
 		this.settings.bucketName = config.bucketName.trim();
 		this.settings.databaseId = config.databaseId.trim();

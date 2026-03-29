@@ -4,7 +4,6 @@
  */
 
 import { Platform, requestUrl } from 'obsidian';
-import { createServer } from 'http';
 
 const CLIENT_ID = '54d11594-84e4-41aa-b438-e81b8fa78ee7';
 const AUTH_URL = 'https://dash.cloudflare.com/oauth2/auth';
@@ -29,6 +28,28 @@ export interface OAuthTokens {
 export interface OAuthResult {
 	accountId: string;
 	tokens: OAuthTokens;
+}
+
+interface OAuthRequest {
+	url?: string | null;
+}
+
+interface OAuthResponse {
+	writeHead(status: number, headers?: Record<string, string>): void;
+	end(body?: string): void;
+}
+
+interface OAuthCallbackServer {
+	close(): void;
+	listen(port: number, host: string, callback: () => void): void;
+	on(event: 'error', listener: (error: Error) => void): void;
+}
+
+async function loadCreateServer(): Promise<
+	(handler: (req: OAuthRequest, res: OAuthResponse) => void) => OAuthCallbackServer
+> {
+	const httpModule = await import('node:http');
+	return httpModule.createServer as unknown as (handler: (req: OAuthRequest, res: OAuthResponse) => void) => OAuthCallbackServer;
 }
 
 function createRandomHex(bytes: number): string {
@@ -168,7 +189,7 @@ async function exchangeCodeForToken(code: string, codeVerifier: string): Promise
 	};
 }
 
-let activeServer: ReturnType<typeof createServer> | null = null;
+let activeServer: OAuthCallbackServer | null = null;
 let activeTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export function abortOAuthLogin(): void {
@@ -193,6 +214,7 @@ export async function performOAuthLogin(openBrowser: (url: string) => Promise<vo
 	const codeVerifier = createCodeVerifier();
 	const codeChallenge = await createCodeChallenge(codeVerifier);
 	const authUrl = getAuthorizationUrl(state, codeChallenge);
+	const createServer = await loadCreateServer();
 
 	return new Promise((resolve, reject) => {
 		const cleanup = () => {
@@ -206,8 +228,8 @@ export async function performOAuthLogin(openBrowser: (url: string) => Promise<vo
 			reject(new Error('OAuth login timed out after 5 minutes'));
 		}, 5 * 60 * 1000);
 
-		const server = createServer(async (req, res) => {
-			try {
+		const server = createServer((req, res) => {
+			void (async () => {
 				const url = new URL(req.url || '/', `http://localhost:${REDIRECT_PORT}`);
 				if (url.pathname !== '/oauth/callback') {
 					res.writeHead(404);
@@ -259,14 +281,14 @@ export async function performOAuthLogin(openBrowser: (url: string) => Promise<vo
 				server.close();
 				cleanup();
 				resolve({ accountId, tokens });
-			} catch (error) {
+			})().catch((error: unknown) => {
 				res.writeHead(500, { 'Content-Type': 'text/html' });
 				res.end('<html><body><h2>Authorization failed.</h2><p>You can close this tab.</p></body></html>');
 				clearTimeout(timeoutHandle);
 				server.close();
 				cleanup();
 				reject(error instanceof Error ? error : new Error(String(error)));
-			}
+			});
 		});
 
 		server.on('error', (error) => {
@@ -278,12 +300,10 @@ export async function performOAuthLogin(openBrowser: (url: string) => Promise<vo
 		activeServer = server;
 		activeTimeout = timeoutHandle;
 
-		server.listen(REDIRECT_PORT, '127.0.0.1', async () => {
-			try {
-				await openBrowser(authUrl);
-			} catch {
+		server.listen(REDIRECT_PORT, '127.0.0.1', () => {
+			void openBrowser(authUrl).catch(() => {
 				// If opening fails, the user can still copy URL from notice/UI.
-			}
+			});
 		});
 	});
 }

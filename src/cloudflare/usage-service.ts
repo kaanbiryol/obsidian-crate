@@ -31,38 +31,46 @@ export class CloudflareUsageService {
 		const today = now.toISOString().split('T')[0]!;
 		const monthStart = today.substring(0, 8) + '01';
 
-		const d1Fragment = config.databaseId ? `
+		const hasDatabase = Boolean(config.databaseId);
+		const d1Fragment = hasDatabase ? `
 			d1Analytics: d1AnalyticsAdaptiveGroups(
-				filter: { databaseId: "${config.databaseId}", date_geq: "${today}", date_leq: "${today}" }
+				filter: { databaseId: $databaseId, date_geq: $today, date_leq: $today }
 				limit: 1
 			) {
 				sum { readQueries writeQueries }
 			}
 			d1Storage: d1StorageAdaptiveGroups(
-				filter: { databaseId: "${config.databaseId}", date_geq: "${today}", date_leq: "${today}" }
+				filter: { databaseId: $databaseId, date_geq: $today, date_leq: $today }
 				limit: 1
 			) {
 				max { databaseSizeBytes }
 			}
 		` : '';
 
-		const query = `query {
+		const query = `query UsageMetrics(
+			$accountId: String!,
+			$workerName: String!,
+			$bucketName: String!,
+			$today: String!,
+			$monthStart: String!,
+			$databaseId: String
+		) {
 			viewer {
-				accounts(filter: { accountTag: "${config.accountId}" }) {
+				accounts(filter: { accountTag: $accountId }) {
 					workersInvocationsAdaptive(
-						filter: { scriptName: "${config.workerName}", date_geq: "${today}", date_leq: "${today}" }
+						filter: { scriptName: $workerName, date_geq: $today, date_leq: $today }
 						limit: 1
 					) {
 						sum { requests }
 					}
 					r2Storage: r2StorageAdaptiveGroups(
-						filter: { bucketName: "${config.bucketName}", date_geq: "${today}", date_leq: "${today}" }
+						filter: { bucketName: $bucketName, date_geq: $today, date_leq: $today }
 						limit: 1
 					) {
 						max { payloadSize metadataSize }
 					}
 					r2Ops: r2OperationsAdaptiveGroups(
-						filter: { bucketName: "${config.bucketName}", date_geq: "${monthStart}", date_leq: "${today}" }
+						filter: { bucketName: $bucketName, date_geq: $monthStart, date_leq: $today }
 						limit: 100
 						orderBy: [sum_requests_DESC]
 					) {
@@ -81,7 +89,17 @@ export class CloudflareUsageService {
 				'Authorization': `Bearer ${token}`,
 				'Content-Type': 'application/json',
 			},
-			body: JSON.stringify({ query }),
+			body: JSON.stringify({
+				query,
+				variables: {
+					accountId: config.accountId,
+					workerName: config.workerName,
+					bucketName: config.bucketName,
+					today,
+					monthStart,
+					databaseId: config.databaseId || null,
+				},
+			}),
 		});
 
 		const gqlData = gqlResponse.json as {

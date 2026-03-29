@@ -1,4 +1,5 @@
 import { sendToAllSubscriptions } from './push';
+import { parseJsonObject, parseOptionalString, parseNonNegativeInteger } from './utils';
 
 interface ReminderData {
 	reminderId: string;
@@ -18,9 +19,30 @@ export class ReminderAlarm implements DurableObject {
 		const method = request.method;
 
 		if (method === 'PUT') {
-			const body = await request.json() as ReminderData;
+			const parsedBody = await parseJsonObject(request);
+			if (!parsedBody.ok) {
+				return parsedBody.response;
+			}
+
+			const reminderId = parseOptionalString(parsedBody.value.reminderId, 256);
+			const content = parseOptionalString(parsedBody.value.content, 1024);
+			const dueDatetime = parseOptionalString(parsedBody.value.dueDatetime, 128);
+			const project = parsedBody.value.project === undefined
+				? undefined
+				: parseOptionalString(parsedBody.value.project, 256) || undefined;
+			const priority = parsedBody.value.priority === undefined
+				? undefined
+				: parseNonNegativeInteger(parsedBody.value.priority) ?? undefined;
+			if (!reminderId || !content || !dueDatetime) {
+				return new Response(JSON.stringify({ error: 'Invalid reminder payload' }), { status: 400 });
+			}
+
+			const body: ReminderData = { reminderId, content, dueDatetime, project, priority };
 			await this.state.storage.put('reminder', body);
 			const alarmTime = new Date(body.dueDatetime);
+			if (Number.isNaN(alarmTime.getTime())) {
+				return new Response(JSON.stringify({ error: 'Invalid dueDatetime' }), { status: 400 });
+			}
 			await this.state.storage.setAlarm(alarmTime);
 			return new Response(JSON.stringify({ success: true }));
 		}

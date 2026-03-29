@@ -648,7 +648,7 @@ async function emptyBucketWithPurgeWorker(
 	credentials: CloudflareCredentials,
 	bucketName: string
 ): Promise<PurgeResult> {
-	const tempWorkerName = `crate-purge-${Math.random().toString(36).slice(2, 8)}`;
+	const tempWorkerName = generateWorkerName('crate-purge');
 	const authToken = generateAuthToken();
 
 	const deployment = await deployWorker(credentials, tempWorkerName, PURGE_WORKER_SCRIPT, {

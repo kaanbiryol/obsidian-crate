@@ -2,6 +2,7 @@ import { corsHeaders, corsResponse } from './cors';
 import { initDb, queryRows } from './db';
 import { getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
 import { PWA_HTML, SERVICE_WORKER_JS, MANIFEST_JSON, ICON_SVG, OPEN_OBSIDIAN_HTML } from './pwa';
+import { parseJsonObject, parseOptionalString } from './utils';
 
 export function handleNotificationsPage(url: URL): Response {
 	return new Response(PWA_HTML, {
@@ -55,22 +56,41 @@ export async function handleVapidPublicKey(db: D1Database | null): Promise<Respo
 
 export async function handleSubscribe(request: Request, db: D1Database): Promise<Response> {
 	await initDb(db);
-	const body = await request.json() as {
-		endpoint?: string;
-		keys?: { p256dh?: string; auth?: string };
-		deviceName?: string;
-	};
+	const parsedBody = await parseJsonObject(request);
+	if (!parsedBody.ok) {
+		return parsedBody.response;
+	}
 
-	if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
+	const endpoint = parseOptionalString(parsedBody.value.endpoint, 2048);
+	const keys = parsedBody.value.keys;
+	const p256dh = keys && typeof keys === 'object' ? parseOptionalString((keys as Record<string, unknown>).p256dh, 512) : null;
+	const auth = keys && typeof keys === 'object' ? parseOptionalString((keys as Record<string, unknown>).auth, 512) : null;
+	const deviceName = parsedBody.value.deviceName === undefined
+		? null
+		: parseOptionalString(parsedBody.value.deviceName, 128);
+
+	if (!endpoint || !p256dh || !auth) {
 		return corsResponse({ error: 'endpoint and keys (p256dh, auth) required' }, 400);
+	}
+	if (parsedBody.value.deviceName !== undefined && deviceName === null) {
+		return corsResponse({ error: 'Invalid deviceName' }, 400);
+	}
+
+	try {
+		const url = new URL(endpoint);
+		if (url.protocol !== 'https:') {
+			return corsResponse({ error: 'Invalid endpoint' }, 400);
+		}
+	} catch {
+		return corsResponse({ error: 'Invalid endpoint' }, 400);
 	}
 
 	const id = crypto.randomUUID();
 	await db.batch([
-		db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(body.endpoint),
+		db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint),
 		db.prepare(
 			'INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name) VALUES (?, ?, ?, ?, ?)'
-		).bind(id, body.endpoint, body.keys.p256dh, body.keys.auth, body.deviceName || null),
+		).bind(id, endpoint, p256dh, auth, deviceName),
 	]);
 
 	return corsResponse({ id });
@@ -78,10 +98,15 @@ export async function handleSubscribe(request: Request, db: D1Database): Promise
 
 export async function handleUnsubscribe(request: Request, db: D1Database): Promise<Response> {
 	await initDb(db);
-	const body = await request.json() as { id?: string };
-	if (!body.id) return corsResponse({ error: 'id required' }, 400);
+	const parsedBody = await parseJsonObject(request);
+	if (!parsedBody.ok) {
+		return parsedBody.response;
+	}
 
-	await db.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(body.id).run();
+	const id = parseOptionalString(parsedBody.value.id, 128);
+	if (!id) return corsResponse({ error: 'id required' }, 400);
+
+	await db.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(id).run();
 	return corsResponse({ success: true });
 }
 

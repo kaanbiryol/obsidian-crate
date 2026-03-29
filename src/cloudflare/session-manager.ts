@@ -20,7 +20,10 @@ export class CloudflareSessionManager {
 	) {}
 
 	hasCredentials(): boolean {
-		return this.settings.cloudflareAccountId.length > 0 && this.secretStorage.has(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
+		return this.settings.cloudflareAccountId.length > 0 && (
+			this.secretStorage.has(SECRET_KEYS.CLOUDFLARE_API_TOKEN) ||
+			this.secretStorage.has(SECRET_KEYS.CLOUDFLARE_REFRESH_TOKEN)
+		);
 	}
 
 	getCredentials(): CloudflareCredentials | null {
@@ -37,12 +40,12 @@ export class CloudflareSessionManager {
 		let apiToken = (this.secretStorage.get(SECRET_KEYS.CLOUDFLARE_API_TOKEN) || '').trim();
 		const refreshToken = (this.secretStorage.get(SECRET_KEYS.CLOUDFLARE_REFRESH_TOKEN) || '').trim();
 
-		if (!accountId || !apiToken) {
+		if (!accountId) {
 			return null;
 		}
 
 		const expiresAt = this.settings.cloudflareTokenExpiresAt;
-		const shouldRefresh = !!refreshToken && !!expiresAt && Date.now() > expiresAt - 60_000;
+		const shouldRefresh = !!refreshToken && (!apiToken || (!!expiresAt && Date.now() > expiresAt - 60_000));
 		if (shouldRefresh) {
 			const refreshed = await refreshAccessToken(refreshToken);
 			apiToken = refreshed.accessToken;
@@ -50,6 +53,10 @@ export class CloudflareSessionManager {
 				refreshToken: refreshed.refreshToken || refreshToken,
 				expiresAt: refreshed.expiresAt ?? null,
 			});
+		}
+
+		if (!apiToken) {
+			return null;
 		}
 
 		return { accountId, apiToken };

@@ -127,7 +127,18 @@ async function cfRequest<T>(
 }
 
 function randomBoundary(): string {
-	return `----crate-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+	return `----crate-${randomBase36(12)}-${Date.now()}`;
+}
+
+function randomBase36(length: number): string {
+	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+	const bytes = new Uint8Array(length);
+	crypto.getRandomValues(bytes);
+	let result = '';
+	for (const value of bytes) {
+		result += chars[value % chars.length];
+	}
+	return result;
 }
 
 function createMultipartBody(parts: Array<{
@@ -462,11 +473,9 @@ export function generateAuthToken(): string {
 }
 
 export function generateBucketName(prefix: string = 'crate'): string {
-	const randomSuffix = Math.random().toString(36).substring(2, 10);
-	return `${prefix}-${randomSuffix}`;
+	return `${prefix}-${randomBase36(8)}`;
 }
 
 export function generateWorkerName(prefix: string = 'crate-sync'): string {
-	const randomSuffix = Math.random().toString(36).substring(2, 8);
-	return `${prefix}-${randomSuffix}`;
+	return `${prefix}-${randomBase36(6)}`;
 }
