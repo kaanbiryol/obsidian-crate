@@ -8,6 +8,8 @@ export function handleNotificationsPage(url: URL): Response {
 	return new Response(PWA_HTML, {
 		headers: {
 			'Content-Type': 'text/html; charset=utf-8',
+			'Cache-Control': 'no-store',
+			'Referrer-Policy': 'no-referrer',
 			...corsHeaders(),
 		},
 	});

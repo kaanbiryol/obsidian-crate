@@ -6,6 +6,7 @@ export const PWA_HTML = `<!DOCTYPE html>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#7c3aed">
+<meta name="referrer" content="no-referrer">
 <link rel="manifest" href="/notifications/manifest.json">
 <title>Crate Notifications</title>
 <style>
@@ -59,9 +60,15 @@ To receive notifications on iOS, tap <strong>Share</strong> (box with arrow) the
 	// Save auth token from URL param or hash. On iOS the PWA has separate storage
 	// from Safari, so we use a query param (preserved when adding to home screen).
 	const params = new URLSearchParams(location.search);
-	const tokenFromUrl = params.get('token') || location.hash.slice(1);
+	const tokenFromQuery = params.get('token');
+	const tokenFromHash = location.hash.slice(1);
+	const tokenFromUrl = tokenFromQuery || tokenFromHash;
 	if (tokenFromUrl) {
 		localStorage.setItem('crate-push-token', tokenFromUrl);
+		const shouldPreserveQueryForIOSInstall = Boolean(tokenFromQuery && isIOS && !isStandalone);
+		if (!shouldPreserveQueryForIOSInstall) {
+			history.replaceState(null, '', location.pathname);
+		}
 	}
 	const token = localStorage.getItem('crate-push-token');
 

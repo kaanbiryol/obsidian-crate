@@ -170,6 +170,11 @@ export class SyncRuntime {
 	}
 
 	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput): Promise<void> {
+		const authToken = config.authToken.trim();
+		if (!authToken) {
+			throw new Error('Auth token is required');
+		}
+
 		this.settings.workerUrl = requireNormalizedWorkerUrl(config.workerUrl);
 		this.settings.workerName = config.workerName.trim();
 		this.settings.bucketName = config.bucketName.trim();
@@ -177,7 +182,7 @@ export class SyncRuntime {
 		if (config.accountId !== undefined) {
 			this.settings.cloudflareAccountId = config.accountId.trim();
 		}
-		this.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, config.authToken.trim());
+		this.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, authToken);
 		await this.deleteManifestFile();
 		this.settings.lastSeq = 0;
 		await this.persistSettings();

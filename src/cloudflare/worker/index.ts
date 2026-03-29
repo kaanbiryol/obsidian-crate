@@ -20,6 +20,10 @@ import type { Env } from './types';
 
 export { ReminderAlarm } from './reminder-alarm';
 
+function requireDatabase(db: D1Database | null): Response | null {
+	return db ? null : corsResponse({ error: 'Database not available' }, 503);
+}
+
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		if (request.method === 'OPTIONS') {
@@ -64,9 +68,18 @@ export default {
 		try {
 			// Sync routes
 			if (path === '/health' && method === 'GET') return await handleHealth();
-			if (path === '/sync/check' && method === 'GET') return await handleCheckChanges(request, db!);
-			if (path === '/sync/changes' && method === 'GET') return await handleGetChanges(request, db!);
-			if (path === '/sync/manifest' && method === 'GET') return await handleGetManifest(request, db!);
+			if (path === '/sync/check' && method === 'GET') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleCheckChanges(request, db);
+			}
+			if (path === '/sync/changes' && method === 'GET') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleGetChanges(request, db);
+			}
+			if (path === '/sync/manifest' && method === 'GET') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleGetManifest(request, db);
+			}
 			if (path === '/sync/upload' && method === 'PUT') return await handleUpload(request, bucket, db);
 			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket);
 			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
@@ -76,10 +89,15 @@ export default {
 			if (path === '/sync/config' && method === 'GET') return await handleGetConfig(env);
 
 			// Auth token routes
-			if (db) {
-				if (path === '/auth/tokens' && method === 'POST') return await handleRegisterToken(request, db);
-				if (path === '/auth/tokens' && method === 'DELETE') return await handleRevokeToken(request, db);
-				if (path === '/auth/tokens' && method === 'GET') return await handleListTokens(db);
+			if (path === '/auth/tokens' && (method === 'POST' || method === 'DELETE' || method === 'GET')) {
+				const dbResponse = requireDatabase(db);
+				if (dbResponse) {
+					return dbResponse;
+				}
+
+				if (method === 'POST') return await handleRegisterToken(request, db);
+				if (method === 'DELETE') return await handleRevokeToken(request, db);
+				return await handleListTokens(db);
 			}
 
 			// Settings routes
@@ -89,18 +107,34 @@ export default {
 			// Reminder routes
 			if (path === '/reminders/schedule' && method === 'POST') return await handleScheduleReminder(request, env);
 			if (path === '/reminders/cancel' && method === 'DELETE') return await handleCancelReminder(request, env);
-			if (path === '/reminders/scheduled' && method === 'GET') return await handleListScheduled(db!);
+			if (path === '/reminders/scheduled' && method === 'GET') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleListScheduled(db);
+			}
 
 			// Push subscription routes (authenticated)
-			if (path === '/notifications/subscribe' && method === 'POST') return await handleSubscribe(request, db!);
-			if (path === '/notifications/subscribe' && method === 'DELETE') return await handleUnsubscribe(request, db!);
-			if (path === '/notifications/subscriptions' && method === 'GET') return await handleListSubscriptions(db!);
-			if (path === '/notifications/test' && method === 'POST') return await handleTestPush(db!);
+			if (path === '/notifications/subscribe' && (method === 'POST' || method === 'DELETE')) {
+				const dbResponse = requireDatabase(db);
+				if (dbResponse) {
+					return dbResponse;
+				}
+
+				return method === 'POST'
+					? await handleSubscribe(request, db)
+					: await handleUnsubscribe(request, db);
+			}
+			if (path === '/notifications/subscriptions' && method === 'GET') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleListSubscriptions(db);
+			}
+			if (path === '/notifications/test' && method === 'POST') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleTestPush(db);
+			}
 
 			return corsResponse({ error: 'Not found' }, 404);
-		} catch (err: unknown) {
-			const message = err instanceof Error ? err.message : 'Internal server error';
-			return corsResponse({ error: message }, 500);
+		} catch {
+			return corsResponse({ error: 'Internal server error' }, 500);
 		}
 	},
 };

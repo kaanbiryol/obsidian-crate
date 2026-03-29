@@ -28,35 +28,12 @@ import {
 	registerVaultSyncEventHandlers,
 } from '../sync/plugin-integration';
 import { SyncRuntime } from '../sync/runtime';
-import { normalizeWorkerUrl } from '../sync/worker-url';
 import { CrateSettingTab } from '../ui/settings-tab';
 import { createLogger } from './logger';
 import { SecretStorageService } from './secret-storage';
-import { DEFAULT_SETTINGS, type CrateSettings } from './settings';
+import { normalizeCrateSettings, type CrateSettings } from './settings';
 
 const logger = createLogger('Plugin');
-
-function ensureStringArray(value: unknown, fallback: string[]): string[] {
-	if (!Array.isArray(value)) {
-		return [...fallback];
-	}
-
-	return value.filter((item): item is string => typeof item === 'string');
-}
-
-function ensureConfigDirWorkspaceIgnorePattern(ignorePatterns: string[], configDir: string): string[] {
-	const normalizedConfigDir = configDir.replace(/^\/+|\/+$/g, '');
-	if (!normalizedConfigDir) {
-		return ignorePatterns;
-	}
-
-	const workspacePattern = `${normalizedConfigDir}/workspace*`;
-	if (ignorePatterns.includes(workspacePattern)) {
-		return ignorePatterns;
-	}
-
-	return [...ignorePatterns, workspacePattern];
-}
 
 export default class CratePlugin extends Plugin {
 	settings!: CrateSettings;
@@ -127,17 +104,11 @@ export default class CratePlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		const data = await this.loadData() as Partial<CrateSettings> | null;
-		const merged = Object.assign({}, DEFAULT_SETTINGS, data);
-		merged.workerUrl = normalizeWorkerUrl(typeof merged.workerUrl === 'string' ? merged.workerUrl : '');
-		merged.deviceId = typeof merged.deviceId === 'string' ? merged.deviceId.trim() : '';
-		merged.ignorePatterns = ensureConfigDirWorkspaceIgnorePattern(
-			ensureStringArray(merged.ignorePatterns, DEFAULT_SETTINGS.ignorePatterns),
-			this.app.vault.configDir,
-		);
-		this.settings = merged;
+		this.settings = normalizeCrateSettings(data, this.app.vault.configDir);
 	}
 
 	async saveSettings(): Promise<void> {
+		this.settings = normalizeCrateSettings(this.settings, this.app.vault.configDir);
 		await this.saveData(this.settings);
 	}
 

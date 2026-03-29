@@ -35,7 +35,7 @@ export async function handleScheduleReminder(request: Request, env: Env): Promis
 	}
 
 	const db = env.DB;
-	if (!db) return corsResponse({ error: 'Database not available' }, 404);
+	if (!db) return corsResponse({ error: 'Database not available' }, 503);
 
 	await initDb(db);
 
@@ -57,10 +57,10 @@ export async function handleScheduleReminder(request: Request, env: Env): Promis
 		return corsResponse({ error: 'Failed to schedule alarm' }, 500);
 	}
 
-	// Track in D1 for reconciliation (ntfy_topic kept for backward compat with old schema)
+	// Track in D1 for reconciliation.
 	await db.prepare(
-		'INSERT OR REPLACE INTO scheduled_reminders (reminder_id, content, project, due_datetime, ntfy_topic) VALUES (?, ?, ?, ?, ?)'
-	).bind(reminderId, content, project, dueDatetime, '').run();
+		'INSERT OR REPLACE INTO scheduled_reminders (reminder_id, content, project, due_datetime) VALUES (?, ?, ?, ?)'
+	).bind(reminderId, content, project, dueDatetime).run();
 
 	return corsResponse({ success: true });
 }
@@ -78,7 +78,7 @@ export async function handleCancelReminder(request: Request, env: Env): Promise<
 	}
 
 	const db = env.DB;
-	if (!db) return corsResponse({ error: 'Database not available' }, 404);
+	if (!db) return corsResponse({ error: 'Database not available' }, 503);
 
 	await initDb(db);
 

@@ -234,7 +234,6 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	lastSeq: 0,
 	deviceId: '',
 	ignorePatterns: [
-		'.obsidian/workspace*',
 		'.git/',
 		'.trash/',
 		'*.tmp',

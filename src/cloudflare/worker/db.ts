@@ -1,7 +1,10 @@
-let dbReady = false;
+const initializedDatabases = new WeakSet<D1Database>();
 
 export async function initDb(db: D1Database): Promise<void> {
-	if (dbReady) return;
+	if (initializedDatabases.has(db)) {
+		return;
+	}
+
 	await db.prepare(`CREATE TABLE IF NOT EXISTS changelog (
 		seq INTEGER PRIMARY KEY AUTOINCREMENT,
 		path TEXT NOT NULL,
@@ -43,7 +46,7 @@ export async function initDb(db: D1Database): Promise<void> {
 		device_name TEXT,
 		created_at TEXT NOT NULL DEFAULT (datetime('now'))
 	)`).run();
-	dbReady = true;
+	initializedDatabases.add(db);
 }
 
 const CHANGELOG_RETENTION_DAYS = 30;

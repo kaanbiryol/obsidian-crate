@@ -5,6 +5,11 @@ import { createLogger } from '../utils/logger';
 
 const log = createLogger('ReminderNotificationService');
 
+interface NotificationMutationResult {
+	success: boolean;
+	error?: string;
+}
+
 export class ReminderNotificationService {
 	constructor(
 		private getSettings: () => CrateSettings,
@@ -17,12 +22,34 @@ export class ReminderNotificationService {
 		return !!(settings.pushEnabled && api);
 	}
 
+	private getSchedulableDueDate(dueDatetime: string | null | undefined): Date | null {
+		if (!dueDatetime) {
+			return null;
+		}
+
+		const dueDate = new Date(dueDatetime);
+		if (Number.isNaN(dueDate.getTime()) || dueDate <= new Date()) {
+			return null;
+		}
+
+		return dueDate;
+	}
+
+	private ensureOperationSucceeded(
+		result: NotificationMutationResult,
+		action: 'schedule' | 'cancel',
+		reminderId: string,
+	): void {
+		if (result.success) {
+			return;
+		}
+
+		throw new Error(result.error ?? `Failed to ${action} reminder ${reminderId}`);
+	}
+
 	async onReminderCreated(reminder: Reminder): Promise<void> {
 		if (!this.isAvailable()) return;
-		if (!reminder.dueDatetime || reminder.completed) return;
-
-		const dueDate = new Date(reminder.dueDatetime);
-		if (dueDate <= new Date()) return;
+		if (reminder.completed || !this.getSchedulableDueDate(reminder.dueDatetime)) return;
 
 		await this.schedule(reminder);
 	}
@@ -30,13 +57,7 @@ export class ReminderNotificationService {
 	async onReminderUpdated(reminder: Reminder): Promise<void> {
 		if (!this.isAvailable()) return;
 
-		if (reminder.completed || !reminder.dueDatetime) {
-			await this.cancel(reminder.id);
-			return;
-		}
-
-		const dueDate = new Date(reminder.dueDatetime);
-		if (dueDate <= new Date()) {
+		if (reminder.completed || !this.getSchedulableDueDate(reminder.dueDatetime)) {
 			await this.cancel(reminder.id);
 			return;
 		}
@@ -81,12 +102,11 @@ export class ReminderNotificationService {
 			const { scheduled } = await api.getScheduledReminders();
 			const scheduledIds = new Set(scheduled.map(s => s.reminder_id));
 
-			const now = new Date();
 			const shouldBeScheduled = reminders.filter(
-				r => !r.completed && r.dueDatetime && new Date(r.dueDatetime) > now,
+				r => !r.completed && this.getSchedulableDueDate(r.dueDatetime) !== null,
 			);
 			const shouldBeScheduledIds = new Set(shouldBeScheduled.map(r => r.id));
-			const operations: Promise<{ success: boolean }>[] = [];
+			const operations: Array<Promise<NotificationMutationResult>> = [];
 
 			for (const s of scheduled) {
 				if (!shouldBeScheduledIds.has(s.reminder_id)) {
@@ -110,27 +130,32 @@ export class ReminderNotificationService {
 		}
 	}
 
-	private async schedule(reminder: Reminder): Promise<{ success: boolean }> {
+	private async schedule(reminder: Reminder): Promise<NotificationMutationResult> {
 		const api = this.getApiClient();
 		if (!api) {
 			throw new Error('Reminder notifications are unavailable');
 		}
 
-		return api.scheduleReminder({
+		const result = await api.scheduleReminder({
 			reminderId: reminder.id,
 			content: reminder.content,
 			project: reminder.project,
 			dueDatetime: reminder.dueDatetime!,
 			priority: reminder.priority,
 		});
+
+		this.ensureOperationSucceeded(result, 'schedule', reminder.id);
+		return result;
 	}
 
-	private async cancel(reminderId: string): Promise<{ success: boolean }> {
+	private async cancel(reminderId: string): Promise<NotificationMutationResult> {
 		const api = this.getApiClient();
 		if (!api) {
 			throw new Error('Reminder notifications are unavailable');
 		}
 
-		return api.cancelReminder(reminderId);
+		const result = await api.cancelReminder(reminderId);
+		this.ensureOperationSucceeded(result, 'cancel', reminderId);
+		return result;
 	}
 }

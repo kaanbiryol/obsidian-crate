@@ -12,8 +12,12 @@ export default tseslint.config(
 			parserOptions: {
 				projectService: {
 					allowDefaultProject: [
-						'eslint.config.js',
-						'manifest.json'
+						'eslint.config.mts',
+						'manifest.json',
+						'postcss.config.js',
+						'tailwind.config.js',
+						'tailwind.theme.js',
+						'vitest.config.ts',
 					]
 				},
 				tsconfigRootDir: import.meta.dirname,

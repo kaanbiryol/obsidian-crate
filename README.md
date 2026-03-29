@@ -27,7 +27,12 @@ Use the plugin settings UI to set up Cloudflare infrastructure (R2 bucket, D1 da
 npm run build
 ```
 
-This runs TypeScript type checking followed by an esbuild bundle, producing `main.js`.
+This runs the worker bundle step, TypeScript checks, and the Vite build.
+
+Build artifacts are written to `dist/`:
+
+- `dist/main.js`
+- `dist/styles.css`
 
 ### Install plugin to your vault
 
@@ -36,7 +41,7 @@ export OBSIDIAN_VAULT="/path/to/your/vault"
 npm run deploy
 ```
 
-This builds the plugin and copies `main.js`, `manifest.json`, and `styles.css` into your vault's plugin directory.
+This builds the plugin and copies `dist/main.js`, `manifest.json`, and `dist/styles.css` into your vault's plugin directory.
 
 ### Watch mode
 
@@ -44,3 +49,16 @@ This builds the plugin and copies `main.js`, `manifest.json`, and `styles.css` i
 npm run dev
 ```
 
+### Run tests
+
+```bash
+npm test
+```
+
+### Run lint
+
+```bash
+npm run lint
+```
+
+Note: the repository currently contains broader lint debt outside the most critical sync/worker paths. Use tests and production builds as the primary verification gates for functional changes.

@@ -25,6 +25,9 @@ export class SecretStorageService {
 	private secretStorage: SecretStorage;
 
 	constructor(app: App) {
+		if (!app.secretStorage) {
+			throw new Error('Obsidian secret storage is unavailable on this platform or app version');
+		}
 		this.secretStorage = app.secretStorage;
 	}
 
