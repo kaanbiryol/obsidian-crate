@@ -5,11 +5,11 @@ export class FakeStyle {
 
 	setProperty(name: string, value: string): void {
 		this.properties.set(name, value);
-		(this as Record<string, string>)[name] = value;
+		(this as unknown as Record<string, string>)[name] = value;
 	}
 
 	getPropertyValue(name: string): string {
-		return this.properties.get(name) ?? (this as Record<string, string>)[name] ?? '';
+		return this.properties.get(name) ?? (this as unknown as Record<string, string>)[name] ?? '';
 	}
 }
 

@@ -63,7 +63,7 @@ function installDomHelpers(): void {
 	};
 
 	Node.prototype.appendText = function appendText(value: string): void {
-		this.appendChild(this.ownerDocument.createTextNode(value));
+		this.appendChild(this.ownerDocument!.createTextNode(value));
 	};
 
 	Element.prototype.setText = function setText(value: string | DocumentFragment): void {
