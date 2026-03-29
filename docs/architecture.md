@@ -54,7 +54,7 @@
 | `CF_DATABASE_ID` | Plain Text | Database UUID (exposed via `/sync/config`) |
 | `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
 
-Optional: `CF_ANALYTICS_TOKEN` (secret, set up via `crate analytics` CLI command).
+Optional: `CF_ANALYTICS_TOKEN` (secret, set up via plugin settings).
 
 ## Component Ownership
 

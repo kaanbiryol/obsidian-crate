@@ -1,6 +1,6 @@
 # Obsidian Crate
 
-Obsidian plugin that syncs vault files to Cloudflare R2 via a CF Worker, with integrated reminders and push notifications. Includes a CLI (`packages/cli`) for provisioning.
+Obsidian plugin that syncs vault files to Cloudflare R2 via a CF Worker, with integrated reminders and push notifications.
 
 ## Commands
 
@@ -11,7 +11,6 @@ npm test             # vitest run (all tests)
 npx vitest run src/sync/planner.test.ts  # single test file
 npm run lint         # eslint
 npm run deploy       # build + copy to $OBSIDIAN_VAULT plugin dir
-npm run build:cli    # build the CLI package
 ```
 
 ## Module Map
@@ -32,12 +31,11 @@ npm run build:cli    # build the CLI package
 | Styles | `styles/main.scss`, `styles/colors.scss`, `styles/crate.scss` | Tailwind + SCSS pipeline |
 | Cloudflare worker | `cloudflare/worker/` | Worker source (bundled by esbuild into `worker-bundle.gen.ts`) |
 | Cloudflare infra | `cloudflare/api.ts`, `cloudflare/session-manager.ts`, `cloudflare/infrastructure.ts` | CF API, OAuth PKCE, deploy helpers |
-| CLI | `packages/cli/` | Infrastructure provisioning (see `packages/cli/CLAUDE.md`) |
 
 ## Critical Invariants
 
-1. **Worker source** - real TypeScript in `src/cloudflare/worker/`, bundled to `worker-bundle.gen.ts` by `scripts/build-worker.mjs`. Both plugin and CLI import from the generated bundle (no duplication)
-2. **Worker binding 3-place update** - new bindings must be added in plugin `cloudflare/api.ts:deployWorker()`, CLI `cloudflare/api.ts:deployWorker()`, AND both `redeployWorker() keep_bindings` (includes `durable_object_namespace` for `REMINDER_ALARMS`)
+1. **Worker source** - real TypeScript in `src/cloudflare/worker/`, bundled to `worker-bundle.gen.ts` by `scripts/build-worker.mjs`
+2. **Worker binding update** - new bindings must be added in plugin `cloudflare/api.ts:deployWorker()` AND `redeployWorker() keep_bindings` (includes `durable_object_namespace` for `REMINDER_ALARMS`)
 3. **Hidden files require adapter API** - `vault.getFiles()` excludes hidden files; use `file-discovery.ts:getAllVaultFiles()` which also walks via `vault.adapter.list()`
 4. **SecretStorageService empty-string-as-null** - Obsidian has no `deleteSecret`; empty string = deleted
 5. **Batch constants must match worker validation** - `BATCH_MAX_FILES` (50) and `BATCH_MAX_BYTES` (10 MB) in `types.ts` must match limits in worker template
@@ -45,7 +43,7 @@ npm run build:cli    # build the CLI package
 7. **Files >= `BATCH_FILE_SIZE_LIMIT` (1 MB) bypass batch upload** - sent as individual binary PUT requests
 8. **Worker DO class `ReminderAlarm`** - exported from worker template; needs `durable_object_namespace` binding and migration metadata on deploy
 9. **Reminders settings separate** - stored in `reminders-settings.json`, not `data.json`; accessed via `plugin.remindersSettings`
-10. **Build system** - Vite for the plugin, esbuild for the worker bundle and CLI. `npm run build` runs worker bundle first, then tsc + vite
+10. **Build system** - Vite for the plugin, esbuild for the worker bundle. `npm run build` runs worker bundle first, then tsc + vite
 
 ## Testing
 
@@ -61,4 +59,3 @@ npm run build:cli    # build the CLI package
 | `docs/sync-pipeline.md` | Working on sync modes, change detection, batching, constants, conflict resolution |
 | `docs/worker-api.md` | Modifying worker endpoints, D1 schema, request/response formats |
 | `docs/testing.md` | Writing or modifying tests, understanding mock patterns |
-| `packages/cli/CLAUDE.md` | Working on CLI commands, worker bindings checklist |

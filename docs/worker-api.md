@@ -1,6 +1,6 @@
 # Worker API
 
-The worker is deployed via the Cloudflare API (not Wrangler). Source is embedded as a template string in `src/cloudflare/worker-template.ts` (plugin) and `packages/cli/src/worker-template.ts` (CLI). **Both must be kept in sync.**
+The worker is deployed via the Cloudflare API (not Wrangler). Source is embedded as a template string in `src/cloudflare/worker-template.ts`.
 
 ## Authentication
 
@@ -325,6 +325,4 @@ When a client's `since` cursor points to pruned entries, the `cursorExpired` fla
 
 ## Bindings Table
 
-See `docs/architecture.md` for the full bindings table. When adding new bindings, update both:
-1. `packages/cli/src/commands/init.ts` - `deployWorker()` (fresh installs)
-2. `packages/cli/src/cloudflare/api.ts` - `redeployWorker()` `keep_bindings` (code-only redeploys)
+See `docs/architecture.md` for the full bindings table. When adding new bindings, update `src/cloudflare/api.ts` - both `deployWorker()` and `redeployWorker() keep_bindings`.
