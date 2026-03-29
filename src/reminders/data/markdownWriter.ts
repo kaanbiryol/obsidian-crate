@@ -30,6 +30,15 @@ export interface SyncResult {
 
 const log = createLogger('MarkdownWriter');
 
+function isTFileLike(value: unknown): value is TFile {
+  return typeof value === "object"
+    && value !== null
+    && "path" in value
+    && typeof value.path === "string"
+    && "extension" in value
+    && typeof value.extension === "string";
+}
+
 /**
  * Callback for sync and notification orchestration.
  */
@@ -129,8 +138,8 @@ export function createMarkdownWriter(
    */
   async function getFile(filePath: string): Promise<TFile | null> {
     const abstractFile = app.vault.getAbstractFileByPath(filePath);
-    if (abstractFile && "extension" in abstractFile) {
-      return abstractFile as TFile;
+    if (isTFileLike(abstractFile)) {
+      return abstractFile;
     }
     return null;
   }

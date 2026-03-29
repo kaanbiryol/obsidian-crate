@@ -1,8 +1,9 @@
 import React, { memo } from 'react';
+import { isPast } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Clock, Flag, Check, Hash, Repeat } from 'lucide-react';
 import { getProjectColor } from '../utils/projectColors';
-import { formatDueDate, isReminderOverdue } from '../utils/dateFormatting';
+import { formatDueDate } from '../utils/dateFormatting';
 import type { AnimationConfig } from '../types/componentAdapter';
 import type { RecurrenceRule } from '../types/reminder';
 
@@ -41,16 +42,11 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     hideProject = false
 }) => {
     const dueDate = reminder.dueDatetime || reminder.dueDate;
-    const isOverdue = isReminderOverdue(reminder as any);
+    const isOverdue = Boolean(dueDate && !reminder.completed && isPast(new Date(dueDate)));
     const isImportant = reminder.priority === 1;
 
     // Get project color for accent (using dark theme colors for premium UI)
     const projectColors = reminder.project ? getProjectColor(reminder.project) : null;
-    const accentColor = isImportant
-        ? '#ef4444'
-        : projectColors
-            ? projectColors.dark.accent
-            : 'var(--interactive-accent)';
     const projectAccentRgb = projectColors?.dark.accentRgb;
 
     // Check if we have metadata pills to display
@@ -138,7 +134,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                                     ) : (
                                         <Clock size={12} strokeWidth={2} />
                                     )}
-                                    <span>{formatDueDate(dueDate!)}</span>
+                                    <span>{dueDate ? formatDueDate(dueDate) : null}</span>
                                 </span>
                             )}
 

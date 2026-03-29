@@ -28,7 +28,7 @@ export class CloudflareUsageService {
 
 	private async queryAnalytics(token: string, config: WorkerConfig): Promise<UsageResponse> {
 		const now = new Date();
-		const today = now.toISOString().split('T')[0]!;
+		const today = now.toISOString().slice(0, 10);
 		const monthStart = today.substring(0, 8) + '01';
 
 		const hasDatabase = Boolean(config.databaseId);
@@ -118,7 +118,8 @@ export class CloudflareUsageService {
 		};
 
 		if (gqlData.errors && gqlData.errors.length > 0) {
-			return { available: true, error: gqlData.errors[0]!.message };
+			const firstError = gqlData.errors[0];
+			return { available: true, error: firstError?.message ?? 'Analytics query failed' };
 		}
 
 		const account = gqlData.data?.viewer?.accounts?.[0];

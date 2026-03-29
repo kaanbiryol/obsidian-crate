@@ -1,5 +1,9 @@
 import * as chrono from 'chrono-node';
 import type { Priority, RecurrenceRule, RecurrenceFrequency } from '../types/reminder';
+import {
+  findStandalonePriorityMarkerIndexes,
+  removeStandalonePriorityMarkers,
+} from './priorityMarker';
 
 export interface ParsedReminder {
   cleanContent: string;
@@ -111,12 +115,11 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
   // Matches: " !" at word boundary (space before, followed by space or end)
   // Also matches: "!" as the entire content (standalone after other parts removed)
   // Does NOT match: "!" without space before when part of text (e.g., "hello!" is not important)
-  const importantMatch = taskContent.match(/(?<=\s)!(?=\s|$)|^!(?=\s)|^!$/);
-  if (importantMatch) {
+  const priorityMarkerIndexes = findStandalonePriorityMarkerIndexes(taskContent);
+  if (priorityMarkerIndexes.length > 0) {
     priority = 1;
     priorityPart = '!';
-    // Remove all standalone ! markers (with space before, or standalone)
-    taskContent = taskContent.replace(/(?<=\s)!(?=\s|$)|^!(?=\s)|^!$/g, '').trim();
+    taskContent = removeStandalonePriorityMarkers(taskContent).trim();
   }
 
   // Extract project tag: #projectname (single word/identifier)
@@ -155,7 +158,7 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
   // Fallback: Support nested tags with / (e.g., #Project/Reminders, #work/meetings)
   // Only if no project was matched from knownProjects
   if (!project) {
-    const projectMatch = contentWithoutLinks.match(/#([a-zA-Z][a-zA-Z0-9_\-\/]*)/);
+    const projectMatch = contentWithoutLinks.match(/#([a-zA-Z][a-zA-Z0-9_/-]*)/);
     if (projectMatch) {
       project = projectMatch[1].trim();
       // Remove from the content with links intact

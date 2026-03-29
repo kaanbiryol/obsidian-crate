@@ -15,7 +15,7 @@ export class QRModal extends Modal {
 
 		contentEl.createEl('h2', { text: 'Scan to set up' });
 		contentEl.createEl('p', {
-			text: 'Scan this QR code with your other device to configure Crate.',
+			text: 'Scan this code with your other device to finish setup.',
 			cls: 'crate-qr-desc',
 		});
 
@@ -24,7 +24,17 @@ export class QRModal extends Modal {
 		qr.make();
 
 		const wrapper = contentEl.createDiv({ cls: 'crate-qr-wrapper' });
-		wrapper.innerHTML = qr.createSvgTag({ scalable: true });
+		const parsedSvg = new DOMParser().parseFromString(
+			qr.createSvgTag({ scalable: true }),
+			'image/svg+xml',
+		).documentElement;
+
+		if (parsedSvg.tagName.toLowerCase() !== 'svg') {
+			wrapper.setText('Unable to render setup code.');
+			return;
+		}
+
+		wrapper.appendChild(document.importNode(parsedSvg, true));
 	}
 
 	onClose(): void {

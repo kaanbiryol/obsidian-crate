@@ -17,6 +17,7 @@ export default tseslint.config(
 						'postcss.config.js',
 						'tailwind.config.js',
 						'tailwind.theme.js',
+						'vite.config.mts',
 						'vitest.config.ts',
 					]
 				},
@@ -25,7 +26,21 @@ export default tseslint.config(
 			},
 		},
 	},
+	{
+		files: ['scripts/**/*.mjs', 'vite.config.mts', 'vitest.config.ts'],
+		languageOptions: {
+			globals: {
+				...globals.node,
+			},
+		},
+	},
 	...obsidianmd.configs.recommended,
+	{
+		files: ['**/*.{ts,tsx,mts}'],
+		rules: {
+			'no-undef': 'off',
+		},
+	},
 	globalIgnores([
 		"node_modules",
 		"dist",

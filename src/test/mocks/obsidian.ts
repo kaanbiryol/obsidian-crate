@@ -141,11 +141,11 @@ function installDomHelpers(): void {
 	};
 
 	HTMLElement.prototype.show = function show(): void {
-		this.style.display = '';
+		this.setCssProps({ display: '' });
 	};
 
 	HTMLElement.prototype.hide = function hide(): void {
-		this.style.display = 'none';
+		this.setCssProps({ display: 'none' });
 	};
 
 	HTMLElement.prototype.toggle = function toggle(show: boolean): void {
@@ -249,7 +249,7 @@ export class ButtonComponent extends BaseMockComponent {
 
 	onClick(callback: (event: MouseEvent) => unknown): this {
 		this.buttonEl.addEventListener('click', (event) => {
-			void callback(event as MouseEvent);
+			void callback(event);
 		});
 		return this;
 	}
@@ -483,7 +483,7 @@ export class Modal {
 
 	open(): void {
 		document.body.appendChild(this.containerEl);
-		this.onOpen();
+		void this.onOpen();
 	}
 
 	close(): void {

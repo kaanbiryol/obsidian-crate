@@ -1,7 +1,16 @@
 import { corsResponse } from './cors';
 
-const CONTROL_CHARS_REGEX = /[\0-\x1F\x7F]/;
 const SHA256_HEX_REGEX = /^[a-f0-9]{64}$/i;
+
+function containsControlCharacters(value: string): boolean {
+	for (const character of value) {
+		const codePoint = character.codePointAt(0);
+		if (codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f)) {
+			return true;
+		}
+	}
+	return false;
+}
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -11,7 +20,7 @@ export async function parseJsonObject(
 	request: Request,
 ): Promise<{ ok: true; value: Record<string, unknown> } | { ok: false; response: Response }> {
 	try {
-		const parsed = await request.json();
+		const parsed: unknown = await request.json();
 		if (!isRecord(parsed)) {
 			return { ok: false, response: corsResponse({ error: 'JSON object body required' }, 400) };
 		}
@@ -26,7 +35,7 @@ export function sanitizePath(path: string): string | null {
 	if (!path || path !== path.trim() || path.startsWith('/') || path.endsWith('/') || path.includes('\\')) {
 		return null;
 	}
-	if (CONTROL_CHARS_REGEX.test(path)) {
+	if (containsControlCharacters(path)) {
 		return null;
 	}
 
@@ -47,7 +56,7 @@ export function parseOptionalString(value: unknown, maxLength = 4096): string | 
 	}
 
 	const trimmed = value.trim();
-	if (!trimmed || trimmed.length > maxLength || CONTROL_CHARS_REGEX.test(trimmed)) {
+	if (!trimmed || trimmed.length > maxLength || containsControlCharacters(trimmed)) {
 		return null;
 	}
 	return trimmed;

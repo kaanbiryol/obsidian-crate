@@ -1,10 +1,10 @@
 import type React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { sortReminders, getUpcomingReminders, groupRemindersByDate, formatDateHeader, isReminderOverdue, STAGGERED_CARD_ANIMATION } from "@/reminders";
 
 import type { Reminder } from "@/reminders/types/plugin-reminder";
-import { indexedToReminder } from "@/reminders/data/reminderIndex";
+import { indexedToReminder, type IndexedReminder } from "@/reminders/data/reminderIndex";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
@@ -35,6 +35,7 @@ export const RemindersList: React.FC<Props> = ({
 
   // Subscribe to index changes for automatic refresh
   const { refreshToken, triggerRefresh } = useIndexRefresh();
+  const todayPrefix = new Date().toISOString().slice(0, 10);
 
   // State for reminders (needed because getAll is async when showCompleted is true)
   const [rawReminders, setRawReminders] = useState<Reminder[]>([]);
@@ -59,11 +60,10 @@ export const RemindersList: React.FC<Props> = ({
 
           if (showCompletedState) {
             // Also include completed reminders from today
-            const completedToday = plugin.reminderIndex.getCompleted().filter((r: any) => {
+            const completedToday = plugin.reminderIndex.getCompleted().filter((r: IndexedReminder) => {
               const date = r.dueDatetime || r.dueDate;
               if (!date) return false;
-              const today = new Date().toISOString().split("T")[0];
-              return date.startsWith(today);
+              return date.startsWith(todayPrefix);
             });
             indexed = [...indexed, ...completedToday];
           }
@@ -93,8 +93,8 @@ export const RemindersList: React.FC<Props> = ({
       }
       setRawReminders(loaded);
     };
-    loadReminders();
-  }, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken]);
+    void loadReminders();
+  }, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken, todayPrefix]);
 
   const reminders = useMemo(() => {
     let allReminders = [...rawReminders];
@@ -131,7 +131,7 @@ export const RemindersList: React.FC<Props> = ({
   const overdueCount = reminders.filter(r => isReminderOverdue(r)).length;
 
   const handleAdd = () => {
-    openReminderCreationModal(
+    void openReminderCreationModal(
       plugin,
       projectFilter || "Inbox",
       () => {

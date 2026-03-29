@@ -54,7 +54,7 @@ export class ReminderAlarm implements DurableObject {
 		}
 
 		if (method === 'GET') {
-			const reminder = await this.state.storage.get('reminder');
+			const reminder = await this.state.storage.get<ReminderData>('reminder');
 			const alarm = await this.state.storage.getAlarm();
 			return new Response(JSON.stringify({ reminder, alarmTime: alarm }));
 		}

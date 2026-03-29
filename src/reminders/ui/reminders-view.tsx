@@ -6,6 +6,7 @@ import { X, ChevronDown } from "lucide-react";
 import type CratePlugin from "@/main";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
+import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
 import { HeroUIProvider } from "@heroui/react";
 import {
     isReminderOverdue,
@@ -76,8 +77,12 @@ export class RemindersView extends ItemView {
      * Used to determine if we should render in full-screen mode on mobile
      */
     isInMainContent(): boolean {
-        const rightSplit = (this.app.workspace as any).rightSplit;
-        const leftSplit = (this.app.workspace as any).leftSplit;
+        const workspaceWithSplits = this.app.workspace as typeof this.app.workspace & {
+            rightSplit?: { children?: WorkspaceLeaf[] };
+            leftSplit?: { children?: WorkspaceLeaf[] };
+        };
+        const rightSplit = workspaceWithSplits.rightSplit;
+        const leftSplit = workspaceWithSplits.leftSplit;
 
         if (rightSplit?.children?.includes(this.leaf)) return false;
         if (leftSplit?.children?.includes(this.leaf)) return false;
@@ -91,16 +96,14 @@ export class RemindersView extends ItemView {
 
         // CRITICAL: Force height chain to work
         // Obsidian's container is a flex child, so height: 100% will resolve
-        container.style.height = "100%";
-        container.style.overflow = "hidden";
+        container.setCssProps({
+            height: "100%",
+            overflow: "hidden",
+        });
 
         // Create shadow root for CSS isolation from Obsidian's styles
         this.shadowRoot = container.attachShadow({ mode: "open" });
-
-        // Inject styles into shadow DOM
-        const styleSheet = document.createElement("style");
-        styleSheet.textContent = await this.loadStyles();
-        this.shadowRoot.appendChild(styleSheet);
+        await attachPluginStylesheet(this.plugin, this.shadowRoot);
 
         // Create mount point inside shadow DOM
         const mountPoint = document.createElement("div");
@@ -130,13 +133,6 @@ export class RemindersView extends ItemView {
             this.root = null;
         }
         this.shadowRoot = null;
-    }
-
-    /**
-     * Load styles for injection into Shadow DOM
-     */
-    private async loadStyles(): Promise<string> {
-        return await this.plugin.loadStyles();
     }
 }
 
@@ -205,8 +201,8 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     const { refreshToken, triggerRefresh } = useIndexRefresh();
 
     // Get all reminders from storage
-    const updateReminders = useCallback(async () => {
-        const allReminders = await plugin.storage.getAll();
+    const updateReminders = useCallback(() => {
+        const allReminders = plugin.storage.getAll();
         setReminders(allReminders);
         setIsInitialLoadComplete(true);
     }, [plugin]);
@@ -312,7 +308,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     const renderCard = useCallback((reminder: SharedReminder, index: number) => (
         <ReminderCardWrapper
             key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
-            reminder={reminder as Reminder}
+            reminder={reminder}
             onUpdate={triggerRefresh}
             index={index}
             hideProject={viewMode === "browse" && selectedProject !== null}

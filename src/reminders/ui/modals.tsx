@@ -1,239 +1,225 @@
-import { Modal, Platform } from "obsidian";
-import { type Root, createRoot } from "react-dom/client";
-import type { ReactElement } from "react";
 import { HeroUIProvider } from "@heroui/react";
-import { createLogger } from "@/reminders";
-
+import { Modal, Platform } from "obsidian";
+import type { ReactElement } from "react";
+import { type Root, createRoot } from "react-dom/client";
 import type CratePlugin from "@/main";
-
-const log = createLogger('ReminderEditModal');
+import { createLogger } from "@/reminders";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
-import { ModalContext, PluginContext } from "./reminders-context";
 import { ReminderModal } from "./createReminderModal";
+import { ModalContext, PluginContext } from "./reminders-context";
 import { RemindersViewContent } from "./reminders-view";
+import { attachPluginStylesheet } from "./shadowStyles";
+
+const log = createLogger("ReminderEditModal");
 
 /**
- * Base class for reminder modals with common setup logic
+ * Base class for reminder modals with common setup logic.
  */
 abstract class BaseReminderModal extends Modal {
-  protected readonly plugin: CratePlugin;
-  private root: Root | undefined = undefined;
+	protected readonly plugin: CratePlugin;
+	private root: Root | undefined;
 
-  constructor(plugin: CratePlugin) {
-    super(plugin.app);
-    this.plugin = plugin;
-  }
+	constructor(plugin: CratePlugin) {
+		super(plugin.app);
+		this.plugin = plugin;
+	}
 
-  /**
-   * Subclasses must implement this to provide the modal content
-   */
-  protected abstract renderContent(): ReactElement;
+	protected abstract renderContent(): ReactElement;
 
-  onOpen() {
-    const { contentEl } = this;
+	onOpen(): void {
+		const { contentEl } = this;
+		const isMobile = Platform.isMobile;
 
-    // Detect if on mobile
-    const isMobile = Platform.isMobile;
+		this.modalEl.setCssProps({
+			all: "unset",
+			position: "fixed",
+			inset: "0",
+			display: "flex",
+			"align-items": isMobile ? "flex-end" : "center",
+			"justify-content": "center",
+			"pointer-events": "none",
+			"z-index": "9999",
+		});
 
-    // Make Obsidian's modal container transparent and invisible
-    this.modalEl.style.all = 'unset';
-    this.modalEl.style.position = 'fixed';
-    this.modalEl.style.inset = '0';
-    this.modalEl.style.display = 'flex';
-    // On mobile, align to bottom for bottom-sheet; on desktop, center
-    this.modalEl.style.alignItems = isMobile ? 'flex-end' : 'center';
-    this.modalEl.style.justifyContent = 'center';
-    this.modalEl.style.pointerEvents = 'none';
-    this.modalEl.style.zIndex = '9999';
+		const closeButton = this.modalEl.querySelector(".modal-close-button");
+		if (closeButton instanceof HTMLElement) {
+			closeButton.setCssProps({ display: "none" });
+		}
 
-    // Hide Obsidian's native close button (redundant with our custom UI)
-    const closeButton = this.modalEl.querySelector('.modal-close-button') as HTMLElement;
-    if (closeButton) {
-      closeButton.style.display = 'none';
-    }
+		contentEl.setCssProps({
+			all: "unset",
+			"pointer-events": "auto",
+			display: "block",
+			position: "relative",
+			"z-index": "10000",
+		});
 
-    // Make content element a proper container for React portals
-    contentEl.style.all = 'unset';
-    contentEl.style.pointerEvents = 'auto';
-    contentEl.style.display = 'block';
-    contentEl.style.position = 'relative';
-    contentEl.style.zIndex = '10000';
+		const isDarkMode = document.body.classList.contains("theme-dark");
+		const close = () => this.close();
+		const popoverContainerEl = document.body;
 
-    // Detect if Obsidian is in dark mode
-    const isDarkMode = document.body.classList.contains('theme-dark');
+		this.root = createRoot(contentEl);
+		this.root.render(
+			<PluginContext.Provider value={this.plugin}>
+				<HeroUIProvider disableRipple>
+					<div className={isDarkMode ? "dark" : "light"}>
+						<ModalContext.Provider value={{ close, popoverContainerEl, isMobile }}>
+							{this.renderContent()}
+						</ModalContext.Provider>
+					</div>
+				</HeroUIProvider>
+			</PluginContext.Provider>,
+		);
+	}
 
-    const close = () => this.close();
-    // Use document.body as popover container for proper positioning
-    const popoverContainerEl = document.body;
-
-    this.root = createRoot(contentEl);
-    this.root.render(
-      <PluginContext.Provider value={this.plugin}>
-        <HeroUIProvider disableRipple>
-          <div className={isDarkMode ? 'dark' : 'light'}>
-            <ModalContext.Provider value={{ close, popoverContainerEl, isMobile }}>
-              {this.renderContent()}
-            </ModalContext.Provider>
-          </div>
-        </HeroUIProvider>
-      </PluginContext.Provider>,
-    );
-  }
-
-  onClose() {
-    if (this.root) {
-      this.root.unmount();
-    }
-  }
+	onClose(): void {
+		this.root?.unmount();
+	}
 }
 
 class ReminderCreationModal extends BaseReminderModal {
-  private readonly initialProject: string | undefined;
-  private readonly onCreate: ((reminder: any) => void) | undefined;
+	private readonly initialProject: string | undefined;
+	private readonly onCreate: ((reminder: Reminder | null) => void) | undefined;
 
-  constructor(
-    plugin: CratePlugin,
-    initialProject: string | undefined,
-    onCreate?: (reminder: any) => void,
-  ) {
-    super(plugin);
-    this.initialProject = initialProject;
-    this.onCreate = onCreate;
-  }
+	constructor(
+		plugin: CratePlugin,
+		initialProject: string | undefined,
+		onCreate?: (reminder: Reminder | null) => void,
+	) {
+		super(plugin);
+		this.initialProject = initialProject;
+		this.onCreate = onCreate;
+	}
 
-  protected renderContent(): ReactElement {
-    return (
-      <ReminderModal
-        initialProject={this.initialProject}
-        onSave={this.onCreate}
-      />
-    );
-  }
+	protected renderContent(): ReactElement {
+		return (
+			<ReminderModal
+				initialProject={this.initialProject}
+				onSave={this.onCreate}
+			/>
+		);
+	}
 }
 
 class ReminderEditModal extends BaseReminderModal {
-  private readonly reminder: Reminder;
-  private readonly onUpdate: (action: 'saved' | 'deleted', reminder?: Reminder) => void;
+	private readonly reminder: Reminder;
+	private readonly onUpdate: (action: "saved" | "deleted", reminder?: Reminder) => void;
 
-  constructor(
-    plugin: CratePlugin,
-    reminder: Reminder,
-    onUpdate: (action: 'saved' | 'deleted', reminder?: Reminder) => void,
-  ) {
-    super(plugin);
-    this.reminder = reminder;
-    this.onUpdate = onUpdate;
-  }
+	constructor(
+		plugin: CratePlugin,
+		reminder: Reminder,
+		onUpdate: (action: "saved" | "deleted", reminder?: Reminder) => void,
+	) {
+		super(plugin);
+		this.reminder = reminder;
+		this.onUpdate = onUpdate;
+	}
 
-  protected renderContent(): ReactElement {
-    return (
-      <ReminderModal
-        reminder={this.reminder}
-        onSave={(updatedReminder) => {
-          log.info(' onSave called:', updatedReminder?.id);
-          this.onUpdate('saved', updatedReminder);
-        }}
-        onDelete={() => {
-          log.info(' onDelete called for reminder:', this.reminder.id);
-          this.onUpdate('deleted');
-        }}
-      />
-    );
-  }
+	protected renderContent(): ReactElement {
+		return (
+			<ReminderModal
+				reminder={this.reminder}
+				onSave={(updatedReminder: Reminder | null) => {
+					log.info(" onSave called:", updatedReminder?.id);
+					this.onUpdate("saved", updatedReminder ?? undefined);
+				}}
+				onDelete={() => {
+					log.info(" onDelete called for reminder:", this.reminder.id);
+					this.onUpdate("deleted");
+				}}
+			/>
+		);
+	}
 }
 
 export function openReminderCreationModal(
-  plugin: CratePlugin,
-  initialProject?: string,
-  onCreate?: (reminder: any) => void,
-) {
-  new ReminderCreationModal(plugin, initialProject, onCreate).open();
+	plugin: CratePlugin,
+	initialProject?: string,
+	onCreate?: (reminder: Reminder | null) => void,
+): void {
+	new ReminderCreationModal(plugin, initialProject, onCreate).open();
 }
 
 export function openReminderEditModal(
-  plugin: CratePlugin,
-  reminder: Reminder,
-  onUpdate: (action: 'saved' | 'deleted', reminder?: Reminder) => void,
-) {
-  new ReminderEditModal(plugin, reminder, onUpdate).open();
+	plugin: CratePlugin,
+	reminder: Reminder,
+	onUpdate: (action: "saved" | "deleted", reminder?: Reminder) => void,
+): void {
+	new ReminderEditModal(plugin, reminder, onUpdate).open();
 }
 
 /**
- * Full-screen modal that renders RemindersView as an overlay
- * Covers the entire viewport including Obsidian's bottom navigation bar
+ * Full-screen modal that renders RemindersView as an overlay.
+ * Covers the entire viewport including Obsidian's bottom navigation bar.
  */
 class FullScreenReminderModal extends Modal {
-  private readonly plugin: CratePlugin;
-  private readonly initialProject: string | undefined;
-  private root: Root | undefined;
-  private shadowRoot: ShadowRoot | null = null;
+	private readonly plugin: CratePlugin;
+	private readonly initialProject: string | undefined;
+	private root: Root | undefined;
+	private shadowRoot: ShadowRoot | null = null;
 
-  constructor(plugin: CratePlugin, initialProject?: string) {
-    super(plugin.app);
-    this.plugin = plugin;
-    this.initialProject = initialProject;
-  }
+	constructor(plugin: CratePlugin, initialProject?: string) {
+		super(plugin.app);
+		this.plugin = plugin;
+		this.initialProject = initialProject;
+	}
 
-  async onOpen() {
-    const { contentEl } = this;
+	async onOpen(): Promise<void> {
+		const { contentEl } = this;
 
-    // Full-screen takeover - cover everything including Obsidian's nav
-    this.modalEl.style.all = 'unset';
-    this.modalEl.style.position = 'fixed';
-    this.modalEl.style.inset = '0';
-    this.modalEl.style.zIndex = '9999';
-    this.modalEl.style.display = 'flex';
-    this.modalEl.style.flexDirection = 'column';
-    this.modalEl.style.background = 'var(--background-primary)';
+		this.modalEl.setCssProps({
+			all: "unset",
+			position: "fixed",
+			inset: "0",
+			"z-index": "9999",
+			display: "flex",
+			"flex-direction": "column",
+			background: "var(--background-primary)",
+		});
 
-    // Hide Obsidian's close button
-    const closeButton = this.modalEl.querySelector('.modal-close-button') as HTMLElement;
-    if (closeButton) closeButton.style.display = 'none';
+		const closeButton = this.modalEl.querySelector(".modal-close-button");
+		if (closeButton instanceof HTMLElement) {
+			closeButton.setCssProps({ display: "none" });
+		}
 
-    // Content fills the modal
-    contentEl.style.all = 'unset';
-    contentEl.style.flex = '1';
-    contentEl.style.display = 'flex';
-    contentEl.style.flexDirection = 'column';
-    contentEl.style.overflow = 'hidden';
-    contentEl.style.height = '100%';
+		contentEl.setCssProps({
+			all: "unset",
+			flex: "1",
+			display: "flex",
+			"flex-direction": "column",
+			overflow: "hidden",
+			height: "100%",
+		});
 
-    // Create shadow root for CSS isolation
-    this.shadowRoot = contentEl.attachShadow({ mode: 'open' });
+		this.shadowRoot = contentEl.attachShadow({ mode: "open" });
+		await attachPluginStylesheet(this.plugin, this.shadowRoot);
 
-    // Load styles into shadow DOM
-    const styleSheet = document.createElement('style');
-    styleSheet.textContent = await this.plugin.loadStyles();
-    this.shadowRoot.appendChild(styleSheet);
+		const mountPoint = document.createElement("div");
+		mountPoint.className = "reminders-shadow-root";
+		this.shadowRoot.appendChild(mountPoint);
 
-    // Create mount point
-    const mountPoint = document.createElement('div');
-    mountPoint.className = 'reminders-shadow-root';
-    this.shadowRoot.appendChild(mountPoint);
+		const close = () => this.close();
+		this.root = createRoot(mountPoint);
+		this.root.render(
+			<PluginContext.Provider value={this.plugin}>
+				<RemindersViewContent
+					plugin={this.plugin}
+					shadowRoot={this.shadowRoot}
+					isFullScreen={true}
+					onClose={close}
+					initialTab={this.plugin.remindersSettings.fullscreenDefaultTab}
+					initialProject={this.initialProject}
+				/>
+			</PluginContext.Provider>,
+		);
+	}
 
-    // Render React
-    const close = () => this.close();
-    this.root = createRoot(mountPoint);
-    this.root.render(
-      <PluginContext.Provider value={this.plugin}>
-        <RemindersViewContent
-          plugin={this.plugin}
-          shadowRoot={this.shadowRoot}
-          isFullScreen={true}
-          onClose={close}
-          initialTab={this.plugin.remindersSettings.fullscreenDefaultTab}
-          initialProject={this.initialProject}
-        />
-      </PluginContext.Provider>
-    );
-  }
-
-  onClose() {
-    if (this.root) this.root.unmount();
-    this.shadowRoot = null;
-  }
+	onClose(): void {
+		this.root?.unmount();
+		this.shadowRoot = null;
+	}
 }
 
-export function openFullScreenReminderModal(plugin: CratePlugin, initialProject?: string) {
-  new FullScreenReminderModal(plugin, initialProject).open();
+export function openFullScreenReminderModal(plugin: CratePlugin, initialProject?: string): void {
+	new FullScreenReminderModal(plugin, initialProject).open();
 }

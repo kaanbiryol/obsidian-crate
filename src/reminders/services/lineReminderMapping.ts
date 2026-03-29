@@ -19,6 +19,22 @@ interface FileMapping {
   [lineNumber: number]: LineMappingEntry;
 }
 
+function getFileMappingEntries(fileMapping: FileMapping): Array<readonly [number, LineMappingEntry]> {
+  const entries: Array<readonly [number, LineMappingEntry]> = [];
+  for (const key of Object.keys(fileMapping)) {
+    const lineNumber = Number.parseInt(key, 10);
+    const entry = fileMapping[lineNumber];
+    if (!Number.isNaN(lineNumber) && entry !== undefined) {
+      entries.push([lineNumber, entry] as const);
+    }
+  }
+  return entries;
+}
+
+function getFileMappingValues(fileMapping: FileMapping): LineMappingEntry[] {
+  return getFileMappingEntries(fileMapping).map(([, entry]) => entry);
+}
+
 /**
  * Service that tracks which markdown line corresponds to which reminder
  */
@@ -125,9 +141,7 @@ export class LineReminderMappingService {
     const newMapping: FileMapping = {};
     const affectedReminders: Array<{ reminderId: string; newLine: number }> = [];
 
-    for (const [lineNumStr, entry] of Object.entries(fileMapping)) {
-      const lineNum = parseInt(lineNumStr, 10);
-
+    for (const [lineNum, entry] of getFileMappingEntries(fileMapping)) {
       if (lineNum >= fromLine) {
         // Line needs to shift
         const newLineNum = lineNum + delta;
@@ -162,7 +176,7 @@ export class LineReminderMappingService {
     const fileMapping = this.mappings.get(filePath);
     if (fileMapping) {
       // Remove from reverse map
-      for (const entry of Object.values(fileMapping)) {
+      for (const entry of getFileMappingValues(fileMapping)) {
         this.reverseMap.delete(entry.reminderId);
       }
       this.mappings.delete(filePath);
@@ -255,7 +269,7 @@ export class LineReminderMappingService {
     const fileMapping = this.mappings.get(filePath);
     if (!fileMapping) return undefined;
 
-    for (const entry of Object.values(fileMapping)) {
+    for (const entry of getFileMappingValues(fileMapping)) {
       if (entry.contentHash === contentHash) {
         return entry;
       }

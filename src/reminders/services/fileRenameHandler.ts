@@ -1,4 +1,4 @@
-import type { TAbstractFile, TFile } from "obsidian";
+import { TFile, type TAbstractFile } from "obsidian";
 import { createLogger } from "@/reminders";
 import type CratePlugin from "@/main";
 
@@ -23,7 +23,7 @@ export class FileRenameHandler {
   register(): void {
     this.plugin.registerEvent(
       this.plugin.app.vault.on("rename", (file, oldPath) => {
-        this.handleRename(file, oldPath);
+        void this.handleRename(file, oldPath);
       })
     );
 
@@ -63,6 +63,6 @@ export class FileRenameHandler {
    * Check if file is a markdown file
    */
   private isMarkdownFile(file: TAbstractFile): file is TFile {
-    return "extension" in file && (file as TFile).extension === "md";
+    return file instanceof TFile && file.extension === "md";
   }
 }

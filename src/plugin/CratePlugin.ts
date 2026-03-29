@@ -48,7 +48,6 @@ export default class CratePlugin extends Plugin {
 	storage!: StorageCompat;
 	remindersSettings: RemindersSettings = useRemindersSettingsStore.getState();
 	remindersVaultWatcher?: VaultWatcher;
-	private cachedStyles: string | null = null;
 
 	async onload(): Promise<void> {
 		logger.info('Plugin loaded');
@@ -126,18 +125,6 @@ export default class CratePlugin extends Plugin {
 
 	async reinitializeWithFolder(newFolderPath: string): Promise<void> {
 		await reinitializeReminders(this, newFolderPath);
-	}
-
-	async loadStyles(): Promise<string> {
-		if (this.cachedStyles) return this.cachedStyles;
-		try {
-			const stylesPath = `${this.manifest.dir}/styles.css`;
-			this.cachedStyles = await this.app.vault.adapter.read(stylesPath);
-			return this.cachedStyles;
-		} catch (error) {
-			logger.error('Failed to load styles.css:', error);
-			return '';
-		}
 	}
 
 	private async ensureDeviceId(): Promise<void> {

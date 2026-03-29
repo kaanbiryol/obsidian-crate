@@ -75,12 +75,12 @@ export function createLogger(serviceName: string): Logger {
   return {
     debug(...args: unknown[]) {
       if (shouldLog('debug')) {
-        console.log(getPrefix(serviceName), ...args);
+        console.debug(getPrefix(serviceName), ...args);
       }
     },
     info(...args: unknown[]) {
       if (shouldLog('info')) {
-        console.log(getPrefix(serviceName), ...args);
+        console.debug(getPrefix(serviceName), ...args);
       }
     },
     warn(...args: unknown[]) {

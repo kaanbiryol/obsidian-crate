@@ -51,7 +51,7 @@ export default defineConfig({
 					if (assetInfo.name === "index.css" || assetInfo.name === "main.css") {
 						return "styles.css";
 					}
-					return assetInfo.name as string;
+					return assetInfo.name ?? "asset";
 				},
 				inlineDynamicImports: true,
 			},

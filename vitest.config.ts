@@ -1,12 +1,14 @@
 import { defineConfig } from 'vitest/config';
-import path from 'path';
+
+const srcPath = new URL('./src', import.meta.url).pathname;
+const obsidianMockPath = new URL('./src/test/mocks/obsidian.ts', import.meta.url).pathname;
 
 export default defineConfig({
 	resolve: {
 		alias: {
-			'@': path.resolve(__dirname, 'src'),
-			'src': path.resolve(__dirname, 'src'),
-			'obsidian': path.resolve(__dirname, 'src/test/mocks/obsidian.ts'),
+			'@': srcPath,
+			'src': srcPath,
+			'obsidian': obsidianMockPath,
 		},
 	},
 	test: {

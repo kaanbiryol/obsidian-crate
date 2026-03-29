@@ -48,6 +48,7 @@ interface OAuthCallbackServer {
 async function loadCreateServer(): Promise<
 	(handler: (req: OAuthRequest, res: OAuthResponse) => void) => OAuthCallbackServer
 > {
+	// eslint-disable-next-line import/no-nodejs-modules -- Desktop-only OAuth callback listener
 	const httpModule = await import('node:http');
 	return httpModule.createServer as unknown as (handler: (req: OAuthRequest, res: OAuthResponse) => void) => OAuthCallbackServer;
 }
@@ -116,7 +117,12 @@ async function fetchAccountId(accessToken: string): Promise<string> {
 		throw new Error('No Cloudflare accounts found for this user');
 	}
 
-	return data.result[0]!.id;
+	const firstAccount = data.result[0];
+	if (!firstAccount) {
+		throw new Error('No Cloudflare accounts found for this user');
+	}
+
+	return firstAccount.id;
 }
 
 export async function refreshAccessToken(refreshToken: string): Promise<OAuthTokens> {

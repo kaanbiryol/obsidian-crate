@@ -1,4 +1,3 @@
-import { editorViewField } from "obsidian";
 import {
   Decoration,
   DecorationSet,
@@ -12,9 +11,16 @@ import { EditorState, RangeSetBuilder } from "@codemirror/state";
 import { createRoot, Root } from "react-dom/client";
 
 import type CratePlugin from "@/main";
+import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { RemindersList } from "@/reminders/ui/remindersList/RemindersList";
+import { getEditorFile } from "./editorFile";
 import { parseQuery, type ReminderQueryOptions } from "./injector";
+
+type WidgetHost = HTMLDivElement & {
+  crateReactRoot?: Root;
+  crateShadowRoot?: ShadowRoot;
+};
 
 class RemindersBlockWidget extends WidgetType {
   private readonly plugin: CratePlugin;
@@ -74,8 +80,9 @@ class RemindersBlockWidget extends WidgetType {
     this.options = newOptions;
 
     // Re-render React component with new props
-    const root = (dom as any)._reactRoot as Root | undefined;
-    const shadowRoot = (dom as any)._shadowRoot as ShadowRoot | undefined;
+    const host = dom as WidgetHost;
+    const root = host.crateReactRoot;
+    const shadowRoot = host.crateShadowRoot;
     if (root && shadowRoot) {
       // Update dark mode class
       const mountPoint = shadowRoot.querySelector(".reminders-shadow-root") as HTMLElement;
@@ -150,7 +157,7 @@ class RemindersBlockWidget extends WidgetType {
   };
 
   toDOM(): HTMLElement {
-    const container = document.createElement("div");
+    const container = document.createElement("div") as WidgetHost;
     container.className = "reminders-block-widget";
 
     // Create shadow root for CSS isolation
@@ -167,15 +174,9 @@ class RemindersBlockWidget extends WidgetType {
     }
 
     const root: Root = createRoot(mountPoint);
-    (container as any)._reactRoot = root;
-    (container as any)._shadowRoot = shadowRoot;
-
-    // Load styles async and render
-    this.plugin.loadStyles().then((styles: string) => {
-      const styleSheet = document.createElement("style");
-      styleSheet.textContent = styles;
-      shadowRoot.insertBefore(styleSheet, shadowRoot.firstChild);
-    });
+    container.crateReactRoot = root;
+    container.crateShadowRoot = shadowRoot;
+    void attachPluginStylesheet(this.plugin, shadowRoot);
 
     // Render immediately (styles will apply when loaded)
     root.render(
@@ -194,7 +195,7 @@ class RemindersBlockWidget extends WidgetType {
   }
 
   destroy(dom: HTMLElement): void {
-    const root = (dom as any)._reactRoot as Root | undefined;
+    const root = (dom as WidgetHost).crateReactRoot;
     if (root) {
       root.unmount();
     }
@@ -313,14 +314,14 @@ export function createRemindersBlockExtension(plugin: CratePlugin) {
       buildDecorations(view: EditorView): DecorationSet {
         const builder = new RangeSetBuilder<Decoration>();
         const cursorPos = view.state.selection.main.head;
-        const file = view.state.field(editorViewField)?.file;
+        const file = getEditorFile(view.state);
         const filePath = file?.path;
 
         for (const { from, to } of view.visibleRanges) {
           syntaxTree(view.state).iterate({
             from,
             to,
-            enter: (node: any) => {
+            enter: (node) => {
               if (
                 node.name === "HyperMD-codeblock" ||
                 node.name === "FencedCode" ||

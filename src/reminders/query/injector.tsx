@@ -4,6 +4,7 @@ import type React from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import type CratePlugin from "@/main";
+import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { RemindersList } from "@/reminders/ui/remindersList/RemindersList";
 import { hashFileContent } from "@/reminders/utils/hashing";
@@ -170,7 +171,7 @@ function buildQueryPreferenceKey(
   return hashFileContent(keySeed);
 }
 
-class ReactRenderer<T extends {}> extends MarkdownRenderChild {
+class ReactRenderer<T extends object> extends MarkdownRenderChild {
   private readonly plugin: CratePlugin;
   private readonly props: T;
   private readonly component: React.FC<T>;
@@ -189,15 +190,10 @@ class ReactRenderer<T extends {}> extends MarkdownRenderChild {
     this.props = props;
   }
 
-  async onload(): Promise<void> {
+  onload(): void {
     // Create shadow root for CSS isolation
     this.shadowRoot = this.containerEl.attachShadow({ mode: "open" });
-
-    // Load and inject styles
-    const styles = await this.plugin.loadStyles();
-    const styleSheet = document.createElement("style");
-    styleSheet.textContent = styles;
-    this.shadowRoot.appendChild(styleSheet);
+    void attachPluginStylesheet(this.plugin, this.shadowRoot);
 
     // Create mount point
     const mountPoint = document.createElement("div");

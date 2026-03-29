@@ -13,8 +13,8 @@ import { useKeyboardHeight } from "@/reminders/ui/hooks/useKeyboardHeight";
 type ReminderModalProps = {
   initialProject?: string;
   reminder?: Reminder;
-  onSave?: (reminder: any) => void;
-  onDelete?: (reminder: any) => void;
+  onSave?: (reminder: Reminder | null) => void;
+  onDelete?: (reminder: Reminder) => void;
 };
 
 const calculateDefaultDueDate = (setting: DueDateDefaultSetting): string | undefined => {
@@ -83,7 +83,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     }
   };
 
-  const handleSave = async (updatedReminder: any) => {
+  const handleSave = async (updatedReminder: Reminder) => {
     // Close modal immediately
     modal.close();
 
@@ -134,7 +134,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     }
   };
 
-  const handleDelete = async (reminderToDelete: any) => {
+  const handleDelete = async (reminderToDelete: Reminder) => {
     // Shared modal handles confirmation
     modal.close();
 
@@ -183,7 +183,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
       onSave={handleSave}
       onDelete={handleDelete}
       reminder={reminder}
-      projects={projectsList as string[]}
+      projects={projectsList}
       defaultProject={initialProject}
       initialDueDate={defaultDueDate}
       variant={isMobile ? "bottom-sheet" : "centered"}

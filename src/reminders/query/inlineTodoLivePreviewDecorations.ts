@@ -1,4 +1,3 @@
-import { editorViewField, type TFile } from 'obsidian';
 import { RangeSetBuilder } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
 import { Decoration, type DecorationSet, EditorView } from '@codemirror/view';
@@ -9,6 +8,7 @@ import type CratePlugin from '@/main';
 import { isInRemindersFolder } from '@/reminders/data/vaultScanner';
 import type { LineReminderMappingService } from '@/reminders/services/lineReminderMapping';
 import { isCheckboxLine } from '@/reminders/utils/checkboxParser';
+import { getEditorFile } from './editorFile';
 import { InlineChipWidget, isRecurrenceText } from './inlineTodoLivePreviewWidget';
 
 function isInsideCodeBlock(view: EditorView, pos: number): boolean {
@@ -59,7 +59,7 @@ export function buildInlineTodoDecorations(
 ): DecorationSet {
 	const builder = new RangeSetBuilder<Decoration>();
 	const cursorPos = view.state.selection.main.head;
-	const file = view.state.field(editorViewField)?.file as TFile | undefined;
+	const file = getEditorFile(view.state);
 	const filePath = file?.path;
 
 	if (!filePath) {
@@ -124,7 +124,7 @@ export function buildInlineTodoDecorations(
 				}
 
 				const widget = new InlineChipWidget(
-					match.type as 'date' | 'priority',
+					match.type,
 					match.text,
 					displayText,
 					plugin,

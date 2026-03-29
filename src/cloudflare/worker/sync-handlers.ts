@@ -8,9 +8,9 @@ import {
 	parseJsonObject,
 	parseNonNegativeInteger,
 	parseOptionalString,
+	parseStringArray,
 } from './utils';
 import type { Env } from './types';
-import type { SharedSettings } from '../../plugin/types';
 import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
 
 const MAX_BATCH_FILES = 50;
@@ -317,9 +317,8 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket): P
 	if (!parsedBody.ok) {
 		return parsedBody.response;
 	}
-	const paths = parsedBody.value.paths;
-	if (!Array.isArray(paths) || paths.length === 0) return corsResponse({ error: 'paths array required' }, 400);
-	if (paths.length > MAX_BATCH_FILES) return corsResponse({ error: `Maximum ${MAX_BATCH_FILES} files per batch` }, 400);
+	const paths = parseStringArray(parsedBody.value.paths, MAX_BATCH_FILES, 4096);
+	if (!paths || paths.length === 0) return corsResponse({ error: 'paths array required' }, 400);
 
 	const files: Array<{ path: string; content: string; hash: string; size: number; contentType: string; error?: string }> = [];
 	for (const rawPath of paths) {
@@ -367,9 +366,8 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 	if (!parsedBody.ok) {
 		return parsedBody.response;
 	}
-	const paths = parsedBody.value.paths;
-	if (!Array.isArray(paths) || paths.length === 0) return corsResponse({ error: 'paths array required' }, 400);
-	if (paths.length > MAX_BATCH_FILES) return corsResponse({ error: `Maximum ${MAX_BATCH_FILES} files per batch` }, 400);
+	const paths = parseStringArray(parsedBody.value.paths, MAX_BATCH_FILES, 4096);
+	if (!paths || paths.length === 0) return corsResponse({ error: 'paths array required' }, 400);
 
 	const deleted: string[] = [];
 	const dbOps: D1PreparedStatement[] = [];

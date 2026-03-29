@@ -2,6 +2,7 @@
  * Worker API client for sync operations
  */
 
+import { requestUrl, type RequestUrlParam, type RequestUrlResponse } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import { normalizeWorkerUrl } from './worker-url';
 import type {
@@ -27,14 +28,44 @@ export class HttpError extends Error {
 	}
 }
 
-function parseRetryAfter(response: Response): number | null {
-	const header = response.headers.get('Retry-After');
+function getHeader(headers: Record<string, string>, headerName: string): string | null {
+	const normalizedHeaderName = headerName.toLowerCase();
+	for (const [key, value] of Object.entries(headers)) {
+		if (key.toLowerCase() === normalizedHeaderName) {
+			return value;
+		}
+	}
+	return null;
+}
+
+function parseRetryAfter(headers: Record<string, string>): number | null {
+	const header = getHeader(headers, 'Retry-After');
 	if (!header) return null;
 	const seconds = parseInt(header, 10);
 	return !isNaN(seconds) && seconds > 0 ? seconds * 1000 : null;
 }
 
+function parseErrorMessage(status: number, responseText: string): string {
+	try {
+		const errorJson = JSON.parse(responseText) as { error?: string };
+		return errorJson.error || `HTTP ${status}`;
+	} catch {
+		return `HTTP ${status}: ${responseText}`;
+	}
+}
+
+function parseJsonResponse<T>(responseText: string, path: string): T {
+	try {
+		return JSON.parse(responseText) as T;
+	} catch (error) {
+		throw new Error(
+			`Invalid JSON response for ${path}: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
+}
+
 const TRANSFER_TIMEOUT_MS = 120_000;
+type ApiRequestOptions = Pick<RequestUrlParam, 'body' | 'contentType' | 'headers' | 'method'>;
 
 export class SyncApiClient {
 	private workerUrl: string;
@@ -68,53 +99,96 @@ export class SyncApiClient {
 		return this.workerUrl.length > 0 && this.authToken.length > 0;
 	}
 
+	private async runRequest(
+		path: string,
+		options: ApiRequestOptions,
+		timeout: number,
+	): Promise<RequestUrlResponse> {
+		const externalSignal = this.externalSignal;
+		let timeoutId: ReturnType<typeof setTimeout> | null = null;
+		let onAbort: (() => void) | null = null;
+
+		const timeoutPromise = new Promise<never>((_, reject) => {
+			timeoutId = setTimeout(() => {
+				reject(new Error(`Request timed out after ${timeout}ms`));
+			}, timeout);
+		});
+
+		const abortPromise = externalSignal
+			? new Promise<never>((_, reject) => {
+				if (externalSignal.aborted) {
+					const error = new Error('Sync request aborted');
+					error.name = 'AbortError';
+					reject(error);
+					return;
+				}
+
+				onAbort = () => {
+					const error = new Error('Sync request aborted');
+					error.name = 'AbortError';
+					reject(error);
+				};
+				externalSignal.addEventListener('abort', onAbort, { once: true });
+			})
+			: null;
+
+		const headersWithoutContentType = Object.fromEntries(
+			Object.entries(options.headers ?? {}).filter(([key]) => key.toLowerCase() !== 'content-type'),
+		);
+		const resolvedContentType = options.contentType
+			?? getHeader(options.headers ?? {}, 'Content-Type')
+			?? undefined;
+
+		const requestPromise = requestUrl({
+			url: `${this.workerUrl}${path}`,
+			method: options.method,
+			body: options.body,
+			contentType: resolvedContentType,
+			headers: {
+				Authorization: `Bearer ${this.authToken}`,
+				...headersWithoutContentType,
+			},
+			throw: false,
+		});
+
+		try {
+			return await Promise.race([
+				requestPromise,
+				timeoutPromise,
+				...(abortPromise ? [abortPromise] : []),
+			]);
+		} finally {
+			if (timeoutId !== null) {
+				clearTimeout(timeoutId);
+			}
+			if (onAbort && externalSignal) {
+				externalSignal.removeEventListener('abort', onAbort);
+			}
+		}
+	}
+
 	/**
 	 * Make authenticated JSON request to worker
 	 */
 	private async requestJson<T>(
 		path: string,
-		options: RequestInit = {},
+		options: ApiRequestOptions = {},
 		timeout: number = 30_000,
 	): Promise<T> {
-		const url = `${this.workerUrl}${path}`;
 		logger.info(`${options.method ?? 'GET'} ${path}`);
-
-		const headers: Record<string, string> = {
-			'Authorization': `Bearer ${this.authToken}`,
-		};
-
-		// Only set Content-Type to JSON if caller didn't provide explicit headers with Content-Type
-		const callerHeaders = options.headers as Record<string, string> | undefined;
-		if (!callerHeaders?.['Content-Type']) {
-			headers['Content-Type'] = 'application/json';
-		}
-
-		const response = await fetch(url, {
+		const response = await this.runRequest(path, {
 			...options,
-			signal: this.externalSignal
-				? AbortSignal.any([AbortSignal.timeout(timeout), this.externalSignal])
-				: AbortSignal.timeout(timeout),
-			headers: {
-				...headers,
-				...options.headers,
-			},
-		});
+			contentType: options.contentType ?? getHeader(options.headers ?? {}, 'Content-Type') ?? 'application/json',
+		}, timeout);
 
-		if (!response.ok) {
-			const errorBody = await response.text();
-			let errorMessage: string;
-			try {
-				const errorJson = JSON.parse(errorBody) as { error?: string };
-				errorMessage = errorJson.error || `HTTP ${response.status}`;
-			} catch {
-				errorMessage = `HTTP ${response.status}: ${errorBody}`;
-			}
+		if (response.status >= 400) {
+			const errorMessage = parseErrorMessage(response.status, response.text);
 			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} — ${errorMessage}`);
-			throw new HttpError(errorMessage, response.status, parseRetryAfter(response));
+			throw new HttpError(errorMessage, response.status, parseRetryAfter(response.headers));
 		}
 
 		logger.info(`${options.method ?? 'GET'} ${path} → ${response.status}`);
-		return response.json() as Promise<T>;
+		return parseJsonResponse<T>(response.text, path);
 	}
 
 	/**
@@ -122,38 +196,20 @@ export class SyncApiClient {
 	 */
 	private async requestBinary(
 		path: string,
-		options: RequestInit = {},
+		options: ApiRequestOptions = {},
 		timeout: number = 30_000,
-	): Promise<{ body: ArrayBuffer; headers: Headers }> {
-		const url = `${this.workerUrl}${path}`;
+	): Promise<{ body: ArrayBuffer; headers: Record<string, string> }> {
 		logger.info(`${options.method ?? 'GET'} ${path} (binary)`);
+		const response = await this.runRequest(path, options, timeout);
 
-		const response = await fetch(url, {
-			...options,
-			signal: this.externalSignal
-				? AbortSignal.any([AbortSignal.timeout(timeout), this.externalSignal])
-				: AbortSignal.timeout(timeout),
-			headers: {
-				'Authorization': `Bearer ${this.authToken}`,
-				...options.headers,
-			},
-		});
-
-		if (!response.ok) {
-			const errorBody = await response.text();
-			let errorMessage: string;
-			try {
-				const errorJson = JSON.parse(errorBody) as { error?: string };
-				errorMessage = errorJson.error || `HTTP ${response.status}`;
-			} catch {
-				errorMessage = `HTTP ${response.status}: ${errorBody}`;
-			}
+		if (response.status >= 400) {
+			const errorMessage = parseErrorMessage(response.status, response.text);
 			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} — ${errorMessage}`);
-			throw new HttpError(errorMessage, response.status, parseRetryAfter(response));
+			throw new HttpError(errorMessage, response.status, parseRetryAfter(response.headers));
 		}
 
 		logger.info(`${options.method ?? 'GET'} ${path} → ${response.status} (binary)`);
-		return { body: await response.arrayBuffer(), headers: response.headers };
+		return { body: response.arrayBuffer, headers: response.headers };
 	}
 
 	/**
@@ -215,7 +271,7 @@ export class SyncApiClient {
 		const { body, headers } = await this.requestBinary(`/sync/download?path=${encodedPath}`, {}, TRANSFER_TIMEOUT_MS);
 		return {
 			content: body,
-			contentType: headers.get('Content-Type') || 'application/octet-stream',
+			contentType: getHeader(headers, 'Content-Type') || 'application/octet-stream',
 			size: body.byteLength,
 		};
 	}

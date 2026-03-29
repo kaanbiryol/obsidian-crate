@@ -75,51 +75,59 @@ export class InlineChipWidget extends WidgetType {
 
 	toDOM(): HTMLElement {
 		const chip = document.createElement('span');
-
-		const completedStyles = this.isCompleted ? 'opacity: 0.5;' : '';
-		const baseStyles = `
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-size: var(--reminder-font-sm);
-      font-weight: var(--reminder-font-weight-medium);
-      margin-left: 8px;
-      margin-right: 2px;
-      vertical-align: baseline;
-      cursor: pointer;
-      ${completedStyles}
-    `;
+		chip.setCssProps({
+			display: 'inline-flex',
+			'align-items': 'center',
+			gap: '4px',
+			padding: '3px 8px',
+			'border-radius': '12px',
+			'font-size': 'var(--reminder-font-sm)',
+			'font-weight': 'var(--reminder-font-weight-medium)',
+			'margin-left': '8px',
+			'margin-right': '2px',
+			'vertical-align': 'baseline',
+			cursor: 'pointer',
+			opacity: this.isCompleted ? '0.5' : '1',
+		});
 
 		const iconSpan = document.createElement('span');
-		iconSpan.style.cssText = 'display: inline-flex; align-items: center; width: 12px; height: 12px;';
+		iconSpan.setCssProps({
+			display: 'inline-flex',
+			'align-items': 'center',
+			width: '12px',
+			height: '12px',
+		});
 
 		const textSpan = document.createElement('span');
 
 		if (this.type === 'date') {
 			const colors = getVariantColors('success');
-			chip.style.cssText = `${baseStyles}
-        background-color: ${colors.bg};
-        color: ${colors.text};
-      `;
+			chip.setCssProps({
+				'background-color': colors.bg,
+				color: colors.text,
+			});
 			setIcon(iconSpan, isRecurrenceText(this.text) ? 'repeat' : 'calendar');
 			textSpan.textContent = this.displayText;
 			chip.appendChild(iconSpan);
 			chip.appendChild(textSpan);
 		} else {
 			const colors = getVariantColors('danger');
-			chip.style.cssText = `${baseStyles}
-        background-color: ${colors.bg};
-        color: ${colors.text};
-        padding: 5px 8px;
-      `;
+			chip.setCssProps({
+				'background-color': colors.bg,
+				color: colors.text,
+				padding: '5px 8px',
+			});
 			const priorityIconSpan = document.createElement('span');
-			priorityIconSpan.style.cssText = 'display: inline-flex; align-items: center; width: 14px; height: 14px;';
+			priorityIconSpan.setCssProps({
+				display: 'inline-flex',
+				'align-items': 'center',
+				width: '14px',
+				height: '14px',
+			});
 			setIcon(priorityIconSpan, 'flag');
 			const svg = priorityIconSpan.querySelector('svg');
 			if (svg) {
-				svg.style.fill = 'currentColor';
+				svg.setCssProps({ fill: 'currentColor' });
 			}
 			chip.appendChild(priorityIconSpan);
 		}

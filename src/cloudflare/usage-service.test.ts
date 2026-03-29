@@ -38,7 +38,10 @@ describe('CloudflareUsageService', () => {
 		if (!request || typeof request === 'string') {
 			throw new Error('Expected requestUrl to be called with a request object');
 		}
-		const body = JSON.parse(String(request.body)) as {
+		if (typeof request.body !== 'string') {
+			throw new Error('Expected request body to be a JSON string');
+		}
+		const body = JSON.parse(request.body) as {
 			query: string;
 			variables: Record<string, unknown>;
 		};

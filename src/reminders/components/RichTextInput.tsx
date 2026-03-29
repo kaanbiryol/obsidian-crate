@@ -3,6 +3,63 @@ import { buildHTML, getPlainText } from '../utils/richTextParsing';
 import { saveCursorPosition, restoreCursorPosition, moveCursorToEnd } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
 
+function renderRichText(element: HTMLDivElement, html: string): void {
+    if (!html) {
+        element.replaceChildren();
+        return;
+    }
+
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const fragment = range.createContextualFragment(html);
+    element.replaceChildren(fragment);
+}
+
+function insertPlainTextAtSelection(text: string): void {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+        return;
+    }
+
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+
+    const lines = text.replace(/\r\n?/g, '\n').split('\n');
+    const fragment = document.createDocumentFragment();
+    let lastInsertedNode: Node | null = null;
+
+    for (let index = 0; index < lines.length; index++) {
+        const line = lines[index] ?? '';
+        if (line) {
+            const textNode = document.createTextNode(line);
+            fragment.append(textNode);
+            lastInsertedNode = textNode;
+        }
+
+        if (index < lines.length - 1) {
+            const lineBreak = document.createElement('br');
+            fragment.append(lineBreak);
+            lastInsertedNode = lineBreak;
+        }
+    }
+
+    if (!lastInsertedNode) {
+        return;
+    }
+
+    range.insertNode(fragment);
+
+    const nextRange = document.createRange();
+    if (lastInsertedNode instanceof Text) {
+        nextRange.setStart(lastInsertedNode, lastInsertedNode.textContent?.length ?? 0);
+    } else {
+        nextRange.setStartAfter(lastInsertedNode);
+    }
+    nextRange.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(nextRange);
+}
+
 export interface RichTextInputHandle {
     /** Focus the input */
     focus: () => void;
@@ -62,7 +119,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     // Ref callback to update refs when element attaches to DOM
     const refCallback = useCallback((el: HTMLDivElement | null) => {
         if (inputRef) {
-            (inputRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+            inputRef.current = el;
         } else {
             editableRef.current = el;
         }
@@ -101,9 +158,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
         // Build and render HTML with chips
         const html = buildHTML(plainText, knownProjects);
-        if (actualRef.current.innerHTML !== html) {
-            actualRef.current.innerHTML = html || '';
-        }
+        renderRichText(actualRef.current, html);
 
         // Call onChange with plain text
         onChange(plainText);
@@ -149,7 +204,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         const shouldPreserveCursor = preserveSelection && isFocused;
         const cursorPos = shouldPreserveCursor ? saveCursorPosition(actualRef.current) : null;
 
-        actualRef.current.innerHTML = normalizedHtml;
+        renderRichText(actualRef.current, normalizedHtml);
 
         // If autoFocus is enabled and this is initial content, move cursor to end
         if (autoFocus && !hasInitializedRef.current && value) {
@@ -205,7 +260,8 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const handlePaste = (e: React.ClipboardEvent) => {
         e.preventDefault();
         const text = e.clipboardData.getData('text/plain');
-        document.execCommand('insertText', false, text);
+        insertPlainTextAtSelection(text);
+        handleInput();
     };
 
     // Prevent focus loss when clicking interactive elements (buttons, pills) inside the modal

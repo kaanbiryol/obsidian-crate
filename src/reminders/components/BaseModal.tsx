@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { motion, AnimatePresence, PanInfo, useMotionValue, useTransform } from 'framer-motion';
 import type { AnimationConfig, ModalVariant } from '../types/componentAdapter';
 import {
@@ -67,7 +67,6 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 }) => {
     const isAnimationEnabled = animationConfig.enabled && !prefersReducedMotion();
     const isBottomSheet = variant === 'bottom-sheet';
-    const [isAnimating, setIsAnimating] = useState(() => isAnimationEnabled);
     // Always reduce effects (no backdrop blur) for consistent performance across all platforms
     const reduceEffects = true;
 
@@ -180,18 +179,9 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     // Handle animation completion - only fire callback for entry animation
     const handleAnimationComplete = useCallback((definition: string) => {
         if (definition === 'visible') {
-            setIsAnimating(false);
             onAnimationComplete?.();
         }
     }, [onAnimationComplete]);
-
-    useEffect(() => {
-        if (!isAnimationEnabled) {
-            setIsAnimating(false);
-            return;
-        }
-        setIsAnimating(true);
-    }, [isOpen, isAnimationEnabled]);
 
     // Drag constraints - only allow dragging down
     const dragConstraints = { top: 0, bottom: 0 };

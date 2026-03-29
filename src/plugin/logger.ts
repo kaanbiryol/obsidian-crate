@@ -14,7 +14,7 @@ export function createLogger(component: string): Logger {
 
 	return {
 		debug: (...args: unknown[]) => console.debug(prefix, ...args),
-		info: (...args: unknown[]) => console.info(prefix, ...args),
+		info: (...args: unknown[]) => console.debug(prefix, ...args),
 		warn: (...args: unknown[]) => console.warn(prefix, ...args),
 		error: (...args: unknown[]) => console.error(prefix, ...args),
 	};

@@ -71,8 +71,11 @@ export class ActivityModal extends Modal {
 		this.renderHistory(historyPanel);
 
 		for (let i = 0; i < this.allTabs.length; i++) {
-			const idx = i;
-			this.allTabs[idx]!.addEventListener('click', () => this.switchTab(idx));
+			const tab = this.allTabs[i];
+			if (!tab) {
+				continue;
+			}
+			tab.addEventListener('click', () => this.switchTab(i));
 		}
 
 		this.deps.addStateChangeListener(this.onStateChange);
@@ -80,12 +83,17 @@ export class ActivityModal extends Modal {
 
 	private switchTab(index: number): void {
 		for (let i = 0; i < this.allTabs.length; i++) {
+			const tab = this.allTabs[i];
+			const panel = this.allPanels[i];
+			if (!tab || !panel) {
+				continue;
+			}
 			if (i === index) {
-				this.allTabs[i]!.addClass('crate-activity-tab-active');
-				this.allPanels[i]!.show();
+				tab.addClass('crate-activity-tab-active');
+				panel.show();
 			} else {
-				this.allTabs[i]!.removeClass('crate-activity-tab-active');
-				this.allPanels[i]!.hide();
+				tab.removeClass('crate-activity-tab-active');
+				panel.hide();
 			}
 		}
 	}

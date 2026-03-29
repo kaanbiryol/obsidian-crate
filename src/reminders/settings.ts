@@ -7,9 +7,9 @@ export type AutoOpenSetting = 'none' | 'sidebar' | 'fullscreen';
 
 export const DEFAULT_REMINDERS_FOLDER_PATH = 'Reminders';
 
-const VALID_DUE_DATE_DEFAULTS = new Set<DueDateDefaultSetting>(['none', 'today', 'tomorrow']);
-const VALID_AUTO_OPEN_SETTINGS = new Set<AutoOpenSetting>(['none', 'sidebar', 'fullscreen']);
-const VALID_TAB_IDS = new Set<TabId>(['inbox', 'today', 'upcoming', 'browse']);
+const VALID_DUE_DATE_DEFAULTS = new Set<string>(['none', 'today', 'tomorrow']);
+const VALID_AUTO_OPEN_SETTINGS = new Set<string>(['none', 'sidebar', 'fullscreen']);
+const VALID_TAB_IDS = new Set<string>(['inbox', 'today', 'upcoming', 'browse']);
 
 type QueryViewPreference = {
 	showCompleted?: boolean;
@@ -62,9 +62,21 @@ function normalizeQueryViewPreferences(
 	return normalized;
 }
 
+function isTabId(value: unknown): value is TabId {
+	return typeof value === 'string' && VALID_TAB_IDS.has(value);
+}
+
+function isDueDateDefaultSetting(value: unknown): value is DueDateDefaultSetting {
+	return typeof value === 'string' && VALID_DUE_DATE_DEFAULTS.has(value);
+}
+
+function isAutoOpenSetting(value: unknown): value is AutoOpenSetting {
+	return typeof value === 'string' && VALID_AUTO_OPEN_SETTINGS.has(value);
+}
+
 function normalizeTabId(value: unknown, fallback: TabId): TabId {
-	return typeof value === 'string' && VALID_TAB_IDS.has(value as TabId)
-		? value as TabId
+	return isTabId(value)
+		? value
 		: fallback;
 }
 
@@ -86,22 +98,18 @@ export function normalizeRemindersSettings(
 		debugLogging: typeof value?.debugLogging === 'boolean'
 			? value.debugLogging
 			: DEFAULT_REMINDERS_SETTINGS.debugLogging,
-		taskCreationDefaultDueDate:
-			typeof value?.taskCreationDefaultDueDate === 'string'
-			&& VALID_DUE_DATE_DEFAULTS.has(value.taskCreationDefaultDueDate as DueDateDefaultSetting)
-				? value.taskCreationDefaultDueDate as DueDateDefaultSetting
-				: DEFAULT_REMINDERS_SETTINGS.taskCreationDefaultDueDate,
+		taskCreationDefaultDueDate: isDueDateDefaultSetting(value?.taskCreationDefaultDueDate)
+			? value.taskCreationDefaultDueDate
+			: DEFAULT_REMINDERS_SETTINGS.taskCreationDefaultDueDate,
 		remindersFolderPath: normalizeRemindersFolderPath(value?.remindersFolderPath),
 		queryViewPreferences: normalizeQueryViewPreferences(value?.queryViewPreferences),
 		upcomingDaysDefault: normalizePositiveInteger(
 			value?.upcomingDaysDefault,
 			DEFAULT_REMINDERS_SETTINGS.upcomingDaysDefault,
 		),
-		autoOpenView:
-			typeof value?.autoOpenView === 'string'
-			&& VALID_AUTO_OPEN_SETTINGS.has(value.autoOpenView as AutoOpenSetting)
-				? value.autoOpenView as AutoOpenSetting
-				: DEFAULT_REMINDERS_SETTINGS.autoOpenView,
+		autoOpenView: isAutoOpenSetting(value?.autoOpenView)
+			? value.autoOpenView
+			: DEFAULT_REMINDERS_SETTINGS.autoOpenView,
 		sidebarDefaultTab: normalizeTabId(
 			value?.sidebarDefaultTab,
 			DEFAULT_REMINDERS_SETTINGS.sidebarDefaultTab,

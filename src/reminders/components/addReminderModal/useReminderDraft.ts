@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import type { Priority, Reminder, RecurrenceRule } from '../../types';
 import { parseReminderContent } from '../../utils/reminderParser';
+import { findStandalonePriorityMarkerIndexes } from '../../utils/priorityMarker';
 import { recurrenceToText } from '../../utils/rruleConverter';
 
 type UpdateOptions = {
@@ -189,9 +190,9 @@ export function useReminderDraft({
 		const hasPriorityMarker = !!parsed.priorityPart;
 
 		if (hasPriorityMarker && detectedPriority !== priority) {
-			setPriority(detectedPriority as Priority);
+			setPriority(detectedPriority);
 		} else if (!hasPriorityMarker && priority !== 4) {
-			const hadImportantMarker = /(?<=\s)!(?=\s|$)|^!(?=\s)/.test(content);
+			const hadImportantMarker = findStandalonePriorityMarkerIndexes(content).length > 0;
 			if (!hadImportantMarker) {
 				setPriority(4);
 			}

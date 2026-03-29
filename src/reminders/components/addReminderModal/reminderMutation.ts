@@ -55,7 +55,7 @@ export function buildReminderSubmission({
 		return null;
 	}
 
-	const finalPriority = (parsed.priorityPart ? parsed.priority : priority) as Priority;
+	const finalPriority = parsed.priorityPart ? parsed.priority : priority;
 	const finalProject = parsed.project || project;
 	const finalDueDate = parsed.dueDate ? parsed.dueDate.toISOString() : dueDate ?? undefined;
 	const finalRecurrence = parsed.recurrence || recurrence;

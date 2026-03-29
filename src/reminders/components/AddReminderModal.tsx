@@ -25,8 +25,8 @@ const log = createLogger('AddReminderModal');
 interface AddReminderModalProps {
     onClose: () => void;
     onAdd?: (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule) => Promise<void>;
-    onSave?: (reminder: any) => Promise<void>;
-    onDelete?: (reminder: any) => Promise<void>;
+    onSave?: (reminder: Reminder) => Promise<void>;
+    onDelete?: (reminder: Reminder) => Promise<void>;
     onError?: (error: Error) => void;
     reminder?: Reminder;
     projects?: string[];
@@ -170,7 +170,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            handleSubmit();
+            void handleSubmit();
         }
     };
 
@@ -246,7 +246,9 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 canSubmit={!!content.trim()}
                 onDelete={handleDeleteClick}
                 onClose={handleClose}
-                onSubmit={handleSubmit}
+                onSubmit={() => {
+                    void handleSubmit();
+                }}
                 onTouchEnd={handleModalContentTouch}
             />
             <AddReminderModalBody
@@ -318,7 +320,9 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         <DeleteConfirmationModal
             isOpen={showDeleteConfirm}
             onClose={() => setShowDeleteConfirm(false)}
-            onConfirm={handleDeleteConfirm}
+            onConfirm={() => {
+                void handleDeleteConfirm();
+            }}
             title="Delete Reminder"
             message={`Are you sure you want to delete "${reminder?.content?.substring(0, 50)}${(reminder?.content?.length || 0) > 50 ? '...' : ''}"? This action cannot be undone.`}
             animationConfig={animationConfig}

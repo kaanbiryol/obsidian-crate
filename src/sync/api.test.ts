@@ -1,64 +1,72 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as obsidian from 'obsidian';
+import type { RequestUrlResponse } from 'obsidian';
 import { HttpError, SyncApiClient } from './api';
 
-describe('SyncApiClient', () => {
-	beforeEach(() => {
-		vi.stubGlobal('fetch', vi.fn());
-	});
+function createRequestUrlResponse(overrides: Partial<RequestUrlResponse>): RequestUrlResponse {
+	return {
+		status: 200,
+		headers: {},
+		arrayBuffer: new ArrayBuffer(0),
+		json: {},
+		text: '',
+		...overrides,
+	};
+}
 
+describe('SyncApiClient', () => {
 	afterEach(() => {
-		vi.unstubAllGlobals();
 		vi.resetAllMocks();
 	});
 
 	it('uses encoded paths and auth headers for requests', async () => {
-		const fetchMock = vi.mocked(fetch);
-		const body = new ArrayBuffer(1);
-		const headers = new Headers({
-			'Content-Type': 'text/plain',
-			'Content-Length': '1',
-		});
-		fetchMock.mockResolvedValue({
-			ok: true,
-			status: 200,
-			arrayBuffer: vi.fn().mockResolvedValue(body),
-			headers,
-		} as unknown as Response);
-
-		const client = new SyncApiClient('https://worker.example/', 'token-1');
-		await client.downloadFile('folder/a b#.md');
-
-		expect(fetchMock).toHaveBeenCalledWith(
-			'https://worker.example/sync/download?path=folder%2Fa%20b%23.md',
-			expect.objectContaining({
-				headers: expect.objectContaining({
-					Authorization: 'Bearer token-1',
-				}),
+		const requestUrlSpy = vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
+			createRequestUrlResponse({
+				status: 200,
+				arrayBuffer: new ArrayBuffer(1),
+				headers: {
+					'Content-Type': 'text/plain',
+					'Content-Length': '1',
+				},
 			}),
 		);
+		const body = new ArrayBuffer(1);
+
+		const client = new SyncApiClient('https://worker.example/', 'token-1');
+		await expect(client.downloadFile('folder/a b#.md')).resolves.toEqual({
+			content: body,
+			contentType: 'text/plain',
+			size: 1,
+		});
+
+		const request = requestUrlSpy.mock.calls[0]?.[0];
+		if (!request || typeof request === 'string') {
+			throw new Error('Expected requestUrl to be called with a request object');
+		}
+		expect(request.url).toBe('https://worker.example/sync/download?path=folder%2Fa%20b%23.md');
+		expect(request.method).toBeUndefined();
+		expect(request.headers?.Authorization).toBe('Bearer token-1');
 	});
 
 	it('parses JSON error responses', async () => {
-		const fetchMock = vi.mocked(fetch);
-		fetchMock.mockResolvedValue({
-			ok: false,
-			status: 401,
-			headers: new Headers(),
-			text: vi.fn().mockResolvedValue('{"error":"Unauthorized"}'),
-		} as unknown as Response);
+		vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
+			createRequestUrlResponse({
+				status: 401,
+				text: '{"error":"Unauthorized"}',
+			}),
+		);
 
 		const client = new SyncApiClient('https://worker.example', 'token');
 		await expect(client.health()).rejects.toThrow('Unauthorized');
 	});
 
 	it('falls back to HTTP status and body for non-JSON errors', async () => {
-		const fetchMock = vi.mocked(fetch);
-		fetchMock.mockResolvedValue({
-			ok: false,
-			status: 503,
-			headers: new Headers(),
-			text: vi.fn().mockResolvedValue('Service unavailable'),
-		} as unknown as Response);
+		vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
+			createRequestUrlResponse({
+				status: 503,
+				text: 'Service unavailable',
+			}),
+		);
 
 		const client = new SyncApiClient('https://worker.example', 'token');
 		await expect(client.getManifest()).rejects.toThrow(
@@ -67,35 +75,32 @@ describe('SyncApiClient', () => {
 	});
 
 	it('updates credentials used by subsequent requests', async () => {
-		const fetchMock = vi.mocked(fetch);
-		fetchMock.mockResolvedValue({
-			ok: true,
-			status: 200,
-			json: vi.fn().mockResolvedValue({ status: 'ok', timestamp: 'now' }),
-		} as unknown as Response);
+		const requestUrlSpy = vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
+			createRequestUrlResponse({
+				status: 200,
+				text: '{"status":"ok","timestamp":"now"}',
+			}),
+		);
 
 		const client = new SyncApiClient('https://old.example/', 'old-token');
 		client.updateCredentials('https://new.example/', 'new-token');
 		await client.health();
 
-		expect(fetchMock).toHaveBeenCalledWith(
-			'https://new.example/health',
-			expect.objectContaining({
-				headers: expect.objectContaining({
-					Authorization: 'Bearer new-token',
-				}),
-			}),
-		);
+		const request = requestUrlSpy.mock.calls[0]?.[0];
+		if (!request || typeof request === 'string') {
+			throw new Error('Expected requestUrl to be called with a request object');
+		}
+		expect(request.url).toBe('https://new.example/health');
+		expect(request.headers?.Authorization).toBe('Bearer new-token');
 	});
 
 	it('returns user-friendly testConnection failure details', async () => {
-		const fetchMock = vi.mocked(fetch);
-		fetchMock.mockResolvedValue({
-			ok: false,
-			status: 500,
-			headers: new Headers(),
-			text: vi.fn().mockResolvedValue('boom'),
-		} as unknown as Response);
+		vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
+			createRequestUrlResponse({
+				status: 500,
+				text: 'boom',
+			}),
+		);
 
 		const client = new SyncApiClient('https://worker.example', 'token');
 		await expect(client.testConnection()).resolves.toEqual({
@@ -110,13 +115,13 @@ describe('SyncApiClient', () => {
 	});
 
 	it('throws HttpError with retryAfter on 429 with Retry-After header', async () => {
-		const fetchMock = vi.mocked(fetch);
-		fetchMock.mockResolvedValue({
-			ok: false,
-			status: 429,
-			headers: new Headers({ 'Retry-After': '30' }),
-			text: vi.fn().mockResolvedValue('{"error":"Too many requests"}'),
-		} as unknown as Response);
+		vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
+			createRequestUrlResponse({
+				status: 429,
+				headers: { 'Retry-After': '30' },
+				text: '{"error":"Too many requests"}',
+			}),
+		);
 
 		const client = new SyncApiClient('https://worker.example', 'token');
 		try {
@@ -132,13 +137,12 @@ describe('SyncApiClient', () => {
 	});
 
 	it('throws HttpError with null retryAfter when no Retry-After header', async () => {
-		const fetchMock = vi.mocked(fetch);
-		fetchMock.mockResolvedValue({
-			ok: false,
-			status: 500,
-			headers: new Headers(),
-			text: vi.fn().mockResolvedValue('{"error":"Server error"}'),
-		} as unknown as Response);
+		vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
+			createRequestUrlResponse({
+				status: 500,
+				text: '{"error":"Server error"}',
+			}),
+		);
 
 		const client = new SyncApiClient('https://worker.example', 'token');
 		try {

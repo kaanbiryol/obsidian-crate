@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { arrayBufferToBase64, base64ToArrayBuffer } from './encoding';
 
+function toArrayBuffer(view: Uint8Array): ArrayBuffer {
+	const buffer = new ArrayBuffer(view.byteLength);
+	new Uint8Array(buffer).set(view);
+	return buffer;
+}
+
 describe('encoding round-trip', () => {
 	it('round-trips text content', () => {
 		const original = new TextEncoder().encode('Hello, world!');
-		const b64 = arrayBufferToBase64(original.buffer as ArrayBuffer);
+		const b64 = arrayBufferToBase64(toArrayBuffer(original));
 		const decoded = base64ToArrayBuffer(b64);
 
 		expect(new Uint8Array(decoded)).toEqual(original);
@@ -16,7 +22,7 @@ describe('encoding round-trip', () => {
 			original[i] = i;
 		}
 
-		const b64 = arrayBufferToBase64(original.buffer as ArrayBuffer);
+		const b64 = arrayBufferToBase64(toArrayBuffer(original));
 		const decoded = base64ToArrayBuffer(b64);
 
 		expect(new Uint8Array(decoded)).toEqual(original);
@@ -37,7 +43,7 @@ describe('encoding round-trip', () => {
 			original[i] = i % 256;
 		}
 
-		const b64 = arrayBufferToBase64(original.buffer as ArrayBuffer);
+		const b64 = arrayBufferToBase64(toArrayBuffer(original));
 		const decoded = base64ToArrayBuffer(b64);
 
 		expect(new Uint8Array(decoded)).toEqual(original);

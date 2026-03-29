@@ -18,7 +18,7 @@ interface ReminderCardWrapperProps {
   reminder: Reminder;
   onUpdate?: () => void;
   onToggleCompleteOverride?: () => Promise<void> | void;
-  onEditOverride?: (event: React.MouseEvent) => void;
+  onEditOverride?: () => void;
   index?: number;
   hideProject?: boolean;
 }
@@ -76,7 +76,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
    */
   const handleEdit = () => {
     if (onEditOverride) {
-      onEditOverride({} as React.MouseEvent);
+      onEditOverride();
       return;
     }
     openReminderEditModal(plugin, reminder, onUpdate ?? (() => undefined));
@@ -95,7 +95,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
       // Handle checkbox clicks (premium checkbox or legacy HeroUI checkbox)
       if (target.closest('.premium-checkbox') || target.closest('[data-slot="wrapper"]') || target.closest('input[type="checkbox"]')) {
         e.stopPropagation();
-        handleToggle();
+        void handleToggle();
         return;
       }
 

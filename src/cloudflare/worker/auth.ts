@@ -31,8 +31,8 @@ export async function timingSafeEqual(a: string, b: string): Promise<boolean> {
 	const maxLength = Math.max(aBytes.byteLength, bBytes.byteLength, 1);
 	let diff = aBytes.byteLength ^ bBytes.byteLength;
 	for (let index = 0; index < maxLength; index++) {
-		const aValue = index < aBytes.byteLength ? aBytes[index]! : 0;
-		const bValue = index < bBytes.byteLength ? bBytes[index]! : 0;
+		const aValue = index < aBytes.byteLength ? aBytes[index] : 0;
+		const bValue = index < bBytes.byteLength ? bBytes[index] : 0;
 		diff |= aValue ^ bValue;
 	}
 	return diff === 0;

@@ -1,5 +1,6 @@
 import * as chrono from 'chrono-node';
-import { getFontSize, getFontWeight } from '../ui/themes';
+import { getFontWeight } from '../ui/themes';
+import { findStandalonePriorityMarkerIndexes } from './priorityMarker';
 
 export interface TextMatch {
     text: string;
@@ -74,20 +75,12 @@ export const createChipHTML = (type: string, text: string): string => {
  * Extensible for future p1-p4 support
  */
 export const findPriorityMatches = (text: string): TextMatch[] => {
-    const matches: TextMatch[] = [];
-    // Match ! with space before (or at start with space after, or standalone)
-    const importantMatches = [...text.matchAll(/(?<=\s)!(?=\s|$)|^!(?=\s)|^!$/g)];
-    importantMatches.forEach(match => {
-        if (match.index !== undefined) {
-            matches.push({
-                text: match[0],
-                index: match.index,
-                length: match[0].length,
-                type: 'priority'
-            });
-        }
-    });
-    return matches;
+    return findStandalonePriorityMarkerIndexes(text).map(index => ({
+        text: text[index] ?? '!',
+        index,
+        length: 1,
+        type: 'priority'
+    }));
 };
 
 /**
@@ -160,25 +153,26 @@ export const findProjectMatches = (text: string, knownProjects?: string[]): Text
     // 1. Start with # followed by at least one letter (not purely numeric)
     // 2. Can contain letters, numbers, underscores, hyphens, slashes (for nested tags)
     // e.g., #work, #Project/Reminders, #work/meetings
-    const projectMatches = [...text.matchAll(/#([a-zA-Z][a-zA-Z0-9_\-\/]*)/g)];
+    const projectMatches = [...text.matchAll(/#([a-zA-Z][a-zA-Z0-9_/-]*)/g)];
     projectMatches.forEach(match => {
         if (match.index !== undefined) {
+            const matchIndex = match.index;
             // Check if this match is inside a markdown link
             const isInsideLink = linkRanges.some(
-                range => match.index! >= range.start && match.index! < range.end
+                range => matchIndex >= range.start && matchIndex < range.end
             );
 
             // Check if this range is already covered by a known project match
-            if (!isInsideLink && !isRangeCovered(match.index, match[0].length)) {
+            if (!isInsideLink && !isRangeCovered(matchIndex, match[0].length)) {
                 matches.push({
                     text: match[0],
-                    index: match.index,
+                    index: matchIndex,
                     length: match[0].length,
                     type: 'project'
                 });
                 coveredRanges.push({
-                    start: match.index,
-                    end: match.index + match[0].length
+                    start: matchIndex,
+                    end: matchIndex + match[0].length
                 });
             }
         }

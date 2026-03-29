@@ -9,6 +9,7 @@
 		"dev": "npm run build:worker && vite build --watch --mode development",
 		"typecheck": "tsc -noEmit -skipLibCheck",
 		"build": "npm run build:worker && tsc -noEmit -skipLibCheck && vite build",
+		"size-check": "node scripts/check-bundle-size.mjs",
 		"deploy": "if [ -z \"$OBSIDIAN_VAULT\" ]; then echo 'Error: OBSIDIAN_VAULT env var is not set. Export it to your vault path.'; exit 1; fi && npm run build && mkdir -p \"$OBSIDIAN_VAULT/.obsidian/plugins/obsidian-crate\" && cp dist/main.js manifest.json dist/styles.css \"$OBSIDIAN_VAULT/.obsidian/plugins/obsidian-crate/\"",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "eslint .",
@@ -17,6 +18,8 @@
 	"keywords": [],
 	"license": "0-BSD",
 	"devDependencies": {
+		"@codemirror/state": "^6.5.0",
+		"@codemirror/view": "^6.38.6",
 		"@codemirror/language": "^6.11.3",
 		"@eslint/js": "9.30.1",
 		"@preact/preset-vite": "^2.10.2",

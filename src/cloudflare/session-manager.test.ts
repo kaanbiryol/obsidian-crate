@@ -30,13 +30,14 @@ describe('CloudflareSessionManager', () => {
 	});
 
 	it('refreshes the API token when only a refresh token is available', async () => {
+		const setMock = vi.fn();
 		const storage = {
 			get: vi.fn((key: string) => {
 				if (key === SECRET_KEYS.CLOUDFLARE_API_TOKEN) return '';
 				if (key === SECRET_KEYS.CLOUDFLARE_REFRESH_TOKEN) return 'refresh-token';
 				return null;
 			}),
-			set: vi.fn(),
+			set: setMock,
 			delete: vi.fn(),
 			has: vi.fn(() => false),
 		} as unknown as SecretStorageService;
@@ -61,8 +62,8 @@ describe('CloudflareSessionManager', () => {
 			accountId: 'acct',
 			apiToken: 'new-api-token',
 		});
-		expect(oauthMocks.refreshAccessToken).toHaveBeenCalledWith('refresh-token');
-		expect((storage.set as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
+		expect(oauthMocks.refreshAccessToken.mock.calls).toEqual([['refresh-token']]);
+		expect(setMock).toHaveBeenCalledWith(
 			SECRET_KEYS.CLOUDFLARE_API_TOKEN,
 			'new-api-token',
 		);

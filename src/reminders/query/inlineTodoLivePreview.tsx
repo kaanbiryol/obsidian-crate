@@ -1,4 +1,3 @@
-import { editorViewField } from 'obsidian';
 import {
 	DecorationSet,
 	EditorView,
@@ -7,6 +6,7 @@ import {
 } from '@codemirror/view';
 import type CratePlugin from '@/main';
 import { getLineReminderMappingService } from '@/reminders/services/lineReminderMapping';
+import { getEditorFile } from './editorFile';
 import { buildInlineTodoDecorations } from './inlineTodoLivePreviewDecorations';
 import { createInlineTodoController } from './inlineTodoLivePreviewController';
 
@@ -21,7 +21,7 @@ export function createInlineTodoExtension(plugin: CratePlugin) {
 			private previousLineNum: number | null = null;
 
 			constructor(view: EditorView) {
-				const file = view.state.field(editorViewField)?.file;
+				const file = getEditorFile(view.state);
 				this.filePath = file?.path;
 				this.decorations = buildInlineTodoDecorations(view, plugin, mappingService);
 				this.previousLineNum = view.state.doc.lineAt(view.state.selection.main.head).number;
@@ -32,7 +32,7 @@ export function createInlineTodoExtension(plugin: CratePlugin) {
 			}
 
 			update(update: ViewUpdate) {
-				const file = update.view.state.field(editorViewField)?.file;
+				const file = getEditorFile(update.view.state);
 				const newFilePath = file?.path;
 
 				if (newFilePath !== this.filePath) {

@@ -1,4 +1,4 @@
-import type { TFile } from 'obsidian';
+import { TFile } from 'obsidian';
 import type { EditorView } from '@codemirror/view';
 import { createLogger } from '@/reminders';
 import type CratePlugin from '@/main';
@@ -59,7 +59,7 @@ export function createInlineTodoController(
 		}
 
 		try {
-			const reminders = await plugin.storage.getByFile(filePath);
+			const reminders = plugin.storage.getByFile(filePath);
 			const checkboxLines: Array<{ lineNumber: number; content: string }> = [];
 			const doc = view.state.doc;
 
@@ -107,8 +107,8 @@ export function createInlineTodoController(
 
 			log.info(`Processing ${result.unmapped.length} unmapped lines in batch`);
 			const file = plugin.app.vault.getAbstractFileByPath(filePath);
-			if (file && 'extension' in file) {
-				await plugin.reminderIndex.rescanFile(file as TFile, true);
+			if (file instanceof TFile) {
+				await plugin.reminderIndex.rescanFile(file, true);
 			}
 
 			const indexedReminders = plugin.reminderIndex.getByFile(filePath);

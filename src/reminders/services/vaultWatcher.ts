@@ -8,7 +8,7 @@
  * - rename: Update file paths in the index
  */
 
-import type { TAbstractFile, TFile, EventRef } from "obsidian";
+import { TFile, type TAbstractFile, type EventRef } from "obsidian";
 import { createLogger } from "@/reminders";
 import type CratePlugin from "@/main";
 import type { ReminderIndex } from "@/reminders/data/reminderIndex";
@@ -21,7 +21,7 @@ export class VaultWatcher {
   private eventRefs: EventRef[] = [];
 
   // Debounce file modifications to avoid excessive rescans
-  private pendingScans: Map<string, NodeJS.Timeout> = new Map();
+  private pendingScans: Map<string, number> = new Map();
   private static DEBOUNCE_MS = 1500;
 
   constructor(plugin: CratePlugin, index: ReminderIndex) {
@@ -43,7 +43,7 @@ export class VaultWatcher {
     // File created
     this.eventRefs.push(
       this.plugin.app.vault.on("create", (file) => {
-        this.handleCreate(file);
+        void this.handleCreate(file);
       })
     );
 
@@ -57,7 +57,7 @@ export class VaultWatcher {
     // File renamed
     this.eventRefs.push(
       this.plugin.app.vault.on("rename", (file, oldPath) => {
-        this.handleRename(file, oldPath);
+        void this.handleRename(file, oldPath);
       })
     );
 
@@ -98,9 +98,9 @@ export class VaultWatcher {
     }
 
     // Schedule a debounced scan
-    const timeout = setTimeout(async () => {
+    const timeout = window.setTimeout(() => {
       this.pendingScans.delete(filePath);
-      await this.index.rescanFile(file as TFile);
+      void this.index.rescanFile(file);
     }, VaultWatcher.DEBOUNCE_MS);
 
     this.pendingScans.set(filePath, timeout);
@@ -114,7 +114,7 @@ export class VaultWatcher {
     if (!this.index.isReminderFile(file.path)) return; // Only watch reminders folder
 
     log.info(` New reminder file created: ${file.path}`);
-    await this.index.rescanFile(file as TFile);
+    await this.index.rescanFile(file);
   }
 
   /**
@@ -139,7 +139,7 @@ export class VaultWatcher {
   /**
    * Handle file rename - update paths in index
    */
-  private handleRename(file: TAbstractFile, oldPath: string): void {
+  private async handleRename(file: TAbstractFile, oldPath: string): Promise<void> {
     if (!this.isMarkdownFile(file)) return;
 
     const wasInFolder = this.index.isReminderFile(oldPath);
@@ -163,7 +163,7 @@ export class VaultWatcher {
     } else if (!wasInFolder && nowInFolder) {
       // Moved into reminders folder - scan
       log.info(` File moved into reminders folder: ${file.path}`);
-      this.index.rescanFile(file as TFile);
+      await this.index.rescanFile(file);
     }
     // If neither was in folder, ignore
   }
@@ -172,6 +172,6 @@ export class VaultWatcher {
    * Check if file is a markdown file
    */
   private isMarkdownFile(file: TAbstractFile): file is TFile {
-    return "extension" in file && (file as TFile).extension === "md";
+    return file instanceof TFile && file.extension === "md";
   }
 }

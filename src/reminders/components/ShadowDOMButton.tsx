@@ -1,23 +1,46 @@
-import React, { useRef, useEffect, forwardRef } from "react";
+import React, { useRef, useEffect, forwardRef, useCallback } from "react";
 import { Button } from "@heroui/react";
 import { motion } from "framer-motion";
+
+type NativeButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "children"> & {
+  onClick: () => void;
+  children: React.ReactNode;
+};
+
+type NativeMotionButtonProps = Omit<React.ComponentProps<typeof motion.button>, "children" | "onClick" | "ref"> & {
+  onClick: () => void;
+  children: React.ReactNode;
+};
+
+type HeroButtonProps = Omit<React.ComponentProps<typeof Button>, "children" | "onPress"> & {
+  onPress: () => void;
+  children: React.ReactNode;
+};
+
+function assignRef<T>(ref: React.ForwardedRef<T>, value: T | null): void {
+  if (typeof ref === "function") {
+    ref(value);
+    return;
+  }
+
+  if (ref) {
+    ref.current = value;
+  }
+}
 
 /**
  * Native button wrapper that works inside Shadow DOM
  * Preserves all styling from className/style props - use for buttons with custom inline styles
  */
-export const ShadowDOMNativeButton = forwardRef<HTMLButtonElement, {
-  onClick: () => void;
-  children: React.ReactNode;
-  className?: string;
-  style?: React.CSSProperties;
-  [key: string]: any;
-}>(({ onClick, children, className, style, ...props }, ref) => {
+export const ShadowDOMNativeButton = forwardRef<HTMLButtonElement, NativeButtonProps>(({ onClick, children, className, style, ...props }, ref) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const combinedRef = (ref as React.RefObject<HTMLButtonElement>) || buttonRef;
+  const combinedRef = useCallback((node: HTMLButtonElement | null) => {
+    buttonRef.current = node;
+    assignRef(ref, node);
+  }, [ref]);
 
   useEffect(() => {
-    const button = combinedRef?.current;
+    const button = buttonRef.current;
     if (!button) return;
 
     const handleClick = (e: MouseEvent) => {
@@ -42,18 +65,15 @@ ShadowDOMNativeButton.displayName = 'ShadowDOMNativeButton';
  * Native motion.button wrapper that works inside Shadow DOM
  * Preserves all styling and motion props - use for animated buttons with custom inline styles
  */
-export const ShadowDOMNativeMotionButton = forwardRef<HTMLButtonElement, {
-  onClick: () => void;
-  children: React.ReactNode;
-  className?: string;
-  style?: React.CSSProperties;
-  [key: string]: any;
-}>(({ onClick, children, className, style, ...props }, ref) => {
+export const ShadowDOMNativeMotionButton = forwardRef<HTMLButtonElement, NativeMotionButtonProps>(({ onClick, children, className, style, ...props }, ref) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const combinedRef = (ref as React.RefObject<HTMLButtonElement>) || buttonRef;
+  const combinedRef = useCallback((node: HTMLButtonElement | null) => {
+    buttonRef.current = node;
+    assignRef(ref, node);
+  }, [ref]);
 
   useEffect(() => {
-    const button = combinedRef?.current;
+    const button = buttonRef.current;
     if (!button) return;
 
     const handleClick = (e: MouseEvent) => {
@@ -78,16 +98,15 @@ ShadowDOMNativeMotionButton.displayName = 'ShadowDOMNativeMotionButton';
  * HeroUI Button wrapper that works inside Shadow DOM
  * Uses native click handler via capture phase since HeroUI's onPress doesn't work in Shadow DOM
  */
-export const ShadowDOMButton = forwardRef<HTMLButtonElement, {
-  onPress: () => void;
-  children: React.ReactNode;
-  [key: string]: any;
-}>(({ onPress, children, ...props }, ref) => {
+export const ShadowDOMButton = forwardRef<HTMLButtonElement, HeroButtonProps>(({ onPress, children, ...props }, ref) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const combinedRef = (ref as React.RefObject<HTMLButtonElement>) || buttonRef;
+  const combinedRef = useCallback((node: HTMLButtonElement | null) => {
+    buttonRef.current = node;
+    assignRef(ref, node);
+  }, [ref]);
 
   useEffect(() => {
-    const button = combinedRef?.current;
+    const button = buttonRef.current;
     if (!button) return;
 
     const handleClick = (e: MouseEvent) => {
@@ -113,17 +132,20 @@ ShadowDOMButton.displayName = 'ShadowDOMButton';
  * Combines framer-motion animations with capture-phase click handling
  */
 const MotionButton = motion.create(Button);
-
-export const ShadowDOMMotionButton = forwardRef<HTMLButtonElement, {
+type MotionHeroButtonProps = Omit<React.ComponentProps<typeof MotionButton>, "children" | "onPress" | "ref"> & {
   onPress: () => void;
   children: React.ReactNode;
-  [key: string]: any;
-}>(({ onPress, children, ...props }, ref) => {
+};
+
+export const ShadowDOMMotionButton = forwardRef<HTMLButtonElement, MotionHeroButtonProps>(({ onPress, children, ...props }, ref) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const combinedRef = (ref as React.RefObject<HTMLButtonElement>) || buttonRef;
+  const combinedRef = useCallback((node: HTMLButtonElement | null) => {
+    buttonRef.current = node;
+    assignRef(ref, node);
+  }, [ref]);
 
   useEffect(() => {
-    const button = combinedRef?.current;
+    const button = buttonRef.current;
     if (!button) return;
 
     const handleClick = (e: MouseEvent) => {
