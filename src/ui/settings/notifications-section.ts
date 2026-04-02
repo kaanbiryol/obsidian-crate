@@ -1,7 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { QRModal } from '../qr-modal';
-import { SECRET_KEYS } from '../../plugin/types';
 import { createSettingsSectionHeading } from './section-helpers';
 
 export interface NotificationsSectionContext {
@@ -40,25 +39,30 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 	// Subscribe link + QR code
 	const apiClient = plugin.syncRuntime.getApiClient();
 	if (apiClient) {
-		const subscribeUrl = `${plugin.settings.workerUrl}/notifications`;
-		const authToken = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || '';
-
 		new Setting(containerEl)
 			.setName('Subscribe a device')
-			.setDesc('Open this link on your phone or scan the code to enable notifications on that device.')
+			.setDesc('Open this link on your phone or scan the code to enable notifications on that device. Each link expires shortly and does not expose your sync token.')
 			.addButton(button => {
 				button.setButtonText('Copy link');
 				button.onClick(async () => {
-					const url = `${subscribeUrl}?token=${authToken}`;
-					await navigator.clipboard.writeText(url);
-					new Notice('Subscribe link copied to clipboard');
+					try {
+						const url = await buildEnrollmentUrl(plugin);
+						await navigator.clipboard.writeText(url);
+						new Notice('Subscribe link copied to clipboard');
+					} catch {
+						new Notice('Failed to create subscribe link');
+					}
 				});
 			})
 			.addButton(button => {
 				button.setButtonText('Show code');
 				button.onClick(async () => {
-					const url = `${subscribeUrl}?token=${authToken}`;
-					new QRModal(plugin.app, url).open();
+					try {
+						const url = await buildEnrollmentUrl(plugin);
+						new QRModal(plugin.app, url).open();
+					} catch {
+						new Notice('Failed to create subscribe code');
+					}
 				});
 			});
 
@@ -93,6 +97,18 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 				});
 			});
 	}
+}
+
+async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
+	const apiClient = plugin.syncRuntime.getApiClient();
+	if (!apiClient) {
+		throw new Error('Sync API is unavailable');
+	}
+
+	const { token } = await apiClient.createPushEnrollmentToken();
+	const subscribeUrl = new URL('notifications', `${plugin.settings.workerUrl}/`);
+	subscribeUrl.searchParams.set('token', token);
+	return subscribeUrl.toString();
 }
 
 async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin): Promise<void> {

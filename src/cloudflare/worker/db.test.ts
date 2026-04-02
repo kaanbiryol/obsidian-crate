@@ -18,11 +18,11 @@ describe('initDb', () => {
 		const first = createDb();
 		const second = createDb();
 
-		await initDb(first.db as never);
-		await initDb(first.db as never);
-		await initDb(second.db as never);
+	await initDb(first.db as never);
+	await initDb(first.db as never);
+	await initDb(second.db as never);
 
-		expect(first.db.prepare).toHaveBeenCalledTimes(6);
-		expect(second.db.prepare).toHaveBeenCalledTimes(6);
+		expect(first.db.prepare).toHaveBeenCalledTimes(7);
+		expect(second.db.prepare).toHaveBeenCalledTimes(7);
 	});
 });

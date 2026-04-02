@@ -1,15 +1,44 @@
 import { corsHeaders, corsResponse } from './cors';
 import { initDb, queryRows } from './db';
 import { getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
+import { issuePushEnrollmentToken } from './push-enrollment';
 import { PWA_HTML, SERVICE_WORKER_JS, MANIFEST_JSON, ICON_SVG, OPEN_OBSIDIAN_HTML } from './pwa';
 import { parseJsonObject, parseOptionalString } from './utils';
 
-export function handleNotificationsPage(url: URL): Response {
+function htmlSecurityHeaders(): Record<string, string> {
+	return {
+		'Cache-Control': 'no-store',
+		'Referrer-Policy': 'no-referrer',
+		'X-Content-Type-Options': 'nosniff',
+		'X-Frame-Options': 'DENY',
+		'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
+		'Content-Security-Policy': [
+			"default-src 'none'",
+			"style-src 'unsafe-inline'",
+			"script-src 'unsafe-inline'",
+			"connect-src 'self'",
+			"img-src 'self' data:",
+			"manifest-src 'self'",
+			"base-uri 'none'",
+			"form-action 'none'",
+			"frame-ancestors 'none'",
+		].join('; '),
+	};
+}
+
+function staticAssetHeaders(): Record<string, string> {
+	return {
+		'Cache-Control': 'no-store',
+		'Referrer-Policy': 'no-referrer',
+		'X-Content-Type-Options': 'nosniff',
+	};
+}
+
+export function handleNotificationsPage(): Response {
 	return new Response(PWA_HTML, {
 		headers: {
 			'Content-Type': 'text/html; charset=utf-8',
-			'Cache-Control': 'no-store',
-			'Referrer-Policy': 'no-referrer',
+			...htmlSecurityHeaders(),
 			...corsHeaders(),
 		},
 	});
@@ -20,6 +49,7 @@ export function handleServiceWorker(): Response {
 		headers: {
 			'Content-Type': 'application/javascript',
 			'Service-Worker-Allowed': '/notifications',
+			...staticAssetHeaders(),
 			...corsHeaders(),
 		},
 	});
@@ -29,6 +59,7 @@ export function handleManifest(): Response {
 	return new Response(MANIFEST_JSON, {
 		headers: {
 			'Content-Type': 'application/manifest+json',
+			...staticAssetHeaders(),
 			...corsHeaders(),
 		},
 	});
@@ -36,7 +67,10 @@ export function handleManifest(): Response {
 
 export function handleOpenObsidian(): Response {
 	return new Response(OPEN_OBSIDIAN_HTML, {
-		headers: { 'Content-Type': 'text/html; charset=utf-8' },
+		headers: {
+			'Content-Type': 'text/html; charset=utf-8',
+			...htmlSecurityHeaders(),
+		},
 	});
 }
 
@@ -45,6 +79,7 @@ export function handleIcon(): Response {
 		headers: {
 			'Content-Type': 'image/svg+xml',
 			'Cache-Control': 'public, max-age=86400',
+			'X-Content-Type-Options': 'nosniff',
 			...corsHeaders(),
 		},
 	});
@@ -54,6 +89,15 @@ export async function handleVapidPublicKey(db: D1Database | null): Promise<Respo
 	if (!db) return corsResponse({ error: 'Database not available' }, 404);
 	const keys = await getOrCreateVapidKeys(db);
 	return corsResponse({ publicKey: keys.publicKey });
+}
+
+export async function handleCreateEnrollmentToken(db: D1Database): Promise<Response> {
+	await initDb(db);
+	const { token, expiresAt } = await issuePushEnrollmentToken(db);
+	return corsResponse({
+		token,
+		expiresAt: new Date(expiresAt).toISOString(),
+	});
 }
 
 export async function handleSubscribe(request: Request, db: D1Database): Promise<Response> {

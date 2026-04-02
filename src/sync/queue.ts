@@ -15,7 +15,11 @@ export interface QueueApi {
 		contentType: string,
 	): Promise<{ success: boolean; path: string; hash?: string; error?: string }>;
 	deleteFile(path: string): Promise<{ success: boolean; path: string }>;
-	batchDelete(paths: string[]): Promise<{ success: boolean; deleted: string[] }>;
+	batchDelete(paths: string[]): Promise<{
+		success: boolean;
+		deleted: string[];
+		errors?: Array<{ path: string; error: string }>;
+	}>;
 }
 
 export interface QueueManifest {
@@ -230,11 +234,27 @@ export async function processPendingChanges(
 
 		if (deletes.length > 0) {
 			const deleteResult = await context.api.batchDelete(deletes);
-			if (!deleteResult.success) {
-				throw new Error(`Batch delete failed`);
-			}
 			for (const path of deleteResult.deleted) {
 				context.localManifest.removeEntry(path);
+			}
+			if (!deleteResult.success) {
+				const deletedSet = new Set(deleteResult.deleted);
+				const failedDeletes = deleteResult.errors
+					&& deleteResult.errors.length > 0
+					? deleteResult.errors
+					: deletes
+						.filter((path) => !deletedSet.has(path))
+						.map((path) => ({ path, error: 'Batch delete failed' }));
+				for (const failedDelete of failedDeletes) {
+					context.pendingPaths.add(`delete:${failedDelete.path}`);
+				}
+				await context.localManifest.save();
+				context.updateState({
+					status: 'error',
+					lastError: failedDeletes.map((failure) => `${failure.path}: ${failure.error}`).join('; '),
+					pendingChanges: context.pendingPaths.size,
+				});
+				return;
 			}
 		}
 

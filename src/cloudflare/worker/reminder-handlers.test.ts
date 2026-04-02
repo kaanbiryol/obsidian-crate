@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleScheduleReminder } from './reminder-handlers';
+import { handleCancelReminder, handleScheduleReminder } from './reminder-handlers';
 
 function createDb() {
 	const statements: string[] = [];
@@ -52,5 +52,30 @@ describe('worker reminder handlers', () => {
 		expect(insertStatement).toContain('(reminder_id, content, project, due_datetime)');
 		expect(insertStatement).not.toContain('ntfy_topic');
 		expect(alarmFetch).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not delete scheduled reminders when alarm cancellation fails', async () => {
+		const { db, statements } = createDb();
+		const alarmFetch = vi.fn(async () => new Response(null, { status: 500 }));
+		const env = {
+			DB: db,
+			REMINDER_ALARMS: {
+				idFromName: vi.fn(() => 'alarm-id'),
+				get: vi.fn(() => ({ fetch: alarmFetch })),
+			},
+		};
+
+		const response = await handleCancelReminder(
+			new Request('https://worker.test/reminders/cancel', {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ reminderId: 'rem-1' }),
+			}),
+			env as never,
+		);
+
+		expect(response.status).toBe(500);
+		expect(await response.json()).toEqual({ error: 'Failed to cancel alarm' });
+		expect(statements.some((sql) => sql.includes('DELETE FROM scheduled_reminders'))).toBe(false);
 	});
 });

@@ -2,7 +2,7 @@ export function corsHeaders(): Record<string, string> {
 	return {
 		'Access-Control-Allow-Origin': '*',
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-		'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-File-Hash, X-File-Size',
+		'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-File-Hash, X-File-Size, X-Crate-Enrollment-Token',
 		'Access-Control-Expose-Headers': 'X-File-Hash, X-File-Size, Content-Type, Content-Length',
 	};
 }

@@ -422,6 +422,12 @@ export class SyncApiClient {
 		return this.requestJson('/notifications/subscriptions');
 	}
 
+	async createPushEnrollmentToken(): Promise<{ token: string; expiresAt: string }> {
+		return this.requestJson('/notifications/enrollment-token', {
+			method: 'POST',
+		});
+	}
+
 	async deletePushSubscription(id: string): Promise<{ success: boolean }> {
 		return this.requestJson<{ success: boolean }>('/notifications/subscribe', {
 			method: 'DELETE',

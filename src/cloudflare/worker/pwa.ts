@@ -57,8 +57,8 @@ To receive notifications on iOS, tap <strong>Share</strong> (box with arrow) the
 	const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 	const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 
-	// Save auth token from URL param or hash. On iOS the PWA has separate storage
-	// from Safari, so we use a query param (preserved when adding to home screen).
+	// Save the short-lived enrollment token from the setup link. On iOS the PWA has
+	// separate storage from Safari, so we use a query param preserved during install.
 	const params = new URLSearchParams(location.search);
 	const tokenFromQuery = params.get('token');
 	const tokenFromHash = location.hash.slice(1);
@@ -86,15 +86,21 @@ To receive notifications on iOS, tap <strong>Share</strong> (box with arrow) the
 	// Register service worker
 	const reg = await navigator.serviceWorker.register('/notifications/sw.js');
 	const sub = await reg.pushManager.getSubscription();
+	const btn = document.getElementById('subscribe-btn');
+	const statusEl = document.getElementById('status');
 
 	if (sub) {
+		localStorage.removeItem('crate-push-token');
 		show('subscribed-section');
 		return;
 	}
 
 	show('subscribe-section');
-	const btn = document.getElementById('subscribe-btn');
-	const statusEl = document.getElementById('status');
+	if (!token) {
+		btn.disabled = true;
+		showStatus('This setup link is missing or expired. Open a new link from Crate.', true);
+		return;
+	}
 
 	btn.addEventListener('click', async () => {
 		btn.disabled = true;
@@ -114,7 +120,7 @@ To receive notifications on iOS, tap <strong>Share</strong> (box with arrow) the
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+					'X-Crate-Enrollment-Token': token,
 				},
 				body: JSON.stringify({
 					endpoint: subJson.endpoint,
@@ -128,10 +134,16 @@ To receive notifications on iOS, tap <strong>Share</strong> (box with arrow) the
 				throw new Error(resp.status + ': ' + (body || resp.statusText));
 			}
 
+			localStorage.removeItem('crate-push-token');
 			show('subscribed-section');
 			hide('subscribe-section');
 		} catch (err) {
-			showStatus(err.message || 'Failed to subscribe', true);
+			if ((err && err.message ? String(err.message) : '').startsWith('401:')) {
+				localStorage.removeItem('crate-push-token');
+				showStatus('This setup link expired. Open a fresh link from Crate and try again.', true);
+			} else {
+				showStatus(err && err.message ? String(err.message) : 'Failed to subscribe', true);
+			}
 			btn.disabled = false;
 			btn.textContent = 'Enable Notifications';
 		}

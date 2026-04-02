@@ -249,6 +249,62 @@ describe('runIncrementalSync', () => {
 		expect(localManifest.save).toHaveBeenCalledTimes(1);
 	});
 
+	it('records partial remote delete failures and leaves the sync cursor unchanged', async () => {
+		const settings = createSettings({ lastSeq: 7 });
+		const localManifest = {
+			save: vi.fn(async () => {}),
+			setEntry: vi.fn(),
+			removeEntry: vi.fn(),
+			getEntry: vi.fn(),
+			getAllPaths: vi.fn(() => []),
+			getManifest: vi.fn(() => ({ version: 1, files: {} })),
+		};
+
+		const context = {
+			settings,
+			vault: {
+				getAbstractFileByPath: vi.fn(() => null),
+				delete: vi.fn(),
+				adapter: {
+					exists: vi.fn(async () => false),
+					remove: vi.fn(),
+					stat: vi.fn(),
+					readBinary: vi.fn(),
+				},
+			} as never,
+			api: {
+				getChanges: vi.fn(async () => ({ changes: [], lastSeq: 8, hasMore: false })),
+				downloadFile: vi.fn(),
+				deleteFile: vi.fn(),
+				batchDelete: vi.fn(async () => ({
+					success: false,
+					deleted: ['notes/ok.md'],
+					errors: [
+						{ path: 'notes/fail.md', error: 'bucket unavailable' },
+					],
+				})),
+			},
+			localManifest,
+			shouldIgnore: vi.fn(() => false),
+			getLocalChanges: vi.fn(async () => []),
+			getLocalDeletes: vi.fn(async () => ['notes/ok.md', 'notes/fail.md']),
+			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
+			processDiff: vi.fn(async () => {}),
+			prepareUploadFromPath: vi.fn(async () => null),
+			uploadPreparedFiles: vi.fn(async () => {}),
+		};
+
+		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
+
+		expect(localManifest.removeEntry).toHaveBeenCalledWith('notes/ok.md');
+		expect(localManifest.removeEntry).not.toHaveBeenCalledWith('notes/fail.md');
+		expect(result?.success).toBe(false);
+		expect(result?.deleted).toBe(1);
+		expect(result?.errors).toContain('notes/fail.md: bucket unavailable');
+		expect(settings.lastSeq).toBe(7);
+		expect(localManifest.save).toHaveBeenCalledTimes(1);
+	});
+
 	it('keeps cursor unchanged when incremental sync finishes with errors', async () => {
 		const settings = createSettings({ lastSeq: 11 });
 		const localManifest = {

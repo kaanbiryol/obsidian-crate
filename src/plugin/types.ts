@@ -151,6 +151,7 @@ export interface BatchDownloadResponse {
 export interface BatchDeleteResponse {
 	success: boolean;
 	deleted: string[];
+	errors?: Array<{ path: string; error: string }>;
 }
 
 // ============================================================================

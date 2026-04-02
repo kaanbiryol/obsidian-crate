@@ -370,11 +370,15 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 	if (!paths || paths.length === 0) return corsResponse({ error: 'paths array required' }, 400);
 
 	const deleted: string[] = [];
+	const errors: Array<{ path: string; error: string }> = [];
 	const dbOps: D1PreparedStatement[] = [];
 
 	for (const rawPath of paths) {
 		const safePath = sanitizePath(rawPath);
-		if (!safePath) continue;
+		if (!safePath) {
+			errors.push({ path: rawPath, error: 'Invalid path' });
+			continue;
+		}
 
 		try {
 			await bucket.delete(FILES_PREFIX + safePath);
@@ -386,7 +390,12 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 					db.prepare('DELETE FROM files WHERE path = ?').bind(safePath),
 				);
 			}
-		} catch { /* skip failed deletes */ }
+		} catch (error: unknown) {
+			errors.push({
+				path: safePath,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
 	}
 
 	if (db && dbOps.length > 0) {
@@ -397,7 +406,11 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 		} catch { /* D1 failure is non-fatal */ }
 	}
 
-	return corsResponse({ success: true, deleted });
+	return corsResponse({
+		success: errors.length === 0,
+		deleted,
+		...(errors.length > 0 ? { errors } : {}),
+	});
 }
 
 export async function handleGetConfig(env: Env): Promise<Response> {

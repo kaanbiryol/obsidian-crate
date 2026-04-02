@@ -23,7 +23,11 @@ export interface PlannerApi {
 	getChanges(since: number): Promise<{ changes: ChangelogEntry[]; lastSeq: number; hasMore: boolean; cursorExpired?: boolean }>;
 	downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number }>;
 	deleteFile(path: string): Promise<{ success: boolean; path: string }>;
-	batchDelete(paths: string[]): Promise<{ success: boolean; deleted: string[] }>;
+	batchDelete(paths: string[]): Promise<{
+		success: boolean;
+		deleted: string[];
+		errors?: Array<{ path: string; error: string }>;
+	}>;
 }
 
 export interface LocalDiffPlannerContext {
@@ -351,6 +355,18 @@ export async function runIncrementalSync(
 					context.localManifest.removeEntry(path);
 					result.deleted++;
 					result.deletedPaths.push(path);
+				}
+				if (!deleteResult.success) {
+					const deletedSet = new Set(deleteResult.deleted);
+					const failures = deleteResult.errors
+						&& deleteResult.errors.length > 0
+						? deleteResult.errors
+						: localOnlyDeletes
+							.filter((path) => !deletedSet.has(path))
+							.map((path) => ({ path, error: 'Batch delete failed' }));
+					for (const failure of failures) {
+						result.errors.push(`${failure.path}: ${failure.error}`);
+					}
 				}
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : 'Unknown error';

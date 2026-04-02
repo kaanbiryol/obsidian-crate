@@ -14,8 +14,9 @@ import {
 import {
 	handleNotificationsPage, handleServiceWorker, handleManifest, handleIcon,
 	handleOpenObsidian, handleVapidPublicKey, handleSubscribe, handleUnsubscribe,
-	handleListSubscriptions, handleTestPush,
+	handleListSubscriptions, handleTestPush, handleCreateEnrollmentToken,
 } from './push-handlers';
+import { consumePushEnrollmentToken } from './push-enrollment';
 import type { Env } from './types';
 
 export { ReminderAlarm } from './reminder-alarm';
@@ -33,14 +34,36 @@ export default {
 		const url = new URL(request.url);
 		const path = url.pathname;
 		const method = request.method;
+		const db = env.DB || null;
 
 		// Unauthenticated PWA routes
-		if (path === '/notifications' && method === 'GET') return handleNotificationsPage(url);
+		if (path === '/notifications' && method === 'GET') return handleNotificationsPage();
 		if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
 		if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest();
 		if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon();
 		if (path === '/notifications/open-obsidian' && method === 'GET') return handleOpenObsidian();
-		if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(env.DB);
+		if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);
+
+		if (path === '/notifications/subscribe' && method === 'POST') {
+			const enrollmentToken = request.headers.get('X-Crate-Enrollment-Token')?.trim() || '';
+			if (enrollmentToken) {
+				const dbResponse = requireDatabase(db);
+				if (dbResponse) {
+					return dbResponse;
+				}
+
+				const accepted = await consumePushEnrollmentToken(db, enrollmentToken);
+				if (!accepted) {
+					return corsResponse({ error: 'Invalid or expired enrollment token' }, 401);
+				}
+
+				try {
+					return await handleSubscribe(request, db);
+				} catch {
+					return corsResponse({ error: 'Internal server error' }, 500);
+				}
+			}
+		}
 
 		// Auth check
 		const authHeader = request.headers.get('Authorization');
@@ -48,7 +71,6 @@ export default {
 			return corsResponse({ error: 'Unauthorized' }, 401);
 		}
 		const token = authHeader.substring(7);
-		const db = env.DB || null;
 
 		let authenticated = false;
 		if (db) {
@@ -126,6 +148,10 @@ export default {
 			if (path === '/notifications/subscriptions' && method === 'GET') {
 				const dbResponse = requireDatabase(db);
 				return dbResponse ?? await handleListSubscriptions(db);
+			}
+			if (path === '/notifications/enrollment-token' && method === 'POST') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleCreateEnrollmentToken(db);
 			}
 			if (path === '/notifications/test' && method === 'POST') {
 				const dbResponse = requireDatabase(db);

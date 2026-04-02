@@ -84,7 +84,15 @@ export async function handleCancelReminder(request: Request, env: Env): Promise<
 
 	const id = env.REMINDER_ALARMS.idFromName(reminderId);
 	const stub = env.REMINDER_ALARMS.get(id);
-	await stub.fetch('https://do/cancel', { method: 'DELETE' });
+	let response: Response;
+	try {
+		response = await stub.fetch('https://do/cancel', { method: 'DELETE' });
+	} catch {
+		return corsResponse({ error: 'Failed to cancel alarm' }, 500);
+	}
+	if (!response.ok) {
+		return corsResponse({ error: 'Failed to cancel alarm' }, 500);
+	}
 
 	await db.prepare('DELETE FROM scheduled_reminders WHERE reminder_id = ?')
 		.bind(reminderId).run();

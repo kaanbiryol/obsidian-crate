@@ -372,4 +372,29 @@ describe('processPendingChanges', () => {
 		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
 	});
+
+	it('keeps successful deletes committed and requeues only failed remote deletes', async () => {
+		const harness = createFlushHarness({
+			batchDelete: async () => ({
+				success: false,
+				deleted: ['notes/ok.md'],
+				errors: [
+					{ path: 'notes/fail.md', error: 'bucket unavailable' },
+				],
+			}),
+		});
+		harness.pendingPaths.add('delete:notes/ok.md');
+		harness.pendingPaths.add('delete:notes/fail.md');
+
+		await processPendingChanges(harness.context, 4);
+
+		expect(harness.removeEntry).toHaveBeenCalledWith('notes/ok.md');
+		expect(harness.removeEntry).not.toHaveBeenCalledWith('notes/fail.md');
+		expect(harness.pendingPaths.has('delete:notes/fail.md')).toBe(true);
+		expect(harness.pendingPaths.has('delete:notes/ok.md')).toBe(false);
+		expect(harness.state.status).toBe('error');
+		expect(harness.state.lastError).toContain('notes/fail.md');
+		expect(harness.save).toHaveBeenCalledTimes(1);
+		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
+	});
 });

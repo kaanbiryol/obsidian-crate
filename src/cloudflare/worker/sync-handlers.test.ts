@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleBatchUpload, handleDelete, handleGetSettings, handlePutSettings, handleUpload } from './sync-handlers';
+import {
+	handleBatchDelete,
+	handleBatchUpload,
+	handleDelete,
+	handleGetSettings,
+	handlePutSettings,
+	handleUpload,
+} from './sync-handlers';
 
 type StoredObject = {
 	body: ArrayBuffer;
@@ -137,6 +144,39 @@ describe('worker sync handlers', () => {
 
 		expect(response.status).toBe(400);
 		expect(await responseJson(response)).toEqual({ error: 'Invalid JSON body' });
+	});
+
+	it('reports partial batch delete failures instead of claiming full success', async () => {
+		const { bucket } = createBucket();
+		bucket.delete = vi.fn(async (key: string) => {
+			if (key === 'files/notes/fail.md') {
+				throw new Error('bucket unavailable');
+			}
+		});
+
+		const response = await handleBatchDelete(
+			new Request('https://worker.test/sync/batch-delete', {
+				method: 'POST',
+				body: JSON.stringify({
+					paths: ['notes/ok.md', 'notes/fail.md'],
+				}),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket as never,
+			null,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await responseJson(response)).toEqual({
+			success: false,
+			deleted: ['notes/ok.md'],
+			errors: [
+				{
+					path: 'notes/fail.md',
+					error: 'bucket unavailable',
+				},
+			],
+		});
 	});
 
 	it('validates shared settings writes and treats corrupt stored settings as absent', async () => {
