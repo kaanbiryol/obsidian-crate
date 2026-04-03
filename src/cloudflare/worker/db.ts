@@ -17,8 +17,17 @@ export async function initDb(db: D1Database): Promise<void> {
 		path TEXT PRIMARY KEY,
 		hash TEXT NOT NULL DEFAULT '',
 		size INTEGER NOT NULL DEFAULT 0,
-		modified TEXT NOT NULL DEFAULT (datetime('now'))
+		modified TEXT NOT NULL DEFAULT (datetime('now')),
+		storage_key TEXT
 	)`).run();
+	try {
+		await db.prepare('ALTER TABLE files ADD COLUMN storage_key TEXT').run();
+	} catch (error: unknown) {
+		const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+		if (!message.includes('duplicate column') && !message.includes('already exists')) {
+			throw error;
+		}
+	}
 	await db.prepare(`CREATE TABLE IF NOT EXISTS auth_tokens (
 		id TEXT PRIMARY KEY,
 		token_hash TEXT NOT NULL UNIQUE,

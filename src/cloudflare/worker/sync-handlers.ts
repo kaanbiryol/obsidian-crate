@@ -15,20 +15,10 @@ import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
 
 const MAX_BATCH_FILES = 50;
 const MAX_BATCH_TOTAL_BYTES = 10 * 1024 * 1024;
+const MANAGED_FILES_PREFIX = '__crate__/files/';
 
-type BucketObjectSnapshot =
-	| { exists: false }
-	| {
-		exists: true;
-		body: ArrayBuffer;
-		httpMetadata?: R2HttpMetadata;
-		customMetadata?: Record<string, string>;
-	};
-
-interface BatchRollbackEntry {
-	path: string;
-	objectKey: string;
-	snapshot: BucketObjectSnapshot;
+interface FileStorageRow {
+	storageKey: string | null;
 }
 
 function parseDeclaredSize(headerValue: string | null): number | null {
@@ -44,88 +34,82 @@ function formatMutationError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
-async function snapshotBucketObject(bucket: R2Bucket, key: string): Promise<BucketObjectSnapshot> {
-	const object = await bucket.get(key);
-	if (!object) {
-		return { exists: false };
+function legacyObjectKey(path: string): string {
+	return FILES_PREFIX + path;
+}
+
+function createManagedObjectKey(hash: string): string {
+	return `${MANAGED_FILES_PREFIX}${hash}/${crypto.randomUUID()}`;
+}
+
+function normalizeStorageKey(value: unknown): string | null {
+	if (typeof value !== 'string') {
+		return null;
+	}
+
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : null;
+}
+
+function resolveObjectKey(path: string, storageKey: string | null): string {
+	return storageKey ?? legacyObjectKey(path);
+}
+
+function collectCleanupKeys(path: string, previousFile: FileStorageRow | null, preserve?: string): string[] {
+	const keys = new Set<string>();
+	const legacyKey = legacyObjectKey(path);
+	if (legacyKey !== preserve) {
+		keys.add(legacyKey);
+	}
+
+	if (previousFile) {
+		const previousKey = resolveObjectKey(path, previousFile.storageKey);
+		if (previousKey !== preserve) {
+			keys.add(previousKey);
+		}
+	}
+
+	return Array.from(keys);
+}
+
+async function deleteBucketObjectsQuietly(bucket: R2Bucket, keys: string[]): Promise<void> {
+	const uniqueKeys = Array.from(new Set(keys.filter((key) => key.length > 0)));
+	await Promise.allSettled(uniqueKeys.map((key) => bucket.delete(key)));
+}
+
+function formatMetadataCommitFailure(actionLabel: 'Upload' | 'Delete', metadataMessage: string): string {
+	return `${actionLabel} not committed because sync metadata update failed: ${metadataMessage}`;
+}
+
+async function getStoredFileRow(db: D1Database, path: string): Promise<FileStorageRow | null> {
+	const row = await db.prepare('SELECT storage_key FROM files WHERE path = ?')
+		.bind(path)
+		.first<{ storage_key?: string | null }>();
+	if (!row) {
+		return null;
 	}
 
 	return {
-		exists: true,
-		body: await object.arrayBuffer(),
-		httpMetadata: object.httpMetadata ? { ...object.httpMetadata } : undefined,
-		customMetadata: object.customMetadata ? { ...object.customMetadata } : undefined,
+		storageKey: normalizeStorageKey(row.storage_key),
 	};
 }
 
-async function restoreBucketObject(bucket: R2Bucket, key: string, snapshot: BucketObjectSnapshot): Promise<void> {
-	if (!snapshot.exists) {
-		await bucket.delete(key);
-		return;
-	}
-
-	await bucket.put(key, snapshot.body, {
-		httpMetadata: snapshot.httpMetadata ? { ...snapshot.httpMetadata } : undefined,
-		customMetadata: snapshot.customMetadata ? { ...snapshot.customMetadata } : undefined,
-	});
-}
-
-function formatBatchMetadataFailure(
-	actionLabel: 'Upload' | 'Delete',
-	metadataMessage: string,
-	rollbackMessage?: string,
-): string {
-	if (!rollbackMessage) {
-		return `${actionLabel} rolled back because sync metadata update failed: ${metadataMessage}`;
-	}
-
-	return `${actionLabel} metadata update failed and rollback failed: ${metadataMessage}; ${rollbackMessage}`;
-}
-
-async function rollbackBatchEntries(
-	bucket: R2Bucket,
-	entries: BatchRollbackEntry[],
-): Promise<Map<string, string | null>> {
-	const outcomes = new Map<string, string | null>();
-	await Promise.all(entries.map(async (entry) => {
-		try {
-			await restoreBucketObject(bucket, entry.objectKey, entry.snapshot);
-			outcomes.set(entry.path, null);
-		} catch (error: unknown) {
-			outcomes.set(entry.path, formatMutationError(error));
-		}
+async function loadStoredFileRows(db: D1Database, paths: string[]): Promise<Map<string, FileStorageRow>> {
+	const rows = await Promise.all(paths.map(async (path) => {
+		const row = await getStoredFileRow(db, path);
+		return row ? [path, row] as const : null;
 	}));
-	return outcomes;
+
+	return new Map(rows.filter((entry): entry is readonly [string, FileStorageRow] => entry !== null));
 }
 
-async function rollbackMutationOnMetadataFailure(params: {
-	actionLabel: 'Upload' | 'Delete';
-	path: string;
-	bucket: R2Bucket;
-	objectKey: string;
-	snapshot: BucketObjectSnapshot;
-	commitMetadata: () => Promise<void>;
-}): Promise<Response | null> {
-	try {
-		await params.commitMetadata();
+async function resolveCommittedObjectKey(db: D1Database, path: string): Promise<string | null> {
+	const row = await getStoredFileRow(db, path);
+	if (!row) {
 		return null;
-	} catch (metadataError: unknown) {
-		const metadataMessage = formatMutationError(metadataError);
-		try {
-			await restoreBucketObject(params.bucket, params.objectKey, params.snapshot);
-			return corsResponse({
-				success: false,
-				path: params.path,
-				error: `${params.actionLabel} rolled back because sync metadata update failed: ${metadataMessage}`,
-			}, 503);
-		} catch (rollbackError: unknown) {
-			return corsResponse({
-				success: false,
-				path: params.path,
-				error: `${params.actionLabel} metadata update failed and rollback failed: ${metadataMessage}; ${formatMutationError(rollbackError)}`,
-			}, 500);
-		}
 	}
+
+	return resolveObjectKey(path, row.storageKey);
 }
 
 export async function handleHealth(): Promise<Response> {
@@ -221,32 +205,43 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 
 		const hash = hashHeader || computedHash;
 		const size = declaredSize ?? computedSize;
-		const objectKey = FILES_PREFIX + safePath;
-		const previousObject = db ? await snapshotBucketObject(bucket, objectKey) : null;
+		let previousFile: FileStorageRow | null = null;
+		if (db) {
+			try {
+				await initDb(db);
+				previousFile = await getStoredFileRow(db, safePath);
+			} catch (error: unknown) {
+				return corsResponse({
+					success: false,
+					path: safePath,
+					error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
+				}, 503);
+			}
+		}
+
+		const objectKey = db ? createManagedObjectKey(hash) : legacyObjectKey(safePath);
 		await bucket.put(objectKey, body, {
 			httpMetadata: { contentType },
 			customMetadata: { hash },
 		});
 
-		if (db && previousObject) {
-			const rollbackResponse = await rollbackMutationOnMetadataFailure({
-				actionLabel: 'Upload',
-				path: safePath,
-				bucket,
-				objectKey,
-				snapshot: previousObject,
-				commitMetadata: async () => {
-					await initDb(db);
-					await db.batch([
-						db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'put', hash || '', size || 0),
-						db.prepare("INSERT OR REPLACE INTO files (path, hash, size, modified) VALUES (?, ?, ?, datetime('now'))").bind(safePath, hash || '', size || 0),
-					]);
-					await maybePruneChangelog(db);
-				},
-			});
-			if (rollbackResponse) {
-				return rollbackResponse;
+		if (db) {
+			try {
+				await db.batch([
+					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'put', hash || '', size || 0),
+					db.prepare("INSERT OR REPLACE INTO files (path, hash, size, modified, storage_key) VALUES (?, ?, ?, datetime('now'), ?)").bind(safePath, hash || '', size || 0, objectKey),
+				]);
+				await maybePruneChangelog(db);
+			} catch (error: unknown) {
+				await deleteBucketObjectsQuietly(bucket, [objectKey]);
+				return corsResponse({
+					success: false,
+					path: safePath,
+					error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
+				}, 503);
 			}
+
+			await deleteBucketObjectsQuietly(bucket, collectCleanupKeys(safePath, previousFile, objectKey));
 		}
 
 		return corsResponse({ success: true, path: safePath, hash });
@@ -256,7 +251,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 	}
 }
 
-export async function handleDownload(request: Request, bucket: R2Bucket): Promise<Response> {
+export async function handleDownload(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
 	const url = new URL(request.url);
 	const rawPath = url.searchParams.get('path');
 	if (!rawPath) return corsResponse({ error: 'Path query parameter required' }, 400);
@@ -264,8 +259,24 @@ export async function handleDownload(request: Request, bucket: R2Bucket): Promis
 	const path = sanitizePath(rawPath);
 	if (!path) return corsResponse({ error: 'Invalid path' }, 400);
 
-	const obj = await bucket.get(FILES_PREFIX + path);
-	if (!obj) return corsResponse({ error: 'File not found' }, 404);
+	let objectKey: string | null;
+	if (db) {
+		try {
+			await initDb(db);
+			objectKey = await resolveCommittedObjectKey(db, path);
+		} catch {
+			return corsResponse({ error: 'Sync metadata unavailable' }, 503);
+		}
+	} else {
+		objectKey = legacyObjectKey(path);
+	}
+
+	if (!objectKey) return corsResponse({ error: 'File not found' }, 404);
+
+	const obj = await bucket.get(objectKey);
+	if (!obj) {
+		return corsResponse({ error: db ? 'File content unavailable' : 'File not found' }, db ? 503 : 404);
+	}
 
 	const { corsHeaders } = await import('./cors');
 	return new Response(obj.body, {
@@ -291,29 +302,27 @@ export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Dat
 	const safePath = sanitizePath(rawPath);
 	if (!safePath) return corsResponse({ error: 'Invalid path' }, 400);
 
-	const objectKey = FILES_PREFIX + safePath;
-	const previousObject = db ? await snapshotBucketObject(bucket, objectKey) : null;
-	await bucket.delete(objectKey);
-
-	if (db && previousObject) {
-		const rollbackResponse = await rollbackMutationOnMetadataFailure({
-			actionLabel: 'Delete',
-			path: safePath,
-			bucket,
-			objectKey,
-			snapshot: previousObject,
-			commitMetadata: async () => {
-				await initDb(db);
-				await db.batch([
-					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'delete', '', 0),
-					db.prepare('DELETE FROM files WHERE path = ?').bind(safePath),
-				]);
-				await maybePruneChangelog(db);
-			},
-		});
-		if (rollbackResponse) {
-			return rollbackResponse;
+	let previousFile: FileStorageRow | null = null;
+	if (db) {
+		try {
+			await initDb(db);
+			previousFile = await getStoredFileRow(db, safePath);
+			await db.batch([
+				db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'delete', '', 0),
+				db.prepare('DELETE FROM files WHERE path = ?').bind(safePath),
+			]);
+			await maybePruneChangelog(db);
+		} catch (error: unknown) {
+			return corsResponse({
+				success: false,
+				path: safePath,
+				error: formatMetadataCommitFailure('Delete', formatMutationError(error)),
+			}, 503);
 		}
+
+		await deleteBucketObjectsQuietly(bucket, collectCleanupKeys(safePath, previousFile));
+	} else {
+		await bucket.delete(legacyObjectKey(safePath));
 	}
 
 	return corsResponse({ success: true, path: safePath });
@@ -339,9 +348,8 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 
 	const results: Array<{ path: string; success: boolean; hash?: string; error?: string }> = [];
 	const dbOps: D1PreparedStatement[] = [];
-	const uploads: Array<{ safePath: string; bytes: ArrayBuffer; hash: string; size: number; contentType: string }> = [];
-	const rollbackEntries = new Map<string, BatchRollbackEntry>();
-	const committedUploads: Array<{ safePath: string; hash: string }> = [];
+	const uploads: Array<{ safePath: string; bytes: ArrayBuffer; hash: string; size: number; contentType: string; objectKey: string }> = [];
+	const committedUploads: Array<{ safePath: string; hash: string; objectKey: string }> = [];
 	let totalBytes = 0;
 
 	for (const file of files as BatchFile[]) {
@@ -402,6 +410,7 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 				hash: providedHash || computedHash,
 				size,
 				contentType: parseOptionalString(file.contentType, 255) || 'application/octet-stream',
+				objectKey: db ? createManagedObjectKey(providedHash || computedHash) : legacyObjectKey(safePath),
 			});
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : String(err);
@@ -409,29 +418,37 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 		}
 	}
 
+	let previousFiles = new Map<string, FileStorageRow>();
+	if (db && uploads.length > 0) {
+		try {
+			await initDb(db);
+			previousFiles = await loadStoredFileRows(db, uploads.map((file) => file.safePath));
+		} catch (error: unknown) {
+			return corsResponse({
+				success: false,
+				results: results.concat(uploads.map((file) => ({
+					path: file.safePath,
+					success: false as const,
+					error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
+				}))),
+			}, 503);
+		}
+	}
+
 	await Promise.all(uploads.map(async (file) => {
 		try {
-			const objectKey = FILES_PREFIX + file.safePath;
-			if (db) {
-				rollbackEntries.set(file.safePath, {
-					path: file.safePath,
-					objectKey,
-					snapshot: await snapshotBucketObject(bucket, objectKey),
-				});
-			}
-
-			await bucket.put(objectKey, file.bytes, {
+			await bucket.put(file.objectKey, file.bytes, {
 				httpMetadata: { contentType: file.contentType },
 				customMetadata: { hash: file.hash },
 			});
 
 			results.push({ path: file.safePath, success: true, hash: file.hash });
-			committedUploads.push({ safePath: file.safePath, hash: file.hash });
+			committedUploads.push({ safePath: file.safePath, hash: file.hash, objectKey: file.objectKey });
 
 			if (db) {
 				dbOps.push(
 					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(file.safePath, 'put', file.hash, file.size),
-					db.prepare("INSERT OR REPLACE INTO files (path, hash, size, modified) VALUES (?, ?, ?, datetime('now'))").bind(file.safePath, file.hash, file.size),
+					db.prepare("INSERT OR REPLACE INTO files (path, hash, size, modified, storage_key) VALUES (?, ?, ?, datetime('now'), ?)").bind(file.safePath, file.hash, file.size, file.objectKey),
 				);
 			}
 		} catch (err: unknown) {
@@ -442,45 +459,49 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 
 	if (db && dbOps.length > 0) {
 		try {
-			await initDb(db);
 			await db.batch(dbOps);
 			await maybePruneChangelog(db);
 		} catch (error: unknown) {
 			const metadataMessage = formatMutationError(error);
-			const pathsToRollback = committedUploads
-				.map((upload) => rollbackEntries.get(upload.safePath))
-				.filter((entry): entry is BatchRollbackEntry => entry !== undefined);
-			const rollbackOutcomes = await rollbackBatchEntries(bucket, pathsToRollback);
+			await deleteBucketObjectsQuietly(bucket, committedUploads.map((upload) => upload.objectKey));
 			const failedPaths = new Set(committedUploads.map((upload) => upload.safePath));
 			const finalResults = results
 				.filter((result) => !failedPaths.has(result.path))
 				.concat(committedUploads.map((upload) => {
-					const rollbackMessage = rollbackOutcomes.get(upload.safePath) ?? null;
 					return {
 						path: upload.safePath,
 						success: false as const,
-						error: formatBatchMetadataFailure('Upload', metadataMessage, rollbackMessage ?? undefined),
+						error: formatMetadataCommitFailure('Upload', metadataMessage),
 					};
 				}));
 
-			const rollbackFailed = Array.from(rollbackOutcomes.values()).some((value) => value !== null);
-			return corsResponse(
-				{ success: false, results: finalResults },
-				rollbackFailed ? 500 : 503,
-			);
+			return corsResponse({ success: false, results: finalResults }, 503);
 		}
+
+		await deleteBucketObjectsQuietly(
+			bucket,
+			committedUploads.flatMap((upload) => collectCleanupKeys(upload.safePath, previousFiles.get(upload.safePath) ?? null, upload.objectKey)),
+		);
 	}
 
 	return corsResponse({ success: results.every(r => r.success), results });
 }
 
-export async function handleBatchDownload(request: Request, bucket: R2Bucket): Promise<Response> {
+export async function handleBatchDownload(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
 	}
 	const paths = parseStringArray(parsedBody.value.paths, MAX_BATCH_FILES, 4096);
 	if (!paths || paths.length === 0) return corsResponse({ error: 'paths array required' }, 400);
+
+	if (db) {
+		try {
+			await initDb(db);
+		} catch {
+			return corsResponse({ error: 'Sync metadata unavailable' }, 503);
+		}
+	}
 
 	const files: Array<{ path: string; content: string; hash: string; size: number; contentType: string; error?: string }> = [];
 	for (const rawPath of paths) {
@@ -491,9 +512,24 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket): P
 		}
 
 		try {
-			const obj = await bucket.get(FILES_PREFIX + safePath);
-			if (!obj) {
+			const objectKey = db
+				? await resolveCommittedObjectKey(db, safePath)
+				: legacyObjectKey(safePath);
+			if (!objectKey) {
 				files.push({ path: safePath, content: '', hash: '', size: 0, contentType: '', error: 'File not found' });
+				continue;
+			}
+
+			const obj = await bucket.get(objectKey);
+			if (!obj) {
+				files.push({
+					path: safePath,
+					content: '',
+					hash: '',
+					size: 0,
+					contentType: '',
+					error: db ? 'File content unavailable' : 'File not found',
+				});
 				continue;
 			}
 
@@ -534,7 +570,7 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 	const deleted: string[] = [];
 	const errors: Array<{ path: string; error: string }> = [];
 	const dbOps: D1PreparedStatement[] = [];
-	const rollbackEntries = new Map<string, BatchRollbackEntry>();
+	const validPaths: string[] = [];
 
 	for (const rawPath of paths) {
 		const safePath = sanitizePath(rawPath);
@@ -543,25 +579,39 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 			continue;
 		}
 
+		validPaths.push(safePath);
+	}
+
+	let previousFiles = new Map<string, FileStorageRow>();
+	if (db && validPaths.length > 0) {
 		try {
-			const objectKey = FILES_PREFIX + safePath;
-			if (db) {
-				rollbackEntries.set(safePath, {
-					path: safePath,
-					objectKey,
-					snapshot: await snapshotBucketObject(bucket, objectKey),
-				});
-			}
+			await initDb(db);
+			previousFiles = await loadStoredFileRows(db, validPaths);
+		} catch (error: unknown) {
+			return corsResponse({
+				success: false,
+				deleted: [],
+				errors: errors.concat(validPaths.map((path) => ({
+					path,
+					error: formatMetadataCommitFailure('Delete', formatMutationError(error)),
+				}))),
+			}, 503);
+		}
+	}
 
-			await bucket.delete(objectKey);
-			deleted.push(safePath);
-
+	for (const safePath of validPaths) {
+		try {
 			if (db) {
 				dbOps.push(
 					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'delete', '', 0),
 					db.prepare('DELETE FROM files WHERE path = ?').bind(safePath),
 				);
+				deleted.push(safePath);
+				continue;
 			}
+
+			await bucket.delete(legacyObjectKey(safePath));
+			deleted.push(safePath);
 		} catch (error: unknown) {
 			errors.push({
 				path: safePath,
@@ -572,32 +622,27 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 
 	if (db && dbOps.length > 0) {
 		try {
-			await initDb(db);
 			await db.batch(dbOps);
 			await maybePruneChangelog(db);
 		} catch (error: unknown) {
 			const metadataMessage = formatMutationError(error);
-			const pathsToRollback = deleted
-				.map((path) => rollbackEntries.get(path))
-				.filter((entry): entry is BatchRollbackEntry => entry !== undefined);
-			const rollbackOutcomes = await rollbackBatchEntries(bucket, pathsToRollback);
 			const metadataErrors = deleted.map((path) => {
-				const rollbackMessage = rollbackOutcomes.get(path) ?? null;
 				return {
 					path,
-					error: formatBatchMetadataFailure('Delete', metadataMessage, rollbackMessage ?? undefined),
+					error: formatMetadataCommitFailure('Delete', metadataMessage),
 				};
 			});
-			const rollbackFailed = Array.from(rollbackOutcomes.values()).some((value) => value !== null);
-			return corsResponse(
-				{
-					success: false,
-					deleted: [],
-					errors: errors.concat(metadataErrors),
-				},
-				rollbackFailed ? 500 : 503,
-			);
+			return corsResponse({
+				success: false,
+				deleted: [],
+				errors: errors.concat(metadataErrors),
+			}, 503);
 		}
+
+		await deleteBucketObjectsQuietly(
+			bucket,
+			deleted.flatMap((path) => collectCleanupKeys(path, previousFiles.get(path) ?? null)),
+		);
 	}
 
 	return corsResponse({

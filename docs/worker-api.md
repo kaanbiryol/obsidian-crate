@@ -248,11 +248,12 @@ CREATE TABLE IF NOT EXISTS files (
   path     TEXT PRIMARY KEY,
   hash     TEXT NOT NULL DEFAULT '',
   size     INTEGER NOT NULL DEFAULT 0,
-  modified TEXT NOT NULL DEFAULT (datetime('now'))
+  modified TEXT NOT NULL DEFAULT (datetime('now')),
+  storage_key TEXT
 );
 ```
 
-D1-backed remote manifest. Updated atomically with changelog entries via `db.batch()`.
+D1-backed remote manifest. Updated atomically with changelog entries via `db.batch()`. `storage_key` points at the committed R2 blob for the path, so D1 is the visibility boundary even if best-effort R2 cleanup later fails.
 
 ### auth_tokens
 
@@ -311,7 +312,7 @@ Web Push subscriptions. Each subscribed device gets a row. Expired subscriptions
 
 ## R2 Key Convention
 
-All file objects stored under `files/` prefix: `files/<vault-path>`
+With D1 enabled, committed file blobs are stored under `__crate__/files/<hash>/<uuid>` and referenced through `files.storage_key`. Legacy rows without `storage_key` still fall back to `files/<vault-path>`. When D1 is unavailable entirely, uploads/downloads continue to use the legacy `files/<vault-path>` layout.
 
 ## Path Sanitization
 

@@ -100,10 +100,10 @@ export default {
 				return dbResponse ?? await handleGetManifest(request, db);
 			}
 			if (path === '/sync/upload' && method === 'PUT') return await handleUpload(request, bucket, db);
-			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket);
+			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket, db);
 			if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
 			if (path === '/sync/batch-upload' && method === 'POST') return await handleBatchUpload(request, bucket, db);
-			if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket);
+			if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket, db);
 			if (path === '/sync/batch-delete' && method === 'POST') return await handleBatchDelete(request, bucket, db);
 			if (path === '/sync/config' && method === 'GET') return await handleGetConfig(env);
 

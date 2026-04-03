@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+	handleBatchDownload,
 	handleBatchDelete,
 	handleBatchUpload,
 	handleDelete,
+	handleDownload,
 	handleGetSettings,
 	handlePutSettings,
 	handleUpload,
@@ -54,32 +56,61 @@ function createBucket(initialEntries: Record<string, string> = {}) {
 	};
 }
 
-function createDb(options?: { failBatch?: boolean }) {
+function createDb(options?: { failBatch?: boolean; files?: Record<string, string | null> }) {
+	const files = new Map<string, string | null>(Object.entries(options?.files ?? {}));
+
 	const db = {
 		prepare: vi.fn((sql: string) => {
 			const statement = {
-				bind: vi.fn(() => statement),
+				_sql: sql,
+				_args: [] as unknown[],
+				bind: vi.fn((...args: unknown[]) => {
+					statement._args = args;
+					return statement;
+				}),
 				run: vi.fn(async () => {
-					if (sql.startsWith('CREATE TABLE')) {
+					if (sql.startsWith('CREATE TABLE') || sql.startsWith('ALTER TABLE')) {
 						return {};
 					}
 					return {};
 				}),
-				first: vi.fn(async () => null),
+				first: vi.fn(async () => {
+					if (sql.includes('SELECT storage_key FROM files WHERE path = ?')) {
+						const path = String(statement._args[0] ?? '');
+						if (!files.has(path)) {
+							return null;
+						}
+
+						return { storage_key: files.get(path) };
+					}
+
+					return null;
+				}),
 				all: vi.fn(async () => ({ results: [] })),
 			};
 			return statement;
 		}),
-		batch: vi.fn(async () => {
+		batch: vi.fn(async (statements: Array<{ _sql: string; _args: unknown[] }>) => {
 			if (options?.failBatch) {
 				throw new Error('D1 unavailable');
 			}
+
+			for (const statement of statements) {
+				if (statement._sql.includes("INSERT OR REPLACE INTO files")) {
+					files.set(String(statement._args[0] ?? ''), typeof statement._args[3] === 'string' ? statement._args[3] : null);
+				}
+
+				if (statement._sql.includes('DELETE FROM files WHERE path = ?')) {
+					files.delete(String(statement._args[0] ?? ''));
+				}
+			}
+
 			return [];
 		}),
 		exec: vi.fn(async () => ({})),
 	};
 
-	return { db };
+	return { db, files };
 }
 
 async function responseJson(response: Response): Promise<unknown> {
@@ -157,7 +188,7 @@ describe('worker sync handlers', () => {
 		expect(store.get('files/notes/test.md')?.customMetadata?.hash).toBe(expectedHash);
 	});
 
-	it('rolls back single-file uploads when the D1 metadata write fails', async () => {
+	it('leaves single-file uploads uncommitted when the D1 metadata write fails', async () => {
 		const { bucket, store } = createBucket({
 			'files/notes/test.md': 'before',
 		});
@@ -179,9 +210,37 @@ describe('worker sync handlers', () => {
 		expect(await responseJson(response)).toEqual({
 			success: false,
 			path: 'notes/test.md',
-			error: 'Upload rolled back because sync metadata update failed: D1 unavailable',
+			error: 'Upload not committed because sync metadata update failed: D1 unavailable',
 		});
 		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
+	});
+
+	it('still returns 503 when upload cleanup after a failed D1 commit also fails', async () => {
+		const { bucket } = createBucket();
+		bucket.delete = vi.fn(async () => {
+			throw new Error('cleanup unavailable');
+		});
+		const { db } = createDb({ failBatch: true });
+
+		const response = await handleUpload(
+			new Request('https://worker.test/sync/upload?path=notes/test.md', {
+				method: 'PUT',
+				body: 'after',
+				headers: {
+					'Content-Type': 'text/plain',
+				},
+			}),
+			bucket as never,
+			db as never,
+		);
+
+		expect(response.status).toBe(503);
+		expect(await responseJson(response)).toEqual({
+			success: false,
+			path: 'notes/test.md',
+			error: 'Upload not committed because sync metadata update failed: D1 unavailable',
+		});
+		expect(bucket.delete).toHaveBeenCalledTimes(1);
 	});
 
 	it('returns 400 for invalid JSON delete requests instead of throwing 500', async () => {
@@ -201,7 +260,7 @@ describe('worker sync handlers', () => {
 		expect(await responseJson(response)).toEqual({ error: 'Invalid JSON body' });
 	});
 
-	it('rolls back single-file deletes when the D1 metadata write fails', async () => {
+	it('leaves single-file deletes uncommitted when the D1 metadata write fails', async () => {
 		const { bucket, store } = createBucket({
 			'files/notes/test.md': 'before',
 		});
@@ -221,8 +280,40 @@ describe('worker sync handlers', () => {
 		expect(await responseJson(response)).toEqual({
 			success: false,
 			path: 'notes/test.md',
-			error: 'Delete rolled back because sync metadata update failed: D1 unavailable',
+			error: 'Delete not committed because sync metadata update failed: D1 unavailable',
 		});
+		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
+	});
+
+	it('returns success when delete cleanup fails after the D1 commit', async () => {
+		const { bucket, store } = createBucket({
+			'files/notes/test.md': 'before',
+		});
+		bucket.delete = vi.fn(async () => {
+			throw new Error('cleanup unavailable');
+		});
+		const { db, files } = createDb({
+			files: {
+				'notes/test.md': null,
+			},
+		});
+
+		const response = await handleDelete(
+			new Request('https://worker.test/sync/delete', {
+				method: 'POST',
+				body: JSON.stringify({ path: 'notes/test.md' }),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket as never,
+			db as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await responseJson(response)).toEqual({
+			success: true,
+			path: 'notes/test.md',
+		});
+		expect(files.has('notes/test.md')).toBe(false);
 		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
 	});
 
@@ -259,7 +350,7 @@ describe('worker sync handlers', () => {
 		});
 	});
 
-	it('rolls back batch uploads when the D1 metadata write fails', async () => {
+	it('leaves batch uploads uncommitted when the D1 metadata write fails', async () => {
 		const { bucket, store } = createBucket({
 			'files/notes/test.md': 'before',
 		});
@@ -291,14 +382,14 @@ describe('worker sync handlers', () => {
 				{
 					path: 'notes/test.md',
 					success: false,
-					error: 'Upload rolled back because sync metadata update failed: D1 unavailable',
+					error: 'Upload not committed because sync metadata update failed: D1 unavailable',
 				},
 			],
 		});
 		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
 	});
 
-	it('rolls back batch deletes when the D1 metadata write fails', async () => {
+	it('leaves batch deletes uncommitted when the D1 metadata write fails', async () => {
 		const { bucket, store } = createBucket({
 			'files/notes/test.md': 'before',
 		});
@@ -323,11 +414,70 @@ describe('worker sync handlers', () => {
 			errors: [
 				{
 					path: 'notes/test.md',
-					error: 'Delete rolled back because sync metadata update failed: D1 unavailable',
+					error: 'Delete not committed because sync metadata update failed: D1 unavailable',
 				},
 			],
 		});
 		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
+	});
+
+	it('downloads committed files through their D1 storage keys', async () => {
+		const managedKey = '__crate__/files/hash/object-1';
+		const { bucket } = createBucket({
+			[managedKey]: 'hello',
+		});
+		const { db } = createDb({
+			files: {
+				'notes/test.md': managedKey,
+			},
+		});
+
+		const response = await handleDownload(
+			new Request('https://worker.test/sync/download?path=notes/test.md'),
+			bucket as never,
+			db as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('hello');
+		expect(bucket.get).toHaveBeenCalledWith(managedKey);
+	});
+
+	it('batch downloads legacy path-backed files when migrated rows have no storage key yet', async () => {
+		const { bucket } = createBucket({
+			'files/notes/test.md': 'hello',
+		});
+		const { db } = createDb({
+			files: {
+				'notes/test.md': null,
+			},
+		});
+
+		const response = await handleBatchDownload(
+			new Request('https://worker.test/sync/batch-download', {
+				method: 'POST',
+				body: JSON.stringify({
+					paths: ['notes/test.md'],
+				}),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket as never,
+			db as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await responseJson(response)).toEqual({
+			files: [
+				{
+					path: 'notes/test.md',
+					content: btoa('hello'),
+					hash: '',
+					size: 5,
+					contentType: 'application/octet-stream',
+				},
+			],
+		});
+		expect(bucket.get).toHaveBeenCalledWith('files/notes/test.md');
 	});
 
 	it('validates shared settings writes and treats corrupt stored settings as absent', async () => {
