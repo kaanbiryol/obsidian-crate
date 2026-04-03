@@ -16,7 +16,6 @@ import {
 	handleOpenObsidian, handleVapidPublicKey, handleSubscribe, handleUnsubscribe,
 	handleListSubscriptions, handleTestPush, handleCreateEnrollmentToken,
 } from './push-handlers';
-import { consumePushEnrollmentToken } from './push-enrollment';
 import type { Env } from './types';
 
 export { ReminderAlarm } from './reminder-alarm';
@@ -45,16 +44,10 @@ export default {
 		if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);
 
 		if (path === '/notifications/subscribe' && method === 'POST') {
-			const enrollmentToken = request.headers.get('X-Crate-Enrollment-Token')?.trim() || '';
-			if (enrollmentToken) {
+			if (request.headers.get('X-Crate-Enrollment-Token')?.trim()) {
 				const dbResponse = requireDatabase(db);
 				if (dbResponse) {
 					return dbResponse;
-				}
-
-				const accepted = await consumePushEnrollmentToken(db, enrollmentToken);
-				if (!accepted) {
-					return corsResponse({ error: 'Invalid or expired enrollment token' }, 401);
 				}
 
 				try {

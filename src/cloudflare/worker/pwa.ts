@@ -140,7 +140,7 @@ To receive notifications on iOS, tap <strong>Share</strong> (box with arrow) the
 		} catch (err) {
 			if ((err && err.message ? String(err.message) : '').startsWith('401:')) {
 				localStorage.removeItem('crate-push-token');
-				showStatus('This setup link expired. Open a fresh link from Crate and try again.', true);
+				showStatus('This one-time setup link expired or was already used. Open a fresh link from Crate and try again.', true);
 			} else {
 				showStatus(err && err.message ? String(err.message) : 'Failed to subscribe', true);
 			}

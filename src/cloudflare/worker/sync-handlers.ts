@@ -16,6 +16,15 @@ import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
 const MAX_BATCH_FILES = 50;
 const MAX_BATCH_TOTAL_BYTES = 10 * 1024 * 1024;
 
+type BucketObjectSnapshot =
+	| { exists: false }
+	| {
+		exists: true;
+		body: ArrayBuffer;
+		httpMetadata?: R2HttpMetadata;
+		customMetadata?: Record<string, string>;
+	};
+
 function parseDeclaredSize(headerValue: string | null): number | null {
 	if (headerValue === null) {
 		return null;
@@ -23,6 +32,66 @@ function parseDeclaredSize(headerValue: string | null): number | null {
 
 	const size = Number.parseInt(headerValue, 10);
 	return Number.isInteger(size) && size >= 0 ? size : null;
+}
+
+function formatMutationError(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+async function snapshotBucketObject(bucket: R2Bucket, key: string): Promise<BucketObjectSnapshot> {
+	const object = await bucket.get(key);
+	if (!object) {
+		return { exists: false };
+	}
+
+	return {
+		exists: true,
+		body: await object.arrayBuffer(),
+		httpMetadata: object.httpMetadata ? { ...object.httpMetadata } : undefined,
+		customMetadata: object.customMetadata ? { ...object.customMetadata } : undefined,
+	};
+}
+
+async function restoreBucketObject(bucket: R2Bucket, key: string, snapshot: BucketObjectSnapshot): Promise<void> {
+	if (!snapshot.exists) {
+		await bucket.delete(key);
+		return;
+	}
+
+	await bucket.put(key, snapshot.body, {
+		httpMetadata: snapshot.httpMetadata ? { ...snapshot.httpMetadata } : undefined,
+		customMetadata: snapshot.customMetadata ? { ...snapshot.customMetadata } : undefined,
+	});
+}
+
+async function rollbackMutationOnMetadataFailure(params: {
+	actionLabel: 'Upload' | 'Delete';
+	path: string;
+	bucket: R2Bucket;
+	objectKey: string;
+	snapshot: BucketObjectSnapshot;
+	commitMetadata: () => Promise<void>;
+}): Promise<Response | null> {
+	try {
+		await params.commitMetadata();
+		return null;
+	} catch (metadataError: unknown) {
+		const metadataMessage = formatMutationError(metadataError);
+		try {
+			await restoreBucketObject(params.bucket, params.objectKey, params.snapshot);
+			return corsResponse({
+				success: false,
+				path: params.path,
+				error: `${params.actionLabel} rolled back because sync metadata update failed: ${metadataMessage}`,
+			}, 503);
+		} catch (rollbackError: unknown) {
+			return corsResponse({
+				success: false,
+				path: params.path,
+				error: `${params.actionLabel} metadata update failed and rollback failed: ${metadataMessage}; ${formatMutationError(rollbackError)}`,
+			}, 500);
+		}
+	}
 }
 
 export async function handleHealth(): Promise<Response> {
@@ -118,25 +187,37 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 
 		const hash = hashHeader || computedHash;
 		const size = declaredSize ?? computedSize;
-		await bucket.put(FILES_PREFIX + safePath, body, {
+		const objectKey = FILES_PREFIX + safePath;
+		const previousObject = db ? await snapshotBucketObject(bucket, objectKey) : null;
+		await bucket.put(objectKey, body, {
 			httpMetadata: { contentType },
 			customMetadata: { hash },
 		});
 
-		if (db) {
-			try {
-				await initDb(db);
-				await db.batch([
-					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'put', hash || '', size || 0),
-					db.prepare("INSERT OR REPLACE INTO files (path, hash, size, modified) VALUES (?, ?, ?, datetime('now'))").bind(safePath, hash || '', size || 0),
-				]);
-				await maybePruneChangelog(db);
-			} catch { /* D1 failure is non-fatal */ }
+		if (db && previousObject) {
+			const rollbackResponse = await rollbackMutationOnMetadataFailure({
+				actionLabel: 'Upload',
+				path: safePath,
+				bucket,
+				objectKey,
+				snapshot: previousObject,
+				commitMetadata: async () => {
+					await initDb(db);
+					await db.batch([
+						db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'put', hash || '', size || 0),
+						db.prepare("INSERT OR REPLACE INTO files (path, hash, size, modified) VALUES (?, ?, ?, datetime('now'))").bind(safePath, hash || '', size || 0),
+					]);
+					await maybePruneChangelog(db);
+				},
+			});
+			if (rollbackResponse) {
+				return rollbackResponse;
+			}
 		}
 
 		return corsResponse({ success: true, path: safePath, hash });
 	} catch (err: unknown) {
-		const message = err instanceof Error ? err.message : String(err);
+		const message = formatMutationError(err);
 		return corsResponse({ success: false, path: safePath, error: message }, 500);
 	}
 }
@@ -176,17 +257,29 @@ export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Dat
 	const safePath = sanitizePath(rawPath);
 	if (!safePath) return corsResponse({ error: 'Invalid path' }, 400);
 
-	await bucket.delete(FILES_PREFIX + safePath);
+	const objectKey = FILES_PREFIX + safePath;
+	const previousObject = db ? await snapshotBucketObject(bucket, objectKey) : null;
+	await bucket.delete(objectKey);
 
-	if (db) {
-		try {
-			await initDb(db);
-			await db.batch([
-				db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'delete', '', 0),
-				db.prepare('DELETE FROM files WHERE path = ?').bind(safePath),
-			]);
-			await maybePruneChangelog(db);
-		} catch { /* D1 failure is non-fatal */ }
+	if (db && previousObject) {
+		const rollbackResponse = await rollbackMutationOnMetadataFailure({
+			actionLabel: 'Delete',
+			path: safePath,
+			bucket,
+			objectKey,
+			snapshot: previousObject,
+			commitMetadata: async () => {
+				await initDb(db);
+				await db.batch([
+					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'delete', '', 0),
+					db.prepare('DELETE FROM files WHERE path = ?').bind(safePath),
+				]);
+				await maybePruneChangelog(db);
+			},
+		});
+		if (rollbackResponse) {
+			return rollbackResponse;
+		}
 	}
 
 	return corsResponse({ success: true, path: safePath });

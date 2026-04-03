@@ -41,7 +41,7 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 	if (apiClient) {
 		new Setting(containerEl)
 			.setName('Subscribe a device')
-			.setDesc('Open this link on your phone or scan the code to enable notifications on that device. Each link expires shortly and does not expose your sync token.')
+			.setDesc('Open this link on your phone or scan the code to enable notifications on that device. Each link expires shortly, works once after a successful subscription, and does not expose your sync token.')
 			.addButton(button => {
 				button.setButtonText('Copy link');
 				button.onClick(async () => {

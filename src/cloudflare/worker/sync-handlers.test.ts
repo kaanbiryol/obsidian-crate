@@ -54,6 +54,34 @@ function createBucket(initialEntries: Record<string, string> = {}) {
 	};
 }
 
+function createDb(options?: { failBatch?: boolean }) {
+	const db = {
+		prepare: vi.fn((sql: string) => {
+			const statement = {
+				bind: vi.fn(() => statement),
+				run: vi.fn(async () => {
+					if (sql.startsWith('CREATE TABLE')) {
+						return {};
+					}
+					return {};
+				}),
+				first: vi.fn(async () => null),
+				all: vi.fn(async () => ({ results: [] })),
+			};
+			return statement;
+		}),
+		batch: vi.fn(async () => {
+			if (options?.failBatch) {
+				throw new Error('D1 unavailable');
+			}
+			return [];
+		}),
+		exec: vi.fn(async () => ({})),
+	};
+
+	return { db };
+}
+
 async function responseJson(response: Response): Promise<unknown> {
 	return response.json() as Promise<unknown>;
 }
@@ -129,6 +157,33 @@ describe('worker sync handlers', () => {
 		expect(store.get('files/notes/test.md')?.customMetadata?.hash).toBe(expectedHash);
 	});
 
+	it('rolls back single-file uploads when the D1 metadata write fails', async () => {
+		const { bucket, store } = createBucket({
+			'files/notes/test.md': 'before',
+		});
+		const { db } = createDb({ failBatch: true });
+
+		const response = await handleUpload(
+			new Request('https://worker.test/sync/upload?path=notes/test.md', {
+				method: 'PUT',
+				body: 'after',
+				headers: {
+					'Content-Type': 'text/plain',
+				},
+			}),
+			bucket as never,
+			db as never,
+		);
+
+		expect(response.status).toBe(503);
+		expect(await responseJson(response)).toEqual({
+			success: false,
+			path: 'notes/test.md',
+			error: 'Upload rolled back because sync metadata update failed: D1 unavailable',
+		});
+		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
+	});
+
 	it('returns 400 for invalid JSON delete requests instead of throwing 500', async () => {
 		const { bucket } = createBucket();
 
@@ -144,6 +199,31 @@ describe('worker sync handlers', () => {
 
 		expect(response.status).toBe(400);
 		expect(await responseJson(response)).toEqual({ error: 'Invalid JSON body' });
+	});
+
+	it('rolls back single-file deletes when the D1 metadata write fails', async () => {
+		const { bucket, store } = createBucket({
+			'files/notes/test.md': 'before',
+		});
+		const { db } = createDb({ failBatch: true });
+
+		const response = await handleDelete(
+			new Request('https://worker.test/sync/delete', {
+				method: 'POST',
+				body: JSON.stringify({ path: 'notes/test.md' }),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket as never,
+			db as never,
+		);
+
+		expect(response.status).toBe(503);
+		expect(await responseJson(response)).toEqual({
+			success: false,
+			path: 'notes/test.md',
+			error: 'Delete rolled back because sync metadata update failed: D1 unavailable',
+		});
+		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
 	});
 
 	it('reports partial batch delete failures instead of claiming full success', async () => {

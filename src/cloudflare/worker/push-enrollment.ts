@@ -9,7 +9,7 @@ function createEnrollmentToken(): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function purgeExpiredEnrollmentTokens(db: D1Database): Promise<void> {
+export async function purgeExpiredPushEnrollmentTokens(db: D1Database): Promise<void> {
 	try {
 		await db.prepare('DELETE FROM push_enrollment_tokens WHERE expires_at <= ?')
 			.bind(Date.now())
@@ -23,7 +23,7 @@ export async function issuePushEnrollmentToken(
 	db: D1Database,
 ): Promise<{ token: string; expiresAt: number }> {
 	await initDb(db);
-	await purgeExpiredEnrollmentTokens(db);
+	await purgeExpiredPushEnrollmentTokens(db);
 
 	const token = createEnrollmentToken();
 	const tokenHash = await sha256Hex(token);
@@ -41,7 +41,7 @@ export async function consumePushEnrollmentToken(
 	token: string,
 ): Promise<boolean> {
 	await initDb(db);
-	await purgeExpiredEnrollmentTokens(db);
+	await purgeExpiredPushEnrollmentTokens(db);
 
 	const trimmedToken = token.trim();
 	if (!trimmedToken) {

@@ -1,9 +1,25 @@
 import { corsHeaders, corsResponse } from './cors';
+import { sha256Hex } from './auth';
 import { initDb, queryRows } from './db';
 import { getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
-import { issuePushEnrollmentToken } from './push-enrollment';
+import { issuePushEnrollmentToken, purgeExpiredPushEnrollmentTokens } from './push-enrollment';
 import { PWA_HTML, SERVICE_WORKER_JS, MANIFEST_JSON, ICON_SVG, OPEN_OBSIDIAN_HTML } from './pwa';
 import { parseJsonObject, parseOptionalString } from './utils';
+
+interface D1MutationResult {
+	meta?: {
+		changes?: number;
+	};
+}
+
+function changedRows(result: unknown): number {
+	if (!result || typeof result !== 'object') {
+		return 0;
+	}
+
+	const changes = (result as D1MutationResult).meta?.changes;
+	return typeof changes === 'number' ? changes : 0;
+}
 
 function htmlSecurityHeaders(): Record<string, string> {
 	return {
@@ -132,6 +148,28 @@ export async function handleSubscribe(request: Request, db: D1Database): Promise
 	}
 
 	const id = crypto.randomUUID();
+	const enrollmentToken = request.headers.get('X-Crate-Enrollment-Token')?.trim() || '';
+	if (enrollmentToken) {
+		await purgeExpiredPushEnrollmentTokens(db);
+		const now = Date.now();
+		const tokenHash = await sha256Hex(enrollmentToken);
+		const results = await db.batch([
+			db.prepare(
+				'DELETE FROM push_subscriptions WHERE endpoint = ? AND EXISTS (SELECT 1 FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?)'
+			).bind(endpoint, tokenHash, now),
+			db.prepare(
+				'INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?)'
+			).bind(id, endpoint, p256dh, auth, deviceName, tokenHash, now),
+			db.prepare('DELETE FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?').bind(tokenHash, now),
+		]) as unknown[];
+
+		if (changedRows(results[1]) !== 1 || changedRows(results[2]) !== 1) {
+			return corsResponse({ error: 'Invalid or expired enrollment token' }, 401);
+		}
+
+		return corsResponse({ id });
+	}
+
 	await db.batch([
 		db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint),
 		db.prepare(
