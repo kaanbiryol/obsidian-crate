@@ -69,4 +69,23 @@ describe('CloudflareSessionManager', () => {
 		);
 		expect(persistSettings).toHaveBeenCalled();
 	});
+
+	it('rejects attempts to persist blank credentials', async () => {
+		const setMock = vi.fn();
+		const storage = {
+			set: setMock,
+			delete: vi.fn(),
+			get: vi.fn(() => null),
+			has: vi.fn(() => false),
+		} as unknown as SecretStorageService;
+		const manager = new CloudflareSessionManager(
+			{ ...DEFAULT_SETTINGS },
+			storage,
+			vi.fn(async () => {}),
+		);
+
+		await expect(manager.saveCredentials(' ', 'token')).rejects.toThrow('Cloudflare account ID is required');
+		await expect(manager.saveCredentials('acct', '   ')).rejects.toThrow('Cloudflare API token is required');
+		expect(setMock).not.toHaveBeenCalled();
+	});
 });

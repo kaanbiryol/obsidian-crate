@@ -86,9 +86,49 @@ function normalizePositiveInteger(value: unknown, fallback: number): number {
 		: fallback;
 }
 
+function containsControlCharacters(value: string): boolean {
+	for (const character of value) {
+		const codePoint = character.codePointAt(0);
+		if (codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 export function normalizeRemindersFolderPath(rawPath: string | null | undefined): string {
-	const trimmed = rawPath?.trim().replace(/^\/+|\/+$/g, '');
-	return trimmed || DEFAULT_REMINDERS_FOLDER_PATH;
+	const trimmed = rawPath?.trim();
+	if (!trimmed) {
+		return DEFAULT_REMINDERS_FOLDER_PATH;
+	}
+
+	const normalized = trimmed
+		.replace(/\\/g, '/')
+		.replace(/^\/+|\/+$/g, '');
+	if (!normalized) {
+		return DEFAULT_REMINDERS_FOLDER_PATH;
+	}
+
+	const segments = normalized.split('/');
+	if (segments.length === 0) {
+		return DEFAULT_REMINDERS_FOLDER_PATH;
+	}
+
+	const safeSegments: string[] = [];
+	for (const segment of segments) {
+		const safeSegment = segment.trim();
+		if (
+			!safeSegment
+			|| safeSegment === '.'
+			|| safeSegment === '..'
+			|| containsControlCharacters(safeSegment)
+		) {
+			return DEFAULT_REMINDERS_FOLDER_PATH;
+		}
+		safeSegments.push(safeSegment);
+	}
+
+	return safeSegments.join('/');
 }
 
 export function normalizeRemindersSettings(

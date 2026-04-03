@@ -80,9 +80,21 @@ export class CloudflareSessionManager {
 		apiToken: string,
 		options?: SaveCloudflareCredentialOptions
 	): Promise<void> {
-		this.settings.cloudflareAccountId = accountId.trim();
-		this.settings.cloudflareTokenExpiresAt = options?.expiresAt ?? null;
-		this.secretStorage.set(SECRET_KEYS.CLOUDFLARE_API_TOKEN, apiToken.trim());
+		const normalizedAccountId = accountId.trim();
+		if (!normalizedAccountId) {
+			throw new Error('Cloudflare account ID is required');
+		}
+
+		const normalizedApiToken = apiToken.trim();
+		if (!normalizedApiToken) {
+			throw new Error('Cloudflare API token is required');
+		}
+
+		this.settings.cloudflareAccountId = normalizedAccountId;
+		this.settings.cloudflareTokenExpiresAt = typeof options?.expiresAt === 'number' && Number.isFinite(options.expiresAt)
+			? options.expiresAt
+			: null;
+		this.secretStorage.set(SECRET_KEYS.CLOUDFLARE_API_TOKEN, normalizedApiToken);
 		if (options && Object.prototype.hasOwnProperty.call(options, 'refreshToken')) {
 			const refreshToken = options.refreshToken?.trim() || '';
 			if (refreshToken) {

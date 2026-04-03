@@ -153,15 +153,15 @@ export async function handleSubscribe(request: Request, db: D1Database): Promise
 		await purgeExpiredPushEnrollmentTokens(db);
 		const now = Date.now();
 		const tokenHash = await sha256Hex(enrollmentToken);
-		const results = await db.batch([
-			db.prepare(
-				'DELETE FROM push_subscriptions WHERE endpoint = ? AND EXISTS (SELECT 1 FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?)'
-			).bind(endpoint, tokenHash, now),
-			db.prepare(
-				'INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?)'
-			).bind(id, endpoint, p256dh, auth, deviceName, tokenHash, now),
-			db.prepare('DELETE FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?').bind(tokenHash, now),
-		]) as unknown[];
+			const results: unknown[] = await db.batch([
+				db.prepare(
+					'DELETE FROM push_subscriptions WHERE endpoint = ? AND EXISTS (SELECT 1 FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?)'
+				).bind(endpoint, tokenHash, now),
+				db.prepare(
+					'INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?)'
+				).bind(id, endpoint, p256dh, auth, deviceName, tokenHash, now),
+				db.prepare('DELETE FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?').bind(tokenHash, now),
+			]);
 
 		if (changedRows(results[1]) !== 1 || changedRows(results[2]) !== 1) {
 			return corsResponse({ error: 'Invalid or expired enrollment token' }, 401);

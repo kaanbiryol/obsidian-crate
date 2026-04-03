@@ -41,8 +41,19 @@ function getHeader(headers: Record<string, string>, headerName: string): string 
 function parseRetryAfter(headers: Record<string, string>): number | null {
 	const header = getHeader(headers, 'Retry-After');
 	if (!header) return null;
-	const seconds = parseInt(header, 10);
-	return !isNaN(seconds) && seconds > 0 ? seconds * 1000 : null;
+
+	const seconds = Number.parseInt(header, 10);
+	if (!Number.isNaN(seconds) && seconds > 0) {
+		return seconds * 1000;
+	}
+
+	const retryAt = Date.parse(header);
+	if (Number.isNaN(retryAt)) {
+		return null;
+	}
+
+	const delay = retryAt - Date.now();
+	return delay > 0 ? delay : null;
 }
 
 function parseErrorMessage(status: number, responseText: string): string {

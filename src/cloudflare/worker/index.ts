@@ -63,7 +63,11 @@ export default {
 		if (!authHeader || !authHeader.startsWith('Bearer ')) {
 			return corsResponse({ error: 'Unauthorized' }, 401);
 		}
-		const token = authHeader.substring(7);
+		const token = authHeader.substring(7).trim();
+		if (!token) {
+			return corsResponse({ error: 'Unauthorized' }, 401);
+		}
+		const fallbackAuthToken = env.AUTH_TOKEN.trim();
 
 		let authenticated = false;
 		if (db) {
@@ -74,7 +78,7 @@ export default {
 				if (row) authenticated = true;
 			} catch { /* D1 failure falls through to binding check */ }
 		}
-		if (!authenticated && !await timingSafeEqual(token, env.AUTH_TOKEN)) {
+		if (!authenticated && (!fallbackAuthToken || !await timingSafeEqual(token, fallbackAuthToken))) {
 			return corsResponse({ error: 'Invalid token' }, 401);
 		}
 

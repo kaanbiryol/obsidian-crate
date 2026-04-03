@@ -136,6 +136,30 @@ describe('SyncApiClient', () => {
 		}
 	});
 
+	it('parses HTTP-date Retry-After headers', async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+		vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
+			createRequestUrlResponse({
+				status: 429,
+				headers: { 'Retry-After': 'Thu, 01 Jan 2026 00:00:30 GMT' },
+				text: '{"error":"Too many requests"}',
+			}),
+		);
+
+		const client = new SyncApiClient('https://worker.example', 'token');
+		try {
+			await client.health();
+			expect.unreachable('Should have thrown');
+		} catch (error) {
+			expect(error).toBeInstanceOf(HttpError);
+			const httpError = error as HttpError;
+			expect(httpError.retryAfter).toBe(30_000);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('throws HttpError with null retryAfter when no Retry-After header', async () => {
 		vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
 			createRequestUrlResponse({

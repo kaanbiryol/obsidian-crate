@@ -194,6 +194,18 @@ function createSubscriptionRequest(token: string): Request {
 }
 
 describe('worker entrypoint', () => {
+	it('rejects blank bearer tokens when no fallback auth token is configured', async () => {
+		const response = await worker.fetch(
+			new Request('https://worker.test/health', {
+				headers: { Authorization: 'Bearer ' },
+			}),
+			createEnv({ AUTH_TOKEN: '' }) as never,
+		);
+
+		expect(response.status).toBe(401);
+		expect(await response.json()).toEqual({ error: 'Unauthorized' });
+	});
+
 	it('returns a controlled 503 when a DB-backed sync route is requested without D1', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/sync/manifest', {

@@ -25,6 +25,12 @@ type BucketObjectSnapshot =
 		customMetadata?: Record<string, string>;
 	};
 
+interface BatchRollbackEntry {
+	path: string;
+	objectKey: string;
+	snapshot: BucketObjectSnapshot;
+}
+
 function parseDeclaredSize(headerValue: string | null): number | null {
 	if (headerValue === null) {
 		return null;
@@ -62,6 +68,34 @@ async function restoreBucketObject(bucket: R2Bucket, key: string, snapshot: Buck
 		httpMetadata: snapshot.httpMetadata ? { ...snapshot.httpMetadata } : undefined,
 		customMetadata: snapshot.customMetadata ? { ...snapshot.customMetadata } : undefined,
 	});
+}
+
+function formatBatchMetadataFailure(
+	actionLabel: 'Upload' | 'Delete',
+	metadataMessage: string,
+	rollbackMessage?: string,
+): string {
+	if (!rollbackMessage) {
+		return `${actionLabel} rolled back because sync metadata update failed: ${metadataMessage}`;
+	}
+
+	return `${actionLabel} metadata update failed and rollback failed: ${metadataMessage}; ${rollbackMessage}`;
+}
+
+async function rollbackBatchEntries(
+	bucket: R2Bucket,
+	entries: BatchRollbackEntry[],
+): Promise<Map<string, string | null>> {
+	const outcomes = new Map<string, string | null>();
+	await Promise.all(entries.map(async (entry) => {
+		try {
+			await restoreBucketObject(bucket, entry.objectKey, entry.snapshot);
+			outcomes.set(entry.path, null);
+		} catch (error: unknown) {
+			outcomes.set(entry.path, formatMutationError(error));
+		}
+	}));
+	return outcomes;
 }
 
 async function rollbackMutationOnMetadataFailure(params: {
@@ -306,6 +340,8 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 	const results: Array<{ path: string; success: boolean; hash?: string; error?: string }> = [];
 	const dbOps: D1PreparedStatement[] = [];
 	const uploads: Array<{ safePath: string; bytes: ArrayBuffer; hash: string; size: number; contentType: string }> = [];
+	const rollbackEntries = new Map<string, BatchRollbackEntry>();
+	const committedUploads: Array<{ safePath: string; hash: string }> = [];
 	let totalBytes = 0;
 
 	for (const file of files as BatchFile[]) {
@@ -375,12 +411,22 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 
 	await Promise.all(uploads.map(async (file) => {
 		try {
-			await bucket.put(FILES_PREFIX + file.safePath, file.bytes, {
+			const objectKey = FILES_PREFIX + file.safePath;
+			if (db) {
+				rollbackEntries.set(file.safePath, {
+					path: file.safePath,
+					objectKey,
+					snapshot: await snapshotBucketObject(bucket, objectKey),
+				});
+			}
+
+			await bucket.put(objectKey, file.bytes, {
 				httpMetadata: { contentType: file.contentType },
 				customMetadata: { hash: file.hash },
 			});
 
 			results.push({ path: file.safePath, success: true, hash: file.hash });
+			committedUploads.push({ safePath: file.safePath, hash: file.hash });
 
 			if (db) {
 				dbOps.push(
@@ -399,7 +445,30 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 			await initDb(db);
 			await db.batch(dbOps);
 			await maybePruneChangelog(db);
-		} catch { /* D1 failure is non-fatal */ }
+		} catch (error: unknown) {
+			const metadataMessage = formatMutationError(error);
+			const pathsToRollback = committedUploads
+				.map((upload) => rollbackEntries.get(upload.safePath))
+				.filter((entry): entry is BatchRollbackEntry => entry !== undefined);
+			const rollbackOutcomes = await rollbackBatchEntries(bucket, pathsToRollback);
+			const failedPaths = new Set(committedUploads.map((upload) => upload.safePath));
+			const finalResults = results
+				.filter((result) => !failedPaths.has(result.path))
+				.concat(committedUploads.map((upload) => {
+					const rollbackMessage = rollbackOutcomes.get(upload.safePath) ?? null;
+					return {
+						path: upload.safePath,
+						success: false as const,
+						error: formatBatchMetadataFailure('Upload', metadataMessage, rollbackMessage ?? undefined),
+					};
+				}));
+
+			const rollbackFailed = Array.from(rollbackOutcomes.values()).some((value) => value !== null);
+			return corsResponse(
+				{ success: false, results: finalResults },
+				rollbackFailed ? 500 : 503,
+			);
+		}
 	}
 
 	return corsResponse({ success: results.every(r => r.success), results });
@@ -465,6 +534,7 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 	const deleted: string[] = [];
 	const errors: Array<{ path: string; error: string }> = [];
 	const dbOps: D1PreparedStatement[] = [];
+	const rollbackEntries = new Map<string, BatchRollbackEntry>();
 
 	for (const rawPath of paths) {
 		const safePath = sanitizePath(rawPath);
@@ -474,7 +544,16 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 		}
 
 		try {
-			await bucket.delete(FILES_PREFIX + safePath);
+			const objectKey = FILES_PREFIX + safePath;
+			if (db) {
+				rollbackEntries.set(safePath, {
+					path: safePath,
+					objectKey,
+					snapshot: await snapshotBucketObject(bucket, objectKey),
+				});
+			}
+
+			await bucket.delete(objectKey);
 			deleted.push(safePath);
 
 			if (db) {
@@ -496,7 +575,29 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 			await initDb(db);
 			await db.batch(dbOps);
 			await maybePruneChangelog(db);
-		} catch { /* D1 failure is non-fatal */ }
+		} catch (error: unknown) {
+			const metadataMessage = formatMutationError(error);
+			const pathsToRollback = deleted
+				.map((path) => rollbackEntries.get(path))
+				.filter((entry): entry is BatchRollbackEntry => entry !== undefined);
+			const rollbackOutcomes = await rollbackBatchEntries(bucket, pathsToRollback);
+			const metadataErrors = deleted.map((path) => {
+				const rollbackMessage = rollbackOutcomes.get(path) ?? null;
+				return {
+					path,
+					error: formatBatchMetadataFailure('Delete', metadataMessage, rollbackMessage ?? undefined),
+				};
+			});
+			const rollbackFailed = Array.from(rollbackOutcomes.values()).some((value) => value !== null);
+			return corsResponse(
+				{
+					success: false,
+					deleted: [],
+					errors: errors.concat(metadataErrors),
+				},
+				rollbackFailed ? 500 : 503,
+			);
+		}
 	}
 
 	return corsResponse({

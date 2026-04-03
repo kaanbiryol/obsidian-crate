@@ -13,6 +13,57 @@ const logger = createLogger('Manifest');
 const MANIFEST_FILENAME = 'file-manifest.json';
 const MANIFEST_TMP_FILENAME = 'file-manifest.json.tmp';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeNonNegativeInteger(value: unknown): number | null {
+	return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function normalizeFileEntry(value: unknown): FileEntry | null {
+	if (!isRecord(value)) {
+		return null;
+	}
+
+	const hash = typeof value.hash === 'string' ? value.hash : null;
+	const size = normalizeNonNegativeInteger(value.size);
+	const modified = typeof value.modified === 'string' ? value.modified : null;
+	if (!hash || size === null || !modified) {
+		return null;
+	}
+
+	return { hash, size, modified };
+}
+
+function normalizeFileManifest(value: unknown): FileManifest | null {
+	if (!isRecord(value) || !isRecord(value.files)) {
+		return null;
+	}
+
+	const files: Record<string, FileEntry> = {};
+	for (const [path, entry] of Object.entries(value.files)) {
+		if (!path.trim()) {
+			continue;
+		}
+
+		const normalizedEntry = normalizeFileEntry(entry);
+		if (normalizedEntry) {
+			files[path] = normalizedEntry;
+		}
+	}
+
+	const version = normalizeNonNegativeInteger(value.version) ?? 1;
+	const lastSeq = normalizeNonNegativeInteger(value.lastSeq);
+	const truncated = typeof value.truncated === 'boolean' ? value.truncated : undefined;
+	return {
+		version: version > 0 ? version : 1,
+		files,
+		...(lastSeq !== null ? { lastSeq } : {}),
+		...(truncated !== undefined ? { truncated } : {}),
+	};
+}
+
 export class LocalManifest {
 	private app: App;
 	private manifestPath: string;
@@ -41,8 +92,8 @@ export class LocalManifest {
 		if (await adapter.exists(this.manifestPath)) {
 			try {
 				const raw = await adapter.read(this.manifestPath);
-				const parsed = JSON.parse(raw) as FileManifest;
-				if (parsed && typeof parsed === 'object' && 'version' in parsed && 'files' in parsed) {
+				const parsed = normalizeFileManifest(JSON.parse(raw));
+				if (parsed) {
 					this.manifest = parsed;
 					loaded = true;
 				}
@@ -54,8 +105,8 @@ export class LocalManifest {
 		if (!loaded && await adapter.exists(this.tmpPath)) {
 			try {
 				const raw = await adapter.read(this.tmpPath);
-				const parsed = JSON.parse(raw) as FileManifest;
-				if (parsed && typeof parsed === 'object' && 'version' in parsed && 'files' in parsed) {
+				const parsed = normalizeFileManifest(JSON.parse(raw));
+				if (parsed) {
 					this.manifest = parsed;
 					// Promote recovered tmp to main file
 					await adapter.write(this.manifestPath, JSON.stringify(this.manifest));
@@ -138,7 +189,7 @@ export class LocalManifest {
 	 * Replace entire manifest (used after remote sync)
 	 */
 	replaceManifest(manifest: FileManifest): void {
-		this.manifest = manifest;
+		this.manifest = normalizeFileManifest(manifest) ?? { version: 1, files: {} };
 		this.dirty = true;
 	}
 

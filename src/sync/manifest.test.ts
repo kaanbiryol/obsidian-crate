@@ -81,6 +81,47 @@ describe('LocalManifest', () => {
 		expect(manifest.getManifest()).toEqual({ version: 1, files: {} });
 	});
 
+	it('drops malformed persisted file entries instead of trusting them', async () => {
+		adapter.exists.mockImplementation((path: string) =>
+			Promise.resolve(path.endsWith('file-manifest.json') && !path.endsWith('.tmp')),
+		);
+		adapter.read.mockResolvedValue(JSON.stringify({
+			version: 1,
+			lastSeq: 42,
+			files: {
+				'good.md': {
+					hash: 'hash-1',
+					size: 12,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+				'bad-size.md': {
+					hash: 'hash-2',
+					size: -1,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+				'bad-modified.md': {
+					hash: 'hash-3',
+					size: 4,
+					modified: 123,
+				},
+			},
+		}));
+
+		await manifest.load();
+
+		expect(manifest.getManifest()).toEqual({
+			version: 1,
+			lastSeq: 42,
+			files: {
+				'good.md': {
+					hash: 'hash-1',
+					size: 12,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+			},
+		});
+	});
+
 	it('recovers from tmp file when main file is corrupt', async () => {
 		const validManifest = JSON.stringify({
 			version: 1,
@@ -150,6 +191,36 @@ describe('LocalManifest', () => {
 		expect(JSON.parse(lastPayload)).toEqual({
 			version: 1,
 			files: {},
+		});
+	});
+
+	it('normalizes replacement manifests before storing them', () => {
+		manifest.replaceManifest({
+			version: 1,
+			files: {
+				'ok.md': {
+					hash: 'hash-1',
+					size: 10,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+				'bad.md': {
+					hash: '',
+					size: -1,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+			},
+			lastSeq: -5,
+		} as never);
+
+		expect(manifest.getManifest()).toEqual({
+			version: 1,
+			files: {
+				'ok.md': {
+					hash: 'hash-1',
+					size: 10,
+					modified: '2026-02-06T12:00:00.000Z',
+				},
+			},
 		});
 	});
 });

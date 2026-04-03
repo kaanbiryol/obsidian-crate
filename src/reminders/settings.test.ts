@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_REMINDERS_SETTINGS, normalizeRemindersSettings } from './settings';
+import {
+	DEFAULT_REMINDERS_FOLDER_PATH,
+	DEFAULT_REMINDERS_SETTINGS,
+	normalizeRemindersFolderPath,
+	normalizeRemindersSettings,
+} from './settings';
 
 describe('normalizeRemindersSettings', () => {
 	it('normalizes persisted reminders settings defensively', () => {
@@ -44,5 +49,12 @@ describe('normalizeRemindersSettings', () => {
 		});
 
 		expect(settings).toEqual(DEFAULT_REMINDERS_SETTINGS);
+	});
+
+	it('rejects unsafe reminders folder paths and normalizes Windows separators', () => {
+		expect(normalizeRemindersFolderPath('Reminders\\Work')).toBe('Reminders/Work');
+		expect(normalizeRemindersFolderPath('../Secrets')).toBe(DEFAULT_REMINDERS_FOLDER_PATH);
+		expect(normalizeRemindersFolderPath('Reminders//Nested')).toBe(DEFAULT_REMINDERS_FOLDER_PATH);
+		expect(normalizeRemindersFolderPath('Reminders/\u0000Hidden')).toBe(DEFAULT_REMINDERS_FOLDER_PATH);
 	});
 });

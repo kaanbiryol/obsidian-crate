@@ -259,6 +259,77 @@ describe('worker sync handlers', () => {
 		});
 	});
 
+	it('rolls back batch uploads when the D1 metadata write fails', async () => {
+		const { bucket, store } = createBucket({
+			'files/notes/test.md': 'before',
+		});
+		const { db } = createDb({ failBatch: true });
+
+		const response = await handleBatchUpload(
+			new Request('https://worker.test/sync/batch-upload', {
+				method: 'POST',
+				body: JSON.stringify({
+					files: [
+						{
+							path: 'notes/test.md',
+							content: btoa('after'),
+							size: 5,
+							contentType: 'text/plain',
+						},
+					],
+				}),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket as never,
+			db as never,
+		);
+
+		expect(response.status).toBe(503);
+		expect(await responseJson(response)).toEqual({
+			success: false,
+			results: [
+				{
+					path: 'notes/test.md',
+					success: false,
+					error: 'Upload rolled back because sync metadata update failed: D1 unavailable',
+				},
+			],
+		});
+		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
+	});
+
+	it('rolls back batch deletes when the D1 metadata write fails', async () => {
+		const { bucket, store } = createBucket({
+			'files/notes/test.md': 'before',
+		});
+		const { db } = createDb({ failBatch: true });
+
+		const response = await handleBatchDelete(
+			new Request('https://worker.test/sync/batch-delete', {
+				method: 'POST',
+				body: JSON.stringify({
+					paths: ['notes/test.md'],
+				}),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket as never,
+			db as never,
+		);
+
+		expect(response.status).toBe(503);
+		expect(await responseJson(response)).toEqual({
+			success: false,
+			deleted: [],
+			errors: [
+				{
+					path: 'notes/test.md',
+					error: 'Delete rolled back because sync metadata update failed: D1 unavailable',
+				},
+			],
+		});
+		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
+	});
+
 	it('validates shared settings writes and treats corrupt stored settings as absent', async () => {
 		const { bucket } = createBucket({
 			'__crate__/settings.json': '{broken json',
