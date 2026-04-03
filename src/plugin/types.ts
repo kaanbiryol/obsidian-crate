@@ -261,6 +261,7 @@ export const SECRET_KEYS = {
 export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
 
 export const MAX_SYNC_HISTORY = 20;
+export const MAX_SYNC_HISTORY_PATHS = 50;
 export const DEBOUNCE_DELAY_MS = 5000;
 export const MAX_DEBOUNCE_WAIT_MS = 30_000;
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB

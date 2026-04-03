@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, normalizeCrateSettings } from './settings';
+import { MAX_SYNC_HISTORY_PATHS } from './types';
 
 describe('normalizeCrateSettings', () => {
 	it('normalizes persisted values and rejects unsafe runtime settings', () => {
@@ -75,5 +76,29 @@ describe('normalizeCrateSettings', () => {
 		expect(normalizeCrateSettings({ workerUrl: 'https://worker.example?token=1' }, configDir).workerUrl).toBe('');
 		expect(normalizeCrateSettings({ workerUrl: 'https://worker.example/#frag' }, configDir).workerUrl).toBe('');
 		expect(normalizeCrateSettings({ workerUrl: 'https://worker.example/api/' }, configDir).workerUrl).toBe('https://worker.example/api');
+	});
+
+	it('caps persisted sync history file lists to avoid oversized settings payloads', () => {
+		const uploadedPaths = Array.from({ length: MAX_SYNC_HISTORY_PATHS + 10 }, (_, index) => `notes/${index}.md`);
+
+		const settings = normalizeCrateSettings({
+			syncHistory: [
+				{
+					timestamp: '2026-01-01T00:00:00.000Z',
+					type: 'sync',
+					success: true,
+					uploaded: uploadedPaths.length,
+					downloaded: 0,
+					deleted: 0,
+					errorCount: 0,
+					conflictCount: 0,
+					uploadedPaths,
+				},
+			],
+		}, 'vault-config');
+
+		expect(settings.syncHistory[0]?.uploadedPaths).toHaveLength(MAX_SYNC_HISTORY_PATHS);
+		expect(settings.syncHistory[0]?.uploadedPaths?.[0]).toBe('notes/0.md');
+		expect(settings.syncHistory[0]?.uploadedPaths?.at(-1)).toBe(`notes/${MAX_SYNC_HISTORY_PATHS - 1}.md`);
 	});
 });

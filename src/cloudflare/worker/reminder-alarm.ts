@@ -37,12 +37,15 @@ export class ReminderAlarm implements DurableObject {
 				return new Response(JSON.stringify({ error: 'Invalid reminder payload' }), { status: 400 });
 			}
 
-			const body: ReminderData = { reminderId, content, dueDatetime, project, priority };
-			await this.state.storage.put('reminder', body);
-			const alarmTime = new Date(body.dueDatetime);
+			const alarmTime = new Date(dueDatetime);
 			if (Number.isNaN(alarmTime.getTime())) {
 				return new Response(JSON.stringify({ error: 'Invalid dueDatetime' }), { status: 400 });
 			}
+			if (alarmTime.getTime() <= Date.now()) {
+				return new Response(JSON.stringify({ error: 'dueDatetime must be in the future' }), { status: 400 });
+			}
+			const body: ReminderData = { reminderId, content, dueDatetime, project, priority };
+			await this.state.storage.put('reminder', body);
 			await this.state.storage.setAlarm(alarmTime);
 			return new Response(JSON.stringify({ success: true }));
 		}

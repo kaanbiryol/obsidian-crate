@@ -59,6 +59,11 @@ function createBucket(initialEntries: Record<string, string> = {}) {
 function createDb(options?: { failBatch?: boolean; files?: Record<string, string | null> }) {
 	const files = new Map<string, string | null>(Object.entries(options?.files ?? {}));
 
+	function getBoundString(args: unknown[], index: number): string {
+		const value = args[index];
+		return typeof value === 'string' ? value : '';
+	}
+
 	const db = {
 		prepare: vi.fn((sql: string) => {
 			const statement = {
@@ -76,7 +81,7 @@ function createDb(options?: { failBatch?: boolean; files?: Record<string, string
 				}),
 				first: vi.fn(async () => {
 					if (sql.includes('SELECT storage_key FROM files WHERE path = ?')) {
-						const path = String(statement._args[0] ?? '');
+						const path = getBoundString(statement._args, 0);
 						if (!files.has(path)) {
 							return null;
 						}
@@ -97,11 +102,11 @@ function createDb(options?: { failBatch?: boolean; files?: Record<string, string
 
 			for (const statement of statements) {
 				if (statement._sql.includes("INSERT OR REPLACE INTO files")) {
-					files.set(String(statement._args[0] ?? ''), typeof statement._args[3] === 'string' ? statement._args[3] : null);
+					files.set(getBoundString(statement._args, 0), typeof statement._args[3] === 'string' ? statement._args[3] : null);
 				}
 
 				if (statement._sql.includes('DELETE FROM files WHERE path = ?')) {
-					files.delete(String(statement._args[0] ?? ''));
+					files.delete(getBoundString(statement._args, 0));
 				}
 			}
 

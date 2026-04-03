@@ -33,6 +33,9 @@ export async function handleScheduleReminder(request: Request, env: Env): Promis
 	if (Number.isNaN(dueDate.getTime())) {
 		return corsResponse({ error: 'Invalid dueDatetime' }, 400);
 	}
+	if (dueDate.getTime() <= Date.now()) {
+		return corsResponse({ error: 'dueDatetime must be in the future' }, 400);
+	}
 
 	const db = env.DB;
 	if (!db) return corsResponse({ error: 'Database not available' }, 503);

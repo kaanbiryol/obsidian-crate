@@ -7,6 +7,7 @@ import {
 	type CrateSettings,
 	DEFAULT_SETTINGS,
 	MAX_SYNC_HISTORY,
+	MAX_SYNC_HISTORY_PATHS,
 	type SyncHistoryEntry,
 } from './types';
 
@@ -84,13 +85,13 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 		errorCount: normalizeNonNegativeInteger(value.errorCount, 0),
 		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
 		uploadedPaths: Array.isArray(value.uploadedPaths)
-			? normalizeStringArray(value.uploadedPaths, [])
+			? normalizeStringArray(value.uploadedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
 			: undefined,
 		downloadedPaths: Array.isArray(value.downloadedPaths)
-			? normalizeStringArray(value.downloadedPaths, [])
+			? normalizeStringArray(value.downloadedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
 			: undefined,
 		deletedPaths: Array.isArray(value.deletedPaths)
-			? normalizeStringArray(value.deletedPaths, [])
+			? normalizeStringArray(value.deletedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
 			: undefined,
 	};
 }

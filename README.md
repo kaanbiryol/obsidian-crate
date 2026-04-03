@@ -70,3 +70,11 @@ npm test
 ```bash
 npm run lint
 ```
+
+### Run the full local verification suite
+
+```bash
+npm run check
+```
+
+This runs linting, TypeScript checks, and the full test suite in the same order used during the hardening pass.

@@ -19,15 +19,19 @@ import { loadRemindersSettings } from './settings-storage';
 const remindersLogger = createLogger('Reminders');
 const registeredReminderUi = new WeakSet<CratePlugin>();
 
+function createNotificationService(plugin: CratePlugin): ReminderNotificationService {
+	return new ReminderNotificationService(
+		() => plugin.settings,
+		() => plugin.syncRuntime.getApiClient(),
+	);
+}
+
 function configureReminderWriterCallbacks(plugin: CratePlugin): void {
 	plugin.markdownWriter.setOnFileWritten(async (file) => {
 		await plugin.reminderIndex.rescanFile(file, true);
 	});
 
-	const notificationService = new ReminderNotificationService(
-		() => plugin.settings,
-		() => plugin.syncRuntime.getApiClient(),
-	);
+	const notificationService = createNotificationService(plugin);
 	plugin.markdownWriter.setOnReminderChange(async (reminder, operation) => {
 		const result = await notificationService.onReminderChange(reminder, operation);
 		if (!result.success) {
@@ -45,9 +49,18 @@ async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Pr
 	plugin.markdownWriter = createMarkdownWriter(plugin.app, plugin.reminderIndex);
 	plugin.storage = createStorageCompat(plugin.reminderIndex, plugin.markdownWriter);
 	configureReminderWriterCallbacks(plugin);
+	await reconcileReminderNotifications(plugin);
 
 	plugin.remindersVaultWatcher = new VaultWatcher(plugin, plugin.reminderIndex);
 	plugin.remindersVaultWatcher.register();
+}
+
+async function reconcileReminderNotifications(plugin: CratePlugin): Promise<void> {
+	try {
+		await createNotificationService(plugin).reconcile(plugin.reminderIndex.getAll());
+	} catch (error) {
+		remindersLogger.warn('Failed to reconcile reminder notifications:', error);
+	}
 }
 
 function registerReminderIntegrations(plugin: CratePlugin): void {

@@ -1,7 +1,7 @@
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
-import { MAX_SYNC_HISTORY, SECRET_KEYS, type CrateSettings, type SharedSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../plugin/types';
+import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, SECRET_KEYS, type CrateSettings, type SharedSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../plugin/types';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
@@ -184,6 +184,7 @@ export class SyncRuntime {
 		this.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, authToken);
 		await this.deleteManifestFile();
 		this.settings.lastSeq = 0;
+		this.resetSyncState();
 		await this.persistSettings();
 		await this.initialize();
 	}
@@ -192,7 +193,7 @@ export class SyncRuntime {
 		this.destroy();
 		await this.deleteManifestFile();
 
-		this.settings.lastSeq = 0;
+		this.resetSyncState();
 		this.settings.workerUrl = '';
 		this.settings.workerName = '';
 		this.settings.bucketName = '';
@@ -258,14 +259,24 @@ export class SyncRuntime {
 			deleted: result.deleted,
 			errorCount: result.errors.length,
 			conflictCount: result.conflicts.length,
-			uploadedPaths: result.uploadedPaths,
-			downloadedPaths: result.downloadedPaths,
-			deletedPaths: result.deletedPaths,
+			uploadedPaths: this.limitHistoryPaths(result.uploadedPaths),
+			downloadedPaths: this.limitHistoryPaths(result.downloadedPaths),
+			deletedPaths: this.limitHistoryPaths(result.deletedPaths),
 		};
 		this.settings.syncHistory.unshift(entry);
 		if (this.settings.syncHistory.length > MAX_SYNC_HISTORY) {
 			this.settings.syncHistory.length = MAX_SYNC_HISTORY;
 		}
+	}
+
+	private resetSyncState(): void {
+		this.settings.lastSeq = 0;
+		this.settings.lastSync = null;
+		this.settings.syncHistory = [];
+	}
+
+	private limitHistoryPaths(paths: string[]): string[] {
+		return paths.slice(0, MAX_SYNC_HISTORY_PATHS);
 	}
 
 	private getConfiguredSyncEngine(): SyncEngine | SyncResult {

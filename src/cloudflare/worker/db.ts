@@ -1,5 +1,10 @@
 const initializedDatabases = new WeakSet<D1Database>();
 
+async function hasColumn(db: D1Database, tableName: string, columnName: string): Promise<boolean> {
+	const rows = await queryRows<{ name?: string }>(db.prepare(`PRAGMA table_info(${tableName})`));
+	return rows.some((row) => row.name === columnName);
+}
+
 export async function initDb(db: D1Database): Promise<void> {
 	if (initializedDatabases.has(db)) {
 		return;
@@ -20,12 +25,14 @@ export async function initDb(db: D1Database): Promise<void> {
 		modified TEXT NOT NULL DEFAULT (datetime('now')),
 		storage_key TEXT
 	)`).run();
-	try {
-		await db.prepare('ALTER TABLE files ADD COLUMN storage_key TEXT').run();
-	} catch (error: unknown) {
-		const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-		if (!message.includes('duplicate column') && !message.includes('already exists')) {
-			throw error;
+	if (!await hasColumn(db, 'files', 'storage_key')) {
+		try {
+			await db.prepare('ALTER TABLE files ADD COLUMN storage_key TEXT').run();
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+			if (!message.includes('duplicate column') && !message.includes('already exists')) {
+				throw error;
+			}
 		}
 	}
 	await db.prepare(`CREATE TABLE IF NOT EXISTS auth_tokens (

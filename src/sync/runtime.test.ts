@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { createEmptySyncResult } from './sync-result';
 import { SyncRuntime } from './runtime';
-import type { CrateSettings, SyncResult } from '../plugin/types';
+import { MAX_SYNC_HISTORY_PATHS, type CrateSettings, type SyncResult } from '../plugin/types';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/obsidian-crate`;
@@ -229,5 +229,85 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(persistSettings).toHaveBeenCalledTimes(1);
 		expect(settings.syncHistory[0]?.type).toBe(historyType);
 		expect(settings.syncHistory[0]?.uploaded).toBe(2);
+	});
+
+	it('caps stored sync history file paths', async () => {
+		const { runtime, settings } = createRuntimeHarness();
+		const uploadedPaths = Array.from({ length: MAX_SYNC_HISTORY_PATHS + 5 }, (_, index) => `notes/${index}.md`);
+
+		setSyncEngine(runtime, {
+			sync: vi.fn(async () => ({
+				...createEmptySyncResult(),
+				success: true,
+				uploaded: uploadedPaths.length,
+				uploadedPaths,
+			})),
+			initialSync: vi.fn(async () => createEmptySyncResult()),
+			forceFullSync: vi.fn(async () => createEmptySyncResult()),
+		});
+
+		await runtime.sync();
+
+		expect(settings.syncHistory[0]?.uploadedPaths).toHaveLength(MAX_SYNC_HISTORY_PATHS);
+		expect(settings.syncHistory[0]?.uploadedPaths?.at(-1)).toBe(`notes/${MAX_SYNC_HISTORY_PATHS - 1}.md`);
+	});
+
+	it('resets sync state when applying infrastructure config', async () => {
+		const { runtime, settings } = createRuntimeHarness({
+			lastSeq: 42,
+			lastSync: '2026-01-01T00:00:00.000Z',
+			syncHistory: [
+				{
+					timestamp: '2026-01-01T00:00:00.000Z',
+					type: 'sync',
+					success: true,
+					uploaded: 1,
+					downloaded: 0,
+					deleted: 0,
+					errorCount: 0,
+					conflictCount: 0,
+				},
+			],
+		});
+		const initialize = vi.spyOn(runtime, 'initialize').mockResolvedValue(undefined);
+
+		await runtime.applyInfrastructureConfig({
+			workerUrl: 'https://worker.example',
+			authToken: 'new-auth-token',
+			workerName: 'worker-name',
+			bucketName: 'bucket-name',
+			databaseId: 'db-id',
+		});
+
+		expect(settings.lastSeq).toBe(0);
+		expect(settings.lastSync).toBeNull();
+		expect(settings.syncHistory).toEqual([]);
+		expect(initialize).toHaveBeenCalledTimes(1);
+	});
+
+	it('clears sync state when clearing configuration', async () => {
+		const { runtime, settings } = createRuntimeHarness({
+			lastSeq: 42,
+			lastSync: '2026-01-01T00:00:00.000Z',
+			syncHistory: [
+				{
+					timestamp: '2026-01-01T00:00:00.000Z',
+					type: 'sync',
+					success: true,
+					uploaded: 1,
+					downloaded: 0,
+					deleted: 0,
+					errorCount: 0,
+					conflictCount: 0,
+				},
+			],
+		});
+
+		await runtime.clearSyncConfiguration();
+
+		expect(settings.lastSeq).toBe(0);
+		expect(settings.lastSync).toBeNull();
+		expect(settings.syncHistory).toEqual([]);
+		expect(settings.workerUrl).toBe('');
 	});
 });

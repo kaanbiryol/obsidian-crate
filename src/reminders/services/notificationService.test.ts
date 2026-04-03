@@ -127,4 +127,35 @@ describe('ReminderNotificationService', () => {
 			priority: 4,
 		});
 	});
+
+	it('reschedules reminders when the remote schedule drifted from the current reminder state', async () => {
+		getScheduledReminders.mockResolvedValueOnce({
+			scheduled: [
+				{
+					reminder_id: 'rem-1',
+					content: 'Old reminder',
+					project: 'Old project',
+					due_datetime: '2027-01-09T10:00:00.000Z',
+				},
+			],
+		});
+		scheduleReminder.mockResolvedValue({ success: true });
+
+		const service = new ReminderNotificationService(
+			() => createSettings(),
+			() => apiClient as never,
+		);
+
+		await service.reconcile([createReminder()]);
+
+		expect(cancelReminder).not.toHaveBeenCalled();
+		expect(scheduleReminder).toHaveBeenCalledTimes(1);
+		expect(scheduleReminder).toHaveBeenCalledWith({
+			reminderId: 'rem-1',
+			content: 'Test reminder',
+			project: 'Inbox',
+			dueDatetime: '2027-01-10T10:00:00.000Z',
+			priority: 4,
+		});
+	});
 });

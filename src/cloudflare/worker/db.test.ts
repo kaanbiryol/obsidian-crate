@@ -5,8 +5,13 @@ function createDb() {
 	const run = vi.fn(async () => ({}));
 	return {
 		db: {
-			prepare: vi.fn(() => ({
+			prepare: vi.fn((sql: string) => ({
 				run,
+				all: vi.fn(async () => ({
+					results: sql.includes('PRAGMA table_info(files)')
+						? [{ name: 'path' }, { name: 'storage_key' }]
+						: [],
+				})),
 			})),
 		},
 		run,
@@ -22,7 +27,7 @@ describe('initDb', () => {
 	await initDb(first.db as never);
 	await initDb(second.db as never);
 
-		expect(first.db.prepare).toHaveBeenCalledTimes(7);
-		expect(second.db.prepare).toHaveBeenCalledTimes(7);
+		expect(first.db.prepare).toHaveBeenCalledTimes(8);
+		expect(second.db.prepare).toHaveBeenCalledTimes(8);
 	});
 });
