@@ -37,13 +37,6 @@ export class CrateSettingTab extends PluginSettingTab {
 
 		createSettingsRootHeading(containerEl, 'Crate settings');
 
-		renderConfigSection({
-			containerEl,
-			plugin: this.plugin,
-			manualState: this.manualState,
-			rerender: () => this.display(),
-		});
-
 		const isConfigured = this.plugin.syncRuntime.isConfigured();
 		const hasCloudflareCredentials = this.plugin.cloudflareSession.hasCredentials();
 
@@ -56,14 +49,17 @@ export class CrateSettingTab extends PluginSettingTab {
 			this.cleanupFns.push(syncCleanup);
 		}
 
-		if (isConfigured || hasCloudflareCredentials) {
-			renderInfrastructureSection({
-				containerEl,
-				plugin: this.plugin,
-				isConfigured,
-				rerender: () => this.display(),
-			});
-		}
+		renderRemindersSection({
+			containerEl,
+			plugin: this.plugin,
+			rerender: () => this.display(),
+		});
+
+		renderNotificationsSection({
+			containerEl,
+			plugin: this.plugin,
+			rerender: () => this.display(),
+		});
 
 		if (isConfigured) {
 			renderUsageSection({
@@ -72,17 +68,21 @@ export class CrateSettingTab extends PluginSettingTab {
 			});
 		}
 
-		renderNotificationsSection({
+		renderConfigSection({
 			containerEl,
 			plugin: this.plugin,
+			manualState: this.manualState,
 			rerender: () => this.display(),
 		});
 
-		renderRemindersSection({
-			containerEl,
-			plugin: this.plugin,
-			rerender: () => this.display(),
-		});
+		if (isConfigured || hasCloudflareCredentials) {
+			renderInfrastructureSection({
+				containerEl,
+				plugin: this.plugin,
+				isConfigured,
+				rerender: () => this.display(),
+			});
+		}
 	}
 
 	hide(): void {

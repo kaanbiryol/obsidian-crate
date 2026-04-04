@@ -304,6 +304,15 @@ describe('SyncEngine pattern/ignore behavior', () => {
 		expect(matchPattern(harness.engine, 'notes/file.md', '*.tmp')).toBe(false);
 	});
 
+	it('matches slashless filename patterns against nested files', () => {
+		const dsHarness = createHarness({ ignorePatterns: ['.DS_Store'] });
+
+		expect(matchPattern(dsHarness.engine, '.DS_Store', '.DS_Store')).toBe(true);
+		expect(matchPattern(dsHarness.engine, 'notes/.DS_Store', '.DS_Store')).toBe(true);
+		expect(shouldIgnorePath(dsHarness.engine, 'notes/.DS_Store')).toBe(true);
+		expect(shouldIgnorePath(dsHarness.engine, 'notes/keep.md')).toBe(false);
+	});
+
 	it('ignores plugin state files (data.json and file-manifest.json)', () => {
 		expect(shouldIgnorePath(harness.engine, `${PLUGIN_DIR}/data.json`)).toBe(true);
 		expect(shouldIgnorePath(harness.engine, `${PLUGIN_DIR}/file-manifest.json`)).toBe(true);
@@ -380,6 +389,18 @@ describe('SyncEngine event queue behavior', () => {
 		const pendingPaths = getPendingPaths(harness.engine);
 		expect(pendingPaths.has(`delete:${TRACKED_PLUGIN_MAIN_PATH}`)).toBe(true);
 		expect(debouncedSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('skips raw events for nested files ignored by slashless filename patterns', async () => {
+		const dsHarness = createHarness({ ignorePatterns: ['.DS_Store'] });
+		const debouncedSync = spyOnDebouncedSync(dsHarness.engine);
+		dsHarness.vault.adapter.stat.mockResolvedValueOnce({ type: 'file', size: 1, mtime: 1700000000000 });
+
+		dsHarness.engine.onRawFileEvent('notes/.DS_Store');
+		await flushMicrotasks();
+
+		expect(getPendingPaths(dsHarness.engine).size).toBe(0);
+		expect(debouncedSync).not.toHaveBeenCalled();
 	});
 
 	it('emits idle state after flush with no pending paths left', async () => {

@@ -255,15 +255,15 @@ export class SyncEngine {
 			return path.startsWith(pattern) || path === pattern.slice(0, -1);
 		}
 
-			let regex = this.patternCache.get(pattern);
-			if (!regex) {
-				const regexPattern = Array.from(pattern).map(char => {
-					if (char === '*') return '.*';
-					if (char === '?') return '.';
-					return char.replace(/[\\^$+.|(){}[\]]/g, '\\$&');
-				}).join('');
-				try {
-					regex = new RegExp(`^${regexPattern}$`);
+		let regex = this.patternCache.get(pattern);
+		if (!regex) {
+			const regexPattern = Array.from(pattern).map(char => {
+				if (char === '*') return '.*';
+				if (char === '?') return '.';
+				return char.replace(/[\\^$+.|(){}[\]]/g, '\\$&');
+			}).join('');
+			try {
+				regex = new RegExp(`^${regexPattern}$`);
 			} catch (error) {
 				logger.warn(`Invalid ignore pattern "${pattern}":`, error instanceof Error ? error.message : 'Unknown error');
 				// Never match on invalid patterns to avoid sync crashes.
@@ -271,7 +271,14 @@ export class SyncEngine {
 			}
 			this.patternCache.set(pattern, regex);
 		}
-		return regex.test(path);
+
+		if (pattern.includes('/')) {
+			return regex.test(path);
+		}
+
+		// Slashless patterns should behave like filename globs and match nested basenames too.
+		const basename = path.split('/').pop() ?? path;
+		return regex.test(path) || regex.test(basename);
 	}
 
 	private throwIfDestroyed(): void {
