@@ -202,27 +202,31 @@ export class LineReminderMappingService {
   reconcile(
     filePath: string,
     reminders: Reminder[],
-    checkboxLines: Array<{ lineNumber: number; content: string }>
+    checkboxLines: Array<{ lineNumber: number; content: string; reminderId?: string | null }>
   ): {
     matched: Array<{ lineNumber: number; reminder: Reminder }>;
     orphaned: Reminder[];
-    unmapped: Array<{ lineNumber: number; content: string }>;
+    unmapped: Array<{ lineNumber: number; content: string; reminderId?: string | null }>;
   } {
     // Clear existing mappings for this file
     this.clearFile(filePath);
 
     const matched: Array<{ lineNumber: number; reminder: Reminder }> = [];
     const orphaned: Reminder[] = [];
-    const unmapped: Array<{ lineNumber: number; content: string }> = [];
+    const unmapped: Array<{ lineNumber: number; content: string; reminderId?: string | null }> = [];
 
     // Create hash map of checkbox lines for matching
     const linesByHash = new Map<string, Array<{ lineNumber: number; content: string }>>();
+    const linesByReminderId = new Map<string, { lineNumber: number; content: string }>();
     for (const line of checkboxLines) {
       const hash = generateContentHash(line.content);
       if (!linesByHash.has(hash)) {
         linesByHash.set(hash, []);
       }
       linesByHash.get(hash)!.push(line);
+      if (line.reminderId && !linesByReminderId.has(line.reminderId)) {
+        linesByReminderId.set(line.reminderId, line);
+      }
     }
 
     // Track which lines have been matched
@@ -230,6 +234,14 @@ export class LineReminderMappingService {
 
     // Try to match each reminder to a line
     for (const reminder of reminders) {
+      const directMatch = linesByReminderId.get(reminder.id);
+      if (directMatch && !matchedLineNumbers.has(directMatch.lineNumber)) {
+        matchedLineNumbers.add(directMatch.lineNumber);
+        this.registerLine(filePath, directMatch.lineNumber, reminder.id, directMatch.content);
+        matched.push({ lineNumber: directMatch.lineNumber, reminder });
+        continue;
+      }
+
       const hash = generateContentHash(reminder.content);
       const candidates = linesByHash.get(hash);
 

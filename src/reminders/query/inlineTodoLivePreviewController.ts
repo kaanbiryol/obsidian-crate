@@ -68,7 +68,7 @@ export function createInlineTodoController(
 
 		try {
 			const reminders = plugin.storage.getByFile(filePath);
-			const checkboxLines: Array<{ lineNumber: number; content: string }> = [];
+			const checkboxLines: Array<{ lineNumber: number; content: string; reminderId?: string | null }> = [];
 			const doc = view.state.doc;
 
 			for (let index = 1; index <= doc.lines; index++) {
@@ -77,10 +77,11 @@ export function createInlineTodoController(
 					continue;
 				}
 				const parsed = parseCheckboxLine(line.text);
-				if (parsed) {
+				if (parsed?.reminderId) {
 					checkboxLines.push({
 						lineNumber: index,
 						content: parsed.rawContent,
+						reminderId: parsed.reminderId,
 					});
 				}
 			}
@@ -119,29 +120,25 @@ export function createInlineTodoController(
 				await plugin.reminderIndex.rescanFile(file, true);
 			}
 
-			const indexedReminders = plugin.reminderIndex.getByFile(filePath);
-			const indexedByContent = new Map<string, typeof indexedReminders[0]>();
-			for (const indexedReminder of indexedReminders) {
-				indexedByContent.set(indexedReminder.content, indexedReminder);
+				let cachedReminders = reminderCache.get(filePath);
+				if (!cachedReminders) {
+					cachedReminders = new Map();
+					reminderCache.set(filePath, cachedReminders);
 			}
 
-			let cachedReminders = reminderCache.get(filePath);
-			if (!cachedReminders) {
-				cachedReminders = new Map();
-				reminderCache.set(filePath, cachedReminders);
-			}
-
-			for (const { lineNumber, content } of result.unmapped) {
+			for (const { lineNumber, content, reminderId } of result.unmapped) {
 				const parsed = parseCheckboxLine(`- [ ] ${content}`);
 				if (!parsed || !parsed.parsed.cleanContent.trim()) {
 					continue;
-				}
+					}
 
-				const cleanContent = parsed.parsed.cleanContent;
-				const indexedReminder = indexedByContent.get(cleanContent);
-				if (!indexedReminder) {
-					log.warn(`Could not find indexed reminder for line ${lineNumber} with content: ${cleanContent.substring(0, 50)}`);
-					continue;
+					const cleanContent = parsed.parsed.cleanContent;
+					const indexedReminder = reminderId
+						? plugin.reminderIndex.getById(reminderId)
+						: undefined;
+					if (!indexedReminder) {
+						log.warn(`Could not find indexed reminder for line ${lineNumber} with content: ${cleanContent.substring(0, 50)}`);
+						continue;
 				}
 
 				const reminder: Reminder = {
@@ -219,34 +216,24 @@ export function createInlineTodoController(
 			return;
 		}
 
-		const fileCache = reminderCache.get(filePath);
-		if (fileCache) {
-			for (const reminder of fileCache.values()) {
-				if (reminder.content !== parsed.parsed.cleanContent) {
-					continue;
-				}
-				mappingService.registerLine(filePath, lineNum, reminder.id, line.text);
-				if (hasReminderChanged(reminder, parsed)) {
-					await updateReminderFromLine(reminder.id, parsed, filePath);
-				}
+			const fileCache = reminderCache.get(filePath);
+			if (!parsed.reminderId) {
 				return;
 			}
-		}
 
-		const existingReminderId = mappingService.getReminderForLine(filePath, lineNum);
-		if (!existingReminderId || !fileCache) {
-			return;
-		}
+			mappingService.registerLine(filePath, lineNum, parsed.reminderId, parsed.rawContent);
+			const reminder = fileCache?.get(parsed.reminderId) ?? plugin.storage.getById(parsed.reminderId);
+			if (!reminder) {
+				return;
+			}
 
-		const existingReminder = fileCache.get(existingReminderId);
-		if (!existingReminder) {
-			return;
+			if (fileCache) {
+				fileCache.set(parsed.reminderId, reminder);
+			}
+			if (hasReminderChanged(reminder, parsed)) {
+				await updateReminderFromLine(parsed.reminderId, parsed, filePath);
+			}
 		}
-
-		if (existingReminder.content === parsed.parsed.cleanContent && hasReminderChanged(existingReminder, parsed)) {
-			await updateReminderFromLine(existingReminderId, parsed, filePath);
-		}
-	}
 
 	return {
 		reconcileFile,

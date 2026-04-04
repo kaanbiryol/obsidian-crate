@@ -13,6 +13,7 @@ import { parseReminderContent, type ParsedReminder } from './reminderParser';
 import type { Priority, RecurrenceRule } from '../types';
 import { format } from 'date-fns';
 import { recurrenceToText } from './rruleConverter';
+import { extractReminderId, setReminderIdMarker, stripReminderIdMarker } from '../data/reminderIdentity';
 
 interface ParsedCheckbox {
   /** Original line content */
@@ -23,6 +24,8 @@ interface ParsedCheckbox {
   isCompleted: boolean;
   /** Content after the checkbox (before parsing) */
   rawContent: string;
+  /** Stable reminder ID persisted in markdown metadata */
+  reminderId: string | null;
   /** Parsed reminder data from the content */
   parsed: ParsedReminder;
 }
@@ -48,8 +51,10 @@ export function parseCheckboxLine(line: string): ParsedCheckbox | null {
     return null;
   }
 
-  const [, indentation, state, rawContent] = match;
+  const [, indentation, state, rawContentWithMetadata] = match;
   const isCompleted = state.toLowerCase() === 'x';
+  const reminderId = extractReminderId(rawContentWithMetadata);
+  const rawContent = stripReminderIdMarker(rawContentWithMetadata);
   const parsed = parseReminderContent(rawContent);
 
   return {
@@ -57,6 +62,7 @@ export function parseCheckboxLine(line: string): ParsedCheckbox | null {
     indentation,
     isCompleted,
     rawContent,
+    reminderId,
     parsed,
   };
 }
@@ -88,7 +94,8 @@ export function rebuildCheckboxLine(
   priority: Priority,
   project?: string,
   recurrence?: RecurrenceRule,
-  hasTime?: boolean
+  hasTime?: boolean,
+  reminderId?: string,
 ): string {
   const checkbox = isCompleted ? '[x]' : '[ ]';
 
@@ -118,7 +125,8 @@ export function rebuildCheckboxLine(
     content += ' !';
   }
 
-  return `${indentation}- ${checkbox} ${content}`;
+  const line = `${indentation}- ${checkbox} ${content}`;
+  return reminderId ? setReminderIdMarker(line, reminderId) : line;
 }
 
 /**
@@ -133,8 +141,11 @@ export function rebuildCheckboxLine(
  * Used to detect when lines are moved vs edited
  */
 export function generateContentHash(content: string): string {
+  const withoutMetadata = stripReminderIdMarker(content);
+  const parsedCheckbox = parseCheckboxLine(withoutMetadata);
+  const hashSource = parsedCheckbox ? parsedCheckbox.rawContent : withoutMetadata;
   // Simple hash based on cleaned content (ignoring dates/priority which change)
-  const cleaned = parseReminderContent(content).cleanContent.toLowerCase().trim();
+  const cleaned = parseReminderContent(hashSource).cleanContent.toLowerCase().trim();
   let hash = 0;
   for (let i = 0; i < cleaned.length; i++) {
     const char = cleaned.charCodeAt(i);

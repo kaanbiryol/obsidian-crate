@@ -1,6 +1,7 @@
 import { Notice, type MarkdownPostProcessorContext } from 'obsidian';
 import type CratePlugin from '../main';
 import { createReminderIndex } from './data/reminderIndex';
+import { migrateReminderIds } from './data/reminderIdMigration';
 import { createMarkdownWriter } from './data/markdownWriter';
 import { createStorageCompat } from './data/storageCompat';
 import { ReminderQueryInjector } from './query/injector';
@@ -53,6 +54,19 @@ async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Pr
 
 	plugin.remindersVaultWatcher = new VaultWatcher(plugin, plugin.reminderIndex);
 	plugin.remindersVaultWatcher.register();
+
+	const migrate = async () => {
+		const result = await migrateReminderIds(plugin.app, folderPath);
+		if (result.remindersUpdated > 0) {
+			await plugin.reminderIndex.load();
+		}
+	};
+
+	if (plugin.app.workspace.layoutReady) {
+		await migrate();
+	} else {
+		plugin.app.workspace.onLayoutReady(() => void migrate());
+	}
 }
 
 async function reconcileReminderNotifications(plugin: CratePlugin): Promise<void> {

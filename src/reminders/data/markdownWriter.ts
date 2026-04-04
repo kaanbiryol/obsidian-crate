@@ -11,8 +11,8 @@
 import type { App, TFile } from "obsidian";
 import { createLogger, type Priority, type Reminder, type RecurrenceRule, calculateNextOccurrence, calculateFirstOccurrence, generateContentHash } from "@/reminders";
 import type { IndexedReminder, ReminderIndex } from "./reminderIndex";
-import { generateReminderId } from "./reminderIdentity";
-import { rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
+import { createReminderId, extractReminderId, setReminderIdMarker } from "./reminderIdentity";
+import { parseCheckboxLine, rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
 import {
   buildStoredReminderDates,
   inferHasTimeFromDate,
@@ -36,6 +36,59 @@ export interface SyncResult {
 }
 
 const log = createLogger('MarkdownWriter');
+
+function recurrenceKey(value: RecurrenceRule | undefined): string {
+  return JSON.stringify(normalizeRecurrenceRule(value) ?? null);
+}
+
+function lineMatchesReminder(line: string, reminder: IndexedReminder): boolean {
+  const parsed = parseCheckboxLine(line);
+  if (!parsed) {
+    return false;
+  }
+
+  const storedDates = buildStoredReminderDates(parsed.parsed.dueDate, parsed.parsed.hasTime);
+  return parsed.parsed.cleanContent === reminder.content
+    && parsed.isCompleted === reminder.completed
+    && parsed.parsed.priority === reminder.priority
+    && storedDates.dueDate === reminder.dueDate
+    && storedDates.dueDatetime === reminder.dueDatetime
+    && recurrenceKey(parsed.parsed.recurrence) === recurrenceKey(reminder.recurrence);
+}
+
+function findReminderLineNumber(lines: string[], reminder: IndexedReminder): number {
+  if (reminder.lineNumber >= 0 && reminder.lineNumber < lines.length && lines[reminder.lineNumber] === reminder.rawLine) {
+    return reminder.lineNumber;
+  }
+
+  for (let index = 0; index < lines.length; index++) {
+    if (extractReminderId(lines[index]) === reminder.id) {
+      return index;
+    }
+  }
+
+  const exactMatches: number[] = [];
+  for (let index = 0; index < lines.length; index++) {
+    if (lines[index] === reminder.rawLine) {
+      exactMatches.push(index);
+    }
+  }
+  if (exactMatches.length === 1) {
+    return exactMatches[0];
+  }
+
+  const semanticMatches: number[] = [];
+  for (let index = 0; index < lines.length; index++) {
+    if (lineMatchesReminder(lines[index], reminder)) {
+      semanticMatches.push(index);
+    }
+  }
+  if (semanticMatches.length === 1) {
+    return semanticMatches[0];
+  }
+
+  return -1;
+}
 
 function isTFileLike(value: unknown): value is TFile {
   return typeof value === "object"
@@ -91,6 +144,7 @@ export interface MarkdownWriter {
     priority: Priority,
     recurrence?: RecurrenceRule,
     hasTime?: boolean,
+    reminderId?: string,
   ): Promise<void>;
 
   /**
@@ -194,8 +248,10 @@ export function createMarkdownWriter(
       priority: Priority,
       recurrence?: RecurrenceRule,
       hasTime?: boolean,
+      reminderId?: string,
     ): Promise<void> {
       const normalizedRecurrence = normalizeRecurrenceRule(recurrence);
+      const stableReminderId = reminderId ?? createReminderId();
       // Get or create the project file
       const file = await getOrCreateProjectFile(project);
 
@@ -220,13 +276,13 @@ export function createMarkdownWriter(
         undefined,  // project (not used in line)
         normalizedRecurrence,
         resolvedHasTime,
+        stableReminderId,
       );
 
       // Generate ID and build optimistic reminder for immediate UI update
-      const reminderId = generateReminderId(file.path, content);
       const contentHash = generateContentHash(content);
       const optimisticReminder: IndexedReminder = {
-        id: reminderId,
+        id: stableReminderId,
         content,
         dueDate: storedDates.dueDate,
         dueDatetime: storedDates.dueDatetime,
@@ -261,7 +317,7 @@ export function createMarkdownWriter(
         // Fire CalDAV sync in background (don't await)
         if (onReminderChange) {
           const reminder: Reminder & { contentHash: string } = {
-            id: reminderId,
+            id: stableReminderId,
             content,
             dueDate: storedDates.dueDate,
             dueDatetime: storedDates.dueDatetime,
@@ -279,7 +335,7 @@ export function createMarkdownWriter(
         }
       } catch (error) {
         // Rollback optimistic state on file write failure
-        index.clearOptimistic(reminderId);
+        index.clearOptimistic(stableReminderId);
         throw error;
       }
     },
@@ -322,7 +378,7 @@ export function createMarkdownWriter(
         await this.deleteReminder(reminder);
 
         // 2. Create in new file (without project tag since project = file name)
-        await this.createReminder(newProject, newContent, newDueDate, newPriority, newRecurrence, newHasTime);
+        await this.createReminder(newProject, newContent, newDueDate, newPriority, newRecurrence, newHasTime, reminder.id);
 
         return;
       }
@@ -335,25 +391,11 @@ export function createMarkdownWriter(
       const fileContent = await app.vault.read(file);
       const lines = fileContent.split("\n");
 
-      // Verify the line still matches
-      if (
-        reminder.lineNumber >= lines.length ||
-        lines[reminder.lineNumber] !== reminder.rawLine
-      ) {
-        // Line has moved or changed, try to find it by content hash
-        let foundLine = -1;
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes(reminder.content)) {
-            foundLine = i;
-            break;
-          }
-        }
-        if (foundLine === -1) {
-          throw new Error(
-            `Cannot find reminder line in ${reminder.filePath}. The file may have been modified.`
-          );
-        }
-        reminder.lineNumber = foundLine;
+      const lineNumber = findReminderLineNumber(lines, reminder);
+      if (lineNumber === -1) {
+        throw new Error(
+          `Cannot safely locate reminder line in ${reminder.filePath}. The file may have been modified.`
+        );
       }
 
       // Build the updated line
@@ -386,15 +428,16 @@ export function createMarkdownWriter(
         undefined,  // project (not used in line)
         newRecurrence,
         newHasTime,
+        reminder.id,
       );
 
       // Replace the line
-      lines[reminder.lineNumber] = newLine;
+      lines[lineNumber] = newLine;
 
       try {
         // Write back to file (fast)
         await app.vault.modify(file, lines.join("\n"));
-        log.info(`Updated reminder in ${reminder.filePath} at line ${reminder.lineNumber}`);
+        log.info(`Updated reminder in ${reminder.filePath} at line ${lineNumber}`);
 
         // Force index rescan (clears optimistic state with real data)
         if (onFileWritten) {
@@ -440,29 +483,14 @@ export function createMarkdownWriter(
       const fileContent = await app.vault.read(file);
       const lines = fileContent.split("\n");
 
-      // Verify and find the line
-      let lineToDelete = reminder.lineNumber;
-      if (
-        lineToDelete >= lines.length ||
-        lines[lineToDelete] !== reminder.rawLine
-      ) {
-        // Try to find by content
-        let foundLine = -1;
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes(reminder.content)) {
-            foundLine = i;
-            break;
-          }
-        }
-        if (foundLine === -1) {
-          log.warn(
-            ` Reminder line not found, may already be deleted`
-          );
-          // Clear optimistic state since item doesn't exist
-          index.clearOptimistic(reminder.id);
-          return;
-        }
-        lineToDelete = foundLine;
+      const lineToDelete = findReminderLineNumber(lines, reminder);
+      if (lineToDelete === -1) {
+        log.warn(
+          ` Reminder line not found, may already be deleted`
+        );
+        // Clear optimistic state since item doesn't exist
+        index.clearOptimistic(reminder.id);
+        return;
       }
 
       // Remove the line
@@ -535,28 +563,13 @@ export function createMarkdownWriter(
       const fileContent = await app.vault.read(file);
       const lines = fileContent.split("\n");
 
-      // Find the line
-      let lineNumber = reminder.lineNumber;
-      if (
-        lineNumber >= lines.length ||
-        lines[lineNumber] !== reminder.rawLine
-      ) {
-        // Try to find by content
-        let foundLine = -1;
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes(reminder.content)) {
-            foundLine = i;
-            break;
-          }
-        }
-        if (foundLine === -1) {
-          // Rollback optimistic state
-          index.clearOptimistic(reminder.id);
-          throw new Error(
-            `Cannot find reminder line in ${reminder.filePath}`
-          );
-        }
-        lineNumber = foundLine;
+      const lineNumber = findReminderLineNumber(lines, reminder);
+      if (lineNumber === -1) {
+        // Rollback optimistic state
+        index.clearOptimistic(reminder.id);
+        throw new Error(
+          `Cannot safely locate reminder line in ${reminder.filePath}`
+        );
       }
 
       const line = lines[lineNumber];
@@ -586,6 +599,7 @@ export function createMarkdownWriter(
               reminder.project,
               recurrence,
               currentHasTime,
+              reminder.id,
             );
 
             log.info(`Recurring reminder: advancing to next occurrence ${nextDue.toISOString()}`);
@@ -600,7 +614,7 @@ export function createMarkdownWriter(
         }
       }
 
-      lines[lineNumber] = newLine;
+      lines[lineNumber] = setReminderIdMarker(newLine, reminder.id);
 
       try {
         // Write back to file (fast)

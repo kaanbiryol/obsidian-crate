@@ -167,6 +167,11 @@ export class MockSetting {
 		return this;
 	}
 
+	setDesc(desc: string): this {
+		this.descEl.setText(desc);
+		return this;
+	}
+
 	setClass(cls: string): this {
 		this.settingEl.addClasses(cls.split(/\s+/).filter(Boolean));
 		return this;

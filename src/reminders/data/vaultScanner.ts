@@ -14,7 +14,6 @@ import { createLogger } from "@/reminders";
 import { parseCheckboxLine, generateContentHash } from "@/reminders/utils/checkboxParser";
 import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import type { IndexedReminder } from "./reminderIndex";
-import { generateReminderId } from "./reminderIdentity";
 
 const log = createLogger('VaultScanner');
 
@@ -147,14 +146,14 @@ export async function scanFile(
       const line = lines[lineNumber];
       const parsed = parseCheckboxLine(line);
 
-      if (parsed && parsed.parsed.cleanContent.trim()) {
+      if (parsed && parsed.parsed.cleanContent.trim() && parsed.reminderId) {
         // This is a checkbox line with content - treat as a reminder
         // Project is always determined by filename (e.g., "Work.md" → "Work")
         const project = projectFromFile;
         const storedDates = buildStoredReminderDates(parsed.parsed.dueDate, parsed.parsed.hasTime);
 
         const reminder: IndexedReminder = {
-          id: generateReminderId(filePath, parsed.rawContent),
+          id: parsed.reminderId,
           content: parsed.parsed.cleanContent,
           dueDate: storedDates.dueDate,
           dueDatetime: storedDates.dueDatetime,

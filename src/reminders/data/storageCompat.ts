@@ -10,7 +10,7 @@
 import type { ReminderIndex, IndexedReminder } from "./reminderIndex";
 import type { MarkdownWriter } from "./markdownWriter";
 import type { Reminder, CreateReminderParams, UpdateReminderParams, Priority } from "@/reminders/types/plugin-reminder";
-import { generateReminderId } from "./reminderIdentity";
+import { createReminderId } from "./reminderIdentity";
 import {
   buildStoredReminderDates,
   formatLocalDateKey,
@@ -146,8 +146,7 @@ export function createStorageCompat(
     // Mutation methods
     async create(params: CreateReminderParams): Promise<Reminder> {
       const project = params.project || 'Inbox';
-      const filePath = `${index.remindersFolderPath}/${project}.md`;
-      const reminderId = generateReminderId(filePath, params.content);
+      const reminderId = params.id?.trim() || createReminderId();
       const recurrence = normalizeRecurrenceRule(params.recurrence);
       const dueDate = parseReminderDateValue(
         params.dueDatetime ?? params.dueDate,
@@ -163,6 +162,7 @@ export function createStorageCompat(
         priority,
         recurrence,
         params.dueDatetime ? true : params.dueDate ? false : undefined,
+        reminderId,
       );
 
       // VaultWatcher will handle rescanning after file modify event

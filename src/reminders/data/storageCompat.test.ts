@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ReminderIndex, IndexedReminder } from './reminderIndex';
 import type { MarkdownWriter } from './markdownWriter';
 import { createStorageCompat } from './storageCompat';
-import { generateReminderId } from './reminderIdentity';
 import { timezone as getLocalTimeZone } from '../utils/time';
 
 function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
@@ -59,11 +58,10 @@ function createWriter(): {
 }
 
 describe('storageCompat.create', () => {
-	it('returns the optimistic reminder id instead of a random placeholder', async () => {
+	it('returns the persisted reminder id when the index already reflects the create', async () => {
 		const filePath = 'Reminders/Work.md';
-		const reminderId = generateReminderId(filePath, 'Task A');
-		const indexedReminder: IndexedReminder = {
-			id: reminderId,
+		let persistedId: string | undefined;
+		const indexedReminder: Omit<IndexedReminder, 'id'> = {
 			content: 'Task A',
 			priority: 1,
 			completed: false,
@@ -74,7 +72,10 @@ describe('storageCompat.create', () => {
 			contentHash: 'hash',
 		};
 		const index = createIndex({
-			getById: (id: string) => id === reminderId ? indexedReminder : undefined,
+			getById: (id: string) => {
+				persistedId = id;
+				return { ...indexedReminder, id };
+			},
 		});
 		const { writer, spies } = createWriter();
 		const storage = createStorageCompat(index, writer);
@@ -85,9 +86,17 @@ describe('storageCompat.create', () => {
 			priority: 1,
 		});
 
-		expect(created.id).toBe(reminderId);
+		expect(created.id).toBe(persistedId);
 		expect(created.content).toBe('Task A');
-		expect(spies.createReminder).toHaveBeenCalledWith('Work', 'Task A', undefined, 1, undefined, undefined);
+		expect(spies.createReminder).toHaveBeenCalledWith(
+			'Work',
+			'Task A',
+			undefined,
+			1,
+			undefined,
+			undefined,
+			created.id,
+		);
 	});
 
 	it('passes recurrence through on create', async () => {
@@ -96,7 +105,7 @@ describe('storageCompat.create', () => {
 		const storage = createStorageCompat(index, writer);
 
 		const recurrence = { frequency: 'daily' as const };
-		await storage.create({
+		const created = await storage.create({
 			content: 'Task recur',
 			project: 'Work',
 			priority: 1,
@@ -110,6 +119,7 @@ describe('storageCompat.create', () => {
 			1,
 			{ frequency: 'daily', timezone: getLocalTimeZone() },
 			undefined,
+			created.id,
 		);
 	});
 
@@ -132,9 +142,9 @@ describe('storageCompat.create', () => {
 		expect(call?.[5]).toBe(false);
 	});
 
-	it('falls back to the deterministic reminder id when optimistic state is unavailable', async () => {
+	it('returns the generated reminder id when optimistic state is unavailable', async () => {
 		const index = createIndex();
-		const { writer } = createWriter();
+		const { writer, spies } = createWriter();
 		const storage = createStorageCompat(index, writer);
 
 		const created = await storage.create({
@@ -143,7 +153,10 @@ describe('storageCompat.create', () => {
 			priority: 4,
 		});
 
-		expect(created.id).toBe(generateReminderId('Reminders/Inbox.md', 'Task B'));
+		expect(created.id).toBe(spies.createReminder.mock.calls[0]?.[6]);
+		expect(created.id).toMatch(
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+		);
 	});
 });
 
@@ -174,7 +187,10 @@ describe('storageCompat.update and today view', () => {
 			indexedReminder,
 			expect.objectContaining({ recurrence: null }),
 		);
-		const updates = spies.updateReminder.mock.calls[0]?.[1];
+		const updateCall = spies.updateReminder.mock.calls[0] as
+			| [IndexedReminder, Parameters<MarkdownWriter['updateReminder']>[1]]
+			| undefined;
+		const updates = updateCall?.[1];
 		expect(Object.prototype.hasOwnProperty.call(updates ?? {}, 'dueDate')).toBe(false);
 	});
 

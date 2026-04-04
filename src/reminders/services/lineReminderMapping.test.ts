@@ -70,4 +70,24 @@ describe('LineReminderMappingService', () => {
     expect(service.getReminderForLine('file.md', 0)).toBeDefined();
     expect(service.getReminderForLine('file.md', 1)).toBeDefined();
   });
+
+  it('prefers persisted reminder IDs over content matching for duplicates', () => {
+    const reminders = [
+      makeReminder('r1', 'Task A'),
+      makeReminder('r2', 'Task A'),
+    ];
+    const checkboxLines = [
+      { lineNumber: 0, content: 'Task A', reminderId: 'r2' },
+      { lineNumber: 1, content: 'Task A', reminderId: 'r1' },
+    ];
+
+    const result = service.reconcile('file.md', reminders, checkboxLines);
+
+    expect(result.matched).toEqual([
+      { lineNumber: 1, reminder: reminders[0] },
+      { lineNumber: 0, reminder: reminders[1] },
+    ]);
+    expect(service.getReminderForLine('file.md', 0)).toBe('r2');
+    expect(service.getReminderForLine('file.md', 1)).toBe('r1');
+  });
 });

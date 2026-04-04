@@ -138,6 +138,60 @@ describe('markdownWriter', () => {
     expect(content).toContain('Task B updated');
   });
 
+  it('updates the correct duplicate reminder by persisted ID', async () => {
+    const initial = [
+      '# Work',
+      '',
+      '- [ ] Task A Jan 1, 2026 <!-- crate-id:rem-1 -->',
+      '- [ ] Task A Jan 1, 2026 <!-- crate-id:rem-2 -->',
+      '',
+    ].join('\n');
+    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    folders.add('Reminders');
+
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    const reminder = makeIndexedReminder({
+      id: 'rem-2',
+      content: 'Task A',
+      filePath: 'Reminders/Work.md',
+      lineNumber: 2,
+      rawLine: '- [ ] Task A Jan 1, 2026 <!-- crate-id:rem-2 -->',
+      dueDate: '2026-01-01',
+    });
+
+    await writer.updateReminder(reminder, { content: 'Task A updated' });
+
+    const content = files.get('Reminders/Work.md') || '';
+    expect(content).toContain('- [ ] Task A Jan 1, 2026 <!-- crate-id:rem-1 -->');
+    expect(content).toContain('- [ ] Task A updated Jan 1, 2026 <!-- crate-id:rem-2 -->');
+  });
+
+  it('preserves reminder ID metadata when updating content', async () => {
+    const initial = '# Work\n\n- [ ] Task A Jan 1, 2026 <!-- crate-id:rem-1 -->\n';
+    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    folders.add('Reminders');
+
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    const reminder = makeIndexedReminder({
+      id: 'rem-1',
+      content: 'Task A',
+      filePath: 'Reminders/Work.md',
+      lineNumber: 2,
+      rawLine: '- [ ] Task A Jan 1, 2026 <!-- crate-id:rem-1 -->',
+      dueDate: '2026-01-01',
+    });
+
+    await writer.updateReminder(reminder, { content: 'Task A updated' });
+
+    const content = files.get('Reminders/Work.md') || '';
+    expect(content).toContain('<!-- crate-id:rem-1 -->');
+    expect(content).toContain('Task A updated');
+  });
+
   it('preserves date-only due dates when updating other fields', async () => {
     const initial = '# Work\n\n- [ ] Task D Jan 2, 2026\n';
     const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });

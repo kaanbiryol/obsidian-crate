@@ -34,7 +34,9 @@ describe('vaultScanner', () => {
   it('scans a file and ignores empty checkbox content', async () => {
     const app = {
       vault: {
-        cachedRead: vi.fn().mockResolvedValue('- [ ] Task A\n- [ ] \n- [x] Done task'),
+        cachedRead: vi.fn().mockResolvedValue(
+          '- [ ] Task A <!-- crate-id:rem-1 -->\n- [ ] \n- [x] Done task <!-- crate-id:rem-2 -->',
+        ),
       },
     } as unknown as App;
 
@@ -54,7 +56,7 @@ describe('vaultScanner', () => {
     ];
 
     const contentByPath: Record<string, string> = {
-      'Reminders/Work.md': '- [ ] Task A',
+      'Reminders/Work.md': '- [ ] Task A <!-- crate-id:rem-1 -->',
       'Reminders/Empty.md': 'No reminders here',
       'Notes/Other.md': '- [ ] Not included',
     };
@@ -80,7 +82,7 @@ describe('vaultScanner', () => {
     ];
 
     const contentByPath: Record<string, string> = {
-      'Reminders/Work.md': '- [ ] Task A',
+      'Reminders/Work.md': '- [ ] Task A <!-- crate-id:rem-1 -->',
       'Notes/Other.md': '- [ ] Not included',
     };
 
@@ -96,5 +98,33 @@ describe('vaultScanner', () => {
     expect(result.filesScanned).toBe(1);
     expect(result.reminders).toHaveLength(1);
     expect(result.reminders[0].id).toBeTruthy();
+  });
+
+  it('preserves persisted reminder IDs from markdown metadata', async () => {
+    const app = {
+      vault: {
+        cachedRead: vi.fn().mockResolvedValue('- [ ] Task A <!-- crate-id:rem-123 -->'),
+      },
+    } as unknown as App;
+
+    const file = makeMockFile('Reminders/Work.md');
+    const result = await scanFile(app, file, 'Reminders');
+
+    expect(result.reminders).toHaveLength(1);
+    expect(result.reminders[0].id).toBe('rem-123');
+    expect(result.reminders[0].content).toBe('Task A');
+  });
+
+  it('ignores reminder lines that do not have persisted IDs yet', async () => {
+    const app = {
+      vault: {
+        cachedRead: vi.fn().mockResolvedValue('- [ ] Task A\n- [ ] Task A'),
+      },
+    } as unknown as App;
+
+    const file = makeMockFile('Reminders/Work.md');
+    const result = await scanFile(app, file, 'Reminders');
+
+    expect(result.reminders).toHaveLength(0);
   });
 });
