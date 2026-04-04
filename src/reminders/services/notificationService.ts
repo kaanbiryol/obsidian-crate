@@ -1,3 +1,4 @@
+import { errorMessage } from '../../plugin/logger';
 import type { CrateSettings } from '../../plugin/types';
 import type { SyncApiClient } from '../../sync/api';
 import type { Reminder } from '../types/reminder';
@@ -105,7 +106,7 @@ export class ReminderNotificationService {
 			}
 			return { success: true };
 		} catch (error) {
-			const msg = error instanceof Error ? error.message : String(error);
+			const msg = errorMessage(error);
 			log.error(`Notification sync failed (${operation}):`, error);
 			return { success: false, error: msg };
 		}

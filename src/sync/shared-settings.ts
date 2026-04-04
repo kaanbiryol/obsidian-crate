@@ -1,8 +1,5 @@
+import { isRecord } from '../plugin/settings';
 import type { CrateSettings, SharedSettings } from '../plugin/types';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function normalizeStringArray(value: unknown): string[] | null {
 	if (!Array.isArray(value)) {

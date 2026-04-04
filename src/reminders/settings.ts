@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isRecord } from '../plugin/settings';
 import type { TabId } from './ui/layoutConstants';
 
 export type DueDateDefaultSetting = 'none' | 'today' | 'tomorrow';
@@ -36,10 +37,6 @@ export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
 	sidebarDefaultTab: 'inbox',
 	fullscreenDefaultTab: 'inbox',
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function normalizeQueryViewPreferences(
 	value: unknown,

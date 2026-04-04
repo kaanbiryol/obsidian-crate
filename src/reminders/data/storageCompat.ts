@@ -62,7 +62,6 @@ export interface StorageCompat {
 
   // Utility methods
   forceSave(): Promise<void>;
-  updateFileLinks(oldPath: string, newPath: string): Promise<number>;
 
   // Stats
   getStats(): { activeCount: number; completedCount: number; totalCount: number };
@@ -281,12 +280,6 @@ export function createStorageCompat(
     // Utility methods
     async forceSave(): Promise<void> {
       // No-op - markdown files are saved immediately
-    },
-
-    async updateFileLinks(_oldPath: string, _newPath: string): Promise<number> {
-      // This would require updating markdown files directly
-      // For now, return 0 as file links aren't used in markdown mode
-      return 0;
     },
 
     // Stats

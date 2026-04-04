@@ -6,16 +6,13 @@
 
 import type { App, PluginManifest } from 'obsidian';
 import { createLogger } from '../plugin/logger';
+import { isRecord } from '../plugin/settings';
 import type { FileManifest, FileEntry } from '../plugin/types';
 
 const logger = createLogger('Manifest');
 
 const MANIFEST_FILENAME = 'file-manifest.json';
 const MANIFEST_TMP_FILENAME = 'file-manifest.json.tmp';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function normalizeNonNegativeInteger(value: unknown): number | null {
 	return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;

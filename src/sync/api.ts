@@ -3,7 +3,7 @@
  */
 
 import { requestUrl, type RequestUrlParam, type RequestUrlResponse } from 'obsidian';
-import { createLogger } from '../plugin/logger';
+import { createLogger, errorMessage } from '../plugin/logger';
 import { normalizeWorkerUrl } from './worker-url';
 import type {
 	FileManifest,
@@ -70,7 +70,7 @@ function parseJsonResponse<T>(responseText: string, path: string): T {
 		return JSON.parse(responseText) as T;
 	} catch (error) {
 		throw new Error(
-			`Invalid JSON response for ${path}: ${error instanceof Error ? error.message : String(error)}`,
+			`Invalid JSON response for ${path}: ${errorMessage(error)}`,
 		);
 	}
 }
@@ -240,7 +240,7 @@ export class SyncApiClient {
 		} catch (error) {
 			return {
 				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
+				error: errorMessage(error),
 			};
 		}
 	}

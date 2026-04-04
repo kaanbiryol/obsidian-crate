@@ -8,6 +8,7 @@ import { isHiddenPath } from './file-discovery';
 import { ActivityModal } from '../ui/activity-modal';
 import { openConfirmationModal } from '../ui/confirmation-modal';
 import { applySharedSettings, parseSharedSettingsFromSetupParams } from './shared-settings';
+import { errorMessage } from '../plugin/logger';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
 
@@ -189,7 +190,7 @@ export async function handleSyncSetupProtocol(
 			new Notice(`Configured but connection test failed: ${result.error}`);
 		}
 	} catch (error) {
-		const msg = error instanceof Error ? error.message : 'Unknown error';
+		const msg = errorMessage(error);
 		new Notice(`Setup link failed: ${msg}`);
 	}
 }

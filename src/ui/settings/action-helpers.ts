@@ -1,4 +1,5 @@
 import { Notice, Setting, type ButtonComponent } from 'obsidian';
+import { errorMessage } from '../../plugin/logger';
 
 export interface RunButtonTaskContext {
 	setButtonText: (text: string) => void;
@@ -20,7 +21,7 @@ export interface RunButtonTaskOptions<T> {
 }
 
 export function getErrorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : 'Unknown error';
+	return errorMessage(error);
 }
 
 export async function runButtonTask<T>(options: RunButtonTaskOptions<T>): Promise<void> {

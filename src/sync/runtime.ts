@@ -6,7 +6,7 @@ import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
 import { SyncEngine } from './engine';
-import { guardSyncConfigured } from './sync-guards';
+import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from './sync-result';
 import { requireNormalizedWorkerUrl } from './worker-url';
 
 const logger = createLogger('SyncRuntime');
@@ -279,43 +279,27 @@ export class SyncRuntime {
 		return paths.slice(0, MAX_SYNC_HISTORY_PATHS);
 	}
 
-	private getConfiguredSyncEngine(): SyncEngine | SyncResult {
-		const guardResult = guardSyncConfigured(this.syncEngine !== null);
-		if (guardResult) {
-			return guardResult;
-		}
-		return this.syncEngine as SyncEngine;
-	}
-
-	private createProgressReporter(progressCallback?: (current: number, total: number) => void) {
-		return (current: number, total: number) => {
-			this.statusBar?.setSyncProgress(current, total);
-			progressCallback?.(current, total);
-			for (const listener of this.progressListeners) {
-				listener(current, total);
-			}
-		};
-	}
-
 	private async runSyncOperation(
 		type: SyncHistoryEntry['type'],
 		operation: (engine: SyncEngine, progress: (current: number, total: number) => void) => Promise<SyncResult>,
 		progressCallback?: (current: number, total: number) => void,
 		logMessage?: string,
 	): Promise<SyncResult> {
-		const syncEngineOrGuard = this.getConfiguredSyncEngine();
-		if ('success' in syncEngineOrGuard) {
-			return syncEngineOrGuard;
-		}
-		const syncEngine = syncEngineOrGuard;
+		if (!this.syncEngine) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
 
 		if (logMessage) {
 			logger.info(logMessage);
 		}
 
-		const wrappedCallback = this.createProgressReporter(progressCallback);
+		const wrappedCallback = (current: number, total: number) => {
+			this.statusBar?.setSyncProgress(current, total);
+			progressCallback?.(current, total);
+			for (const listener of this.progressListeners) {
+				listener(current, total);
+			}
+		};
 		try {
-			const result = await operation(syncEngine, wrappedCallback);
+			const result = await operation(this.syncEngine, wrappedCallback);
 			this.recordSyncResult(type, result);
 			await this.persistSettings();
 			return result;

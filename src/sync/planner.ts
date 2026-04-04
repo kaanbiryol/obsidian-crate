@@ -4,7 +4,7 @@ import { createConflictCopy } from './conflict';
 import { detectConflicts } from './conflict';
 import { getAllVaultFiles, isHiddenPath } from './file-discovery';
 import { createEmptySyncResult, finalizeSyncResult } from './sync-result';
-import { createLogger } from '../plugin/logger';
+import { createLogger, errorMessage } from '../plugin/logger';
 import type { ChangelogEntry, CrateSettings, FileDiff, FileEntry, PreparedUpload, SyncResult } from '../plugin/types';
 import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
 
@@ -299,8 +299,7 @@ export async function runIncrementalSync(
 					}
 				}
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-				result.errors.push(`${path}: ${errorMessage}`);
+				result.errors.push(`${path}: ${errorMessage(error)}`);
 			}
 		}
 
@@ -324,8 +323,7 @@ export async function runIncrementalSync(
 				const localFiles: Record<string, FileEntry> = {};
 				await context.processDiff(diff, localFiles, result);
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-				result.errors.push(`${diff.path}: ${errorMessage}`);
+				result.errors.push(`${diff.path}: ${errorMessage(error)}`);
 			}
 		}
 
@@ -337,8 +335,7 @@ export async function runIncrementalSync(
 					localOnlyUploads.push(uploadFile);
 				}
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-				result.errors.push(`${file.path}: ${errorMessage}`);
+				result.errors.push(`${file.path}: ${errorMessage(error)}`);
 			}
 			current++;
 			options.progressCallback?.(current, total);
@@ -369,9 +366,9 @@ export async function runIncrementalSync(
 					}
 				}
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+				const errMsg = errorMessage(error);
 				for (const path of localOnlyDeletes) {
-					result.errors.push(`${path}: ${errorMessage}`);
+					result.errors.push(`${path}: ${errMsg}`);
 				}
 			}
 			current += localOnlyDeletes.length;
@@ -387,7 +384,7 @@ export async function runIncrementalSync(
 		return result;
 	} catch (error) {
 		if (error instanceof DOMException && error.name === 'AbortError') throw error;
-		logger.warn('Incremental sync failed, falling back to full sync:', error instanceof Error ? error.message : 'Unknown error');
+		logger.warn('Incremental sync failed, falling back to full sync:', errorMessage(error));
 		return null;
 	}
 }

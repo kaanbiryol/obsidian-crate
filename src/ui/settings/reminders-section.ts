@@ -6,6 +6,7 @@ import {
 	type DueDateDefaultSetting,
 } from '../../reminders/settings';
 import type { TabId } from '../../reminders/ui/layoutConstants';
+import { errorMessage } from '../../plugin/logger';
 import { createSettingsSectionHeading } from './section-helpers';
 
 export interface RemindersSectionContext {
@@ -47,8 +48,7 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 				});
 			text.inputEl.addEventListener('blur', () => {
 				void commitFolderPath().catch((error: unknown) => {
-					const message = error instanceof Error ? error.message : 'Unknown error';
-					new Notice(`Failed to update reminders folder: ${message}`);
+					new Notice(`Failed to update reminders folder: ${errorMessage(error)}`);
 					text.setValue(plugin.remindersSettings.remindersFolderPath);
 				});
 			});

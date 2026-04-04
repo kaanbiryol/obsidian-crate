@@ -27,6 +27,7 @@ import {
 	redeployWorker,
 	verifyCredentials,
 } from './api';
+import { errorMessage } from '../plugin/logger';
 import { normalizeWorkerUrl } from '../sync/worker-url';
 import { getWorkerScript } from './worker-template';
 
@@ -479,7 +480,7 @@ export async function runDiagnostics(input: DiagnosticsInput): Promise<Diagnosti
 					results.push({
 						name: 'Worker health',
 						status: 'fail',
-						message: `Unable to reach worker: ${error instanceof Error ? error.message : String(error)}`,
+						message: `Unable to reach worker: ${errorMessage(error)}`,
 					});
 				}
 			}
@@ -708,7 +709,7 @@ export async function resetInfrastructure(input: ResetInput, onProgress?: Progre
 			await deleteWorker(credentials, worker.id);
 			deleted.push(`Worker ${worker.id}`);
 		} catch (error) {
-			failed.push(`Worker ${worker.id}: ${error instanceof Error ? error.message : String(error)}`);
+			failed.push(`Worker ${worker.id}: ${errorMessage(error)}`);
 		}
 	}
 
@@ -718,7 +719,7 @@ export async function resetInfrastructure(input: ResetInput, onProgress?: Progre
 			await deleteD1Database(credentials, database.uuid);
 			deleted.push(`D1 database ${database.name}`);
 		} catch (error) {
-			failed.push(`D1 database ${database.name}: ${error instanceof Error ? error.message : String(error)}`);
+			failed.push(`D1 database ${database.name}: ${errorMessage(error)}`);
 		}
 	}
 
@@ -740,11 +741,11 @@ export async function resetInfrastructure(input: ResetInput, onProgress?: Progre
 					deleted.push(`R2 bucket ${bucket.name}`);
 				} catch (purgeError) {
 					failed.push(
-						`R2 bucket ${bucket.name}: ${purgeError instanceof Error ? purgeError.message : String(purgeError)}`
+						`R2 bucket ${bucket.name}: ${errorMessage(purgeError)}`
 					);
 				}
 			} else {
-				failed.push(`R2 bucket ${bucket.name}: ${error instanceof Error ? error.message : String(error)}`);
+				failed.push(`R2 bucket ${bucket.name}: ${errorMessage(error)}`);
 			}
 		}
 	}

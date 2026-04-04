@@ -9,7 +9,6 @@ import { createInlineTodoExtension } from './query/inlineTodoLivePreview';
 import { createRemindersBlockExtension } from './query/remindersBlockLivePreview';
 import { registerReminderCommands } from './commands';
 import { normalizeRemindersFolderPath } from './settings';
-import { FileRenameHandler } from './services/fileRenameHandler';
 import { ReminderNotificationService } from './services/notificationService';
 import { VaultWatcher } from './services/vaultWatcher';
 import { openFullScreenReminderModal } from './ui/modals';
@@ -82,9 +81,6 @@ function registerReminderIntegrations(plugin: CratePlugin): void {
 		return;
 	}
 	registeredReminderUi.add(plugin);
-
-	const fileRenameHandler = new FileRenameHandler(plugin);
-	fileRenameHandler.register();
 
 	const queryProcessor = new ReminderQueryInjector(plugin);
 	plugin.registerMarkdownCodeBlockProcessor(

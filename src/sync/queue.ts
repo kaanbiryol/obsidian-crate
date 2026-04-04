@@ -1,6 +1,6 @@
 import type { TAbstractFile, Vault } from 'obsidian';
 import { TFolder } from 'obsidian';
-import { createLogger } from '../plugin/logger';
+import { createLogger, errorMessage } from '../plugin/logger';
 import type { PreparedUpload, SyncState } from '../plugin/types';
 
 const logger = createLogger('SyncQueue');
@@ -275,10 +275,10 @@ export async function processPendingChanges(
 				context.pendingPaths.add(path);
 			}
 			context.inFlightPaths.clear();
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			const errMsg = errorMessage(error);
 			context.updateState({
 				status: 'error',
-				lastError: errorMessage,
+				lastError: errMsg,
 				pendingChanges: context.pendingPaths.size,
 			});
 		}

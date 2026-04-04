@@ -29,7 +29,7 @@ import {
 } from '../sync/plugin-integration';
 import { SyncRuntime } from '../sync/runtime';
 import { CrateSettingTab } from '../ui/settings-tab';
-import { createLogger } from './logger';
+import { createLogger, errorMessage } from './logger';
 import { SecretStorageService } from './secret-storage';
 import { normalizeCrateSettings, type CrateSettings } from './settings';
 
@@ -58,7 +58,7 @@ export default class CratePlugin extends Plugin {
 			initializeSyncManagers(this);
 			await this.ensureDeviceId();
 		} catch (error) {
-			const msg = error instanceof Error ? error.message : 'Unknown error';
+			const msg = errorMessage(error);
 			logger.error('Plugin initialization failed:', msg);
 			new Notice(`Crate failed to initialize: ${msg}`);
 			return;
@@ -72,7 +72,7 @@ export default class CratePlugin extends Plugin {
 				await this.syncRuntime.initialize();
 			}
 		} catch (error) {
-			const msg = error instanceof Error ? error.message : 'Unknown error';
+			const msg = errorMessage(error);
 			logger.error('Sync initialization failed:', msg);
 			new Notice(`Crate sync failed to start: ${msg}`);
 		}
@@ -88,7 +88,7 @@ export default class CratePlugin extends Plugin {
 		try {
 			await initializeReminders(this);
 		} catch (error) {
-			const msg = error instanceof Error ? error.message : 'Unknown error';
+			const msg = errorMessage(error);
 			logger.error('Reminders initialization failed:', msg);
 			new Notice(`Reminders failed to initialize: ${msg}`);
 		}

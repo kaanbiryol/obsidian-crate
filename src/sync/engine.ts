@@ -33,13 +33,14 @@ import {
 	uploadPreparedFiles as transferUploadPreparedFiles,
 	createVaultFileChunks as transferCreateVaultFileChunks,
 } from './transfer';
-import { acquireSyncLock } from './sync-guards';
 import {
 	createEmptySyncResult,
+	createSyncFailureResult,
 	finalizeSyncResult,
 	getSyncResultError,
+	SYNC_ERROR_MESSAGES,
 } from './sync-result';
-import { createLogger } from '../plugin/logger';
+import { createLogger, errorMessage } from '../plugin/logger';
 import type {
 	SyncState,
 	SyncResult,
@@ -192,7 +193,7 @@ export class SyncEngine {
 			const result = await this.sync();
 			notifyConflicts(result.conflicts);
 		} catch (error) {
-			logger.warn('Periodic check failed:', error instanceof Error ? error.message : 'Unknown error');
+			logger.warn('Periodic check failed:', errorMessage(error));
 		}
 	}
 
@@ -265,7 +266,7 @@ export class SyncEngine {
 			try {
 				regex = new RegExp(`^${regexPattern}$`);
 			} catch (error) {
-				logger.warn(`Invalid ignore pattern "${pattern}":`, error instanceof Error ? error.message : 'Unknown error');
+				logger.warn(`Invalid ignore pattern "${pattern}":`, errorMessage(error));
 				// Never match on invalid patterns to avoid sync crashes.
 				regex = /^$/;
 			}
@@ -367,7 +368,7 @@ export class SyncEngine {
 		} catch (error) {
 			logger.warn(
 				`Raw event stat failed for ${path}:`,
-				error instanceof Error ? error.message : 'Unknown error',
+				errorMessage(error),
 			);
 			return 'missing';
 		}
@@ -559,11 +560,9 @@ export class SyncEngine {
 	 * Full sync - compare manifests and sync all differences
 	 */
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const guardResult = acquireSyncLock(
-			{ isConfigured: this.api.isConfigured(), status: this.state.status },
-			() => this.updateState({ status: 'syncing' }),
-		);
-		if (guardResult) return guardResult;
+		if (!this.api.isConfigured()) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
+		if (this.state.status === 'syncing') return createSyncFailureResult(SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS);
+		this.updateState({ status: 'syncing' });
 
 		logger.info('Sync started');
 
@@ -625,8 +624,7 @@ export class SyncEngine {
 					try {
 						await this.processDiff(diff, localFiles, result);
 					} catch (error) {
-						const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-						result.errors.push(`${diff.path}: ${errorMessage}`);
+						result.errors.push(`${diff.path}: ${errorMessage(error)}`);
 					}
 					current++;
 					progressCallback?.(current, total);
@@ -668,8 +666,7 @@ export class SyncEngine {
 				try {
 					await this.processDiff(diff, localFiles, result);
 				} catch (error) {
-					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-					result.errors.push(`${diff.path}: ${errorMessage}`);
+					result.errors.push(`${diff.path}: ${errorMessage(error)}`);
 				}
 				current++;
 				progressCallback?.(current, total);
@@ -709,12 +706,12 @@ export class SyncEngine {
 				new Notice(AUTH_ERROR_MESSAGE);
 				this.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
 			} else {
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-				result.errors.push(errorMessage);
-				logger.error('Full sync failed:', errorMessage);
+				const errMsg = errorMessage(error);
+				result.errors.push(errMsg);
+				logger.error('Full sync failed:', errMsg);
 				this.updateState({
 					status: 'error',
-					lastError: errorMessage,
+					lastError: errMsg,
 				});
 			}
 		}
@@ -768,11 +765,9 @@ export class SyncEngine {
 	 * Initial sync - upload all local files
 	 */
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const guardResult = acquireSyncLock(
-			{ isConfigured: this.api.isConfigured(), status: this.state.status },
-			() => this.updateState({ status: 'syncing' }),
-		);
-		if (guardResult) return guardResult;
+		if (!this.api.isConfigured()) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
+		if (this.state.status === 'syncing') return createSyncFailureResult(SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS);
+		this.updateState({ status: 'syncing' });
 
 		const result: SyncResult = createEmptySyncResult();
 
@@ -840,11 +835,11 @@ export class SyncEngine {
 				new Notice(AUTH_ERROR_MESSAGE);
 				this.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
 			} else {
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-				result.errors.push(errorMessage);
+				const errMsg = errorMessage(error);
+				result.errors.push(errMsg);
 				this.updateState({
 					status: 'error',
-					lastError: errorMessage,
+					lastError: errMsg,
 				});
 			}
 		}
@@ -859,11 +854,9 @@ export class SyncEngine {
 	 * and deletes remote-only files.
 	 */
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const guardResult = acquireSyncLock(
-			{ isConfigured: this.api.isConfigured(), status: this.state.status },
-			() => this.updateState({ status: 'syncing' }),
-		);
-		if (guardResult) return guardResult;
+		if (!this.api.isConfigured()) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
+		if (this.state.status === 'syncing') return createSyncFailureResult(SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS);
+		this.updateState({ status: 'syncing' });
 
 		const result: SyncResult = createEmptySyncResult();
 
@@ -912,8 +905,7 @@ export class SyncEngine {
 					result.deleted++;
 					result.deletedPaths.push(path);
 				} catch (error) {
-					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-					result.errors.push(`delete ${path}: ${errorMessage}`);
+					result.errors.push(`delete ${path}: ${errorMessage(error)}`);
 				}
 				current++;
 				progressCallback?.(current, total);
@@ -945,12 +937,12 @@ export class SyncEngine {
 				new Notice(AUTH_ERROR_MESSAGE);
 				this.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
 			} else {
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-				result.errors.push(errorMessage);
-				logger.error('Force full sync failed:', errorMessage);
+				const errMsg = errorMessage(error);
+				result.errors.push(errMsg);
+				logger.error('Force full sync failed:', errMsg);
 				this.updateState({
 					status: 'error',
-					lastError: errorMessage,
+					lastError: errMsg,
 				});
 			}
 		}

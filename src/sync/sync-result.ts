@@ -26,14 +26,6 @@ export function createSyncFailureResult(error: string): SyncResult {
 	return result;
 }
 
-export function createNotConfiguredSyncResult(): SyncResult {
-	return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
-}
-
-export function createSyncInProgressResult(): SyncResult {
-	return createSyncFailureResult(SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS);
-}
-
 export function finalizeSyncResult(result: SyncResult): boolean {
 	result.success = result.errors.length === 0;
 	return result.success;
