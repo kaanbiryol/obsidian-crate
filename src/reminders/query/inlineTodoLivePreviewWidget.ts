@@ -5,6 +5,7 @@ import type { Reminder } from '@/reminders/types/plugin-reminder';
 import { openReminderEditModal } from '@/reminders/ui/modals';
 import { rebuildCheckboxLine } from '@/reminders/utils/checkboxParser';
 import type { LineReminderMappingService } from '@/reminders/services/lineReminderMapping';
+import { parseStoredReminderDate } from '@/reminders/utils/reminderDate';
 
 export function isRecurrenceText(text: string): boolean {
 	const recurrencePatterns = /^(every|daily|weekly|monthly|yearly)\b/i;
@@ -168,11 +169,7 @@ export class InlineChipWidget extends WidgetType {
 				return;
 			}
 
-			const dueDate = updated.dueDatetime
-				? new Date(updated.dueDatetime)
-				: updated.dueDate
-					? new Date(updated.dueDate)
-					: undefined;
+			const dueDate = parseStoredReminderDate(updated);
 
 			const newLine = rebuildCheckboxLine(
 				'',
@@ -180,6 +177,9 @@ export class InlineChipWidget extends WidgetType {
 				updated.content,
 				dueDate,
 				updated.priority,
+				undefined,
+				updated.recurrence,
+				!!updated.dueDatetime,
 			);
 
 			const lineText = doc.sliceString(this.lineFrom, this.lineTo);

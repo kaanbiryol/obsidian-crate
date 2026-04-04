@@ -12,6 +12,8 @@ import { getGlassColors, getPickerModalProps } from '../../ui/glassStyles';
 import { PickerHeader } from './PickerHeader';
 import { PickerTimeCard } from './PickerTimeCard';
 import { PickerDoneButton } from './PickerDoneButton';
+import { formatLocalDateKey, parseReminderDateValue } from '../../utils/reminderDate';
+import { buildDatePickerDateSelection, buildDatePickerTimeSelection } from './datePickerSelection';
 
 interface DatePickerModalProps {
     isOpen: boolean;
@@ -19,8 +21,9 @@ interface DatePickerModalProps {
     animationConfig: AnimationConfig;
     pickerMode: 'replace' | 'overlay';
     dueDate: string | null;
+    hasTime?: boolean;
     isDark: boolean;
-    onDateTimeChange: (isoDate: string) => void;
+    onDateTimeChange: (value: string, hasTime: boolean) => void;
 }
 
 const calendarVariants = {
@@ -63,17 +66,18 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
     animationConfig,
     pickerMode,
     dueDate,
+    hasTime,
     isDark,
     onDateTimeChange,
 }) => {
     const animationsEnabled = animationConfig.enabled && !prefersReducedMotion();
-    const currentDate = dueDate ? new Date(dueDate) : null;
+    const currentDate = parseReminderDateValue(dueDate, hasTime) ?? null;
     const glass = getGlassColors(isDark);
     const modalProps = getPickerModalProps(pickerMode);
 
     const [calendarDirection, setCalendarDirection] = useState(0);
     const [displayMonth, setDisplayMonth] = useState<CalendarDate>(() =>
-        dueDate ? parseDate(dueDate.split('T')[0]) : today(getLocalTimeZone())
+        currentDate ? parseDate(formatLocalDateKey(currentDate)) : today(getLocalTimeZone())
     );
 
     const handlePrevMonth = useCallback(() => {
@@ -95,25 +99,29 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
     }, [currentDate]);
 
     const selectedTimeDisplay = useMemo(() => {
-        if (!currentDate) return '09:00';
+        if (!currentDate || !hasTime) return '09:00';
         return format(currentDate, 'HH:mm');
-    }, [currentDate]);
+    }, [currentDate, hasTime]);
 
     const handleQuickDate = useCallback((getDate: () => Date) => {
         const date = getDate();
-        const existingDate = dueDate ? new Date(dueDate) : new Date();
-        date.setHours(existingDate.getHours() || 9);
-        date.setMinutes(existingDate.getMinutes() || 0);
-        onDateTimeChange(date.toISOString());
-        setDisplayMonth(parseDate(date.toISOString().split('T')[0]));
-    }, [dueDate, onDateTimeChange]);
+        const selection = buildDatePickerDateSelection(
+            date,
+            parseReminderDateValue(dueDate, hasTime) ?? null,
+            hasTime ?? false,
+        );
+        onDateTimeChange(selection.value, selection.hasTime);
+        setDisplayMonth(parseDate(formatLocalDateKey(date)));
+    }, [dueDate, hasTime, onDateTimeChange]);
 
     const handleTimeChange = useCallback((hour: number, minute: number) => {
-        const existingDate = dueDate ? new Date(dueDate) : new Date();
-        existingDate.setHours(hour);
-        existingDate.setMinutes(minute);
-        onDateTimeChange(existingDate.toISOString());
-    }, [dueDate, onDateTimeChange]);
+        const selection = buildDatePickerTimeSelection(
+            hour,
+            minute,
+            parseReminderDateValue(dueDate, hasTime) ?? null,
+        );
+        onDateTimeChange(selection.value, selection.hasTime);
+    }, [dueDate, hasTime, onDateTimeChange]);
 
     return (
         <BaseModal
@@ -247,16 +255,17 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                                 <Calendar
                                     aria-label="Date picker"
                                     showShadow={false}
-                                    value={dueDate ? parseDate(dueDate.split('T')[0]) : undefined}
+                                    value={currentDate ? parseDate(formatLocalDateKey(currentDate)) : undefined}
                                     defaultFocusedValue={displayMonth}
                                     focusedValue={displayMonth}
                                     onChange={(date) => {
                                         if (date) {
-                                            const existingDate = dueDate ? new Date(dueDate) : new Date();
-                                            const newDate = new Date(date.year, date.month - 1, date.day);
-                                            newDate.setHours(existingDate.getHours() || 9);
-                                            newDate.setMinutes(existingDate.getMinutes() || 0);
-                                            onDateTimeChange(newDate.toISOString());
+                                            const selection = buildDatePickerDateSelection(
+                                                new Date(date.year, date.month - 1, date.day),
+                                                parseReminderDateValue(dueDate, hasTime) ?? null,
+                                                hasTime ?? false,
+                                            );
+                                            onDateTimeChange(selection.value, selection.hasTime);
                                             setDisplayMonth(date);
                                         }
                                     }}
@@ -294,8 +303,8 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                 <div className="mx-4 mt-4">
                     <PickerTimeCard
                         isDark={isDark}
-                        hour={currentDate?.getHours() ?? 9}
-                        minute={currentDate?.getMinutes() ?? 0}
+                        hour={currentDate ? (hasTime ? currentDate.getHours() : 9) : 9}
+                        minute={currentDate ? (hasTime ? currentDate.getMinutes() : 0) : 0}
                         onChange={handleTimeChange}
                     />
                 </div>

@@ -87,7 +87,8 @@ export function rebuildCheckboxLine(
   dueDate: Date | undefined,
   priority: Priority,
   project?: string,
-  recurrence?: RecurrenceRule
+  recurrence?: RecurrenceRule,
+  hasTime?: boolean
 ): string {
   const checkbox = isCompleted ? '[x]' : '[ ]';
 
@@ -103,8 +104,8 @@ export function rebuildCheckboxLine(
   if (dueDate) {
     // When recurrence has time, only show date (avoid duplicating time)
     const recurrenceHasTime = recurrence?.hour !== undefined;
-    const hasTime = !recurrenceHasTime && (dueDate.getHours() !== 0 || dueDate.getMinutes() !== 0);
-    const formatted = hasTime
+    const showTime = !recurrenceHasTime && (hasTime ?? (dueDate.getHours() !== 0 || dueDate.getMinutes() !== 0));
+    const formatted = showTime
       ? format(dueDate, "MMM d, yyyy HH:mm")   // "Jan 13, 2026 12:00"
       : format(dueDate, "MMM d, yyyy");        // "Jan 13, 2026"
     content += ` ${formatted}`;

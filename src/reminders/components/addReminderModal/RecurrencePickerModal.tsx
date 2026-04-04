@@ -9,6 +9,7 @@ import { getGlassColors, getPickerModalProps } from '../../ui/glassStyles';
 import { PickerHeader } from './PickerHeader';
 import { PickerTimeCard } from './PickerTimeCard';
 import { PickerDoneButton } from './PickerDoneButton';
+import { normalizeRecurrenceRule } from '../../utils/recurrenceRule';
 
 interface RecurrencePickerModalProps {
     isOpen: boolean;
@@ -93,7 +94,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
         if (frequency === 'monthly') {
             rule.dayOfMonth = dayOfMonth;
         }
-        onApply(rule);
+        onApply(normalizeRecurrenceRule(rule));
         onClose();
     };
 

@@ -11,6 +11,7 @@ import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper"
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
 import { openReminderCreationModal } from "@/reminders/ui/modals";
+import { formatLocalDateKey } from "@/reminders/utils/reminderDate";
 import "./styles.scss";
 
 type Props = {
@@ -35,7 +36,7 @@ export const RemindersList: React.FC<Props> = ({
 
   // Subscribe to index changes for automatic refresh
   const { refreshToken, triggerRefresh } = useIndexRefresh();
-  const todayPrefix = new Date().toISOString().slice(0, 10);
+  const todayPrefix = formatLocalDateKey(new Date());
 
   // State for reminders (needed because getAll is async when showCompleted is true)
   const [rawReminders, setRawReminders] = useState<Reminder[]>([]);
@@ -61,9 +62,10 @@ export const RemindersList: React.FC<Props> = ({
           if (showCompletedState) {
             // Also include completed reminders from today
             const completedToday = plugin.reminderIndex.getCompleted().filter((r: IndexedReminder) => {
-              const date = r.dueDatetime || r.dueDate;
-              if (!date) return false;
-              return date.startsWith(todayPrefix);
+              if (r.dueDatetime) {
+                return formatLocalDateKey(new Date(r.dueDatetime)) === todayPrefix;
+              }
+              return r.dueDate === todayPrefix;
             });
             indexed = [...indexed, ...completedToday];
           }

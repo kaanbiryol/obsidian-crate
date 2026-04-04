@@ -5,6 +5,7 @@ import { AddReminderModal as SharedAddReminderModal, createLogger, type Recurren
 const log = createLogger('ReminderModal');
 
 import { today } from "@/reminders/utils/time";
+import { parseReminderDateValue } from "@/reminders/utils/reminderDate";
 import { type DueDateDefaultSetting, useRemindersSettingsStore } from "@/reminders/settings";
 import { ModalContext, PluginContext } from "@/reminders/ui/reminders-context";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
@@ -52,15 +53,12 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     return calculateDefaultDueDate(settings.taskCreationDefaultDueDate);
   }, [reminder, settings.taskCreationDefaultDueDate]);
 
-  const handleAdd = async (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule) => {
+  const handleAdd = async (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean) => {
     // Close modal immediately for better UX
     modal.close();
 
     // Parse due date
-    let parsedDueDate: Date | undefined;
-    if (dueDate) {
-      parsedDueDate = new Date(dueDate);
-    }
+    const parsedDueDate = parseReminderDateValue(dueDate, hasTime);
 
     try {
       // Always use markdown writer (markdown-first is always enabled)
@@ -69,7 +67,8 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
         content.trim(),
         parsedDueDate,
         priority as 1 | 4,
-        recurrence
+        recurrence,
+        hasTime,
       );
 
       // VaultWatcher will handle rescanning after file modify event
@@ -89,12 +88,9 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
     try {
       // Parse due date for markdown writer
-      let parsedDueDate: Date | undefined;
-      if (updatedReminder.dueDatetime) {
-        parsedDueDate = new Date(updatedReminder.dueDatetime);
-      } else if (updatedReminder.dueDate) {
-        parsedDueDate = new Date(updatedReminder.dueDate);
-      }
+      const parsedDueDate = updatedReminder.dueDatetime
+        ? parseReminderDateValue(updatedReminder.dueDatetime, true)
+        : parseReminderDateValue(updatedReminder.dueDate, false);
 
       // Use markdown writer directly (markdown-first is always enabled)
       const indexed = plugin.reminderIndex?.getById(updatedReminder.id);
@@ -105,6 +101,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
           priority: updatedReminder.priority,
           project: updatedReminder.project,
           recurrence: updatedReminder.recurrence,
+          hasTime: !!updatedReminder.dueDatetime,
         });
 
         // VaultWatcher will handle rescanning after file modify event

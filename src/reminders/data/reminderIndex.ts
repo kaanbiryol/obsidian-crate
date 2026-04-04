@@ -8,6 +8,7 @@
 
 import type { App, TFile } from "obsidian";
 import { createLogger, type Priority, type RecurrenceRule, type Reminder } from "@/reminders";
+import { formatLocalDateKey, isDateOnlyString, parseReminderDateValue } from "@/reminders/utils/reminderDate";
 import { scanVault, scanFile, isInRemindersFolder, getProjectFromPath, type ScanResult } from "./vaultScanner";
 
 const log = createLogger('ReminderIndex');
@@ -200,9 +201,16 @@ export function createReminderIndex(
    */
   function isToday(dateStr: string | undefined): boolean {
     if (!dateStr) return false;
+    if (isDateOnlyString(dateStr)) {
+      return dateStr === formatLocalDateKey(new Date());
+    }
+    const date = new Date(dateStr);
     const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
-    return dateStr.startsWith(todayStr);
+    return (
+      date.getFullYear() === today.getFullYear()
+      && date.getMonth() === today.getMonth()
+      && date.getDate() === today.getDate()
+    );
   }
 
   /**
@@ -210,11 +218,21 @@ export function createReminderIndex(
    */
   function isWithinDays(dateStr: string | undefined, days: number): boolean {
     if (!dateStr) return false;
-    const date = new Date(dateStr);
     const now = new Date();
-    const futureDate = new Date(now);
-    futureDate.setDate(futureDate.getDate() + days);
-    return date >= now && date <= futureDate;
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endDate = new Date(todayStart);
+    endDate.setDate(endDate.getDate() + days + 1);
+
+    if (isDateOnlyString(dateStr)) {
+      const date = parseReminderDateValue(dateStr, false);
+      if (!date) return false;
+      const tomorrowStart = new Date(todayStart);
+      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+      return date >= tomorrowStart && date < endDate;
+    }
+
+    const date = new Date(dateStr);
+    return date > now && date < endDate;
   }
 
   /**
@@ -222,11 +240,10 @@ export function createReminderIndex(
    */
   function isOverdue(dateStr: string | undefined, completed: boolean): boolean {
     if (!dateStr || completed) return false;
-    const date = new Date(dateStr);
-    const now = new Date();
-    // Set to start of today for date-only comparison
-    now.setHours(0, 0, 0, 0);
-    return date < now;
+    if (isDateOnlyString(dateStr)) {
+      return dateStr < formatLocalDateKey(new Date());
+    }
+    return new Date(dateStr) < new Date();
   }
 
   /**

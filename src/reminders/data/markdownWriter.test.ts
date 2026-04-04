@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createMarkdownWriter } from '@/reminders/data/markdownWriter';
 import type { MarkdownWriter } from '@/reminders/data/markdownWriter';
 import type { ReminderIndex, IndexedReminder } from '@/reminders/data/reminderIndex';
+import { timezone as getLocalTimeZone } from '@/reminders/utils/time';
 import { TFile, type App } from 'obsidian';
 
 type MockVault = {
@@ -137,6 +138,30 @@ describe('markdownWriter', () => {
     expect(content).toContain('Task B updated');
   });
 
+  it('preserves date-only due dates when updating other fields', async () => {
+    const initial = '# Work\n\n- [ ] Task D Jan 2, 2026\n';
+    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    folders.add('Reminders');
+
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    const reminder = makeIndexedReminder({
+      id: 'r-date-only',
+      content: 'Task D',
+      filePath: 'Reminders/Work.md',
+      lineNumber: 2,
+      rawLine: '- [ ] Task D Jan 2, 2026',
+      dueDate: '2026-01-02',
+    });
+
+    await writer.updateReminder(reminder, { content: 'Task D updated' });
+
+    const content = files.get('Reminders/Work.md') || '';
+    expect(content).toContain('Task D updated Jan 2, 2026');
+    expect(content).not.toContain('00:00');
+  });
+
   it('advances recurring reminders on toggleComplete without marking complete', async () => {
     const initial = '# Work\n\n- [ ] Task C Jan 1, 2026 10:00\n';
     const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
@@ -195,6 +220,35 @@ describe('markdownWriter', () => {
     expect(content).toContain('Task D');
     expect(content).toContain('daily 14:30');
     expect(content).toContain('Jan 10, 2026');
+  });
+
+  it('creates an all-day recurring reminder without leaking the current clock time', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-10T10:00:00.000Z'));
+
+    const { app, files } = createMockApp();
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    const onChange = vi.fn<ReminderChangeCallback>(async () => ({ success: true }));
+    writer.setOnReminderChange(onChange);
+
+    await writer.createReminder('Work', 'Task all day', undefined, 4, {
+      frequency: 'daily',
+    });
+
+    const content = files.get('Reminders/Work.md') || '';
+    expect(content).toContain('Task all day');
+    expect(content).toContain('daily');
+    expect(content).toContain('Jan 10, 2026');
+    expect(content).not.toContain('10:00');
+
+    const updated = onChange.mock.calls[0]?.[0];
+    expect(updated?.dueDate).toBe('2026-01-10');
+    expect(updated?.dueDatetime).toBeUndefined();
+    expect(updated?.recurrence?.timezone).toBe(getLocalTimeZone());
+
+    vi.useRealTimers();
   });
 
   it('moves a reminder to a new project file when project changes', async () => {

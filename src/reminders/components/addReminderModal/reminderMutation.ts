@@ -1,5 +1,11 @@
 import type { Priority, Reminder, RecurrenceRule } from '../../types';
 import { parseReminderContent } from '../../utils/reminderParser';
+import {
+	buildStoredReminderDates,
+	parseReminderDateValue,
+	serializeReminderDateValue,
+} from '../../utils/reminderDate';
+import { normalizeRecurrenceRule } from '../../utils/recurrenceRule';
 
 export interface ReminderSubmissionInput {
 	content: string;
@@ -7,6 +13,7 @@ export interface ReminderSubmissionInput {
 	priority: Priority;
 	project: string;
 	dueDate: string | null;
+	hasTime?: boolean;
 	recurrence?: RecurrenceRule;
 	reminder?: Reminder;
 }
@@ -16,6 +23,7 @@ export interface ReminderSubmission {
 	project: string;
 	priority: Priority;
 	dueDate?: string;
+	hasTime?: boolean;
 	recurrence?: RecurrenceRule;
 	updatedReminder?: Reminder;
 }
@@ -42,6 +50,7 @@ export function buildReminderSubmission({
 	priority,
 	project,
 	dueDate,
+	hasTime,
 	recurrence,
 	reminder,
 }: ReminderSubmissionInput): ReminderSubmission | null {
@@ -57,14 +66,22 @@ export function buildReminderSubmission({
 
 	const finalPriority = parsed.priorityPart ? parsed.priority : priority;
 	const finalProject = parsed.project || project;
-	const finalDueDate = parsed.dueDate ? parsed.dueDate.toISOString() : dueDate ?? undefined;
-	const finalRecurrence = parsed.recurrence || recurrence;
+	const finalDueDate = parsed.dueDate
+		? serializeReminderDateValue(parsed.dueDate, parsed.hasTime)
+		: dueDate ?? undefined;
+	const finalHasTime = parsed.dueDate ? (parsed.hasTime ?? false) : (hasTime ?? false);
+	const finalRecurrence = normalizeRecurrenceRule(parsed.recurrence || recurrence);
+	const storedDates = buildStoredReminderDates(
+		parseReminderDateValue(finalDueDate, finalHasTime),
+		finalHasTime,
+	);
 
 	const submission: ReminderSubmission = {
 		content: finalContent,
 		project: finalProject,
 		priority: finalPriority,
 		dueDate: finalDueDate,
+		hasTime: finalHasTime,
 		recurrence: finalRecurrence,
 	};
 
@@ -74,8 +91,8 @@ export function buildReminderSubmission({
 			content: finalContent,
 			project: finalProject,
 			priority: finalPriority,
-			dueDatetime: finalDueDate,
-			dueDate: finalDueDate,
+			dueDatetime: storedDates.dueDatetime,
+			dueDate: storedDates.dueDate,
 			recurrence: finalRecurrence,
 		};
 	}

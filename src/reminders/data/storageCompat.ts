@@ -11,6 +11,12 @@ import type { ReminderIndex, IndexedReminder } from "./reminderIndex";
 import type { MarkdownWriter } from "./markdownWriter";
 import type { Reminder, CreateReminderParams, UpdateReminderParams, Priority } from "@/reminders/types/plugin-reminder";
 import { generateReminderId } from "./reminderIdentity";
+import {
+  buildStoredReminderDates,
+  formatLocalDateKey,
+  parseReminderDateValue,
+} from "@/reminders/utils/reminderDate";
+import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 
 /**
  * Convert IndexedReminder to Reminder
@@ -24,7 +30,7 @@ function toReminder(indexed: IndexedReminder): Reminder {
     priority: indexed.priority,
     completed: indexed.completed,
     project: indexed.project || 'Inbox',
-    recurrence: indexed.recurrence,
+    recurrence: normalizeRecurrenceRule(indexed.recurrence),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -93,10 +99,12 @@ export function createStorageCompat(
         combined.set(r.id, r);
       }
       if (_includeCompleted) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = formatLocalDateKey(new Date());
         for (const reminder of index.getCompleted()) {
-          const dueDate = reminder.dueDatetime || reminder.dueDate;
-          if (dueDate?.startsWith(today)) {
+          const dueDate = reminder.dueDatetime
+            ? formatLocalDateKey(new Date(reminder.dueDatetime))
+            : reminder.dueDate;
+          if (dueDate === today) {
             combined.set(reminder.id, reminder);
           }
         }
@@ -140,19 +148,21 @@ export function createStorageCompat(
       const project = params.project || 'Inbox';
       const filePath = `${index.remindersFolderPath}/${project}.md`;
       const reminderId = generateReminderId(filePath, params.content);
-      const dueDate = params.dueDatetime
-        ? new Date(params.dueDatetime)
-        : params.dueDate
-        ? new Date(params.dueDate)
-        : undefined;
+      const recurrence = normalizeRecurrenceRule(params.recurrence);
+      const dueDate = parseReminderDateValue(
+        params.dueDatetime ?? params.dueDate,
+        !!params.dueDatetime,
+      );
       const priority: Priority = params.priority ?? 4;
+      const storedDates = buildStoredReminderDates(dueDate, params.dueDatetime ? true : undefined);
 
       await writer.createReminder(
         project,
         params.content,
         dueDate,
         priority,
-        params.recurrence,
+        recurrence,
+        params.dueDatetime ? true : params.dueDate ? false : undefined,
       );
 
       // VaultWatcher will handle rescanning after file modify event
@@ -165,12 +175,12 @@ export function createStorageCompat(
       return {
         id: reminderId,
         content: params.content,
-        dueDate: params.dueDate,
-        dueDatetime: params.dueDatetime,
+        dueDate: storedDates.dueDate,
+        dueDatetime: storedDates.dueDatetime,
         priority,
         completed: false,
         project,
-        recurrence: params.recurrence,
+        recurrence,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -179,22 +189,34 @@ export function createStorageCompat(
     async update(id: string, params: UpdateReminderParams): Promise<Reminder | undefined> {
       const indexed = index.getById(id);
       if (!indexed) return undefined;
-
-      const dueDate = params.dueDatetime
-        ? new Date(params.dueDatetime)
-        : params.dueDate
-        ? new Date(params.dueDate)
+      const hasRecurrenceUpdate = Object.prototype.hasOwnProperty.call(params, 'recurrence');
+      const recurrenceUpdate = hasRecurrenceUpdate
+        ? (params.recurrence === null ? null : normalizeRecurrenceRule(params.recurrence))
         : undefined;
 
-      await writer.updateReminder(indexed, {
+      const hasDueDateUpdate = Object.prototype.hasOwnProperty.call(params, 'dueDate')
+        || Object.prototype.hasOwnProperty.call(params, 'dueDatetime');
+      const dueDate = hasDueDateUpdate
+        ? parseReminderDateValue(params.dueDatetime ?? params.dueDate, !!params.dueDatetime)
+        : undefined;
+      const storedDates = hasDueDateUpdate
+        ? buildStoredReminderDates(dueDate, params.dueDatetime ? true : params.dueDate ? false : undefined)
+        : {};
+
+      const updates: Parameters<MarkdownWriter['updateReminder']>[1] = {
         content: params.content,
-        dueDate,
         priority: params.priority,
         project: params.project,
-        ...(Object.prototype.hasOwnProperty.call(params, 'recurrence')
-          ? { recurrence: params.recurrence ?? null }
+        ...(hasRecurrenceUpdate
+          ? { recurrence: recurrenceUpdate }
           : {}),
-      });
+      };
+      if (hasDueDateUpdate) {
+        updates.dueDate = dueDate;
+        updates.hasTime = params.dueDatetime ? true : params.dueDate ? false : undefined;
+      }
+
+      await writer.updateReminder(indexed, updates);
 
       // VaultWatcher will handle rescanning after file modify event
 
@@ -202,6 +224,10 @@ export function createStorageCompat(
       const updated = {
         ...toReminder(indexed),
         ...params,
+        ...(hasRecurrenceUpdate
+          ? { recurrence: recurrenceUpdate }
+          : {}),
+        ...storedDates,
         updatedAt: new Date().toISOString(),
       };
       // Ensure recurrence is undefined instead of null

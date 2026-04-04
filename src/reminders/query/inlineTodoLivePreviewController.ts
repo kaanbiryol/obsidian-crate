@@ -12,6 +12,11 @@ import {
 	isCheckboxLine,
 	parseCheckboxLine,
 } from '@/reminders/utils/checkboxParser';
+import {
+	buildStoredReminderDates,
+	parseStoredReminderDate,
+	reminderHasTime,
+} from '@/reminders/utils/reminderDate';
 
 const log = createLogger('InlineTodo');
 
@@ -34,7 +39,7 @@ function hasReminderChanged(
 		return true;
 	}
 
-	const reminderDate = reminder.dueDatetime || reminder.dueDate;
+	const reminderDate = parseStoredReminderDate(reminder);
 	const parsedDate = parsed.parsed.dueDate;
 	if (!reminderDate && !parsedDate) {
 		return false;
@@ -42,8 +47,11 @@ function hasReminderChanged(
 	if (!reminderDate || !parsedDate) {
 		return true;
 	}
+	if ((reminderHasTime(reminder) ?? false) !== (parsed.parsed.hasTime ?? false)) {
+		return true;
+	}
 
-	return Math.abs(new Date(reminderDate).getTime() - parsedDate.getTime()) > 60000;
+	return Math.abs(reminderDate.getTime() - parsedDate.getTime()) > 60000;
 }
 
 export function createInlineTodoController(
@@ -164,18 +172,7 @@ export function createInlineTodoController(
 		parsed: NonNullable<ReturnType<typeof parseCheckboxLine>>,
 		filePath: string,
 	): Promise<void> {
-		let dueDate: string | undefined;
-		let dueDatetime: string | undefined;
-
-		if (parsed.parsed.dueDate) {
-			const date = parsed.parsed.dueDate;
-			const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0;
-			if (hasTime) {
-				dueDatetime = date.toISOString();
-			} else {
-				dueDate = date.toISOString().split('T')[0];
-			}
-		}
+		const storedDates = buildStoredReminderDates(parsed.parsed.dueDate, parsed.parsed.hasTime);
 
 		const existingReminder = reminderCache.get(filePath)?.get(reminderId);
 		const oldProject = existingReminder?.project;
@@ -185,8 +182,8 @@ export function createInlineTodoController(
 		try {
 			const updated = await plugin.storage.update(reminderId, {
 				content: parsed.parsed.cleanContent,
-				dueDate,
-				dueDatetime,
+				dueDate: storedDates.dueDate,
+				dueDatetime: storedDates.dueDatetime,
 				priority: parsed.parsed.priority,
 				project: parsed.parsed.project || undefined,
 				recurrence: parsed.parsed.recurrence ?? null,

@@ -12,6 +12,7 @@
 import { TAbstractFile, TFile, TFolder, type App } from "obsidian";
 import { createLogger } from "@/reminders";
 import { parseCheckboxLine, generateContentHash } from "@/reminders/utils/checkboxParser";
+import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import type { IndexedReminder } from "./reminderIndex";
 import { generateReminderId } from "./reminderIdentity";
 
@@ -150,14 +151,13 @@ export async function scanFile(
         // This is a checkbox line with content - treat as a reminder
         // Project is always determined by filename (e.g., "Work.md" → "Work")
         const project = projectFromFile;
+        const storedDates = buildStoredReminderDates(parsed.parsed.dueDate, parsed.parsed.hasTime);
 
         const reminder: IndexedReminder = {
           id: generateReminderId(filePath, parsed.rawContent),
           content: parsed.parsed.cleanContent,
-          dueDate: parsed.parsed.dueDate
-            ? parsed.parsed.dueDate.toISOString().split("T")[0]
-            : undefined,
-          dueDatetime: parsed.parsed.dueDate?.toISOString(),
+          dueDate: storedDates.dueDate,
+          dueDatetime: storedDates.dueDatetime,
           priority: parsed.parsed.priority,
           completed: parsed.isCompleted,
           project,

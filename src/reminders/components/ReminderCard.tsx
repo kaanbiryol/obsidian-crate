@@ -1,9 +1,8 @@
 import React, { memo } from 'react';
-import { isPast } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Clock, Flag, Check, Hash, Repeat } from 'lucide-react';
 import { getProjectColor } from '../utils/projectColors';
-import { formatDueDate } from '../utils/dateFormatting';
+import { formatDueDate, isReminderOverdue } from '../utils/dateFormatting';
 import type { AnimationConfig } from '../types/componentAdapter';
 import type { RecurrenceRule } from '../types/reminder';
 
@@ -42,7 +41,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     hideProject = false
 }) => {
     const dueDate = reminder.dueDatetime || reminder.dueDate;
-    const isOverdue = Boolean(dueDate && !reminder.completed && isPast(new Date(dueDate)));
+    const isOverdue = isReminderOverdue(reminder);
     const isImportant = reminder.priority === 1;
 
     // Get project color for accent (using dark theme colors for premium UI)

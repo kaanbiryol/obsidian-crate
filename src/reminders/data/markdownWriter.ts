@@ -13,6 +13,13 @@ import { createLogger, type Priority, type Reminder, type RecurrenceRule, calcul
 import type { IndexedReminder, ReminderIndex } from "./reminderIndex";
 import { generateReminderId } from "./reminderIdentity";
 import { rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
+import {
+  buildStoredReminderDates,
+  inferHasTimeFromDate,
+  parseStoredReminderDate,
+  reminderHasTime,
+} from "@/reminders/utils/reminderDate";
+import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 
 export type ReminderOperation = "create" | "update" | "delete";
 
@@ -66,7 +73,7 @@ function toReminder(indexed: IndexedReminder): Reminder {
     priority: indexed.priority,
     completed: indexed.completed,
     project: indexed.project || 'Inbox',
-    recurrence: indexed.recurrence,
+    recurrence: normalizeRecurrenceRule(indexed.recurrence),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -82,7 +89,8 @@ export interface MarkdownWriter {
     content: string,
     dueDate: Date | undefined,
     priority: Priority,
-    recurrence?: RecurrenceRule
+    recurrence?: RecurrenceRule,
+    hasTime?: boolean,
   ): Promise<void>;
 
   /**
@@ -96,6 +104,7 @@ export interface MarkdownWriter {
       priority?: Priority;
       project?: string;
       recurrence?: RecurrenceRule | null;
+      hasTime?: boolean;
     }
   ): Promise<void>;
 
@@ -183,8 +192,10 @@ export function createMarkdownWriter(
       content: string,
       dueDate: Date | undefined,
       priority: Priority,
-      recurrence?: RecurrenceRule
+      recurrence?: RecurrenceRule,
+      hasTime?: boolean,
     ): Promise<void> {
+      const normalizedRecurrence = normalizeRecurrenceRule(recurrence);
       // Get or create the project file
       const file = await getOrCreateProjectFile(project);
 
@@ -193,9 +204,11 @@ export function createMarkdownWriter(
 
       // Calculate initial date for recurring reminders if not provided
       let effectiveDueDate = dueDate;
-      if (recurrence && !dueDate) {
-        effectiveDueDate = calculateFirstOccurrence(recurrence);
+      if (normalizedRecurrence && !dueDate) {
+        effectiveDueDate = calculateFirstOccurrence(normalizedRecurrence);
       }
+      const resolvedHasTime = hasTime ?? inferHasTimeFromDate(effectiveDueDate);
+      const storedDates = buildStoredReminderDates(effectiveDueDate, resolvedHasTime);
 
       // Build the new reminder line
       const newLine = rebuildCheckboxLine(
@@ -205,7 +218,8 @@ export function createMarkdownWriter(
         effectiveDueDate,
         priority,
         undefined,  // project (not used in line)
-        recurrence
+        normalizedRecurrence,
+        resolvedHasTime,
       );
 
       // Generate ID and build optimistic reminder for immediate UI update
@@ -214,12 +228,12 @@ export function createMarkdownWriter(
       const optimisticReminder: IndexedReminder = {
         id: reminderId,
         content,
-        dueDate: effectiveDueDate?.toISOString().split('T')[0],
-        dueDatetime: effectiveDueDate?.toISOString(),
+        dueDate: storedDates.dueDate,
+        dueDatetime: storedDates.dueDatetime,
         priority,
         completed: false,
         project,
-        recurrence,
+        recurrence: normalizedRecurrence,
         filePath: file.path,
         lineNumber: -1, // Will be set by rescan
         rawLine: newLine,
@@ -249,12 +263,12 @@ export function createMarkdownWriter(
           const reminder: Reminder & { contentHash: string } = {
             id: reminderId,
             content,
-            dueDate: effectiveDueDate?.toISOString().split('T')[0],
-            dueDatetime: effectiveDueDate?.toISOString(),
+            dueDate: storedDates.dueDate,
+            dueDatetime: storedDates.dueDatetime,
             priority,
             completed: false,
             project,
-            recurrence,
+            recurrence: normalizedRecurrence,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             contentHash,
@@ -278,13 +292,19 @@ export function createMarkdownWriter(
         priority?: Priority;
         project?: string;
         recurrence?: RecurrenceRule | null;
+        hasTime?: boolean;
       }
     ): Promise<void> {
       const newProject = updates.project ?? reminder.project;
       const oldProject = reminder.project || 'Inbox';
       const newRecurrence = Object.prototype.hasOwnProperty.call(updates, 'recurrence')
-        ? updates.recurrence ?? undefined
-        : reminder.recurrence;
+        ? normalizeRecurrenceRule(updates.recurrence ?? undefined)
+        : normalizeRecurrenceRule(reminder.recurrence);
+      const currentDueDate = parseStoredReminderDate(reminder);
+      const currentHasTime = reminderHasTime(reminder);
+      const newHasTime = Object.prototype.hasOwnProperty.call(updates, 'hasTime')
+        ? updates.hasTime
+        : ('dueDate' in updates ? inferHasTimeFromDate(updates.dueDate) : currentHasTime);
 
       // If project changed, move the reminder to the new file
       if (newProject && newProject !== oldProject) {
@@ -295,14 +315,14 @@ export function createMarkdownWriter(
         // Use 'in' check to distinguish "not provided" from "explicitly cleared to undefined"
         const newDueDate = 'dueDate' in updates
           ? updates.dueDate
-          : (reminder.dueDatetime ? new Date(reminder.dueDatetime) : undefined);
+          : currentDueDate;
         const newPriority = updates.priority ?? reminder.priority;
 
         // 1. Delete from old file
         await this.deleteReminder(reminder);
 
         // 2. Create in new file (without project tag since project = file name)
-        await this.createReminder(newProject, newContent, newDueDate, newPriority, newRecurrence);
+        await this.createReminder(newProject, newContent, newDueDate, newPriority, newRecurrence, newHasTime);
 
         return;
       }
@@ -341,13 +361,14 @@ export function createMarkdownWriter(
       // Use 'in' check to distinguish "not provided" from "explicitly cleared to undefined"
       const newDueDate = 'dueDate' in updates
         ? updates.dueDate
-        : (reminder.dueDatetime ? new Date(reminder.dueDatetime) : undefined);
+        : currentDueDate;
       const newPriority = updates.priority ?? reminder.priority;
+      const storedDates = buildStoredReminderDates(newDueDate, newHasTime);
       // Apply optimistic update immediately (UI updates)
       index.applyOptimisticUpdate(reminder.id, {
         content: newContent,
-        dueDate: newDueDate?.toISOString().split('T')[0],
-        dueDatetime: newDueDate?.toISOString(),
+        dueDate: storedDates.dueDate,
+        dueDatetime: storedDates.dueDatetime,
         priority: newPriority,
         recurrence: newRecurrence,
       });
@@ -363,7 +384,8 @@ export function createMarkdownWriter(
         newDueDate,
         newPriority,
         undefined,  // project (not used in line)
-        newRecurrence
+        newRecurrence,
+        newHasTime,
       );
 
       // Replace the line
@@ -385,8 +407,8 @@ export function createMarkdownWriter(
           const updatedReminder: Reminder & { contentHash: string } = {
             id: reminder.id,
             content: newContent,
-            dueDate: newDueDate?.toISOString().split('T')[0],
-            dueDatetime: newDueDate?.toISOString(),
+            dueDate: storedDates.dueDate,
+            dueDatetime: storedDates.dueDatetime,
             priority: newPriority,
             completed: reminder.completed,
             project: newProject || 'Inbox',
@@ -480,19 +502,18 @@ export function createMarkdownWriter(
       let newDueDatetime = reminder.dueDatetime;
       let newDueDate = reminder.dueDate;
       let context: ReminderChangeContext | undefined;
+      const currentDue = parseStoredReminderDate(reminder) ?? new Date();
+      const currentHasTime = reminderHasTime(reminder) ?? false;
+      const recurrence = normalizeRecurrenceRule(reminder.recurrence);
 
       // For recurring reminders that are being completed, calculate next occurrence
-      if (!reminder.completed && reminder.recurrence) {
-        const currentDue = reminder.dueDatetime
-          ? new Date(reminder.dueDatetime)
-          : reminder.dueDate
-            ? new Date(reminder.dueDate)
-            : new Date();
-        const nextDue = calculateNextOccurrence(currentDue, reminder.recurrence);
+      if (!reminder.completed && recurrence) {
+        const nextDue = calculateNextOccurrence(currentDue, recurrence);
         if (nextDue) {
           newCompleted = false; // Stays uncompleted
-          newDueDatetime = nextDue.toISOString();
-          newDueDate = nextDue.toISOString().split('T')[0];
+          const storedDates = buildStoredReminderDates(nextDue, currentHasTime);
+          newDueDatetime = storedDates.dueDatetime;
+          newDueDate = storedDates.dueDate;
 
           // Pass context about the completed instance for CalDAV sync
           context = {
@@ -546,16 +567,9 @@ export function createMarkdownWriter(
         newLine = line.replace(/\[x\]/i, "[ ]");
       } else {
         // Completing - check for recurrence
-        if (reminder.recurrence) {
-          // Get current due date (prefer datetime over date)
-          const currentDue = reminder.dueDatetime
-            ? new Date(reminder.dueDatetime)
-            : reminder.dueDate
-              ? new Date(reminder.dueDate)
-              : new Date();
-
+        if (recurrence) {
           // Calculate next occurrence
-          const nextDue = calculateNextOccurrence(currentDue, reminder.recurrence);
+          const nextDue = calculateNextOccurrence(currentDue, recurrence);
 
           if (nextDue) {
             // Has next occurrence - rebuild line with new date, keep unchecked
@@ -570,7 +584,8 @@ export function createMarkdownWriter(
               nextDue,
               reminder.priority,
               reminder.project,
-              reminder.recurrence
+              recurrence,
+              currentHasTime,
             );
 
             log.info(`Recurring reminder: advancing to next occurrence ${nextDue.toISOString()}`);
@@ -612,7 +627,7 @@ export function createMarkdownWriter(
             project: reminder.project || 'Inbox',
             dueDate: newDueDate,
             dueDatetime: newDueDatetime,
-            recurrence: reminder.recurrence,
+            recurrence,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             contentHash,

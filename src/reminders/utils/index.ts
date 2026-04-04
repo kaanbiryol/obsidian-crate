@@ -7,6 +7,7 @@ export * from './richTextParsing';
 export * from './cursorPosition';
 export * from './rruleConverter';
 export * from './recurrenceCalculator';
+export * from './recurrenceRule';
 export * from './checkboxParser';
 export * from './logger';
 export * from './concurrency';

@@ -24,7 +24,7 @@ const log = createLogger('AddReminderModal');
 
 interface AddReminderModalProps {
     onClose: () => void;
-    onAdd?: (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule) => Promise<void>;
+    onAdd?: (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean) => Promise<void>;
     onSave?: (reminder: Reminder) => Promise<void>;
     onDelete?: (reminder: Reminder) => Promise<void>;
     onError?: (error: Error) => void;
@@ -79,6 +79,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         project,
         priority,
         dueDate,
+        hasTime,
         recurrence,
         isUpdatingFromButtons,
         applyDateSelection,
@@ -138,6 +139,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             priority,
             project,
             dueDate,
+            hasTime,
             recurrence,
             reminder,
         });
@@ -157,6 +159,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                         submission.priority,
                         submission.dueDate,
                         submission.recurrence,
+                        submission.hasTime,
                     );
                 }
             },
@@ -265,6 +268,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 richTextInputRef={richTextInputRef}
                 onTouchEnd={handleModalContentTouch}
                 dueDate={dueDate}
+                hasTime={hasTime}
                 project={project}
                 defaultProject={defaultProject}
                 priority={priority}
@@ -286,9 +290,10 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             animationConfig={animationConfig}
             pickerMode={pickerMode}
             dueDate={dueDate}
+            hasTime={hasTime}
             isDark={isDark}
-            onDateTimeChange={(isoDate) => {
-                applyDateSelection(isoDate);
+            onDateTimeChange={(value, nextHasTime) => {
+                applyDateSelection(value, nextHasTime);
             }}
         />
         <ProjectPickerModal

@@ -4,6 +4,7 @@
  */
 
 import type { Reminder } from '../types/reminder';
+import { formatLocalDateKey, isDateOnlyString, parseReminderDateValue } from './reminderDate';
 
 /**
  * Sort reminders by:
@@ -30,8 +31,8 @@ export function sortReminders(reminders: Reminder[]): Reminder[] {
 
     // If both have dates, compare them
     if (dateA && dateB) {
-      const timeA = new Date(dateA).getTime();
-      const timeB = new Date(dateB).getTime();
+      const timeA = parseReminderDateValue(dateA, !isDateOnlyString(dateA))?.getTime() ?? 0;
+      const timeB = parseReminderDateValue(dateB, !isDateOnlyString(dateB))?.getTime() ?? 0;
       const dateDiff = timeA - timeB;
       if (dateDiff !== 0) return dateDiff;
     }
@@ -45,18 +46,14 @@ export function sortReminders(reminders: Reminder[]): Reminder[] {
  * Get reminders due today
  */
 export function getTodayReminders(reminders: Reminder[]): Reminder[] {
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-
-  const todayStartISO = todayStart.toISOString();
-  const todayEndISO = todayEnd.toISOString();
+  const todayKey = formatLocalDateKey(new Date());
 
   return reminders.filter(r => {
     if (r.completed) return false;
-    const dueDate = r.dueDatetime || r.dueDate;
-    if (!dueDate) return false;
-    return dueDate >= todayStartISO && dueDate < todayEndISO;
+    if (r.dueDatetime) {
+      return formatLocalDateKey(new Date(r.dueDatetime)) === todayKey;
+    }
+    return r.dueDate === todayKey;
   });
 }
 
@@ -64,13 +61,15 @@ export function getTodayReminders(reminders: Reminder[]): Reminder[] {
  * Get overdue reminders
  */
 export function getOverdueReminders(reminders: Reminder[]): Reminder[] {
-  const now = new Date().toISOString();
+  const now = new Date();
+  const todayKey = formatLocalDateKey(now);
 
   return reminders.filter(r => {
     if (r.completed) return false;
-    const dueDate = r.dueDatetime || r.dueDate;
-    if (!dueDate) return false;
-    return dueDate < now;
+    if (r.dueDatetime) {
+      return new Date(r.dueDatetime) < now;
+    }
+    return !!r.dueDate && r.dueDate < todayKey;
   });
 }
 
@@ -79,17 +78,20 @@ export function getOverdueReminders(reminders: Reminder[]): Reminder[] {
  */
 export function getUpcomingReminders(reminders: Reminder[], days: number = 7): Reminder[] {
   const now = new Date();
-  const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1); // Tomorrow
-  const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days + 1);
-
-  const startISO = startDate.toISOString();
-  const endISO = endDate.toISOString();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startDate = new Date(todayStart);
+  startDate.setDate(startDate.getDate() + 1);
+  const endDate = new Date(todayStart);
+  endDate.setDate(endDate.getDate() + days + 1);
 
   return reminders.filter(r => {
     if (r.completed) return false;
-    const dueDate = r.dueDatetime || r.dueDate;
-    if (!dueDate) return false;
-    return dueDate >= startISO && dueDate < endISO;
+    if (r.dueDatetime) {
+      const dueDate = new Date(r.dueDatetime);
+      return dueDate > now && dueDate < endDate;
+    }
+    const dueDate = parseReminderDateValue(r.dueDate, false);
+    return !!dueDate && dueDate >= startDate && dueDate < endDate;
   });
 }
 
@@ -111,9 +113,10 @@ export function groupRemindersByDate(reminders: Reminder[]): Array<{ date: Date;
     const dueDateStr = getReminderDueDate(reminder);
     if (!dueDateStr) continue;
 
-    const dueDate = new Date(dueDateStr);
+    const dueDate = parseReminderDateValue(dueDateStr, !isDateOnlyString(dueDateStr));
+    if (!dueDate) continue;
     const startOfDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-    const dateKey = startOfDay.toISOString().split('T')[0]; // YYYY-MM-DD
+    const dateKey = formatLocalDateKey(startOfDay);
 
     if (!grouped[dateKey]) {
       grouped[dateKey] = {

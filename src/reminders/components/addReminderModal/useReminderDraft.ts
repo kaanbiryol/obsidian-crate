@@ -4,6 +4,7 @@ import type { Priority, Reminder, RecurrenceRule } from '../../types';
 import { parseReminderContent } from '../../utils/reminderParser';
 import { findStandalonePriorityMarkerIndexes } from '../../utils/priorityMarker';
 import { recurrenceToText } from '../../utils/rruleConverter';
+import { parseReminderDateValue, serializeReminderDateValue } from '../../utils/reminderDate';
 
 type UpdateOptions = {
 	mode?: 'timeout' | 'raf';
@@ -37,7 +38,12 @@ export function buildInitialReminderContent(
 	} else {
 		const effectiveDate = reminder.dueDatetime || reminder.dueDate || initialDueDate;
 		if (effectiveDate) {
-			reconstructed += ` ${format(new Date(effectiveDate), 'MMM d, yyyy HH:mm')}`;
+			const isDateOnly = !reminder.dueDatetime && !!reminder.dueDate;
+			const fmt = isDateOnly ? 'MMM d, yyyy' : 'MMM d, yyyy HH:mm';
+			const parsedDate = parseReminderDateValue(effectiveDate, !isDateOnly);
+			if (parsedDate) {
+				reconstructed += ` ${format(parsedDate, fmt)}`;
+			}
 		}
 	}
 
@@ -64,13 +70,18 @@ export function rebuildReminderContent(
 	project: string,
 	priority: number,
 	defaultProject: string,
+	hasTime?: boolean,
 ): string {
 	let result = cleanText.trim();
 
 	if (recurrence) {
 		result += ` ${recurrenceToText(recurrence)}`;
 	} else if (date) {
-		result += ` ${format(new Date(date), 'MMM d, yyyy HH:mm')}`;
+		const fmt = hasTime ? 'MMM d, yyyy HH:mm' : 'MMM d, yyyy';
+		const parsedDate = parseReminderDateValue(date, hasTime);
+		if (parsedDate) {
+			result += ` ${format(parsedDate, fmt)}`;
+		}
 	}
 
 	const resolvedDefaultProject = getDefaultProject(defaultProject);
@@ -105,6 +116,10 @@ export function useReminderDraft({
 	const [project, setProject] = useState(initialProject);
 	const [priority, setPriority] = useState(reminder?.priority || 4);
 	const [dueDate, setDueDate] = useState<string | null>(initialDueDateValue);
+	const [hasTime, setHasTime] = useState<boolean>(() => {
+		if (reminder) return !!reminder.dueDatetime;
+		return false;
+	});
 	const [isUpdatingFromButtons, setIsUpdatingFromButtons] = useState(false);
 	const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(reminder?.recurrence);
 
@@ -112,11 +127,13 @@ export function useReminderDraft({
 	const dueDateSetFromText = useRef(false);
 	const dueDateRef = useRef(dueDate);
 	const recurrenceRef = useRef(recurrence);
+	const hasTimeRef = useRef(hasTime);
 
 	useEffect(() => {
 		dueDateRef.current = dueDate;
 		recurrenceRef.current = recurrence;
-	}, [dueDate, recurrence]);
+		hasTimeRef.current = hasTime;
+	}, [dueDate, recurrence, hasTime]);
 
 	const initialContentHadDate = useMemo(() => {
 		const parsed = parseReminderContent(initialContent, projects);
@@ -144,6 +161,7 @@ export function useReminderDraft({
 		recurrence?: RecurrenceRule | null;
 		project?: string;
 		priority?: Priority;
+		hasTime?: boolean;
 	}, options?: UpdateOptions) => {
 		setIsUpdatingFromButtons(true);
 		const parsed = parseReminderContent(content, projects);
@@ -153,6 +171,7 @@ export function useReminderDraft({
 		const nextRecurrence = next.recurrence !== undefined ? (next.recurrence ?? undefined) : recurrenceRef.current;
 		const nextProject = next.project !== undefined ? next.project : project;
 		const nextPriority = next.priority !== undefined ? next.priority : priority;
+		const nextHasTime = next.hasTime !== undefined ? next.hasTime : hasTimeRef.current;
 
 		if (next.dueDate !== undefined) {
 			setDueDate(next.dueDate);
@@ -166,6 +185,9 @@ export function useReminderDraft({
 		if (next.priority !== undefined) {
 			setPriority(next.priority);
 		}
+		if (next.hasTime !== undefined) {
+			setHasTime(next.hasTime);
+		}
 
 		setContent(
 			rebuildReminderContent(
@@ -175,6 +197,7 @@ export function useReminderDraft({
 				nextProject,
 				nextPriority,
 				resolvedDefaultProject,
+				nextHasTime,
 			),
 		);
 		finalizeUpdate(options);
@@ -214,6 +237,7 @@ export function useReminderDraft({
 				setRecurrence(detectedRecurrence);
 				if (dueDateRef.current || parsed.dueDate) {
 					setDueDate(null);
+					setHasTime(false);
 					dueDateSetFromText.current = false;
 					const cleanText = parsed.cleanContent ?? content.trim();
 					setContent(
@@ -224,6 +248,7 @@ export function useReminderDraft({
 							project,
 							priority,
 							resolvedDefaultProject,
+							false,
 						),
 					);
 				}
@@ -235,10 +260,14 @@ export function useReminderDraft({
 
 		const detectedDueDate = parsed.dueDate;
 		if (detectedDueDate && !detectedRecurrence) {
-			const newDueDateStr = detectedDueDate.toISOString();
+			const newHasTime = parsed.hasTime ?? false;
+			const newDueDateStr = serializeReminderDateValue(detectedDueDate, newHasTime) ?? null;
 			if (dueDateRef.current !== newDueDateStr) {
 				dueDateSetFromText.current = true;
 				setDueDate(newDueDateStr);
+			}
+			if (hasTimeRef.current !== newHasTime) {
+				setHasTime(newHasTime);
 			}
 		} else if (
 			!detectedDueDate &&
@@ -247,14 +276,19 @@ export function useReminderDraft({
 			(initialContentHadDate || dueDateSetFromText.current)
 		) {
 			setDueDate(null);
+			setHasTime(false);
 			dueDateSetFromText.current = false;
 		}
 	}, [content, initialContentHadDate, isUpdatingFromButtons, priority, project, projects, resolvedDefaultProject]);
 
-	const applyDateSelection = useCallback((isoDate: string | null) => {
+	const applyDateSelection = useCallback((nextDate: string | null, nextHasTime?: boolean) => {
 		dueDateSetFromText.current = false;
 		recurrenceSetFromText.current = false;
-		applyContentUpdate({ dueDate: isoDate, recurrence: null });
+		applyContentUpdate({
+			dueDate: nextDate,
+			recurrence: null,
+			hasTime: nextDate ? (nextHasTime ?? hasTimeRef.current) : false,
+		});
 	}, [applyContentUpdate]);
 
 	const applyProjectSelection = useCallback((selected: string) => {
@@ -285,6 +319,7 @@ export function useReminderDraft({
 		project,
 		priority,
 		dueDate,
+		hasTime,
 		recurrence,
 		isUpdatingFromButtons,
 		applyDateSelection,

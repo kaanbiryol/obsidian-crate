@@ -3,6 +3,7 @@ import type { ReminderIndex, IndexedReminder } from './reminderIndex';
 import type { MarkdownWriter } from './markdownWriter';
 import { createStorageCompat } from './storageCompat';
 import { generateReminderId } from './reminderIdentity';
+import { timezone as getLocalTimeZone } from '../utils/time';
 
 function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 	return {
@@ -86,7 +87,7 @@ describe('storageCompat.create', () => {
 
 		expect(created.id).toBe(reminderId);
 		expect(created.content).toBe('Task A');
-		expect(spies.createReminder).toHaveBeenCalledWith('Work', 'Task A', undefined, 1, undefined);
+		expect(spies.createReminder).toHaveBeenCalledWith('Work', 'Task A', undefined, 1, undefined, undefined);
 	});
 
 	it('passes recurrence through on create', async () => {
@@ -102,7 +103,33 @@ describe('storageCompat.create', () => {
 			recurrence,
 		});
 
-		expect(spies.createReminder).toHaveBeenCalledWith('Work', 'Task recur', undefined, 1, recurrence);
+		expect(spies.createReminder).toHaveBeenCalledWith(
+			'Work',
+			'Task recur',
+			undefined,
+			1,
+			{ frequency: 'daily', timezone: getLocalTimeZone() },
+			undefined,
+		);
+	});
+
+	it('passes date-only reminders through with hasTime false', async () => {
+		const index = createIndex();
+		const { writer, spies } = createWriter();
+		const storage = createStorageCompat(index, writer);
+
+		await storage.create({
+			content: 'Task dated',
+			project: 'Work',
+			priority: 4,
+			dueDate: '2026-01-10',
+		});
+
+		const call = spies.createReminder.mock.calls[0];
+		expect(call?.[0]).toBe('Work');
+		expect(call?.[1]).toBe('Task dated');
+		expect(call?.[2]).toEqual(new Date(2026, 0, 10));
+		expect(call?.[5]).toBe(false);
 	});
 
 	it('falls back to the deterministic reminder id when optimistic state is unavailable', async () => {
@@ -129,6 +156,7 @@ describe('storageCompat.update and today view', () => {
 			completed: false,
 			project: 'Work',
 			recurrence: { frequency: 'daily' },
+			dueDate: '2026-01-10',
 			filePath: 'Reminders/Work.md',
 			lineNumber: 2,
 			rawLine: '- [ ] Task A every day',
@@ -146,6 +174,8 @@ describe('storageCompat.update and today view', () => {
 			indexedReminder,
 			expect.objectContaining({ recurrence: null }),
 		);
+		const updates = spies.updateReminder.mock.calls[0]?.[1];
+		expect(Object.prototype.hasOwnProperty.call(updates ?? {}, 'dueDate')).toBe(false);
 	});
 
 	it('includes completed reminders due today when requested', () => {

@@ -12,6 +12,7 @@ export interface RecurrenceRule {
   count?: number;              // optional max occurrences
   hour?: number;               // 0-23, time of day for recurring reminder
   minute?: number;             // 0-59, time of day for recurring reminder
+  timezone?: string;           // IANA timezone for local wall-clock recurrence semantics
 }
 
 export interface Reminder {

@@ -10,6 +10,7 @@ import { useProjectAutocomplete } from '../useProjectAutocomplete';
 import { formatRecurrence } from '../../utils/rruleConverter';
 import { getFontSize } from '../../ui/themes';
 import { RecurrenceRule } from '../../types';
+import { parseReminderDateValue } from '../../utils/reminderDate';
 
 // Helper to generate pill styles using HeroUI CSS variables
 // Refined glass pill design with subtle borders and minimal shadows (no glows)
@@ -68,6 +69,7 @@ interface AddReminderModalBodyProps {
     richTextInputRef: React.RefObject<RichTextInputHandle | null>;
     onTouchEnd: () => void;
     dueDate: string | null;
+    hasTime?: boolean;
     project: string;
     defaultProject: string;
     priority: number;
@@ -95,6 +97,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     richTextInputRef,
     onTouchEnd,
     dueDate,
+    hasTime,
     project,
     defaultProject,
     priority,
@@ -108,6 +111,9 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     onTogglePriority,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const dueDateDisplay = dueDate
+        ? parseReminderDateValue(dueDate, hasTime)
+        : undefined;
 
     const autocomplete = useProjectAutocomplete({
         content,
@@ -195,7 +201,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                     transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
                     className="whitespace-nowrap"
                 >
-                    {dueDate ? format(new Date(dueDate), 'MMM d, HH:mm') : 'Date'}
+                    {dueDateDisplay ? format(dueDateDisplay, hasTime ? 'MMM d, HH:mm' : 'MMM d') : 'Date'}
                 </motion.span>
             </ShadowDOMButton>
 

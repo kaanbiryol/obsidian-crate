@@ -4,6 +4,8 @@ import {
   findStandalonePriorityMarkerIndexes,
   removeStandalonePriorityMarkers,
 } from './priorityMarker';
+import { normalizeRecurrenceRule } from './recurrenceRule';
+import { parseLocalDateKey } from './reminderDate';
 
 export interface ParsedReminder {
   cleanContent: string;
@@ -11,6 +13,7 @@ export interface ParsedReminder {
   priorityPart?: string;
   recurrencePart?: string;
   dueDate?: Date;
+  hasTime?: boolean;
   priority: Priority;
   project?: string; // Project tag (e.g., "project1", "work")
   recurrence?: RecurrenceRule; // Parsed recurrence rule
@@ -58,6 +61,7 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
 
   let taskContent = content;
   let dueDate: Date | undefined;
+  let hasTime: boolean | undefined;
   let priority: Priority = 4;
   let datePart: string | undefined;
   let priorityPart: string | undefined;
@@ -79,6 +83,10 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
       const parsed = chrono.parse(recurrencePart, new Date(), { forwardDate: true });
       if (parsed.length > 0) {
         dueDate = parsed[0].start.date();
+        hasTime = parsed[0].start.isCertain('hour');
+        if (!hasTime) {
+          dueDate.setHours(0, 0, 0, 0);
+        }
         datePart = recurrencePart; // The date is part of the recurrence pattern
       }
     }
@@ -91,7 +99,8 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
     /@?(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?(?:Z|[+-]\d{2}:\d{2})?)?)/
   );
   if (isoDateMatch) {
-    dueDate = new Date(isoDateMatch[1]);
+    hasTime = isoDateMatch[1].includes('T');
+    dueDate = hasTime ? new Date(isoDateMatch[1]) : parseLocalDateKey(isoDateMatch[1]);
     datePart = isoDateMatch[0]; // Keep the full match (with @ if present)
     if (taskContent.includes(isoDateMatch[0])) {
       taskContent = taskContent.replace(isoDateMatch[0], '').trim();
@@ -105,6 +114,10 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
       const result = parsed[0];
       if (taskContent.includes(result.text)) {
         dueDate = result.start.date();
+        hasTime = result.start.isCertain('hour');
+        if (!hasTime) {
+          dueDate.setHours(0, 0, 0, 0);
+        }
         datePart = result.text;
         taskContent = taskContent.replace(result.text, '').trim();
       }
@@ -180,6 +193,7 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
     priorityPart,
     recurrencePart,
     dueDate,
+    hasTime,
     priority,
     project,
     recurrence,
@@ -261,10 +275,10 @@ function parseRecurrenceFromContent(content: string): { matched: string; rule: R
       week: 'weekly',
       month: 'monthly',
     };
-    const rule: RecurrenceRule = {
+    const rule = normalizeRecurrenceRule({
       frequency: frequencyMap[unit],
       interval: interval > 1 ? interval : undefined,
-    };
+    })!;
     // Parse time if present
     if (intervalMatch[3]) {
       const time = parseTimeString(intervalMatch[3]);
@@ -282,7 +296,7 @@ function parseRecurrenceFromContent(content: string): { matched: string; rule: R
   // Pattern 2: "every day" or "daily" (optionally with time)
   const dailyMatch = content.match(new RegExp(`\\b(?:every\\s*day|daily)${timePattern}\\b`, 'i'));
   if (dailyMatch) {
-    const rule: RecurrenceRule = { frequency: 'daily' };
+    const rule = normalizeRecurrenceRule({ frequency: 'daily' })!;
     // Parse time if present
     if (dailyMatch[1]) {
       const time = parseTimeString(dailyMatch[1]);
@@ -300,7 +314,7 @@ function parseRecurrenceFromContent(content: string): { matched: string; rule: R
   // Pattern 3: "every week" or "weekly" (optionally with time)
   const weeklyMatch = content.match(new RegExp(`\\b(?:every\\s*week|weekly)${timePattern}\\b`, 'i'));
   if (weeklyMatch) {
-    const rule: RecurrenceRule = { frequency: 'weekly' };
+    const rule = normalizeRecurrenceRule({ frequency: 'weekly' })!;
     // Parse time if present
     if (weeklyMatch[1]) {
       const time = parseTimeString(weeklyMatch[1]);
@@ -318,7 +332,7 @@ function parseRecurrenceFromContent(content: string): { matched: string; rule: R
   // Pattern 4: "every month" or "monthly" (optionally with day and/or time)
   const monthlyMatch = content.match(new RegExp(`\\b(?:every\\s*month|monthly)(?:\\s+on\\s+(?:the\\s+)?(\\d{1,2})(?:st|nd|rd|th)?)?${timePattern}\\b`, 'i'));
   if (monthlyMatch) {
-    const rule: RecurrenceRule = { frequency: 'monthly' };
+    const rule = normalizeRecurrenceRule({ frequency: 'monthly' })!;
     if (monthlyMatch[1]) {
       const dayOfMonth = parseInt(monthlyMatch[1], 10);
       if (dayOfMonth >= 1 && dayOfMonth <= 31) {
@@ -350,10 +364,10 @@ function parseRecurrenceFromContent(content: string): { matched: string; rule: R
     const dayMatches = daysText.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/gi);
     if (dayMatches && dayMatches.length > 0) {
       const daysOfWeek = [...new Set(dayMatches.map(d => DAY_NAME_MAP[d.toLowerCase()]))].sort((a, b) => a - b);
-      const rule: RecurrenceRule = {
+      const rule = normalizeRecurrenceRule({
         frequency: 'weekly',
         daysOfWeek,
-      };
+      })!;
       // Parse time if present (capture group 2)
       if (weekdayMatch[2]) {
         const time = parseTimeString(weekdayMatch[2]);

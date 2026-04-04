@@ -1,5 +1,6 @@
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
 import type { Reminder } from '../types/reminder';
+import { formatLocalDateKey, parseReminderDateValue } from './reminderDate';
 
 /**
  * Format a due date for display
@@ -9,7 +10,9 @@ import type { Reminder } from '../types/reminder';
  */
 export function formatDueDate(dateString: string | undefined): string | null {
   if (!dateString) return null;
-  const date = new Date(dateString);
+  const hasTime = dateString.includes('T');
+  const date = parseReminderDateValue(dateString, hasTime);
+  if (!date) return null;
 
   let dateText = '';
   if (isToday(date)) {
@@ -46,9 +49,15 @@ export function formatDateHeader(date: Date): string {
  * @param reminder - Reminder to check
  * @returns True if reminder is overdue
  */
-export function isReminderOverdue(reminder: Reminder): boolean {
-  const dueDate = reminder.dueDatetime || reminder.dueDate;
-  return !!dueDate && isPast(new Date(dueDate)) && !reminder.completed;
+export function isReminderOverdue(reminder: Pick<Reminder, 'dueDate' | 'dueDatetime' | 'completed'>): boolean {
+  if (reminder.completed) return false;
+  if (reminder.dueDatetime) {
+    return isPast(new Date(reminder.dueDatetime));
+  }
+  if (reminder.dueDate) {
+    return reminder.dueDate < formatLocalDateKey(new Date());
+  }
+  return false;
 }
 
 /**
