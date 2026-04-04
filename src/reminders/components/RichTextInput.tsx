@@ -112,6 +112,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const hasInitializedRef = useRef(false);
     const knownProjectsKeyRef = useRef<string | null>(null);
     const pendingCursorRef = useRef<number | null>(null);
+    const restoreRequestIdRef = useRef(0);
 
     // Use provided ref or internal one
     const actualRef = inputRef || editableRef;
@@ -149,6 +150,18 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         },
     }));
 
+    const scheduleSelectionRestore = useCallback((position: number | null, afterRestore?: () => void) => {
+        const requestId = ++restoreRequestIdRef.current;
+        requestAnimationFrame(() => {
+            if (restoreRequestIdRef.current !== requestId || !actualRef.current) {
+                return;
+            }
+
+            restoreCursorPosition(actualRef.current, position);
+            afterRestore?.();
+        });
+    }, [actualRef]);
+
     // Handle input changes
     const handleInput = () => {
         if (!actualRef.current) return;
@@ -158,26 +171,37 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
         // Build and render HTML with chips
         const html = buildHTML(plainText, knownProjects);
-        renderRichText(actualRef.current, html);
+        const normalizedHtml = html || '';
+        const shouldRerender = actualRef.current.innerHTML !== normalizedHtml;
+        if (shouldRerender) {
+            renderRichText(actualRef.current, normalizedHtml);
+        }
 
         // Call onChange with plain text
         onChange(plainText);
 
-        // Restore cursor, then detect autocomplete query
-        requestAnimationFrame(() => {
-            restoreCursorPosition(actualRef.current, cursorPos);
-
-            if (onAutocompleteQuery && cursorPos !== null) {
-                const hashInfo = extractHashtagQuery(plainText, cursorPos);
-                if (hashInfo) {
-                    const sel = window.getSelection();
-                    const rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
-                    onAutocompleteQuery(hashInfo.query, rect ?? null);
-                } else {
-                    onAutocompleteQuery(null, null);
-                }
+        const updateAutocompleteQuery = () => {
+            if (!onAutocompleteQuery || cursorPos === null) {
+                return;
             }
-        });
+
+            const hashInfo = extractHashtagQuery(plainText, cursorPos);
+            if (hashInfo) {
+                const sel = window.getSelection();
+                const rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
+                onAutocompleteQuery(hashInfo.query, rect ?? null);
+                return;
+            }
+
+            onAutocompleteQuery(null, null);
+        };
+
+        if (shouldRerender) {
+            scheduleSelectionRestore(cursorPos, updateAutocompleteQuery);
+            return;
+        }
+
+        updateAutocompleteQuery();
     };
 
     // Update content when value changes externally (e.g., from parent reset)
@@ -220,15 +244,11 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         if (pendingCursorRef.current !== null) {
             const pendingPos = pendingCursorRef.current;
             pendingCursorRef.current = null;
-            requestAnimationFrame(() => {
-                restoreCursorPosition(actualRef.current, pendingPos);
-            });
+            scheduleSelectionRestore(pendingPos);
         } else if (shouldPreserveCursor) {
-            requestAnimationFrame(() => {
-                restoreCursorPosition(actualRef.current, cursorPos);
-            });
+            scheduleSelectionRestore(cursorPos);
         }
-    }, [value, autoFocus, knownProjects, preserveSelection]);
+    }, [value, autoFocus, knownProjects, preserveSelection, scheduleSelectionRestore]);
 
     // Handle auto-focus on mount (more reliable than HTML autoFocus for contentEditable)
     useEffect(() => {

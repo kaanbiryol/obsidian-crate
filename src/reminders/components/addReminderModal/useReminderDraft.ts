@@ -128,6 +128,9 @@ export function useReminderDraft({
 	const dueDateRef = useRef(dueDate);
 	const recurrenceRef = useRef(recurrence);
 	const hasTimeRef = useRef(hasTime);
+	const setContentIfChanged = useCallback((nextContent: string) => {
+		setContent((previous) => (previous === nextContent ? previous : nextContent));
+	}, []);
 
 	useEffect(() => {
 		dueDateRef.current = dueDate;
@@ -189,7 +192,7 @@ export function useReminderDraft({
 			setHasTime(next.hasTime);
 		}
 
-		setContent(
+		setContentIfChanged(
 			rebuildReminderContent(
 				cleanText,
 				nextDueDate,
@@ -201,7 +204,7 @@ export function useReminderDraft({
 			),
 		);
 		finalizeUpdate(options);
-	}, [content, finalizeUpdate, priority, project, projects, resolvedDefaultProject]);
+	}, [content, finalizeUpdate, priority, project, projects, resolvedDefaultProject, setContentIfChanged]);
 
 	useEffect(() => {
 		if (isUpdatingFromButtons) {
@@ -240,7 +243,7 @@ export function useReminderDraft({
 					setHasTime(false);
 					dueDateSetFromText.current = false;
 					const cleanText = parsed.cleanContent ?? content.trim();
-					setContent(
+					setContentIfChanged(
 						rebuildReminderContent(
 							cleanText,
 							null,
@@ -279,7 +282,7 @@ export function useReminderDraft({
 			setHasTime(false);
 			dueDateSetFromText.current = false;
 		}
-	}, [content, initialContentHadDate, isUpdatingFromButtons, priority, project, projects, resolvedDefaultProject]);
+	}, [content, initialContentHadDate, isUpdatingFromButtons, priority, project, projects, resolvedDefaultProject, setContentIfChanged]);
 
 	const applyDateSelection = useCallback((nextDate: string | null, nextHasTime?: boolean) => {
 		dueDateSetFromText.current = false;
