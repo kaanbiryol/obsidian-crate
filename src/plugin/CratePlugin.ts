@@ -69,6 +69,8 @@ export default class CratePlugin extends Plugin {
 		try {
 			if (this.syncRuntime.isConfigured()) {
 				await this.syncRuntime.initialize();
+			} else {
+				this.showSetupNotice();
 			}
 		} catch (error) {
 			const msg = errorMessage(error);
@@ -123,6 +125,20 @@ export default class CratePlugin extends Plugin {
 
 	async reinitializeWithFolder(newFolderPath: string): Promise<void> {
 		await reinitializeReminders(this, newFolderPath);
+	}
+
+	private showSetupNotice(): void {
+		const fragment = new DocumentFragment();
+		fragment.createSpan({ text: 'Crate is not configured. ' });
+		const link = fragment.createEl('a', { text: 'Open settings' });
+		link.addEventListener('click', () => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(this.app as any).setting.open();
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(this.app as any).setting.openTabById(this.manifest.id);
+		});
+		fragment.createSpan({ text: ' to set up sync.' });
+		new Notice(fragment, 10000);
 	}
 
 	private async ensureDeviceId(): Promise<void> {
