@@ -3,7 +3,6 @@
  */
 
 import { Notice, Plugin } from 'obsidian';
-import { abortOAuthLogin } from '../cloudflare/oauth';
 import { CloudflareSessionManager } from '../cloudflare/session-manager';
 import { CloudflareUsageService } from '../cloudflare/usage-service';
 import { type ReminderIndex } from '../reminders/data/reminderIndex';
@@ -96,7 +95,6 @@ export default class CratePlugin extends Plugin {
 
 	onunload(): void {
 		this.syncRuntime?.destroy();
-		abortOAuthLogin();
 		this.remindersVaultWatcher?.unregister();
 		// Preserve reminders leaves so Obsidian restores the pane in place on reload.
 	}

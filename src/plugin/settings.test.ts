@@ -7,7 +7,6 @@ describe('normalizeCrateSettings', () => {
 		const settings = normalizeCrateSettings({
 			workerUrl: ' http://worker.example/ ',
 			cloudflareAccountId: ' acct ',
-			cloudflareTokenExpiresAt: Number.NaN,
 			workerName: ' worker ',
 			bucketName: ' bucket ',
 			databaseId: ' db ',
@@ -37,7 +36,6 @@ describe('normalizeCrateSettings', () => {
 
 		expect(settings.workerUrl).toBe('');
 		expect(settings.cloudflareAccountId).toBe('acct');
-		expect(settings.cloudflareTokenExpiresAt).toBeNull();
 		expect(settings.workerName).toBe('worker');
 		expect(settings.bucketName).toBe('bucket');
 		expect(settings.databaseId).toBe('db');

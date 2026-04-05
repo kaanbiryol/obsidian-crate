@@ -202,9 +202,7 @@ export class SyncRuntime {
 
 		if (options?.clearCloudflareCredentials) {
 			this.settings.cloudflareAccountId = '';
-			this.settings.cloudflareTokenExpiresAt = null;
 			this.secretStorage.delete(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
-			this.secretStorage.delete(SECRET_KEYS.CLOUDFLARE_REFRESH_TOKEN);
 		}
 
 		await this.persistSettings();

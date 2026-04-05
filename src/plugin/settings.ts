@@ -23,10 +23,6 @@ function normalizeBoolean(value: unknown, fallback: boolean): boolean {
 	return typeof value === 'boolean' ? value : fallback;
 }
 
-function normalizeNullableTimestamp(value: unknown): number | null {
-	return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
 function normalizeNullableString(value: unknown): string | null {
 	if (typeof value !== 'string') {
 		return null;
@@ -127,7 +123,6 @@ export function normalizeCrateSettings(
 		...DEFAULT_SETTINGS,
 		workerUrl: normalizeWorkerUrl(normalizeString(value?.workerUrl)),
 		cloudflareAccountId: normalizeString(value?.cloudflareAccountId),
-		cloudflareTokenExpiresAt: normalizeNullableTimestamp(value?.cloudflareTokenExpiresAt),
 		workerName: normalizeString(value?.workerName),
 		bucketName: normalizeString(value?.bucketName),
 		databaseId: normalizeString(value?.databaseId),

@@ -7,7 +7,6 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 	return {
 		workerUrl: 'https://crate.example.workers.dev',
 		cloudflareAccountId: '',
-		cloudflareTokenExpiresAt: null,
 		workerName: '',
 		bucketName: '',
 		databaseId: '',

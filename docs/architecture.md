@@ -83,8 +83,6 @@ CratePlugin (main.ts)
 3. Plugin lists accessible accounts via `GET /accounts`
 4. User selects an account; credentials are saved (token in keychain, account ID in settings)
 
-Legacy OAuth sessions with a stored refresh token are still auto-refreshed by `CloudflareSessionManager.resolveCredentials()` for backward compatibility.
-
 ### Worker Authentication
 
 Every request carries a Bearer token in `Authorization` header. Worker verifies against `AUTH_TOKEN` secret binding. Token is a 256-bit random hex string generated during setup.
@@ -93,14 +91,13 @@ Push-notification device enrollment is intentionally narrower: the plugin mints 
 
 ## Secret Storage
 
-Four keys stored in OS keychain via `SecretStorageService`:
+Three keys stored in OS keychain via `SecretStorageService`:
 
 | Key | Value |
 |---|---|
 | `crate-auth-token` | Bearer token for worker authentication |
 | `crate-analytics-token` | Cloudflare Analytics API token (optional) |
-| `crate-cloudflare-api-token` | Cloudflare API token (user-created or legacy OAuth) |
-| `crate-cloudflare-refresh-token` | Legacy OAuth refresh token |
+| `crate-cloudflare-api-token` | Cloudflare API token (user-created) |
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes empty string to "delete" and treats empty strings as null on read.
 

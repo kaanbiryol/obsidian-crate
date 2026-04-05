@@ -188,7 +188,6 @@ function createSettings(): CrateSettings {
 	return {
 		workerUrl: 'https://worker.example',
 		cloudflareAccountId: '',
-		cloudflareTokenExpiresAt: null,
 		workerName: '',
 		bucketName: '',
 		databaseId: '',
