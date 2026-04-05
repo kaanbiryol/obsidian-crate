@@ -33,6 +33,7 @@ function toReminder(indexed: IndexedReminder): Reminder {
     recurrence: normalizeRecurrenceRule(indexed.recurrence),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    lineNumber: indexed.lineNumber,
   };
 }
 
@@ -59,6 +60,7 @@ export interface StorageCompat {
   delete(id: string): Promise<boolean>;
   complete(id: string): Promise<Reminder | undefined>;
   uncomplete(id: string): Promise<Reminder | undefined>;
+  reorder(project: string, orderedIds: string[]): Promise<void>;
 
   // Utility methods
   forceSave(): Promise<void>;
@@ -275,6 +277,11 @@ export function createStorageCompat(
         completed: false,
         completedAt: undefined,
       };
+    },
+
+    async reorder(project: string, orderedIds: string[]): Promise<void> {
+      const filePath = `${index.remindersFolderPath}/${project}.md`;
+      await writer.reorderReminders(filePath, orderedIds);
     },
 
     // Utility methods

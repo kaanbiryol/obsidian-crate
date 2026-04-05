@@ -47,6 +47,7 @@ function createWriter(): {
 			updateReminder,
 			deleteReminder: vi.fn(async () => {}),
 			toggleComplete: vi.fn(async () => {}),
+			reorderReminders: vi.fn(async () => {}),
 			setOnReminderChange: vi.fn(),
 			setOnFileWritten: vi.fn(),
 		},

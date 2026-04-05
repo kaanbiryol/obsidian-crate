@@ -28,6 +28,7 @@ export interface Reminder {
   updatedAt: string; // ISO datetime string
   completedAt?: string; // ISO datetime string when completed
   recurrence?: RecurrenceRule; // Optional recurrence rule for recurring reminders
+  lineNumber?: number; // Line position in source markdown file (for manual ordering)
 }
 
 export interface CreateReminderParams {

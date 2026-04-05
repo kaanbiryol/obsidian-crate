@@ -173,6 +173,12 @@ export interface MarkdownWriter {
   toggleComplete(reminder: IndexedReminder): Promise<void>;
 
   /**
+   * Reorder active reminder lines within a file to match the given ID order.
+   * Completed lines are placed after active lines, preserving their relative order.
+   */
+  reorderReminders(filePath: string, orderedIds: string[]): Promise<void>;
+
+  /**
    * Set callback for sync and notification orchestration.
    */
   setOnReminderChange(callback: OnReminderChangeCallback): void;
@@ -655,6 +661,70 @@ export function createMarkdownWriter(
         index.clearOptimistic(reminder.id);
         throw error;
       }
+    },
+
+    async reorderReminders(filePath: string, orderedIds: string[]): Promise<void> {
+      const file = await getFile(filePath);
+      if (!file) {
+        throw new Error(`File not found: ${filePath}`);
+      }
+
+      const fileContent = await app.vault.read(file);
+      const lines = fileContent.split("\n");
+
+      // Identify checkbox lines and their positions
+      const checkboxEntries: { index: number; line: string; id: string | null; isCompleted: boolean }[] = [];
+      const nonCheckboxLines: { index: number; line: string }[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const parsed = parseCheckboxLine(lines[i]);
+        if (parsed) {
+          checkboxEntries.push({
+            index: i,
+            line: lines[i],
+            id: extractReminderId(lines[i]),
+            isCompleted: parsed.isCompleted,
+          });
+        } else {
+          nonCheckboxLines.push({ index: i, line: lines[i] });
+        }
+      }
+
+      // Separate active and completed checkbox lines
+      const activeLines = checkboxEntries.filter(e => !e.isCompleted);
+      const completedLines = checkboxEntries.filter(e => e.isCompleted);
+
+      // Build ID-to-line lookup for active lines
+      const activeById = new Map(activeLines.map(e => [e.id, e.line]));
+
+      // Reorder active lines according to orderedIds
+      const reorderedActive: string[] = [];
+      for (const id of orderedIds) {
+        const line = activeById.get(id);
+        if (line !== undefined) {
+          reorderedActive.push(line);
+          activeById.delete(id);
+        }
+      }
+      // Append any active lines not in orderedIds (e.g., newly created)
+      for (const entry of activeLines) {
+        if (entry.id !== null && activeById.has(entry.id)) {
+          reorderedActive.push(entry.line);
+        } else if (entry.id === null) {
+          reorderedActive.push(entry.line);
+        }
+      }
+
+      // Rebuild the file: non-checkbox lines in place, checkbox slots filled with reordered lines
+      const checkboxPositions = checkboxEntries.map(e => e.index);
+      const reorderedCheckbox = [...reorderedActive, ...completedLines.map(e => e.line)];
+      const newLines = [...lines];
+      for (let i = 0; i < checkboxPositions.length; i++) {
+        newLines[checkboxPositions[i]] = reorderedCheckbox[i] ?? '';
+      }
+
+      await app.vault.modify(file, newLines.join("\n"));
+      log.info(`Reordered reminders in ${filePath}`);
     },
 
     setOnReminderChange(callback: OnReminderChangeCallback): void {

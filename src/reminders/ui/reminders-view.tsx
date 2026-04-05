@@ -341,6 +341,16 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
         </ShadowDOMButton>
     ), []);
 
+    // Determine current project for reorder
+    const currentProject = viewMode === "inbox"
+        ? DEFAULT_PROJECT
+        : (viewMode === "browse" && selectedProject ? selectedProject : null);
+
+    const handleReorder = useCallback(async (orderedIds: string[]) => {
+        if (!currentProject) return;
+        await plugin.storage.reorder(currentProject, orderedIds);
+    }, [plugin, currentProject]);
+
     return (
         <HeroUIProvider>
             <div className={`reminders-view ${isDarkMode ? "dark" : ""} ${isFullScreen ? "is-fullscreen" : ""} ${onClose ? "is-modal" : ""}`}>
@@ -433,6 +443,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
                                                 renderCard={renderCard}
                                                 renderToggleButton={renderToggleButton}
                                                 hasFab={showFab}
+                                                onReorder={handleReorder}
                                             />
                                         </motion.div>
                                     );
@@ -496,6 +507,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
                                                     animationConfig={{ enabled: false }}
                                                     renderCard={renderCard}
                                                     hasFab={showFab}
+                                                    onReorder={handleReorder}
                                                 />
                                             </motion.div>
                                         );

@@ -1,13 +1,14 @@
-import React, { useMemo, useState, memo, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronDown, FolderOpen, Circle, CheckCircle2, Check } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { ShadowDOMButton, ShadowDOMNativeButton } from '../ShadowDOMButton';
 import type { Reminder } from '../../types/reminder';
-import { sortReminders } from '../../utils/reminderSort';
+import { sortRemindersByFileOrder } from '../../utils/reminderSort';
 import { getProjectColor } from '../../utils/projectColors';
 import { ReminderCard } from '../ReminderCard';
+import { ReorderableReminderList } from '../ReorderableReminderList';
 import { EmptyState } from '../EmptyState';
 import {
   CONTENT_PADDING_X,
@@ -28,6 +29,8 @@ export interface ProjectDetailViewProps {
   hasFab?: boolean;
   /** Custom class name for the container */
   className?: string;
+  /** Callback when reminders are reordered via drag */
+  onReorder?: (orderedIds: string[]) => void;
 }
 
 
@@ -127,7 +130,8 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   animationConfig = { enabled: true },
   renderCard,
   hasFab = true,
-  className = ''
+  className = '',
+  onReorder,
 }: ProjectDetailViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
 
@@ -137,8 +141,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
       (r.project || 'Inbox') === project
     );
 
-    // Sort and split
-    const sorted = sortReminders(projectReminders);
+    const sorted = sortRemindersByFileOrder(projectReminders);
     const activeList = sorted.filter(r => !r.completed);
     const completedList = sorted.filter(r => r.completed);
 
@@ -158,6 +161,17 @@ export const ProjectDetailView = memo(function ProjectDetailView({
       completionPercentage: percentage
     };
   }, [reminders, project]);
+
+  // Local state for optimistic reorder (visual only during drag)
+  const [localOrder, setLocalOrder] = useState<Reminder[]>(active);
+
+  useEffect(() => {
+    setLocalOrder(active);
+  }, [active]);
+
+  const handleReorderCommit = useCallback((orderedIds: string[]) => {
+    onReorder?.(orderedIds);
+  }, [onReorder]);
 
   const hasContent = active.length > 0 || completed.length > 0;
 
@@ -262,19 +276,12 @@ export const ProjectDetailView = memo(function ProjectDetailView({
           style={scrollStyle}
         >
           {/* Active reminders */}
-          <AnimatePresence mode="popLayout" initial={false}>
-            {active.map((reminder, index) => (
-              <motion.div
-                key={reminder.id}
-                initial={false}
-                animate={{ opacity: 1 }}
-                exit={CARD_ANIMATION.exit}
-                className="premium-reminder-card-wrapper"
-              >
-                {cardRenderer(reminder, index)}
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          <ReorderableReminderList
+            reminders={localOrder}
+            onReorder={setLocalOrder}
+            onReorderCommit={handleReorderCommit}
+            renderCard={cardRenderer}
+          />
 
           {/* Completed section */}
           {completed.length > 0 && (

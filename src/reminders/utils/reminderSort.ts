@@ -43,6 +43,19 @@ export function sortReminders(reminders: Reminder[]): Reminder[] {
 }
 
 /**
+ * Sort reminders by file line order (for manual sort mode).
+ * Incomplete reminders first, then by line number ascending.
+ */
+export function sortRemindersByFileOrder(reminders: Reminder[]): Reminder[] {
+  return [...reminders].sort((a, b) => {
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1;
+    }
+    return (a.lineNumber ?? Infinity) - (b.lineNumber ?? Infinity);
+  });
+}
+
+/**
  * Get reminders due today
  */
 export function getTodayReminders(reminders: Reminder[]): Reminder[] {

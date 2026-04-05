@@ -533,6 +533,7 @@ export function indexedToReminder(indexed: IndexedReminder): Reminder {
     project: indexed.project,
     fileLink: indexed.filePath, // Map filePath to fileLink
     recurrence: indexed.recurrence,
+    lineNumber: indexed.lineNumber,
     // Generate placeholder timestamps (not stored in markdown)
     createdAt: now,
     updatedAt: now,

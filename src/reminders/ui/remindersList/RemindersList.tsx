@@ -1,13 +1,14 @@
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
-import { sortReminders, getUpcomingReminders, groupRemindersByDate, formatDateHeader, isReminderOverdue, STAGGERED_CARD_ANIMATION } from "@/reminders";
+import { sortReminders, sortRemindersByFileOrder, getUpcomingReminders, groupRemindersByDate, formatDateHeader, isReminderOverdue, STAGGERED_CARD_ANIMATION } from "@/reminders";
 
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { indexedToReminder, type IndexedReminder } from "@/reminders/data/reminderIndex";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
+import { ReorderableReminderList } from "@/reminders/components/ReorderableReminderList";
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
 import { openReminderCreationModal } from "@/reminders/ui/modals";
@@ -98,6 +99,10 @@ export const RemindersList: React.FC<Props> = ({
     void loadReminders();
   }, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken, todayPrefix]);
 
+  // Reorder support: only for project-filtered, non-today, non-upcoming views
+  const supportsReorder = !!projectFilter && !showToday && !showUpcoming;
+  const effectiveProject = projectFilter?.trim() || 'Inbox';
+
   const reminders = useMemo(() => {
     let allReminders = [...rawReminders];
 
@@ -110,11 +115,14 @@ export const RemindersList: React.FC<Props> = ({
       });
     }
 
-    // Use shared sorting: completion status → due date → priority
-    return sortReminders(allReminders);
+    // Use file order for project views (supports drag reorder), auto-sort for date views
+    return supportsReorder
+      ? sortRemindersByFileOrder(allReminders)
+      : sortReminders(allReminders);
   }, [
     rawReminders,
     projectFilter,
+    supportsReorder,
   ]);
 
   // Sync showCompleted prop to state when it changes (e.g., from widget update)
@@ -127,6 +135,26 @@ export const RemindersList: React.FC<Props> = ({
     if (!showUpcoming) return null;
     return groupRemindersByDate(reminders);
   }, [showUpcoming, reminders]);
+
+  // Local reorder state
+  const activeReminders = useMemo(() => reminders.filter(r => !r.completed), [reminders]);
+  const [localOrder, setLocalOrder] = useState<Reminder[]>(activeReminders);
+
+  useEffect(() => {
+    setLocalOrder(activeReminders);
+  }, [activeReminders]);
+
+  const handleReorderCommit = useCallback(async (orderedIds: string[]) => {
+    await plugin.storage.reorder(effectiveProject, orderedIds);
+  }, [plugin, effectiveProject]);
+
+  const renderCard = useCallback((reminder: Reminder, _index: number) => (
+    <ReminderCardWrapper
+      key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
+      reminder={reminder}
+      onUpdate={triggerRefresh}
+    />
+  ), [triggerRefresh]);
 
   const activeCount = reminders.filter(r => !r.completed).length;
   const completedCount = reminders.filter(r => r.completed).length;
@@ -226,13 +254,22 @@ export const RemindersList: React.FC<Props> = ({
         </LayoutGroup>
       ) : (
         <div className="reminders-list">
-          {reminders.map((reminder) => (
-            <ReminderCardWrapper
-              key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
-              reminder={reminder}
-              onUpdate={triggerRefresh}
+          {supportsReorder ? (
+            <ReorderableReminderList
+              reminders={localOrder}
+              onReorder={setLocalOrder}
+              onReorderCommit={handleReorderCommit}
+              renderCard={renderCard}
             />
-          ))}
+          ) : (
+            reminders.map((reminder) => (
+              <ReminderCardWrapper
+                key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
+                reminder={reminder}
+                onUpdate={triggerRefresh}
+              />
+            ))
+          )}
         </div>
       )}
     </div>

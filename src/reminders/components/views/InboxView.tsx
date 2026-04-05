@@ -1,4 +1,4 @@
-import React, { useMemo, useState, memo } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, memo } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { Inbox, ChevronDown } from 'lucide-react';
 import { Button, Divider } from '@heroui/react';
@@ -6,14 +6,14 @@ import { Button, Divider } from '@heroui/react';
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
 import { DEFAULT_PROJECT } from '../../utils/constants';
-import { sortReminders } from '../../utils/reminderSort';
+import { sortRemindersByFileOrder } from '../../utils/reminderSort';
 import { ReminderCard } from '../ReminderCard';
+import { ReorderableReminderList } from '../ReorderableReminderList';
 import { EmptyState } from '../EmptyState';
 import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,
   SCROLL_PADDING_WITH_FAB_CSS,
-  CARD_ANIMATION,
   SPRING_CONFIG_BOUNCY
 } from '../../ui/layoutConstants';
 
@@ -32,6 +32,8 @@ export interface InboxViewProps {
     showCompleted: boolean;
     count: number;
   }) => React.ReactNode;
+  /** Callback when reminders are reordered via drag */
+  onReorder?: (orderedIds: string[]) => void;
 }
 
 /**
@@ -44,32 +46,40 @@ export const InboxView = memo(function InboxView({
   renderCard,
   hasFab = true,
   className = '',
-  renderToggleButton
+  renderToggleButton,
+  onReorder,
 }: InboxViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
 
   const { active, completed } = useMemo(() => {
-    // Filter to only show reminders from the Inbox project
     const inboxReminders = reminders.filter(r =>
       (r.project || DEFAULT_PROJECT) === DEFAULT_PROJECT
     );
 
-    // Use shared sorting for active items: due date → priority
-    const sorted = sortReminders(inboxReminders);
+    const sorted = sortRemindersByFileOrder(inboxReminders);
     const activeList = sorted.filter(r => !r.completed);
 
-    // Sort completed items by updatedAt (most recently completed at bottom)
-    // This prevents reshuffling when items are completed
     const completedList = sorted
       .filter(r => r.completed)
       .sort((a, b) => {
         const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
         const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-        return timeA - timeB; // Oldest first, newest at bottom
+        return timeA - timeB;
       });
 
     return { active: activeList, completed: completedList };
   }, [reminders]);
+
+  // Local state for optimistic reorder (visual only during drag)
+  const [localOrder, setLocalOrder] = useState<Reminder[]>(active);
+
+  useEffect(() => {
+    setLocalOrder(active);
+  }, [active]);
+
+  const handleReorderCommit = useCallback((orderedIds: string[]) => {
+    onReorder?.(orderedIds);
+  }, [onReorder]);
 
   const hasContent = active.length > 0 || completed.length > 0;
 
@@ -84,7 +94,6 @@ export const InboxView = memo(function InboxView({
 
   const cardRenderer = renderCard || defaultRenderCard;
 
-  // When empty, show centered EmptyState without scrolling
   if (!hasContent) {
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
@@ -99,7 +108,6 @@ export const InboxView = memo(function InboxView({
     );
   }
 
-  // Scroll container styles
   const scrollStyle: React.CSSProperties = {
     paddingLeft: `${CONTENT_PADDING_X}px`,
     paddingRight: `${CONTENT_PADDING_X}px`,
@@ -114,19 +122,12 @@ export const InboxView = memo(function InboxView({
         className="flex-1 overflow-y-auto space-y-2 ios-scroll"
         style={scrollStyle}
       >
-        <AnimatePresence mode="popLayout" initial={false}>
-          {active.map((reminder, index) => (
-            <motion.div
-              key={reminder.id}
-              initial={animationConfig.enabled ? CARD_ANIMATION.initial : false}
-              animate={animationConfig.enabled ? CARD_ANIMATION.animate : { opacity: 1 }}
-              exit={animationConfig.enabled ? CARD_ANIMATION.exit : undefined}
-              style={{ marginBottom: '0.5rem' }}
-            >
-              {cardRenderer(reminder, index)}
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        <ReorderableReminderList
+          reminders={localOrder}
+          onReorder={setLocalOrder}
+          onReorderCommit={handleReorderCommit}
+          renderCard={cardRenderer}
+        />
 
         {/* Completed section */}
         {completed.length > 0 && (
@@ -190,17 +191,20 @@ export const InboxView = memo(function InboxView({
                       <motion.div
                         key={reminder.id}
                         layout="position"
-                        initial={animationConfig.enabled ? CARD_ANIMATION.initial : false}
+                        initial={animationConfig.enabled ? { opacity: 0, y: 6 } : false}
                         animate={animationConfig.enabled ? {
-                          ...CARD_ANIMATION.animate,
+                          opacity: 1,
+                          y: 0,
                           transition: {
-                            ...CARD_ANIMATION.animate.transition,
-                            delay: index * 0.03
+                            duration: 0.4,
+                            delay: index * 0.03,
+                            ease: [0.4, 0, 0.2, 1] as const
                           }
                         } : { opacity: 1 }}
                         exit={animationConfig.enabled ? {
-                          ...CARD_ANIMATION.exit,
-                          x: 20 // Exit to right for completed items
+                          opacity: 0,
+                          x: 20,
+                          transition: { duration: 0.25, ease: [0.4, 0, 1, 1] as const }
                         } : undefined}
                         style={{ marginBottom: '0.5rem' }}
                       >
