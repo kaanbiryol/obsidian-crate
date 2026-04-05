@@ -107,6 +107,14 @@ function setSyncStatus(engine: SyncEngine, status: 'idle' | 'syncing' | 'error')
 	(engine as unknown as { state: { status: 'idle' | 'syncing' | 'error' } }).state.status = status;
 }
 
+function getConsecutiveCheckFailures(engine: SyncEngine): number {
+	return (engine as unknown as { consecutiveCheckFailures: number }).consecutiveCheckFailures;
+}
+
+async function runPeriodicCheck(engine: SyncEngine): Promise<void> {
+	await (engine as unknown as { periodicCheck(): Promise<void> }).periodicCheck();
+}
+
 function createSyncResult(): SyncResult {
 	return createEmptySyncResult();
 }
@@ -1320,5 +1328,67 @@ describe('SyncEngine abort-on-destroy', () => {
 
 		expect(result.errors).toHaveLength(0);
 		expect(harness.engine.getState().status).not.toBe('error');
+	});
+});
+
+describe('SyncEngine periodic check backoff', () => {
+	it('increments failure counter on consecutive check failures', async () => {
+		const harness = createHarness({ syncInterval: 60 });
+		setEngineLocalManifest(harness.engine, harness.localManifest);
+		harness.api.checkForChanges.mockRejectedValue(new Error('network error'));
+
+		await runPeriodicCheck(harness.engine);
+		expect(getConsecutiveCheckFailures(harness.engine)).toBe(1);
+
+		// Advance time past the 1x backoff window (60s)
+		vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000);
+		await runPeriodicCheck(harness.engine);
+		expect(getConsecutiveCheckFailures(harness.engine)).toBe(2);
+
+		vi.restoreAllMocks();
+	});
+
+	it('resets failure counter on successful check', async () => {
+		const harness = createHarness({ syncInterval: 60 });
+		setEngineLocalManifest(harness.engine, harness.localManifest);
+
+		// Fail first
+		harness.api.checkForChanges.mockRejectedValueOnce(new Error('network error'));
+		await runPeriodicCheck(harness.engine);
+		expect(getConsecutiveCheckFailures(harness.engine)).toBe(1);
+
+		// Succeed next (advance time past backoff window)
+		vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 120_000);
+		harness.api.checkForChanges.mockResolvedValueOnce({ hasChanges: false });
+		await runPeriodicCheck(harness.engine);
+		expect(getConsecutiveCheckFailures(harness.engine)).toBe(0);
+
+		vi.restoreAllMocks();
+	});
+
+	it('skips check within backoff window after failure', async () => {
+		const harness = createHarness({ syncInterval: 60 });
+		setEngineLocalManifest(harness.engine, harness.localManifest);
+		harness.api.checkForChanges.mockRejectedValue(new Error('network error'));
+
+		// First failure
+		await runPeriodicCheck(harness.engine);
+		expect(harness.api.checkForChanges).toHaveBeenCalledTimes(1);
+
+		// Immediate retry should be skipped (within 1x backoff = 60s)
+		await runPeriodicCheck(harness.engine);
+		expect(harness.api.checkForChanges).toHaveBeenCalledTimes(1);
+	});
+
+	it('resets backoff on updateSettings', async () => {
+		const harness = createHarness({ syncInterval: 60 });
+		setEngineLocalManifest(harness.engine, harness.localManifest);
+		harness.api.checkForChanges.mockRejectedValue(new Error('network error'));
+
+		await runPeriodicCheck(harness.engine);
+		expect(getConsecutiveCheckFailures(harness.engine)).toBe(1);
+
+		harness.engine.updateSettings({ ...harness.settings, syncInterval: 60 });
+		expect(getConsecutiveCheckFailures(harness.engine)).toBe(0);
 	});
 });

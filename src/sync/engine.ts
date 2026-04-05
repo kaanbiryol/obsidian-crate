@@ -66,6 +66,7 @@ const INITIAL_SYNC_PIPELINE_CHUNK_FILES = 500;
 const BATCH_UPLOAD_CONCURRENCY = 5;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
+const MAX_CHECK_BACKOFF_MULTIPLIER = 32;
 
 export class SyncEngine {
 	private plugin: Plugin;
@@ -85,6 +86,8 @@ export class SyncEngine {
 	private pluginIgnorePaths: Set<string>;
 	private destroyed = false;
 	private abortController = new AbortController();
+	private consecutiveCheckFailures = 0;
+	private lastCheckAttempt = 0;
 
 	constructor(
 		plugin: Plugin,
@@ -140,6 +143,8 @@ export class SyncEngine {
 		this.patternCache.clear();
 		this.settings = settings;
 		this.ignoredDirPrefixes = settings.ignorePatterns.filter(p => p.endsWith('/'));
+		this.consecutiveCheckFailures = 0;
+		this.lastCheckAttempt = 0;
 
 		// Restart periodic sync with new interval
 		this.stopPeriodicSync();
@@ -181,19 +186,41 @@ export class SyncEngine {
 		if (this.state.status === 'syncing') return;
 		if (!this.api.isConfigured()) return;
 
+		if (this.consecutiveCheckFailures > 0) {
+			const multiplier = Math.min(
+				2 ** (this.consecutiveCheckFailures - 1),
+				MAX_CHECK_BACKOFF_MULTIPLIER,
+			);
+			const backoffMs = this.settings.syncInterval * 1000 * multiplier;
+			if (Date.now() - this.lastCheckAttempt < backoffMs) {
+				return;
+			}
+		}
+		this.lastCheckAttempt = Date.now();
+
 		try {
 			const { hasChanges } = await this.api.checkForChanges(this.settings.lastSeq);
 
 			if (!hasChanges && this.pendingPaths.size === 0) {
 				logger.debug('Periodic check: no changes');
+				this.consecutiveCheckFailures = 0;
 				return;
 			}
 
 			logger.info('Periodic check: changes detected, running sync');
 			const result = await this.sync();
 			notifyConflicts(result.conflicts);
+			this.consecutiveCheckFailures = 0;
 		} catch (error) {
-			logger.warn('Periodic check failed:', errorMessage(error));
+			this.consecutiveCheckFailures++;
+			const multiplier = Math.min(
+				2 ** (this.consecutiveCheckFailures - 1),
+				MAX_CHECK_BACKOFF_MULTIPLIER,
+			);
+			logger.warn(
+				`Periodic check failed (attempt ${this.consecutiveCheckFailures}, next in ~${multiplier}x interval):`,
+				errorMessage(error),
+			);
 		}
 	}
 

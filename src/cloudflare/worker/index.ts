@@ -67,7 +67,7 @@ export default {
 		if (!token) {
 			return corsResponse({ error: 'Unauthorized' }, 401);
 		}
-		const fallbackAuthToken = env.AUTH_TOKEN.trim();
+		const fallbackAuthToken = (env.AUTH_TOKEN ?? '').trim();
 
 		let authenticated = false;
 		if (db) {

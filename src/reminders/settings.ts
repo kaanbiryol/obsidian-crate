@@ -107,10 +107,6 @@ export function normalizeRemindersFolderPath(rawPath: string | null | undefined)
 	}
 
 	const segments = normalized.split('/');
-	if (segments.length === 0) {
-		return DEFAULT_REMINDERS_FOLDER_PATH;
-	}
-
 	const safeSegments: string[] = [];
 	for (const segment of segments) {
 		const safeSegment = segment.trim();

@@ -101,9 +101,14 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
   if (isoDateMatch) {
     hasTime = isoDateMatch[1].includes('T');
     dueDate = hasTime ? new Date(isoDateMatch[1]) : parseLocalDateKey(isoDateMatch[1]);
-    datePart = isoDateMatch[0]; // Keep the full match (with @ if present)
-    if (taskContent.includes(isoDateMatch[0])) {
-      taskContent = taskContent.replace(isoDateMatch[0], '').trim();
+    if (isNaN(dueDate.getTime())) {
+      dueDate = undefined;
+      hasTime = undefined;
+    } else {
+      datePart = isoDateMatch[0]; // Keep the full match (with @ if present)
+      if (taskContent.includes(isoDateMatch[0])) {
+        taskContent = taskContent.replace(isoDateMatch[0], '').trim();
+      }
     }
   } else {
     // Use chrono-node to naturally find and parse dates in the content
@@ -203,7 +208,7 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
 /**
  * Rebuild content string with new date and priority
  */
-export function rebuildReminderContent(cleanContent: string, dueDate: Date | undefined, priority: Priority): string {
+export function rebuildReminderContent(cleanContent: string, dueDate: Date | undefined, priority: Priority, hasTime?: boolean): string {
   let newContent = cleanContent;
 
   // Add date if present (without @ prefix)
@@ -211,10 +216,10 @@ export function rebuildReminderContent(cleanContent: string, dueDate: Date | und
     const year = dueDate.getFullYear();
     const month = (dueDate.getMonth() + 1).toString().padStart(2, '0');
     const day = dueDate.getDate().toString().padStart(2, '0');
-    const hours = dueDate.getHours().toString().padStart(2, '0');
-    const minutes = dueDate.getMinutes().toString().padStart(2, '0');
 
-    if (dueDate.getHours() !== 0 || dueDate.getMinutes() !== 0) {
+    if (hasTime) {
+      const hours = dueDate.getHours().toString().padStart(2, '0');
+      const minutes = dueDate.getMinutes().toString().padStart(2, '0');
       newContent += ` ${year}-${month}-${day}T${hours}:${minutes}`;
     } else {
       newContent += ` ${year}-${month}-${day}`;
