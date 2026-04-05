@@ -138,6 +138,8 @@ export function normalizeCrateSettings(
 		showStatusBar: normalizeBoolean(value?.showStatusBar, DEFAULT_SETTINGS.showStatusBar),
 		syncHistory: normalizeSyncHistory(value?.syncHistory),
 		pushEnabled: normalizeBoolean(value?.pushEnabled, DEFAULT_SETTINGS.pushEnabled),
+		syncDebugLogging: normalizeBoolean(value?.syncDebugLogging, DEFAULT_SETTINGS.syncDebugLogging),
+		debounceDelay: normalizeNonNegativeInteger(value?.debounceDelay, DEFAULT_SETTINGS.debounceDelay),
 	};
 }
 

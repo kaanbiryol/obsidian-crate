@@ -213,6 +213,8 @@ export interface CrateSettings {
 	showStatusBar: boolean;
 	syncHistory: SyncHistoryEntry[];
 	pushEnabled: boolean;
+	syncDebugLogging: boolean;
+	debounceDelay: number; // seconds
 }
 
 export interface SharedSettings {
@@ -243,6 +245,8 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	showStatusBar: true,
 	syncHistory: [],
 	pushEnabled: false,
+	syncDebugLogging: false,
+	debounceDelay: 5,
 };
 
 // ============================================================================

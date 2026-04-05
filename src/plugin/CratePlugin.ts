@@ -28,7 +28,7 @@ import {
 } from '../sync/plugin-integration';
 import { SyncRuntime } from '../sync/runtime';
 import { CrateSettingTab } from '../ui/settings-tab';
-import { createLogger, errorMessage } from './logger';
+import { configureSyncLogger, createLogger, errorMessage } from './logger';
 import { SecretStorageService } from './secret-storage';
 import { normalizeCrateSettings, type CrateSettings } from './settings';
 
@@ -104,6 +104,7 @@ export default class CratePlugin extends Plugin {
 	async loadSettings(): Promise<void> {
 		const data = await this.loadData() as Partial<CrateSettings> | null;
 		this.settings = normalizeCrateSettings(data, this.app.vault.configDir);
+		configureSyncLogger({ enabled: this.settings.syncDebugLogging });
 	}
 
 	async saveSettings(): Promise<void> {

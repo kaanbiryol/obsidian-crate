@@ -60,6 +60,28 @@ describe('normalizeCrateSettings', () => {
 			},
 		]);
 		expect(settings.pushEnabled).toBe(true);
+		expect(settings.syncDebugLogging).toBe(DEFAULT_SETTINGS.syncDebugLogging);
+		expect(settings.debounceDelay).toBe(DEFAULT_SETTINGS.debounceDelay);
+	});
+
+	it('preserves valid syncDebugLogging and debounceDelay values', () => {
+		const settings = normalizeCrateSettings({
+			syncDebugLogging: true,
+			debounceDelay: 10,
+		}, 'vault-config');
+
+		expect(settings.syncDebugLogging).toBe(true);
+		expect(settings.debounceDelay).toBe(10);
+	});
+
+	it('rejects invalid syncDebugLogging and debounceDelay values', () => {
+		const settings = normalizeCrateSettings({
+			syncDebugLogging: 'yes' as never,
+			debounceDelay: -3,
+		}, 'vault-config');
+
+		expect(settings.syncDebugLogging).toBe(DEFAULT_SETTINGS.syncDebugLogging);
+		expect(settings.debounceDelay).toBe(DEFAULT_SETTINGS.debounceDelay);
 	});
 
 	it('always includes the workspace ignore pattern for the active config directory', () => {

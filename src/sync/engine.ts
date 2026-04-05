@@ -49,7 +49,7 @@ import type {
 	FileEntry,
 	CrateSettings,
 } from '../plugin/types';
-import { DEBOUNCE_DELAY_MS, MAX_DEBOUNCE_WAIT_MS } from '../plugin/types';
+import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/types';
 
 const logger = createLogger('SyncEngine');
 
@@ -426,7 +426,8 @@ export class SyncEngine {
 	 * Debounced sync trigger
 	 */
 	private debouncedSync(): void {
-		runDebouncedQueueSync(this.getQueueDebounceContext(), DEBOUNCE_DELAY_MS, MAX_DEBOUNCE_WAIT_MS);
+		const delayMs = (this.settings.debounceDelay ?? 5) * 1000;
+		runDebouncedQueueSync(this.getQueueDebounceContext(), delayMs, MAX_DEBOUNCE_WAIT_MS);
 	}
 
 	/**

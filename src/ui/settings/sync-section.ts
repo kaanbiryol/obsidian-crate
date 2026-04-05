@@ -1,5 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
+import { configureSyncLogger } from '../../plugin/logger';
 import type { SyncState } from '../../plugin/types';
 import { createFileSyncProgress, hideFileSyncProgress, runButtonTask, showFileSyncProgress, updateFileSyncProgress } from './action-helpers';
 import { createSettingsSectionHeading } from './section-helpers';
@@ -142,6 +143,30 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 				plugin.settings.showStatusBar = value;
 				await plugin.saveSettings();
 				plugin.syncRuntime.updateStatusBar(value);
+			}));
+
+	new Setting(containerEl)
+		.setName('Debounce delay')
+		.setDesc('Seconds to wait after a file change before syncing (0 to sync immediately)')
+		.addText(text => text
+			.setValue(String(plugin.settings.debounceDelay))
+			.onChange(async (value) => {
+				const delay = parseInt(value, 10);
+				if (!isNaN(delay) && delay >= 0) {
+					plugin.settings.debounceDelay = delay;
+					await plugin.saveSettings();
+				}
+			}));
+
+	new Setting(containerEl)
+		.setName('Debug logging')
+		.setDesc('Enable verbose sync logging to the developer console')
+		.addToggle(toggle => toggle
+			.setValue(plugin.settings.syncDebugLogging)
+			.onChange(async (value) => {
+				plugin.settings.syncDebugLogging = value;
+				await plugin.saveSettings();
+				configureSyncLogger({ enabled: value });
 			}));
 
 	return cleanup;
