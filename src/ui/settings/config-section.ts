@@ -111,9 +111,9 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 		new Setting(containerEl)
 			.setName('Connected account')
 			.setDesc(plugin.settings.cloudflareAccountId)
-			.addExtraButton(button => button
-				.setIcon('x')
-				.setTooltip('Sign out')
+			.addButton(button => button
+				.setButtonText('Log out')
+				.setWarning()
 				.onClick(async () => {
 					await plugin.syncRuntime.clearSyncConfiguration({ clearCloudflareCredentials: true });
 					new Notice('Signed out and configuration cleared');

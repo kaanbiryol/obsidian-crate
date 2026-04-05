@@ -13,12 +13,6 @@ export function renderUsageSection(context: UsageSectionContext): void {
 	const { containerEl } = context;
 	createSettingsSectionHeading(containerEl, 'Usage');
 
-	const usageContainer = containerEl.createDiv({ cls: 'crate-usage-container' });
-	usageContainer.createEl('p', {
-		text: 'Select refresh to load usage metrics.',
-		cls: 'setting-item-description',
-	});
-
 	new Setting(containerEl)
 		.setName('Refresh metrics')
 		.setDesc('Fetch the latest usage metrics')
@@ -44,6 +38,7 @@ export function renderUsageSection(context: UsageSectionContext): void {
 				});
 			}));
 
+	const usageContainer = containerEl.createDiv({ cls: 'crate-usage-container' });
 }
 
 async function loadUsageData(context: UsageSectionContext, container: HTMLElement): Promise<void> {
