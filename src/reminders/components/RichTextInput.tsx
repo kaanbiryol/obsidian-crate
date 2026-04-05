@@ -268,6 +268,21 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         }
     }, [autoFocus]);
 
+    // Handle link clicks in contentEditable: Cmd/Ctrl+Click opens the URL, regular click positions cursor
+    const handleClick = useCallback((e: React.MouseEvent) => {
+        const target = e.target as HTMLElement;
+        const linkEl = target.closest('a[data-markdown-link]');
+        if (linkEl instanceof HTMLAnchorElement) {
+            e.preventDefault();
+            if (e.metaKey || e.ctrlKey) {
+                const url = linkEl.getAttribute('href');
+                if (url) {
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                }
+            }
+        }
+    }, []);
+
     // Handle keydown - autocomplete gets first chance to consume the event
     const handleKeyDownInternal = (e: React.KeyboardEvent) => {
         if (onAutocompleteKeyDown?.(e)) return;
@@ -315,6 +330,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 inputMode="text"
                 autoFocus={autoFocus}
                 onInput={handleInput}
+                onClick={handleClick}
                 onKeyDown={handleKeyDownInternal}
                 onPaste={handlePaste}
                 onFocus={onFocus}

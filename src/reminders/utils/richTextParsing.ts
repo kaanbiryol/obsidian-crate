@@ -1,12 +1,15 @@
 import * as chrono from 'chrono-node';
 import { getFontWeight } from '../ui/themes';
 import { findStandalonePriorityMarkerIndexes } from './priorityMarker';
+import { parseMarkdownLinks, isSafeUrl } from './markdownLinks';
 
 export interface TextMatch {
     text: string;
     index: number;
     length: number;
-    type: 'priority' | 'date' | 'project';
+    type: 'priority' | 'date' | 'project' | 'link';
+    linkText?: string;
+    linkUrl?: string;
 }
 
 /**
@@ -94,15 +97,10 @@ export const findProjectMatches = (text: string, knownProjects?: string[]): Text
     const coveredRanges: Array<{ start: number; end: number }> = [];
 
     // First, find all markdown link ranges to exclude
-    const linkRanges: Array<{ start: number; end: number }> = [];
-    const linkRegex = /\[([^\]]*)\]\([^)]*\)/g;
-    let linkMatch;
-    while ((linkMatch = linkRegex.exec(text)) !== null) {
-        linkRanges.push({
-            start: linkMatch.index,
-            end: linkMatch.index + linkMatch[0].length
-        });
-    }
+    const linkRanges = parseMarkdownLinks(text).map(link => ({
+        start: link.index,
+        end: link.index + link.fullMatch.length
+    }));
 
     // Helper to check if a position overlaps with already matched ranges
     const isRangeCovered = (start: number, length: number): boolean => {
@@ -310,12 +308,30 @@ export const findDateMatches = (text: string): TextMatch[] => {
 };
 
 /**
- * Find all matches (priorities, projects, dates) in text
+ * Find all markdown link matches in text
+ */
+export const findLinkMatches = (text: string): TextMatch[] => {
+    return parseMarkdownLinks(text)
+        .filter(link => isSafeUrl(link.url))
+        .map(link => ({
+            text: link.fullMatch,
+            index: link.index,
+            length: link.fullMatch.length,
+            type: 'link' as const,
+            linkText: link.text,
+            linkUrl: link.url,
+        }));
+};
+
+/**
+ * Find all matches (links, priorities, projects, dates) in text
+ * Links are matched first so their contents don't get misidentified as other types.
  * @param text The text to search
  * @param knownProjects Optional array of known project names for multi-word matching
  */
 export const findAllMatches = (text: string, knownProjects?: string[]): TextMatch[] => {
     const allMatches = [
+        ...findLinkMatches(text),
         ...findPriorityMatches(text),
         ...findProjectMatches(text, knownProjects),
         ...findDateMatches(text)
@@ -358,9 +374,13 @@ export const buildHTML = (text: string, knownProjects?: string[]): string => {
             parts.push(escapeHTML(beforeText));
         }
 
-        // Add chip span
-        const chipHTML = createChipHTML(match.type, match.text);
-        parts.push(chipHTML);
+        if (match.type === 'link' && match.linkText !== undefined && match.linkUrl !== undefined) {
+            parts.push(
+                `<a href="${escapeHTML(match.linkUrl)}" class="reminder-markdown-link" data-markdown-link="true" target="_blank" rel="noopener noreferrer">${escapeHTML(match.linkText)}</a>`
+            );
+        } else {
+            parts.push(createChipHTML(match.type, match.text));
+        }
 
         lastIndex = match.index + match.length;
     });
@@ -385,6 +405,10 @@ export const getPlainText = (element: HTMLElement | null): string => {
             text += node.textContent || '';
         } else if (node.nodeName === 'BR') {
             text += '\n';
+        } else if (node.nodeName === 'A' && (node as HTMLElement).hasAttribute('data-markdown-link')) {
+            const linkText = node.textContent || '';
+            const href = (node as HTMLAnchorElement).getAttribute('href') || '';
+            text += `[${linkText}](${href})`;
         } else if (node.childNodes) {
             node.childNodes.forEach(walk);
         }

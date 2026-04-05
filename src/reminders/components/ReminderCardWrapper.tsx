@@ -99,6 +99,12 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
         return;
       }
 
+      // Allow markdown link clicks to open in browser (don't open edit modal)
+      if (target.closest('a[data-markdown-link]')) {
+        e.stopPropagation();
+        return;
+      }
+
       // Handle card clicks (edit)
       handleEdit();
     };

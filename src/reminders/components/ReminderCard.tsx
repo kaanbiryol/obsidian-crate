@@ -3,8 +3,46 @@ import { motion } from 'framer-motion';
 import { Clock, Flag, Check, Hash, Repeat } from 'lucide-react';
 import { getProjectColor } from '../utils/projectColors';
 import { formatDueDate, isReminderOverdue } from '../utils/dateFormatting';
+import { parseMarkdownLinks, isSafeUrl } from '../utils/markdownLinks';
 import type { AnimationConfig } from '../types/componentAdapter';
 import type { RecurrenceRule } from '../types/reminder';
+
+function renderContentWithLinks(content: string): React.ReactNode[] {
+    const links = parseMarkdownLinks(content);
+    if (links.length === 0) return [content];
+
+    const elements: React.ReactNode[] = [];
+    let lastIndex = 0;
+
+    for (const link of links) {
+        if (link.index > lastIndex) {
+            elements.push(content.slice(lastIndex, link.index));
+        }
+        if (isSafeUrl(link.url)) {
+            elements.push(
+                <a
+                    key={link.index}
+                    href={link.url}
+                    className="reminder-markdown-link"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-markdown-link="true"
+                >
+                    {link.text}
+                </a>
+            );
+        } else {
+            elements.push(link.text);
+        }
+        lastIndex = link.index + link.fullMatch.length;
+    }
+
+    if (lastIndex < content.length) {
+        elements.push(content.slice(lastIndex));
+    }
+
+    return elements;
+}
 
 
 interface ReminderData {
@@ -104,7 +142,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                     {/* Title row */}
                     <div className="premium-reminder-title-row">
                         <span className={`premium-reminder-title ${reminder.completed ? 'is-completed' : ''}`}>
-                            {reminder.content}
+                            {renderContentWithLinks(reminder.content)}
                         </span>
 
                         {/* Priority flag */}

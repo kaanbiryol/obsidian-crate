@@ -146,9 +146,10 @@ interface RemindersViewContentProps {
     onClose?: () => void;
     initialTab?: TabId;
     initialProject?: string;
+    hideTabBar?: boolean;
 }
 
-export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, shadowRoot, isFullScreen = false, onClose, initialTab, initialProject }) => {
+export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, shadowRoot, isFullScreen = false, onClose, initialTab, initialProject, hideTabBar = false }) => {
     const isDarkMode = useObsidianDarkMode();
     const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? "browse" : (initialTab ?? "inbox"));
     const [isTransitioning, setIsTransitioning] = useState(false);
@@ -353,7 +354,9 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
 
     return (
         <HeroUIProvider>
-            <div className={`reminders-view ${isDarkMode ? "dark" : ""} ${isFullScreen ? "is-fullscreen" : ""} ${onClose ? "is-modal" : ""}`}>
+            <div
+                className={`reminders-view ${isDarkMode ? "dark" : ""} ${isFullScreen ? "is-fullscreen" : ""} ${onClose ? "is-modal" : ""} ${hideTabBar ? "is-compact" : ""}`}
+            >
                 {/* Close button for modal mode */}
                 {onClose && (
                     <ShadowDOMNativeButton
@@ -520,11 +523,13 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
                 </div>
 
                 {/* Bottom Tab Bar */}
-                <BottomTabBar
-                    activeTab={viewMode}
-                    onTabChange={handleViewModeChange}
-                    className="animated-tab-bar animated-tab-bar-bottom"
-                />
+                {!hideTabBar && (
+                    <BottomTabBar
+                        activeTab={viewMode}
+                        onTabChange={handleViewModeChange}
+                        className="animated-tab-bar animated-tab-bar-bottom"
+                    />
+                )}
 
                 {/* Floating Action Button */}
                 <AnimatePresence>

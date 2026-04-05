@@ -431,8 +431,8 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px 8px 10px;
-    margin: 16px 16px 8px;
+    padding: 6px 12px 6px 8px;
+    margin: 10px 16px 4px;
     width: fit-content;
     flex-shrink: 0;
     font-size: 13px;
@@ -501,9 +501,9 @@
 
 .premium-hero-card {
     position: relative;
-    margin: 16px 16px 16px;
-    padding: 20px;
-    border-radius: 16px;
+    margin: 4px 16px 12px;
+    padding: 14px;
+    border-radius: 14px;
     overflow: hidden;
 
     background: rgba(255, 255, 255, 0.04);
@@ -530,11 +530,11 @@
 }
 
 .premium-hero-title {
-    font-size: 24px;
+    font-size: 18px;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--text-normal);
-    margin: 0 0 4px;
+    margin: 0;
     line-height: 1.2;
 }
 
@@ -578,7 +578,7 @@
 }
 
 .premium-ring-percentage {
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--text-normal);
 }
@@ -590,17 +590,17 @@
 .premium-stats-row {
     position: relative;
     display: flex;
-    gap: 12px;
-    margin-top: 16px;
+    gap: 10px;
+    margin-top: 10px;
 }
 
 .premium-stat-pill {
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
-    border-radius: 12px;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
 
     // Glass effect
     background: rgba(255, 255, 255, 0.02);
@@ -624,7 +624,7 @@
 }
 
 .premium-stat-number {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--text-normal);
     line-height: 1;
@@ -757,6 +757,27 @@
         text-decoration-color: var(--text-faint);
         text-decoration-thickness: 1.5px;
     }
+}
+
+.reminder-markdown-link {
+    color: hsl(var(--heroui-primary));
+    text-decoration: none;
+    cursor: pointer;
+    border-bottom: 1px solid hsl(var(--heroui-primary) / 0.3);
+    transition: border-color 200ms ease-out, color 200ms ease-out;
+
+    &:hover {
+        border-bottom-color: hsl(var(--heroui-primary) / 0.7);
+    }
+
+    .is-completed & {
+        color: var(--text-muted);
+        border-bottom-color: transparent;
+    }
+}
+
+[contenteditable] .reminder-markdown-link {
+    cursor: text;
 }
 
 .premium-priority-flag {
@@ -970,6 +991,18 @@
             margin-bottom: var(--reminders-tabbar-bottom-offset);
         }
     }
+}
+
+// ============================================
+// Compact Mode (no tab bar, tighter spacing)
+// ============================================
+
+.reminders-view.is-modal.is-compact {
+    --reminders-tabbar-overlay: 0px;
+    --reminders-safe-area: 0px;
+    --reminders-fab-gap: 8px;
+    --reminders-bottom-gap: 8px;
+    --reminders-tabbar-bottom-offset: 0px;
 }
 
 // ============================================

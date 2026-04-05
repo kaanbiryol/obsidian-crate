@@ -225,7 +225,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
               <RingProgress
                 percentage={completionPercentage}
                 accentColor={accentColor}
-                size={72}
+                size={52}
               />
             </div>
           )}
