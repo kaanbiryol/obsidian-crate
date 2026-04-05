@@ -1,6 +1,28 @@
-import { Notice } from "obsidian";
+import { FuzzySuggestModal, Notice } from "obsidian";
 import type CratePlugin from "@/main";
-import { openReminderCreationModal } from "@/reminders/ui/modals";
+import { openFullScreenReminderModal, openReminderCreationModal } from "@/reminders/ui/modals";
+
+class ProjectSuggestModal extends FuzzySuggestModal<string> {
+  private readonly plugin: CratePlugin;
+
+  constructor(plugin: CratePlugin) {
+    super(plugin.app);
+    this.plugin = plugin;
+    this.setPlaceholder("Switch to project...");
+  }
+
+  getItems(): string[] {
+    return this.plugin.storage.getProjects();
+  }
+
+  getItemText(item: string): string {
+    return item;
+  }
+
+  onChooseItem(item: string): void {
+    openFullScreenReminderModal(this.plugin, item);
+  }
+}
 
 export function registerReminderCommands(plugin: CratePlugin) {
   plugin.addCommand({
@@ -8,6 +30,19 @@ export function registerReminderCommands(plugin: CratePlugin) {
     name: "Create reminder",
     callback: () => {
       openReminderCreationModal(plugin);
+    },
+  });
+
+  plugin.addCommand({
+    id: "open-project",
+    name: "Open project",
+    callback: () => {
+      const projects = plugin.storage.getProjects();
+      if (projects.length === 0) {
+        new Notice("No projects found. Create a reminder first.");
+        return;
+      }
+      new ProjectSuggestModal(plugin).open();
     },
   });
 
