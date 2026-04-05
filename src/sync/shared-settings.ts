@@ -21,28 +21,6 @@ function normalizeStringArray(value: unknown): string[] | null {
 	return [...normalized];
 }
 
-function parseBooleanParam(value: string | undefined): boolean | undefined {
-	if (value === undefined) {
-		return undefined;
-	}
-	if (value === 'true') {
-		return true;
-	}
-	if (value === 'false') {
-		return false;
-	}
-	return undefined;
-}
-
-function parseNonNegativeIntegerParam(value: string | undefined): number | undefined {
-	if (value === undefined) {
-		return undefined;
-	}
-
-	const parsed = Number.parseInt(value, 10);
-	return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
-}
-
 type SharedSettingsTarget = Pick<
 	CrateSettings,
 	'ignorePatterns' | 'syncOnStartup' | 'syncInterval' | 'showStatusBar' | 'pushEnabled'
@@ -54,46 +32,6 @@ export function applySharedSettings(target: SharedSettingsTarget, shared: Shared
 	target.syncInterval = shared.syncInterval;
 	target.showStatusBar = shared.showStatusBar;
 	target.pushEnabled = shared.pushEnabled;
-}
-
-export function parseSharedSettingsFromSetupParams(
-	params: Record<string, string>,
-): Partial<SharedSettings> {
-	const update: Partial<SharedSettings> = {};
-
-	if (params['ignorePatterns']) {
-		try {
-			const parsed = JSON.parse(params['ignorePatterns']) as unknown;
-			const ignorePatterns = normalizeStringArray(parsed);
-			if (ignorePatterns) {
-				update.ignorePatterns = ignorePatterns;
-			}
-		} catch {
-			// Keep existing ignore patterns when parsing fails.
-		}
-	}
-
-	const syncOnStartup = parseBooleanParam(params['syncOnStartup']);
-	if (syncOnStartup !== undefined) {
-		update.syncOnStartup = syncOnStartup;
-	}
-
-	const syncInterval = parseNonNegativeIntegerParam(params['syncInterval']);
-	if (syncInterval !== undefined) {
-		update.syncInterval = syncInterval;
-	}
-
-	const showStatusBar = parseBooleanParam(params['showStatusBar']);
-	if (showStatusBar !== undefined) {
-		update.showStatusBar = showStatusBar;
-	}
-
-	const pushEnabled = parseBooleanParam(params['pushEnabled']);
-	if (pushEnabled !== undefined) {
-		update.pushEnabled = pushEnabled;
-	}
-
-	return update;
 }
 
 export function normalizeSharedSettingsValue(value: unknown): SharedSettings | null {

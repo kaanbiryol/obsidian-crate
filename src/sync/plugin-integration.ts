@@ -7,7 +7,8 @@ import { notifyConflicts } from './conflict';
 import { isHiddenPath } from './file-discovery';
 import { ActivityModal } from '../ui/activity-modal';
 import { openConfirmationModal } from '../ui/confirmation-modal';
-import { applySharedSettings, parseSharedSettingsFromSetupParams } from './shared-settings';
+import { applySharedSettings } from './shared-settings';
+import { SyncApiClient } from './api';
 import { errorMessage } from '../plugin/logger';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
@@ -158,20 +159,17 @@ export async function handleSyncSetupProtocol(
 	}
 
 	try {
-		const sharedSettingsUpdate = parseSharedSettingsFromSetupParams(params);
-		if (Object.keys(sharedSettingsUpdate).length > 0) {
-			applySharedSettings(plugin.settings, {
-				ignorePatterns: sharedSettingsUpdate.ignorePatterns ?? plugin.settings.ignorePatterns,
-				syncOnStartup: sharedSettingsUpdate.syncOnStartup ?? plugin.settings.syncOnStartup,
-				syncInterval: sharedSettingsUpdate.syncInterval ?? plugin.settings.syncInterval,
-				showStatusBar: sharedSettingsUpdate.showStatusBar ?? plugin.settings.showStatusBar,
-				pushEnabled: sharedSettingsUpdate.pushEnabled ?? plugin.settings.pushEnabled,
-			});
-		}
-
 		if (params['analyticsToken']) {
 			plugin.secretStorage.set(SECRET_KEYS.ANALYTICS_TOKEN, params['analyticsToken']);
 		}
+
+		try {
+			const tempClient = new SyncApiClient(workerUrl, authToken);
+			const { settings: shared } = await tempClient.getSharedSettings();
+			if (shared) {
+				applySharedSettings(plugin.settings, shared);
+			}
+		} catch { /* best-effort */ }
 
 		await plugin.syncRuntime.applyInfrastructureConfig({
 			workerUrl,
@@ -181,6 +179,9 @@ export async function handleSyncSetupProtocol(
 			databaseId: params['databaseId'] || '',
 			accountId: params['accountId'] || undefined,
 		});
+
+		plugin.syncRuntime.pushSharedSettings().catch(() => {});
+
 		new Notice('Crate configured from setup link');
 
 		const result = await plugin.syncRuntime.testConnection();

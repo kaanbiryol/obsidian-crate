@@ -299,11 +299,5 @@ async function buildSetupLink(plugin: CratePlugin): Promise<string | null> {
 	if (plugin.settings.cloudflareAccountId) {
 		params.set('accountId', plugin.settings.cloudflareAccountId);
 	}
-	params.set('ignorePatterns', JSON.stringify(plugin.settings.ignorePatterns));
-	params.set('syncOnStartup', String(plugin.settings.syncOnStartup));
-	params.set('syncInterval', String(plugin.settings.syncInterval));
-	params.set('showStatusBar', String(plugin.settings.showStatusBar));
-	params.set('pushEnabled', String(plugin.settings.pushEnabled));
-
 	return `obsidian://crate-setup?${params.toString()}`;
 }
