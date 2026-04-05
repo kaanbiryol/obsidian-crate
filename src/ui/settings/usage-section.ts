@@ -10,27 +10,8 @@ export interface UsageSectionContext {
 }
 
 export function renderUsageSection(context: UsageSectionContext): void {
-	const { containerEl, plugin } = context;
+	const { containerEl } = context;
 	createSettingsSectionHeading(containerEl, 'Usage');
-
-	const usageHelp = containerEl.createDiv({ cls: 'setting-item-description' });
-	usageHelp.appendText('To enable usage metrics, create a read-only analytics token and paste it below. ');
-	const tokenLink = usageHelp.createEl('a', {
-		text: 'Open token page',
-		href: 'https://dash.cloudflare.com/profile/api-tokens',
-	});
-	tokenLink.target = '_blank';
-	tokenLink.rel = 'noopener noreferrer';
-
-	new Setting(containerEl)
-		.setName('Analytics token')
-		.setDesc('Optional. Create a read-only token for analytics access')
-		.addText(text => {
-			text.inputEl.type = 'password';
-			text
-				.setValue(plugin.secretStorage.get(SECRET_KEYS.ANALYTICS_TOKEN) || '')
-				.onChange(value => plugin.secretStorage.set(SECRET_KEYS.ANALYTICS_TOKEN, value));
-		});
 
 	const usageContainer = containerEl.createDiv({ cls: 'crate-usage-container' });
 	usageContainer.createEl('p', {
@@ -70,8 +51,9 @@ async function loadUsageData(context: UsageSectionContext, container: HTMLElemen
 	container.empty();
 	container.createEl('p', { text: 'Loading usage data...', cls: 'setting-item-description' });
 
+	const analyticsToken = plugin.secretStorage.get(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
 	const data = await plugin.usageService.getUsage(
-		plugin.secretStorage.get(SECRET_KEYS.ANALYTICS_TOKEN),
+		analyticsToken,
 		plugin.syncRuntime.getApiClient()
 	);
 	container.empty();

@@ -76,17 +76,14 @@ CratePlugin (main.ts)
 
 ## Authentication
 
-### OAuth 2.0 (Desktop - Infrastructure Setup)
+### Token-Based Setup
 
-1. Plugin generates PKCE code verifier + challenge
-2. Opens browser to `dash.cloudflare.com/oauth2/auth`
-3. Local HTTP server on port 8976 at `/oauth/callback`
-4. Exchanges authorization code for access token via PKCE
-5. Fetches account ID from Cloudflare API
+1. User creates a Cloudflare API token on the dashboard with permissions: Workers Scripts (Edit), Workers R2 Storage (Edit), D1 (Edit), Account Settings (Read)
+2. Plugin verifies the token via `GET /user/tokens/verify`
+3. Plugin lists accessible accounts via `GET /accounts`
+4. User selects an account; credentials are saved (token in keychain, account ID in settings)
 
-**Scopes:** `account:read`, `user:read`, `workers:write`, `workers_scripts:write`, `d1:write`, `offline_access`
-
-Access tokens are short-lived. Refresh token stored in keychain; auto-refreshed when within 60s of expiry.
+Legacy OAuth sessions with a stored refresh token are still auto-refreshed by `CloudflareSessionManager.resolveCredentials()` for backward compatibility.
 
 ### Worker Authentication
 
@@ -102,8 +99,8 @@ Four keys stored in OS keychain via `SecretStorageService`:
 |---|---|
 | `crate-auth-token` | Bearer token for worker authentication |
 | `crate-analytics-token` | Cloudflare Analytics API token (optional) |
-| `crate-cloudflare-api-token` | Cloudflare API access token (from OAuth) |
-| `crate-cloudflare-refresh-token` | OAuth refresh token |
+| `crate-cloudflare-api-token` | Cloudflare API token (user-created or legacy OAuth) |
+| `crate-cloudflare-refresh-token` | Legacy OAuth refresh token |
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes empty string to "delete" and treats empty strings as null on read.
 

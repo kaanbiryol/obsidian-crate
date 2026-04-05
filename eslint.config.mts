@@ -37,8 +37,10 @@ export default tseslint.config(
 	...obsidianmd.configs.recommended,
 	{
 		files: ['**/*.{ts,tsx,mts}'],
+		plugins: { obsidianmd },
 		rules: {
 			'no-undef': 'off',
+			'obsidianmd/ui/sentence-case': [2, { ignoreWords: ['Cloudflare', 'R2', 'D1'] }],
 		},
 	},
 	globalIgnores([

@@ -28,14 +28,6 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 
 	if (!plugin.settings.pushEnabled) return;
 
-	if (!plugin.syncRuntime.isConfigured()) {
-		containerEl.createEl('p', {
-			text: 'Set up sync first to enable push notifications.',
-			cls: 'setting-item-description',
-		});
-		return;
-	}
-
 	// Subscribe link + QR code
 	const apiClient = plugin.syncRuntime.getApiClient();
 	if (apiClient) {

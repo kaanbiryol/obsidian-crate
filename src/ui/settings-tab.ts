@@ -4,7 +4,7 @@
 
 import { App, PluginSettingTab } from 'obsidian';
 import type CratePlugin from '../main';
-import { renderConfigSection, type ManualSetupState } from './settings/config-section';
+import { renderConfigSection, type SetupWizardState } from './settings/config-section';
 import { renderInfrastructureSection } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
 import { renderUsageSection } from './settings/usage-section';
@@ -14,12 +14,10 @@ import { createSettingsRootHeading } from './settings/section-helpers';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
-	private readonly manualState: ManualSetupState = {
-		manualEntryEnabled: false,
-		manualAccountId: '',
-		manualApiToken: '',
-		manualBucketName: '',
-		manualWorkerName: '',
+	private readonly wizardState: SetupWizardState = {
+		wizardToken: '',
+		wizardTokenValidated: false,
+		wizardSelectedAccountId: '',
 	};
 	private cleanupFns: (() => void)[] = [];
 
@@ -40,6 +38,13 @@ export class CrateSettingTab extends PluginSettingTab {
 		const isConfigured = this.plugin.syncRuntime.isConfigured();
 		const hasCloudflareCredentials = this.plugin.cloudflareSession.hasCredentials();
 
+		renderConfigSection({
+			containerEl,
+			plugin: this.plugin,
+			wizardState: this.wizardState,
+			rerender: () => this.display(),
+		});
+
 		if (isConfigured) {
 			const syncCleanup = renderSyncSection({
 				containerEl,
@@ -55,11 +60,13 @@ export class CrateSettingTab extends PluginSettingTab {
 			rerender: () => this.display(),
 		});
 
-		renderNotificationsSection({
-			containerEl,
-			plugin: this.plugin,
-			rerender: () => this.display(),
-		});
+		if (isConfigured) {
+			renderNotificationsSection({
+				containerEl,
+				plugin: this.plugin,
+				rerender: () => this.display(),
+			});
+		}
 
 		if (isConfigured) {
 			renderUsageSection({
@@ -67,13 +74,6 @@ export class CrateSettingTab extends PluginSettingTab {
 				plugin: this.plugin,
 			});
 		}
-
-		renderConfigSection({
-			containerEl,
-			plugin: this.plugin,
-			manualState: this.manualState,
-			rerender: () => this.display(),
-		});
 
 		if (isConfigured || hasCloudflareCredentials) {
 			renderInfrastructureSection({

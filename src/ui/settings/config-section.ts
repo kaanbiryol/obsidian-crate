@@ -1,6 +1,11 @@
-import { Notice, Platform, requestUrl, Setting } from 'obsidian';
-import { generateAuthToken, verifyCredentials } from '../../cloudflare/api';
-import { computeTokenHash, quickSetup, refreshWorkerAuthToken } from '../../cloudflare/infrastructure';
+import { Notice, requestUrl, Setting } from 'obsidian';
+import {
+	buildCloudflareTokenTemplateUrl,
+	generateAuthToken,
+	listAccessibleAccounts,
+	verifyToken,
+} from '../../cloudflare/api';
+import { computeTokenHash, quickSetup } from '../../cloudflare/infrastructure';
 import type CratePlugin from '../../main';
 import { SECRET_KEYS } from '../../plugin/types';
 import { SyncApiClient } from '../../sync/api';
@@ -15,30 +20,24 @@ interface CloudflareCredentials {
 	apiToken: string;
 }
 
-export interface ManualSetupState {
-	manualEntryEnabled: boolean;
-	manualAccountId: string;
-	manualApiToken: string;
-	manualBucketName: string;
-	manualWorkerName: string;
+export interface SetupWizardState {
+	wizardToken: string;
+	wizardTokenValidated: boolean;
+	wizardSelectedAccountId: string;
 }
 
 export interface ConfigSectionContext {
 	containerEl: HTMLElement;
 	plugin: CratePlugin;
-	manualState: ManualSetupState;
+	wizardState: SetupWizardState;
 	rerender: () => void;
 }
 
 export function renderConfigSection(context: ConfigSectionContext): void {
-	const { containerEl, plugin, manualState, rerender } = context;
-	seedManualState(plugin, manualState);
-	const isDesktop = Platform.isDesktopApp;
+	const { containerEl, plugin, wizardState, rerender } = context;
+	seedWizardState(plugin, wizardState);
 
 	const hasCloudflareCredentials = plugin.cloudflareSession.hasCredentials();
-	if (hasCloudflareCredentials) {
-		manualState.manualEntryEnabled = false;
-	}
 
 	createSettingsSectionHeading(containerEl, 'Configuration');
 
@@ -51,169 +50,95 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 
 	if (!hasCloudflareCredentials && !isConfigured) {
 		new Setting(containerEl)
-			.setName('Cloudflare sign in')
-			.setDesc(
-				isDesktop
-					? 'Sign in via browser. Infrastructure is created automatically after authorization.'
-					: 'Desktop only. Set up on desktop first, then use "Set up another device" to copy a setup link.'
-			)
-			.addButton(button => {
-				button.setButtonText('Sign in').setCta();
-				if (!isDesktop) {
-					button.setDisabled(true);
-					button.setTooltip('Cloudflare sign-in is only available on desktop');
-					return button;
-				}
+			.setName('Create a Cloudflare API token')
+			.setDesc('Create a token with edit access to workers, R2 storage, and D1, plus read access to account settings and account analytics')
+			.addButton(button => button
+				.setButtonText('Open Cloudflare')
+				.onClick(() => {
+					window.open(buildCloudflareTokenTemplateUrl(), '_blank', 'noopener,noreferrer');
+				}));
 
-				button.onClick(async () => {
-					let loggedIn = false;
-					await runButtonTask({
-						button,
-						idleText: 'Sign in',
-						runningText: 'Waiting...',
-						progressEl: setupProgress,
-						progressMessage: 'Waiting for Cloudflare authorization...',
-						task: async ({ setProgress }) => {
-							await plugin.cloudflareSession.loginWithCloudflare();
-							loggedIn = true;
-							const creds = await plugin.cloudflareSession.resolveCredentials();
-							if (!creds) {
-								throw new Error('Cloudflare credentials are unavailable after login');
-							}
-							setProgress('Creating infrastructure...');
-							await createInfrastructureFromCredentials(plugin, manualState, creds, setProgress);
-						},
-						onSuccess: () => {
-							new Notice('Cloudflare login successful and infrastructure is ready');
-							rerender();
-						},
-						onError: (error) => {
-							const message = getErrorMessage(error);
-							if (loggedIn) {
-								new Notice(`Cloudflare login succeeded but setup failed: ${message}`);
-							} else {
-								new Notice(`Cloudflare login failed: ${message}`);
-							}
-						},
-					});
-				});
-
-				return button;
-			});
-		} else if (hasCloudflareCredentials) {
 		new Setting(containerEl)
-			.setName('Signed-in account')
-			.setDesc(
-				isDesktop
-					? plugin.settings.cloudflareAccountId
-					: `${plugin.settings.cloudflareAccountId} (re-authentication requires desktop)`
-			)
-			.addButton(button => {
-				button.setButtonText('Re-authenticate');
-				if (!isDesktop) {
-					button.setDisabled(true);
-					button.setTooltip('Cloudflare re-authentication is only available on desktop');
-					return button;
-				}
-
-				button.onClick(async () => {
-					const shouldSetup = !plugin.syncRuntime.isConfigured();
+			.setName('API token')
+			.setDesc('Paste the API token you created on the Cloudflare dashboard')
+			.addText(text => {
+				text.inputEl.type = 'password';
+				text
+					.setPlaceholder('Paste API token')
+					.setValue(wizardState.wizardToken)
+					.onChange(value => {
+						wizardState.wizardToken = value.trim();
+						if (wizardState.wizardTokenValidated) {
+							wizardState.wizardTokenValidated = false;
+							wizardState.wizardSelectedAccountId = '';
+						}
+					});
+				text.inputEl.size = 50;
+			})
+			.addButton(button => button
+				.setButtonText('Validate')
+				.onClick(async () => {
 					await runButtonTask({
 						button,
-						idleText: 'Re-authenticate',
-						runningText: 'Waiting...',
-						progressEl: shouldSetup ? setupProgress : undefined,
-						task: async ({ setProgress }) => {
-							await plugin.cloudflareSession.loginWithCloudflare();
-							if (shouldSetup) {
-								setProgress('Creating infrastructure...');
-								const creds = await plugin.cloudflareSession.resolveCredentials();
-								if (!creds) {
-									throw new Error('Cloudflare credentials are unavailable after login');
-								}
-								await createInfrastructureFromCredentials(plugin, manualState, creds, setProgress);
-							} else {
-								const connTest = await plugin.syncRuntime.testConnection();
-								if (!connTest.success) {
-									const creds = await plugin.cloudflareSession.resolveCredentials();
-									if (!creds) {
-										throw new Error('Cloudflare credentials are unavailable after login');
-									}
-									const newToken = await refreshWorkerAuthToken(creds, {
-										workerUrl: plugin.settings.workerUrl,
-										workerName: plugin.settings.workerName,
-										bucketName: plugin.settings.bucketName,
-										databaseId: plugin.settings.databaseId,
-									});
-									await plugin.syncRuntime.applyInfrastructureConfig({
-										workerUrl: plugin.settings.workerUrl,
-										authToken: newToken,
-										workerName: plugin.settings.workerName,
-										bucketName: plugin.settings.bucketName,
-										databaseId: plugin.settings.databaseId,
-									});
-								}
+						idleText: 'Validate',
+						runningText: 'Validating...',
+						task: async () => {
+							const token = wizardState.wizardToken.trim();
+							if (!token) {
+								throw new Error('Enter an API token first');
 							}
+							const valid = await verifyToken(token);
+							if (!valid) {
+								throw new Error('Token is invalid or does not have sufficient permissions');
+							}
+							const accounts = await listAccessibleAccounts(token);
+							if (accounts.length === 0) {
+								throw new Error('No Cloudflare accounts accessible with this token');
+							}
+							wizardState.wizardTokenValidated = true;
+							wizardState.wizardSelectedAccountId = accounts[0].id;
 						},
 						onSuccess: () => {
-							if (shouldSetup) {
-								new Notice('Cloudflare account updated and infrastructure is ready');
-							} else {
-								new Notice('Cloudflare account updated');
-							}
+							new Notice('Token validated');
 							rerender();
 						},
 						onError: (error) => {
-							new Notice(`Cloudflare login failed: ${getErrorMessage(error)}`);
+							new Notice(`Validation failed: ${getErrorMessage(error)}`);
 						},
 					});
-				});
-
-				return button;
-				})
-				.addExtraButton(button => button
-					.setIcon('x')
-					.setTooltip('Sign out')
-					.onClick(async () => {
-						await plugin.syncRuntime.clearSyncConfiguration({ clearCloudflareCredentials: true });
-						new Notice('Signed out and configuration cleared');
+				}));
+	} else if (hasCloudflareCredentials) {
+		new Setting(containerEl)
+			.setName('Connected account')
+			.setDesc(plugin.settings.cloudflareAccountId)
+			.addExtraButton(button => button
+				.setIcon('x')
+				.setTooltip('Sign out')
+				.onClick(async () => {
+					await plugin.syncRuntime.clearSyncConfiguration({ clearCloudflareCredentials: true });
+					new Notice('Signed out and configuration cleared');
 					rerender();
 				}));
 	}
 
-	if (!hasCloudflareCredentials && !isConfigured) {
-		new Setting(containerEl)
-			.setName('Manual entry')
-			.setDesc('Show advanced fields for account, API token, bucket, and worker names')
-			.addToggle(toggle => toggle
-				.setValue(manualState.manualEntryEnabled)
-				.onChange((value) => {
-					manualState.manualEntryEnabled = value;
-					rerender();
-				}));
-
-		if (manualState.manualEntryEnabled) {
-			renderManualEntryFields(containerEl, plugin, manualState, rerender);
-		}
-	}
-
-	if (!isConfigured && (hasCloudflareCredentials || manualState.manualEntryEnabled)) {
+	const wizardReady = wizardState.wizardTokenValidated && !!wizardState.wizardSelectedAccountId;
+	if (!isConfigured && (hasCloudflareCredentials || wizardReady)) {
 		new Setting(containerEl)
 			.setName('Quick setup')
-			.setDesc('Create the sync infrastructure and configure this plugin automatically')
+			.setDesc('Set up sync infrastructure or reconnect to an existing one')
 			.addButton(button => button
-				.setButtonText('Create infrastructure')
+				.setButtonText('Set up')
 				.setCta()
 				.onClick(async () => {
 					await runButtonTask({
 						button,
-						idleText: 'Create infrastructure',
+						idleText: 'Set up',
 						runningText: 'Working...',
 						progressEl: setupProgress,
 						progressMessage: 'Starting setup...',
 						task: async ({ setProgress }) => {
-							const creds = await resolveCredentialsForSetup(plugin, manualState);
-							await createInfrastructureFromCredentials(plugin, manualState, creds, setProgress);
+							const creds = await resolveCredentialsForSetup(plugin, wizardState);
+							await createInfrastructureFromCredentials(plugin, creds, setProgress);
 						},
 						onSuccess: () => {
 							new Notice('Infrastructure created and plugin configured');
@@ -272,139 +197,29 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 	}
 }
 
-function renderManualEntryFields(
-	containerEl: HTMLElement,
-	plugin: CratePlugin,
-	manualState: ManualSetupState,
-	rerender: () => void
-): void {
-	new Setting(containerEl)
-		.setName('Account ID')
-		.setDesc('Used for manual setup mode')
-		.addText(text => {
-			text
-				.setPlaceholder('Paste account ID')
-				.setValue(manualState.manualAccountId)
-				.onChange(value => {
-					manualState.manualAccountId = value.trim();
-				});
-			text.inputEl.size = 50;
-		});
-
-	new Setting(containerEl)
-		.setName('API token')
-		.setDesc('Used for manual setup mode')
-		.addText(text => {
-			text.inputEl.type = 'password';
-			text
-				.setPlaceholder('Paste API token')
-				.setValue(manualState.manualApiToken)
-				.onChange(value => {
-					manualState.manualApiToken = value.trim();
-				});
-			text.inputEl.size = 50;
-		});
-
-	new Setting(containerEl)
-		.setName('Bucket name')
-		.setDesc('Optional for setup. Leave empty to auto-generate')
-		.addText(text => {
-			text
-				.setValue(manualState.manualBucketName)
-				.onChange(value => {
-					manualState.manualBucketName = value.trim();
-				});
-			text.inputEl.size = 40;
-		});
-
-	new Setting(containerEl)
-		.setName('Worker name')
-		.setDesc('Optional for setup. Leave empty to auto-generate')
-		.addText(text => {
-			text
-				.setValue(manualState.manualWorkerName)
-				.onChange(value => {
-					manualState.manualWorkerName = value.trim();
-				});
-			text.inputEl.size = 40;
-		});
-
-	new Setting(containerEl)
-		.setName('Save manual credentials')
-		.setDesc('Validate and save the account ID and API token from the manual entry fields')
-		.addButton(button => button
-			.setButtonText('Save')
-			.onClick(async () => {
-				await runButtonTask({
-					button,
-					idleText: 'Save',
-					runningText: 'Validating...',
-					task: async () => {
-						const accountId = manualState.manualAccountId.trim();
-						const apiToken = manualState.manualApiToken.trim();
-						if (!accountId || !apiToken) {
-							throw new Error('Enter both Cloudflare account ID and API token');
-						}
-
-						const valid = await verifyCredentials({ accountId, apiToken });
-						if (!valid) {
-							throw new Error('Cloudflare credentials are invalid');
-						}
-						await plugin.cloudflareSession.saveCredentials(accountId, apiToken);
-					},
-					onSuccess: () => {
-						new Notice('Manual credentials saved');
-						rerender();
-					},
-					onError: (error) => {
-						new Notice(`Failed to save manual credentials: ${getErrorMessage(error)}`);
-					},
-				});
-			}));
-}
-
-function seedManualState(plugin: CratePlugin, manualState: ManualSetupState): void {
-	if (!manualState.manualAccountId) {
-		manualState.manualAccountId = plugin.settings.cloudflareAccountId.trim();
-	}
-	if (!manualState.manualApiToken) {
-		manualState.manualApiToken = (plugin.secretStorage.get(SECRET_KEYS.CLOUDFLARE_API_TOKEN) || '').trim();
-	}
-	if (!manualState.manualBucketName) {
-		manualState.manualBucketName = plugin.settings.bucketName.trim();
-	}
-	if (!manualState.manualWorkerName) {
-		manualState.manualWorkerName = plugin.settings.workerName.trim();
+function seedWizardState(plugin: CratePlugin, wizardState: SetupWizardState): void {
+	if (!wizardState.wizardToken) {
+		wizardState.wizardToken = (plugin.secretStorage.get(SECRET_KEYS.CLOUDFLARE_API_TOKEN) || '').trim();
 	}
 }
 
 async function resolveCredentialsForSetup(
 	plugin: CratePlugin,
-	manualState: ManualSetupState
+	wizardState: SetupWizardState
 ): Promise<CloudflareCredentials> {
-	if (manualState.manualEntryEnabled) {
-		const accountId = manualState.manualAccountId.trim();
-		const apiToken = manualState.manualApiToken.trim();
-		if (!accountId || !apiToken) {
-			throw new Error('Enter both Cloudflare account ID and API token in manual entry mode');
+	if (wizardState.wizardTokenValidated && wizardState.wizardSelectedAccountId) {
+		const apiToken = wizardState.wizardToken.trim();
+		const accountId = wizardState.wizardSelectedAccountId.trim();
+		if (!apiToken || !accountId) {
+			throw new Error('Complete the token setup first');
 		}
-
-		const valid = await verifyCredentials({ accountId, apiToken });
-		if (!valid) {
-			throw new Error('Cloudflare credentials are invalid');
-		}
-
 		await plugin.cloudflareSession.saveCredentials(accountId, apiToken);
 		return { accountId, apiToken };
 	}
 
 	const creds = await plugin.cloudflareSession.resolveCredentials();
 	if (!creds) {
-		throw new Error(
-			Platform.isDesktopApp
-				? 'Please sign in with Cloudflare first'
-				: 'Please sign in with Cloudflare on desktop first, or use manual entry mode'
-		);
+		throw new Error('Please complete the token setup first');
 	}
 
 	return creds;
@@ -412,23 +227,13 @@ async function resolveCredentialsForSetup(
 
 async function createInfrastructureFromCredentials(
 	plugin: CratePlugin,
-	manualState: ManualSetupState,
 	creds: CloudflareCredentials,
 	onProgress: (message: string) => void
 ): Promise<void> {
-	const manualBucketName = manualState.manualBucketName.trim();
-	const manualWorkerName = manualState.manualWorkerName.trim();
-
 	const result = await quickSetup(
 		{
 			accountId: creds.accountId,
 			apiToken: creds.apiToken,
-			bucketName: manualState.manualEntryEnabled && manualBucketName
-				? manualBucketName
-				: undefined,
-			workerName: manualState.manualEntryEnabled && manualWorkerName
-				? manualWorkerName
-				: undefined,
 		},
 		onProgress
 	);

@@ -29,6 +29,11 @@ export interface CloudflareCredentials {
 	apiToken: string;
 }
 
+export interface CloudflareAccount {
+	id: string;
+	name: string;
+}
+
 export interface R2Bucket {
 	name: string;
 	creation_date: string;
@@ -173,12 +178,47 @@ function createMultipartBody(parts: Array<{
 }
 
 export async function verifyCredentials(credentials: CloudflareCredentials): Promise<boolean> {
+	return verifyToken(credentials.apiToken);
+}
+
+export async function verifyToken(apiToken: string): Promise<boolean> {
 	try {
-		await cfRequest<{ id: string }>(credentials, '/user');
-		return true;
+		const response = await requestUrl({
+			url: `${CF_API_BASE}/user/tokens/verify`,
+			method: 'GET',
+			headers: { Authorization: `Bearer ${apiToken}` },
+			throw: false,
+		});
+		if (response.status >= 400) return false;
+		const json = response.json as CloudflareEnvelope<{ status?: string }>;
+		return json.success === true;
 	} catch {
 		return false;
 	}
+}
+
+export async function listAccessibleAccounts(apiToken: string): Promise<CloudflareAccount[]> {
+	const response = await requestUrl({
+		url: `${CF_API_BASE}/accounts`,
+		method: 'GET',
+		headers: { Authorization: `Bearer ${apiToken}` },
+		throw: false,
+	});
+
+	if (response.status >= 400) {
+		throw formatCloudflareError(response.status, response.json);
+	}
+
+	const json = response.json as CloudflareEnvelope<Array<{ id: string; name: string }>>;
+	if (!json.success || !Array.isArray(json.result)) {
+		throw new Error('Failed to fetch Cloudflare accounts');
+	}
+
+	return json.result.map(a => ({ id: a.id, name: a.name }));
+}
+
+export function buildCloudflareTokenTemplateUrl(): string {
+	return 'https://dash.cloudflare.com/profile/api-tokens';
 }
 
 export async function listR2Buckets(credentials: CloudflareCredentials): Promise<R2Bucket[]> {
