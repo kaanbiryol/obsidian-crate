@@ -5,7 +5,6 @@ import { migrateReminderIds } from './data/reminderIdMigration';
 import { createMarkdownWriter } from './data/markdownWriter';
 import { createStorageCompat } from './data/storageCompat';
 import { ReminderQueryInjector } from './query/injector';
-import { createInlineTodoExtension } from './query/inlineTodoLivePreview';
 import { createRemindersBlockExtension } from './query/remindersBlockLivePreview';
 import { registerReminderCommands } from './commands';
 import { normalizeRemindersFolderPath } from './settings';
@@ -105,12 +104,6 @@ function registerReminderIntegrations(plugin: CratePlugin): void {
 	} catch (error) {
 		remindersLogger.error('Failed to register reminder block extension:', error);
 	}
-	try {
-		plugin.registerEditorExtension(createInlineTodoExtension(plugin));
-	} catch (error) {
-		remindersLogger.error('Failed to register inline todo extension:', error);
-	}
-
 	plugin.registerView(
 		VIEW_TYPE_REMINDERS,
 		(leaf) => new RemindersView(leaf, plugin),
