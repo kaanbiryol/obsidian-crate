@@ -72,8 +72,10 @@ export const RemindersList: React.FC<Props> = ({
           }
           loaded = indexed.map(indexedToReminder);
         } else if (showUpcoming) {
-          // Get all active reminders and filter for upcoming
-          const allReminders = plugin.reminderIndex.getActive().map(indexedToReminder);
+          const source = showCompletedState
+            ? plugin.reminderIndex.getAll()
+            : plugin.reminderIndex.getActive();
+          const allReminders = source.map(indexedToReminder);
           loaded = getUpcomingReminders(allReminders, effectiveDays);
         } else if (showCompletedState) {
           loaded = plugin.reminderIndex.getAll().map(indexedToReminder);
@@ -85,8 +87,9 @@ export const RemindersList: React.FC<Props> = ({
         if (showToday) {
           loaded = plugin.storage.getTodayReminders(showCompletedState);
         } else if (showUpcoming) {
-          // Get all active reminders and filter for upcoming
-          const allReminders = plugin.storage.getActive();
+          const allReminders = showCompletedState
+            ? plugin.storage.getAll()
+            : plugin.storage.getActive();
           loaded = getUpcomingReminders(allReminders, effectiveDays);
         } else if (showCompletedState) {
           loaded = plugin.storage.getAll();
@@ -255,12 +258,21 @@ export const RemindersList: React.FC<Props> = ({
       ) : (
         <div className="reminders-list">
           {supportsReorder ? (
-            <ReorderableReminderList
-              reminders={localOrder}
-              onReorder={setLocalOrder}
-              onReorderCommit={handleReorderCommit}
-              renderCard={renderCard}
-            />
+            <>
+              <ReorderableReminderList
+                reminders={localOrder}
+                onReorder={setLocalOrder}
+                onReorderCommit={handleReorderCommit}
+                renderCard={renderCard}
+              />
+              {showCompletedState && reminders.filter(r => r.completed).map((reminder) => (
+                <ReminderCardWrapper
+                  key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
+                  reminder={reminder}
+                  onUpdate={triggerRefresh}
+                />
+              ))}
+            </>
           ) : (
             reminders.map((reminder) => (
               <ReminderCardWrapper
