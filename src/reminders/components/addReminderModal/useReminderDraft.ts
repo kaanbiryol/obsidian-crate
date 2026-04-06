@@ -113,6 +113,7 @@ export function useReminderDraft({
 		: (reminder?.dueDatetime || reminder?.dueDate || initialDueDate || null);
 
 	const [content, setContent] = useState(() => initialContent);
+	const [description, setDescription] = useState(reminder?.description ?? '');
 	const [project, setProject] = useState(initialProject);
 	const [priority, setPriority] = useState(reminder?.priority || 4);
 	const [dueDate, setDueDate] = useState<string | null>(initialDueDateValue);
@@ -319,6 +320,8 @@ export function useReminderDraft({
 	return {
 		content,
 		setContent,
+		description,
+		setDescription,
 		project,
 		priority,
 		dueDate,

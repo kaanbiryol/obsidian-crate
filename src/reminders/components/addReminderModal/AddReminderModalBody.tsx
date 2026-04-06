@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Calendar as CalendarIcon, Flag, Hash, Repeat } from 'lucide-react';
 import { format } from 'date-fns';
@@ -8,6 +8,46 @@ import { ShadowDOMButton, ShadowDOMMotionButton } from '../ShadowDOMButton';
 import { ProjectAutocompleteDropdown } from '../ProjectAutocompleteDropdown';
 import { useProjectAutocomplete } from '../useProjectAutocomplete';
 import { formatRecurrence } from '../../utils/rruleConverter';
+
+/**
+ * Track whether a scrollable element has content below the visible area.
+ * Returns true when the element overflows and isn't scrolled to the bottom.
+ */
+function useBottomFade(ref: React.RefObject<HTMLElement | null>): boolean {
+    const [show, setShow] = useState(false);
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+
+        const update = () => {
+            const overflows = el.scrollHeight > el.clientHeight + 1;
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+            setShow(overflows && !atBottom);
+        };
+
+        update();
+        el.addEventListener('scroll', update, { passive: true });
+        el.addEventListener('input', update);
+        const ro = new ResizeObserver(update);
+        ro.observe(el);
+
+        return () => {
+            el.removeEventListener('scroll', update);
+            el.removeEventListener('input', update);
+            ro.disconnect();
+        };
+    }, [ref]);
+
+    return show;
+}
+
+const FADE_MASK = 'linear-gradient(to bottom, black calc(100% - 40px), transparent)';
+const NO_FADE: React.CSSProperties = {};
+const FADE_STYLE: React.CSSProperties = {
+    maskImage: FADE_MASK,
+    WebkitMaskImage: FADE_MASK,
+};
 import { getFontSize } from '../../ui/themes';
 import { RecurrenceRule } from '../../types';
 import { parseReminderDateValue } from '../../utils/reminderDate';
@@ -61,6 +101,8 @@ interface AddReminderModalBodyProps {
     textColor: string;
     content: string;
     onContentChange: (value: string) => void;
+    description: string;
+    onDescriptionChange: (value: string) => void;
     onKeyDown: (event: React.KeyboardEvent) => void;
     allowAutoFocus: boolean;
     preserveSelection: boolean;
@@ -89,6 +131,8 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     textColor,
     content,
     onContentChange,
+    description,
+    onDescriptionChange,
     onKeyDown,
     allowAutoFocus,
     preserveSelection,
@@ -111,6 +155,19 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     onTogglePriority,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const descriptionRef = useRef<HTMLTextAreaElement>(null);
+    const titleFade = useBottomFade(textareaRef);
+    const descFade = useBottomFade(descriptionRef);
+
+    // Auto-size description textarea on mount when editing existing content
+    useEffect(() => {
+        const el = descriptionRef.current;
+        if (el && description) {
+            el.style.height = 'auto';
+            el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+        }
+    }, []);
+
     const dueDateDisplay = dueDate
         ? parseReminderDateValue(dueDate, hasTime)
         : undefined;
@@ -150,8 +207,8 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                 knownProjects={projects}
                 onAutocompleteQuery={handleAutocompleteQuery}
                 onAutocompleteKeyDown={autocomplete.handleKeyDown}
-                className="w-full px-0 py-0 bg-transparent border-none outline-none resize-none min-h-[32px]"
-                style={{ fontSize: getFontSize('lg'), color: textColor }}
+                className="w-full px-0 py-0 bg-transparent border-none outline-none resize-none min-h-[32px] ios-scroll"
+                style={{ fontSize: getFontSize('lg'), color: textColor, maxHeight: '100px', overflowY: 'auto', ...(titleFade ? FADE_STYLE : NO_FADE) }}
             />
             {autocomplete.isOpen && (
                 <ProjectAutocompleteDropdown
@@ -163,6 +220,49 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                     onSelect={autocomplete.selectProject}
                 />
             )}
+
+            {/* Description - inside glass container, separated by subtle divider */}
+            <div
+                style={{
+                    marginTop: '8px',
+                    paddingTop: '8px',
+                    borderTop: isDark
+                        ? '1px solid rgba(255, 255, 255, 0.04)'
+                        : '1px solid rgba(0, 0, 0, 0.04)',
+                }}
+            >
+                <textarea
+                    ref={descriptionRef}
+                    value={description}
+                    onChange={(e) => onDescriptionChange(e.target.value)}
+                    placeholder="Add description..."
+                    rows={1}
+                    className="ios-scroll focus:outline-none focus:ring-0 focus:shadow-none"
+                    style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: 0,
+                        background: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        boxShadow: 'none',
+                        WebkitAppearance: 'none',
+                        resize: 'none',
+                        fontSize: '13px',
+                        lineHeight: 1.5,
+                        color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
+                        fontFamily: 'inherit',
+                        maxHeight: '120px',
+                        overflowY: 'auto',
+                        ...(descFade ? FADE_STYLE : NO_FADE),
+                    }}
+                    onInput={(e) => {
+                        const el = e.currentTarget;
+                        el.style.height = 'auto';
+                        el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+                    }}
+                />
+            </div>
         </div>
 
         {/* Action Buttons - Compact Inline Chips */}

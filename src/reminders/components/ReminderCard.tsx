@@ -48,6 +48,7 @@ function renderContentWithLinks(content: string): React.ReactNode[] {
 interface ReminderData {
     id: string;
     content: string;
+    description?: string;
     completed: boolean;
     dueDatetime?: string;
     dueDate?: string;
@@ -153,6 +154,13 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                         )}
                     </div>
 
+                    {/* Description */}
+                    {reminder.description && !reminder.completed && (
+                        <div className="premium-reminder-description">
+                            {reminder.description}
+                        </div>
+                    )}
+
                     {/* Metadata pills */}
                     {hasPills && (
                         <div className="premium-reminder-pills">
@@ -216,6 +224,7 @@ export default memo(ReminderCard, (prevProps, nextProps) => {
         prevReminder.priority === nextReminder.priority &&
         prevReminder.project === nextReminder.project &&
         JSON.stringify(prevReminder.recurrence) === JSON.stringify(nextReminder.recurrence) &&
+        prevReminder.description === nextReminder.description &&
         prevProps.hideProject === nextProps.hideProject
     );
 });

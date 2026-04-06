@@ -25,6 +25,7 @@ function toReminder(indexed: IndexedReminder): Reminder {
   return {
     id: indexed.id,
     content: indexed.content,
+    description: indexed.description,
     dueDate: indexed.dueDate,
     dueDatetime: indexed.dueDatetime,
     priority: indexed.priority,
@@ -164,6 +165,7 @@ export function createStorageCompat(
         recurrence,
         params.dueDatetime ? true : params.dueDate ? false : undefined,
         reminderId,
+        params.description,
       );
 
       // VaultWatcher will handle rescanning after file modify event
@@ -176,6 +178,7 @@ export function createStorageCompat(
       return {
         id: reminderId,
         content: params.content,
+        description: params.description,
         dueDate: storedDates.dueDate,
         dueDatetime: storedDates.dueDatetime,
         priority,
@@ -206,6 +209,7 @@ export function createStorageCompat(
 
       const updates: Parameters<MarkdownWriter['updateReminder']>[1] = {
         content: params.content,
+        description: params.description,
         priority: params.priority,
         project: params.project,
         ...(hasRecurrenceUpdate

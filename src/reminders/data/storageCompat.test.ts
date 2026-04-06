@@ -97,6 +97,7 @@ describe('storageCompat.create', () => {
 			undefined,
 			undefined,
 			created.id,
+			undefined,
 		);
 	});
 
@@ -121,6 +122,7 @@ describe('storageCompat.create', () => {
 			{ frequency: 'daily', timezone: getLocalTimeZone() },
 			undefined,
 			created.id,
+			undefined,
 		);
 	});
 

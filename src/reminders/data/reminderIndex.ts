@@ -28,6 +28,8 @@ export interface IndexedReminder {
   project?: string;
   recurrence?: RecurrenceRule;
 
+  description?: string; // Optional multi-line notes (stored as <!-- crate-desc:... --> in markdown)
+
   // Location tracking (critical for write-back)
   filePath: string;
   lineNumber: number;
@@ -526,6 +528,7 @@ export function indexedToReminder(indexed: IndexedReminder): Reminder {
   return {
     id: indexed.id,
     content: indexed.content,
+    description: indexed.description,
     dueDate: indexed.dueDate,
     dueDatetime: indexed.dueDatetime,
     priority: indexed.priority,

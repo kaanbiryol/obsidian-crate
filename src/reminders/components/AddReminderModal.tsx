@@ -24,7 +24,7 @@ const log = createLogger('AddReminderModal');
 
 interface AddReminderModalProps {
     onClose: () => void;
-    onAdd?: (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean) => Promise<void>;
+    onAdd?: (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean, description?: string) => Promise<void>;
     onSave?: (reminder: Reminder) => Promise<void>;
     onDelete?: (reminder: Reminder) => Promise<void>;
     onError?: (error: Error) => void;
@@ -76,6 +76,8 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     const {
         content,
         setContent,
+        description,
+        setDescription,
         project,
         priority,
         dueDate,
@@ -135,6 +137,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     const handleSubmit = async () => {
         const submission = buildReminderSubmission({
             content,
+            description,
             projects,
             priority,
             project,
@@ -160,6 +163,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                         submission.dueDate,
                         submission.recurrence,
                         submission.hasTime,
+                        submission.description,
                     );
                 }
             },
@@ -260,6 +264,8 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 textColor={textColor}
                 content={content}
                 onContentChange={setContent}
+                description={description}
+                onDescriptionChange={setDescription}
                 onKeyDown={handleKeyDown}
                 allowAutoFocus={allowAutoFocus}
                 preserveSelection={!isUpdatingFromButtons}

@@ -53,7 +53,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     return calculateDefaultDueDate(settings.taskCreationDefaultDueDate);
   }, [reminder, settings.taskCreationDefaultDueDate]);
 
-  const handleAdd = async (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean) => {
+  const handleAdd = async (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean, description?: string) => {
     // Close modal immediately for better UX
     modal.close();
 
@@ -69,6 +69,8 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
         priority as 1 | 4,
         recurrence,
         hasTime,
+        undefined,
+        description,
       );
 
       // VaultWatcher will handle rescanning after file modify event
@@ -97,6 +99,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
       if (indexed) {
         await plugin.markdownWriter.updateReminder(indexed, {
           content: updatedReminder.content,
+          description: updatedReminder.description,
           dueDate: parsedDueDate,
           priority: updatedReminder.priority,
           project: updatedReminder.project,
@@ -112,6 +115,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
         // Fallback to storage compatibility layer
         await plugin.storage.update(updatedReminder.id, {
           content: updatedReminder.content,
+          description: updatedReminder.description,
           priority: updatedReminder.priority,
           project: updatedReminder.project,
           dueDate: updatedReminder.dueDate,

@@ -9,6 +9,7 @@ import { normalizeRecurrenceRule } from '../../utils/recurrenceRule';
 
 export interface ReminderSubmissionInput {
 	content: string;
+	description?: string;
 	projects: string[];
 	priority: Priority;
 	project: string;
@@ -20,6 +21,7 @@ export interface ReminderSubmissionInput {
 
 export interface ReminderSubmission {
 	content: string;
+	description?: string;
 	project: string;
 	priority: Priority;
 	dueDate?: string;
@@ -46,6 +48,7 @@ function toError(error: unknown): Error {
 
 export function buildReminderSubmission({
 	content,
+	description,
 	projects,
 	priority,
 	project,
@@ -76,8 +79,11 @@ export function buildReminderSubmission({
 		finalHasTime,
 	);
 
+	const finalDescription = description?.trim() || undefined;
+
 	const submission: ReminderSubmission = {
 		content: finalContent,
+		description: finalDescription,
 		project: finalProject,
 		priority: finalPriority,
 		dueDate: finalDueDate,
@@ -89,6 +95,7 @@ export function buildReminderSubmission({
 		submission.updatedReminder = {
 			...reminder,
 			content: finalContent,
+			description: finalDescription,
 			project: finalProject,
 			priority: finalPriority,
 			dueDatetime: storedDates.dueDatetime,

@@ -152,9 +152,37 @@ export async function scanFile(
         const project = projectFromFile;
         const storedDates = buildStoredReminderDates(parsed.parsed.dueDate, parsed.parsed.hasTime);
 
+        // Lookahead: check for a <!-- crate-desc:... --> comment block on following lines
+        let description: string | undefined;
+        let descBlockLineCount = 0;
+        const nextIdx = lineNumber + 1;
+        if (nextIdx < lines.length && lines[nextIdx].startsWith('<!-- crate-desc:')) {
+          // Find the closing --> (may be on the same line or a later line)
+          let descContent = lines[nextIdx].slice('<!-- crate-desc:'.length);
+          let endIdx = nextIdx;
+          while (endIdx < lines.length) {
+            const closingPos = (endIdx === nextIdx ? descContent : lines[endIdx]).indexOf('-->');
+            if (closingPos !== -1) {
+              if (endIdx === nextIdx) {
+                descContent = descContent.slice(0, closingPos).trimEnd();
+              } else {
+                descContent += '\n' + lines[endIdx].slice(0, closingPos).trimEnd();
+              }
+              descBlockLineCount = endIdx - nextIdx + 1;
+              break;
+            }
+            if (endIdx > nextIdx) {
+              descContent += '\n' + lines[endIdx];
+            }
+            endIdx++;
+          }
+          description = descContent.trim() || undefined;
+        }
+
         const reminder: IndexedReminder = {
           id: parsed.reminderId,
           content: parsed.parsed.cleanContent,
+          description,
           dueDate: storedDates.dueDate,
           dueDatetime: storedDates.dueDatetime,
           priority: parsed.parsed.priority,
@@ -169,6 +197,11 @@ export async function scanFile(
         };
 
         reminders.push(reminder);
+
+        // Skip past description block lines
+        if (descBlockLineCount > 0) {
+          lineNumber = nextIdx + descBlockLineCount - 1;
+        }
       }
     }
 

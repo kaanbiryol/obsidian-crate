@@ -123,6 +123,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
         reminder={{
           id: reminder.id,
           content: reminder.content,
+          description: reminder.description,
           completed: reminder.completed,
           dueDatetime: reminder.dueDatetime,
           dueDate: reminder.dueDate,

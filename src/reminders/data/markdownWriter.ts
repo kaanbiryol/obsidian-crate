@@ -121,6 +121,7 @@ function toReminder(indexed: IndexedReminder): Reminder {
   return {
     id: indexed.id,
     content: indexed.content,
+    description: indexed.description,
     dueDate: indexed.dueDate,
     dueDatetime: indexed.dueDatetime,
     priority: indexed.priority,
@@ -130,6 +131,29 @@ function toReminder(indexed: IndexedReminder): Reminder {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Build a description as an HTML comment block: <!-- crate-desc:...\n... -->
+ * Returns an array of lines to insert after the checkbox line.
+ */
+function buildDescriptionBlock(description: string | undefined): string[] {
+  if (!description?.trim()) return [];
+  return [`<!-- crate-desc:${description.trim()} -->`];
+}
+
+/**
+ * Count the number of lines occupied by a <!-- crate-desc:... --> block
+ * following a checkbox line. Returns 0 if no description block found.
+ */
+function countDescriptionBlockLines(lines: string[], checkboxLineNumber: number): number {
+  const nextIdx = checkboxLineNumber + 1;
+  if (nextIdx >= lines.length || !lines[nextIdx].startsWith('<!-- crate-desc:')) return 0;
+  // Find closing -->
+  for (let i = nextIdx; i < lines.length; i++) {
+    if (lines[i].includes('-->')) return i - nextIdx + 1;
+  }
+  return 0;
 }
 
 export interface MarkdownWriter {
@@ -145,6 +169,7 @@ export interface MarkdownWriter {
     recurrence?: RecurrenceRule,
     hasTime?: boolean,
     reminderId?: string,
+    description?: string,
   ): Promise<void>;
 
   /**
@@ -154,6 +179,7 @@ export interface MarkdownWriter {
     reminder: IndexedReminder,
     updates: {
       content?: string;
+      description?: string;
       dueDate?: Date;
       priority?: Priority;
       project?: string;
@@ -255,6 +281,7 @@ export function createMarkdownWriter(
       recurrence?: RecurrenceRule,
       hasTime?: boolean,
       reminderId?: string,
+      description?: string,
     ): Promise<void> {
       const normalizedRecurrence = normalizeRecurrenceRule(recurrence);
       const stableReminderId = reminderId ?? createReminderId();
@@ -287,9 +314,12 @@ export function createMarkdownWriter(
 
       // Generate ID and build optimistic reminder for immediate UI update
       const contentHash = generateContentHash(content);
+      const normalizedDescription = description?.trim() || undefined;
+      const descLines = buildDescriptionBlock(normalizedDescription);
       const optimisticReminder: IndexedReminder = {
         id: stableReminderId,
         content,
+        description: normalizedDescription,
         dueDate: storedDates.dueDate,
         dueDatetime: storedDates.dueDatetime,
         priority,
@@ -308,7 +338,10 @@ export function createMarkdownWriter(
       // Append to bottom of file with empty line after header
       const trimmed = fileContent.trimEnd();
       const separator = trimmed.match(/^#[^\n]*$/) ? "\n\n" : "\n";
-      const newContent = trimmed + separator + newLine + "\n";
+      const block = descLines.length > 0
+        ? newLine + "\n" + descLines.join("\n")
+        : newLine;
+      const newContent = trimmed + separator + block + "\n";
 
       try {
         // Write back to file (fast, ~10ms)
@@ -350,6 +383,7 @@ export function createMarkdownWriter(
       reminder: IndexedReminder,
       updates: {
         content?: string;
+        description?: string;
         dueDate?: Date;
         priority?: Priority;
         project?: string;
@@ -384,7 +418,8 @@ export function createMarkdownWriter(
         await this.deleteReminder(reminder);
 
         // 2. Create in new file (without project tag since project = file name)
-        await this.createReminder(newProject, newContent, newDueDate, newPriority, newRecurrence, newHasTime, reminder.id);
+        const movedDescription = 'description' in updates ? updates.description : reminder.description;
+        await this.createReminder(newProject, newContent, newDueDate, newPriority, newRecurrence, newHasTime, reminder.id, movedDescription);
 
         return;
       }
@@ -412,9 +447,15 @@ export function createMarkdownWriter(
         : currentDueDate;
       const newPriority = updates.priority ?? reminder.priority;
       const storedDates = buildStoredReminderDates(newDueDate, newHasTime);
+      const newDescription = 'description' in updates
+        ? (updates.description?.trim() || undefined)
+        : reminder.description;
+      const newDescLines = buildDescriptionBlock(newDescription);
+
       // Apply optimistic update immediately (UI updates)
       index.applyOptimisticUpdate(reminder.id, {
         content: newContent,
+        description: newDescription,
         dueDate: storedDates.dueDate,
         dueDatetime: storedDates.dueDatetime,
         priority: newPriority,
@@ -437,8 +478,9 @@ export function createMarkdownWriter(
         reminder.id,
       );
 
-      // Replace the line
-      lines[lineNumber] = newLine;
+      // Replace checkbox line + old description lines with new checkbox line + new description lines
+      const oldDescCount = countDescriptionBlockLines(lines, lineNumber);
+      lines.splice(lineNumber, 1 + oldDescCount, newLine, ...newDescLines);
 
       try {
         // Write back to file (fast)
@@ -499,8 +541,9 @@ export function createMarkdownWriter(
         return;
       }
 
-      // Remove the line
-      lines.splice(lineToDelete, 1);
+      // Remove the checkbox line and its description lines
+      const descCount = countDescriptionBlockLines(lines, lineToDelete);
+      lines.splice(lineToDelete, 1 + descCount);
 
       try {
         // Write back to file (fast)
@@ -672,58 +715,80 @@ export function createMarkdownWriter(
       const fileContent = await app.vault.read(file);
       const lines = fileContent.split("\n");
 
-      // Identify checkbox lines and their positions
-      const checkboxEntries: { index: number; line: string; id: string | null; isCompleted: boolean }[] = [];
-      const nonCheckboxLines: { index: number; line: string }[] = [];
+      // Build segments: alternating non-block content and checkbox blocks
+      // Each block = checkbox line + optional <!-- crate-desc:... --> comment block
+      interface FileSegment {
+        isBlock: boolean;
+        lines: string[];
+        id?: string | null;
+        isCompleted?: boolean;
+      }
+      const segments: FileSegment[] = [];
+      let i = 0;
+      let nonBlockAccum: string[] = [];
 
-      for (let i = 0; i < lines.length; i++) {
+      while (i < lines.length) {
         const parsed = parseCheckboxLine(lines[i]);
         if (parsed) {
-          checkboxEntries.push({
-            index: i,
-            line: lines[i],
+          if (nonBlockAccum.length > 0) {
+            segments.push({ isBlock: false, lines: [...nonBlockAccum] });
+            nonBlockAccum = [];
+          }
+          const blockLines = [lines[i]];
+          // Include following <!-- crate-desc:... --> block if present
+          const descCount = countDescriptionBlockLines(lines, i);
+          for (let d = 1; d <= descCount; d++) {
+            blockLines.push(lines[i + d]);
+          }
+          segments.push({
+            isBlock: true,
+            lines: blockLines,
             id: extractReminderId(lines[i]),
             isCompleted: parsed.isCompleted,
           });
+          i += 1 + descCount;
         } else {
-          nonCheckboxLines.push({ index: i, line: lines[i] });
+          nonBlockAccum.push(lines[i]);
+          i++;
         }
       }
+      if (nonBlockAccum.length > 0) {
+        segments.push({ isBlock: false, lines: nonBlockAccum });
+      }
 
-      // Separate active and completed checkbox lines
-      const activeLines = checkboxEntries.filter(e => !e.isCompleted);
-      const completedLines = checkboxEntries.filter(e => e.isCompleted);
+      // Separate and reorder block segments
+      const allBlockSegments = segments.filter(s => s.isBlock);
+      const activeBlocks = allBlockSegments.filter(s => !s.isCompleted);
+      const completedBlocks = allBlockSegments.filter(s => s.isCompleted);
 
-      // Build ID-to-line lookup for active lines
-      const activeById = new Map(activeLines.map(e => [e.id, e.line]));
-
-      // Reorder active lines according to orderedIds
-      const reorderedActive: string[] = [];
+      const activeById = new Map(activeBlocks.map(b => [b.id, b]));
+      const reorderedActive: FileSegment[] = [];
       for (const id of orderedIds) {
-        const line = activeById.get(id);
-        if (line !== undefined) {
-          reorderedActive.push(line);
-          activeById.delete(id);
-        }
+        const block = activeById.get(id);
+        if (block) { reorderedActive.push(block); activeById.delete(id); }
       }
-      // Append any active lines not in orderedIds (e.g., newly created)
-      for (const entry of activeLines) {
-        if (entry.id !== null && activeById.has(entry.id)) {
-          reorderedActive.push(entry.line);
-        } else if (entry.id === null) {
-          reorderedActive.push(entry.line);
+      for (const block of activeBlocks) {
+        if (block.id !== null && activeById.has(block.id)) reorderedActive.push(block);
+        else if (block.id === null) reorderedActive.push(block);
+      }
+
+      const reorderedBlocks = [...reorderedActive, ...completedBlocks];
+
+      // Reconstruct file: non-block segments stay in place, block slots filled in order
+      let blockIdx = 0;
+      const result: string[] = [];
+      for (const segment of segments) {
+        if (segment.isBlock) {
+          if (blockIdx < reorderedBlocks.length) {
+            result.push(...reorderedBlocks[blockIdx].lines);
+            blockIdx++;
+          }
+        } else {
+          result.push(...segment.lines);
         }
       }
 
-      // Rebuild the file: non-checkbox lines in place, checkbox slots filled with reordered lines
-      const checkboxPositions = checkboxEntries.map(e => e.index);
-      const reorderedCheckbox = [...reorderedActive, ...completedLines.map(e => e.line)];
-      const newLines = [...lines];
-      for (let i = 0; i < checkboxPositions.length; i++) {
-        newLines[checkboxPositions[i]] = reorderedCheckbox[i] ?? '';
-      }
-
-      await app.vault.modify(file, newLines.join("\n"));
+      await app.vault.modify(file, result.join("\n"));
       log.info(`Reordered reminders in ${filePath}`);
     },
 

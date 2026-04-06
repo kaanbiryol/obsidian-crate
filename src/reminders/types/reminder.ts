@@ -18,6 +18,7 @@ export interface RecurrenceRule {
 export interface Reminder {
   id: string; // Unique identifier for the reminder
   content: string;
+  description?: string; // Optional multi-line notes stored as indented lines in markdown
   dueDate?: string; // ISO date string
   dueDatetime?: string; // ISO datetime string
   priority: Priority;
@@ -33,6 +34,7 @@ export interface Reminder {
 
 export interface CreateReminderParams {
   content: string;
+  description?: string;
   dueDate?: string;
   dueDatetime?: string;
   priority?: Priority;
@@ -44,6 +46,7 @@ export interface CreateReminderParams {
 
 export interface UpdateReminderParams {
   content?: string;
+  description?: string;
   dueDate?: string;
   dueDatetime?: string;
   priority?: Priority;
