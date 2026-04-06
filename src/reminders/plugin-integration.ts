@@ -21,6 +21,7 @@ const registeredReminderUi = new WeakSet<CratePlugin>();
 function createNotificationService(plugin: CratePlugin): ReminderNotificationService {
 	return new ReminderNotificationService(
 		() => plugin.settings,
+		() => plugin.remindersSettings,
 		() => plugin.syncRuntime.getApiClient(),
 	);
 }
@@ -67,7 +68,7 @@ async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Pr
 	}
 }
 
-async function reconcileReminderNotifications(plugin: CratePlugin): Promise<void> {
+export async function reconcileReminderNotifications(plugin: CratePlugin): Promise<void> {
 	try {
 		await createNotificationService(plugin).reconcile(plugin.reminderIndex.getAll());
 	} catch (error) {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReminderNotificationService } from './notificationService';
 import type { CrateSettings } from '../../plugin/types';
+import { DEFAULT_REMINDERS_SETTINGS, type RemindersSettings } from '../settings';
 import type { Reminder } from '../types/reminder';
 
 function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
@@ -23,6 +24,10 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 		debounceDelay: 5,
 		...overrides,
 	};
+}
+
+function createRemindersSettings(overrides: Partial<RemindersSettings> = {}): RemindersSettings {
+	return { ...DEFAULT_REMINDERS_SETTINGS, ...overrides };
 }
 
 function createReminder(overrides: Partial<Reminder> = {}): Reminder {
@@ -62,6 +67,7 @@ describe('ReminderNotificationService', () => {
 
 		const service = new ReminderNotificationService(
 			() => createSettings(),
+			() => createRemindersSettings(),
 			() => apiClient as never,
 		);
 
@@ -76,6 +82,7 @@ describe('ReminderNotificationService', () => {
 
 		const service = new ReminderNotificationService(
 			() => createSettings(),
+			() => createRemindersSettings(),
 			() => apiClient as never,
 		);
 
@@ -87,6 +94,7 @@ describe('ReminderNotificationService', () => {
 	it('skips invalid due dates instead of scheduling them', async () => {
 		const service = new ReminderNotificationService(
 			() => createSettings(),
+			() => createRemindersSettings(),
 			() => apiClient as never,
 		);
 
@@ -111,6 +119,7 @@ describe('ReminderNotificationService', () => {
 
 		const service = new ReminderNotificationService(
 			() => createSettings(),
+			() => createRemindersSettings(),
 			() => apiClient as never,
 		);
 
@@ -129,6 +138,50 @@ describe('ReminderNotificationService', () => {
 		});
 	});
 
+	it('schedules date-only reminders at the configured all-day notification time', async () => {
+		scheduleReminder.mockResolvedValueOnce({ success: true });
+
+		const service = new ReminderNotificationService(
+			() => createSettings(),
+			() => createRemindersSettings({ allDayNotificationTime: '09:00' }),
+			() => apiClient as never,
+		);
+
+		await service.onReminderCreated(createReminder({ dueDatetime: undefined, dueDate: '2027-06-15' }));
+
+		expect(scheduleReminder).toHaveBeenCalledTimes(1);
+		const call = scheduleReminder.mock.calls[0][0];
+		expect(call.dueDatetime).toContain('2027-06-15');
+	});
+
+	it('skips date-only reminders when allDayNotificationTime is null', async () => {
+		const service = new ReminderNotificationService(
+			() => createSettings(),
+			() => createRemindersSettings({ allDayNotificationTime: null }),
+			() => apiClient as never,
+		);
+
+		await service.onReminderCreated(createReminder({ dueDatetime: undefined, dueDate: '2027-06-15' }));
+
+		expect(scheduleReminder).not.toHaveBeenCalled();
+	});
+
+	it('uses explicit dueDatetime over allDayNotificationTime', async () => {
+		scheduleReminder.mockResolvedValueOnce({ success: true });
+
+		const service = new ReminderNotificationService(
+			() => createSettings(),
+			() => createRemindersSettings({ allDayNotificationTime: '09:00' }),
+			() => apiClient as never,
+		);
+
+		await service.onReminderCreated(createReminder());
+
+		expect(scheduleReminder).toHaveBeenCalledWith(
+			expect.objectContaining({ dueDatetime: '2027-01-10T10:00:00.000Z' }),
+		);
+	});
+
 	it('reschedules reminders when the remote schedule drifted from the current reminder state', async () => {
 		getScheduledReminders.mockResolvedValueOnce({
 			scheduled: [
@@ -144,6 +197,7 @@ describe('ReminderNotificationService', () => {
 
 		const service = new ReminderNotificationService(
 			() => createSettings(),
+			() => createRemindersSettings(),
 			() => apiClient as never,
 		);
 

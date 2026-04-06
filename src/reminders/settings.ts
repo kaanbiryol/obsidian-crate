@@ -11,6 +11,7 @@ export const DEFAULT_REMINDERS_FOLDER_PATH = 'Reminders';
 const VALID_DUE_DATE_DEFAULTS = new Set<string>(['none', 'today', 'tomorrow']);
 const VALID_AUTO_OPEN_SETTINGS = new Set<string>(['none', 'sidebar', 'fullscreen']);
 const VALID_TAB_IDS = new Set<string>(['inbox', 'today', 'upcoming', 'browse']);
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 type QueryViewPreference = {
 	showCompleted?: boolean;
@@ -25,6 +26,7 @@ export type RemindersSettings = {
 	autoOpenView: AutoOpenSetting;
 	sidebarDefaultTab: TabId;
 	fullscreenDefaultTab: TabId;
+	allDayNotificationTime: string | null;
 };
 
 export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
@@ -36,6 +38,7 @@ export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
 	autoOpenView: 'none',
 	sidebarDefaultTab: 'inbox',
 	fullscreenDefaultTab: 'inbox',
+	allDayNotificationTime: null,
 };
 
 function normalizeQueryViewPreferences(
@@ -75,6 +78,12 @@ function normalizeTabId(value: unknown, fallback: TabId): TabId {
 	return isTabId(value)
 		? value
 		: fallback;
+}
+
+export function normalizeTimeString(value: unknown): string | null {
+	if (typeof value !== 'string') return null;
+	const match = TIME_PATTERN.exec(value.trim());
+	return match ? `${match[1]}:${match[2]}` : null;
 }
 
 function normalizePositiveInteger(value: unknown, fallback: number): number {
@@ -151,6 +160,7 @@ export function normalizeRemindersSettings(
 			value?.fullscreenDefaultTab,
 			DEFAULT_REMINDERS_SETTINGS.fullscreenDefaultTab,
 		),
+		allDayNotificationTime: normalizeTimeString(value?.allDayNotificationTime),
 	};
 }
 

@@ -4,6 +4,7 @@ import {
 	DEFAULT_REMINDERS_SETTINGS,
 	normalizeRemindersFolderPath,
 	normalizeRemindersSettings,
+	normalizeTimeString,
 } from './settings';
 
 describe('normalizeRemindersSettings', () => {
@@ -20,6 +21,7 @@ describe('normalizeRemindersSettings', () => {
 			autoOpenView: 'fullscreen',
 			sidebarDefaultTab: 'today',
 			fullscreenDefaultTab: 'browse',
+			allDayNotificationTime: '09:00',
 		});
 
 		expect(settings).toEqual({
@@ -33,6 +35,7 @@ describe('normalizeRemindersSettings', () => {
 			autoOpenView: 'fullscreen',
 			sidebarDefaultTab: 'today',
 			fullscreenDefaultTab: 'browse',
+			allDayNotificationTime: '09:00',
 		});
 	});
 
@@ -49,6 +52,19 @@ describe('normalizeRemindersSettings', () => {
 		});
 
 		expect(settings).toEqual(DEFAULT_REMINDERS_SETTINGS);
+	});
+
+	it('normalizes allDayNotificationTime values', () => {
+		expect(normalizeTimeString('09:00')).toBe('09:00');
+		expect(normalizeTimeString('23:59')).toBe('23:59');
+		expect(normalizeTimeString('00:00')).toBe('00:00');
+		expect(normalizeTimeString(' 09:00 ')).toBe('09:00');
+		expect(normalizeTimeString('25:00')).toBeNull();
+		expect(normalizeTimeString('9:00')).toBeNull();
+		expect(normalizeTimeString('abc')).toBeNull();
+		expect(normalizeTimeString(null)).toBeNull();
+		expect(normalizeTimeString(undefined)).toBeNull();
+		expect(normalizeTimeString(42)).toBeNull();
 	});
 
 	it('rejects unsafe reminders folder paths and normalizes Windows separators', () => {

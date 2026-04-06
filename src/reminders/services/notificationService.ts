@@ -1,7 +1,9 @@
 import { errorMessage } from '../../plugin/logger';
 import type { CrateSettings } from '../../plugin/types';
 import type { SyncApiClient } from '../../sync/api';
+import type { RemindersSettings } from '../settings';
 import type { Reminder } from '../types/reminder';
+import { parseLocalDateKey } from '../utils/reminderDate';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('ReminderNotificationService');
@@ -20,7 +22,7 @@ interface ScheduledReminderRecord {
 
 type SchedulableReminder = Pick<
 	Reminder,
-	'id' | 'content' | 'dueDatetime' | 'priority' | 'completed' | 'project'
+	'id' | 'content' | 'dueDate' | 'dueDatetime' | 'priority' | 'completed' | 'project'
 >;
 
 function normalizeProject(project: string | null | undefined): string | null {
@@ -31,6 +33,7 @@ function normalizeProject(project: string | null | undefined): string | null {
 export class ReminderNotificationService {
 	constructor(
 		private getSettings: () => CrateSettings,
+		private getRemindersSettings: () => RemindersSettings,
 		private getApiClient: () => SyncApiClient | null,
 	) {}
 
@@ -38,6 +41,22 @@ export class ReminderNotificationService {
 		const settings = this.getSettings();
 		const api = this.getApiClient();
 		return !!(settings.pushEnabled && api);
+	}
+
+	private resolveNotificationDatetime(reminder: SchedulableReminder): string | undefined {
+		if (reminder.dueDatetime) {
+			return reminder.dueDatetime;
+		}
+
+		const allDayTime = this.getRemindersSettings().allDayNotificationTime;
+		if (!allDayTime || !reminder.dueDate) {
+			return undefined;
+		}
+
+		const [hours, minutes] = allDayTime.split(':').map(Number);
+		const date = parseLocalDateKey(reminder.dueDate);
+		date.setHours(hours, minutes, 0, 0);
+		return date.toISOString();
 	}
 
 	private getSchedulableDueDate(dueDatetime: string | null | undefined): Date | null {
@@ -67,20 +86,22 @@ export class ReminderNotificationService {
 
 	async onReminderCreated(reminder: SchedulableReminder): Promise<void> {
 		if (!this.isAvailable()) return;
-		if (reminder.completed || !this.getSchedulableDueDate(reminder.dueDatetime)) return;
+		const effectiveDatetime = this.resolveNotificationDatetime(reminder);
+		if (reminder.completed || !this.getSchedulableDueDate(effectiveDatetime)) return;
 
-		await this.schedule(reminder);
+		await this.schedule(reminder, effectiveDatetime!);
 	}
 
 	async onReminderUpdated(reminder: SchedulableReminder): Promise<void> {
 		if (!this.isAvailable()) return;
+		const effectiveDatetime = this.resolveNotificationDatetime(reminder);
 
-		if (reminder.completed || !this.getSchedulableDueDate(reminder.dueDatetime)) {
+		if (reminder.completed || !this.getSchedulableDueDate(effectiveDatetime)) {
 			await this.cancel(reminder.id);
 			return;
 		}
 
-		await this.schedule(reminder);
+		await this.schedule(reminder, effectiveDatetime!);
 	}
 
 	async onReminderDeleted(reminderId: string): Promise<void> {
@@ -120,9 +141,14 @@ export class ReminderNotificationService {
 			const { scheduled } = await api.getScheduledReminders();
 			const scheduledById = new Map(scheduled.map((entry) => [entry.reminder_id, entry] as const));
 
-			const shouldBeScheduled = reminders.filter(
-				r => !r.completed && this.getSchedulableDueDate(r.dueDatetime) !== null,
-			);
+			const resolvedDatetimes = new Map<string, string>();
+			const shouldBeScheduled = reminders.filter(r => {
+				if (r.completed) return false;
+				const effectiveDatetime = this.resolveNotificationDatetime(r);
+				if (!this.getSchedulableDueDate(effectiveDatetime)) return false;
+				resolvedDatetimes.set(r.id, effectiveDatetime!);
+				return true;
+			});
 			const shouldBeScheduledIds = new Set(shouldBeScheduled.map(r => r.id));
 			const operations: Array<Promise<NotificationMutationResult>> = [];
 
@@ -134,8 +160,9 @@ export class ReminderNotificationService {
 
 			for (const r of shouldBeScheduled) {
 				const existing = scheduledById.get(r.id);
-				if (!existing || this.shouldReschedule(existing, r)) {
-					operations.push(this.schedule(r));
+				const effectiveDatetime = resolvedDatetimes.get(r.id)!;
+				if (!existing || this.shouldReschedule(existing, r, effectiveDatetime)) {
+					operations.push(this.schedule(r, effectiveDatetime));
 				}
 			}
 
@@ -149,13 +176,20 @@ export class ReminderNotificationService {
 		}
 	}
 
-	private shouldReschedule(scheduled: ScheduledReminderRecord, reminder: SchedulableReminder): boolean {
+	private shouldReschedule(
+		scheduled: ScheduledReminderRecord,
+		reminder: SchedulableReminder,
+		effectiveDatetime: string,
+	): boolean {
 		return scheduled.content !== reminder.content
 			|| normalizeProject(scheduled.project) !== normalizeProject(reminder.project)
-			|| scheduled.due_datetime !== reminder.dueDatetime;
+			|| scheduled.due_datetime !== effectiveDatetime;
 	}
 
-	private async schedule(reminder: SchedulableReminder): Promise<NotificationMutationResult> {
+	private async schedule(
+		reminder: SchedulableReminder,
+		effectiveDatetime: string,
+	): Promise<NotificationMutationResult> {
 		const api = this.getApiClient();
 		if (!api) {
 			throw new Error('Reminder notifications are unavailable');
@@ -165,7 +199,7 @@ export class ReminderNotificationService {
 			reminderId: reminder.id,
 			content: reminder.content,
 			project: reminder.project,
-			dueDatetime: reminder.dueDatetime!,
+			dueDatetime: effectiveDatetime,
 			priority: reminder.priority,
 		});
 

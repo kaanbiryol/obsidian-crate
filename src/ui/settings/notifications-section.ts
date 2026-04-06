@@ -1,5 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
+import { reconcileReminderNotifications } from '../../reminders/plugin-integration';
+import { normalizeTimeString } from '../../reminders/settings';
 import { QRModal } from '../qr-modal';
 import { createSettingsSectionHeading } from './section-helpers';
 
@@ -27,6 +29,40 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 		});
 
 	if (!plugin.settings.pushEnabled) return;
+
+	new Setting(containerEl)
+		.setName('All-day reminder notification time')
+		.setDesc('Send notifications for date-only reminders at this time (24h format, e.g. 09:00)')
+		.addText(text => {
+			text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '')
+				.setPlaceholder('09:00');
+			text.inputEl.maxLength = 5;
+
+			const commit = async (): Promise<void> => {
+				const trimmed = text.inputEl.value.trim();
+				if (trimmed === '') {
+					await plugin.writeRemindersSettings({ allDayNotificationTime: null });
+					void reconcileReminderNotifications(plugin);
+					return;
+				}
+				const normalized = normalizeTimeString(trimmed);
+				if (normalized) {
+					text.setValue(normalized);
+					await plugin.writeRemindersSettings({ allDayNotificationTime: normalized });
+					void reconcileReminderNotifications(plugin);
+				} else {
+					text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
+				}
+			};
+
+			text.inputEl.addEventListener('blur', () => void commit());
+			text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					text.inputEl.blur();
+				}
+			});
+		});
 
 	// Subscribe link + QR code
 	const apiClient = plugin.syncRuntime.getApiClient();
