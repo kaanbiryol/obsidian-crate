@@ -78,13 +78,20 @@ export function ReorderableReminderList({
 }: ReorderableReminderListProps) {
   const latestOrderRef = useRef(reminders);
   latestOrderRef.current = reminders;
+  const orderBeforeDragRef = useRef<string[]>([]);
 
   const handleDragStart = useCallback(() => {
+    orderBeforeDragRef.current = latestOrderRef.current.map(r => r.id);
     onDragActiveChange?.(true);
   }, [onDragActiveChange]);
 
   const handleDragEnd = useCallback(() => {
-    onReorderCommit(latestOrderRef.current.map(r => r.id));
+    const newOrder = latestOrderRef.current.map(r => r.id);
+    const changed = newOrder.length !== orderBeforeDragRef.current.length
+      || newOrder.some((id, i) => id !== orderBeforeDragRef.current[i]);
+    if (changed) {
+      onReorderCommit(newOrder);
+    }
     onDragActiveChange?.(false);
   }, [onReorderCommit, onDragActiveChange]);
 
