@@ -26,6 +26,7 @@ $reminder-motion-curve: cubic-bezier(0.33, 1, 0.68, 1); // Smooth ease-out
 
 .reminders-list-container {
   margin: 1em 0;
+  padding: 0 20px;
 
   .reminders-list-header {
     display: flex;

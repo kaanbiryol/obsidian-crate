@@ -52,11 +52,9 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd }
       style={{ marginBottom: '0.5rem', cursor: 'grab' }}
       whileTap={{
         scale: 1.03,
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
       }}
       whileDrag={{
         scale: 1.05,
-        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.35)',
         zIndex: 50,
         cursor: 'grabbing',
       }}
