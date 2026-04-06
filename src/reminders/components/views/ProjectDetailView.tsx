@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronDown, FolderOpen, Circle, CheckCircle2, Check } from 'lucide-react';
+import { ChevronLeft, ChevronDown, FolderOpen, Circle, CheckCircle2 } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { ShadowDOMButton, ShadowDOMNativeButton } from '../ShadowDOMButton';
@@ -33,90 +33,6 @@ export interface ProjectDetailViewProps {
   onReorder?: (orderedIds: string[]) => void;
 }
 
-
-/**
- * Premium Ring Progress Component with glow effect
- */
-interface RingProgressProps {
-  percentage: number;
-  accentColor: string;
-  size?: number;
-}
-
-const RingProgress = memo(function RingProgress({
-  percentage,
-  accentColor,
-  size = 100
-}: RingProgressProps) {
-  const [animatedOffset, setAnimatedOffset] = useState(264); // Full circumference (no fill)
-  const radius = 42;
-  const circumference = 2 * Math.PI * radius;
-  const targetOffset = circumference - (percentage / 100) * circumference;
-  const isComplete = percentage === 100;
-
-  // Animate the ring on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setAnimatedOffset(targetOffset);
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [targetOffset]);
-
-  return (
-    <div className="premium-ring-container" style={{ width: size, height: size }}>
-      {/* SVG Ring */}
-      <svg
-        viewBox="0 0 100 100"
-        className="premium-ring-svg"
-        style={{ width: size, height: size }}
-      >
-        {/* Track */}
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          fill="none"
-          stroke="rgba(255,255,255,0.06)"
-          strokeWidth="4"
-        />
-        {/* Progress */}
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          fill="none"
-          stroke={isComplete ? '#22c55e' : accentColor}
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={animatedOffset}
-          className="premium-ring-progress"
-          style={{
-            filter: `drop-shadow(0 0 3px ${isComplete ? '#22c55e' : accentColor})`,
-            transform: 'rotate(-90deg)',
-            transformOrigin: '50% 50%',
-            transition: 'stroke-dashoffset 800ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        />
-      </svg>
-
-      {/* Center content */}
-      <div className="premium-ring-center">
-        {isComplete ? (
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.6, duration: 0.3, ease: 'easeOut' }}
-          >
-            <Check size={28} strokeWidth={3} style={{ color: '#22c55e' }} />
-          </motion.div>
-        ) : (
-          <span className="premium-ring-percentage">{percentage}%</span>
-        )}
-      </div>
-    </div>
-  );
-});
 
 /**
  * Shared Project Detail view component
@@ -210,50 +126,45 @@ export const ProjectDetailView = memo(function ProjectDetailView({
         </ShadowDOMNativeButton>
       </div>
 
-      {/* Premium Hero Header Card */}
-      <div className="premium-hero-card">
-        {/* Glass content */}
-        <div className="premium-hero-content">
-          {/* Left: Title */}
-          <div className="premium-hero-info">
-            <h1 className="premium-hero-title">{project}</h1>
-          </div>
-
-          {/* Right: Ring Progress */}
+      {/* Compact Project Header */}
+      <div className="project-detail-header">
+        <div className="project-detail-header-top">
+          <h1 className="project-detail-title">{project}</h1>
           {total > 0 && (
-            <div className="premium-hero-progress">
-              <RingProgress
-                percentage={completionPercentage}
-                accentColor={accentColor}
-                size={52}
-              />
-            </div>
+            <span
+              className="project-detail-percentage"
+              style={{ color: completionPercentage === 100 ? '#22c55e' : accentColor }}
+            >
+              {completionPercentage}%
+            </span>
           )}
         </div>
-
-        {/* Stat Pills */}
         {total > 0 && (
-          <div className="premium-stats-row">
-            {/* Active Pill */}
-            <div className="premium-stat-pill">
-              <div className="premium-stat-icon">
-                <Circle size={14} strokeWidth={2.5} />
-              </div>
-              <div className="premium-stat-content">
-                <span className="premium-stat-number">{active.length}</span>
-                <span className="premium-stat-label">ACTIVE</span>
-              </div>
+          <div className="project-detail-header-bottom">
+            <div className="project-detail-stats-text">
+              <span className="project-detail-stat">
+                <Circle size={10} strokeWidth={2.5} />
+                {active.length}
+                <span className="project-detail-stat-label">active</span>
+              </span>
+              <span className="project-detail-stat-dot">&middot;</span>
+              <span className="project-detail-stat project-detail-stat-done">
+                <CheckCircle2 size={10} strokeWidth={2.5} />
+                {completed.length}
+                <span className="project-detail-stat-label">done</span>
+              </span>
             </div>
-
-            {/* Done Pill */}
-            <div className="premium-stat-pill premium-stat-pill-success">
-              <div className="premium-stat-icon" style={{ color: '#22c55e' }}>
-                <CheckCircle2 size={14} strokeWidth={2.5} />
-              </div>
-              <div className="premium-stat-content">
-                <span className="premium-stat-number">{completed.length}</span>
-                <span className="premium-stat-label">DONE</span>
-              </div>
+            <div className="project-detail-progress-bar">
+              <div
+                className="project-detail-progress-fill"
+                style={{
+                  width: `${completionPercentage}%`,
+                  backgroundColor: completionPercentage === 100 ? '#22c55e' : accentColor,
+                  boxShadow: completionPercentage > 0
+                    ? `0 0 4px ${completionPercentage === 100 ? '#22c55e' : accentColor}30`
+                    : 'none',
+                }}
+              />
             </div>
           </div>
         )}
