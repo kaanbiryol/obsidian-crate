@@ -197,13 +197,13 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 	}
 }
 
-function seedWizardState(plugin: CratePlugin, wizardState: SetupWizardState): void {
+export function seedWizardState(plugin: CratePlugin, wizardState: SetupWizardState): void {
 	if (!wizardState.wizardToken) {
 		wizardState.wizardToken = (plugin.secretStorage.get(SECRET_KEYS.CLOUDFLARE_API_TOKEN) || '').trim();
 	}
 }
 
-async function resolveCredentialsForSetup(
+export async function resolveCredentialsForSetup(
 	plugin: CratePlugin,
 	wizardState: SetupWizardState
 ): Promise<CloudflareCredentials> {
@@ -225,7 +225,7 @@ async function resolveCredentialsForSetup(
 	return creds;
 }
 
-async function createInfrastructureFromCredentials(
+export async function createInfrastructureFromCredentials(
 	plugin: CratePlugin,
 	creds: CloudflareCredentials,
 	onProgress: (message: string) => void
@@ -258,7 +258,7 @@ async function createInfrastructureFromCredentials(
 	plugin.syncRuntime.pushSharedSettings().catch(() => {});
 }
 
-async function buildSetupLink(plugin: CratePlugin): Promise<string | null> {
+export async function buildSetupLink(plugin: CratePlugin): Promise<string | null> {
 	const currentAuthToken = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
 	if (!currentAuthToken) {
 		new Notice('Auth token not found');

@@ -31,6 +31,7 @@ export class SyncRuntime {
 	private stateChangeListeners = new Set<(state: SyncState) => void>();
 	private progressListeners = new Set<(current: number, total: number) => void>();
 	private acceptingEvents = false;
+	private initializationRevision = 0;
 
 	private onStatusBarClick: (() => void) | undefined;
 
@@ -89,6 +90,7 @@ export class SyncRuntime {
 	async initialize(): Promise<void> {
 		logger.info('Initializing sync engine');
 
+		const initializationRevision = ++this.initializationRevision;
 		this.acceptingEvents = false;
 
 		this.syncEngine?.destroy();
@@ -99,6 +101,7 @@ export class SyncRuntime {
 			this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN) || ''
 		);
 		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, this.settings);
+		const syncEngine = this.syncEngine;
 
 		if (this.settings.showStatusBar) {
 			this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
@@ -112,6 +115,9 @@ export class SyncRuntime {
 		});
 
 		await this.syncEngine.initialize();
+		if (this.initializationRevision !== initializationRevision || this.syncEngine !== syncEngine) {
+			return;
+		}
 		this.statusBar?.update(this.syncEngine.getState());
 
 		if (this.settings.syncOnStartup) {
@@ -123,7 +129,9 @@ export class SyncRuntime {
 					logger.error('Startup sync failed:', error);
 				})
 				.finally(() => {
-					this.acceptingEvents = true;
+					if (this.initializationRevision === initializationRevision && this.syncEngine === syncEngine) {
+						this.acceptingEvents = true;
+					}
 				});
 			return;
 		}
@@ -132,6 +140,7 @@ export class SyncRuntime {
 	}
 
 	destroy(): void {
+		this.initializationRevision++;
 		this.acceptingEvents = false;
 		this.syncEngine?.destroy();
 		this.statusBar?.destroy();
