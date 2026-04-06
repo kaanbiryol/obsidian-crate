@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect, memo } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronDown, FolderOpen, Circle, CheckCircle2 } from 'lucide-react';
 
@@ -80,10 +80,17 @@ export const ProjectDetailView = memo(function ProjectDetailView({
 
   // Local state for optimistic reorder (visual only during drag)
   const [localOrder, setLocalOrder] = useState<Reminder[]>(active);
+  const isDraggingRef = useRef(false);
 
   useEffect(() => {
-    setLocalOrder(active);
+    if (!isDraggingRef.current) {
+      setLocalOrder(active);
+    }
   }, [active]);
+
+  const handleDragActiveChange = useCallback((active: boolean) => {
+    isDraggingRef.current = active;
+  }, []);
 
   const handleReorderCommit = useCallback((orderedIds: string[]) => {
     onReorder?.(orderedIds);
@@ -191,6 +198,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
             reminders={localOrder}
             onReorder={setLocalOrder}
             onReorderCommit={handleReorderCommit}
+            onDragActiveChange={handleDragActiveChange}
             renderCard={cardRenderer}
           />
 

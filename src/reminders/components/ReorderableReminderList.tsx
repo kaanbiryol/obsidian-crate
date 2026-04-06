@@ -1,12 +1,12 @@
 import React, { useCallback, useRef } from 'react';
-import { Reorder, useDragControls } from 'framer-motion';
-import { GripVertical } from 'lucide-react';
+import { Reorder } from 'framer-motion';
 import type { Reminder } from '../types/reminder';
 
 interface ReorderableReminderListProps {
   reminders: Reminder[];
   onReorder: (reordered: Reminder[]) => void;
   onReorderCommit: (orderedIds: string[]) => void;
+  onDragActiveChange?: (active: boolean) => void;
   renderCard: (reminder: Reminder, index: number) => React.ReactNode;
 }
 
@@ -14,54 +14,57 @@ interface ReorderableItemProps {
   reminder: Reminder;
   index: number;
   renderCard: (reminder: Reminder, index: number) => React.ReactNode;
+  onDragStart: () => void;
   onDragEnd: () => void;
 }
 
-function ReorderableItem({ reminder, index, renderCard, onDragEnd }: ReorderableItemProps) {
-  const controls = useDragControls();
+function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd }: ReorderableItemProps) {
+  const didDragRef = useRef(false);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    controls.start(e);
-  }, [controls]);
+  const handleDragStart = useCallback(() => {
+    didDragRef.current = true;
+    onDragStart();
+  }, [onDragStart]);
+
+  const handleDragEnd = useCallback(() => {
+    onDragEnd();
+    // Suppress the click event that fires after drag release
+    // Use requestAnimationFrame so the flag clears after the click event
+    requestAnimationFrame(() => {
+      didDragRef.current = false;
+    });
+  }, [onDragEnd]);
+
+  const handleClickCapture = useCallback((e: React.MouseEvent) => {
+    if (didDragRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, []);
 
   return (
     <Reorder.Item
       as="div"
       value={reminder}
-      dragListener={false}
-      dragControls={controls}
-      onDragEnd={onDragEnd}
-      style={{ marginBottom: '0.5rem' }}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onClickCapture={handleClickCapture}
+      style={{ marginBottom: '0.5rem', cursor: 'grab' }}
+      whileTap={{
+        scale: 1.03,
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+      }}
       whileDrag={{
-        scale: 1.02,
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+        scale: 1.05,
+        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.35)',
         zIndex: 50,
+        cursor: 'grabbing',
       }}
       transition={{
         layout: { type: 'spring', stiffness: 350, damping: 35 },
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        <div
-          onPointerDown={handlePointerDown}
-          className="reorder-drag-handle"
-          style={{
-            cursor: 'grab',
-            touchAction: 'none',
-            padding: '4px 0',
-            color: 'var(--text-faint, rgba(255,255,255,0.3))',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          <GripVertical size={16} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {renderCard(reminder, index)}
-        </div>
-      </div>
+      {renderCard(reminder, index)}
     </Reorder.Item>
   );
 }
@@ -70,14 +73,20 @@ export function ReorderableReminderList({
   reminders,
   onReorder,
   onReorderCommit,
+  onDragActiveChange,
   renderCard,
 }: ReorderableReminderListProps) {
   const latestOrderRef = useRef(reminders);
   latestOrderRef.current = reminders;
 
+  const handleDragStart = useCallback(() => {
+    onDragActiveChange?.(true);
+  }, [onDragActiveChange]);
+
   const handleDragEnd = useCallback(() => {
     onReorderCommit(latestOrderRef.current.map(r => r.id));
-  }, [onReorderCommit]);
+    onDragActiveChange?.(false);
+  }, [onReorderCommit, onDragActiveChange]);
 
   return (
     <Reorder.Group
@@ -92,6 +101,7 @@ export function ReorderableReminderList({
           reminder={reminder}
           index={index}
           renderCard={renderCard}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         />
       ))}
