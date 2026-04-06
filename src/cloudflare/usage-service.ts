@@ -9,8 +9,8 @@ const CLASS_A_ACTIONS = [
 ];
 
 export class CloudflareUsageService {
-	async getUsage(analyticsToken: string | null, apiClient: SyncApiClient | null): Promise<UsageResponse> {
-		if (!analyticsToken || !apiClient) {
+	async getUsage(apiToken: string | null, apiClient: SyncApiClient | null): Promise<UsageResponse> {
+		if (!apiToken || !apiClient) {
 			return { available: false };
 		}
 
@@ -20,7 +20,7 @@ export class CloudflareUsageService {
 				return { available: false, error: 'Worker config incomplete' };
 			}
 
-			return await this.queryAnalytics(analyticsToken, config);
+			return await this.queryAnalytics(apiToken, config);
 		} catch (error) {
 			return { available: false, error: error instanceof Error ? error.message : 'Failed to fetch usage data' };
 		}

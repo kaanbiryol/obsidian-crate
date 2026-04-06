@@ -46,16 +46,16 @@ async function loadUsageData(context: UsageSectionContext, container: HTMLElemen
 	container.empty();
 	container.createEl('p', { text: 'Loading usage data...', cls: 'setting-item-description' });
 
-	const analyticsToken = plugin.secretStorage.get(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
+	const apiToken = plugin.secretStorage.get(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
 	const data = await plugin.usageService.getUsage(
-		analyticsToken,
+		apiToken,
 		plugin.syncRuntime.getApiClient()
 	);
 	container.empty();
 
 	if (!data.available) {
 		container.createEl('p', {
-			text: data.error || 'Add an analytics token in the Connection section above to view usage metrics.',
+			text: data.error || 'Add your Cloudflare API token in the Configuration section above to view usage metrics.',
 			cls: 'setting-item-description',
 		});
 		return;

@@ -54,8 +54,6 @@
 | `CF_DATABASE_ID` | Plain Text | Database UUID (exposed via `/sync/config`) |
 | `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
 
-Optional: `CF_ANALYTICS_TOKEN` (secret, set up via plugin settings).
-
 ## Component Ownership
 
 ```
@@ -91,12 +89,11 @@ Push-notification device enrollment is intentionally narrower: the plugin mints 
 
 ## Secret Storage
 
-Three keys stored in OS keychain via `SecretStorageService`:
+Two keys stored in OS keychain via `SecretStorageService`:
 
 | Key | Value |
 |---|---|
 | `crate-auth-token` | Bearer token for worker authentication |
-| `crate-analytics-token` | Cloudflare Analytics API token (optional) |
 | `crate-cloudflare-api-token` | Cloudflare API token (user-created) |
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes empty string to "delete" and treats empty strings as null on read.

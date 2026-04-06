@@ -255,7 +255,6 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 
 export const SECRET_KEYS = {
 	AUTH_TOKEN: 'crate-auth-token',
-	ANALYTICS_TOKEN: 'crate-analytics-token',
 	CLOUDFLARE_API_TOKEN: 'crate-cloudflare-api-token',
 } as const;
 

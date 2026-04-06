@@ -31,7 +31,7 @@ describe('CloudflareUsageService', () => {
 		} as unknown as SyncApiClient;
 
 		const service = new CloudflareUsageService();
-		const result = await service.getUsage('analytics-token', apiClient);
+		const result = await service.getUsage('cloudflare-api-token', apiClient);
 
 		expect(result.available).toBe(true);
 		const request = requestUrlSpy.mock.calls[0]?.[0];

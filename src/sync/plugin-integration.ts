@@ -1,7 +1,6 @@
 import { Notice, type TAbstractFile } from 'obsidian';
 import { CloudflareSessionManager } from '../cloudflare/session-manager';
 import type CratePlugin from '../main';
-import { SECRET_KEYS } from '../plugin/types';
 import { SyncRuntime } from './runtime';
 import { notifyConflicts } from './conflict';
 import { isHiddenPath } from './file-discovery';
@@ -159,10 +158,6 @@ export async function handleSyncSetupProtocol(
 	}
 
 	try {
-		if (params['analyticsToken']) {
-			plugin.secretStorage.set(SECRET_KEYS.ANALYTICS_TOKEN, params['analyticsToken']);
-		}
-
 		try {
 			const tempClient = new SyncApiClient(workerUrl, authToken);
 			const { settings: shared } = await tempClient.getSharedSettings();
