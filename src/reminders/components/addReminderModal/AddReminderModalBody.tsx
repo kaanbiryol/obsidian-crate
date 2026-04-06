@@ -251,6 +251,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                         fontSize: '13px',
                         lineHeight: 1.5,
                         color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
+                        caretColor: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
                         fontFamily: 'inherit',
                         maxHeight: '120px',
                         overflowY: 'auto',
