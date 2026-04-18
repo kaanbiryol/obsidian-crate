@@ -5,10 +5,10 @@ import { Divider } from '@heroui/react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
-import { getUpcomingReminders, groupRemindersByDate, sortReminders } from '../../utils/reminderSort';
 import { formatDateHeader } from '../../utils/dateFormatting';
 import { ReminderCard } from '../ReminderCard';
 import { EmptyState } from '../EmptyState';
+import { buildUpcomingViewModel } from './viewModels';
 import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,
@@ -42,13 +42,7 @@ export const UpcomingView = memo(function UpcomingView({
   className = ''
 }: UpcomingViewProps) {
   const { upcomingReminders, dateGroups } = useMemo(() => {
-    const upcoming = sortReminders(getUpcomingReminders(reminders, days));
-    const groups = groupRemindersByDate(upcoming);
-
-    return {
-      upcomingReminders: upcoming,
-      dateGroups: groups
-    };
+    return buildUpcomingViewModel(reminders, days);
   }, [reminders, days]);
 
   // Default card renderer

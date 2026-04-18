@@ -5,11 +5,10 @@ import { Button, Divider } from '@heroui/react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
-import { DEFAULT_PROJECT } from '../../utils/constants';
-import { sortRemindersByFileOrder } from '../../utils/reminderSort';
 import { ReminderCard } from '../ReminderCard';
 import { ReorderableReminderList } from '../ReorderableReminderList';
 import { EmptyState } from '../EmptyState';
+import { buildInboxViewModel } from './viewModels';
 import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,
@@ -51,24 +50,7 @@ export const InboxView = memo(function InboxView({
 }: InboxViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
 
-  const { active, completed } = useMemo(() => {
-    const inboxReminders = reminders.filter(r =>
-      (r.project || DEFAULT_PROJECT) === DEFAULT_PROJECT
-    );
-
-    const sorted = sortRemindersByFileOrder(inboxReminders);
-    const activeList = sorted.filter(r => !r.completed);
-
-    const completedList = sorted
-      .filter(r => r.completed)
-      .sort((a, b) => {
-        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-        return timeA - timeB;
-      });
-
-    return { active: activeList, completed: completedList };
-  }, [reminders]);
+  const { active, completed } = useMemo(() => buildInboxViewModel(reminders), [reminders]);
 
   // Local state for optimistic reorder (visual only during drag)
   const [localOrder, setLocalOrder] = useState<Reminder[]>(active);

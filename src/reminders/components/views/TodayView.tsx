@@ -4,9 +4,9 @@ import { Calendar } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
-import { sortReminders, getTodayReminders, getOverdueReminders } from '../../utils/reminderSort';
 import { ReminderCard } from '../ReminderCard';
 import { EmptyState } from '../EmptyState';
+import { buildTodayViewModel } from './viewModels';
 import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,
@@ -36,17 +36,7 @@ export const TodayView = memo(function TodayView({
   hasFab = true,
   className = ''
 }: TodayViewProps) {
-  const todayReminders = useMemo(() => {
-    // Get today's reminders and overdue reminders
-    const today = getTodayReminders(reminders);
-    const overdue = getOverdueReminders(reminders);
-
-    // Combine today and overdue, then deduplicate and sort
-    const combined = [...overdue, ...today];
-    const unique = Array.from(new Map(combined.map(r => [r.id, r])).values());
-
-    return sortReminders(unique);
-  }, [reminders]);
+  const todayReminders = useMemo(() => buildTodayViewModel(reminders), [reminders]);
 
   // Default card renderer
   const defaultRenderCard = (reminder: Reminder, index: number) => (

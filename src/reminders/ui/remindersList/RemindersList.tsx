@@ -1,10 +1,9 @@
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
-import { sortReminders, sortRemindersByFileOrder, getUpcomingReminders, groupRemindersByDate, formatDateHeader, isReminderOverdue, STAGGERED_CARD_ANIMATION } from "@/reminders";
+import { STAGGERED_CARD_ANIMATION } from "@/reminders";
 
 import type { Reminder } from "@/reminders/types/plugin-reminder";
-import { indexedToReminder, type IndexedReminder } from "@/reminders/data/reminderIndex";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
@@ -13,6 +12,11 @@ import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
 import { openReminderCreationModal } from "@/reminders/ui/modals";
 import { formatLocalDateKey } from "@/reminders/utils/reminderDate";
+import {
+  buildRemindersListPresentation,
+  formatDateHeader,
+  loadRemindersListData,
+} from "./remindersListModel";
 import "./styles.scss";
 
 type Props = {
@@ -45,111 +49,43 @@ export const RemindersList: React.FC<Props> = ({
   // Load reminders - always use markdown index (markdown-first mode)
   useEffect(() => {
     const loadReminders = async () => {
-      let loaded: Reminder[];
-
-      if (plugin.reminderIndex?.isLoaded) {
-        // Use markdown index (source of truth: markdown files)
-        if (showToday) {
-          // Get today's reminders plus overdue reminders
-          const todayReminders = plugin.reminderIndex.getToday();
-          const overdueReminders = plugin.reminderIndex.getOverdue();
-          // Combine and deduplicate by id
-          const todayAndOverdueMap = new Map<string, typeof todayReminders[0]>();
-          for (const r of [...todayReminders, ...overdueReminders]) {
-            todayAndOverdueMap.set(r.id, r);
-          }
-          let indexed = Array.from(todayAndOverdueMap.values());
-
-          if (showCompletedState) {
-            // Also include completed reminders from today
-            const completedToday = plugin.reminderIndex.getCompleted().filter((r: IndexedReminder) => {
-              if (r.dueDatetime) {
-                return formatLocalDateKey(new Date(r.dueDatetime)) === todayPrefix;
-              }
-              return r.dueDate === todayPrefix;
-            });
-            indexed = [...indexed, ...completedToday];
-          }
-          loaded = indexed.map(indexedToReminder);
-        } else if (showUpcoming) {
-          const source = showCompletedState
-            ? plugin.reminderIndex.getAll()
-            : plugin.reminderIndex.getActive();
-          const allReminders = source.map(indexedToReminder);
-          loaded = getUpcomingReminders(allReminders, effectiveDays);
-        } else if (showCompletedState) {
-          loaded = plugin.reminderIndex.getAll().map(indexedToReminder);
-        } else {
-          loaded = plugin.reminderIndex.getActive().map(indexedToReminder);
-        }
-      } else {
-        // Fallback to storage compatibility layer
-        if (showToday) {
-          loaded = plugin.storage.getTodayReminders(showCompletedState);
-        } else if (showUpcoming) {
-          const allReminders = showCompletedState
-            ? plugin.storage.getAll()
-            : plugin.storage.getActive();
-          loaded = getUpcomingReminders(allReminders, effectiveDays);
-        } else if (showCompletedState) {
-          loaded = plugin.storage.getAll();
-        } else {
-          loaded = plugin.storage.getActive();
-        }
-      }
+      const loaded = await loadRemindersListData({
+        reminderIndex: plugin.reminderIndex,
+        storage: plugin.storage,
+        showToday,
+        showUpcoming,
+        showCompleted: showCompletedState,
+        effectiveDays,
+        todayPrefix,
+      });
       setRawReminders(loaded);
     };
     void loadReminders();
   }, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken, todayPrefix]);
 
-  // Reorder support: only for project-filtered, non-today, non-upcoming views
-  const supportsReorder = !!projectFilter && !showToday && !showUpcoming;
-  const effectiveProject = projectFilter?.trim() || 'Inbox';
-
-  const reminders = useMemo(() => {
-    let allReminders = [...rawReminders];
-
-    // Filter by project if specified
-    if (projectFilter) {
-      const normalizedProject = projectFilter.toLowerCase().trim();
-      allReminders = allReminders.filter(r => {
-        const reminderProject = (r.project || "Inbox").toLowerCase();
-        return reminderProject === normalizedProject;
-      });
-    }
-
-    // Use file order for project views (supports drag reorder), auto-sort for date views
-    return supportsReorder
-      ? sortRemindersByFileOrder(allReminders)
-      : sortReminders(allReminders);
-  }, [
+  const presentation = useMemo(() => buildRemindersListPresentation({
     rawReminders,
     projectFilter,
-    supportsReorder,
-  ]);
+    showToday,
+    showUpcoming,
+    effectiveDays,
+  }), [rawReminders, projectFilter, showToday, showUpcoming, effectiveDays]);
 
   // Sync showCompleted prop to state when it changes (e.g., from widget update)
   useEffect(() => {
     setShowCompletedState(showCompleted);
   }, [showCompleted]);
 
-  // Group reminders by date for upcoming view
-  const dateGroups = useMemo(() => {
-    if (!showUpcoming) return null;
-    return groupRemindersByDate(reminders);
-  }, [showUpcoming, reminders]);
-
   // Local reorder state
-  const activeReminders = useMemo(() => reminders.filter(r => !r.completed), [reminders]);
-  const [localOrder, setLocalOrder] = useState<Reminder[]>(activeReminders);
+  const [localOrder, setLocalOrder] = useState<Reminder[]>(presentation.activeReminders);
 
   useEffect(() => {
-    setLocalOrder(activeReminders);
-  }, [activeReminders]);
+    setLocalOrder(presentation.activeReminders);
+  }, [presentation.activeReminders]);
 
   const handleReorderCommit = useCallback(async (orderedIds: string[]) => {
-    await plugin.storage.reorder(effectiveProject, orderedIds);
-  }, [plugin, effectiveProject]);
+    await plugin.storage.reorder(presentation.effectiveProject, orderedIds);
+  }, [plugin, presentation.effectiveProject]);
 
   const renderCard = useCallback((reminder: Reminder, _index: number) => (
     <ReminderCardWrapper
@@ -158,10 +94,6 @@ export const RemindersList: React.FC<Props> = ({
       onUpdate={triggerRefresh}
     />
   ), [triggerRefresh]);
-
-  const activeCount = reminders.filter(r => !r.completed).length;
-  const completedCount = reminders.filter(r => r.completed).length;
-  const overdueCount = reminders.filter(r => isReminderOverdue(r)).length;
 
   const handleAdd = () => {
     void openReminderCreationModal(
@@ -179,12 +111,12 @@ export const RemindersList: React.FC<Props> = ({
         <div className="reminders-count">
           {showToday && <span className="reminders-count-title">Today · </span>}
           {showUpcoming && <span className="reminders-count-title">Upcoming · </span>}
-          <span className="reminders-count-active">{activeCount} active</span>
-          {overdueCount > 0 && (
-            <span className="reminders-count-overdue">{overdueCount} overdue</span>
+          <span className="reminders-count-active">{presentation.activeCount} active</span>
+          {presentation.overdueCount > 0 && (
+            <span className="reminders-count-overdue">{presentation.overdueCount} overdue</span>
           )}
-          {completedCount > 0 && (
-            <span className="reminders-count-completed"> · {completedCount} completed</span>
+          {presentation.completedCount > 0 && (
+            <span className="reminders-count-completed"> · {presentation.completedCount} completed</span>
           )}
         </div>
         <div className="reminders-header-actions">
@@ -219,18 +151,15 @@ export const RemindersList: React.FC<Props> = ({
           </ShadowDOMButton>
         </div>
       </div>
-      {reminders.length === 0 ? (
+      {presentation.reminders.length === 0 ? (
         <div className="reminders-empty">
           <ObsidianIcon size="l" id="calendar-check" />
-          <p>
-            No reminders
-            {showToday ? " due today" : showUpcoming ? ` in the next ${effectiveDays} days` : projectFilter ? ` in project "${projectFilter}"` : ""}
-          </p>
+          <p>{presentation.emptyMessage}</p>
         </div>
-      ) : showUpcoming && dateGroups ? (
+      ) : showUpcoming && presentation.dateGroups ? (
         <LayoutGroup>
           <div className="reminders-list reminders-list-grouped">
-            {dateGroups.map((group, groupIndex) => (
+            {presentation.dateGroups.map((group, groupIndex) => (
               <div key={group.date.toISOString()} className="reminders-date-group">
                 {groupIndex > 0 && <div className="reminders-date-divider" />}
                 <h3 className="reminders-date-header">{formatDateHeader(group.date)}</h3>
@@ -257,7 +186,7 @@ export const RemindersList: React.FC<Props> = ({
         </LayoutGroup>
       ) : (
         <div className="reminders-list">
-          {supportsReorder ? (
+          {presentation.supportsReorder ? (
             <>
               <ReorderableReminderList
                 reminders={localOrder}
@@ -265,7 +194,7 @@ export const RemindersList: React.FC<Props> = ({
                 onReorderCommit={handleReorderCommit}
                 renderCard={renderCard}
               />
-              {showCompletedState && reminders.filter(r => r.completed).map((reminder) => (
+              {showCompletedState && presentation.reminders.filter(r => r.completed).map((reminder) => (
                 <ReminderCardWrapper
                   key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
                   reminder={reminder}
@@ -274,7 +203,7 @@ export const RemindersList: React.FC<Props> = ({
               ))}
             </>
           ) : (
-            reminders.map((reminder) => (
+            presentation.reminders.map((reminder) => (
               <ReminderCardWrapper
                 key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
                 reminder={reminder}

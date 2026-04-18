@@ -5,11 +5,10 @@ import { ChevronLeft, ChevronDown, FolderOpen, Circle, CheckCircle2 } from 'luci
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { ShadowDOMButton, ShadowDOMNativeButton } from '../ShadowDOMButton';
 import type { Reminder } from '../../types/reminder';
-import { sortRemindersByFileOrder } from '../../utils/reminderSort';
-import { getProjectColor } from '../../utils/projectColors';
 import { ReminderCard } from '../ReminderCard';
 import { ReorderableReminderList } from '../ReorderableReminderList';
 import { EmptyState } from '../EmptyState';
+import { buildProjectDetailViewModel } from './viewModels';
 import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,
@@ -52,30 +51,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   const [showCompleted, setShowCompleted] = useState(false);
 
   const { active, completed, accentColor, total, completionPercentage } = useMemo(() => {
-    // Filter to only show reminders from this project
-    const projectReminders = reminders.filter(r =>
-      (r.project || 'Inbox') === project
-    );
-
-    const sorted = sortRemindersByFileOrder(projectReminders);
-    const activeList = sorted.filter(r => !r.completed);
-    const completedList = sorted.filter(r => r.completed);
-
-    // Get project colors (using dark theme for premium UI)
-    const colors = getProjectColor(project);
-    const accent = colors.dark.accent;
-
-    // Calculate completion percentage
-    const totalCount = projectReminders.length;
-    const percentage = totalCount > 0 ? Math.round((completedList.length / totalCount) * 100) : 0;
-
-    return {
-      active: activeList,
-      completed: completedList,
-      accentColor: accent,
-      total: totalCount,
-      completionPercentage: percentage
-    };
+    return buildProjectDetailViewModel(reminders, project);
   }, [reminders, project]);
 
   // Local state for optimistic reorder (visual only during drag)

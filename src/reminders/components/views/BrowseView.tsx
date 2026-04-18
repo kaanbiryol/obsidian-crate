@@ -6,19 +6,12 @@ import { ShadowDOMNativeMotionButton } from '../ShadowDOMButton';
 import type { Reminder } from '../../types/reminder';
 import { getProjectColor } from '../../utils/projectColors';
 import { EmptyState } from '../EmptyState';
+import { buildProjectStatsMap, getProjectStats, type ProjectStats } from './viewModels';
 import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,
   SCROLL_PADDING_WITHOUT_FAB_CSS
 } from '../../ui/layoutConstants';
-
-
-export interface ProjectStats {
-  active: number;
-  completed: number;
-  total: number;
-  completionPercentage: number;
-}
 
 export interface BrowseViewProps {
   projects: string[];
@@ -33,13 +26,7 @@ export interface BrowseViewProps {
   className?: string;
 }
 
-const EMPTY_STATS: ProjectStats = {
-  active: 0,
-  completed: 0,
-  total: 0,
-  completionPercentage: 0,
-};
-
+export type { ProjectStats } from './viewModels';
 
 /**
  * Mini progress bar component
@@ -183,40 +170,7 @@ export const BrowseView = memo(function BrowseView({
   showHeader = false,
   className = ''
 }: BrowseViewProps) {
-  const projectStatsMap = useMemo(() => {
-    const counts = new Map<string, { active: number; completed: number; total: number }>();
-
-    for (const reminder of reminders) {
-      const project = reminder.project || 'Inbox';
-      const current = counts.get(project) ?? { active: 0, completed: 0, total: 0 };
-      current.total += 1;
-      if (reminder.completed) {
-        current.completed += 1;
-      } else {
-        current.active += 1;
-      }
-      counts.set(project, current);
-    }
-
-    const finalized = new Map<string, ProjectStats>();
-    for (const [project, stats] of counts.entries()) {
-      const completionPercentage = stats.total > 0
-        ? Math.round((stats.completed / stats.total) * 100)
-        : 0;
-      finalized.set(project, {
-        active: stats.active,
-        completed: stats.completed,
-        total: stats.total,
-        completionPercentage,
-      });
-    }
-
-    return finalized;
-  }, [reminders]);
-
-  const getProjectStats = (project: string): ProjectStats => {
-    return projectStatsMap.get(project) ?? EMPTY_STATS;
-  };
+  const projectStatsMap = useMemo(() => buildProjectStatsMap(reminders), [reminders]);
 
   // Empty state
   if (projects.length === 0) {
@@ -256,7 +210,7 @@ export const BrowseView = memo(function BrowseView({
         {/* Projects list */}
         <div className="premium-projects-list">
           {projects.map((project, index) => {
-            const stats = getProjectStats(project);
+            const stats = getProjectStats(projectStatsMap, project);
             const projectColors = getProjectColor(project);
             const accentColor = projectColors.dark.accent;
 
