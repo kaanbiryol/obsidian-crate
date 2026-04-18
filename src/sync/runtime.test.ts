@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { createEmptySyncResult } from './sync-result';
 import { SyncRuntime } from './runtime';
-import { MAX_SYNC_HISTORY_PATHS, SECRET_KEYS, type CrateSettings, type SyncResult } from '../plugin/types';
+import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, SECRET_KEYS, type CrateSettings, type SyncResult } from '../plugin/types';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/obsidian-crate`;
@@ -34,6 +34,13 @@ function setStatusBar(runtime: SyncRuntime, statusBar: RuntimeStatusBarStub): vo
 
 function setSyncEngine(runtime: SyncRuntime, syncEngine: RuntimeSyncEngineStub): void {
 	(runtime as unknown as { syncEngine: RuntimeSyncEngineStub | null }).syncEngine = syncEngine;
+}
+
+function setApiClient(runtime: SyncRuntime, apiClient: {
+	testConnection(): Promise<{ success: boolean; error?: string }>;
+	putSharedSettings(shared: unknown): Promise<void>;
+} | null): void {
+	(runtime as unknown as { apiClient: typeof apiClient }).apiClient = apiClient;
 }
 
 function createDeferred<T>(): Deferred<T> {
@@ -343,15 +350,20 @@ describe('SyncRuntime operation wrappers', () => {
 
 		await runtime.applyInfrastructureConfig({
 			workerUrl: 'https://worker.example',
-			authToken: 'new-auth-token',
-			workerName: 'worker-name',
-			bucketName: 'bucket-name',
-			databaseId: 'db-id',
+			authToken: ' new-auth-token ',
+			workerName: ' worker-name ',
+			bucketName: ' bucket-name ',
+			databaseId: ' db-id ',
+			accountId: ' acct-1 ',
 		});
 
 		expect(settings.lastSeq).toBe(0);
 		expect(settings.lastSync).toBeNull();
 		expect(settings.syncHistory).toEqual([]);
+		expect(settings.workerName).toBe('worker-name');
+		expect(settings.bucketName).toBe('bucket-name');
+		expect(settings.databaseId).toBe('db-id');
+		expect(settings.cloudflareAccountId).toBe('acct-1');
 		expect(initialize).toHaveBeenCalledTimes(1);
 	});
 
@@ -391,5 +403,58 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(settings.cloudflareAccountId).toBe('');
 		expect(secretStorage.delete).toHaveBeenCalledWith(SECRET_KEYS.AUTH_TOKEN);
 		expect(secretStorage.delete).toHaveBeenCalledWith(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
+	});
+
+	it('caps stored sync history entries', async () => {
+		const { runtime, settings } = createRuntimeHarness();
+
+		setSyncEngine(runtime, {
+			sync: vi.fn(async () => createEmptySyncResult()),
+			initialSync: vi.fn(async () => createEmptySyncResult()),
+			forceFullSync: vi.fn(async () => createEmptySyncResult()),
+		});
+
+		for (let index = 0; index < MAX_SYNC_HISTORY + 5; index++) {
+			await runtime.sync();
+		}
+
+		expect(settings.syncHistory).toHaveLength(MAX_SYNC_HISTORY);
+	});
+
+	it('pushes shared settings through the current API client', async () => {
+		const { runtime, settings } = createRuntimeHarness({
+			ignorePatterns: ['*.tmp'],
+			syncOnStartup: false,
+			syncInterval: 15,
+			showStatusBar: true,
+			pushEnabled: true,
+		});
+		const putSharedSettings = vi.fn(async () => {});
+		setApiClient(runtime, {
+			putSharedSettings,
+			testConnection: vi.fn(async () => ({ success: true })),
+		});
+
+		await runtime.pushSharedSettings();
+
+		expect(putSharedSettings).toHaveBeenCalledWith({
+			ignorePatterns: ['*.tmp'],
+			syncOnStartup: false,
+			syncInterval: 15,
+			showStatusBar: true,
+			pushEnabled: true,
+		});
+	});
+
+	it('delegates connection tests to the API client when configured', async () => {
+		const { runtime } = createRuntimeHarness();
+		const testConnection = vi.fn(async () => ({ success: false, error: 'boom' }));
+		setApiClient(runtime, {
+			putSharedSettings: vi.fn(async () => {}),
+			testConnection,
+		});
+
+		await expect(runtime.testConnection()).resolves.toEqual({ success: false, error: 'boom' });
+		expect(testConnection).toHaveBeenCalledTimes(1);
 	});
 });
