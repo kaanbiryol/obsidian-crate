@@ -3,12 +3,10 @@ import React, { useState, useRef, useCallback } from 'react';
 import type { RichTextInputHandle } from './RichTextInput';
 import { BaseModal } from './BaseModal';
 import { ModalBackdrop } from './ModalBackdrop';
-import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { AddReminderModalBody } from './addReminderModal/AddReminderModalBody';
 import { AddReminderModalHeader } from './addReminderModal/AddReminderModalHeader';
-import { DatePickerModal } from './addReminderModal/DatePickerModal';
-import { ProjectPickerModal } from './addReminderModal/ProjectPickerModal';
-import { RecurrencePickerModal } from './addReminderModal/RecurrencePickerModal';
+import { AddReminderModalOverlays } from './addReminderModal/AddReminderModalOverlays';
+import { buildDeleteConfirmationMessage } from './addReminderModal/deleteConfirmation';
 import {
 	buildReminderSubmission,
 	executeReminderAction,
@@ -289,55 +287,31 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             />
         </BaseModal>
 
-        {/* Picker modals - BaseModal handles AnimatePresence internally */}
-        <DatePickerModal
-            isOpen={currentView === 'date' && !isClosing}
-            onClose={closePickerModal}
+        <AddReminderModalOverlays
+            currentView={currentView}
+            isClosing={isClosing}
             animationConfig={animationConfig}
             pickerMode={pickerMode}
             dueDate={dueDate}
             hasTime={hasTime}
             isDark={isDark}
-            onDateTimeChange={(value, nextHasTime) => {
-                applyDateSelection(value, nextHasTime);
-            }}
-        />
-        <ProjectPickerModal
-            isOpen={currentView === 'project' && !isClosing}
-            onClose={closePickerModal}
-            animationConfig={animationConfig}
-            pickerMode={pickerMode}
             projects={projects}
             project={project}
             defaultProject={defaultProject}
-            isDark={isDark}
-            onSelectProject={(selected) => {
-                applyProjectSelection(selected);
-            }}
-        />
-        <RecurrencePickerModal
-            isOpen={currentView === 'recurrence' && !isClosing}
-            onClose={closePickerModal}
-            animationConfig={animationConfig}
-            pickerMode={pickerMode}
-            isDark={isDark}
             recurrence={recurrence}
-            onApply={(rule) => {
-                applyRecurrenceSelection(rule ?? null);
+            onClosePicker={closePickerModal}
+            onDateTimeChange={applyDateSelection}
+            onSelectProject={applyProjectSelection}
+            onApplyRecurrence={(rule) => {
+                applyRecurrenceSelection(rule);
             }}
-        />
-
-        {/* Delete Confirmation Modal - rendered outside AnimatePresence to avoid interfering with modal transitions */}
-        <DeleteConfirmationModal
-            isOpen={showDeleteConfirm}
-            onClose={() => setShowDeleteConfirm(false)}
-            onConfirm={() => {
+            showDeleteConfirm={showDeleteConfirm}
+            onCloseDeleteConfirm={() => setShowDeleteConfirm(false)}
+            onConfirmDelete={() => {
                 void handleDeleteConfirm();
             }}
-            title="Delete Reminder"
-            message={`Are you sure you want to delete "${reminder?.content?.substring(0, 50)}${(reminder?.content?.length || 0) > 50 ? '...' : ''}"? This action cannot be undone.`}
-            animationConfig={animationConfig}
-            isLoading={isDeleting}
+            deleteMessage={buildDeleteConfirmationMessage(reminder)}
+            isDeleting={isDeleting}
         />
         </>
     );

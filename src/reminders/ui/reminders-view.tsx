@@ -1,28 +1,19 @@
 import { ItemView, Platform, WorkspaceLeaf } from "obsidian";
 import { Root, createRoot } from "react-dom/client";
 import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
-import { AnimatePresence, motion, type Easing } from "framer-motion";
-import { X, ChevronDown } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import type CratePlugin from "@/main";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
+import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
 import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
 import { HeroUIProvider } from "@heroui/react";
 import {
-    isReminderOverdue,
-    getUpcomingReminders,
-    getTodayReminders,
-    getOverdueReminders,
     BottomTabBar,
     FloatingActionButton,
     ViewHeader,
-    InboxView,
-    TodayView,
-    UpcomingView,
-    BrowseView,
-    ProjectDetailView,
     DEFAULT_PROJECT,
-    EASE_EXPO_OUT,
     PAGE_TRANSITION_DURATION,
     type TabId,
     type Reminder as SharedReminder
@@ -31,22 +22,18 @@ import { openReminderCreationModal } from "@/reminders/ui/modals";
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
 import { ShadowDOMButton, ShadowDOMNativeButton } from "@/reminders/components/ShadowDOMButton";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
+import { RemindersViewCloseButton } from "./RemindersViewCloseButton";
+import { RemindersViewPanels } from "./RemindersViewPanels";
+import {
+    getCurrentHeaderData,
+    getReminderCreateProject,
+    getReminderProjects,
+    getRemindersHeaderData,
+    getReorderProject,
+    shouldShowReminderFab,
+    type ViewMode,
+} from "./remindersViewModel";
 import "./reminders-view.scss";
-
-// Hook to detect Obsidian's dark/light theme
-function useObsidianDarkMode(): boolean {
-    const [isDark, setIsDark] = useState(() => document.body.classList.contains("theme-dark"));
-
-    useEffect(() => {
-        const observer = new MutationObserver(() => {
-            setIsDark(document.body.classList.contains("theme-dark"));
-        });
-        observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-        return () => observer.disconnect();
-    }, []);
-
-    return isDark;
-}
 
 export const VIEW_TYPE_REMINDERS = "reminders-view";
 
@@ -136,9 +123,6 @@ export class RemindersView extends ItemView {
     }
 }
 
-// Map shared TabId to plugin ViewMode
-type ViewMode = TabId;
-
 interface RemindersViewContentProps {
     plugin: CratePlugin;
     shadowRoot: ShadowRoot;
@@ -154,17 +138,6 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? "browse" : (initialTab ?? "inbox"));
     const [isTransitioning, setIsTransitioning] = useState(false);
     const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Glass styling for close button based on theme
-    const glassButtonBg = isDarkMode
-        ? 'rgba(255, 255, 255, 0.04)'
-        : 'rgba(0, 0, 0, 0.03)';
-    const glassButtonBorder = isDarkMode
-        ? 'rgba(255, 255, 255, 0.08)'
-        : 'rgba(0, 0, 0, 0.06)';
-    const glassButtonHoverBg = isDarkMode
-        ? 'rgba(255, 255, 255, 0.08)'
-        : 'rgba(0, 0, 0, 0.06)';
     const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
@@ -215,10 +188,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
 
     // Get unique projects from reminders
     const projects = useMemo(() => {
-        const uniqueProjects = Array.from(
-            new Set(reminders.map((r) => r.project || DEFAULT_PROJECT))
-        ).sort();
-        return uniqueProjects;
+        return getReminderProjects(reminders);
     }, [reminders]);
 
     const startTransition = useCallback(() => {
@@ -255,55 +225,26 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
 
     // Calculate header data for each tab
     const headerData = useMemo(() => {
-        const effectiveDays = plugin.remindersSettings.upcomingDaysDefault ?? 7;
-        const activeReminders = reminders.filter(r => !r.completed);
-
-        // Inbox: reminders in Inbox project
-        const inboxReminders = activeReminders.filter(r => (r.project || DEFAULT_PROJECT) === DEFAULT_PROJECT);
-        const inboxOverdue = inboxReminders.filter(r => isReminderOverdue(r)).length;
-
-        // Today: reminders due today or overdue
-        const todayList = getTodayReminders(activeReminders);
-        const overdueList = getOverdueReminders(activeReminders);
-        const todayCombined = [...new Map([...overdueList, ...todayList].map(r => [r.id, r])).values()];
-        const todayOverdue = overdueList.length;
-
-        // Upcoming: reminders in next N days
-        const upcomingReminders = getUpcomingReminders(activeReminders, effectiveDays);
-        const upcomingOverdue = upcomingReminders.filter(r => isReminderOverdue(r)).length;
-
-        return {
-            inbox: { count: inboxReminders.length, overdueCount: inboxOverdue },
-            today: { count: todayCombined.length, overdueCount: todayOverdue },
-            upcoming: { count: upcomingReminders.length, overdueCount: upcomingOverdue },
-            browse: { count: projects.length, overdueCount: 0 },
-        };
+        return getRemindersHeaderData(
+            reminders,
+            projects,
+            plugin.remindersSettings.upcomingDaysDefault ?? 7,
+        );
     }, [reminders, projects, plugin.remindersSettings.upcomingDaysDefault]);
 
     // Get current header based on view mode
     const getCurrentHeader = () => {
-        switch (viewMode) {
-            case "inbox":
-                return { title: "Inbox", ...headerData.inbox };
-            case "today":
-                return { title: "Today", ...headerData.today };
-            case "upcoming":
-                return { title: "Upcoming", ...headerData.upcoming };
-            case "browse":
-                return { title: "Projects", count: headerData.browse.count, overdueCount: 0 };
-        }
+        return getCurrentHeaderData(viewMode, headerData);
     };
 
     // Handle FAB click
     const handleAdd = useCallback(() => {
-        const defaultProject = viewMode === "inbox" || viewMode === "browse"
-            ? (selectedProject || DEFAULT_PROJECT)
-            : DEFAULT_PROJECT;
+        const defaultProject = getReminderCreateProject(viewMode, selectedProject);
         openReminderCreationModal(plugin, defaultProject, updateReminders);
     }, [plugin, viewMode, selectedProject, updateReminders]);
 
     // Determine whether to show FAB
-    const showFab = viewMode !== "browse" || selectedProject !== null;
+    const showFab = shouldShowReminderFab(viewMode, selectedProject);
 
     // Create custom card renderer that uses ReminderCardWrapper
     const renderCard = useCallback((reminder: SharedReminder, index: number) => (
@@ -343,9 +284,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     ), []);
 
     // Determine current project for reorder
-    const currentProject = viewMode === "inbox"
-        ? DEFAULT_PROJECT
-        : (viewMode === "browse" && selectedProject ? selectedProject : null);
+    const currentProject = getReorderProject(viewMode, selectedProject);
 
     const handleReorder = useCallback(async (orderedIds: string[]) => {
         if (!currentProject) return;
@@ -359,34 +298,10 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
             >
                 {/* Close button for modal mode */}
                 {onClose && (
-                    <ShadowDOMNativeButton
-                        onClick={onClose}
-                        className="flex items-center justify-center w-11 h-11 rounded-full transition-all duration-200 active:scale-95"
-                        aria-label="Close"
-                        style={{
-                            position: 'absolute',
-                            top: '12px',
-                            right: '16px',
-                            zIndex: 100,
-                            background: glassButtonBg,
-                            backdropFilter: 'blur(8px)',
-                            WebkitBackdropFilter: 'blur(8px)',
-                            border: `1px solid ${glassButtonBorder}`,
-                            color: 'var(--text-muted)',
-                            boxShadow: `0 2px 8px ${isDarkMode ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)'}`,
-                            transition: 'all 200ms ease-out',
-                        }}
-                        onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                            e.currentTarget.style.background = glassButtonHoverBg;
-                            e.currentTarget.style.boxShadow = `0 0 12px ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)'}`;
-                        }}
-                        onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                            e.currentTarget.style.background = glassButtonBg;
-                            e.currentTarget.style.boxShadow = `0 2px 8px ${isDarkMode ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)'}`;
-                        }}
-                    >
-                        <X size={24} strokeWidth={2.5} />
-                    </ShadowDOMNativeButton>
+                    <RemindersViewCloseButton
+                        isDarkMode={isDarkMode}
+                        onClose={onClose}
+                    />
                 )}
 
                 {/* Tab Header - hide when in project detail view */}
@@ -414,111 +329,20 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
                 {/* Content - Scrollable */}
                 <div className={`reminders-content${isTransitioning ? ' is-transitioning' : ''}`}>
                     <AnimatePresence mode="sync">
-                        {(() => {
-                            const tabContainerStyle: React.CSSProperties = {
-                                display: "flex",
-                                height: "100%",
-                                flexDirection: "column",
-                            };
-
-                            // Unified page transition props - simple fade
-                            const easeExpoOut = EASE_EXPO_OUT as unknown as Easing;
-                            const pageTransition = {
-                                initial: { opacity: 0 },
-                                animate: { opacity: 1 },
-                                exit: { opacity: 0 },
-                                transition: {
-                                    duration: PAGE_TRANSITION_DURATION,
-                                    ease: easeExpoOut
-                                }
-                            };
-
-                            switch (viewMode) {
-                                case "inbox":
-                                    return (
-                                        <motion.div
-                                            key="inbox"
-                                            style={tabContainerStyle}
-                                            {...pageTransition}
-                                        >
-                                            <InboxView
-                                                reminders={reminders}
-                                                renderCard={renderCard}
-                                                renderToggleButton={renderToggleButton}
-                                                hasFab={showFab}
-                                                onReorder={handleReorder}
-                                            />
-                                        </motion.div>
-                                    );
-                                case "today":
-                                    return (
-                                        <motion.div
-                                            key="today"
-                                            style={tabContainerStyle}
-                                            {...pageTransition}
-                                        >
-                                            <TodayView
-                                                reminders={reminders}
-                                                renderCard={renderCard}
-                                                hasFab={showFab}
-                                            />
-                                        </motion.div>
-                                    );
-                                case "upcoming":
-                                    return (
-                                        <motion.div
-                                            key="upcoming"
-                                            style={tabContainerStyle}
-                                            {...pageTransition}
-                                        >
-                                            <UpcomingView
-                                                reminders={reminders}
-                                                renderCard={renderCard}
-                                                days={plugin.remindersSettings.upcomingDaysDefault ?? 7}
-                                                hasFab={showFab}
-                                            />
-                                        </motion.div>
-                                    );
-                                case "browse":
-                                    if (!selectedProject) {
-                                        return (
-                                            <motion.div
-                                                key="browse"
-                                                style={tabContainerStyle}
-                                                {...pageTransition}
-                                            >
-                                                <BrowseView
-                                                    projects={projects}
-                                                    reminders={reminders}
-                                                    onProjectSelect={handleProjectSelect}
-                                                />
-                                            </motion.div>
-                                        );
-                                    }
-
-                                    if (isInitialLoadComplete) {
-                                        return (
-                                            <motion.div
-                                                key={`project-${selectedProject}`}
-                                                style={tabContainerStyle}
-                                                {...pageTransition}
-                                            >
-                                                <ProjectDetailView
-                                                    project={selectedProject}
-                                                    reminders={reminders}
-                                                    onBack={handleBackToProjects}
-                                                    animationConfig={{ enabled: false }}
-                                                    renderCard={renderCard}
-                                                    hasFab={showFab}
-                                                    onReorder={handleReorder}
-                                                />
-                                            </motion.div>
-                                        );
-                                    }
-
-                                    return null;
-                            }
-                        })()}
+                        <RemindersViewPanels
+                            viewMode={viewMode}
+                            selectedProject={selectedProject}
+                            isInitialLoadComplete={isInitialLoadComplete}
+                            reminders={reminders}
+                            projects={projects}
+                            showFab={showFab}
+                            plugin={plugin}
+                            renderCard={renderCard}
+                            renderToggleButton={renderToggleButton}
+                            onProjectSelect={handleProjectSelect}
+                            onBackToProjects={handleBackToProjects}
+                            onReorder={handleReorder}
+                        />
                     </AnimatePresence>
                 </div>
 
