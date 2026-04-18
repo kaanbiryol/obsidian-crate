@@ -2,12 +2,9 @@
  * Core sync engine - orchestrates synchronization between local vault and remote storage
  */
 
-import { Notice, type Plugin, type TAbstractFile, type Vault } from 'obsidian';
-import { HttpError, SyncApiClient } from './api';
+import { type Plugin, type TAbstractFile, type Vault } from 'obsidian';
+import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
-import { computeHash } from './hasher';
-import { isConflictFile, notifyConflicts } from './conflict';
-import { getAllVaultFiles } from './file-discovery';
 import type { VaultFile } from './file-discovery';
 import {
 	onRawPathChange as queueOnRawPathChange,
@@ -33,13 +30,6 @@ import {
 	uploadPreparedFiles as transferUploadPreparedFiles,
 	createVaultFileChunks as transferCreateVaultFileChunks,
 } from './transfer';
-import {
-	createEmptySyncResult,
-	createSyncFailureResult,
-	finalizeSyncResult,
-	getSyncResultError,
-	SYNC_ERROR_MESSAGES,
-} from './sync-result';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type {
 	SyncState,
@@ -50,23 +40,23 @@ import type {
 	CrateSettings,
 } from '../plugin/types';
 import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/types';
+import {
+	DOWNLOAD_CONCURRENCY,
+	MAX_RETRIES,
+	PREPARE_CONCURRENCY,
+	RETRY_BASE_DELAY_MS,
+	UPLOAD_CONCURRENCY,
+} from './engine-constants';
+import { matchIgnorePattern, shouldIgnoreSyncPath } from './engine-ignore';
+import { retryWithBackoff, runConcurrentTasks } from './engine-utils';
+import {
+	runForceFullSyncWorkflow,
+	runInitialSyncWorkflow,
+	runPeriodicCheckWorkflow,
+	runSyncWorkflow,
+} from './engine-workflows';
 
 const logger = createLogger('SyncEngine');
-
-const AUTH_ERROR_MESSAGE = 'Authentication expired - please sign in again in plugin settings';
-
-function isAuthError(error: unknown): boolean {
-	return error instanceof HttpError && error.status === 401;
-}
-const UPLOAD_CONCURRENCY = 10;
-const DOWNLOAD_CONCURRENCY = 5;
-const FORCE_SYNC_CONCURRENCY = 2;
-const PREPARE_CONCURRENCY = 20;
-const INITIAL_SYNC_PIPELINE_CHUNK_FILES = 500;
-const BATCH_UPLOAD_CONCURRENCY = 5;
-const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY_MS = 1000;
-const MAX_CHECK_BACKOFF_MULTIPLIER = 32;
 
 export class SyncEngine {
 	private plugin: Plugin;
@@ -116,29 +106,19 @@ export class SyncEngine {
 		};
 	}
 
-	/**
-	 * Initialize the sync engine
-	 */
 	async initialize(): Promise<void> {
 		await this.localManifest.load();
 		logger.info('Engine initialized');
 
-		// Set up periodic sync if enabled
 		if (this.settings.syncInterval > 0) {
 			this.startPeriodicSync();
 		}
 	}
 
-	/**
-	 * Set state change callback
-	 */
 	setStateChangeCallback(callback: (state: SyncState) => void): void {
 		this.onStateChange = callback;
 	}
 
-	/**
-	 * Update settings
-	 */
 	updateSettings(settings: CrateSettings): void {
 		this.patternCache.clear();
 		this.settings = settings;
@@ -146,16 +126,12 @@ export class SyncEngine {
 		this.consecutiveCheckFailures = 0;
 		this.lastCheckAttempt = 0;
 
-		// Restart periodic sync with new interval
 		this.stopPeriodicSync();
 		if (settings.syncInterval > 0) {
 			this.startPeriodicSync();
 		}
 	}
 
-	/**
-	 * Get current sync state
-	 */
 	getState(): SyncState {
 		return { ...this.state };
 	}
@@ -166,9 +142,6 @@ export class SyncEngine {
 		return Array.from(combined);
 	}
 
-	/**
-	 * Start periodic sync
-	 */
 	private startPeriodicSync(): void {
 		if (this.syncInterval) {
 			clearInterval(this.syncInterval);
@@ -179,54 +152,10 @@ export class SyncEngine {
 		);
 	}
 
-	/**
-	 * Lightweight periodic check — only triggers full sync if remote has changes
-	 */
 	private async periodicCheck(): Promise<void> {
-		if (this.state.status === 'syncing') return;
-		if (!this.api.isConfigured()) return;
-
-		if (this.consecutiveCheckFailures > 0) {
-			const multiplier = Math.min(
-				2 ** (this.consecutiveCheckFailures - 1),
-				MAX_CHECK_BACKOFF_MULTIPLIER,
-			);
-			const backoffMs = this.settings.syncInterval * 1000 * multiplier;
-			if (Date.now() - this.lastCheckAttempt < backoffMs) {
-				return;
-			}
-		}
-		this.lastCheckAttempt = Date.now();
-
-		try {
-			const { hasChanges } = await this.api.checkForChanges(this.settings.lastSeq);
-
-			if (!hasChanges && this.pendingPaths.size === 0) {
-				logger.debug('Periodic check: no changes');
-				this.consecutiveCheckFailures = 0;
-				return;
-			}
-
-			logger.info('Periodic check: changes detected, running sync');
-			const result = await this.sync();
-			notifyConflicts(result.conflicts);
-			this.consecutiveCheckFailures = 0;
-		} catch (error) {
-			this.consecutiveCheckFailures++;
-			const multiplier = Math.min(
-				2 ** (this.consecutiveCheckFailures - 1),
-				MAX_CHECK_BACKOFF_MULTIPLIER,
-			);
-			logger.warn(
-				`Periodic check failed (attempt ${this.consecutiveCheckFailures}, next in ~${multiplier}x interval):`,
-				errorMessage(error),
-			);
-		}
+		await runPeriodicCheckWorkflow(this.getPeriodicCheckWorkflowContext());
 	}
 
-	/**
-	 * Stop periodic sync
-	 */
 	private stopPeriodicSync(): void {
 		if (this.syncInterval) {
 			clearInterval(this.syncInterval);
@@ -234,79 +163,22 @@ export class SyncEngine {
 		}
 	}
 
-	/**
-	 * Update and notify state change
-	 */
 	private updateState(updates: Partial<SyncState>): void {
 		this.state = { ...this.state, ...updates };
 		this.onStateChange?.(this.state);
 	}
 
-	/**
-	 * Check if path should be ignored
-	 */
 	private shouldIgnore(path: string): boolean {
-		// Always ignore plugin's own state files (device-specific)
-		if (this.pluginIgnorePaths.has(path)) {
-			return true;
-		}
-
-		// Always ignore conflict files to prevent loops
-		if (isConflictFile(path)) {
-			return true;
-		}
-
-		// Fast-path: check pre-computed directory prefixes with startsWith
-		for (const prefix of this.ignoredDirPrefixes) {
-			if (path.startsWith(prefix) || path === prefix.slice(0, -1)) {
-				return true;
-			}
-		}
-
-		for (const pattern of this.settings.ignorePatterns) {
-			// Skip directory patterns already handled above
-			if (pattern.endsWith('/')) continue;
-			if (this.matchPattern(path, pattern)) {
-					return true;
-			}
-		}
-		return false;
+		return shouldIgnoreSyncPath(path, {
+			pluginIgnorePaths: this.pluginIgnorePaths,
+			ignoredDirPrefixes: this.ignoredDirPrefixes,
+			ignorePatterns: this.settings.ignorePatterns,
+			patternCache: this.patternCache,
+		});
 	}
 
-	/**
-	 * Simple glob pattern matching
-	 * Trailing-slash patterns (e.g. `.trash/`) match everything under that prefix.
-	 */
 	private matchPattern(path: string, pattern: string): boolean {
-		// Trailing-slash pattern: match the prefix and anything beneath it
-		if (pattern.endsWith('/')) {
-			return path.startsWith(pattern) || path === pattern.slice(0, -1);
-		}
-
-		let regex = this.patternCache.get(pattern);
-		if (!regex) {
-			const regexPattern = Array.from(pattern).map(char => {
-				if (char === '*') return '.*';
-				if (char === '?') return '.';
-				return char.replace(/[\\^$+.|(){}[\]]/g, '\\$&');
-			}).join('');
-			try {
-				regex = new RegExp(`^${regexPattern}$`);
-			} catch (error) {
-				logger.warn(`Invalid ignore pattern "${pattern}":`, errorMessage(error));
-				// Never match on invalid patterns to avoid sync crashes.
-				regex = /^$/;
-			}
-			this.patternCache.set(pattern, regex);
-		}
-
-		if (pattern.includes('/')) {
-			return regex.test(path);
-		}
-
-		// Slashless patterns should behave like filename globs and match nested basenames too.
-		const basename = path.split('/').pop() ?? path;
-		return regex.test(path) || regex.test(basename);
+		return matchIgnorePattern(path, pattern, this.patternCache);
 	}
 
 	private throwIfDestroyed(): void {
@@ -372,9 +244,6 @@ export class SyncEngine {
 		};
 	}
 
-	/**
-	 * Handle raw filesystem event (for hidden paths not covered by typed vault events)
-	 */
 	onRawFileEvent(path: string): void {
 		void this.handleRawFileEvent(path);
 	}
@@ -401,38 +270,23 @@ export class SyncEngine {
 		}
 	}
 
-	/**
-	 * Handle file change (create, modify)
-	 */
 	onFileChange(file: TAbstractFile): void {
 		queueOnFileChange(this.getQueueEventContext(), file);
 	}
 
-	/**
-	 * Handle file deletion
-	 */
 	onFileDelete(file: TAbstractFile): void {
 		queueOnFileDelete(this.getQueueEventContext(), file);
 	}
 
-	/**
-	 * Handle file rename
-	 */
 	onFileRename(file: TAbstractFile, oldPath: string): void {
 		queueOnFileRename(this.getQueueEventContext(), file, oldPath);
 	}
 
-	/**
-	 * Debounced sync trigger
-	 */
 	private debouncedSync(): void {
 		const delayMs = (this.settings.debounceDelay ?? 5) * 1000;
 		runDebouncedQueueSync(this.getQueueDebounceContext(), delayMs, MAX_DEBOUNCE_WAIT_MS);
 	}
 
-	/**
-	 * Process pending file changes
-	 */
 	private async processPendingChanges(): Promise<void> {
 		await flushPendingQueueChanges(this.getQueueFlushContext(), UPLOAD_CONCURRENCY);
 	}
@@ -441,52 +295,20 @@ export class SyncEngine {
 		return prepareTransferUploadFromPath(this.getTransferContext(), path);
 	}
 
-	/**
-	 * Run tasks with limited concurrency
-	 */
 	private async runConcurrent<T>(
 		tasks: (() => Promise<T>)[],
 		concurrency: number
 	): Promise<T[]> {
-		const results: T[] = [];
-		let index = 0;
-		const destroyed = () => this.destroyed;
-			async function next(): Promise<void> {
-				while (index < tasks.length) {
-					if (destroyed()) break;
-					const i = index++;
-					const task = tasks[i];
-					if (!task) {
-						break;
-					}
-					results[i] = await task();
-				}
-			}
-		await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, () => next()));
-		return results;
+		return runConcurrentTasks(tasks, concurrency, () => this.destroyed);
 	}
 
-	/**
-	 * Retry an async operation with exponential backoff
-	 */
 	private async retryWithBackoff<T>(fn: () => Promise<T>): Promise<T> {
-		for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-			try {
-				return await fn();
-			} catch (error) {
-				if (this.isAbortError(error) || this.destroyed) throw error;
-				if (attempt === MAX_RETRIES) throw error;
-				let delay: number;
-				if (error instanceof HttpError && error.retryAfter !== null) {
-					delay = error.retryAfter;
-				} else {
-					delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
-				}
-				logger.warn(`Retry ${attempt + 1}/${MAX_RETRIES} after ${delay}ms`);
-				await new Promise(resolve => setTimeout(resolve, delay));
-			}
-		}
-		throw new Error('Unreachable');
+		return retryWithBackoff(fn, {
+			maxRetries: MAX_RETRIES,
+			baseDelayMs: RETRY_BASE_DELAY_MS,
+			isAbortError: this.isAbortError.bind(this),
+			isDestroyed: () => this.destroyed,
+		});
 	}
 
 	private async getModifiedIso(path: string, fallbackMtime?: number): Promise<string> {
@@ -525,12 +347,12 @@ export class SyncEngine {
 				result: SyncResult,
 			) => this.processDiff(diff, localFiles, result),
 			prepareUploadFromPath: (path: string) => this.prepareUploadFromPath(path),
-				uploadPreparedFiles: (
-					prepared: PreparedUpload[],
-					result: SyncResult,
-					options: { concurrency: number; retry: boolean },
-				) => this.uploadPreparedFiles(prepared, result, options),
-			};
+			uploadPreparedFiles: (
+				prepared: PreparedUpload[],
+				result: SyncResult,
+				options: { concurrency: number; retry: boolean },
+			) => this.uploadPreparedFiles(prepared, result, options),
+		};
 	}
 
 	private getFullSyncPlannerContext() {
@@ -543,14 +365,109 @@ export class SyncEngine {
 		};
 	}
 
+	private getPeriodicCheckWorkflowContext() {
+		return {
+			apiConfigured: () => this.api.isConfigured(),
+			getStatus: () => this.state.status,
+			getSyncIntervalSeconds: () => this.settings.syncInterval,
+			getLastSeq: () => this.settings.lastSeq,
+			getPendingPathCount: () => this.pendingPaths.size,
+			getConsecutiveCheckFailures: () => this.consecutiveCheckFailures,
+			setConsecutiveCheckFailures: (value: number) => {
+				this.consecutiveCheckFailures = value;
+			},
+			getLastCheckAttempt: () => this.lastCheckAttempt,
+			setLastCheckAttempt: (value: number) => {
+				this.lastCheckAttempt = value;
+			},
+			checkForChanges: (lastSeq: number) => this.api.checkForChanges(lastSeq),
+			sync: () => this.sync(),
+		};
+	}
+
+	private getSyncWorkflowContext() {
+		return {
+			apiConfigured: () => this.api.isConfigured(),
+			getStatus: () => this.state.status,
+			updateState: this.updateState.bind(this),
+			getManifest: () => this.api.getManifest(),
+			incrementalSync: (progressCallback?: (current: number, total: number) => void) =>
+				this.incrementalSync(progressCallback),
+			isAbortError: this.isAbortError.bind(this),
+			throwIfDestroyed: this.throwIfDestroyed.bind(this),
+			createFullSyncPlan: (
+				remoteFiles: Record<string, FileEntry>,
+				concurrency: number,
+			) => createFullSyncPlan(this.getFullSyncPlannerContext(), remoteFiles, concurrency),
+			processDiff: this.processDiff.bind(this),
+			parallelDownloadAndSaveFiles: this.parallelDownloadAndSaveFiles.bind(this),
+			runConcurrent: this.runConcurrent.bind(this),
+			readBinary: (path: string) => this.vault.adapter.readBinary(path),
+			getModifiedIso: this.getModifiedIso.bind(this),
+			setLocalManifestEntry: (path: string, entry: FileEntry) => {
+				this.localManifest.setEntry(path, entry);
+			},
+			saveLocalManifest: () => this.localManifest.save(),
+			setLastSync: (value: string) => {
+				this.settings.lastSync = value;
+			},
+			setLastSeq: (value: number) => {
+				this.settings.lastSeq = value;
+			},
+		};
+	}
+
+	private getInitialSyncWorkflowContext() {
+		return {
+			vault: this.vault,
+			apiConfigured: () => this.api.isConfigured(),
+			getStatus: () => this.state.status,
+			updateState: this.updateState.bind(this),
+			shouldIgnore: this.shouldIgnore.bind(this),
+			isAbortError: this.isAbortError.bind(this),
+			prepareUploadsFromVaultFiles: this.prepareUploadsFromVaultFiles.bind(this),
+			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
+			createVaultFileChunks: this.createVaultFileChunks.bind(this),
+			saveLocalManifest: () => this.localManifest.save(),
+			throwIfDestroyed: this.throwIfDestroyed.bind(this),
+			setLastSync: (value: string) => {
+				this.settings.lastSync = value;
+			},
+		};
+	}
+
+	private getForceSyncWorkflowContext() {
+		return {
+			vault: this.vault,
+			apiConfigured: () => this.api.isConfigured(),
+			getStatus: () => this.state.status,
+			updateState: this.updateState.bind(this),
+			shouldIgnore: this.shouldIgnore.bind(this),
+			isAbortError: this.isAbortError.bind(this),
+			getManifest: () => this.api.getManifest(),
+			clearLocalManifest: () => {
+				this.localManifest.clear();
+			},
+			prepareUploadsFromVaultFiles: this.prepareUploadsFromVaultFiles.bind(this),
+			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
+			throwIfDestroyed: this.throwIfDestroyed.bind(this),
+			deleteRemoteFile: async (path: string) => {
+				await this.api.deleteFile(path);
+			},
+			removeLocalManifestEntry: (path: string) => {
+				this.localManifest.removeEntry(path);
+			},
+			saveLocalManifest: () => this.localManifest.save(),
+			setLastSync: (value: string) => {
+				this.settings.lastSync = value;
+			},
+		};
+	}
+
 	private async getLocalDeletes(): Promise<string[]> {
 		return planLocalDeletes(this.getLocalDiffPlannerContext(), PREPARE_CONCURRENCY);
 	}
 
-	/**
-	 * Incremental sync using changelog.
-	 * Returns SyncResult on success, or null to fall back to full sync.
-	 */
 	private async incrementalSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult | null> {
 		return runIncrementalSync(this.getIncrementalPlannerContext(), {
 			uploadConcurrency: UPLOAD_CONCURRENCY,
@@ -558,23 +475,14 @@ export class SyncEngine {
 		});
 	}
 
-	/**
-	 * Get locally modified files since last sync
-	 */
 	private async getLocalChanges(): Promise<{ path: string; hash: string }[]> {
 		return planLocalChanges(this.getLocalDiffPlannerContext(), PREPARE_CONCURRENCY);
 	}
 
-	/**
-	 * Download a file from remote and save it locally
-	 */
 	private async downloadAndSaveFile(path: string, result: SyncResult): Promise<void> {
 		await transferDownloadAndSaveFile(this.getTransferContext(), path, result);
 	}
 
-	/**
-	 * Download files in parallel using individual binary requests
-	 */
 	private async parallelDownloadAndSaveFiles(paths: string[], result: SyncResult): Promise<void> {
 		await transferParallelDownloadAndSaveFiles(
 			this.getTransferContext(),
@@ -584,173 +492,10 @@ export class SyncEngine {
 		);
 	}
 
-	/**
-	 * Full sync - compare manifests and sync all differences
-	 */
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		if (!this.api.isConfigured()) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
-		if (this.state.status === 'syncing') return createSyncFailureResult(SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS);
-		this.updateState({ status: 'syncing' });
-
-		logger.info('Sync started');
-
-		// Try incremental sync first
-		try {
-			const incrementalResult = await this.incrementalSync(progressCallback);
-			if (incrementalResult) {
-				if (incrementalResult.success) {
-					const lastSync = new Date().toISOString();
-					this.updateState({ status: 'idle', lastSync, lastError: null, conflictCount: incrementalResult.conflicts.length });
-					this.settings.lastSync = lastSync;
-				} else {
-					const lastError = getSyncResultError(incrementalResult, 'Incremental sync completed with errors');
-					this.updateState({ status: 'error', lastError, conflictCount: incrementalResult.conflicts.length });
-				}
-				return incrementalResult;
-			}
-		} catch (error) {
-			if (this.isAbortError(error)) {
-				logger.info('Incremental sync aborted');
-				return createEmptySyncResult();
-			}
-			throw error;
-		}
-
-		logger.info('Running full sync');
-
-		const result: SyncResult = createEmptySyncResult();
-
-		try {
-			this.throwIfDestroyed();
-			const remoteManifest = await this.api.getManifest();
-			const plan = await createFullSyncPlan(
-				this.getFullSyncPlannerContext(),
-				remoteManifest.files,
-				PREPARE_CONCURRENCY,
-			);
-
-			const {
-				localFiles,
-				diffs,
-				uploadDiffs,
-				downloadDiffs,
-				remainingDiffs,
-				errors,
-			} = plan;
-			result.errors.push(...errors);
-
-			const conflictDiffs = diffs.filter(d => d.action === 'conflict');
-			const deleteDiffs = diffs.filter(d => d.action === 'delete');
-			logger.info(`Full sync diffs: ${uploadDiffs.length} upload, ${downloadDiffs.length} download, ${conflictDiffs.length} conflict, ${deleteDiffs.length} delete`);
-
-			const total = diffs.length;
-			let current = 0;
-
-			// Run upload diffs concurrently
-			if (uploadDiffs.length > 0) {
-				const uploadTasks = uploadDiffs.map(diff => async () => {
-					try {
-						await this.processDiff(diff, localFiles, result);
-					} catch (error) {
-						result.errors.push(`${diff.path}: ${errorMessage(error)}`);
-					}
-					current++;
-					progressCallback?.(current, total);
-				});
-				await this.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
-			}
-
-			this.throwIfDestroyed();
-
-			// Download files in parallel
-			if (downloadDiffs.length > 0) {
-				await this.parallelDownloadAndSaveFiles(
-					downloadDiffs.map(d => d.path),
-					result,
-				);
-				// Update localFiles record for downloaded files
-				for (const diff of downloadDiffs) {
-					try {
-						const content = await this.vault.adapter.readBinary(diff.path);
-						const hash = await computeHash(content);
-						localFiles[diff.path] = {
-							hash,
-							size: content.byteLength,
-							modified: await this.getModifiedIso(diff.path),
-						};
-					} catch {
-						// File may have failed to download; error already recorded
-					}
-				}
-				current += downloadDiffs.length;
-				progressCallback?.(current, total);
-			}
-
-			this.throwIfDestroyed();
-
-			// Process conflict and delete diffs sequentially
-			for (const diff of remainingDiffs) {
-				if (this.destroyed) break;
-				try {
-					await this.processDiff(diff, localFiles, result);
-				} catch (error) {
-					result.errors.push(`${diff.path}: ${errorMessage(error)}`);
-				}
-				current++;
-				progressCallback?.(current, total);
-			}
-
-			// Update local manifest
-			for (const [path, entry] of Object.entries(localFiles)) {
-				this.localManifest.setEntry(path, entry);
-			}
-			await this.localManifest.save();
-
-			const lastSync = new Date().toISOString();
-			this.updateState({
-				status: 'idle',
-				lastSync,
-				lastError: result.errors.length > 0 ? result.errors[0] ?? null : null,
-				conflictCount: result.conflicts.length,
-			});
-
-			// Save last sync time and seq cursor to settings
-			this.settings.lastSync = lastSync;
-			if (
-				result.errors.length === 0 &&
-				remoteManifest.lastSeq !== undefined &&
-				remoteManifest.lastSeq > 0
-			) {
-				this.settings.lastSeq = remoteManifest.lastSeq;
-			}
-
-			logger.info(`Full sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.conflicts.length} conflicts`);
-		} catch (error) {
-			if (this.isAbortError(error)) {
-				logger.info('Full sync aborted');
-			} else if (isAuthError(error)) {
-				result.errors.push(AUTH_ERROR_MESSAGE);
-				logger.error('Full sync failed: auth error (401)');
-				new Notice(AUTH_ERROR_MESSAGE);
-				this.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
-			} else {
-				const errMsg = errorMessage(error);
-				result.errors.push(errMsg);
-				logger.error('Full sync failed:', errMsg);
-				this.updateState({
-					status: 'error',
-					lastError: errMsg,
-				});
-			}
-		}
-
-		finalizeSyncResult(result);
-		return result;
+		return runSyncWorkflow(this.getSyncWorkflowContext(), progressCallback);
 	}
 
-	/**
-	 * Process a single diff
-	 */
 	private async processDiff(
 		diff: FileDiff,
 		localFiles: Record<string, FileEntry>,
@@ -759,9 +504,6 @@ export class SyncEngine {
 		await transferProcessDiff(this.getTransferContext(), diff, localFiles, result);
 	}
 
-	/**
-	 * Prepare uploads with bounded concurrency to reduce initial sync wall time.
-	 */
 	private async prepareUploadsFromVaultFiles(
 		files: VaultFile[],
 		onPrepared?: (completed: number) => void,
@@ -774,9 +516,6 @@ export class SyncEngine {
 		);
 	}
 
-	/**
-	 * Upload prepared files as parallel individual binary uploads
-	 */
 	private async uploadPreparedFiles(
 		prepared: PreparedUpload[],
 		result: SyncResult,
@@ -789,199 +528,14 @@ export class SyncEngine {
 		return transferCreateVaultFileChunks(files, chunkSize);
 	}
 
-	/**
-	 * Initial sync - upload all local files
-	 */
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		if (!this.api.isConfigured()) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
-		if (this.state.status === 'syncing') return createSyncFailureResult(SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS);
-		this.updateState({ status: 'syncing' });
-
-		const result: SyncResult = createEmptySyncResult();
-
-		try {
-			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
-			logger.info(`Initial sync started with ${files.length} files`);
-			const total = files.length;
-			let preparedCount = 0;
-			let uploadCandidates = 0;
-
-			const chunks = this.createVaultFileChunks(files, INITIAL_SYNC_PIPELINE_CHUNK_FILES);
-			const prepareChunk = (chunk: VaultFile[]) => this.prepareUploadsFromVaultFiles(chunk, () => {
-				preparedCount++;
-				progressCallback?.(preparedCount, total);
-			});
-
-				let chunkIndex = 0;
-				const firstChunk = chunks[0];
-				let currentPrepare = firstChunk ? prepareChunk(firstChunk) : null;
-				while (currentPrepare) {
-					const preparedChunk = await currentPrepare;
-					this.throwIfDestroyed();
-					uploadCandidates += preparedChunk.length;
-
-					chunkIndex++;
-					const nextChunk = chunks[chunkIndex];
-					const nextPrepare = nextChunk ? prepareChunk(nextChunk) : null;
-
-				if (preparedChunk.length > 0) {
-					await this.uploadPreparedFiles(preparedChunk, result, {
-						concurrency: UPLOAD_CONCURRENCY,
-						retry: true,
-						batchConcurrency: BATCH_UPLOAD_CONCURRENCY,
-					});
-				}
-
-				currentPrepare = nextPrepare;
-			}
-
-			logger.info(`Prepared ${uploadCandidates}/${total} files for upload (${total - uploadCandidates} unchanged)`);
-
-			await this.localManifest.save();
-
-			logger.info(`Initial sync completed: ${result.uploaded} uploaded`);
-			if (finalizeSyncResult(result)) {
-				const lastSync = new Date().toISOString();
-				this.updateState({
-					status: 'idle',
-					lastSync,
-					lastError: null,
-				});
-				this.settings.lastSync = lastSync;
-			} else {
-				this.updateState({
-					status: 'error',
-					lastError: getSyncResultError(result, 'Initial sync completed with errors'),
-				});
-			}
-		} catch (error) {
-			if (this.isAbortError(error)) {
-				logger.info('Initial sync aborted');
-			} else if (isAuthError(error)) {
-				result.errors.push(AUTH_ERROR_MESSAGE);
-				logger.error('Initial sync failed: auth error (401)');
-				new Notice(AUTH_ERROR_MESSAGE);
-				this.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
-			} else {
-				const errMsg = errorMessage(error);
-				result.errors.push(errMsg);
-				this.updateState({
-					status: 'error',
-					lastError: errMsg,
-				});
-			}
-		}
-
-		finalizeSyncResult(result);
-		return result;
+		return runInitialSyncWorkflow(this.getInitialSyncWorkflowContext(), progressCallback);
 	}
 
-	/**
-	 * Force full sync - overwrite all remote files with local vault state
-	 * Clears local manifest so all files are uploaded regardless of hash,
-	 * and deletes remote-only files.
-	 */
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		if (!this.api.isConfigured()) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
-		if (this.state.status === 'syncing') return createSyncFailureResult(SYNC_ERROR_MESSAGES.ALREADY_IN_PROGRESS);
-		this.updateState({ status: 'syncing' });
-
-		const result: SyncResult = createEmptySyncResult();
-
-		try {
-			// Fetch remote manifest to find remote-only files
-			const remoteManifest = await this.api.getManifest();
-			const remotePaths = new Set(Object.keys(remoteManifest.files));
-
-			// Get local files
-			const files = await getAllVaultFiles(this.vault, this.shouldIgnore.bind(this));
-			const localPaths = new Set(files.map(f => f.path));
-
-			// Find remote-only paths (to be deleted), excluding ignored paths.
-			const remoteOnlyPaths = [...remotePaths].filter(
-				p => !localPaths.has(p) && !this.shouldIgnore(p),
-			);
-
-			const total = files.length + remoteOnlyPaths.length;
-			let current = 0;
-
-			// Clear local manifest so prepareUpload won't skip any file
-			this.localManifest.clear();
-
-			// First pass: prepare uploads with bounded concurrency (local I/O)
-			const prepared = await this.prepareUploadsFromVaultFiles(files, completed => {
-				current = completed;
-				progressCallback?.(current, total);
-			});
-
-			this.throwIfDestroyed();
-
-			// Second pass: upload individually with retry
-			await this.uploadPreparedFiles(prepared, result, {
-				concurrency: FORCE_SYNC_CONCURRENCY,
-				retry: true,
-			});
-
-			this.throwIfDestroyed();
-
-			// Delete remote-only files
-			for (const path of remoteOnlyPaths) {
-				if (this.destroyed) break;
-				try {
-					await this.api.deleteFile(path);
-					this.localManifest.removeEntry(path);
-					result.deleted++;
-					result.deletedPaths.push(path);
-				} catch (error) {
-					result.errors.push(`delete ${path}: ${errorMessage(error)}`);
-				}
-				current++;
-				progressCallback?.(current, total);
-			}
-
-			await this.localManifest.save();
-
-			const lastSync = new Date().toISOString();
-			logger.info(`Force full sync completed: ${result.uploaded} uploaded, ${result.deleted} remote-only deleted`);
-			if (finalizeSyncResult(result)) {
-				this.updateState({
-					status: 'idle',
-					lastSync,
-					lastError: null,
-				});
-				this.settings.lastSync = lastSync;
-			} else {
-				this.updateState({
-					status: 'error',
-					lastError: getSyncResultError(result, 'Force full sync completed with errors'),
-				});
-			}
-		} catch (error) {
-			if (this.isAbortError(error)) {
-				logger.info('Force full sync aborted');
-			} else if (isAuthError(error)) {
-				result.errors.push(AUTH_ERROR_MESSAGE);
-				logger.error('Force full sync failed: auth error (401)');
-				new Notice(AUTH_ERROR_MESSAGE);
-				this.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
-			} else {
-				const errMsg = errorMessage(error);
-				result.errors.push(errMsg);
-				logger.error('Force full sync failed:', errMsg);
-				this.updateState({
-					status: 'error',
-					lastError: errMsg,
-				});
-			}
-		}
-
-		finalizeSyncResult(result);
-		return result;
+		return runForceFullSyncWorkflow(this.getForceSyncWorkflowContext(), progressCallback);
 	}
 
-	/**
-	 * Cleanup on unload
-	 */
 	destroy(): void {
 		this.destroyed = true;
 		this.abortController.abort();
