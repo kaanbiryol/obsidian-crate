@@ -12,16 +12,23 @@ const apiMocks = vi.hoisted(() => ({
 	deleteWorker: vi.fn(),
 	deployWorker: vi.fn(),
 	redeployWorker: vi.fn(),
+	queryD1: vi.fn(),
 	generateAuthToken: vi.fn(() => 'purge-token'),
 	generateBucketName: vi.fn(() => 'crate-bucket-test'),
 	generateWorkerName: vi.fn((prefix = 'crate-sync') => `${prefix}-test`),
 	getWorkerBindings: vi.fn(),
+	getWorkerSubdomain: vi.fn(),
 	deleteR2Bucket: vi.fn(),
 }));
 
 vi.mock('./api', () => apiMocks);
 
-import { discoverCrateResources, resetInfrastructure } from './infrastructure';
+import {
+	discoverCrateResources,
+	quickSetup,
+	resetInfrastructure,
+	runDiagnostics,
+} from './infrastructure';
 
 describe('cloudflare infrastructure reset helpers', () => {
 	beforeEach(() => {
@@ -168,5 +175,186 @@ describe('cloudflare infrastructure reset helpers', () => {
 		expect(
 			apiMocks.deleteWorker.mock.calls.some((call) => String(call[1]).startsWith('crate-purge-'))
 		).toBe(true);
+	});
+});
+
+describe('cloudflare infrastructure setup and diagnostics', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+	});
+
+	it('reconnects to existing crate infrastructure before provisioning new resources', async () => {
+		apiMocks.listWorkers.mockResolvedValue([{ id: 'crate-sync-existing' }]);
+		apiMocks.getWorkerBindings.mockResolvedValue([
+			{ type: 'plain_text', name: 'CF_BUCKET_NAME', text: 'crate-bucket-existing' },
+			{ type: 'plain_text', name: 'CF_DATABASE_ID', text: 'db-existing' },
+		]);
+		apiMocks.listR2Buckets.mockResolvedValue([
+			{ name: 'crate-bucket-existing', creation_date: '2026-02-16T00:00:00.000Z' },
+		]);
+		apiMocks.listD1Databases.mockResolvedValue([
+			{ uuid: 'db-existing', name: 'crate-sync-existing' },
+		]);
+		apiMocks.getWorkerSubdomain.mockResolvedValue('workers-subdomain');
+
+		const result = await quickSetup({
+			accountId: 'acct',
+			apiToken: 'token',
+		});
+
+		expect(result).toEqual({
+			workerUrl: 'https://crate-sync-existing.workers-subdomain.workers.dev',
+			authToken: 'purge-token',
+			bucketName: 'crate-bucket-existing',
+			workerName: 'crate-sync-existing',
+			databaseId: 'db-existing',
+			bucketCreated: false,
+		});
+		expect(apiMocks.queryD1).toHaveBeenCalledWith(
+			{ accountId: 'acct', apiToken: 'token' },
+			'db-existing',
+			'INSERT INTO auth_tokens (id, token_hash, device_name) VALUES (?, ?, ?)',
+			expect.arrayContaining([expect.any(String), expect.any(String), 'plugin-reconnect']),
+		);
+		expect(apiMocks.redeployWorker).toHaveBeenCalledWith(
+			{ accountId: 'acct', apiToken: 'token' },
+			'crate-sync-existing',
+			expect.any(String),
+		);
+		expect(apiMocks.createR2Bucket).not.toHaveBeenCalled();
+		expect(apiMocks.createD1Database).not.toHaveBeenCalled();
+		expect(apiMocks.deployWorker).not.toHaveBeenCalled();
+	});
+
+	it('provisions new infrastructure and registers the generated worker token', async () => {
+		apiMocks.listWorkers.mockResolvedValue([]);
+		apiMocks.listR2Buckets.mockResolvedValue([]);
+		apiMocks.createD1Database.mockResolvedValue({ uuid: 'db-created' });
+		apiMocks.deployWorker.mockResolvedValue({
+			id: 'crate-sync-test',
+			url: 'https://crate-sync-test.example.workers.dev',
+		});
+
+		const requestUrlSpy = vi.spyOn(obsidian, 'requestUrl').mockResolvedValue({
+			status: 200,
+			json: {},
+		} as never);
+
+		const result = await quickSetup({
+			accountId: 'acct',
+			apiToken: 'token',
+		});
+
+		expect(result).toEqual({
+			workerUrl: 'https://crate-sync-test.example.workers.dev',
+			authToken: 'purge-token',
+			bucketName: 'crate-bucket-test',
+			workerName: 'crate-sync-test',
+			databaseId: 'db-created',
+			bucketCreated: true,
+		});
+		expect(apiMocks.createR2Bucket).toHaveBeenCalledWith(
+			{ accountId: 'acct', apiToken: 'token' },
+			'crate-bucket-test',
+		);
+		expect(apiMocks.createD1Database).toHaveBeenCalledWith(
+			{ accountId: 'acct', apiToken: 'token' },
+			'crate-crate-sync-test',
+		);
+		expect(apiMocks.deployWorker).toHaveBeenCalledWith(
+			{ accountId: 'acct', apiToken: 'token' },
+			'crate-sync-test',
+			expect.any(String),
+			expect.objectContaining({
+				r2Bucket: 'crate-bucket-test',
+				d1DatabaseId: 'db-created',
+				authToken: 'purge-token',
+			}),
+		);
+		expect(requestUrlSpy).toHaveBeenNthCalledWith(
+			1,
+			expect.objectContaining({
+				url: 'https://crate-sync-test.example.workers.dev/health',
+				method: 'GET',
+			}),
+		);
+		expect(requestUrlSpy).toHaveBeenNthCalledWith(
+			2,
+			expect.objectContaining({
+				url: 'https://crate-sync-test.example.workers.dev/auth/tokens',
+				method: 'POST',
+			}),
+		);
+	});
+
+	it('reports worker auth failures and missing configured resources in diagnostics', async () => {
+		apiMocks.verifyCredentials.mockResolvedValue(true);
+		apiMocks.listR2Buckets.mockResolvedValue([]);
+		apiMocks.listWorkers.mockResolvedValue([]);
+		apiMocks.listD1Databases.mockResolvedValue([]);
+
+		const requestUrlSpy = vi.spyOn(obsidian, 'requestUrl').mockResolvedValue({
+			status: 401,
+			json: {},
+		} as never);
+
+		const results = await runDiagnostics({
+			workerUrl: 'https://crate-sync-test.example.workers.dev',
+			authToken: 'token',
+			accountId: 'acct',
+			apiToken: 'cloudflare-token',
+			workerName: 'crate-sync-test',
+			bucketName: 'crate-bucket-test',
+			databaseId: 'db-created',
+		});
+
+		expect(results).toEqual([
+			{
+				name: 'Worker health',
+				status: 'fail',
+				message: 'Authentication failed. Check the worker auth token.',
+			},
+			{
+				name: 'Cloudflare credentials',
+				status: 'pass',
+				message: 'Credentials verified.',
+			},
+			{
+				name: 'R2 access',
+				status: 'pass',
+				message: 'Accessible. 0 bucket(s) found.',
+			},
+			{
+				name: 'Workers access',
+				status: 'pass',
+				message: 'Accessible. 0 worker(s) found.',
+			},
+			{
+				name: 'D1 access',
+				status: 'pass',
+				message: 'Accessible. 0 database(s) found.',
+			},
+			{
+				name: 'Configured worker',
+				status: 'warn',
+				message: 'Worker crate-sync-test was not found.',
+			},
+			{
+				name: 'Configured bucket',
+				status: 'warn',
+				message: 'Bucket crate-bucket-test was not found.',
+			},
+			{
+				name: 'Configured database',
+				status: 'warn',
+				message: 'Database db-created was not found.',
+			},
+		]);
+		expect(requestUrlSpy).toHaveBeenCalledTimes(1);
 	});
 });

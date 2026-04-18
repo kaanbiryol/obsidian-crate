@@ -335,6 +335,73 @@ describe('markdownWriter', () => {
     expect(newContent).toContain('Task Move');
   });
 
+  it('deletes the reminder line together with its description block', async () => {
+    const initial = [
+      '# Work',
+      '',
+      '- [ ] Task A Jan 1, 2026 <!-- crate-id:r-delete -->',
+      '<!-- crate-desc:extra details -->',
+      '- [ ] Task B Jan 2, 2026 <!-- crate-id:r-keep -->',
+      '',
+    ].join('\n');
+    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    folders.add('Reminders');
+
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    const reminder = makeIndexedReminder({
+      id: 'r-delete',
+      content: 'Task A',
+      filePath: 'Reminders/Work.md',
+      lineNumber: 2,
+      rawLine: '- [ ] Task A Jan 1, 2026 <!-- crate-id:r-delete -->',
+      dueDate: '2026-01-01',
+      description: 'extra details',
+    });
+
+    await writer.deleteReminder(reminder);
+
+    const content = files.get('Reminders/Work.md') || '';
+    expect(content).not.toContain('Task A');
+    expect(content).not.toContain('crate-desc:extra details');
+    expect(content).toContain('Task B');
+  });
+
+  it('reorders active reminders while preserving descriptions, completed items, and surrounding content', async () => {
+    const initial = [
+      '# Work',
+      '',
+      '- [ ] First Jan 1, 2026 <!-- crate-id:r1 -->',
+      '<!-- crate-desc:first note -->',
+      '- [ ] Second Jan 2, 2026 <!-- crate-id:r2 -->',
+      '- [x] Done Jan 3, 2026 <!-- crate-id:r3 -->',
+      '',
+      'Footer',
+      '',
+    ].join('\n');
+    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    folders.add('Reminders');
+
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    await writer.reorderReminders('Reminders/Work.md', ['r2', 'r1']);
+
+    const lines = (files.get('Reminders/Work.md') || '').split('\n');
+    const secondIndex = lines.findIndex((line) => line.includes('Second Jan 2, 2026'));
+    const firstIndex = lines.findIndex((line) => line.includes('First Jan 1, 2026'));
+    const descIndex = lines.findIndex((line) => line.includes('crate-desc:first note'));
+    const doneIndex = lines.findIndex((line) => line.includes('Done Jan 3, 2026'));
+    const footerIndex = lines.findIndex((line) => line === 'Footer');
+
+    expect(secondIndex).toBeGreaterThan(0);
+    expect(firstIndex).toBeGreaterThan(secondIndex);
+    expect(descIndex).toBe(firstIndex + 1);
+    expect(doneIndex).toBeGreaterThan(descIndex);
+    expect(footerIndex).toBeGreaterThan(doneIndex);
+  });
+
   it('removes recurrence when update explicitly clears it', async () => {
     const dueDate = new Date(2026, 0, 1, 9, 0);
     const initial = '# Work\n\n- [ ] Task Repeat every day Jan 1, 2026 09:00\n';

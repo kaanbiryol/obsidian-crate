@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { HttpError } from './api';
 import { SyncEngine } from './engine';
 import { computeHash } from './hasher';
 import { createEmptySyncResult } from './sync-result';
@@ -1287,6 +1288,30 @@ describe('SyncEngine abort-on-destroy', () => {
 		).rejects.toThrow('first failure');
 
 		expect(callCount).toBe(1);
+	});
+
+	it('retryWithBackoff honours retryAfter delays from HttpError responses', async () => {
+		vi.useFakeTimers();
+		const harness = createHarness();
+		let callCount = 0;
+
+		const fn = vi.fn(async () => {
+			callCount++;
+			if (callCount === 1) {
+				throw new HttpError('retry later', 429, 2500);
+			}
+			return 'done';
+		});
+
+		const promise = retryWithBackoff(harness.engine, fn);
+
+		expect(callCount).toBe(1);
+		await vi.advanceTimersByTimeAsync(2499);
+		expect(callCount).toBe(1);
+		await vi.advanceTimersByTimeAsync(1);
+
+		await expect(promise).resolves.toBe('done');
+		expect(callCount).toBe(2);
 	});
 
 	it('initialSync aborts cleanly when destroyed during chunk processing', async () => {
