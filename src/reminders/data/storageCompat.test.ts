@@ -37,23 +37,32 @@ function createWriter(): {
 	spies: {
 		createReminder: ReturnType<typeof vi.fn>;
 		updateReminder: ReturnType<typeof vi.fn>;
+		deleteReminder: ReturnType<typeof vi.fn>;
+		toggleComplete: ReturnType<typeof vi.fn>;
+		reorderReminders: ReturnType<typeof vi.fn>;
 	};
 } {
 	const createReminder = vi.fn(async () => {});
 	const updateReminder = vi.fn(async () => {});
+	const deleteReminder = vi.fn(async () => {});
+	const toggleComplete = vi.fn(async () => {});
+	const reorderReminders = vi.fn(async () => {});
 	return {
 		writer: {
 			createReminder,
 			updateReminder,
-			deleteReminder: vi.fn(async () => {}),
-			toggleComplete: vi.fn(async () => {}),
-			reorderReminders: vi.fn(async () => {}),
+			deleteReminder,
+			toggleComplete,
+			reorderReminders,
 			setOnReminderChange: vi.fn(),
 			setOnFileWritten: vi.fn(),
 		},
 		spies: {
 			createReminder,
 			updateReminder,
+			deleteReminder,
+			toggleComplete,
+			reorderReminders,
 		},
 	};
 }
@@ -234,5 +243,48 @@ describe('storageCompat.update and today view', () => {
 		expect(storage.getTodayReminders(true).map(reminder => reminder.id)).toEqual(['active', 'completed']);
 
 		vi.useRealTimers();
+	});
+
+	it('routes delete, toggle, reorder, and stats to the underlying services', async () => {
+		const indexedReminder: IndexedReminder = {
+			id: 'r1',
+			content: 'Task A',
+			priority: 1,
+			completed: false,
+			project: 'Work',
+			filePath: 'Reminders/Work.md',
+			lineNumber: 2,
+			rawLine: '- [ ] Task A',
+			contentHash: 'hash',
+		};
+		const index = createIndex({
+			getById: (id: string) => id === 'r1' ? indexedReminder : undefined,
+			getActive: () => [indexedReminder],
+			getCompleted: () => [{ ...indexedReminder, id: 'done', completed: true }],
+		});
+		const { writer, spies } = createWriter();
+		const storage = createStorageCompat(index, writer);
+
+		expect(await storage.delete('r1')).toBe(true);
+		expect(spies.deleteReminder).toHaveBeenCalledWith(indexedReminder);
+
+		const completed = await storage.complete('r1');
+		expect(spies.toggleComplete).toHaveBeenNthCalledWith(1, indexedReminder);
+		expect(completed?.completed).toBe(true);
+		expect(completed?.completedAt).toEqual(expect.any(String));
+
+		const uncompleted = await storage.uncomplete('r1');
+		expect(spies.toggleComplete).toHaveBeenNthCalledWith(2, indexedReminder);
+		expect(uncompleted?.completed).toBe(false);
+		expect(uncompleted?.completedAt).toBeUndefined();
+
+		await storage.reorder('Work', ['r1', 'done']);
+		expect(spies.reorderReminders).toHaveBeenCalledWith('Reminders/Work.md', ['r1', 'done']);
+
+		expect(storage.getStats()).toEqual({
+			activeCount: 1,
+			completedCount: 1,
+			totalCount: 2,
+		});
 	});
 });
