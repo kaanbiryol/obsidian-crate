@@ -11,6 +11,7 @@ import { renderUsageSection } from './settings/usage-section';
 import { renderRemindersSection } from './settings/reminders-section';
 import { renderNotificationsSection } from './settings/notifications-section';
 import { createSettingsRootHeading } from './settings/section-helpers';
+import { getSettingsTabSections } from './settings/settings-tab-model';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
@@ -37,6 +38,10 @@ export class CrateSettingTab extends PluginSettingTab {
 
 		const isConfigured = this.plugin.syncRuntime.isConfigured();
 		const hasCloudflareCredentials = this.plugin.cloudflareSession.hasCredentials();
+		const sections = getSettingsTabSections({
+			isConfigured,
+			hasCloudflareCredentials,
+		});
 
 		renderConfigSection({
 			containerEl,
@@ -45,7 +50,7 @@ export class CrateSettingTab extends PluginSettingTab {
 			rerender: () => this.display(),
 		});
 
-		if (isConfigured) {
+		if (sections.showSync) {
 			const syncCleanup = renderSyncSection({
 				containerEl,
 				plugin: this.plugin,
@@ -60,7 +65,7 @@ export class CrateSettingTab extends PluginSettingTab {
 			rerender: () => this.display(),
 		});
 
-		if (isConfigured) {
+		if (sections.showNotifications) {
 			renderNotificationsSection({
 				containerEl,
 				plugin: this.plugin,
@@ -68,14 +73,14 @@ export class CrateSettingTab extends PluginSettingTab {
 			});
 		}
 
-		if (isConfigured) {
+		if (sections.showUsage) {
 			renderUsageSection({
 				containerEl,
 				plugin: this.plugin,
 			});
 		}
 
-		if (isConfigured || hasCloudflareCredentials) {
+		if (sections.showInfrastructure) {
 			renderInfrastructureSection({
 				containerEl,
 				plugin: this.plugin,
