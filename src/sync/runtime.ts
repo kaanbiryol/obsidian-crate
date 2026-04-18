@@ -1,28 +1,24 @@
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
-import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, SECRET_KEYS, type CrateSettings, type SharedSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../plugin/types';
+import { SECRET_KEYS, type CrateSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../plugin/types';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
 import { SyncEngine } from './engine';
+import {
+	applyInfrastructureConfigState,
+	buildSharedSettings,
+	clearSyncConfigurationState,
+	deleteManifestFile,
+	type ApplyInfrastructureConfigInput,
+	type ClearSyncConfigurationOptions,
+} from './runtime-config';
+import { recordSyncHistory, resetStoredSyncState } from './runtime-history';
+import { emitStateChange, emitSyncProgress } from './runtime-listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from './sync-result';
-import { requireNormalizedWorkerUrl } from './worker-url';
 
 const logger = createLogger('SyncRuntime');
-
-interface ApplyInfrastructureConfigInput {
-	workerUrl: string;
-	authToken: string;
-	workerName: string;
-	bucketName: string;
-	databaseId: string;
-	accountId?: string;
-}
-
-interface ClearSyncConfigurationOptions {
-	clearCloudflareCredentials?: boolean;
-}
 
 export class SyncRuntime {
 	private syncEngine: SyncEngine | null = null;
@@ -108,10 +104,9 @@ export class SyncRuntime {
 		}
 
 		this.syncEngine.setStateChangeCallback((state: SyncState) => {
-			this.statusBar?.update(state);
-			for (const listener of this.stateChangeListeners) {
-				listener(state);
-			}
+			emitStateChange(this.stateChangeListeners, state, (nextState) => {
+				this.statusBar?.update(nextState);
+			});
 		});
 
 		await this.syncEngine.initialize();
@@ -149,16 +144,6 @@ export class SyncRuntime {
 		this.statusBar = null;
 	}
 
-	private async deleteManifestFile(): Promise<void> {
-		const path = `${this.plugin.manifest.dir}/file-manifest.json`;
-		const adapter = this.plugin.app.vault.adapter;
-		try {
-			if (await adapter.exists(path)) {
-				await adapter.remove(path);
-			}
-		} catch { /* best effort */ }
-	}
-
 	onRawFileEvent(path: string): void {
 		if (!this.acceptingEvents) return;
 		this.syncEngine?.onRawFileEvent(path);
@@ -180,39 +165,19 @@ export class SyncRuntime {
 	}
 
 	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput): Promise<void> {
-		const authToken = config.authToken.trim();
-		if (!authToken) {
-			throw new Error('Auth token is required');
-		}
-
-		this.settings.workerUrl = requireNormalizedWorkerUrl(config.workerUrl);
-		this.settings.workerName = config.workerName.trim();
-		this.settings.bucketName = config.bucketName.trim();
-		this.settings.databaseId = config.databaseId.trim();
-		this.settings.cloudflareAccountId = config.accountId?.trim() || '';
-		this.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, authToken);
-		await this.deleteManifestFile();
-		this.settings.lastSeq = 0;
-		this.resetSyncState();
+		applyInfrastructureConfigState(this.settings, this.secretStorage, config);
+		await deleteManifestFile(this.plugin);
+		resetStoredSyncState(this.settings);
 		await this.persistSettings();
 		await this.initialize();
 	}
 
 	async clearSyncConfiguration(options?: ClearSyncConfigurationOptions): Promise<void> {
 		this.destroy();
-		await this.deleteManifestFile();
+		await deleteManifestFile(this.plugin);
 
-		this.resetSyncState();
-		this.settings.workerUrl = '';
-		this.settings.workerName = '';
-		this.settings.bucketName = '';
-		this.settings.databaseId = '';
-		this.secretStorage.delete(SECRET_KEYS.AUTH_TOKEN);
-
-		if (options?.clearCloudflareCredentials) {
-			this.settings.cloudflareAccountId = '';
-			this.secretStorage.delete(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
-		}
+		resetStoredSyncState(this.settings);
+		clearSyncConfigurationState(this.settings, this.secretStorage, options);
 
 		await this.persistSettings();
 	}
@@ -223,15 +188,8 @@ export class SyncRuntime {
 
 	async pushSharedSettings(): Promise<void> {
 		if (!this.apiClient) return;
-		const shared: SharedSettings = {
-			ignorePatterns: this.settings.ignorePatterns,
-			syncOnStartup: this.settings.syncOnStartup,
-			syncInterval: this.settings.syncInterval,
-			showStatusBar: this.settings.showStatusBar,
-			pushEnabled: this.settings.pushEnabled,
-		};
 		try {
-			await this.apiClient.putSharedSettings(shared);
+			await this.apiClient.putSharedSettings(buildSharedSettings(this.settings));
 		} catch (error) {
 			logger.error('Failed to push shared settings:', error);
 		}
@@ -257,33 +215,7 @@ export class SyncRuntime {
 	}
 
 	private recordSyncResult(type: SyncHistoryEntry['type'], result: SyncResult): void {
-		const entry: SyncHistoryEntry = {
-			timestamp: new Date().toISOString(),
-			type,
-			success: result.success,
-			uploaded: result.uploaded,
-			downloaded: result.downloaded,
-			deleted: result.deleted,
-			errorCount: result.errors.length,
-			conflictCount: result.conflicts.length,
-			uploadedPaths: this.limitHistoryPaths(result.uploadedPaths),
-			downloadedPaths: this.limitHistoryPaths(result.downloadedPaths),
-			deletedPaths: this.limitHistoryPaths(result.deletedPaths),
-		};
-		this.settings.syncHistory.unshift(entry);
-		if (this.settings.syncHistory.length > MAX_SYNC_HISTORY) {
-			this.settings.syncHistory.length = MAX_SYNC_HISTORY;
-		}
-	}
-
-	private resetSyncState(): void {
-		this.settings.lastSeq = 0;
-		this.settings.lastSync = null;
-		this.settings.syncHistory = [];
-	}
-
-	private limitHistoryPaths(paths: string[]): string[] {
-		return paths.slice(0, MAX_SYNC_HISTORY_PATHS);
+		recordSyncHistory(this.settings, type, result);
 	}
 
 	private async runSyncOperation(
@@ -299,11 +231,12 @@ export class SyncRuntime {
 		}
 
 		const wrappedCallback = (current: number, total: number) => {
-			this.statusBar?.setSyncProgress(current, total);
-			progressCallback?.(current, total);
-			for (const listener of this.progressListeners) {
-				listener(current, total);
-			}
+			emitSyncProgress(this.progressListeners, current, total, {
+				onStatusBarProgress: (nextCurrent, nextTotal) => {
+					this.statusBar?.setSyncProgress(nextCurrent, nextTotal);
+				},
+				onExternalProgress: progressCallback,
+			});
 		};
 		try {
 			const result = await operation(this.syncEngine, wrappedCallback);
