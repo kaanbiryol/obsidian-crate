@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Reminder } from "@/reminders/types/reminder";
 import {
+  buildBrowseProjectCardsViewModel,
   buildInboxViewModel,
+  buildProjectDetailHeaderViewModel,
   buildProjectDetailViewModel,
   buildProjectStatsMap,
   buildTodayViewModel,
@@ -83,5 +85,57 @@ describe("reminder view models", () => {
     expect(detail.total).toBe(2);
     expect(detail.completionPercentage).toBe(50);
     expect(detail.accentColor).toEqual(expect.any(String));
+  });
+
+  it("builds browse card models with fallback empty stats for projects without reminders", () => {
+    const cards = buildBrowseProjectCardsViewModel(
+      ["Work", "Empty"],
+      [
+        makeReminder({ id: "work-active", project: "Work" }),
+        makeReminder({ id: "work-done", project: "Work", completed: true }),
+      ],
+    );
+
+    expect(cards).toEqual([
+      {
+        project: "Work",
+        stats: {
+          active: 1,
+          completed: 1,
+          total: 2,
+          completionPercentage: 50,
+        },
+        accentColor: expect.any(String),
+        isComplete: false,
+      },
+      {
+        project: "Empty",
+        stats: {
+          active: 0,
+          completed: 0,
+          total: 0,
+          completionPercentage: 0,
+        },
+        accentColor: expect.any(String),
+        isComplete: false,
+      },
+    ]);
+  });
+
+  it("builds compact project detail header state including all-done status", () => {
+    const header = buildProjectDetailHeaderViewModel([
+      makeReminder({ id: "done-1", project: "Work", completed: true }),
+      makeReminder({ id: "done-2", project: "Work", completed: true }),
+      makeReminder({ id: "other", project: "Home" }),
+    ], "Work");
+
+    expect(header).toEqual({
+      activeCount: 0,
+      completedCount: 2,
+      total: 2,
+      completionPercentage: 100,
+      accentColor: expect.any(String),
+      isComplete: true,
+    });
   });
 });

@@ -17,6 +17,22 @@ export interface ProjectStats {
   completionPercentage: number;
 }
 
+export interface BrowseProjectCardViewModel {
+  project: string;
+  stats: ProjectStats;
+  accentColor: string;
+  isComplete: boolean;
+}
+
+export interface ProjectDetailHeaderViewModel {
+  activeCount: number;
+  completedCount: number;
+  total: number;
+  completionPercentage: number;
+  accentColor: string;
+  isComplete: boolean;
+}
+
 export const EMPTY_PROJECT_STATS: ProjectStats = {
   active: 0,
   completed: 0,
@@ -100,6 +116,24 @@ export function getProjectStats(
   return projectStatsMap.get(project) ?? EMPTY_PROJECT_STATS;
 }
 
+export function buildBrowseProjectCardsViewModel(
+  projects: string[],
+  reminders: Reminder[],
+): BrowseProjectCardViewModel[] {
+  const projectStatsMap = buildProjectStatsMap(reminders);
+
+  return projects.map((project) => {
+    const stats = getProjectStats(projectStatsMap, project);
+
+    return {
+      project,
+      stats,
+      accentColor: getProjectColor(project).dark.accent,
+      isComplete: stats.total > 0 && stats.active === 0,
+    };
+  });
+}
+
 export function buildProjectDetailViewModel(
   reminders: Reminder[],
   project: string,
@@ -122,5 +156,21 @@ export function buildProjectDetailViewModel(
     accentColor: getProjectColor(project).dark.accent,
     total,
     completionPercentage: total > 0 ? Math.round((completed.length / total) * 100) : 0,
+  };
+}
+
+export function buildProjectDetailHeaderViewModel(
+  reminders: Reminder[],
+  project: string,
+): ProjectDetailHeaderViewModel {
+  const detail = buildProjectDetailViewModel(reminders, project);
+
+  return {
+    activeCount: detail.active.length,
+    completedCount: detail.completed.length,
+    total: detail.total,
+    completionPercentage: detail.completionPercentage,
+    accentColor: detail.accentColor,
+    isComplete: detail.total > 0 && detail.active.length === 0,
   };
 }
