@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronDown, FolderOpen, Circle, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, FolderOpen } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { ShadowDOMButton, ShadowDOMNativeButton } from '../ShadowDOMButton';
@@ -8,12 +7,13 @@ import type { Reminder } from '../../types/reminder';
 import { ReminderCard } from '../ReminderCard';
 import { ReorderableReminderList } from '../ReorderableReminderList';
 import { EmptyState } from '../EmptyState';
-import { buildProjectDetailViewModel } from './viewModels';
+import { ProjectCompletedSection } from './ProjectCompletedSection';
+import { ProjectDetailHeader } from './ProjectDetailHeader';
+import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
 import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,
   SCROLL_PADDING_WITH_FAB_CSS,
-  CARD_ANIMATION,
 } from '../../ui/layoutConstants';
 
 
@@ -50,9 +50,11 @@ export const ProjectDetailView = memo(function ProjectDetailView({
 }: ProjectDetailViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
 
-  const { active, completed, accentColor, total, completionPercentage } = useMemo(() => {
+  const detail = useMemo(() => {
     return buildProjectDetailViewModel(reminders, project);
   }, [reminders, project]);
+  const header = useMemo(() => buildProjectDetailHeaderViewModel(reminders, project), [reminders, project]);
+  const { active, completed } = detail;
 
   // Local state for optimistic reorder (visual only during drag)
   const [localOrder, setLocalOrder] = useState<Reminder[]>(active);
@@ -109,49 +111,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
         </ShadowDOMNativeButton>
       </div>
 
-      {/* Compact Project Header */}
-      <div className="project-detail-header">
-        <div className="project-detail-header-top">
-          <h1 className="project-detail-title">{project}</h1>
-          {total > 0 && (
-            <span
-              className="project-detail-percentage"
-              style={{ color: completionPercentage === 100 ? '#22c55e' : accentColor }}
-            >
-              {completionPercentage}%
-            </span>
-          )}
-        </div>
-        {total > 0 && (
-          <div className="project-detail-header-bottom">
-            <div className="project-detail-stats-text">
-              <span className="project-detail-stat">
-                <Circle size={10} strokeWidth={2.5} />
-                {active.length}
-                <span className="project-detail-stat-label">active</span>
-              </span>
-              <span className="project-detail-stat-dot">&middot;</span>
-              <span className="project-detail-stat project-detail-stat-done">
-                <CheckCircle2 size={10} strokeWidth={2.5} />
-                {completed.length}
-                <span className="project-detail-stat-label">done</span>
-              </span>
-            </div>
-            <div className="project-detail-progress-bar">
-              <div
-                className="project-detail-progress-fill"
-                style={{
-                  width: `${completionPercentage}%`,
-                  backgroundColor: completionPercentage === 100 ? '#22c55e' : accentColor,
-                  boxShadow: completionPercentage > 0
-                    ? `0 0 4px ${completionPercentage === 100 ? '#22c55e' : accentColor}30`
-                    : 'none',
-                }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
+      <ProjectDetailHeader project={project} header={header} />
 
       {/* Content */}
       {!hasContent ? (
@@ -178,72 +138,12 @@ export const ProjectDetailView = memo(function ProjectDetailView({
             renderCard={cardRenderer}
           />
 
-          {/* Completed section */}
-          {completed.length > 0 && (
-            <div className="mt-6 pb-4">
-              <div className="premium-divider" />
-              <ShadowDOMButton
-                variant="light"
-                onPress={() => setShowCompleted(prev => !prev)}
-                className="w-full justify-between h-10 px-0"
-                endContent={
-                  <motion.span
-                    animate={{ rotate: showCompleted ? 180 : 0 }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
-                    className="inline-flex"
-                  >
-                    <ChevronDown size={18} />
-                  </motion.span>
-                }
-              >
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Completed ({completed.length})
-                </span>
-              </ShadowDOMButton>
-
-              <AnimatePresence mode="popLayout" initial={false}>
-                {showCompleted && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{
-                      opacity: 1,
-                      height: 'auto',
-                      transition: {
-                        height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
-                        opacity: { duration: 0.2, delay: 0.05 }
-                      }
-                    }}
-                    exit={{
-                      opacity: 0,
-                      height: 0,
-                      transition: {
-                        height: { duration: 0.2 },
-                        opacity: { duration: 0.15 }
-                      }
-                    }}
-                    className="mt-3 overflow-hidden"
-                  >
-                      <AnimatePresence mode="popLayout" initial={false}>
-                      {completed.map((reminder, index) => (
-                        <motion.div
-                          key={reminder.id}
-                          initial={false}
-                          animate={{ opacity: 1 }}
-                          exit={{ ...CARD_ANIMATION.exit, x: 20 }}
-                          className="premium-reminder-card-wrapper"
-                        >
-                          {cardRenderer(reminder, index)}
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
+          <ProjectCompletedSection
+            reminders={completed}
+            showCompleted={showCompleted}
+            onToggle={() => setShowCompleted((prev) => !prev)}
+            renderCard={cardRenderer}
+          />
         </div>
       )}
     </div>
