@@ -23,6 +23,7 @@ dist
 
 # Deploy config (local vault path)
 deploy.yml
+deploy.local.json
 
 # Generated files
 *.gen.ts

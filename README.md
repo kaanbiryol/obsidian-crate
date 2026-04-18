@@ -63,14 +63,23 @@ Build artifacts are written to `dist/`:
 - `dist/main.js`
 - `dist/styles.css`
 
+### Configure a local vault for deploys
+
+```bash
+npm run deploy:configure
+```
+
+The command prompts for your vault path and saves it to `deploy.local.json`, which is gitignored and will not be pushed. A committed example lives at `deploy.local.example.json`.
+
 ### Install plugin to your vault
 
 ```bash
-export OBSIDIAN_VAULT="/path/to/your/vault"
 npm run deploy
 ```
 
-This builds the plugin and copies `dist/main.js`, `manifest.json`, and `dist/styles.css` into your vault's plugin directory.
+This builds the plugin and copies `dist/main.js`, `manifest.json`, and `dist/styles.css` into `<vault>/.obsidian/plugins/obsidian-crate/`.
+
+`npm run deploy` will also create `deploy.local.json` for you on first run if it does not exist. `OBSIDIAN_VAULT` still works as a fallback for one-off deploys.
 
 ### Watch mode
 
