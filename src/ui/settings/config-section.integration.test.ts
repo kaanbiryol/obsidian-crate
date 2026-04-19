@@ -139,11 +139,11 @@ describe('renderConfigSection integration', () => {
 		expect(renderApiTokenSetup).not.toHaveBeenCalled();
 		expect(MockSetting.instances.map((setting) => setting.nameEl.textContent)).toEqual([
 			'Connected account',
-			'Quick setup',
+			'Set up sync',
 			'Reset local configuration',
 		]);
 
-		getSettingByName('Quick setup').buttons[0]?.click();
+		getSettingByName('Set up sync').buttons[0]?.click();
 		await flushMicrotasks();
 
 		expect(resolveCredentialsForSetup).toHaveBeenCalledWith(plugin, wizardState);

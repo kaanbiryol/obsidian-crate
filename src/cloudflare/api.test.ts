@@ -90,8 +90,22 @@ describe('listAccessibleAccounts', () => {
 });
 
 describe('buildCloudflareTokenTemplateUrl', () => {
-	it('returns a Cloudflare dashboard URL', () => {
+	it('returns a prefilled Cloudflare dashboard URL for crate permissions', () => {
 		const url = buildCloudflareTokenTemplateUrl();
-		expect(url).toContain('dash.cloudflare.com/profile/api-tokens');
+		const parsed = new URL(url);
+		const permissions = JSON.parse(parsed.searchParams.get('permissionGroupKeys') || '[]');
+
+		expect(parsed.origin).toBe('https://dash.cloudflare.com');
+		expect(parsed.pathname).toBe('/profile/api-tokens');
+		expect(parsed.searchParams.get('accountId')).toBe('*');
+		expect(parsed.searchParams.get('zoneId')).toBe('all');
+		expect(parsed.searchParams.get('name')).toBe('Crate');
+		expect(permissions).toEqual([
+			{ key: 'workers_scripts', type: 'edit' },
+			{ key: 'workers_r2', type: 'edit' },
+			{ key: 'd1', type: 'edit' },
+			{ key: 'account_settings', type: 'read' },
+			{ key: 'account_analytics', type: 'read' },
+		]);
 	});
 });

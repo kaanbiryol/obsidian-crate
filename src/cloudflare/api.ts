@@ -63,6 +63,14 @@ export interface DeployWorkerBindings {
 	skipDurableObjects?: boolean;
 }
 
+const CRATE_TOKEN_TEMPLATE_PERMISSIONS = [
+	{ key: 'workers_scripts', type: 'edit' },
+	{ key: 'workers_r2', type: 'edit' },
+	{ key: 'd1', type: 'edit' },
+	{ key: 'account_settings', type: 'read' },
+	{ key: 'account_analytics', type: 'read' },
+] as const;
+
 function formatCloudflareError(status: number, body: unknown): Error {
 	if (body && typeof body === 'object') {
 		const errorBody = body as CloudflareErrorBody;
@@ -218,7 +226,13 @@ export async function listAccessibleAccounts(apiToken: string): Promise<Cloudfla
 }
 
 export function buildCloudflareTokenTemplateUrl(): string {
-	return 'https://dash.cloudflare.com/profile/api-tokens';
+	const params = new URLSearchParams({
+		permissionGroupKeys: JSON.stringify(CRATE_TOKEN_TEMPLATE_PERMISSIONS),
+		accountId: '*',
+		zoneId: 'all',
+		name: 'Crate',
+	});
+	return `https://dash.cloudflare.com/profile/api-tokens?${params.toString()}`;
 }
 
 export async function listR2Buckets(credentials: CloudflareCredentials): Promise<R2Bucket[]> {

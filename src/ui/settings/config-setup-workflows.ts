@@ -86,8 +86,8 @@ export function renderApiTokenSetup(
 	rerender: () => void
 ): void {
 	new Setting(containerEl)
-		.setName('Create a Cloudflare API token')
-		.setDesc('Create a token with edit access to workers, R2 storage, and D1, plus read access to account settings and account analytics')
+		.setName('Create a prefilled Cloudflare API token')
+		.setDesc('Open Cloudflare with Crate\'s required Workers, R2, D1, account settings, and account analytics permissions pre-selected')
 		.addButton(button => button
 			.setButtonText('Open Cloudflare')
 			.onClick(() => {
@@ -96,7 +96,7 @@ export function renderApiTokenSetup(
 
 	new Setting(containerEl)
 		.setName('API token')
-		.setDesc('Paste the API token you created on the Cloudflare dashboard')
+		.setDesc('Paste the API token you created from the prefilled Cloudflare form')
 		.addText(text => {
 			text.inputEl.type = 'password';
 			text
@@ -109,7 +109,7 @@ export function renderApiTokenSetup(
 						wizardState.wizardSelectedAccountId = '';
 					}
 				});
-			text.inputEl.size = 50;
+			text.inputEl.size = 36;
 		})
 		.addButton(button => button
 			.setButtonText('Validate')

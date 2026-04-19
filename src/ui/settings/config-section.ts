@@ -50,15 +50,15 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 
 	if (sectionState.showQuickSetup) {
 		new Setting(containerEl)
-			.setName('Quick setup')
-			.setDesc('Set up sync infrastructure or reconnect to an existing one')
+			.setName('Set up sync')
+			.setDesc('Create Cloudflare sync infrastructure or reconnect to an existing setup')
 			.addButton(button => button
-				.setButtonText('Set up')
+				.setButtonText('Set up/reconnect')
 				.setCta()
 				.onClick(async () => {
 					await runButtonTask({
 						button,
-						idleText: 'Set up',
+						idleText: 'Set up/reconnect',
 						runningText: 'Working...',
 						progressEl: setupProgress,
 						progressMessage: 'Starting setup...',

@@ -15,28 +15,15 @@ Sync your Obsidian vault to Cloudflare R2 storage via a Cloudflare Worker.
 npm install
 ```
 
-### Create a Cloudflare API token
-
-1. Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens) and click **Create Token**
-2. Scroll past the templates and click **Get started** next to "Create Custom Token"
-3. Name it `Crate` (or anything you prefer)
-4. Under **Permissions**, add these rows:
-   - Account / Workers Scripts / Edit
-   - Account / Workers R2 Storage / Edit
-   - Account / D1 / Edit
-   - Account / Account Settings / Read
-   - Account / Account Analytics / Read
-5. Under **Account Resources**, select your account
-6. Click **Continue to summary**, then **Create Token**
-7. Copy the token - it is only shown once
-
 ### Initialize Cloudflare infrastructure
 
 Open the Crate settings tab in Obsidian:
 
-1. Paste your API token and click **Validate**
-2. Select your Cloudflare account from the dropdown
-3. Click **Create infrastructure** to provision the R2 bucket, D1 database, and Worker
+1. Click **Open Cloudflare** to open a prefilled token form with the required permissions already selected
+2. Review the token, narrow the account scope if needed, create it, and copy the token
+3. Paste your API token and click **Validate**
+4. Select your Cloudflare account from the dropdown
+5. Click **Create infrastructure** to provision the R2 bucket, D1 database, and Worker
 
 Cross-device setup links copy sync credentials and sync preferences. Usage metrics use the same Cloudflare API token you entered during setup.
 
