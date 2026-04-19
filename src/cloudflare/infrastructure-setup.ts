@@ -49,7 +49,7 @@ export async function quickSetup(
 
 	if (!input.workerName?.trim() && !input.bucketName?.trim()) {
 		try {
-			const reconnectResult = await tryReconnectExisting(credentials, onProgress);
+			const reconnectResult = await tryReconnectExisting(credentials, input, onProgress);
 			if (reconnectResult) return reconnectResult;
 		} catch {
 			// Fall through to create-new logic
@@ -95,7 +95,11 @@ export async function quickSetup(
 	});
 
 	await waitForWorkerReady(deployment.url, authToken, onProgress);
-	await registerTokenWithWorker(deployment.url, authToken);
+	await registerTokenWithWorker(deployment.url, authToken, {
+		deviceId: input.deviceId,
+		deviceName: input.deviceName,
+		platform: input.platform,
+	});
 
 	return {
 		workerUrl: deployment.url,
@@ -109,6 +113,7 @@ export async function quickSetup(
 
 async function tryReconnectExisting(
 	credentials: CloudflareCredentials,
+	input: QuickSetupInput,
 	onProgress?: ProgressCallback
 ): Promise<QuickSetupResult | null> {
 	onProgress?.('Checking for existing crate infrastructure...');
@@ -138,8 +143,8 @@ async function tryReconnectExisting(
 	await queryD1(
 		credentials,
 		config.databaseId,
-		'INSERT INTO auth_tokens (id, token_hash, device_name) VALUES (?, ?, ?)',
-		[tokenId, tokenHash, 'plugin-reconnect']
+		'INSERT INTO auth_tokens (id, token_hash, device_id, device_name, platform, last_seen_at) VALUES (?, ?, NULLIF(?, \'\'), ?, NULLIF(?, \'\'), datetime(\'now\'))',
+		[tokenId, tokenHash, input.deviceId || '', input.deviceName || 'plugin-reconnect', input.platform || '']
 	);
 
 	onProgress?.(`Updating worker ${crateWorker.id}...`);

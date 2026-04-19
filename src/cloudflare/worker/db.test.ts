@@ -27,7 +27,7 @@ describe('initDb', () => {
 	await initDb(first.db as never);
 	await initDb(second.db as never);
 
-		expect(first.db.prepare).toHaveBeenCalledTimes(8);
-		expect(second.db.prepare).toHaveBeenCalledTimes(8);
+		expect(first.db.prepare).toHaveBeenCalledTimes(14);
+		expect(second.db.prepare).toHaveBeenCalledTimes(14);
 	});
 });

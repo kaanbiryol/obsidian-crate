@@ -1,4 +1,6 @@
 import type { Plugin, TAbstractFile } from 'obsidian';
+import { computeTokenHash } from '../cloudflare/infrastructure-shared';
+import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
 import { createLogger } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../plugin/types';
@@ -113,6 +115,7 @@ export class SyncRuntime {
 		if (this.initializationRevision !== initializationRevision || this.syncEngine !== syncEngine) {
 			return;
 		}
+		await this.registerCurrentDevice();
 		this.statusBar?.update(this.syncEngine.getState());
 
 		if (this.settings.syncOnStartup) {
@@ -212,6 +215,27 @@ export class SyncRuntime {
 			return { success: false, error: 'Not configured' };
 		}
 		return this.apiClient.testConnection();
+	}
+
+	private async registerCurrentDevice(): Promise<void> {
+		if (!this.apiClient) {
+			return;
+		}
+
+		const authToken = this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN)?.trim();
+		if (!authToken) {
+			return;
+		}
+
+		try {
+			await this.apiClient.registerToken(await computeTokenHash(authToken), {
+				deviceId: this.settings.deviceId,
+				deviceName: getCurrentDeviceName(this.settings.deviceId),
+				platform: getCurrentPlatformCode(),
+			});
+		} catch (error) {
+			logger.warn('Failed to register current device metadata:', error);
+		}
 	}
 
 	private recordSyncResult(type: SyncHistoryEntry['type'], result: SyncResult): void {

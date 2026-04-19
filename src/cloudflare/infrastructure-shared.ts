@@ -47,7 +47,11 @@ export async function waitForWorkerReady(
 export async function registerTokenWithWorker(
 	workerUrl: string,
 	authToken: string,
-	deviceName?: string
+	device?: {
+		deviceId?: string;
+		deviceName?: string;
+		platform?: string;
+	}
 ): Promise<void> {
 	const baseUrl = requireWorkerUrl(workerUrl);
 	const tokenHash = await computeTokenHash(authToken);
@@ -59,7 +63,12 @@ export async function registerTokenWithWorker(
 				Authorization: `Bearer ${authToken}`,
 				'Content-Type': 'application/json',
 			},
-			body: JSON.stringify({ token_hash: tokenHash, device_name: deviceName }),
+			body: JSON.stringify({
+				token_hash: tokenHash,
+				device_id: device?.deviceId,
+				device_name: device?.deviceName,
+				platform: device?.platform,
+			}),
 		});
 	} catch {
 		// Best effort - AUTH_TOKEN binding provides fallback

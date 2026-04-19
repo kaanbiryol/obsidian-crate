@@ -38,9 +38,42 @@ export async function initDb(db: D1Database): Promise<void> {
 	await db.prepare(`CREATE TABLE IF NOT EXISTS auth_tokens (
 		id TEXT PRIMARY KEY,
 		token_hash TEXT NOT NULL UNIQUE,
+		device_id TEXT,
 		device_name TEXT,
-		created_at TEXT NOT NULL DEFAULT (datetime('now'))
+		platform TEXT,
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		last_seen_at TEXT
 	)`).run();
+	if (!await hasColumn(db, 'auth_tokens', 'device_id')) {
+		try {
+			await db.prepare('ALTER TABLE auth_tokens ADD COLUMN device_id TEXT').run();
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+			if (!message.includes('duplicate column') && !message.includes('already exists')) {
+				throw error;
+			}
+		}
+	}
+	if (!await hasColumn(db, 'auth_tokens', 'platform')) {
+		try {
+			await db.prepare('ALTER TABLE auth_tokens ADD COLUMN platform TEXT').run();
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+			if (!message.includes('duplicate column') && !message.includes('already exists')) {
+				throw error;
+			}
+		}
+	}
+	if (!await hasColumn(db, 'auth_tokens', 'last_seen_at')) {
+		try {
+			await db.prepare('ALTER TABLE auth_tokens ADD COLUMN last_seen_at TEXT').run();
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+			if (!message.includes('duplicate column') && !message.includes('already exists')) {
+				throw error;
+			}
+		}
+	}
 	await db.prepare(`CREATE TABLE IF NOT EXISTS scheduled_reminders (
 		reminder_id TEXT PRIMARY KEY,
 		content TEXT NOT NULL,

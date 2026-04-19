@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
+import { SyncApiClient } from './api';
 import { createEmptySyncResult } from './sync-result';
 import { SyncRuntime } from './runtime';
 import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, SECRET_KEYS, type CrateSettings, type SyncResult } from '../plugin/types';
@@ -129,6 +130,7 @@ describe('SyncRuntime startup event handling', () => {
 
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 		vi.spyOn(SyncEngine.prototype, 'sync').mockImplementation(async () => startupSync.promise);
+		vi.spyOn(SyncApiClient.prototype, 'registerToken').mockResolvedValue({ id: 'token-id' });
 		vi.spyOn(SyncEngine.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 	});
 
@@ -202,6 +204,7 @@ describe('SyncRuntime teardown and reinitialization', () => {
 			const nextSync = queuedStartupSyncs.shift();
 			return nextSync ? nextSync.promise : createEmptySyncResult();
 		});
+		vi.spyOn(SyncApiClient.prototype, 'registerToken').mockResolvedValue({ id: 'token-id' });
 		vi.spyOn(SyncEngine.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 	});
 
@@ -421,11 +424,11 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(settings.syncHistory).toHaveLength(MAX_SYNC_HISTORY);
 	});
 
-	it('pushes shared settings through the current API client', async () => {
-		const { runtime, settings } = createRuntimeHarness({
-			ignorePatterns: ['*.tmp'],
-			syncOnStartup: false,
-			syncInterval: 15,
+		it('pushes shared settings through the current API client', async () => {
+			const { runtime } = createRuntimeHarness({
+				ignorePatterns: ['*.tmp'],
+				syncOnStartup: false,
+				syncInterval: 15,
 			showStatusBar: true,
 			pushEnabled: true,
 		});

@@ -26,7 +26,7 @@ This allows multiple devices to have independent tokens stored in D1, while main
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths) |
 | `POST` | `/sync/batch-delete` | Batch delete `{ paths: [...] }` (max 50 paths) |
 | `GET` | `/sync/config` | Returns `{ accountId, workerName, bucketName, databaseId }` |
-| `POST` | `/auth/tokens` | Register a per-device auth token `{ token_hash, device_name? }` |
+| `POST` | `/auth/tokens` | Register or refresh a per-device auth token `{ token_hash, device_id?, device_name?, platform? }` |
 | `DELETE` | `/auth/tokens` | Revoke an auth token `{ id }` |
 | `GET` | `/auth/tokens` | List all registered auth tokens |
 | `GET` | `/settings` | Get shared settings from R2 |
@@ -115,9 +115,9 @@ Response (gzip-compressed when `Accept-Encoding: gzip`):
 
 ### POST /auth/tokens
 
-Register a per-device auth token. The token hash (SHA-256 hex) is stored in D1 - the plaintext token is never persisted.
+Register or refresh a per-device auth token. The token hash (SHA-256 hex) is stored in D1 - the plaintext token is never persisted.
 
-Request: `{ token_hash: "<sha256-hex>", device_name?: "optional label" }`
+Request: `{ token_hash: "<sha256-hex>", device_id?: "device-abc123", device_name?: "Mac (abc1)", platform?: "macos" }`
 
 Response: `{ id: "<uuid>" }`
 
@@ -131,9 +131,9 @@ Response: `{ success: true }`
 
 ### GET /auth/tokens
 
-List all registered tokens (does not expose hashes).
+List all registered tokens (does not expose hashes). The current token is marked with `is_current`.
 
-Response: `{ tokens: [{ id, device_name, created_at }] }`
+Response: `{ tokens: [{ id, device_id, device_name, platform, created_at, last_seen_at, is_current }] }`
 
 ### GET /settings
 
@@ -261,12 +261,15 @@ D1-backed remote manifest. Updated atomically with changelog entries via `db.bat
 CREATE TABLE IF NOT EXISTS auth_tokens (
   id         TEXT PRIMARY KEY,
   token_hash TEXT NOT NULL UNIQUE,
+  device_id TEXT,
   device_name TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  platform TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_seen_at TEXT
 );
 ```
 
-Per-device auth tokens. Token hashes are SHA-256 hex of the bearer token. Used for multi-device support - each device gets its own token that can be independently revoked.
+Per-device auth tokens. Token hashes are SHA-256 hex of the bearer token. Used for multi-device support - each device gets its own token that can be independently revoked. Device metadata is updated when a plugin instance comes online, and `last_seen_at` is refreshed periodically while that token is actively used.
 
 ### scheduled_reminders
 

@@ -205,6 +205,9 @@ describe('cloudflare infrastructure setup and diagnostics', () => {
 		const result = await quickSetup({
 			accountId: 'acct',
 			apiToken: 'token',
+			deviceId: 'device-abcd',
+			deviceName: 'Mac (abcd)',
+			platform: 'macos',
 		});
 
 		expect(result).toEqual({
@@ -218,8 +221,8 @@ describe('cloudflare infrastructure setup and diagnostics', () => {
 		expect(apiMocks.queryD1).toHaveBeenCalledWith(
 			{ accountId: 'acct', apiToken: 'token' },
 			'db-existing',
-			'INSERT INTO auth_tokens (id, token_hash, device_name) VALUES (?, ?, ?)',
-			expect.arrayContaining([expect.any(String), expect.any(String), 'plugin-reconnect']),
+			'INSERT INTO auth_tokens (id, token_hash, device_id, device_name, platform, last_seen_at) VALUES (?, ?, NULLIF(?, \'\'), ?, NULLIF(?, \'\'), datetime(\'now\'))',
+			expect.arrayContaining([expect.any(String), expect.any(String), 'device-abcd', 'Mac (abcd)', 'macos']),
 		);
 		expect(apiMocks.redeployWorker).toHaveBeenCalledWith(
 			{ accountId: 'acct', apiToken: 'token' },
@@ -248,6 +251,9 @@ describe('cloudflare infrastructure setup and diagnostics', () => {
 		const result = await quickSetup({
 			accountId: 'acct',
 			apiToken: 'token',
+			deviceId: 'device-abcd',
+			deviceName: 'Mac (abcd)',
+			platform: 'macos',
 		});
 
 		expect(result).toEqual({
@@ -290,6 +296,14 @@ describe('cloudflare infrastructure setup and diagnostics', () => {
 				method: 'POST',
 			}),
 		);
+		const secondRequest = requestUrlSpy.mock.calls[1]?.[0] as { body?: string } | undefined;
+		expect(typeof secondRequest?.body).toBe('string');
+		expect(JSON.parse(secondRequest?.body ?? '')).toEqual({
+			token_hash: expect.any(String),
+			device_id: 'device-abcd',
+			device_name: 'Mac (abcd)',
+			platform: 'macos',
+		});
 	});
 
 	it('reports worker auth failures and missing configured resources in diagnostics', async () => {

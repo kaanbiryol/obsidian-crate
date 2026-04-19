@@ -18,6 +18,9 @@ export interface QuickSetupInput {
 	apiToken: string;
 	bucketName?: string;
 	workerName?: string;
+	deviceId?: string;
+	deviceName?: string;
+	platform?: string;
 }
 
 export interface QuickSetupResult {

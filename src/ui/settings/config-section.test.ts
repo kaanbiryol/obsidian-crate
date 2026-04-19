@@ -22,6 +22,15 @@ async function loadConfigSectionModule() {
 				}
 			}
 		},
+		Platform: {
+			isIosApp: false,
+			isAndroidApp: false,
+			isMacOS: true,
+			isMobileApp: false,
+			isWin: false,
+			isLinux: false,
+			isDesktopApp: true,
+		},
 		requestUrl,
 		Setting: class Setting {},
 	}));
@@ -154,6 +163,7 @@ describe('createInfrastructureFromCredentials', () => {
 		const pushSharedSettings = vi.fn(async () => {});
 		const onProgress = vi.fn();
 		const pluginSettings = {
+			deviceId: '',
 			ignorePatterns: [],
 			syncOnStartup: false,
 			syncInterval: 0,
@@ -184,6 +194,9 @@ describe('createInfrastructureFromCredentials', () => {
 		expect(quickSetup).toHaveBeenCalledWith({
 			accountId: 'acct-123',
 			apiToken: 'cloudflare-api-token',
+			deviceId: '',
+			deviceName: 'Mac (this)',
+			platform: 'macos',
 		}, onProgress);
 		expect(syncApiClientCtor).toHaveBeenCalledWith('https://worker.example', 'worker-auth-token');
 		expect(applySharedSettings).toHaveBeenCalledWith(pluginSettings, sharedSettings);

@@ -74,8 +74,15 @@ export default {
 			try {
 				await initDb(db);
 				const tokenHash = await sha256Hex(token);
-				const row = await db.prepare('SELECT id FROM auth_tokens WHERE token_hash = ?').bind(tokenHash).first();
-				if (row) authenticated = true;
+				const row = await db.prepare('SELECT id FROM auth_tokens WHERE token_hash = ?').bind(tokenHash).first<{ id: string }>();
+				if (row?.id) {
+					authenticated = true;
+					await db.prepare(`UPDATE auth_tokens
+						SET last_seen_at = datetime('now')
+						WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at < datetime('now', '-6 hours'))`)
+						.bind(row.id)
+						.run();
+				}
 			} catch { /* D1 failure falls through to binding check */ }
 		}
 		if (!authenticated && (!fallbackAuthToken || !await timingSafeEqual(token, fallbackAuthToken))) {
@@ -116,7 +123,7 @@ export default {
 
 				if (method === 'POST') return await handleRegisterToken(request, db);
 				if (method === 'DELETE') return await handleRevokeToken(request, db);
-				return await handleListTokens(db);
+				return await handleListTokens(request, db);
 			}
 
 			// Settings routes

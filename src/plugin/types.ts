@@ -194,6 +194,16 @@ export interface WorkerConfig {
 	databaseId: string | null;
 }
 
+export interface RegisteredDevice {
+	id: string;
+	device_id: string | null;
+	device_name: string | null;
+	platform: string | null;
+	created_at: string;
+	last_seen_at: string | null;
+	is_current: boolean;
+}
+
 // ============================================================================
 // Settings Types
 // ============================================================================

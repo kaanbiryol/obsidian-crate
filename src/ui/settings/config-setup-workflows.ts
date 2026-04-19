@@ -6,6 +6,7 @@ import {
 } from '../../cloudflare/api';
 import { quickSetup } from '../../cloudflare/infrastructure';
 import type CratePlugin from '../../main';
+import { getCurrentDeviceName, getCurrentPlatformCode } from '../../plugin/deviceInfo';
 import { SECRET_KEYS } from '../../plugin/types';
 import { SyncApiClient } from '../../sync/api';
 import { applySharedSettings } from '../../sync/shared-settings';
@@ -49,6 +50,9 @@ export async function createInfrastructureFromCredentials(
 		{
 			accountId: creds.accountId,
 			apiToken: creds.apiToken,
+			deviceId: plugin.settings.deviceId,
+			deviceName: getCurrentDeviceName(plugin.settings.deviceId),
+			platform: getCurrentPlatformCode(),
 		},
 		onProgress
 	);

@@ -5,6 +5,7 @@
 import { App, PluginSettingTab } from 'obsidian';
 import type CratePlugin from '../main';
 import { renderConfigSection, type SetupWizardState } from './settings/config-section';
+import { renderDevicesSection } from './settings/devices-section';
 import { renderInfrastructureSection } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
 import { renderUsageSection } from './settings/usage-section';
@@ -49,6 +50,13 @@ export class CrateSettingTab extends PluginSettingTab {
 			wizardState: this.wizardState,
 			rerender: () => this.display(),
 		});
+
+		if (isConfigured) {
+			renderDevicesSection({
+				containerEl,
+				plugin: this.plugin,
+			});
+		}
 
 		if (sections.showSync) {
 			const syncCleanup = renderSyncSection({
