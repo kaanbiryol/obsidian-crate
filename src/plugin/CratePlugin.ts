@@ -23,7 +23,7 @@ import { SyncRuntime } from '../sync/runtime';
 import { configureSyncLogger } from './logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { SecretStorageService } from './secret-storage';
-import { normalizeCrateSettings, type CrateSettings } from './settings';
+import { buildPersistedCrateSettings, normalizeCrateSettings, type CrateSettings } from './settings';
 
 export default class CratePlugin extends Plugin {
 	settings!: CrateSettings;
@@ -56,7 +56,7 @@ export default class CratePlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		this.settings = normalizeCrateSettings(this.settings, this.app.vault.configDir);
-		await this.saveData(this.settings);
+		await this.saveData(buildPersistedCrateSettings(this.settings));
 	}
 
 	async loadRemindersSettings(): Promise<void> {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, normalizeCrateSettings } from './settings';
+import { buildPersistedCrateSettings, DEFAULT_SETTINGS, normalizeCrateSettings } from './settings';
 import { MAX_SYNC_HISTORY_PATHS } from './types';
 
 describe('normalizeCrateSettings', () => {
@@ -120,5 +120,15 @@ describe('normalizeCrateSettings', () => {
 		expect(settings.syncHistory[0]?.uploadedPaths).toHaveLength(MAX_SYNC_HISTORY_PATHS);
 		expect(settings.syncHistory[0]?.uploadedPaths?.[0]).toBe('notes/0.md');
 		expect(settings.syncHistory[0]?.uploadedPaths?.at(-1)).toBe(`notes/${MAX_SYNC_HISTORY_PATHS - 1}.md`);
+	});
+
+	it('omits deviceId from persisted settings so device identity stays local', () => {
+		const persisted = buildPersistedCrateSettings({
+			...DEFAULT_SETTINGS,
+			deviceId: 'device-local-only',
+		});
+
+		expect('deviceId' in persisted).toBe(false);
+		expect(persisted.workerUrl).toBe(DEFAULT_SETTINGS.workerUrl);
 	});
 });

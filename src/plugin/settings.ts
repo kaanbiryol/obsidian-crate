@@ -143,6 +143,11 @@ export function normalizeCrateSettings(
 	};
 }
 
+export function buildPersistedCrateSettings(settings: CrateSettings): Omit<CrateSettings, 'deviceId'> {
+	const { deviceId: _deviceId, ...persistedSettings } = settings;
+	return persistedSettings;
+}
+
 export {
 	type CrateSettings,
 	DEFAULT_SETTINGS,

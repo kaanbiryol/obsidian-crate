@@ -1,4 +1,5 @@
 import { Notice, Setting } from 'obsidian';
+import { setPluginDeviceId } from '../../plugin/deviceId';
 import { openConfirmationModal } from '../confirmation-modal';
 import {
 	createFileSyncProgress,
@@ -42,12 +43,11 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 
 	new Setting(containerEl)
 		.setName('Device ID')
-		.setDesc('Unique identifier for this device')
+		.setDesc('Unique identifier for this device. Stored locally and not shared through vault sync.')
 		.addText(text => text
 			.setValue(plugin.settings.deviceId)
 			.onChange(async (value) => {
-				plugin.settings.deviceId = value;
-				await plugin.saveSettings();
+				await setPluginDeviceId(plugin, value);
 			}));
 
 	const initialSyncSetting = new Setting(containerEl)
