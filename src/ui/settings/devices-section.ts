@@ -19,7 +19,7 @@ export function renderDevicesSection(context: DevicesSectionContext): void {
 	createSettingsSectionHeading(containerEl, 'Devices');
 	new Setting(containerEl)
 		.setName('Connected devices')
-		.setDesc('Remove sync access for devices and setup links you no longer use.')
+		.setDesc('Remove sync access for devices you no longer use.')
 		.addButton((button) => {
 			button.setButtonText('Refresh');
 			button.onClick(async () => {
@@ -44,7 +44,8 @@ async function loadDevices(container: HTMLElement, plugin: CratePlugin): Promise
 
 	try {
 		const { tokens } = await apiClient.listTokens();
-		if (tokens.length === 0) {
+		const visibleTokens = tokens.filter(shouldDisplayToken);
+		if (visibleTokens.length === 0) {
 			container.createEl('p', {
 				text: 'No connected devices found yet.',
 				cls: 'setting-item-description',
@@ -52,7 +53,7 @@ async function loadDevices(container: HTMLElement, plugin: CratePlugin): Promise
 			return;
 		}
 
-		for (const token of tokens) {
+		for (const token of visibleTokens) {
 			const label = formatDeviceLabel(token);
 			const setting = new Setting(container)
 				.setName(label)
@@ -93,6 +94,13 @@ async function loadDevices(container: HTMLElement, plugin: CratePlugin): Promise
 			cls: 'setting-item-description',
 		});
 	}
+}
+
+function shouldDisplayToken(token: {
+	device_name: string | null;
+	last_seen_at: string | null;
+}): boolean {
+	return token.device_name !== 'setup-link' || !!token.last_seen_at;
 }
 
 function formatDeviceDescription(token: {

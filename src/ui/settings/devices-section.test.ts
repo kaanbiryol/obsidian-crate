@@ -63,11 +63,11 @@ describe('renderDevicesSection', () => {
 				},
 				{
 					id: 'other-id',
-					device_id: null,
-					device_name: 'setup-link',
-					platform: null,
+					device_id: 'device-other',
+					device_name: 'Android device (5678)',
+					platform: 'android',
 					created_at: '2026-04-18 09:00:00',
-					last_seen_at: null,
+					last_seen_at: '2026-04-18 11:00:00',
 					is_current: false,
 				},
 			],
@@ -91,15 +91,48 @@ describe('renderDevicesSection', () => {
 
 		expect(getSettingByName('Connected devices')).toBeTruthy();
 		expect(getSettingByName('Mac (1234) (Current device)').buttons).toHaveLength(0);
-		expect(getSettingByName('setup-link').descEl.textContent).toContain('Not used yet');
+		expect(getSettingByName('Android device (5678)').descEl.textContent).toContain('Last seen');
 
-		getSettingByName('setup-link').buttons[0]?.click();
+		getSettingByName('Android device (5678)').buttons[0]?.click();
 		await flushMicrotasks();
 
 		expect(openConfirmationModal).toHaveBeenCalledTimes(1);
 		expect(revokeToken).toHaveBeenCalledWith('other-id');
 		expect(listTokens).toHaveBeenCalledTimes(2);
-		expect(noticeMessages).toContain('Removed setup-link');
+		expect(noticeMessages).toContain('Removed Android device (5678)');
+	});
+
+	it('hides unused setup-link placeholders from the devices list', async () => {
+		const { renderDevicesSection } = await loadDevicesSectionModule();
+
+		renderDevicesSection({
+			containerEl: new FakeElement('div') as never,
+			plugin: {
+				app: {},
+				syncRuntime: {
+					getApiClient: () => ({
+						listTokens: vi.fn(async () => ({
+							tokens: [
+								{
+									id: 'placeholder-id',
+									device_id: null,
+									device_name: 'setup-link',
+									platform: null,
+									created_at: '2026-04-18 09:00:00',
+									last_seen_at: null,
+									is_current: false,
+								},
+							],
+						})),
+						revokeToken: vi.fn(),
+					}),
+				},
+			} as never,
+		});
+		await flushMicrotasks();
+
+		expect(() => getSettingByName('setup-link')).toThrow('Setting not found: setup-link');
+		expect(MockSetting.instances.map((setting) => setting.nameEl.textContent)).toEqual(['Connected devices']);
 	});
 
 	it('renders a failure message when device loading fails', async () => {
