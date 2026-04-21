@@ -47,14 +47,19 @@ describe("reminder view models", () => {
     expect(viewModel.completed.map((reminder) => reminder.id)).toEqual(["c", "a"]);
   });
 
-  it("combines overdue and today reminders without duplicates", () => {
+  it("groups today, overdue, and completed-due-today reminders", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
+
     const viewModel = buildTodayViewModel([
       makeReminder({ id: "today", dueDate: "2026-01-10" }),
       makeReminder({ id: "overdue", dueDate: "2026-01-08" }),
-      makeReminder({ id: "done", dueDate: "2026-01-10", completed: true }),
+      makeReminder({ id: "done-today", dueDate: "2026-01-10", completed: true }),
+      makeReminder({ id: "done-old", dueDate: "2026-01-08", completed: true }),
     ]);
 
-    expect(viewModel.map((reminder) => reminder.id)).toEqual(["overdue", "today"]);
+    expect(viewModel.active.map((reminder) => reminder.id)).toEqual(["overdue", "today"]);
+    expect(viewModel.completed.map((reminder) => reminder.id)).toEqual(["done-today"]);
   });
 
   it("builds upcoming groups and project stats/details", () => {

@@ -3,7 +3,7 @@ import type { IndexedReminder } from "./reminderIndex";
 import type { Priority, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
 import {
   buildStoredReminderDates,
-  formatLocalDateKey,
+  isReminderDueToday,
   parseReminderDateValue,
 } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
@@ -37,12 +37,8 @@ export function getTodayReminderIds(
   }
 
   if (includeCompleted) {
-    const today = formatLocalDateKey(new Date());
     for (const reminder of completed) {
-      const dueDate = reminder.dueDatetime
-        ? formatLocalDateKey(new Date(reminder.dueDatetime))
-        : reminder.dueDate;
-      if (dueDate === today) {
+      if (isReminderDueToday(reminder)) {
         combined.set(reminder.id, reminder);
       }
     }

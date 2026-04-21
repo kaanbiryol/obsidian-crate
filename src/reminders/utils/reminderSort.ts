@@ -4,7 +4,7 @@
  */
 
 import type { Reminder } from '../types/reminder';
-import { formatLocalDateKey, isDateOnlyString, parseReminderDateValue } from './reminderDate';
+import { formatLocalDateKey, isDateOnlyString, isReminderDueToday, parseReminderDateValue } from './reminderDate';
 
 /**
  * Sort reminders by:
@@ -59,15 +59,14 @@ export function sortRemindersByFileOrder(reminders: Reminder[]): Reminder[] {
  * Get reminders due today
  */
 export function getTodayReminders(reminders: Reminder[]): Reminder[] {
-  const todayKey = formatLocalDateKey(new Date());
+  return reminders.filter((reminder) => !reminder.completed && isReminderDueToday(reminder));
+}
 
-  return reminders.filter(r => {
-    if (r.completed) return false;
-    if (r.dueDatetime) {
-      return formatLocalDateKey(new Date(r.dueDatetime)) === todayKey;
-    }
-    return r.dueDate === todayKey;
-  });
+/**
+ * Get completed reminders due today
+ */
+export function getCompletedTodayReminders(reminders: Reminder[]): Reminder[] {
+  return reminders.filter((reminder) => reminder.completed && isReminderDueToday(reminder));
 }
 
 /**

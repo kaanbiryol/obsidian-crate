@@ -11,6 +11,17 @@ export function formatLocalDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export function isReminderDueToday(input: {
+  dueDate?: string;
+  dueDatetime?: string;
+}): boolean {
+  const todayKey = formatLocalDateKey(new Date());
+  if (input.dueDatetime) {
+    return formatLocalDateKey(new Date(input.dueDatetime)) === todayKey;
+  }
+  return input.dueDate === todayKey;
+}
+
 export function parseLocalDateKey(value: string): Date {
   const match = DATE_ONLY_PATTERN.exec(value);
   if (!match) {

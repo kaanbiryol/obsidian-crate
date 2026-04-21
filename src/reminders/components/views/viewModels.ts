@@ -1,6 +1,7 @@
 import { type Reminder } from "@/reminders/types/reminder";
 import { getProjectColor } from "@/reminders/utils/projectColors";
 import {
+  getCompletedTodayReminders,
   getOverdueReminders,
   getTodayReminders,
   getUpcomingReminders,
@@ -61,10 +62,22 @@ export function buildInboxViewModel(reminders: Reminder[]): {
   };
 }
 
-export function buildTodayViewModel(reminders: Reminder[]): Reminder[] {
-  const combined = [...getOverdueReminders(reminders), ...getTodayReminders(reminders)];
+export function buildTodayViewModel(reminders: Reminder[]): {
+  active: Reminder[];
+  completed: Reminder[];
+} {
+  const combined = [
+    ...getOverdueReminders(reminders),
+    ...getTodayReminders(reminders),
+    ...getCompletedTodayReminders(reminders),
+  ];
   const unique = Array.from(new Map(combined.map((reminder) => [reminder.id, reminder])).values());
-  return sortReminders(unique);
+  const sorted = sortReminders(unique);
+
+  return {
+    active: sorted.filter((reminder) => !reminder.completed),
+    completed: sorted.filter((reminder) => reminder.completed),
+  };
 }
 
 export function buildUpcomingViewModel(

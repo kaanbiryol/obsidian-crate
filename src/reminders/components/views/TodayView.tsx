@@ -1,4 +1,4 @@
-import React, { useMemo, memo } from 'react';
+import React, { useMemo, useState, memo } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { Calendar } from 'lucide-react';
 
@@ -6,6 +6,7 @@ import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
 import { ReminderCard } from '../ReminderCard';
 import { EmptyState } from '../EmptyState';
+import { ProjectCompletedSection } from './ProjectCompletedSection';
 import { buildTodayViewModel } from './viewModels';
 import {
   CONTENT_PADDING_X,
@@ -27,7 +28,7 @@ export interface TodayViewProps {
 
 /**
  * Shared Today view component
- * Displays reminders due today and overdue reminders
+ * Displays reminders due today, overdue reminders, and completed reminders due today
  */
 export const TodayView = memo(function TodayView({
   reminders,
@@ -36,7 +37,9 @@ export const TodayView = memo(function TodayView({
   hasFab = true,
   className = ''
 }: TodayViewProps) {
-  const todayReminders = useMemo(() => buildTodayViewModel(reminders), [reminders]);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const { active, completed } = useMemo(() => buildTodayViewModel(reminders), [reminders]);
+  const hasContent = active.length > 0 || completed.length > 0;
 
   // Default card renderer
   const defaultRenderCard = (reminder: Reminder, index: number) => (
@@ -50,7 +53,7 @@ export const TodayView = memo(function TodayView({
   const cardRenderer = renderCard || defaultRenderCard;
 
   // When empty, show centered EmptyState
-  if (todayReminders.length === 0) {
+  if (!hasContent) {
     return (
       <div className={`flex flex-col h-full relative ${className}`}>
         <div className="flex-1 flex items-center justify-center">
@@ -83,7 +86,7 @@ export const TodayView = memo(function TodayView({
       >
         <LayoutGroup>
           <AnimatePresence mode="popLayout" initial={false}>
-            {todayReminders.map((reminder, index) => (
+            {active.map((reminder, index) => (
               <motion.div
                 key={reminder.id}
                 layout="position"
@@ -97,6 +100,13 @@ export const TodayView = memo(function TodayView({
             ))}
           </AnimatePresence>
         </LayoutGroup>
+
+        <ProjectCompletedSection
+          reminders={completed}
+          showCompleted={showCompleted}
+          onToggle={() => setShowCompleted((previous) => !previous)}
+          renderCard={cardRenderer}
+        />
       </div>
     </div>
   );
