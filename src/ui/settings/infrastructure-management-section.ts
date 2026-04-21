@@ -16,6 +16,7 @@ import {
 import { renderDiagnostics } from './infrastructure-diagnostics';
 import type { InfrastructureSectionContext } from './infrastructure-types';
 import { createSettingsSubsectionHeading } from './section-helpers';
+import { buildDiagnosticsSettingsStateKey } from '../../plugin/settings-ui-state';
 
 export function renderInfrastructureManagementSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin, isConfigured, rerender } = context;
@@ -24,6 +25,10 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 
 	const diagnosticsContainer = containerEl.createDiv({ cls: 'crate-diagnostics' });
 	diagnosticsContainer.hide();
+	const cachedDiagnostics = plugin.settingsUiState.diagnostics;
+	if (isConfigured && cachedDiagnostics && cachedDiagnostics.key === buildDiagnosticsSettingsStateKey(plugin.settings)) {
+		renderDiagnostics(diagnosticsContainer, cachedDiagnostics.results);
+	}
 
 	if (isConfigured) {
 		new Setting(containerEl)
@@ -126,6 +131,10 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 							databaseId: plugin.settings.databaseId || undefined,
 						}),
 						onSuccess: (results) => {
+							plugin.settingsUiState.diagnostics = {
+								key: buildDiagnosticsSettingsStateKey(plugin.settings),
+								results,
+							};
 							renderDiagnostics(diagnosticsContainer, results);
 							new Notice(getDiagnosticsNoticeMessage(summarizeDiagnosticResults(results)));
 						},
@@ -207,6 +216,7 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 									return;
 								}
 								shouldResumeSync = false;
+								plugin.clearSettingsUiState();
 								await plugin.syncRuntime.clearSyncConfiguration();
 								new Notice(`Infrastructure reset complete (${result.deleted.length} deleted)`);
 								rerender();

@@ -41,6 +41,10 @@ export class FakeElement {
 		return this.createEl('div', info);
 	}
 
+	createSpan(info?: { text?: string; cls?: string }): FakeElement {
+		return this.createEl('span', info);
+	}
+
 	appendChild(child: FakeElement): FakeElement {
 		this.children.push(child);
 		return child;

@@ -67,6 +67,7 @@ export async function createInfrastructureFromCredentials(
 		// Best effort: setup remains valid even if shared settings cannot be fetched.
 	}
 
+	plugin.clearSettingsUiState();
 	await plugin.syncRuntime.applyInfrastructureConfig({
 		workerUrl: result.workerUrl,
 		authToken: result.authToken,
@@ -87,7 +88,7 @@ export function renderApiTokenSetup(
 ): void {
 	new Setting(containerEl)
 		.setName('Create a prefilled Cloudflare API token')
-		.setDesc('Open Cloudflare with Crate\'s required Workers, R2, D1, account settings, and account analytics permissions pre-selected')
+		.setDesc('Open a prefilled token template with the required worker, bucket, database, account settings, and analytics permissions')
 		.addButton(button => button
 			.setButtonText('Open Cloudflare')
 			.onClick(() => {

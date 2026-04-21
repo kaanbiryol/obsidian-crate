@@ -42,6 +42,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				.setButtonText('Log out')
 				.setWarning()
 				.onClick(async () => {
+					plugin.clearSettingsUiState();
 					await plugin.syncRuntime.clearSyncConfiguration({ clearCloudflareCredentials: true });
 					new Notice('Signed out and configuration cleared');
 					rerender();
@@ -116,6 +117,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 					if (!confirmed) {
 						return;
 					}
+					plugin.clearSettingsUiState();
 					await plugin.syncRuntime.clearSyncConfiguration();
 					new Notice('Local plugin configuration cleared');
 					rerender();

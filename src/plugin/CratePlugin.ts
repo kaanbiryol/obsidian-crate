@@ -22,6 +22,7 @@ import { activateOrRevealRemindersLeaf } from '../reminders/ui/workspaceLayout';
 import { SyncRuntime } from '../sync/runtime';
 import { configureSyncLogger } from './logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
+import { createSettingsUiState, type SettingsUiState } from './settings-ui-state';
 import { SecretStorageService } from './secret-storage';
 import { buildPersistedCrateSettings, normalizeCrateSettings, type CrateSettings } from './settings';
 
@@ -31,6 +32,7 @@ export default class CratePlugin extends Plugin {
 	cloudflareSession!: CloudflareSessionManager;
 	syncRuntime!: SyncRuntime;
 	readonly usageService = new CloudflareUsageService();
+	readonly settingsUiState: SettingsUiState = createSettingsUiState();
 
 	// Reminders
 	reminderIndex!: ReminderIndex;
@@ -73,5 +75,10 @@ export default class CratePlugin extends Plugin {
 
 	async reinitializeWithFolder(newFolderPath: string): Promise<void> {
 		await reinitializeReminders(this, newFolderPath);
+	}
+
+	clearSettingsUiState(): void {
+		this.settingsUiState.usage = null;
+		this.settingsUiState.diagnostics = null;
 	}
 }

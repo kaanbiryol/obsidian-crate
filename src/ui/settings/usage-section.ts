@@ -1,5 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
+import { buildUsageSettingsStateKey } from '../../plugin/settings-ui-state';
 import { SECRET_KEYS, type UsageMetric } from '../../plugin/types';
 import { getErrorMessage, runButtonTask } from './action-helpers';
 import { createSettingsSectionHeading } from './section-helpers';
@@ -10,7 +11,7 @@ export interface UsageSectionContext {
 }
 
 export function renderUsageSection(context: UsageSectionContext): void {
-	const { containerEl } = context;
+	const { containerEl, plugin } = context;
 	createSettingsSectionHeading(containerEl, 'Usage');
 
 	new Setting(containerEl)
@@ -39,6 +40,10 @@ export function renderUsageSection(context: UsageSectionContext): void {
 			}));
 
 	const usageContainer = containerEl.createDiv({ cls: 'crate-usage-container' });
+	const cachedUsage = plugin.settingsUiState.usage;
+	if (cachedUsage && cachedUsage.key === buildUsageSettingsStateKey(plugin.settings)) {
+		renderUsageData(usageContainer, cachedUsage.data);
+	}
 }
 
 async function loadUsageData(context: UsageSectionContext, container: HTMLElement): Promise<void> {
@@ -51,6 +56,17 @@ async function loadUsageData(context: UsageSectionContext, container: HTMLElemen
 		apiToken,
 		plugin.syncRuntime.getApiClient()
 	);
+	if (data.available && !data.error) {
+		plugin.settingsUiState.usage = {
+			key: buildUsageSettingsStateKey(plugin.settings),
+			data,
+		};
+	}
+
+	renderUsageData(container, data);
+}
+
+function renderUsageData(container: HTMLElement, data: Awaited<ReturnType<CratePlugin['usageService']['getUsage']>>): void {
 	container.empty();
 
 	if (!data.available) {
