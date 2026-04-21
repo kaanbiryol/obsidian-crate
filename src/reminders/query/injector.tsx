@@ -177,6 +177,7 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
   private readonly component: React.FC<T>;
   private reactRoot: Root | null = null;
   private shadowRoot: ShadowRoot | null = null;
+  private isDisposed = false;
 
   constructor(
     container: HTMLElement,
@@ -193,12 +194,13 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
   onload(): void {
     // Create shadow root for CSS isolation
     this.shadowRoot = this.containerEl.attachShadow({ mode: "open" });
-    void attachPluginStylesheet(this.plugin, this.shadowRoot);
+    const shadowRoot = this.shadowRoot;
 
-    // Create mount point
+    // Create mount point immediately so the shadow tree is stable, but wait for
+    // the stylesheet before the first React paint to avoid a flash of unstyled content.
     const mountPoint = document.createElement("div");
     mountPoint.className = "reminders-shadow-root";
-    this.shadowRoot.appendChild(mountPoint);
+    shadowRoot.appendChild(mountPoint);
 
     // Sync dark mode
     if (document.body.classList.contains("theme-dark")) {
@@ -210,7 +212,24 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
       mountPoint.classList.add("is-mobile");
     }
 
-    // Create React root and render
+    void this.initializeReactRoot(shadowRoot, mountPoint);
+  }
+
+  onunload(): void {
+    this.isDisposed = true;
+    if (this.reactRoot) {
+      this.reactRoot.unmount();
+    }
+    this.shadowRoot = null;
+  }
+
+  private async initializeReactRoot(shadowRoot: ShadowRoot, mountPoint: HTMLDivElement): Promise<void> {
+    await attachPluginStylesheet(this.plugin, shadowRoot);
+
+    if (this.isDisposed || this.shadowRoot !== shadowRoot) {
+      return;
+    }
+
     this.reactRoot = createRoot(mountPoint);
     const Component = this.component;
     this.reactRoot.render(
@@ -218,12 +237,5 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
         <Component {...this.props} />
       </PluginContext.Provider>,
     );
-  }
-
-  onunload(): void {
-    if (this.reactRoot) {
-      this.reactRoot.unmount();
-    }
-    this.shadowRoot = null;
   }
 }

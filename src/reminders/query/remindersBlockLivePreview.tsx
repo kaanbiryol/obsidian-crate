@@ -20,6 +20,8 @@ import { parseQuery, type ReminderQueryOptions } from "./injector";
 type WidgetHost = HTMLDivElement & {
   crateReactRoot?: Root;
   crateShadowRoot?: ShadowRoot;
+  crateMountPoint?: HTMLDivElement;
+  crateDisposed?: boolean;
 };
 
 class RemindersBlockWidget extends WidgetType {
@@ -83,9 +85,9 @@ class RemindersBlockWidget extends WidgetType {
     const host = dom as WidgetHost;
     const root = host.crateReactRoot;
     const shadowRoot = host.crateShadowRoot;
+    const mountPoint = host.crateMountPoint;
     if (root && shadowRoot) {
       // Update dark mode class
-      const mountPoint = shadowRoot.querySelector(".reminders-shadow-root") as HTMLElement;
       if (mountPoint) {
         if (document.body.classList.contains("theme-dark")) {
           mountPoint.classList.add("dark");
@@ -108,7 +110,7 @@ class RemindersBlockWidget extends WidgetType {
       return true; // Successfully updated in place
     }
 
-    return false; // Need to recreate
+    return !!shadowRoot; // Initial render may still be waiting on stylesheet attachment
   }
 
   private toggleShowCompleted = (newValue: boolean) => {
@@ -173,12 +175,36 @@ class RemindersBlockWidget extends WidgetType {
       mountPoint.classList.add("dark");
     }
 
-    const root: Root = createRoot(mountPoint);
-    container.crateReactRoot = root;
     container.crateShadowRoot = shadowRoot;
-    void attachPluginStylesheet(this.plugin, shadowRoot);
+    container.crateMountPoint = mountPoint;
 
-    // Render immediately (styles will apply when loaded)
+    void this.initializeRoot(container, shadowRoot, mountPoint);
+
+    return container;
+  }
+
+  destroy(dom: HTMLElement): void {
+    const host = dom as WidgetHost;
+    host.crateDisposed = true;
+    const root = host.crateReactRoot;
+    if (root) {
+      root.unmount();
+    }
+  }
+
+  private async initializeRoot(
+    host: WidgetHost,
+    shadowRoot: ShadowRoot,
+    mountPoint: HTMLDivElement,
+  ): Promise<void> {
+    await attachPluginStylesheet(this.plugin, shadowRoot);
+
+    if (host.crateDisposed || host.crateShadowRoot !== shadowRoot) {
+      return;
+    }
+
+    const root = createRoot(mountPoint);
+    host.crateReactRoot = root;
     root.render(
       <PluginContext.Provider value={this.plugin}>
         <RemindersList
@@ -190,15 +216,6 @@ class RemindersBlockWidget extends WidgetType {
         />
       </PluginContext.Provider>,
     );
-
-    return container;
-  }
-
-  destroy(dom: HTMLElement): void {
-    const root = (dom as WidgetHost).crateReactRoot;
-    if (root) {
-      root.unmount();
-    }
   }
 }
 
