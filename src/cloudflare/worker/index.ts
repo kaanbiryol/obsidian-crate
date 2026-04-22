@@ -12,9 +12,18 @@ import {
 	handleScheduleReminder, handleCancelReminder, handleListScheduled,
 } from './reminder-handlers';
 import {
-	handleNotificationsPage, handleServiceWorker, handleManifest, handleIcon,
+	handleCreateReminder,
+	handleDeleteReminder,
+	handleListReminders,
+	handleReorderReminders,
+	handleSetReminderCompleted,
+	handleUpdateReminder,
+} from './reminders-web-handlers';
+import {
+	handleNotificationsPage, handlePwaApp, handleServiceWorker, handleManifest, handleIcon,
 	handleOpenObsidian, handleVapidPublicKey, handleSubscribe, handleUnsubscribe,
 	handleListSubscriptions, handleTestPush, handleCreateEnrollmentToken,
+	handleCreateRemindersEnrollmentToken, handleExchangeRemindersEnrollmentToken,
 } from './push-handlers';
 import type { Env } from './types';
 
@@ -37,11 +46,19 @@ export default {
 
 		// Unauthenticated PWA routes
 		if (path === '/notifications' && method === 'GET') return handleNotificationsPage();
+		if (path === '/notifications/app.js' && method === 'GET') return handlePwaApp();
 		if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
 		if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest();
 		if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon();
 		if (path === '/notifications/open-obsidian' && method === 'GET') return handleOpenObsidian();
 		if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);
+		if (path === '/notifications/reminders-exchange' && method === 'POST') {
+			const dbResponse = requireDatabase(db);
+			if (dbResponse) {
+				return dbResponse;
+			}
+			return await handleExchangeRemindersEnrollmentToken(request, db);
+		}
 
 		if (path === '/notifications/subscribe' && method === 'POST') {
 			if (request.headers.get('X-Crate-Enrollment-Token')?.trim()) {
@@ -131,6 +148,30 @@ export default {
 			if (path === '/settings' && method === 'PUT') return await handlePutSettings(request, bucket);
 
 			// Reminder routes
+			if (path === '/reminders/list' && method === 'GET') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleListReminders(request, env);
+			}
+			if (path === '/reminders/create' && method === 'POST') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleCreateReminder(request, env);
+			}
+			if (path === '/reminders/update' && method === 'POST') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleUpdateReminder(request, env);
+			}
+			if (path === '/reminders/set-completed' && method === 'POST') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleSetReminderCompleted(request, env);
+			}
+			if (path === '/reminders/delete' && method === 'DELETE') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleDeleteReminder(request, env);
+			}
+			if (path === '/reminders/reorder' && method === 'POST') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleReorderReminders(request, env);
+			}
 			if (path === '/reminders/schedule' && method === 'POST') return await handleScheduleReminder(request, env);
 			if (path === '/reminders/cancel' && method === 'DELETE') return await handleCancelReminder(request, env);
 			if (path === '/reminders/scheduled' && method === 'GET') {
@@ -156,6 +197,10 @@ export default {
 			if (path === '/notifications/enrollment-token' && method === 'POST') {
 				const dbResponse = requireDatabase(db);
 				return dbResponse ?? await handleCreateEnrollmentToken(db);
+			}
+			if (path === '/notifications/reminders-enrollment-token' && method === 'POST') {
+				const dbResponse = requireDatabase(db);
+				return dbResponse ?? await handleCreateRemindersEnrollmentToken(db);
 			}
 			if (path === '/notifications/test' && method === 'POST') {
 				const dbResponse = requireDatabase(db);

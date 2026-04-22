@@ -182,6 +182,7 @@ describe('createInfrastructureFromCredentials', () => {
 
 		await createInfrastructureFromCredentials({
 			settings: pluginSettings,
+			clearSettingsUiState: vi.fn(),
 			syncRuntime: {
 				applyInfrastructureConfig,
 				pushSharedSettings,

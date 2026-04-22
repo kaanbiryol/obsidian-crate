@@ -77,6 +77,7 @@ export class ReminderAlarm implements DurableObject {
 					body: reminder.project || '',
 					tag: reminder.reminderId,
 					project: reminder.project,
+					reminderId: reminder.reminderId,
 				});
 			} catch (err) {
 				console.error('ReminderAlarm: push failed', reminder.reminderId, err);

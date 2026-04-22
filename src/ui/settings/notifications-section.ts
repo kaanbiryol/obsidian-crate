@@ -67,32 +67,32 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 	// Subscribe link + QR code
 	const apiClient = plugin.syncRuntime.getApiClient();
 	if (apiClient) {
-		new Setting(containerEl)
-			.setName('Subscribe a device')
-			.setDesc('Open this link on your phone or scan the code to enable notifications on that device. Each link expires shortly, works once after a successful subscription, and does not expose your sync token.')
-			.addButton(button => {
-				button.setButtonText('Copy link');
-				button.onClick(async () => {
-					try {
-						const url = await buildEnrollmentUrl(plugin);
-						await navigator.clipboard.writeText(url);
-						new Notice('Subscribe link copied to clipboard');
-					} catch {
-						new Notice('Failed to create subscribe link');
-					}
-				});
-			})
-			.addButton(button => {
-				button.setButtonText('Show code');
-				button.onClick(async () => {
-					try {
-						const url = await buildEnrollmentUrl(plugin);
-						new QRModal(plugin.app, url).open();
-					} catch {
-						new Notice('Failed to create subscribe code');
-					}
-				});
+	new Setting(containerEl)
+		.setName('Reminders web app')
+		.setDesc('Open this link on your phone or scan the code to use reminders without opening Obsidian. The app can also enable notifications on that device. Each link expires shortly and does not expose your sync token.')
+		.addButton(button => {
+			button.setButtonText('Copy app link');
+			button.onClick(async () => {
+				try {
+					const url = await buildEnrollmentUrl(plugin);
+					await navigator.clipboard.writeText(url);
+					new Notice('App link copied to clipboard');
+				} catch {
+					new Notice('Failed to create app link');
+				}
 			});
+		})
+		.addButton(button => {
+			button.setButtonText('Show code');
+			button.onClick(async () => {
+				try {
+					const url = await buildEnrollmentUrl(plugin);
+					new QRModal(plugin.app, url).open();
+				} catch {
+					new Notice('Failed to create app code');
+				}
+			});
+		});
 
 		// Subscriptions list
 		const listContainer = containerEl.createDiv({ cls: 'crate-push-subscriptions' });
@@ -133,9 +133,14 @@ async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 		throw new Error('Sync API is unavailable');
 	}
 
-	const { token } = await apiClient.createPushEnrollmentToken();
+	const { token } = await apiClient.createRemindersEnrollmentToken();
 	const subscribeUrl = new URL('notifications', `${plugin.settings.workerUrl}/`);
 	subscribeUrl.searchParams.set('token', token);
+	subscribeUrl.searchParams.set('folder', plugin.remindersSettings.remindersFolderPath);
+	subscribeUrl.searchParams.set('upcomingDays', String(plugin.remindersSettings.upcomingDaysDefault ?? 7));
+	if (plugin.remindersSettings.allDayNotificationTime) {
+		subscribeUrl.searchParams.set('allDayTime', plugin.remindersSettings.allDayNotificationTime);
+	}
 	return subscribeUrl.toString();
 }
 

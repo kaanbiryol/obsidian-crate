@@ -100,6 +100,11 @@ export async function initDb(db: D1Database): Promise<void> {
 		expires_at INTEGER NOT NULL,
 		created_at TEXT NOT NULL DEFAULT (datetime('now'))
 	)`).run();
+	await db.prepare(`CREATE TABLE IF NOT EXISTS web_enrollment_tokens (
+		token_hash TEXT PRIMARY KEY,
+		expires_at INTEGER NOT NULL,
+		created_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)`).run();
 	initializedDatabases.add(db);
 }
 

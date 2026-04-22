@@ -1,182 +1,166 @@
+import { PWA_CLIENT_JS } from './pwa-client-bundle.gen';
+import { PWA_ASSET_VERSION } from './pwa-version.gen';
+
 export const PWA_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#7c3aed">
+<meta name="theme-color" content="#0f0f10">
 <meta name="referrer" content="no-referrer">
-<link rel="manifest" href="/notifications/manifest.json">
-<title>Crate Notifications</title>
+<link rel="manifest" href="/notifications/manifest.json?v=${PWA_ASSET_VERSION}">
+<title>Crate Reminders</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f0f23;color:#e0e0e0;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
-.card{background:#1a1a2e;border-radius:16px;padding:32px;max-width:400px;width:100%;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.3)}
-h1{font-size:1.5rem;margin-bottom:8px;color:#fff}
-.subtitle{color:#888;margin-bottom:24px;font-size:.9rem}
-.btn{display:inline-block;padding:14px 28px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s}
-.btn-primary{background:#7c3aed;color:#fff}
-.btn-primary:hover{background:#6d28d9}
-.btn-primary:disabled{background:#444;cursor:not-allowed}
-.status{margin-top:16px;padding:12px;border-radius:8px;font-size:.9rem}
-.status-ok{background:#065f46;color:#6ee7b7}
-.status-err{background:#7f1d1d;color:#fca5a5}
-.status-info{background:#1e3a5f;color:#93c5fd}
-.ios-hint{margin-top:20px;padding:16px;background:#2a2a3e;border-radius:12px;font-size:.85rem;color:#aaa;line-height:1.5}
-.ios-hint strong{color:#e0e0e0}
-#app{width:100%}
-.hidden{display:none}
+:root{
+	--bg:#0f0f10;
+	--panel:#161618;
+	--panel-2:#1b1b1f;
+	--panel-3:#222228;
+	--line:rgba(255,255,255,.08);
+	--line-soft:rgba(255,255,255,.05);
+	--text:#f4f4f5;
+	--text-muted:#a1a1aa;
+	--text-faint:#71717a;
+	--accent:#8b5cf6;
+	--accent-strong:#7c3aed;
+	--danger:#fb6b6b;
+	--success:#22c55e;
+	--shadow:0 18px 48px rgba(0,0,0,.4);
+	--radius-xl:24px;
+	--radius-lg:20px;
+	--radius-md:16px;
+	--radius-sm:12px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:radial-gradient(circle at top,#202024 0%,#121214 28%,#0f0f10 68%);color:var(--text);font-family:"SF Pro Display","Inter","Segoe UI",system-ui,sans-serif;min-height:100%;overscroll-behavior:none}
+body{min-height:100dvh}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.55}
+:focus-visible{outline:2px solid rgba(139,92,246,.72);outline-offset:2px}
+#app{min-height:100dvh}
+.auth-card{max-width:420px;margin:0 auto;padding:24px 20px;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;gap:14px}
+.auth-card h1{margin:0;font-size:34px;line-height:1.06;letter-spacing:-.04em}
+.auth-card p{margin:0;color:var(--text-muted);line-height:1.5;font-size:15px}
+.app-shell{min-height:100dvh;display:flex;flex-direction:column}
+.app-header{padding:14px 16px 10px;position:sticky;top:0;z-index:20;background:linear-gradient(180deg,rgba(15,15,16,.98),rgba(15,15,16,.94),rgba(15,15,16,.78),transparent);backdrop-filter:blur(16px)}
+.app-header__top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.header-actions{display:flex;align-items:center;gap:8px}
+.header-spacer{display:block;width:36px;height:36px}
+.app-header__body h1{margin:0;font-size:32px;line-height:1.05;letter-spacing:-.04em}
+.header-meta{margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--text-muted);font-size:14px}
+.overdue-pill{display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;border-radius:999px;background:var(--danger);color:#fff;font-weight:700;font-size:14px}
+.app-content{flex:1;padding:8px 16px 116px}
+.empty-state,.loading-card{margin-top:28px;padding:24px 18px;border-radius:var(--radius-lg);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);text-align:center}
+.empty-state h2,.loading-card{font-size:18px}
+.empty-state p{margin:10px 0 0;color:var(--text-muted)}
+.project-card,.reminder-card,.auth-card,.modal-card,.loading-card,.empty-state{box-shadow:var(--shadow)}
+.project-card{display:block;width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:var(--radius-lg);padding:14px 14px 13px;margin-bottom:10px;text-align:left;color:inherit}
+.project-card__row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.project-card__title{font-size:18px;font-weight:700;letter-spacing:-.02em}
+.project-card__meta{margin-top:6px;color:var(--text-muted);font-size:14px}
+.reminders-stack{display:flex;flex-direction:column;gap:10px}
+.reorder-list{display:flex;flex-direction:column;gap:10px}
+.reminder-card{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06);border-radius:var(--radius-lg);overflow:hidden}
+.reminder-card.is-completed{opacity:.72}
+.reminder-card__main{display:flex;align-items:flex-start;gap:10px;padding:14px}
+.checkbox{width:34px;height:34px;flex:0 0 34px;border-radius:999px;border:3px solid rgba(255,255,255,.18);background:transparent;color:white;display:grid;place-items:center;margin-top:2px}
+.checkbox.is-checked{background:var(--success);border-color:var(--success)}
+.checkbox svg{width:16px;height:16px}
+.card-body{flex:1;min-width:0;background:none;border:none;padding:0;color:inherit;text-align:left}
+.card-title-row{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.card-title{font-size:18px;font-weight:700;line-height:1.3;letter-spacing:-.02em;word-break:break-word}
+.card-description{margin-top:8px;color:var(--text-muted);line-height:1.45;font-size:14px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.card-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.meta-pill,.tag-pill,.priority-pill{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:12px;font-size:12px;font-weight:650;border:1px solid rgba(255,255,255,.08)}
+.meta-pill{background:rgba(255,255,255,.05);color:var(--text-muted)}
+.meta-pill.is-overdue{background:rgba(251,107,107,.12);border-color:rgba(251,107,107,.3);color:#ff8f8f}
+.tag-pill{background:rgba(var(--pill-rgb),.10);border-color:rgba(var(--pill-rgb),.28);color:var(--pill-color)}
+.priority-pill{background:rgba(251,107,107,.10);border-color:rgba(251,107,107,.18);color:#ff8f8f;text-transform:uppercase;font-size:10px;letter-spacing:.08em}
+.meta-pill svg,.tag-pill svg,.card-handle svg,.tab-button__icon svg,.icon-button svg,.fab svg{width:14px;height:14px;display:block}
+.card-handle{width:34px;height:34px;flex:0 0 34px;border:none;background:rgba(255,255,255,.04);border-radius:12px;color:var(--text-faint);display:grid;place-items:center;touch-action:none}
+.completed-section{margin-top:6px}
+.completed-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;color:var(--text-muted);padding:10px 2px 2px;font-size:14px;font-weight:650}
+.chevron{font-size:18px;line-height:1;transform:rotate(0deg);transition:transform .16s ease}
+.chevron.is-open{transform:rotate(180deg)}
+.completed-list{display:flex;flex-direction:column;gap:10px;padding-top:10px}
+.date-group{margin-bottom:20px}
+.date-group__title{margin:0 0 10px;padding-left:4px;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint)}
+.bottom-tabs{position:fixed;left:0;right:0;bottom:0;z-index:25;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:rgba(24,24,24,.96);backdrop-filter:blur(24px);border-top:1px solid rgba(255,255,255,.08);display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tab-button{border:none;background:none;border-radius:14px;padding:10px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--text-faint);font-size:11px;font-weight:700;min-height:58px}
+.tab-button__icon{width:20px;height:20px}
+.tab-button.is-active{background:rgba(139,92,246,.14);color:var(--accent)}
+.fab{position:fixed;right:16px;bottom:76px;z-index:24;width:58px;height:58px;border:none;border-radius:999px;background:radial-gradient(circle at 30% 25%,#b084ff 0%,#8b5cf6 42%,#6d28d9 100%);color:white;box-shadow:0 12px 28px rgba(139,92,246,.45)}
+.fab svg{width:24px;height:24px;margin:0 auto}
+.icon-button,.secondary-button,.primary-button{border:none}
+.icon-button{width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,.05);color:var(--text);display:grid;place-items:center}
+.icon-button.is-active{background:rgba(139,92,246,.16);color:var(--accent)}
+.primary-button,.secondary-button{border-radius:14px;padding:11px 14px;font-weight:700;font-size:14px}
+.primary-button{background:var(--accent-strong);color:white}
+.secondary-button{background:rgba(255,255,255,.06);color:var(--text)}
+.secondary-button.is-danger{background:rgba(251,107,107,.12);color:#ff9a9a}
+.modal-backdrop{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.6);backdrop-filter:blur(12px);display:flex;align-items:flex-end;justify-content:center;padding:10px}
+.modal-card{width:min(560px,100%);max-height:calc(100dvh - 20px);overflow:auto;background:#17171a;border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+.modal-form{display:flex;flex-direction:column;gap:14px}
+.modal-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.modal-header h2{margin:0;font-size:22px;letter-spacing:-.03em}
+.field{display:flex;flex-direction:column;gap:8px}
+.field span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)}
+.field input,.field textarea,.field select{width:100%;border-radius:14px;border:1px solid rgba(255,255,255,.08);background:#232327;color:var(--text);padding:12px 14px;outline:none}
+.field textarea{resize:vertical;min-height:96px}
+.field-row{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:10px}
+.modal-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
+.modal-actions__primary{display:flex;gap:8px}
+.toast{position:fixed;left:12px;right:12px;bottom:78px;z-index:45;padding:13px 14px;border-radius:14px;background:#222228;color:white;border:1px solid rgba(255,255,255,.08);box-shadow:var(--shadow);font-size:14px}
+.toast.is-success{background:rgba(34,197,94,.16);border-color:rgba(34,197,94,.3)}
+.toast.is-error{background:rgba(251,107,107,.16);border-color:rgba(251,107,107,.3)}
+.toast.is-info{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.3)}
+.settings-backdrop{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.35);backdrop-filter:blur(10px)}
+.settings-sheet{position:fixed;left:50%;bottom:calc(74px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:31;width:min(420px,calc(100vw - 24px));max-height:calc(100dvh - 110px);overflow:auto;background:var(--panel);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:14px;box-shadow:var(--shadow)}
+.settings-sheet__header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.settings-sheet__header h2{margin:0;font-size:18px;letter-spacing:-.02em}
+.settings-sheet__header p{margin:6px 0 0;color:var(--text-muted);line-height:1.45;font-size:13px}
+.settings-panel{padding:0;border-radius:0;background:none;border:none}
+.settings-panel__section+.settings-panel__section{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)}
+.settings-panel__title{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px}
+.settings-panel__row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.settings-panel__row:last-child{margin-bottom:0}
+.settings-panel__row code{max-width:55%;overflow:auto;font-size:12px;color:var(--text-muted);text-align:right}
+.settings-panel__hint{margin:8px 0 0;color:var(--text-muted);line-height:1.45;font-size:13px}
+.settings-panel__actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.placeholder-card{min-height:72px;background:rgba(139,92,246,.08);border:1px dashed rgba(139,92,246,.35)}
+.is-dragging{opacity:.98;transform:scale(1.01);box-shadow:0 18px 44px rgba(0,0,0,.45)}
+@media (min-width: 760px){
+	body{display:flex;justify-content:center}
+	#app{width:min(640px,100vw);border-left:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.06);background:rgba(10,10,11,.45)}
+	.app-content{padding-left:18px;padding-right:18px}
+	.bottom-tabs{left:50%;transform:translateX(-50%);width:min(640px,100vw)}
+	.fab{right:max(calc(50vw - 300px), 20px)}
+	.toast{left:50%;right:auto;transform:translateX(-50%);width:min(420px,calc(100vw - 24px))}
+}
+@media (max-width: 520px){
+	.field-row{grid-template-columns:1fr}
+}
+@media (max-width: 420px){
+	.app-header__body h1{font-size:28px}
+	.project-card__title{font-size:17px}
+	.card-title{font-size:16px}
+	.modal-actions{flex-direction:column-reverse;align-items:stretch}
+	.modal-actions__primary{display:grid;grid-template-columns:1fr 1fr}
+	.settings-panel__row{align-items:flex-start;flex-direction:column}
+	.settings-panel__row code{max-width:100%;text-align:left}
+}
 </style>
 </head>
 <body>
-<div class="card">
-<h1>Crate Notifications</h1>
-<p class="subtitle">Receive push notifications for your reminders</p>
-<div id="app">
-<div id="unsupported" class="hidden">
-<div class="status status-err">Push notifications are not supported in this browser.</div>
-</div>
-<div id="ios-standalone" class="hidden">
-<div class="ios-hint">
-<strong>Almost there!</strong><br>
-To receive notifications on iOS, tap <strong>Share</strong> (box with arrow) then <strong>Add to Home Screen</strong>. Open from there to complete setup.
-</div>
-</div>
-<div id="subscribe-section" class="hidden">
-<button id="subscribe-btn" class="btn btn-primary">Enable Notifications</button>
-<div id="status" class="hidden"></div>
-</div>
-<div id="subscribed-section" class="hidden">
-<div class="status status-ok">Notifications enabled</div>
-</div>
-</div>
-</div>
-<script>
-(async function() {
-	const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-	const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-
-	// Save the short-lived enrollment token from the setup link. On iOS the PWA has
-	// separate storage from Safari, so we use a query param preserved during install.
-	const params = new URLSearchParams(location.search);
-	const tokenFromQuery = params.get('token');
-	const tokenFromHash = location.hash.slice(1);
-	const tokenFromUrl = tokenFromQuery || tokenFromHash;
-	if (tokenFromUrl) {
-		localStorage.setItem('crate-push-token', tokenFromUrl);
-		const shouldPreserveQueryForIOSInstall = Boolean(tokenFromQuery && isIOS && !isStandalone);
-		if (!shouldPreserveQueryForIOSInstall) {
-			history.replaceState(null, '', location.pathname);
-		}
-	}
-	const token = localStorage.getItem('crate-push-token');
-
-	// iOS only exposes PushManager inside a standalone PWA - check this first
-	if (isIOS && !isStandalone) {
-		show('ios-standalone');
-		return;
-	}
-
-	if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-		show('unsupported');
-		return;
-	}
-
-	// Register service worker
-	const reg = await navigator.serviceWorker.register('/notifications/sw.js');
-	const sub = await reg.pushManager.getSubscription();
-	const btn = document.getElementById('subscribe-btn');
-	const statusEl = document.getElementById('status');
-
-	if (sub) {
-		localStorage.removeItem('crate-push-token');
-		show('subscribed-section');
-		return;
-	}
-
-	show('subscribe-section');
-	if (!token) {
-		btn.disabled = true;
-		showStatus('This setup link is missing or expired. Open a new link from Crate.', true);
-		return;
-	}
-
-	btn.addEventListener('click', async () => {
-		btn.disabled = true;
-		btn.textContent = 'Setting up...';
-		try {
-			const keyResp = await fetch('/notifications/vapid-public-key');
-			const { publicKey } = await keyResp.json();
-			const applicationServerKey = urlBase64ToUint8Array(publicKey);
-
-			const subscription = await reg.pushManager.subscribe({
-				userVisibleOnly: true,
-				applicationServerKey,
-			});
-
-			const subJson = subscription.toJSON();
-			const resp = await fetch('/notifications/subscribe', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-Crate-Enrollment-Token': token,
-				},
-				body: JSON.stringify({
-					endpoint: subJson.endpoint,
-					keys: subJson.keys,
-					deviceName: detectDeviceName(),
-				}),
-			});
-
-			if (!resp.ok) {
-				const body = await resp.text().catch(() => '');
-				throw new Error(resp.status + ': ' + (body || resp.statusText));
-			}
-
-			localStorage.removeItem('crate-push-token');
-			show('subscribed-section');
-			hide('subscribe-section');
-		} catch (err) {
-			if ((err && err.message ? String(err.message) : '').startsWith('401:')) {
-				localStorage.removeItem('crate-push-token');
-				showStatus('This one-time setup link expired or was already used. Open a fresh link from Crate and try again.', true);
-			} else {
-				showStatus(err && err.message ? String(err.message) : 'Failed to subscribe', true);
-			}
-			btn.disabled = false;
-			btn.textContent = 'Enable Notifications';
-		}
-	});
-
-	function show(id) { document.getElementById(id).classList.remove('hidden'); }
-	function hide(id) { document.getElementById(id).classList.add('hidden'); }
-	function showStatus(msg, isError) {
-		statusEl.textContent = msg;
-		statusEl.className = 'status ' + (isError ? 'status-err' : 'status-ok');
-		statusEl.classList.remove('hidden');
-	}
-	function detectDeviceName() {
-		const ua = navigator.userAgent;
-		if (/iPhone/.test(ua)) return 'iPhone';
-		if (/iPad/.test(ua)) return 'iPad';
-		if (/Android/.test(ua)) return 'Android';
-		if (/Mac/.test(ua)) return 'Mac';
-		if (/Windows/.test(ua)) return 'Windows';
-		return 'Unknown';
-	}
-	function urlBase64ToUint8Array(base64String) {
-		const padding = '='.repeat((4 - base64String.length % 4) % 4);
-		const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-		const rawData = atob(base64);
-		const outputArray = new Uint8Array(rawData.length);
-		for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-		return outputArray;
-	}
-})();
-</script>
+<div id="app"></div>
+<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
 </body>
 </html>`;
+
+export const PWA_APP_JS = PWA_CLIENT_JS;
 
 export const SERVICE_WORKER_JS = `
 self.addEventListener('push', function(event) {
@@ -185,8 +169,11 @@ self.addEventListener('push', function(event) {
 		self.registration.showNotification(data.title || 'Reminder', {
 			body: data.body || '',
 			tag: data.tag || 'crate-reminder',
-			icon: '/notifications/icon.svg',
-			data: { project: data.project || '' },
+			icon: '/notifications/icon.svg?v=${PWA_ASSET_VERSION}',
+			data: {
+				project: data.project || '',
+				reminderId: data.reminderId || '',
+			},
 		})
 	);
 });
@@ -194,14 +181,16 @@ self.addEventListener('push', function(event) {
 self.addEventListener('notificationclick', function(event) {
 	event.notification.close();
 	var project = (event.notification.data && event.notification.data.project) || '';
-	var url = '/notifications/open-obsidian' + (project ? '?project=' + encodeURIComponent(project) : '');
+	var reminderId = (event.notification.data && event.notification.data.reminderId) || '';
+	var params = new URLSearchParams();
+	if (project) params.set('project', project);
+	if (reminderId) params.set('reminderId', reminderId);
+	var url = '/notifications' + (params.toString() ? '?' + params.toString() : '');
 	event.waitUntil(clients.openWindow(url));
 });
 
-self.addEventListener('pushsubscriptionchange', function(event) {
-	const token = self.registration.scope.includes('#')
-		? null
-		: null; // re-subscription handled by app on next visit
+self.addEventListener('pushsubscriptionchange', function() {
+	// Re-subscription is handled by the app the next time it opens.
 });
 `;
 
@@ -213,11 +202,11 @@ export const OPEN_OBSIDIAN_HTML = `<!DOCTYPE html>
 <title>Opening Obsidian...</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f0f23;color:#e0e0e0;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
-.card{background:#1a1a2e;border-radius:16px;padding:32px;max-width:400px;width:100%;text-align:center}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f0f10;color:#f4f4f5;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:#181818;border-radius:20px;padding:32px;max-width:420px;width:100%;text-align:center;box-shadow:0 18px 48px rgba(0,0,0,.4)}
 h1{font-size:1.3rem;margin-bottom:16px;color:#fff}
-.btn{display:inline-block;padding:14px 28px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;background:#7c3aed;color:#fff;text-decoration:none;margin-top:8px}
-p{color:#888;font-size:.85rem;margin-top:16px}
+.btn{display:inline-block;padding:14px 28px;border:none;border-radius:14px;font-size:1rem;font-weight:600;cursor:pointer;background:#7c3aed;color:#fff;text-decoration:none;margin-top:8px}
+p{color:#a1a1aa;font-size:.9rem;margin-top:16px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -236,16 +225,15 @@ window.location.href = uri;
 </body>
 </html>`;
 
-// No start_url - iOS uses the page URL (with ?token=) when adding to home screen
 export const MANIFEST_JSON = JSON.stringify({
-	name: 'Crate Notifications',
+	name: 'Crate Reminders',
 	short_name: 'Crate',
 	display: 'standalone',
-	background_color: '#0f0f23',
-	theme_color: '#7c3aed',
+	background_color: '#0f0f10',
+	theme_color: '#0f0f10',
 	icons: [
 		{
-			src: '/notifications/icon.svg',
+			src: `/notifications/icon.svg?v=${PWA_ASSET_VERSION}`,
 			sizes: 'any',
 			type: 'image/svg+xml',
 		},

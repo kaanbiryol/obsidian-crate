@@ -449,6 +449,12 @@ export class SyncApiClient {
 		});
 	}
 
+	async createRemindersEnrollmentToken(): Promise<{ token: string; expiresAt: string }> {
+		return this.requestJson('/notifications/reminders-enrollment-token', {
+			method: 'POST',
+		});
+	}
+
 	async deletePushSubscription(id: string): Promise<{ success: boolean }> {
 		return this.requestJson<{ success: boolean }>('/notifications/subscribe', {
 			method: 'DELETE',

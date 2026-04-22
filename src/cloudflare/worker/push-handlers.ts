@@ -3,7 +3,8 @@ import { sha256Hex } from './auth';
 import { initDb, queryRows } from './db';
 import { getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
 import { issuePushEnrollmentToken, purgeExpiredPushEnrollmentTokens } from './push-enrollment';
-import { PWA_HTML, SERVICE_WORKER_JS, MANIFEST_JSON, ICON_SVG, OPEN_OBSIDIAN_HTML } from './pwa';
+import { consumeWebEnrollmentToken, issueWebEnrollmentToken } from './web-enrollment';
+import { PWA_HTML, PWA_APP_JS, SERVICE_WORKER_JS, MANIFEST_JSON, ICON_SVG, OPEN_OBSIDIAN_HTML } from './pwa';
 import { parseJsonObject, parseOptionalString } from './utils';
 
 interface D1MutationResult {
@@ -31,7 +32,7 @@ function htmlSecurityHeaders(): Record<string, string> {
 		'Content-Security-Policy': [
 			"default-src 'none'",
 			"style-src 'unsafe-inline'",
-			"script-src 'unsafe-inline'",
+			"script-src 'self' 'unsafe-inline'",
 			"connect-src 'self'",
 			"img-src 'self' data:",
 			"manifest-src 'self'",
@@ -65,6 +66,16 @@ export function handleServiceWorker(): Response {
 		headers: {
 			'Content-Type': 'application/javascript',
 			'Service-Worker-Allowed': '/notifications',
+			...staticAssetHeaders(),
+			...corsHeaders(),
+		},
+	});
+}
+
+export function handlePwaApp(): Response {
+	return new Response(PWA_APP_JS, {
+		headers: {
+			'Content-Type': 'application/javascript; charset=utf-8',
 			...staticAssetHeaders(),
 			...corsHeaders(),
 		},
@@ -114,6 +125,52 @@ export async function handleCreateEnrollmentToken(db: D1Database): Promise<Respo
 		token,
 		expiresAt: new Date(expiresAt).toISOString(),
 	});
+}
+
+function createBearerToken(): string {
+	const bytes = new Uint8Array(32);
+	crypto.getRandomValues(bytes);
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function handleCreateRemindersEnrollmentToken(db: D1Database): Promise<Response> {
+	await initDb(db);
+	const { token, expiresAt } = await issueWebEnrollmentToken(db);
+	return corsResponse({
+		token,
+		expiresAt: new Date(expiresAt).toISOString(),
+	});
+}
+
+export async function handleExchangeRemindersEnrollmentToken(request: Request, db: D1Database): Promise<Response> {
+	await initDb(db);
+	const parsedBody = await parseJsonObject(request);
+	if (!parsedBody.ok) {
+		return parsedBody.response;
+	}
+
+	const token = parseOptionalString(parsedBody.value.token, 128);
+	const deviceName = parseOptionalString(parsedBody.value.deviceName, 128) || 'Reminders web app';
+	if (!token) {
+		return corsResponse({ error: 'token required' }, 400);
+	}
+
+	const consumed = await consumeWebEnrollmentToken(db, token);
+	if (!consumed) {
+		return corsResponse({ error: 'Invalid or expired enrollment token' }, 401);
+	}
+
+	const authToken = createBearerToken();
+	const tokenHash = await sha256Hex(authToken);
+	const id = crypto.randomUUID();
+
+	await db.prepare(`INSERT INTO auth_tokens
+		(id, token_hash, device_id, device_name, platform, last_seen_at)
+		VALUES (?, ?, ?, ?, ?, datetime('now'))`)
+		.bind(id, tokenHash, null, deviceName, 'pwa')
+		.run();
+
+	return corsResponse({ authToken });
 }
 
 export async function handleSubscribe(request: Request, db: D1Database): Promise<Response> {

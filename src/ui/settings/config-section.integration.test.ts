@@ -113,6 +113,7 @@ describe('renderConfigSection integration', () => {
 				cloudflareAccountId: 'acct-123',
 			},
 			app: {},
+			clearSettingsUiState: vi.fn(),
 			cloudflareSession: {
 				hasCredentials: vi.fn(() => true),
 			},
@@ -170,6 +171,7 @@ describe('renderConfigSection integration', () => {
 				cloudflareAccountId: 'acct-123',
 			},
 			app: {},
+			clearSettingsUiState: vi.fn(),
 			cloudflareSession: {
 				hasCredentials: vi.fn(() => true),
 			},
