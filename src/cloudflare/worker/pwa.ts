@@ -288,8 +288,10 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-loading-state{height:100%;padding:16px}
 .pwa-reminders-view .bottom-tab-bar>div{width:100%}
 .pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-bottom-offset) + var(--reminders-tabbar-height) + var(--reminders-fab-gap))}
-.pwa-reminder-editor-backdrop{align-items:flex-start;justify-content:center;padding:112px 18px 18px;background:rgba(0,0,0,.56);backdrop-filter:blur(8px)}
-.modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(100dvh - 130px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-radius:24px;padding:24px 44px 76px;box-shadow:0 16px 48px rgba(0,0,0,.36);animation:sheet-in .22s cubic-bezier(.2,.8,.2,1)}
+.pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px;background:rgba(0,0,0,.56);backdrop-filter:blur(8px)}
+.modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(100dvh - 72px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.38);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
+.modal-card.pwa-reminder-editor.is-switching-out{pointer-events:none;animation:pwa-sheet-out .22s cubic-bezier(.4,0,1,1) forwards}
+.modal-card.pwa-reminder-editor::before{content:"";display:block;width:40px;height:5px;margin:0 auto 18px;border-radius:999px;background:rgba(255,255,255,.16)}
 .pwa-reminder-editor .modal-form{gap:0}
 .pwa-editor-header{display:grid;grid-template-columns:64px minmax(0,1fr) 64px;align-items:center;margin-bottom:112px}
 .pwa-editor-header__side{display:flex;align-items:center;justify-content:flex-start}
@@ -315,6 +317,26 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-editor-chip--icon{width:44px;padding:0}
 .pwa-reminder-editor .composer-panel{margin-top:18px;padding:14px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055)}
 .pwa-reminder-editor .delete-confirm{margin-top:18px}
+.pwa-picker-sheet{width:min(620px,calc(100vw - 36px));max-height:calc(100dvh - 88px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 24px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.42);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
+.pwa-picker-sheet.is-switching-out{pointer-events:none;animation:pwa-sheet-out .22s cubic-bezier(.4,0,1,1) forwards}
+.pwa-picker-sheet::before{content:"";display:block;width:40px;height:5px;margin:0 auto 16px;border-radius:999px;background:rgba(255,255,255,.16)}
+.pwa-picker-header{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:12px;margin-bottom:18px}
+.pwa-picker-header h3{margin:0;text-align:center;font-size:18px;font-weight:600;line-height:1.2;letter-spacing:0;color:var(--text-normal)}
+.pwa-picker-icon-button{width:44px;height:44px;min-width:44px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.055);color:var(--text-muted);padding:0}
+.pwa-picker-icon-button--done{background:#7c3aed;border-color:rgba(124,58,237,.55);color:white;box-shadow:0 6px 18px rgba(124,58,237,.28)}
+.pwa-picker-content{display:flex;flex-direction:column;gap:14px}
+.pwa-picker-presets,.pwa-project-list{display:flex;flex-direction:column;gap:8px}
+.pwa-project-list{max-height:280px;overflow:auto;padding-right:2px}
+.pwa-picker-option,.pwa-project-option{width:100%;height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);color:var(--text-normal);font-size:14px;font-weight:600;padding:0 14px;text-align:left}
+.pwa-picker-option svg,.pwa-project-option svg{width:16px;height:16px;opacity:.9;flex:0 0 auto}
+.pwa-picker-option.is-danger{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.16);color:#ff8f8f}
+.pwa-project-option.is-active{background:rgba(124,58,237,.16);border-color:rgba(124,58,237,.38);color:#a78bfa}
+.pwa-project-option span{display:flex;align-items:center;gap:9px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pwa-picker-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-top:4px}
+.pwa-picker-field{display:flex;flex-direction:column;gap:8px}
+.pwa-picker-field span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)}
+.pwa-picker-field input{width:100%;height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:var(--text-normal);padding:0 12px;outline:none;font-size:16px;font-family:inherit;-webkit-appearance:none}
+.pwa-picker-field input:focus{border-color:rgba(124,58,237,.44);box-shadow:0 0 0 3px rgba(124,58,237,.12)}
 .app-header.view-header{position:relative;z-index:20;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0}
 .app-content.reminders-content{flex:1;min-height:0;position:relative;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;padding:16px 16px calc(var(--reminders-tabbar-overlay,0px) + var(--reminders-fab-gap,24px) + var(--reminders-fab-size,56px) + var(--reminders-safe-area,env(safe-area-inset-bottom)))}
 .ios-scroll{scrollbar-width:thin;scrollbar-color:var(--background-modifier-border) transparent;-webkit-overflow-scrolling:touch}
@@ -381,10 +403,12 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 @keyframes header-title-in{from{opacity:.35;transform:translate3d(0,6px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @keyframes tab-active-pop{0%{transform:scale(.96)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
 @media (prefers-reduced-motion: reduce){
-	.view-transition,.app-header__body,.tab-button.is-active,.modal-card,.settings-sheet{animation:none!important}
+	.view-transition,.app-header__body,.tab-button.is-active,.modal-card,.settings-sheet,.pwa-picker-sheet{animation:none!important}
 	.tab-button,.tab-button__icon,.premium-reminder-content,.fab{transition:none!important}
 }
 @keyframes sheet-in{from{translate:0 18px;opacity:.92}to{translate:0 0;opacity:1}}
+@keyframes pwa-sheet-in{from{transform:translate3d(0,100%,0)}to{transform:translate3d(0,0,0)}}
+@keyframes pwa-sheet-out{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,100%,0)}}
 @media (min-width: 760px){
 	body{display:block}
 	#app{width:100vw;border-left:none;border-right:none;background:var(--background-primary)}
@@ -397,8 +421,9 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 	.settings-sheet{left:50%;right:auto;transform:translateX(-50%);width:min(640px,100vw)}
 }
 @media (max-width: 640px){
-	.pwa-reminder-editor-backdrop{align-items:center;padding:14px}
-	.modal-card.pwa-reminder-editor{width:calc(100vw - 28px);max-height:calc(100dvh - 28px);padding:18px 24px 28px;border-radius:24px}
+	.pwa-reminder-editor-backdrop{align-items:flex-end;padding:0 14px}
+	.modal-card.pwa-reminder-editor{width:calc(100vw - 28px);max-height:calc(100dvh - 44px);padding:12px 24px calc(28px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0}
+	.modal-card.pwa-reminder-editor::before{margin-bottom:14px}
 	.pwa-editor-header{grid-template-columns:56px minmax(0,1fr) 56px;margin-bottom:24px}
 	.pwa-editor-icon-button{width:44px;height:44px;min-width:44px}
 	.pwa-editor-card{min-height:0;padding:18px 20px 22px}
@@ -407,10 +432,11 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 	.pwa-editor-chip-row{gap:10px;margin-top:22px;padding-top:18px}
 	.pwa-editor-chip{height:40px;min-width:40px;border-radius:13px;padding:0 12px}
 	.pwa-editor-chip--icon{width:40px;padding:0}
+	.pwa-picker-sheet{width:calc(100vw - 28px);max-height:calc(100dvh - 44px);padding:12px 24px calc(24px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0}
 }
 @media (max-width: 520px){
 	.field-row{grid-template-columns:1fr}
-	.composer-panel__grid,.priority-grid{grid-template-columns:1fr}
+	.composer-panel__grid,.priority-grid,.pwa-picker-fields{grid-template-columns:1fr}
 }
 @media (max-width: 420px){
 	.app-header{padding-left:12px;padding-right:12px}

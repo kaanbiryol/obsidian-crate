@@ -83,6 +83,7 @@ interface PushState {
 
 const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
 const CONFIG_KEY = 'crate-reminders-config';
+const SHEET_SWITCH_DELAY_MS = 220;
 
 const defaultConfig: StoredConfig = {
 	folderPath: 'Reminders',
@@ -797,6 +798,9 @@ function ReminderSheet({
 	onDelete: (id: string) => void;
 }) {
 	const contentRef = useRef<HTMLTextAreaElement | null>(null);
+	const switchTimerRef = useRef<number | null>(null);
+	const [pendingPicker, setPendingPicker] = useState<ModalPickerId | null>(null);
+	const [returningToEditor, setReturningToEditor] = useState(false);
 	const draft = modal.draft;
 	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 	const isEditing = modal.mode === 'edit';
@@ -810,6 +814,19 @@ function ReminderSheet({
 			contentRef.current?.setSelectionRange(end, end);
 		}, 180);
 		return () => window.clearTimeout(timer);
+	}, [modal.mode, modal.reminderId]);
+
+	useEffect(() => () => {
+		if (switchTimerRef.current !== null) window.clearTimeout(switchTimerRef.current);
+	}, []);
+
+	useEffect(() => {
+		setPendingPicker(null);
+		setReturningToEditor(false);
+		if (switchTimerRef.current !== null) {
+			window.clearTimeout(switchTimerRef.current);
+			switchTimerRef.current = null;
+		}
 	}, [modal.mode, modal.reminderId]);
 
 	const patchDraft = (patch: Partial<ModalDraft>) => {
@@ -833,217 +850,280 @@ function ReminderSheet({
 	};
 
 	const togglePicker = (picker: ModalPickerId) => {
-		patchDraft({
-			activePicker: draft.activePicker === picker ? null : picker,
-			deleteConfirm: false,
-		});
+		if (switchTimerRef.current !== null) return;
+		if (draft.activePicker === picker) {
+			returnToEditor();
+			return;
+		}
+
+		setPendingPicker(picker);
+		switchTimerRef.current = window.setTimeout(() => {
+			switchTimerRef.current = null;
+			setPendingPicker(null);
+			patchDraft({ activePicker: picker, deleteConfirm: false });
+		}, SHEET_SWITCH_DELAY_MS);
+	};
+
+	const returnToEditor = (patch: Partial<ModalDraft> = {}) => {
+		if (switchTimerRef.current !== null) return;
+		setPendingPicker(null);
+		setReturningToEditor(true);
+		if (Object.keys(patch).length) patchDraft({ ...patch, deleteConfirm: false });
+		switchTimerRef.current = window.setTimeout(() => {
+			switchTimerRef.current = null;
+			setReturningToEditor(false);
+			patchDraft({ activePicker: null, deleteConfirm: false });
+		}, SHEET_SWITCH_DELAY_MS);
 	};
 
 	return (
 		<div className="modal-backdrop pwa-reminder-editor-backdrop" onClick={(event) => {
-			if (event.target === event.currentTarget) onClose();
+			if (event.target !== event.currentTarget) return;
+			if (draft.activePicker) returnToEditor();
+			else onClose();
 		}}>
-			<div className="modal-card pwa-reminder-editor" role="dialog" aria-modal="true" aria-label={title}>
-				<form className="modal-form" onSubmit={(event) => {
-					event.preventDefault();
-					onSave({ ...modal, draft: draftFromForm(event.currentTarget) });
-				}}>
-					<div className="pwa-editor-header">
-						<div className="pwa-editor-header__side">
-							{isEditing ? (
+			{draft.activePicker ? (
+				<PickerSheet
+					draft={draft}
+					projectOptions={projectOptions}
+					isSwitchingOut={returningToEditor}
+					onPatch={patchDraft}
+					onSelect={returnToEditor}
+					onClose={() => returnToEditor()}
+				/>
+			) : (
+				<div className={`modal-card pwa-reminder-editor${pendingPicker ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+					<form className="modal-form" onSubmit={(event) => {
+						event.preventDefault();
+						onSave({ ...modal, draft: draftFromForm(event.currentTarget) });
+					}}>
+						<div className="pwa-editor-header">
+							<div className="pwa-editor-header__side">
+								{isEditing ? (
+									<Button
+										isIconOnly
+										className={`pwa-editor-icon-button pwa-editor-icon-button--danger${draft.deleteConfirm ? ' is-active' : ''}`}
+										type="button"
+										data-action="toggle-delete-confirm"
+										aria-label="Delete reminder"
+										onClick={() => patchDraft({ deleteConfirm: !draft.deleteConfirm, activePicker: null })}
+									>
+										<Trash2 size={20} />
+									</Button>
+								) : (
+									<Button
+										isIconOnly
+										className="pwa-editor-icon-button pwa-editor-icon-button--muted"
+										type="button"
+										aria-label="Close modal"
+										onClick={onClose}
+									>
+										<X size={20} />
+									</Button>
+								)}
+							</div>
+							<h2 className="pwa-editor-title">{title}</h2>
+							<div className="pwa-editor-header__side pwa-editor-header__side--right">
 								<Button
 									isIconOnly
-									className={`pwa-editor-icon-button pwa-editor-icon-button--danger${draft.deleteConfirm ? ' is-active' : ''}`}
-									type="button"
-									data-action="toggle-delete-confirm"
-									aria-label="Delete reminder"
-									onClick={() => patchDraft({ deleteConfirm: !draft.deleteConfirm, activePicker: null })}
+									className="pwa-editor-icon-button pwa-editor-icon-button--save"
+									type="submit"
+									data-action="save-reminder"
+									aria-label={isEditing ? 'Save reminder' : 'Add reminder'}
+									isDisabled={!canSubmit}
+									isLoading={saving}
 								>
-									<Trash2 size={20} />
+									{isEditing ? <Check size={22} /> : <ArrowUp size={22} />}
 								</Button>
-							) : (
-								<Button
-									isIconOnly
-									className="pwa-editor-icon-button pwa-editor-icon-button--muted"
-									type="button"
-									aria-label="Close modal"
-									onClick={onClose}
-								>
-									<X size={20} />
-								</Button>
-							)}
+							</div>
 						</div>
-						<h2 className="pwa-editor-title">{title}</h2>
-						<div className="pwa-editor-header__side pwa-editor-header__side--right">
+
+						<div className="pwa-editor-card">
+							<textarea
+								ref={contentRef}
+								data-draft-field="content"
+								className="pwa-editor-title-input ios-scroll"
+								rows={2}
+								maxLength={1024}
+								required
+								placeholder={isEditing ? 'Edit your reminder...' : 'What do you need to remember?'}
+								value={draft.content}
+								onChange={(event) => patchDraft({ content: event.currentTarget.value })}
+							/>
+							<div className="pwa-editor-divider" />
+							<textarea
+								data-draft-field="description"
+								className="pwa-editor-description-input ios-scroll"
+								rows={3}
+								maxLength={4096}
+								placeholder="Add description..."
+								value={draft.description}
+								onChange={(event) => patchDraft({ description: event.currentTarget.value })}
+							/>
+						</div>
+
+						<div className="pwa-editor-chip-row">
+							<Button
+								className={`pwa-editor-chip${draft.dueDate ? ' is-active' : ''}`}
+								type="button"
+								data-action="toggle-picker"
+								data-picker="date"
+								isDisabled={Boolean(pendingPicker)}
+								onClick={() => togglePicker('date')}
+							>
+								<Calendar size={16} />
+								<span>{draft.dueDate ? formatModalDueSummary(draft) : 'Date'}</span>
+							</Button>
+							<Button
+								className="pwa-editor-chip"
+								type="button"
+								data-action="toggle-picker"
+								data-picker="project"
+								isDisabled={Boolean(pendingPicker)}
+								onClick={() => togglePicker('project')}
+							>
+								<Hash size={16} />
+								<span>{draft.project || 'Inbox'}</span>
+							</Button>
 							<Button
 								isIconOnly
-								className="pwa-editor-icon-button pwa-editor-icon-button--save"
-								type="submit"
-								data-action="save-reminder"
-								aria-label={isEditing ? 'Save reminder' : 'Add reminder'}
-								isDisabled={!canSubmit}
-								isLoading={saving}
+								className={`pwa-editor-chip pwa-editor-chip--icon${draft.priority === 1 ? ' is-important' : ''}`}
+								type="button"
+								data-action="toggle-priority"
+								aria-label="Toggle priority"
+								onClick={() => patchDraft({ priority: draft.priority === 1 ? 4 : 1, activePicker: null, deleteConfirm: false })}
 							>
-								{isEditing ? <Check size={22} /> : <ArrowUp size={22} />}
+								<Flag size={16} fill={draft.priority === 1 ? 'currentColor' : 'none'} />
+							</Button>
+							<Button
+								isIconOnly
+								className="pwa-editor-chip pwa-editor-chip--icon"
+								type="button"
+								aria-label="Recurrence"
+							>
+								<Repeat size={16} />
 							</Button>
 						</div>
-					</div>
 
-					<div className="pwa-editor-card">
-						<textarea
-							ref={contentRef}
-							data-draft-field="content"
-							className="pwa-editor-title-input ios-scroll"
-							rows={2}
-							maxLength={1024}
-							required
-							placeholder={isEditing ? 'Edit your reminder...' : 'What do you need to remember?'}
-							value={draft.content}
-							onChange={(event) => patchDraft({ content: event.currentTarget.value })}
-						/>
-						<div className="pwa-editor-divider" />
-						<textarea
-							data-draft-field="description"
-							className="pwa-editor-description-input ios-scroll"
-							rows={3}
-							maxLength={4096}
-							placeholder="Add description..."
-							value={draft.description}
-							onChange={(event) => patchDraft({ description: event.currentTarget.value })}
-						/>
-					</div>
-
-					<div className="pwa-editor-chip-row">
-						<Button
-							className={`pwa-editor-chip${draft.activePicker === 'date' || draft.dueDate ? ' is-active' : ''}`}
-							type="button"
-							data-action="toggle-picker"
-							data-picker="date"
-							onClick={() => togglePicker('date')}
-						>
-							<Calendar size={16} />
-							<span>{draft.dueDate ? formatModalDueSummary(draft) : 'Date'}</span>
-						</Button>
-						<Button
-							className={`pwa-editor-chip${draft.activePicker === 'project' ? ' is-active' : ''}`}
-							type="button"
-							data-action="toggle-picker"
-							data-picker="project"
-							onClick={() => togglePicker('project')}
-						>
-							<Hash size={16} />
-							<span>{draft.project || 'Inbox'}</span>
-						</Button>
-						<Button
-							isIconOnly
-							className={`pwa-editor-chip pwa-editor-chip--icon${draft.priority === 1 ? ' is-important' : ''}`}
-							type="button"
-							data-action="toggle-priority"
-							aria-label="Toggle priority"
-							onClick={() => patchDraft({ priority: draft.priority === 1 ? 4 : 1, activePicker: null, deleteConfirm: false })}
-						>
-							<Flag size={16} fill={draft.priority === 1 ? 'currentColor' : 'none'} />
-						</Button>
-						<Button
-							isIconOnly
-							className="pwa-editor-chip pwa-editor-chip--icon"
-							type="button"
-							aria-label="Recurrence"
-						>
-							<Repeat size={16} />
-						</Button>
-					</div>
-
-					<PickerPanel draft={draft} projectOptions={projectOptions} onPatch={patchDraft} />
-					{isEditing && draft.deleteConfirm && (
-						<div className="delete-confirm">
-							<div>
-								<strong>Delete this reminder?</strong>
-								<p>This removes it from the original markdown file and cancels its scheduled notification.</p>
+						{isEditing && draft.deleteConfirm && (
+							<div className="delete-confirm">
+								<div>
+									<strong>Delete this reminder?</strong>
+									<p>This removes it from the original markdown file and cancels its scheduled notification.</p>
+								</div>
+								<div className="delete-confirm__actions">
+									<Button className="secondary-button" type="button" onClick={() => patchDraft({ deleteConfirm: false })}>Keep it</Button>
+									<Button className="secondary-button is-danger" type="button" data-action="delete-reminder" onClick={() => modal.reminderId && onDelete(modal.reminderId)}>Delete</Button>
+								</div>
 							</div>
-							<div className="delete-confirm__actions">
-								<Button className="secondary-button" type="button" onClick={() => patchDraft({ deleteConfirm: false })}>Keep it</Button>
-								<Button className="secondary-button is-danger" type="button" data-action="delete-reminder" onClick={() => modal.reminderId && onDelete(modal.reminderId)}>Delete</Button>
-							</div>
-						</div>
-					)}
-				</form>
-			</div>
+						)}
+					</form>
+				</div>
+			)}
 		</div>
 	);
 }
 
-function PickerPanel({
+function PickerSheet({
 	draft,
 	projectOptions,
+	isSwitchingOut,
 	onPatch,
+	onSelect,
+	onClose,
 }: {
 	draft: ModalDraft;
 	projectOptions: string[];
+	isSwitchingOut: boolean;
 	onPatch: (patch: Partial<ModalDraft>) => void;
+	onSelect: (patch?: Partial<ModalDraft>) => void;
+	onClose: () => void;
 }) {
+	if (!draft.activePicker) return null;
+
 	if (draft.activePicker === 'date') {
 		return (
-			<section className="composer-panel">
-				<div className="composer-panel__header">
-					<h3>When should this happen?</h3>
+			<section className={`pwa-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Schedule reminder">
+				<div className="pwa-picker-header">
+					<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Close schedule" onClick={onClose}>
+						<X size={20} />
+					</Button>
+					<h3>Schedule</h3>
+					<Button isIconOnly className="pwa-picker-icon-button pwa-picker-icon-button--done" type="button" aria-label="Done" onClick={onClose}>
+						<Check size={20} />
+					</Button>
 				</div>
-				<div className="composer-presets">
-					{([
-						['today', 'Today'],
-						['tomorrow', 'Tomorrow'],
-						['evening', 'This evening'],
-						['next-week', 'Next week'],
-						['clear', 'Clear'],
-					] as const).map(([preset, label]) => (
-						<Button
-							key={preset}
-							className={`preset-chip${preset === 'clear' ? ' is-danger' : ''}`}
-							type="button"
-							data-action="apply-date-preset"
-							data-preset={preset}
-							onClick={() => onPatch(applyDatePresetToDraft(draft, preset))}
-						>
-							{label}
-						</Button>
-					))}
-				</div>
-				<div className="composer-panel__grid">
-					<label className="field field--dense">
-						<span>Date</span>
-						<input data-draft-field="dueDate" type="date" value={draft.dueDate} onChange={(event) => onPatch({ dueDate: event.currentTarget.value })} />
-					</label>
-					<label className="field field--dense">
-						<span>Time</span>
-						<input data-draft-field="dueTime" type="time" value={draft.dueTime} onChange={(event) => onPatch({ dueTime: event.currentTarget.value })} />
-					</label>
+				<div className="pwa-picker-content">
+					<div className="pwa-picker-presets">
+						{([
+							['today', 'Today'],
+							['tomorrow', 'Tomorrow'],
+							['evening', 'This evening'],
+							['next-week', 'Next week'],
+							['clear', 'No date'],
+						] as const).map(([preset, label]) => (
+							<Button
+								key={preset}
+								className={`pwa-picker-option${preset === 'clear' ? ' is-danger' : ''}`}
+								type="button"
+								data-action="apply-date-preset"
+								data-preset={preset}
+								onClick={() => onSelect(applyDatePresetToDraft(draft, preset))}
+							>
+								<span>{label}</span>
+								{preset === 'clear' ? <X size={16} /> : <Calendar size={16} />}
+							</Button>
+						))}
+					</div>
+					<div className="pwa-picker-fields">
+						<label className="pwa-picker-field">
+							<span>Date</span>
+							<input data-draft-field="dueDate" type="date" value={draft.dueDate} onChange={(event) => onPatch({ dueDate: event.currentTarget.value })} />
+						</label>
+						<label className="pwa-picker-field">
+							<span>Time</span>
+							<input data-draft-field="dueTime" type="time" value={draft.dueTime} onChange={(event) => onPatch({ dueTime: event.currentTarget.value })} />
+						</label>
+					</div>
 				</div>
 			</section>
 		);
 	}
 
-	if (draft.activePicker === 'project') {
-		return (
-			<section className="composer-panel">
-				<div className="composer-panel__header">
-					<h3>Project</h3>
-				</div>
-				<label className="field field--dense">
+	return (
+		<section className={`pwa-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Choose project">
+			<div className="pwa-picker-header">
+				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Close project picker" onClick={onClose}>
+					<X size={20} />
+				</Button>
+				<h3>Project</h3>
+				<Button isIconOnly className="pwa-picker-icon-button pwa-picker-icon-button--done" type="button" aria-label="Done" onClick={onClose}>
+					<Check size={20} />
+				</Button>
+			</div>
+			<div className="pwa-picker-content">
+				<label className="pwa-picker-field">
 					<span>Project name</span>
 					<input data-draft-field="project" type="text" maxLength={256} value={draft.project} onChange={(event) => onPatch({ project: event.currentTarget.value })} />
 				</label>
-				<div className="project-choice-list">
+				<div className="pwa-project-list ios-scroll">
 					{projectOptions.map((project) => (
-						<Button key={project} className={`project-choice${draft.project === project ? ' is-active' : ''}`} type="button" data-action="select-project" data-project={project} onClick={() => onPatch({ project })}>
-							# {project}
+						<Button
+							key={project}
+							className={`pwa-project-option${draft.project === project ? ' is-active' : ''}`}
+							type="button"
+							data-action="select-project"
+							data-project={project}
+							onClick={() => onSelect({ project })}
+						>
+							<span><Hash size={16} />{project}</span>
+							{draft.project === project ? <Check size={16} /> : null}
 						</Button>
 					))}
 				</div>
-			</section>
-		);
-	}
-
-	return null;
+			</div>
+		</section>
+	);
 }
 
 function SettingsSheet({
