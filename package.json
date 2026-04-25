@@ -6,6 +6,7 @@
 	"type": "module",
 	"scripts": {
 		"build:worker": "node scripts/build-worker.mjs",
+		"preview:pwa": "node scripts/pwa-preview.mjs",
 		"dev": "npm run build:worker && vite build --watch --mode development",
 		"typecheck": "tsc -noEmit -skipLibCheck",
 		"build": "npm run build:worker && tsc -noEmit -skipLibCheck && vite build",

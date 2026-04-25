@@ -10,7 +10,6 @@ import {
   TodayView,
   UpcomingView,
 } from "@/reminders";
-import type CratePlugin from "@/main";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import type { ViewMode } from "./remindersViewModel";
 
@@ -21,7 +20,7 @@ interface RemindersViewPanelsProps {
   reminders: Reminder[];
   projects: string[];
   showFab: boolean;
-  plugin: CratePlugin;
+  upcomingDays: number;
   renderCard: (reminder: SharedReminder, index: number) => React.ReactNode;
   renderToggleButton: (props: {
     onPress: () => void;
@@ -40,7 +39,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
   reminders,
   projects,
   showFab,
-  plugin,
+  upcomingDays,
   renderCard,
   renderToggleButton,
   onProjectSelect,
@@ -88,7 +87,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
           <UpcomingView
             reminders={reminders}
             renderCard={renderCard}
-            days={plugin.remindersSettings.upcomingDaysDefault ?? 7}
+            days={upcomingDays}
             hasFab={showFab}
           />
         </motion.div>

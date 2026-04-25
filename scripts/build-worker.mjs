@@ -51,7 +51,7 @@ export function getWorkerScript(): string {
 
 async function buildPwaClientBundle() {
 	const result = await build({
-		entryPoints: [resolve(root, 'src/cloudflare/worker/pwa-client.ts')],
+		entryPoints: [resolve(root, 'src/cloudflare/worker/pwa-client.tsx')],
 		bundle: true,
 		format: 'esm',
 		platform: 'browser',

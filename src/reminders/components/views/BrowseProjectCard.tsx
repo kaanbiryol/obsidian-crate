@@ -43,6 +43,8 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
     <ShadowDOMNativeMotionButton
       onClick={onClick}
       className="premium-project-card"
+      data-action="open-project"
+      data-project={project}
       initial={false}
       animate={{ opacity: 1 }}
       transition={{ duration: 0 }}

@@ -1,38 +1,17 @@
 import { ItemView, Platform, WorkspaceLeaf } from "obsidian";
 import { Root, createRoot } from "react-dom/client";
-import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import type CratePlugin from "@/main";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
 import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
-import { HeroUIProvider } from "@heroui/react";
-import {
-    BottomTabBar,
-    FloatingActionButton,
-    ViewHeader,
-    DEFAULT_PROJECT,
-    PAGE_TRANSITION_DURATION,
-    type TabId,
-    type Reminder as SharedReminder
-} from "@/reminders";
+import type { TabId } from "@/reminders/ui/layoutConstants";
 import { openReminderCreationModal } from "@/reminders/ui/modals";
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
-import { ShadowDOMButton, ShadowDOMNativeButton } from "@/reminders/components/ShadowDOMButton";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { RemindersViewCloseButton } from "./RemindersViewCloseButton";
-import { RemindersViewPanels } from "./RemindersViewPanels";
-import {
-    getCurrentHeaderData,
-    getReminderCreateProject,
-    getReminderProjects,
-    getRemindersHeaderData,
-    getReorderProject,
-    shouldShowReminderFab,
-    type ViewMode,
-} from "./remindersViewModel";
+import { RemindersAppShell, type ReminderCardRenderer } from "./RemindersAppShell";
 import "./reminders-view.scss";
 
 export const VIEW_TYPE_REMINDERS = "reminders-view";
@@ -135,13 +114,8 @@ interface RemindersViewContentProps {
 
 export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, shadowRoot, isFullScreen = false, onClose, initialTab, initialProject, hideTabBar = false }) => {
     const isDarkMode = useObsidianDarkMode();
-    const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? "browse" : (initialTab ?? "inbox"));
-    const [isTransitioning, setIsTransitioning] = useState(false);
-    const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
-
 
     // Create portal container ref inside shadow DOM for HeroUI popovers/modals
     const portalContainerRef = useRef<HTMLDivElement | null>(null);
@@ -163,14 +137,6 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
         }
     }, [shadowRoot, isDarkMode]);
 
-    useEffect(() => {
-        return () => {
-            if (transitionTimeoutRef.current) {
-                clearTimeout(transitionTimeoutRef.current);
-            }
-        };
-    }, []);
-
     // Subscribe to index changes for automatic refresh (replaces 5-second polling)
     const { refreshToken, triggerRefresh } = useIndexRefresh();
 
@@ -186,184 +152,47 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
         updateReminders();
     }, [updateReminders, refreshToken]);
 
-    // Get unique projects from reminders
-    const projects = useMemo(() => {
-        return getReminderProjects(reminders);
-    }, [reminders]);
-
-    const startTransition = useCallback(() => {
-        // Hide scrollbars during transitions to prevent flicker/jitter
-        setIsTransitioning(true);
-
-        if (transitionTimeoutRef.current) {
-            clearTimeout(transitionTimeoutRef.current);
-        }
-
-        transitionTimeoutRef.current = setTimeout(() => {
-            setIsTransitioning(false);
-        }, PAGE_TRANSITION_DURATION * 1000);
-    }, []);
-
-    const handleViewModeChange = (mode: ViewMode) => {
-        startTransition();
-        setViewMode(mode);
-        // Reset selected project when switching tabs
-        if (mode !== "browse") {
-            setSelectedProject(null);
-        }
-    };
-
-    const handleProjectSelect = (project: string) => {
-        startTransition();
-        setSelectedProject(project);
-    };
-
-    const handleBackToProjects = () => {
-        startTransition();
-        setSelectedProject(null);
-    };
-
-    // Calculate header data for each tab
-    const headerData = useMemo(() => {
-        return getRemindersHeaderData(
-            reminders,
-            projects,
-            plugin.remindersSettings.upcomingDaysDefault ?? 7,
-        );
-    }, [reminders, projects, plugin.remindersSettings.upcomingDaysDefault]);
-
-    // Get current header based on view mode
-    const getCurrentHeader = () => {
-        return getCurrentHeaderData(viewMode, headerData);
-    };
-
-    // Handle FAB click
-    const handleAdd = useCallback(() => {
-        const defaultProject = getReminderCreateProject(viewMode, selectedProject);
+    const handleAdd = useCallback((defaultProject: string) => {
         openReminderCreationModal(plugin, defaultProject, updateReminders);
-    }, [plugin, viewMode, selectedProject, updateReminders]);
+    }, [plugin, updateReminders]);
 
-    // Determine whether to show FAB
-    const showFab = shouldShowReminderFab(viewMode, selectedProject);
-
-    // Create custom card renderer that uses ReminderCardWrapper
-    const renderCard = useCallback((reminder: SharedReminder, index: number) => (
+    const renderCard = useCallback<ReminderCardRenderer>(({ reminder, index, hideProject }) => (
         <ReminderCardWrapper
             key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
             reminder={reminder}
             onUpdate={triggerRefresh}
             index={index}
-            hideProject={viewMode === "browse" && selectedProject !== null}
+            hideProject={hideProject}
         />
-    ), [triggerRefresh, viewMode, selectedProject]);
+    ), [triggerRefresh]);
 
-    // Custom toggle button renderer for Shadow DOM compatibility
-    const renderToggleButton = useCallback(({ onPress, showCompleted, count }: {
-        onPress: () => void;
-        showCompleted: boolean;
-        count: number;
-    }) => (
-        <ShadowDOMButton
-            variant="light"
-            onPress={onPress}
-            className="w-full justify-between h-10 px-0"
-            endContent={
-                <motion.span
-                    animate={{ rotate: showCompleted ? 180 : 0 }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
-                    className="inline-flex"
-                >
-                    <ChevronDown size={18} />
-                </motion.span>
-            }
-        >
-            <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
-                Completed ({count})
-            </span>
-        </ShadowDOMButton>
-    ), []);
-
-    // Determine current project for reorder
-    const currentProject = getReorderProject(viewMode, selectedProject);
-
-    const handleReorder = useCallback(async (orderedIds: string[]) => {
-        if (!currentProject) return;
-        await plugin.storage.reorder(currentProject, orderedIds);
-    }, [plugin, currentProject]);
+    const handleReorder = useCallback(async (project: string, orderedIds: string[]) => {
+        await plugin.storage.reorder(project, orderedIds);
+    }, [plugin]);
 
     return (
-        <HeroUIProvider>
-            <div
-                className={`reminders-view ${isDarkMode ? "dark" : ""} ${isFullScreen ? "is-fullscreen" : ""} ${onClose ? "is-modal" : ""} ${hideTabBar ? "is-compact" : ""}`}
-            >
-                {/* Close button for modal mode */}
-                {onClose && (
+        <RemindersAppShell
+            reminders={reminders}
+            isInitialLoadComplete={isInitialLoadComplete}
+            isDarkMode={isDarkMode}
+            isFullScreen={isFullScreen}
+            isModal={Boolean(onClose)}
+            isCompact={hideTabBar}
+            initialTab={initialTab}
+            initialProject={initialProject}
+            hideTabBar={hideTabBar}
+            upcomingDays={plugin.remindersSettings.upcomingDaysDefault ?? 7}
+            renderCard={renderCard}
+            onAdd={handleAdd}
+            onReorder={handleReorder}
+            topOverlay={onClose ? (
+                <>
                     <RemindersViewCloseButton
                         isDarkMode={isDarkMode}
                         onClose={onClose}
                     />
-                )}
-
-                {/* Tab Header - hide when in project detail view */}
-                <AnimatePresence initial={false}>
-                    {!(viewMode === "browse" && selectedProject) && (
-                        <motion.div
-                            key="view-header"
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{
-                                height: { duration: PAGE_TRANSITION_DURATION, ease: "easeOut" },
-                                opacity: { duration: 0.18, ease: "easeOut" }
-                            }}
-                            style={{ overflow: "hidden" }}
-                        >
-                            <ViewHeader
-                                {...getCurrentHeader()}
-                                large={isFullScreen}
-                            />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Content - Scrollable */}
-                <div className={`reminders-content${isTransitioning ? ' is-transitioning' : ''}`}>
-                    <AnimatePresence mode="sync">
-                        <RemindersViewPanels
-                            viewMode={viewMode}
-                            selectedProject={selectedProject}
-                            isInitialLoadComplete={isInitialLoadComplete}
-                            reminders={reminders}
-                            projects={projects}
-                            showFab={showFab}
-                            plugin={plugin}
-                            renderCard={renderCard}
-                            renderToggleButton={renderToggleButton}
-                            onProjectSelect={handleProjectSelect}
-                            onBackToProjects={handleBackToProjects}
-                            onReorder={handleReorder}
-                        />
-                    </AnimatePresence>
-                </div>
-
-                {/* Bottom Tab Bar */}
-                {!hideTabBar && (
-                    <BottomTabBar
-                        activeTab={viewMode}
-                        onTabChange={handleViewModeChange}
-                        className="animated-tab-bar animated-tab-bar-bottom"
-                    />
-                )}
-
-                {/* Floating Action Button */}
-                <AnimatePresence>
-                    {showFab && (
-                        <FloatingActionButton
-                            onClick={handleAdd}
-                        />
-                    )}
-                </AnimatePresence>
-            </div>
-        </HeroUIProvider>
+                </>
+            ) : undefined}
+        />
     );
 };

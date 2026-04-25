@@ -73,6 +73,8 @@ const TabButton = memo(function TabButton({
       style={buttonStyle}
       whileTap={{ scale: 0.95 }}
       transition={{ duration: 0.1 }}
+      data-action="switch-tab"
+      data-tab={tab.id === 'browse' ? 'projects' : tab.id}
     >
       {/* Active indicator with layoutId for smooth sliding */}
       {isActive && (
@@ -164,6 +166,7 @@ export const BottomTabBar = memo(function BottomTabBar({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
+          width: '100%',
           maxWidth: '42rem',
           margin: '0 auto',
           padding: '8px 12px',

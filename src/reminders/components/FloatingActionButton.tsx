@@ -9,6 +9,7 @@ interface FloatingActionButtonProps {
   style?: React.CSSProperties;
   icon?: React.ReactNode;
   'aria-label'?: string;
+  'data-action'?: string;
 }
 
 /**
@@ -20,7 +21,8 @@ export const FloatingActionButton = memo(function FloatingActionButton({
   className = '',
   style = {},
   icon,
-  'aria-label': ariaLabel = 'Add reminder'
+  'aria-label': ariaLabel = 'Add reminder',
+  'data-action': dataAction,
 }: FloatingActionButtonProps) {
   const backgroundColor = '#7c3aed';
   const shadowColor = 'rgba(124, 58, 237, 0.4)';
@@ -36,6 +38,7 @@ export const FloatingActionButton = memo(function FloatingActionButton({
       whileTap={{ scale: 0.85, rotate: 90 }}
       whileHover={{ scale: 1.1 }}
       aria-label={ariaLabel}
+      data-action={dataAction}
       style={{
         width: FAB_SIZE,
         height: FAB_SIZE,
