@@ -1,5 +1,6 @@
 import React, { useCallback, useRef } from 'react';
-import { Reorder } from 'framer-motion';
+import { Reorder, useDragControls } from 'framer-motion';
+import { GripVertical } from 'lucide-react';
 import type { Reminder } from '../types/reminder';
 
 interface ReorderableReminderListProps {
@@ -20,6 +21,7 @@ interface ReorderableItemProps {
 
 function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd }: ReorderableItemProps) {
   const didDragRef = useRef(false);
+  const dragControls = useDragControls();
 
   const handleDragStart = useCallback(() => {
     didDragRef.current = true;
@@ -42,27 +44,46 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd }
     }
   }, []);
 
+  const handleDragHandlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    dragControls.start(e);
+  }, [dragControls]);
+
   return (
     <Reorder.Item
       as="div"
       value={reminder}
+      className="reorderable-reminder-item"
+      dragListener={false}
+      dragControls={dragControls}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClickCapture={handleClickCapture}
-      style={{ marginBottom: '0.5rem', cursor: 'grab' }}
+      style={{ marginBottom: '0.5rem' }}
       whileTap={{
-        scale: 1.03,
+        scale: 1,
       }}
       whileDrag={{
-        scale: 1.05,
+        scale: 1.02,
         zIndex: 50,
-        cursor: 'grabbing',
       }}
       transition={{
         layout: { type: 'spring', stiffness: 350, damping: 35 },
       }}
     >
       {renderCard(reminder, index)}
+      <button
+        className="reorder-drag-handle"
+        type="button"
+        aria-label="Reorder reminder"
+        onPointerDown={handleDragHandlePointerDown}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+        }}
+      >
+        <GripVertical size={18} strokeWidth={2} aria-hidden="true" />
+      </button>
     </Reorder.Item>
   );
 }
@@ -97,6 +118,7 @@ export function ReorderableReminderList({
     <Reorder.Group
       as="div"
       axis="y"
+      className="reorderable-reminder-list"
       values={reminders}
       onReorder={onReorder}
     >

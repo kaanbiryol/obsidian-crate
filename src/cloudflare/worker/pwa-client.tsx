@@ -489,16 +489,44 @@ async function exchangeEnrollmentToken(token: string): Promise<string> {
 	return result.authToken;
 }
 
-function replaceBrowserUrlWithInstallToken(token: string, config: StoredConfig): void {
+async function validateStoredAuthToken(authToken: string): Promise<boolean> {
+	try {
+		const response = await fetch('/health', {
+			headers: { Authorization: `Bearer ${authToken}` },
+		});
+		return response.status !== 401 && response.status !== 403;
+	} catch {
+		return true;
+	}
+}
+
+function installActivationParams(token: string, config: StoredConfig): URLSearchParams {
 	const params = currentQueryParams();
-	params.set('token', token);
-	params.set('folder', config.folderPath);
-	params.set('upcomingDays', String(config.upcomingDays));
-	if (config.allDayNotificationTime) params.set('allDayTime', config.allDayNotificationTime);
-	else params.delete('allDayTime');
+	const project = params.get('project');
+	const nextParams = new URLSearchParams();
+	nextParams.set('token', token);
+	nextParams.set('folder', config.folderPath);
+	nextParams.set('upcomingDays', String(config.upcomingDays));
+	if (config.allDayNotificationTime) nextParams.set('allDayTime', config.allDayNotificationTime);
+	if (project) nextParams.set('project', project);
+	return nextParams;
+}
+
+function updateManifestWithInstallToken(token: string, config: StoredConfig): void {
+	const params = installActivationParams(token, config);
+	params.set('v', PWA_ASSET_VERSION);
+	const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+	if (manifest) {
+		manifest.href = `/notifications/manifest.json?${params.toString()}`;
+	}
+}
+
+function replaceBrowserUrlWithInstallToken(token: string, config: StoredConfig): void {
+	const params = installActivationParams(token, config);
 
 	const query = params.toString();
 	history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+	updateManifestWithInstallToken(token, config);
 }
 
 function makeApiFetch(authToken: string | null, onUnauthorized: () => void) {
@@ -519,6 +547,7 @@ function makeApiFetch(authToken: string | null, onUnauthorized: () => void) {
 
 function App() {
 	const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_KEY));
+	const [bootstrapped, setBootstrapped] = useState(false);
 	const [config, setConfig] = useState<StoredConfig>(() => loadStoredConfig());
 	const [reminders, setReminders] = useState<ReminderRecord[]>([]);
 	const [projects, setProjects] = useState<string[]>([]);
@@ -620,6 +649,15 @@ function App() {
 				}
 
 				let nextToken = authToken;
+				if (nextToken && applied.token) {
+					const storedTokenValid = await validateStoredAuthToken(nextToken);
+					if (cancelled) return;
+					if (!storedTokenValid) {
+						localStorage.removeItem(AUTH_TOKEN_KEY);
+						nextToken = null;
+					}
+				}
+
 				if (!nextToken && applied.token) {
 					nextToken = await exchangeEnrollmentToken(applied.token);
 					localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
@@ -633,8 +671,14 @@ function App() {
 				}
 			} catch (bootstrapError) {
 				if (!cancelled) {
+					localStorage.removeItem(AUTH_TOKEN_KEY);
+					setAuthToken(null);
 					setError(bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError));
 					setLoading(false);
+				}
+			} finally {
+				if (!cancelled) {
+					setBootstrapped(true);
 				}
 			}
 		}
@@ -648,13 +692,13 @@ function App() {
 	}, []);
 
 	useEffect(() => {
-		if (!authToken) return;
+		if (!bootstrapped || !authToken) return;
 		void refreshInstallActivationUrl().catch(() => undefined);
 		void Promise.all([
 			loadReminders(),
 			refreshPushState().catch(() => undefined),
 		]);
-	}, [authToken, loadReminders, refreshInstallActivationUrl, refreshPushState]);
+	}, [authToken, bootstrapped, loadReminders, refreshInstallActivationUrl, refreshPushState]);
 
 	const openModal = useCallback((mode: ModalMode, reminderId?: string, defaultProject?: string) => {
 		const reminder = reminderId ? reminders.find((item) => item.id === reminderId) ?? null : null;
@@ -824,6 +868,10 @@ function App() {
 		/>
 	), [openModal, toggleReminderCompleted]);
 
+	if (!bootstrapped) {
+		return <LoadingAuthState />;
+	}
+
 	if (!authToken) {
 		return error ? <ErrorState error={error} onRetry={() => window.location.reload()} /> : <EmptyAuthState />;
 	}
@@ -911,6 +959,15 @@ function EmptyAuthState() {
 	);
 }
 
+function LoadingAuthState() {
+	return (
+		<div className="auth-card">
+			<h1>Crate Reminders</h1>
+			<p>Loading reminders...</p>
+		</div>
+	);
+}
+
 function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
 	return (
 		<div className="auth-card">
@@ -942,6 +999,11 @@ function WebReminderCard({
 
 		const handleClick = (event: MouseEvent) => {
 			const target = event.target as HTMLElement;
+			if (target.closest('.reorder-drag-handle')) {
+				event.stopPropagation();
+				return;
+			}
+
 			if (target.closest('.premium-checkbox') || target.closest('[role="checkbox"]')) {
 				event.stopPropagation();
 				onToggleComplete(reminder.id, reminder.completed);

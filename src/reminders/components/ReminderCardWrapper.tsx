@@ -92,6 +92,11 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
 
+      if (target.closest('.reorder-drag-handle')) {
+        e.stopPropagation();
+        return;
+      }
+
       // Handle checkbox clicks (premium checkbox or legacy HeroUI checkbox)
       if (target.closest('.premium-checkbox') || target.closest('[data-slot="wrapper"]') || target.closest('input[type="checkbox"]')) {
         e.stopPropagation();

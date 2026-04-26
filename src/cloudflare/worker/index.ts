@@ -45,10 +45,10 @@ export default {
 		const db = env.DB || null;
 
 		// Unauthenticated PWA routes
-		if (path === '/notifications' && method === 'GET') return handleNotificationsPage();
+		if (path === '/notifications' && method === 'GET') return handleNotificationsPage(request);
 		if (path === '/notifications/app.js' && method === 'GET') return handlePwaApp();
 		if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
-		if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest();
+		if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest(request);
 		if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon();
 		if (path === '/notifications/open-obsidian' && method === 'GET') return handleOpenObsidian();
 		if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);

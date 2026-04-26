@@ -637,6 +637,49 @@
     background: rgba(255, 255, 255, 0.01);
 }
 
+.reorderable-reminder-list {
+    touch-action: pan-y;
+}
+
+.reorderable-reminder-item {
+    position: relative;
+    touch-action: pan-y;
+
+    .premium-reminder-content,
+    .reminder-card__main {
+        padding-right: 52px;
+    }
+}
+
+.reorder-drag-handle {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    z-index: 2;
+    width: 40px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    color: var(--text-faint);
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+    transform: translateY(-50%);
+
+    &:active {
+        cursor: grabbing;
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    svg {
+        display: block;
+    }
+}
+
 // Custom checkbox
 .premium-checkbox {
     flex-shrink: 0;
@@ -1007,4 +1050,3 @@
         margin-bottom: var(--reminders-tabbar-bottom-offset);
     }
 }
-

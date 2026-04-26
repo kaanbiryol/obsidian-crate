@@ -19,11 +19,11 @@ if (buildResult.status !== 0) {
 
 const jiti = createJiti(import.meta.url, { interopDefault: true });
 const {
-	PWA_HTML,
 	PWA_APP_JS,
 	SERVICE_WORKER_JS,
-	MANIFEST_JSON,
 	ICON_SVG,
+	createManifestJson,
+	createPwaHtml,
 } = await jiti.import('../src/cloudflare/worker/pwa.ts');
 
 function daysFromNow(days, hour = 9, minute = 0) {
@@ -264,7 +264,7 @@ const server = http.createServer(async (req, res) => {
 	if (method === 'GET' && path === '/notifications') {
 		const action = url.searchParams.get('previewAction');
 		const project = url.searchParams.get('previewProject');
-		sendText(res, 200, withPreviewAction(PWA_HTML, action, project), 'text/html; charset=utf-8');
+		sendText(res, 200, withPreviewAction(createPwaHtml(url.toString()), action, project), 'text/html; charset=utf-8');
 		return;
 	}
 
@@ -279,7 +279,7 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	if (method === 'GET' && path === '/notifications/manifest.json') {
-		sendText(res, 200, MANIFEST_JSON, 'application/manifest+json; charset=utf-8');
+		sendText(res, 200, createManifestJson(url.toString()), 'application/manifest+json; charset=utf-8');
 		return;
 	}
 

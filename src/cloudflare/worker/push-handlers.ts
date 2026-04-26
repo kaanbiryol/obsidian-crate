@@ -4,7 +4,7 @@ import { initDb, queryRows } from './db';
 import { getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
 import { issuePushEnrollmentToken, purgeExpiredPushEnrollmentTokens } from './push-enrollment';
 import { consumeWebEnrollmentToken, issueWebEnrollmentToken } from './web-enrollment';
-import { PWA_HTML, PWA_APP_JS, SERVICE_WORKER_JS, MANIFEST_JSON, ICON_SVG, OPEN_OBSIDIAN_HTML } from './pwa';
+import { PWA_APP_JS, SERVICE_WORKER_JS, ICON_SVG, OPEN_OBSIDIAN_HTML, createManifestJson, createPwaHtml } from './pwa';
 import { parseJsonObject, parseOptionalString } from './utils';
 
 interface D1MutationResult {
@@ -51,8 +51,8 @@ function staticAssetHeaders(): Record<string, string> {
 	};
 }
 
-export function handleNotificationsPage(): Response {
-	return new Response(PWA_HTML, {
+export function handleNotificationsPage(request: Request): Response {
+	return new Response(createPwaHtml(request.url), {
 		headers: {
 			'Content-Type': 'text/html; charset=utf-8',
 			...htmlSecurityHeaders(),
@@ -82,8 +82,8 @@ export function handlePwaApp(): Response {
 	});
 }
 
-export function handleManifest(): Response {
-	return new Response(MANIFEST_JSON, {
+export function handleManifest(request: Request): Response {
+	return new Response(createManifestJson(request.url), {
 		headers: {
 			'Content-Type': 'application/manifest+json',
 			...staticAssetHeaders(),

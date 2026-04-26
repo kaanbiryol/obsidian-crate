@@ -1,18 +1,42 @@
 import { PWA_CLIENT_JS } from './pwa-client-bundle.gen';
 import { PWA_ASSET_VERSION } from './pwa-version.gen';
 
-export const PWA_HTML = `<!DOCTYPE html>
+const PWA_START_PARAM_KEYS = ['token', 'folder', 'upcomingDays', 'allDayTime', 'project'] as const;
+
+function pwaStartSearchFromUrl(requestUrl?: string): string {
+	if (!requestUrl) return '';
+
+	const source = new URL(requestUrl).searchParams;
+	const params = new URLSearchParams();
+	for (const key of PWA_START_PARAM_KEYS) {
+		const value = source.get(key)?.trim();
+		if (value) params.set(key, value);
+	}
+
+	const query = params.toString();
+	return query ? `?${query}` : '';
+}
+
+function manifestHrefForUrl(requestUrl?: string): string {
+	const startSearch = pwaStartSearchFromUrl(requestUrl);
+	const versionSeparator = startSearch ? '&' : '?';
+	return `/notifications/manifest.json${startSearch}${versionSeparator}v=${PWA_ASSET_VERSION}`;
+}
+
+export function createPwaHtml(requestUrl?: string): string {
+	const manifestHref = manifestHrefForUrl(requestUrl);
+	return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Crate">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="referrer" content="no-referrer">
-<link rel="manifest" href="/notifications/manifest.json?v=${PWA_ASSET_VERSION}">
+<link rel="manifest" href="${manifestHref}">
 <link rel="apple-touch-icon" href="/notifications/icon.svg?v=${PWA_ASSET_VERSION}">
 <title>Crate Reminders</title>
 <style>
@@ -246,6 +270,12 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .premium-reminder-card:active{transform:none}
 .premium-reminder-card:hover .premium-reminder-content{background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.06)}
 .premium-reminder-card.is-completed .premium-reminder-content{opacity:.6;background:rgba(255,255,255,.01)}
+.reorderable-reminder-list{touch-action:pan-y}
+.reorderable-reminder-item{position:relative;touch-action:pan-y}
+.reorderable-reminder-item .premium-reminder-content,.reorderable-reminder-item .reminder-card__main{padding-right:52px}
+.reorder-drag-handle{position:absolute;top:50%;right:8px;z-index:2;width:40px;height:44px;display:grid;place-items:center;padding:0;border:none;border-radius:12px;color:var(--text-faint);background:transparent;cursor:grab;touch-action:none;transform:translateY(-50%)}
+.reorder-drag-handle:active{cursor:grabbing;color:var(--text-muted);background:rgba(255,255,255,.04)}
+.reorder-drag-handle svg{display:block}
 .checkbox,.premium-checkbox{flex-shrink:0;width:20px;height:20px;min-width:20px;flex-basis:20px;border-radius:50%;border:2px solid rgba(255,255,255,.2);background:transparent;color:white;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:all 200ms ease-out;padding:0}
 .premium-checkbox:hover{border-color:rgba(255,255,255,.4);transform:scale(1.05)}
 .premium-checkbox:active{transform:scale(.95)}
@@ -529,11 +559,24 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 }
 </style>
 </head>
-<body>
-<div id="app"></div>
-<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
-</body>
-</html>`;
+	<body>
+	<div id="app"></div>
+	<script>
+	(function() {
+		var blockZoom = function(event) {
+			event.preventDefault();
+		};
+		document.addEventListener('gesturestart', blockZoom, { passive: false });
+		document.addEventListener('gesturechange', blockZoom, { passive: false });
+		document.addEventListener('gestureend', blockZoom, { passive: false });
+	})();
+	</script>
+	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
+	</body>
+	</html>`;
+}
+
+export const PWA_HTML = createPwaHtml();
 
 export const PWA_APP_JS = PWA_CLIENT_JS;
 
@@ -600,27 +643,31 @@ window.location.href = uri;
 </body>
 </html>`;
 
-export const MANIFEST_JSON = JSON.stringify({
-	id: '/notifications',
-	name: 'Crate Reminders',
-	short_name: 'Crate',
-	description: 'Manage Crate reminders without opening Obsidian.',
-	start_url: '/notifications',
-	scope: '/notifications',
-	display: 'standalone',
-	display_override: ['standalone', 'minimal-ui'],
-	orientation: 'portrait',
-	background_color: '#1e1e1e',
-	theme_color: '#1e1e1e',
-	icons: [
-		{
-			src: `/notifications/icon.svg?v=${PWA_ASSET_VERSION}`,
-			sizes: 'any',
-			type: 'image/svg+xml',
-			purpose: 'any maskable',
-		},
-	],
-});
+export function createManifestJson(requestUrl?: string): string {
+	return JSON.stringify({
+		id: '/notifications',
+		name: 'Crate Reminders',
+		short_name: 'Crate',
+		description: 'Manage Crate reminders without opening Obsidian.',
+		start_url: `/notifications${pwaStartSearchFromUrl(requestUrl)}`,
+		scope: '/notifications',
+		display: 'standalone',
+		display_override: ['standalone', 'minimal-ui'],
+		orientation: 'portrait',
+		background_color: '#1e1e1e',
+		theme_color: '#1e1e1e',
+		icons: [
+			{
+				src: `/notifications/icon.svg?v=${PWA_ASSET_VERSION}`,
+				sizes: 'any',
+				type: 'image/svg+xml',
+				purpose: 'any maskable',
+			},
+		],
+	});
+}
+
+export const MANIFEST_JSON = createManifestJson();
 
 export const ICON_SVG = `<svg id="custom-logo" width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" style="height:100%;width:100%;">
   <defs>
