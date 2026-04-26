@@ -38,6 +38,7 @@ export const PWA_HTML = `<!DOCTYPE html>
 	--radius-sm:10px;
 	--tabbar-h:70px;
 	--keyboard-offset:0px;
+	--keyboard-usable-height:100dvh;
 	--heroui-primary:263 90% 61%;
 	--heroui-secondary:263 90% 61%;
 	--heroui-danger:0 100% 65%;
@@ -293,8 +294,8 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-loading-state{height:100%;padding:16px}
 .pwa-reminders-view .bottom-tab-bar>div{width:100%}
 .pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-bottom-offset) + var(--reminders-tabbar-height) + var(--reminders-fab-gap))}
-.pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px;background:rgba(0,0,0,.56);backdrop-filter:blur(8px)}
-.modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(100dvh - 72px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.38);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
+.pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);background:rgba(0,0,0,.56);backdrop-filter:blur(8px);transition:padding-bottom .22s cubic-bezier(.32,.72,0,1)}
+.modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.38);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
 .modal-card.pwa-reminder-editor.is-switching-out{pointer-events:none;animation:pwa-sheet-out .22s cubic-bezier(.4,0,1,1) forwards}
 .modal-card.pwa-reminder-editor::before{content:"";display:block;width:40px;height:5px;margin:0 auto 18px;border-radius:999px;background:rgba(255,255,255,.16)}
 .pwa-reminder-editor .modal-form{gap:0}
@@ -325,7 +326,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-editor-chip--icon{width:44px;padding:0}
 .pwa-reminder-editor .composer-panel{margin-top:18px;padding:14px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055)}
 .pwa-reminder-editor .delete-confirm{margin-top:18px}
-.pwa-picker-sheet{width:min(620px,calc(100vw - 36px));max-height:calc(100dvh - 88px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 24px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.42);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
+.pwa-picker-sheet{width:min(620px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 88px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 24px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.42);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
 .pwa-picker-sheet.is-switching-out{pointer-events:none;animation:pwa-sheet-out .22s cubic-bezier(.4,0,1,1) forwards}
 .pwa-picker-sheet::before{content:"";display:block;width:40px;height:5px;margin:0 auto 16px;border-radius:999px;background:rgba(255,255,255,.16)}
 .pwa-picker-header{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:12px;margin-bottom:18px}
@@ -455,8 +456,8 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 	.settings-sheet{left:50%;right:auto;transform:translateX(-50%);width:min(640px,100vw)}
 }
 @media (max-width: 640px){
-	.pwa-reminder-editor-backdrop{align-items:flex-end;padding:0 14px}
-	.modal-card.pwa-reminder-editor{width:calc(100vw - 28px);max-height:calc(100dvh - 44px);padding:12px 24px calc(28px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0}
+	.pwa-reminder-editor-backdrop{align-items:flex-end;padding:0 14px var(--keyboard-offset)}
+	.modal-card.pwa-reminder-editor{width:calc(100vw - 28px);max-height:calc(var(--keyboard-usable-height,100dvh) - 44px);padding:12px 24px calc(28px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0}
 	.modal-card.pwa-reminder-editor::before{margin-bottom:14px}
 	.pwa-editor-header{grid-template-columns:56px minmax(0,1fr) 56px;margin-bottom:24px}
 	.pwa-editor-icon-button{width:44px;height:44px;min-width:44px}
@@ -466,10 +467,10 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 	.pwa-editor-chip-row{gap:10px;margin-top:22px;padding-top:18px}
 	.pwa-editor-chip{height:40px;min-width:40px;border-radius:13px;padding:0 12px}
 	.pwa-editor-chip--icon{width:40px;padding:0}
-	.pwa-picker-sheet{width:calc(100vw - 28px);max-height:calc(100dvh - 44px);padding:12px 24px calc(24px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0}
+	.pwa-picker-sheet{width:calc(100vw - 28px);max-height:calc(var(--keyboard-usable-height,100dvh) - 44px);padding:12px 24px calc(24px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0}
 }
 @media (max-height: 900px) and (min-width: 641px){
-	.modal-card.pwa-reminder-editor{max-height:calc(100dvh - 36px);padding-bottom:calc(32px + env(safe-area-inset-bottom))}
+	.modal-card.pwa-reminder-editor{max-height:calc(var(--keyboard-usable-height,100dvh) - 36px);padding-bottom:calc(32px + env(safe-area-inset-bottom))}
 	.pwa-editor-header{margin-bottom:42px}
 	.pwa-editor-card{min-height:320px}
 	.pwa-editor-chip-row{margin-top:24px;padding-top:20px}

@@ -372,27 +372,80 @@ function applyDatePresetToDraft(
 	});
 }
 
-function updateKeyboardInset(): void {
+function scrollFocusedEditorFieldIntoView(): void {
+	const active = document.activeElement;
+	if (!(active instanceof HTMLElement)) return;
+	if (!active.matches('input, textarea, [contenteditable="true"]')) return;
+	if (!active.closest('.pwa-reminder-editor, .pwa-picker-sheet')) return;
+
+	active.scrollIntoView({
+		block: 'center',
+		inline: 'nearest',
+		behavior: 'smooth',
+	});
+}
+
+function updateKeyboardInset(): number {
 	const viewport = window.visualViewport;
-	const keyboardOffset = viewport
-		? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
-		: 0;
-	document.documentElement.style.setProperty('--keyboard-offset', `${Math.round(keyboardOffset)}px`);
+	const viewportHeight = viewport?.height ?? window.innerHeight;
+	const viewportOffsetTop = viewport?.offsetTop ?? 0;
+	const keyboardOffset = Math.max(0, window.innerHeight - viewportHeight - viewportOffsetTop);
+	const usableHeight = Math.max(0, viewportOffsetTop + viewportHeight);
+	const roundedKeyboardOffset = Math.round(keyboardOffset);
+
+	document.documentElement.style.setProperty('--keyboard-offset', `${roundedKeyboardOffset}px`);
+	document.documentElement.style.setProperty('--keyboard-usable-height', `${Math.round(usableHeight)}px`);
+	document.documentElement.classList.toggle('pwa-keyboard-open', roundedKeyboardOffset > 24);
+	return roundedKeyboardOffset;
 }
 
 function useKeyboardInset(): void {
 	useEffect(() => {
-		updateKeyboardInset();
-		const viewport = window.visualViewport;
-		if (!viewport) return;
+		const timers = new Set<number>();
+		const updateAndScrollFocusedField = () => {
+			const keyboardOffset = updateKeyboardInset();
+			if (keyboardOffset > 24) scrollFocusedEditorFieldIntoView();
+		};
+		const scheduleUpdate = () => {
+			updateKeyboardInset();
+			window.requestAnimationFrame(updateAndScrollFocusedField);
+			for (const delay of [80, 220, 420]) {
+				const timer = window.setTimeout(() => {
+					timers.delete(timer);
+					updateAndScrollFocusedField();
+				}, delay);
+				timers.add(timer);
+			}
+		};
 
-		viewport.addEventListener('resize', updateKeyboardInset);
-		viewport.addEventListener('scroll', updateKeyboardInset);
-		window.addEventListener('orientationchange', updateKeyboardInset);
+		scheduleUpdate();
+		const viewport = window.visualViewport;
+		if (!viewport) {
+			window.addEventListener('orientationchange', scheduleUpdate);
+			document.addEventListener('focusin', scheduleUpdate);
+			document.addEventListener('focusout', scheduleUpdate);
+			return () => {
+				window.removeEventListener('orientationchange', scheduleUpdate);
+				document.removeEventListener('focusin', scheduleUpdate);
+				document.removeEventListener('focusout', scheduleUpdate);
+				for (const timer of timers) window.clearTimeout(timer);
+				timers.clear();
+			};
+		}
+
+		viewport.addEventListener('resize', scheduleUpdate);
+		viewport.addEventListener('scroll', scheduleUpdate);
+		window.addEventListener('orientationchange', scheduleUpdate);
+		document.addEventListener('focusin', scheduleUpdate);
+		document.addEventListener('focusout', scheduleUpdate);
 		return () => {
-			viewport.removeEventListener('resize', updateKeyboardInset);
-			viewport.removeEventListener('scroll', updateKeyboardInset);
-			window.removeEventListener('orientationchange', updateKeyboardInset);
+			viewport.removeEventListener('resize', scheduleUpdate);
+			viewport.removeEventListener('scroll', scheduleUpdate);
+			window.removeEventListener('orientationchange', scheduleUpdate);
+			document.removeEventListener('focusin', scheduleUpdate);
+			document.removeEventListener('focusout', scheduleUpdate);
+			for (const timer of timers) window.clearTimeout(timer);
+			timers.clear();
 		};
 	}, []);
 }
