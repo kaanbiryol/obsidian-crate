@@ -4,7 +4,7 @@ import { initDb, queryRows } from './db';
 import { getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
 import { issuePushEnrollmentToken, purgeExpiredPushEnrollmentTokens } from './push-enrollment';
 import { consumeWebEnrollmentToken, issueWebEnrollmentToken } from './web-enrollment';
-import { PWA_APP_JS, SERVICE_WORKER_JS, ICON_SVG, OPEN_OBSIDIAN_HTML, createManifestJson, createPwaHtml } from './pwa';
+import { PWA_APP_JS, SERVICE_WORKER_JS, ICON_SVG, OPEN_OBSIDIAN_HTML, createManifestJson, createPwaHtml, createPwaVersionJson } from './pwa';
 import { parseJsonObject, parseOptionalString } from './utils';
 
 interface D1MutationResult {
@@ -86,6 +86,16 @@ export function handleManifest(request: Request): Response {
 	return new Response(createManifestJson(request.url), {
 		headers: {
 			'Content-Type': 'application/manifest+json',
+			...staticAssetHeaders(),
+			...corsHeaders(),
+		},
+	});
+}
+
+export function handlePwaVersion(): Response {
+	return new Response(createPwaVersionJson(), {
+		headers: {
+			'Content-Type': 'application/json; charset=utf-8',
 			...staticAssetHeaders(),
 			...corsHeaders(),
 		},

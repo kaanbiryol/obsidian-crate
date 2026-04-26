@@ -21,7 +21,7 @@ import {
 } from './reminders-web-handlers';
 import {
 	handleNotificationsPage, handlePwaApp, handleServiceWorker, handleManifest, handleIcon,
-	handleOpenObsidian, handleVapidPublicKey, handleSubscribe, handleUnsubscribe,
+	handleOpenObsidian, handlePwaVersion, handleVapidPublicKey, handleSubscribe, handleUnsubscribe,
 	handleListSubscriptions, handleTestPush, handleCreateEnrollmentToken,
 	handleCreateRemindersEnrollmentToken, handleExchangeRemindersEnrollmentToken,
 } from './push-handlers';
@@ -49,6 +49,7 @@ export default {
 		if (path === '/notifications/app.js' && method === 'GET') return handlePwaApp();
 		if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
 		if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest(request);
+		if (path === '/notifications/version.json' && method === 'GET') return handlePwaVersion();
 		if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon();
 		if (path === '/notifications/open-obsidian' && method === 'GET') return handleOpenObsidian();
 		if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createManifestJson, createPwaHtml } from './pwa';
+import { createManifestJson, createPwaHtml, createPwaVersionJson } from './pwa';
+import { PWA_ASSET_VERSION } from './pwa-version.gen';
 
 describe('PWA activation metadata', () => {
 	it('uses the plain notifications route when no activation params are present', () => {
@@ -29,5 +30,18 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain("document.addEventListener('gesturestart', blockZoom, { passive: false })");
 		expect(html).toContain("document.addEventListener('gesturechange', blockZoom, { passive: false })");
 		expect(html).toContain("document.addEventListener('gestureend', blockZoom, { passive: false })");
+	});
+
+	it('exposes the current PWA asset version', () => {
+		expect(JSON.parse(createPwaVersionJson())).toEqual({ assetVersion: PWA_ASSET_VERSION });
+	});
+
+	it('keeps standalone safe areas outside visible navigation chrome', () => {
+		const html = createPwaHtml('https://worker.test/notifications');
+
+		expect(html).toContain('bottom:0;left:0;right:0;flex-shrink:0;margin-bottom:0;transform:translate3d(0,env(safe-area-inset-bottom),0)');
+		expect(html).toContain('.pwa-reminders-view .premium-back-button{margin-top:calc(env(safe-area-inset-top) + 12px)}');
+		expect(html).not.toContain('bottom:calc(var(--pwa-tabbar-safe-area) * -1)');
+		expect(html).not.toContain('bottom:calc(0px - var(--pwa-tabbar-safe-area))');
 	});
 });

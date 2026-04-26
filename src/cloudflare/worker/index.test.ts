@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import { sha256Hex } from './auth';
+import { PWA_ASSET_VERSION } from './pwa-version.gen';
 
 interface SubscriptionRecord {
 	id: string;
@@ -194,6 +195,16 @@ function createSubscriptionRequest(token: string): Request {
 }
 
 describe('worker entrypoint', () => {
+	it('serves PWA version metadata without authentication', async () => {
+		const response = await worker.fetch(
+			new Request('https://worker.test/notifications/version.json'),
+			createEnv() as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ assetVersion: PWA_ASSET_VERSION });
+	});
+
 	it('rejects blank bearer tokens when no fallback auth token is configured', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/health', {

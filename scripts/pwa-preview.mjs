@@ -24,6 +24,7 @@ const {
 	ICON_SVG,
 	createManifestJson,
 	createPwaHtml,
+	createPwaVersionJson,
 } = await jiti.import('../src/cloudflare/worker/pwa.ts');
 
 function daysFromNow(days, hour = 9, minute = 0) {
@@ -107,6 +108,7 @@ function createInitialState() {
 }
 
 let state = createInitialState();
+let forcePreviewUpdate = false;
 
 function withPreviewAction(html, action, project) {
 	if (!action) {
@@ -133,6 +135,39 @@ window.addEventListener('load', () => {
 		const card = document.querySelector('.premium-reminder-card');
 		if (card) card.click();
 	};
+	const dispatchTouch = (target, type, y) => {
+		if (!target) return;
+		let event;
+		try {
+			const touch = new Touch({
+				identifier: 1,
+				target,
+				clientX: Math.round(window.innerWidth / 2),
+				clientY: y,
+				pageX: Math.round(window.innerWidth / 2),
+				pageY: y,
+			});
+			event = new TouchEvent(type, {
+				bubbles: true,
+				cancelable: true,
+				touches: type === 'touchend' ? [] : [touch],
+				targetTouches: type === 'touchend' ? [] : [touch],
+				changedTouches: [touch],
+			});
+		} catch {
+			event = new Event(type, { bubbles: true, cancelable: true });
+			Object.defineProperty(event, 'touches', { value: type === 'touchend' ? [] : [{ clientY: y }] });
+			Object.defineProperty(event, 'changedTouches', { value: [{ clientY: y }] });
+		}
+		target.dispatchEvent(event);
+	};
+	const previewPullRefresh = () => {
+		const scroll = document.querySelector('.pwa-reminders-view .ios-scroll');
+		if (!scroll) return;
+		scroll.scrollTop = 0;
+		dispatchTouch(scroll, 'touchstart', 96);
+		setTimeout(() => dispatchTouch(scroll, 'touchmove', 236), 40);
+	};
 	const run = () => {
 		switch (action) {
 			case 'create':
@@ -156,6 +191,9 @@ window.addEventListener('load', () => {
 			case 'project':
 				click('[data-action="switch-tab"][data-tab="projects"]');
 				setTimeout(openProject, 120);
+				break;
+			case 'pull':
+				previewPullRefresh();
 				break;
 		}
 	};
@@ -264,6 +302,7 @@ const server = http.createServer(async (req, res) => {
 	if (method === 'GET' && path === '/notifications') {
 		const action = url.searchParams.get('previewAction');
 		const project = url.searchParams.get('previewProject');
+		forcePreviewUpdate = action === 'update' || url.searchParams.get('previewUpdate') === '1';
 		sendText(res, 200, withPreviewAction(createPwaHtml(url.toString()), action, project), 'text/html; charset=utf-8');
 		return;
 	}
@@ -280,6 +319,15 @@ const server = http.createServer(async (req, res) => {
 
 	if (method === 'GET' && path === '/notifications/manifest.json') {
 		sendText(res, 200, createManifestJson(url.toString()), 'application/manifest+json; charset=utf-8');
+		return;
+	}
+
+	if (method === 'GET' && path === '/notifications/version.json') {
+		const version = JSON.parse(createPwaVersionJson()).assetVersion;
+		const body = forcePreviewUpdate
+			? JSON.stringify({ assetVersion: `${version}-preview` })
+			: createPwaVersionJson();
+		sendText(res, 200, body, 'application/json; charset=utf-8');
 		return;
 	}
 

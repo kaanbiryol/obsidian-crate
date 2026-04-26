@@ -43,6 +43,7 @@ interface RemindersAppShellProps {
   upcomingDays: number;
   loadingContent?: React.ReactNode;
   headerRightContent?: React.ReactNode;
+  belowHeaderContent?: React.ReactNode;
   topOverlay?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
@@ -66,6 +67,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
   upcomingDays,
   loadingContent,
   headerRightContent,
+  belowHeaderContent,
   topOverlay,
   children,
   className = "",
@@ -211,6 +213,8 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {belowHeaderContent}
 
         <div className={`reminders-content${isTransitioning ? " is-transitioning" : ""}`}>
           {loadingContent ? (

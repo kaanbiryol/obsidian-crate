@@ -4,7 +4,9 @@ import {
 	Button,
 } from '@heroui/react';
 import {
+	ArrowDown,
 	ArrowUp,
+	Bell,
 	Calendar,
 	Check,
 	ChevronLeft,
@@ -90,9 +92,41 @@ interface PushState {
 	status: string | null;
 }
 
+interface CachedReminderSnapshot {
+	folderPath: string;
+	reminders: ReminderRecord[];
+	projects: string[];
+	savedAt: number;
+}
+
+interface ReminderMutationBody {
+	folderPath: string;
+	allDayNotificationTime: string | null;
+	content: string;
+	description: string | null;
+	project: string;
+	priority: ReminderRecord['priority'];
+	dueDate: string | null;
+	dueDatetime: string | null;
+	recurrence?: RecurrenceRule | null;
+}
+
+interface PullRefreshState {
+	distance: number;
+	progress: number;
+	ready: boolean;
+	refreshing: boolean;
+}
+
+type DataMode = 'live' | 'cached' | 'error';
+
 const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
 const CONFIG_KEY = 'crate-reminders-config';
+const REMINDERS_CACHE_KEY = 'crate-reminders-cache-v1';
 const SHEET_SWITCH_DELAY_MS = 220;
+const PULL_REFRESH_THRESHOLD = 70;
+const PULL_REFRESH_MAX_DISTANCE = 120;
+const PULL_REFRESH_SNAP_DISTANCE = 58;
 
 const defaultConfig: StoredConfig = {
 	folderPath: 'Reminders',
@@ -122,6 +156,35 @@ function loadStoredConfig(): StoredConfig {
 
 function saveConfig(config: StoredConfig): void {
 	localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+}
+
+function loadCachedReminderSnapshot(folderPath: string): CachedReminderSnapshot | null {
+	try {
+		const raw = localStorage.getItem(REMINDERS_CACHE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as Partial<CachedReminderSnapshot>;
+		if (parsed.folderPath !== folderPath) return null;
+		if (!Array.isArray(parsed.reminders) || !Array.isArray(parsed.projects) || typeof parsed.savedAt !== 'number') {
+			return null;
+		}
+		return {
+			folderPath,
+			reminders: parsed.reminders as ReminderRecord[],
+			projects: parsed.projects.filter((project): project is string => typeof project === 'string'),
+			savedAt: parsed.savedAt,
+		};
+	} catch {
+		return null;
+	}
+}
+
+function saveCachedReminderSnapshot(folderPath: string, reminders: ReminderRecord[], projects: string[], savedAt = Date.now()): void {
+	try {
+		const snapshot: CachedReminderSnapshot = { folderPath, reminders, projects, savedAt };
+		localStorage.setItem(REMINDERS_CACHE_KEY, JSON.stringify(snapshot));
+	} catch {
+		// Best-effort cache for offline display; storage can be unavailable in private contexts.
+	}
 }
 
 function currentQueryParams(): URLSearchParams {
@@ -160,6 +223,67 @@ function toSharedReminder(reminder: ReminderRecord): SharedReminder {
 		createdAt: reminder.createdAt ?? timestamp,
 		updatedAt: timestamp,
 	};
+}
+
+function buildOptimisticReminder(body: ReminderMutationBody, id: string): ReminderRecord {
+	const now = new Date().toISOString();
+	const project = body.project.trim() || 'Inbox';
+	return {
+		id,
+		content: body.content,
+		description: body.description?.trim() || undefined,
+		dueDate: body.dueDate || undefined,
+		dueDatetime: body.dueDatetime || undefined,
+		priority: body.priority,
+		completed: false,
+		project,
+		recurrence: normalizeRecurrenceRule(body.recurrence ?? undefined),
+		filePath: `${body.folderPath}/${project}.md`,
+		createdAt: now,
+		updatedAt: now,
+	};
+}
+
+function applyOptimisticReminderUpdate(reminder: ReminderRecord, body: ReminderMutationBody): ReminderRecord {
+	const project = body.project.trim() || reminder.project || 'Inbox';
+	return {
+		...reminder,
+		content: body.content,
+		description: body.description?.trim() || undefined,
+		dueDate: body.dueDate || undefined,
+		dueDatetime: body.dueDatetime || undefined,
+		priority: body.priority,
+		project,
+		recurrence: Object.prototype.hasOwnProperty.call(body, 'recurrence')
+			? normalizeRecurrenceRule(body.recurrence ?? undefined)
+			: reminder.recurrence,
+		filePath: project === reminder.project ? reminder.filePath : `${body.folderPath}/${project}.md`,
+		updatedAt: new Date().toISOString(),
+	};
+}
+
+function reorderProjectReminders(reminders: ReminderRecord[], project: string, orderedIds: string[]): ReminderRecord[] {
+	const order = new Map(orderedIds.map((id, index) => [id, index]));
+	const activeProjectReminders = reminders
+		.filter((reminder) => reminder.project === project && !reminder.completed)
+		.sort((a, b) => {
+			const aIndex = order.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+			const bIndex = order.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+			return aIndex - bIndex;
+		});
+
+	let activeIndex = 0;
+	return reminders.map((reminder) => {
+		if (reminder.project !== project || reminder.completed) return reminder;
+		const nextReminder = activeProjectReminders[activeIndex];
+		activeIndex += 1;
+		return nextReminder ?? reminder;
+	});
+}
+
+function mergeProject(projects: string[], project: string): string[] {
+	const normalized = project.trim() || 'Inbox';
+	return projects.includes(normalized) ? projects : [...projects, normalized].sort((a, b) => a.localeCompare(b));
 }
 
 function buildModalDraft(reminder: ReminderRecord | null, selectedProject: string | null): ModalDraft {
@@ -545,6 +669,154 @@ function makeApiFetch(authToken: string | null, onUnauthorized: () => void) {
 	};
 }
 
+function formatLastUpdated(timestamp: number | null, now: number): string {
+	if (!timestamp) return 'Not updated yet';
+	const elapsedSeconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+	if (elapsedSeconds < 45) return 'Last updated just now';
+	if (elapsedSeconds < 90) return 'Last updated 1m ago';
+	const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+	if (elapsedMinutes < 60) return `Last updated ${elapsedMinutes}m ago`;
+	const elapsedHours = Math.floor(elapsedMinutes / 60);
+	if (elapsedHours < 24) return `Last updated ${elapsedHours}h ago`;
+	const elapsedDays = Math.floor(elapsedHours / 24);
+	return `Last updated ${elapsedDays}d ago`;
+}
+
+async function fetchPwaAssetVersion(): Promise<string | null> {
+	const response = await fetch(`/notifications/version.json?ts=${Date.now()}`, { cache: 'no-store' });
+	if (!response.ok) return null;
+	const result = await response.json() as { assetVersion?: string };
+	return typeof result.assetVersion === 'string' && result.assetVersion.trim() ? result.assetVersion : null;
+}
+
+function findPullScrollTarget(target: EventTarget | null): HTMLElement | null {
+	if (!(target instanceof Element)) return null;
+	const targetScroll = target.closest<HTMLElement>('.pwa-reminders-view .ios-scroll');
+	if (targetScroll) return targetScroll;
+	return document.querySelector<HTMLElement>('.pwa-reminders-view .ios-scroll');
+}
+
+function dampenPullDistance(distance: number): number {
+	const ratio = Math.min(distance / PULL_REFRESH_MAX_DISTANCE, 1);
+	return PULL_REFRESH_MAX_DISTANCE * (1 - Math.pow(1 - ratio, 2));
+}
+
+function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void>): PullRefreshState {
+	const [state, setState] = useState<PullRefreshState>({ distance: 0, progress: 0, ready: false, refreshing: false });
+	const refreshRef = useRef(onRefresh);
+
+	useEffect(() => {
+		refreshRef.current = onRefresh;
+	}, [onRefresh]);
+
+	useEffect(() => {
+		if (!enabled) {
+			setState({ distance: 0, progress: 0, ready: false, refreshing: false });
+			return;
+		}
+
+		let startY = 0;
+		let active = false;
+		let pulling = false;
+		let currentDistance = 0;
+		let animationFrame: number | null = null;
+
+		const reset = () => {
+			active = false;
+			pulling = false;
+			currentDistance = 0;
+			if (animationFrame !== null) {
+				window.cancelAnimationFrame(animationFrame);
+				animationFrame = null;
+			}
+			setState({ distance: 0, progress: 0, ready: false, refreshing: false });
+		};
+
+		const handleTouchStart = (event: TouchEvent) => {
+			if (event.touches.length !== 1) return;
+			if ((event.target as Element | null)?.closest('.modal-backdrop, .settings-sheet, .settings-backdrop')) return;
+			const scrollTarget = findPullScrollTarget(event.target);
+			if (!scrollTarget || scrollTarget.scrollTop > 0) return;
+
+			startY = event.touches[0].clientY;
+			active = true;
+			pulling = false;
+			currentDistance = 0;
+		};
+
+		const handleTouchMove = (event: TouchEvent) => {
+			if (!active || event.touches.length !== 1) return;
+			const scrollTarget = findPullScrollTarget(event.target);
+			if (!scrollTarget || scrollTarget.scrollTop > 0) {
+				reset();
+				return;
+			}
+
+			const delta = event.touches[0].clientY - startY;
+			if (delta <= 0) {
+				reset();
+				return;
+			}
+
+			pulling = true;
+			currentDistance = Math.min(PULL_REFRESH_MAX_DISTANCE, Math.round(dampenPullDistance(delta)));
+			if (currentDistance > 8) event.preventDefault();
+
+			if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+			animationFrame = window.requestAnimationFrame(() => {
+				setState({
+					distance: currentDistance,
+					progress: Math.min(currentDistance / PULL_REFRESH_THRESHOLD, 1),
+					ready: currentDistance >= PULL_REFRESH_THRESHOLD,
+					refreshing: false,
+				});
+				animationFrame = null;
+			});
+		};
+
+		const handleTouchEnd = () => {
+			if (animationFrame !== null) {
+				window.cancelAnimationFrame(animationFrame);
+				animationFrame = null;
+			}
+
+			if (!pulling) {
+				reset();
+				return;
+			}
+
+			if (currentDistance < PULL_REFRESH_THRESHOLD) {
+				reset();
+				return;
+			}
+
+			active = false;
+			pulling = false;
+			currentDistance = 0;
+			setState({ distance: PULL_REFRESH_SNAP_DISTANCE, progress: 1, ready: true, refreshing: true });
+			void refreshRef.current().finally(() => {
+				window.setTimeout(() => {
+					setState({ distance: 0, progress: 0, ready: false, refreshing: false });
+				}, 360);
+			});
+		};
+
+		document.addEventListener('touchstart', handleTouchStart, { passive: true });
+		document.addEventListener('touchmove', handleTouchMove, { passive: false });
+		document.addEventListener('touchend', handleTouchEnd);
+		document.addEventListener('touchcancel', reset);
+		return () => {
+			document.removeEventListener('touchstart', handleTouchStart);
+			document.removeEventListener('touchmove', handleTouchMove);
+			document.removeEventListener('touchend', handleTouchEnd);
+			document.removeEventListener('touchcancel', reset);
+			if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+		};
+	}, [enabled]);
+
+	return state;
+}
+
 function App() {
 	const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_KEY));
 	const [bootstrapped, setBootstrapped] = useState(false);
@@ -554,14 +826,36 @@ function App() {
 	const [selectedProject, setSelectedProject] = useState<string | null>(null);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [loading, setLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [dataMode, setDataMode] = useState<DataMode>('live');
+	const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+	const [statusNow, setStatusNow] = useState(() => Date.now());
+	const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
+	const [updateAvailable, setUpdateAvailable] = useState(false);
 	const [modal, setModal] = useState<ModalState | null>(null);
 	const [toast, setToastState] = useState<ToastState | null>(null);
 	const [push, setPush] = useState<PushState>({ supported: false, subscribed: false, status: null });
 	const toastTimerRef = useRef<number | null>(null);
+	const remindersRef = useRef(reminders);
+	const projectsRef = useRef(projects);
+	const hydratedCacheRef = useRef(false);
 
 	useKeyboardInset();
+
+	useEffect(() => {
+		remindersRef.current = reminders;
+	}, [reminders]);
+
+	useEffect(() => {
+		projectsRef.current = projects;
+	}, [projects]);
+
+	useEffect(() => {
+		const timer = window.setInterval(() => setStatusNow(Date.now()), 30_000);
+		return () => window.clearInterval(timer);
+	}, []);
 
 	const showToast = useCallback((kind: ToastKind, message: string) => {
 		setToastState({ kind, message });
@@ -571,6 +865,7 @@ function App() {
 
 	const logOut = useCallback((showMessage: boolean) => {
 		localStorage.removeItem(AUTH_TOKEN_KEY);
+		localStorage.removeItem(REMINDERS_CACHE_KEY);
 		setAuthToken(null);
 		setReminders([]);
 		setProjects([]);
@@ -585,25 +880,57 @@ function App() {
 
 	const apiFetch = useMemo(() => makeApiFetch(authToken, () => logOut(false)), [authToken, logOut]);
 
-	const loadReminders = useCallback(async () => {
+	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
+		setReminders(snapshot.reminders);
+		setProjects(snapshot.projects);
+		setLastUpdatedAt(snapshot.savedAt);
+		setDataMode('cached');
+		setSelectedProject((current) => current && !snapshot.projects.includes(current) ? null : current);
+	}, []);
+
+	const loadReminders = useCallback(async (options: { silent?: boolean } = {}) => {
 		if (!authToken) return;
-		setLoading(true);
+		if (options.silent) setRefreshing(true);
+		else setLoading(true);
 		setError(null);
 		try {
+			if (!navigator.onLine) {
+				const cached = loadCachedReminderSnapshot(config.folderPath);
+				if (cached) {
+					hydrateCachedSnapshot(cached);
+					return;
+				}
+				throw new Error('Offline');
+			}
+
 			const response = await apiFetch(`/reminders/list?folderPath=${encodeURIComponent(config.folderPath)}`);
 			if (!response.ok) throw new Error(await response.text());
 			const result = await response.json() as { reminders?: ReminderRecord[]; projects?: string[] };
 			const nextReminders = Array.isArray(result.reminders) ? result.reminders : [];
 			const nextProjects = Array.isArray(result.projects) ? result.projects : [];
+			const savedAt = Date.now();
 			setReminders(nextReminders);
 			setProjects(nextProjects);
 			setSelectedProject((current) => current && !nextProjects.includes(current) ? null : current);
+			setLastUpdatedAt(savedAt);
+			setDataMode('live');
+			setIsOffline(false);
+			saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt);
 		} catch (loadError) {
-			setError(loadError instanceof Error ? loadError.message : String(loadError));
+			const message = loadError instanceof Error ? loadError.message : String(loadError);
+			const cached = loadCachedReminderSnapshot(config.folderPath);
+			if (cached) {
+				hydrateCachedSnapshot(cached);
+				setError(message);
+			} else {
+				setDataMode('error');
+				setError(message);
+			}
 		} finally {
+			setRefreshing(false);
 			setLoading(false);
 		}
-	}, [apiFetch, authToken, config.folderPath]);
+	}, [apiFetch, authToken, config.folderPath, hydrateCachedSnapshot]);
 
 	const refreshInstallActivationUrl = useCallback(async () => {
 		if (!authToken || isStandaloneApp()) return;
@@ -669,6 +996,13 @@ function App() {
 					setLoading(false);
 					return;
 				}
+
+				const cached = loadCachedReminderSnapshot(applied.config.folderPath);
+				hydratedCacheRef.current = Boolean(cached);
+				if (cached) {
+					hydrateCachedSnapshot(cached);
+					setLoading(false);
+				}
 			} catch (bootstrapError) {
 				if (!cancelled) {
 					localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -695,24 +1029,103 @@ function App() {
 		if (!bootstrapped || !authToken) return;
 		void refreshInstallActivationUrl().catch(() => undefined);
 		void Promise.all([
-			loadReminders(),
+			loadReminders({ silent: hydratedCacheRef.current }),
 			refreshPushState().catch(() => undefined),
 		]);
 	}, [authToken, bootstrapped, loadReminders, refreshInstallActivationUrl, refreshPushState]);
 
+	const checkForUpdate = useCallback(async () => {
+		try {
+			const assetVersion = await fetchPwaAssetVersion();
+			if (assetVersion && assetVersion !== PWA_ASSET_VERSION) {
+				setUpdateAvailable(true);
+			}
+		} catch {
+			// Version checks are opportunistic and should not disrupt reminder use.
+		}
+	}, []);
+
+	useEffect(() => {
+		void checkForUpdate();
+	}, [checkForUpdate]);
+
+	useEffect(() => {
+		const resume = () => {
+			void checkForUpdate();
+			if (!bootstrapped || !authToken) return;
+			void loadReminders({ silent: true });
+			void refreshPushState().catch(() => undefined);
+		};
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === 'visible') resume();
+		};
+
+		window.addEventListener('pageshow', resume);
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		return () => {
+			window.removeEventListener('pageshow', resume);
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+		};
+	}, [authToken, bootstrapped, checkForUpdate, loadReminders, refreshPushState]);
+
+	useEffect(() => {
+		const handleOnline = () => {
+			setIsOffline(false);
+			if (bootstrapped && authToken) void loadReminders({ silent: true });
+		};
+		const handleOffline = () => setIsOffline(true);
+
+		window.addEventListener('online', handleOnline);
+		window.addEventListener('offline', handleOffline);
+		return () => {
+			window.removeEventListener('online', handleOnline);
+			window.removeEventListener('offline', handleOffline);
+		};
+	}, [authToken, bootstrapped, loadReminders]);
+
+	const readOnlyMessage = useMemo(() => {
+		if (isOffline) return 'Offline data is read-only';
+		if (dataMode === 'cached') return 'Showing last saved reminders. Refresh before editing.';
+		if (dataMode === 'error') return 'Refresh reminders before editing.';
+		return null;
+	}, [dataMode, isOffline]);
+	const readOnly = Boolean(readOnlyMessage);
+	const canShowNotificationPrompt = Boolean(authToken && bootstrapped && push.supported && !push.subscribed && isStandaloneApp());
+	const statusText = useMemo(() => {
+		const lastUpdated = formatLastUpdated(lastUpdatedAt, statusNow);
+		if (isOffline) return lastUpdatedAt ? `Offline - ${lastUpdated}` : 'Offline';
+		if (dataMode === 'cached') return `${lastUpdated} - stale`;
+		if (dataMode === 'error') return error ? `Refresh failed - ${error}` : 'Refresh failed';
+		if (refreshing) return lastUpdatedAt ? `Refreshing - ${lastUpdated}` : 'Refreshing';
+		return lastUpdatedAt ? lastUpdated : null;
+	}, [dataMode, error, isOffline, lastUpdatedAt, refreshing, statusNow]);
+	const statusKind = isOffline ? 'offline' : dataMode === 'live' ? 'live' : dataMode;
+
+	const ensureCanMutate = useCallback(() => {
+		if (!readOnlyMessage) return true;
+		showToast('info', readOnlyMessage);
+		return false;
+	}, [readOnlyMessage, showToast]);
+
+	const pullRefresh = usePullToRefresh(
+		Boolean(authToken && bootstrapped && !loading && !modal && !settingsOpen),
+		useCallback(() => loadReminders({ silent: true }), [loadReminders]),
+	);
+
 	const openModal = useCallback((mode: ModalMode, reminderId?: string, defaultProject?: string) => {
+		if (!ensureCanMutate()) return;
 		const reminder = reminderId ? reminders.find((item) => item.id === reminderId) ?? null : null;
 		setSettingsOpen(false);
 		setSaving(false);
 		setModal({ mode, reminderId, draft: buildModalDraft(reminder, defaultProject ?? selectedProject) });
-	}, [reminders, selectedProject]);
+	}, [ensureCanMutate, reminders, selectedProject]);
 
 	const closeModal = useCallback(() => {
 		setModal(null);
 		setSaving(false);
 	}, []);
 
-	const buildMutationBody = useCallback((draft: ModalDraft, mode: ModalMode) => {
+	const buildMutationBody = useCallback((draft: ModalDraft, mode: ModalMode): ReminderMutationBody => {
 		const createDefaultProject = selectedProject ?? 'Inbox';
 		const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 		const rawContent = draft.content.replace(/\s+/g, ' ').trim();
@@ -749,6 +1162,7 @@ function App() {
 	}, [config.allDayNotificationTime, config.folderPath, projects, selectedProject]);
 
 	const saveReminder = useCallback(async (currentModal: ModalState) => {
+		if (!ensureCanMutate()) return;
 		const body = buildMutationBody(currentModal.draft, currentModal.mode);
 		if (!String(body.content || '').trim()) {
 			showToast('error', 'Reminder title required');
@@ -756,10 +1170,21 @@ function App() {
 		}
 
 		setSaving(true);
+		const previousReminders = remindersRef.current;
+		const previousProjects = projectsRef.current;
+		const isEdit = currentModal.mode === 'edit' && Boolean(currentModal.reminderId);
+		const optimisticId = currentModal.reminderId ?? crypto.randomUUID();
+		const optimisticReminder = buildOptimisticReminder(body, optimisticId);
+		const nextProjects = mergeProject(previousProjects, optimisticReminder.project);
+		setProjects(nextProjects);
+		setReminders((current) => isEdit
+			? current.map((reminder) => reminder.id === optimisticId ? applyOptimisticReminderUpdate(reminder, body) : reminder)
+			: [...current, optimisticReminder]);
+		closeModal();
 		try {
-			const path = currentModal.mode === 'edit' && currentModal.reminderId ? '/reminders/update' : '/reminders/create';
+			const path = isEdit ? '/reminders/update' : '/reminders/create';
 			const requestBody: Record<string, unknown> = { ...body };
-			if (currentModal.reminderId) requestBody.id = currentModal.reminderId;
+			requestBody.id = optimisticId;
 
 			const response = await apiFetch(path, {
 				method: 'POST',
@@ -767,18 +1192,24 @@ function App() {
 			});
 			if (!response.ok) throw new Error(await response.text());
 			const result = await response.json() as { notificationWarning?: string };
-			closeModal();
-			await loadReminders();
+			await loadReminders({ silent: true });
 			showToast(result.notificationWarning ? 'info' : 'success', result.notificationWarning
 				? `Saved. Notification sync failed: ${result.notificationWarning}`
 				: 'Reminder saved');
 		} catch (saveError) {
-			setSaving(false);
+			setReminders(previousReminders);
+			setProjects(previousProjects);
 			showToast('error', saveError instanceof Error ? saveError.message : String(saveError));
 		}
-	}, [apiFetch, buildMutationBody, closeModal, loadReminders, showToast]);
+	}, [apiFetch, buildMutationBody, closeModal, ensureCanMutate, loadReminders, showToast]);
 
 	const toggleReminderCompleted = useCallback(async (reminderId: string, completed: boolean) => {
+		if (!ensureCanMutate()) return;
+		const previousReminders = remindersRef.current;
+		const nextCompleted = !completed;
+		setReminders((current) => current.map((reminder) => reminder.id === reminderId
+			? { ...reminder, completed: nextCompleted, updatedAt: new Date().toISOString() }
+			: reminder));
 		try {
 			const response = await apiFetch('/reminders/set-completed', {
 				method: 'POST',
@@ -786,45 +1217,57 @@ function App() {
 					folderPath: config.folderPath,
 					allDayNotificationTime: config.allDayNotificationTime,
 					id: reminderId,
-					completed: !completed,
+					completed: nextCompleted,
 				}),
 			});
 			if (!response.ok) throw new Error(await response.text());
 			const result = await response.json() as { notificationWarning?: string };
-			await loadReminders();
+			await loadReminders({ silent: true });
 			if (result.notificationWarning) showToast('info', `Updated. Notification sync failed: ${result.notificationWarning}`);
 		} catch (toggleError) {
+			setReminders(previousReminders);
 			showToast('error', toggleError instanceof Error ? toggleError.message : String(toggleError));
 		}
-	}, [apiFetch, config.allDayNotificationTime, config.folderPath, loadReminders, showToast]);
+	}, [apiFetch, config.allDayNotificationTime, config.folderPath, ensureCanMutate, loadReminders, showToast]);
 
 	const deleteReminder = useCallback(async (reminderId: string) => {
+		if (!ensureCanMutate()) return;
+		const previousReminders = remindersRef.current;
+		setReminders((current) => current.filter((reminder) => reminder.id !== reminderId));
+		closeModal();
 		try {
 			const response = await apiFetch('/reminders/delete', {
 				method: 'DELETE',
 				body: JSON.stringify({ folderPath: config.folderPath, id: reminderId }),
 			});
 			if (!response.ok) throw new Error(await response.text());
-			closeModal();
-			await loadReminders();
+			await loadReminders({ silent: true });
 			showToast('success', 'Reminder deleted');
 		} catch (deleteError) {
+			setReminders(previousReminders);
 			showToast('error', deleteError instanceof Error ? deleteError.message : String(deleteError));
 		}
-	}, [apiFetch, closeModal, config.folderPath, loadReminders, showToast]);
+	}, [apiFetch, closeModal, config.folderPath, ensureCanMutate, loadReminders, showToast]);
 
 	const persistReorder = useCallback(async (project: string, orderedIds: string[]) => {
+		if (!ensureCanMutate()) {
+			setReminders((current) => [...current]);
+			return;
+		}
+		const previousReminders = remindersRef.current;
+		setReminders((current) => reorderProjectReminders(current, project, orderedIds));
 		try {
 			const response = await apiFetch('/reminders/reorder', {
 				method: 'POST',
 				body: JSON.stringify({ folderPath: config.folderPath, project, orderedIds }),
 			});
 			if (!response.ok) throw new Error(await response.text());
-			await loadReminders();
+			await loadReminders({ silent: true });
 		} catch (reorderError) {
+			setReminders(previousReminders);
 			showToast('error', reorderError instanceof Error ? reorderError.message : String(reorderError));
 		}
-	}, [apiFetch, config.folderPath, loadReminders, showToast]);
+	}, [apiFetch, config.folderPath, ensureCanMutate, loadReminders, showToast]);
 
 	const enablePushNotifications = useCallback(async () => {
 		try {
@@ -873,7 +1316,9 @@ function App() {
 	}
 
 	if (!authToken) {
-		return error ? <ErrorState error={error} onRetry={() => window.location.reload()} /> : <EmptyAuthState />;
+		return error
+			? <ErrorState error={error} config={config} onRetry={() => window.location.reload()} />
+			: <EmptyAuthState config={config} />;
 	}
 
 	return (
@@ -891,13 +1336,30 @@ function App() {
 				upcomingDays={config.upcomingDays}
 				className="app-shell pwa-reminders-view"
 				headerRightContent={
-					<PwaSettingsButton
+					<PwaHeaderActions
 						settingsOpen={settingsOpen}
+						statusText={statusText}
+						statusKind={statusKind}
+						refreshing={refreshing}
+						onRefresh={() => void loadReminders({ silent: true })}
 						onToggleSettings={() => setSettingsOpen((open) => !open)}
 					/>
 				}
-				loadingContent={loading ? <div className="pwa-loading-state"><div className="loading-card">Loading reminders...</div></div> : undefined}
-				suppressFab={Boolean(modal) || settingsOpen}
+				belowHeaderContent={
+					<>
+						<PwaPullRefreshIndicator pullRefresh={pullRefresh} />
+						<PwaTopNotices
+							statusText={statusText}
+							statusKind={statusKind}
+							updateAvailable={updateAvailable}
+							showNotificationPrompt={canShowNotificationPrompt}
+							onReload={() => window.location.reload()}
+							onEnableNotifications={enablePushNotifications}
+						/>
+					</>
+				}
+				loadingContent={loading ? <PwaLoadingSkeleton /> : undefined}
+				suppressFab={Boolean(modal) || settingsOpen || readOnly}
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
 				onReorder={persistReorder}
@@ -908,7 +1370,7 @@ function App() {
 						push={push}
 						onClose={() => setSettingsOpen(false)}
 						onEnablePush={enablePushNotifications}
-						onRefresh={loadReminders}
+						onRefresh={() => void loadReminders()}
 						onLogout={() => logOut(true)}
 					/>
 				)}
@@ -950,11 +1412,150 @@ function PwaSettingsButton({
 	);
 }
 
-function EmptyAuthState() {
+function PwaHeaderActions({
+	settingsOpen,
+	statusText,
+	statusKind,
+	refreshing,
+	onRefresh,
+	onToggleSettings,
+}: {
+	settingsOpen: boolean;
+	statusText: string | null;
+	statusKind: DataMode | 'offline';
+	refreshing: boolean;
+	onRefresh: () => void;
+	onToggleSettings: () => void;
+}) {
+	return (
+		<div className="pwa-header-actions">
+			<button
+				className={`pwa-header-sync-button is-${statusKind}${refreshing ? ' is-refreshing' : ''}`}
+				type="button"
+				data-action="refresh-header"
+				aria-label={statusText ? `Refresh reminders. ${statusText}` : 'Refresh reminders'}
+				onClick={onRefresh}
+			>
+				<RefreshCw size={22} strokeWidth={2.1} />
+				<span className="pwa-header-sync-button__dot" aria-hidden="true" />
+			</button>
+			<PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />
+		</div>
+	);
+}
+
+function PwaTopNotices({
+	statusText,
+	statusKind,
+	updateAvailable,
+	showNotificationPrompt,
+	onReload,
+	onEnableNotifications,
+}: {
+	statusText: string | null;
+	statusKind: DataMode | 'offline';
+	updateAvailable: boolean;
+	showNotificationPrompt: boolean;
+	onReload: () => void;
+	onEnableNotifications: () => void;
+}) {
+	const showStatusLine = Boolean(statusText && statusKind !== 'live');
+	if (!showStatusLine && !updateAvailable && !showNotificationPrompt) return null;
+
+	return (
+		<div className="pwa-top-notices">
+			{updateAvailable && (
+				<div className="pwa-update-banner">
+					<div className="pwa-update-banner__label">
+						<span className="pwa-update-banner__dot" aria-hidden="true" />
+						<span className="pwa-update-banner__text">Update available</span>
+					</div>
+					<button className="pwa-update-button" type="button" onClick={onReload} aria-label="Update to the latest version">
+						Update
+					</button>
+				</div>
+			)}
+			{showStatusLine && <div className={`pwa-status-line is-${statusKind}`}>{statusText}</div>}
+			{showNotificationPrompt && (
+				<div className="pwa-notification-prompt">
+					<div className="pwa-notification-prompt__icon">
+						<Bell size={16} />
+					</div>
+					<div className="pwa-notification-prompt__copy">
+						<strong>Enable notifications</strong>
+						<span>Get reminder alerts from this Home Screen app.</span>
+					</div>
+					<Button className="pwa-inline-button" type="button" onClick={onEnableNotifications}>
+						Enable
+					</Button>
+				</div>
+			)}
+		</div>
+	);
+}
+
+function PwaPullRefreshIndicator({ pullRefresh }: { pullRefresh: PullRefreshState }) {
+	const visible = pullRefresh.distance > 0 || pullRefresh.refreshing;
+	const height = visible ? Math.min(82, Math.max(0, pullRefresh.distance)) : 0;
+	const label = pullRefresh.refreshing ? 'Refreshing' : pullRefresh.ready ? 'Release to refresh' : null;
+	const iconStyle: React.CSSProperties = pullRefresh.refreshing
+		? {}
+		: {
+			transform: `rotate(${Math.round(pullRefresh.progress * 360)}deg) scale(${pullRefresh.ready ? 1.08 : 1})`,
+		};
+
+	return (
+		<div
+			className={`pwa-pull-refresh${visible ? ' is-visible' : ''}${pullRefresh.ready ? ' is-ready' : ''}${pullRefresh.refreshing ? ' is-refreshing' : ''}`}
+			style={{ height: `${height}px` }}
+			aria-hidden={!visible}
+		>
+			<div className="pwa-pull-refresh__inner">
+				<div className="pwa-pull-refresh__glyph" style={iconStyle}>
+					{pullRefresh.refreshing ? <RefreshCw size={19} /> : <ArrowDown size={19} />}
+				</div>
+				{label && <div className="pwa-pull-refresh__label">{label}</div>}
+			</div>
+		</div>
+	);
+}
+
+function PwaLoadingSkeleton() {
+	return (
+		<div className="pwa-loading-state" aria-label="Loading reminders">
+			<div className="pwa-skeleton-header">
+				<div className="pwa-skeleton-line is-title" />
+				<div className="pwa-skeleton-line is-meta" />
+			</div>
+			<div className="pwa-skeleton-list">
+				{[0, 1, 2, 3, 4].map((item) => (
+					<div className="pwa-skeleton-row" key={item}>
+						<div className="pwa-skeleton-check" />
+						<div className="pwa-skeleton-body">
+							<div className="pwa-skeleton-line" />
+							<div className="pwa-skeleton-line is-short" />
+						</div>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
+function openObsidianRecoveryLink() {
+	window.location.href = '/notifications/open-obsidian';
+}
+
+function EmptyAuthState({ config }: { config: StoredConfig }) {
+	const standalone = isStandaloneApp();
 	return (
 		<div className="auth-card">
 			<h1>Crate Reminders</h1>
-			<p>Open a fresh link from Crate to activate this web app on your device.</p>
+			<p>{standalone
+				? 'Open Crate in Obsidian and send a new app link to reconnect this Home Screen app.'
+				: 'Open a fresh link from Crate to activate this web app on your device.'}</p>
+			<p>Your reminders folder setting is preserved: {config.folderPath}</p>
+			<Button className="primary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian</Button>
 		</div>
 	);
 }
@@ -968,11 +1569,17 @@ function LoadingAuthState() {
 	);
 }
 
-function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
+function ErrorState({ error, config, onRetry }: { error: string; config: StoredConfig; onRetry: () => void }) {
+	const standalone = isStandaloneApp();
 	return (
 		<div className="auth-card">
 			<h1>Crate Reminders</h1>
 			<p>{error || 'Something went wrong.'}</p>
+			<p>{standalone
+				? 'Open Crate in Obsidian and send a new app link if this app can no longer authenticate.'
+				: 'Retry, or open a fresh link from Crate if this browser is no longer authenticated.'}</p>
+			<p>Your reminders folder setting is preserved: {config.folderPath}</p>
+			<Button className="secondary-button" type="button" onClick={openObsidianRecoveryLink}>Open Obsidian</Button>
 			<Button className="primary-button" type="button" onClick={onRetry}>Retry</Button>
 		</div>
 	);
@@ -1064,6 +1671,7 @@ function ReminderSheet({
 	const canSubmit = !saving && Boolean(draft.content.trim());
 
 	useLayoutEffect(() => {
+		if (modal.mode !== 'create') return;
 		const initialContent = draft.content.trim();
 		const shouldSelect = draft.content.trim().length > 0;
 		const focusTitle = () => {
@@ -1621,8 +2229,9 @@ function SettingsSheet({
 			: 'You can also install this app from your browser for faster access.';
 
 	return (
-		<>
-			<div className="settings-backdrop" onClick={onClose} />
+		<div className="settings-backdrop" onClick={(event) => {
+			if (event.target === event.currentTarget) onClose();
+		}}>
 			<aside className="settings-sheet" role="dialog" aria-modal="true" aria-label="Settings">
 				<div className="settings-handle" aria-hidden="true" />
 				<div className="settings-sheet__header">
@@ -1661,7 +2270,7 @@ function SettingsSheet({
 					</div>
 				</div>
 			</aside>
-		</>
+		</div>
 	);
 }
 
