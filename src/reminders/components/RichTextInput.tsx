@@ -60,13 +60,25 @@ function insertPlainTextAtSelection(text: string): void {
     selection.addRange(nextRange);
 }
 
+function selectElementContents(element: HTMLElement): void {
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
 export interface RichTextInputHandle {
     /** Focus the input */
-    focus: () => void;
+    focus: (options?: { select?: boolean }) => void;
     /** Blur the input (dismiss keyboard on mobile) */
     blur: () => void;
     /** Get the underlying DOM element */
     getElement: () => HTMLDivElement | null;
+    /** Select all editable content */
+    selectAll: () => void;
     /** Set a pending cursor position to be applied on next content update */
     setCursorPosition: (pos: number) => void;
 }
@@ -128,13 +140,17 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
     // Expose methods to parent via ref
     useImperativeHandle(ref, () => ({
-        focus: () => {
+        focus: (options = {}) => {
             if (actualRef.current) {
-                actualRef.current.focus();
+                actualRef.current.focus({ preventScroll: true });
                 // Delay cursor positioning to allow focus to stabilize
                 requestAnimationFrame(() => {
                     if (actualRef.current) {
-                        moveCursorToEnd(actualRef.current);
+                        if (options.select) {
+                            selectElementContents(actualRef.current);
+                        } else {
+                            moveCursorToEnd(actualRef.current);
+                        }
                     }
                 });
             }
@@ -145,6 +161,12 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             }
         },
         getElement: () => actualRef.current,
+        selectAll: () => {
+            if (actualRef.current) {
+                actualRef.current.focus({ preventScroll: true });
+                selectElementContents(actualRef.current);
+            }
+        },
         setCursorPosition: (pos: number) => {
             pendingCursorRef.current = pos;
         },

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
 	Button,
@@ -10,13 +10,9 @@ import {
 	ChevronLeft,
 	Flag,
 	Hash,
-	Info,
-	Link,
-	List,
-	PanelRight,
 	RefreshCw,
 	Repeat,
-	CheckCircle2,
+	Settings,
 	Trash2,
 	X,
 } from 'lucide-react';
@@ -846,8 +842,8 @@ function App() {
 				initialProject={selectedProject ?? undefined}
 				upcomingDays={config.upcomingDays}
 				className="app-shell pwa-reminders-view"
-				topOverlay={
-					<PwaSidebarChrome
+				headerRightContent={
+					<PwaSettingsButton
 						settingsOpen={settingsOpen}
 						onToggleSettings={() => setSettingsOpen((open) => !open)}
 					/>
@@ -858,70 +854,51 @@ function App() {
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
 				onReorder={persistReorder}
 			>
-					{settingsOpen && (
-						<SettingsSheet
-							config={config}
-							push={push}
-							onClose={() => setSettingsOpen(false)}
-							onEnablePush={enablePushNotifications}
-							onRefresh={loadReminders}
-							onLogout={() => logOut(true)}
-						/>
-					)}
-					{modal && (
-						<ReminderSheet
-							modal={modal}
-							projects={projects}
-							saving={saving}
-							onChange={setModal}
-							onClose={closeModal}
-							onSave={saveReminder}
-							onDelete={deleteReminder}
-						/>
-					)}
-					{toast && <div className={`toast is-${toast.kind}`}>{toast.message}</div>}
+				{settingsOpen && (
+					<SettingsSheet
+						config={config}
+						push={push}
+						onClose={() => setSettingsOpen(false)}
+						onEnablePush={enablePushNotifications}
+						onRefresh={loadReminders}
+						onLogout={() => logOut(true)}
+					/>
+				)}
+				{modal && (
+					<ReminderSheet
+						modal={modal}
+						projects={projects}
+						saving={saving}
+						onChange={setModal}
+						onClose={closeModal}
+						onSave={saveReminder}
+						onDelete={deleteReminder}
+					/>
+				)}
+				{toast && <div className={`toast is-${toast.kind}`}>{toast.message}</div>}
 			</RemindersAppShell>
 		</div>
 	);
 }
 
-function PwaSidebarChrome({
+function PwaSettingsButton({
 	settingsOpen,
 	onToggleSettings,
 }: {
 	settingsOpen: boolean;
 	onToggleSettings: () => void;
 }) {
-	const chromeItems = [
-		{ icon: Link, label: 'Backlinks' },
-		{ icon: Link, label: 'Outgoing links' },
-		{ icon: List, label: 'Outline' },
-		{ icon: Info, label: 'Info' },
-		{ icon: CheckCircle2, label: 'Tasks', active: true },
-	] as const;
-
 	return (
-		<div className="pwa-sidebar-chrome" aria-label="Sidebar controls">
-			<div className="pwa-sidebar-chrome__cluster" aria-hidden="true">
-				{chromeItems.map(({ icon: Icon, label, active }) => (
-					<span
-						key={label}
-						className={`pwa-sidebar-chrome__item${active ? ' is-active' : ''}`}
-					>
-						<Icon size={26} strokeWidth={active ? 2.3 : 2.1} />
-					</span>
-				))}
-			</div>
-			<button
-				className={`pwa-sidebar-chrome__item pwa-sidebar-chrome__settings${settingsOpen ? ' is-active' : ''}`}
-				type="button"
-				data-action="toggle-settings"
-				aria-label="Open settings"
-				onClick={onToggleSettings}
-			>
-				<PanelRight size={26} strokeWidth={2.1} />
-			</button>
-		</div>
+		<button
+			className={`pwa-header-settings-button${settingsOpen ? ' is-active' : ''}`}
+			type="button"
+			data-action="toggle-settings"
+			aria-label={settingsOpen ? 'Close settings' : 'Open settings'}
+			aria-pressed={settingsOpen}
+			onClick={onToggleSettings}
+		>
+			<Settings size={22} strokeWidth={2.1} />
+		</button>
 	);
 }
 
@@ -1024,11 +1001,28 @@ function ReminderSheet({
 	const title = isEditing ? 'Edit Reminder' : 'New Reminder';
 	const canSubmit = !saving && Boolean(draft.content.trim());
 
-	useEffect(() => {
-		const timer = window.setTimeout(() => {
-			richTextInputRef.current?.focus();
-		}, 180);
-		return () => window.clearTimeout(timer);
+	useLayoutEffect(() => {
+		const initialContent = draft.content.trim();
+		const shouldSelect = draft.content.trim().length > 0;
+		const focusTitle = () => {
+			const element = richTextInputRef.current?.getElement();
+			const currentContent = element?.textContent?.trim() ?? '';
+			if (element && currentContent !== initialContent) {
+				if (currentContent === '') richTextInputRef.current?.focus();
+				return;
+			}
+			richTextInputRef.current?.focus({ select: shouldSelect });
+		};
+
+		focusTitle();
+		const frame = window.requestAnimationFrame(focusTitle);
+		const timers = [60, 180, 320].map((delay) => window.setTimeout(focusTitle, delay));
+		return () => {
+			window.cancelAnimationFrame(frame);
+			for (const timer of timers) window.clearTimeout(timer);
+		};
+		// Intentionally only run when opening a different editor sheet.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [modal.mode, modal.reminderId]);
 
 	useEffect(() => () => {
