@@ -7,6 +7,7 @@ import {
 	ArrowUp,
 	Calendar,
 	Check,
+	ChevronLeft,
 	Flag,
 	Hash,
 	Info,
@@ -19,16 +20,26 @@ import {
 	Trash2,
 	X,
 } from 'lucide-react';
+import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/RichTextInput';
+import { ProjectAutocompleteDropdown } from '@/reminders/components/ProjectAutocompleteDropdown';
+import { useProjectAutocomplete } from '@/reminders/components/useProjectAutocomplete';
+import {
+	buildInitialReminderContent,
+	rebuildReminderContent,
+} from '@/reminders/components/addReminderModal/useReminderDraft';
 import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
 import { RemindersAppShell, type ReminderCardRenderer } from '@/reminders/ui/RemindersAppShell';
-import type { Reminder as SharedReminder, RecurrenceRule } from '@/reminders/types/reminder';
+import type { Priority, Reminder as SharedReminder, RecurrenceRule } from '@/reminders/types/reminder';
 import { formatDueDate } from '@/reminders/utils/dateFormatting';
-import { buildStoredReminderDates, formatLocalDateKey, parseReminderDateValue } from '@/reminders/utils/reminderDate';
+import { getProjectColor } from '@/reminders/utils/projectColors';
+import { buildStoredReminderDates, formatLocalDateKey, parseReminderDateValue, serializeReminderDateValue } from '@/reminders/utils/reminderDate';
 import { parseReminderContent } from '@/reminders/utils/reminderParser';
+import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
+import { formatRecurrence } from '@/reminders/utils/rruleConverter';
 import { PWA_ASSET_VERSION } from './pwa-version.gen';
 
 type ModalMode = 'create' | 'edit';
-type ModalPickerId = 'date' | 'project';
+type ModalPickerId = 'date' | 'project' | 'recurrence';
 type ToastKind = 'success' | 'error' | 'info';
 
 interface ReminderRecord {
@@ -57,9 +68,11 @@ interface ModalDraft {
 	content: string;
 	description: string;
 	project: string;
+	defaultProject: string;
 	priority: ReminderRecord['priority'];
 	dueDate: string;
 	dueTime: string;
+	recurrence?: RecurrenceRule;
 	activePicker: ModalPickerId | null;
 	deleteConfirm: boolean;
 }
@@ -159,16 +172,20 @@ function buildModalDraft(reminder: ReminderRecord | null, selectedProject: strin
 		: reminder?.dueDate
 			? parseReminderDateValue(reminder.dueDate, false) ?? null
 			: null;
+	const defaultProject = selectedProject ?? 'Inbox';
+	const sharedReminder = reminder ? toSharedReminder(reminder) : undefined;
 
 	return {
-		content: reminder?.content ?? '',
+		content: buildInitialReminderContent(sharedReminder, defaultProject),
 		description: reminder?.description ?? '',
-		project: reminder?.project ?? (selectedProject ?? 'Inbox'),
+		project: reminder?.project ?? defaultProject,
+		defaultProject,
 		priority: reminder?.priority ?? 4,
-		dueDate: parsedDate ? formatLocalDateKey(parsedDate) : '',
-		dueTime: reminder?.dueDatetime
+		dueDate: parsedDate && !reminder?.recurrence ? formatLocalDateKey(parsedDate) : '',
+		dueTime: reminder?.dueDatetime && !reminder?.recurrence
 			? `${String(parsedDate?.getHours() ?? 0).padStart(2, '0')}:${String(parsedDate?.getMinutes() ?? 0).padStart(2, '0')}`
 			: '',
+		recurrence: reminder?.recurrence,
 		activePicker: null,
 		deleteConfirm: false,
 	};
@@ -179,9 +196,159 @@ function formatModalDueSummary(draft: ModalDraft): string {
 	return formatDueDate(draft.dueTime ? `${draft.dueDate}T${draft.dueTime}` : draft.dueDate) ?? 'No date';
 }
 
-function applyDatePresetToDraft(draft: ModalDraft, preset: 'today' | 'tomorrow' | 'evening' | 'next-week' | 'clear'): ModalDraft {
+function getDraftDueValue(draft: ModalDraft): string | null {
+	if (!draft.dueDate) return null;
+	if (!draft.dueTime) return draft.dueDate;
+	const date = new Date(`${draft.dueDate}T${draft.dueTime}`);
+	return Number.isNaN(date.getTime()) ? draft.dueDate : date.toISOString();
+}
+
+function draftHasTime(draft: Pick<ModalDraft, 'dueDate' | 'dueTime'>): boolean {
+	return Boolean(draft.dueDate && draft.dueTime);
+}
+
+function splitDraftDateValue(dateValue: string | null | undefined, hasTime: boolean): Pick<ModalDraft, 'dueDate' | 'dueTime'> {
+	if (!dateValue) return { dueDate: '', dueTime: '' };
+	const parsedDate = parseReminderDateValue(dateValue, hasTime);
+	if (!parsedDate || Number.isNaN(parsedDate.getTime())) return { dueDate: '', dueTime: '' };
+	return {
+		dueDate: formatLocalDateKey(parsedDate),
+		dueTime: hasTime
+			? `${String(parsedDate.getHours()).padStart(2, '0')}:${String(parsedDate.getMinutes()).padStart(2, '0')}`
+			: '',
+	};
+}
+
+type ReminderTextUpdate = {
+	dueDateValue?: string | null;
+	hasTime?: boolean;
+	recurrence?: RecurrenceRule | null;
+	project?: string;
+	priority?: Priority;
+};
+
+function applyReminderTextUpdate(
+	draft: ModalDraft,
+	projectOptions: string[],
+	update: ReminderTextUpdate,
+): Partial<ModalDraft> {
+	const parsed = parseReminderContent(draft.content, projectOptions);
+	const cleanText = parsed.cleanContent?.trim() ?? draft.content.trim();
+	const parsedDateValue = parsed.dueDate
+		? serializeReminderDateValue(parsed.dueDate, parsed.hasTime)
+		: undefined;
+	const hasDueDateUpdate = Object.prototype.hasOwnProperty.call(update, 'dueDateValue');
+	const hasRecurrenceUpdate = Object.prototype.hasOwnProperty.call(update, 'recurrence');
+	let nextDueDateValue = hasDueDateUpdate
+		? update.dueDateValue ?? null
+		: parsedDateValue ?? getDraftDueValue(draft);
+	let nextHasTime = Object.prototype.hasOwnProperty.call(update, 'hasTime')
+		? Boolean(update.hasTime)
+		: parsed.dueDate
+			? Boolean(parsed.hasTime)
+			: draftHasTime(draft);
+	let nextRecurrence = hasRecurrenceUpdate
+		? normalizeRecurrenceRule(update.recurrence ?? undefined)
+		: normalizeRecurrenceRule(parsed.recurrence ?? draft.recurrence);
+
+	if (hasRecurrenceUpdate && nextRecurrence) {
+		nextDueDateValue = null;
+		nextHasTime = false;
+	} else if (hasDueDateUpdate) {
+		nextRecurrence = undefined;
+		if (!nextDueDateValue) nextHasTime = false;
+	}
+
+	const nextProject = update.project ?? parsed.project ?? draft.project ?? draft.defaultProject;
+	const nextPriority = update.priority ?? (parsed.priorityPart ? parsed.priority : draft.priority);
+	const dateFields = splitDraftDateValue(nextDueDateValue, nextHasTime);
+
+	return {
+		content: rebuildReminderContent(
+			cleanText,
+			nextDueDateValue,
+			nextRecurrence,
+			nextProject,
+			nextPriority,
+			draft.defaultProject,
+			nextHasTime,
+		),
+		project: nextProject,
+		priority: nextPriority,
+		recurrence: nextRecurrence,
+		...dateFields,
+		deleteConfirm: false,
+	};
+}
+
+function deriveDraftPatchFromContent(draft: ModalDraft, projectOptions: string[]): Partial<ModalDraft> {
+	const parsed = parseReminderContent(draft.content, projectOptions);
+	const patch: Partial<ModalDraft> = {};
+	const nextProject = parsed.project ?? draft.defaultProject;
+
+	if (nextProject !== draft.project) {
+		patch.project = nextProject;
+	}
+
+	const nextPriority = parsed.priorityPart ? parsed.priority : 4;
+	if (nextPriority !== draft.priority) {
+		patch.priority = nextPriority;
+	}
+
+	if (parsed.recurrence) {
+		const nextRecurrence = normalizeRecurrenceRule(parsed.recurrence);
+		if (JSON.stringify(nextRecurrence) !== JSON.stringify(draft.recurrence)) {
+			patch.recurrence = nextRecurrence;
+		}
+		if (draft.dueDate || draft.dueTime) {
+			patch.dueDate = '';
+			patch.dueTime = '';
+		}
+		return patch;
+	}
+
+	if (draft.recurrence) {
+		patch.recurrence = undefined;
+	}
+
+	if (parsed.dueDate) {
+		const hasTime = Boolean(parsed.hasTime);
+		const serialized = serializeReminderDateValue(parsed.dueDate, hasTime);
+		const dateFields = splitDraftDateValue(serialized, hasTime);
+		if (dateFields.dueDate !== draft.dueDate) patch.dueDate = dateFields.dueDate;
+		if (dateFields.dueTime !== draft.dueTime) patch.dueTime = dateFields.dueTime;
+		return patch;
+	}
+
+	if (draft.dueDate || draft.dueTime) {
+		patch.dueDate = '';
+		patch.dueTime = '';
+	}
+
+	return patch;
+}
+
+function applyDateFieldsToDraft(
+	draft: ModalDraft,
+	projectOptions: string[],
+	dueDate: string,
+	dueTime: string,
+): Partial<ModalDraft> {
+	if (!dueDate) {
+		return applyReminderTextUpdate(draft, projectOptions, { dueDateValue: null, hasTime: false, recurrence: null });
+	}
+	const hasTime = Boolean(dueTime);
+	const dateValue = hasTime ? new Date(`${dueDate}T${dueTime}`).toISOString() : dueDate;
+	return applyReminderTextUpdate(draft, projectOptions, { dueDateValue: dateValue, hasTime, recurrence: null });
+}
+
+function applyDatePresetToDraft(
+	draft: ModalDraft,
+	projectOptions: string[],
+	preset: 'today' | 'tomorrow' | 'evening' | 'next-week' | 'clear',
+): Partial<ModalDraft> {
 	if (preset === 'clear') {
-		return { ...draft, dueDate: '', dueTime: '', activePicker: 'date', deleteConfirm: false };
+		return applyReminderTextUpdate(draft, projectOptions, { dueDateValue: null, hasTime: false, recurrence: null });
 	}
 
 	const next = new Date();
@@ -198,13 +365,11 @@ function applyDatePresetToDraft(draft: ModalDraft, preset: 'today' | 'tomorrow' 
 		next.setHours(0, 0, 0, 0);
 	}
 
-	return {
-		...draft,
-		dueDate: formatLocalDateKey(next),
-		dueTime: preset === 'evening' ? '18:00' : '',
-		activePicker: 'date',
-		deleteConfirm: false,
-	};
+	return applyReminderTextUpdate(draft, projectOptions, {
+		dueDateValue: preset === 'evening' ? next.toISOString() : formatLocalDateKey(next),
+		hasTime: preset === 'evening',
+		recurrence: null,
+	});
 }
 
 function updateKeyboardInset(): void {
@@ -457,28 +622,24 @@ function App() {
 	const buildMutationBody = useCallback((draft: ModalDraft, mode: ModalMode) => {
 		const createDefaultProject = selectedProject ?? 'Inbox';
 		const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
-		const rawDate = draft.dueDate.trim();
-		const rawTime = draft.dueTime.trim();
-		let project = draft.project.trim() || createDefaultProject;
-		let priority: 1 | 4 = draft.priority === 1 ? 1 : 4;
-		let content = draft.content.replace(/\s+/g, ' ').trim();
+		const rawContent = draft.content.replace(/\s+/g, ' ').trim();
+		const parsed = parseReminderContent(rawContent, projectOptions);
+		const project = parsed.project || draft.project.trim() || createDefaultProject;
+		const priority: 1 | 4 = parsed.priorityPart ? parsed.priority : draft.priority === 1 ? 1 : 4;
+		const content = (parsed.cleanContent || rawContent).replace(/\s+/g, ' ').trim();
+		const recurrence = normalizeRecurrenceRule(parsed.recurrence || draft.recurrence);
 		let dueDate: string | null = null;
 		let dueDatetime: string | null = null;
 
-		if (rawDate && rawTime) dueDatetime = new Date(`${rawDate}T${rawTime}`).toISOString();
-		else if (rawDate) dueDate = rawDate;
-
-		if (mode === 'create' && content) {
-			const parsed = parseReminderContent(content, projectOptions);
-			const cleanedContent = parsed.cleanContent.replace(/\s+/g, ' ').trim();
-			if (cleanedContent) content = cleanedContent;
-			if ((!draft.project.trim() || project === createDefaultProject) && parsed.project) project = parsed.project;
-			if (priority === 4 && parsed.priority === 1) priority = 1;
-			if (!rawDate && !rawTime && parsed.dueDate) {
-				const parsedDates = buildStoredReminderDates(parsed.dueDate, parsed.hasTime);
-				dueDate = parsedDates.dueDate ?? null;
-				dueDatetime = parsedDates.dueDatetime ?? null;
-			}
+		if (parsed.dueDate) {
+			const parsedDates = buildStoredReminderDates(parsed.dueDate, parsed.hasTime);
+			dueDate = parsedDates.dueDate ?? null;
+			dueDatetime = parsedDates.dueDatetime ?? null;
+		} else if (!recurrence) {
+			const rawDate = draft.dueDate.trim();
+			const rawTime = draft.dueTime.trim();
+			if (rawDate && rawTime) dueDatetime = new Date(`${rawDate}T${rawTime}`).toISOString();
+			else if (rawDate) dueDate = rawDate;
 		}
 
 		return {
@@ -490,6 +651,7 @@ function App() {
 			priority,
 			dueDate,
 			dueDatetime,
+			recurrence: recurrence ?? (mode === 'edit' ? null : undefined),
 		};
 	}, [config.allDayNotificationTime, config.folderPath, projects, selectedProject]);
 
@@ -797,7 +959,9 @@ function ReminderSheet({
 	onSave: (modal: ModalState) => void;
 	onDelete: (id: string) => void;
 }) {
-	const contentRef = useRef<HTMLTextAreaElement | null>(null);
+	const contentRef = useRef<HTMLDivElement | null>(null);
+	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
+	const editorCardRef = useRef<HTMLDivElement | null>(null);
 	const switchTimerRef = useRef<number | null>(null);
 	const [pendingPicker, setPendingPicker] = useState<ModalPickerId | null>(null);
 	const [returningToEditor, setReturningToEditor] = useState(false);
@@ -809,9 +973,7 @@ function ReminderSheet({
 
 	useEffect(() => {
 		const timer = window.setTimeout(() => {
-			contentRef.current?.focus();
-			const end = contentRef.current?.value.length ?? 0;
-			contentRef.current?.setSelectionRange(end, end);
+			richTextInputRef.current?.focus();
 		}, 180);
 		return () => window.clearTimeout(timer);
 	}, [modal.mode, modal.reminderId]);
@@ -833,6 +995,23 @@ function ReminderSheet({
 		onChange((current) => current ? ({ ...current, draft: { ...current.draft, ...patch } }) : current);
 	};
 
+	const autocomplete = useProjectAutocomplete({
+		content: draft.content,
+		projects: projectOptions,
+		onContentChange: (content) => patchDraft({ content }),
+		richTextInputRef,
+	});
+
+	useEffect(() => {
+		if (draft.activePicker || pendingPicker || returningToEditor) return;
+		const patch = deriveDraftPatchFromContent(draft, projectOptions);
+		if (Object.keys(patch).length > 0) {
+			patchDraft(patch);
+		}
+		// This mirrors the plugin's live text parsing; patchDraft is intentionally local to the render.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [draft.content, draft.activePicker, pendingPicker, returningToEditor, projectOptions.join('\u0000')]);
+
 	const draftFromForm = (form: HTMLFormElement): ModalDraft => {
 		const readField = (field: string) => {
 			const input = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-draft-field="${field}"]`);
@@ -841,7 +1020,7 @@ function ReminderSheet({
 
 		return {
 			...draft,
-			content: readField('content') || draft.content,
+			content: draft.content,
 			description: readField('description') || draft.description,
 			project: readField('project') || draft.project,
 			dueDate: readField('dueDate') || draft.dueDate,
@@ -938,18 +1117,29 @@ function ReminderSheet({
 							</div>
 						</div>
 
-						<div className="pwa-editor-card">
-							<textarea
-								ref={contentRef}
-								data-draft-field="content"
-								className="pwa-editor-title-input ios-scroll"
-								rows={2}
-								maxLength={1024}
-								required
-								placeholder={isEditing ? 'Edit your reminder...' : 'What do you need to remember?'}
+						<div ref={editorCardRef} className="pwa-editor-card">
+							<RichTextInput
+								ref={richTextInputRef}
 								value={draft.content}
-								onChange={(event) => patchDraft({ content: event.currentTarget.value })}
+								onChange={(content) => patchDraft({ content })}
+								placeholder={isEditing ? 'Edit your reminder...' : 'What do you need to remember?'}
+								inputRef={contentRef}
+								preserveSelection={!pendingPicker && !returningToEditor}
+								knownProjects={projectOptions}
+								onAutocompleteQuery={autocomplete.updateAutocomplete}
+								onAutocompleteKeyDown={autocomplete.handleKeyDown}
+								className="pwa-editor-title-input pwa-editor-title-rich-input ios-scroll"
 							/>
+							{autocomplete.isOpen && (
+								<ProjectAutocompleteDropdown
+									filteredProjects={autocomplete.filteredProjects}
+									highlightedIndex={autocomplete.highlightedIndex}
+									anchorRect={autocomplete.rect}
+									containerRef={editorCardRef}
+									isDark
+									onSelect={autocomplete.selectProject}
+								/>
+							)}
 							<div className="pwa-editor-divider" />
 							<textarea
 								data-draft-field="description"
@@ -991,15 +1181,22 @@ function ReminderSheet({
 								type="button"
 								data-action="toggle-priority"
 								aria-label="Toggle priority"
-								onClick={() => patchDraft({ priority: draft.priority === 1 ? 4 : 1, activePicker: null, deleteConfirm: false })}
+								onClick={() => patchDraft({
+									...applyReminderTextUpdate(draft, projectOptions, { priority: draft.priority === 1 ? 4 : 1 }),
+									activePicker: null,
+								})}
 							>
 								<Flag size={16} fill={draft.priority === 1 ? 'currentColor' : 'none'} />
 							</Button>
 							<Button
 								isIconOnly
-								className="pwa-editor-chip pwa-editor-chip--icon"
+								className={`pwa-editor-chip pwa-editor-chip--icon${draft.recurrence ? ' is-active' : ''}`}
 								type="button"
-								aria-label="Recurrence"
+								data-action="toggle-picker"
+								data-picker="recurrence"
+								isDisabled={Boolean(pendingPicker)}
+								aria-label={draft.recurrence ? formatRecurrence(draft.recurrence) : 'Recurrence'}
+								onClick={() => togglePicker('recurrence')}
 							>
 								<Repeat size={16} />
 							</Button>
@@ -1024,6 +1221,50 @@ function ReminderSheet({
 	);
 }
 
+const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const;
+const RECURRENCE_DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
+
+interface RecurrencePickerDraft {
+	frequency: RecurrenceRule['frequency'];
+	interval: number;
+	daysOfWeek: number[];
+	dayOfMonth: number;
+	time: string;
+}
+
+function buildRecurrencePickerDraft(rule: RecurrenceRule | undefined): RecurrencePickerDraft {
+	return {
+		frequency: rule?.frequency ?? 'daily',
+		interval: rule?.interval ?? 1,
+		daysOfWeek: rule?.daysOfWeek ?? [],
+		dayOfMonth: rule?.dayOfMonth ?? new Date().getDate(),
+		time: `${String(rule?.hour ?? 9).padStart(2, '0')}:${String(rule?.minute ?? 0).padStart(2, '0')}`,
+	};
+}
+
+function getOrdinalSuffix(value: number): string {
+	const endings = ['th', 'st', 'nd', 'rd'];
+	const mod = value % 100;
+	return `${value}${endings[(mod - 20) % 10] || endings[mod] || endings[0]}`;
+}
+
+function recurrenceRuleFromPicker(draft: RecurrencePickerDraft): RecurrenceRule {
+	const [rawHour, rawMinute] = draft.time.split(':').map(Number);
+	const hour = Number.isInteger(rawHour) ? Math.min(23, Math.max(0, rawHour)) : 9;
+	const minute = Number.isInteger(rawMinute) ? Math.min(59, Math.max(0, rawMinute)) : 0;
+	const rule: RecurrenceRule = {
+		frequency: draft.frequency,
+		hour,
+		minute,
+	};
+
+	if (draft.interval > 1) rule.interval = draft.interval;
+	if (draft.frequency === 'weekly' && draft.daysOfWeek.length > 0) rule.daysOfWeek = draft.daysOfWeek;
+	if (draft.frequency === 'monthly') rule.dayOfMonth = Math.min(31, Math.max(1, draft.dayOfMonth));
+
+	return normalizeRecurrenceRule(rule) ?? rule;
+}
+
 function PickerSheet({
 	draft,
 	projectOptions,
@@ -1039,6 +1280,13 @@ function PickerSheet({
 	onSelect: (patch?: Partial<ModalDraft>) => void;
 	onClose: () => void;
 }) {
+	const [recurrenceDraft, setRecurrenceDraft] = useState(() => buildRecurrencePickerDraft(draft.recurrence));
+
+	useEffect(() => {
+		if (draft.activePicker !== 'recurrence') return;
+		setRecurrenceDraft(buildRecurrencePickerDraft(draft.recurrence));
+	}, [draft.activePicker, draft.recurrence]);
+
 	if (!draft.activePicker) return null;
 
 	if (draft.activePicker === 'date') {
@@ -1068,7 +1316,7 @@ function PickerSheet({
 								type="button"
 								data-action="apply-date-preset"
 								data-preset={preset}
-								onClick={() => onSelect(applyDatePresetToDraft(draft, preset))}
+								onClick={() => onSelect(applyDatePresetToDraft(draft, projectOptions, preset))}
 							>
 								<span>{label}</span>
 								{preset === 'clear' ? <X size={16} /> : <Calendar size={16} />}
@@ -1078,11 +1326,21 @@ function PickerSheet({
 					<div className="pwa-picker-fields">
 						<label className="pwa-picker-field">
 							<span>Date</span>
-							<input data-draft-field="dueDate" type="date" value={draft.dueDate} onChange={(event) => onPatch({ dueDate: event.currentTarget.value })} />
+							<input
+								data-draft-field="dueDate"
+								type="date"
+								value={draft.dueDate}
+								onChange={(event) => onPatch(applyDateFieldsToDraft(draft, projectOptions, event.currentTarget.value, draft.dueTime))}
+							/>
 						</label>
 						<label className="pwa-picker-field">
 							<span>Time</span>
-							<input data-draft-field="dueTime" type="time" value={draft.dueTime} onChange={(event) => onPatch({ dueTime: event.currentTarget.value })} />
+							<input
+								data-draft-field="dueTime"
+								type="time"
+								value={draft.dueTime}
+								onChange={(event) => onPatch(applyDateFieldsToDraft(draft, projectOptions, draft.dueDate || formatLocalDateKey(new Date()), event.currentTarget.value))}
+							/>
 						</label>
 					</div>
 				</div>
@@ -1090,37 +1348,143 @@ function PickerSheet({
 		);
 	}
 
-	return (
-		<section className={`pwa-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Choose project">
-			<div className="pwa-picker-header">
-				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Close project picker" onClick={onClose}>
-					<X size={20} />
+	if (draft.activePicker === 'project') {
+		return (
+		<section className={`pwa-picker-sheet pwa-project-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Select Project">
+			<div className="pwa-picker-header pwa-project-picker-header">
+				<Button isIconOnly className="pwa-picker-icon-button pwa-project-picker-back" type="button" aria-label="Back to reminder" onClick={onClose}>
+					<ChevronLeft size={22} />
 				</Button>
-				<h3>Project</h3>
-				<Button isIconOnly className="pwa-picker-icon-button pwa-picker-icon-button--done" type="button" aria-label="Done" onClick={onClose}>
+				<h3>Select Project</h3>
+				<span aria-hidden="true" />
+			</div>
+			<div className="pwa-picker-content">
+				<div className="pwa-project-list ios-scroll" role="listbox" aria-label="Project selection">
+					{projectOptions.map((project) => {
+						const colors = getProjectColor(project);
+						const selected = draft.project === project;
+						return (
+							<Button
+								key={project}
+								className={`pwa-project-option${selected ? ' is-active' : ''}`}
+								type="button"
+								role="option"
+								aria-selected={selected}
+								data-action="select-project"
+								data-project={project}
+								onClick={() => onSelect(applyReminderTextUpdate(draft, projectOptions, { project }))}
+							>
+								<span className="pwa-project-option__label">
+									<span
+										className="pwa-project-dot"
+										style={{ '--project-color': colors.dark.accent } as React.CSSProperties}
+										aria-hidden="true"
+									/>
+									<span className="pwa-project-option__name">{project}</span>
+								</span>
+								{selected ? <Check size={18} /> : null}
+							</Button>
+						);
+					})}
+				</div>
+			</div>
+		</section>
+		);
+	}
+
+	return (
+		<section className={`pwa-picker-sheet pwa-recurrence-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Repeat reminder">
+			<div className="pwa-picker-header">
+				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Back to reminder" onClick={onClose}>
+					<ChevronLeft size={20} />
+				</Button>
+				<h3>{draft.recurrence ? formatRecurrence(draft.recurrence) : 'Repeat'}</h3>
+				<Button
+					isIconOnly
+					className="pwa-picker-icon-button pwa-picker-icon-button--done"
+					type="button"
+					aria-label="Apply repeat"
+					onClick={() => onSelect(applyReminderTextUpdate(draft, projectOptions, {
+						recurrence: recurrenceRuleFromPicker(recurrenceDraft),
+						dueDateValue: null,
+						hasTime: false,
+					}))}
+				>
 					<Check size={20} />
 				</Button>
 			</div>
 			<div className="pwa-picker-content">
-				<label className="pwa-picker-field">
-					<span>Project name</span>
-					<input data-draft-field="project" type="text" maxLength={256} value={draft.project} onChange={(event) => onPatch({ project: event.currentTarget.value })} />
-				</label>
-				<div className="pwa-project-list ios-scroll">
-					{projectOptions.map((project) => (
+				<div className="pwa-recurrence-segmented" role="tablist" aria-label="Repeat frequency">
+					{RECURRENCE_FREQUENCIES.map((frequency) => (
 						<Button
-							key={project}
-							className={`pwa-project-option${draft.project === project ? ' is-active' : ''}`}
+							key={frequency}
+							className={`pwa-recurrence-segment${recurrenceDraft.frequency === frequency ? ' is-active' : ''}`}
 							type="button"
-							data-action="select-project"
-							data-project={project}
-							onClick={() => onSelect({ project })}
+							role="tab"
+							aria-selected={recurrenceDraft.frequency === frequency}
+							onClick={() => setRecurrenceDraft((current) => ({ ...current, frequency }))}
 						>
-							<span><Hash size={16} />{project}</span>
-							{draft.project === project ? <Check size={16} /> : null}
+							{frequency[0].toUpperCase() + frequency.slice(1)}
 						</Button>
 					))}
 				</div>
+
+				{recurrenceDraft.frequency === 'daily' && (
+					<div className="pwa-recurrence-stepper">
+						<span>Every</span>
+						<Button isIconOnly className="pwa-recurrence-stepper__button" type="button" onClick={() => setRecurrenceDraft((current) => ({ ...current, interval: Math.max(1, current.interval - 1) }))}>-</Button>
+						<strong>{recurrenceDraft.interval}</strong>
+						<Button isIconOnly className="pwa-recurrence-stepper__button" type="button" onClick={() => setRecurrenceDraft((current) => ({ ...current, interval: Math.min(30, current.interval + 1) }))}>+</Button>
+						<span>{recurrenceDraft.interval === 1 ? 'day' : 'days'}</span>
+					</div>
+				)}
+
+				{recurrenceDraft.frequency === 'weekly' && (
+					<div className="pwa-recurrence-days" aria-label="Repeat days">
+						{RECURRENCE_DAY_LABELS.map((label, index) => {
+							const selected = recurrenceDraft.daysOfWeek.includes(index);
+							return (
+								<Button
+									isIconOnly
+									key={`${label}-${index}`}
+									className={`pwa-recurrence-day${selected ? ' is-active' : ''}`}
+									type="button"
+									aria-pressed={selected}
+									onClick={() => setRecurrenceDraft((current) => ({
+										...current,
+										daysOfWeek: selected
+											? current.daysOfWeek.filter((day) => day !== index)
+											: [...current.daysOfWeek, index].sort((a, b) => a - b),
+									}))}
+								>
+									{label}
+								</Button>
+							);
+						})}
+					</div>
+				)}
+
+				{recurrenceDraft.frequency === 'monthly' && (
+					<div className="pwa-recurrence-stepper">
+						<span>Day</span>
+						<Button isIconOnly className="pwa-recurrence-stepper__button" type="button" onClick={() => setRecurrenceDraft((current) => ({ ...current, dayOfMonth: Math.max(1, current.dayOfMonth - 1) }))}>-</Button>
+						<strong>{getOrdinalSuffix(recurrenceDraft.dayOfMonth)}</strong>
+						<Button isIconOnly className="pwa-recurrence-stepper__button" type="button" onClick={() => setRecurrenceDraft((current) => ({ ...current, dayOfMonth: Math.min(31, current.dayOfMonth + 1) }))}>+</Button>
+						<span>of month</span>
+					</div>
+				)}
+
+				<label className="pwa-picker-field pwa-recurrence-time-field">
+					<span>Time</span>
+					<input type="time" value={recurrenceDraft.time} onChange={(event) => setRecurrenceDraft((current) => ({ ...current, time: event.currentTarget.value }))} />
+				</label>
+
+				{draft.recurrence && (
+					<Button className="pwa-picker-option is-danger" type="button" onClick={() => onSelect(applyReminderTextUpdate(draft, projectOptions, { recurrence: null, dueDateValue: null, hasTime: false }))}>
+						<span>Remove repeat</span>
+						<X size={16} />
+					</Button>
+				)}
 			</div>
 		</section>
 	);

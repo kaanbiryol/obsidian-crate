@@ -4,6 +4,7 @@ import {
 	handleDeleteReminder,
 	handleListReminders,
 	handleReorderReminders,
+	handleUpdateReminder,
 } from './reminders-web-handlers';
 
 type StoredObject = {
@@ -262,6 +263,68 @@ describe('reminders web handlers', () => {
 		expect(deleteResponse.status).toBe(200);
 		expect(workspace.readCurrentFile('Reminders/Inbox.md')).not.toContain('Check article');
 		expect(workspace.scheduled.size).toBe(0);
+	});
+
+	it('persists recurrence from create and update payloads', async () => {
+		const workspace = createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] Existing task <!-- crate-id:r-existing -->\n',
+			},
+			files: {
+				'Reminders/Inbox.md': null,
+			},
+		});
+
+		const createResponse = await handleCreateReminder(
+			new Request('https://worker.test/reminders/create', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					content: 'Recurring create',
+					project: 'Inbox',
+					recurrence: { frequency: 'daily', hour: 9, minute: 0 },
+				}),
+			}),
+			workspace.env as never,
+		);
+
+		expect(createResponse.status).toBe(200);
+		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('Recurring create daily 09:00');
+
+		const addRecurrenceResponse = await handleUpdateReminder(
+			new Request('https://worker.test/reminders/update', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					id: 'r-existing',
+					recurrence: { frequency: 'weekly', daysOfWeek: [1, 3], hour: 10, minute: 30 },
+				}),
+			}),
+			workspace.env as never,
+		);
+
+		expect(addRecurrenceResponse.status).toBe(200);
+		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('Existing task every Mon, Wed 10:30');
+
+		const removeRecurrenceResponse = await handleUpdateReminder(
+			new Request('https://worker.test/reminders/update', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					id: 'r-existing',
+					recurrence: null,
+				}),
+			}),
+			workspace.env as never,
+		);
+
+		expect(removeRecurrenceResponse.status).toBe(200);
+		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('Existing task');
+		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('<!-- crate-id:r-existing -->');
+		expect(workspace.readCurrentFile('Reminders/Inbox.md')).not.toContain('every Mon, Wed 10:30');
 	});
 
 	it('reorders active reminders while leaving completed reminders at the bottom', async () => {

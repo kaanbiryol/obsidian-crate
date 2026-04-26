@@ -268,6 +268,69 @@ function parseOptionalAllDayNotificationTime(value: unknown): string | null | un
 	return /^\d{2}:\d{2}$/.test(parsed) ? parsed : null;
 }
 
+type RecurrenceMutationResult =
+	| { ok: true; value: RecurrenceRule | null | undefined }
+	| { ok: false; response: Response };
+
+function parseRecurrenceMutationValue(value: unknown): RecurrenceMutationResult {
+	if (value === undefined) {
+		return { ok: true, value: undefined };
+	}
+
+	if (value === null) {
+		return { ok: true, value: null };
+	}
+
+	if (typeof value !== 'object' || Array.isArray(value)) {
+		return { ok: false, response: corsResponse({ error: 'Invalid recurrence' }, 400) };
+	}
+
+	const raw = value as Partial<RecurrenceRule>;
+	if (raw.frequency !== 'daily' && raw.frequency !== 'weekly' && raw.frequency !== 'monthly') {
+		return { ok: false, response: corsResponse({ error: 'Invalid recurrence frequency' }, 400) };
+	}
+
+	const rule: RecurrenceRule = { frequency: raw.frequency };
+	if (raw.interval !== undefined) {
+		if (!Number.isInteger(raw.interval) || raw.interval < 1 || raw.interval > 365) {
+			return { ok: false, response: corsResponse({ error: 'Invalid recurrence interval' }, 400) };
+		}
+		rule.interval = raw.interval;
+	}
+	if (raw.daysOfWeek !== undefined) {
+		if (
+			!Array.isArray(raw.daysOfWeek)
+			|| raw.daysOfWeek.some((day) => !Number.isInteger(day) || day < 0 || day > 6)
+		) {
+			return { ok: false, response: corsResponse({ error: 'Invalid recurrence daysOfWeek' }, 400) };
+		}
+		rule.daysOfWeek = Array.from(new Set(raw.daysOfWeek)).sort((a, b) => a - b);
+	}
+	if (raw.dayOfMonth !== undefined) {
+		if (!Number.isInteger(raw.dayOfMonth) || raw.dayOfMonth < 1 || raw.dayOfMonth > 31) {
+			return { ok: false, response: corsResponse({ error: 'Invalid recurrence dayOfMonth' }, 400) };
+		}
+		rule.dayOfMonth = raw.dayOfMonth;
+	}
+	if (raw.hour !== undefined) {
+		if (!Number.isInteger(raw.hour) || raw.hour < 0 || raw.hour > 23) {
+			return { ok: false, response: corsResponse({ error: 'Invalid recurrence hour' }, 400) };
+		}
+		rule.hour = raw.hour;
+	}
+	if (raw.minute !== undefined) {
+		if (!Number.isInteger(raw.minute) || raw.minute < 0 || raw.minute > 59) {
+			return { ok: false, response: corsResponse({ error: 'Invalid recurrence minute' }, 400) };
+		}
+		rule.minute = raw.minute;
+	}
+	if (typeof raw.timezone === 'string' && raw.timezone.trim()) {
+		rule.timezone = raw.timezone.trim();
+	}
+
+	return { ok: true, value: normalizeRecurrenceRule(rule) };
+}
+
 function resolveNotificationDatetime(
 	reminder: Pick<RemoteReminderRecord, 'dueDate' | 'dueDatetime'>,
 	allDayNotificationTime: string | null | undefined,
@@ -611,6 +674,10 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 	if (!content) {
 		return corsResponse({ error: 'content required' }, 400);
 	}
+	const recurrenceResult = parseRecurrenceMutationValue(parsedBody.value.recurrence);
+	if (!recurrenceResult.ok) {
+		return recurrenceResult.response;
+	}
 
 	const priority = parsedBody.value.priority === 1 ? 1 : 4;
 	const createArgs = buildCreateReminderArgs({
@@ -618,7 +685,7 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 		description: parseOptionalString(parsedBody.value.description, 4096) || undefined,
 		project,
 		priority,
-		recurrence: undefined,
+		recurrence: recurrenceResult.value ?? undefined,
 		dueDate: parseOptionalString(parsedBody.value.dueDate, 64) || undefined,
 		dueDatetime: parseOptionalString(parsedBody.value.dueDatetime, 128) || undefined,
 		id: parseOptionalString(parsedBody.value.id, 128) || undefined,
@@ -695,6 +762,13 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 	}
 	if (Object.prototype.hasOwnProperty.call(parsedBody.value, 'dueDatetime')) {
 		updateParams.dueDatetime = parseOptionalString(parsedBody.value.dueDatetime, 128) || undefined;
+	}
+	if (Object.prototype.hasOwnProperty.call(parsedBody.value, 'recurrence')) {
+		const recurrenceResult = parseRecurrenceMutationValue(parsedBody.value.recurrence);
+		if (!recurrenceResult.ok) {
+			return recurrenceResult.response;
+		}
+		updateParams.recurrence = recurrenceResult.value ?? null;
 	}
 
 	const update = buildReminderUpdate(updateParams);

@@ -38,6 +38,11 @@ export const PWA_HTML = `<!DOCTYPE html>
 	--radius-sm:10px;
 	--tabbar-h:70px;
 	--keyboard-offset:0px;
+	--heroui-primary:263 90% 61%;
+	--heroui-secondary:263 90% 61%;
+	--heroui-danger:0 100% 65%;
+	--heroui-warning:38 92% 55%;
+	--heroui-success:142 71% 45%;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:linear-gradient(180deg,#131820 0%,#0c0f14 44%,#090a0d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;height:100%;overscroll-behavior:none;color-scheme:dark}
@@ -303,9 +308,12 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-editor-icon-button--danger.is-active{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.28)}
 .pwa-editor-icon-button--save{background:#7c3aed;border-color:rgba(124,58,237,.55);color:white;box-shadow:0 6px 18px rgba(124,58,237,.34)}
 .pwa-editor-icon-button--save:disabled{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.08);color:var(--text-faint);box-shadow:none}
-.pwa-editor-card{display:flex;flex-direction:column;min-height:420px;padding:24px 30px 28px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.pwa-editor-card{position:relative;display:flex;flex-direction:column;min-height:420px;padding:24px 30px 28px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);box-shadow:0 2px 8px rgba(0,0,0,.04)}
 .pwa-editor-title-input,.pwa-editor-description-input{display:block;width:100%;padding:0;margin:0;background:transparent;border:none;outline:none;box-shadow:none;color:var(--text-normal);font-family:inherit;resize:none;-webkit-appearance:none}
 .pwa-editor-title-input{min-height:42px;max-height:120px;font-size:20px;font-weight:500;line-height:1.35;letter-spacing:0;overflow:auto}
+.pwa-editor-title-rich-input{white-space:pre-wrap;word-break:break-word;caret-color:var(--text-normal)}
+.pwa-editor-title-rich-input:empty::before{content:attr(data-placeholder);color:rgba(255,255,255,.32);pointer-events:none}
+.pwa-editor-title-rich-input .rich-text-chip{line-height:1.45}
 .pwa-editor-description-input{flex:1;min-height:78px;max-height:260px;font-size:13px;font-weight:500;line-height:1.55;color:rgba(255,255,255,.43);overflow:auto}
 .pwa-editor-title-input::placeholder,.pwa-editor-description-input::placeholder{color:rgba(255,255,255,.32)}
 .pwa-editor-divider{height:1px;background:rgba(255,255,255,.055);margin:18px 0 20px}
@@ -332,11 +340,37 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-picker-option.is-danger{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.16);color:#ff8f8f}
 .pwa-project-option.is-active{background:rgba(124,58,237,.16);border-color:rgba(124,58,237,.38);color:#a78bfa}
 .pwa-project-option span{display:flex;align-items:center;gap:9px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pwa-project-picker-sheet{width:min(760px,calc(100vw - 36px));padding:12px 22px calc(22px + env(safe-area-inset-bottom))}
+.pwa-project-picker-sheet::before{display:none}
+.pwa-project-picker-sheet .pwa-picker-content{gap:0}
+.pwa-project-picker-header{grid-template-columns:48px minmax(0,1fr) 48px;margin-bottom:34px}
+.pwa-project-picker-header h3{font-size:20px;font-weight:700}
+.pwa-project-picker-back{width:46px;height:46px;min-width:46px;border-radius:50%;background:rgba(255,255,255,.055);color:var(--text-muted)}
+.pwa-project-picker-back svg{width:22px;height:22px}
+.pwa-project-picker-sheet .pwa-project-list{gap:8px;max-height:calc(70dvh - 100px);padding-right:0}
+.pwa-project-picker-sheet .pwa-project-option{min-height:54px;height:auto;padding:0 22px;border-radius:13px;background:#232323;border-color:rgba(255,255,255,.065);box-shadow:0 2px 8px rgba(0,0,0,.06);color:var(--text-normal);font-size:14px;font-weight:600}
+.pwa-project-picker-sheet .pwa-project-option.is-active{background:#232323;border-color:#86b7f5;box-shadow:0 0 0 1px #86b7f5,0 0 10px -6px #86b7f5;color:var(--text-normal)}
+.pwa-project-picker-sheet .pwa-project-option svg{width:18px;height:18px;color:#86b7f5;filter:drop-shadow(0 0 6px rgba(134,183,245,.65))}
+.pwa-project-option__label{display:flex;align-items:center;gap:14px;min-width:0;overflow:hidden}
+.pwa-project-option__name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pwa-project-dot{position:relative;display:block;width:10px;height:10px;min-width:10px;overflow:visible;border-radius:50%;background:var(--project-color,#a78bfa);box-shadow:0 0 10px rgba(255,255,255,.05)}
+.pwa-project-dot::before{content:"";position:absolute;inset:-4px;border-radius:50%;background:var(--project-color,#a78bfa);opacity:.22;filter:blur(2px)}
 .pwa-picker-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-top:4px}
 .pwa-picker-field{display:flex;flex-direction:column;gap:8px}
 .pwa-picker-field span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)}
 .pwa-picker-field input{width:100%;height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:var(--text-normal);padding:0 12px;outline:none;font-size:16px;font-family:inherit;-webkit-appearance:none}
 .pwa-picker-field input:focus{border-color:rgba(124,58,237,.44);box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+.pwa-recurrence-picker-sheet{width:min(620px,calc(100vw - 36px))}
+.pwa-recurrence-segmented{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07)}
+.pwa-recurrence-segment{height:38px;border-radius:10px;color:var(--text-muted);font-size:13px;font-weight:650}
+.pwa-recurrence-segment.is-active{background:#7c3aed;color:white;box-shadow:0 2px 10px rgba(124,58,237,.24)}
+.pwa-recurrence-stepper{display:flex;align-items:center;justify-content:center;gap:10px;min-height:64px;border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);color:var(--text-muted);font-size:14px;font-weight:600}
+.pwa-recurrence-stepper strong{min-width:36px;text-align:center;color:var(--text-normal);font-size:16px}
+.pwa-recurrence-stepper__button{width:36px;height:36px;min-width:36px;border-radius:10px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.07);color:var(--text-normal);font-size:16px;font-weight:700}
+.pwa-recurrence-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.pwa-recurrence-day{aspect-ratio:1;min-width:0;width:100%;height:auto;border-radius:12px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);color:var(--text-muted);font-size:12px;font-weight:700}
+.pwa-recurrence-day.is-active{background:#7c3aed;border-color:rgba(124,58,237,.55);color:white}
+.pwa-recurrence-time-field{border-radius:14px;background:rgba(255,255,255,.025)}
 .app-header.view-header{position:relative;z-index:20;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0}
 .app-content.reminders-content{flex:1;min-height:0;position:relative;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;padding:16px 16px calc(var(--reminders-tabbar-overlay,0px) + var(--reminders-fab-gap,24px) + var(--reminders-fab-size,56px) + var(--reminders-safe-area,env(safe-area-inset-bottom)))}
 .ios-scroll{scrollbar-width:thin;scrollbar-color:var(--background-modifier-border) transparent;-webkit-overflow-scrolling:touch}
@@ -433,6 +467,12 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 	.pwa-editor-chip{height:40px;min-width:40px;border-radius:13px;padding:0 12px}
 	.pwa-editor-chip--icon{width:40px;padding:0}
 	.pwa-picker-sheet{width:calc(100vw - 28px);max-height:calc(100dvh - 44px);padding:12px 24px calc(24px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0}
+}
+@media (max-height: 900px) and (min-width: 641px){
+	.modal-card.pwa-reminder-editor{max-height:calc(100dvh - 36px);padding-bottom:calc(32px + env(safe-area-inset-bottom))}
+	.pwa-editor-header{margin-bottom:42px}
+	.pwa-editor-card{min-height:320px}
+	.pwa-editor-chip-row{margin-top:24px;padding-top:20px}
 }
 @media (max-width: 520px){
 	.field-row{grid-template-columns:1fr}
