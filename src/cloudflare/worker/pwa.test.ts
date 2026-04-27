@@ -39,8 +39,15 @@ describe('PWA activation metadata', () => {
 	it('keeps standalone safe areas outside visible navigation chrome', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('bottom:0;left:0;right:0;flex-shrink:0;margin-bottom:0;transform:translate3d(0,env(safe-area-inset-bottom),0)');
+		expect(html).toContain('body{position:fixed;inset:0;overflow:hidden;width:100%;height:100dvh}');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100vw;max-width:100vw;height:var(--reminders-tabbar-height);overflow:hidden}');
+		expect(html).toContain('--reminders-tabbar-height:64px');
+		expect(html).toContain('align-items:stretch;width:100%;height:var(--reminders-tabbar-height);max-width:none!important;padding:4px 8px!important');
+		expect(html).toContain('height:56px!important;min-height:0!important;padding:4px 2px!important');
+		expect(html).toContain('position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none');
 		expect(html).toContain('.pwa-reminders-view .premium-back-button{margin-top:calc(env(safe-area-inset-top) + 12px)}');
+		expect(html).not.toContain('@supports (-webkit-touch-callout: none)');
+		expect(html).not.toContain('bottom:calc(0px - env(safe-area-inset-bottom))');
 		expect(html).not.toContain('bottom:calc(var(--pwa-tabbar-safe-area) * -1)');
 		expect(html).not.toContain('bottom:calc(0px - var(--pwa-tabbar-safe-area))');
 	});
