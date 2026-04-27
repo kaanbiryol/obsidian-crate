@@ -21,6 +21,10 @@ import { emitStateChange, emitSyncProgress } from './runtime-listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from './sync-result';
 
 const logger = createLogger('SyncRuntime');
+export const FOREGROUND_SYNC_DEBOUNCE_MS = 1_000;
+export const FOREGROUND_SYNC_COOLDOWN_MS = 30_000;
+
+export type ForegroundSyncReason = 'focus' | 'visible' | 'online';
 
 export class SyncRuntime {
 	private syncEngine: SyncEngine | null = null;
@@ -30,6 +34,8 @@ export class SyncRuntime {
 	private progressListeners = new Set<(current: number, total: number) => void>();
 	private acceptingEvents = false;
 	private initializationRevision = 0;
+	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
+	private lastForegroundSyncAt: number | null = null;
 
 	private onStatusBarClick: (() => void) | undefined;
 
@@ -90,6 +96,7 @@ export class SyncRuntime {
 
 		const initializationRevision = ++this.initializationRevision;
 		this.acceptingEvents = false;
+		this.clearForegroundSyncTimer();
 
 		this.syncEngine?.destroy();
 		this.statusBar?.destroy();
@@ -140,6 +147,7 @@ export class SyncRuntime {
 	destroy(): void {
 		this.initializationRevision++;
 		this.acceptingEvents = false;
+		this.clearForegroundSyncTimer();
 		this.syncEngine?.destroy();
 		this.statusBar?.destroy();
 		this.syncEngine = null;
@@ -165,6 +173,22 @@ export class SyncRuntime {
 	onFileRename(file: TAbstractFile, oldPath: string): void {
 		if (!this.acceptingEvents) return;
 		this.syncEngine?.onFileRename(file, oldPath);
+	}
+
+	triggerForegroundSync(reason: ForegroundSyncReason): void {
+		if (!this.settings.syncOnResume) return;
+		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine) return;
+		if (this.syncEngine.getState().status === 'syncing') return;
+		if (this.foregroundSyncTimer) return;
+
+		if (this.isForegroundSyncOnCooldown()) {
+			return;
+		}
+
+		this.foregroundSyncTimer = setTimeout(() => {
+			this.foregroundSyncTimer = null;
+			void this.runForegroundSync(reason);
+		}, FOREGROUND_SYNC_DEBOUNCE_MS);
 	}
 
 	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput): Promise<void> {
@@ -217,6 +241,35 @@ export class SyncRuntime {
 		return this.apiClient.testConnection();
 	}
 
+	private clearForegroundSyncTimer(): void {
+		if (this.foregroundSyncTimer) {
+			clearTimeout(this.foregroundSyncTimer);
+			this.foregroundSyncTimer = null;
+		}
+	}
+
+	private isForegroundSyncOnCooldown(): boolean {
+		return this.lastForegroundSyncAt !== null
+			&& Date.now() - this.lastForegroundSyncAt < FOREGROUND_SYNC_COOLDOWN_MS;
+	}
+
+	private async runForegroundSync(reason: ForegroundSyncReason): Promise<void> {
+		if (!this.settings.syncOnResume) return;
+		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine) return;
+		if (this.syncEngine.getState().status === 'syncing') return;
+		if (this.isForegroundSyncOnCooldown()) return;
+
+		this.lastForegroundSyncAt = Date.now();
+		logger.info(`Foreground sync triggered: ${reason}`);
+
+		try {
+			const result = await this.sync();
+			notifyConflicts(result.conflicts);
+		} catch (error) {
+			logger.warn('Foreground sync failed:', error);
+		}
+	}
+
 	private async registerCurrentDevice(): Promise<void> {
 		if (!this.apiClient) {
 			return;
@@ -264,6 +317,9 @@ export class SyncRuntime {
 		};
 		try {
 			const result = await operation(this.syncEngine, wrappedCallback);
+			if (type === 'sync') {
+				this.lastForegroundSyncAt = Date.now();
+			}
 			this.recordSyncResult(type, result);
 			await this.persistSettings();
 			return result;

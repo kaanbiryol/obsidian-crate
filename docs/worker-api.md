@@ -139,13 +139,13 @@ Response: `{ tokens: [{ id, device_id, device_name, platform, created_at, last_s
 
 Returns shared plugin preferences stored in R2 as `__crate__/settings.json`. Used by second devices to inherit settings during setup.
 
-Response: `{ settings: { ignorePatterns, syncOnStartup, syncInterval, showStatusBar } }` or `{ settings: null }` if not yet stored.
+Response: `{ settings: { ignorePatterns, syncOnStartup, syncOnResume, syncInterval, showStatusBar } }` or `{ settings: null }` if not yet stored.
 
 ### PUT /settings
 
 Stores shared plugin preferences to R2.
 
-Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncInterval: 300, showStatusBar: true } }`
+Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncOnResume: true, syncInterval: 300, showStatusBar: true } }`
 
 Response: `{ success: true }`
 

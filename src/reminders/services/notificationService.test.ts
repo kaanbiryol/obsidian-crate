@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReminderNotificationService } from './notificationService';
 import type { CrateSettings } from '../../plugin/types';
+import type { SyncApiClient } from '../../sync/api';
 import { DEFAULT_REMINDERS_SETTINGS, type RemindersSettings } from '../settings';
 import type { Reminder } from '../types/reminder';
+
+type ScheduleReminderPayload = Parameters<SyncApiClient['scheduleReminder']>[0];
 
 function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 	return {
@@ -16,6 +19,7 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 		deviceId: 'device-test',
 		ignorePatterns: [],
 		syncOnStartup: true,
+		syncOnResume: true,
 		syncInterval: 300,
 		showStatusBar: true,
 		syncHistory: [],
@@ -150,8 +154,8 @@ describe('ReminderNotificationService', () => {
 		await service.onReminderCreated(createReminder({ dueDatetime: undefined, dueDate: '2027-06-15' }));
 
 		expect(scheduleReminder).toHaveBeenCalledTimes(1);
-		const call = scheduleReminder.mock.calls[0][0];
-		expect(call.dueDatetime).toContain('2027-06-15');
+		const call = scheduleReminder.mock.calls[0]?.[0] as ScheduleReminderPayload | undefined;
+		expect(call?.dueDatetime).toContain('2027-06-15');
 	});
 
 	it('skips date-only reminders when allDayNotificationTime is null', async () => {

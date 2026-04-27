@@ -37,6 +37,7 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 		deviceId: 'dev-1',
 		ignorePatterns: [],
 		syncOnStartup: false,
+		syncOnResume: true,
 		syncInterval: 0,
 		showStatusBar: true,
 		syncHistory: [],

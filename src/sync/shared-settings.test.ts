@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { SharedSettings } from '../plugin/types';
+import { DEFAULT_SETTINGS, type SharedSettings } from '../plugin/types';
 import { applySharedSettings, normalizeSharedSettingsValue } from './shared-settings';
 
 describe('shared-settings helpers', () => {
-	it('normalizes stored shared settings and defaults missing pushEnabled to false', () => {
+	it('normalizes stored shared settings and defaults missing optional flags', () => {
 		expect(normalizeSharedSettingsValue({
 			ignorePatterns: ['.git/'],
 			syncOnStartup: true,
@@ -12,6 +12,7 @@ describe('shared-settings helpers', () => {
 		})).toEqual({
 			ignorePatterns: ['.git/'],
 			syncOnStartup: true,
+			syncOnResume: DEFAULT_SETTINGS.syncOnResume,
 			syncInterval: 30,
 			showStatusBar: true,
 			pushEnabled: false,
@@ -22,6 +23,7 @@ describe('shared-settings helpers', () => {
 		const target = {
 			ignorePatterns: ['.trash/'],
 			syncOnStartup: false,
+			syncOnResume: false,
 			syncInterval: 10,
 			showStatusBar: false,
 			pushEnabled: false,
@@ -30,6 +32,7 @@ describe('shared-settings helpers', () => {
 		applySharedSettings(target, {
 			ignorePatterns: ['.git/'],
 			syncOnStartup: true,
+			syncOnResume: true,
 			syncInterval: 300,
 			showStatusBar: true,
 			pushEnabled: true,
@@ -38,6 +41,7 @@ describe('shared-settings helpers', () => {
 		expect(target).toEqual({
 			ignorePatterns: ['.git/'],
 			syncOnStartup: true,
+			syncOnResume: true,
 			syncInterval: 300,
 			showStatusBar: true,
 			pushEnabled: true,

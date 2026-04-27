@@ -155,6 +155,7 @@ describe('createInfrastructureFromCredentials', () => {
 		const sharedSettings = {
 			ignorePatterns: ['.git/'],
 			syncOnStartup: true,
+			syncOnResume: true,
 			syncInterval: 300,
 			showStatusBar: true,
 			pushEnabled: true,
@@ -166,6 +167,7 @@ describe('createInfrastructureFromCredentials', () => {
 			deviceId: '',
 			ignorePatterns: [],
 			syncOnStartup: false,
+			syncOnResume: false,
 			syncInterval: 0,
 			showStatusBar: false,
 			pushEnabled: false,

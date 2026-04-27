@@ -134,6 +134,7 @@ export function normalizeCrateSettings(
 			configDir,
 		),
 		syncOnStartup: normalizeBoolean(value?.syncOnStartup, DEFAULT_SETTINGS.syncOnStartup),
+		syncOnResume: normalizeBoolean(value?.syncOnResume, DEFAULT_SETTINGS.syncOnResume),
 		syncInterval: normalizeNonNegativeInteger(value?.syncInterval, DEFAULT_SETTINGS.syncInterval),
 		showStatusBar: normalizeBoolean(value?.showStatusBar, DEFAULT_SETTINGS.showStatusBar),
 		syncHistory: normalizeSyncHistory(value?.syncHistory),
@@ -144,7 +145,8 @@ export function normalizeCrateSettings(
 }
 
 export function buildPersistedCrateSettings(settings: CrateSettings): Omit<CrateSettings, 'deviceId'> {
-	const { deviceId: _deviceId, ...persistedSettings } = settings;
+	const { deviceId, ...persistedSettings } = settings;
+	void deviceId;
 	return persistedSettings;
 }
 

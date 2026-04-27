@@ -103,6 +103,16 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 			}));
 
 	new Setting(containerEl)
+		.setName('Sync when Obsidian resumes')
+		.setDesc('Automatically sync when the app comes back into focus or reconnects')
+		.addToggle(toggle => toggle
+			.setValue(plugin.settings.syncOnResume)
+			.onChange(async (value) => {
+				plugin.settings.syncOnResume = value;
+				await plugin.saveSettings();
+			}));
+
+	new Setting(containerEl)
 		.setName('Sync interval')
 		.setDesc('How often to check for remote changes (seconds, 0 disables)')
 		.addText(text => text

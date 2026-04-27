@@ -508,6 +508,7 @@ describe('worker sync handlers', () => {
 			settings: {
 				ignorePatterns: ['.git/'],
 				syncOnStartup: true,
+				syncOnResume: true,
 				syncInterval: 30,
 				showStatusBar: true,
 				pushEnabled: false,
@@ -521,6 +522,7 @@ describe('worker sync handlers', () => {
 					settings: {
 						ignorePatterns: ['ok'],
 						syncOnStartup: 'yes',
+						syncOnResume: true,
 						syncInterval: 30,
 						showStatusBar: true,
 						pushEnabled: false,
@@ -539,6 +541,7 @@ describe('worker sync handlers', () => {
 					settings: {
 						ignorePatterns: ['.git/'],
 						syncOnStartup: true,
+						syncOnResume: true,
 						syncInterval: 30,
 						showStatusBar: true,
 						pushEnabled: false,

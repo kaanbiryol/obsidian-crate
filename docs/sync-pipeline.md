@@ -8,7 +8,13 @@ Every N seconds (configurable via `syncInterval`, default 300s), the engine call
 
 Entry point: `engine.ts:periodicCheck()`
 
-### 2. Incremental Sync
+### 2. Foreground Sync
+
+When `syncOnResume` is enabled, the plugin schedules a sync when Obsidian comes back into focus, becomes visible, or the device reconnects to the network. Foreground triggers are debounced for 1 second and throttled by a 30-second cooldown.
+
+Entry point: `runtime.ts:triggerForegroundSync()`
+
+### 3. Incremental Sync
 
 Primary sync mode. Fetches only changelog entries since `lastSeq`:
 
@@ -23,7 +29,7 @@ Returns `null` to signal fallback to full sync (on error or cursor expiry).
 
 Entry point: `planner.ts:runIncrementalSync()`
 
-### 3. Full Sync (Fallback)
+### 4. Full Sync (Fallback)
 
 Triggered when incremental sync fails or `lastSeq` is 0:
 
@@ -35,13 +41,13 @@ Triggered when incremental sync fails or `lastSeq` is 0:
 
 Entry point: `engine.ts:sync()` -> `planner.ts:createFullSyncPlan()`
 
-### 4. Initial Sync
+### 5. Initial Sync
 
 First-time upload of all vault files. Processes files in pipelined chunks - prepares the next chunk while uploading the current one.
 
 Entry point: `engine.ts:initialSync()`
 
-### 5. Force Full Sync
+### 6. Force Full Sync
 
 Clears local manifest, uploads all local files regardless of hash, deletes remote-only files.
 

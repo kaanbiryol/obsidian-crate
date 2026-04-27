@@ -1,7 +1,7 @@
 import { Notice, type TAbstractFile } from 'obsidian';
 import { CloudflareSessionManager } from '../cloudflare/session-manager';
 import type CratePlugin from '../main';
-import { SyncRuntime } from './runtime';
+import { type ForegroundSyncReason, SyncRuntime } from './runtime';
 import { notifyConflicts } from './conflict';
 import { isHiddenPath } from './file-discovery';
 import { ActivityModal } from '../ui/activity-modal';
@@ -130,6 +130,24 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 			},
 		),
 	);
+
+	const triggerForegroundSync = (reason: ForegroundSyncReason): void => {
+		plugin.syncRuntime.triggerForegroundSync(reason);
+	};
+
+	plugin.registerDomEvent(window, 'focus', () => {
+		triggerForegroundSync('focus');
+	});
+
+	plugin.registerDomEvent(window, 'online', () => {
+		triggerForegroundSync('online');
+	});
+
+	plugin.registerDomEvent(document, 'visibilitychange', () => {
+		if (document.visibilityState === 'visible') {
+			triggerForegroundSync('visible');
+		}
+	});
 }
 
 export async function handleSyncSetupProtocol(

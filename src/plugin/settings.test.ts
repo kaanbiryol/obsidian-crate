@@ -15,6 +15,7 @@ describe('normalizeCrateSettings', () => {
 			deviceId: ' device-1 ',
 			ignorePatterns: [' .git/ ', '', 'vault-config/workspace*', '.git/', 42 as never],
 			syncOnStartup: 'yes' as never,
+			syncOnResume: 'yes' as never,
 			syncInterval: -30,
 			showStatusBar: false,
 			syncHistory: [
@@ -44,6 +45,7 @@ describe('normalizeCrateSettings', () => {
 		expect(settings.deviceId).toBe('device-1');
 		expect(settings.ignorePatterns).toEqual(['.git/', 'vault-config/workspace*']);
 		expect(settings.syncOnStartup).toBe(DEFAULT_SETTINGS.syncOnStartup);
+		expect(settings.syncOnResume).toBe(DEFAULT_SETTINGS.syncOnResume);
 		expect(settings.syncInterval).toBe(DEFAULT_SETTINGS.syncInterval);
 		expect(settings.showStatusBar).toBe(false);
 		expect(settings.syncHistory).toEqual([
@@ -64,12 +66,14 @@ describe('normalizeCrateSettings', () => {
 		expect(settings.debounceDelay).toBe(DEFAULT_SETTINGS.debounceDelay);
 	});
 
-	it('preserves valid syncDebugLogging and debounceDelay values', () => {
+	it('preserves valid syncOnResume, syncDebugLogging, and debounceDelay values', () => {
 		const settings = normalizeCrateSettings({
+			syncOnResume: false,
 			syncDebugLogging: true,
 			debounceDelay: 10,
 		}, 'vault-config');
 
+		expect(settings.syncOnResume).toBe(false);
 		expect(settings.syncDebugLogging).toBe(true);
 		expect(settings.debounceDelay).toBe(10);
 	});

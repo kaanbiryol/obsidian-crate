@@ -219,6 +219,7 @@ export interface CrateSettings {
 	deviceId: string;
 	ignorePatterns: string[];
 	syncOnStartup: boolean;
+	syncOnResume: boolean;
 	syncInterval: number; // in seconds, 0 = disabled
 	showStatusBar: boolean;
 	syncHistory: SyncHistoryEntry[];
@@ -230,6 +231,7 @@ export interface CrateSettings {
 export interface SharedSettings {
 	ignorePatterns: string[];
 	syncOnStartup: boolean;
+	syncOnResume: boolean;
 	syncInterval: number;
 	showStatusBar: boolean;
 	pushEnabled: boolean;
@@ -251,6 +253,7 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 		'.DS_Store',
 	],
 	syncOnStartup: true,
+	syncOnResume: true,
 	syncInterval: 300,
 	showStatusBar: true,
 	syncHistory: [],
