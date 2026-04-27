@@ -124,6 +124,8 @@ const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
 const CONFIG_KEY = 'crate-reminders-config';
 const REMINDERS_CACHE_KEY = 'crate-reminders-cache-v1';
 const SHEET_SWITCH_DELAY_MS = 220;
+const KEYBOARD_SHEET_OVERLAP_MAX = 72;
+const KEYBOARD_SHEET_OVERLAP_MIN = 40;
 const PULL_REFRESH_THRESHOLD = 70;
 const PULL_REFRESH_MAX_DISTANCE = 120;
 const PULL_REFRESH_SNAP_DISTANCE = 58;
@@ -512,8 +514,14 @@ function updateKeyboardInset(): number {
 	const keyboardOffset = Math.max(0, window.innerHeight - viewportHeight - viewportOffsetTop);
 	const usableHeight = Math.max(0, viewportOffsetTop + viewportHeight);
 	const roundedKeyboardOffset = Math.round(keyboardOffset);
+	const sheetOverlap = roundedKeyboardOffset > 24
+		? Math.min(KEYBOARD_SHEET_OVERLAP_MAX, Math.max(KEYBOARD_SHEET_OVERLAP_MIN, Math.round(roundedKeyboardOffset * 0.18)))
+		: 0;
+	const sheetOffset = Math.max(0, roundedKeyboardOffset - sheetOverlap);
 
 	document.documentElement.style.setProperty('--keyboard-offset', `${roundedKeyboardOffset}px`);
+	document.documentElement.style.setProperty('--keyboard-sheet-offset', `${sheetOffset}px`);
+	document.documentElement.style.setProperty('--keyboard-sheet-overlap', `${sheetOverlap}px`);
 	document.documentElement.style.setProperty('--keyboard-usable-height', `${Math.round(usableHeight)}px`);
 	document.documentElement.classList.toggle('pwa-keyboard-open', roundedKeyboardOffset > 24);
 	return roundedKeyboardOffset;
@@ -1671,7 +1679,6 @@ function ReminderSheet({
 	const canSubmit = !saving && Boolean(draft.content.trim());
 
 	useLayoutEffect(() => {
-		if (modal.mode !== 'create') return;
 		const initialContent = draft.content.trim();
 		const shouldSelect = draft.content.trim().length > 0;
 		const focusTitle = () => {
