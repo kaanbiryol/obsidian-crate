@@ -70,8 +70,8 @@ export function createPwaHtml(requestUrl?: string): string {
 	--heroui-success:142 71% 45%;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;background:linear-gradient(180deg,#131820 0%,#0c0f14 44%,#090a0d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;height:100%;overscroll-behavior:none;color-scheme:dark}
-body{position:fixed;overflow:hidden;width:100%;height:100%;top:0;left:0}
+html,body{margin:0;padding:0;background:linear-gradient(180deg,#131820 0%,#0c0f14 44%,#090a0d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;height:100%;overflow:hidden;overscroll-behavior:none;color-scheme:dark}
+body{width:100%;min-height:100%;overflow:hidden}
 button,input,textarea,select{font:inherit}
 button{cursor:pointer;border:none;background:transparent;color:inherit}
 button:disabled{cursor:not-allowed;opacity:.55}
@@ -311,7 +311,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .placeholder-card{min-height:64px;background:rgba(124,58,237,.08);border:1px dashed rgba(124,58,237,.35);border-radius:12px}
 .is-dragging{opacity:.98;box-shadow:0 10px 24px rgba(0,0,0,.25)}
 .reminders-shadow-root{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden;color:var(--text-normal);font-family:var(--font-interface);font-size:var(--font-ui-medium,14px);background:var(--background-primary)}
-.pwa-reminders-view{position:relative;flex:1;min-height:0;width:100%;max-width:100vw;height:100%;display:flex;flex-direction:column;overflow:hidden;--reminders-tabbar-height:64px;--reminders-tabbar-overlay:calc(var(--reminders-tabbar-height) + max(env(safe-area-inset-bottom),16px));--reminders-tabbar-bottom-offset:0px;--reminders-bottom-gap:16px;--reminders-fab-gap:16px;--reminders-fab-size:56px;--reminders-safe-area:0px;--pwa-tabbar-safe-area:max(env(safe-area-inset-bottom),16px);background:var(--background-primary)}
+.pwa-reminders-view{position:fixed;inset:0;flex:1;min-height:0;width:100%;max-width:100vw;height:auto;display:flex;flex-direction:column;overflow:hidden;--reminders-tabbar-height:64px;--reminders-tabbar-overlay:calc(var(--reminders-tabbar-height) + max(env(safe-area-inset-bottom),16px));--reminders-tabbar-bottom-offset:0px;--reminders-bottom-gap:16px;--reminders-fab-gap:16px;--reminders-fab-size:56px;--reminders-safe-area:0px;--pwa-tabbar-safe-area:max(env(safe-area-inset-bottom),16px);background:var(--background-primary)}
 .pwa-reminders-view.is-fullscreen{--reminders-tabbar-overlay:calc(var(--reminders-tabbar-height) + max(env(safe-area-inset-bottom),16px));--reminders-safe-area:0px;--reminders-tabbar-bottom-offset:0px;--reminders-fab-gap:16px}
 .pwa-reminders-view .view-header{max-width:100vw;overflow:hidden;padding:calc(env(safe-area-inset-top) + 16px) 20px 12px!important;gap:12px}
 .pwa-reminders-view .view-header>div:first-child{min-width:0;flex:1 1 auto!important;width:0}
@@ -364,7 +364,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:auto;overflow:visible;padding-bottom:max(env(safe-area-inset-bottom),16px)}
 .pwa-reminders-view .bottom-tab-bar>div{display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--reminders-tabbar-height);max-width:42rem!important;margin:0 auto!important;padding:0!important}
 .pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]{flex:1 1 0%!important;width:auto!important;max-width:100%!important;min-width:0!important;height:100%!important;min-height:0!important;padding:0!important}
-.pwa-reminders-view .reminders-fab.fab{position:fixed;right:16px;bottom:calc(var(--reminders-tabbar-height) + max(env(safe-area-inset-bottom),16px) + 16px)}
+.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-height) + max(env(safe-area-inset-bottom),16px) + 16px)}
 .pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);background:rgba(0,0,0,.56);backdrop-filter:blur(8px);transition:padding-bottom .22s cubic-bezier(.32,.72,0,1)}
 .modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.38);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
 .modal-card.pwa-reminder-editor.is-switching-out{pointer-events:none;animation:pwa-sheet-out .22s cubic-bezier(.4,0,1,1) forwards}
@@ -504,7 +504,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .animated-tab-bar{flex-shrink:0;z-index:40;background:var(--background-primary)}
 .animated-tab-bar-bottom{position:fixed;bottom:0;left:0;right:0;border-top:1px solid var(--background-modifier-border);margin-bottom:var(--reminders-tabbar-bottom-offset)}
 .pwa-reminders-view.is-fullscreen .animated-tab-bar{background:transparent}
-.pwa-reminders-view.is-fullscreen .animated-tab-bar-bottom{position:fixed;bottom:0;left:0;right:0;flex-shrink:0;margin-bottom:0;transform:none}
+.pwa-reminders-view.is-fullscreen .animated-tab-bar-bottom{position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none}
 @keyframes view-slide-forward{from{opacity:0;transform:translate3d(22px,0,0) scale(.992);filter:blur(1px)}to{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}}
 @keyframes view-slide-backward{from{opacity:0;transform:translate3d(-22px,0,0) scale(.992);filter:blur(1px)}to{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}}
 @keyframes header-title-in{from{opacity:.35;transform:translate3d(0,6px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
