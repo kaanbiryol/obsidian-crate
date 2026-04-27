@@ -124,8 +124,8 @@ const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
 const CONFIG_KEY = 'crate-reminders-config';
 const REMINDERS_CACHE_KEY = 'crate-reminders-cache-v1';
 const SHEET_SWITCH_DELAY_MS = 220;
-const KEYBOARD_SHEET_OVERLAP_MAX = 72;
-const KEYBOARD_SHEET_OVERLAP_MIN = 40;
+const KEYBOARD_SHEET_OVERLAP_MAX = 120;
+const KEYBOARD_SHEET_OVERLAP_MIN = 72;
 const PULL_REFRESH_THRESHOLD = 70;
 const PULL_REFRESH_MAX_DISTANCE = 120;
 const PULL_REFRESH_SNAP_DISTANCE = 58;
@@ -515,7 +515,7 @@ function updateKeyboardInset(): number {
 	const usableHeight = Math.max(0, viewportOffsetTop + viewportHeight);
 	const roundedKeyboardOffset = Math.round(keyboardOffset);
 	const sheetOverlap = roundedKeyboardOffset > 24
-		? Math.min(KEYBOARD_SHEET_OVERLAP_MAX, Math.max(KEYBOARD_SHEET_OVERLAP_MIN, Math.round(roundedKeyboardOffset * 0.18)))
+		? Math.min(KEYBOARD_SHEET_OVERLAP_MAX, Math.max(KEYBOARD_SHEET_OVERLAP_MIN, Math.round(roundedKeyboardOffset * 0.28)))
 		: 0;
 	const sheetOffset = Math.max(0, roundedKeyboardOffset - sheetOverlap);
 
