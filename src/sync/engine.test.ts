@@ -489,6 +489,52 @@ describe('SyncEngine event queue behavior', () => {
 	});
 });
 
+describe('SyncEngine explicit sync queue reconciliation', () => {
+	it('clears queued paths that were handled by an explicit sync result', async () => {
+		const harness = createHarness();
+		const result = createSyncResult();
+		result.uploaded = 1;
+		result.downloaded = 1;
+		result.deleted = 1;
+		result.uploadedPaths.push('notes/uploaded.md');
+		result.downloadedPaths.push('notes/downloaded.md');
+		result.deletedPaths.push('notes/deleted.md');
+		spyOnIncrementalSync(harness.engine, result);
+
+		const pendingPaths = getPendingPaths(harness.engine);
+		pendingPaths.add('notes/uploaded.md');
+		pendingPaths.add('notes/downloaded.md');
+		pendingPaths.add('delete:notes/deleted.md');
+		pendingPaths.add('notes/still-pending.md');
+
+		const syncResult = await harness.engine.sync();
+
+		expect(syncResult).toBe(result);
+		expect(pendingPaths.has('notes/uploaded.md')).toBe(false);
+		expect(pendingPaths.has('notes/downloaded.md')).toBe(false);
+		expect(pendingPaths.has('delete:notes/deleted.md')).toBe(false);
+		expect(pendingPaths.has('notes/still-pending.md')).toBe(true);
+		expect(harness.engine.getState().pendingChanges).toBe(1);
+	});
+
+	it('clears pending state immediately when explicit sync handled all queued paths', async () => {
+		const harness = createHarness();
+		const result = createSyncResult();
+		result.uploaded = 1;
+		result.uploadedPaths.push('notes/a.md');
+		spyOnIncrementalSync(harness.engine, result);
+
+		const pendingPaths = getPendingPaths(harness.engine);
+		pendingPaths.add('notes/a.md');
+
+		await harness.engine.sync();
+
+		expect(pendingPaths.size).toBe(0);
+		expect(harness.engine.getPendingPaths()).toEqual([]);
+		expect(harness.engine.getState().pendingChanges).toBe(0);
+	});
+});
+
 describe('prepareUploadFromVaultFile', () => {
 	let harness: Harness;
 

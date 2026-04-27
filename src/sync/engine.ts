@@ -291,6 +291,41 @@ export class SyncEngine {
 		await flushPendingQueueChanges(this.getQueueFlushContext(), UPLOAD_CONCURRENCY);
 	}
 
+	private clearDebounceTimer(): void {
+		if (this.debounceTimer) {
+			clearTimeout(this.debounceTimer);
+			this.debounceTimer = null;
+		}
+		this.maxWaitStart = null;
+	}
+
+	private clearSyncedPendingPaths(result: SyncResult): void {
+		if (!result.success || this.pendingPaths.size === 0) {
+			return;
+		}
+
+		const previousPendingCount = this.pendingPaths.size;
+
+		for (const path of result.uploadedPaths) {
+			this.pendingPaths.delete(path);
+		}
+		for (const path of result.downloadedPaths) {
+			this.pendingPaths.delete(path);
+		}
+		for (const path of result.deletedPaths) {
+			this.pendingPaths.delete(`delete:${path}`);
+		}
+
+		if (this.pendingPaths.size === previousPendingCount) {
+			return;
+		}
+
+		if (this.pendingPaths.size === 0) {
+			this.clearDebounceTimer();
+		}
+		this.updateState({ pendingChanges: this.pendingPaths.size });
+	}
+
 	private async prepareUploadFromPath(path: string): Promise<PreparedUpload | null> {
 		return prepareTransferUploadFromPath(this.getTransferContext(), path);
 	}
@@ -493,7 +528,9 @@ export class SyncEngine {
 	}
 
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		return runSyncWorkflow(this.getSyncWorkflowContext(), progressCallback);
+		const result = await runSyncWorkflow(this.getSyncWorkflowContext(), progressCallback);
+		this.clearSyncedPendingPaths(result);
+		return result;
 	}
 
 	private async processDiff(
@@ -529,22 +566,22 @@ export class SyncEngine {
 	}
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		return runInitialSyncWorkflow(this.getInitialSyncWorkflowContext(), progressCallback);
+		const result = await runInitialSyncWorkflow(this.getInitialSyncWorkflowContext(), progressCallback);
+		this.clearSyncedPendingPaths(result);
+		return result;
 	}
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		return runForceFullSyncWorkflow(this.getForceSyncWorkflowContext(), progressCallback);
+		const result = await runForceFullSyncWorkflow(this.getForceSyncWorkflowContext(), progressCallback);
+		this.clearSyncedPendingPaths(result);
+		return result;
 	}
 
 	destroy(): void {
 		this.destroyed = true;
 		this.abortController.abort();
 		this.stopPeriodicSync();
-		if (this.debounceTimer) {
-			clearTimeout(this.debounceTimer);
-			this.debounceTimer = null;
-		}
-		this.maxWaitStart = null;
+		this.clearDebounceTimer();
 		this.pendingPaths.clear();
 	}
 }
