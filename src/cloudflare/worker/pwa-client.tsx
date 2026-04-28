@@ -119,6 +119,7 @@ interface PullRefreshState {
 }
 
 type DataMode = 'live' | 'cached' | 'error';
+type SafeAreaDebugRow = [label: string, value: string];
 
 const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
 const CONFIG_KEY = 'crate-reminders-config';
@@ -206,6 +207,76 @@ function detectDeviceName(): string {
 function isStandaloneApp(): boolean {
 	return window.matchMedia('(display-mode: standalone)').matches
 		|| Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+}
+
+function formatDebugNumber(value: number | undefined): string {
+	if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
+	return Number.isInteger(value) ? `${value}` : value.toFixed(1);
+}
+
+function getSafeAreaProbe(): HTMLElement {
+	const existing = document.getElementById('pwa-safe-area-debug-probe');
+	if (existing instanceof HTMLElement) return existing;
+
+	const probe = document.createElement('div');
+	probe.id = 'pwa-safe-area-debug-probe';
+	probe.style.cssText = [
+		'position:fixed',
+		'inset:auto auto 0 0',
+		'width:0',
+		'height:0',
+		'padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)',
+		'visibility:hidden',
+		'pointer-events:none',
+		'z-index:-1',
+	].join(';');
+	document.body.appendChild(probe);
+	return probe;
+}
+
+function describeElementRect(selector: string): string {
+	const element = document.querySelector<HTMLElement>(selector);
+	if (!element) return 'missing';
+
+	const rect = element.getBoundingClientRect();
+	const style = window.getComputedStyle(element);
+	const bottomGap = window.innerHeight - rect.bottom;
+	const transform = style.transform === 'none' ? 'none' : style.transform;
+	return [
+		`t:${formatDebugNumber(rect.top)}`,
+		`b:${formatDebugNumber(bottomGap)}`,
+		`h:${formatDebugNumber(rect.height)}`,
+		`cssH:${style.height}`,
+		`pb:${style.paddingBottom}`,
+		`tr:${transform}`,
+	].join(' ');
+}
+
+function measureSafeAreaDebugRows(): SafeAreaDebugRow[] {
+	const viewport = window.visualViewport;
+	const probeStyle = window.getComputedStyle(getSafeAreaProbe());
+	const tab = document.querySelector<HTMLElement>('.pwa-reminders-view .bottom-tab-bar');
+	const tabRect = tab?.getBoundingClientRect();
+	const tabBottomGap = tabRect ? window.innerHeight - tabRect.bottom : undefined;
+	const viewportBottomGap = viewport ? window.innerHeight - viewport.offsetTop - viewport.height : undefined;
+
+	return [
+		['standalone', isStandaloneApp() ? 'yes' : 'no'],
+		['dpr', formatDebugNumber(window.devicePixelRatio)],
+		['screen', `${formatDebugNumber(window.screen.width)}x${formatDebugNumber(window.screen.height)}`],
+		['inner', `${formatDebugNumber(window.innerWidth)}x${formatDebugNumber(window.innerHeight)}`],
+		['docEl', `${formatDebugNumber(document.documentElement.clientWidth)}x${formatDebugNumber(document.documentElement.clientHeight)}`],
+		['visualViewport', viewport ? `${formatDebugNumber(viewport.width)}x${formatDebugNumber(viewport.height)} top:${formatDebugNumber(viewport.offsetTop)} bottomGap:${formatDebugNumber(viewportBottomGap)}` : 'missing'],
+		['safeArea', `t:${probeStyle.paddingTop} r:${probeStyle.paddingRight} b:${probeStyle.paddingBottom} l:${probeStyle.paddingLeft}`],
+		['tabBottomGap', formatDebugNumber(tabBottomGap)],
+		['#app', describeElementRect('#app')],
+		['shadow', describeElementRect('.reminders-shadow-root')],
+		['view', describeElementRect('.pwa-reminders-view')],
+		['content', describeElementRect('.pwa-reminders-view .reminders-content')],
+		['tab', describeElementRect('.pwa-reminders-view .bottom-tab-bar')],
+		['tabInner', describeElementRect('.pwa-reminders-view .bottom-tab-bar > div')],
+		['fab', describeElementRect('.pwa-reminders-view .reminders-fab')],
+	];
 }
 
 function toSharedReminder(reminder: ReminderRecord): SharedReminder {
@@ -1394,7 +1465,51 @@ function App() {
 					/>
 				)}
 				{toast && <div className={`toast is-${toast.kind}`}>{toast.message}</div>}
+				<SafeAreaDebugOverlay />
 			</RemindersAppShell>
+		</div>
+	);
+}
+
+function SafeAreaDebugOverlay() {
+	const [rows, setRows] = useState<SafeAreaDebugRow[]>([]);
+	const [copied, setCopied] = useState(false);
+
+	useEffect(() => {
+		const update = () => setRows(measureSafeAreaDebugRows());
+		update();
+		const interval = window.setInterval(update, 500);
+		window.addEventListener('resize', update);
+		window.visualViewport?.addEventListener('resize', update);
+		window.visualViewport?.addEventListener('scroll', update);
+		return () => {
+			window.clearInterval(interval);
+			window.removeEventListener('resize', update);
+			window.visualViewport?.removeEventListener('resize', update);
+			window.visualViewport?.removeEventListener('scroll', update);
+		};
+	}, []);
+
+	const copyRows = useCallback(() => {
+		const payload = rows.map(([label, value]) => `${label}: ${value}`).join('\n');
+		void navigator.clipboard?.writeText(payload).then(() => {
+			setCopied(true);
+			window.setTimeout(() => setCopied(false), 1200);
+		});
+	}, [rows]);
+
+	return (
+		<div className="pwa-safe-area-debug" data-testid="safe-area-debug">
+			<div className="pwa-safe-area-debug__header">
+				<strong>safe area</strong>
+				<button type="button" onClick={copyRows}>{copied ? 'copied' : 'copy'}</button>
+			</div>
+			{rows.map(([label, value]) => (
+				<div className="pwa-safe-area-debug__row" key={label}>
+					<span>{label}</span>
+					<code>{value}</code>
+				</div>
+			))}
 		</div>
 	);
 }
