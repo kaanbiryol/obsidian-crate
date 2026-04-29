@@ -65,7 +65,6 @@ export function createPwaHtml(requestUrl?: string): string {
 	--keyboard-sheet-offset:0px;
 	--keyboard-sheet-overlap:0px;
 	--keyboard-usable-height:100dvh;
-	--pwa-viewport-extension:env(safe-area-inset-top);
 	--heroui-primary:263 90% 61%;
 	--heroui-secondary:263 90% 61%;
 	--heroui-danger:0 100% 65%;
@@ -314,7 +313,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .placeholder-card{min-height:64px;background:rgba(124,58,237,.08);border:1px dashed rgba(124,58,237,.35);border-radius:12px}
 .is-dragging{opacity:.98;box-shadow:0 10px 24px rgba(0,0,0,.25)}
 .reminders-shadow-root{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:visible;color:var(--text-normal);font-family:var(--font-interface);font-size:var(--font-ui-medium,14px);background:var(--background-primary)}
-.pwa-reminders-view{position:fixed;inset:0;bottom:calc(0px - var(--pwa-viewport-extension));flex:1;min-height:0;width:100%;max-width:100vw;height:auto;display:flex;flex-direction:column;overflow:visible;--reminders-tabbar-height:64px;--reminders-tabbar-overlay:var(--reminders-tabbar-height);--reminders-tabbar-bottom-offset:0px;--reminders-bottom-gap:16px;--reminders-fab-gap:18px;--reminders-fab-size:56px;--reminders-safe-area:0px;--pwa-tabbar-safe-area:0px;--pwa-tabbar-bleed:0px;background:var(--background-primary)}
+.pwa-reminders-view{position:fixed;inset:0;flex:1;min-height:0;width:100%;max-width:100vw;height:auto;display:flex;flex-direction:column;overflow:visible;--pwa-tabbar-content-height:64px;--reminders-tabbar-height:calc(var(--pwa-tabbar-content-height) + env(safe-area-inset-bottom));--reminders-tabbar-overlay:var(--reminders-tabbar-height);--reminders-tabbar-bottom-offset:0px;--reminders-bottom-gap:16px;--reminders-fab-gap:18px;--reminders-fab-size:56px;--reminders-safe-area:0px;--pwa-tabbar-safe-area:env(safe-area-inset-bottom);--pwa-tabbar-bleed:0px;background:var(--background-primary)}
 .pwa-reminders-view.is-fullscreen{--reminders-tabbar-overlay:var(--reminders-tabbar-height);--reminders-safe-area:0px;--reminders-tabbar-bottom-offset:0px;--reminders-fab-gap:18px}
 .pwa-reminders-view .view-header{max-width:100vw;overflow:hidden;padding:calc(env(safe-area-inset-top) + 16px) 20px 12px!important;gap:12px}
 .pwa-reminders-view .view-header>div:first-child{min-width:0;flex:1 1 auto!important;width:0}
@@ -374,7 +373,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none}
 .pwa-reminders-view .bottom-tab-bar>div{display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--reminders-tabbar-height);max-width:42rem!important;margin:0 auto!important;padding:0!important}
 .pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]{flex:1 1 0%!important;width:auto!important;max-width:100%!important;min-width:0!important;height:100%!important;min-height:0!important;padding:0!important}
-.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:translate3d(0,8px,0)}
+.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}
 .pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))}
 .pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-sheet-offset,var(--keyboard-offset));background:rgba(0,0,0,.56);backdrop-filter:blur(8px);transition:padding-bottom .22s cubic-bezier(.32,.72,0,1)}
 .modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 72px + var(--keyboard-sheet-overlap,0px));overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.38);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
