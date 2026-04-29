@@ -265,6 +265,7 @@ function measureSafeAreaDebugRows(): SafeAreaDebugRow[] {
 		['dpr', formatDebugNumber(window.devicePixelRatio)],
 		['screen', `${formatDebugNumber(window.screen.width)}x${formatDebugNumber(window.screen.height)}`],
 		['inner', `${formatDebugNumber(window.innerWidth)}x${formatDebugNumber(window.innerHeight)}`],
+		['screenGap', formatDebugNumber(window.screen.height - window.innerHeight)],
 		['docEl', `${formatDebugNumber(document.documentElement.clientWidth)}x${formatDebugNumber(document.documentElement.clientHeight)}`],
 		['visualViewport', viewport ? `${formatDebugNumber(viewport.width)}x${formatDebugNumber(viewport.height)} top:${formatDebugNumber(viewport.offsetTop)} bottomGap:${formatDebugNumber(viewportBottomGap)}` : 'missing'],
 		['safeArea', `t:${probeStyle.paddingTop} r:${probeStyle.paddingRight} b:${probeStyle.paddingBottom} l:${probeStyle.paddingLeft}`],
@@ -586,11 +587,13 @@ function updateKeyboardInset(): number {
 	const keyboardOffset = Math.max(0, window.innerHeight - viewportHeight - viewportOffsetTop);
 	const usableHeight = Math.max(0, viewportOffsetTop + viewportHeight);
 	const roundedKeyboardOffset = Math.round(keyboardOffset);
+	const viewportExtension = isStandaloneApp() ? Math.max(0, Math.round(window.screen.height - window.innerHeight)) : 0;
 	const sheetOverlap = roundedKeyboardOffset > 24
 		? Math.min(KEYBOARD_SHEET_OVERLAP_MAX, Math.max(KEYBOARD_SHEET_OVERLAP_MIN, Math.round(roundedKeyboardOffset * 0.28)))
 		: 0;
 	const sheetOffset = Math.max(0, roundedKeyboardOffset - sheetOverlap);
 
+	document.documentElement.style.setProperty('--pwa-viewport-extension', `${viewportExtension}px`);
 	document.documentElement.style.setProperty('--keyboard-offset', `${roundedKeyboardOffset}px`);
 	document.documentElement.style.setProperty('--keyboard-sheet-offset', `${sheetOffset}px`);
 	document.documentElement.style.setProperty('--keyboard-sheet-overlap', `${sheetOverlap}px`);
