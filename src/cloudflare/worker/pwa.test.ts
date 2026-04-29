@@ -9,14 +9,14 @@ describe('PWA activation metadata', () => {
 		expect(manifest.start_url).toBe('/notifications');
 	});
 
-	it('requests fullscreen install chrome with standalone fallback', () => {
+	it('requests standalone install chrome without fullscreen overrides', () => {
 		const manifest = JSON.parse(createManifestJson('https://worker.test/notifications/manifest.json?v=asset')) as {
 			display: string;
 			display_override: string[];
 		};
 
-		expect(manifest.display).toBe('fullscreen');
-		expect(manifest.display_override).toEqual(['fullscreen', 'standalone', 'minimal-ui']);
+		expect(manifest.display).toBe('standalone');
+		expect(manifest.display_override).toEqual(['standalone', 'minimal-ui']);
 	});
 
 	it('carries activation params into the manifest start URL', () => {
@@ -57,11 +57,13 @@ describe('PWA activation metadata', () => {
 	it('keeps standalone safe areas outside visible navigation chrome', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('html,body{margin:0;padding:0;background:linear-gradient(180deg,#131820 0%,#0c0f14 44%,#090a0d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;height:100%;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
-		expect(html).toContain('body{width:100%;min-height:100%;overflow:hidden}');
-		expect(html).toContain('#app{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden}');
-		expect(html).toContain('.reminders-shadow-root{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:visible;');
-		expect(html).toContain('.pwa-reminders-view{position:fixed;inset:0;flex:1;min-height:0;width:100%;max-width:100vw;height:auto;display:flex;flex-direction:column;overflow:visible;');
+		expect(html).toContain('height=device-height');
+		expect(html).not.toContain('apple-mobile-web-app-status-bar-style');
+		expect(html).toContain('html,body{margin:0;padding:0;background:linear-gradient(180deg,#131820 0%,#0c0f14 44%,#090a0d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;height:100vh;min-height:100vh;max-height:100vh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
+		expect(html).toContain('body{width:100%;height:100vh;min-height:100vh;overflow:hidden}');
+		expect(html).toContain('#app{height:100vh;min-height:100vh;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden}');
+		expect(html).toContain('.reminders-shadow-root{height:100vh;min-height:100vh;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:visible;');
+		expect(html).toContain('.pwa-reminders-view{position:fixed;top:0;right:0;bottom:auto;left:0;flex:1;min-height:100vh;width:100%;max-width:100vw;height:100vh;display:flex;flex-direction:column;overflow:visible;');
 		expect(html).toContain('--pwa-tabbar-content-height:64px');
 		expect(html).toContain('--reminders-tabbar-height:var(--pwa-tabbar-content-height)');
 		expect(html).toContain('--reminders-tabbar-overlay:var(--reminders-tabbar-height)');
