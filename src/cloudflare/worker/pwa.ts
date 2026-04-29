@@ -71,19 +71,19 @@ export function createPwaHtml(requestUrl?: string): string {
 	--heroui-success:142 71% 45%;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;background:linear-gradient(180deg,#131820 0%,#0c0f14 44%,#090a0d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;height:100vh;min-height:100vh;max-height:100vh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}
-body{width:100%;height:100vh;min-height:100vh;overflow:hidden}
+html,body{margin:0;padding:0;background:linear-gradient(180deg,#131820 0%,#0c0f14 44%,#090a0d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;height:100%;overflow:hidden;overscroll-behavior:none;color-scheme:dark}
+body{width:100%;min-height:100%;overflow:hidden}
 button,input,textarea,select{font:inherit}
 button{cursor:pointer;border:none;background:transparent;color:inherit}
 button:disabled{cursor:not-allowed;opacity:.55}
 :focus-visible{outline:2px solid rgba(var(--accent-rgb),.72);outline-offset:2px}
 .flex{display:flex}.inline-flex{display:inline-flex}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.flex-1{flex:1 1 0%}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.justify-end{justify-content:flex-end}.h-full{height:100%}.h-10{height:2.5rem}.h-auto{height:auto}.w-full{width:100%}.min-w-0{min-width:0}.relative{position:relative}.fixed{position:fixed}.absolute{position:absolute}.inset-0{inset:0}.overflow-hidden{overflow:hidden}.overflow-y-auto{overflow-y:auto}.overflow-y-scroll{overflow-y:scroll}.text-center{text-align:center}.whitespace-nowrap{white-space:nowrap}.bg-transparent{background:transparent}.border-none{border:none}.outline-none{outline:none}.resize-none{resize:none}.rounded-lg{border-radius:8px}.rounded-xl{border-radius:12px}.rounded-2xl{border-radius:16px}.rounded-t-3xl{border-top-left-radius:24px;border-top-right-radius:24px}.px-0{padding-left:0;padding-right:0}.px-5{padding-left:1.25rem;padding-right:1.25rem}.py-0{padding-top:0;padding-bottom:0}.pt-3{padding-top:.75rem}.pt-4{padding-top:1rem}.pb-3{padding-bottom:.75rem}.pb-4{padding-bottom:1rem}.mt-3{margin-top:.75rem}.mt-4{margin-top:1rem}.mt-6{margin-top:1.5rem}.mb-3{margin-bottom:.75rem}.mx-4{margin-left:1rem;margin-right:1rem}.max-w-lg{max-width:32rem}.text-sm{font-size:.875rem}.font-semibold{font-weight:600}.space-y-2>:not([hidden])~:not([hidden]){margin-top:.5rem}.space-y-6>:not([hidden])~:not([hidden]){margin-top:1.5rem}.gap-0{gap:0}.gap-2{gap:.5rem}.w-9{width:2.25rem}.h-9{height:2.25rem}.min-w-9{min-width:2.25rem}.w-16{width:4rem}
 .app-shell [data-slot="ripple"],.app-shell [data-ripple="true"],.app-shell .heroui-ripple,.app-shell .nextui-ripple{display:none!important;opacity:0!important}
-#app{height:100vh;min-height:100vh;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden}
+#app{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden}
 .auth-card{max-width:420px;margin:0 auto;padding:24px 20px;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;gap:14px}
 .auth-card h1{margin:0;font-size:34px;line-height:1.06;letter-spacing:-.04em}
 .auth-card p{margin:0;color:var(--text-muted);line-height:1.5;font-size:15px}
-.app-shell{height:100vh;min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.app-shell{height:100%;display:flex;flex-direction:column;overflow:hidden}
 .app-header{padding:calc(env(safe-area-inset-top) + 12px) 14px 11px;position:relative;z-index:20;background:linear-gradient(180deg,rgba(12,15,20,.96),rgba(12,15,20,.90));backdrop-filter:blur(22px);border-bottom:1px solid var(--line-soft);flex-shrink:0}
 .app-header__row{display:flex;align-items:center;gap:10px}
 .app-header__body{flex:1;min-width:0}
@@ -311,8 +311,8 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .field input,.field textarea,.field select{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08);color:var(--text-normal)}
 .placeholder-card{min-height:64px;background:rgba(124,58,237,.08);border:1px dashed rgba(124,58,237,.35);border-radius:12px}
 .is-dragging{opacity:.98;box-shadow:0 10px 24px rgba(0,0,0,.25)}
-.reminders-shadow-root{height:100vh;min-height:100vh;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:visible;color:var(--text-normal);font-family:var(--font-interface);font-size:var(--font-ui-medium,14px);background:var(--background-primary)}
-.pwa-reminders-view{position:fixed;top:0;right:0;bottom:auto;left:0;flex:1;min-height:100vh;width:100%;max-width:100vw;height:100vh;display:flex;flex-direction:column;overflow:visible;--pwa-tabbar-content-height:64px;--reminders-tabbar-height:var(--pwa-tabbar-content-height);--reminders-tabbar-overlay:var(--reminders-tabbar-height);--reminders-tabbar-bottom-offset:0px;--reminders-bottom-gap:16px;--reminders-fab-gap:18px;--reminders-fab-size:56px;--reminders-safe-area:0px;--pwa-tabbar-safe-area:0px;--pwa-tabbar-bleed:0px;background:var(--background-primary)}
+.reminders-shadow-root{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:visible;color:var(--text-normal);font-family:var(--font-interface);font-size:var(--font-ui-medium,14px);background:var(--background-primary)}
+.pwa-reminders-view{position:fixed;inset:0;flex:1;min-height:0;width:100%;max-width:100vw;height:auto;display:flex;flex-direction:column;overflow:visible;--pwa-tabbar-content-height:64px;--reminders-tabbar-height:var(--pwa-tabbar-content-height);--reminders-tabbar-overlay:var(--reminders-tabbar-height);--reminders-tabbar-bottom-offset:0px;--reminders-bottom-gap:16px;--reminders-fab-gap:18px;--reminders-fab-size:56px;--reminders-safe-area:0px;--pwa-tabbar-safe-area:0px;--pwa-tabbar-bleed:0px;background:var(--background-primary)}
 .pwa-reminders-view.is-fullscreen{--reminders-tabbar-overlay:var(--reminders-tabbar-height);--reminders-safe-area:0px;--reminders-tabbar-bottom-offset:0px;--reminders-fab-gap:18px}
 .pwa-reminders-view .view-header{max-width:100vw;overflow:hidden;padding:calc(env(safe-area-inset-top) + 16px) 20px 12px!important;gap:12px}
 .pwa-reminders-view .view-header>div:first-child{min-width:0;flex:1 1 auto!important;width:0}
