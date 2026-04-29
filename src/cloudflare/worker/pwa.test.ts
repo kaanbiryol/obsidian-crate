@@ -9,6 +9,16 @@ describe('PWA activation metadata', () => {
 		expect(manifest.start_url).toBe('/notifications');
 	});
 
+	it('requests fullscreen install chrome with standalone fallback', () => {
+		const manifest = JSON.parse(createManifestJson('https://worker.test/notifications/manifest.json?v=asset')) as {
+			display: string;
+			display_override: string[];
+		};
+
+		expect(manifest.display).toBe('fullscreen');
+		expect(manifest.display_override).toEqual(['fullscreen', 'standalone', 'minimal-ui']);
+	});
+
 	it('carries activation params into the manifest start URL', () => {
 		const manifest = JSON.parse(createManifestJson(
 			'https://worker.test/notifications/manifest.json?token=install-token&folder=Reminders&upcomingDays=14&allDayTime=09%3A30&v=asset',
