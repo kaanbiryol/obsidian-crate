@@ -58,6 +58,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--reminders-tabbar-height:64px');
 		expect(html).toContain('display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--reminders-tabbar-height);max-width:42rem!important;margin:0 auto!important;padding:0!important');
 		expect(html).toContain('height:100%!important;min-height:0!important;padding:0!important');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:translate3d(0,8px,0)}');
 		expect(html).toContain('bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))');
 		expect(html).toContain('position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none');
 		expect(html).toContain('.pwa-reminders-view .premium-back-button{margin-top:calc(env(safe-area-inset-top) + 12px)}');

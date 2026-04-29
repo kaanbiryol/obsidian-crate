@@ -275,6 +275,7 @@ function measureSafeAreaDebugRows(): SafeAreaDebugRow[] {
 		['content', describeElementRect('.pwa-reminders-view .reminders-content')],
 		['tab', describeElementRect('.pwa-reminders-view .bottom-tab-bar')],
 		['tabInner', describeElementRect('.pwa-reminders-view .bottom-tab-bar > div')],
+		['tabChrome', describeElementRect('.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"] > div:last-child')],
 		['fab', describeElementRect('.pwa-reminders-view .reminders-fab')],
 	];
 }
