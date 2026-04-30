@@ -1,7 +1,7 @@
 import { PWA_CLIENT_JS } from './pwa-client-bundle.gen';
 import { PWA_ASSET_VERSION } from './pwa-version.gen';
 
-const PWA_START_PARAM_KEYS = ['token', 'folder', 'upcomingDays', 'allDayTime', 'project', 'debugSafeArea'] as const;
+const PWA_START_PARAM_KEYS = ['token', 'folder', 'upcomingDays', 'allDayTime', 'project'] as const;
 
 function pwaStartSearchFromUrl(requestUrl?: string): string {
 	if (!requestUrl) return '';
@@ -339,13 +339,6 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-update-button{height:32px;min-height:32px;border-radius:9px;padding:0 8px;background:transparent;border:0;color:#a78bfa;font-size:13px;font-weight:720;line-height:1;white-space:nowrap}
 .pwa-update-button:active{background:rgba(124,58,237,.12);transform:scale(.98)}
 .pwa-inline-button svg{width:14px;height:14px;display:block}
-.pwa-safe-area-debug{position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:8px;right:8px;z-index:9999;max-height:44vh;overflow:auto;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.82);border:1px solid rgba(255,255,255,.18);box-shadow:0 12px 32px rgba(0,0,0,.36);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);color:white;font:11px/1.35 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;text-align:left;overscroll-behavior:contain}
-.pwa-safe-area-debug__header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
-.pwa-safe-area-debug__header strong{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#c4b5fd}
-.pwa-safe-area-debug__header button{height:24px;min-height:24px;padding:0 8px;border-radius:7px;background:rgba(124,58,237,.32);color:white;border:1px solid rgba(167,139,250,.36);font-size:11px;font-weight:700}
-.pwa-safe-area-debug__row{display:grid;grid-template-columns:86px minmax(0,1fr);gap:8px;padding:2px 0;border-top:1px solid rgba(255,255,255,.07)}
-.pwa-safe-area-debug__row span{color:rgba(255,255,255,.58);white-space:nowrap}
-.pwa-safe-area-debug__row code{min-width:0;white-space:pre-wrap;word-break:break-word;color:rgba(255,255,255,.92);font:inherit}
 .pwa-notification-prompt{display:flex;align-items:center;gap:10px;padding:10px}
 .pwa-notification-prompt__icon{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border-radius:10px;background:rgba(124,58,237,.14);color:#a78bfa}
 .pwa-notification-prompt__copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}

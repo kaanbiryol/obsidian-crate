@@ -27,14 +27,6 @@ describe('PWA activation metadata', () => {
 		expect(manifest.start_url).toBe('/notifications?token=install-token&folder=Reminders&upcomingDays=14&allDayTime=09%3A30');
 	});
 
-	it('can carry the safe-area debug flag into the manifest start URL', () => {
-		const manifest = JSON.parse(createManifestJson(
-			'https://worker.test/notifications/manifest.json?token=install-token&folder=Reminders&debugSafeArea=1&v=asset',
-		)) as { start_url: string };
-
-		expect(manifest.start_url).toBe('/notifications?token=install-token&folder=Reminders&debugSafeArea=1');
-	});
-
 	it('links the page to an activation-aware manifest', () => {
 		const html = createPwaHtml('https://worker.test/notifications?token=install-token&folder=Reminders&upcomingDays=7');
 
@@ -82,6 +74,7 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('bottom:calc(var(--pwa-tabbar-safe-area) * -1)');
 		expect(html).not.toContain('bottom:calc(0px - var(--pwa-tabbar-safe-area))');
 		expect(html).not.toContain('padding-bottom:max(env(safe-area-inset-bottom),16px)');
+		expect(html).not.toContain('pwa-safe-area-debug');
 	});
 
 	it('lets reminder sheets tuck under the keyboard while keeping settings above it', () => {
@@ -94,10 +87,4 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-keyboard-open .pwa-editor-description-input{flex:0 1 auto;min-height:42px;max-height:88px}');
 	});
 
-	it('includes safe area debug overlay styles for real-device measurement', () => {
-		const html = createPwaHtml('https://worker.test/notifications');
-
-		expect(html).toContain('.pwa-safe-area-debug{position:fixed;top:calc(env(safe-area-inset-top) + 8px);');
-		expect(html).toContain('.pwa-safe-area-debug__row{display:grid;grid-template-columns:86px minmax(0,1fr);');
-	});
 });
