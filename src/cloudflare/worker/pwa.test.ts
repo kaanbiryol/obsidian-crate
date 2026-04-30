@@ -65,12 +65,12 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.reminders-shadow-root{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:visible;');
 		expect(html).toContain('.pwa-reminders-view{position:fixed;inset:0;flex:1;min-height:0;width:100%;max-width:100vw;height:auto;display:flex;flex-direction:column;overflow:visible;');
 		expect(html).toContain('--pwa-tabbar-content-height:64px');
-		expect(html).toContain('--reminders-tabbar-height:var(--pwa-tabbar-content-height)');
+		expect(html).toContain('--pwa-tabbar-safe-area:env(safe-area-inset-bottom)');
+		expect(html).toContain('--reminders-tabbar-height:calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area))');
 		expect(html).toContain('--reminders-tabbar-overlay:var(--reminders-tabbar-height)');
-		expect(html).toContain('--pwa-tabbar-safe-area:0px');
 		expect(html).toContain('--pwa-tabbar-bleed:0px');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none}');
-		expect(html).toContain('display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--reminders-tabbar-height);max-width:42rem!important;margin:0 auto!important;padding:0!important');
+		expect(html).toContain('display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--pwa-tabbar-content-height);max-width:42rem!important;margin:0 auto!important;padding:0!important');
 		expect(html).toContain('height:100%!important;min-height:0!important;padding:0!important');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}');
 		expect(html).toContain('bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))');
