@@ -39,6 +39,7 @@ import { PWA_ASSET_VERSION } from './pwa-version.gen';
 type ModalMode = 'create' | 'edit';
 type ModalPickerId = 'date' | 'project' | 'recurrence';
 type ToastKind = 'success' | 'error' | 'info';
+type StartTab = 'inbox' | 'today' | 'upcoming' | 'browse';
 
 interface ReminderRecord {
 	id: string;
@@ -123,17 +124,29 @@ const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
 const CONFIG_KEY = 'crate-reminders-config';
 const REMINDERS_CACHE_KEY = 'crate-reminders-cache-v1';
 const SHEET_SWITCH_DELAY_MS = 220;
-const KEYBOARD_SHEET_OVERLAP_MAX = 120;
-const KEYBOARD_SHEET_OVERLAP_MIN = 72;
 const PULL_REFRESH_THRESHOLD = 70;
 const PULL_REFRESH_MAX_DISTANCE = 120;
 const PULL_REFRESH_SNAP_DISTANCE = 58;
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const defaultConfig: StoredConfig = {
 	folderPath: 'Reminders',
 	upcomingDays: 7,
 	allDayNotificationTime: null,
 };
+
+function normalizeTimeString(value: unknown): string | null {
+	if (typeof value !== 'string') return null;
+	const match = TIME_PATTERN.exec(value.trim());
+	return match ? `${match[1]}:${match[2]}` : null;
+}
+
+function parseStartTab(value: unknown): StartTab | null {
+	return value === 'inbox' || value === 'today' || value === 'upcoming' || value === 'browse'
+		? value
+		: null;
+}
+
 function loadStoredConfig(): StoredConfig {
 	try {
 		const raw = localStorage.getItem(CONFIG_KEY);
@@ -146,9 +159,7 @@ function loadStoredConfig(): StoredConfig {
 			upcomingDays: typeof parsed.upcomingDays === 'number' && Number.isInteger(parsed.upcomingDays) && parsed.upcomingDays > 0
 				? parsed.upcomingDays
 				: defaultConfig.upcomingDays,
-			allDayNotificationTime: typeof parsed.allDayNotificationTime === 'string' && parsed.allDayNotificationTime.length === 5
-				? parsed.allDayNotificationTime
-				: null,
+			allDayNotificationTime: normalizeTimeString(parsed.allDayNotificationTime),
 		};
 	} catch {
 		return { ...defaultConfig };
@@ -170,7 +181,7 @@ function loadCachedReminderSnapshot(folderPath: string): CachedReminderSnapshot 
 		}
 		return {
 			folderPath,
-			reminders: parsed.reminders as ReminderRecord[],
+			reminders: parsed.reminders,
 			projects: parsed.projects.filter((project): project is string => typeof project === 'string'),
 			savedAt: parsed.savedAt,
 		};
@@ -497,10 +508,22 @@ function scrollFocusedEditorFieldIntoView(): void {
 	const active = document.activeElement;
 	if (!(active instanceof HTMLElement)) return;
 	if (!active.matches('input, textarea, [contenteditable="true"]')) return;
-	if (!active.closest('.pwa-reminder-editor, .pwa-picker-sheet')) return;
+	const sheet = active.closest('.pwa-reminder-editor, .pwa-picker-sheet');
+	if (!(sheet instanceof HTMLElement)) return;
+
+	const viewport = window.visualViewport;
+	const viewportTop = viewport?.offsetTop ?? 0;
+	const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+	const sheetRect = sheet.getBoundingClientRect();
+	const visibleTop = Math.max(viewportTop, sheetRect.top);
+	const visibleBottom = Math.min(viewportBottom, sheetRect.bottom);
+	const fieldRect = active.getBoundingClientRect();
+	const margin = 18;
+
+	if (fieldRect.top >= visibleTop + margin && fieldRect.bottom <= visibleBottom - margin) return;
 
 	active.scrollIntoView({
-		block: 'center',
+		block: 'nearest',
 		inline: 'nearest',
 		behavior: 'smooth',
 	});
@@ -513,14 +536,8 @@ function updateKeyboardInset(): number {
 	const keyboardOffset = Math.max(0, window.innerHeight - viewportHeight - viewportOffsetTop);
 	const usableHeight = Math.max(0, viewportOffsetTop + viewportHeight);
 	const roundedKeyboardOffset = Math.round(keyboardOffset);
-	const sheetOverlap = roundedKeyboardOffset > 24
-		? Math.min(KEYBOARD_SHEET_OVERLAP_MAX, Math.max(KEYBOARD_SHEET_OVERLAP_MIN, Math.round(roundedKeyboardOffset * 0.28)))
-		: 0;
-	const sheetOffset = Math.max(0, roundedKeyboardOffset - sheetOverlap);
 
 	document.documentElement.style.setProperty('--keyboard-offset', `${roundedKeyboardOffset}px`);
-	document.documentElement.style.setProperty('--keyboard-sheet-offset', `${sheetOffset}px`);
-	document.documentElement.style.setProperty('--keyboard-sheet-overlap', `${sheetOverlap}px`);
 	document.documentElement.style.setProperty('--keyboard-usable-height', `${Math.round(usableHeight)}px`);
 	document.documentElement.classList.toggle('pwa-keyboard-open', roundedKeyboardOffset > 24);
 	return roundedKeyboardOffset;
@@ -577,7 +594,7 @@ function useKeyboardInset(): void {
 	}, []);
 }
 
-function applyConfigFromUrl(config: StoredConfig): { config: StoredConfig; token: string | null; project: string | null } {
+function applyConfigFromUrl(config: StoredConfig): { config: StoredConfig; token: string | null; project: string | null; tab: StartTab | null } {
 	const params = currentQueryParams();
 	const nextConfig = { ...config };
 	const folderPath = params.get('folder');
@@ -592,7 +609,7 @@ function applyConfigFromUrl(config: StoredConfig): { config: StoredConfig; token
 		}
 	}
 	if (allDayTime) {
-		nextConfig.allDayNotificationTime = /^\d{2}:\d{2}$/.test(allDayTime) ? allDayTime : null;
+		nextConfig.allDayNotificationTime = normalizeTimeString(allDayTime);
 	}
 
 	saveConfig(nextConfig);
@@ -600,6 +617,7 @@ function applyConfigFromUrl(config: StoredConfig): { config: StoredConfig; token
 		config: nextConfig,
 		token: params.get('token'),
 		project: params.get('project'),
+		tab: parseStartTab(params.get('tab')),
 	};
 }
 
@@ -634,12 +652,14 @@ async function validateStoredAuthToken(authToken: string): Promise<boolean> {
 function installActivationParams(token: string, config: StoredConfig): URLSearchParams {
 	const params = currentQueryParams();
 	const project = params.get('project');
+	const tab = parseStartTab(params.get('tab'));
 	const nextParams = new URLSearchParams();
 	nextParams.set('token', token);
 	nextParams.set('folder', config.folderPath);
 	nextParams.set('upcomingDays', String(config.upcomingDays));
 	if (config.allDayNotificationTime) nextParams.set('allDayTime', config.allDayNotificationTime);
 	if (project) nextParams.set('project', project);
+	if (tab) nextParams.set('tab', tab);
 	return nextParams;
 }
 
@@ -694,6 +714,11 @@ async function fetchPwaAssetVersion(): Promise<string | null> {
 	if (!response.ok) return null;
 	const result = await response.json() as { assetVersion?: string };
 	return typeof result.assetVersion === 'string' && result.assetVersion.trim() ? result.assetVersion : null;
+}
+
+async function registerPwaServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+	if (!('serviceWorker' in navigator)) return null;
+	return navigator.serviceWorker.register(`/notifications/sw.js?v=${PWA_ASSET_VERSION}`);
 }
 
 function findPullScrollTarget(target: EventTarget | null): HTMLElement | null {
@@ -831,6 +856,7 @@ function App() {
 	const [reminders, setReminders] = useState<ReminderRecord[]>([]);
 	const [projects, setProjects] = useState<string[]>([]);
 	const [selectedProject, setSelectedProject] = useState<string | null>(null);
+	const [startTab, setStartTab] = useState<StartTab>('inbox');
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
@@ -850,6 +876,10 @@ function App() {
 	const hydratedCacheRef = useRef(false);
 
 	useKeyboardInset();
+
+	useEffect(() => {
+		void registerPwaServiceWorker().catch(() => undefined);
+	}, []);
 
 	useEffect(() => {
 		remindersRef.current = reminders;
@@ -961,7 +991,11 @@ function App() {
 			return;
 		}
 
-		const registration = await navigator.serviceWorker.register(`/notifications/sw.js?v=${PWA_ASSET_VERSION}`);
+		const registration = await registerPwaServiceWorker();
+		if (!registration) {
+			setPush({ supported: false, subscribed: false, status: 'Push notifications are not supported in this browser.' });
+			return;
+		}
 		const subscription = await registration.pushManager.getSubscription();
 		setPush({
 			supported: true,
@@ -980,6 +1014,9 @@ function App() {
 				setConfig(applied.config);
 				if (applied.project) {
 					setSelectedProject(applied.project);
+				}
+				if (applied.tab) {
+					setStartTab(applied.tab);
 				}
 
 				let nextToken = authToken;
@@ -1028,8 +1065,6 @@ function App() {
 		return () => {
 			cancelled = true;
 		};
-		// Bootstrap is intentionally one-shot; subsequent auth changes are handled below.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	useEffect(() => {
@@ -1279,7 +1314,8 @@ function App() {
 	const enablePushNotifications = useCallback(async () => {
 		try {
 			if (!push.supported) throw new Error('Push is not supported on this device.');
-			const registration = await navigator.serviceWorker.register(`/notifications/sw.js?v=${PWA_ASSET_VERSION}`);
+			const registration = await registerPwaServiceWorker();
+			if (!registration) throw new Error('Push is not supported on this device.');
 			const keyResponse = await fetch('/notifications/vapid-public-key');
 			const { publicKey } = await keyResponse.json() as { publicKey?: string };
 			if (!publicKey) throw new Error('Missing VAPID public key');
@@ -1331,14 +1367,14 @@ function App() {
 	return (
 		<div className="reminders-shadow-root pwa-shadow-root">
 			<RemindersAppShell
-				key={`pwa-shell-${selectedProject ?? 'root'}`}
+				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}
 				projects={projects}
 				isInitialLoadComplete={!loading}
 				isDarkMode
 				isFullScreen
 				isModal
-				initialTab={selectedProject ? 'browse' : 'inbox'}
+				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}
 				upcomingDays={config.upcomingDays}
 				className="app-shell pwa-reminders-view"
@@ -1697,8 +1733,6 @@ function ReminderSheet({
 			window.cancelAnimationFrame(frame);
 			for (const timer of timers) window.clearTimeout(timer);
 		};
-		// Intentionally only run when opening a different editor sheet.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [modal.mode, modal.reminderId]);
 
 	useEffect(() => () => {
@@ -1731,8 +1765,6 @@ function ReminderSheet({
 		if (Object.keys(patch).length > 0) {
 			patchDraft(patch);
 		}
-		// This mirrors the plugin's live text parsing; patchDraft is intentionally local to the render.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [draft.content, draft.activePicker, pendingPicker, returningToEditor, projectOptions.join('\u0000')]);
 
 	const draftFromForm = (form: HTMLFormElement): ModalDraft => {

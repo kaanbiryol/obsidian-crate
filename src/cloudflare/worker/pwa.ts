@@ -1,7 +1,7 @@
 import { PWA_CLIENT_JS } from './pwa-client-bundle.gen';
 import { PWA_ASSET_VERSION } from './pwa-version.gen';
 
-const PWA_START_PARAM_KEYS = ['token', 'folder', 'upcomingDays', 'allDayTime', 'project'] as const;
+const PWA_START_PARAM_KEYS = ['token', 'folder', 'upcomingDays', 'allDayTime', 'project', 'tab'] as const;
 
 function pwaStartSearchFromUrl(requestUrl?: string): string {
 	if (!requestUrl) return '';
@@ -29,11 +29,14 @@ export function createPwaHtml(requestUrl?: string): string {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crate">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="application-name" content="Crate">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1e1e1e">
+<meta name="format-detection" content="telephone=no,date=no,email=no,address=no">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="${manifestHref}">
 <link rel="apple-touch-icon" href="/notifications/icon.svg?v=${PWA_ASSET_VERSION}">
@@ -61,8 +64,6 @@ export function createPwaHtml(requestUrl?: string): string {
 	--radius-sm:10px;
 	--tabbar-h:70px;
 	--keyboard-offset:0px;
-	--keyboard-sheet-offset:0px;
-	--keyboard-sheet-overlap:0px;
 	--keyboard-usable-height:100dvh;
 	--heroui-primary:263 90% 61%;
 	--heroui-secondary:263 90% 61%;
@@ -72,10 +73,11 @@ export function createPwaHtml(requestUrl?: string): string {
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:linear-gradient(180deg,#131820 0%,#0c0f14 44%,#090a0d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;height:100%;overflow:hidden;overscroll-behavior:none;color-scheme:dark}
-body{width:100%;min-height:100%;overflow:hidden}
+body{width:100%;min-height:100%;overflow:hidden;touch-action:manipulation}
 button,input,textarea,select{font:inherit}
-button{cursor:pointer;border:none;background:transparent;color:inherit}
+button{cursor:pointer;border:none;background:transparent;color:inherit;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 button:disabled{cursor:not-allowed;opacity:.55}
+input,textarea,[contenteditable="true"]{user-select:text;-webkit-user-select:text}
 :focus-visible{outline:2px solid rgba(var(--accent-rgb),.72);outline-offset:2px}
 .flex{display:flex}.inline-flex{display:inline-flex}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.flex-1{flex:1 1 0%}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.justify-end{justify-content:flex-end}.h-full{height:100%}.h-10{height:2.5rem}.h-auto{height:auto}.w-full{width:100%}.min-w-0{min-width:0}.relative{position:relative}.fixed{position:fixed}.absolute{position:absolute}.inset-0{inset:0}.overflow-hidden{overflow:hidden}.overflow-y-auto{overflow-y:auto}.overflow-y-scroll{overflow-y:scroll}.text-center{text-align:center}.whitespace-nowrap{white-space:nowrap}.bg-transparent{background:transparent}.border-none{border:none}.outline-none{outline:none}.resize-none{resize:none}.rounded-lg{border-radius:8px}.rounded-xl{border-radius:12px}.rounded-2xl{border-radius:16px}.rounded-t-3xl{border-top-left-radius:24px;border-top-right-radius:24px}.px-0{padding-left:0;padding-right:0}.px-5{padding-left:1.25rem;padding-right:1.25rem}.py-0{padding-top:0;padding-bottom:0}.pt-3{padding-top:.75rem}.pt-4{padding-top:1rem}.pb-3{padding-bottom:.75rem}.pb-4{padding-bottom:1rem}.mt-3{margin-top:.75rem}.mt-4{margin-top:1rem}.mt-6{margin-top:1.5rem}.mb-3{margin-bottom:.75rem}.mx-4{margin-left:1rem;margin-right:1rem}.max-w-lg{max-width:32rem}.text-sm{font-size:.875rem}.font-semibold{font-weight:600}.space-y-2>:not([hidden])~:not([hidden]){margin-top:.5rem}.space-y-6>:not([hidden])~:not([hidden]){margin-top:1.5rem}.gap-0{gap:0}.gap-2{gap:.5rem}.w-9{width:2.25rem}.h-9{height:2.25rem}.min-w-9{min-width:2.25rem}.w-16{width:4rem}
 .app-shell [data-slot="ripple"],.app-shell [data-ripple="true"],.app-shell .heroui-ripple,.app-shell .nextui-ripple{display:none!important;opacity:0!important}
@@ -150,7 +152,7 @@ button:disabled{cursor:not-allowed;opacity:.55}
 .icon-button,.secondary-button,.primary-button{border:none}
 .icon-button{width:34px;height:34px;min-width:34px;border-radius:12px;background:rgba(255,255,255,.055);color:var(--text);display:grid;place-items:center}
 .icon-button.is-active{background:rgba(var(--accent-rgb),.16);color:var(--accent)}
-.primary-button,.secondary-button{border-radius:11px;padding:9px 12px;font-weight:740;font-size:13.5px;min-height:38px}
+.primary-button,.secondary-button{border-radius:12px;padding:10px 14px;font-weight:740;font-size:13.5px;min-height:44px}
 .primary-button{background:var(--accent-strong);color:white}
 .secondary-button{background:rgba(255,255,255,.06);color:var(--text)}
 .secondary-button.is-danger{background:rgba(248,113,113,.12);color:#ff9a9a}
@@ -249,7 +251,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .app-header__body h1{font-size:28px;font-weight:600;line-height:1.2;letter-spacing:0;color:var(--text-normal)}
 .header-meta{gap:8px;margin-top:4px;min-height:28px;font-size:14px;color:var(--text-muted)}
 .overdue-pill{padding:4px 12px;background:var(--reminder-red);border:none;border-radius:12px;color:white;font-size:14px;font-weight:600}
-.icon-button{width:36px;height:36px;min-width:36px;border-radius:10px;background:rgba(255,255,255,.045);color:var(--text-muted)}
+.icon-button{width:44px;height:44px;min-width:44px;border-radius:14px;background:rgba(255,255,255,.045);color:var(--text-muted)}
 .icon-button.is-active{background:rgba(124,58,237,.10);color:#7c3aed}
 .app-content{background:var(--background-primary);padding:16px 16px calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + var(--reminders-fab-size) + env(safe-area-inset-bottom));overflow-x:hidden}
 .view-transition{will-change:transform,opacity;transform-origin:center top}
@@ -267,9 +269,10 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .reminder-card,.premium-reminder-card{position:relative;margin-bottom:10px;background:transparent;border:none;border-radius:12px;box-shadow:none;overflow:visible}
 .reminder-card[data-drag-handle="true"]{cursor:grab}
 .reminder-card[data-drag-handle="true"]:active{cursor:grabbing}
-.reminder-card__main,.premium-reminder-content{position:relative;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:background 200ms ease-out,border-color 200ms ease-out}
+.reminder-card__main,.premium-reminder-content{position:relative;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:transform 160ms ease,background 200ms ease-out,border-color 200ms ease-out}
 .premium-reminder-card:active{transform:none}
 .premium-reminder-card:hover .premium-reminder-content{background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.06)}
+.premium-reminder-card:active .premium-reminder-content{transform:scale(.985);background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.07)}
 .premium-reminder-card.is-completed .premium-reminder-content{opacity:.6;background:rgba(255,255,255,.01)}
 .reorderable-reminder-list{touch-action:pan-y}
 .reorderable-reminder-item{position:relative;touch-action:pan-y}
@@ -317,11 +320,13 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view .view-header{max-width:100vw;overflow:hidden;padding:calc(env(safe-area-inset-top) + 16px) 20px 12px!important;gap:12px}
 .pwa-reminders-view .view-header>div:first-child{min-width:0;flex:1 1 auto!important;width:0}
 .pwa-header-actions{display:flex;align-items:flex-start;justify-content:flex-end;gap:8px;min-width:0}
-.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:40px;height:40px;min-width:40px;border-radius:14px;display:grid;place-items:center;margin-top:2px;padding:0;color:var(--text-muted);background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.055);box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.pwa-reminders-view button,.pwa-reminder-editor button,.pwa-picker-sheet button,.settings-sheet button{touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;border-radius:15px;display:grid;place-items:center;margin-top:0;padding:0;color:var(--text-muted);background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.055);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:transform 160ms ease,background 180ms ease,border-color 180ms ease,color 180ms ease}
 .pwa-header-settings-button svg,.pwa-header-sync-button svg{display:block}
 .pwa-header-settings-button:hover,.pwa-header-settings-button.is-active,.pwa-header-sync-button:hover{color:var(--text-normal);background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.09)}
+.pwa-header-settings-button:active,.pwa-header-sync-button:active{transform:scale(.94)}
 .pwa-header-sync-button.is-refreshing svg{animation:pwa-spin .8s linear infinite}
-.pwa-header-sync-button__dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#22c55e;border:2px solid var(--background-primary);box-shadow:0 0 0 2px rgba(34,197,94,.16)}
+.pwa-header-sync-button__dot{position:absolute;top:7px;right:7px;width:8px;height:8px;border-radius:50%;background:#22c55e;border:2px solid var(--background-primary);box-shadow:0 0 0 2px rgba(34,197,94,.16)}
 .pwa-header-sync-button.is-cached .pwa-header-sync-button__dot,.pwa-header-sync-button.is-offline .pwa-header-sync-button__dot{background:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.16)}
 .pwa-header-sync-button.is-error .pwa-header-sync-button__dot{background:#ef4444;box-shadow:0 0 0 2px rgba(239,68,68,.16)}
 .pwa-reminders-view .reminders-content{flex:1;min-height:0;overflow:hidden;padding-bottom:0;position:relative}
@@ -335,9 +340,10 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-update-banner__label{min-width:0;display:flex;align-items:center;gap:10px}
 .pwa-update-banner__dot{width:7px;height:7px;min-width:7px;border-radius:50%;background:#a78bfa;box-shadow:0 0 0 3px rgba(167,139,250,.13)}
 .pwa-update-banner__text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:650;line-height:1.2;color:rgba(220,221,222,.90)}
-.pwa-inline-button{height:32px;min-height:32px;border-radius:10px;padding:0 10px;display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:white;font-size:12px;font-weight:700;white-space:nowrap}
-.pwa-update-button{height:32px;min-height:32px;border-radius:9px;padding:0 8px;background:transparent;border:0;color:#a78bfa;font-size:13px;font-weight:720;line-height:1;white-space:nowrap}
+.pwa-inline-button{height:40px;min-height:40px;border-radius:12px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:white;font-size:12px;font-weight:700;white-space:nowrap}
+.pwa-update-button{height:40px;min-height:40px;border-radius:11px;padding:0 10px;background:transparent;border:0;color:#a78bfa;font-size:13px;font-weight:720;line-height:1;white-space:nowrap}
 .pwa-update-button:active{background:rgba(124,58,237,.12);transform:scale(.98)}
+.pwa-inline-button:active,.primary-button:active,.secondary-button:active,.pwa-picker-option:active,.pwa-project-option:active,.pwa-recurrence-segment:active,.pwa-recurrence-stepper__button:active,.pwa-recurrence-day:active{transform:scale(.97)}
 .pwa-inline-button svg{width:14px;height:14px;display:block}
 .pwa-notification-prompt{display:flex;align-items:center;gap:10px;padding:10px}
 .pwa-notification-prompt__icon{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border-radius:10px;background:rgba(124,58,237,.14);color:#a78bfa}
@@ -367,8 +373,8 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]{flex:1 1 0%!important;width:auto!important;max-width:100%!important;min-width:0!important;height:100%!important;min-height:0!important;padding:0!important}
 .pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}
 .pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))}
-.pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-sheet-offset,var(--keyboard-offset));background:rgba(0,0,0,.56);backdrop-filter:blur(8px);transition:padding-bottom .22s cubic-bezier(.32,.72,0,1)}
-.modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 72px + var(--keyboard-sheet-overlap,0px));overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.38);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
+.pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);background:rgba(0,0,0,.56);backdrop-filter:blur(8px);transition:padding-bottom .22s cubic-bezier(.32,.72,0,1)}
+.modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.38);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
 .modal-card.pwa-reminder-editor.is-switching-out{pointer-events:none;animation:pwa-sheet-out .22s cubic-bezier(.4,0,1,1) forwards}
 .modal-card.pwa-reminder-editor::before{content:"";display:block;width:40px;height:5px;margin:0 auto 18px;border-radius:999px;background:rgba(255,255,255,.16)}
 .pwa-reminder-editor .modal-form{gap:0}
@@ -400,7 +406,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-editor-chip--icon{width:44px;padding:0}
 .pwa-reminder-editor .composer-panel{margin-top:18px;padding:14px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055)}
 .pwa-reminder-editor .delete-confirm{margin-top:18px}
-.pwa-picker-sheet{width:min(620px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 88px + var(--keyboard-sheet-overlap,0px));overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 24px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.42);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
+.pwa-picker-sheet{width:min(620px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 88px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 24px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -12px 48px rgba(0,0,0,.42);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
 .pwa-picker-sheet.is-switching-out{pointer-events:none;animation:pwa-sheet-out .22s cubic-bezier(.4,0,1,1) forwards}
 .pwa-picker-sheet::before{content:"";display:block;width:40px;height:5px;margin:0 auto 16px;border-radius:999px;background:rgba(255,255,255,.16)}
 .pwa-picker-header{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:12px;margin-bottom:18px}
@@ -410,7 +416,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-picker-content{display:flex;flex-direction:column;gap:14px}
 .pwa-picker-presets,.pwa-project-list{display:flex;flex-direction:column;gap:8px}
 .pwa-project-list{max-height:280px;overflow:auto;padding-right:2px}
-.pwa-picker-option,.pwa-project-option{width:100%;height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);color:var(--text-normal);font-size:14px;font-weight:600;padding:0 14px;text-align:left}
+.pwa-picker-option,.pwa-project-option{width:100%;height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);color:var(--text-normal);font-size:14px;font-weight:600;padding:0 14px;text-align:left;transition:transform 160ms ease,background 180ms ease,border-color 180ms ease,color 180ms ease}
 .pwa-picker-option svg,.pwa-project-option svg{width:16px;height:16px;opacity:.9;flex:0 0 auto}
 .pwa-picker-option.is-danger{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.16);color:#ff8f8f}
 .pwa-project-option.is-active{background:rgba(124,58,237,.16);border-color:rgba(124,58,237,.38);color:#a78bfa}
@@ -433,22 +439,22 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-picker-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-top:4px}
 .pwa-picker-field{display:flex;flex-direction:column;gap:8px}
 .pwa-picker-field span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)}
-.pwa-picker-field input{width:100%;height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:var(--text-normal);padding:0 12px;outline:none;font-size:16px;font-family:inherit;-webkit-appearance:none}
+.pwa-picker-field input{width:100%;height:48px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:var(--text-normal);padding:0 12px;outline:none;font-size:16px;font-family:inherit;-webkit-appearance:none}
 .pwa-picker-field input:focus{border-color:rgba(124,58,237,.44);box-shadow:0 0 0 3px rgba(124,58,237,.12)}
 .pwa-recurrence-picker-sheet{width:min(620px,calc(100vw - 36px))}
 .pwa-recurrence-segmented{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07)}
-.pwa-recurrence-segment{height:38px;border-radius:10px;color:var(--text-muted);font-size:13px;font-weight:650}
+.pwa-recurrence-segment{height:44px;border-radius:10px;color:var(--text-muted);font-size:13px;font-weight:650;transition:transform 160ms ease,background 180ms ease,color 180ms ease}
 .pwa-recurrence-segment.is-active{background:#7c3aed;color:white;box-shadow:0 2px 10px rgba(124,58,237,.24)}
 .pwa-recurrence-stepper{display:flex;align-items:center;justify-content:center;gap:10px;min-height:64px;border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);color:var(--text-muted);font-size:14px;font-weight:600}
 .pwa-recurrence-stepper strong{min-width:36px;text-align:center;color:var(--text-normal);font-size:16px}
-.pwa-recurrence-stepper__button{width:36px;height:36px;min-width:36px;border-radius:10px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.07);color:var(--text-normal);font-size:16px;font-weight:700}
+.pwa-recurrence-stepper__button{width:44px;height:44px;min-width:44px;border-radius:12px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.07);color:var(--text-normal);font-size:16px;font-weight:700;transition:transform 160ms ease,background 180ms ease,border-color 180ms ease}
 .pwa-recurrence-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
 .pwa-recurrence-day{aspect-ratio:1;min-width:0;width:100%;height:auto;border-radius:12px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);color:var(--text-muted);font-size:12px;font-weight:700}
 .pwa-recurrence-day.is-active{background:#7c3aed;border-color:rgba(124,58,237,.55);color:white}
 .pwa-recurrence-time-field{border-radius:14px;background:rgba(255,255,255,.025)}
-.pwa-keyboard-open .modal-card.pwa-reminder-editor{padding-bottom:calc(24px + env(safe-area-inset-bottom) + var(--keyboard-sheet-overlap,0px))}
+.pwa-keyboard-open .modal-card.pwa-reminder-editor{padding-bottom:12px}
 .pwa-keyboard-open .pwa-editor-header{margin-bottom:18px}
-.pwa-keyboard-open .pwa-editor-card{padding:16px 18px 18px}
+.pwa-keyboard-open .pwa-editor-card{min-height:0;padding:16px 18px 18px}
 .pwa-keyboard-open .pwa-editor-title-input{max-height:96px}
 .pwa-keyboard-open .pwa-editor-description-input{flex:0 1 auto;min-height:42px;max-height:88px}
 .pwa-keyboard-open .pwa-editor-divider{margin:12px 0 14px}
@@ -463,6 +469,8 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .ios-scroll::-webkit-scrollbar-track{background:transparent}
 .ios-scroll::-webkit-scrollbar-thumb{background:var(--background-modifier-border);border-radius:3px}
 .ios-scroll::-webkit-scrollbar-thumb:hover{background:var(--text-faint)}
+.pwa-reminders-view .ios-scroll{scrollbar-width:none;overscroll-behavior-y:contain}
+.pwa-reminders-view .ios-scroll::-webkit-scrollbar{display:none;width:0;height:0}
 .premium-projects-list{display:flex;flex-direction:column;gap:10px}
 .premium-project-card{position:relative;width:100%;padding:0;border:none;background:transparent;cursor:pointer;text-align:left;appearance:none;-webkit-appearance:none;outline:none;box-shadow:none;font-family:inherit;color:inherit}
 .premium-project-card.project-card{margin:0;background:transparent;border:none;border-radius:0;box-shadow:none}
@@ -544,9 +552,9 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 	.settings-sheet{width:min(640px,calc(100vw - 80px))}
 }
 @media (max-width: 640px){
-	.pwa-reminder-editor-backdrop{align-items:flex-end;padding:0 0 var(--keyboard-sheet-offset,var(--keyboard-offset))}
+	.pwa-reminder-editor-backdrop{align-items:flex-end;padding:0 0 var(--keyboard-offset)}
 	.settings-backdrop{align-items:flex-end;padding:0 0 var(--keyboard-offset)}
-	.modal-card.pwa-reminder-editor{width:100vw;max-height:calc(var(--keyboard-usable-height,100dvh) - 28px + var(--keyboard-sheet-overlap,0px));padding:12px 24px calc(28px + env(safe-area-inset-bottom));border-right:none;border-left:none;border-radius:24px 24px 0 0}
+	.modal-card.pwa-reminder-editor{width:100vw;max-height:calc(var(--keyboard-usable-height,100dvh) - 28px);padding:12px 24px calc(28px + env(safe-area-inset-bottom));border-right:none;border-left:none;border-radius:24px 24px 0 0}
 	.settings-sheet{width:100vw;max-height:calc(var(--keyboard-usable-height,100dvh) - 28px);border-right:none;border-left:none;border-radius:24px 24px 0 0}
 	.modal-card.pwa-reminder-editor::before{margin-bottom:14px}
 	.pwa-editor-header{grid-template-columns:56px minmax(0,1fr) 56px;margin-bottom:24px}
@@ -560,10 +568,10 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 	.pwa-editor-chip{height:38px;min-width:38px;border-radius:12px;padding:0 10px;flex:0 1 auto}
 	.pwa-editor-chip:not(.pwa-editor-chip--icon){max-width:calc((100vw - 136px)/2)}
 	.pwa-editor-chip--icon{width:38px;min-width:38px;padding:0;flex:0 0 38px}
-	.pwa-picker-sheet{width:100vw;max-height:calc(var(--keyboard-usable-height,100dvh) - 28px + var(--keyboard-sheet-overlap,0px));padding:12px 24px calc(24px + env(safe-area-inset-bottom));border-right:none;border-left:none;border-radius:24px 24px 0 0}
+	.pwa-picker-sheet{width:100vw;max-height:calc(var(--keyboard-usable-height,100dvh) - 28px);padding:12px 24px calc(24px + env(safe-area-inset-bottom));border-right:none;border-left:none;border-radius:24px 24px 0 0}
 }
 @media (max-height: 900px) and (min-width: 641px){
-	.modal-card.pwa-reminder-editor{max-height:calc(var(--keyboard-usable-height,100dvh) - 36px + var(--keyboard-sheet-overlap,0px));padding-bottom:calc(32px + env(safe-area-inset-bottom))}
+	.modal-card.pwa-reminder-editor{max-height:calc(var(--keyboard-usable-height,100dvh) - 36px);padding-bottom:calc(32px + env(safe-area-inset-bottom))}
 	.pwa-editor-header{margin-bottom:42px}
 	.pwa-editor-card{min-height:320px}
 	.pwa-editor-chip-row{margin-top:24px;padding-top:20px}
@@ -603,7 +611,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 }
 @media (max-width: 420px){
 	.pwa-reminders-view .view-header{padding:calc(env(safe-area-inset-top) + 16px) 20px 12px!important}
-	.pwa-header-settings-button{width:38px;height:38px;min-width:38px}
+	.pwa-header-settings-button,.pwa-header-sync-button{width:44px;height:44px;min-width:44px}
 	.app-header{padding:calc(env(safe-area-inset-top) + 16px) 20px 12px}
 	.app-header__body h1{font-size:28px}
 	.header-meta{font-size:14px}
@@ -648,6 +656,88 @@ export function createPwaVersionJson(): string {
 }
 
 export const SERVICE_WORKER_JS = `
+const PWA_SHELL_CACHE = 'crate-reminders-shell-${PWA_ASSET_VERSION}';
+const PWA_SHELL_URL = '/notifications';
+const PWA_PRECACHE_URLS = [
+	PWA_SHELL_URL,
+	'/notifications/app.js?v=${PWA_ASSET_VERSION}',
+	'/notifications/icon.svg?v=${PWA_ASSET_VERSION}',
+];
+
+self.addEventListener('install', function(event) {
+	event.waitUntil(
+		caches.open(PWA_SHELL_CACHE)
+			.then(function(cache) {
+				return cache.addAll(PWA_PRECACHE_URLS);
+			})
+			.then(function() {
+				return self.skipWaiting();
+			})
+	);
+});
+
+self.addEventListener('activate', function(event) {
+	event.waitUntil(
+		caches.keys()
+			.then(function(cacheNames) {
+				return Promise.all(cacheNames.map(function(cacheName) {
+					if (cacheName === PWA_SHELL_CACHE || cacheName.indexOf('crate-reminders-shell-') !== 0) {
+						return undefined;
+					}
+					return caches.delete(cacheName);
+				}));
+			})
+			.then(function() {
+				return self.clients.claim();
+			})
+	);
+});
+
+self.addEventListener('fetch', function(event) {
+	if (event.request.method !== 'GET') return;
+
+	var url = new URL(event.request.url);
+	if (url.origin !== self.location.origin || url.pathname.indexOf('/notifications') !== 0) return;
+
+	if (event.request.mode === 'navigate' || url.pathname === PWA_SHELL_URL) {
+		event.respondWith(
+			fetch(event.request)
+				.then(function(response) {
+					if (response.ok && !url.search) {
+						var cachedResponse = response.clone();
+						event.waitUntil(caches.open(PWA_SHELL_CACHE).then(function(cache) {
+							return cache.put(PWA_SHELL_URL, cachedResponse);
+						}));
+					}
+					return response;
+				})
+				.catch(function() {
+					return caches.match(PWA_SHELL_URL).then(function(cached) {
+						return cached || Response.error();
+					});
+				})
+		);
+		return;
+	}
+
+	if (url.pathname === '/notifications/app.js' || url.pathname === '/notifications/icon.svg') {
+		event.respondWith(
+			caches.match(event.request).then(function(cached) {
+				if (cached) return cached;
+				return fetch(event.request).then(function(response) {
+					if (response.ok) {
+						var cachedResponse = response.clone();
+						event.waitUntil(caches.open(PWA_SHELL_CACHE).then(function(cache) {
+							return cache.put(event.request, cachedResponse);
+						}));
+					}
+					return response;
+				});
+			})
+		);
+	}
+});
+
 self.addEventListener('push', function(event) {
 	const data = event.data ? event.data.json() : {};
 	event.waitUntil(
@@ -723,6 +813,30 @@ export function createManifestJson(requestUrl?: string): string {
 		orientation: 'portrait',
 		background_color: '#1e1e1e',
 		theme_color: '#1e1e1e',
+		categories: ['productivity', 'utilities'],
+		launch_handler: {
+			client_mode: 'navigate-existing',
+		},
+		shortcuts: [
+			{
+				name: 'Inbox',
+				short_name: 'Inbox',
+				url: '/notifications',
+				icons: [{ src: `/notifications/icon.svg?v=${PWA_ASSET_VERSION}`, sizes: 'any', type: 'image/svg+xml' }],
+			},
+			{
+				name: 'Today',
+				short_name: 'Today',
+				url: '/notifications?tab=today',
+				icons: [{ src: `/notifications/icon.svg?v=${PWA_ASSET_VERSION}`, sizes: 'any', type: 'image/svg+xml' }],
+			},
+			{
+				name: 'Upcoming',
+				short_name: 'Upcoming',
+				url: '/notifications?tab=upcoming',
+				icons: [{ src: `/notifications/icon.svg?v=${PWA_ASSET_VERSION}`, sizes: 'any', type: 'image/svg+xml' }],
+			},
+		],
 		icons: [
 			{
 				src: `/notifications/icon.svg?v=${PWA_ASSET_VERSION}`,
