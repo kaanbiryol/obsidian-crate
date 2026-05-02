@@ -47,6 +47,8 @@ interface ReminderWorkspace {
 	projects: string[];
 }
 
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
 function getProjectFromPath(filePath: string, remindersFolderPath: string): string {
 	const normalizedFile = filePath.toLowerCase();
 	const normalizedFolder = remindersFolderPath.replace(/^\/|\/$/g, '').toLowerCase();
@@ -251,6 +253,15 @@ function parseFolderPath(value: unknown): string | null {
 	return parsed ? sanitizePath(parsed) : null;
 }
 
+function parseProjectPath(value: unknown): string | null {
+	const parsed = parseOptionalString(value, 256);
+	return parsed ? sanitizePath(parsed) : null;
+}
+
+function hasNonEmptyStringValue(value: unknown): boolean {
+	return typeof value === 'string' && value.trim().length > 0;
+}
+
 function parseOptionalAllDayNotificationTime(value: unknown): string | null | undefined {
 	if (value === undefined) {
 		return undefined;
@@ -265,7 +276,8 @@ function parseOptionalAllDayNotificationTime(value: unknown): string | null | un
 		return null;
 	}
 
-	return /^\d{2}:\d{2}$/.test(parsed) ? parsed : null;
+	const match = TIME_PATTERN.exec(parsed);
+	return match ? `${match[1]}:${match[2]}` : null;
 }
 
 type RecurrenceMutationResult =
@@ -669,7 +681,11 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 		return workspaceResult;
 	}
 
-	const project = parseOptionalString(parsedBody.value.project, 256) || 'Inbox';
+	const parsedProject = parseProjectPath(parsedBody.value.project);
+	if (hasNonEmptyStringValue(parsedBody.value.project) && !parsedProject) {
+		return corsResponse({ error: 'Invalid project' }, 400);
+	}
+	const project = parsedProject || 'Inbox';
 	const content = parseOptionalString(parsedBody.value.content, 1024);
 	if (!content) {
 		return corsResponse({ error: 'content required' }, 400);
@@ -755,7 +771,11 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		}
 	}
 	if (Object.prototype.hasOwnProperty.call(parsedBody.value, 'project')) {
-		updateParams.project = parseOptionalString(parsedBody.value.project, 256) || undefined;
+		const parsedProject = parseProjectPath(parsedBody.value.project);
+		if (hasNonEmptyStringValue(parsedBody.value.project) && !parsedProject) {
+			return corsResponse({ error: 'Invalid project' }, 400);
+		}
+		updateParams.project = parsedProject || undefined;
 	}
 	if (Object.prototype.hasOwnProperty.call(parsedBody.value, 'dueDate')) {
 		updateParams.dueDate = parseOptionalString(parsedBody.value.dueDate, 64) || undefined;
@@ -907,7 +927,7 @@ export async function handleReorderReminders(request: Request, env: Env): Promis
 	}
 
 	const folderPath = parseFolderPath(parsedBody.value.folderPath);
-	const project = parseOptionalString(parsedBody.value.project, 256);
+	const project = parseProjectPath(parsedBody.value.project);
 	const orderedIds = parseStringArray(parsedBody.value.orderedIds, 500, 128);
 	if (!folderPath || !project || !orderedIds) {
 		return corsResponse({ error: 'folderPath, project, and orderedIds required' }, 400);

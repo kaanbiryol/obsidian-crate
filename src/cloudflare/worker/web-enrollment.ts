@@ -57,5 +57,9 @@ export async function consumeWebEnrollmentToken(
 		return false;
 	}
 
+	await db.prepare('DELETE FROM web_enrollment_tokens WHERE token_hash = ?')
+		.bind(tokenHash)
+		.run();
+
 	return Number.isFinite(row.expires_at) && row.expires_at > Date.now();
 }

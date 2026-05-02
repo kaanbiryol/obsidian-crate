@@ -162,8 +162,8 @@ function createEnv(input: {
 				idFromName: vi.fn((name: string) => name),
 				get: vi.fn((name: string) => ({
 					fetch: vi.fn(async (url: string, init?: RequestInit) => {
-						if (url.endsWith('/schedule') && init?.body) {
-							const body = JSON.parse(String(init.body)) as { reminderId: string; content: string; project?: string; dueDatetime: string };
+						if (url.endsWith('/schedule') && typeof init?.body === 'string') {
+							const body = JSON.parse(init.body) as { reminderId: string; content: string; project?: string; dueDatetime: string };
 							scheduled.set(name, {
 								content: body.content,
 								project: body.project ?? null,
@@ -263,6 +263,50 @@ describe('reminders web handlers', () => {
 		expect(deleteResponse.status).toBe(200);
 		expect(workspace.readCurrentFile('Reminders/Inbox.md')).not.toContain('Check article');
 		expect(workspace.scheduled.size).toBe(0);
+	});
+
+	it('rejects unsafe project paths and invalid all-day notification times', async () => {
+		const workspace = createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n',
+			},
+			files: {
+				'Reminders/Inbox.md': null,
+			},
+		});
+
+		const unsafeProjectResponse = await handleCreateReminder(
+			new Request('https://worker.test/reminders/create', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					content: 'Escape folder',
+					project: '../Secrets',
+				}),
+			}),
+			workspace.env as never,
+		);
+
+		expect(unsafeProjectResponse.status).toBe(400);
+		expect(await unsafeProjectResponse.json()).toEqual({ error: 'Invalid project' });
+		expect(workspace.files.has('Reminders/../Secrets.md')).toBe(false);
+
+		const invalidTimeResponse = await handleCreateReminder(
+			new Request('https://worker.test/reminders/create', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					content: 'Bad notification time',
+					allDayNotificationTime: '25:00',
+				}),
+			}),
+			workspace.env as never,
+		);
+
+		expect(invalidTimeResponse.status).toBe(400);
+		expect(await invalidTimeResponse.json()).toEqual({ error: 'Invalid allDayNotificationTime' });
 	});
 
 	it('persists recurrence from create and update payloads', async () => {

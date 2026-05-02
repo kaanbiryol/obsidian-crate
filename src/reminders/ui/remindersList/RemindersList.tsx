@@ -83,8 +83,8 @@ export const RemindersList: React.FC<Props> = ({
     setLocalOrder(presentation.activeReminders);
   }, [presentation.activeReminders]);
 
-  const handleReorderCommit = useCallback(async (orderedIds: string[]) => {
-    await plugin.storage.reorder(presentation.effectiveProject, orderedIds);
+  const handleReorderCommit = useCallback((orderedIds: string[]) => {
+    void plugin.storage.reorder(presentation.effectiveProject, orderedIds);
   }, [plugin, presentation.effectiveProject]);
 
   const renderCard = useCallback((reminder: Reminder, _index: number) => (

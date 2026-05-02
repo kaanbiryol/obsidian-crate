@@ -49,7 +49,7 @@ function createDb(initialTokens?: Record<string, number>) {
 }
 
 describe('web enrollment tokens', () => {
-	it('issues short-lived tokens that can be reused until they expire', async () => {
+	it('issues short-lived tokens that are consumed once', async () => {
 		const { db, tokens } = createDb();
 
 		const issued = await issueWebEnrollmentToken(db as never);
@@ -57,8 +57,8 @@ describe('web enrollment tokens', () => {
 		expect(issued.token).toHaveLength(64);
 		expect(tokens.size).toBe(1);
 		await expect(consumeWebEnrollmentToken(db as never, issued.token)).resolves.toBe(true);
-		await expect(consumeWebEnrollmentToken(db as never, issued.token)).resolves.toBe(true);
-		expect(tokens.size).toBe(1);
+		await expect(consumeWebEnrollmentToken(db as never, issued.token)).resolves.toBe(false);
+		expect(tokens.size).toBe(0);
 	});
 
 	it('rejects expired tokens and purges them', async () => {

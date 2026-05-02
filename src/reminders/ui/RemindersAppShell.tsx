@@ -173,9 +173,9 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
 
   const currentProject = getReorderProject(viewMode, selectedProject);
 
-  const handleReorder = useCallback(async (orderedIds: string[]) => {
+  const handleReorder = useCallback((orderedIds: string[]) => {
     if (!currentProject) return;
-    await onReorder(currentProject, orderedIds);
+    void onReorder(currentProject, orderedIds);
   }, [currentProject, onReorder]);
 
   return (

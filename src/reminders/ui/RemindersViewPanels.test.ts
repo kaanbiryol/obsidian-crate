@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -57,11 +58,7 @@ function makeProps(overrides: Record<string, unknown> = {}) {
 		}],
 		projects: ['Inbox', 'Work'],
 		showFab: true,
-		plugin: {
-			remindersSettings: {
-				upcomingDaysDefault: 9,
-			},
-		},
+		upcomingDays: 9,
 		renderCard: vi.fn(() => null),
 		renderToggleButton: vi.fn(() => null),
 		onProjectSelect: vi.fn(),

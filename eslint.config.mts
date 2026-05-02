@@ -17,6 +17,7 @@ export default tseslint.config(
 						'postcss.config.js',
 						'tailwind.config.js',
 						'tailwind.theme.js',
+						'src/cloudflare/worker/pwa-client.tsx',
 						'vite.config.mts',
 						'vitest.config.ts',
 					]
@@ -41,6 +42,15 @@ export default tseslint.config(
 		rules: {
 			'no-undef': 'off',
 			'obsidianmd/ui/sentence-case': [2, { ignoreWords: ['Cloudflare', 'R2', 'D1'] }],
+		},
+	},
+	{
+		files: ['src/cloudflare/worker/pwa-client.tsx'],
+		rules: {
+			'no-restricted-globals': 'off',
+			'obsidianmd/platform': 'off',
+			'@typescript-eslint/no-deprecated': 'off',
+			'@typescript-eslint/no-misused-promises': 'off',
 		},
 	},
 	globalIgnores([

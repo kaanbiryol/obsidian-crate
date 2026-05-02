@@ -29,6 +29,10 @@ function resolveObjectKey(path: string, storageKey: string | null): string {
 	return storageKey ?? legacyObjectKey(path);
 }
 
+function escapeLikePattern(value: string): string {
+	return value.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
 function collectCleanupKeys(path: string, previousFile: FileStorageRow | null, preserve?: string): string[] {
 	const keys = new Set<string>();
 	const legacyKey = legacyObjectKey(path);
@@ -87,7 +91,7 @@ export async function listStoredMarkdownFilesByPrefix(
 	const rows = await queryRows<{ path: string }>(
 		db.prepare(
 			"SELECT path FROM files WHERE path LIKE ? ESCAPE '\\' AND lower(path) LIKE '%.md' ORDER BY path ASC",
-		).bind(`${pathPrefix}/%`),
+		).bind(`${escapeLikePattern(pathPrefix)}/%`),
 	);
 
 	const decoder = new TextDecoder();
