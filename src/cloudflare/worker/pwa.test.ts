@@ -102,9 +102,14 @@ describe('PWA activation metadata', () => {
 
 		expect(html).toContain('.pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);');
 		expect(html).toContain('.settings-backdrop{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);');
-		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{padding-bottom:12px}');
-		expect(html).toContain('.pwa-keyboard-open .pwa-editor-card{min-height:0;padding:16px 18px 18px}');
+		expect(html).toContain('.pwa-reminder-editor .modal-form{gap:0;display:flex;flex:1;min-height:0;flex-direction:column}');
+		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 72px);max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);padding-bottom:8px}');
+		expect(html).toContain('.pwa-keyboard-open .pwa-editor-card{flex:0 1 auto;min-height:0;padding:16px 18px 18px}');
 		expect(html).toContain('.pwa-keyboard-open .pwa-editor-description-input{flex:0 1 auto;min-height:42px;max-height:88px}');
+		expect(html).toContain('.pwa-keyboard-open .pwa-editor-chip-row{flex-wrap:nowrap;gap:8px;margin-top:auto;padding-top:14px;overflow-x:auto;scrollbar-width:none}');
+		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 28px);max-height:calc(var(--keyboard-usable-height,100dvh) - 28px);padding-bottom:8px}');
+		expect(html).toContain('box-shadow:0 -6px 20px rgba(0,0,0,.22),0 -1px 0 rgba(255,255,255,.035)');
+		expect(html).not.toContain('box-shadow:0 -12px 48px rgba(0,0,0,.38)');
 	});
 
 	it('ships an offline-capable installed app shell service worker', () => {

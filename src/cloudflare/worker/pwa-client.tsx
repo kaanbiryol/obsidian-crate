@@ -128,6 +128,10 @@ const PULL_REFRESH_THRESHOLD = 70;
 const PULL_REFRESH_MAX_DISTANCE = 120;
 const PULL_REFRESH_SNAP_DISTANCE = 58;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const KEYBOARD_OVERLAY_THRESHOLD = 24;
+const KEYBOARD_RESIZE_THRESHOLD = 80;
+const KEYBOARD_WIDTH_RESET_THRESHOLD = 40;
+const KEYBOARD_INPUT_SELECTOR = 'input, textarea, [contenteditable="true"]';
 
 const defaultConfig: StoredConfig = {
 	folderPath: 'Reminders',
@@ -504,10 +508,17 @@ function applyDatePresetToDraft(
 	});
 }
 
+let keyboardClosedViewportHeight = 0;
+let keyboardClosedViewportWidth = 0;
+
+function isKeyboardInput(element: Element | null): element is HTMLElement {
+	return element instanceof HTMLElement && element.matches(KEYBOARD_INPUT_SELECTOR);
+}
+
 function scrollFocusedEditorFieldIntoView(): void {
 	const active = document.activeElement;
 	if (!(active instanceof HTMLElement)) return;
-	if (!active.matches('input, textarea, [contenteditable="true"]')) return;
+	if (!active.matches(KEYBOARD_INPUT_SELECTOR)) return;
 	const sheet = active.closest('.pwa-reminder-editor, .pwa-picker-sheet');
 	if (!(sheet instanceof HTMLElement)) return;
 
@@ -532,15 +543,38 @@ function scrollFocusedEditorFieldIntoView(): void {
 function updateKeyboardInset(): number {
 	const viewport = window.visualViewport;
 	const viewportHeight = viewport?.height ?? window.innerHeight;
+	const viewportWidth = viewport?.width ?? window.innerWidth;
 	const viewportOffsetTop = viewport?.offsetTop ?? 0;
-	const keyboardOffset = Math.max(0, window.innerHeight - viewportHeight - viewportOffsetTop);
+	const viewportBottom = viewportOffsetTop + viewportHeight;
+	const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight || 0);
+	const focusedKeyboardInput = isKeyboardInput(document.activeElement);
+	if (keyboardClosedViewportWidth && Math.abs(viewportWidth - keyboardClosedViewportWidth) > KEYBOARD_WIDTH_RESET_THRESHOLD) {
+		keyboardClosedViewportHeight = 0;
+		keyboardClosedViewportWidth = 0;
+	}
+	if (!focusedKeyboardInput) {
+		// Keep the largest closed height so focus hops do not lower the baseline while the keyboard is still closing.
+		keyboardClosedViewportHeight = Math.max(keyboardClosedViewportHeight, layoutHeight, viewportBottom);
+		keyboardClosedViewportWidth = viewportWidth;
+	} else if (keyboardClosedViewportHeight === 0) {
+		keyboardClosedViewportHeight = Math.max(layoutHeight, viewportBottom);
+		keyboardClosedViewportWidth = viewportWidth;
+	}
+
+	const keyboardOffset = Math.max(0, layoutHeight - viewportHeight - viewportOffsetTop);
+	const resizedViewportKeyboardOffset = focusedKeyboardInput
+		? Math.max(0, keyboardClosedViewportHeight - viewportBottom)
+		: 0;
+	const effectiveKeyboardOffset = Math.max(keyboardOffset, resizedViewportKeyboardOffset);
 	const usableHeight = Math.max(0, viewportOffsetTop + viewportHeight);
 	const roundedKeyboardOffset = Math.round(keyboardOffset);
+	const keyboardIsOpen = roundedKeyboardOffset > KEYBOARD_OVERLAY_THRESHOLD
+		|| resizedViewportKeyboardOffset > KEYBOARD_RESIZE_THRESHOLD;
 
 	document.documentElement.style.setProperty('--keyboard-offset', `${roundedKeyboardOffset}px`);
 	document.documentElement.style.setProperty('--keyboard-usable-height', `${Math.round(usableHeight)}px`);
-	document.documentElement.classList.toggle('pwa-keyboard-open', roundedKeyboardOffset > 24);
-	return roundedKeyboardOffset;
+	document.documentElement.classList.toggle('pwa-keyboard-open', keyboardIsOpen);
+	return Math.round(effectiveKeyboardOffset);
 }
 
 function useKeyboardInset(): void {
@@ -1715,7 +1749,6 @@ function ReminderSheet({
 
 	useLayoutEffect(() => {
 		const initialContent = draft.content.trim();
-		const shouldSelect = draft.content.trim().length > 0;
 		const focusTitle = () => {
 			const element = richTextInputRef.current?.getElement();
 			const currentContent = element?.textContent?.trim() ?? '';
@@ -1723,7 +1756,7 @@ function ReminderSheet({
 				if (currentContent === '') richTextInputRef.current?.focus();
 				return;
 			}
-			richTextInputRef.current?.focus({ select: shouldSelect });
+			richTextInputRef.current?.focus();
 		};
 
 		focusTitle();
