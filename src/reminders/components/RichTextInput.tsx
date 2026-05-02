@@ -139,22 +139,32 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     }, [inputRef]);
 
     // Expose methods to parent via ref
-    useImperativeHandle(ref, () => ({
-        focus: (options = {}) => {
-            if (actualRef.current) {
-                actualRef.current.focus({ preventScroll: true });
-                // Delay cursor positioning to allow focus to stabilize
-                requestAnimationFrame(() => {
-                    if (actualRef.current) {
-                        if (options.select) {
-                            selectElementContents(actualRef.current);
-                        } else {
-                            moveCursorToEnd(actualRef.current);
-                        }
-                    }
-                });
-            }
-        },
+	    useImperativeHandle(ref, () => ({
+	        focus: (options = {}) => {
+	            if (actualRef.current) {
+	                actualRef.current.focus({ preventScroll: true });
+	                if (options.select) {
+	                    requestAnimationFrame(() => {
+	                        if (actualRef.current) {
+	                            selectElementContents(actualRef.current);
+	                        }
+	                    });
+	                    return;
+	                }
+
+	                const moveActiveCursorToEnd = () => {
+	                    const element = actualRef.current;
+	                    if (!element || document.activeElement !== element) return;
+	                    moveCursorToEnd(element);
+	                };
+
+	                moveActiveCursorToEnd();
+	                requestAnimationFrame(moveActiveCursorToEnd);
+	                for (const delay of [50, 140, 320, 650]) {
+	                    window.setTimeout(moveActiveCursorToEnd, delay);
+	                }
+	            }
+	        },
         blur: () => {
             if (actualRef.current) {
                 actualRef.current.blur();

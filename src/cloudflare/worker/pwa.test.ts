@@ -13,10 +13,14 @@ describe('PWA activation metadata', () => {
 		const manifest = JSON.parse(createManifestJson('https://worker.test/notifications/manifest.json?v=asset')) as {
 			display: string;
 			display_override: string[];
+			background_color: string;
+			theme_color: string;
 		};
 
 		expect(manifest.display).toBe('standalone');
 		expect(manifest.display_override).toEqual(['standalone', 'minimal-ui']);
+		expect(manifest.background_color).toBe('#080808');
+		expect(manifest.theme_color).toBe('#080808');
 	});
 
 	it('carries activation params into the manifest start URL', () => {
@@ -66,7 +70,8 @@ describe('PWA activation metadata', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('height=device-height');
-		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
+		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black">');
+		expect(html).toContain('<meta name="theme-color" content="#080808">');
 		expect(html).toContain('<meta name="format-detection" content="telephone=no,date=no,email=no,address=no">');
 		expect(html).toContain('html,body{margin:0;padding:0;background:linear-gradient(180deg,#131820 0%,#0c0f14 44%,#090a0d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;height:100%;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
 		expect(html).toContain('body{width:100%;min-height:100%;overflow:hidden;touch-action:manipulation}');
@@ -108,7 +113,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-keyboard-open .pwa-editor-description-input{flex:0 1 auto;min-height:42px;max-height:88px}');
 		expect(html).toContain('.pwa-keyboard-open .pwa-editor-chip-row{flex-wrap:nowrap;gap:8px;margin-top:auto;padding-top:14px;overflow-x:auto;scrollbar-width:none}');
 		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 28px);max-height:calc(var(--keyboard-usable-height,100dvh) - 28px);padding-bottom:8px}');
-		expect(html).toContain('box-shadow:0 -6px 20px rgba(0,0,0,.22),0 -1px 0 rgba(255,255,255,.035)');
+		expect(html).toContain('box-shadow:0 -1px 0 rgba(255,255,255,.035)');
+		expect(html).not.toContain('box-shadow:0 -6px 20px rgba(0,0,0,.22)');
 		expect(html).not.toContain('box-shadow:0 -12px 48px rgba(0,0,0,.38)');
 	});
 

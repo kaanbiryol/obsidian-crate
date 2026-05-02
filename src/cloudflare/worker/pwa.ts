@@ -1,6 +1,7 @@
 import { PWA_CLIENT_JS } from './pwa-client-bundle.gen';
 import { PWA_ASSET_VERSION } from './pwa-version.gen';
 
+const PWA_CHROME_COLOR = '#080808';
 const PWA_START_PARAM_KEYS = ['token', 'folder', 'upcomingDays', 'allDayTime', 'project', 'tab'] as const;
 
 function pwaStartSearchFromUrl(requestUrl?: string): string {
@@ -32,10 +33,10 @@ export function createPwaHtml(requestUrl?: string): string {
 <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crate">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="application-name" content="Crate">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#1e1e1e">
+<meta name="theme-color" content="${PWA_CHROME_COLOR}">
 <meta name="format-detection" content="telephone=no,date=no,email=no,address=no">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="${manifestHref}">
@@ -374,7 +375,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}
 .pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))}
 .pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);background:rgba(0,0,0,.56);backdrop-filter:blur(8px);transition:padding-bottom .22s cubic-bezier(.32,.72,0,1)}
-.modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(0,0,0,.22),0 -1px 0 rgba(255,255,255,.035);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both;display:flex;flex-direction:column}
+.modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -1px 0 rgba(255,255,255,.035);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both;display:flex;flex-direction:column}
 .modal-card.pwa-reminder-editor.is-switching-out{pointer-events:none;animation:pwa-sheet-out .22s cubic-bezier(.4,0,1,1) forwards}
 .modal-card.pwa-reminder-editor::before{content:"";display:block;width:40px;height:5px;margin:0 auto 18px;border-radius:999px;background:rgba(255,255,255,.16)}
 .pwa-reminder-editor .modal-form{gap:0;display:flex;flex:1;min-height:0;flex-direction:column}
@@ -406,7 +407,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-editor-chip--icon{width:44px;padding:0}
 .pwa-reminder-editor .composer-panel{margin-top:18px;padding:14px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055)}
 .pwa-reminder-editor .delete-confirm{margin-top:18px}
-.pwa-picker-sheet{width:min(620px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 88px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 24px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(0,0,0,.22),0 -1px 0 rgba(255,255,255,.035);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
+.pwa-picker-sheet{width:min(620px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 88px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 24px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -1px 0 rgba(255,255,255,.035);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both}
 .pwa-picker-sheet.is-switching-out{pointer-events:none;animation:pwa-sheet-out .22s cubic-bezier(.4,0,1,1) forwards}
 .pwa-picker-sheet::before{content:"";display:block;width:40px;height:5px;margin:0 auto 16px;border-radius:999px;background:rgba(255,255,255,.16)}
 .pwa-picker-header{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:12px;margin-bottom:18px}
@@ -812,8 +813,8 @@ export function createManifestJson(requestUrl?: string): string {
 		display: 'standalone',
 		display_override: ['standalone', 'minimal-ui'],
 		orientation: 'portrait',
-		background_color: '#1e1e1e',
-		theme_color: '#1e1e1e',
+		background_color: PWA_CHROME_COLOR,
+		theme_color: PWA_CHROME_COLOR,
 		categories: ['productivity', 'utilities'],
 		launch_handler: {
 			client_mode: 'navigate-existing',
