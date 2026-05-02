@@ -51,6 +51,15 @@ function staticAssetHeaders(): Record<string, string> {
 	};
 }
 
+function versionedAssetHeaders(request: Request): Record<string, string> {
+	const version = new URL(request.url).searchParams.get('v')?.trim();
+	return {
+		'Cache-Control': version ? 'public, max-age=31536000, immutable' : 'no-store',
+		'Referrer-Policy': 'no-referrer',
+		'X-Content-Type-Options': 'nosniff',
+	};
+}
+
 export function handleNotificationsPage(request: Request): Response {
 	return new Response(createPwaHtml(request.url), {
 		headers: {
@@ -72,11 +81,11 @@ export function handleServiceWorker(): Response {
 	});
 }
 
-export function handlePwaApp(): Response {
+export function handlePwaApp(request: Request): Response {
 	return new Response(PWA_APP_JS, {
 		headers: {
 			'Content-Type': 'application/javascript; charset=utf-8',
-			...staticAssetHeaders(),
+			...versionedAssetHeaders(request),
 			...corsHeaders(),
 		},
 	});
@@ -111,12 +120,11 @@ export function handleOpenObsidian(): Response {
 	});
 }
 
-export function handleIcon(): Response {
+export function handleIcon(request: Request): Response {
 	return new Response(ICON_SVG, {
 		headers: {
 			'Content-Type': 'image/svg+xml',
-			'Cache-Control': 'public, max-age=86400',
-			'X-Content-Type-Options': 'nosniff',
+			...versionedAssetHeaders(request),
 			...corsHeaders(),
 		},
 	});

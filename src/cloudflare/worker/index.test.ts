@@ -205,6 +205,25 @@ describe('worker entrypoint', () => {
 		expect(await response.json()).toEqual({ assetVersion: PWA_ASSET_VERSION });
 	});
 
+	it('uses immutable caching for versioned PWA app assets only', async () => {
+		const versionedAppResponse = await worker.fetch(
+			new Request(`https://worker.test/notifications/app.js?v=${PWA_ASSET_VERSION}`),
+			createEnv() as never,
+		);
+		const unversionedAppResponse = await worker.fetch(
+			new Request('https://worker.test/notifications/app.js'),
+			createEnv() as never,
+		);
+		const versionedIconResponse = await worker.fetch(
+			new Request(`https://worker.test/notifications/icon.svg?v=${PWA_ASSET_VERSION}`),
+			createEnv() as never,
+		);
+
+		expect(versionedAppResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+		expect(unversionedAppResponse.headers.get('Cache-Control')).toBe('no-store');
+		expect(versionedIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+	});
+
 	it('rejects blank bearer tokens when no fallback auth token is configured', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/health', {

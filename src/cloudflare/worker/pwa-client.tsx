@@ -628,12 +628,19 @@ function useKeyboardInset(): void {
 	}, []);
 }
 
-function applyConfigFromUrl(config: StoredConfig): { config: StoredConfig; token: string | null; project: string | null; tab: StartTab | null } {
+function applyConfigFromUrl(config: StoredConfig): {
+	config: StoredConfig;
+	token: string | null;
+	project: string | null;
+	tab: StartTab | null;
+	reminderId: string | null;
+} {
 	const params = currentQueryParams();
 	const nextConfig = { ...config };
 	const folderPath = params.get('folder');
 	const upcomingDays = params.get('upcomingDays');
 	const allDayTime = params.get('allDayTime');
+	const reminderId = params.get('reminderId')?.trim() ?? '';
 
 	if (folderPath) nextConfig.folderPath = folderPath;
 	if (upcomingDays) {
@@ -652,6 +659,7 @@ function applyConfigFromUrl(config: StoredConfig): { config: StoredConfig; token
 		token: params.get('token'),
 		project: params.get('project'),
 		tab: parseStartTab(params.get('tab')),
+		reminderId: reminderId || null,
 	};
 }
 
@@ -892,6 +900,7 @@ function App() {
 	const [selectedProject, setSelectedProject] = useState<string | null>(null);
 	const [startTab, setStartTab] = useState<StartTab>('inbox');
 	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [launchReminderId, setLaunchReminderId] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [saving, setSaving] = useState(false);
@@ -1052,6 +1061,9 @@ function App() {
 				if (applied.tab) {
 					setStartTab(applied.tab);
 				}
+				if (applied.reminderId) {
+					setLaunchReminderId(applied.reminderId);
+				}
 
 				let nextToken = authToken;
 				if (nextToken && applied.token) {
@@ -1187,6 +1199,48 @@ function App() {
 		Boolean(authToken && bootstrapped && !loading && !modal && !settingsOpen),
 		useCallback(() => loadReminders({ silent: true }), [loadReminders]),
 	);
+
+	useEffect(() => {
+		if (!launchReminderId || !bootstrapped || !authToken || loading) return;
+		if (!isOffline && dataMode === 'cached' && refreshing) return;
+
+		const reminder = reminders.find((item) => item.id === launchReminderId);
+		if (!reminder) {
+			if (!refreshing) {
+				showToast('info', 'Reminder no longer exists');
+				setLaunchReminderId(null);
+			}
+			return;
+		}
+
+		setSelectedProject(reminder.project || null);
+		if (readOnlyMessage) {
+			showToast('info', readOnlyMessage);
+			setLaunchReminderId(null);
+			return;
+		}
+
+		setSettingsOpen(false);
+		setSaving(false);
+		setModal({
+			mode: 'edit',
+			reminderId: reminder.id,
+			draft: buildModalDraft(reminder, reminder.project || selectedProject),
+		});
+		setLaunchReminderId(null);
+	}, [
+		authToken,
+		bootstrapped,
+		dataMode,
+		isOffline,
+		launchReminderId,
+		loading,
+		readOnlyMessage,
+		refreshing,
+		reminders,
+		selectedProject,
+		showToast,
+	]);
 
 	const openModal = useCallback((mode: ModalMode, reminderId?: string, defaultProject?: string) => {
 		if (!ensureCanMutate()) return;

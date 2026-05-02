@@ -127,4 +127,11 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("url.pathname === '/notifications/app.js' || url.pathname === '/notifications/icon.svg'");
 	});
 
+	it('deep links notification clicks to the reminder and project', () => {
+		expect(SERVICE_WORKER_JS).toContain("var reminderId = (event.notification.data && event.notification.data.reminderId) || ''");
+		expect(SERVICE_WORKER_JS).toContain("if (project) params.set('project', project)");
+		expect(SERVICE_WORKER_JS).toContain("if (reminderId) params.set('reminderId', reminderId)");
+		expect(SERVICE_WORKER_JS).toContain("clients.openWindow(url)");
+	});
+
 });

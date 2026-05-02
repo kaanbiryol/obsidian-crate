@@ -57,7 +57,15 @@ async function buildPwaClientBundle() {
 		platform: 'browser',
 		target: 'es2020',
 		write: false,
-		minify: false,
+		minify: true,
+		define: {
+			'process.env.NODE_ENV': JSON.stringify('production'),
+		},
+		alias: {
+			'react': 'preact/compat',
+			'react-dom': 'preact/compat',
+			'react/jsx-runtime': 'preact/jsx-runtime',
+		},
 		mainFields: ['browser', 'module', 'main'],
 		conditions: ['browser', 'import'],
 	});

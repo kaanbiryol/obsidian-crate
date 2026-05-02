@@ -46,11 +46,11 @@ export default {
 
 		// Unauthenticated PWA routes
 		if (path === '/notifications' && method === 'GET') return handleNotificationsPage(request);
-		if (path === '/notifications/app.js' && method === 'GET') return handlePwaApp();
+		if (path === '/notifications/app.js' && method === 'GET') return handlePwaApp(request);
 		if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
 		if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest(request);
 		if (path === '/notifications/version.json' && method === 'GET') return handlePwaVersion();
-		if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon();
+		if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon(request);
 		if (path === '/notifications/open-obsidian' && method === 'GET') return handleOpenObsidian();
 		if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);
 		if (path === '/notifications/reminders-exchange' && method === 'POST') {
