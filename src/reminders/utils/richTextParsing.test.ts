@@ -147,6 +147,14 @@ describe('findAllMatches', () => {
 describe('getPlainText', () => {
     const TEXT_NODE = 3;
     const ELEMENT_NODE = 1;
+    type MockNode = {
+        nodeType: number;
+        nodeName: string;
+        textContent: string;
+        childNodes: MockNode[];
+        hasAttribute?: (name: string) => boolean;
+        getAttribute?: (name: string) => string | null;
+    };
 
     beforeAll(() => {
         if (typeof globalThis.Node === 'undefined') {
@@ -154,15 +162,15 @@ describe('getPlainText', () => {
         }
     });
 
-    function textNode(content: string) {
+    function textNode(content: string): MockNode {
         return { nodeType: TEXT_NODE, nodeName: '#text', textContent: content, childNodes: [] };
     }
 
-    function elementNode(tag: string, children: unknown[], attrs: Record<string, string> = {}) {
+    function elementNode(tag: string, children: MockNode[], attrs: Record<string, string> = {}): MockNode {
         return {
             nodeType: ELEMENT_NODE,
             nodeName: tag.toUpperCase(),
-            textContent: children.map((c: any) => c.textContent ?? '').join(''),
+            textContent: children.map((child) => child.textContent).join(''),
             childNodes: children,
             hasAttribute: (name: string) => name in attrs,
             getAttribute: (name: string) => attrs[name] ?? null,

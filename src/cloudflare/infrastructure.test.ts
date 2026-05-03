@@ -298,8 +298,15 @@ describe('cloudflare infrastructure setup and diagnostics', () => {
 		);
 		const secondRequest = requestUrlSpy.mock.calls[1]?.[0] as { body?: string } | undefined;
 		expect(typeof secondRequest?.body).toBe('string');
-		expect(JSON.parse(secondRequest?.body ?? '')).toEqual({
-			token_hash: expect.any(String),
+		const tokenPayload = JSON.parse(secondRequest?.body ?? '') as {
+			token_hash: string;
+			device_id: string;
+			device_name: string;
+			platform: string;
+		};
+		expect(typeof tokenPayload.token_hash).toBe('string');
+		expect(tokenPayload).toEqual({
+			token_hash: tokenPayload.token_hash,
 			device_id: 'device-abcd',
 			device_name: 'Mac (abcd)',
 			platform: 'macos',

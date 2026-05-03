@@ -7,7 +7,7 @@ import {
   type Reminder,
   type RecurrenceRule,
 } from "@/reminders";
-import { parseCheckboxLine, rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
+import { rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
 import {
   buildStoredReminderDates,
   inferHasTimeFromDate,
@@ -17,16 +17,20 @@ import {
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import {
   createReminderId,
-  extractReminderId,
   setReminderIdMarker,
 } from "./reminderIdentity";
 import type { IndexedReminder } from "./reminderIndex";
 import {
-  buildDescriptionBlock,
-  countDescriptionBlockLines,
   findReminderLineNumber,
   toReminder,
 } from "./markdownWriterHelpers";
+import {
+  appendReminderBlockToContent,
+  buildDescriptionBlock,
+  deleteReminderBlockFromContent,
+  replaceReminderBlockInContent,
+  reorderReminderBlocksInContent,
+} from "./markdownReminderFile";
 import type {
   MarkdownWriterContext,
   ReminderChangeContext,
@@ -96,7 +100,6 @@ export async function createReminderInMarkdown(
 
   const contentHash = generateContentHash(content);
   const normalizedDescription = description?.trim() || undefined;
-  const descLines = buildDescriptionBlock(normalizedDescription);
   const optimisticReminder: IndexedReminder = {
     id: stableReminderId,
     content,
@@ -115,12 +118,11 @@ export async function createReminderInMarkdown(
 
   context.index.applyOptimisticCreate(optimisticReminder);
 
-  const trimmed = fileContent.trimEnd();
-  const separator = trimmed.match(/^#[^\n]*$/) ? "\n\n" : "\n";
-  const block = descLines.length > 0
-    ? `${newLine}\n${descLines.join("\n")}`
-    : newLine;
-  const newContent = `${trimmed}${separator}${block}\n`;
+  const newContent = appendReminderBlockToContent(
+    fileContent,
+    newLine,
+    normalizedDescription,
+  );
 
   try {
     await context.app.vault.modify(file, newContent);
@@ -233,12 +235,15 @@ export async function updateReminderInMarkdown(
     reminder.id,
   );
 
-  const oldDescCount = countDescriptionBlockLines(lines, lineNumber);
-  lines.splice(lineNumber, 1 + oldDescCount, newLine, ...newDescLines);
+  const replacement = replaceReminderBlockInContent(
+    fileContent,
+    reminder,
+    [newLine, ...newDescLines],
+  );
 
   try {
-    await context.app.vault.modify(file, lines.join("\n"));
-    log.info(`Updated reminder in ${reminder.filePath} at line ${lineNumber}`);
+    await context.app.vault.modify(file, replacement.content);
+    log.info(`Updated reminder in ${reminder.filePath} at line ${replacement.lineNumber}`);
     await notifyFileWritten(context, file);
 
     const contentHash = generateContentHash(newContent);
@@ -274,20 +279,16 @@ export async function deleteReminderInMarkdown(
   context.index.applyOptimisticDelete(reminder.id);
 
   const fileContent = await context.app.vault.read(file);
-  const lines = fileContent.split("\n");
-  const lineToDelete = findReminderLineNumber(lines, reminder);
-  if (lineToDelete === -1) {
+  const deletion = deleteReminderBlockFromContent(fileContent, reminder);
+  if (!deletion.found) {
     log.warn(" Reminder line not found, may already be deleted");
     context.index.clearOptimistic(reminder.id);
     return;
   }
 
-  const descCount = countDescriptionBlockLines(lines, lineToDelete);
-  lines.splice(lineToDelete, 1 + descCount);
-
   try {
-    await context.app.vault.modify(file, lines.join("\n"));
-    log.info(`Deleted reminder from ${reminder.filePath} at line ${lineToDelete}`);
+    await context.app.vault.modify(file, deletion.content);
+    log.info(`Deleted reminder from ${reminder.filePath} at line ${deletion.lineNumber}`);
     await notifyFileWritten(context, file);
     triggerReminderChange(context, toReminder(reminder), "delete");
   } catch (error) {
@@ -414,85 +415,6 @@ export async function reorderRemindersInMarkdown(
   }
 
   const fileContent = await context.app.vault.read(file);
-  const lines = fileContent.split("\n");
-
-  interface FileSegment {
-    isBlock: boolean;
-    lines: string[];
-    id?: string | null;
-    isCompleted?: boolean;
-  }
-
-  const segments: FileSegment[] = [];
-  let index = 0;
-  let nonBlockAccum: string[] = [];
-
-  while (index < lines.length) {
-    const parsed = parseCheckboxLine(lines[index]);
-    if (parsed) {
-      if (nonBlockAccum.length > 0) {
-        segments.push({ isBlock: false, lines: [...nonBlockAccum] });
-        nonBlockAccum = [];
-      }
-
-      const blockLines = [lines[index]];
-      const descCount = countDescriptionBlockLines(lines, index);
-      for (let descIndex = 1; descIndex <= descCount; descIndex++) {
-        blockLines.push(lines[index + descIndex]);
-      }
-
-      segments.push({
-        isBlock: true,
-        lines: blockLines,
-        id: extractReminderId(lines[index]),
-        isCompleted: parsed.isCompleted,
-      });
-      index += 1 + descCount;
-    } else {
-      nonBlockAccum.push(lines[index]);
-      index++;
-    }
-  }
-  if (nonBlockAccum.length > 0) {
-    segments.push({ isBlock: false, lines: nonBlockAccum });
-  }
-
-  const allBlockSegments = segments.filter((segment) => segment.isBlock);
-  const activeBlocks = allBlockSegments.filter((segment) => !segment.isCompleted);
-  const completedBlocks = allBlockSegments.filter((segment) => segment.isCompleted);
-
-  const activeById = new Map(activeBlocks.map((block) => [block.id, block]));
-  const reorderedActive: FileSegment[] = [];
-  for (const id of orderedIds) {
-    const block = activeById.get(id);
-    if (block) {
-      reorderedActive.push(block);
-      activeById.delete(id);
-    }
-  }
-  for (const block of activeBlocks) {
-    if (block.id !== null && activeById.has(block.id)) {
-      reorderedActive.push(block);
-    } else if (block.id === null) {
-      reorderedActive.push(block);
-    }
-  }
-
-  const reorderedBlocks = [...reorderedActive, ...completedBlocks];
-
-  let blockIndex = 0;
-  const result: string[] = [];
-  for (const segment of segments) {
-    if (segment.isBlock) {
-      if (blockIndex < reorderedBlocks.length) {
-        result.push(...reorderedBlocks[blockIndex].lines);
-        blockIndex++;
-      }
-    } else {
-      result.push(...segment.lines);
-    }
-  }
-
-  await context.app.vault.modify(file, result.join("\n"));
+  await context.app.vault.modify(file, reorderReminderBlocksInContent(fileContent, orderedIds));
   log.info(`Reordered reminders in ${filePath}`);
 }

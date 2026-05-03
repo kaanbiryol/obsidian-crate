@@ -17,8 +17,6 @@ export default tseslint.config(
 						'postcss.config.js',
 						'tailwind.config.js',
 						'tailwind.theme.js',
-						'src/cloudflare/worker/pwa-client.tsx',
-						'src/cloudflare/worker/pwa-client/components/*.tsx',
 						'vite.config.mts',
 						'vitest.config.ts',
 					]

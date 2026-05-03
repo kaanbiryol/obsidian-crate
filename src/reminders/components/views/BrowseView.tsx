@@ -5,7 +5,7 @@ import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
 import { EmptyState } from '../EmptyState';
 import { BrowseProjectCard } from './BrowseProjectCard';
-import { buildBrowseProjectCardsViewModel, type ProjectStats } from './viewModels';
+import { buildBrowseProjectCardsViewModel } from './viewModels';
 import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,

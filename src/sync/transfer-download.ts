@@ -1,4 +1,4 @@
-import { arrayBufferToBase64, base64ToArrayBuffer } from "./encoding";
+import { base64ToArrayBuffer } from "./encoding";
 import { isHiddenPath } from "./file-discovery";
 import { computeHash } from "./hasher";
 import type { SyncResult } from "../plugin/types";

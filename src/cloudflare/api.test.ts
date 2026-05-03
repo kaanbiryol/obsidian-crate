@@ -93,7 +93,10 @@ describe('buildCloudflareTokenTemplateUrl', () => {
 	it('returns a prefilled Cloudflare dashboard URL for crate permissions', () => {
 		const url = buildCloudflareTokenTemplateUrl();
 		const parsed = new URL(url);
-		const permissions = JSON.parse(parsed.searchParams.get('permissionGroupKeys') || '[]');
+		const permissions = JSON.parse(parsed.searchParams.get('permissionGroupKeys') || '[]') as Array<{
+			key: string;
+			type: string;
+		}>;
 
 		expect(parsed.origin).toBe('https://dash.cloudflare.com');
 		expect(parsed.pathname).toBe('/profile/api-tokens');

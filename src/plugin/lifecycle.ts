@@ -89,12 +89,20 @@ async function initializePluginReminders(plugin: CratePlugin): Promise<void> {
 }
 
 function showSetupNotice(plugin: CratePlugin): void {
+  type AppWithSettings = CratePlugin["app"] & {
+    setting: {
+      open: () => void;
+      openTabById: (id: string) => void;
+    };
+  };
+
   const fragment = new DocumentFragment();
   fragment.createSpan({ text: "Crate is not configured. " });
   const link = fragment.createEl("a", { text: "Open settings" });
   link.addEventListener("click", () => {
-    (plugin.app as any).setting.open();
-    (plugin.app as any).setting.openTabById(plugin.manifest.id);
+    const settings = (plugin.app as AppWithSettings).setting;
+    settings.open();
+    settings.openTabById(plugin.manifest.id);
   });
   fragment.createSpan({ text: " to set up sync." });
   new Notice(fragment, 10000);

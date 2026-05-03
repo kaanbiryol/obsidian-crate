@@ -6,9 +6,7 @@ import {
 	AUTH_TOKEN_KEY,
 	REMINDERS_CACHE_KEY,
 	isStandaloneApp,
-	loadCachedReminderSnapshot,
 	loadStoredConfig,
-	saveCachedReminderSnapshot,
 } from './pwa-client/config';
 import {
 	fetchPwaAssetVersion,
@@ -25,6 +23,7 @@ import { useKeyboardInset } from './pwa-client/hooks/useKeyboardInset';
 import { usePushNotifications } from './pwa-client/hooks/usePushNotifications';
 import { usePwaBootstrap } from './pwa-client/hooks/usePwaBootstrap';
 import { usePwaStatus } from './pwa-client/hooks/usePwaStatus';
+import { useReminderSync } from './pwa-client/hooks/useReminderSync';
 import { useReminderMutations } from './pwa-client/hooks/useReminderMutations';
 import { usePullToRefresh } from './pwa-client/hooks/usePullToRefresh';
 import { useToast } from './pwa-client/hooks/useToast';
@@ -33,11 +32,8 @@ import {
 	toSharedReminder,
 } from './pwa-client/reminder-state';
 import type {
-	CachedReminderSnapshot,
-	DataMode,
 	ModalMode,
 	ModalState,
-	ReminderRecord,
 	StartTab,
 	StoredConfig,
 } from './pwa-client/types';
@@ -46,25 +42,15 @@ function App() {
 	const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_KEY));
 	const [bootstrapped, setBootstrapped] = useState(false);
 	const [config, setConfig] = useState<StoredConfig>(() => loadStoredConfig());
-	const [reminders, setReminders] = useState<ReminderRecord[]>([]);
-	const [projects, setProjects] = useState<string[]>([]);
 	const [selectedProject, setSelectedProject] = useState<string | null>(null);
 	const [startTab, setStartTab] = useState<StartTab>('inbox');
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [launchReminderId, setLaunchReminderId] = useState<string | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [refreshing, setRefreshing] = useState(false);
 	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [dataMode, setDataMode] = useState<DataMode>('live');
-	const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
-	const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
 	const [updateAvailable, setUpdateAvailable] = useState(false);
 	const [modal, setModal] = useState<ModalState | null>(null);
 	const { toast, showToast } = useToast();
-	const remindersRef = useRef(reminders);
-	const projectsRef = useRef(projects);
-	const hydratedCacheRef = useRef(false);
+	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
 
 	useKeyboardInset();
 
@@ -72,83 +58,49 @@ function App() {
 		void registerPwaServiceWorker().catch(() => undefined);
 	}, []);
 
-	useEffect(() => {
-		remindersRef.current = reminders;
-	}, [reminders]);
-
-	useEffect(() => {
-		projectsRef.current = projects;
-	}, [projects]);
+	const apiFetch = useMemo(
+		() => makeApiFetch(authToken, () => handleUnauthorizedRef.current()),
+		[authToken],
+	);
+	const reminderSync = useReminderSync({ apiFetch, authToken, bootstrapped, config, setSelectedProject });
+	const { push, refreshPushState, enablePushNotifications } = usePushNotifications({ apiFetch, showToast });
+	const {
+		reminders,
+		projects,
+		loading,
+		refreshing,
+		error,
+		dataMode,
+		lastUpdatedAt,
+		isOffline,
+		remindersRef,
+		projectsRef,
+		hydratedCacheRef,
+		hydrateCachedSnapshot,
+		loadReminders,
+		resetReminderState,
+		setReminders,
+		setProjects,
+		setLoading,
+		setError,
+	} = reminderSync;
 
 	const logOut = useCallback((showMessage: boolean) => {
 		localStorage.removeItem(AUTH_TOKEN_KEY);
 		localStorage.removeItem(REMINDERS_CACHE_KEY);
 		setAuthToken(null);
-		setReminders([]);
-		setProjects([]);
-		setSelectedProject(null);
+		resetReminderState();
 		setSettingsOpen(false);
 		setModal(null);
 		if (showMessage) {
 			setError(null);
 			showToast('info', 'Logged out');
 		}
-	}, [showToast]);
+	}, [resetReminderState, setError, showToast]);
 
-	const apiFetch = useMemo(() => makeApiFetch(authToken, () => logOut(false)), [authToken, logOut]);
-	const { push, refreshPushState, enablePushNotifications } = usePushNotifications({ apiFetch, showToast });
-
-	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
-		setReminders(snapshot.reminders);
-		setProjects(snapshot.projects);
-		setLastUpdatedAt(snapshot.savedAt);
-		setDataMode('cached');
-		setSelectedProject((current) => current && !snapshot.projects.includes(current) ? null : current);
-	}, []);
-
-	const loadReminders = useCallback(async (options: { silent?: boolean } = {}) => {
-		if (!authToken) return;
-		if (options.silent) setRefreshing(true);
-		else setLoading(true);
-		setError(null);
-		try {
-			if (!navigator.onLine) {
-				const cached = loadCachedReminderSnapshot(config.folderPath);
-				if (cached) {
-					hydrateCachedSnapshot(cached);
-					return;
-				}
-				throw new Error('Offline');
-			}
-
-			const response = await apiFetch(`/reminders/list?folderPath=${encodeURIComponent(config.folderPath)}`);
-			if (!response.ok) throw new Error(await response.text());
-			const result = await response.json() as { reminders?: ReminderRecord[]; projects?: string[] };
-			const nextReminders = Array.isArray(result.reminders) ? result.reminders : [];
-			const nextProjects = Array.isArray(result.projects) ? result.projects : [];
-			const savedAt = Date.now();
-			setReminders(nextReminders);
-			setProjects(nextProjects);
-			setSelectedProject((current) => current && !nextProjects.includes(current) ? null : current);
-			setLastUpdatedAt(savedAt);
-			setDataMode('live');
-			setIsOffline(false);
-			saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt);
-		} catch (loadError) {
-			const message = loadError instanceof Error ? loadError.message : String(loadError);
-			const cached = loadCachedReminderSnapshot(config.folderPath);
-			if (cached) {
-				hydrateCachedSnapshot(cached);
-				setError(message);
-			} else {
-				setDataMode('error');
-				setError(message);
-			}
-		} finally {
-			setRefreshing(false);
-			setLoading(false);
-		}
-	}, [apiFetch, authToken, config.folderPath, hydrateCachedSnapshot]);
+	useEffect(() => {
+		handleUnauthorizedRef.current = () => logOut(false);
+	}, [logOut]);
 
 	usePwaBootstrap({
 		authToken,
@@ -215,21 +167,6 @@ function App() {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		};
 	}, [authToken, bootstrapped, checkForUpdate, loadReminders, refreshPushState]);
-
-	useEffect(() => {
-		const handleOnline = () => {
-			setIsOffline(false);
-			if (bootstrapped && authToken) void loadReminders({ silent: true });
-		};
-		const handleOffline = () => setIsOffline(true);
-
-		window.addEventListener('online', handleOnline);
-		window.addEventListener('offline', handleOffline);
-		return () => {
-			window.removeEventListener('online', handleOnline);
-			window.removeEventListener('offline', handleOffline);
-		};
-	}, [authToken, bootstrapped, loadReminders]);
 
 	const {
 		readOnlyMessage,

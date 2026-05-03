@@ -1,9 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const noticeMessages: Array<string | object> = [];
+type ProtocolHandler = (params: Record<string, string>) => void;
+type SyncRuntimeTarget = {
+	syncRuntime?: {
+		isConfigured: () => boolean;
+		initialize: () => Promise<void>;
+	};
+};
+
 const initializeReminders = vi.fn();
 const handleSyncSetupProtocol = vi.fn();
-const initializeSyncManagers = vi.fn();
+const initializeSyncManagers = vi.fn<(target: SyncRuntimeTarget) => void>();
 const registerSyncCommands = vi.fn();
 const registerVaultSyncEventHandlers = vi.fn();
 const ensurePluginDeviceId = vi.fn();
@@ -143,14 +151,14 @@ describe('bootstrapPlugin', () => {
 		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(2);
 
 		const setupHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
-			([name]: [string]) => name === 'crate-setup',
-		)?.[1];
+			([name]) => name === 'crate-setup',
+		)?.[1] as ProtocolHandler | undefined;
 		const remindersHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
-			([name]: [string]) => name === 'crate-reminders',
-		)?.[1];
+			([name]) => name === 'crate-reminders',
+		)?.[1] as ProtocolHandler | undefined;
 
-		expect(setupHandler).toEqual(expect.any(Function));
-		expect(remindersHandler).toEqual(expect.any(Function));
+		expect(typeof setupHandler).toBe('function');
+		expect(typeof remindersHandler).toBe('function');
 
 		setupHandler?.({ workerUrl: 'https://worker.example', authToken: 'token' });
 		remindersHandler?.({ project: 'Work' });

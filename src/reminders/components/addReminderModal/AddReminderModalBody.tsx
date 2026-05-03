@@ -163,8 +163,8 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     useEffect(() => {
         const el = descriptionRef.current;
         if (el && description) {
-            el.style.height = 'auto';
-            el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+            el.setCssProps({ height: 'auto' });
+            el.setCssProps({ height: `${Math.min(el.scrollHeight, 120)}px` });
         }
     }, []);
 
@@ -259,8 +259,8 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                     }}
                     onInput={(e) => {
                         const el = e.currentTarget;
-                        el.style.height = 'auto';
-                        el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+                        el.setCssProps({ height: 'auto' });
+                        el.setCssProps({ height: `${Math.min(el.scrollHeight, 120)}px` });
                     }}
                 />
             </div>

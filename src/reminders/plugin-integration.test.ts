@@ -1,5 +1,50 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+type RemindersSettingsStub = {
+	debugLogging: boolean;
+	remindersFolderPath: string;
+	autoOpenView: 'sidebar' | 'fullscreen' | 'none';
+};
+
+type FileWrittenCallback = (file: unknown) => Promise<void>;
+type ReminderChangeCallback = (reminder: unknown, operation: unknown) => Promise<unknown>;
+type MockWriter = {
+	setOnFileWritten: ReturnType<typeof vi.fn<(callback: FileWrittenCallback) => void>>;
+	setOnReminderChange: ReturnType<typeof vi.fn<(callback: ReminderChangeCallback) => void>>;
+	onFileWritten?: FileWrittenCallback;
+	onReminderChange?: ReminderChangeCallback;
+};
+
+type MockPlugin = {
+	app: {
+		workspace: {
+			layoutReady: boolean;
+			onLayoutReady: ReturnType<typeof vi.fn<(callback: () => void) => void>>;
+		};
+	};
+	settings: {
+		workerUrl: string;
+	};
+	remindersSettings: RemindersSettingsStub;
+	syncRuntime: {
+		getApiClient: ReturnType<typeof vi.fn>;
+	};
+	activateRemindersView: ReturnType<typeof vi.fn<() => Promise<void>>>;
+	registerMarkdownCodeBlockProcessor: ReturnType<typeof vi.fn>;
+	registerEditorExtension: ReturnType<typeof vi.fn>;
+	registerView: ReturnType<typeof vi.fn>;
+	addRibbonIcon: ReturnType<typeof vi.fn>;
+	addCommand: ReturnType<typeof vi.fn>;
+	reminderIndex?: unknown;
+	markdownWriter?: unknown;
+	storage?: unknown;
+	remindersVaultWatcher?: {
+		register?: ReturnType<typeof vi.fn>;
+		unregister: ReturnType<typeof vi.fn>;
+	};
+	getLayoutReadyHandler: () => (() => void) | undefined;
+};
+
 const noticeMessages: string[] = [];
 const reminderIndexLoad = vi.fn(async () => {});
 const reminderIndexGetAll = vi.fn(() => [{ id: 'r1' }]);
@@ -18,14 +63,9 @@ const notificationOnReminderChange = vi.fn<(...args: unknown[]) => Promise<{ suc
 	async () => ({ success: true }),
 );
 const openFullScreenReminderModal = vi.fn();
-const loadRemindersSettings = vi.fn();
+const loadRemindersSettings = vi.fn<(plugin: MockPlugin) => Promise<void>>();
 
-let latestWriter: {
-	setOnFileWritten: ReturnType<typeof vi.fn>;
-	setOnReminderChange: ReturnType<typeof vi.fn>;
-	onFileWritten?: (file: unknown) => Promise<void>;
-	onReminderChange?: (reminder: unknown, operation: unknown) => Promise<unknown>;
-};
+let latestWriter: MockWriter;
 let latestWatcher: {
 	register: ReturnType<typeof vi.fn>;
 	unregister: ReturnType<typeof vi.fn>;
@@ -108,9 +148,7 @@ async function loadPluginIntegrationModule() {
 	return import('./plugin-integration');
 }
 
-function createPlugin(overrides: Record<string, unknown> = {}): Record<string, unknown> & {
-	getLayoutReadyHandler: () => (() => void) | undefined;
-} {
+function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 	let layoutReadyHandler: (() => void) | undefined;
 
 	return {
@@ -164,10 +202,10 @@ beforeEach(() => {
 	loadRemindersSettings.mockReset();
 
 	latestWriter = {
-		setOnFileWritten: vi.fn((callback) => {
+		setOnFileWritten: vi.fn((callback: FileWrittenCallback) => {
 			latestWriter.onFileWritten = callback;
 		}),
-		setOnReminderChange: vi.fn((callback) => {
+		setOnReminderChange: vi.fn((callback: ReminderChangeCallback) => {
 			latestWriter.onReminderChange = callback;
 		}),
 	};
@@ -225,8 +263,8 @@ describe('initializeReminders', () => {
 		expect(loadRemindersSettings).toHaveBeenCalledWith(plugin);
 		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders');
 		expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
-		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, (plugin as any).reminderIndex);
-		expect(createStorageCompat).toHaveBeenCalledWith((plugin as any).reminderIndex, latestWriter);
+		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex);
+		expect(createStorageCompat).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
 		expect(notificationReconcile).toHaveBeenCalledWith([{ id: 'r1' }]);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
 		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(4);

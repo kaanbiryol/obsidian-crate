@@ -89,7 +89,7 @@ describe("reminder view models", () => {
     expect(detail.completed.map((reminder) => reminder.id)).toEqual(["work-done"]);
     expect(detail.total).toBe(2);
     expect(detail.completionPercentage).toBe(50);
-    expect(detail.accentColor).toEqual(expect.any(String));
+    expect(typeof detail.accentColor).toBe("string");
   });
 
   it("builds browse card models with fallback empty stats for projects without reminders", () => {
@@ -101,7 +101,8 @@ describe("reminder view models", () => {
       ],
     );
 
-    expect(cards).toEqual([
+    expect(cards.every((card) => typeof card.accentColor === "string")).toBe(true);
+    expect(cards.map(({ project, stats, isComplete }) => ({ project, stats, isComplete }))).toEqual([
       {
         project: "Work",
         stats: {
@@ -110,7 +111,6 @@ describe("reminder view models", () => {
           total: 2,
           completionPercentage: 50,
         },
-        accentColor: expect.any(String),
         isComplete: false,
       },
       {
@@ -121,7 +121,6 @@ describe("reminder view models", () => {
           total: 0,
           completionPercentage: 0,
         },
-        accentColor: expect.any(String),
         isComplete: false,
       },
     ]);
@@ -134,12 +133,18 @@ describe("reminder view models", () => {
       makeReminder({ id: "other", project: "Home" }),
     ], "Work");
 
-    expect(header).toEqual({
+    expect(typeof header.accentColor).toBe("string");
+    expect({
+      activeCount: header.activeCount,
+      completedCount: header.completedCount,
+      total: header.total,
+      completionPercentage: header.completionPercentage,
+      isComplete: header.isComplete,
+    }).toEqual({
       activeCount: 0,
       completedCount: 2,
       total: 2,
       completionPercentage: 100,
-      accentColor: expect.any(String),
       isComplete: true,
     });
   });

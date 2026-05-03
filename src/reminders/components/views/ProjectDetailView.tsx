@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from '
 import { ChevronLeft, FolderOpen } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
-import { ShadowDOMButton, ShadowDOMNativeButton } from '../ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../ShadowDOMButton';
 import type { Reminder } from '../../types/reminder';
 import { ReminderCard } from '../ReminderCard';
 import { ReorderableReminderList } from '../ReorderableReminderList';

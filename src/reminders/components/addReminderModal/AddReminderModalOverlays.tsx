@@ -1,6 +1,6 @@
 import React from "react";
 import type { AnimationConfig } from "@/reminders/ui/animations";
-import type { Reminder, RecurrenceRule } from "@/reminders/types";
+import type { RecurrenceRule } from "@/reminders/types";
 import { DeleteConfirmationModal } from "../DeleteConfirmationModal";
 import { DatePickerModal } from "./DatePickerModal";
 import { ProjectPickerModal } from "./ProjectPickerModal";
