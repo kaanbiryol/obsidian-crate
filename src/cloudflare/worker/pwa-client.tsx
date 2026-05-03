@@ -23,6 +23,7 @@ import { useKeyboardInset } from './pwa-client/hooks/useKeyboardInset';
 import { usePushNotifications } from './pwa-client/hooks/usePushNotifications';
 import { usePwaBootstrap } from './pwa-client/hooks/usePwaBootstrap';
 import { usePwaStatus } from './pwa-client/hooks/usePwaStatus';
+import { useLaunchReminderModal } from './pwa-client/hooks/useLaunchReminderModal';
 import { useReminderSync } from './pwa-client/hooks/useReminderSync';
 import { useReminderMutations } from './pwa-client/hooks/useReminderMutations';
 import { usePullToRefresh } from './pwa-client/hooks/usePullToRefresh';
@@ -196,35 +197,7 @@ function App() {
 		useCallback(() => loadReminders({ silent: true }), [loadReminders]),
 	);
 
-	useEffect(() => {
-		if (!launchReminderId || !bootstrapped || !authToken || loading) return;
-		if (!isOffline && dataMode === 'cached' && refreshing) return;
-
-		const reminder = reminders.find((item) => item.id === launchReminderId);
-		if (!reminder) {
-			if (!refreshing) {
-				showToast('info', 'Reminder no longer exists');
-				setLaunchReminderId(null);
-			}
-			return;
-		}
-
-		setSelectedProject(reminder.project || null);
-		if (readOnlyMessage) {
-			showToast('info', readOnlyMessage);
-			setLaunchReminderId(null);
-			return;
-		}
-
-		setSettingsOpen(false);
-		setSaving(false);
-		setModal({
-			mode: 'edit',
-			reminderId: reminder.id,
-			draft: buildModalDraft(reminder, reminder.project || selectedProject),
-		});
-		setLaunchReminderId(null);
-	}, [
+	useLaunchReminderModal({
 		authToken,
 		bootstrapped,
 		dataMode,
@@ -235,8 +208,13 @@ function App() {
 		refreshing,
 		reminders,
 		selectedProject,
+		setLaunchReminderId,
+		setModal,
+		setSaving,
+		setSelectedProject,
+		setSettingsOpen,
 		showToast,
-	]);
+	});
 
 	const openModal = useCallback((mode: ModalMode, reminderId?: string, defaultProject?: string) => {
 		if (!ensureCanMutate()) return;

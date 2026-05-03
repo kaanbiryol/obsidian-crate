@@ -1,0 +1,105 @@
+// ============================================
+// Floating Action Button
+// ============================================
+
+.reminders-fab {
+    position: absolute;
+    right: 16px;
+    // Position above the bottom tab bar + spacing
+    bottom: calc(var(--reminders-tabbar-bottom-offset) + var(--reminders-tabbar-height) + var(--reminders-fab-gap));
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #7c3aed;
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+    z-index: 50;
+    transition: box-shadow 0.2s ease;
+
+    &:hover {
+        box-shadow: 0 6px 16px rgba(124, 58, 237, 0.5);
+    }
+
+    &:active {
+        box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+    }
+}
+
+// Modal-specific fullscreen adjustments
+.reminders-view.is-modal {
+    // Use Obsidian's primary background for consistency with status bar
+    background: var(--background-primary);
+
+    // Transparent to inherit modal background
+    .animated-tab-bar {
+        background: transparent;
+    }
+
+    // In modal mode, don't offset for Obsidian's nav bar
+    // Use minimal safe area - just enough to clear the home indicator
+    &.is-fullscreen {
+        --reminders-tabbar-overlay: 0px;
+        --reminders-safe-area: 0px;
+        --reminders-tabbar-bottom-offset: max(8px, calc(env(safe-area-inset-bottom) - 16px));
+        --reminders-fab-gap: 36px;
+
+        .animated-tab-bar-bottom {
+            margin-bottom: var(--reminders-tabbar-bottom-offset);
+        }
+    }
+}
+
+// ============================================
+// Compact Mode (no tab bar, tighter spacing)
+// ============================================
+
+.reminders-view.is-modal.is-compact {
+    --reminders-tabbar-overlay: 0px;
+    --reminders-tabbar-height: 0px;
+    --reminders-safe-area: 0px;
+    --reminders-fab-gap: 24px;
+    --reminders-bottom-gap: 8px;
+    --reminders-tabbar-bottom-offset: 0px;
+}
+
+// ============================================
+// Full-Screen Mode (Mobile Main Content)
+// ============================================
+
+.reminders-view.is-fullscreen {
+    // Use Obsidian's primary background for consistency with status bar
+    background: var(--background-primary);
+    --reminders-tabbar-overlay: 0px;
+    --reminders-safe-area: 0px;
+    // Add margin to sit above Obsidian's native bottom nav bar (~50px)
+    // Plus safe area for home indicator
+    // Reduced from 50px to 40px to position tab bar slightly lower on iOS
+    --reminders-tabbar-bottom-offset: calc(40px + env(safe-area-inset-bottom));
+
+    // Content doesn't need bottom padding for tab bar
+    // since tab bar is now in flex flow
+    .reminders-content {
+        padding-bottom: 0;
+    }
+
+    // Transparent to inherit view background
+    .animated-tab-bar {
+        background: transparent;
+    }
+
+    // Convert from fixed positioning to flex child
+    // This positions the tab bar at the bottom of our container
+    .animated-tab-bar-bottom {
+        position: relative;  // Override position: fixed
+        bottom: auto;        // Reset
+        left: auto;
+        right: auto;
+        flex-shrink: 0;
+        margin-bottom: var(--reminders-tabbar-bottom-offset);
+    }
+}

@@ -1,0 +1,214 @@
+.reminders-view-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    // No background for code blocks - they inherit from Obsidian
+    // Modal/fullscreen modes set their own background
+}
+
+// Shadow DOM root container
+// CSS custom properties from Obsidian inherit through shadow boundary
+.reminders-shadow-root {
+    height: 100%;
+    width: 100%; // Shadow DOM needs explicit width
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: var(--text-normal);
+    font-family: var(--font-interface);
+    font-size: var(--font-ui-medium);
+    // No background for code blocks - they inherit from Obsidian
+    // Modal/fullscreen modes set their own background
+    --reminders-noise: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyB2aWV3Qm94PScwIDAgMTIwIDEyMCc+CjxmaWx0ZXIgaWQ9J24nPgogIDxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjknIG51bU9jdGF2ZXM9JzEnIHN0aXRjaFRpbGVzPSdzdGl0Y2gnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyBmaWx0ZXI9J3VybCgjbiknIG9wYWNpdHk9JzAuMjUnLz4KPC9zdmc+");
+    --reminders-noise-size: 180px 180px;
+
+    // HeroUIProvider adds this wrapper - must participate in flex chain
+    > [data-overlay-container="true"] {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+    }
+}
+
+// Portal container inside shadow DOM for HeroUI components
+.heroui-portal-container {
+    position: relative;
+    z-index: 1000;
+}
+
+.reminders-view {
+    position: relative; // For FAB absolute positioning in fullscreen mode
+    flex: 1;
+    min-height: 0; // Critical: allows flex child to shrink below content size
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    --reminders-tabbar-height: 80px;
+    --reminders-tabbar-overlay: var(--reminders-tabbar-height);
+    --reminders-tabbar-bottom-offset: 0px;
+    --reminders-bottom-gap: 16px;
+    --reminders-fab-gap: 24px;
+    --reminders-fab-size: 56px;
+    --reminders-safe-area: env(safe-area-inset-bottom);
+
+    // Fix HeroUI component text visibility in Shadow DOM dark mode
+    // HeroUI's foreground color needs to be explicitly set for dark mode
+    &.dark {
+        // Set text color for HeroUI Card content
+        [data-slot="base"] {
+            color: var(--text-normal);
+        }
+
+        // Ensure Chip text is visible
+        [data-slot="content"] {
+            color: inherit;
+        }
+
+        // Fix text-sm and other text utilities
+        .text-sm, .text-base, .font-medium {
+            color: var(--text-normal);
+        }
+    }
+}
+
+// ============================================
+// Animated Tab Bar (Framer Motion)
+// ============================================
+
+// Base tab bar styles
+.animated-tab-bar {
+    flex-shrink: 0;
+    z-index: 40;
+    background: var(--background-primary);
+}
+
+// Bottom position variant
+.animated-tab-bar-bottom {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+// Content area - wrapper (views manage their own scrolling)
+.reminders-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    // Views handle their own bottom padding via hasFab prop
+    padding-bottom: 0;
+
+    // Hide scrollbar during page transitions to prevent flickering
+    &.is-transitioning {
+        // WebKit: transparent scrollbar thumb
+        &::-webkit-scrollbar-thumb {
+            background: transparent !important;
+        }
+
+        // Firefox: hide via scrollbar-color
+        scrollbar-color: transparent transparent;
+
+        // Hide inner view scrollbars during transitions (browse/project)
+        .ios-scroll {
+            scrollbar-color: transparent transparent;
+            overflow-y: hidden !important;
+        }
+
+        .ios-scroll::-webkit-scrollbar {
+            background: transparent;
+        }
+
+        .ios-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .ios-scroll::-webkit-scrollbar-thumb {
+            background: transparent !important;
+        }
+    }
+}
+
+// Minimal scrollbar - overlay style for all platforms
+.ios-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--background-modifier-border) transparent;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ios-scroll::-webkit-scrollbar {
+    width: 6px;
+    background: transparent;
+}
+
+.ios-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ios-scroll::-webkit-scrollbar-thumb {
+    background: var(--background-modifier-border);
+    border-radius: 3px;
+}
+
+.ios-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--text-faint);
+}
+
+// ============================================
+// Project Picker Modal Scrollbar
+// ============================================
+
+.project-picker-scroll {
+    // Thin, translucent scrollbar
+    scrollbar-width: thin;
+    scrollbar-color: rgba(128, 128, 128, 0.3) transparent;
+
+    &::-webkit-scrollbar {
+        width: 4px;
+        background: transparent;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
+        margin: 8px 0;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(128, 128, 128, 0.3);
+        border-radius: 2px;
+
+        &:hover {
+            background: rgba(128, 128, 128, 0.5);
+        }
+    }
+}
+
+// Dark theme scrollbar
+.theme-dark .project-picker-scroll {
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+    }
+}
+
+// Light theme scrollbar
+.theme-light .project-picker-scroll {
+    scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.12);
+
+        &:hover {
+            background: rgba(0, 0, 0, 0.2);
+        }
+    }
+}

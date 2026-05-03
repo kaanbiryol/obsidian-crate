@@ -1,0 +1,341 @@
+// ============================================
+// Premium Reminder Card (Glassmorphism)
+// ============================================
+
+.premium-reminder-card {
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.premium-reminder-content {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+
+    background: rgba(255, 255, 255, 0.015);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+
+    transition: background 200ms ease-out, border-color 200ms ease-out;
+}
+
+.premium-reminder-card:hover .premium-reminder-content {
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+.premium-reminder-card.is-completed .premium-reminder-content {
+    opacity: 0.6;
+    background: rgba(255, 255, 255, 0.01);
+}
+
+.reorderable-reminder-list {
+    touch-action: pan-y;
+}
+
+.reorderable-reminder-item {
+    position: relative;
+    touch-action: pan-y;
+
+    .premium-reminder-content,
+    .reminder-card__main {
+        padding-right: 52px;
+    }
+}
+
+.reorder-drag-handle {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    z-index: 2;
+    width: 40px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    color: var(--text-faint);
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+    transform: translateY(-50%);
+
+    &:active {
+        cursor: grabbing;
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    svg {
+        display: block;
+    }
+}
+
+// Custom checkbox
+.premium-checkbox {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 200ms ease-out;
+    margin-top: 1px;
+
+    &:hover {
+        border-color: rgba(255, 255, 255, 0.4);
+        transform: scale(1.05);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+
+    &.is-checked {
+        border-color: #22c55e;
+        background: #22c55e;
+
+        &:hover {
+            border-color: #22c55e;
+        }
+    }
+}
+
+.premium-checkbox-icon {
+    color: white;
+    animation: checkmarkPop 200ms ease-out;
+}
+
+@keyframes checkmarkPop {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+// Body content
+.premium-reminder-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.premium-reminder-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+.premium-reminder-title {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--text-normal);
+    position: relative;
+    transition: color 200ms ease-out;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    min-width: 0;
+
+    &.is-completed {
+        color: var(--text-muted);
+        text-decoration: line-through;
+        text-decoration-color: var(--text-faint);
+        text-decoration-thickness: 1.5px;
+    }
+}
+
+.premium-reminder-description {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 2px;
+    line-height: 1.4;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+}
+
+.reminder-markdown-link {
+    color: hsl(var(--heroui-primary));
+    text-decoration: none;
+    cursor: pointer;
+    border-bottom: 1px solid hsl(var(--heroui-primary) / 0.3);
+    transition: border-color 200ms ease-out, color 200ms ease-out;
+
+    &:hover {
+        border-bottom-color: hsl(var(--heroui-primary) / 0.7);
+    }
+
+    .is-completed & {
+        color: var(--text-muted);
+        border-bottom-color: transparent;
+    }
+}
+
+[contenteditable] .reminder-markdown-link {
+    cursor: text;
+}
+
+.premium-priority-flag {
+    flex-shrink: 0;
+    color: #ef4444;
+}
+
+// Metadata pills
+.premium-reminder-pills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.premium-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+
+    // Default glass pill style
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+
+    svg {
+        opacity: 0.7;
+    }
+
+    &.is-overdue {
+        svg {
+            opacity: 1;
+        }
+    }
+}
+
+.premium-pill-project {
+    padding-left: 5px;
+    gap: 3px;
+
+    svg {
+        opacity: 0.9;
+    }
+}
+
+// ============================================
+// Light theme adjustments for Reminder Card
+// ============================================
+
+.theme-light {
+    .premium-reminder-content {
+        background: rgba(0, 0, 0, 0.01);
+        border-color: rgba(0, 0, 0, 0.03);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.025);
+    }
+
+    .premium-reminder-card:hover .premium-reminder-content {
+        background: rgba(0, 0, 0, 0.025);
+        border-color: rgba(0, 0, 0, 0.06);
+    }
+
+    .premium-reminder-card.is-completed .premium-reminder-content {
+        background: rgba(0, 0, 0, 0.01);
+    }
+
+    .premium-checkbox {
+        border-color: rgba(0, 0, 0, 0.2);
+
+        &:hover {
+            border-color: rgba(0, 0, 0, 0.4);
+        }
+    }
+
+    .premium-pill {
+        background: rgba(0, 0, 0, 0.02);
+        border-color: rgba(0, 0, 0, 0.05);
+    }
+}
+
+// ============================================
+// Premium Reminder Card Wrapper (for views)
+// ============================================
+
+.premium-reminder-card-wrapper {
+    // Wrapper styles if needed for layout
+}
+
+// ============================================
+// Premium Divider
+// ============================================
+
+.premium-divider {
+    height: 1px;
+    margin: 8px 0 12px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.08) 20%,
+        rgba(255, 255, 255, 0.08) 80%,
+        transparent 100%
+    );
+}
+
+// ============================================
+// Light theme adjustments
+// ============================================
+
+.theme-light {
+    .project-detail-progress-bar {
+        background: rgba(0, 0, 0, 0.06);
+    }
+
+    .premium-divider {
+        background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(0, 0, 0, 0.08) 20%,
+            rgba(0, 0, 0, 0.08) 80%,
+            transparent 100%
+        );
+    }
+
+    .premium-back-button {
+        background: rgba(0, 0, 0, 0.015);
+        border-color: rgba(0, 0, 0, 0.04);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.025);
+
+        &:hover {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.045);
+        }
+
+        &:active {
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.025);
+        }
+    }
+}

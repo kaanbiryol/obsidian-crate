@@ -3,69 +3,9 @@ import { createMarkdownWriter } from '@/reminders/data/markdownWriter';
 import type { MarkdownWriter } from '@/reminders/data/markdownWriter';
 import type { ReminderIndex, IndexedReminder } from '@/reminders/data/reminderIndex';
 import { timezone as getLocalTimeZone } from '@/reminders/utils/time';
-import { TFile, type App } from 'obsidian';
-
-type MockVault = {
-  adapter: {
-    exists: ReturnType<typeof vi.fn<(path: string) => Promise<boolean>>>;
-  };
-  getAbstractFileByPath: ReturnType<typeof vi.fn<(path: string) => TFile | null>>;
-  createFolder: ReturnType<typeof vi.fn<(path: string) => Promise<void>>>;
-  create: ReturnType<typeof vi.fn<(path: string, content: string) => Promise<void>>>;
-  read: ReturnType<typeof vi.fn<(file: TFile) => Promise<string>>>;
-  modify: ReturnType<typeof vi.fn<(file: TFile, content: string) => Promise<void>>>;
-};
-
-type MockAppResult = {
-  app: App;
-  files: Map<string, string>;
-  folders: Set<string>;
-  vault: MockVault;
-};
+import { createMockAppWithVault } from '@/test/factories/obsidian';
 
 type ReminderChangeCallback = Parameters<MarkdownWriter['setOnReminderChange']>[0];
-
-function makeMockFile(path: string): TFile {
-  const file = new TFile();
-  const name = path.split('/').pop() ?? path;
-  const dotIndex = name.lastIndexOf('.');
-
-  file.vault = {} as never;
-  file.path = path;
-  file.name = name;
-  file.parent = null;
-  file.basename = dotIndex >= 0 ? name.slice(0, dotIndex) : name;
-  file.extension = dotIndex >= 0 ? name.slice(dotIndex + 1) : '';
-  file.stat = { ctime: 0, mtime: 0, size: 0 };
-
-  return file;
-}
-
-function createMockApp(initialFiles: Record<string, string> = {}): MockAppResult {
-  const files = new Map(Object.entries(initialFiles));
-  const folders = new Set<string>();
-
-  const vault: MockVault = {
-    adapter: {
-      exists: vi.fn(async (path: string) => folders.has(path) || files.has(path)),
-    },
-    getAbstractFileByPath: vi.fn((path: string) =>
-      files.has(path) ? makeMockFile(path) : null
-    ),
-    createFolder: vi.fn(async (path: string) => {
-      folders.add(path);
-    }),
-    create: vi.fn(async (path: string, content: string) => {
-      files.set(path, content);
-    }),
-    read: vi.fn(async (file: { path: string }) => files.get(file.path) || ''),
-    modify: vi.fn(async (file: { path: string }, content: string) => {
-      files.set(file.path, content);
-    }),
-  };
-
-  return { app: { vault } as unknown as App, files, folders, vault };
-}
 
 function createMockIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
   return {
@@ -96,7 +36,7 @@ function makeIndexedReminder(overrides: Partial<IndexedReminder>): IndexedRemind
 
 describe('markdownWriter', () => {
   it('creates a reminder file and appends a new line', async () => {
-    const { app, files, folders } = createMockApp();
+    const { app, files, folders } = createMockAppWithVault();
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
@@ -117,7 +57,7 @@ describe('markdownWriter', () => {
 
   it('updates a reminder when the line moved and rawLine no longer matches', async () => {
     const initial = '# Work\n\n- [ ] Task A Jan 1, 2026\n- [ ] Task B Jan 2, 2026\n';
-    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
     const index = createMockIndex();
@@ -146,7 +86,7 @@ describe('markdownWriter', () => {
       '- [ ] Task A Jan 1, 2026 <!-- crate-id:rem-2 -->',
       '',
     ].join('\n');
-    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
     const index = createMockIndex();
@@ -170,7 +110,7 @@ describe('markdownWriter', () => {
 
   it('preserves reminder ID metadata when updating content', async () => {
     const initial = '# Work\n\n- [ ] Task A Jan 1, 2026 <!-- crate-id:rem-1 -->\n';
-    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
     const index = createMockIndex();
@@ -194,7 +134,7 @@ describe('markdownWriter', () => {
 
   it('preserves date-only due dates when updating other fields', async () => {
     const initial = '# Work\n\n- [ ] Task D Jan 2, 2026\n';
-    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
     const index = createMockIndex();
@@ -218,7 +158,7 @@ describe('markdownWriter', () => {
 
   it('advances recurring reminders on toggleComplete without marking complete', async () => {
     const initial = '# Work\n\n- [ ] Task C Jan 1, 2026 10:00\n';
-    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
     const index = createMockIndex();
@@ -257,7 +197,7 @@ describe('markdownWriter', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 10, 9, 0, 0));
 
-    const { app, files } = createMockApp();
+    const { app, files } = createMockAppWithVault();
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
@@ -280,7 +220,7 @@ describe('markdownWriter', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-10T10:00:00.000Z'));
 
-    const { app, files } = createMockApp();
+    const { app, files } = createMockAppWithVault();
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
@@ -307,7 +247,7 @@ describe('markdownWriter', () => {
 
   it('moves a reminder to a new project file when project changes', async () => {
     const initial = '# Work\n\n- [ ] Task Move Jan 1, 2026\n';
-    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
     const index = createMockIndex();
@@ -344,7 +284,7 @@ describe('markdownWriter', () => {
       '- [ ] Task B Jan 2, 2026 <!-- crate-id:r-keep -->',
       '',
     ].join('\n');
-    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
     const index = createMockIndex();
@@ -380,7 +320,7 @@ describe('markdownWriter', () => {
       'Footer',
       '',
     ].join('\n');
-    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
     const index = createMockIndex();
@@ -405,7 +345,7 @@ describe('markdownWriter', () => {
   it('removes recurrence when update explicitly clears it', async () => {
     const dueDate = new Date(2026, 0, 1, 9, 0);
     const initial = '# Work\n\n- [ ] Task Repeat every day Jan 1, 2026 09:00\n';
-    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
     const index = createMockIndex();
@@ -436,7 +376,7 @@ describe('markdownWriter', () => {
   it('preserves recurrence when moving a reminder to a new project file', async () => {
     const dueDate = new Date(2026, 0, 1, 9, 0);
     const initial = '# Work\n\n- [ ] Task Move every day Jan 1, 2026 09:00\n';
-    const { app, files, folders } = createMockApp({ 'Reminders/Work.md': initial });
+    const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
     folders.add('Reminders');
 
     const index = createMockIndex();

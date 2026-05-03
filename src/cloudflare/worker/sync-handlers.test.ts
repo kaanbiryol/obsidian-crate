@@ -9,114 +9,7 @@ import {
 	handlePutSettings,
 	handleUpload,
 } from './sync-handlers';
-
-type StoredObject = {
-	body: ArrayBuffer;
-	httpMetadata?: { contentType?: string };
-	customMetadata?: { hash?: string };
-};
-
-function createBucket(initialEntries: Record<string, string> = {}) {
-	const store = new Map<string, StoredObject>();
-	for (const [key, value] of Object.entries(initialEntries)) {
-		store.set(key, {
-			body: new TextEncoder().encode(value).buffer,
-		});
-	}
-
-	return {
-		store,
-		bucket: {
-			put: vi.fn(async (key: string, body: ArrayBuffer, options?: StoredObject) => {
-				store.set(key, {
-					body,
-					httpMetadata: options?.httpMetadata,
-					customMetadata: options?.customMetadata,
-				});
-			}),
-			get: vi.fn(async (key: string) => {
-				const entry = store.get(key);
-				if (!entry) {
-					return null;
-				}
-
-				return {
-					body: entry.body,
-					size: entry.body.byteLength,
-					httpMetadata: entry.httpMetadata,
-					customMetadata: entry.customMetadata,
-					arrayBuffer: async () => entry.body,
-					text: async () => new TextDecoder().decode(entry.body),
-				};
-			}),
-			delete: vi.fn(async (key: string) => {
-				store.delete(key);
-			}),
-		},
-	};
-}
-
-function createDb(options?: { failBatch?: boolean; files?: Record<string, string | null> }) {
-	const files = new Map<string, string | null>(Object.entries(options?.files ?? {}));
-
-	function getBoundString(args: unknown[], index: number): string {
-		const value = args[index];
-		return typeof value === 'string' ? value : '';
-	}
-
-	const db = {
-		prepare: vi.fn((sql: string) => {
-			const statement = {
-				_sql: sql,
-				_args: [] as unknown[],
-				bind: vi.fn((...args: unknown[]) => {
-					statement._args = args;
-					return statement;
-				}),
-				run: vi.fn(async () => {
-					if (sql.startsWith('CREATE TABLE') || sql.startsWith('ALTER TABLE')) {
-						return {};
-					}
-					return {};
-				}),
-				first: vi.fn(async () => {
-					if (sql.includes('SELECT storage_key FROM files WHERE path = ?')) {
-						const path = getBoundString(statement._args, 0);
-						if (!files.has(path)) {
-							return null;
-						}
-
-						return { storage_key: files.get(path) };
-					}
-
-					return null;
-				}),
-				all: vi.fn(async () => ({ results: [] })),
-			};
-			return statement;
-		}),
-		batch: vi.fn(async (statements: Array<{ _sql: string; _args: unknown[] }>) => {
-			if (options?.failBatch) {
-				throw new Error('D1 unavailable');
-			}
-
-			for (const statement of statements) {
-				if (statement._sql.includes("INSERT OR REPLACE INTO files")) {
-					files.set(getBoundString(statement._args, 0), typeof statement._args[3] === 'string' ? statement._args[3] : null);
-				}
-
-				if (statement._sql.includes('DELETE FROM files WHERE path = ?')) {
-					files.delete(getBoundString(statement._args, 0));
-				}
-			}
-
-			return [];
-		}),
-		exec: vi.fn(async () => ({})),
-	};
-
-	return { db, files };
-}
+import { createMockD1Database, createMockR2Bucket } from '@/test/factories/cloudflare';
 
 async function responseJson(response: Response): Promise<unknown> {
 	return response.json() as Promise<unknown>;
@@ -131,14 +24,14 @@ async function sha256Hex(data: string): Promise<string> {
 
 describe('worker sync handlers', () => {
 	it('rejects traversal-style upload paths', async () => {
-		const { bucket } = createBucket();
+		const { bucket } = createMockR2Bucket();
 
 		const response = await handleUpload(
 			new Request('https://worker.test/sync/upload?path=notes/../secret.md', {
 				method: 'PUT',
 				body: 'hello',
 			}),
-			bucket as never,
+			bucket,
 			null,
 		);
 
@@ -148,7 +41,7 @@ describe('worker sync handlers', () => {
 	});
 
 	it('rejects uploads when the declared hash does not match the body', async () => {
-		const { bucket } = createBucket();
+		const { bucket } = createMockR2Bucket();
 
 		const response = await handleUpload(
 			new Request('https://worker.test/sync/upload?path=notes/test.md', {
@@ -159,7 +52,7 @@ describe('worker sync handlers', () => {
 					'X-File-Size': '5',
 				},
 			}),
-			bucket as never,
+			bucket,
 			null,
 		);
 
@@ -169,7 +62,7 @@ describe('worker sync handlers', () => {
 	});
 
 	it('computes and stores upload hash metadata when the client does not send one', async () => {
-		const { bucket, store } = createBucket();
+		const { bucket, store } = createMockR2Bucket();
 
 		const response = await handleUpload(
 			new Request('https://worker.test/sync/upload?path=notes/test.md', {
@@ -179,7 +72,7 @@ describe('worker sync handlers', () => {
 					'Content-Type': 'text/plain',
 				},
 			}),
-			bucket as never,
+			bucket,
 			null,
 		);
 
@@ -194,10 +87,10 @@ describe('worker sync handlers', () => {
 	});
 
 	it('leaves single-file uploads uncommitted when the D1 metadata write fails', async () => {
-		const { bucket, store } = createBucket({
+		const { bucket, store } = createMockR2Bucket({
 			'files/notes/test.md': 'before',
 		});
-		const { db } = createDb({ failBatch: true });
+		const { db } = createMockD1Database({ failBatch: true });
 
 		const response = await handleUpload(
 			new Request('https://worker.test/sync/upload?path=notes/test.md', {
@@ -207,8 +100,8 @@ describe('worker sync handlers', () => {
 					'Content-Type': 'text/plain',
 				},
 			}),
-			bucket as never,
-			db as never,
+			bucket,
+			db,
 		);
 
 		expect(response.status).toBe(503);
@@ -221,11 +114,11 @@ describe('worker sync handlers', () => {
 	});
 
 	it('still returns 503 when upload cleanup after a failed D1 commit also fails', async () => {
-		const { bucket } = createBucket();
+		const { bucket } = createMockR2Bucket();
 		bucket.delete = vi.fn(async () => {
 			throw new Error('cleanup unavailable');
 		});
-		const { db } = createDb({ failBatch: true });
+		const { db } = createMockD1Database({ failBatch: true });
 
 		const response = await handleUpload(
 			new Request('https://worker.test/sync/upload?path=notes/test.md', {
@@ -235,8 +128,8 @@ describe('worker sync handlers', () => {
 					'Content-Type': 'text/plain',
 				},
 			}),
-			bucket as never,
-			db as never,
+			bucket,
+			db,
 		);
 
 		expect(response.status).toBe(503);
@@ -249,7 +142,7 @@ describe('worker sync handlers', () => {
 	});
 
 	it('returns 400 for invalid JSON delete requests instead of throwing 500', async () => {
-		const { bucket } = createBucket();
+		const { bucket } = createMockR2Bucket();
 
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
@@ -257,7 +150,7 @@ describe('worker sync handlers', () => {
 				body: '{invalid',
 				headers: { 'Content-Type': 'application/json' },
 			}),
-			bucket as never,
+			bucket,
 			null,
 		);
 
@@ -266,10 +159,10 @@ describe('worker sync handlers', () => {
 	});
 
 	it('leaves single-file deletes uncommitted when the D1 metadata write fails', async () => {
-		const { bucket, store } = createBucket({
+		const { bucket, store } = createMockR2Bucket({
 			'files/notes/test.md': 'before',
 		});
-		const { db } = createDb({ failBatch: true });
+		const { db } = createMockD1Database({ failBatch: true });
 
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
@@ -277,8 +170,8 @@ describe('worker sync handlers', () => {
 				body: JSON.stringify({ path: 'notes/test.md' }),
 				headers: { 'Content-Type': 'application/json' },
 			}),
-			bucket as never,
-			db as never,
+			bucket,
+			db,
 		);
 
 		expect(response.status).toBe(503);
@@ -291,13 +184,13 @@ describe('worker sync handlers', () => {
 	});
 
 	it('returns success when delete cleanup fails after the D1 commit', async () => {
-		const { bucket, store } = createBucket({
+		const { bucket, store } = createMockR2Bucket({
 			'files/notes/test.md': 'before',
 		});
 		bucket.delete = vi.fn(async () => {
 			throw new Error('cleanup unavailable');
 		});
-		const { db, files } = createDb({
+		const { db, files } = createMockD1Database({
 			files: {
 				'notes/test.md': null,
 			},
@@ -309,8 +202,8 @@ describe('worker sync handlers', () => {
 				body: JSON.stringify({ path: 'notes/test.md' }),
 				headers: { 'Content-Type': 'application/json' },
 			}),
-			bucket as never,
-			db as never,
+			bucket,
+			db,
 		);
 
 		expect(response.status).toBe(200);
@@ -323,7 +216,7 @@ describe('worker sync handlers', () => {
 	});
 
 	it('reports partial batch delete failures instead of claiming full success', async () => {
-		const { bucket } = createBucket();
+		const { bucket } = createMockR2Bucket();
 		bucket.delete = vi.fn(async (key: string) => {
 			if (key === 'files/notes/fail.md') {
 				throw new Error('bucket unavailable');
@@ -338,7 +231,7 @@ describe('worker sync handlers', () => {
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),
-			bucket as never,
+			bucket,
 			null,
 		);
 
@@ -356,10 +249,10 @@ describe('worker sync handlers', () => {
 	});
 
 	it('leaves batch uploads uncommitted when the D1 metadata write fails', async () => {
-		const { bucket, store } = createBucket({
+		const { bucket, store } = createMockR2Bucket({
 			'files/notes/test.md': 'before',
 		});
-		const { db } = createDb({ failBatch: true });
+		const { db } = createMockD1Database({ failBatch: true });
 
 		const response = await handleBatchUpload(
 			new Request('https://worker.test/sync/batch-upload', {
@@ -376,8 +269,8 @@ describe('worker sync handlers', () => {
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),
-			bucket as never,
-			db as never,
+			bucket,
+			db,
 		);
 
 		expect(response.status).toBe(503);
@@ -395,10 +288,10 @@ describe('worker sync handlers', () => {
 	});
 
 	it('leaves batch deletes uncommitted when the D1 metadata write fails', async () => {
-		const { bucket, store } = createBucket({
+		const { bucket, store } = createMockR2Bucket({
 			'files/notes/test.md': 'before',
 		});
-		const { db } = createDb({ failBatch: true });
+		const { db } = createMockD1Database({ failBatch: true });
 
 		const response = await handleBatchDelete(
 			new Request('https://worker.test/sync/batch-delete', {
@@ -408,8 +301,8 @@ describe('worker sync handlers', () => {
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),
-			bucket as never,
-			db as never,
+			bucket,
+			db,
 		);
 
 		expect(response.status).toBe(503);
@@ -428,10 +321,10 @@ describe('worker sync handlers', () => {
 
 	it('downloads committed files through their D1 storage keys', async () => {
 		const managedKey = '__crate__/files/hash/object-1';
-		const { bucket } = createBucket({
+		const { bucket } = createMockR2Bucket({
 			[managedKey]: 'hello',
 		});
-		const { db } = createDb({
+		const { db } = createMockD1Database({
 			files: {
 				'notes/test.md': managedKey,
 			},
@@ -439,8 +332,8 @@ describe('worker sync handlers', () => {
 
 		const response = await handleDownload(
 			new Request('https://worker.test/sync/download?path=notes/test.md'),
-			bucket as never,
-			db as never,
+			bucket,
+			db,
 		);
 
 		expect(response.status).toBe(200);
@@ -449,10 +342,10 @@ describe('worker sync handlers', () => {
 	});
 
 	it('batch downloads legacy path-backed files when migrated rows have no storage key yet', async () => {
-		const { bucket } = createBucket({
+		const { bucket } = createMockR2Bucket({
 			'files/notes/test.md': 'hello',
 		});
-		const { db } = createDb({
+		const { db } = createMockD1Database({
 			files: {
 				'notes/test.md': null,
 			},
@@ -466,8 +359,8 @@ describe('worker sync handlers', () => {
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),
-			bucket as never,
-			db as never,
+			bucket,
+			db,
 		);
 
 		expect(response.status).toBe(200);
@@ -486,11 +379,11 @@ describe('worker sync handlers', () => {
 	});
 
 	it('validates shared settings writes and treats corrupt stored settings as absent', async () => {
-		const { bucket } = createBucket({
+		const { bucket } = createMockR2Bucket({
 			'__crate__/settings.json': '{broken json',
 		});
 
-		const getResponse = await handleGetSettings(bucket as never);
+		const getResponse = await handleGetSettings(bucket);
 		expect(getResponse.status).toBe(200);
 		expect(await responseJson(getResponse)).toEqual({ settings: null });
 
@@ -503,7 +396,7 @@ describe('worker sync handlers', () => {
 				showStatusBar: true,
 			})).buffer,
 		);
-		const legacyGetResponse = await handleGetSettings(bucket as never);
+		const legacyGetResponse = await handleGetSettings(bucket);
 		expect(await responseJson(legacyGetResponse)).toEqual({
 			settings: {
 				ignorePatterns: ['.git/'],
@@ -530,7 +423,7 @@ describe('worker sync handlers', () => {
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),
-			bucket as never,
+			bucket,
 		);
 		expect(badPutResponse.status).toBe(400);
 
@@ -549,13 +442,13 @@ describe('worker sync handlers', () => {
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),
-			bucket as never,
+			bucket,
 		);
 		expect(goodPutResponse.status).toBe(200);
 	});
 
 	it('rejects malformed batch upload entries without writing them', async () => {
-		const { bucket } = createBucket();
+		const { bucket } = createMockR2Bucket();
 
 		const response = await handleBatchUpload(
 			new Request('https://worker.test/sync/batch-upload', {
@@ -570,7 +463,7 @@ describe('worker sync handlers', () => {
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),
-			bucket as never,
+			bucket,
 			null,
 		);
 
