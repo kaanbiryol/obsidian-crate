@@ -18,6 +18,7 @@ export default tseslint.config(
 						'tailwind.config.js',
 						'tailwind.theme.js',
 						'src/cloudflare/worker/pwa-client.tsx',
+						'src/cloudflare/worker/pwa-client/components/*.tsx',
 						'vite.config.mts',
 						'vitest.config.ts',
 					]
@@ -45,7 +46,7 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['src/cloudflare/worker/pwa-client.tsx'],
+		files: ['src/cloudflare/worker/pwa-client.tsx', 'src/cloudflare/worker/pwa-client/**/*.{ts,tsx}'],
 		rules: {
 			'no-restricted-globals': 'off',
 			'obsidianmd/platform': 'off',
