@@ -1,5 +1,6 @@
-import { spawn } from 'node:child_process';
 import net from 'node:net';
+import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 
 async function getFreePort() {
 	return new Promise((resolve, reject) => {
@@ -17,35 +18,6 @@ async function getFreePort() {
 	});
 }
 
-function waitForPreview(child, port) {
-	return new Promise((resolve, reject) => {
-		let output = '';
-		const timeout = setTimeout(() => {
-			reject(new Error(`Timed out waiting for PWA preview on port ${port}\n${output}`));
-		}, 20_000);
-
-		const finish = (error) => {
-			clearTimeout(timeout);
-			reject(error);
-		};
-
-		child.stdout.on('data', (chunk) => {
-			output += chunk.toString();
-			if (output.includes(`PWA preview running at http://127.0.0.1:${port}`)) {
-				clearTimeout(timeout);
-				resolve();
-			}
-		});
-		child.stderr.on('data', (chunk) => {
-			output += chunk.toString();
-		});
-		child.once('error', finish);
-		child.once('exit', (code) => {
-			finish(new Error(`PWA preview exited before readiness with code ${code}\n${output}`));
-		});
-	});
-}
-
 async function fetchOk(url, init) {
 	const response = await fetch(url, init);
 	if (!response.ok) {
@@ -55,16 +27,10 @@ async function fetchOk(url, init) {
 }
 
 const port = await getFreePort();
-const origin = `http://127.0.0.1:${port}`;
-const child = spawn(process.execPath, ['scripts/pwa-preview.mjs'], {
-	cwd: process.cwd(),
-	env: { ...process.env, PORT: String(port) },
-	stdio: ['ignore', 'pipe', 'pipe'],
-});
+const assets = await buildPwaPreviewAssets();
+const { server, origin } = await listenPwaPreviewServer({ port, assets });
 
 try {
-	await waitForPreview(child, port);
-
 	const pageResponse = await fetchOk(`${origin}/notifications?token=preview-install-token&folder=Reminders&upcomingDays=7`);
 	const pageHtml = await pageResponse.text();
 	if (!pageHtml.includes('<div id="app"></div>')) throw new Error('PWA page is missing the app root');
@@ -105,5 +71,5 @@ try {
 
 	console.log(`PWA preview smoke test passed on ${origin}`);
 } finally {
-	child.kill('SIGTERM');
+	await new Promise((resolve) => server.close(resolve));
 }

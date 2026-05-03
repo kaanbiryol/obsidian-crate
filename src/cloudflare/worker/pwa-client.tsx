@@ -1,29 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RemindersAppShell, type ReminderCardRenderer } from '@/reminders/ui/RemindersAppShell';
-import { buildStoredReminderDates } from '@/reminders/utils/reminderDate';
-import { parseReminderContent } from '@/reminders/utils/reminderParser';
-import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import { PWA_ASSET_VERSION } from './pwa-version.gen';
 import {
 	AUTH_TOKEN_KEY,
 	REMINDERS_CACHE_KEY,
-	applyConfigFromUrl,
-	detectDeviceName,
-	formatLastUpdated,
 	isStandaloneApp,
 	loadCachedReminderSnapshot,
 	loadStoredConfig,
 	saveCachedReminderSnapshot,
 } from './pwa-client/config';
 import {
-	exchangeEnrollmentToken,
 	fetchPwaAssetVersion,
 	makeApiFetch,
 	registerPwaServiceWorker,
 	replaceBrowserUrlWithInstallToken,
-	urlBase64ToUint8Array,
-	validateStoredAuthToken,
 } from './pwa-client/api';
 import { ErrorState, EmptyAuthState, LoadingAuthState } from './pwa-client/components/AuthStates';
 import { PwaHeaderActions, PwaLoadingSkeleton, PwaPullRefreshIndicator, PwaTopNotices } from './pwa-client/components/PwaChrome';
@@ -31,28 +22,24 @@ import { ReminderSheet } from './pwa-client/components/ReminderSheet';
 import { SettingsSheet } from './pwa-client/components/SettingsSheet';
 import { WebReminderCard } from './pwa-client/components/WebReminderCard';
 import { useKeyboardInset } from './pwa-client/hooks/useKeyboardInset';
+import { usePushNotifications } from './pwa-client/hooks/usePushNotifications';
+import { usePwaBootstrap } from './pwa-client/hooks/usePwaBootstrap';
+import { usePwaStatus } from './pwa-client/hooks/usePwaStatus';
+import { useReminderMutations } from './pwa-client/hooks/useReminderMutations';
 import { usePullToRefresh } from './pwa-client/hooks/usePullToRefresh';
+import { useToast } from './pwa-client/hooks/useToast';
 import {
-	applyOptimisticReminderUpdate,
 	buildModalDraft,
-	buildOptimisticReminder,
-	mergeProject,
-	reorderProjectReminders,
 	toSharedReminder,
 } from './pwa-client/reminder-state';
 import type {
 	CachedReminderSnapshot,
 	DataMode,
-	ModalDraft,
 	ModalMode,
 	ModalState,
-	PushState,
-	ReminderMutationBody,
 	ReminderRecord,
 	StartTab,
 	StoredConfig,
-	ToastKind,
-	ToastState,
 } from './pwa-client/types';
 
 function App() {
@@ -71,13 +58,10 @@ function App() {
 	const [error, setError] = useState<string | null>(null);
 	const [dataMode, setDataMode] = useState<DataMode>('live');
 	const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
-	const [statusNow, setStatusNow] = useState(() => Date.now());
 	const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
 	const [updateAvailable, setUpdateAvailable] = useState(false);
 	const [modal, setModal] = useState<ModalState | null>(null);
-	const [toast, setToastState] = useState<ToastState | null>(null);
-	const [push, setPush] = useState<PushState>({ supported: false, subscribed: false, status: null });
-	const toastTimerRef = useRef<number | null>(null);
+	const { toast, showToast } = useToast();
 	const remindersRef = useRef(reminders);
 	const projectsRef = useRef(projects);
 	const hydratedCacheRef = useRef(false);
@@ -96,17 +80,6 @@ function App() {
 		projectsRef.current = projects;
 	}, [projects]);
 
-	useEffect(() => {
-		const timer = window.setInterval(() => setStatusNow(Date.now()), 30_000);
-		return () => window.clearInterval(timer);
-	}, []);
-
-	const showToast = useCallback((kind: ToastKind, message: string) => {
-		setToastState({ kind, message });
-		if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
-		toastTimerRef.current = window.setTimeout(() => setToastState(null), 3200);
-	}, []);
-
 	const logOut = useCallback((showMessage: boolean) => {
 		localStorage.removeItem(AUTH_TOKEN_KEY);
 		localStorage.removeItem(REMINDERS_CACHE_KEY);
@@ -123,6 +96,7 @@ function App() {
 	}, [showToast]);
 
 	const apiFetch = useMemo(() => makeApiFetch(authToken, () => logOut(false)), [authToken, logOut]);
+	const { push, refreshPushState, enablePushNotifications } = usePushNotifications({ apiFetch, showToast });
 
 	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
 		setReminders(snapshot.reminders);
@@ -176,6 +150,20 @@ function App() {
 		}
 	}, [apiFetch, authToken, config.folderPath, hydrateCachedSnapshot]);
 
+	usePwaBootstrap({
+		authToken,
+		hydrateCachedSnapshot,
+		hydratedCacheRef,
+		setAuthToken,
+		setBootstrapped,
+		setConfig,
+		setError,
+		setLaunchReminderId,
+		setLoading,
+		setSelectedProject,
+		setStartTab,
+	});
+
 	const refreshInstallActivationUrl = useCallback(async () => {
 		if (!authToken || isStandaloneApp()) return;
 		const response = await apiFetch('/notifications/reminders-enrollment-token', { method: 'POST' });
@@ -184,98 +172,6 @@ function App() {
 		if (!result.token) throw new Error('Missing install token');
 		replaceBrowserUrlWithInstallToken(result.token, config);
 	}, [apiFetch, authToken, config]);
-
-	const refreshPushState = useCallback(async () => {
-		const standalone = isStandaloneApp();
-		const supported = 'serviceWorker' in navigator && 'PushManager' in window;
-		if (!supported) {
-			setPush({ supported: false, subscribed: false, status: 'Push notifications are not supported in this browser.' });
-			return;
-		}
-
-		if (!standalone && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-			setPush({ supported: true, subscribed: false, status: 'Install this app on your home screen to enable push notifications on iOS.' });
-			return;
-		}
-
-		const registration = await registerPwaServiceWorker();
-		if (!registration) {
-			setPush({ supported: false, subscribed: false, status: 'Push notifications are not supported in this browser.' });
-			return;
-		}
-		const subscription = await registration.pushManager.getSubscription();
-		setPush({
-			supported: true,
-			subscribed: !!subscription,
-			status: subscription ? 'Notifications enabled on this device.' : null,
-		});
-	}, []);
-
-	useEffect(() => {
-		let cancelled = false;
-
-		async function bootstrap() {
-			try {
-				const applied = applyConfigFromUrl(loadStoredConfig());
-				if (cancelled) return;
-				setConfig(applied.config);
-				if (applied.project) {
-					setSelectedProject(applied.project);
-				}
-				if (applied.tab) {
-					setStartTab(applied.tab);
-				}
-				if (applied.reminderId) {
-					setLaunchReminderId(applied.reminderId);
-				}
-
-				let nextToken = authToken;
-				if (nextToken && applied.token) {
-					const storedTokenValid = await validateStoredAuthToken(nextToken);
-					if (cancelled) return;
-					if (!storedTokenValid) {
-						localStorage.removeItem(AUTH_TOKEN_KEY);
-						nextToken = null;
-					}
-				}
-
-				if (!nextToken && applied.token) {
-					nextToken = await exchangeEnrollmentToken(applied.token);
-					localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
-					if (cancelled) return;
-					setAuthToken(nextToken);
-				}
-
-				if (!nextToken) {
-					setLoading(false);
-					return;
-				}
-
-				const cached = loadCachedReminderSnapshot(applied.config.folderPath);
-				hydratedCacheRef.current = Boolean(cached);
-				if (cached) {
-					hydrateCachedSnapshot(cached);
-					setLoading(false);
-				}
-			} catch (bootstrapError) {
-				if (!cancelled) {
-					localStorage.removeItem(AUTH_TOKEN_KEY);
-					setAuthToken(null);
-					setError(bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError));
-					setLoading(false);
-				}
-			} finally {
-				if (!cancelled) {
-					setBootstrapped(true);
-				}
-			}
-		}
-
-		void bootstrap();
-		return () => {
-			cancelled = true;
-		};
-	}, []);
 
 	useEffect(() => {
 		if (!bootstrapped || !authToken) return;
@@ -335,23 +231,22 @@ function App() {
 		};
 	}, [authToken, bootstrapped, loadReminders]);
 
-	const readOnlyMessage = useMemo(() => {
-		if (isOffline) return 'Offline data is read-only';
-		if (dataMode === 'cached') return 'Showing last saved reminders. Refresh before editing.';
-		if (dataMode === 'error') return 'Refresh reminders before editing.';
-		return null;
-	}, [dataMode, isOffline]);
-	const readOnly = Boolean(readOnlyMessage);
-	const canShowNotificationPrompt = Boolean(authToken && bootstrapped && push.supported && !push.subscribed && isStandaloneApp());
-	const statusText = useMemo(() => {
-		const lastUpdated = formatLastUpdated(lastUpdatedAt, statusNow);
-		if (isOffline) return lastUpdatedAt ? `Offline - ${lastUpdated}` : 'Offline';
-		if (dataMode === 'cached') return `${lastUpdated} - stale`;
-		if (dataMode === 'error') return error ? `Refresh failed - ${error}` : 'Refresh failed';
-		if (refreshing) return lastUpdatedAt ? `Refreshing - ${lastUpdated}` : 'Refreshing';
-		return lastUpdatedAt ? lastUpdated : null;
-	}, [dataMode, error, isOffline, lastUpdatedAt, refreshing, statusNow]);
-	const statusKind = isOffline ? 'offline' : dataMode === 'live' ? 'live' : dataMode;
+	const {
+		readOnlyMessage,
+		readOnly,
+		canShowNotificationPrompt,
+		statusText,
+		statusKind,
+	} = usePwaStatus({
+		authToken,
+		bootstrapped,
+		dataMode,
+		error,
+		isOffline,
+		lastUpdatedAt,
+		push,
+		refreshing,
+	});
 
 	const ensureCanMutate = useCallback(() => {
 		if (!readOnlyMessage) return true;
@@ -419,180 +314,26 @@ function App() {
 		setSaving(false);
 	}, []);
 
-	const buildMutationBody = useCallback((draft: ModalDraft, mode: ModalMode): ReminderMutationBody => {
-		const createDefaultProject = selectedProject ?? 'Inbox';
-		const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
-		const rawContent = draft.content.replace(/\s+/g, ' ').trim();
-		const parsed = parseReminderContent(rawContent, projectOptions);
-		const project = parsed.project || draft.project.trim() || createDefaultProject;
-		const priority: 1 | 4 = parsed.priorityPart ? parsed.priority : draft.priority === 1 ? 1 : 4;
-		const content = (parsed.cleanContent || rawContent).replace(/\s+/g, ' ').trim();
-		const recurrence = normalizeRecurrenceRule(parsed.recurrence || draft.recurrence);
-		let dueDate: string | null = null;
-		let dueDatetime: string | null = null;
-
-		if (parsed.dueDate) {
-			const parsedDates = buildStoredReminderDates(parsed.dueDate, parsed.hasTime);
-			dueDate = parsedDates.dueDate ?? null;
-			dueDatetime = parsedDates.dueDatetime ?? null;
-		} else if (!recurrence) {
-			const rawDate = draft.dueDate.trim();
-			const rawTime = draft.dueTime.trim();
-			if (rawDate && rawTime) dueDatetime = new Date(`${rawDate}T${rawTime}`).toISOString();
-			else if (rawDate) dueDate = rawDate;
-		}
-
-		return {
-			folderPath: config.folderPath,
-			allDayNotificationTime: config.allDayNotificationTime,
-			content,
-			description: draft.description.trim() || null,
-			project,
-			priority,
-			dueDate,
-			dueDatetime,
-			recurrence: recurrence ?? (mode === 'edit' ? null : undefined),
-		};
-	}, [config.allDayNotificationTime, config.folderPath, projects, selectedProject]);
-
-	const saveReminder = useCallback(async (currentModal: ModalState) => {
-		if (!ensureCanMutate()) return;
-		const body = buildMutationBody(currentModal.draft, currentModal.mode);
-		if (!String(body.content || '').trim()) {
-			showToast('error', 'Reminder title required');
-			return;
-		}
-
-		setSaving(true);
-		const previousReminders = remindersRef.current;
-		const previousProjects = projectsRef.current;
-		const isEdit = currentModal.mode === 'edit' && Boolean(currentModal.reminderId);
-		const optimisticId = currentModal.reminderId ?? crypto.randomUUID();
-		const optimisticReminder = buildOptimisticReminder(body, optimisticId);
-		const nextProjects = mergeProject(previousProjects, optimisticReminder.project);
-		setProjects(nextProjects);
-		setReminders((current) => isEdit
-			? current.map((reminder) => reminder.id === optimisticId ? applyOptimisticReminderUpdate(reminder, body) : reminder)
-			: [...current, optimisticReminder]);
-		closeModal();
-		try {
-			const path = isEdit ? '/reminders/update' : '/reminders/create';
-			const requestBody: Record<string, unknown> = { ...body };
-			requestBody.id = optimisticId;
-
-			const response = await apiFetch(path, {
-				method: 'POST',
-				body: JSON.stringify(requestBody),
-			});
-			if (!response.ok) throw new Error(await response.text());
-			const result = await response.json() as { notificationWarning?: string };
-			await loadReminders({ silent: true });
-			showToast(result.notificationWarning ? 'info' : 'success', result.notificationWarning
-				? `Saved. Notification sync failed: ${result.notificationWarning}`
-				: 'Reminder saved');
-		} catch (saveError) {
-			setReminders(previousReminders);
-			setProjects(previousProjects);
-			showToast('error', saveError instanceof Error ? saveError.message : String(saveError));
-		}
-	}, [apiFetch, buildMutationBody, closeModal, ensureCanMutate, loadReminders, showToast]);
-
-	const toggleReminderCompleted = useCallback(async (reminderId: string, completed: boolean) => {
-		if (!ensureCanMutate()) return;
-		const previousReminders = remindersRef.current;
-		const nextCompleted = !completed;
-		setReminders((current) => current.map((reminder) => reminder.id === reminderId
-			? { ...reminder, completed: nextCompleted, updatedAt: new Date().toISOString() }
-			: reminder));
-		try {
-			const response = await apiFetch('/reminders/set-completed', {
-				method: 'POST',
-				body: JSON.stringify({
-					folderPath: config.folderPath,
-					allDayNotificationTime: config.allDayNotificationTime,
-					id: reminderId,
-					completed: nextCompleted,
-				}),
-			});
-			if (!response.ok) throw new Error(await response.text());
-			const result = await response.json() as { notificationWarning?: string };
-			await loadReminders({ silent: true });
-			if (result.notificationWarning) showToast('info', `Updated. Notification sync failed: ${result.notificationWarning}`);
-		} catch (toggleError) {
-			setReminders(previousReminders);
-			showToast('error', toggleError instanceof Error ? toggleError.message : String(toggleError));
-		}
-	}, [apiFetch, config.allDayNotificationTime, config.folderPath, ensureCanMutate, loadReminders, showToast]);
-
-	const deleteReminder = useCallback(async (reminderId: string) => {
-		if (!ensureCanMutate()) return;
-		const previousReminders = remindersRef.current;
-		setReminders((current) => current.filter((reminder) => reminder.id !== reminderId));
-		closeModal();
-		try {
-			const response = await apiFetch('/reminders/delete', {
-				method: 'DELETE',
-				body: JSON.stringify({ folderPath: config.folderPath, id: reminderId }),
-			});
-			if (!response.ok) throw new Error(await response.text());
-			await loadReminders({ silent: true });
-			showToast('success', 'Reminder deleted');
-		} catch (deleteError) {
-			setReminders(previousReminders);
-			showToast('error', deleteError instanceof Error ? deleteError.message : String(deleteError));
-		}
-	}, [apiFetch, closeModal, config.folderPath, ensureCanMutate, loadReminders, showToast]);
-
-	const persistReorder = useCallback(async (project: string, orderedIds: string[]) => {
-		if (!ensureCanMutate()) {
-			setReminders((current) => [...current]);
-			return;
-		}
-		const previousReminders = remindersRef.current;
-		setReminders((current) => reorderProjectReminders(current, project, orderedIds));
-		try {
-			const response = await apiFetch('/reminders/reorder', {
-				method: 'POST',
-				body: JSON.stringify({ folderPath: config.folderPath, project, orderedIds }),
-			});
-			if (!response.ok) throw new Error(await response.text());
-			await loadReminders({ silent: true });
-		} catch (reorderError) {
-			setReminders(previousReminders);
-			showToast('error', reorderError instanceof Error ? reorderError.message : String(reorderError));
-		}
-	}, [apiFetch, config.folderPath, ensureCanMutate, loadReminders, showToast]);
-
-	const enablePushNotifications = useCallback(async () => {
-		try {
-			if (!push.supported) throw new Error('Push is not supported on this device.');
-			const registration = await registerPwaServiceWorker();
-			if (!registration) throw new Error('Push is not supported on this device.');
-			const keyResponse = await fetch('/notifications/vapid-public-key');
-			const { publicKey } = await keyResponse.json() as { publicKey?: string };
-			if (!publicKey) throw new Error('Missing VAPID public key');
-			const subscription = await registration.pushManager.subscribe({
-				userVisibleOnly: true,
-				applicationServerKey: urlBase64ToUint8Array(publicKey),
-			});
-			const body = subscription.toJSON();
-			const response = await apiFetch('/notifications/subscribe', {
-				method: 'POST',
-				body: JSON.stringify({
-					endpoint: body.endpoint,
-					keys: body.keys,
-					deviceName: detectDeviceName(),
-				}),
-			});
-			if (!response.ok) throw new Error(await response.text());
-			setPush({ supported: true, subscribed: true, status: 'Notifications enabled on this device.' });
-			showToast('success', 'Notifications enabled');
-		} catch (pushError) {
-			const message = pushError instanceof Error ? pushError.message : String(pushError);
-			setPush((current) => ({ ...current, status: message }));
-			showToast('error', message);
-		}
-	}, [apiFetch, push.supported, showToast]);
+	const {
+		saveReminder,
+		toggleReminderCompleted,
+		deleteReminder,
+		persistReorder,
+	} = useReminderMutations({
+		apiFetch,
+		closeModal,
+		config,
+		ensureCanMutate,
+		loadReminders,
+		projects,
+		projectsRef,
+		remindersRef,
+		selectedProject,
+		setProjects,
+		setReminders,
+		setSaving,
+		showToast,
+	});
 
 	const sharedReminders = useMemo(() => reminders.map(toSharedReminder), [reminders]);
 	const renderSharedCard = useCallback<ReminderCardRenderer>(({ reminder, index, hideProject }) => (

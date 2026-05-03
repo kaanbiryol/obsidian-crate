@@ -14,10 +14,15 @@ import {
 import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/RichTextInput';
 import { ProjectAutocompleteDropdown } from '@/reminders/components/ProjectAutocompleteDropdown';
 import { useProjectAutocomplete } from '@/reminders/components/useProjectAutocomplete';
-import type { RecurrenceRule } from '@/reminders/types/reminder';
+import {
+	RECURRENCE_DAY_LABELS,
+	RECURRENCE_FREQUENCIES,
+	buildRecurrencePickerDraft,
+	getOrdinalSuffix,
+	recurrenceRuleFromPickerDraft,
+} from '@/reminders/components/addReminderModal/recurrencePickerShared';
 import { getProjectColor } from '@/reminders/utils/projectColors';
 import { formatLocalDateKey } from '@/reminders/utils/reminderDate';
-import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
 import {
 	applyDateFieldsToDraft,
@@ -29,8 +34,6 @@ import {
 import type { ModalDraft, ModalPickerId, ModalState } from '../types';
 
 const SHEET_SWITCH_DELAY_MS = 220;
-const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const;
-const RECURRENCE_DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
 
 export function ReminderSheet({
 	modal,
@@ -323,47 +326,6 @@ export function ReminderSheet({
 	);
 }
 
-interface RecurrencePickerDraft {
-	frequency: RecurrenceRule['frequency'];
-	interval: number;
-	daysOfWeek: number[];
-	dayOfMonth: number;
-	time: string;
-}
-
-function buildRecurrencePickerDraft(rule: RecurrenceRule | undefined): RecurrencePickerDraft {
-	return {
-		frequency: rule?.frequency ?? 'daily',
-		interval: rule?.interval ?? 1,
-		daysOfWeek: rule?.daysOfWeek ?? [],
-		dayOfMonth: rule?.dayOfMonth ?? new Date().getDate(),
-		time: `${String(rule?.hour ?? 9).padStart(2, '0')}:${String(rule?.minute ?? 0).padStart(2, '0')}`,
-	};
-}
-
-function getOrdinalSuffix(value: number): string {
-	const endings = ['th', 'st', 'nd', 'rd'];
-	const mod = value % 100;
-	return `${value}${endings[(mod - 20) % 10] || endings[mod] || endings[0]}`;
-}
-
-function recurrenceRuleFromPicker(draft: RecurrencePickerDraft): RecurrenceRule {
-	const [rawHour, rawMinute] = draft.time.split(':').map(Number);
-	const hour = Number.isInteger(rawHour) ? Math.min(23, Math.max(0, rawHour)) : 9;
-	const minute = Number.isInteger(rawMinute) ? Math.min(59, Math.max(0, rawMinute)) : 0;
-	const rule: RecurrenceRule = {
-		frequency: draft.frequency,
-		hour,
-		minute,
-	};
-
-	if (draft.interval > 1) rule.interval = draft.interval;
-	if (draft.frequency === 'weekly' && draft.daysOfWeek.length > 0) rule.daysOfWeek = draft.daysOfWeek;
-	if (draft.frequency === 'monthly') rule.dayOfMonth = Math.min(31, Math.max(1, draft.dayOfMonth));
-
-	return normalizeRecurrenceRule(rule) ?? rule;
-}
-
 function PickerSheet({
 	draft,
 	projectOptions,
@@ -504,7 +466,7 @@ function PickerSheet({
 					type="button"
 					aria-label="Apply repeat"
 					onClick={() => onSelect(applyReminderTextUpdate(draft, projectOptions, {
-						recurrence: recurrenceRuleFromPicker(recurrenceDraft),
+						recurrence: recurrenceRuleFromPickerDraft(recurrenceDraft),
 						dueDateValue: null,
 						hasTime: false,
 					}))}

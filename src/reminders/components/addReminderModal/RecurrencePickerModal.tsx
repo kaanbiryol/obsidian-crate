@@ -9,7 +9,14 @@ import { getGlassColors, getPickerModalProps } from '../../ui/glassStyles';
 import { PickerHeader } from './PickerHeader';
 import { PickerTimeCard } from './PickerTimeCard';
 import { PickerDoneButton } from './PickerDoneButton';
-import { normalizeRecurrenceRule } from '../../utils/recurrenceRule';
+import {
+	RECURRENCE_DAY_LABELS,
+	RECURRENCE_FREQUENCIES,
+	RECURRENCE_FREQUENCY_LABELS,
+	getOrdinalSuffix,
+	recurrenceRuleFromPickerState,
+	summarizeRecurrencePickerState,
+} from './recurrencePickerShared';
 
 interface RecurrencePickerModalProps {
     isOpen: boolean;
@@ -20,23 +27,6 @@ interface RecurrencePickerModalProps {
     recurrence?: RecurrenceRule;
     onApply: (rule: RecurrenceRule | undefined) => void;
 }
-
-const FREQUENCIES = ['daily', 'weekly', 'monthly'] as const;
-const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const DAY_FULL_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-const getOrdinalSuffix = (n: number): string => {
-    if (n === -1) return 'Last';
-    const s = ['th', 'st', 'nd', 'rd'];
-    const v = n % 100;
-    return n + (s[(v - 20) % 10] || s[v] || s[0]);
-};
-
-const FREQUENCY_LABELS: Record<string, string> = {
-    daily: 'Daily',
-    weekly: 'Weekly',
-    monthly: 'Monthly',
-};
 
 export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     isOpen,
@@ -69,32 +59,25 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     }, [isOpen, recurrence]);
 
     const summaryText = useMemo(() => {
-        const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        switch (frequency) {
-            case 'daily':
-                if (interval > 1) return `Every ${interval} days at ${timeStr}`;
-                return `Daily at ${timeStr}`;
-            case 'weekly': {
-                if (selectedDays.length === 0) return `Weekly at ${timeStr}`;
-                if (selectedDays.length === 7) return `Every day at ${timeStr}`;
-                const dayNames = selectedDays.map(d => DAY_FULL_NAMES[d]).join(', ');
-                return `${dayNames} at ${timeStr}`;
-            }
-            case 'monthly':
-                return `${getOrdinalSuffix(dayOfMonth)} of month at ${timeStr}`;
-        }
+        return summarizeRecurrencePickerState({
+            frequency,
+            interval,
+            daysOfWeek: selectedDays,
+            dayOfMonth,
+            hour,
+            minute,
+        });
     }, [frequency, interval, selectedDays, dayOfMonth, hour, minute]);
 
     const handleDone = () => {
-        const rule: RecurrenceRule = { frequency, hour, minute };
-        if (interval > 1) rule.interval = interval;
-        if (frequency === 'weekly' && selectedDays.length > 0) {
-            rule.daysOfWeek = selectedDays;
-        }
-        if (frequency === 'monthly') {
-            rule.dayOfMonth = dayOfMonth;
-        }
-        onApply(normalizeRecurrenceRule(rule));
+        onApply(recurrenceRuleFromPickerState({
+            frequency,
+            interval,
+            daysOfWeek: selectedDays,
+            dayOfMonth,
+            hour,
+            minute,
+        }));
         onClose();
     };
 
@@ -106,7 +89,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
         );
     };
 
-    const frequencyIndex = FREQUENCIES.indexOf(frequency);
+    const frequencyIndex = RECURRENCE_FREQUENCIES.indexOf(frequency);
 
     return (
         <BaseModal
@@ -151,7 +134,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                                     : '0 2px 8px hsl(var(--heroui-primary) / 0.2)',
                             }}
                         />
-                        {FREQUENCIES.map((freq) => {
+                        {RECURRENCE_FREQUENCIES.map((freq) => {
                             const isSelected = frequency === freq;
                             return (
                                 <ShadowDOMNativeButton
@@ -172,7 +155,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                                         transition: 'color 150ms ease',
                                     }}
                                 >
-                                    {FREQUENCY_LABELS[freq]}
+                                    {RECURRENCE_FREQUENCY_LABELS[freq]}
                                 </ShadowDOMNativeButton>
                             );
                         })}
@@ -270,7 +253,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                                             Repeat on
                                         </div>
                                         <div style={{ display: 'flex', gap: 6 }}>
-                                            {DAY_LABELS.map((label, idx) => {
+                                            {RECURRENCE_DAY_LABELS.map((label, idx) => {
                                                 const isSelected = selectedDays.includes(idx);
                                                 return (
                                                     <ShadowDOMNativeButton

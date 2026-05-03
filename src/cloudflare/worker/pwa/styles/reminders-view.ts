@@ -1,0 +1,151 @@
+export const REMINDERS_VIEW_STYLES = `
+/* Obsidian reminders view parity. Keep this standalone PWA visually aligned with the plugin UI. */
+:root{
+	--background-primary:#1e1e1e;
+	--background-secondary:#161616;
+	--background-modifier-border:#333333;
+	--text-normal:#dcddde;
+	--text-muted:#999999;
+	--text-faint:#6f6f6f;
+	--font-interface:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+	--reminder-red:#e53935;
+	--accent:#7c3aed;
+	--accent-rgb:124,58,237;
+	--accent-strong:#7c3aed;
+	--shadow:none;
+	--tabbar-h:80px;
+	--reminders-tabbar-height:80px;
+	--reminders-fab-gap:24px;
+	--reminders-fab-size:56px;
+}
+html,body{background:var(--background-primary);font-family:var(--font-interface);color:var(--text-normal)}
+#app{background:var(--background-primary)}
+.app-shell{background:var(--background-primary);--reminders-tabbar-overlay:0px;--reminders-safe-area:0px}
+.app-header{padding:calc(env(safe-area-inset-top) + 16px) 20px 12px;background:transparent;backdrop-filter:none;border-bottom:1px solid var(--background-modifier-border)}
+.app-header__row{align-items:flex-start;gap:12px}
+.app-header__body{animation:header-title-in 240ms cubic-bezier(.16,1,.3,1)}
+.app-header__body h1{font-size:28px;font-weight:600;line-height:1.2;letter-spacing:0;color:var(--text-normal)}
+.header-meta{gap:8px;margin-top:4px;min-height:28px;font-size:14px;color:var(--text-muted)}
+.overdue-pill{padding:4px 12px;background:var(--reminder-red);border:none;border-radius:12px;color:white;font-size:14px;font-weight:600}
+.icon-button{width:44px;height:44px;min-width:44px;border-radius:14px;background:rgba(255,255,255,.045);color:var(--text-muted)}
+.icon-button.is-active{background:rgba(124,58,237,.10);color:#7c3aed}
+.app-content{background:var(--background-primary);padding:16px 16px calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + var(--reminders-fab-size) + env(safe-area-inset-bottom));overflow-x:hidden}
+.view-transition{will-change:transform,opacity;transform-origin:center top}
+.view-transition--forward{animation:view-slide-forward 280ms cubic-bezier(.16,1,.3,1)}
+.view-transition--backward{animation:view-slide-backward 280ms cubic-bezier(.16,1,.3,1)}
+.view-transition--none{animation:none}
+.reminders-stack,.reorder-list,.completed-list{gap:0}
+.date-group{margin-bottom:24px}
+.date-group__title{margin:0 0 12px;padding-left:4px;font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+.project-card{background:transparent;border:none;box-shadow:none;margin-bottom:10px;padding:0}
+.project-card__row{padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03);box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.project-card__title{font-size:14px;font-weight:500;color:var(--text-normal);letter-spacing:0}
+.project-card__meta{font-size:12px;color:var(--text-muted)}
+.project-card__icon{background:rgba(var(--project-rgb,124,58,237),.08);border-radius:10px}
+.reminder-card,.premium-reminder-card{position:relative;margin-bottom:10px;background:transparent;border:none;border-radius:12px;box-shadow:none;overflow:visible}
+.reminder-card[data-drag-handle="true"]{cursor:grab}
+.reminder-card[data-drag-handle="true"]:active{cursor:grabbing}
+.reminder-card__main,.premium-reminder-content{position:relative;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:transform 160ms ease,background 200ms ease-out,border-color 200ms ease-out}
+.premium-reminder-card:active{transform:none}
+.premium-reminder-card:hover .premium-reminder-content{background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.06)}
+.premium-reminder-card:active .premium-reminder-content{transform:scale(.985);background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.07)}
+.premium-reminder-card.is-completed .premium-reminder-content{opacity:.6;background:rgba(255,255,255,.01)}
+.reorderable-reminder-list{touch-action:pan-y}
+.reorderable-reminder-item{position:relative;touch-action:pan-y}
+.reorderable-reminder-item .premium-reminder-content,.reorderable-reminder-item .reminder-card__main{padding-right:52px}
+.reorder-drag-handle{position:absolute;top:50%;right:8px;z-index:2;width:40px;height:44px;display:grid;place-items:center;padding:0;border:none;border-radius:12px;color:var(--text-faint);background:transparent;cursor:grab;touch-action:none;transform:translateY(-50%)}
+.reorder-drag-handle:active{cursor:grabbing;color:var(--text-muted);background:rgba(255,255,255,.04)}
+.reorder-drag-handle svg{display:block}
+.checkbox,.premium-checkbox{flex-shrink:0;width:20px;height:20px;min-width:20px;flex-basis:20px;border-radius:50%;border:2px solid rgba(255,255,255,.2);background:transparent;color:white;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:all 200ms ease-out;padding:0}
+.premium-checkbox:hover{border-color:rgba(255,255,255,.4);transform:scale(1.05)}
+.premium-checkbox:active{transform:scale(.95)}
+.premium-checkbox.is-checked{border-color:#22c55e;background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.35)}
+.premium-checkbox-icon{color:white;animation:checkmarkPop 200ms ease-out}
+@keyframes checkmarkPop{0%{transform:scale(0);opacity:0}50%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+.card-body,.premium-reminder-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;background:transparent;border:none;padding:0;text-align:left;color:inherit}
+.card-title-row,.premium-reminder-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0}
+.card-title,.premium-reminder-title{font-size:14px;font-weight:500;line-height:1.5;color:var(--text-normal);letter-spacing:0;position:relative;transition:color 200ms ease-out;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;display:block}
+.premium-reminder-title.is-completed{color:var(--text-muted);text-decoration:line-through;text-decoration-color:var(--text-faint);text-decoration-thickness:1.5px}
+.card-description,.premium-reminder-description{font-size:12px;color:rgba(255,255,255,.4);margin-top:2px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.priority-flag,.premium-priority-flag{flex-shrink:0;color:#ef4444;display:inline-flex;align-items:center}
+.card-pills,.premium-reminder-pills{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:0}
+.meta-pill,.tag-pill,.premium-pill{display:inline-flex;align-items:center;gap:4px;min-height:auto;padding:4px 10px 4px 8px;border-radius:6px;font-size:11px;font-weight:500;line-height:1;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);color:var(--text-muted)}
+.premium-pill svg{opacity:.7}
+.meta-pill.is-overdue,.premium-pill.is-overdue{background:rgba(239,68,68,.12);color:#ef4444;border-color:rgba(239,68,68,.2)}
+.premium-pill.is-overdue svg{opacity:1}
+.premium-pill-project{padding-left:5px;gap:3px}
+.premium-pill-project svg{opacity:.9}
+.card-handle{display:none}
+.completed-toggle{padding:8px 0 0;color:var(--text-muted);font-size:14px;font-weight:600}
+.bottom-tabs{position:fixed;left:0;right:0;bottom:0;z-index:40;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--background-primary);backdrop-filter:none;border-top:1px solid var(--background-modifier-border);display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.tab-button{position:relative;width:100%;min-height:48px;padding:10px 16px;border-radius:12px;background:transparent;color:var(--text-faint);font-size:13px;font-weight:500;letter-spacing:.01em;gap:4px;transition:color 180ms ease,background 260ms cubic-bezier(.16,1,.3,1),transform 180ms ease}
+.tab-button:active{transform:scale(.96)}
+.tab-button__icon{width:24px;height:24px;border-radius:0;background:transparent;transition:transform 260ms cubic-bezier(.16,1,.3,1),color 180ms ease}
+.tab-button.is-active{background:rgba(124,58,237,.10);color:#7c3aed;font-weight:600;animation:tab-active-pop 260ms cubic-bezier(.16,1,.3,1)}
+.tab-button.is-active .tab-button__icon{background:transparent;transform:translateY(-1px) scale(1.04)}
+.fab{right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:56px;height:56px;min-width:56px;border-radius:50%;background:#7c3aed;color:white;box-shadow:0 4px 12px rgba(124,58,237,.4);display:flex;align-items:center;justify-content:center}
+.fab:hover{box-shadow:0 6px 16px rgba(124,58,237,.5)}
+.modal-card,.settings-sheet{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:24px 24px 0 0}
+.composer-surface,.composer-panel{background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03);border-radius:14px}
+.field input,.field textarea,.field select{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08);color:var(--text-normal)}
+.placeholder-card{min-height:64px;background:rgba(124,58,237,.08);border:1px dashed rgba(124,58,237,.35);border-radius:12px}
+.is-dragging{opacity:.98;box-shadow:0 10px 24px rgba(0,0,0,.25)}
+.reminders-shadow-root{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:visible;color:var(--text-normal);font-family:var(--font-interface);font-size:var(--font-ui-medium,14px);background:var(--background-primary)}
+.pwa-reminders-view{position:fixed;inset:0;flex:1;min-height:0;width:100%;max-width:100vw;height:auto;display:flex;flex-direction:column;overflow:visible;--pwa-tabbar-content-height:64px;--pwa-tabbar-safe-area:env(safe-area-inset-bottom);--pwa-tabbar-content-offset:min(4px,var(--pwa-tabbar-safe-area));--reminders-tabbar-height:calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area));--reminders-tabbar-overlay:var(--reminders-tabbar-height);--reminders-tabbar-bottom-offset:0px;--reminders-bottom-gap:16px;--reminders-fab-gap:18px;--reminders-fab-size:56px;--reminders-safe-area:0px;--pwa-tabbar-bleed:0px;background:var(--background-primary)}
+.pwa-reminders-view.is-fullscreen{--reminders-tabbar-overlay:var(--reminders-tabbar-height);--reminders-safe-area:0px;--reminders-tabbar-bottom-offset:0px;--reminders-fab-gap:18px}
+.pwa-reminders-view .view-header{max-width:100vw;overflow:hidden;padding:calc(env(safe-area-inset-top) + 16px) 20px 12px!important;gap:12px}
+.pwa-reminders-view .view-header>div:first-child{min-width:0;flex:1 1 auto!important;width:0}
+.pwa-header-actions{display:flex;align-items:flex-start;justify-content:flex-end;gap:8px;min-width:0}
+.pwa-reminders-view button,.pwa-reminder-editor button,.pwa-picker-sheet button,.settings-sheet button{touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;border-radius:15px;display:grid;place-items:center;margin-top:0;padding:0;color:var(--text-muted);background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.055);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:transform 160ms ease,background 180ms ease,border-color 180ms ease,color 180ms ease}
+.pwa-header-settings-button svg,.pwa-header-sync-button svg{display:block}
+.pwa-header-settings-button:hover,.pwa-header-settings-button.is-active,.pwa-header-sync-button:hover{color:var(--text-normal);background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.09)}
+.pwa-header-settings-button:active,.pwa-header-sync-button:active{transform:scale(.94)}
+.pwa-header-sync-button.is-refreshing svg{animation:pwa-spin .8s linear infinite}
+.pwa-header-sync-button__dot{position:absolute;top:7px;right:7px;width:8px;height:8px;border-radius:50%;background:#22c55e;border:2px solid var(--background-primary);box-shadow:0 0 0 2px rgba(34,197,94,.16)}
+.pwa-header-sync-button.is-cached .pwa-header-sync-button__dot,.pwa-header-sync-button.is-offline .pwa-header-sync-button__dot{background:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.16)}
+.pwa-header-sync-button.is-error .pwa-header-sync-button__dot{background:#ef4444;box-shadow:0 0 0 2px rgba(239,68,68,.16)}
+.pwa-reminders-view .reminders-content{flex:1;min-height:0;overflow:hidden;padding-bottom:0;position:relative}
+.pwa-top-notices{flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding:12px 20px 4px;background:var(--background-primary)}
+.pwa-top-notices:empty{display:none}
+.pwa-status-line,.pwa-notification-prompt{width:100%;border-radius:12px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);color:var(--text-muted)}
+.pwa-status-line{padding:7px 10px;font-size:12px;font-weight:600;line-height:1.35;text-align:center}
+.pwa-status-line.is-offline,.pwa-status-line.is-cached,.pwa-status-line.is-error{background:rgba(245,158,11,.10);border-color:rgba(245,158,11,.18);color:#fbbf24}
+.pwa-status-line.is-live{background:rgba(255,255,255,.018)}
+.pwa-update-banner{align-self:stretch;min-width:0;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;border-radius:13px;color:var(--text-normal);background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);box-shadow:none;animation:pwa-update-slide-in .2s cubic-bezier(.32,.72,0,1) both}
+.pwa-update-banner__label{min-width:0;display:flex;align-items:center;gap:10px}
+.pwa-update-banner__dot{width:7px;height:7px;min-width:7px;border-radius:50%;background:#a78bfa;box-shadow:0 0 0 3px rgba(167,139,250,.13)}
+.pwa-update-banner__text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:650;line-height:1.2;color:rgba(220,221,222,.90)}
+.pwa-inline-button{height:40px;min-height:40px;border-radius:12px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:white;font-size:12px;font-weight:700;white-space:nowrap}
+.pwa-update-button{height:40px;min-height:40px;border-radius:11px;padding:0 10px;background:transparent;border:0;color:#a78bfa;font-size:13px;font-weight:720;line-height:1;white-space:nowrap}
+.pwa-update-button:active{background:rgba(124,58,237,.12);transform:scale(.98)}
+.pwa-inline-button:active,.primary-button:active,.secondary-button:active,.pwa-picker-option:active,.pwa-project-option:active,.pwa-recurrence-segment:active,.pwa-recurrence-stepper__button:active,.pwa-recurrence-day:active{transform:scale(.97)}
+.pwa-inline-button svg{width:14px;height:14px;display:block}
+.pwa-notification-prompt{display:flex;align-items:center;gap:10px;padding:10px}
+.pwa-notification-prompt__icon{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border-radius:10px;background:rgba(124,58,237,.14);color:#a78bfa}
+.pwa-notification-prompt__copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pwa-notification-prompt__copy strong{font-size:13px;font-weight:700;color:var(--text-normal);line-height:1.25}
+.pwa-notification-prompt__copy span{font-size:12px;color:var(--text-muted);line-height:1.35}
+.pwa-pull-refresh{flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--background-primary);opacity:0;transition:height .32s cubic-bezier(.32,.72,0,1),opacity .16s ease}
+.pwa-pull-refresh.is-visible{opacity:1}
+.pwa-pull-refresh__inner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:44px;transform:translateY(-2px)}
+.pwa-pull-refresh__glyph{width:28px;height:28px;display:grid;place-items:center;border-radius:50%;color:#a78bfa;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.16);box-shadow:0 4px 14px rgba(0,0,0,.14);transition:transform .18s cubic-bezier(.32,.72,0,1),color .16s ease,background .16s ease,border-color .16s ease}
+.pwa-pull-refresh.is-ready .pwa-pull-refresh__glyph,.pwa-pull-refresh.is-refreshing .pwa-pull-refresh__glyph{color:white;background:#7c3aed;border-color:rgba(124,58,237,.55);box-shadow:0 6px 18px rgba(124,58,237,.24)}
+.pwa-pull-refresh__glyph svg{width:19px;height:19px;display:block}
+.pwa-pull-refresh.is-refreshing .pwa-pull-refresh__glyph svg{animation:pwa-spin .82s linear infinite}
+.pwa-pull-refresh__label{font-size:10.5px;font-weight:650;line-height:1;color:#a78bfa;white-space:nowrap}
+.pwa-loading-state{height:100%;padding:16px}
+.pwa-skeleton-header{padding:2px 4px 16px}
+.pwa-skeleton-list{display:flex;flex-direction:column;gap:10px}
+.pwa-skeleton-row{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03)}
+.pwa-skeleton-check{width:20px;height:20px;min-width:20px;border-radius:50%;background:rgba(255,255,255,.07)}
+.pwa-skeleton-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px;padding-top:2px}
+.pwa-skeleton-line{height:12px;border-radius:999px;background:linear-gradient(90deg,rgba(255,255,255,.045),rgba(255,255,255,.09),rgba(255,255,255,.045));background-size:220% 100%;animation:pwa-skeleton-shimmer 1.4s ease-in-out infinite}
+.pwa-skeleton-line.is-title{width:38%;height:16px}
+.pwa-skeleton-line.is-meta{width:24%;height:11px;margin-top:8px}
+.pwa-skeleton-line.is-short{width:46%;height:10px}
+.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none}
+.pwa-reminders-view .bottom-tab-bar>div{display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--pwa-tabbar-content-height);max-width:42rem!important;margin:0 auto!important;padding:0!important;transform:translate3d(0,var(--pwa-tabbar-content-offset),0)!important}
+.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]{flex:1 1 0%!important;width:auto!important;max-width:100%!important;min-width:0!important;height:100%!important;min-height:0!important;padding:0!important}
+.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}
+.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))}`;
