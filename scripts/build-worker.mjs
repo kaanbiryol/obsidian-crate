@@ -2,6 +2,7 @@ import { build } from 'esbuild';
 import { writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { rawTextPlugin } from './raw-text-plugin.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
@@ -34,6 +35,7 @@ async function buildWorkerBundle() {
 		minify: false,
 		mainFields: ['module', 'main'],
 		conditions: ['worker', 'browser', 'import'],
+		plugins: [rawTextPlugin()],
 	});
 
 	const code = result.outputFiles[0].text;

@@ -1,4 +1,4 @@
-export const REMINDERS_VIEW_STYLES = `
+
 /* Obsidian reminders view parity. Keep this standalone PWA visually aligned with the plugin UI. */
 :root{
 	--background-primary:#1e1e1e;
@@ -148,4 +148,4 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view .bottom-tab-bar>div{display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--pwa-tabbar-content-height);max-width:42rem!important;margin:0 auto!important;padding:0!important;transform:translate3d(0,var(--pwa-tabbar-content-offset),0)!important}
 .pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]{flex:1 1 0%!important;width:auto!important;max-width:100%!important;min-width:0!important;height:100%!important;min-height:0!important;padding:0!important}
 .pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}
-.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))}`;
+.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))}

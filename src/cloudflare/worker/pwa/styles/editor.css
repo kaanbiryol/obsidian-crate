@@ -1,4 +1,4 @@
-export const EDITOR_STYLES = `
+
 .pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);background:rgba(0,0,0,.56);backdrop-filter:blur(8px);transition:padding-bottom .22s cubic-bezier(.32,.72,0,1)}
 .modal-card.pwa-reminder-editor{width:min(1120px,calc(100vw - 36px));max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);overflow:auto;background:#1f1f1f;border:1px solid rgba(255,255,255,.08);border-bottom:none;border-radius:24px 24px 0 0;padding:12px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -1px 0 rgba(255,255,255,.035);backface-visibility:hidden;transform:translate3d(0,0,0);will-change:transform;animation:pwa-sheet-in .36s cubic-bezier(.32,.72,0,1) both;display:flex;flex-direction:column}
 .modal-card.pwa-reminder-editor.is-switching-out{pointer-events:none;animation:pwa-sheet-out .22s cubic-bezier(.4,0,1,1) forwards}
@@ -151,4 +151,4 @@ export const EDITOR_STYLES = `
 .animated-tab-bar{flex-shrink:0;z-index:40;background:var(--background-primary)}
 .animated-tab-bar-bottom{position:fixed;bottom:0;left:0;right:0;border-top:1px solid var(--background-modifier-border);margin-bottom:var(--reminders-tabbar-bottom-offset)}
 .pwa-reminders-view.is-fullscreen .animated-tab-bar{background:transparent}
-.pwa-reminders-view.is-fullscreen .animated-tab-bar-bottom{position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none}`;
+.pwa-reminders-view.is-fullscreen .animated-tab-bar-bottom{position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none}

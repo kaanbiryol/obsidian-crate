@@ -1,11 +1,11 @@
-import { BASE_STYLES } from './styles/base';
-import { EDITOR_STYLES } from './styles/editor';
-import { REMINDERS_VIEW_STYLES } from './styles/reminders-view';
-import { RESPONSIVE_STYLES } from './styles/responsive';
+import baseStyles from './styles/base.css?raw-css';
+import editorStyles from './styles/editor.css?raw-css';
+import remindersViewStyles from './styles/reminders-view.css?raw-css';
+import responsiveStyles from './styles/responsive.css?raw-css';
 
 export const PWA_STYLES = [
-	BASE_STYLES,
-	REMINDERS_VIEW_STYLES,
-	EDITOR_STYLES,
-	RESPONSIVE_STYLES,
+	baseStyles,
+	remindersViewStyles,
+	editorStyles,
+	responsiveStyles,
 ].join('');

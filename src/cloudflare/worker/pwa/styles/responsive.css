@@ -1,4 +1,4 @@
-export const RESPONSIVE_STYLES = `
+
 @keyframes view-slide-forward{from{opacity:0;transform:translate3d(22px,0,0) scale(.992);filter:blur(1px)}to{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}}
 @keyframes view-slide-backward{from{opacity:0;transform:translate3d(-22px,0,0) scale(.992);filter:blur(1px)}to{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}}
 @keyframes header-title-in{from{opacity:.35;transform:translate3d(0,6px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
@@ -101,4 +101,4 @@ export const RESPONSIVE_STYLES = `
 	.checkbox,.premium-checkbox{width:20px;height:20px;min-width:20px;flex-basis:20px}
 	.bottom-tabs{padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
 	.fab{right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:56px;height:56px;min-width:56px}
-}`;
+}

@@ -1,5 +1,7 @@
+import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
-import { createJiti } from 'jiti';
+import { resolve } from 'node:path';
+import { rawTextPlugin } from './raw-text-plugin.mjs';
 
 export async function buildPwaPreviewAssets() {
 	const buildResult = spawnSync(process.execPath, ['scripts/build-worker.mjs'], {
@@ -13,6 +15,16 @@ export async function buildPwaPreviewAssets() {
 		throw error;
 	}
 
-	const jiti = createJiti(import.meta.url, { interopDefault: true });
-	return jiti.import('../src/cloudflare/worker/pwa.ts');
+	const pwaBundle = await build({
+		entryPoints: [resolve(process.cwd(), 'src/cloudflare/worker/pwa.ts')],
+		bundle: true,
+		format: 'esm',
+		platform: 'node',
+		target: 'es2020',
+		write: false,
+		plugins: [rawTextPlugin()],
+	});
+	const code = pwaBundle.outputFiles[0].text;
+	const url = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+	return import(url);
 }

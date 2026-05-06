@@ -1,4 +1,4 @@
-export const BASE_STYLES = `:root{
+:root{
 	--bg:#0b0d11;
 	--panel:#15171d;
 	--panel-2:#1a1d24;
@@ -178,4 +178,3 @@ input,textarea,[contenteditable="true"]{user-select:text;-webkit-user-select:tex
 .settings-panel__actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
 .placeholder-card{min-height:58px;background:rgba(var(--accent-rgb),.08);border:1px dashed rgba(var(--accent-rgb),.35)}
 .is-dragging{opacity:.98;transform:scale(1.01);box-shadow:0 18px 44px rgba(0,0,0,.45)}
-`;
