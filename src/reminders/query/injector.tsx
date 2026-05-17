@@ -8,13 +8,9 @@ import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { RemindersList } from "@/reminders/ui/remindersList/RemindersList";
 import { hashFileContent } from "@/reminders/utils/hashing";
+import { parseQuery } from "./queryOptions";
 
-export type ReminderQueryOptions = {
-  projectFilter?: string;
-  showCompleted?: boolean;
-  showToday?: boolean;
-  showUpcoming?: boolean;
-};
+export { parseQuery, type ReminderQueryOptions } from "./queryOptions";
 
 export class ReminderQueryInjector {
   private readonly plugin: CratePlugin;
@@ -123,37 +119,6 @@ export class ReminderQueryInjector {
       });
     };
   }
-}
-
-// Simple query parser - supports project filter and show-completed flag
-export function parseQuery(source: string): ReminderQueryOptions {
-  const lines = source.trim().split("\n");
-  const options: ReminderQueryOptions = {
-    showCompleted: false,
-    showToday: false,
-    showUpcoming: false,
-  };
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    const lower = line.toLowerCase();
-
-    if (lower.startsWith("project:")) {
-      const value = line.slice("project:".length).trim();
-      if (value) {
-        options.projectFilter = value;
-      }
-    } else if (lower.startsWith("show-completed:")) {
-      const value = lower.slice("show-completed:".length).trim();
-      if (value === "true") {
-        options.showCompleted = true;
-      } else if (value === "false") {
-        options.showCompleted = false;
-      }
-    }
-  }
-
-  return options;
 }
 
 function buildQueryPreferenceKey(

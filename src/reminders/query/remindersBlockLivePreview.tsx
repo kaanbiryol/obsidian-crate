@@ -15,7 +15,13 @@ import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { RemindersList } from "@/reminders/ui/remindersList/RemindersList";
 import { getEditorFile } from "./editorFile";
-import { parseQuery, type ReminderQueryOptions } from "./injector";
+import type { ReminderQueryOptions } from "./queryOptions";
+import {
+  extractRemindersBlockInfo,
+  isRemindersBlockStart,
+  parseRemindersBlockOptions,
+  setRemindersBlockShowCompleted,
+} from "./remindersBlockOptions";
 
 type WidgetHost = HTMLDivElement & {
   crateReactRoot?: Root;
@@ -70,13 +76,14 @@ class RemindersBlockWidget extends WidgetType {
 
   updateDOM(dom: HTMLElement, view: EditorView): boolean {
     // Re-parse the current block to get updated options
-    const blockInfo = extractBlockInfo(view, this.from, this.to);
+    const blockText = view.state.doc.sliceString(this.from, this.to);
+    const blockInfo = extractRemindersBlockInfo(blockText);
 
     if (!blockInfo) {
       return false; // Can't update, need to recreate
     }
 
-    const newOptions = parseBlockOptions(blockInfo.content, blockInfo.isToday, blockInfo.isUpcoming);
+    const newOptions = parseRemindersBlockOptions(blockInfo);
 
     // Update options
     this.options = newOptions;
@@ -118,41 +125,17 @@ class RemindersBlockWidget extends WidgetType {
     // Widget will update in place via updateDOM() - no recreation, no flicker
     setTimeout(() => {
       const blockText = this.view.state.doc.sliceString(this.from, this.to);
-      const lines = blockText.split("\n");
-
-      // Find the opening ``` line
-      const openingIndex = lines.findIndex(line => line.trim().startsWith("```"));
-      if (openingIndex === -1) return;
-
-      // Find the closing ``` line
-      const closingIndex = lines.findIndex((line, idx) => idx > openingIndex && line.trim().startsWith("```"));
-      if (closingIndex === -1) return;
-
-      // Get content lines (between opening and closing)
-      const contentLines = lines.slice(openingIndex + 1, closingIndex);
-
-      const existingLine = contentLines.find(line => line.trim().startsWith("show-completed:"));
-      const indentation = existingLine?.match(/^\s*/)?.[0] ?? "";
-
-      // Remove existing show-completed line
-      const filteredLines = contentLines.filter(line => !line.trim().startsWith("show-completed:"));
-
-      // Add new show-completed line with explicit value
-      filteredLines.push(`${indentation}show-completed: ${newValue}`);
-
-      // Reconstruct the block
-      const newContent = [
-        lines[openingIndex],
-        ...filteredLines,
-        ...lines.slice(closingIndex)
-      ].join("\n");
+      const newContent = setRemindersBlockShowCompleted(blockText, newValue);
+      if (!newContent) {
+        return;
+      }
 
       // Apply the edit
       this.view.dispatch({
         changes: {
           from: this.from,
           to: this.to,
-          insert: newContent
+          insert: newContent,
         }
       });
     }, 50); // Minimal delay for smooth state transition
@@ -219,56 +202,6 @@ class RemindersBlockWidget extends WidgetType {
   }
 }
 
-function extractBlockInfo(view: EditorView, from: number, to: number): { content: string; isToday: boolean; isUpcoming: boolean } | null {
-  const blockText = view.state.doc.sliceString(from, to);
-  const lines = blockText.split("\n");
-  if (lines.length < 2) {
-    return null;
-  }
-
-  const opening = lines[0].trim();
-  if (!opening.startsWith("```")) {
-    return null;
-  }
-
-  const blockWidgetType = opening.slice(3).trim().toLowerCase();
-
-  // Only support reminders, reminders-today, and reminders-upcoming
-  if (blockWidgetType !== "reminders" && blockWidgetType !== "reminders-today" && blockWidgetType !== "reminders-upcoming") {
-    return null;
-  }
-
-  const isToday = blockWidgetType === "reminders-today";
-  const isUpcoming = blockWidgetType === "reminders-upcoming";
-
-  const closingIndex = lines.findIndex((line, idx) => idx !== 0 && line.trim().startsWith("```"));
-  const contentLines = closingIndex === -1 ? lines.slice(1) : lines.slice(1, closingIndex);
-  const content = contentLines.join("\n");
-
-  return { content, isToday, isUpcoming };
-}
-
-function parseBlockOptions(content: string, isToday: boolean, isUpcoming: boolean): ReminderQueryOptions {
-  const parsed = parseQuery(content);
-
-  if (isToday) {
-    return {
-      ...parsed,
-      showToday: true,
-      projectFilter: undefined, // Show all projects for reminders-today
-    };
-  }
-
-  if (isUpcoming) {
-    return {
-      ...parsed,
-      showUpcoming: true,
-    };
-  }
-
-  return parsed;
-}
-
 export function createRemindersBlockExtension(plugin: CratePlugin) {
   return ViewPlugin.fromClass(
     class {
@@ -319,7 +252,7 @@ export function createRemindersBlockExtension(plugin: CratePlugin) {
               node.name.includes("codeblock")
             ) {
               const text = state.doc.sliceString(node.from, Math.min(node.from + 50, node.to));
-              if (text.match(/^```reminders(-today|-upcoming)?/)) {
+              if (isRemindersBlockStart(text)) {
                 inBlock = true;
               }
             }
@@ -349,12 +282,13 @@ export function createRemindersBlockExtension(plugin: CratePlugin) {
                   return;
                 }
 
-                const blockInfo = extractBlockInfo(view, node.from, node.to);
+                const blockText = view.state.doc.sliceString(node.from, node.to);
+                const blockInfo = extractRemindersBlockInfo(blockText);
                 if (!blockInfo) {
                   return;
                 }
 
-                const options = parseBlockOptions(blockInfo.content, blockInfo.isToday, blockInfo.isUpcoming);
+                const options = parseRemindersBlockOptions(blockInfo);
 
                 const widget = new RemindersBlockWidget(
                   plugin,
