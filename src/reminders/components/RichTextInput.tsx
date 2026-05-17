@@ -2,73 +2,12 @@ import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback 
 import { buildHTML, getPlainText } from '../utils/richTextParsing';
 import { saveCursorPosition, restoreCursorPosition, moveCursorToEnd } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
-
-function renderRichText(element: HTMLDivElement, html: string): void {
-    if (!html) {
-        element.replaceChildren();
-        return;
-    }
-
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    const fragment = range.createContextualFragment(html);
-    element.replaceChildren(fragment);
-}
-
-function insertPlainTextAtSelection(text: string): void {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) {
-        return;
-    }
-
-    const range = selection.getRangeAt(0);
-    range.deleteContents();
-
-    const lines = text.replace(/\r\n?/g, '\n').split('\n');
-    const fragment = document.createDocumentFragment();
-    let lastInsertedNode: Node | null = null;
-
-    for (let index = 0; index < lines.length; index++) {
-        const line = lines[index] ?? '';
-        if (line) {
-            const textNode = document.createTextNode(line);
-            fragment.append(textNode);
-            lastInsertedNode = textNode;
-        }
-
-        if (index < lines.length - 1) {
-            const lineBreak = document.createElement('br');
-            fragment.append(lineBreak);
-            lastInsertedNode = lineBreak;
-        }
-    }
-
-    if (!lastInsertedNode) {
-        return;
-    }
-
-    range.insertNode(fragment);
-
-    const nextRange = document.createRange();
-    if (lastInsertedNode instanceof Text) {
-        nextRange.setStart(lastInsertedNode, lastInsertedNode.textContent?.length ?? 0);
-    } else {
-        nextRange.setStartAfter(lastInsertedNode);
-    }
-    nextRange.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(nextRange);
-}
-
-function selectElementContents(element: HTMLElement): void {
-    const selection = window.getSelection();
-    if (!selection) return;
-
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    selection.removeAllRanges();
-    selection.addRange(range);
-}
+import {
+    focusRichTextElement,
+    insertPlainTextAtSelection,
+    renderRichText,
+    selectElementContents,
+} from './richTextInputDom';
 
 export interface RichTextInputHandle {
     /** Focus the input */
@@ -139,32 +78,12 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     }, [inputRef]);
 
     // Expose methods to parent via ref
-	    useImperativeHandle(ref, () => ({
-	        focus: (options = {}) => {
-	            if (actualRef.current) {
-	                actualRef.current.focus({ preventScroll: true });
-	                if (options.select) {
-	                    requestAnimationFrame(() => {
-	                        if (actualRef.current) {
-	                            selectElementContents(actualRef.current);
-	                        }
-	                    });
-	                    return;
-	                }
-
-	                const moveActiveCursorToEnd = () => {
-	                    const element = actualRef.current;
-	                    if (!element || document.activeElement !== element) return;
-	                    moveCursorToEnd(element);
-	                };
-
-	                moveActiveCursorToEnd();
-	                requestAnimationFrame(moveActiveCursorToEnd);
-	                for (const delay of [50, 140, 320, 650]) {
-	                    window.setTimeout(moveActiveCursorToEnd, delay);
-	                }
-	            }
-	        },
+    useImperativeHandle(ref, () => ({
+        focus: (options = {}) => {
+            if (actualRef.current) {
+                focusRichTextElement(actualRef.current, options);
+            }
+        },
         blur: () => {
             if (actualRef.current) {
                 actualRef.current.blur();
