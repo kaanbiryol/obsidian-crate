@@ -5,7 +5,7 @@ import type { StorageCompat } from "@/reminders/data/storageCompat";
 import {
   buildRemindersListPresentation,
   loadRemindersListData,
-} from "./remindersListModel";
+} from "./reminderListModel";
 
 function makeReminder(overrides: Partial<Reminder>): Reminder {
   return {

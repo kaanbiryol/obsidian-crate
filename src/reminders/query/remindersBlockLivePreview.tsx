@@ -13,7 +13,7 @@ import { createRoot, Root } from "react-dom/client";
 import type CratePlugin from "@/main";
 import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
 import { PluginContext } from "@/reminders/ui/reminders-context";
-import { RemindersList } from "@/reminders/ui/remindersList/RemindersList";
+import { RemindersList } from "@/reminders/ui/reminder-list/RemindersList";
 import { getEditorFile } from "./editorFile";
 import type { ReminderQueryOptions } from "./queryOptions";
 import {

@@ -16,7 +16,7 @@ import {
   buildRemindersListPresentation,
   formatDateHeader,
   loadRemindersListData,
-} from "./remindersListModel";
+} from "./reminderListModel";
 import "./styles.scss";
 
 type Props = {
