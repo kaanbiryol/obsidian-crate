@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import { sha256Hex } from './auth';
 import { PWA_ASSET_VERSION } from './pwa-version.gen';
+import type { Env } from './types';
 
 interface SubscriptionRecord {
 	id: string;
@@ -35,7 +36,7 @@ function createDb(initialTokens: Record<string, number>, options?: { failSubscri
 			const tokenHash = String(args[1]);
 			const now = Number(args[2]);
 			const expiresAt = state.tokens.get(tokenHash);
-			if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+			if (typeof expiresAt !== 'number' || expiresAt <= now) {
 				return { meta: { changes: 0 } };
 			}
 
@@ -59,7 +60,7 @@ function createDb(initialTokens: Record<string, number>, options?: { failSubscri
 			const tokenHash = String(args[5]);
 			const now = Number(args[6]);
 			const expiresAt = state.tokens.get(tokenHash);
-			if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+			if (typeof expiresAt !== 'number' || expiresAt <= now) {
 				return { meta: { changes: 0 } };
 			}
 
@@ -71,7 +72,7 @@ function createDb(initialTokens: Record<string, number>, options?: { failSubscri
 			const tokenHash = String(args[0]);
 			const now = Number(args[1]);
 			const expiresAt = state.tokens.get(tokenHash);
-			if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+			if (typeof expiresAt !== 'number' || expiresAt <= now) {
 				return { meta: { changes: 0 } };
 			}
 
@@ -154,16 +155,16 @@ function createDb(initialTokens: Record<string, number>, options?: { failSubscri
 	};
 }
 
-function createEnv(overrides?: Partial<ReturnType<typeof createEnvDefaults>>) {
+function createEnv(overrides?: Partial<Env>): Env {
 	return {
 		...createEnvDefaults(),
 		...overrides,
 	};
 }
 
-function createEnvDefaults() {
+function createEnvDefaults(): Env {
 	return {
-		BUCKET: {},
+		BUCKET: {} as R2Bucket,
 		DB: null,
 		AUTH_TOKEN: 'secret-token',
 		CF_ACCOUNT_ID: '',
@@ -173,7 +174,7 @@ function createEnvDefaults() {
 		REMINDER_ALARMS: {
 			idFromName: vi.fn(),
 			get: vi.fn(),
-		},
+		} as unknown as DurableObjectNamespace,
 	};
 }
 
@@ -253,7 +254,7 @@ describe('worker entrypoint', () => {
 		const db = createDb({ [tokenHash]: Date.now() + 60_000 });
 		const response = await worker.fetch(
 			createSubscriptionRequest('setup-token'),
-			createEnv({ DB: db.db }) as never,
+			createEnv({ DB: db.db as unknown as D1Database }) as never,
 		);
 
 		expect(response.status).toBe(200);
@@ -267,7 +268,7 @@ describe('worker entrypoint', () => {
 		const db = createDb({ [tokenHash]: Date.now() - 1000 });
 		const response = await worker.fetch(
 			createSubscriptionRequest('expired-token'),
-			createEnv({ DB: db.db }) as never,
+			createEnv({ DB: db.db as unknown as D1Database }) as never,
 		);
 
 		expect(response.status).toBe(401);
@@ -281,7 +282,7 @@ describe('worker entrypoint', () => {
 
 		const firstResponse = await worker.fetch(
 			createSubscriptionRequest('setup-token'),
-			createEnv({ DB: db.db }) as never,
+			createEnv({ DB: db.db as unknown as D1Database }) as never,
 		);
 
 		expect(firstResponse.status).toBe(500);
@@ -291,7 +292,7 @@ describe('worker entrypoint', () => {
 		db.setFailSubscriptionInsert(false);
 		const retryResponse = await worker.fetch(
 			createSubscriptionRequest('setup-token'),
-			createEnv({ DB: db.db }) as never,
+			createEnv({ DB: db.db as unknown as D1Database }) as never,
 		);
 
 		expect(retryResponse.status).toBe(200);

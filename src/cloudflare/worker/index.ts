@@ -29,8 +29,12 @@ import type { Env } from './types';
 
 export { ReminderAlarm } from './reminder-alarm';
 
-function requireDatabase(db: D1Database | null): Response | null {
-	return db ? null : corsResponse({ error: 'Database not available' }, 503);
+function requireDatabase(db: D1Database | null): D1Database | Response {
+	return db ?? corsResponse({ error: 'Database not available' }, 503);
+}
+
+function isResponse(value: D1Database | Response): value is Response {
+	return value instanceof Response;
 }
 
 export default {
@@ -54,22 +58,22 @@ export default {
 		if (path === '/notifications/open-obsidian' && method === 'GET') return handleOpenObsidian();
 		if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);
 		if (path === '/notifications/reminders-exchange' && method === 'POST') {
-			const dbResponse = requireDatabase(db);
-			if (dbResponse) {
-				return dbResponse;
+			const requiredDb = requireDatabase(db);
+			if (isResponse(requiredDb)) {
+				return requiredDb;
 			}
-			return await handleExchangeRemindersEnrollmentToken(request, db);
+			return await handleExchangeRemindersEnrollmentToken(request, requiredDb);
 		}
 
 		if (path === '/notifications/subscribe' && method === 'POST') {
 			if (request.headers.get('X-Crate-Enrollment-Token')?.trim()) {
-				const dbResponse = requireDatabase(db);
-				if (dbResponse) {
-					return dbResponse;
+				const requiredDb = requireDatabase(db);
+				if (isResponse(requiredDb)) {
+					return requiredDb;
 				}
 
 				try {
-					return await handleSubscribe(request, db);
+					return await handleSubscribe(request, requiredDb);
 				} catch {
 					return corsResponse({ error: 'Internal server error' }, 500);
 				}
@@ -113,16 +117,16 @@ export default {
 			// Sync routes
 			if (path === '/health' && method === 'GET') return await handleHealth();
 			if (path === '/sync/check' && method === 'GET') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleCheckChanges(request, db);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleCheckChanges(request, requiredDb);
 			}
 			if (path === '/sync/changes' && method === 'GET') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleGetChanges(request, db);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleGetChanges(request, requiredDb);
 			}
 			if (path === '/sync/manifest' && method === 'GET') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleGetManifest(request, db);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleGetManifest(request, requiredDb);
 			}
 			if (path === '/sync/upload' && method === 'PUT') return await handleUpload(request, bucket, db);
 			if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket, db);
@@ -134,14 +138,14 @@ export default {
 
 			// Auth token routes
 			if (path === '/auth/tokens' && (method === 'POST' || method === 'DELETE' || method === 'GET')) {
-				const dbResponse = requireDatabase(db);
-				if (dbResponse) {
-					return dbResponse;
+				const requiredDb = requireDatabase(db);
+				if (isResponse(requiredDb)) {
+					return requiredDb;
 				}
 
-				if (method === 'POST') return await handleRegisterToken(request, db);
-				if (method === 'DELETE') return await handleRevokeToken(request, db);
-				return await handleListTokens(request, db);
+				if (method === 'POST') return await handleRegisterToken(request, requiredDb);
+				if (method === 'DELETE') return await handleRevokeToken(request, requiredDb);
+				return await handleListTokens(request, requiredDb);
 			}
 
 			// Settings routes
@@ -150,62 +154,62 @@ export default {
 
 			// Reminder routes
 			if (path === '/reminders/list' && method === 'GET') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleListReminders(request, env);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleListReminders(request, env);
 			}
 			if (path === '/reminders/create' && method === 'POST') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleCreateReminder(request, env);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleCreateReminder(request, env);
 			}
 			if (path === '/reminders/update' && method === 'POST') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleUpdateReminder(request, env);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleUpdateReminder(request, env);
 			}
 			if (path === '/reminders/set-completed' && method === 'POST') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleSetReminderCompleted(request, env);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleSetReminderCompleted(request, env);
 			}
 			if (path === '/reminders/delete' && method === 'DELETE') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleDeleteReminder(request, env);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleDeleteReminder(request, env);
 			}
 			if (path === '/reminders/reorder' && method === 'POST') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleReorderReminders(request, env);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleReorderReminders(request, env);
 			}
 			if (path === '/reminders/schedule' && method === 'POST') return await handleScheduleReminder(request, env);
 			if (path === '/reminders/cancel' && method === 'DELETE') return await handleCancelReminder(request, env);
 			if (path === '/reminders/scheduled' && method === 'GET') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleListScheduled(db);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleListScheduled(requiredDb);
 			}
 
 			// Push subscription routes (authenticated)
 			if (path === '/notifications/subscribe' && (method === 'POST' || method === 'DELETE')) {
-				const dbResponse = requireDatabase(db);
-				if (dbResponse) {
-					return dbResponse;
+				const requiredDb = requireDatabase(db);
+				if (isResponse(requiredDb)) {
+					return requiredDb;
 				}
 
 				return method === 'POST'
-					? await handleSubscribe(request, db)
-					: await handleUnsubscribe(request, db);
+					? await handleSubscribe(request, requiredDb)
+					: await handleUnsubscribe(request, requiredDb);
 			}
 			if (path === '/notifications/subscriptions' && method === 'GET') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleListSubscriptions(db);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleListSubscriptions(requiredDb);
 			}
 			if (path === '/notifications/enrollment-token' && method === 'POST') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleCreateEnrollmentToken(db);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleCreateEnrollmentToken(requiredDb);
 			}
 			if (path === '/notifications/reminders-enrollment-token' && method === 'POST') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleCreateRemindersEnrollmentToken(db);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleCreateRemindersEnrollmentToken(requiredDb);
 			}
 			if (path === '/notifications/test' && method === 'POST') {
-				const dbResponse = requireDatabase(db);
-				return dbResponse ?? await handleTestPush(db);
+				const requiredDb = requireDatabase(db);
+				return isResponse(requiredDb) ? requiredDb : await handleTestPush(requiredDb);
 			}
 
 			return corsResponse({ error: 'Not found' }, 404);

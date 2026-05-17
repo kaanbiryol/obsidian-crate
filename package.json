@@ -10,6 +10,7 @@
 		"test:pwa-preview": "node scripts/pwa-smoke-test.mjs",
 		"dev": "npm run build:worker && vite build --watch --mode development",
 		"typecheck": "tsc -noEmit -skipLibCheck",
+		"typecheck:worker": "tsc -p src/cloudflare/worker/tsconfig.json --noEmit -skipLibCheck",
 		"build": "npm run build:worker && tsc -noEmit -skipLibCheck && vite build",
 		"size-check": "node scripts/check-bundle-size.mjs",
 		"deploy": "node scripts/deploy.mjs",
@@ -17,7 +18,7 @@
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "eslint .",
 		"test": "vitest run",
-		"check": "npm run lint && npm run typecheck && npm test"
+		"check": "npm run build:worker && npm run lint && npm run typecheck && npm run typecheck:worker && npm test"
 	},
 	"keywords": [],
 	"license": "0-BSD",
