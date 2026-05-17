@@ -7,7 +7,8 @@
  */
 import { Notice } from 'obsidian';
 import React, { useRef, useEffect } from 'react';
-import { ReminderCard as SharedReminderCard, createLogger } from '@/reminders';
+import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
+import { createLogger } from '@/reminders/utils/logger';
 
 const log = createLogger('ReminderCardWrapper');
 import type { Reminder } from '@/reminders/types/plugin-reminder';

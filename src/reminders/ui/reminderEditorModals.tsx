@@ -3,7 +3,7 @@ import { Modal, Platform } from "obsidian";
 import type { ReactElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import type CratePlugin from "@/main";
-import { createLogger } from "@/reminders";
+import { createLogger } from "@/reminders/utils/logger";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { ReminderModal } from "./createReminderModal";
 import { ModalContext, PluginContext } from "./reminders-context";

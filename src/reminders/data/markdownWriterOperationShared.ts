@@ -1,7 +1,5 @@
-import {
-  createLogger,
-  type Reminder,
-} from "@/reminders";
+import type { Reminder } from "@/reminders/types/reminder";
+import { createLogger } from "@/reminders/utils/logger";
 import type {
   MarkdownWriterContext,
   ReminderChangeContext,

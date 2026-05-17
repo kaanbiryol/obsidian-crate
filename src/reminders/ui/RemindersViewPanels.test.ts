@@ -15,17 +15,15 @@ async function loadPanelsModule() {
 			div: ({ children, ...props }: { children?: React.ReactNode }) => React.createElement('div', props, children),
 		},
 	}));
-	vi.doMock('@/reminders', () => ({
+	vi.doMock('@/reminders/components/views', () => ({
 		BrowseView: (props: unknown) => {
 			browseViewProps(props);
 			return React.createElement('div', { 'data-view': 'browse' });
 		},
-		EASE_EXPO_OUT: [0.16, 1, 0.3, 1],
 		InboxView: (props: unknown) => {
 			inboxViewProps(props);
 			return React.createElement('div', { 'data-view': 'inbox' });
 		},
-		PAGE_TRANSITION_DURATION: 0.2,
 		ProjectDetailView: (props: unknown) => {
 			projectDetailViewProps(props);
 			return React.createElement('div', { 'data-view': 'project-detail' });
@@ -38,6 +36,10 @@ async function loadPanelsModule() {
 			upcomingViewProps(props);
 			return React.createElement('div', { 'data-view': 'upcoming' });
 		},
+	}));
+	vi.doMock('@/reminders/ui/layoutConstants', () => ({
+		EASE_EXPO_OUT: [0.16, 1, 0.3, 1],
+		PAGE_TRANSITION_DURATION: 0.2,
 	}));
 
 	return import('./RemindersViewPanels');
@@ -80,7 +82,8 @@ afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
 	vi.doUnmock('framer-motion');
-	vi.doUnmock('@/reminders');
+	vi.doUnmock('@/reminders/components/views');
+	vi.doUnmock('@/reminders/ui/layoutConstants');
 });
 
 describe('RemindersViewPanels', () => {

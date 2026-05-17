@@ -1,10 +1,6 @@
-import {
-  calculateFirstOccurrence,
-  generateContentHash,
-  type Priority,
-  type Reminder,
-  type RecurrenceRule,
-} from "@/reminders";
+import type { Priority, Reminder, RecurrenceRule } from "@/reminders/types/reminder";
+import { generateContentHash } from "@/reminders/utils/checkboxParser";
+import { calculateFirstOccurrence } from "@/reminders/utils/recurrenceCalculator";
 import { rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
 import {
   buildStoredReminderDates,

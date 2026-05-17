@@ -6,7 +6,7 @@
  *
  * Usage:
  * - Import directly: import { InboxView } from '@obsidian-reminders/shared/components/views';
- * - Or via main export: import { InboxView } from '@/reminders';
+ * - Or via local barrel: import { InboxView } from '@/reminders/components/views';
  *
  * Each view accepts:
  * - reminders: Array of reminder objects

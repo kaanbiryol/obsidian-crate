@@ -1,8 +1,8 @@
 import {
-  calculateNextOccurrence,
   generateContentHash,
-  type Reminder,
-} from "@/reminders";
+} from "@/reminders/utils/checkboxParser";
+import type { Reminder } from "@/reminders/types/reminder";
+import { calculateNextOccurrence } from "@/reminders/utils/recurrenceCalculator";
 import { rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
 import {
   buildStoredReminderDates,

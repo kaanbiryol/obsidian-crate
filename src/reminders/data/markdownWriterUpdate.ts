@@ -1,7 +1,5 @@
-import {
-  generateContentHash,
-  type Reminder,
-} from "@/reminders";
+import type { Reminder } from "@/reminders/types/reminder";
+import { generateContentHash } from "@/reminders/utils/checkboxParser";
 import { rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
 import {
   buildStoredReminderDates,

@@ -5,7 +5,7 @@
  * Enables sync between markdown content and JSONStorage.
  */
 
-import type { Reminder } from '@/reminders';
+import type { Reminder } from '@/reminders/types/reminder';
 import { generateContentHash } from '@/reminders/utils/checkboxParser';
 
 interface LineMappingEntry {

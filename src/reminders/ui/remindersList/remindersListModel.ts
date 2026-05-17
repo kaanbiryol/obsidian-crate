@@ -1,11 +1,10 @@
 import {
-  formatDateHeader,
   getUpcomingReminders,
   groupRemindersByDate,
-  isReminderOverdue,
   sortReminders,
   sortRemindersByFileOrder,
-} from "@/reminders";
+} from "@/reminders/utils/reminderSort";
+import { formatDateHeader, isReminderOverdue } from "@/reminders/utils/dateFormatting";
 import { indexedToReminder, type IndexedReminder, type ReminderIndex } from "@/reminders/data/reminderIndex";
 import type { StorageCompat } from "@/reminders/data/storageCompat";
 import type { Reminder } from "@/reminders/types/plugin-reminder";

@@ -2,14 +2,16 @@ import React from "react";
 import { motion, type Easing } from "framer-motion";
 import {
   BrowseView,
-  EASE_EXPO_OUT,
   InboxView,
-  PAGE_TRANSITION_DURATION,
   ProjectDetailView,
-  type Reminder as SharedReminder,
   TodayView,
   UpcomingView,
-} from "@/reminders";
+} from "@/reminders/components/views";
+import {
+  EASE_EXPO_OUT,
+  PAGE_TRANSITION_DURATION,
+} from "@/reminders/ui/layoutConstants";
+import type { Reminder as SharedReminder } from "@/reminders/types/reminder";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import type { ViewMode } from "./remindersViewModel";
 

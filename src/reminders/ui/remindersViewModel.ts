@@ -1,12 +1,14 @@
 import {
   DEFAULT_PROJECT,
+} from "@/reminders/utils/constants";
+import {
   getOverdueReminders,
   getTodayReminders,
   getUpcomingReminders,
-  isReminderOverdue,
-  type Reminder,
-  type TabId,
-} from "@/reminders";
+} from "@/reminders/utils/reminderSort";
+import { isReminderOverdue } from "@/reminders/utils/dateFormatting";
+import type { Reminder } from "@/reminders/types/reminder";
+import type { TabId } from "@/reminders/ui/layoutConstants";
 
 export type ViewMode = TabId;
 

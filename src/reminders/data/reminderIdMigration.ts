@@ -1,5 +1,5 @@
 import { TFile, type App } from "obsidian";
-import { createLogger } from "@/reminders";
+import { createLogger } from "@/reminders/utils/logger";
 import { createReminderId, setReminderIdMarker } from "./reminderIdentity";
 import { isInRemindersFolder } from "./vaultScanner";
 import { parseCheckboxLine } from "@/reminders/utils/checkboxParser";

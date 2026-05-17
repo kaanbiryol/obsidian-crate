@@ -1,7 +1,7 @@
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
-import { STAGGERED_CARD_ANIMATION } from "@/reminders";
+import { STAGGERED_CARD_ANIMATION } from "@/reminders/ui/layoutConstants";
 
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { PluginContext } from "@/reminders/ui/reminders-context";

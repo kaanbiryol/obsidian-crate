@@ -1,8 +1,6 @@
 import type { App, TFile } from "obsidian";
-import {
-  createLogger,
-  type Reminder,
-} from "@/reminders";
+import type { Reminder } from "@/reminders/types/reminder";
+import { createLogger } from "@/reminders/utils/logger";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { IndexedReminder, ReminderIndex } from "./reminderIndex";
 import { getInitialProjectFileContent } from "./markdownReminderFile";

@@ -4,4 +4,4 @@ export type {
   Reminder,
   CreateReminderParams,
   UpdateReminderParams,
-} from "@/reminders";
+} from "./reminder";

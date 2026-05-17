@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Reminder } from "@/reminders";
+import type { Reminder } from "@/reminders/types/reminder";
 import {
   getCurrentHeaderData,
   getReminderCreateProject,

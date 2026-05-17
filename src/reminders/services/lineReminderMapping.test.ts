@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LineReminderMappingService } from '@/reminders/services/lineReminderMapping';
-import type { Reminder } from '@/reminders';
+import type { Reminder } from '@/reminders/types/reminder';
 
 function makeReminder(id: string, content: string): Reminder {
   return {

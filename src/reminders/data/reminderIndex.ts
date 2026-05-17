@@ -7,7 +7,8 @@
  */
 
 import type { App, TFile } from "obsidian";
-import { createLogger, type Priority, type RecurrenceRule, type Reminder } from "@/reminders";
+import type { Priority, RecurrenceRule, Reminder } from "@/reminders/types/reminder";
+import { createLogger } from "@/reminders/utils/logger";
 import { isReminderOverdue, isReminderToday, isReminderWithinDays } from "./reminderIndexDates";
 import { createReminderLookupStore } from "./reminderIndexLookupStore";
 import { createReminderOptimisticState } from "./reminderIndexOptimisticState";

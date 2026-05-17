@@ -10,7 +10,7 @@
  */
 
 import { TAbstractFile, TFile, TFolder, type App } from "obsidian";
-import { createLogger } from "@/reminders";
+import { createLogger } from "@/reminders/utils/logger";
 import { parseCheckboxLine, generateContentHash } from "@/reminders/utils/checkboxParser";
 import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import type { IndexedReminder } from "./reminderIndex";
