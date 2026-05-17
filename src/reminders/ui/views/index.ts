@@ -5,8 +5,7 @@
  * They handle the display of reminders with consistent styling and animations.
  *
  * Usage:
- * - Import directly: import { InboxView } from '@obsidian-reminders/shared/components/views';
- * - Or via local barrel: import { InboxView } from '@/reminders/components/views';
+ * - Import directly: import { InboxView } from '@/reminders/ui/views';
  *
  * Each view accepts:
  * - reminders: Array of reminder objects

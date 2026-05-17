@@ -15,7 +15,7 @@ async function loadPanelsModule() {
 			div: ({ children, ...props }: { children?: React.ReactNode }) => React.createElement('div', props, children),
 		},
 	}));
-	vi.doMock('@/reminders/components/views', () => ({
+	vi.doMock('@/reminders/ui/views', () => ({
 		BrowseView: (props: unknown) => {
 			browseViewProps(props);
 			return React.createElement('div', { 'data-view': 'browse' });
@@ -82,7 +82,7 @@ afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
 	vi.doUnmock('framer-motion');
-	vi.doUnmock('@/reminders/components/views');
+	vi.doUnmock('@/reminders/ui/views');
 	vi.doUnmock('@/reminders/ui/layoutConstants');
 });
 

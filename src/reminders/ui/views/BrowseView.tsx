@@ -3,14 +3,14 @@ import { FolderOpen } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
-import { EmptyState } from '../EmptyState';
+import { EmptyState } from '../../components/EmptyState';
 import { BrowseProjectCard } from './BrowseProjectCard';
 import { buildBrowseProjectCardsViewModel } from './viewModels';
 import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,
   SCROLL_PADDING_WITHOUT_FAB_CSS
-} from '../../ui/layoutConstants';
+} from '../layoutConstants';
 
 export interface BrowseViewProps {
   projects: string[];

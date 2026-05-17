@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 
 import type { Reminder } from '../../types/reminder';
-import { ShadowDOMButton } from '../ShadowDOMButton';
-import { CARD_ANIMATION } from '../../ui/layoutConstants';
+import { ShadowDOMButton } from '../../components/ShadowDOMButton';
+import { CARD_ANIMATION } from '../layoutConstants';
 
 export const ProjectCompletedSection = memo(function ProjectCompletedSection({
   reminders,

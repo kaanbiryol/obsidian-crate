@@ -6,15 +6,15 @@ import { Divider } from '@heroui/react';
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
 import { formatDateHeader } from '../../utils/dateFormatting';
-import { ReminderCard } from '../ReminderCard';
-import { EmptyState } from '../EmptyState';
+import { ReminderCard } from '../../components/ReminderCard';
+import { EmptyState } from '../../components/EmptyState';
 import { buildUpcomingViewModel } from './viewModels';
 import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,
   SCROLL_PADDING_WITH_FAB_CSS,
   STAGGERED_CARD_ANIMATION
-} from '../../ui/layoutConstants';
+} from '../layoutConstants';
 
 export interface UpcomingViewProps {
   reminders: Reminder[];

@@ -4,8 +4,8 @@ import { Calendar } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
-import { ReminderCard } from '../ReminderCard';
-import { EmptyState } from '../EmptyState';
+import { ReminderCard } from '../../components/ReminderCard';
+import { EmptyState } from '../../components/EmptyState';
 import { ProjectCompletedSection } from './ProjectCompletedSection';
 import { buildTodayViewModel } from './viewModels';
 import {
@@ -13,7 +13,7 @@ import {
   CONTENT_PADDING_TOP,
   SCROLL_PADDING_WITH_FAB_CSS,
   CARD_ANIMATION
-} from '../../ui/layoutConstants';
+} from '../layoutConstants';
 
 export interface TodayViewProps {
   reminders: Reminder[];

@@ -15,7 +15,7 @@ export * from './components/DeleteConfirmationModal';
 export * from './components/BottomTabBar';
 export * from './components/FloatingActionButton';
 export * from './components/ViewHeader';
-export * from './components/views';
+export * from './ui/views';
 export * from './components/ShadowDOMButton';
 
 // UI utilities

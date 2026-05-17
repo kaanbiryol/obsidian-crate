@@ -6,7 +6,7 @@ import {
   ProjectDetailView,
   TodayView,
   UpcomingView,
-} from "@/reminders/components/views";
+} from "@/reminders/ui/views";
 import {
   EASE_EXPO_OUT,
   PAGE_TRANSITION_DURATION,

@@ -2,11 +2,11 @@ import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from '
 import { ChevronLeft, FolderOpen } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
-import { ShadowDOMNativeButton } from '../ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
 import type { Reminder } from '../../types/reminder';
-import { ReminderCard } from '../ReminderCard';
-import { ReorderableReminderList } from '../ReorderableReminderList';
-import { EmptyState } from '../EmptyState';
+import { ReminderCard } from '../../components/ReminderCard';
+import { ReorderableReminderList } from '../../components/ReorderableReminderList';
+import { EmptyState } from '../../components/EmptyState';
 import { ProjectCompletedSection } from './ProjectCompletedSection';
 import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
@@ -14,7 +14,7 @@ import {
   CONTENT_PADDING_X,
   CONTENT_PADDING_TOP,
   SCROLL_PADDING_WITH_FAB_CSS,
-} from '../../ui/layoutConstants';
+} from '../layoutConstants';
 
 
 export interface ProjectDetailViewProps {
