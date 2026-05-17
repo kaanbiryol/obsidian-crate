@@ -1,5 +1,5 @@
 import React from 'react';
-import type { RichTextInputHandle } from '../RichTextInput';
+import type { RichTextInputHandle } from '../../components/RichTextInput';
 import type { RecurrenceRule } from '../../types';
 import { ReminderActionChips } from './ReminderActionChips';
 import { ReminderEditorFields } from './ReminderEditorFields';

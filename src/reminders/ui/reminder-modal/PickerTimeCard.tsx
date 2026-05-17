@@ -3,7 +3,7 @@ import { Clock } from 'lucide-react';
 import { TimeInput } from '@heroui/react';
 import { Time } from '@internationalized/date';
 
-import { getGlassColors } from '../../ui/glassStyles';
+import { getGlassColors } from '../glassStyles';
 
 interface PickerTimeCardProps {
     isDark: boolean;

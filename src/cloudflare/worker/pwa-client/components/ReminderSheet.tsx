@@ -11,8 +11,8 @@ import {
 	X,
 } from 'lucide-react';
 import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/RichTextInput';
-import { ProjectAutocompleteDropdown } from '@/reminders/components/ProjectAutocompleteDropdown';
-import { useProjectAutocomplete } from '@/reminders/components/useProjectAutocomplete';
+import { ProjectAutocompleteDropdown } from '@/reminders/ui/reminder-modal/ProjectAutocompleteDropdown';
+import { useProjectAutocomplete } from '@/reminders/ui/reminder-modal/useProjectAutocomplete';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
 import {
 	applyReminderTextUpdate,

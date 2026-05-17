@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 
-import { ProjectDot } from './addReminderModal/ProjectPickerModal';
+import { ProjectDot } from './ProjectPickerModal';
 
 interface ProjectAutocompleteDropdownProps {
     filteredProjects: string[];

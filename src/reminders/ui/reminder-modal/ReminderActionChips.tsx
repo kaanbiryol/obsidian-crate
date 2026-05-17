@@ -2,7 +2,7 @@ import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Calendar as CalendarIcon, Flag, Hash, Repeat } from 'lucide-react';
 import { format } from 'date-fns';
-import { ShadowDOMButton, ShadowDOMMotionButton } from '../ShadowDOMButton';
+import { ShadowDOMButton, ShadowDOMMotionButton } from '../../components/ShadowDOMButton';
 import type { RecurrenceRule } from '../../types';
 import { parseReminderDateValue } from '../../utils/reminderDate';
 import { formatRecurrence } from '../../utils/rruleConverter';

@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { BaseModal } from '../BaseModal';
-import { AnimationConfig, prefersReducedMotion } from '../../ui/animations';
+import { BaseModal } from '../../components/BaseModal';
+import { AnimationConfig, prefersReducedMotion } from '../animations';
 import { RecurrenceRule } from '../../types';
-import { ShadowDOMNativeButton } from '../ShadowDOMButton';
-import { getGlassColors, getPickerModalProps } from '../../ui/glassStyles';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
+import { getGlassColors, getPickerModalProps } from '../glassStyles';
 import { PickerHeader } from './PickerHeader';
 import { PickerTimeCard } from './PickerTimeCard';
 import { PickerDoneButton } from './PickerDoneButton';

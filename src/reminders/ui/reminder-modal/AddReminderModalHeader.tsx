@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowUp, Check, Trash2, X } from 'lucide-react';
 
-import { ShadowDOMButton } from '../ShadowDOMButton';
+import { ShadowDOMButton } from '../../components/ShadowDOMButton';
 
 interface AddReminderModalHeaderProps {
     isEditing: boolean;

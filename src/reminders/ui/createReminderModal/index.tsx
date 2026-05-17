@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Notice } from "obsidian";
-import { AddReminderModal as SharedAddReminderModal } from "@/reminders/components/AddReminderModal";
+import { AddReminderModal as SharedAddReminderModal } from "@/reminders/ui/reminder-modal/AddReminderModal";
 import type { RecurrenceRule } from "@/reminders/types/reminder";
 import { createLogger } from "@/reminders/utils/logger";
 

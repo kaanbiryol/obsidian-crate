@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import type { RichTextInputHandle } from '../RichTextInput';
+import type { RichTextInputHandle } from '../../components/RichTextInput';
 
 interface UseReminderModalPresentationOptions {
 	focusDelayMs: number;

@@ -7,7 +7,7 @@ import {
 	buildRecurrencePickerDraft,
 	getOrdinalSuffix,
 	recurrenceRuleFromPickerDraft,
-} from '@/reminders/components/addReminderModal/recurrencePickerShared';
+} from '@/reminders/ui/reminder-modal/recurrencePickerShared';
 import { getProjectColor } from '@/reminders/utils/projectColors';
 import { formatLocalDateKey } from '@/reminders/utils/reminderDate';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';

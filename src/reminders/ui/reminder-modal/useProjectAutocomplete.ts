@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import type React from 'react';
 
-import { filterProjects, extractHashtagQuery } from '../utils/projectSearch';
-import type { RichTextInputHandle } from './RichTextInput';
+import { filterProjects, extractHashtagQuery } from '../../utils/projectSearch';
+import type { RichTextInputHandle } from '../../components/RichTextInput';
 
 const MAX_RESULTS = 10;
 

@@ -1,12 +1,12 @@
 import React, { useRef, useEffect } from 'react';
 import { Check } from 'lucide-react';
 
-import { BaseModal } from '../BaseModal';
-import { AnimationConfig } from '../../ui/animations';
+import { BaseModal } from '../../components/BaseModal';
+import { AnimationConfig } from '../animations';
 import { getProjectColor } from '../../utils/projectColors';
-import { ShadowDOMNativeButton } from '../ShadowDOMButton';
-import { softRadialGlow } from '../../ui/gradients';
-import { getGlassColors, getPickerModalProps } from '../../ui/glassStyles';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
+import { softRadialGlow } from '../gradients';
+import { getGlassColors, getPickerModalProps } from '../glassStyles';
 import { PickerHeader } from './PickerHeader';
 
 interface ProjectPickerModalProps {

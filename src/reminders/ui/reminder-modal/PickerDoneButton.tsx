@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { ShadowDOMNativeButton } from '../ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
 
 interface PickerDoneButtonProps {
     onClick: () => void;

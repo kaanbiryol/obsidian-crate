@@ -1,8 +1,8 @@
 import React from 'react';
 import { ChevronLeft } from 'lucide-react';
 
-import { ShadowDOMNativeButton } from '../ShadowDOMButton';
-import { getGlassColors } from '../../ui/glassStyles';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
+import { getGlassColors } from '../glassStyles';
 
 interface PickerHeaderProps {
     onBack: () => void;

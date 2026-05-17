@@ -10,7 +10,7 @@ export * from './components/ReminderCard';
 export * from './components/EmptyState';
 export * from './components/BaseModal';
 export * from './components/ModalBackdrop';
-export * from './components/AddReminderModal';
+export * from './ui/reminder-modal/AddReminderModal';
 export * from './components/DeleteConfirmationModal';
 export * from './components/BottomTabBar';
 export * from './components/FloatingActionButton';

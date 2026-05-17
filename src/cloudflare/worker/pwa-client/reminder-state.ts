@@ -1,7 +1,7 @@
 import {
 	buildInitialReminderContent,
 	rebuildReminderContent,
-} from '@/reminders/components/addReminderModal/useReminderDraft';
+} from '@/reminders/ui/reminder-modal/useReminderDraft';
 import type { Priority, Reminder as SharedReminder, RecurrenceRule } from '@/reminders/types/reminder';
 import { formatDueDate } from '@/reminders/utils/dateFormatting';
 import { formatLocalDateKey, parseReminderDateValue, serializeReminderDateValue } from '@/reminders/utils/reminderDate';

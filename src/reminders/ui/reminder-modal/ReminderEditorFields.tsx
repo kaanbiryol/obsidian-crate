@@ -1,8 +1,8 @@
 import React, { useCallback, useRef } from 'react';
-import { ProjectAutocompleteDropdown } from '../ProjectAutocompleteDropdown';
-import { RichTextInput, type RichTextInputHandle } from '../RichTextInput';
-import { useProjectAutocomplete } from '../useProjectAutocomplete';
-import { getFontSize } from '../../ui/themes';
+import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
+import { RichTextInput, type RichTextInputHandle } from '../../components/RichTextInput';
+import { useProjectAutocomplete } from './useProjectAutocomplete';
+import { getFontSize } from '../themes';
 import { autosizeTextarea, useAutosizeTextarea } from './useAutosizeTextarea';
 import { useBottomFade } from './useBottomFade';
 

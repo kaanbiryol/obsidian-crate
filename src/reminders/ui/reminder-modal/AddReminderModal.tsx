@@ -1,22 +1,22 @@
 import React, { useState, useRef, useCallback } from 'react';
 
-import type { RichTextInputHandle } from './RichTextInput';
-import { BaseModal } from './BaseModal';
-import { ModalBackdrop } from './ModalBackdrop';
-import { AddReminderModalBody } from './addReminderModal/AddReminderModalBody';
-import { AddReminderModalHeader } from './addReminderModal/AddReminderModalHeader';
-import { AddReminderModalOverlays } from './addReminderModal/AddReminderModalOverlays';
-import { buildDeleteConfirmationMessage } from './addReminderModal/deleteConfirmation';
+import type { RichTextInputHandle } from '../../components/RichTextInput';
+import { BaseModal } from '../../components/BaseModal';
+import { ModalBackdrop } from '../../components/ModalBackdrop';
+import { AddReminderModalBody } from './AddReminderModalBody';
+import { AddReminderModalHeader } from './AddReminderModalHeader';
+import { AddReminderModalOverlays } from './AddReminderModalOverlays';
+import { buildDeleteConfirmationMessage } from './deleteConfirmation';
 import {
 	buildReminderSubmission,
 	executeReminderAction,
-} from './addReminderModal/reminderMutation';
-import { useReminderDraft } from './addReminderModal/useReminderDraft';
-import { useReminderModalPresentation } from './addReminderModal/useReminderModalPresentation';
-import { moveCursorToEnd } from '../utils/cursorPosition';
-import { AnimationConfig } from '../ui/animations';
-import { Reminder, RecurrenceRule } from '../types';
-import { createLogger } from '../utils/logger';
+} from './reminderMutation';
+import { useReminderDraft } from './useReminderDraft';
+import { useReminderModalPresentation } from './useReminderModalPresentation';
+import { moveCursorToEnd } from '../../utils/cursorPosition';
+import { AnimationConfig } from '../animations';
+import { Reminder, RecurrenceRule } from '../../types';
+import { createLogger } from '../../utils/logger';
 
 const log = createLogger('AddReminderModal');
 
