@@ -124,10 +124,10 @@ async function loadPluginIntegrationModule() {
 			constructor(public readonly plugin: unknown, public readonly reminderIndex: unknown) {}
 		},
 	}));
-	vi.doMock('./ui/modals', () => ({
+	vi.doMock('./ui/adapters/modals', () => ({
 		openFullScreenReminderModal,
 	}));
-	vi.doMock('./ui/reminders-view', () => ({
+	vi.doMock('./ui/adapters/reminders-view', () => ({
 		RemindersView: class RemindersView {
 			constructor(public readonly leaf: unknown, public readonly plugin: unknown) {}
 		},
@@ -247,8 +247,8 @@ afterEach(() => {
 	vi.doUnmock('./commands');
 	vi.doUnmock('./services/notificationService');
 	vi.doUnmock('./services/vaultWatcher');
-	vi.doUnmock('./ui/modals');
-	vi.doUnmock('./ui/reminders-view');
+	vi.doUnmock('./ui/adapters/modals');
+	vi.doUnmock('./ui/adapters/reminders-view');
 	vi.doUnmock('./utils/logger');
 	vi.doUnmock('./settings-storage');
 });

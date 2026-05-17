@@ -10,7 +10,7 @@ import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper"
 import { ReorderableReminderList } from "@/reminders/components/ReorderableReminderList";
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
-import { openReminderCreationModal } from "@/reminders/ui/modals";
+import { openReminderCreationModal } from "@/reminders/ui/adapters/modals";
 import { formatLocalDateKey } from "@/reminders/utils/reminderDate";
 import {
   buildRemindersListPresentation,

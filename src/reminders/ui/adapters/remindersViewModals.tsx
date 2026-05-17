@@ -1,7 +1,7 @@
 import { Modal } from "obsidian";
 import { type Root, createRoot } from "react-dom/client";
 import type CratePlugin from "@/main";
-import { PluginContext } from "./reminders-context";
+import { PluginContext } from "../reminders-context";
 import { RemindersViewContent } from "./reminders-view";
 import { createShadowRootMount, hideNativeModalCloseButton } from "./modalShell";
 

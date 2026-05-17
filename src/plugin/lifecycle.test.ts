@@ -63,7 +63,7 @@ async function loadLifecycleModule() {
 			constructor(public readonly app: unknown, public readonly plugin: unknown) {}
 		},
 	}));
-	vi.doMock('../reminders/ui/modals', () => ({
+	vi.doMock('../reminders/ui/adapters/modals', () => ({
 		openFullScreenReminderModal,
 	}));
 	vi.doMock('../reminders/plugin-integration', () => ({
@@ -120,7 +120,7 @@ afterEach(() => {
 	vi.doUnmock('./secret-storage');
 	vi.doUnmock('./logger');
 	vi.doUnmock('../ui/settings-tab');
-	vi.doUnmock('../reminders/ui/modals');
+	vi.doUnmock('../reminders/ui/adapters/modals');
 	vi.doUnmock('../reminders/plugin-integration');
 	vi.doUnmock('../sync/plugin-integration');
 	vi.doUnmock('./deviceId');

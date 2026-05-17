@@ -10,8 +10,8 @@ import { registerReminderCommands } from './commands';
 import { normalizeRemindersFolderPath } from './settings';
 import { ReminderNotificationService } from './services/notificationService';
 import { VaultWatcher } from './services/vaultWatcher';
-import { openFullScreenReminderModal } from './ui/modals';
-import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/reminders-view';
+import { openFullScreenReminderModal } from './ui/adapters/modals';
+import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/adapters/reminders-view';
 import { configureLogger, createLogger } from './utils/logger';
 import { loadRemindersSettings } from './settings-storage';
 

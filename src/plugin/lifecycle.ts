@@ -2,7 +2,7 @@ import { Notice } from "obsidian";
 import { SecretStorageService } from "./secret-storage";
 import { createLogger, errorMessage } from "./logger";
 import { CrateSettingTab } from "../ui/settings-tab";
-import { openFullScreenReminderModal } from "../reminders/ui/modals";
+import { openFullScreenReminderModal } from "../reminders/ui/adapters/modals";
 import { initializeReminders } from "../reminders/plugin-integration";
 import {
   handleSyncSetupProtocol,

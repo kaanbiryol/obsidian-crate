@@ -7,12 +7,12 @@ import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
 import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
 import type { TabId } from "@/reminders/ui/layoutConstants";
-import { openReminderCreationModal } from "@/reminders/ui/modals";
+import { openReminderCreationModal } from "@/reminders/ui/adapters/modals";
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
-import { RemindersViewCloseButton } from "./RemindersViewCloseButton";
-import { RemindersAppShell, type ReminderCardRenderer } from "./RemindersAppShell";
-import "./reminders-view.scss";
+import { RemindersViewCloseButton } from "@/reminders/ui/RemindersViewCloseButton";
+import { RemindersAppShell, type ReminderCardRenderer } from "@/reminders/ui/RemindersAppShell";
+import "../reminders-view.scss";
 
 export const VIEW_TYPE_REMINDERS = "reminders-view";
 

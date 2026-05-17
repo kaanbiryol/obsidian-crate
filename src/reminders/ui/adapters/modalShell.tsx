@@ -1,5 +1,5 @@
 import type CratePlugin from "@/main";
-import { attachPluginStylesheet } from "./shadowStyles";
+import { attachPluginStylesheet } from "../shadowStyles";
 
 export function hideNativeModalCloseButton(modalEl: HTMLElement): void {
   const closeButton = modalEl.querySelector(".modal-close-button");
