@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
-import type { CrateSettings, FileEntry, PreparedUpload, SyncResult } from '../plugin/types';
+import type { ChangelogEntry, CrateSettings, FileEntry, PreparedUpload, SyncResult } from '../plugin/types';
 import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
+import type { IncrementalSyncPlannerContext } from './planner-types';
 
 const fileDiscoveryMocks = vi.hoisted(() => ({
 	getAllVaultFiles: vi.fn(),
@@ -45,6 +46,72 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 		syncDebugLogging: false,
 		debounceDelay: 5,
 		...overrides,
+	};
+}
+
+function createIncrementalHarness(overrides: Partial<{
+	settings: Partial<CrateSettings>;
+	changes: ChangelogEntry[];
+	lastSeq: number;
+	hasMore: boolean;
+	localChanges: Array<{ path: string; hash: string }>;
+	localDeletes: string[];
+	shouldIgnore: (path: string) => boolean;
+}> = {}) {
+	const settings = createSettings(overrides.settings);
+	const localManifest = {
+		save: vi.fn(async () => {}),
+		setEntry: vi.fn(),
+		removeEntry: vi.fn(),
+		getEntry: vi.fn(),
+		getAllPaths: vi.fn(() => []),
+		getManifest: vi.fn(() => ({ version: 1, files: {} })),
+	};
+	const vault = {
+		getAbstractFileByPath: vi.fn(),
+		delete: vi.fn(),
+		adapter: {
+			exists: vi.fn(async () => false),
+			remove: vi.fn(async () => {}),
+			stat: vi.fn(),
+			readBinary: vi.fn(),
+		},
+	};
+	const fileManager = {
+		trashFile: vi.fn(async () => {}),
+	};
+	const api = {
+		getChanges: vi.fn(async () => ({
+			changes: overrides.changes ?? [],
+			lastSeq: overrides.lastSeq ?? settings.lastSeq + 1,
+			hasMore: overrides.hasMore ?? false,
+		})),
+		downloadFile: vi.fn(),
+		deleteFile: vi.fn(),
+		batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
+	};
+	const context: IncrementalSyncPlannerContext = {
+		settings,
+		vault: vault as never,
+		fileManager,
+		api,
+		localManifest,
+		shouldIgnore: vi.fn(overrides.shouldIgnore ?? (() => false)),
+		getLocalChanges: vi.fn(async () => overrides.localChanges ?? []),
+		getLocalDeletes: vi.fn(async () => overrides.localDeletes ?? []),
+		parallelDownloadAndSaveFiles: vi.fn(async () => {}),
+		processDiff: vi.fn(async () => {}),
+		prepareUploadFromPath: vi.fn(async () => null),
+		uploadPreparedFiles: vi.fn(async () => {}),
+	};
+
+	return {
+		settings,
+		localManifest,
+		vault,
+		fileManager,
+		api,
+		context,
 	};
 }
 
@@ -178,6 +245,200 @@ describe('runIncrementalSync', () => {
 		});
 		expect(settings.lastSeq).toBe(8);
 		expect(localManifest.save).not.toHaveBeenCalled();
+	});
+
+	it('applies remote delete changes through the file manager', async () => {
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 4 },
+			changes: [
+				{
+					seq: 6,
+					path: 'notes/old.md',
+					action: 'delete',
+					hash: '',
+					size: 0,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 6,
+		});
+		const note = { path: 'notes/old.md' };
+		harness.vault.getAbstractFileByPath.mockReturnValue(note);
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(result?.deleted).toBe(1);
+		expect(harness.fileManager.trashFile).toHaveBeenCalledWith(note);
+		expect(harness.vault.delete).not.toHaveBeenCalled();
+		expect(harness.vault.adapter.remove).not.toHaveBeenCalled();
+		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/old.md');
+		expect(harness.settings.lastSeq).toBe(6);
+	});
+
+	it('hard deletes hidden files for remote delete changes', async () => {
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 4 },
+			changes: [
+				{
+					seq: 6,
+					path: '.vault-config/workspace.json',
+					action: 'delete',
+					hash: '',
+					size: 0,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 6,
+		});
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		harness.vault.adapter.exists.mockResolvedValue(true);
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(result?.deleted).toBe(1);
+		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
+		expect(harness.vault.delete).not.toHaveBeenCalled();
+		expect(harness.vault.adapter.remove).toHaveBeenCalledWith('.vault-config/workspace.json');
+		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('.vault-config/workspace.json');
+		expect(harness.settings.lastSeq).toBe(6);
+	});
+
+	it('cleans manifest state when a remote delete targets an already missing file', async () => {
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 4 },
+			changes: [
+				{
+					seq: 6,
+					path: 'notes/missing.md',
+					action: 'delete',
+					hash: '',
+					size: 0,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 6,
+		});
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		harness.vault.adapter.exists.mockResolvedValue(false);
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(result?.deleted).toBe(0);
+		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
+		expect(harness.vault.delete).not.toHaveBeenCalled();
+		expect(harness.vault.adapter.remove).not.toHaveBeenCalled();
+		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/missing.md');
+		expect(harness.settings.lastSeq).toBe(6);
+	});
+
+	it('skips download when remote put hash matches local content', async () => {
+		const content = new TextEncoder().encode('same').buffer as ArrayBuffer;
+		const hash = await computeHash(content);
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 2 },
+			changes: [
+				{
+					seq: 3,
+					path: 'notes/same.md',
+					action: 'put',
+					hash,
+					size: 4,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 3,
+		});
+		harness.vault.getAbstractFileByPath.mockReturnValue({
+			path: 'notes/same.md',
+			extension: 'md',
+			stat: { size: 4, mtime: 1700000000000 },
+		});
+		harness.vault.adapter.readBinary.mockResolvedValue(content);
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(result?.downloaded).toBe(0);
+		expect(harness.api.downloadFile).not.toHaveBeenCalled();
+		expect(harness.localManifest.setEntry).toHaveBeenCalledWith(
+			'notes/same.md',
+			expect.objectContaining({
+				hash,
+				size: 4,
+			}),
+		);
+	});
+
+	it('uploads local-only changes not present in the remote changelog', async () => {
+		const prepared: PreparedUpload = {
+			path: 'notes/new.md',
+			content: new TextEncoder().encode('hello world').buffer as ArrayBuffer,
+			hash: 'local-hash',
+			size: 11,
+			contentType: 'text/markdown',
+		};
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 7 },
+			localChanges: [{ path: 'notes/new.md', hash: 'local-hash' }],
+			lastSeq: 9,
+		});
+		const uploadPreparedFiles = vi.fn(async (uploads: PreparedUpload[], result: SyncResult) => {
+			result.uploaded += uploads.length;
+			result.uploadedPaths.push(...uploads.map(upload => upload.path));
+		});
+		harness.context.prepareUploadFromPath = vi.fn(async () => prepared);
+		harness.context.uploadPreparedFiles = uploadPreparedFiles;
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(uploadPreparedFiles).toHaveBeenCalledWith(
+			[prepared],
+			expect.any(Object),
+			expect.objectContaining({ concurrency: 5, retry: false }),
+		);
+		expect(result?.uploaded).toBe(1);
+		expect(harness.settings.lastSeq).toBe(9);
+	});
+
+	it('keeps local edits when a remote delete arrives and re-uploads the path', async () => {
+		const prepared: PreparedUpload = {
+			path: 'notes/live.md',
+			content: new TextEncoder().encode('keep local').buffer as ArrayBuffer,
+			hash: 'local-hash',
+			size: 10,
+			contentType: 'text/markdown',
+		};
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 10 },
+			changes: [
+				{
+					seq: 11,
+					path: 'notes/live.md',
+					action: 'delete',
+					hash: '',
+					size: 0,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 11,
+			localChanges: [{ path: 'notes/live.md', hash: 'local-hash' }],
+		});
+		const uploadPreparedFiles = vi.fn(async (uploads: PreparedUpload[], result: SyncResult) => {
+			result.uploaded += uploads.length;
+			result.uploadedPaths.push(...uploads.map(upload => upload.path));
+		});
+		harness.context.prepareUploadFromPath = vi.fn(async () => prepared);
+		harness.context.uploadPreparedFiles = uploadPreparedFiles;
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(harness.api.deleteFile).not.toHaveBeenCalled();
+		expect(uploadPreparedFiles).toHaveBeenCalledWith(
+			[prepared],
+			expect.any(Object),
+			expect.objectContaining({ concurrency: 5 }),
+		);
+		expect(result?.conflicts).toContain('notes/live.md');
+		expect(result?.uploaded).toBe(1);
 	});
 
 	it('applies remote downloads and local deletes during incremental planning', async () => {
