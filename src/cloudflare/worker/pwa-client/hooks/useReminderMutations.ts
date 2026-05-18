@@ -1,15 +1,13 @@
 import { useCallback } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import { buildStoredReminderDates } from '@/reminders/utils/reminderDate';
-import { parseReminderContent } from '@/reminders/utils/reminderParser';
-import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import {
 	applyOptimisticReminderUpdate,
 	buildOptimisticReminder,
 	mergeProject,
 	reorderProjectReminders,
 } from '../reminder-state';
-import type { ModalDraft, ModalMode, ModalState, ReminderMutationBody, ReminderRecord, StoredConfig, ToastKind } from '../types';
+import { buildReminderMutationBody } from '../reminder-mutation';
+import type { ModalState, ReminderRecord, StoredConfig, ToastKind } from '../types';
 
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 
@@ -47,41 +45,17 @@ export function useReminderMutations({
 	deleteReminder: (reminderId: string) => Promise<void>;
 	persistReorder: (project: string, orderedIds: string[]) => Promise<void>;
 } {
-	const buildMutationBody = useCallback((draft: ModalDraft, mode: ModalMode): ReminderMutationBody => {
-		const createDefaultProject = selectedProject ?? 'Inbox';
-		const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
-		const rawContent = draft.content.replace(/\s+/g, ' ').trim();
-		const parsed = parseReminderContent(rawContent, projectOptions);
-		const project = parsed.project || draft.project.trim() || createDefaultProject;
-		const priority: 1 | 4 = parsed.priorityPart ? parsed.priority : draft.priority === 1 ? 1 : 4;
-		const content = (parsed.cleanContent || rawContent).replace(/\s+/g, ' ').trim();
-		const recurrence = normalizeRecurrenceRule(parsed.recurrence || draft.recurrence);
-		let dueDate: string | null = null;
-		let dueDatetime: string | null = null;
-
-		if (parsed.dueDate) {
-			const parsedDates = buildStoredReminderDates(parsed.dueDate, parsed.hasTime);
-			dueDate = parsedDates.dueDate ?? null;
-			dueDatetime = parsedDates.dueDatetime ?? null;
-		} else if (!recurrence) {
-			const rawDate = draft.dueDate.trim();
-			const rawTime = draft.dueTime.trim();
-			if (rawDate && rawTime) dueDatetime = new Date(`${rawDate}T${rawTime}`).toISOString();
-			else if (rawDate) dueDate = rawDate;
-		}
-
-		return {
-			folderPath: config.folderPath,
-			allDayNotificationTime: config.allDayNotificationTime,
-			content,
-			description: draft.description.trim() || null,
-			project,
-			priority,
-			dueDate,
-			dueDatetime,
-			recurrence: recurrence ?? (mode === 'edit' ? null : undefined),
-		};
-	}, [config.allDayNotificationTime, config.folderPath, projects, selectedProject]);
+	const buildMutationBody = useCallback((draft: ModalState['draft'], mode: ModalState['mode']) =>
+		buildReminderMutationBody({
+			config: {
+				allDayNotificationTime: config.allDayNotificationTime,
+				folderPath: config.folderPath,
+			},
+			draft,
+			mode,
+			projects,
+			selectedProject,
+		}), [config.allDayNotificationTime, config.folderPath, projects, selectedProject]);
 
 	const saveReminder = useCallback(async (currentModal: ModalState) => {
 		if (!ensureCanMutate()) return;

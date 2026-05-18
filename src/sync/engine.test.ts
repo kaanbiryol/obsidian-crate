@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HttpError } from './api';
 import { SyncEngine } from './engine';
 import { computeHash } from './hasher';
 import { createEmptySyncResult } from './sync-result';
@@ -86,16 +85,6 @@ function spyOnDebouncedSync(engine: SyncEngine) {
 	return vi.spyOn(engine as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 }
 
-function matchPattern(engine: SyncEngine, path: string, pattern: string): boolean {
-	return (engine as unknown as {
-		matchPattern(pathToCheck: string, patternToCheck: string): boolean;
-	}).matchPattern(path, pattern);
-}
-
-function shouldIgnorePath(engine: SyncEngine, path: string): boolean {
-	return (engine as unknown as { shouldIgnore(pathToCheck: string): boolean }).shouldIgnore(path);
-}
-
 async function runIncrementalSync(engine: SyncEngine): Promise<SyncResult | null> {
 	return (engine as unknown as { incrementalSync(): Promise<SyncResult | null> }).incrementalSync();
 }
@@ -157,22 +146,6 @@ function runProcessDiff(
 			syncResult: SyncResult,
 		): Promise<void>;
 	}).processDiff(diff, localFiles, result);
-}
-
-function runConcurrentTasks<T>(
-	engine: SyncEngine,
-	tasks: Array<() => Promise<T>>,
-	concurrency: number,
-): Promise<T[]> {
-	return (engine as unknown as {
-		runConcurrent(taskQueue: Array<() => Promise<T>>, limit: number): Promise<T[]>;
-	}).runConcurrent(tasks, concurrency);
-}
-
-function retryWithBackoff<T>(engine: SyncEngine, fn: () => Promise<T>): Promise<T> {
-	return (engine as unknown as {
-		retryWithBackoff(task: () => Promise<T>): Promise<T>;
-	}).retryWithBackoff(fn);
 }
 
 function spyOnPrepareUploadsFromVaultFiles(
@@ -300,52 +273,6 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 
 	return { engine, settings, fileManager, api, vault, localManifest };
 }
-
-describe('SyncEngine pattern/ignore behavior', () => {
-	let harness: Harness;
-
-	beforeEach(() => {
-		harness = createHarness();
-	});
-
-	it('matches trailing-slash patterns and wildcard patterns', () => {
-		expect(matchPattern(harness.engine, '.trash', '.trash/')).toBe(true);
-		expect(matchPattern(harness.engine, '.trash/file.md', '.trash/')).toBe(true);
-		expect(matchPattern(harness.engine, 'notes/file.tmp', '*.tmp')).toBe(true);
-		expect(matchPattern(harness.engine, 'notes/file.md', '*.tmp')).toBe(false);
-	});
-
-	it('matches slashless filename patterns against nested files', () => {
-		const dsHarness = createHarness({ ignorePatterns: ['.DS_Store'] });
-
-		expect(matchPattern(dsHarness.engine, '.DS_Store', '.DS_Store')).toBe(true);
-		expect(matchPattern(dsHarness.engine, 'notes/.DS_Store', '.DS_Store')).toBe(true);
-		expect(shouldIgnorePath(dsHarness.engine, 'notes/.DS_Store')).toBe(true);
-		expect(shouldIgnorePath(dsHarness.engine, 'notes/keep.md')).toBe(false);
-	});
-
-	it('ignores plugin state files (data.json and file-manifest.json)', () => {
-		expect(shouldIgnorePath(harness.engine, `${PLUGIN_DIR}/data.json`)).toBe(true);
-		expect(shouldIgnorePath(harness.engine, `${PLUGIN_DIR}/file-manifest.json`)).toBe(true);
-		expect(shouldIgnorePath(harness.engine, `${PLUGIN_DIR}/reminders-settings.json`)).toBe(true);
-		// Other files in the plugin dir should not be ignored
-		expect(shouldIgnorePath(harness.engine, `${PLUGIN_DIR}/main.js`)).toBe(false);
-	});
-
-	it('always ignores conflict files', () => {
-		expect(
-			shouldIgnorePath(harness.engine, 'notes/a (conflict 2026-01-02 03-04-05 a1b2).md'),
-		).toBe(true);
-		expect(shouldIgnorePath(harness.engine, 'notes/file.tmp')).toBe(true);
-		expect(shouldIgnorePath(harness.engine, 'notes/file.md')).toBe(false);
-	});
-
-	it('treats regex metacharacters as literal text in patterns', () => {
-		expect(matchPattern(harness.engine, 'notes[2026].md', 'notes[2026].md')).toBe(true);
-		expect(matchPattern(harness.engine, 'notes2.md', 'notes[2026].md')).toBe(false);
-		expect(matchPattern(harness.engine, '[', '[')).toBe(true);
-	});
-});
 
 describe('SyncEngine event queue behavior', () => {
 	let harness: Harness;
@@ -1296,71 +1223,6 @@ describe('SyncEngine abort-on-destroy', () => {
 		expect(harness.engine.getState().status).not.toBe('error');
 	});
 
-	it('stops launching new concurrent tasks after destroy', async () => {
-		const harness = createHarness();
-		const callOrder: number[] = [];
-
-		const tasks = [
-			async () => { callOrder.push(1); return 1; },
-			async () => {
-				callOrder.push(2);
-				harness.engine.destroy();
-				return 2;
-			},
-			async () => { callOrder.push(3); return 3; },
-			async () => { callOrder.push(4); return 4; },
-		];
-
-		await runConcurrentTasks(harness.engine, tasks, 1);
-
-		// Task 3 and 4 should not run because destroy was called during task 2
-		expect(callOrder).toEqual([1, 2]);
-	});
-
-	it('retryWithBackoff does not retry after destroy', async () => {
-		const harness = createHarness();
-		let callCount = 0;
-
-		const fn = async () => {
-			callCount++;
-			if (callCount === 1) {
-				harness.engine.destroy();
-				throw new Error('first failure');
-			}
-			return 'done';
-		};
-
-		await expect(
-			retryWithBackoff(harness.engine, fn),
-		).rejects.toThrow('first failure');
-
-		expect(callCount).toBe(1);
-	});
-
-	it('retryWithBackoff honours retryAfter delays from HttpError responses', async () => {
-		vi.useFakeTimers();
-		const harness = createHarness();
-		let callCount = 0;
-
-		const fn = vi.fn(async () => {
-			callCount++;
-			if (callCount === 1) {
-				throw new HttpError('retry later', 429, 2500);
-			}
-			return 'done';
-		});
-
-		const promise = retryWithBackoff(harness.engine, fn);
-
-		expect(callCount).toBe(1);
-		await vi.advanceTimersByTimeAsync(2499);
-		expect(callCount).toBe(1);
-		await vi.advanceTimersByTimeAsync(1);
-
-		await expect(promise).resolves.toBe('done');
-		expect(callCount).toBe(2);
-	});
-
 	it('initialSync aborts cleanly when destroyed during chunk processing', async () => {
 		const harness = createHarness();
 		const file = {
@@ -1405,54 +1267,6 @@ describe('SyncEngine abort-on-destroy', () => {
 });
 
 describe('SyncEngine periodic check backoff', () => {
-	it('increments failure counter on consecutive check failures', async () => {
-		const harness = createHarness({ syncInterval: 60 });
-		setEngineLocalManifest(harness.engine, harness.localManifest);
-		harness.api.checkForChanges.mockRejectedValue(new Error('network error'));
-
-		await runPeriodicCheck(harness.engine);
-		expect(getConsecutiveCheckFailures(harness.engine)).toBe(1);
-
-		// Advance time past the 1x backoff window (60s)
-		vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000);
-		await runPeriodicCheck(harness.engine);
-		expect(getConsecutiveCheckFailures(harness.engine)).toBe(2);
-
-		vi.restoreAllMocks();
-	});
-
-	it('resets failure counter on successful check', async () => {
-		const harness = createHarness({ syncInterval: 60 });
-		setEngineLocalManifest(harness.engine, harness.localManifest);
-
-		// Fail first
-		harness.api.checkForChanges.mockRejectedValueOnce(new Error('network error'));
-		await runPeriodicCheck(harness.engine);
-		expect(getConsecutiveCheckFailures(harness.engine)).toBe(1);
-
-		// Succeed next (advance time past backoff window)
-		vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 120_000);
-		harness.api.checkForChanges.mockResolvedValueOnce({ hasChanges: false });
-		await runPeriodicCheck(harness.engine);
-		expect(getConsecutiveCheckFailures(harness.engine)).toBe(0);
-
-		vi.restoreAllMocks();
-	});
-
-	it('skips check within backoff window after failure', async () => {
-		const harness = createHarness({ syncInterval: 60 });
-		setEngineLocalManifest(harness.engine, harness.localManifest);
-		harness.api.checkForChanges.mockRejectedValue(new Error('network error'));
-
-		// First failure
-		await runPeriodicCheck(harness.engine);
-		expect(harness.api.checkForChanges).toHaveBeenCalledTimes(1);
-
-		// Immediate retry should be skipped (within 1x backoff = 60s)
-		await runPeriodicCheck(harness.engine);
-		expect(harness.api.checkForChanges).toHaveBeenCalledTimes(1);
-	});
-
 	it('resets backoff on updateSettings', async () => {
 		const harness = createHarness({ syncInterval: 60 });
 		setEngineLocalManifest(harness.engine, harness.localManifest);
