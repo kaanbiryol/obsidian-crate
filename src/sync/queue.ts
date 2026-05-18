@@ -1,7 +1,7 @@
 import type { TAbstractFile, Vault } from 'obsidian';
 import { TFolder } from 'obsidian';
 import { createLogger, errorMessage } from '../plugin/logger';
-import type { PreparedUpload, SyncState } from '../plugin/types';
+import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
 
 const logger = createLogger('SyncQueue');
 
@@ -65,6 +65,12 @@ export interface QueueFlushContext {
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	triggerDebouncedSync(): void;
+}
+
+export interface QueueReconcileContext {
+	pendingPaths: Set<string>;
+	clearDebounceTimer(): void;
+	updateState(updates: Partial<SyncState>): void;
 }
 
 export function onRawPathChange(
@@ -288,4 +294,34 @@ export async function processPendingChanges(
 			context.triggerDebouncedSync();
 		}
 	}
+}
+
+export function clearSyncedPendingPaths(
+	context: QueueReconcileContext,
+	result: SyncResult,
+): void {
+	if (!result.success || context.pendingPaths.size === 0) {
+		return;
+	}
+
+	const previousPendingCount = context.pendingPaths.size;
+
+	for (const path of result.uploadedPaths) {
+		context.pendingPaths.delete(path);
+	}
+	for (const path of result.downloadedPaths) {
+		context.pendingPaths.delete(path);
+	}
+	for (const path of result.deletedPaths) {
+		context.pendingPaths.delete(`delete:${path}`);
+	}
+
+	if (context.pendingPaths.size === previousPendingCount) {
+		return;
+	}
+
+	if (context.pendingPaths.size === 0) {
+		context.clearDebounceTimer();
+	}
+	context.updateState({ pendingChanges: context.pendingPaths.size });
 }

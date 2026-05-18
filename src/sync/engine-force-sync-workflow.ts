@@ -1,19 +1,16 @@
-import { Notice, type Vault } from 'obsidian';
+import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from './file-discovery';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
-	getSyncResultError,
 } from './sync-result';
-import {
-	AUTH_ERROR_MESSAGE,
-	FORCE_SYNC_CONCURRENCY,
-	isAuthError,
-} from './engine-constants';
+import { FORCE_SYNC_CONCURRENCY } from './engine-constants';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
 import {
+	completeWorkflowResult,
 	getStartFailureResult,
+	handleWorkflowError,
 	type RemoteManifest,
 	type SyncStatus,
 } from './engine-workflow-shared';
@@ -100,37 +97,19 @@ export async function runForceFullSyncWorkflow(
 
 		await context.saveLocalManifest();
 
-		const lastSync = new Date().toISOString();
 		logger.info(
 			`Force full sync completed: ${result.uploaded} uploaded, ${result.deleted} remote-only deleted`,
 		);
-		if (finalizeSyncResult(result)) {
-			context.updateState({
-				status: 'idle',
-				lastSync,
-				lastError: null,
-			});
-			context.setLastSync(lastSync);
-		} else {
-			context.updateState({
-				status: 'error',
-				lastError: getSyncResultError(result, 'Force full sync completed with errors'),
-			});
-		}
+		completeWorkflowResult(context, result, {
+			errorFallback: 'Force full sync completed with errors',
+		});
 	} catch (error) {
-		if (context.isAbortError(error)) {
-			logger.info('Force full sync aborted');
-		} else if (isAuthError(error)) {
-			result.errors.push(AUTH_ERROR_MESSAGE);
-			logger.error('Force full sync failed: auth error (401)');
-			new Notice(AUTH_ERROR_MESSAGE);
-			context.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
-		} else {
-			const errMsg = errorMessage(error);
-			result.errors.push(errMsg);
-			logger.error('Force full sync failed:', errMsg);
-			context.updateState({ status: 'error', lastError: errMsg });
-		}
+		handleWorkflowError(context, result, error, {
+			abortLogMessage: 'Force full sync aborted',
+			failureLogPrefix: 'Force full sync failed',
+			logger,
+			logGenericError: true,
+		});
 	}
 
 	finalizeSyncResult(result);

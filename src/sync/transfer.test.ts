@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload, SyncResult } from '../plugin/types';
+import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
 
 const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
@@ -88,6 +89,20 @@ function emptyResult(): SyncResult {
 }
 
 describe('transfer prepare helpers', () => {
+	it('skips oversized files', async () => {
+		const harness = createTransferHarness();
+
+		const result = await prepareUploadFromVaultFile(harness.context, {
+			path: 'big.bin',
+			size: MAX_FILE_SIZE_BYTES + 1,
+			mtime: Date.now(),
+			extension: 'bin',
+		});
+
+		expect(result).toBeNull();
+		expect(harness.adapter.readBinary).not.toHaveBeenCalled();
+	});
+
 	it('skips upload when manifest hash already matches', async () => {
 		const harness = createTransferHarness();
 		harness.adapter.readBinary.mockResolvedValue(new TextEncoder().encode('same').buffer as ArrayBuffer);
@@ -102,6 +117,44 @@ describe('transfer prepare helpers', () => {
 
 		expect(result).toBeNull();
 		expect(harness.localManifest.hashMatches).toHaveBeenCalled();
+	});
+
+	it('prepares text files with ArrayBuffer content and content type', async () => {
+		const harness = createTransferHarness();
+		const content = new TextEncoder().encode('hello world').buffer as ArrayBuffer;
+		harness.adapter.readBinary.mockResolvedValue(content);
+
+		const result = await prepareUploadFromVaultFile(harness.context, {
+			path: 'notes/a.md',
+			size: 11,
+			mtime: Date.now(),
+			extension: 'md',
+		});
+
+		expect(result?.path).toBe('notes/a.md');
+		expect(result?.content).toBeInstanceOf(ArrayBuffer);
+		expect(result?.contentType).toBe('text/markdown');
+		expect(result?.hash).toHaveLength(64);
+		expect(result).not.toHaveProperty('binary');
+	});
+
+	it('prepares binary files with raw ArrayBuffer content', async () => {
+		const harness = createTransferHarness();
+		const bytes = new Uint8Array([0, 255, 1]);
+		harness.adapter.readBinary.mockResolvedValue(bytes.buffer);
+
+		const result = await prepareUploadFromVaultFile(harness.context, {
+			path: 'images/pixel.png',
+			size: 3,
+			mtime: Date.now(),
+			extension: 'png',
+		});
+
+		expect(result?.path).toBe('images/pixel.png');
+		expect(result?.content).toBeInstanceOf(ArrayBuffer);
+		expect(result?.contentType).toBe('image/png');
+		expect(result?.content.byteLength).toBe(3);
+		expect(result).not.toHaveProperty('binary');
 	});
 
 	it('prepares hidden path uploads by stat + adapter read', async () => {

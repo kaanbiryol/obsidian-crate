@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { debouncedSync, onFileChange, onFileDelete, onFileRename, onRawPathChange, processPendingChanges } from './queue';
-import type { PreparedUpload, SyncState } from '../plugin/types';
+import {
+	clearSyncedPendingPaths,
+	debouncedSync,
+	onFileChange,
+	onFileDelete,
+	onFileRename,
+	onRawPathChange,
+	processPendingChanges,
+} from './queue';
+import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
 
 type QueueState = SyncState;
 type UploadArgs = {
@@ -115,6 +123,21 @@ function createFlushHarness(overrides: Partial<{
 			getModifiedIso,
 			triggerDebouncedSync,
 		},
+	};
+}
+
+function createSyncResult(overrides: Partial<SyncResult> = {}): SyncResult {
+	return {
+		success: true,
+		uploaded: 0,
+		downloaded: 0,
+		deleted: 0,
+		conflicts: [],
+		errors: [],
+		uploadedPaths: [],
+		downloadedPaths: [],
+		deletedPaths: [],
+		...overrides,
 	};
 }
 
@@ -291,6 +314,64 @@ describe('debouncedSync', () => {
 		expect(processPending).toHaveBeenCalledTimes(1);
 		expect(timer).toBeNull();
 		expect(maxWaitStart).toBeNull();
+	});
+});
+
+describe('clearSyncedPendingPaths', () => {
+	it('removes successful uploaded, downloaded, and deleted paths from the queue', () => {
+		const pendingPaths = new Set([
+			'notes/uploaded.md',
+			'notes/downloaded.md',
+			'delete:notes/deleted.md',
+		]);
+		const clearDebounceTimer = vi.fn();
+		const updateState = vi.fn();
+
+		clearSyncedPendingPaths(
+			{ pendingPaths, clearDebounceTimer, updateState },
+			createSyncResult({
+				uploadedPaths: ['notes/uploaded.md'],
+				downloadedPaths: ['notes/downloaded.md'],
+				deletedPaths: ['notes/deleted.md'],
+			}),
+		);
+
+		expect(pendingPaths.size).toBe(0);
+		expect(clearDebounceTimer).toHaveBeenCalledTimes(1);
+		expect(updateState).toHaveBeenCalledWith({ pendingChanges: 0 });
+	});
+
+	it('keeps unrelated pending paths and updates the pending count', () => {
+		const pendingPaths = new Set([
+			'notes/uploaded.md',
+			'notes/still-pending.md',
+		]);
+		const clearDebounceTimer = vi.fn();
+		const updateState = vi.fn();
+
+		clearSyncedPendingPaths(
+			{ pendingPaths, clearDebounceTimer, updateState },
+			createSyncResult({ uploadedPaths: ['notes/uploaded.md'] }),
+		);
+
+		expect([...pendingPaths]).toEqual(['notes/still-pending.md']);
+		expect(clearDebounceTimer).not.toHaveBeenCalled();
+		expect(updateState).toHaveBeenCalledWith({ pendingChanges: 1 });
+	});
+
+	it('does not change the queue when the sync result failed', () => {
+		const pendingPaths = new Set(['notes/a.md']);
+		const clearDebounceTimer = vi.fn();
+		const updateState = vi.fn();
+
+		clearSyncedPendingPaths(
+			{ pendingPaths, clearDebounceTimer, updateState },
+			createSyncResult({ success: false, uploadedPaths: ['notes/a.md'] }),
+		);
+
+		expect([...pendingPaths]).toEqual(['notes/a.md']);
+		expect(clearDebounceTimer).not.toHaveBeenCalled();
+		expect(updateState).not.toHaveBeenCalled();
 	});
 });
 

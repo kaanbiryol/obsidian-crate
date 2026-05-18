@@ -1,20 +1,18 @@
-import { Notice } from 'obsidian';
 import { computeHash } from './hasher';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
-	getSyncResultError,
 } from './sync-result';
 import {
-	AUTH_ERROR_MESSAGE,
 	PREPARE_CONCURRENCY,
 	UPLOAD_CONCURRENCY,
-	isAuthError,
 } from './engine-constants';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { FileDiff, FileEntry, SyncResult, SyncState } from '../plugin/types';
 import {
+	completeWorkflowResult,
 	getStartFailureResult,
+	handleWorkflowError,
 	type FullSyncPlan,
 	type RemoteManifest,
 	type SyncStatus,
@@ -64,26 +62,10 @@ export async function runSyncWorkflow(
 	try {
 		const incrementalResult = await context.incrementalSync(progressCallback);
 		if (incrementalResult) {
-			if (incrementalResult.success) {
-				const lastSync = new Date().toISOString();
-				context.updateState({
-					status: 'idle',
-					lastSync,
-					lastError: null,
-					conflictCount: incrementalResult.conflicts.length,
-				});
-				context.setLastSync(lastSync);
-			} else {
-				const lastError = getSyncResultError(
-					incrementalResult,
-					'Incremental sync completed with errors',
-				);
-				context.updateState({
-					status: 'error',
-					lastError,
-					conflictCount: incrementalResult.conflicts.length,
-				});
-			}
+			completeWorkflowResult(context, incrementalResult, {
+				errorFallback: 'Incremental sync completed with errors',
+				conflictCount: incrementalResult.conflicts.length,
+			});
 			return incrementalResult;
 		}
 	} catch (error) {
@@ -196,19 +178,12 @@ export async function runSyncWorkflow(
 			`Full sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.conflicts.length} conflicts`,
 		);
 	} catch (error) {
-		if (context.isAbortError(error)) {
-			logger.info('Full sync aborted');
-		} else if (isAuthError(error)) {
-			result.errors.push(AUTH_ERROR_MESSAGE);
-			logger.error('Full sync failed: auth error (401)');
-			new Notice(AUTH_ERROR_MESSAGE);
-			context.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
-		} else {
-			const errMsg = errorMessage(error);
-			result.errors.push(errMsg);
-			logger.error('Full sync failed:', errMsg);
-			context.updateState({ status: 'error', lastError: errMsg });
-		}
+		handleWorkflowError(context, result, error, {
+			abortLogMessage: 'Full sync aborted',
+			failureLogPrefix: 'Full sync failed',
+			logger,
+			logGenericError: true,
+		});
 	}
 
 	finalizeSyncResult(result);

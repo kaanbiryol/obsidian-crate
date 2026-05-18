@@ -13,6 +13,7 @@ import {
 	onFileRename as queueOnFileRename,
 	debouncedSync as runDebouncedQueueSync,
 	processPendingChanges as flushPendingQueueChanges,
+	clearSyncedPendingPaths as clearSyncedQueuePaths,
 	type RawPathKind,
 } from './queue';
 import {
@@ -23,7 +24,6 @@ import {
 } from './planner';
 import {
 	prepareUploadFromPath as prepareTransferUploadFromPath,
-	downloadAndSaveFile as transferDownloadAndSaveFile,
 	parallelDownloadAndSaveFiles as transferParallelDownloadAndSaveFiles,
 	processDiff as transferProcessDiff,
 	prepareUploadsFromVaultFiles as transferPrepareUploadsFromVaultFiles,
@@ -47,7 +47,7 @@ import {
 	RETRY_BASE_DELAY_MS,
 	UPLOAD_CONCURRENCY,
 } from './engine-constants';
-import { matchIgnorePattern, shouldIgnoreSyncPath } from './engine-ignore';
+import { shouldIgnoreSyncPath } from './engine-ignore';
 import { retryWithBackoff, runConcurrentTasks } from './engine-utils';
 import {
 	runForceFullSyncWorkflow,
@@ -177,10 +177,6 @@ export class SyncEngine {
 		});
 	}
 
-	private matchPattern(path: string, pattern: string): boolean {
-		return matchIgnorePattern(path, pattern, this.patternCache);
-	}
-
 	private throwIfDestroyed(): void {
 		if (this.destroyed) {
 			throw new DOMException('Sync engine destroyed', 'AbortError');
@@ -244,6 +240,14 @@ export class SyncEngine {
 		};
 	}
 
+	private getQueueReconcileContext() {
+		return {
+			pendingPaths: this.pendingPaths,
+			clearDebounceTimer: this.clearDebounceTimer.bind(this),
+			updateState: this.updateState.bind(this),
+		};
+	}
+
 	onRawFileEvent(path: string): void {
 		void this.handleRawFileEvent(path);
 	}
@@ -297,33 +301,6 @@ export class SyncEngine {
 			this.debounceTimer = null;
 		}
 		this.maxWaitStart = null;
-	}
-
-	private clearSyncedPendingPaths(result: SyncResult): void {
-		if (!result.success || this.pendingPaths.size === 0) {
-			return;
-		}
-
-		const previousPendingCount = this.pendingPaths.size;
-
-		for (const path of result.uploadedPaths) {
-			this.pendingPaths.delete(path);
-		}
-		for (const path of result.downloadedPaths) {
-			this.pendingPaths.delete(path);
-		}
-		for (const path of result.deletedPaths) {
-			this.pendingPaths.delete(`delete:${path}`);
-		}
-
-		if (this.pendingPaths.size === previousPendingCount) {
-			return;
-		}
-
-		if (this.pendingPaths.size === 0) {
-			this.clearDebounceTimer();
-		}
-		this.updateState({ pendingChanges: this.pendingPaths.size });
 	}
 
 	private async prepareUploadFromPath(path: string): Promise<PreparedUpload | null> {
@@ -514,10 +491,6 @@ export class SyncEngine {
 		return planLocalChanges(this.getLocalDiffPlannerContext(), PREPARE_CONCURRENCY);
 	}
 
-	private async downloadAndSaveFile(path: string, result: SyncResult): Promise<void> {
-		await transferDownloadAndSaveFile(this.getTransferContext(), path, result);
-	}
-
 	private async parallelDownloadAndSaveFiles(paths: string[], result: SyncResult): Promise<void> {
 		await transferParallelDownloadAndSaveFiles(
 			this.getTransferContext(),
@@ -529,7 +502,7 @@ export class SyncEngine {
 
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const result = await runSyncWorkflow(this.getSyncWorkflowContext(), progressCallback);
-		this.clearSyncedPendingPaths(result);
+		clearSyncedQueuePaths(this.getQueueReconcileContext(), result);
 		return result;
 	}
 
@@ -567,13 +540,13 @@ export class SyncEngine {
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const result = await runInitialSyncWorkflow(this.getInitialSyncWorkflowContext(), progressCallback);
-		this.clearSyncedPendingPaths(result);
+		clearSyncedQueuePaths(this.getQueueReconcileContext(), result);
 		return result;
 	}
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const result = await runForceFullSyncWorkflow(this.getForceSyncWorkflowContext(), progressCallback);
-		this.clearSyncedPendingPaths(result);
+		clearSyncedQueuePaths(this.getQueueReconcileContext(), result);
 		return result;
 	}
 

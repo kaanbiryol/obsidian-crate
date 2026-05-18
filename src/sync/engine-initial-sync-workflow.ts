@@ -1,20 +1,22 @@
-import { Notice, type Vault } from 'obsidian';
+import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from './file-discovery';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
-	getSyncResultError,
 } from './sync-result';
 import {
-	AUTH_ERROR_MESSAGE,
 	BATCH_UPLOAD_CONCURRENCY,
 	INITIAL_SYNC_PIPELINE_CHUNK_FILES,
 	UPLOAD_CONCURRENCY,
-	isAuthError,
 } from './engine-constants';
-import { createLogger, errorMessage } from '../plugin/logger';
+import { createLogger } from '../plugin/logger';
 import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
-import { getStartFailureResult, type SyncStatus } from './engine-workflow-shared';
+import {
+	completeWorkflowResult,
+	getStartFailureResult,
+	handleWorkflowError,
+	type SyncStatus,
+} from './engine-workflow-shared';
 
 const logger = createLogger('SyncEngine');
 
@@ -92,33 +94,15 @@ export async function runInitialSyncWorkflow(
 		await context.saveLocalManifest();
 
 		logger.info(`Initial sync completed: ${result.uploaded} uploaded`);
-		if (finalizeSyncResult(result)) {
-			const lastSync = new Date().toISOString();
-			context.updateState({
-				status: 'idle',
-				lastSync,
-				lastError: null,
-			});
-			context.setLastSync(lastSync);
-		} else {
-			context.updateState({
-				status: 'error',
-				lastError: getSyncResultError(result, 'Initial sync completed with errors'),
-			});
-		}
+		completeWorkflowResult(context, result, {
+			errorFallback: 'Initial sync completed with errors',
+		});
 	} catch (error) {
-		if (context.isAbortError(error)) {
-			logger.info('Initial sync aborted');
-		} else if (isAuthError(error)) {
-			result.errors.push(AUTH_ERROR_MESSAGE);
-			logger.error('Initial sync failed: auth error (401)');
-			new Notice(AUTH_ERROR_MESSAGE);
-			context.updateState({ status: 'error', lastError: AUTH_ERROR_MESSAGE });
-		} else {
-			const errMsg = errorMessage(error);
-			result.errors.push(errMsg);
-			context.updateState({ status: 'error', lastError: errMsg });
-		}
+		handleWorkflowError(context, result, error, {
+			abortLogMessage: 'Initial sync aborted',
+			failureLogPrefix: 'Initial sync failed',
+			logger,
+		});
 	}
 
 	finalizeSyncResult(result);

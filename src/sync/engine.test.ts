@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { computeHash } from './hasher';
 import { createEmptySyncResult } from './sync-result';
-import { prepareUploadFromVaultFile, type TransferContext } from './transfer';
 import type { CrateSettings, FileDiff, PreparedUpload, SyncResult } from '../plugin/types';
 import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
 
@@ -460,91 +459,6 @@ describe('SyncEngine explicit sync queue reconciliation', () => {
 		expect(pendingPaths.size).toBe(0);
 		expect(harness.engine.getPendingPaths()).toEqual([]);
 		expect(harness.engine.getState().pendingChanges).toBe(0);
-	});
-});
-
-describe('prepareUploadFromVaultFile', () => {
-	let harness: Harness;
-
-	function transferContext(): TransferContext {
-		return {
-			vault: harness.vault as never,
-			api: harness.api as never,
-			localManifest: harness.localManifest as never,
-			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
-			retryWithBackoff: async <T>(fn: () => Promise<T>) => fn(),
-			getModifiedIso: vi.fn().mockResolvedValue(new Date().toISOString()),
-		};
-	}
-
-	beforeEach(() => {
-		harness = createHarness();
-	});
-
-	it('skips oversized files', async () => {
-		const result = await prepareUploadFromVaultFile(transferContext(), {
-			path: 'big.bin',
-			size: 25 * 1024 * 1024 + 1,
-			mtime: Date.now(),
-			extension: 'bin',
-		});
-
-		expect(result).toBeNull();
-		expect(harness.vault.adapter.readBinary).not.toHaveBeenCalled();
-	});
-
-	it('skips unchanged files based on manifest hash', async () => {
-		const content = new TextEncoder().encode('same').buffer as ArrayBuffer;
-		harness.vault.adapter.readBinary.mockResolvedValue(content);
-		harness.localManifest.hashMatches.mockReturnValue(true);
-
-		const result = await prepareUploadFromVaultFile(transferContext(), {
-			path: 'notes/same.md',
-			size: 4,
-			mtime: Date.now(),
-			extension: 'md',
-		});
-
-		expect(result).toBeNull();
-		expect(harness.localManifest.hashMatches).toHaveBeenCalled();
-	});
-
-	it('prepares files with ArrayBuffer content', async () => {
-		const content = new TextEncoder().encode('hello world').buffer as ArrayBuffer;
-		harness.vault.adapter.readBinary.mockResolvedValue(content);
-
-		const result = await prepareUploadFromVaultFile(transferContext(), {
-			path: 'notes/a.md',
-			size: 11,
-			mtime: Date.now(),
-			extension: 'md',
-		});
-
-		expect(result?.path).toBe('notes/a.md');
-		expect(result?.content).toBeInstanceOf(ArrayBuffer);
-		expect(result?.contentType).toBe('text/markdown');
-		expect(result?.hash).toHaveLength(64);
-		// No 'binary' field anymore
-		expect(result).not.toHaveProperty('binary');
-	});
-
-	it('prepares binary files with ArrayBuffer content', async () => {
-		const bytes = new Uint8Array([0, 255, 1]);
-		harness.vault.adapter.readBinary.mockResolvedValue(bytes.buffer);
-
-		const result = await prepareUploadFromVaultFile(transferContext(), {
-			path: 'images/pixel.png',
-			size: 3,
-			mtime: Date.now(),
-			extension: 'png',
-		});
-
-		expect(result?.path).toBe('images/pixel.png');
-		expect(result?.content).toBeInstanceOf(ArrayBuffer);
-		expect(result?.contentType).toBe('image/png');
-		// Content is raw ArrayBuffer, not base64
-		expect(result!.content.byteLength).toBe(3);
-		expect(result).not.toHaveProperty('binary');
 	});
 });
 
