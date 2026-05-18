@@ -4,7 +4,7 @@
 	"version": "1.0.0",
 	"minAppVersion": "1.11.4",
 	"description": "Sync your Obsidian vault and reminders with Cloudflare R2",
-	"author": "",
-	"authorUrl": "",
+	"author": "Kaan Biryol",
+	"authorUrl": "https://github.com/kaanbiryol",
 	"isDesktopOnly": false
 }

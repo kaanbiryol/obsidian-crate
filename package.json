@@ -4,6 +4,15 @@
 	"description": "Sync your Obsidian vault and reminders with Cloudflare R2",
 	"main": "main.js",
 	"type": "module",
+	"author": "Kaan Biryol",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kaanbiryol/obsidian-crate.git"
+	},
+	"bugs": {
+		"url": "https://github.com/kaanbiryol/obsidian-crate/issues"
+	},
+	"homepage": "https://github.com/kaanbiryol/obsidian-crate#readme",
 	"scripts": {
 		"build:worker": "node scripts/build-worker.mjs",
 		"preview:pwa": "node scripts/pwa-preview.mjs",
@@ -20,8 +29,15 @@
 		"test": "vitest run",
 		"check": "npm run build:worker && npm run lint && npm run typecheck && npm run typecheck:worker && npm test"
 	},
-	"keywords": [],
-	"license": "0-BSD",
+	"keywords": [
+		"obsidian",
+		"obsidian-plugin",
+		"cloudflare",
+		"r2",
+		"sync",
+		"reminders"
+	],
+	"license": "0BSD",
 	"devDependencies": {
 		"@codemirror/state": "^6.5.0",
 		"@codemirror/view": "^6.38.6",
