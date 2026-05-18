@@ -1,12 +1,12 @@
-import { deleteReminderBlockFromContent } from "./markdownReminderFile";
-import type { IndexedReminder } from "./reminderIndex";
-import { toReminder } from "./markdownWriterHelpers";
-import type { MarkdownWriterContext } from "./markdownWriterTypes";
+import { deleteReminderBlockFromContent } from "../markdownReminderFile";
+import type { IndexedReminder } from "../reminder-index";
+import { toReminder } from "./helpers";
+import type { MarkdownWriterContext } from "./types";
 import {
   markdownWriterLog,
   notifyFileWritten,
   triggerReminderChange,
-} from "./markdownWriterOperationShared";
+} from "./operation-shared";
 
 export async function deleteReminderInMarkdown(
   context: MarkdownWriterContext,

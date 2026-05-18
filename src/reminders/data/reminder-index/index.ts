@@ -9,10 +9,10 @@
 import type { App, TFile } from "obsidian";
 import type { Priority, RecurrenceRule, Reminder } from "@/reminders/types/reminder";
 import { createLogger } from "@/reminders/utils/logger";
-import { isReminderOverdue, isReminderToday, isReminderWithinDays } from "./reminderIndexDates";
-import { createReminderLookupStore } from "./reminderIndexLookupStore";
-import { createReminderOptimisticState } from "./reminderIndexOptimisticState";
-import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type ScanResult } from "./vaultScanner";
+import { isReminderOverdue, isReminderToday, isReminderWithinDays } from "./dates";
+import { createReminderLookupStore } from "./lookup-store";
+import { createReminderOptimisticState } from "./optimistic-state";
+import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";
 
 const log = createLogger("ReminderIndex");
 

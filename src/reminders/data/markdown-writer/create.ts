@@ -7,15 +7,15 @@ import {
   inferHasTimeFromDate,
 } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
-import { createReminderId } from "./reminderIdentity";
-import type { IndexedReminder } from "./reminderIndex";
-import { appendReminderBlockToContent } from "./markdownReminderFile";
-import type { MarkdownWriterContext } from "./markdownWriterTypes";
+import { createReminderId } from "../reminderIdentity";
+import type { IndexedReminder } from "../reminder-index";
+import { appendReminderBlockToContent } from "../markdownReminderFile";
+import type { MarkdownWriterContext } from "./types";
 import {
   markdownWriterLog,
   notifyFileWritten,
   triggerReminderChange,
-} from "./markdownWriterOperationShared";
+} from "./operation-shared";
 
 export async function createReminderInMarkdown(
   context: MarkdownWriterContext,

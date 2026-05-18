@@ -1,6 +1,6 @@
-import { reorderReminderBlocksInContent } from "./markdownReminderFile";
-import type { MarkdownWriterContext } from "./markdownWriterTypes";
-import { markdownWriterLog } from "./markdownWriterOperationShared";
+import { reorderReminderBlocksInContent } from "../markdownReminderFile";
+import type { MarkdownWriterContext } from "./types";
+import { markdownWriterLog } from "./operation-shared";
 
 export async function reorderRemindersInMarkdown(
   context: MarkdownWriterContext,

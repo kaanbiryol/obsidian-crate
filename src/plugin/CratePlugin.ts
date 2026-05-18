@@ -5,9 +5,9 @@
 import { Plugin } from 'obsidian';
 import { CloudflareSessionManager } from '../cloudflare/session-manager';
 import { CloudflareUsageService } from '../cloudflare/usage-service';
-import { type ReminderIndex } from '../reminders/data/reminderIndex';
-import { type MarkdownWriter } from '../reminders/data/markdownWriter';
-import { type StorageCompat } from '../reminders/data/storageCompat';
+import { type ReminderIndex } from '../reminders/data/reminder-index';
+import { type MarkdownWriter } from '../reminders/data/markdown-writer';
+import { type StorageCompat } from '../reminders/data/storage-compat';
 import { reinitializeReminders } from '../reminders/plugin-integration';
 import {
 	type RemindersSettings,

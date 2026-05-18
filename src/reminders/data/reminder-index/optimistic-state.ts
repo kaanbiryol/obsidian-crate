@@ -1,4 +1,4 @@
-import type { IndexedReminder } from "./reminderIndex";
+import type { IndexedReminder } from "./index";
 
 export interface ReminderOptimisticState {
   mergeReminders(reminders: IndexedReminder[]): IndexedReminder[];

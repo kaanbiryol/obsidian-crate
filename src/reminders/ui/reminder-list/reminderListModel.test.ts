@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
-import type { ReminderIndex, IndexedReminder } from "@/reminders/data/reminderIndex";
-import type { StorageCompat } from "@/reminders/data/storageCompat";
+import type { ReminderIndex, IndexedReminder } from "@/reminders/data/reminder-index";
+import type { StorageCompat } from "@/reminders/data/storage-compat";
 import {
   buildRemindersListPresentation,
   loadRemindersListData,

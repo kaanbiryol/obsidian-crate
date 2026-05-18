@@ -1,9 +1,9 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from '../main';
-import { createReminderIndex } from './data/reminderIndex';
+import { createReminderIndex } from './data/reminder-index';
 import { migrateReminderIds } from './data/reminderIdMigration';
-import { createMarkdownWriter } from './data/markdownWriter';
-import { createStorageCompat } from './data/storageCompat';
+import { createMarkdownWriter } from './data/markdown-writer';
+import { createStorageCompat } from './data/storage-compat';
 import { ReminderNotificationService } from './services/notificationService';
 import { VaultWatcher } from './services/vaultWatcher';
 import { createLogger } from './utils/logger';

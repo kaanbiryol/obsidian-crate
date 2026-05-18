@@ -7,7 +7,7 @@ import {
 } from '@/reminders/utils/reminderDate';
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
-import type { buildReminderUpdate } from '@/reminders/data/storageCompatShared';
+import type { buildReminderUpdate } from '@/reminders/data/storage-compat/shared';
 import { setReminderIdMarker } from '@/reminders/data/reminderIdentity';
 import {
 	appendReminderBlockToContent,

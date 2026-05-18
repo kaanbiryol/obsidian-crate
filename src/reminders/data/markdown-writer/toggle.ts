@@ -10,18 +10,18 @@ import {
   reminderHasTime,
 } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
-import { setReminderIdMarker } from "./reminderIdentity";
-import type { IndexedReminder } from "./reminderIndex";
-import { findReminderLineNumber } from "./markdownWriterHelpers";
+import { setReminderIdMarker } from "../reminderIdentity";
+import type { IndexedReminder } from "../reminder-index";
+import { findReminderLineNumber } from "./helpers";
 import type {
   MarkdownWriterContext,
   ReminderChangeContext,
-} from "./markdownWriterTypes";
+} from "./types";
 import {
   markdownWriterLog,
   notifyFileWritten,
   triggerReminderChange,
-} from "./markdownWriterOperationShared";
+} from "./operation-shared";
 
 export async function toggleReminderCompletionInMarkdown(
   context: MarkdownWriterContext,

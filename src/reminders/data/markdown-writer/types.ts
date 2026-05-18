@@ -4,7 +4,7 @@ import type {
   Reminder,
   RecurrenceRule,
 } from "@/reminders/types/reminder";
-import type { IndexedReminder, ReminderIndex } from "./reminderIndex";
+import type { IndexedReminder, ReminderIndex } from "../reminder-index";
 
 export type ReminderOperation = "create" | "update" | "delete";
 

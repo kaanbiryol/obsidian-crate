@@ -1,6 +1,6 @@
-import { createReminderId } from "./reminderIdentity";
-import { buildCreatedReminderFallback, buildCreateReminderArgs, buildReminderUpdate, toReminder } from "./storageCompatShared";
-import type { StorageCompatContext } from "./storageCompatTypes";
+import { createReminderId } from "../reminderIdentity";
+import { buildCreatedReminderFallback, buildCreateReminderArgs, buildReminderUpdate, toReminder } from "./shared";
+import type { StorageCompatContext } from "./types";
 import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
 
 export function createStorageCompatMutations({ index, writer }: StorageCompatContext) {

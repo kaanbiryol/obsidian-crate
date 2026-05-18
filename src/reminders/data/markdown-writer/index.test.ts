@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createMarkdownWriter } from '@/reminders/data/markdownWriter';
-import type { MarkdownWriter } from '@/reminders/data/markdownWriter';
-import type { ReminderIndex, IndexedReminder } from '@/reminders/data/reminderIndex';
+import { createMarkdownWriter } from '@/reminders/data/markdown-writer';
+import type { MarkdownWriter } from '@/reminders/data/markdown-writer';
+import type { ReminderIndex, IndexedReminder } from '@/reminders/data/reminder-index';
 import { timezone as getLocalTimeZone } from '@/reminders/utils/time';
 import { createMockAppWithVault } from '@/test/factories/obsidian';
 

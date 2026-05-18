@@ -1,5 +1,5 @@
-import type { MarkdownWriter } from "./markdownWriter";
-import type { ReminderIndex } from "./reminderIndex";
+import type { MarkdownWriter } from "../markdown-writer";
+import type { ReminderIndex } from "../reminder-index";
 import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
 
 export interface StorageCompat {

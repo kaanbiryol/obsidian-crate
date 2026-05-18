@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ReminderIndex, IndexedReminder } from './reminderIndex';
-import type { MarkdownWriter } from './markdownWriter';
-import { createStorageCompat } from './storageCompat';
-import { timezone as getLocalTimeZone } from '../utils/time';
+import type { ReminderIndex, IndexedReminder } from '../reminder-index';
+import type { MarkdownWriter } from '../markdown-writer';
+import { createStorageCompat } from '.';
+import { timezone as getLocalTimeZone } from '../../utils/time';
 
 function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 	return {

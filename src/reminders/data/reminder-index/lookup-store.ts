@@ -1,4 +1,4 @@
-import type { IndexedReminder } from "./reminderIndex";
+import type { IndexedReminder } from "./index";
 
 export interface ReminderLookupStore {
   rebuild(reminders: IndexedReminder[]): void;

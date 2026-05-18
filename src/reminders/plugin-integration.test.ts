@@ -86,16 +86,16 @@ async function loadPluginIntegrationModule() {
 			}
 		},
 	}));
-	vi.doMock('./data/reminderIndex', () => ({
+	vi.doMock('./data/reminder-index', () => ({
 		createReminderIndex: reminderIndexFactory,
 	}));
 	vi.doMock('./data/reminderIdMigration', () => ({
 		migrateReminderIds,
 	}));
-	vi.doMock('./data/markdownWriter', () => ({
+	vi.doMock('./data/markdown-writer', () => ({
 		createMarkdownWriter,
 	}));
-	vi.doMock('./data/storageCompat', () => ({
+	vi.doMock('./data/storage-compat', () => ({
 		createStorageCompat,
 	}));
 	vi.doMock('./query/injector', () => ({
@@ -238,10 +238,10 @@ afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
-	vi.doUnmock('./data/reminderIndex');
+	vi.doUnmock('./data/reminder-index');
 	vi.doUnmock('./data/reminderIdMigration');
-	vi.doUnmock('./data/markdownWriter');
-	vi.doUnmock('./data/storageCompat');
+	vi.doUnmock('./data/markdown-writer');
+	vi.doUnmock('./data/storage-compat');
 	vi.doUnmock('./query/injector');
 	vi.doUnmock('./query/remindersBlockLivePreview');
 	vi.doUnmock('./commands');

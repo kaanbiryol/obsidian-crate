@@ -1,5 +1,5 @@
-import type { StorageCompatContext } from "./storageCompatTypes";
-import { getTodayReminderIds, toReminder } from "./storageCompatShared";
+import type { StorageCompatContext } from "./types";
+import { getTodayReminderIds, toReminder } from "./shared";
 
 export function createStorageCompatQueries({ index }: StorageCompatContext) {
   return {

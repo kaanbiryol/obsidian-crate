@@ -11,7 +11,7 @@
 import { TFile, type TAbstractFile, type EventRef } from "obsidian";
 import { createLogger } from "@/reminders/utils/logger";
 import type CratePlugin from "@/main";
-import type { ReminderIndex } from "@/reminders/data/reminderIndex";
+import type { ReminderIndex } from "@/reminders/data/reminder-index";
 
 const log = createLogger('VaultWatcher');
 

@@ -2,13 +2,13 @@ import type { App, TFile } from "obsidian";
 import type { Reminder } from "@/reminders/types/reminder";
 import { createLogger } from "@/reminders/utils/logger";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
-import type { IndexedReminder, ReminderIndex } from "./reminderIndex";
-import { getInitialProjectFileContent } from "./markdownReminderFile";
+import type { IndexedReminder, ReminderIndex } from "../reminder-index";
+import { getInitialProjectFileContent } from "../markdownReminderFile";
 export {
   buildDescriptionBlock,
   countDescriptionBlockLines,
   findReminderLineNumber,
-} from "./markdownReminderFile";
+} from "../markdownReminderFile";
 
 const log = createLogger("MarkdownWriter");
 

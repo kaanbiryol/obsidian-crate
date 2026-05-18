@@ -2,7 +2,7 @@ import { parseStoredReminderDate, reminderHasTime } from '@/reminders/utils/remi
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import type { UpdateReminderParams } from '@/reminders/types/plugin-reminder';
 import { createReminderId } from '@/reminders/data/reminderIdentity';
-import { buildCreateReminderArgs, buildReminderUpdate } from '@/reminders/data/storageCompatShared';
+import { buildCreateReminderArgs, buildReminderUpdate } from '@/reminders/data/storage-compat/shared';
 import { corsResponse } from './cors';
 import { readCommittedMarkdownFile, writeCommittedMarkdownFile } from './storage';
 import type { Env } from './types';

@@ -3,7 +3,7 @@ import { createLogger } from "@/reminders/utils/logger";
 import type {
   MarkdownWriterContext,
   ReminderChangeContext,
-} from "./markdownWriterTypes";
+} from "./types";
 
 export const markdownWriterLog = createLogger("MarkdownWriter");
 

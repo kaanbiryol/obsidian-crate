@@ -5,8 +5,8 @@ import {
   sortRemindersByFileOrder,
 } from "@/reminders/utils/reminderSort";
 import { formatDateHeader, isReminderOverdue } from "@/reminders/utils/dateFormatting";
-import { indexedToReminder, type IndexedReminder, type ReminderIndex } from "@/reminders/data/reminderIndex";
-import type { StorageCompat } from "@/reminders/data/storageCompat";
+import { indexedToReminder, type IndexedReminder, type ReminderIndex } from "@/reminders/data/reminder-index";
+import type { StorageCompat } from "@/reminders/data/storage-compat";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { formatLocalDateKey } from "@/reminders/utils/reminderDate";
 

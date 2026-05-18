@@ -9,24 +9,24 @@
  */
 
 import type { App } from "obsidian";
-import type { ReminderIndex } from "./reminderIndex";
+import type { ReminderIndex } from "../reminder-index";
 import {
   getFile,
   getOrCreateProjectFile,
-} from "./markdownWriterHelpers";
+} from "./helpers";
 import {
   createReminderInMarkdown,
   deleteReminderInMarkdown,
   reorderRemindersInMarkdown,
   toggleReminderCompletionInMarkdown,
   updateReminderInMarkdown,
-} from "./markdownWriterOperations";
+} from "./operations";
 import type {
   MarkdownWriter,
   MarkdownWriterContext,
   OnFileWrittenCallback,
   OnReminderChangeCallback,
-} from "./markdownWriterTypes";
+} from "./types";
 
 export type {
   MarkdownWriter,
@@ -34,7 +34,7 @@ export type {
   ReminderOperation,
   SyncResult,
   UpdateReminderInput,
-} from "./markdownWriterTypes";
+} from "./types";
 
 export function createMarkdownWriter(
   app: App,

@@ -8,7 +8,7 @@ vi.mock('@/reminders/data/vaultScanner', () => ({
   getProjectFromPath: vi.fn(),
 }));
 
-import { createReminderIndex, type IndexedReminder } from '@/reminders/data/reminderIndex';
+import { createReminderIndex, type IndexedReminder } from '@/reminders/data/reminder-index';
 import * as vaultScanner from '@/reminders/data/vaultScanner';
 import type { ScanResult } from '@/reminders/data/vaultScanner';
 

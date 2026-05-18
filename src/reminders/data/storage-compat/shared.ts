@@ -1,5 +1,5 @@
-import type { MarkdownWriter } from "./markdownWriter";
-import type { IndexedReminder } from "./reminderIndex";
+import type { MarkdownWriter } from "../markdown-writer";
+import type { IndexedReminder } from "../reminder-index";
 import type { Priority, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
 import {
   buildStoredReminderDates,
