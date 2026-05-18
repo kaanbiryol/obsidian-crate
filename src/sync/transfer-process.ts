@@ -1,6 +1,9 @@
+import type { TFile } from "obsidian";
 import { computeHash } from "./hasher";
 import { createConflictCopy } from "./conflict";
 import { isHiddenPath } from "./file-discovery";
+import { isMarkdownPath } from "./markdown-base-cache";
+import { mergeMarkdownContent } from "./markdown-merge";
 import { downloadAndSaveFile } from "./transfer-download";
 import { isVaultTFileLike, prepareUploadFromPath } from "./transfer-prepare";
 import type { TransferContext } from "./transfer-types";
@@ -42,6 +45,9 @@ export async function processDiff(
         modified,
       };
       context.localManifest.setEntry(uploadFile.path, entry);
+      if (isMarkdownPath(uploadFile.path)) {
+        await context.markdownBaseCache?.putBase(uploadFile.path, uploadFile.hash, uploadFile.content);
+      }
       localFiles[uploadFile.path] = entry;
       break;
     }
@@ -72,6 +78,19 @@ export async function processDiff(
 
       if (hasLocalFile || hasHiddenFile) {
         const localContent = await context.vault.adapter.readBinary(diff.path);
+        const autoMerged = await tryAutoMergeMarkdownConflict(
+          context,
+          diff,
+          visibleFile,
+          localContent,
+          remoteContent,
+          localFiles,
+          result,
+        );
+        if (autoMerged) {
+          break;
+        }
+
         const conflictPath = await createConflictCopy(context.vault, diff.path, localContent);
 
         if (visibleFile) {
@@ -90,6 +109,9 @@ export async function processDiff(
         };
         localFiles[diff.path] = entry;
         context.localManifest.setEntry(diff.path, entry);
+        if (isMarkdownPath(diff.path)) {
+          await context.markdownBaseCache?.putBase(diff.path, hash, remoteContent);
+        }
       }
       break;
     }
@@ -103,4 +125,69 @@ export async function processDiff(
       break;
     }
   }
+}
+
+async function tryAutoMergeMarkdownConflict(
+  context: TransferContext,
+  diff: FileDiff,
+  visibleFile: TFile | null,
+  localContent: ArrayBuffer,
+  remoteContent: ArrayBuffer,
+  localFiles: Record<string, FileEntry>,
+  result: SyncResult,
+): Promise<boolean> {
+  if (!isMarkdownPath(diff.path) || !context.markdownBaseCache) {
+    return false;
+  }
+
+  const manifestHash = context.localManifest.getEntry?.(diff.path)?.hash;
+  if (!manifestHash) {
+    return false;
+  }
+
+  const baseContent = await context.markdownBaseCache.readBase(diff.path, manifestHash);
+  if (!baseContent) {
+    return false;
+  }
+
+  const mergeResult = mergeMarkdownContent(baseContent, localContent, remoteContent);
+  if (!mergeResult.success) {
+    return false;
+  }
+
+  const mergedContent = mergeResult.content;
+  const mergedHash = await computeHash(mergedContent);
+
+  if (visibleFile) {
+    await context.vault.modifyBinary(visibleFile, mergedContent);
+  } else {
+    await context.vault.adapter.writeBinary(diff.path, mergedContent);
+  }
+
+  const uploadResult = await context.api.uploadFile(
+    diff.path,
+    mergedContent,
+    mergedHash,
+    mergedContent.byteLength,
+    "text/markdown",
+  );
+  if (!uploadResult.success) {
+    throw new Error(uploadResult.error || "Upload failed");
+  }
+
+  if (uploadResult.hash && uploadResult.hash !== mergedHash) {
+    throw new Error(`Hash mismatch after upload (expected ${mergedHash}, got ${uploadResult.hash})`);
+  }
+
+  const entry: FileEntry = {
+    hash: mergedHash,
+    size: mergedContent.byteLength,
+    modified: await context.getModifiedIso(diff.path),
+  };
+  localFiles[diff.path] = entry;
+  context.localManifest.setEntry(diff.path, entry);
+  await context.markdownBaseCache.putBase(diff.path, mergedHash, mergedContent);
+  result.merged++;
+  result.mergedPaths.push(diff.path);
+  return true;
 }

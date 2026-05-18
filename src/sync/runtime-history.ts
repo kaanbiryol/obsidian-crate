@@ -11,11 +11,13 @@ export function recordSyncHistory(
     success: result.success,
     uploaded: result.uploaded,
     downloaded: result.downloaded,
+    merged: result.merged,
     deleted: result.deleted,
     errorCount: result.errors.length,
     conflictCount: result.conflicts.length,
     uploadedPaths: limitHistoryPaths(result.uploadedPaths),
     downloadedPaths: limitHistoryPaths(result.downloadedPaths),
+    mergedPaths: limitHistoryPaths(result.mergedPaths),
     deletedPaths: limitHistoryPaths(result.deletedPaths),
   };
 
@@ -31,6 +33,6 @@ export function resetStoredSyncState(settings: CrateSettings): void {
   settings.syncHistory = [];
 }
 
-function limitHistoryPaths(paths: string[]): string[] {
+function limitHistoryPaths(paths: string[] = []): string[] {
   return paths.slice(0, MAX_SYNC_HISTORY_PATHS);
 }

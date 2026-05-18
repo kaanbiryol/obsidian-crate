@@ -1,6 +1,7 @@
 export type {
   TransferApi,
   TransferContext,
+  TransferMarkdownBaseCache,
   TransferManifest,
 } from "./transfer-types";
 export {

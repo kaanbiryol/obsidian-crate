@@ -175,7 +175,7 @@ export async function runSyncWorkflow(
 		}
 
 		logger.info(
-			`Full sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.conflicts.length} conflicts`,
+			`Full sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.merged} merged, ${result.conflicts.length} conflicts`,
 		);
 	} catch (error) {
 		handleWorkflowError(context, result, error, {

@@ -10,11 +10,12 @@ export interface ActivityModalDeps {
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
 }
 
-type FileCardType = 'upload' | 'download' | 'delete' | 'conflict';
+type FileCardType = 'upload' | 'download' | 'merge' | 'delete' | 'conflict';
 
 const FILE_CARD_ICONS: Record<FileCardType, string> = {
 	upload: 'upload',
 	download: 'download',
+	merge: 'git-merge',
 	delete: 'trash-2',
 	conflict: 'alert-triangle',
 };
@@ -303,6 +304,7 @@ function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry): vo
 	const groups: Array<{ paths: string[]; type: FileCardType }> = [
 		{ paths: entry.uploadedPaths ?? [], type: 'upload' },
 		{ paths: entry.downloadedPaths ?? [], type: 'download' },
+		{ paths: entry.mergedPaths ?? [], type: 'merge' },
 		{ paths: entry.deletedPaths ?? [], type: 'delete' },
 	];
 
@@ -316,6 +318,7 @@ function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry): vo
 function hasFilePaths(entry: SyncHistoryEntry): boolean {
 	return (entry.uploadedPaths?.length ?? 0) > 0
 		|| (entry.downloadedPaths?.length ?? 0) > 0
+		|| (entry.mergedPaths?.length ?? 0) > 0
 		|| (entry.deletedPaths?.length ?? 0) > 0;
 }
 
@@ -331,19 +334,29 @@ function formatTimestamp(iso: string): string {
 function formatSummary(entry: SyncHistoryEntry): string {
 	if (!entry.success) {
 		const parts = [`failed (${entry.errorCount} error${entry.errorCount !== 1 ? 's' : ''})`];
+		if (entry.merged > 0) {
+			parts.push(`${entry.merged} merged`);
+		}
 		if (entry.conflictCount > 0) {
 			parts.push(`${entry.conflictCount} conflict${entry.conflictCount !== 1 ? 's' : ''}`);
 		}
 		return parts.join(', ');
 	}
 
-	if (entry.uploaded === 0 && entry.downloaded === 0 && entry.deleted === 0 && entry.conflictCount === 0) {
+	if (
+		entry.uploaded === 0
+		&& entry.downloaded === 0
+		&& entry.merged === 0
+		&& entry.deleted === 0
+		&& entry.conflictCount === 0
+	) {
 		return 'no changes';
 	}
 
 	const parts: string[] = [];
 	if (entry.uploaded > 0) parts.push(`${entry.uploaded} up`);
 	if (entry.downloaded > 0) parts.push(`${entry.downloaded} down`);
+	if (entry.merged > 0) parts.push(`${entry.merged} merged`);
 	if (entry.deleted > 0) parts.push(`${entry.deleted} del`);
 	if (entry.conflictCount > 0) parts.push(`${entry.conflictCount} conflict${entry.conflictCount !== 1 ? 's' : ''}`);
 	return parts.join(', ');

@@ -131,11 +131,13 @@ function createSyncResult(overrides: Partial<SyncResult> = {}): SyncResult {
 		success: true,
 		uploaded: 0,
 		downloaded: 0,
+		merged: 0,
 		deleted: 0,
 		conflicts: [],
 		errors: [],
 		uploadedPaths: [],
 		downloadedPaths: [],
+		mergedPaths: [],
 		deletedPaths: [],
 		...overrides,
 	};
@@ -318,10 +320,11 @@ describe('debouncedSync', () => {
 });
 
 describe('clearSyncedPendingPaths', () => {
-	it('removes successful uploaded, downloaded, and deleted paths from the queue', () => {
+	it('removes successful uploaded, downloaded, merged, and deleted paths from the queue', () => {
 		const pendingPaths = new Set([
 			'notes/uploaded.md',
 			'notes/downloaded.md',
+			'notes/merged.md',
 			'delete:notes/deleted.md',
 		]);
 		const clearDebounceTimer = vi.fn();
@@ -332,6 +335,7 @@ describe('clearSyncedPendingPaths', () => {
 			createSyncResult({
 				uploadedPaths: ['notes/uploaded.md'],
 				downloadedPaths: ['notes/downloaded.md'],
+				mergedPaths: ['notes/merged.md'],
 				deletedPaths: ['notes/deleted.md'],
 			}),
 		);

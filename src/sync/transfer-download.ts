@@ -1,6 +1,7 @@
 import { base64ToArrayBuffer } from "./encoding";
 import { isHiddenPath } from "./file-discovery";
 import { computeHash } from "./hasher";
+import { isMarkdownPath } from "./markdown-base-cache";
 import type { SyncResult } from "../plugin/types";
 import { BATCH_MAX_FILES, MAX_FILE_SIZE_BYTES } from "../plugin/types";
 import { createLogger, errorMessage } from "../plugin/logger";
@@ -67,11 +68,16 @@ export async function saveDownloadedContent(
   }
 
   const hash = await computeHash(content);
-  context.localManifest.setEntry(path, {
+  const entry = {
     hash,
     size: content.byteLength,
     modified: await context.getModifiedIso(path),
-  });
+  };
+  context.localManifest.setEntry(path, entry);
+
+  if (isMarkdownPath(path)) {
+    await context.markdownBaseCache?.putBase(path, hash, content);
+  }
 }
 
 export async function parallelDownloadAndSaveFiles(

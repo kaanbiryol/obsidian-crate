@@ -1,6 +1,7 @@
 import type { TAbstractFile, Vault } from 'obsidian';
 import { TFolder } from 'obsidian';
 import { createLogger, errorMessage } from '../plugin/logger';
+import { isMarkdownPath } from './markdown-base-cache';
 import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
 
 const logger = createLogger('SyncQueue');
@@ -23,9 +24,14 @@ export interface QueueApi {
 }
 
 export interface QueueManifest {
+	getEntry?(path: string): { hash: string; size: number; modified: string } | undefined;
 	setEntry(path: string, entry: { hash: string; size: number; modified: string }): void;
 	removeEntry(path: string): void;
 	save(): Promise<void>;
+}
+
+export interface QueueMarkdownBaseCache {
+	putBase(path: string, hash: string, content: ArrayBuffer): Promise<void>;
 }
 
 export interface QueueDebounceContext {
@@ -61,6 +67,7 @@ export interface QueueFlushContext {
 	updateState(updates: Partial<SyncState>): void;
 	isDestroyed(): boolean;
 	currentStatus(): SyncState['status'];
+	markdownBaseCache?: QueueMarkdownBaseCache;
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
@@ -234,6 +241,9 @@ export async function processPendingChanges(
 					size: upload.size,
 					modified: await context.getModifiedIso(upload.path, upload.mtime),
 				});
+				if (isMarkdownPath(upload.path)) {
+					await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
+				}
 			});
 			await context.runConcurrent(uploadTasks, uploadConcurrency);
 		}
@@ -310,6 +320,9 @@ export function clearSyncedPendingPaths(
 		context.pendingPaths.delete(path);
 	}
 	for (const path of result.downloadedPaths) {
+		context.pendingPaths.delete(path);
+	}
+	for (const path of result.mergedPaths ?? []) {
 		context.pendingPaths.delete(path);
 	}
 	for (const path of result.deletedPaths) {

@@ -1,5 +1,6 @@
 import { arrayBufferToBase64 } from "./encoding";
 import { createBatchUploadChunks, prepareUploadFromVaultFile } from "./transfer-prepare";
+import { isMarkdownPath } from "./markdown-base-cache";
 import type { TransferContext } from "./transfer-types";
 import type { BatchUploadFile, PreparedUpload, SyncResult } from "../plugin/types";
 import { BATCH_FILE_SIZE_LIMIT } from "../plugin/types";
@@ -80,6 +81,9 @@ export async function uploadPreparedFiles(
               size: upload.size,
               modified: await context.getModifiedIso(upload.path, upload.mtime),
             });
+            if (isMarkdownPath(upload.path)) {
+              await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
+            }
           } else {
             result.errors.push(`${upload.path}: ${fileResult.error || "Upload failed"}`);
           }
@@ -134,6 +138,9 @@ async function uploadPreparedFilesIndividually(
           size: upload.size,
           modified: await context.getModifiedIso(upload.path, upload.mtime),
         });
+        if (isMarkdownPath(upload.path)) {
+          await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
+        }
         return;
       }
 

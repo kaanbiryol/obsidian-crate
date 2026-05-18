@@ -394,6 +394,10 @@ body.is-mobile .crate-activity-panel {
 	background: var(--interactive-accent);
 }
 
+.crate-file-accent-merge {
+	background: var(--color-green);
+}
+
 .crate-file-accent-delete {
 	background: var(--text-error);
 }

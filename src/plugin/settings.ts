@@ -77,6 +77,7 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 		success: value.success,
 		uploaded: normalizeNonNegativeInteger(value.uploaded, 0),
 		downloaded: normalizeNonNegativeInteger(value.downloaded, 0),
+		merged: normalizeNonNegativeInteger(value.merged, 0),
 		deleted: normalizeNonNegativeInteger(value.deleted, 0),
 		errorCount: normalizeNonNegativeInteger(value.errorCount, 0),
 		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
@@ -85,6 +86,9 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 			: undefined,
 		downloadedPaths: Array.isArray(value.downloadedPaths)
 			? normalizeStringArray(value.downloadedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
+			: undefined,
+		mergedPaths: Array.isArray(value.mergedPaths)
+			? normalizeStringArray(value.mergedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
 			: undefined,
 		deletedPaths: Array.isArray(value.deletedPaths)
 			? normalizeStringArray(value.deletedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)

@@ -8,9 +8,15 @@ import type {
 } from "../plugin/types";
 
 export interface TransferManifest {
+  getEntry?(path: string): FileEntry | undefined;
   hashMatches(path: string, hash: string): boolean;
   setEntry(path: string, entry: FileEntry): void;
   removeEntry(path: string): void;
+}
+
+export interface TransferMarkdownBaseCache {
+  readBase(path: string, hash: string): Promise<ArrayBuffer | null>;
+  putBase(path: string, hash: string, content: ArrayBuffer): Promise<void>;
 }
 
 export interface TransferApi {
@@ -31,6 +37,7 @@ export interface TransferContext {
   vault: Vault;
   api: TransferApi;
   localManifest: TransferManifest;
+  markdownBaseCache?: TransferMarkdownBaseCache;
   runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
   retryWithBackoff<T>(fn: () => Promise<T>): Promise<T>;
   getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;

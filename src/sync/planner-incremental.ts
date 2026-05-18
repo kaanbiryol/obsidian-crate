@@ -234,7 +234,7 @@ export async function runIncrementalSync(
     }
 
     logger.info(
-      `Incremental sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.deleted} del, ${result.conflicts.length} conflicts`,
+      `Incremental sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.merged} merged, ${result.deleted} del, ${result.conflicts.length} conflicts`,
     );
     return result;
   } catch (error) {

@@ -5,6 +5,7 @@
 import { type Plugin, type TAbstractFile, type Vault } from 'obsidian';
 import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
+import { MarkdownBaseCache } from './markdown-base-cache';
 import type { VaultFile } from './file-discovery';
 import {
 	onRawPathChange as queueOnRawPathChange,
@@ -63,6 +64,7 @@ export class SyncEngine {
 	private vault: Vault;
 	private api: SyncApiClient;
 	private localManifest: LocalManifest;
+	private markdownBaseCache: MarkdownBaseCache;
 	private settings: CrateSettings;
 	private state: SyncState;
 	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -89,7 +91,8 @@ export class SyncEngine {
 		this.api = api;
 		this.settings = settings;
 		this.localManifest = new LocalManifest(plugin.app, plugin.manifest);
-		this.ignoredDirPrefixes = settings.ignorePatterns.filter(p => p.endsWith('/'));
+		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
+		this.ignoredDirPrefixes = this.getIgnoredDirPrefixes(settings);
 		const dir = plugin.manifest.dir ?? '';
 		this.pluginIgnorePaths = new Set([
 			`${dir}/data.json`,
@@ -109,6 +112,7 @@ export class SyncEngine {
 	async initialize(): Promise<void> {
 		await this.localManifest.load();
 		logger.info('Engine initialized');
+		this.seedMarkdownBaseCacheInBackground();
 
 		if (this.settings.syncInterval > 0) {
 			this.startPeriodicSync();
@@ -122,7 +126,7 @@ export class SyncEngine {
 	updateSettings(settings: CrateSettings): void {
 		this.patternCache.clear();
 		this.settings = settings;
-		this.ignoredDirPrefixes = settings.ignorePatterns.filter(p => p.endsWith('/'));
+		this.ignoredDirPrefixes = this.getIgnoredDirPrefixes(settings);
 		this.consecutiveCheckFailures = 0;
 		this.lastCheckAttempt = 0;
 
@@ -177,6 +181,28 @@ export class SyncEngine {
 		});
 	}
 
+	private getIgnoredDirPrefixes(settings: CrateSettings): string[] {
+		return [
+			...settings.ignorePatterns.filter(p => p.endsWith('/')),
+			this.markdownBaseCache.getIgnoredPrefix(),
+		];
+	}
+
+	private seedMarkdownBaseCacheInBackground(): void {
+		void this.markdownBaseCache.seedFromManifest(this.localManifest, {
+			isDestroyed: () => this.destroyed,
+			runConcurrent: this.runConcurrent.bind(this),
+		}).catch((error) => {
+			logger.warn('Markdown base cache seed failed:', errorMessage(error));
+		});
+	}
+
+	private pruneMarkdownBaseCacheInBackground(): void {
+		void this.markdownBaseCache.pruneUnreferenced(this.localManifest).catch((error) => {
+			logger.warn('Markdown base cache prune failed:', errorMessage(error));
+		});
+	}
+
 	private throwIfDestroyed(): void {
 		if (this.destroyed) {
 			throw new DOMException('Sync engine destroyed', 'AbortError');
@@ -192,6 +218,7 @@ export class SyncEngine {
 			vault: this.vault,
 			api: this.api,
 			localManifest: this.localManifest,
+			markdownBaseCache: this.markdownBaseCache,
 			runConcurrent: this.runConcurrent.bind(this),
 			retryWithBackoff: this.retryWithBackoff.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
@@ -233,6 +260,7 @@ export class SyncEngine {
 			updateState: this.updateState.bind(this),
 			isDestroyed: () => this.destroyed,
 			currentStatus: () => this.state.status,
+			markdownBaseCache: this.markdownBaseCache,
 			prepareUploadFromPath: (path: string) => this.prepareUploadFromPath(path),
 			runConcurrent: this.runConcurrent.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
@@ -503,6 +531,9 @@ export class SyncEngine {
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const result = await runSyncWorkflow(this.getSyncWorkflowContext(), progressCallback);
 		clearSyncedQueuePaths(this.getQueueReconcileContext(), result);
+		if (result.success) {
+			this.pruneMarkdownBaseCacheInBackground();
+		}
 		return result;
 	}
 
@@ -541,12 +572,18 @@ export class SyncEngine {
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const result = await runInitialSyncWorkflow(this.getInitialSyncWorkflowContext(), progressCallback);
 		clearSyncedQueuePaths(this.getQueueReconcileContext(), result);
+		if (result.success) {
+			this.pruneMarkdownBaseCacheInBackground();
+		}
 		return result;
 	}
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const result = await runForceFullSyncWorkflow(this.getForceSyncWorkflowContext(), progressCallback);
 		clearSyncedQueuePaths(this.getQueueReconcileContext(), result);
+		if (result.success) {
+			this.pruneMarkdownBaseCacheInBackground();
+		}
 		return result;
 	}
 

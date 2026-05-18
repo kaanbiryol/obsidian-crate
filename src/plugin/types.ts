@@ -37,11 +37,13 @@ export interface SyncResult {
 	success: boolean;
 	uploaded: number;
 	downloaded: number;
+	merged: number;
 	deleted: number;
 	conflicts: string[];
 	errors: string[];
 	uploadedPaths: string[];
 	downloadedPaths: string[];
+	mergedPaths: string[];
 	deletedPaths: string[];
 }
 
@@ -51,11 +53,13 @@ export interface SyncHistoryEntry {
 	success: boolean;
 	uploaded: number;
 	downloaded: number;
+	merged: number;
 	deleted: number;
 	errorCount: number;
 	conflictCount: number;
 	uploadedPaths?: string[];
 	downloadedPaths?: string[];
+	mergedPaths?: string[];
 	deletedPaths?: string[];
 }
 

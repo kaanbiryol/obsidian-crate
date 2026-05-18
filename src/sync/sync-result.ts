@@ -10,11 +10,13 @@ export function createEmptySyncResult(): SyncResult {
 		success: true,
 		uploaded: 0,
 		downloaded: 0,
+		merged: 0,
 		deleted: 0,
 		conflicts: [],
 		errors: [],
 		uploadedPaths: [],
 		downloadedPaths: [],
+		mergedPaths: [],
 		deletedPaths: [],
 	};
 }

@@ -36,14 +36,20 @@ function createProcessHarness() {
 		batchDownload: vi.fn(),
 	};
 	const localManifest = {
+		getEntry: vi.fn(),
 		hashMatches: vi.fn(() => false),
 		setEntry: vi.fn(),
 		removeEntry: vi.fn(),
+	};
+	const markdownBaseCache = {
+		readBase: vi.fn(),
+		putBase: vi.fn(),
 	};
 	const context: TransferContext = {
 		vault: vault as never,
 		api,
 		localManifest,
+		markdownBaseCache,
 		runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 		retryWithBackoff: async <T>(fn: () => Promise<T>) => fn(),
 		getModifiedIso: vi.fn(async () => '2026-02-15T00:00:00.000Z'),
@@ -54,6 +60,7 @@ function createProcessHarness() {
 		vault,
 		api,
 		localManifest,
+		markdownBaseCache,
 		context,
 	};
 }
@@ -108,6 +115,65 @@ describe('processDiff conflict handling', () => {
 		expect(harness.localManifest.setEntry).toHaveBeenCalledWith(
 			path,
 			expect.objectContaining({ size: mergedWritten.byteLength }),
+		);
+	});
+
+	it('auto-merges non-overlapping markdown conflicts and uploads the merged content', async () => {
+		const harness = createProcessHarness();
+		const path = 'notes/merge.md';
+		const base = 'title\nbase local\nbase remote\n';
+		const local = 'title\nlocal edit\nbase remote\n';
+		const remote = 'title\nbase local\nremote edit\n';
+		const localFile = { path, extension: 'md' };
+		const baseHash = await computeHash(toArrayBuffer(base));
+		harness.localManifest.getEntry.mockReturnValue({
+			hash: baseHash,
+			size: base.length,
+			modified: '2026-02-14T00:00:00.000Z',
+		});
+		harness.markdownBaseCache.readBase.mockResolvedValue(toArrayBuffer(base));
+		harness.vault.getAbstractFileByPath.mockReturnValue(localFile);
+		harness.adapter.readBinary.mockResolvedValue(toArrayBuffer(local));
+		harness.api.downloadFile.mockResolvedValue({
+			content: toArrayBuffer(remote),
+			contentType: 'text/markdown',
+			size: remote.length,
+		});
+		harness.api.uploadFile.mockImplementation(async (
+			_uploadPath: string,
+			_content: ArrayBuffer,
+			hash: string,
+		) => ({ success: true, path, hash }));
+
+		const localFiles: Record<string, FileEntry> = {};
+		const result = createEmptySyncResult();
+
+		await processDiff(
+			harness.context,
+			{ path, action: 'conflict', localHash: 'l', remoteHash: 'r' },
+			localFiles,
+			result,
+		);
+
+		expect(result.conflicts).toEqual([]);
+		expect(result.merged).toBe(1);
+		expect(result.mergedPaths).toEqual([path]);
+		expect(harness.vault.createBinary).not.toHaveBeenCalled();
+		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
+		expect(harness.vault.modifyBinary).toHaveBeenCalledTimes(1);
+
+		const mergedWritten = harness.vault.modifyBinary.mock.calls[0]?.[1] as ArrayBuffer;
+		expect(fromArrayBuffer(mergedWritten)).toBe('title\nlocal edit\nremote edit\n');
+		expect(localFiles[path]).toEqual(
+			expect.objectContaining({
+				hash: await computeHash(mergedWritten),
+				size: mergedWritten.byteLength,
+			}),
+		);
+		expect(harness.markdownBaseCache.putBase).toHaveBeenCalledWith(
+			path,
+			await computeHash(mergedWritten),
+			mergedWritten,
 		);
 	});
 
