@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import { sha256Hex } from './auth';
-import { PWA_ASSET_VERSION } from './pwa-version.gen';
+import { PWA_ASSET_VERSION } from './pwa-version';
 import type { Env } from './types';
 
 interface SubscriptionRecord {

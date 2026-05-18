@@ -4,8 +4,22 @@ import tsConfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vite";
 import { resolve } from "node:path";
 import { builtinModules } from "node:module";
+import { existsSync, readFileSync } from "node:fs";
+
+function readGeneratedWorkerScript() {
+	const generatedPath = resolve(__dirname, ".generated/cloudflare/worker-script.json");
+	if (!existsSync(generatedPath)) {
+		return "";
+	}
+
+	const payload = JSON.parse(readFileSync(generatedPath, "utf-8"));
+	return typeof payload.script === "string" ? payload.script : "";
+}
 
 export default defineConfig({
+	define: {
+		__CRATE_WORKER_SCRIPT__: JSON.stringify(readGeneratedWorkerScript()),
+	},
 	plugins: [
 		preact(),
 		tsConfigPaths({

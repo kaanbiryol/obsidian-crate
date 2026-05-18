@@ -1,4 +1,4 @@
-import { PWA_ASSET_VERSION } from '../pwa-version.gen';
+import { PWA_ASSET_VERSION } from '../pwa-version';
 
 export const SERVICE_WORKER_JS = `
 const PWA_SHELL_CACHE = 'crate-reminders-shell-${PWA_ASSET_VERSION}';

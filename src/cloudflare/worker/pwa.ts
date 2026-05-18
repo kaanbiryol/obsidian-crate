@@ -1,5 +1,5 @@
-import { PWA_CLIENT_JS } from './pwa-client-bundle.gen';
-import { PWA_ASSET_VERSION } from './pwa-version.gen';
+import { PWA_CLIENT_JS } from './pwa-client-bundle';
+import { PWA_ASSET_VERSION } from './pwa-version';
 
 export { createPwaHtml, PWA_HTML } from './pwa/html';
 export { ICON_SVG } from './pwa/icons';

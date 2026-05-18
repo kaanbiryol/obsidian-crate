@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RemindersAppShell, type ReminderCardRenderer } from '@/reminders/ui/RemindersAppShell';
-import { PWA_ASSET_VERSION } from './pwa-version.gen';
+import { PWA_ASSET_VERSION } from './pwa-version';
 import {
 	AUTH_TOKEN_KEY,
 	REMINDERS_CACHE_KEY,

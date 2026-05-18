@@ -29,7 +29,7 @@
 └──────────────────────────────────────────────────────┘
 ```
 
-**Design philosophy:** all sync intelligence (change detection, conflict resolution, batching) lives in the plugin. The worker is a thin storage proxy.
+**Design philosophy:** sync intelligence (change detection, conflict resolution, batching) lives in the plugin. The Worker stores files, exposes reminder web/PWA endpoints, and schedules push notifications, but does not decide sync plans.
 
 ## Infrastructure Stack
 
@@ -38,7 +38,7 @@
 | **Cloudflare Worker** | HTTPS API - receives uploads, serves downloads, manages changelog |
 | **Cloudflare R2** | Object storage for vault file content |
 | **Cloudflare D1** | SQLite database with changelog + files tables |
-| **Cloudflare OAuth** | PKCE-based authentication for infrastructure setup |
+| **Cloudflare API token** | User-provided token for infrastructure setup and redeploys |
 | **OS Keychain** | Stores auth tokens via Obsidian's `secretStorage` API |
 
 ## Worker Bindings
@@ -59,7 +59,7 @@
 ```
 CratePlugin (main.ts)
   ├── SecretStorageService   - OS keychain wrapper
-  ├── CloudflareSessionManager - OAuth PKCE flow, token refresh
+  ├── CloudflareSessionManager - Cloudflare API token/account storage
   ├── CloudflareUsageService   - analytics via CF GraphQL API
   ├── CrateSettingTab          - settings UI (delegates to section modules)
   └── SyncRuntime (sync/runtime.ts) - lifecycle coordinator
@@ -67,9 +67,10 @@ CratePlugin (main.ts)
         │     uses: planner, transfer, queue, file-discovery, manifest
         ├── SyncApiClient (sync/api.ts) - HTTP calls to worker
         └── StatusBarManager (ui/status.ts) - status bar rendering
-  ├── ReminderScanner (reminders/scanner.ts) - vault file scanner for reminder metadata
-  ├── ReminderIndex (reminders/index.ts) - in-memory reminder index
-  └── ReminderWriter (reminders/writer.ts) - markdown CRUD for reminder fields
+  ├── Reminder runtime (reminders/runtime.ts) - index/writer/storage/watcher setup
+  ├── Reminder registrations (reminders/register-integrations.ts) - commands, code blocks, views
+  ├── ReminderIndex (reminders/data/reminderIndex.ts) - in-memory reminder index
+  └── MarkdownWriter (reminders/data/markdownWriter.ts) - markdown CRUD for reminder lines
 ```
 
 ## Authentication
@@ -98,7 +99,13 @@ Two keys stored in OS keychain via `SecretStorageService`:
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes empty string to "delete" and treats empty strings as null on read.
 
-**Type augmentation:** Obsidian's types package doesn't include `secretStorage`. The module augmentation (`declare module 'obsidian'`) lives in `src/secret-storage.ts`.
+**Type augmentation:** Obsidian's types package doesn't include `secretStorage`. The module augmentation (`declare module 'obsidian'`) lives in `src/plugin/secret-storage.ts`.
+
+## Worker and PWA build
+
+The Worker source lives in `src/cloudflare/worker/`. `scripts/build-worker.mjs` builds the PWA client first, injects that bundle into the Worker build, and writes generated artifacts under `.generated/cloudflare/`.
+
+The Obsidian plugin bundle does not import generated TypeScript files. Instead, `vite.config.mts` reads `.generated/cloudflare/worker-script.json` and injects the Worker script into `src/cloudflare/worker-template.ts` through the `__CRATE_WORKER_SCRIPT__` build constant. Source modules have test-safe fallbacks so unit tests do not depend on ignored generated `.gen.ts` files.
 
 ## Status Bar
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SERVICE_WORKER_JS, createManifestJson, createPwaHtml, createPwaVersionJson } from './pwa';
-import { PWA_ASSET_VERSION } from './pwa-version.gen';
+import { PWA_ASSET_VERSION } from './pwa-version';
 
 describe('PWA activation metadata', () => {
 	it('uses the plain notifications route when no activation params are present', () => {

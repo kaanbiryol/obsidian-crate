@@ -1,4 +1,4 @@
-import { PWA_ASSET_VERSION } from '../pwa-version.gen';
+import { PWA_ASSET_VERSION } from '../pwa-version';
 import {
 	currentQueryParams,
 	detectDeviceName,
