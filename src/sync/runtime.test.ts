@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { SyncApiClient } from './api';
+import { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
 import {
 	FOREGROUND_SYNC_COOLDOWN_MS,
@@ -141,7 +142,7 @@ describe('SyncRuntime startup event handling', () => {
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 		vi.spyOn(SyncEngine.prototype, 'sync').mockImplementation(async () => startupSync.promise);
 		vi.spyOn(SyncApiClient.prototype, 'registerToken').mockResolvedValue({ id: 'token-id' });
-		vi.spyOn(SyncEngine.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
+		vi.spyOn(SyncQueueController.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 	});
 
 	afterEach(async () => {
@@ -305,7 +306,7 @@ describe('SyncRuntime teardown and reinitialization', () => {
 			return nextSync ? nextSync.promise : createEmptySyncResult();
 		});
 		vi.spyOn(SyncApiClient.prototype, 'registerToken').mockResolvedValue({ id: 'token-id' });
-		vi.spyOn(SyncEngine.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
+		vi.spyOn(SyncQueueController.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 	});
 
 	afterEach(async () => {
