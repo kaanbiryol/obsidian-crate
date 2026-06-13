@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useRef, useCallback } from 'react';
 
 import type { RichTextInputHandle } from '../../components/RichTextInput';
 import { BaseModal } from '../../components/BaseModal';
@@ -6,19 +6,12 @@ import { ModalBackdrop } from '../../components/ModalBackdrop';
 import { AddReminderModalBody } from './AddReminderModalBody';
 import { AddReminderModalHeader } from './AddReminderModalHeader';
 import { AddReminderModalOverlays } from './AddReminderModalOverlays';
-import { buildDeleteConfirmationMessage } from './deleteConfirmation';
-import {
-	buildReminderSubmission,
-	executeReminderAction,
-} from './reminderMutation';
+import { useReminderModalActions } from './useReminderModalActions';
 import { useReminderDraft } from './useReminderDraft';
 import { useReminderModalPresentation } from './useReminderModalPresentation';
 import { moveCursorToEnd } from '../../utils/cursorPosition';
 import { AnimationConfig } from '../animations';
 import { Reminder, RecurrenceRule } from '../../types';
-import { createLogger } from '../../utils/logger';
-
-const log = createLogger('AddReminderModal');
 
 interface AddReminderModalProps {
     onClose: () => void;
@@ -69,8 +62,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     const focusDelayMs = isMobileSheet ? (isEditing ? 0 : 120) : 0;
     const textareaRef = useRef<HTMLDivElement>(null);
     const richTextInputRef = useRef<RichTextInputHandle>(null);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
     const {
         content,
         setContent,
@@ -111,6 +102,31 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         onClose,
         richTextInputRef,
     });
+    const {
+        showDeleteConfirm,
+        isDeleting,
+        deleteMessage,
+        handleSubmit,
+        handleDeleteClick,
+        handleDeleteConfirm,
+        closeDeleteConfirm,
+    } = useReminderModalActions({
+        content,
+        description,
+        projects,
+        priority,
+        project,
+        dueDate,
+        hasTime,
+        recurrence,
+        reminder,
+        optimistic,
+        onClose,
+        onAdd,
+        onSave,
+        onDelete,
+        onError,
+    });
 
     const textColor = 'var(--text-normal)';
     const keyboardPadding = keyboardOffset > 0 ? Math.max(0, keyboardOffset - 32) : 0;
@@ -132,75 +148,11 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         });
     }, [togglePriority]);
 
-    const handleSubmit = async () => {
-        const submission = buildReminderSubmission({
-            content,
-            description,
-            projects,
-            priority,
-            project,
-            dueDate,
-            hasTime,
-            recurrence,
-            reminder,
-        });
-        if (!submission) return;
-
-        await executeReminderAction({
-            optimistic,
-            close: onClose,
-            delayMs: 300,
-            action: async () => {
-                if (submission.updatedReminder && onSave) {
-                    await onSave(submission.updatedReminder);
-                } else if (onAdd) {
-                    await onAdd(
-                        submission.content,
-                        submission.project,
-                        submission.priority,
-                        submission.dueDate,
-                        submission.recurrence,
-                        submission.hasTime,
-                        submission.description,
-                    );
-                }
-            },
-            onError: (error) => {
-                log.error(`Failed to ${isEditing ? 'update' : 'add'} reminder:`, error);
-                onError?.(error);
-            },
-        });
-    };
-
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             void handleSubmit();
         }
-    };
-
-    const handleDeleteClick = () => {
-        setShowDeleteConfirm(true);
-    };
-
-    const handleDeleteConfirm = async () => {
-        if (!onDelete || !reminder) return;
-
-        await executeReminderAction({
-            optimistic,
-            close: onClose,
-            beforeClose: optimistic ? () => setShowDeleteConfirm(false) : undefined,
-            beforeRun: optimistic ? undefined : () => setIsDeleting(true),
-            afterSuccess: optimistic ? undefined : () => setShowDeleteConfirm(false),
-            afterSettled: optimistic ? undefined : () => setIsDeleting(false),
-            action: async () => {
-                await onDelete(reminder);
-            },
-            onError: (error) => {
-                log.error('Failed to delete reminder:', error);
-                onError?.(error);
-            },
-        });
     };
 
     // Determine if any modal is showing (for shared backdrop)
@@ -306,11 +258,11 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 applyRecurrenceSelection(rule);
             }}
             showDeleteConfirm={showDeleteConfirm}
-            onCloseDeleteConfirm={() => setShowDeleteConfirm(false)}
+            onCloseDeleteConfirm={closeDeleteConfirm}
             onConfirmDelete={() => {
                 void handleDeleteConfirm();
             }}
-            deleteMessage={buildDeleteConfirmationMessage(reminder)}
+            deleteMessage={deleteMessage}
             isDeleting={isDeleting}
         />
         </>
