@@ -4,10 +4,10 @@ import { saveCursorPosition, restoreCursorPosition, moveCursorToEnd } from '../u
 import { extractHashtagQuery } from '../utils/projectSearch';
 import {
     focusRichTextElement,
-    insertPlainTextAtSelection,
     renderRichText,
     selectElementContents,
 } from './richTextInputDom';
+import { useRichTextInputInteractions } from './useRichTextInputInteractions';
 
 export interface RichTextInputHandle {
     /** Focus the input */
@@ -219,55 +219,17 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         }
     }, [autoFocus]);
 
-    // Handle link clicks in contentEditable: Cmd/Ctrl+Click opens the URL, regular click positions cursor
-    const handleClick = useCallback((e: React.MouseEvent) => {
-        const target = e.target as HTMLElement;
-        const linkEl = target.closest('a[data-markdown-link]');
-        if (linkEl instanceof HTMLAnchorElement) {
-            e.preventDefault();
-            if (e.metaKey || e.ctrlKey) {
-                const url = linkEl.getAttribute('href');
-                if (url) {
-                    window.open(url, '_blank', 'noopener,noreferrer');
-                }
-            }
-        }
-    }, []);
-
-    // Handle keydown - autocomplete gets first chance to consume the event
-    const handleKeyDownInternal = (e: React.KeyboardEvent) => {
-        if (onAutocompleteKeyDown?.(e)) return;
-        if (onKeyDown) {
-            onKeyDown(e);
-        }
-    };
-
-    // Handle paste - strip formatting
-    const handlePaste = (e: React.ClipboardEvent) => {
-        e.preventDefault();
-        const text = e.clipboardData.getData('text/plain');
-        insertPlainTextAtSelection(text);
-        handleInput();
-    };
-
-    // Prevent focus loss when clicking interactive elements (buttons, pills) inside the modal
-    // This fixes iOS issue where contentEditable loses focus when tapping buttons
-    const handleMouseDown = useCallback((e: React.MouseEvent) => {
-        const target = e.target as HTMLElement;
-        // If clicking on an interactive element, prevent default blur behavior
-        if (target.closest('button, [role="button"], .pill, [data-slot="base"]')) {
-            e.preventDefault();
-        }
-    }, []);
-
-    // Same for touch events on iOS
-    const handleTouchStart = useCallback((e: React.TouchEvent) => {
-        const target = e.target as HTMLElement;
-        if (target.closest('button, [role="button"], .pill, [data-slot="base"]')) {
-            // Don't prevent default here as it would break button interaction
-            // Instead, we'll restore focus in the button's onPress handler
-        }
-    }, []);
+    const {
+        handleClick,
+        handleKeyDownInternal,
+        handlePaste,
+        handleMouseDown,
+        handleTouchStart,
+    } = useRichTextInputInteractions({
+        onKeyDown,
+        onAutocompleteKeyDown,
+        handleInput,
+    });
 
     return (
         <div
