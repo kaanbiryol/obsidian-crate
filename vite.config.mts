@@ -1,6 +1,5 @@
 import replace from "@rollup/plugin-replace";
 import preact from "@preact/preset-vite";
-import tsConfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vite";
 import { resolve } from "node:path";
 import { builtinModules } from "node:module";
@@ -22,9 +21,6 @@ export default defineConfig({
 	},
 	plugins: [
 		preact(),
-		tsConfigPaths({
-			projects: [resolve(__dirname, "tsconfig.json")],
-		}),
 		replace({
 			"process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
 			preventAssignment: true,
@@ -67,7 +63,7 @@ export default defineConfig({
 					}
 					return assetInfo.name ?? "asset";
 				},
-				inlineDynamicImports: true,
+				codeSplitting: false,
 			},
 		},
 		sourcemap: false,
@@ -75,6 +71,7 @@ export default defineConfig({
 		outDir: "dist",
 	},
 	resolve: {
+		tsconfigPaths: true,
 		alias: {
 			"react": "preact/compat",
 			"react-dom": "preact/compat",

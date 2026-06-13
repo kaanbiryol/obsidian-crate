@@ -13,6 +13,9 @@
 		"url": "https://github.com/kaanbiryol/obsidian-crate/issues"
 	},
 	"homepage": "https://github.com/kaanbiryol/obsidian-crate#readme",
+	"engines": {
+		"node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+	},
 	"scripts": {
 		"build:worker": "node scripts/build-worker.mjs",
 		"preview:pwa": "node scripts/pwa-preview.mjs",
@@ -39,9 +42,9 @@
 	],
 	"license": "0BSD",
 	"devDependencies": {
+		"@codemirror/language": "^6.11.3",
 		"@codemirror/state": "^6.5.0",
 		"@codemirror/view": "^6.38.6",
-		"@codemirror/language": "^6.11.3",
 		"@eslint/js": "9.30.1",
 		"@preact/preset-vite": "^2.10.2",
 		"@rollup/plugin-replace": "^6.0.2",
@@ -50,7 +53,7 @@
 		"@types/react": "^19.2.5",
 		"@types/react-dom": "^19.2.3",
 		"autoprefixer": "^10.4.22",
-		"esbuild": "^0.27.4",
+		"esbuild": "^0.28.1",
 		"eslint-plugin-obsidianmd": "0.1.9",
 		"globals": "14.0.0",
 		"postcss": "^8.5.6",
@@ -62,9 +65,8 @@
 		"tslib": "2.4.0",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "8.35.1",
-		"vite": "^7.2.2",
-		"vite-tsconfig-paths": "^5.1.4",
-		"vitest": "^3.2.4"
+		"vite": "^8.0.16",
+		"vitest": "^4.1.8"
 	},
 	"dependencies": {
 		"@heroui/react": "^2.8.5",

@@ -79,9 +79,11 @@ beforeEach(() => {
 	applySharedSettings.mockReset();
 	getSharedSettings.mockReset();
 	syncApiClientCtor.mockReset();
-	syncApiClientCtor.mockImplementation(() => ({
-		getSharedSettings,
-	}));
+	syncApiClientCtor.mockImplementation(function () {
+		return {
+			getSharedSettings,
+		};
+	});
 });
 
 afterEach(() => {

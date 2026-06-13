@@ -43,7 +43,7 @@ Your Cloudflare API token is used for setup and infrastructure management. Sync 
 
 ## Prerequisites
 
-- Node.js 18 or newer
+- Node.js 20.19 or newer LTS (20.19+, 22.12+, or 24+)
 - npm
 - A Cloudflare account with R2 enabled
 - Obsidian desktop for local development and deployment

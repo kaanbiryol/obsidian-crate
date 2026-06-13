@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { createEmptySyncResult } from './sync-result';
-import type { CrateSettings, PreparedUpload, SyncResult } from '../plugin/types';
+import type { CrateSettings, FileManifest, PreparedUpload, SyncResult, UploadResult } from '../plugin/types';
 import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
 
 const CONFIG_DIR = '.vault-config';
@@ -35,10 +35,16 @@ type Harness = {
 		isConfigured: ReturnType<typeof vi.fn>;
 		setAbortSignal: ReturnType<typeof vi.fn>;
 		getChanges: ReturnType<typeof vi.fn>;
-		uploadFile: ReturnType<typeof vi.fn>;
+		uploadFile: ReturnType<typeof vi.fn<(
+			path: string,
+			content: ArrayBuffer,
+			hash: string,
+			size: number,
+			contentType: string,
+		) => Promise<UploadResult>>>;
 		deleteFile: ReturnType<typeof vi.fn>;
 		downloadFile: ReturnType<typeof vi.fn>;
-		getManifest: ReturnType<typeof vi.fn>;
+		getManifest: ReturnType<typeof vi.fn<() => Promise<FileManifest>>>;
 		checkForChanges: ReturnType<typeof vi.fn>;
 		batchUpload: ReturnType<typeof vi.fn>;
 		batchDownload: ReturnType<typeof vi.fn>;
@@ -177,10 +183,16 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 		isConfigured: vi.fn().mockReturnValue(true),
 		setAbortSignal: vi.fn(),
 		getChanges: vi.fn(),
-		uploadFile: vi.fn(),
+		uploadFile: vi.fn<(
+			path: string,
+			content: ArrayBuffer,
+			hash: string,
+			size: number,
+			contentType: string,
+		) => Promise<UploadResult>>(),
 		deleteFile: vi.fn(),
 		downloadFile: vi.fn(),
-		getManifest: vi.fn(),
+		getManifest: vi.fn<() => Promise<FileManifest>>(),
 		checkForChanges: vi.fn(),
 		batchUpload: vi.fn().mockImplementation(async (files: Array<{ path: string; hash: string; size: number }>) => ({
 			success: true,
