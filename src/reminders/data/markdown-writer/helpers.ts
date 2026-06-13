@@ -3,10 +3,10 @@ import type { Reminder } from "@/reminders/types/reminder";
 import { createLogger } from "@/reminders/utils/logger";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { IndexedReminder, ReminderIndex } from "../reminder-index";
-import { getInitialProjectFileContent } from "../markdownReminderFile";
+import { getInitialProjectFileContent } from "../../core/markdownReminderFile";
 export {
   findReminderLineNumber,
-} from "../markdownReminderFile";
+} from "../../core/markdownReminderFile";
 
 const log = createLogger("MarkdownWriter");
 

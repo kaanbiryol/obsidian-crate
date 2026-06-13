@@ -1,4 +1,4 @@
-import { createReminderId } from "../reminderIdentity";
+import { createReminderId } from "../../core/reminderIdentity";
 import { buildCreatedReminderFallback, buildCreateReminderArgs, buildReminderUpdate, toReminder } from "./shared";
 import type { StorageCompatContext } from "./types";
 import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";

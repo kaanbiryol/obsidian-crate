@@ -13,7 +13,7 @@ import { findReminderLineNumber } from "./helpers";
 import {
   buildDescriptionBlock,
   replaceReminderBlockInContent,
-} from "../markdownReminderFile";
+} from "../../core/markdownReminderFile";
 import type {
   MarkdownWriterContext,
   UpdateReminderInput,

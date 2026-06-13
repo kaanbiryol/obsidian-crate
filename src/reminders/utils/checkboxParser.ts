@@ -13,7 +13,7 @@ import { parseReminderContent, type ParsedReminder } from './reminderParser';
 import type { Priority, RecurrenceRule } from '../types';
 import { format } from 'date-fns';
 import { recurrenceToText } from './rruleConverter';
-import { extractReminderId, setReminderIdMarker, stripReminderIdMarker } from '../data/reminderIdentity';
+import { extractReminderId, setReminderIdMarker, stripReminderIdMarker } from '../core/reminderIdentity';
 
 interface ParsedCheckbox {
   /** Original line content */

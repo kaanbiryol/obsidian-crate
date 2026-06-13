@@ -7,9 +7,9 @@ import {
   inferHasTimeFromDate,
 } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
-import { createReminderId } from "../reminderIdentity";
+import { createReminderId } from "../../core/reminderIdentity";
 import type { IndexedReminder } from "../reminder-index";
-import { appendReminderBlockToContent } from "../markdownReminderFile";
+import { appendReminderBlockToContent } from "../../core/markdownReminderFile";
 import type { MarkdownWriterContext } from "./types";
 import {
   markdownWriterLog,

@@ -52,6 +52,17 @@ export default tseslint.config(
 			'@typescript-eslint/no-misused-promises': 'off',
 		},
 	},
+	{
+		files: ['src/reminders/core/**/*.{ts,tsx}'],
+		rules: {
+			'no-restricted-imports': ['error', {
+				paths: [{
+					name: 'obsidian',
+					message: 'reminders/core must stay platform-neutral so it can be shared by the plugin and Worker.',
+				}],
+			}],
+		},
+	},
 	globalIgnores([
 		"node_modules",
 		"dist",

@@ -1,4 +1,4 @@
-import { deleteReminderBlockFromContent } from "../markdownReminderFile";
+import { deleteReminderBlockFromContent } from "../../core/markdownReminderFile";
 import type { IndexedReminder } from "../reminder-index";
 import { toReminder } from "./helpers";
 import type { MarkdownWriterContext } from "./types";

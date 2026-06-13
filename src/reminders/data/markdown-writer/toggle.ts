@@ -10,7 +10,7 @@ import {
   reminderHasTime,
 } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
-import { setReminderIdMarker } from "../reminderIdentity";
+import { setReminderIdMarker } from "../../core/reminderIdentity";
 import type { IndexedReminder } from "../reminder-index";
 import { findReminderLineNumber } from "./helpers";
 import type {

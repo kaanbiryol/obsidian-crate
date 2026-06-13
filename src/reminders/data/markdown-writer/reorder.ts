@@ -1,4 +1,4 @@
-import { reorderReminderBlocksInContent } from "../markdownReminderFile";
+import { reorderReminderBlocksInContent } from "../../core/markdownReminderFile";
 import type { MarkdownWriterContext } from "./types";
 import { markdownWriterLog } from "./operation-shared";
 
