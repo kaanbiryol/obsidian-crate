@@ -1,4 +1,4 @@
-import { access, copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -104,7 +104,7 @@ async function runBuild() {
 
 async function copyRequiredFile(sourcePath, destinationPath) {
 	await ensureFileExists(sourcePath);
-	await copyFile(sourcePath, destinationPath);
+	await replaceFile(sourcePath, destinationPath);
 }
 
 async function copyOptionalFile(sourcePath, destinationPath) {
@@ -114,7 +114,37 @@ async function copyOptionalFile(sourcePath, destinationPath) {
 		return;
 	}
 
-	await copyFile(sourcePath, destinationPath);
+	await replaceFile(sourcePath, destinationPath);
+}
+
+async function replaceFile(sourcePath, destinationPath) {
+	const destinationDir = path.dirname(destinationPath);
+	const tempPath = path.join(
+		destinationDir,
+		`.${path.basename(destinationPath)}.${process.pid}.${Date.now()}.tmp`,
+	);
+
+	try {
+		await copyFile(sourcePath, tempPath);
+		await rename(tempPath, destinationPath);
+	} catch (error) {
+		await rm(tempPath, { force: true });
+		if (isPermissionError(error)) {
+			throw new Error(
+				[
+					`macOS refused to replace ${destinationPath}.`,
+					'If this file is inside an iCloud-backed Obsidian vault, remove the existing plugin folder in Finder',
+					'or grant Full Disk Access to your terminal app, then run "npm run deploy" again.',
+				].join(' '),
+				{ cause: error },
+			);
+		}
+		throw error;
+	}
+}
+
+function isPermissionError(error) {
+	return error && typeof error === 'object' && 'code' in error && error.code === 'EPERM';
 }
 
 async function ensureFileExists(filePath) {
