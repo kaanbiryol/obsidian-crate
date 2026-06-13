@@ -10,12 +10,16 @@
  */
 
 import { TAbstractFile, TFile, TFolder, type App } from "obsidian";
+import {
+  getProjectFromPath as deriveProjectFromPath,
+  scanReminderMarkdownContent,
+} from "@/reminders/core/markdownScan";
 import { createLogger } from "@/reminders/utils/logger";
-import { parseCheckboxLine, generateContentHash } from "@/reminders/utils/checkboxParser";
-import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import type { IndexedReminder } from "./reminder-index";
 
 const log = createLogger('VaultScanner');
+
+export { getProjectFromPath } from "@/reminders/core/markdownScan";
 
 export interface ScanResult {
   reminders: IndexedReminder[];
@@ -29,31 +33,6 @@ interface FileScanResult {
   filePath: string;
   reminders: IndexedReminder[];
   lineCount: number;
-}
-
-/**
- * Get project name from file path relative to reminders folder
- * Examples:
- *   "Reminders/Work.md" → "Work"
- *   "Reminders/Personal/Health.md" → "Personal/Health"
- */
-export function getProjectFromPath(filePath: string, remindersFolderPath: string): string {
-  // Normalize paths for case-insensitive comparison (macOS/Windows compatibility)
-  const normalizedFile = filePath.toLowerCase();
-  const normalizedFolder = remindersFolderPath.replace(/^\/|\/$/g, '').toLowerCase();
-
-  // Remove the folder prefix (case-insensitive check, but preserve original casing in result)
-  let relativePath = filePath;
-  if (normalizedFile.startsWith(normalizedFolder + "/")) {
-    relativePath = filePath.slice(remindersFolderPath.length + 1);
-  }
-
-  // Remove .md extension
-  if (relativePath.toLowerCase().endsWith(".md")) {
-    relativePath = relativePath.slice(0, -3);
-  }
-
-  return relativePath || "Inbox";
 }
 
 /**
@@ -133,82 +112,15 @@ export async function scanFile(
   remindersFolderPath: string
 ): Promise<FileScanResult> {
   const filePath = file.path;
-  const reminders: IndexedReminder[] = [];
-
-  // Derive project from filename (e.g., "Reminders/Work.md" → "Work")
-  const projectFromFile = getProjectFromPath(filePath, remindersFolderPath);
 
   try {
     const content = await app.vault.cachedRead(file);
-    const lines = content.split("\n");
-
-    for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
-      const line = lines[lineNumber];
-      const parsed = parseCheckboxLine(line);
-
-      if (parsed && parsed.parsed.cleanContent.trim() && parsed.reminderId) {
-        // This is a checkbox line with content - treat as a reminder
-        // Project is always determined by filename (e.g., "Work.md" → "Work")
-        const project = projectFromFile;
-        const storedDates = buildStoredReminderDates(parsed.parsed.dueDate, parsed.parsed.hasTime);
-
-        // Lookahead: check for a <!-- crate-desc:... --> comment block on following lines
-        let description: string | undefined;
-        let descBlockLineCount = 0;
-        const nextIdx = lineNumber + 1;
-        if (nextIdx < lines.length && lines[nextIdx].startsWith('<!-- crate-desc:')) {
-          // Find the closing --> (may be on the same line or a later line)
-          let descContent = lines[nextIdx].slice('<!-- crate-desc:'.length);
-          let endIdx = nextIdx;
-          while (endIdx < lines.length) {
-            const closingPos = (endIdx === nextIdx ? descContent : lines[endIdx]).indexOf('-->');
-            if (closingPos !== -1) {
-              if (endIdx === nextIdx) {
-                descContent = descContent.slice(0, closingPos).trimEnd();
-              } else {
-                descContent += '\n' + lines[endIdx].slice(0, closingPos).trimEnd();
-              }
-              descBlockLineCount = endIdx - nextIdx + 1;
-              break;
-            }
-            if (endIdx > nextIdx) {
-              descContent += '\n' + lines[endIdx];
-            }
-            endIdx++;
-          }
-          description = descContent.trim() || undefined;
-        }
-
-        const reminder: IndexedReminder = {
-          id: parsed.reminderId,
-          content: parsed.parsed.cleanContent,
-          description,
-          dueDate: storedDates.dueDate,
-          dueDatetime: storedDates.dueDatetime,
-          priority: parsed.parsed.priority,
-          completed: parsed.isCompleted,
-          project,
-          recurrence: parsed.parsed.recurrence,
-          // Location tracking
-          filePath,
-          lineNumber,
-          rawLine: line,
-          contentHash: generateContentHash(parsed.rawContent),
-        };
-
-        reminders.push(reminder);
-
-        // Skip past description block lines
-        if (descBlockLineCount > 0) {
-          lineNumber = nextIdx + descBlockLineCount - 1;
-        }
-      }
-    }
+    const result = scanReminderMarkdownContent(filePath, content, remindersFolderPath);
 
     return {
       filePath,
-      reminders,
-      lineCount: lines.length,
+      reminders: result.reminders,
+      lineCount: result.lineCount,
     };
   } catch (error) {
     log.error(` Error scanning file ${filePath}:`, error);
@@ -243,7 +155,7 @@ export async function scanVault(
   // Collect all project names from file paths (including empty files)
   const discoveredProjects = new Set<string>();
   for (const file of reminderFiles) {
-    const project = getProjectFromPath(file.path, remindersFolderPath);
+    const project = deriveProjectFromPath(file.path, remindersFolderPath);
     discoveredProjects.add(project);
   }
 
