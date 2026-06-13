@@ -2,6 +2,7 @@ import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { reconcileReminderNotifications } from '../../reminders/plugin-integration';
 import { normalizeTimeString } from '../../reminders/settings';
+import type { SyncApiClient } from '../../sync/api';
 import { QRModal } from '../qr-modal';
 import { createSettingsSectionHeading } from './section-helpers';
 
@@ -67,63 +68,34 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 	// Subscribe link + QR code
 	const apiClient = plugin.syncRuntime.getApiClient();
 	if (apiClient) {
-	new Setting(containerEl)
-		.setName('Reminders web app')
-		.setDesc('Open this link on your phone or scan the code to use reminders without opening Obsidian. The app can also enable notifications on that device. Each link expires shortly and does not expose your sync token.')
-		.addButton(button => {
-			button.setButtonText('Copy app link');
-			button.onClick(async () => {
-				try {
-					const url = await buildEnrollmentUrl(plugin);
-					await navigator.clipboard.writeText(url);
-					new Notice('App link copied to clipboard');
-				} catch {
-					new Notice('Failed to create app link');
-				}
-			});
-		})
-		.addButton(button => {
-			button.setButtonText('Show code');
-			button.onClick(async () => {
-				try {
-					const url = await buildEnrollmentUrl(plugin);
-					new QRModal(plugin.app, url).open();
-				} catch {
-					new Notice('Failed to create app code');
-				}
-			});
-		});
-
-		// Subscriptions list
-		const listContainer = containerEl.createDiv({ cls: 'crate-push-subscriptions' });
-		void loadSubscriptions(listContainer, plugin);
-
-		// Test button
 		new Setting(containerEl)
-			.setName('Test notification')
-			.setDesc('Send a test push to all subscribed devices')
+			.setName('Reminders web app')
+			.setDesc('Create a short-lived link for opening reminders on another device. The web app can enable push notifications from that device after it opens.')
 			.addButton(button => {
-				button.setButtonText('Send test');
+				button.setButtonText('Copy app link');
 				button.onClick(async () => {
-					button.setButtonText('Sending...');
-					button.setDisabled(true);
 					try {
-						const result = await apiClient.testPush();
-						if (result.sent > 0) {
-							new Notice(`Test sent to ${result.sent} device(s)`);
-						} else if (result.errors?.length) {
-							new Notice(`Push failed: ${result.errors.join('; ')}`, 10000);
-						} else {
-							new Notice('No subscribed devices found. Subscribe a device first.');
-						}
+						const url = await buildEnrollmentUrl(plugin);
+						await navigator.clipboard.writeText(url);
+						new Notice('App link copied to clipboard');
 					} catch {
-						new Notice('Failed to send test notification');
-					} finally {
-						button.setButtonText('Send test');
-						button.setDisabled(false);
+						new Notice('Failed to create app link');
+					}
+				});
+			})
+			.addButton(button => {
+				button.setButtonText('Show code');
+				button.onClick(async () => {
+					try {
+						const url = await buildEnrollmentUrl(plugin);
+						new QRModal(plugin.app, url).open();
+					} catch {
+						new Notice('Failed to create app code');
 					}
 				});
 			});
+
+		renderEnabledDevices(containerEl, plugin, apiClient);
 	}
 }
 
@@ -144,7 +116,54 @@ async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 	return subscribeUrl.toString();
 }
 
+function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, apiClient: SyncApiClient): void {
+	const devicesContainer = containerEl.createDiv({ cls: 'crate-push-devices' });
+	let listContainer: HTMLElement | null = null;
+
+	new Setting(devicesContainer)
+		.setName('Enabled devices')
+		.setDesc('Phones and browsers currently registered to receive reminder push notifications.')
+		.addButton(button => {
+			button.setButtonText('Refresh');
+			button.onClick(async () => {
+				if (listContainer) {
+					await loadSubscriptions(listContainer, plugin);
+				}
+			});
+		});
+
+	listContainer = devicesContainer.createDiv({ cls: 'crate-push-subscriptions' });
+	void loadSubscriptions(listContainer, plugin);
+
+	new Setting(devicesContainer)
+		.setName('Test notification')
+		.setDesc('Send a test push to all enabled devices')
+		.addButton(button => {
+			button.setButtonText('Send test');
+			button.onClick(async () => {
+				button.setButtonText('Sending...');
+				button.setDisabled(true);
+				try {
+					const result = await apiClient.testPush();
+					if (result.sent > 0) {
+						new Notice(`Test sent to ${result.sent} device(s)`);
+					} else if (result.errors?.length) {
+						new Notice(`Push failed: ${result.errors.join('; ')}`, 10000);
+					} else {
+						new Notice('No enabled devices found. Enable notifications in the web app first.');
+					}
+				} catch {
+					new Notice('Failed to send test notification');
+				} finally {
+					button.setButtonText('Send test');
+					button.setDisabled(false);
+				}
+			});
+		});
+}
+
 async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin): Promise<void> {
+	container.empty();
 	const apiClient = plugin.syncRuntime.getApiClient();
 	if (!apiClient) return;
 
@@ -153,7 +172,7 @@ async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin): P
 
 		if (subscriptions.length === 0) {
 			container.createEl('p', {
-				text: 'No devices subscribed yet.',
+				text: 'No enabled devices yet. Open the reminders web app on a device and enable notifications there.',
 				cls: 'setting-item-description',
 			});
 			return;

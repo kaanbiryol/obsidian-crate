@@ -147,6 +147,82 @@ export class MockButtonComponent {
 	}
 }
 
+class FakeTextInput {
+	value = '';
+	maxLength = 0;
+	placeholder = '';
+	type = 'text';
+	size = 0;
+	disabled = false;
+	private readonly listeners = new Map<string, Array<(event: Event) => unknown>>();
+
+	addEventListener(type: string, callback: (event: Event) => unknown): void {
+		const listeners = this.listeners.get(type) ?? [];
+		listeners.push(callback);
+		this.listeners.set(type, listeners);
+	}
+
+	blur(): void {
+		this.dispatchEvent('blur');
+	}
+
+	dispatchEvent(type: string, event = {} as Event): void {
+		for (const listener of this.listeners.get(type) ?? []) {
+			listener(event);
+		}
+	}
+}
+
+export class MockTextComponent {
+	readonly inputEl = new FakeTextInput();
+	private changeHandler?: (value: string) => unknown;
+
+	setValue(value: string): this {
+		this.inputEl.value = value;
+		return this;
+	}
+
+	setPlaceholder(value: string): this {
+		this.inputEl.placeholder = value;
+		return this;
+	}
+
+	setDisabled(disabled: boolean): this {
+		this.inputEl.disabled = disabled;
+		return this;
+	}
+
+	onChange(callback: (value: string) => unknown): this {
+		this.changeHandler = callback;
+		return this;
+	}
+
+	change(value: string): void {
+		this.inputEl.value = value;
+		this.changeHandler?.(value);
+	}
+}
+
+export class MockToggleComponent {
+	private changeHandler?: (value: boolean) => unknown;
+	value = false;
+
+	setValue(value: boolean): this {
+		this.value = value;
+		return this;
+	}
+
+	onChange(callback: (value: boolean) => unknown): this {
+		this.changeHandler = callback;
+		return this;
+	}
+
+	change(value: boolean): void {
+		this.value = value;
+		this.changeHandler?.(value);
+	}
+}
+
 export class MockSetting {
 	static instances: MockSetting[] = [];
 
@@ -156,6 +232,8 @@ export class MockSetting {
 	readonly descEl: FakeElement;
 	readonly controlEl: FakeElement;
 	readonly buttons: MockButtonComponent[] = [];
+	readonly texts: MockTextComponent[] = [];
+	readonly toggles: MockToggleComponent[] = [];
 
 	constructor(containerEl: FakeElement) {
 		this.settingEl = containerEl.createDiv({ cls: 'setting-item' });
@@ -190,6 +268,20 @@ export class MockSetting {
 		const button = new MockButtonComponent(this.controlEl);
 		this.buttons.push(button);
 		callback(button);
+		return this;
+	}
+
+	addText(callback: (text: MockTextComponent) => unknown): this {
+		const text = new MockTextComponent();
+		this.texts.push(text);
+		callback(text);
+		return this;
+	}
+
+	addToggle(callback: (toggle: MockToggleComponent) => unknown): this {
+		const toggle = new MockToggleComponent();
+		this.toggles.push(toggle);
+		callback(toggle);
 		return this;
 	}
 }
