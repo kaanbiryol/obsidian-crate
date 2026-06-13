@@ -177,3 +177,59 @@
     border-radius: 2px;
     transition: width 400ms cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+// ============================================
+// Completed section
+// ============================================
+
+.premium-reminder-card-wrapper {
+    // Wrapper styles if needed for layout
+}
+
+.premium-divider {
+    height: 1px;
+    margin: 8px 0 12px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.08) 20%,
+        rgba(255, 255, 255, 0.08) 80%,
+        transparent 100%
+    );
+}
+
+// ============================================
+// Light theme adjustments
+// ============================================
+
+.theme-light {
+    .project-detail-progress-bar {
+        background: rgba(0, 0, 0, 0.06);
+    }
+
+    .premium-divider {
+        background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(0, 0, 0, 0.08) 20%,
+            rgba(0, 0, 0, 0.08) 80%,
+            transparent 100%
+        );
+    }
+
+    .premium-back-button {
+        background: rgba(0, 0, 0, 0.015);
+        border-color: rgba(0, 0, 0, 0.04);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.025);
+
+        &:hover {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.045);
+        }
+
+        &:active {
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.025);
+        }
+    }
+}
