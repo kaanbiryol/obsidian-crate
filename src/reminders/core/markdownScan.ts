@@ -3,7 +3,7 @@ import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
 
-export interface ScannedReminderRecord {
+interface ScannedReminderRecord {
   id: string;
   content: string;
   description?: string;
