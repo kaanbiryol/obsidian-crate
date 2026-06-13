@@ -1,0 +1,28 @@
+{
+	"$schema": "./node_modules/knip/schema.json",
+	"entry": [
+		"src/main.ts",
+		"src/cloudflare/worker/index.ts",
+		"src/cloudflare/worker/pwa-client.tsx",
+		"scripts/*.mjs",
+		"eslint.config.mts",
+		"vite.config.mts",
+		"vitest.config.ts",
+		"postcss.config.js",
+		"tailwind.config.js",
+		"tailwind.theme.js",
+		"version-bump.mjs"
+	],
+	"project": [
+		"src/**/*.{ts,tsx}",
+		"scripts/*.mjs",
+		"*.{js,mjs,mts,ts}"
+	],
+	"ignoreFiles": [
+		"src/cloudflare/worker/cloudflare-env.d.ts",
+		"src/cloudflare/worker/pwa/raw-css.d.ts"
+	],
+	"ignoreDependencies": [
+		"preact"
+	]
+}
