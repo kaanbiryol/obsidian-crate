@@ -8,10 +8,14 @@ import {
 } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { EditorState, RangeSetBuilder } from "@codemirror/state";
-import { createRoot, Root } from "react-dom/client";
+import type { Root } from "react-dom/client";
 
 import type CratePlugin from "@/main";
-import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
+import {
+  createShadowReactRoot,
+  createShadowRootMount,
+  type ShadowRootMount,
+} from "@/reminders/ui/adapters/shadowReactMount";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { RemindersList } from "@/reminders/ui/reminder-list/RemindersList";
 import { getEditorFile } from "./editorFile";
@@ -145,23 +149,19 @@ class RemindersBlockWidget extends WidgetType {
     const container = document.createElement("div") as WidgetHost;
     container.className = "reminders-block-widget";
 
-    // Create shadow root for CSS isolation
-    const shadowRoot = container.attachShadow({ mode: "open" });
+    const mount = createShadowRootMount(container, {
+      configureMountPoint: (mountPoint) => {
+        // Sync dark mode
+        if (document.body.classList.contains("theme-dark")) {
+          mountPoint.classList.add("dark");
+        }
+      },
+    });
 
-    // Create mount point inside shadow DOM
-    const mountPoint = document.createElement("div");
-    mountPoint.className = "reminders-shadow-root";
-    shadowRoot.appendChild(mountPoint);
+    container.crateShadowRoot = mount.shadowRoot;
+    container.crateMountPoint = mount.mountPoint;
 
-    // Sync dark mode
-    if (document.body.classList.contains("theme-dark")) {
-      mountPoint.classList.add("dark");
-    }
-
-    container.crateShadowRoot = shadowRoot;
-    container.crateMountPoint = mountPoint;
-
-    void this.initializeRoot(container, shadowRoot, mountPoint);
+    void this.initializeRoot(container, mount);
 
     return container;
   }
@@ -177,16 +177,15 @@ class RemindersBlockWidget extends WidgetType {
 
   private async initializeRoot(
     host: WidgetHost,
-    shadowRoot: ShadowRoot,
-    mountPoint: HTMLDivElement,
+    mount: ShadowRootMount,
   ): Promise<void> {
-    await attachPluginStylesheet(this.plugin, shadowRoot);
-
-    if (host.crateDisposed || host.crateShadowRoot !== shadowRoot) {
+    const root = await createShadowReactRoot(this.plugin, mount, {
+      isActive: ({ shadowRoot }) => !host.crateDisposed && host.crateShadowRoot === shadowRoot,
+    });
+    if (!root) {
       return;
     }
 
-    const root = createRoot(mountPoint);
     host.crateReactRoot = root;
     root.render(
       <PluginContext.Provider value={this.plugin}>

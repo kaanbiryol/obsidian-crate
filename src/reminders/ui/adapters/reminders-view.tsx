@@ -1,13 +1,12 @@
 import { ItemView, Platform, WorkspaceLeaf } from "obsidian";
-import { Root, createRoot } from "react-dom/client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type CratePlugin from "@/main";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
-import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
 import type { TabId } from "@/reminders/ui/layoutConstants";
 import { openReminderCreationModal } from "@/reminders/ui/adapters/modals";
+import { createShadowReactMount, type ShadowReactMount } from "@/reminders/ui/adapters/shadowReactMount";
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { RemindersViewCloseButton } from "@/reminders/ui/RemindersViewCloseButton";
@@ -17,9 +16,9 @@ import "../reminders-view.scss";
 export const VIEW_TYPE_REMINDERS = "reminders-view";
 
 export class RemindersView extends ItemView {
-    private root: Root | null = null;
     private plugin: CratePlugin;
-    private shadowRoot: ShadowRoot | null = null;
+    private shadowMount: ShadowReactMount | null = null;
+    private isOpen = false;
 
     constructor(leaf: WorkspaceLeaf, plugin: CratePlugin) {
         super(leaf);
@@ -56,6 +55,7 @@ export class RemindersView extends ItemView {
     }
 
     async onOpen(): Promise<void> {
+        this.isOpen = true;
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
         container.addClass("reminders-view-container");
@@ -67,25 +67,22 @@ export class RemindersView extends ItemView {
             overflow: "hidden",
         });
 
-        // Create shadow root for CSS isolation from Obsidian's styles
-        this.shadowRoot = container.attachShadow({ mode: "open" });
-        await attachPluginStylesheet(this.plugin, this.shadowRoot);
-
-        // Create mount point inside shadow DOM
-        const mountPoint = document.createElement("div");
-        mountPoint.className = "reminders-shadow-root";
-        this.shadowRoot.appendChild(mountPoint);
+        const shadowMount = await createShadowReactMount(this.plugin, container, {
+            isActive: () => this.isOpen,
+        });
+        if (!shadowMount) {
+            return;
+        }
+        this.shadowMount = shadowMount;
 
         // Determine if we're in full-screen mode (main content on mobile)
         const isFullScreen = Platform.isMobile && this.isInMainContent();
 
-        // Render React into shadow DOM
-        this.root = createRoot(mountPoint);
-        this.root.render(
+        shadowMount.render(
             <PluginContext.Provider value={this.plugin}>
                 <RemindersViewContent
                     plugin={this.plugin}
-                    shadowRoot={this.shadowRoot}
+                    shadowRoot={shadowMount.shadowRoot}
                     isFullScreen={isFullScreen}
                     initialTab={this.plugin.remindersSettings.sidebarDefaultTab}
                 />
@@ -94,11 +91,9 @@ export class RemindersView extends ItemView {
     }
 
     async onClose(): Promise<void> {
-        if (this.root) {
-            this.root.unmount();
-            this.root = null;
-        }
-        this.shadowRoot = null;
+        this.isOpen = false;
+        this.shadowMount?.unmount();
+        this.shadowMount = null;
     }
 }
 

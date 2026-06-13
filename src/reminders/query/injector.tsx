@@ -1,10 +1,14 @@
 import type { MarkdownPostProcessorContext, MarkdownSectionInformation } from "obsidian";
 import { MarkdownRenderChild, Platform } from "obsidian";
 import type React from "react";
-import { createRoot, type Root } from "react-dom/client";
+import type { Root } from "react-dom/client";
 
 import type CratePlugin from "@/main";
-import { attachPluginStylesheet } from "@/reminders/ui/shadowStyles";
+import {
+  createShadowReactRoot,
+  createShadowRootMount,
+  type ShadowRootMount,
+} from "@/reminders/ui/adapters/shadowReactMount";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { RemindersList } from "@/reminders/ui/reminder-list/RemindersList";
 import { hashFileContent } from "@/reminders/utils/hashing";
@@ -155,27 +159,22 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
   }
 
   onload(): void {
-    // Create shadow root for CSS isolation
-    this.shadowRoot = this.containerEl.attachShadow({ mode: "open" });
-    const shadowRoot = this.shadowRoot;
+    const mount = createShadowRootMount(this.containerEl, {
+      configureMountPoint: (mountPoint) => {
+        // Sync dark mode
+        if (document.body.classList.contains("theme-dark")) {
+          mountPoint.classList.add("dark");
+        }
 
-    // Create mount point immediately so the shadow tree is stable, but wait for
-    // the stylesheet before the first React paint to avoid a flash of unstyled content.
-    const mountPoint = document.createElement("div");
-    mountPoint.className = "reminders-shadow-root";
-    shadowRoot.appendChild(mountPoint);
+        // Add mobile class for responsive styles
+        if (Platform.isMobile) {
+          mountPoint.classList.add("is-mobile");
+        }
+      },
+    });
+    this.shadowRoot = mount.shadowRoot;
 
-    // Sync dark mode
-    if (document.body.classList.contains("theme-dark")) {
-      mountPoint.classList.add("dark");
-    }
-
-    // Add mobile class for responsive styles
-    if (Platform.isMobile) {
-      mountPoint.classList.add("is-mobile");
-    }
-
-    void this.initializeReactRoot(shadowRoot, mountPoint);
+    void this.initializeReactRoot(mount);
   }
 
   onunload(): void {
@@ -186,14 +185,15 @@ class ReactRenderer<T extends object> extends MarkdownRenderChild {
     this.shadowRoot = null;
   }
 
-  private async initializeReactRoot(shadowRoot: ShadowRoot, mountPoint: HTMLDivElement): Promise<void> {
-    await attachPluginStylesheet(this.plugin, shadowRoot);
-
-    if (this.isDisposed || this.shadowRoot !== shadowRoot) {
+  private async initializeReactRoot(mount: ShadowRootMount): Promise<void> {
+    const root = await createShadowReactRoot(this.plugin, mount, {
+      isActive: ({ shadowRoot }) => !this.isDisposed && this.shadowRoot === shadowRoot,
+    });
+    if (!root) {
       return;
     }
 
-    this.reactRoot = createRoot(mountPoint);
+    this.reactRoot = root;
     const Component = this.component;
     this.reactRoot.render(
       <PluginContext.Provider value={this.plugin}>

@@ -1,15 +1,15 @@
 import { Modal } from "obsidian";
-import { type Root, createRoot } from "react-dom/client";
 import type CratePlugin from "@/main";
 import { PluginContext } from "../reminders-context";
 import { RemindersViewContent } from "./reminders-view";
-import { createShadowRootMount, hideNativeModalCloseButton } from "./modalShell";
+import { hideNativeModalCloseButton } from "./modalShell";
+import { createShadowReactMount, type ShadowReactMount } from "./shadowReactMount";
 
 class FullScreenReminderModal extends Modal {
   private readonly plugin: CratePlugin;
   private readonly initialProject: string | undefined;
-  private root: Root | undefined;
-  private shadowRoot: ShadowRoot | null = null;
+  private shadowMount: ShadowReactMount | null = null;
+  private isOpen = false;
 
   constructor(plugin: CratePlugin, initialProject?: string) {
     super(plugin.app);
@@ -18,6 +18,7 @@ class FullScreenReminderModal extends Modal {
   }
 
   async onOpen(): Promise<void> {
+    this.isOpen = true;
     const { contentEl } = this;
 
     this.modalEl.setCssProps({
@@ -40,16 +41,20 @@ class FullScreenReminderModal extends Modal {
       height: "100%",
     });
 
-    const { shadowRoot, mountPoint } = await createShadowRootMount(this.plugin, contentEl);
-    this.shadowRoot = shadowRoot;
+    const shadowMount = await createShadowReactMount(this.plugin, contentEl, {
+      isActive: () => this.isOpen,
+    });
+    if (!shadowMount) {
+      return;
+    }
+    this.shadowMount = shadowMount;
 
     const close = () => this.close();
-    this.root = createRoot(mountPoint);
-    this.root.render(
+    shadowMount.render(
       <PluginContext.Provider value={this.plugin}>
         <RemindersViewContent
           plugin={this.plugin}
-          shadowRoot={shadowRoot}
+          shadowRoot={shadowMount.shadowRoot}
           isFullScreen={true}
           onClose={close}
           initialTab={this.plugin.remindersSettings.fullscreenDefaultTab}
@@ -60,16 +65,17 @@ class FullScreenReminderModal extends Modal {
   }
 
   onClose(): void {
-    this.root?.unmount();
-    this.shadowRoot = null;
+    this.isOpen = false;
+    this.shadowMount?.unmount();
+    this.shadowMount = null;
   }
 }
 
 class CompactReminderModal extends Modal {
   private readonly plugin: CratePlugin;
   private readonly initialProject: string | undefined;
-  private root: Root | undefined;
-  private shadowRoot: ShadowRoot | null = null;
+  private shadowMount: ShadowReactMount | null = null;
+  private isOpen = false;
 
   constructor(plugin: CratePlugin, initialProject?: string) {
     super(plugin.app);
@@ -78,6 +84,7 @@ class CompactReminderModal extends Modal {
   }
 
   async onOpen(): Promise<void> {
+    this.isOpen = true;
     const { contentEl } = this;
 
     this.modalEl.setCssProps({
@@ -106,16 +113,20 @@ class CompactReminderModal extends Modal {
       "box-shadow": "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
     });
 
-    const { shadowRoot, mountPoint } = await createShadowRootMount(this.plugin, contentEl);
-    this.shadowRoot = shadowRoot;
+    const shadowMount = await createShadowReactMount(this.plugin, contentEl, {
+      isActive: () => this.isOpen,
+    });
+    if (!shadowMount) {
+      return;
+    }
+    this.shadowMount = shadowMount;
 
     const close = () => this.close();
-    this.root = createRoot(mountPoint);
-    this.root.render(
+    shadowMount.render(
       <PluginContext.Provider value={this.plugin}>
         <RemindersViewContent
           plugin={this.plugin}
-          shadowRoot={shadowRoot}
+          shadowRoot={shadowMount.shadowRoot}
           isFullScreen={true}
           onClose={close}
           initialTab="browse"
@@ -127,8 +138,9 @@ class CompactReminderModal extends Modal {
   }
 
   onClose(): void {
-    this.root?.unmount();
-    this.shadowRoot = null;
+    this.isOpen = false;
+    this.shadowMount?.unmount();
+    this.shadowMount = null;
   }
 }
 
