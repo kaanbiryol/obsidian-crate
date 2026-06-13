@@ -12,6 +12,19 @@ npm test                                  # run all tests
 npx vitest run src/sync/planner.test.ts   # single test file
 ```
 
+## Manual Obsidian Smoke Test
+
+Run this before merging changes that touch sync orchestration, reminder parsing, markdown scanning, shadow DOM rendering, or reminder view styles:
+
+- Build the plugin with `npm run build`.
+- Copy `dist/main.js`, `manifest.json`, and `dist/styles.css` to a test vault plugin folder.
+- Reload Obsidian and enable the plugin from **Settings -> Community plugins**.
+- Open the Reminders view and verify Inbox, Today, Upcoming, Browse, and a project detail view render in dark and light themes.
+- Create, edit, complete, reorder, and delete a reminder, including one with a date, priority, project, description, and recurrence.
+- Add a reminders code block and verify reading view plus live preview render and update without duplicate roots or unstyled flashes.
+- Exercise sync event paths by creating, editing, deleting, and renaming a note, then confirm queued paths clear after sync.
+- If push or PWA code changed, run `npm run test:pwa-preview` and manually open the preview URL.
+
 ## Obsidian Mock
 
 `src/test/mocks/obsidian.ts` provides stubs for Obsidian APIs:
