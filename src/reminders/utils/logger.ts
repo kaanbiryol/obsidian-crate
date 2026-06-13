@@ -38,13 +38,6 @@ export function configureLogger(config: Partial<LoggerConfig>): void {
   globalConfig = { ...globalConfig, ...config };
 }
 
-/**
- * Get the current logger configuration.
- */
-export function getLoggerConfig(): LoggerConfig {
-  return { ...globalConfig };
-}
-
 export interface Logger {
   debug(...args: unknown[]): void;
   info(...args: unknown[]): void;

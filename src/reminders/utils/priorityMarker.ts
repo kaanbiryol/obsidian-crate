@@ -1,4 +1,4 @@
-export function isStandalonePriorityMarkerAt(content: string, index: number): boolean {
+function isStandalonePriorityMarkerAt(content: string, index: number): boolean {
 	if (content[index] !== '!') {
 		return false;
 	}

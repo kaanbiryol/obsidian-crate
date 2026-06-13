@@ -1,6 +1,6 @@
 import type CratePlugin from '../../main';
 
-export interface CloudflareCredentials {
+interface CloudflareCredentials {
 	accountId: string;
 	apiToken: string;
 }

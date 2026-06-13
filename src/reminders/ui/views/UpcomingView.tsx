@@ -131,5 +131,3 @@ export const UpcomingView = memo(function UpcomingView({
     </div>
   );
 });
-
-export default UpcomingView;

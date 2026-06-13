@@ -1,7 +1,7 @@
 import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import { errorMessage } from '../../plugin/logger';
 
-export interface RunButtonTaskContext {
+interface RunButtonTaskContext {
 	setButtonText: (text: string) => void;
 	setProgress: (message: string) => void;
 }

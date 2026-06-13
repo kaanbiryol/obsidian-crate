@@ -1,9 +1,9 @@
 import { PWA_CLIENT_JS } from './pwa-client-bundle';
 import { PWA_ASSET_VERSION } from './pwa-version';
 
-export { createPwaHtml, PWA_HTML } from './pwa/html';
+export { createPwaHtml } from './pwa/html';
 export { ICON_SVG } from './pwa/icons';
-export { createManifestJson, MANIFEST_JSON } from './pwa/manifest';
+export { createManifestJson } from './pwa/manifest';
 export { OPEN_OBSIDIAN_HTML } from './pwa/open-obsidian';
 export { SERVICE_WORKER_JS } from './pwa/service-worker';
 

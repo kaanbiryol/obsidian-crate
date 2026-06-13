@@ -25,8 +25,6 @@ export interface BrowseViewProps {
   className?: string;
 }
 
-export type { ProjectStats } from './viewModels';
-
 /**
  * Shared Browse view component
  * Premium dark glassmorphism design - displays projects as elegant glass cards
@@ -92,5 +90,3 @@ export const BrowseView = memo(function BrowseView({
     </div>
   );
 });
-
-export default BrowseView;

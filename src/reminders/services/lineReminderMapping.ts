@@ -289,13 +289,3 @@ export class LineReminderMappingService {
     return undefined;
   }
 }
-
-// Singleton instance
-let instance: LineReminderMappingService | null = null;
-
-export function getLineReminderMappingService(): LineReminderMappingService {
-  if (!instance) {
-    instance = new LineReminderMappingService();
-  }
-  return instance;
-}

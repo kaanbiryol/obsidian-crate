@@ -6,7 +6,7 @@ import type {
 } from "@/reminders/types/reminder";
 import type { IndexedReminder, ReminderIndex } from "../reminder-index";
 
-export type ReminderOperation = "create" | "update" | "delete";
+type ReminderOperation = "create" | "update" | "delete";
 
 export interface ReminderChangeContext {
   recurringInstanceCompleted?: {
@@ -15,7 +15,7 @@ export interface ReminderChangeContext {
   };
 }
 
-export interface SyncResult {
+interface SyncResult {
   success: boolean;
   error?: string;
 }

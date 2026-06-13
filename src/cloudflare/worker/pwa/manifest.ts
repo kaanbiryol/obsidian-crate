@@ -48,5 +48,3 @@ export function createManifestJson(requestUrl?: string): string {
 		],
 	});
 }
-
-export const MANIFEST_JSON = createManifestJson();

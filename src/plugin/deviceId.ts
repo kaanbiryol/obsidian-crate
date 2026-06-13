@@ -38,7 +38,7 @@ export async function setPluginDeviceId(plugin: CratePlugin, value: string): Pro
 	await plugin.saveSettings();
 }
 
-export function generateDeviceId(): string {
+function generateDeviceId(): string {
 	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
 	const bytes = new Uint8Array(8);
 	crypto.getRandomValues(bytes);

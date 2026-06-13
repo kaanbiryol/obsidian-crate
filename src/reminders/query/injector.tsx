@@ -10,8 +10,6 @@ import { RemindersList } from "@/reminders/ui/reminder-list/RemindersList";
 import { hashFileContent } from "@/reminders/utils/hashing";
 import { parseQuery } from "./queryOptions";
 
-export { parseQuery, type ReminderQueryOptions } from "./queryOptions";
-
 export class ReminderQueryInjector {
   private readonly plugin: CratePlugin;
 

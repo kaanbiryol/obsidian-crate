@@ -5,8 +5,6 @@ import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { IndexedReminder, ReminderIndex } from "../reminder-index";
 import { getInitialProjectFileContent } from "../markdownReminderFile";
 export {
-  buildDescriptionBlock,
-  countDescriptionBlockLines,
   findReminderLineNumber,
 } from "../markdownReminderFile";
 

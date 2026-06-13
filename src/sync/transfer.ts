@@ -1,18 +1,10 @@
-export type {
-  TransferApi,
-  TransferContext,
-  TransferMarkdownBaseCache,
-  TransferManifest,
-} from "./transfer-types";
 export {
   createBatchUploadChunks,
   createVaultFileChunks,
-  prepareUpload,
   prepareUploadFromPath,
   prepareUploadFromVaultFile,
 } from "./transfer-prepare";
 export {
-  downloadAndSaveFile,
   parallelDownloadAndSaveFiles,
   saveDownloadedContent,
 } from "./transfer-download";

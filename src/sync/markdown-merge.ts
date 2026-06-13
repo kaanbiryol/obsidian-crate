@@ -1,15 +1,15 @@
-export interface MarkdownMergeSuccess {
+interface MarkdownMergeSuccess {
 	success: true;
 	content: ArrayBuffer;
 	text: string;
 }
 
-export interface MarkdownMergeConflict {
+interface MarkdownMergeConflict {
 	success: false;
 	reason: 'decode' | 'overlap' | 'too-large';
 }
 
-export type MarkdownMergeResult = MarkdownMergeSuccess | MarkdownMergeConflict;
+type MarkdownMergeResult = MarkdownMergeSuccess | MarkdownMergeConflict;
 
 interface ChangeHunk {
 	start: number;

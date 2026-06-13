@@ -4,7 +4,7 @@ import { findAllMatches } from './richTextMatchers';
 /**
  * Escape HTML special characters
  */
-export const escapeHTML = (str: string): string => {
+const escapeHTML = (str: string): string => {
     return str
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')

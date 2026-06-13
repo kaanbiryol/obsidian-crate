@@ -1,12 +1,12 @@
 import type { DiagnosticResult } from '../cloudflare/infrastructure-types';
 import type { CrateSettings, UsageResponse } from './types';
 
-export interface CachedUsageState {
+interface CachedUsageState {
 	key: string;
 	data: UsageResponse;
 }
 
-export interface CachedDiagnosticsState {
+interface CachedDiagnosticsState {
 	key: string;
 	results: DiagnosticResult[];
 }

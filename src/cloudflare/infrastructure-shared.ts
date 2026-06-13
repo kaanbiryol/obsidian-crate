@@ -5,7 +5,7 @@ import type {
 } from './api';
 import { normalizeWorkerUrl } from '../sync/worker-url';
 
-export function requireWorkerUrl(value: string): string {
+function requireWorkerUrl(value: string): string {
 	const normalized = normalizeWorkerUrl(value);
 	if (!normalized) {
 		throw new Error('Worker URL is invalid.');

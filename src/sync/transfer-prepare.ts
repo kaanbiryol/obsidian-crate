@@ -18,13 +18,6 @@ export function isVaultTFileLike(file: unknown): file is TFile {
     && typeof file.extension === "string";
 }
 
-export async function prepareUpload(
-  context: TransferContext,
-  file: TFile,
-): Promise<PreparedUpload | null> {
-  return prepareUploadFromVaultFile(context, tfileToVaultFile(file));
-}
-
 export async function prepareUploadFromVaultFile(
   context: TransferContext,
   file: VaultFile,

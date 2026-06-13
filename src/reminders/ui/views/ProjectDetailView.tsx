@@ -149,5 +149,3 @@ export const ProjectDetailView = memo(function ProjectDetailView({
     </div>
   );
 });
-
-export default ProjectDetailView;

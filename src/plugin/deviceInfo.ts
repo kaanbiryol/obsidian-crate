@@ -17,7 +17,7 @@ export function getCurrentPlatformCode(): string {
 	return 'unknown';
 }
 
-export function getCurrentPlatformLabel(): string {
+function getCurrentPlatformLabel(): string {
 	switch (getCurrentPlatformCode()) {
 		case 'ios':
 			return 'iPhone or iPad';

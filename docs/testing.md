@@ -83,7 +83,7 @@ Key: `vi.hoisted()` ensures mock references are available before module evaluati
 
 ### Context Interface Pattern
 
-Sync modules define narrow context interfaces (e.g., `TransferContext`, `PlannerManifest`, `QueueFlushContext`) rather than depending on concrete classes. This makes tests easy to write with partial mocks:
+Sync modules define narrow context interfaces (e.g., `TransferContext` and `QueueFlushContext`) rather than depending on concrete classes. This makes tests easy to write with partial mocks:
 
 ```ts
 // Module defines what it needs

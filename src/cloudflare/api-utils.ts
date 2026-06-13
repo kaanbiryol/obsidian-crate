@@ -1,4 +1,4 @@
-export function randomBase36(length: number): string {
+function randomBase36(length: number): string {
 	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
 	const bytes = new Uint8Array(length);
 	crypto.getRandomValues(bytes);

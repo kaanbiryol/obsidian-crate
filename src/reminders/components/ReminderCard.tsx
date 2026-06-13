@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Flag, Check, Hash, Repeat } from 'lucide-react';
 import { getProjectColor } from '../utils/projectColors';
@@ -209,25 +209,4 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     );
 };
 
-// Memoize to prevent unnecessary re-renders
-export default memo(ReminderCard, (prevProps, nextProps) => {
-    const prevReminder = prevProps.reminder;
-    const nextReminder = nextProps.reminder;
-
-    return (
-        prevReminder.id === nextReminder.id &&
-        prevReminder.completed === nextReminder.completed &&
-        prevReminder.content === nextReminder.content &&
-        (prevReminder.updated_at || prevReminder.updatedAt) === (nextReminder.updated_at || nextReminder.updatedAt) &&
-        prevReminder.dueDatetime === nextReminder.dueDatetime &&
-        prevReminder.dueDate === nextReminder.dueDate &&
-        prevReminder.priority === nextReminder.priority &&
-        prevReminder.project === nextReminder.project &&
-        JSON.stringify(prevReminder.recurrence) === JSON.stringify(nextReminder.recurrence) &&
-        prevReminder.description === nextReminder.description &&
-        prevProps.hideProject === nextProps.hideProject
-    );
-});
-
-// Also export named for backwards compatibility
 export { ReminderCard };

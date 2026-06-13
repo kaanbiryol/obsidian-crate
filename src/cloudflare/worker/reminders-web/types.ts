@@ -16,7 +16,7 @@ export interface RemoteReminderRecord {
 	contentHash: string;
 }
 
-export interface ReminderFileRecord {
+interface ReminderFileRecord {
 	path: string;
 	content: string;
 }

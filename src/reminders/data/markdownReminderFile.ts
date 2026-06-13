@@ -89,7 +89,7 @@ export function buildDescriptionBlock(description: string | undefined): string[]
 	return [`<!-- crate-desc:${description.trim()} -->`];
 }
 
-export function countDescriptionBlockLines(
+function countDescriptionBlockLines(
 	lines: string[],
 	checkboxLineNumber: number,
 ): number {

@@ -143,7 +143,7 @@ const STANDALONE_RECURRENCE_PATTERNS = [
 /**
  * Find standalone recurrence matches (not followed by a chrono date)
  */
-export const findRecurrenceMatches = (text: string, chronoMatches: TextMatch[]): TextMatch[] => {
+const findRecurrenceMatches = (text: string, chronoMatches: TextMatch[]): TextMatch[] => {
     const matches: TextMatch[] = [];
 
     for (const pattern of STANDALONE_RECURRENCE_PATTERNS) {
@@ -178,7 +178,7 @@ export const findRecurrenceMatches = (text: string, chronoMatches: TextMatch[]):
  * Find all date matches in text using chrono
  * Also extends matches to include recurrence prefixes like "every"
  */
-export const findDateMatches = (text: string): TextMatch[] => {
+const findDateMatches = (text: string): TextMatch[] => {
     const matches: TextMatch[] = [];
     const chronoResults = chrono.parse(text);
     let lastSearchIndex = 0;

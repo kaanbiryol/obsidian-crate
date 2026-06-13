@@ -6,7 +6,7 @@ import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
 
 const logger = createLogger('SyncQueue');
 
-export interface QueueApi {
+interface QueueApi {
 	isConfigured(): boolean;
 	uploadFile(
 		path: string,
@@ -23,14 +23,14 @@ export interface QueueApi {
 	}>;
 }
 
-export interface QueueManifest {
+interface QueueManifest {
 	getEntry?(path: string): { hash: string; size: number; modified: string } | undefined;
 	setEntry(path: string, entry: { hash: string; size: number; modified: string }): void;
 	removeEntry(path: string): void;
 	save(): Promise<void>;
 }
 
-export interface QueueMarkdownBaseCache {
+interface QueueMarkdownBaseCache {
 	putBase(path: string, hash: string, content: ArrayBuffer): Promise<void>;
 }
 

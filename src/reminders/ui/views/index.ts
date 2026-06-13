@@ -12,8 +12,8 @@
  * - renderCard: Optional custom card renderer for platform-specific wrappers
  */
 
-export { InboxView, type InboxViewProps } from './InboxView';
-export { TodayView, type TodayViewProps } from './TodayView';
-export { UpcomingView, type UpcomingViewProps } from './UpcomingView';
-export { BrowseView, type BrowseViewProps, type ProjectStats } from './BrowseView';
-export { ProjectDetailView, type ProjectDetailViewProps } from './ProjectDetailView';
+export { InboxView } from './InboxView';
+export { TodayView } from './TodayView';
+export { UpcomingView } from './UpcomingView';
+export { BrowseView } from './BrowseView';
+export { ProjectDetailView } from './ProjectDetailView';

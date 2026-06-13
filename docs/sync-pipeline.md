@@ -103,7 +103,7 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
 
 | Constant | Value | Location |
 |---|---|---|
-| `DEBOUNCE_DELAY_MS` / `debounceDelay` default | 5,000 ms | `types.ts` |
+| `debounceDelay` default | 5 seconds | `types.ts` |
 | `MAX_DEBOUNCE_WAIT_MS` | 30,000 ms | `types.ts` |
 | `MAX_FILE_SIZE_BYTES` | 25 MB | `types.ts` |
 | `BATCH_MAX_FILES` | 50 | `types.ts` |

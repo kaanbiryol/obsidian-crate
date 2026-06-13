@@ -22,7 +22,6 @@ import type {
 	QuickSetupInput,
 	QuickSetupResult,
 	RedeployInput,
-	WorkerTokenConfig,
 } from './infrastructure-types';
 import {
 	computeTokenHash,
@@ -181,22 +180,4 @@ export async function redeployFromPlugin(
 
 	onProgress?.(`Redeploying worker ${input.workerName}...`);
 	await redeployWorker(credentials, input.workerName.trim(), getWorkerScript());
-}
-
-export async function refreshWorkerAuthToken(
-	credentials: CloudflareCredentials,
-	config: WorkerTokenConfig,
-): Promise<string> {
-	const authToken = generateAuthToken();
-	const workerScript = getWorkerScript();
-	await deployWorker(credentials, config.workerName, workerScript, {
-		r2Bucket: config.bucketName,
-		authToken,
-		d1DatabaseId: config.databaseId,
-		accountId: credentials.accountId,
-		workerName: config.workerName,
-		bucketName: config.bucketName,
-	});
-	await registerTokenWithWorker(config.workerUrl, authToken);
-	return authToken;
 }

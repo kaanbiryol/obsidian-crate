@@ -68,13 +68,6 @@ export function parseCheckboxLine(line: string): ParsedCheckbox | null {
 }
 
 /**
- * Check if a line is a markdown checkbox
- */
-export function isCheckboxLine(line: string): boolean {
-  return CHECKBOX_REGEX.test(line);
-}
-
-/**
  * Rebuild a checkbox line with updated data
  *
  * @param indentation - Leading whitespace

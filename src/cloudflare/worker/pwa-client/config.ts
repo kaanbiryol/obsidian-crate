@@ -1,17 +1,17 @@
 import type { CachedReminderSnapshot, ReminderRecord, StartTab, StoredConfig } from './types';
 
 export const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
-export const CONFIG_KEY = 'crate-reminders-config';
+const CONFIG_KEY = 'crate-reminders-config';
 export const REMINDERS_CACHE_KEY = 'crate-reminders-cache-v1';
-export const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
-export const defaultConfig: StoredConfig = {
+const defaultConfig: StoredConfig = {
 	folderPath: 'Reminders',
 	upcomingDays: 7,
 	allDayNotificationTime: null,
 };
 
-export function normalizeTimeString(value: unknown): string | null {
+function normalizeTimeString(value: unknown): string | null {
 	if (typeof value !== 'string') return null;
 	const match = TIME_PATTERN.exec(value.trim());
 	return match ? `${match[1]}:${match[2]}` : null;
@@ -42,7 +42,7 @@ export function loadStoredConfig(): StoredConfig {
 	}
 }
 
-export function saveConfig(config: StoredConfig): void {
+function saveConfig(config: StoredConfig): void {
 	localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
 }
 

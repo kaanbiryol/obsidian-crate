@@ -59,16 +59,3 @@ export function isReminderOverdue(reminder: Pick<Reminder, 'dueDate' | 'dueDatet
   }
   return false;
 }
-
-/**
- * Check if a date string has a time component
- * @param dateString - ISO date string
- * @returns True if date has time component
- */
-export function hasTimeComponent(dateString: string | undefined): boolean {
-  if (!dateString) return false;
-  // Only check for 'T' presence - don't check hours/minutes as
-  // date-only strings like 'YYYY-MM-DD' are parsed as UTC by JavaScript,
-  // causing timezone issues when checking local hours/minutes
-  return dateString.includes('T');
-}

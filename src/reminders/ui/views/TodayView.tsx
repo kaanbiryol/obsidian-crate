@@ -111,5 +111,3 @@ export const TodayView = memo(function TodayView({
     </div>
   );
 });
-
-export default TodayView;

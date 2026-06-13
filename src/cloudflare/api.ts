@@ -4,12 +4,9 @@
 
 export type {
 	CloudflareCredentials,
-	CloudflareAccount,
 	R2Bucket,
 	WorkerScript,
 	D1Database,
-	WorkerDeployment,
-	DeployWorkerBindings,
 	WorkerBinding,
 } from './api-types';
 export {

@@ -1,4 +1,4 @@
-export type GlowShape = 'circle' | 'ellipse';
+type GlowShape = 'circle' | 'ellipse';
 
 export interface SoftGlowOptions {
     shape?: GlowShape;

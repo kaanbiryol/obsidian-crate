@@ -1,12 +1,12 @@
 import { parseQuery, type ReminderQueryOptions } from "./queryOptions";
 
-export const REMINDERS_BLOCK_TYPES = [
+const REMINDERS_BLOCK_TYPES = [
   "reminders",
   "reminders-today",
   "reminders-upcoming",
 ] as const;
 
-export type RemindersBlockType = (typeof REMINDERS_BLOCK_TYPES)[number];
+type RemindersBlockType = (typeof REMINDERS_BLOCK_TYPES)[number];
 
 export type RemindersBlockInfo = {
   content: string;
@@ -15,7 +15,7 @@ export type RemindersBlockInfo = {
   isUpcoming: boolean;
 };
 
-export function isRemindersBlockType(type: string): type is RemindersBlockType {
+function isRemindersBlockType(type: string): type is RemindersBlockType {
   return (REMINDERS_BLOCK_TYPES as readonly string[]).includes(type);
 }
 

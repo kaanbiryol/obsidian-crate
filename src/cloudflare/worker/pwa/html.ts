@@ -40,5 +40,3 @@ ${PWA_STYLES}
 	</body>
 	</html>`;
 }
-
-export const PWA_HTML = createPwaHtml();

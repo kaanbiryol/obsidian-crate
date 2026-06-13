@@ -30,10 +30,6 @@ import type {
 
 export type {
   MarkdownWriter,
-  ReminderChangeContext,
-  ReminderOperation,
-  SyncResult,
-  UpdateReminderInput,
 } from "./types";
 
 export function createMarkdownWriter(

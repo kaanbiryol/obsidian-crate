@@ -1,4 +1,4 @@
-export type RemindersLeaf = {
+type RemindersLeaf = {
 	setViewState(state: { type: string; active: boolean }): Promise<void>;
 };
 

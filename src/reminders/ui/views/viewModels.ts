@@ -34,7 +34,7 @@ export interface ProjectDetailHeaderViewModel {
   isComplete: boolean;
 }
 
-export const EMPTY_PROJECT_STATS: ProjectStats = {
+const EMPTY_PROJECT_STATS: ProjectStats = {
   active: 0,
   completed: 0,
   total: 0,

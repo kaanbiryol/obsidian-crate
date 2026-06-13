@@ -9,7 +9,7 @@ function createEnrollmentToken(): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function purgeExpiredWebEnrollmentTokens(db: D1Database): Promise<void> {
+async function purgeExpiredWebEnrollmentTokens(db: D1Database): Promise<void> {
 	try {
 		await db.prepare('DELETE FROM web_enrollment_tokens WHERE expires_at <= ?')
 			.bind(Date.now())

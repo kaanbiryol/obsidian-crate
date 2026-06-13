@@ -12,7 +12,7 @@ import type { TabId } from "@/reminders/ui/layoutConstants";
 
 export type ViewMode = TabId;
 
-export interface RemindersHeaderStats {
+interface RemindersHeaderStats {
   count: number;
   overdueCount: number;
 }

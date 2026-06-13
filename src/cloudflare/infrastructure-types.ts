@@ -1,11 +1,10 @@
 import type {
-	CloudflareCredentials,
 	D1Database,
 	R2Bucket,
 	WorkerScript,
 } from './api';
 
-export type DiagnosticStatus = 'pass' | 'fail' | 'warn';
+type DiagnosticStatus = 'pass' | 'fail' | 'warn';
 
 export interface DiagnosticResult {
 	name: string;
@@ -78,12 +77,3 @@ export interface DiscoverCrateResourcesInput {
 }
 
 export type ProgressCallback = (message: string) => void;
-
-export interface WorkerTokenConfig {
-	workerUrl: string;
-	workerName: string;
-	bucketName: string;
-	databaseId: string;
-}
-
-export type { CloudflareCredentials };

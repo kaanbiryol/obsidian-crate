@@ -1,4 +1,4 @@
-export class FakeStyle {
+class FakeStyle {
 	display = '';
 	width = '';
 	private readonly properties = new Map<string, string>();

@@ -1,7 +1,7 @@
 import { TFile, type App } from 'obsidian';
 import { vi } from 'vitest';
 
-export type MockVault = {
+type MockVault = {
 	adapter: {
 		exists: ReturnType<typeof vi.fn<(path: string) => Promise<boolean>>>;
 	};
@@ -19,7 +19,7 @@ export type MockAppResult = {
 	vault: MockVault;
 };
 
-export function createMockTFile(path: string): TFile {
+function createMockTFile(path: string): TFile {
 	const file = new TFile();
 	const name = path.split('/').pop() ?? path;
 	const dotIndex = name.lastIndexOf('.');

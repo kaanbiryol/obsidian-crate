@@ -37,7 +37,7 @@ type StoredObject = {
 	customMetadata?: Record<string, string>;
 };
 
-export type MockR2Bucket = {
+type MockR2Bucket = {
 	put: Mock<(this: void, key: string, body: BodyInit | null, options?: CompatibleR2PutOptions) => Promise<unknown>>;
 	get: Mock<(this: void, key: string) => Promise<CompatibleR2ObjectBody | null>>;
 	delete: Mock<(this: void, keys: string | string[]) => Promise<void>>;
@@ -52,7 +52,7 @@ type MockD1Statement = CompatibleD1PreparedStatement & {
 	all: (<T = Record<string, unknown>>(this: void) => Promise<{ results: T[] }>) & Mock;
 };
 
-export type MockD1Database = CompatibleD1Database & {
+type MockD1Database = CompatibleD1Database & {
 	prepare: Mock<(this: void, sql: string) => MockD1Statement>;
 	batch: (<T = unknown>(this: void, statements: CompatibleD1PreparedStatement[]) => Promise<T[]>) & Mock;
 	exec: Mock<(this: void) => Promise<object>>;

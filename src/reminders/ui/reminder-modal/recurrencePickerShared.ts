@@ -3,7 +3,7 @@ import { normalizeRecurrenceRule } from '../../utils/recurrenceRule';
 
 export const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const;
 export const RECURRENCE_DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
-export const RECURRENCE_DAY_FULL_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const RECURRENCE_DAY_FULL_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 export const RECURRENCE_FREQUENCY_LABELS: Record<RecurrenceRule['frequency'], string> = {
 	daily: 'Daily',

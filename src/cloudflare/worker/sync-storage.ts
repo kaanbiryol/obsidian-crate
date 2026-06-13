@@ -39,7 +39,7 @@ function normalizeStorageKey(value: unknown): string | null {
 	return trimmed.length > 0 ? trimmed : null;
 }
 
-export function resolveObjectKey(path: string, storageKey: string | null): string {
+function resolveObjectKey(path: string, storageKey: string | null): string {
 	return storageKey ?? legacyObjectKey(path);
 }
 

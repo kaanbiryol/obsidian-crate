@@ -204,5 +204,3 @@ export const InboxView = memo(function InboxView({
     </div>
   );
 });
-
-export default InboxView;

@@ -199,18 +199,3 @@ export function getProjectColor(projectName: string): ProjectColorConfig {
         },
     };
 }
-
-/**
- * Get all available project colors
- * Useful for color previews or palette displays
- */
-export function getAllProjectColors(): ProjectColorDef[] {
-    return [...PROJECT_COLORS];
-}
-
-/**
- * Get the total number of colors in the palette
- */
-export function getProjectColorCount(): number {
-    return PROJECT_COLORS.length;
-}

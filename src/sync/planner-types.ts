@@ -1,7 +1,7 @@
 import type { TAbstractFile, Vault } from "obsidian";
 import type { ChangelogEntry, CrateSettings, FileDiff, FileEntry, PreparedUpload, SyncResult } from "../plugin/types";
 
-export interface PlannerManifest {
+interface PlannerManifest {
   getEntry(path: string): FileEntry | undefined;
   getAllPaths(): string[];
   getManifest(): { version: number; files: Record<string, FileEntry> };
@@ -10,7 +10,7 @@ export interface PlannerManifest {
   save(): Promise<void>;
 }
 
-export interface PlannerApi {
+interface PlannerApi {
   getChanges(since: number): Promise<{
     changes: ChangelogEntry[];
     lastSeq: number;

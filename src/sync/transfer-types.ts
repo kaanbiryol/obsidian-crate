@@ -7,19 +7,19 @@ import type {
   UploadResult,
 } from "../plugin/types";
 
-export interface TransferManifest {
+interface TransferManifest {
   getEntry?(path: string): FileEntry | undefined;
   hashMatches(path: string, hash: string): boolean;
   setEntry(path: string, entry: FileEntry): void;
   removeEntry(path: string): void;
 }
 
-export interface TransferMarkdownBaseCache {
+interface TransferMarkdownBaseCache {
   readBase(path: string, hash: string): Promise<ArrayBuffer | null>;
   putBase(path: string, hash: string, content: ArrayBuffer): Promise<void>;
 }
 
-export interface TransferApi {
+interface TransferApi {
   uploadFile(
     path: string,
     content: ArrayBuffer,
