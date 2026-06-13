@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
+import type { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
 import type { CrateSettings, FileManifest, PreparedUpload, SyncResult, UploadResult } from '../plugin/types';
 import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
@@ -80,16 +81,22 @@ function setEngineLocalManifest(
 	(engine as unknown as { localManifest: Harness['localManifest'] }).localManifest = localManifest;
 }
 
+function getQueueController(engine: SyncEngine): SyncQueueController {
+	return (engine as unknown as { queueController: SyncQueueController }).queueController;
+}
+
 function getPendingPaths(engine: SyncEngine): Set<string> {
-	return (engine as unknown as { pendingPaths: Set<string> }).pendingPaths;
+	return (getQueueController(engine) as unknown as { pendingPaths: Set<string> }).pendingPaths;
 }
 
 function spyOnDebouncedSync(engine: SyncEngine) {
-	return vi.spyOn(engine as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
+	return vi
+		.spyOn(getQueueController(engine) as unknown as { debouncedSync(): void }, 'debouncedSync')
+		.mockImplementation(() => {});
 }
 
 async function flushPendingChanges(engine: SyncEngine): Promise<void> {
-	await (engine as unknown as { processPendingChanges(): Promise<void> }).processPendingChanges();
+	await (getQueueController(engine) as unknown as { processPendingChanges(): Promise<void> }).processPendingChanges();
 }
 
 function setSyncStatus(engine: SyncEngine, status: 'idle' | 'syncing' | 'error'): void {

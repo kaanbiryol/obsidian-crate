@@ -7,16 +7,7 @@ import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { MarkdownBaseCache } from './markdown-base-cache';
 import type { VaultFile } from './file-discovery';
-import {
-	onRawPathChange as queueOnRawPathChange,
-	onFileChange as queueOnFileChange,
-	onFileDelete as queueOnFileDelete,
-	onFileRename as queueOnFileRename,
-	debouncedSync as runDebouncedQueueSync,
-	processPendingChanges as flushPendingQueueChanges,
-	clearSyncedPendingPaths as clearSyncedQueuePaths,
-	type RawPathKind,
-} from './queue';
+import { SyncQueueController } from './queue-controller';
 import {
 	getLocalChanges as planLocalChanges,
 	getLocalDeletes as planLocalDeletes,
@@ -67,10 +58,7 @@ export class SyncEngine {
 	private markdownBaseCache: MarkdownBaseCache;
 	private settings: CrateSettings;
 	private state: SyncState;
-	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-	private maxWaitStart: number | null = null;
-	private pendingPaths: Set<string> = new Set();
-	private inFlightPaths: Set<string> = new Set();
+	private queueController: SyncQueueController;
 	private syncInterval: ReturnType<typeof setInterval> | null = null;
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private patternCache = new Map<string, RegExp>();
@@ -107,6 +95,23 @@ export class SyncEngine {
 			pendingChanges: 0,
 			conflictCount: 0,
 		};
+		this.queueController = new SyncQueueController({
+			vault: this.vault,
+			api: this.api,
+			getLocalManifest: () => this.localManifest,
+			markdownBaseCache: this.markdownBaseCache,
+			shouldIgnore: this.shouldIgnore.bind(this),
+			updateState: this.updateState.bind(this),
+			isDestroyed: () => this.destroyed,
+			currentStatus: () => this.state.status,
+			prepareUploadFromPath: (path: string) => this.prepareUploadFromPath(path),
+			runConcurrent: this.runConcurrent.bind(this),
+			getModifiedIso: this.getModifiedIso.bind(this),
+			getDebounceDelayMs: () => (this.settings.debounceDelay ?? 5) * 1000,
+			hasLocalManifestFile: (path: string) => this.localManifest.hasFile(path),
+			uploadConcurrency: UPLOAD_CONCURRENCY,
+			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
+		});
 	}
 
 	async initialize(): Promise<void> {
@@ -141,9 +146,7 @@ export class SyncEngine {
 	}
 
 	getPendingPaths(): string[] {
-		const combined = new Set(this.pendingPaths);
-		for (const p of this.inFlightPaths) combined.add(p);
-		return Array.from(combined);
+		return this.queueController.getPendingPaths();
 	}
 
 	private startPeriodicSync(): void {
@@ -225,110 +228,20 @@ export class SyncEngine {
 		};
 	}
 
-	private getQueueEventContext() {
-		return {
-			pendingPaths: this.pendingPaths,
-			shouldIgnore: this.shouldIgnore.bind(this),
-			triggerDebouncedSync: () => this.debouncedSync(),
-		};
-	}
-
-	private getQueueDebounceContext() {
-		return {
-			pendingPaths: this.pendingPaths,
-			isDestroyed: () => this.destroyed,
-			getDebounceTimer: () => this.debounceTimer,
-			setDebounceTimer: (timer: ReturnType<typeof setTimeout> | null) => {
-				this.debounceTimer = timer;
-			},
-			getMaxWaitStart: () => this.maxWaitStart,
-			setMaxWaitStart: (time: number | null) => {
-				this.maxWaitStart = time;
-			},
-			updateState: this.updateState.bind(this),
-			processPendingChanges: () => this.processPendingChanges(),
-		};
-	}
-
-	private getQueueFlushContext() {
-		return {
-			pendingPaths: this.pendingPaths,
-			inFlightPaths: this.inFlightPaths,
-			vault: this.vault,
-			api: this.api,
-			localManifest: this.localManifest,
-			updateState: this.updateState.bind(this),
-			isDestroyed: () => this.destroyed,
-			currentStatus: () => this.state.status,
-			markdownBaseCache: this.markdownBaseCache,
-			prepareUploadFromPath: (path: string) => this.prepareUploadFromPath(path),
-			runConcurrent: this.runConcurrent.bind(this),
-			getModifiedIso: this.getModifiedIso.bind(this),
-			triggerDebouncedSync: () => this.debouncedSync(),
-		};
-	}
-
-	private getQueueReconcileContext() {
-		return {
-			pendingPaths: this.pendingPaths,
-			clearDebounceTimer: this.clearDebounceTimer.bind(this),
-			updateState: this.updateState.bind(this),
-		};
-	}
-
 	onRawFileEvent(path: string): void {
-		void this.handleRawFileEvent(path);
-	}
-
-	private async handleRawFileEvent(path: string): Promise<void> {
-		if (this.destroyed) return;
-		const kind = await this.getRawPathKind(path);
-		const wasTracked = kind === 'missing' ? this.localManifest.hasFile(path) : false;
-		queueOnRawPathChange(this.getQueueEventContext(), path, { kind, wasTracked });
-	}
-
-	private async getRawPathKind(path: string): Promise<RawPathKind> {
-		try {
-			const stat = await this.vault.adapter.stat(path);
-			if (stat?.type === 'file') return 'file';
-			if (stat?.type === 'folder') return 'folder';
-			return 'missing';
-		} catch (error) {
-			logger.warn(
-				`Raw event stat failed for ${path}:`,
-				errorMessage(error),
-			);
-			return 'missing';
-		}
+		this.queueController.onRawFileEvent(path);
 	}
 
 	onFileChange(file: TAbstractFile): void {
-		queueOnFileChange(this.getQueueEventContext(), file);
+		this.queueController.onFileChange(file);
 	}
 
 	onFileDelete(file: TAbstractFile): void {
-		queueOnFileDelete(this.getQueueEventContext(), file);
+		this.queueController.onFileDelete(file);
 	}
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
-		queueOnFileRename(this.getQueueEventContext(), file, oldPath);
-	}
-
-	private debouncedSync(): void {
-		const delayMs = (this.settings.debounceDelay ?? 5) * 1000;
-		runDebouncedQueueSync(this.getQueueDebounceContext(), delayMs, MAX_DEBOUNCE_WAIT_MS);
-	}
-
-	private async processPendingChanges(): Promise<void> {
-		await flushPendingQueueChanges(this.getQueueFlushContext(), UPLOAD_CONCURRENCY);
-	}
-
-	private clearDebounceTimer(): void {
-		if (this.debounceTimer) {
-			clearTimeout(this.debounceTimer);
-			this.debounceTimer = null;
-		}
-		this.maxWaitStart = null;
+		this.queueController.onFileRename(file, oldPath);
 	}
 
 	private async prepareUploadFromPath(path: string): Promise<PreparedUpload | null> {
@@ -411,7 +324,7 @@ export class SyncEngine {
 			getStatus: () => this.state.status,
 			getSyncIntervalSeconds: () => this.settings.syncInterval,
 			getLastSeq: () => this.settings.lastSeq,
-			getPendingPathCount: () => this.pendingPaths.size,
+			getPendingPathCount: () => this.queueController.getPendingPathCount(),
 			getConsecutiveCheckFailures: () => this.consecutiveCheckFailures,
 			setConsecutiveCheckFailures: (value: number) => {
 				this.consecutiveCheckFailures = value;
@@ -530,7 +443,7 @@ export class SyncEngine {
 
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const result = await runSyncWorkflow(this.getSyncWorkflowContext(), progressCallback);
-		clearSyncedQueuePaths(this.getQueueReconcileContext(), result);
+		this.queueController.clearSyncedPendingPaths(result);
 		if (result.success) {
 			this.pruneMarkdownBaseCacheInBackground();
 		}
@@ -571,7 +484,7 @@ export class SyncEngine {
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const result = await runInitialSyncWorkflow(this.getInitialSyncWorkflowContext(), progressCallback);
-		clearSyncedQueuePaths(this.getQueueReconcileContext(), result);
+		this.queueController.clearSyncedPendingPaths(result);
 		if (result.success) {
 			this.pruneMarkdownBaseCacheInBackground();
 		}
@@ -580,7 +493,7 @@ export class SyncEngine {
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const result = await runForceFullSyncWorkflow(this.getForceSyncWorkflowContext(), progressCallback);
-		clearSyncedQueuePaths(this.getQueueReconcileContext(), result);
+		this.queueController.clearSyncedPendingPaths(result);
 		if (result.success) {
 			this.pruneMarkdownBaseCacheInBackground();
 		}
@@ -591,7 +504,6 @@ export class SyncEngine {
 		this.destroyed = true;
 		this.abortController.abort();
 		this.stopPeriodicSync();
-		this.clearDebounceTimer();
-		this.pendingPaths.clear();
+		this.queueController.destroy();
 	}
 }
