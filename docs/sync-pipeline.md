@@ -103,7 +103,8 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
 
 | Constant | Value | Location |
 |---|---|---|
-| `DEBOUNCE_DELAY_MS` | 10,000 ms | `types.ts` |
+| `DEBOUNCE_DELAY_MS` / `debounceDelay` default | 5,000 ms | `types.ts` |
+| `MAX_DEBOUNCE_WAIT_MS` | 30,000 ms | `types.ts` |
 | `MAX_FILE_SIZE_BYTES` | 25 MB | `types.ts` |
 | `BATCH_MAX_FILES` | 50 | `types.ts` |
 | `BATCH_MAX_BYTES` | 10 MB | `types.ts` |
@@ -113,7 +114,7 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
 | `FORCE_SYNC_CONCURRENCY` | 2 | `engine.ts` |
 | `PREPARE_CONCURRENCY` | 20 | `engine.ts` |
 | `INITIAL_SYNC_PIPELINE_CHUNK_FILES` | 500 | `engine.ts` |
-| `BATCH_UPLOAD_CONCURRENCY` | 3 | `engine.ts` |
+| `BATCH_UPLOAD_CONCURRENCY` | 5 | `engine-constants.ts` |
 | `MAX_RETRIES` | 3 | `engine.ts` |
 | `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine.ts` |
 
@@ -135,8 +136,8 @@ File events (create, modify, delete, rename) are debounced before syncing:
 1. Events collected into `pendingPaths` Set on `SyncEngine`
 2. Delete events use `delete:` prefix convention (e.g. `delete:notes/old.md`)
 3. Rename events emit both a `delete:` for old path and an add for new path
-4. Debounce timer (10s) resets with each new event
-5. After quiet period, `processPendingChanges()` flushes the queue
+4. Debounce timer (default 5s) resets with each new event, with a 30s maximum wait
+5. After the quiet period or maximum wait, `processPendingChanges()` flushes the queue
 
 Implementation: `queue.ts`
 

@@ -1,15 +1,15 @@
 # Worker API
 
-The worker is deployed via the Cloudflare API (not Wrangler). Source is embedded as a template string in `src/cloudflare/worker-template.ts`.
+The Worker is deployed via the Cloudflare API (not Wrangler). Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` bundles it and `vite.config.mts` injects the generated script into `src/cloudflare/worker-template.ts`.
 
 ## Authentication
 
-All endpoints require `Authorization: Bearer <token>` header. The worker validates the token in two steps:
+All non-public API endpoints require an `Authorization: Bearer <token>` header. The Worker validates the token in two steps:
 
 1. Hash the bearer token with SHA-256 and look up the hash in the `auth_tokens` D1 table
 2. If not found, fall back to timing-safe comparison against the `AUTH_TOKEN` secret binding
 
-This allows multiple devices to have independent tokens stored in D1, while maintaining backward compatibility with the single-token binding. CORS headers are included on all responses.
+This allows multiple devices to have independent tokens stored in D1, while maintaining backward compatibility with the single-token binding. Public PWA assets and enrollment-exchange endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
 ## Endpoints
 
@@ -31,9 +31,36 @@ This allows multiple devices to have independent tokens stored in D1, while main
 | `GET` | `/auth/tokens` | List all registered auth tokens |
 | `GET` | `/settings` | Get shared settings from R2 |
 | `PUT` | `/settings` | Store shared settings to R2 |
+| `GET` | `/reminders/list?folderPath=<path>` | List reminders and projects from synced Markdown files |
+| `POST` | `/reminders/create` | Create a reminder in a project Markdown file |
+| `POST` | `/reminders/update` | Update or move a reminder |
+| `POST` | `/reminders/set-completed` | Toggle reminder completion |
+| `DELETE` | `/reminders/delete` | Delete a reminder from Markdown |
+| `POST` | `/reminders/reorder` | Reorder reminders inside a project file |
 | `POST` | `/reminders/schedule` | Schedule a DO alarm for a reminder |
 | `DELETE` | `/reminders/cancel` | Cancel a DO alarm |
 | `GET` | `/reminders/scheduled` | List scheduled reminders from D1 |
+| `POST` | `/notifications/enrollment-token` | Create a one-time push subscription token |
+| `POST` | `/notifications/reminders-enrollment-token` | Create a one-time reminders web app token |
+| `POST` | `/notifications/subscribe` | Save a push subscription |
+| `DELETE` | `/notifications/subscribe` | Remove a push subscription |
+| `GET` | `/notifications/subscriptions` | List push subscriptions |
+| `POST` | `/notifications/test` | Send a test push notification |
+
+## Public PWA Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/notifications` | Serves the reminders PWA HTML |
+| `GET` | `/notifications/app.js` | Serves the bundled PWA client |
+| `GET` | `/notifications/sw.js` | Serves the PWA service worker |
+| `GET` | `/notifications/manifest.json` | Serves the PWA manifest |
+| `GET` | `/notifications/version.json` | Returns the current PWA asset version |
+| `GET` | `/notifications/icon.svg` | Serves the PWA icon |
+| `GET` | `/notifications/open-obsidian` | Serves the browser handoff page for opening Obsidian |
+| `GET` | `/notifications/vapid-public-key` | Returns the Web Push VAPID public key |
+| `POST` | `/notifications/reminders-exchange` | Exchanges a one-time web enrollment token for a PWA auth token |
+| `POST` | `/notifications/subscribe` | Saves a push subscription when `X-Crate-Enrollment-Token` is present |
 
 ## Request/Response Details
 
@@ -139,13 +166,55 @@ Response: `{ tokens: [{ id, device_id, device_name, platform, created_at, last_s
 
 Returns shared plugin preferences stored in R2 as `__crate__/settings.json`. Used by second devices to inherit settings during setup.
 
-Response: `{ settings: { ignorePatterns, syncOnStartup, syncOnResume, syncInterval, showStatusBar } }` or `{ settings: null }` if not yet stored.
+Response: `{ settings: { ignorePatterns, syncOnStartup, syncOnResume, syncInterval, showStatusBar, pushEnabled } }` or `{ settings: null }` if not yet stored or corrupt.
 
 ### PUT /settings
 
 Stores shared plugin preferences to R2.
 
-Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncOnResume: true, syncInterval: 300, showStatusBar: true } }`
+Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncOnResume: true, syncInterval: 300, showStatusBar: true, pushEnabled: false } }`
+
+Response: `{ success: true }`
+
+### GET /reminders/list
+
+Query: `?folderPath=<reminders-folder>`
+
+Reads synced Markdown reminder files from the configured folder and returns web-ready reminder records plus known projects.
+
+Response: `{ reminders: [...], projects: [...] }`
+
+### POST /reminders/create
+
+Creates a reminder in the selected project Markdown file, creating that file if needed.
+
+Request includes `folderPath`, `content`, optional `project`, `description`, `priority`, `dueDate`, `dueDatetime`, `recurrence`, `allDayNotificationTime`, and optional client-provided `id`.
+
+Response: `{ success: true, notificationWarning? }`
+
+### POST /reminders/update
+
+Updates an existing reminder by `id`. The request includes `folderPath` and any mutable reminder fields: `content`, `description`, `priority`, `project`, `dueDate`, `dueDatetime`, `recurrence`, and `allDayNotificationTime`.
+
+If `project` changes, the worker removes the reminder from the old project file and creates it in the new project file.
+
+Response: `{ success: true, notificationWarning? }`
+
+### POST /reminders/set-completed
+
+Request: `{ folderPath, id, completed, allDayNotificationTime? }`
+
+Response: `{ success: true, notificationWarning? }`
+
+### DELETE /reminders/delete
+
+Request: `{ folderPath, id, allDayNotificationTime? }`
+
+Response: `{ success: true, notificationWarning? }`
+
+### POST /reminders/reorder
+
+Request: `{ folderPath, project, orderedIds }`
 
 Response: `{ success: true }`
 
@@ -182,39 +251,71 @@ List all currently scheduled reminders.
 
 Response: `{ scheduled: [{ reminder_id, content, project, due_datetime, created_at }] }`
 
-## Push Notification Endpoints
+## Notifications and PWA Endpoints
 
-### GET /notifications (unauthenticated)
+### GET /notifications (public)
 
-Serves the PWA HTML page for subscribing to push notifications. Pass auth token as URL hash fragment: `{workerUrl}/notifications#{authToken}`.
+Serves the reminders PWA HTML page. The plugin generates short-lived links with query params such as `token`, `folder`, `upcomingDays`, `allDayTime`, `project`, `tab`, and `reminderId`.
 
-### GET /notifications/sw.js (unauthenticated)
+The `token` query parameter is a web enrollment token, not a sync bearer token.
 
-Service worker JS for handling push events.
+### GET /notifications/app.js, /sw.js, /manifest.json, /version.json, /icon.svg, /open-obsidian (public)
 
-### GET /notifications/manifest.json (unauthenticated)
+Serve the PWA client bundle, service worker, manifest, version metadata, icon, and Obsidian handoff page. Versioned static assets use long-lived cache headers when a `v` query param is present.
 
-PWA manifest.
+### GET /notifications/vapid-public-key (public)
 
-### GET /notifications/vapid-public-key (unauthenticated)
+Returns the VAPID public key, lazily generated and stored in D1.
 
-Returns the VAPID public key (lazily generated, stored in D1). Response: `{ publicKey: "base64url-encoded-key" }`
+Response: `{ publicKey: "base64url-encoded-key" }`
+
+### POST /notifications/reminders-exchange (public)
+
+Consumes a one-time web enrollment token and creates a per-device PWA auth token in `auth_tokens`.
+
+Request: `{ token, deviceName? }`
+
+Response: `{ authToken }`
+
+### POST /notifications/enrollment-token
+
+Authenticated. Creates a short-lived, one-time token used only to save a push subscription without exposing the PWA bearer token to the subscription URL flow.
+
+Response: `{ token, expiresAt }`
+
+### POST /notifications/reminders-enrollment-token
+
+Authenticated. Creates a short-lived, one-time token used in `/notifications?token=...` reminders app links.
+
+Response: `{ token, expiresAt }`
 
 ### POST /notifications/subscribe
 
-Save a push subscription. Request: `{ endpoint, keys: { p256dh, auth }, deviceName }`. Response: `{ id }`
+Save a push subscription. This endpoint can be called as an authenticated request, or publicly when the `X-Crate-Enrollment-Token` header contains a valid one-time push enrollment token.
+
+Request: `{ endpoint, keys: { p256dh, auth }, deviceName? }`
+
+Response: `{ id }`
 
 ### DELETE /notifications/subscribe
 
-Remove a push subscription. Request: `{ id }`. Response: `{ success: true }`
+Authenticated. Remove a push subscription.
+
+Request: `{ id }`
+
+Response: `{ success: true }`
 
 ### GET /notifications/subscriptions
 
-List all push subscriptions. Response: `{ subscriptions: [{ id, device_name, created_at }] }`
+Authenticated. List all push subscriptions.
+
+Response: `{ subscriptions: [{ id, device_name, created_at }] }`
 
 ### POST /notifications/test
 
-Send a test push to all subscriptions. Response: `{ sent, failed, pruned }`
+Authenticated. Send a test push to all subscriptions.
+
+Response: `{ sent, failed, pruned, errors }`
 
 ## ReminderAlarm Durable Object
 
@@ -224,7 +325,7 @@ Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and migration 
 
 ## D1 Database Schema
 
-Four tables, created lazily via `initDb()`:
+Eight tables, created lazily via `initDb()`:
 
 ### changelog
 
@@ -313,6 +414,30 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 
 Web Push subscriptions. Each subscribed device gets a row. Expired subscriptions (404/410 on push send) are automatically pruned.
 
+### push_enrollment_tokens
+
+```sql
+CREATE TABLE IF NOT EXISTS push_enrollment_tokens (
+  token_hash TEXT PRIMARY KEY,
+  expires_at INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+One-time, short-lived tokens that allow `POST /notifications/subscribe` without exposing a long-lived bearer token in the subscription flow.
+
+### web_enrollment_tokens
+
+```sql
+CREATE TABLE IF NOT EXISTS web_enrollment_tokens (
+  token_hash TEXT PRIMARY KEY,
+  expires_at INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+One-time, short-lived tokens embedded in reminders PWA setup links. `POST /notifications/reminders-exchange` consumes one token and creates a per-device auth token.
+
 ## R2 Key Convention
 
 With D1 enabled, committed file blobs are stored under `__crate__/files/<hash>/<uuid>` and referenced through `files.storage_key`. Legacy rows without `storage_key` still fall back to `files/<vault-path>`. When D1 is unavailable entirely, uploads/downloads continue to use the legacy `files/<vault-path>` layout.
@@ -329,4 +454,4 @@ When a client's `since` cursor points to pruned entries, the `cursorExpired` fla
 
 ## Bindings Table
 
-See `docs/architecture.md` for the full bindings table. When adding new bindings, update `src/cloudflare/api.ts` - both `deployWorker()` and `redeployWorker() keep_bindings`.
+See `docs/architecture.md` for the full bindings table. When adding new bindings, update `src/cloudflare/api-deploy.ts` in both `deployWorker()` metadata and `redeployWorker()` `keep_bindings`.

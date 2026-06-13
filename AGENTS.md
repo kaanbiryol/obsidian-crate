@@ -3,17 +3,17 @@
 ## Project overview
 
 - Target: Obsidian Community Plugin (TypeScript → bundled JavaScript).
-- Entry point: `main.ts` compiled to `main.js` and loaded by Obsidian.
+- Entry point: `src/main.ts` compiled to `main.js` and loaded by Obsidian.
 - Required release artifacts: `main.js`, `manifest.json`, and optional `styles.css`.
 
 ## Environment & tooling
 
-- Node.js: use current LTS (Node 20.19+, 22.12+, or 24+).
-- **Package manager: npm** (required for this sample - `package.json` defines npm scripts and dependencies).
-- **Bundler: esbuild** (required for this sample - `esbuild.config.mjs` and build scripts depend on it). Alternative bundlers like Rollup or webpack are acceptable for other projects if they bundle all external dependencies into `main.js`.
+- Node.js: use the version range in `package.json` (`^20.19.0 || ^22.12.0 || >=24.0.0`).
+- **Package manager: npm** (`package.json` defines the required scripts and dependencies).
+- **Bundler: Vite/Rollup** (`vite.config.mts` builds `src/main.ts` to `dist/main.js` and emits `dist/styles.css`).
 - Types: `obsidian` type definitions.
 
-**Note**: This sample project has specific technical dependencies on npm and esbuild. If you're creating a plugin from scratch, you can choose different tools, but you'll need to replace the build configuration accordingly.
+**Note**: `npm run build` builds the Cloudflare Worker bundle first, type-checks the plugin, then runs the Vite production build.
 
 ### Install
 
@@ -35,34 +35,29 @@ npm run build
 
 ## Linting
 
-- To use eslint install eslint from terminal: `npm install -g eslint`
-- To use eslint to analyze this project use this command: `eslint main.ts`
-- eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder: `eslint ./src/`
+- Run lint with the repository script:
+  ```bash
+  npm run lint
+  ```
+- The lint config lives in `eslint.config.mts` and covers TypeScript, TSX, scripts, and Obsidian-specific UI rules.
 
 ## File & folder conventions
 
-- **Organize code into multiple files**: Split functionality across separate modules rather than putting everything in `main.ts`.
-- Source lives in `src/`. Keep `main.ts` small and focused on plugin lifecycle (loading, unloading, registering commands).
+- **Organize code into multiple files**: Split functionality across separate modules rather than putting everything in the plugin entry point.
+- Source lives in `src/`. Keep `src/main.ts` as a small entry shell; lifecycle code belongs in `src/plugin/CratePlugin.ts` and delegated modules.
 - **Example file structure**:
   ```
   src/
-    main.ts           # Plugin entry point, lifecycle management
-    settings.ts       # Settings interface and defaults
-    commands/         # Command implementations
-      command1.ts
-      command2.ts
-    ui/              # UI components, modals, views
-      modal.ts
-      view.ts
-    utils/           # Utility functions, helpers
-      helpers.ts
-      constants.ts
-    types.ts         # TypeScript interfaces and types
+    main.ts           # Bundle entry shell
+    plugin/           # Plugin lifecycle, settings, device identity
+    sync/             # Sync runtime, planner, transfer, manifest
+    reminders/        # Reminder parsing, storage, UI, commands
+    cloudflare/       # Cloudflare API, deployment, Worker source
+    ui/               # Settings, status, modals, shared UI helpers
   ```
-- **Do not commit build artifacts**: Never commit `node_modules/`, `main.js`, or other generated files to version control.
+- **Do not commit build artifacts**: Never commit `node_modules/`, `dist/`, `.generated/`, root-level release artifacts such as `main.js`, or other generated files to version control.
 - Keep the plugin small. Avoid large dependencies. Prefer browser-compatible packages.
-- Generated output should be placed at the plugin root or `dist/` depending on your build setup. Release artifacts must end up at the top level of the plugin folder in the vault (`main.js`, `manifest.json`, `styles.css`).
+- Generated output is written to `dist/`. Release artifacts must end up at the top level of the plugin folder in the vault (`main.js`, `manifest.json`, `styles.css`).
 
 ## Manifest rules (`manifest.json`)
 
@@ -80,7 +75,7 @@ npm run build
 
 ## Testing
 
-- Manual install for testing: copy `main.js`, `manifest.json`, `styles.css` (if any) to:
+- Manual install for testing: build, then copy `dist/main.js`, `manifest.json`, and `dist/styles.css` (if present) to:
   ```
   <Vault>/.obsidian/plugins/<plugin-id>/
   ```
@@ -131,7 +126,7 @@ Follow Obsidian's **Developer Policies** and **Plugin Guidelines**. In particula
 ## Coding conventions
 
 - TypeScript with `"strict": true` preferred.
-- **Keep `main.ts` minimal**: Focus only on plugin lifecycle (onload, onunload, addCommand calls). Delegate all feature logic to separate modules.
+- **Keep `src/main.ts` minimal**: It should stay as the bundle entry shell. Delegate plugin lifecycle and feature logic to focused modules.
 - **Split large files**: If any file exceeds ~200-300 lines, consider breaking it into smaller, focused modules.
 - **Use clear module boundaries**: Each file should have a single, well-defined responsibility.
 - Bundle everything into `main.js` (no unbundled runtime deps).
@@ -161,23 +156,14 @@ Follow Obsidian's **Developer Policies** and **Plugin Guidelines**. In particula
 
 ### Organize code across multiple files
 
-**main.ts** (minimal, lifecycle only):
+**src/main.ts** (bundle entry shell):
 ```ts
-import { Plugin } from "obsidian";
-import { MySettings, DEFAULT_SETTINGS } from "./settings";
-import { registerCommands } from "./commands";
+import "./styles/main.scss";
 
-export default class MyPlugin extends Plugin {
-  settings: MySettings;
-
-  async onload() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    registerCommands(this);
-  }
-}
+export { default } from "./plugin/CratePlugin";
 ```
 
-**settings.ts**:
+**src/plugin/settings.ts**:
 ```ts
 export interface MySettings {
   enabled: boolean;
@@ -190,7 +176,7 @@ export const DEFAULT_SETTINGS: MySettings = {
 };
 ```
 
-**commands/index.ts**:
+**feature registration module**:
 ```ts
 import { Plugin } from "obsidian";
 import { doSomething } from "./my-command";
