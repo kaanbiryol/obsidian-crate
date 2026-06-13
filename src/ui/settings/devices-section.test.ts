@@ -53,22 +53,22 @@ describe('renderDevicesSection', () => {
 		const listTokens = vi.fn(async () => ({
 			tokens: [
 				{
-					id: 'current-id',
-					device_id: 'device-current',
-					device_name: 'Mac (1234)',
-					platform: 'macos',
-					created_at: '2026-04-18 10:00:00',
-					last_seen_at: '2026-04-18 12:00:00',
-					is_current: true,
-				},
-				{
 					id: 'other-id',
 					device_id: 'device-other',
 					device_name: 'Android device (5678)',
 					platform: 'android',
 					created_at: '2026-04-18 09:00:00',
-					last_seen_at: '2026-04-18 11:00:00',
+					last_seen_at: '2026-04-18 12:00:00',
 					is_current: false,
+				},
+				{
+					id: 'current-id',
+					device_id: 'device-current',
+					device_name: 'Mac (1234)',
+					platform: 'macos',
+					created_at: '2026-04-18 10:00:00',
+					last_seen_at: '2026-04-18 11:00:00',
+					is_current: true,
 				},
 			],
 		}));
@@ -90,6 +90,11 @@ describe('renderDevicesSection', () => {
 		await flushMicrotasks();
 
 		expect(getSettingByName('Connected devices')).toBeTruthy();
+		expect(MockSetting.instances.map((setting) => setting.nameEl.textContent)).toEqual([
+			'Connected devices',
+			'Mac (1234) (Current device)',
+			'Android device (5678)',
+		]);
 		expect(getSettingByName('Mac (1234) (Current device)').buttons).toHaveLength(0);
 		expect(getSettingByName('Android device (5678)').descEl.textContent).toContain('Last seen');
 

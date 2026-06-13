@@ -1,5 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
+import type { RegisteredDevice } from '../../plugin/types';
 import { openConfirmationModal } from '../confirmation-modal';
 import { createSettingsSectionHeading } from './section-helpers';
 
@@ -44,7 +45,7 @@ async function loadDevices(container: HTMLElement, plugin: CratePlugin): Promise
 
 	try {
 		const { tokens } = await apiClient.listTokens();
-		const visibleTokens = tokens.filter(shouldDisplayToken);
+		const visibleTokens = orderDevices(tokens.filter(shouldDisplayToken));
 		if (visibleTokens.length === 0) {
 			container.createEl('p', {
 				text: 'No connected devices found yet.',
@@ -96,20 +97,17 @@ async function loadDevices(container: HTMLElement, plugin: CratePlugin): Promise
 	}
 }
 
-function shouldDisplayToken(token: {
-	device_name: string | null;
-	last_seen_at: string | null;
-}): boolean {
+function orderDevices(tokens: RegisteredDevice[]): RegisteredDevice[] {
+	const currentTokens = tokens.filter((token) => token.is_current);
+	const otherTokens = tokens.filter((token) => !token.is_current);
+	return [...currentTokens, ...otherTokens];
+}
+
+function shouldDisplayToken(token: RegisteredDevice): boolean {
 	return token.device_name !== 'setup-link' || !!token.last_seen_at;
 }
 
-function formatDeviceDescription(token: {
-	device_id: string | null;
-	platform: string | null;
-	created_at: string;
-	last_seen_at: string | null;
-	is_current: boolean;
-}): string {
+function formatDeviceDescription(token: RegisteredDevice): string {
 	const parts: string[] = [];
 
 	if (token.is_current) {
@@ -131,11 +129,7 @@ function formatDeviceDescription(token: {
 	return parts.join(' • ');
 }
 
-function formatDeviceLabel(token: {
-	device_name: string | null;
-	device_id: string | null;
-	is_current: boolean;
-}): string {
+function formatDeviceLabel(token: RegisteredDevice): string {
 	const baseLabel = token.device_name?.trim() || token.device_id?.trim() || 'Unnamed device';
 	return token.is_current ? `${baseLabel} (Current device)` : baseLabel;
 }
