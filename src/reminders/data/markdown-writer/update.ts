@@ -1,6 +1,7 @@
 import type { Reminder } from "@/reminders/types/reminder";
 import { generateContentHash } from "@/reminders/utils/checkboxParser";
 import { rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
+import { calculateFirstOccurrence } from "@/reminders/utils/recurrenceCalculator";
 import {
   buildStoredReminderDates,
   inferHasTimeFromDate,
@@ -11,15 +12,15 @@ import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { IndexedReminder } from "../reminder-index";
 import { findReminderLineNumber } from "./helpers";
 import {
+  appendReminderBlockToContent,
   buildDescriptionBlock,
+  deleteReminderBlockFromContent,
   replaceReminderBlockInContent,
 } from "../../core/markdownReminderFile";
 import type {
   MarkdownWriterContext,
   UpdateReminderInput,
 } from "./types";
-import { createReminderInMarkdown } from "./create";
-import { deleteReminderInMarkdown } from "./delete";
 import {
   markdownWriterLog,
   notifyFileWritten,
@@ -50,19 +51,86 @@ export async function updateReminderInMarkdown(
     const movedDescription = "description" in updates
       ? updates.description
       : reminder.description;
+    const normalizedDescription = movedDescription?.trim() || undefined;
+    const effectiveDueDate = newRecurrence && !newDueDate
+      ? calculateFirstOccurrence(newRecurrence)
+      : newDueDate;
+    const resolvedHasTime = newHasTime ?? inferHasTimeFromDate(effectiveDueDate);
+    const storedDates = buildStoredReminderDates(effectiveDueDate, resolvedHasTime);
 
-    await deleteReminderInMarkdown(context, reminder);
-    await createReminderInMarkdown(
-      context,
-      newProject,
+    const oldFile = await context.getFile(reminder.filePath);
+    if (!oldFile) {
+      throw new Error(`File not found: ${reminder.filePath}`);
+    }
+
+    const oldFileContent = await context.app.vault.read(oldFile);
+    const deletion = deleteReminderBlockFromContent(oldFileContent, reminder);
+    if (!deletion.found) {
+      throw new Error(
+        `Cannot safely locate reminder line in ${reminder.filePath}. The file may have been modified.`,
+      );
+    }
+
+    const newFile = await context.getOrCreateProjectFile(newProject);
+    const newFileContent = await context.app.vault.read(newFile);
+    const newLine = rebuildCheckboxLine(
+      "",
+      reminder.completed,
       newContent,
-      newDueDate,
+      effectiveDueDate,
       newPriority,
+      undefined,
       newRecurrence,
-      newHasTime,
+      resolvedHasTime,
       reminder.id,
-      movedDescription,
     );
+    const movedContent = appendReminderBlockToContent(
+      newFileContent,
+      newLine,
+      normalizedDescription,
+    );
+
+    context.index.applyOptimisticUpdate(reminder.id, {
+      content: newContent,
+      description: normalizedDescription,
+      dueDate: storedDates.dueDate,
+      dueDatetime: storedDates.dueDatetime,
+      priority: newPriority,
+      completed: reminder.completed,
+      project: newProject,
+      recurrence: newRecurrence,
+      filePath: newFile.path,
+      lineNumber: -1,
+      rawLine: newLine,
+    });
+
+    try {
+      await context.app.vault.modify(newFile, movedContent);
+      await notifyFileWritten(context, newFile);
+
+      await context.app.vault.modify(oldFile, deletion.content);
+      await notifyFileWritten(context, oldFile);
+
+      const contentHash = generateContentHash(newContent);
+      const updatedReminder: Reminder & { contentHash: string } = {
+        id: reminder.id,
+        content: newContent,
+        description: normalizedDescription,
+        dueDate: storedDates.dueDate,
+        dueDatetime: storedDates.dueDatetime,
+        priority: newPriority,
+        completed: reminder.completed,
+        project: newProject,
+        recurrence: newRecurrence,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        contentHash,
+      };
+      triggerReminderChange(context, updatedReminder, "update");
+    } catch (error) {
+      context.index.clearOptimistic(reminder.id);
+      throw error;
+    }
     return;
   }
 

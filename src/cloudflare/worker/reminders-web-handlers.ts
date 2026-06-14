@@ -171,9 +171,6 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 			return corsResponse({ error: 'Reminder source file not found' }, 409);
 		}
 
-		const oldContent = deleteReminderFromFileContent(oldFile.content, reminder);
-		await writeCommittedMarkdownFile(env.BUCKET, env.DB!, reminder.filePath, oldContent);
-
 		const newFilePath = getProjectFilePath(workspaceResult.folderPath, nextProject);
 		const newFileContent = await readCommittedMarkdownFile(env.BUCKET, env.DB!, newFilePath)
 			?? getInitialProjectFileContent(nextProject);
@@ -190,9 +187,13 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 			hasTime: Object.prototype.hasOwnProperty.call(update.updates, 'hasTime')
 				? update.updates.hasTime
 				: reminderHasTime(reminder),
+			completed: reminder.completed,
 			reminderId: reminder.id,
 		});
 		await writeCommittedMarkdownFile(env.BUCKET, env.DB!, newFilePath, movedContent);
+
+		const oldContent = deleteReminderFromFileContent(oldFile.content, reminder);
+		await writeCommittedMarkdownFile(env.BUCKET, env.DB!, reminder.filePath, oldContent);
 	} else {
 		const file = workspace.files.get(reminder.filePath);
 		if (!file) {

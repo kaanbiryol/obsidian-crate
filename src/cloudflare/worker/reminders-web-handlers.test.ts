@@ -13,7 +13,12 @@ type StoredObject = {
 	customMetadata?: { hash?: string };
 };
 
-function createBucket(initialEntries: Record<string, string> = {}) {
+function createBucket(
+	initialEntries: Record<string, string> = {},
+	config?: {
+		failPutWhen?: (key: string, content: string) => boolean;
+	},
+) {
 	const store = new Map<string, StoredObject>();
 	for (const [key, value] of Object.entries(initialEntries)) {
 		store.set(key, {
@@ -26,6 +31,10 @@ function createBucket(initialEntries: Record<string, string> = {}) {
 		bucket: {
 			put: vi.fn(async (key: string, body: ArrayBuffer | Uint8Array, options?: StoredObject) => {
 				const normalizedBody = body instanceof Uint8Array ? body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) : body;
+				const content = new TextDecoder().decode(normalizedBody);
+				if (config?.failPutWhen?.(key, content)) {
+					throw new Error('forced put failure');
+				}
 				store.set(key, {
 					body: normalizedBody,
 					httpMetadata: options?.httpMetadata,
@@ -54,7 +63,7 @@ function createBucket(initialEntries: Record<string, string> = {}) {
 	};
 }
 
-function createDb(options?: { files?: Record<string, string | null> }) {
+function createDb(options?: { files?: Record<string, string | null>; committedPaths?: string[] }) {
 	const files = new Map<string, string | null>(Object.entries(options?.files ?? {}));
 	const scheduled = new Map<string, { content: string; project: string | null; dueDatetime: string }>();
 
@@ -129,6 +138,7 @@ function createDb(options?: { files?: Record<string, string | null> }) {
 					const path = getBoundString(statement._args, 0);
 					const storageKey = typeof statement._args[3] === 'string' ? statement._args[3] : null;
 					files.set(path, storageKey);
+					options?.committedPaths?.push(path);
 				}
 				if (statement._sql.includes('DELETE FROM files WHERE path = ?')) {
 					files.delete(getBoundString(statement._args, 0));
@@ -145,9 +155,11 @@ function createDb(options?: { files?: Record<string, string | null> }) {
 function createEnv(input: {
 	bucketEntries: Record<string, string>;
 	files: Record<string, string | null>;
+	failPutWhen?: (key: string, content: string) => boolean;
 }) {
-	const { bucket, store } = createBucket(input.bucketEntries);
-	const { db, files, scheduled } = createDb({ files: input.files });
+	const committedPaths: string[] = [];
+	const { bucket, store } = createBucket(input.bucketEntries, { failPutWhen: input.failPutWhen });
+	const { db, files, scheduled } = createDb({ files: input.files, committedPaths });
 
 	return {
 		env: {
@@ -181,6 +193,7 @@ function createEnv(input: {
 		store,
 		files,
 		scheduled,
+		committedPaths,
 		readCurrentFile(path: string): string | null {
 			const storageKey = files.get(path);
 			const objectKey = storageKey ?? `files/${path}`;
@@ -369,6 +382,67 @@ describe('reminders web handlers', () => {
 		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('Existing task');
 		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('<!-- crate-id:r-existing -->');
 		expect(workspace.readCurrentFile('Reminders/Inbox.md')).not.toContain('every Mon, Wed 10:30');
+	});
+
+	it('moves completed reminders by writing the destination before removing the source', async () => {
+		const workspace = createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [x] Done task Jan 1, 2026 <!-- crate-id:r-done -->\n',
+			},
+			files: {
+				'Reminders/Inbox.md': null,
+			},
+		});
+
+		const response = await handleUpdateReminder(
+			new Request('https://worker.test/reminders/update', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					id: 'r-done',
+					project: 'Personal',
+				}),
+			}),
+			workspace.env as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(workspace.committedPaths).toEqual([
+			'Reminders/Personal.md',
+			'Reminders/Inbox.md',
+		]);
+		expect(workspace.readCurrentFile('Reminders/Inbox.md')).not.toContain('Done task');
+		expect(workspace.readCurrentFile('Reminders/Personal.md')).toContain('- [x] Done task Jan 1, 2026 <!-- crate-id:r-done -->');
+	});
+
+	it('keeps the source reminder when the destination move write fails', async () => {
+		const workspace = createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] Keep task Jan 1, 2026 <!-- crate-id:r-keep -->\n',
+			},
+			files: {
+				'Reminders/Inbox.md': null,
+			},
+			failPutWhen: (_key, content) => content.includes('# Personal') && content.includes('Keep task'),
+		});
+
+		await expect(handleUpdateReminder(
+			new Request('https://worker.test/reminders/update', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					id: 'r-keep',
+					project: 'Personal',
+				}),
+			}),
+			workspace.env as never,
+		)).rejects.toThrow('forced put failure');
+
+		expect(workspace.committedPaths).toEqual([]);
+		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('Keep task');
+		expect(workspace.readCurrentFile('Reminders/Personal.md')).toBeNull();
 	});
 
 	it('reorders active reminders while leaving completed reminders at the bottom', async () => {

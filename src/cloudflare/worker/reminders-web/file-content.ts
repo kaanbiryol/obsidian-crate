@@ -34,6 +34,7 @@ export function createReminderInFileContent(
 		priority: Priority;
 		recurrence?: RecurrenceRule;
 		hasTime?: boolean;
+		completed?: boolean;
 		reminderId: string;
 	},
 ): string {
@@ -46,7 +47,7 @@ export function createReminderInFileContent(
 	const resolvedHasTime = params.hasTime ?? inferHasTimeFromDate(effectiveDueDate);
 	const newLine = rebuildCheckboxLine(
 		'',
-		false,
+		params.completed ?? false,
 		params.content,
 		effectiveDueDate,
 		params.priority,

@@ -13,6 +13,7 @@ function createMockIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex 
     applyOptimisticCreate: vi.fn(),
     applyOptimisticUpdate: vi.fn(),
     applyOptimisticDelete: vi.fn(),
+    clearOptimistic: vi.fn(),
     ...overrides,
   } as unknown as ReminderIndex;
 }
@@ -27,6 +28,7 @@ function makeIndexedReminder(overrides: Partial<IndexedReminder>): IndexedRemind
     completed: overrides.completed ?? false,
     project: overrides.project,
     recurrence: overrides.recurrence,
+    description: overrides.description,
     filePath: overrides.filePath || 'Reminders/Work.md',
     lineNumber: overrides.lineNumber ?? 0,
     rawLine: overrides.rawLine || '- [ ] Task',
@@ -273,6 +275,92 @@ describe('markdownWriter', () => {
 
     expect(oldContent).not.toContain('Task Move');
     expect(newContent).toContain('Task Move');
+  });
+
+  it('moves a completed reminder without resetting its completion state', async () => {
+    const initial = [
+      '# Work',
+      '',
+      '- [x] Task Done Jan 1, 2026 <!-- crate-id:r-done -->',
+      '<!-- crate-desc:done details -->',
+      '',
+    ].join('\n');
+    const { app, files, folders, vault } = createMockAppWithVault({ 'Reminders/Work.md': initial });
+    folders.add('Reminders');
+
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+    const onChange = vi.fn<ReminderChangeCallback>(async () => ({ success: true }));
+    writer.setOnReminderChange(onChange);
+
+    const reminder = makeIndexedReminder({
+      id: 'r-done',
+      content: 'Task Done',
+      completed: true,
+      project: 'Work',
+      filePath: 'Reminders/Work.md',
+      lineNumber: 2,
+      rawLine: '- [x] Task Done Jan 1, 2026 <!-- crate-id:r-done -->',
+      dueDate: '2026-01-01',
+      description: 'done details',
+    });
+
+    await writer.updateReminder(reminder, {
+      project: 'Personal',
+    });
+
+    expect(vault.modify.mock.calls.map(([file]) => file.path)).toEqual([
+      'Reminders/Personal.md',
+      'Reminders/Work.md',
+    ]);
+    expect(files.get('Reminders/Work.md') || '').not.toContain('Task Done');
+    expect(files.get('Reminders/Personal.md') || '').toContain('- [x] Task Done Jan 1, 2026 <!-- crate-id:r-done -->');
+    expect(files.get('Reminders/Personal.md') || '').toContain('crate-desc:');
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'r-done',
+        completed: true,
+        project: 'Personal',
+      }),
+      'update',
+      undefined,
+    );
+  });
+
+  it('leaves the source reminder intact when the destination move write fails', async () => {
+    const initial = '# Work\n\n- [ ] Task Move Jan 1, 2026 <!-- crate-id:r-move-fail -->\n';
+    const { app, files, folders, vault } = createMockAppWithVault({ 'Reminders/Work.md': initial });
+    folders.add('Reminders');
+
+    const clearOptimistic = vi.fn();
+    const index = createMockIndex({ clearOptimistic });
+    const writer = createMarkdownWriter(app, index);
+
+    vault.modify.mockImplementation(async (file: { path: string }, content: string) => {
+      if (file.path === 'Reminders/Personal.md') {
+        throw new Error('destination unavailable');
+      }
+      files.set(file.path, content);
+    });
+
+    const reminder = makeIndexedReminder({
+      id: 'r-move-fail',
+      content: 'Task Move',
+      project: 'Work',
+      filePath: 'Reminders/Work.md',
+      lineNumber: 2,
+      rawLine: '- [ ] Task Move Jan 1, 2026 <!-- crate-id:r-move-fail -->',
+      dueDate: '2026-01-01',
+    });
+
+    await expect(writer.updateReminder(reminder, {
+      project: 'Personal',
+    })).rejects.toThrow('destination unavailable');
+
+    expect(vault.modify.mock.calls.map(([file]) => file.path)).toEqual(['Reminders/Personal.md']);
+    expect(files.get('Reminders/Work.md') || '').toContain('Task Move');
+    expect(files.get('Reminders/Personal.md') || '').not.toContain('Task Move');
+    expect(clearOptimistic).toHaveBeenCalledWith('r-move-fail');
   });
 
   it('deletes the reminder line together with its description block', async () => {
