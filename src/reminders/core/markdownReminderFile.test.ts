@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
 	appendReminderBlockToContent,
+	decodeDescriptionFromMarkdown,
 	deleteReminderBlockFromContent,
+	encodeDescriptionForMarkdown,
 	findReminderLineNumber,
 	replaceReminderBlockInContent,
 	reorderReminderBlocksInContent,
@@ -34,9 +36,20 @@ describe('markdownReminderFile', () => {
 			'# Work',
 			'',
 			'- [ ] Task <!-- crate-id:r1 -->',
-			'<!-- crate-desc:extra details -->',
+			'<!-- crate-desc:v1:extra%20details -->',
 			'',
 		].join('\n'));
+	});
+
+	it('encodes description payloads so comment syntax and newlines round-trip safely', () => {
+		const description = 'line one\nline two --> still text -- ok';
+		const encoded = encodeDescriptionForMarkdown(description);
+
+		expect(encoded).not.toContain('--');
+		expect(encoded).not.toContain('\n');
+		expect(encoded).not.toContain('>');
+		expect(decodeDescriptionFromMarkdown(encoded)).toBe(description);
+		expect(decodeDescriptionFromMarkdown('legacy plain text')).toBe('legacy plain text');
 	});
 
 	it('replaces and deletes reminder blocks together with description lines', () => {
@@ -58,12 +71,12 @@ describe('markdownReminderFile', () => {
 
 		const replacement = replaceReminderBlockInContent(initial, reminder, [
 			'- [ ] Updated Jan 3, 2026 <!-- crate-id:r1 -->',
-			'<!-- crate-desc:new details -->',
+			'<!-- crate-desc:v1:new%20details -->',
 		]);
 		expect(replacement.found).toBe(true);
 		expect(replacement.lineNumber).toBe(2);
 		expect(replacement.content).toContain('Updated Jan 3, 2026');
-		expect(replacement.content).toContain('crate-desc:new details');
+		expect(replacement.content).toContain('crate-desc:v1:new%20details');
 		expect(replacement.content).not.toContain('old details');
 
 		const deletion = deleteReminderBlockFromContent(replacement.content, {
@@ -74,7 +87,7 @@ describe('markdownReminderFile', () => {
 		});
 		expect(deletion.found).toBe(true);
 		expect(deletion.content).not.toContain('Updated Jan 3, 2026');
-		expect(deletion.content).not.toContain('crate-desc:new details');
+		expect(deletion.content).not.toContain('crate-desc:v1:new%20details');
 		expect(deletion.content).toContain('Keep Jan 2, 2026');
 	});
 

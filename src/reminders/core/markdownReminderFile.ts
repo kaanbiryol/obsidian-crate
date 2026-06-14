@@ -22,6 +22,25 @@ export interface FileContentMutationResult {
 	found: boolean;
 }
 
+const DESCRIPTION_ENCODING_PREFIX = "v1:";
+
+export function encodeDescriptionForMarkdown(description: string): string {
+	return `${DESCRIPTION_ENCODING_PREFIX}${encodeURIComponent(description.trim()).replace(/-/g, "%2D")}`;
+}
+
+export function decodeDescriptionFromMarkdown(description: string): string {
+	const trimmed = description.trim();
+	if (!trimmed.startsWith(DESCRIPTION_ENCODING_PREFIX)) {
+		return trimmed;
+	}
+
+	try {
+		return decodeURIComponent(trimmed.slice(DESCRIPTION_ENCODING_PREFIX.length));
+	} catch {
+		return trimmed;
+	}
+}
+
 function recurrenceKey(value: RecurrenceRule | undefined): string {
 	return JSON.stringify(normalizeRecurrenceRule(value) ?? null);
 }
@@ -86,7 +105,7 @@ export function getInitialProjectFileContent(project: string): string {
 
 export function buildDescriptionBlock(description: string | undefined): string[] {
 	if (!description?.trim()) return [];
-	return [`<!-- crate-desc:${description.trim()} -->`];
+	return [`<!-- crate-desc:${encodeDescriptionForMarkdown(description)} -->`];
 }
 
 function countDescriptionBlockLines(

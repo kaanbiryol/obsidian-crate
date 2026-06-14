@@ -72,7 +72,10 @@ export function createStorageCompatMutations({ index, writer }: StorageCompatCon
       const indexed = index.getById(id);
       if (!indexed) return undefined;
 
-      await writer.toggleComplete(indexed);
+      if (!indexed.completed) {
+        await writer.toggleComplete(indexed);
+      }
+
       return {
         ...toReminder(indexed),
         completed: true,
@@ -84,7 +87,10 @@ export function createStorageCompatMutations({ index, writer }: StorageCompatCon
       const indexed = index.getById(id);
       if (!indexed) return undefined;
 
-      await writer.toggleComplete(indexed);
+      if (indexed.completed) {
+        await writer.toggleComplete(indexed);
+      }
+
       return {
         ...toReminder(indexed),
         completed: false,

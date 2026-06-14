@@ -2,6 +2,7 @@ import { parseCheckboxLine, generateContentHash } from "@/reminders/utils/checkb
 import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
+import { decodeDescriptionFromMarkdown } from "./markdownReminderFile";
 
 interface ScannedReminderRecord {
   id: string;
@@ -80,7 +81,7 @@ export function scanReminderMarkdownContent(
         }
         endIndex++;
       }
-      description = descContent.trim() || undefined;
+      description = decodeDescriptionFromMarkdown(descContent) || undefined;
     }
 
     reminders.push({

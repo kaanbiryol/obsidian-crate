@@ -253,6 +253,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string): Remi
 
     clearOptimistic(id: string) {
       optimisticState.clear(id);
+      notifyListeners();
     },
   };
 }

@@ -46,4 +46,21 @@ describe('markdownScan', () => {
 			lineNumber: 5,
 		});
 	});
+
+	it('decodes encoded description blocks while preserving legacy plain blocks', () => {
+		const result = scanReminderMarkdownContent(
+			'Reminders/Work.md',
+			[
+				'- [ ] Encoded <!-- crate-id:r1 -->',
+				'<!-- crate-desc:v1:line%20one%0Aline%20two%20%2D%2D%3E%20safe -->',
+				'- [ ] Legacy <!-- crate-id:r2 -->',
+				'<!-- crate-desc:plain legacy -->',
+			].join('\n'),
+			'Reminders',
+		);
+
+		expect(result.reminders).toHaveLength(2);
+		expect(result.reminders[0]?.description).toBe('line one\nline two --> safe');
+		expect(result.reminders[1]?.description).toBe('plain legacy');
+	});
 });

@@ -198,6 +198,29 @@ describe('reminderIndex', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it('notifies listeners when optimistic state is cleared', async () => {
+    vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+      reminders: [makeReminder({ id: 'r1', content: 'Original task', project: 'Work' })],
+      filesScanned: 1,
+      totalLines: 1,
+      scanDurationMs: 5,
+      discoveredProjects: ['Work'],
+    });
+
+    const index = createReminderIndex(app, 'Reminders');
+    const listener = vi.fn();
+    index.onIndexChange(listener);
+    await index.load();
+    listener.mockClear();
+
+    index.applyOptimisticUpdate('r1', { content: 'Optimistic task' });
+    listener.mockClear();
+    index.clearOptimistic('r1');
+
+    expect(index.getById('r1')?.content).toBe('Original task');
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it('rescans after debounce window elapses', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));

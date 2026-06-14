@@ -246,7 +246,7 @@ describe('storageCompat.update and today view', () => {
 	});
 
 	it('routes delete, toggle, reorder, and stats to the underlying services', async () => {
-		const indexedReminder: IndexedReminder = {
+		let indexedReminder: IndexedReminder = {
 			id: 'r1',
 			content: 'Task A',
 			priority: 1,
@@ -273,6 +273,7 @@ describe('storageCompat.update and today view', () => {
 		expect(completed?.completed).toBe(true);
 		expect(completed?.completedAt).toEqual(expect.any(String));
 
+		indexedReminder = { ...indexedReminder, completed: true };
 		const uncompleted = await storage.uncomplete('r1');
 		expect(spies.toggleComplete).toHaveBeenNthCalledWith(2, indexedReminder);
 		expect(uncompleted?.completed).toBe(false);
@@ -286,5 +287,34 @@ describe('storageCompat.update and today view', () => {
 			completedCount: 1,
 			totalCount: 2,
 		});
+	});
+
+	it('does not toggle reminders that are already in the requested completion state', async () => {
+		let indexedReminder: IndexedReminder = {
+			id: 'r1',
+			content: 'Task A',
+			priority: 1,
+			completed: true,
+			project: 'Work',
+			filePath: 'Reminders/Work.md',
+			lineNumber: 2,
+			rawLine: '- [x] Task A',
+			contentHash: 'hash',
+		};
+		const index = createIndex({
+			getById: (id: string) => id === 'r1' ? indexedReminder : undefined,
+		});
+		const { writer, spies } = createWriter();
+		const storage = createStorageCompat(index, writer);
+
+		const completed = await storage.complete('r1');
+		expect(completed?.completed).toBe(true);
+		expect(spies.toggleComplete).not.toHaveBeenCalled();
+
+		indexedReminder = { ...indexedReminder, completed: false, rawLine: '- [ ] Task A' };
+		const uncompleted = await storage.uncomplete('r1');
+
+		expect(uncompleted?.completed).toBe(false);
+		expect(spies.toggleComplete).not.toHaveBeenCalled();
 	});
 });
