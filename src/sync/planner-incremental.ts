@@ -2,6 +2,7 @@ import { createConflictCopy } from "./conflict";
 import { computeHash } from "./hasher";
 import { isHiddenPath } from "./file-discovery";
 import { deleteRemotePathLocally, isVaultTFileLike } from "./planner-helpers";
+import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
 import { createEmptySyncResult, finalizeSyncResult } from "./sync-result";
 import { createLogger, errorMessage } from "../plugin/logger";
@@ -238,7 +239,7 @@ export async function runIncrementalSync(
     );
     return result;
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (isAbortError(error)) {
       throw error;
     }
 

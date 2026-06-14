@@ -158,6 +158,12 @@ function toArrayBuffer(text: string): ArrayBuffer {
 	return new TextEncoder().encode(text).buffer as ArrayBuffer;
 }
 
+function createNamedAbortError(message = 'Sync request aborted'): Error {
+	const error = new Error(message);
+	error.name = 'AbortError';
+	return error;
+}
+
 async function flushMicrotasks(): Promise<void> {
 	await Promise.resolve();
 	await Promise.resolve();
@@ -519,6 +525,7 @@ describe('SyncEngine full sync safeguards', () => {
 		expect(result.errors).toContain('notes/big.bin: Skipped remote file larger than 25MB');
 		expect(harness.settings.lastSeq).toBe(5);
 	});
+
 });
 
 describe('SyncEngine slice 5 safeguards', () => {
@@ -713,6 +720,34 @@ describe('SyncEngine abort-on-destroy', () => {
 		expect(harness.engine.getState().status).not.toBe('error');
 	});
 
+	it('treats non-DOM AbortError objects as clean incremental aborts', async () => {
+		const harness = createHarness({ lastSeq: 5 });
+		harness.api.getChanges.mockResolvedValue({
+			changes: [
+				{
+					seq: 8,
+					path: 'notes/remote.md',
+					action: 'put',
+					hash: 'remote-hash',
+					size: 10,
+					created_at: '2026-02-06T12:00:00.000Z',
+				},
+			],
+			lastSeq: 8,
+			hasMore: false,
+		});
+		harness.vault.getFiles.mockReturnValue([]);
+		harness.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
+		harness.vault.getAbstractFileByPath.mockReturnValue(null);
+		harness.api.batchDownload.mockRejectedValue(createNamedAbortError());
+
+		const result = await harness.engine.sync();
+
+		expect(result.errors).toHaveLength(0);
+		expect(harness.settings.lastSeq).toBe(5);
+		expect(harness.engine.getState().status).not.toBe('error');
+	});
+
 	it('aborts in-flight sync when destroyed and does not set error state', async () => {
 		const harness = createHarness({ lastSeq: 0 });
 		// Make incremental sync fall through to full sync
@@ -732,7 +767,7 @@ describe('SyncEngine abort-on-destroy', () => {
 		// Destroy mid-flight - this aborts the controller
 		harness.engine.destroy();
 		// Simulate the fetch abort that would happen
-		rejectManifest(new DOMException('The operation was aborted', 'AbortError'));
+		rejectManifest(createNamedAbortError('The operation was aborted'));
 
 		const result = await syncPromise;
 

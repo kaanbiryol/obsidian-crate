@@ -94,6 +94,22 @@ describe('SyncApiClient', () => {
 		expect(request.headers?.Authorization).toBe('Bearer new-token');
 	});
 
+	it('rejects in-flight requests with an AbortError when the sync signal aborts', async () => {
+		const pendingResponse = new Promise<RequestUrlResponse>(() => {}) as ReturnType<typeof obsidian.requestUrl>;
+		vi.spyOn(obsidian, 'requestUrl').mockReturnValue(pendingResponse);
+		const controller = new AbortController();
+		const client = new SyncApiClient('https://worker.example', 'token');
+		client.setAbortSignal(controller.signal);
+
+		const request = client.health();
+		controller.abort();
+
+		await expect(request).rejects.toMatchObject({
+			name: 'AbortError',
+			message: 'Sync request aborted',
+		});
+	});
+
 	it('returns user-friendly testConnection failure details', async () => {
 		vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
 			createRequestUrlResponse({

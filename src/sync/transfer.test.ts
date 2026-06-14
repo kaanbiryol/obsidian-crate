@@ -90,6 +90,12 @@ function emptyResult(): SyncResult {
 	};
 }
 
+function createNamedAbortError(message = 'Sync request aborted'): Error {
+	const error = new Error(message);
+	error.name = 'AbortError';
+	return error;
+}
+
 describe('transfer prepare helpers', () => {
 	it('skips oversized files', async () => {
 		const harness = createTransferHarness();
@@ -297,6 +303,19 @@ describe('transfer download/process helpers', () => {
 
 		expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md');
 		expect(result.downloaded).toBe(1);
+	});
+
+	it('propagates non-DOM AbortError batch download failures without fallback', async () => {
+		const harness = createTransferHarness();
+		harness.api.batchDownload.mockRejectedValue(createNamedAbortError());
+
+		const result = emptyResult();
+		await expect(
+			parallelDownloadAndSaveFiles(harness.context, ['aborted.md'], result, 5),
+		).rejects.toMatchObject({ name: 'AbortError' });
+
+		expect(harness.api.downloadFile).not.toHaveBeenCalled();
+		expect(result.errors).toEqual([]);
 	});
 });
 

@@ -153,19 +153,13 @@ export async function runSyncWorkflow(
 			progressCallback?.(current, total);
 		}
 
-		for (const [path, entry] of Object.entries(localFiles)) {
-			context.setLocalManifestEntry(path, entry);
+		if (result.errors.length === 0) {
+			for (const [path, entry] of Object.entries(localFiles)) {
+				context.setLocalManifestEntry(path, entry);
+			}
 		}
 		await context.saveLocalManifest();
 
-		const lastSync = new Date().toISOString();
-		context.updateState({
-			status: 'idle',
-			lastSync,
-			lastError: result.errors.length > 0 ? result.errors[0] ?? null : null,
-			conflictCount: result.conflicts.length,
-		});
-		context.setLastSync(lastSync);
 		if (
 			result.errors.length === 0
 			&& remoteManifest.lastSeq !== undefined
@@ -173,6 +167,10 @@ export async function runSyncWorkflow(
 		) {
 			context.setLastSeq(remoteManifest.lastSeq);
 		}
+		completeWorkflowResult(context, result, {
+			errorFallback: 'Full sync completed with errors',
+			conflictCount: result.conflicts.length,
+		});
 
 		logger.info(
 			`Full sync completed: ${result.uploaded} up, ${result.downloaded} down, ${result.merged} merged, ${result.conflicts.length} conflicts`,

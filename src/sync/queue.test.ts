@@ -143,6 +143,12 @@ function createSyncResult(overrides: Partial<SyncResult> = {}): SyncResult {
 	};
 }
 
+function createNamedAbortError(message = 'Sync request aborted'): Error {
+	const error = new Error(message);
+	error.name = 'AbortError';
+	return error;
+}
+
 describe('queue event handlers', () => {
 	it('queues file changes for syncable paths', () => {
 		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
@@ -456,6 +462,29 @@ describe('processPendingChanges', () => {
 		expect(harness.state.lastError).toContain('quota exceeded');
 		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not requeue or mark error when an in-flight queue upload aborts', async () => {
+		const harness = createFlushHarness({
+			prepareUploadFromPath: async path => ({
+				path,
+				content: new TextEncoder().encode('hello').buffer as ArrayBuffer,
+				hash: 'abc123',
+				size: 5,
+				mtime: 1,
+				contentType: 'text/plain',
+			}),
+			uploadFile: async () => {
+				throw createNamedAbortError();
+			},
+		});
+		harness.pendingPaths.add('notes/a.md');
+
+		await processPendingChanges(harness.context, 4);
+
+		expect(harness.state.status).not.toBe('error');
+		expect(harness.pendingPaths.has('notes/a.md')).toBe(false);
+		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 	});
 
 	it('keeps successful deletes committed and requeues only failed remote deletes', async () => {

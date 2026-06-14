@@ -8,6 +8,7 @@ import { LocalManifest } from './manifest';
 import { MarkdownBaseCache } from './markdown-base-cache';
 import type { VaultFile } from './file-discovery';
 import { SyncQueueController } from './queue-controller';
+import { isAbortError as isSyncAbortError } from './abort';
 import {
 	getLocalChanges as planLocalChanges,
 	getLocalDeletes as planLocalDeletes,
@@ -213,7 +214,7 @@ export class SyncEngine {
 	}
 
 	private isAbortError(error: unknown): boolean {
-		return error instanceof DOMException && error.name === 'AbortError';
+		return isSyncAbortError(error);
 	}
 
 	private getTransferContext() {

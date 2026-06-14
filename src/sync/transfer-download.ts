@@ -2,6 +2,7 @@ import { base64ToArrayBuffer } from "./encoding";
 import { isHiddenPath } from "./file-discovery";
 import { computeHash } from "./hasher";
 import { isMarkdownPath } from "./markdown-base-cache";
+import { isAbortError } from "./abort";
 import type { SyncResult } from "../plugin/types";
 import { BATCH_MAX_FILES, MAX_FILE_SIZE_BYTES } from "../plugin/types";
 import { createLogger, errorMessage } from "../plugin/logger";
@@ -119,7 +120,7 @@ export async function parallelDownloadAndSaveFiles(
           }
         }
       } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
+        if (isAbortError(error)) {
           throw error;
         }
 

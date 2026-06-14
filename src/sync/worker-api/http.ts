@@ -1,5 +1,6 @@
 import { requestUrl, type RequestUrlParam, type RequestUrlResponse } from 'obsidian';
 import { createLogger, errorMessage } from '../../plugin/logger';
+import { createAbortError } from '../abort';
 import { normalizeWorkerUrl } from '../worker-url';
 
 const logger = createLogger('ApiClient');
@@ -103,16 +104,12 @@ export class WorkerApiHttpClient {
 		const abortPromise = externalSignal
 			? new Promise<never>((_, reject) => {
 				if (externalSignal.aborted) {
-					const error = new Error('Sync request aborted');
-					error.name = 'AbortError';
-					reject(error);
+					reject(createAbortError('Sync request aborted'));
 					return;
 				}
 
 				onAbort = () => {
-					const error = new Error('Sync request aborted');
-					error.name = 'AbortError';
-					reject(error);
+					reject(createAbortError('Sync request aborted'));
 				};
 				externalSignal.addEventListener('abort', onAbort, { once: true });
 			})

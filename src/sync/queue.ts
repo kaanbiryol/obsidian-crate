@@ -2,6 +2,7 @@ import type { TAbstractFile, Vault } from 'obsidian';
 import { TFolder } from 'obsidian';
 import { createLogger, errorMessage } from '../plugin/logger';
 import { isMarkdownPath } from './markdown-base-cache';
+import { isAbortError } from './abort';
 import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
 
 const logger = createLogger('SyncQueue');
@@ -284,7 +285,7 @@ export async function processPendingChanges(
 			pendingChanges: context.pendingPaths.size,
 		});
 	} catch (error) {
-		if (error instanceof DOMException && error.name === 'AbortError') {
+		if (isAbortError(error)) {
 			logger.info('Queue processing aborted');
 		} else {
 			for (const path of paths) {
