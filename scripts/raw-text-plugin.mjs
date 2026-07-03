@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { compile } from 'sass';
 
 export function rawTextPlugin() {
 	return {
@@ -11,7 +12,9 @@ export function rawTextPlugin() {
 			}));
 
 			build.onLoad({ filter: /.*/, namespace: 'raw-text' }, (args) => ({
-				contents: readFileSync(args.path, 'utf-8'),
+				contents: args.path.endsWith('.scss')
+					? compile(args.path).css
+					: readFileSync(args.path, 'utf-8'),
 				loader: 'text',
 			}));
 		},

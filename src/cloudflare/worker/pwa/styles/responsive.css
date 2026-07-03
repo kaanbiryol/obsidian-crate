@@ -102,3 +102,5 @@
 	.bottom-tabs{padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
 	.fab{right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:56px;height:56px;min-width:56px}
 }
+
+.pwa-reminders-view.is-fullscreen .animated-tab-bar-bottom{position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none}
