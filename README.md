@@ -72,7 +72,7 @@ Build artifacts are written to `dist/`:
 Copy `dist/main.js`, `manifest.json`, and `dist/styles.css` into:
 
 ```text
-<Vault>/.obsidian/plugins/obsidian-crate/
+<Vault>/.obsidian/plugins/crate/
 ```
 
 Then reload Obsidian and enable **Crate** in **Settings -> Community plugins**.

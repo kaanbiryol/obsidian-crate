@@ -3,7 +3,7 @@ import type { App, PluginManifest } from 'obsidian';
 import { LocalManifest } from './manifest';
 
 const CONFIG_DIR = '.vault-config';
-const PLUGIN_DIR = `${CONFIG_DIR}/plugins/obsidian-crate`;
+const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
 
 type MockAdapter = {
 	exists: ReturnType<typeof vi.fn<(path: string) => Promise<boolean>>>;

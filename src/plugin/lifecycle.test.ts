@@ -91,7 +91,7 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 			},
 		},
 		manifest: {
-			id: 'obsidian-crate',
+			id: 'crate',
 		},
 		loadSettings: vi.fn(async () => {}),
 		addSettingTab: vi.fn(),

@@ -4,9 +4,9 @@ import { matchIgnorePattern, shouldIgnoreSyncPath } from './engine-ignore';
 function createIgnoreContext(ignorePatterns: string[] = []) {
 	return {
 		pluginIgnorePaths: new Set([
-			'.vault-config/plugins/obsidian-crate/data.json',
-			'.vault-config/plugins/obsidian-crate/file-manifest.json',
-			'.vault-config/plugins/obsidian-crate/reminders-settings.json',
+			'.vault-config/plugins/crate/data.json',
+			'.vault-config/plugins/crate/file-manifest.json',
+			'.vault-config/plugins/crate/reminders-settings.json',
 		]),
 		ignoredDirPrefixes: ignorePatterns.filter(pattern => pattern.endsWith('/')),
 		ignorePatterns,
@@ -44,10 +44,10 @@ describe('shouldIgnoreSyncPath', () => {
 	it('ignores plugin state files but not other plugin files', () => {
 		const context = createIgnoreContext();
 
-		expect(shouldIgnoreSyncPath('.vault-config/plugins/obsidian-crate/data.json', context)).toBe(true);
-		expect(shouldIgnoreSyncPath('.vault-config/plugins/obsidian-crate/file-manifest.json', context)).toBe(true);
-		expect(shouldIgnoreSyncPath('.vault-config/plugins/obsidian-crate/reminders-settings.json', context)).toBe(true);
-		expect(shouldIgnoreSyncPath('.vault-config/plugins/obsidian-crate/main.js', context)).toBe(false);
+		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/data.json', context)).toBe(true);
+		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/file-manifest.json', context)).toBe(true);
+		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/reminders-settings.json', context)).toBe(true);
+		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/main.js', context)).toBe(false);
 	});
 
 	it('ignores conflict files and configured filename patterns', () => {

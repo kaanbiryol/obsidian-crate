@@ -6,7 +6,7 @@ import type { CrateSettings, FileManifest, PreparedUpload, SyncResult, UploadRes
 import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
 
 const CONFIG_DIR = '.vault-config';
-const PLUGIN_DIR = `${CONFIG_DIR}/plugins/obsidian-crate`;
+const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
 const CONFIG_PLUGINS_DIR = `${CONFIG_DIR}/plugins`;
 const TRACKED_PLUGIN_MAIN_PATH = `${CONFIG_DIR}/plugins/foo/main.js`;
 

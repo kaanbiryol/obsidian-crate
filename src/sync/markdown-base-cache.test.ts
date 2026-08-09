@@ -3,7 +3,7 @@ import { computeHash } from './hasher';
 import { MarkdownBaseCache } from './markdown-base-cache';
 import type { FileEntry } from '../plugin/types';
 
-const PLUGIN_DIR = '.vault-config/plugins/obsidian-crate';
+const PLUGIN_DIR = '.vault-config/plugins/crate';
 
 function toArrayBuffer(text: string): ArrayBuffer {
 	return new TextEncoder().encode(text).buffer as ArrayBuffer;

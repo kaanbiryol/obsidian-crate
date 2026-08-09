@@ -11,7 +11,7 @@ import {
 import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, SECRET_KEYS, type CrateSettings, type SyncResult, type SyncState } from '../plugin/types';
 
 const CONFIG_DIR = '.vault-config';
-const PLUGIN_DIR = `${CONFIG_DIR}/plugins/obsidian-crate`;
+const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
 
 type Deferred<T> = {
 	promise: Promise<T>;
