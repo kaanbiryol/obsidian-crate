@@ -131,6 +131,19 @@ Run the dev watcher:
 npm run dev
 ```
 
+Each successful development build is also installed into
+`test-vault/.obsidian/plugins/crate/`. Open `test-vault` as an Obsidian vault,
+enable **Crate** in **Settings → Community plugins**, and reload the plugin after
+changes. The installer only replaces `main.js`, `manifest.json`, and `styles.css`,
+so local plugin settings are preserved.
+
+Set `OBSIDIAN_TEST_VAULT` to use another development vault without changing the
+production deploy configuration:
+
+```bash
+OBSIDIAN_TEST_VAULT=/path/to/vault npm run dev
+```
+
 Run tests:
 
 ```bash

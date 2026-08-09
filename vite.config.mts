@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 import { resolve } from "node:path";
 import { builtinModules } from "node:module";
 import { existsSync, readFileSync } from "node:fs";
+import { testVaultDeployPlugin } from "./scripts/test-vault-vite-plugin.mjs";
 
 function readGeneratedWorkerScript() {
 	const generatedPath = resolve(__dirname, ".generated/cloudflare/worker-script.json");
@@ -15,7 +16,7 @@ function readGeneratedWorkerScript() {
 	return typeof payload.script === "string" ? payload.script : "";
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
 	define: {
 		__CRATE_WORKER_SCRIPT__: JSON.stringify(readGeneratedWorkerScript()),
 	},
@@ -25,6 +26,7 @@ export default defineConfig({
 			"process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
 			preventAssignment: true,
 		}),
+		...(mode === "development" ? [testVaultDeployPlugin({ rootDir: __dirname })] : []),
 	],
 	build: {
 		minify: true,
@@ -78,4 +80,4 @@ export default defineConfig({
 			"react/jsx-runtime": "preact/jsx-runtime",
 		},
 	},
-});
+}));
