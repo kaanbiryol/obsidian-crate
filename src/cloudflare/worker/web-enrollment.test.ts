@@ -31,9 +31,13 @@ function createDb(initialTokens?: Record<string, number>) {
 					return {};
 				}),
 				first: vi.fn(async () => {
-					if (sql.includes('SELECT expires_at FROM web_enrollment_tokens WHERE token_hash = ?')) {
-						const expiresAt = tokens.get(String(boundArgs[0]));
-						return expiresAt === undefined ? null : { expires_at: expiresAt };
+					if (sql.includes('DELETE FROM web_enrollment_tokens') && sql.includes('RETURNING expires_at')) {
+						const tokenHash = String(boundArgs[0]);
+						const now = Number(boundArgs[1]);
+						const expiresAt = tokens.get(tokenHash);
+						if (expiresAt === undefined || expiresAt <= now) return null;
+						tokens.delete(tokenHash);
+						return { expires_at: expiresAt };
 					}
 					return null;
 				}),
@@ -58,6 +62,22 @@ describe('web enrollment tokens', () => {
 		expect(tokens.size).toBe(1);
 		await expect(consumeWebEnrollmentToken(db as never, issued.token)).resolves.toBe(true);
 		await expect(consumeWebEnrollmentToken(db as never, issued.token)).resolves.toBe(false);
+		expect(tokens.size).toBe(0);
+	});
+
+	it('allows only one concurrent exchange to consume a token', async () => {
+		const issuedToken = 'concurrent-web-token';
+		const tokenHash = await sha256Hex(issuedToken);
+		const { db, tokens } = createDb({
+			[tokenHash]: Date.now() + 60_000,
+		});
+
+		const results = await Promise.all([
+			consumeWebEnrollmentToken(db as never, issuedToken),
+			consumeWebEnrollmentToken(db as never, issuedToken),
+		]);
+
+		expect(results.filter(Boolean)).toHaveLength(1);
 		expect(tokens.size).toBe(0);
 	});
 

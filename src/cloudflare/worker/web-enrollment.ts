@@ -49,17 +49,11 @@ export async function consumeWebEnrollmentToken(
 	}
 
 	const tokenHash = await sha256Hex(trimmedToken);
-	const row = await db.prepare('SELECT expires_at FROM web_enrollment_tokens WHERE token_hash = ?')
-		.bind(tokenHash)
+	const row = await db.prepare(`DELETE FROM web_enrollment_tokens
+		WHERE token_hash = ? AND expires_at > ?
+		RETURNING expires_at`)
+		.bind(tokenHash, Date.now())
 		.first<{ expires_at: number }>();
 
-	if (!row) {
-		return false;
-	}
-
-	await db.prepare('DELETE FROM web_enrollment_tokens WHERE token_hash = ?')
-		.bind(tokenHash)
-		.run();
-
-	return Number.isFinite(row.expires_at) && row.expires_at > Date.now();
+	return row !== null && Number.isFinite(row.expires_at);
 }
