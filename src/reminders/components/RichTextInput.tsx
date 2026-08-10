@@ -33,6 +33,7 @@ interface RichTextInputProps {
     className?: string;
     style?: React.CSSProperties;
     autoFocus?: boolean;
+    readOnly?: boolean;
     /** Preserve cursor position when value is updated externally */
     preserveSelection?: boolean;
     /** Known project names for multi-word project highlighting */
@@ -54,6 +55,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     className,
     style,
     autoFocus = false,
+    readOnly = false,
     preserveSelection = true,
     knownProjects,
     onAutocompleteQuery,
@@ -115,7 +117,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
     // Handle input changes
     const handleInput = () => {
-        if (!actualRef.current) return;
+        if (readOnly || !actualRef.current) return;
 
         const cursorPos = saveCursorPosition(actualRef.current);
         const plainText = getPlainText(actualRef.current);
@@ -239,7 +241,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         >
             <div
                 ref={refCallback}
-                contentEditable
+                contentEditable={!readOnly}
                 inputMode="text"
                 autoFocus={autoFocus}
                 onInput={handleInput}

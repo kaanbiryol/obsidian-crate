@@ -76,7 +76,6 @@ export function useReminderMutations({
 		setReminders((current) => isEdit
 			? current.map((reminder) => reminder.id === optimisticId ? applyOptimisticReminderUpdate(reminder, body) : reminder)
 			: [...current, optimisticReminder]);
-		closeModal();
 		try {
 			const path = isEdit ? '/reminders/update' : '/reminders/create';
 			const requestBody: Record<string, unknown> = { ...body };
@@ -89,12 +88,14 @@ export function useReminderMutations({
 			if (!response.ok) throw new Error(await response.text());
 			const result = await response.json() as { notificationWarning?: string };
 			await loadReminders({ silent: true });
+			closeModal();
 			showToast(result.notificationWarning ? 'info' : 'success', result.notificationWarning
 				? `Saved. Notification sync failed: ${result.notificationWarning}`
 				: 'Reminder saved');
 		} catch (saveError) {
 			setReminders(previousReminders);
 			setProjects(previousProjects);
+			setSaving(false);
 			showToast('error', saveError instanceof Error ? saveError.message : String(saveError));
 		}
 	}, [apiFetch, buildMutationBody, closeModal, ensureCanMutate, loadReminders, projectsRef, remindersRef, setProjects, setReminders, setSaving, showToast]);

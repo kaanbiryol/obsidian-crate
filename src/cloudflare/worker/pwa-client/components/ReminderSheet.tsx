@@ -54,6 +54,7 @@ export function ReminderSheet({
 	const canSubmit = !saving && Boolean(draft.content.trim());
 
 	useLayoutEffect(() => {
+		if (saving) return;
 		const initialContent = draft.content.trim();
 		const focusTitle = () => {
 			const element = richTextInputRef.current?.getElement();
@@ -72,7 +73,7 @@ export function ReminderSheet({
 			window.cancelAnimationFrame(frame);
 			for (const timer of timers) window.clearTimeout(timer);
 		};
-	}, [draft.content, modal.mode, modal.reminderId]);
+	}, [draft.content, modal.mode, modal.reminderId, saving]);
 
 	useEffect(() => () => {
 		if (switchTimerRef.current !== null) window.clearTimeout(switchTimerRef.current);
@@ -151,6 +152,7 @@ export function ReminderSheet({
 
 	return (
 		<div className="modal-backdrop pwa-reminder-editor-backdrop" onClick={(event) => {
+			if (saving) return;
 			if (event.target !== event.currentTarget) return;
 			if (draft.activePicker) returnToEditor();
 			else onClose();
@@ -165,9 +167,10 @@ export function ReminderSheet({
 					onClose={() => returnToEditor()}
 				/>
 			) : (
-				<div className={`modal-card pwa-reminder-editor${pendingPicker ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+				<div className={`modal-card pwa-reminder-editor${pendingPicker ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label={title} aria-busy={saving}>
 					<form className="modal-form" onSubmit={(event) => {
 						event.preventDefault();
+						if (saving) return;
 						onSave({ ...modal, draft: draftFromForm(event.currentTarget) });
 					}}>
 						<div className="pwa-editor-header">
@@ -179,6 +182,7 @@ export function ReminderSheet({
 										type="button"
 										data-action="toggle-delete-confirm"
 										aria-label="Delete reminder"
+										isDisabled={saving}
 										onClick={() => patchDraft({ deleteConfirm: !draft.deleteConfirm, activePicker: null })}
 									>
 										<Trash2 size={20} />
@@ -189,6 +193,7 @@ export function ReminderSheet({
 										className="pwa-editor-icon-button pwa-editor-icon-button--muted"
 										type="button"
 										aria-label="Close modal"
+										isDisabled={saving}
 										onClick={onClose}
 									>
 										<X size={20} />
@@ -217,6 +222,7 @@ export function ReminderSheet({
 								value={draft.content}
 								onChange={(content) => patchDraft({ content })}
 								placeholder={isEditing ? 'Edit your reminder...' : 'What do you need to remember?'}
+								readOnly={saving}
 								inputRef={contentRef}
 								preserveSelection={!pendingPicker && !returningToEditor}
 								knownProjects={projectOptions}
@@ -224,7 +230,7 @@ export function ReminderSheet({
 								onAutocompleteKeyDown={autocomplete.handleKeyDown}
 								className="pwa-editor-title-input pwa-editor-title-rich-input ios-scroll"
 							/>
-							{autocomplete.isOpen && (
+							{!saving && autocomplete.isOpen && (
 								<ProjectAutocompleteDropdown
 									filteredProjects={autocomplete.filteredProjects}
 									highlightedIndex={autocomplete.highlightedIndex}
@@ -242,6 +248,7 @@ export function ReminderSheet({
 								maxLength={4096}
 								placeholder="Add description..."
 								value={draft.description}
+								disabled={saving}
 								onChange={(event) => patchDraft({ description: event.currentTarget.value })}
 							/>
 						</div>
@@ -252,7 +259,7 @@ export function ReminderSheet({
 								type="button"
 								data-action="toggle-picker"
 								data-picker="date"
-								isDisabled={Boolean(pendingPicker)}
+								isDisabled={saving || Boolean(pendingPicker)}
 								onClick={() => togglePicker('date')}
 							>
 								<Calendar size={16} />
@@ -263,7 +270,7 @@ export function ReminderSheet({
 								type="button"
 								data-action="toggle-picker"
 								data-picker="project"
-								isDisabled={Boolean(pendingPicker)}
+								isDisabled={saving || Boolean(pendingPicker)}
 								onClick={() => togglePicker('project')}
 							>
 								<Hash size={16} />
@@ -275,6 +282,7 @@ export function ReminderSheet({
 								type="button"
 								data-action="toggle-priority"
 								aria-label="Toggle priority"
+								isDisabled={saving}
 								onClick={() => patchDraft({
 									...applyReminderTextUpdate(draft, projectOptions, { priority: draft.priority === 1 ? 4 : 1 }),
 									activePicker: null,
@@ -288,7 +296,7 @@ export function ReminderSheet({
 								type="button"
 								data-action="toggle-picker"
 								data-picker="recurrence"
-								isDisabled={Boolean(pendingPicker)}
+								isDisabled={saving || Boolean(pendingPicker)}
 								aria-label={draft.recurrence ? formatRecurrence(draft.recurrence) : 'Recurrence'}
 								onClick={() => togglePicker('recurrence')}
 							>
@@ -303,8 +311,8 @@ export function ReminderSheet({
 									<p>This removes it from the original markdown file and cancels its scheduled notification.</p>
 								</div>
 								<div className="delete-confirm__actions">
-									<Button className="secondary-button" type="button" onClick={() => patchDraft({ deleteConfirm: false })}>Keep it</Button>
-									<Button className="secondary-button is-danger" type="button" data-action="delete-reminder" onClick={() => modal.reminderId && onDelete(modal.reminderId)}>Delete</Button>
+									<Button className="secondary-button" type="button" isDisabled={saving} onClick={() => patchDraft({ deleteConfirm: false })}>Keep it</Button>
+									<Button className="secondary-button is-danger" type="button" data-action="delete-reminder" isDisabled={saving} onClick={() => modal.reminderId && onDelete(modal.reminderId)}>Delete</Button>
 								</div>
 							</div>
 						)}
