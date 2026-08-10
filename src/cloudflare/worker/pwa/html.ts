@@ -8,7 +8,7 @@ export function createPwaHtml(requestUrl?: string): string {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crate">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -26,16 +26,6 @@ ${PWA_STYLES}
 </head>
 	<body>
 	<div id="app"></div>
-	<script>
-	(function() {
-		var blockZoom = function(event) {
-			event.preventDefault();
-		};
-		document.addEventListener('gesturestart', blockZoom, { passive: false });
-		document.addEventListener('gesturechange', blockZoom, { passive: false });
-		document.addEventListener('gestureend', blockZoom, { passive: false });
-	})();
-	</script>
 	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
 	</body>
 	</html>`;

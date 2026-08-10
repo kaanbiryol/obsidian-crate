@@ -114,9 +114,18 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
       // Handle card clicks (edit)
       handleEdit();
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.target !== wrapper || (event.key !== 'Enter' && event.key !== ' ')) return;
+      event.preventDefault();
+      handleEdit();
+    };
 
     wrapper.addEventListener('click', handleClick, true);
-    return () => wrapper.removeEventListener('click', handleClick, true);
+    wrapper.addEventListener('keydown', handleKeyDown);
+    return () => {
+      wrapper.removeEventListener('click', handleClick, true);
+      wrapper.removeEventListener('keydown', handleKeyDown);
+    };
   }, [plugin, reminder, onUpdate, onEditOverride]);
 
   return (
@@ -124,6 +133,9 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
       ref={wrapperRef}
       className="sidebar-reminder-card-wrapper"
       style={{ cursor: 'pointer' }}
+      role="group"
+      tabIndex={0}
+      aria-label={`${reminder.content}. Press Enter to edit reminder.`}
     >
       <SharedReminderCard
         reminder={{

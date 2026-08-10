@@ -14,6 +14,7 @@ import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/
 import { ProjectAutocompleteDropdown } from '@/reminders/ui/reminder-modal/ProjectAutocompleteDropdown';
 import { useProjectAutocomplete } from '@/reminders/ui/reminder-modal/useProjectAutocomplete';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
@@ -54,7 +55,7 @@ export function ReminderSheet({
 	const canSubmit = !saving && Boolean(draft.content.trim());
 
 	useLayoutEffect(() => {
-		if (saving) return;
+		if (saving || draft.activePicker || pendingPicker || returningToEditor) return;
 		const initialContent = draft.content.trim();
 		const focusTitle = () => {
 			const element = richTextInputRef.current?.getElement();
@@ -73,7 +74,7 @@ export function ReminderSheet({
 			window.cancelAnimationFrame(frame);
 			for (const timer of timers) window.clearTimeout(timer);
 		};
-	}, [draft.content, modal.mode, modal.reminderId, saving]);
+	}, [draft.activePicker, draft.content, modal.mode, modal.reminderId, pendingPicker, returningToEditor, saving]);
 
 	useEffect(() => () => {
 		if (switchTimerRef.current !== null) window.clearTimeout(switchTimerRef.current);
@@ -150,8 +151,17 @@ export function ReminderSheet({
 		}, SHEET_SWITCH_DELAY_MS);
 	};
 
+	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
+		activeKey: draft.activePicker ?? 'editor',
+		escapeDisabled: saving,
+		onEscape: () => {
+			if (draft.activePicker) returnToEditor();
+			else onClose();
+		},
+	});
+
 	return (
-		<div className="modal-backdrop pwa-reminder-editor-backdrop" onClick={(event) => {
+		<div className="modal-backdrop pwa-reminder-editor-backdrop" onKeyDown={handleDialogKeyDown} onClick={(event) => {
 			if (saving) return;
 			if (event.target !== event.currentTarget) return;
 			if (draft.activePicker) returnToEditor();
@@ -160,6 +170,7 @@ export function ReminderSheet({
 			{draft.activePicker ? (
 				<ReminderPickerSheet
 					draft={draft}
+					dialogRef={setDialogRef}
 					projectOptions={projectOptions}
 					isSwitchingOut={returningToEditor}
 					onPatch={patchDraft}
@@ -167,7 +178,7 @@ export function ReminderSheet({
 					onClose={() => returnToEditor()}
 				/>
 			) : (
-				<div className={`modal-card pwa-reminder-editor${pendingPicker ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label={title} aria-busy={saving}>
+				<div ref={setDialogRef} className={`modal-card pwa-reminder-editor${pendingPicker ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label={title} aria-busy={saving} tabIndex={-1}>
 					<form className="modal-form" onSubmit={(event) => {
 						event.preventDefault();
 						if (saving) return;
@@ -222,6 +233,7 @@ export function ReminderSheet({
 								value={draft.content}
 								onChange={(content) => patchDraft({ content })}
 								placeholder={isEditing ? 'Edit your reminder...' : 'What do you need to remember?'}
+								ariaLabel="Reminder title"
 								readOnly={saving}
 								inputRef={contentRef}
 								preserveSelection={!pendingPicker && !returningToEditor}
@@ -247,6 +259,7 @@ export function ReminderSheet({
 								rows={3}
 								maxLength={4096}
 								placeholder="Add description..."
+								aria-label="Reminder description"
 								value={draft.description}
 								disabled={saving}
 								onChange={(event) => patchDraft({ description: event.currentTarget.value })}

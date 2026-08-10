@@ -29,6 +29,7 @@ interface RichTextInputProps {
     onFocus?: (e: React.FocusEvent) => void;
     onBlur?: (e: React.FocusEvent) => void;
     placeholder?: string;
+    ariaLabel?: string;
     inputRef?: React.RefObject<HTMLDivElement | null>;
     className?: string;
     style?: React.CSSProperties;
@@ -51,6 +52,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     onFocus,
     onBlur,
     placeholder,
+    ariaLabel,
     inputRef,
     className,
     style,
@@ -242,6 +244,10 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             <div
                 ref={refCallback}
                 contentEditable={!readOnly}
+                role="textbox"
+                aria-label={ariaLabel ?? placeholder}
+                aria-multiline="true"
+                aria-readonly={readOnly}
                 inputMode="text"
                 autoFocus={autoFocus}
                 onInput={handleInput}

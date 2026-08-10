@@ -53,13 +53,13 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('<link rel="manifest" href="/notifications/manifest.json?token=install-token&folder=Reminders&upcomingDays=7&v=');
 	});
 
-	it('disables page zoom in the PWA shell', () => {
+	it('allows users to zoom the PWA shell', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('maximum-scale=1, user-scalable=no');
-		expect(html).toContain("document.addEventListener('gesturestart', blockZoom, { passive: false })");
-		expect(html).toContain("document.addEventListener('gesturechange', blockZoom, { passive: false })");
-		expect(html).toContain("document.addEventListener('gestureend', blockZoom, { passive: false })");
+		expect(html).toContain('initial-scale=1, viewport-fit=cover');
+		expect(html).not.toContain('maximum-scale');
+		expect(html).not.toContain('user-scalable=no');
+		expect(html).not.toContain('blockZoom');
 	});
 
 	it('exposes the current PWA asset version', () => {

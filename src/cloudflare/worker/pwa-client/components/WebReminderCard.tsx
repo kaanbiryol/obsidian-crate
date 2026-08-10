@@ -41,13 +41,29 @@ export function WebReminderCard({
 
 			onEdit(reminder.id);
 		};
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.target !== wrapper || (event.key !== 'Enter' && event.key !== ' ')) return;
+			event.preventDefault();
+			onEdit(reminder.id);
+		};
 
 		wrapper.addEventListener('click', handleClick, true);
-		return () => wrapper.removeEventListener('click', handleClick, true);
+		wrapper.addEventListener('keydown', handleKeyDown);
+		return () => {
+			wrapper.removeEventListener('click', handleClick, true);
+			wrapper.removeEventListener('keydown', handleKeyDown);
+		};
 	}, [onEdit, onToggleComplete, reminder.completed, reminder.id]);
 
 	return (
-		<div ref={wrapperRef} className="sidebar-reminder-card-wrapper" style={{ cursor: 'pointer' }}>
+		<div
+			ref={wrapperRef}
+			className="sidebar-reminder-card-wrapper"
+			style={{ cursor: 'pointer' }}
+			role="group"
+			tabIndex={0}
+			aria-label={`${reminder.content}. Press Enter to edit reminder.`}
+		>
 			<SharedReminderCard
 				reminder={reminder}
 				animationConfig={{ enabled: false }}

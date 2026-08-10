@@ -87,6 +87,10 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    appearance: none;
     transition: all 200ms ease-out;
     margin-top: 1px;
 
@@ -97,6 +101,11 @@
 
     &:active {
         transform: scale(0.95);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--interactive-accent);
+        outline-offset: 2px;
     }
 
     &.is-checked {

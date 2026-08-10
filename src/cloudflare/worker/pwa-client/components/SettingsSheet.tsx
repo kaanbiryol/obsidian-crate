@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@heroui/react';
 import { RefreshCw, X } from 'lucide-react';
 import { isStandaloneApp } from '../config';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import type { PushState, StoredConfig } from '../types';
 
 export function SettingsSheet({
@@ -26,19 +27,24 @@ export function SettingsSheet({
 		: isStandaloneApp()
 			? 'This device is using the installed app experience.'
 			: 'You can also install this app from your browser for faster access.';
+	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
+		activeKey: 'settings',
+		escapeDisabled: loggingOut,
+		onEscape: onClose,
+	});
 
 	return (
 		<div className="settings-backdrop" onClick={(event) => {
-			if (event.target === event.currentTarget) onClose();
+			if (!loggingOut && event.target === event.currentTarget) onClose();
 		}}>
-			<aside className="settings-sheet" role="dialog" aria-modal="true" aria-label="Settings">
+			<aside ref={setDialogRef} className="settings-sheet" role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut} tabIndex={-1} onKeyDown={handleDialogKeyDown}>
 				<div className="settings-handle" aria-hidden="true" />
 				<div className="settings-sheet__header">
 					<div>
 						<h2>Settings</h2>
 						<p>Notifications, install status, and the current reminder sync target for this device.</p>
 					</div>
-					<Button isIconOnly className="icon-button" type="button" data-action="close-settings" aria-label="Close settings" onClick={onClose}>
+					<Button isIconOnly className="icon-button" type="button" data-action="close-settings" aria-label="Close settings" isDisabled={loggingOut} onClick={onClose}>
 						<X size={20} />
 					</Button>
 				</div>

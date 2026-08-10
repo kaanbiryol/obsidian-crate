@@ -358,7 +358,15 @@ function App() {
 						onDelete={deleteReminder}
 					/>
 				)}
-				{toast && <div className={`toast is-${toast.kind}`}>{toast.message}</div>}
+				{toast && (
+					<div
+						className={`toast is-${toast.kind}`}
+						role={toast.kind === 'error' ? 'alert' : 'status'}
+						aria-live={toast.kind === 'error' ? 'assertive' : 'polite'}
+					>
+						{toast.message}
+					</div>
+				)}
 			</RemindersAppShell>
 		</div>
 	);

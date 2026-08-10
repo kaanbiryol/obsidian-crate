@@ -82,7 +82,7 @@ export function PwaTopNotices({
 	return (
 		<div className="pwa-top-notices">
 			{updateAvailable && (
-				<div className="pwa-update-banner">
+				<div className="pwa-update-banner" role="status">
 					<div className="pwa-update-banner__label">
 						<span className="pwa-update-banner__dot" aria-hidden="true" />
 						<span className="pwa-update-banner__text">Update available</span>
@@ -92,7 +92,7 @@ export function PwaTopNotices({
 					</button>
 				</div>
 			)}
-			{showStatusLine && <div className={`pwa-status-line is-${statusKind}`}>{statusText}</div>}
+			{showStatusLine && <div className={`pwa-status-line is-${statusKind}`} role="status">{statusText}</div>}
 			{showNotificationPrompt && (
 				<div className="pwa-notification-prompt">
 					<div className="pwa-notification-prompt__icon">

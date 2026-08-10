@@ -40,7 +40,7 @@ function htmlSecurityHeaders(): Record<string, string> {
 		'Content-Security-Policy': [
 			"default-src 'none'",
 			"style-src 'unsafe-inline'",
-			"script-src 'self' 'unsafe-inline'",
+			"script-src 'self'",
 			"connect-src 'self'",
 			"img-src 'self' data:",
 			"manifest-src 'self'",

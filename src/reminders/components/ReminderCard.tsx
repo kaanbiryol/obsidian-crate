@@ -119,10 +119,14 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
             {/* Card content */}
             <div className="premium-reminder-content">
                 {/* Custom checkbox */}
-                <div
+                <button
+                    type="button"
                     className={`premium-checkbox ${reminder.completed ? 'is-checked' : ''}`}
                     role="checkbox"
                     aria-checked={reminder.completed}
+                    aria-label={reminder.completed
+                        ? `Mark ${reminder.content} incomplete`
+                        : `Mark ${reminder.content} complete`}
                     style={{
                         borderColor: reminder.completed ? '#22c55e' : (isImportant ? '#ef4444' : 'rgba(255,255,255,0.2)'),
                         backgroundColor: reminder.completed ? '#22c55e' : 'transparent',
@@ -136,7 +140,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                     {reminder.completed && (
                         <Check size={12} strokeWidth={3} className="premium-checkbox-icon" />
                     )}
-                </div>
+                </button>
 
                 {/* Main content area */}
                 <div className="premium-reminder-body">

@@ -20,6 +20,7 @@ import type { ModalDraft } from '../types';
 
 interface ReminderPickerSheetProps {
 	draft: ModalDraft;
+	dialogRef: (element: HTMLElement | null) => void;
 	projectOptions: string[];
 	isSwitchingOut: boolean;
 	onPatch: (patch: Partial<ModalDraft>) => void;
@@ -29,6 +30,7 @@ interface ReminderPickerSheetProps {
 
 export function ReminderPickerSheet({
 	draft,
+	dialogRef,
 	projectOptions,
 	isSwitchingOut,
 	onPatch,
@@ -46,7 +48,7 @@ export function ReminderPickerSheet({
 
 	if (draft.activePicker === 'date') {
 		return (
-			<section className={`pwa-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Schedule reminder">
+			<section ref={dialogRef} className={`pwa-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Schedule reminder" tabIndex={-1}>
 				<div className="pwa-picker-header">
 					<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Close schedule" onClick={onClose}>
 						<X size={20} />
@@ -105,7 +107,7 @@ export function ReminderPickerSheet({
 
 	if (draft.activePicker === 'project') {
 		return (
-			<section className={`pwa-picker-sheet pwa-project-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Select Project">
+			<section ref={dialogRef} className={`pwa-picker-sheet pwa-project-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Select project" tabIndex={-1}>
 				<div className="pwa-picker-header pwa-project-picker-header">
 					<Button isIconOnly className="pwa-picker-icon-button pwa-project-picker-back" type="button" aria-label="Back to reminder" onClick={onClose}>
 						<ChevronLeft size={22} />
@@ -148,7 +150,7 @@ export function ReminderPickerSheet({
 	}
 
 	return (
-		<section className={`pwa-picker-sheet pwa-recurrence-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Repeat reminder">
+		<section ref={dialogRef} className={`pwa-picker-sheet pwa-recurrence-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Repeat reminder" tabIndex={-1}>
 			<div className="pwa-picker-header">
 				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Back to reminder" onClick={onClose}>
 					<ChevronLeft size={20} />
