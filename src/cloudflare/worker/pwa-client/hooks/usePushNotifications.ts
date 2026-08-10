@@ -15,6 +15,7 @@ export function usePushNotifications({
 	push: PushState;
 	refreshPushState: () => Promise<void>;
 	enablePushNotifications: () => Promise<void>;
+	disablePushNotifications: () => Promise<void>;
 } {
 	const [push, setPush] = useState<PushState>({ supported: false, subscribed: false, status: null });
 
@@ -75,5 +76,20 @@ export function usePushNotifications({
 		}
 	}, [apiFetch, push.supported, showToast]);
 
-	return { push, refreshPushState, enablePushNotifications };
+	const disablePushNotifications = useCallback(async () => {
+		if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+		const registration = await navigator.serviceWorker.getRegistration();
+		const subscription = await registration?.pushManager.getSubscription();
+		if (!subscription) return;
+
+		const response = await apiFetch('/notifications/subscribe', {
+			method: 'DELETE',
+			body: JSON.stringify({ endpoint: subscription.endpoint }),
+		});
+		if (!response.ok) throw new Error(await response.text());
+		await subscription.unsubscribe();
+		setPush({ supported: true, subscribed: false, status: null });
+	}, [apiFetch]);
+
+	return { push, refreshPushState, enablePushNotifications, disablePushNotifications };
 }

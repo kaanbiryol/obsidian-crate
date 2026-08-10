@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleListTokens, handleRegisterToken } from './auth-handlers';
+import { handleListTokens, handleRegisterToken, handleRevokeCurrentToken } from './auth-handlers';
 
 type TokenRecord = {
 	id: string;
@@ -91,6 +91,10 @@ function createDb() {
 								record.last_seen_at = '2026-04-18 11:00:00';
 							}
 						}
+					}
+
+					if (sql.includes('DELETE FROM auth_tokens WHERE token_hash = ?')) {
+						tokens.delete(getBoundString(statement._args, 0));
 					}
 
 					return {};
@@ -199,5 +203,27 @@ describe('auth token device metadata', () => {
 				}),
 			],
 		});
+	});
+
+	it('revokes the active bearer token when ending a session', async () => {
+		const { db, tokens } = createDb();
+		const tokenHash = await sha256Hex('current-token');
+		tokens.set(tokenHash, {
+			id: 'current-id',
+			token_hash: tokenHash,
+			device_id: null,
+			device_name: 'iPhone',
+			platform: 'pwa',
+			created_at: '2026-04-18 10:00:00',
+			last_seen_at: '2026-04-18 12:00:00',
+		});
+
+		const response = await handleRevokeCurrentToken(new Request('https://worker.test/auth/session', {
+			method: 'DELETE',
+			headers: { Authorization: 'Bearer current-token' },
+		}), db as never);
+
+		expect(response.status).toBe(200);
+		expect(tokens.has(tokenHash)).toBe(false);
 	});
 });

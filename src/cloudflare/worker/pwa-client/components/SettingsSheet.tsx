@@ -7,6 +7,7 @@ import type { PushState, StoredConfig } from '../types';
 export function SettingsSheet({
 	config,
 	push,
+	loggingOut,
 	onClose,
 	onEnablePush,
 	onRefresh,
@@ -14,6 +15,7 @@ export function SettingsSheet({
 }: {
 	config: StoredConfig;
 	push: PushState;
+	loggingOut: boolean;
 	onClose: () => void;
 	onEnablePush: () => void;
 	onRefresh: () => void;
@@ -62,7 +64,9 @@ export function SettingsSheet({
 						<div className="settings-panel__row"><span>All-day time</span><code>{config.allDayNotificationTime ?? 'none'}</code></div>
 						<div className="settings-panel__actions">
 							<Button className="secondary-button" type="button" data-action="refresh" onClick={onRefresh}><RefreshCw size={15} /> Refresh</Button>
-							<Button className="secondary-button is-danger" type="button" data-action="logout" onClick={onLogout}>Log out</Button>
+							<Button className="secondary-button is-danger" type="button" data-action="logout" isDisabled={loggingOut} onClick={onLogout}>
+								{loggingOut ? 'Logging out...' : 'Log out'}
+							</Button>
 						</div>
 					</div>
 				</div>

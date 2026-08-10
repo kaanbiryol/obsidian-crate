@@ -1,4 +1,9 @@
-import { handleListTokens, handleRegisterToken, handleRevokeToken } from '../auth-handlers';
+import {
+	handleListTokens,
+	handleRegisterToken,
+	handleRevokeCurrentToken,
+	handleRevokeToken,
+} from '../auth-handlers';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';
 
@@ -16,6 +21,9 @@ export async function handleAuthRoute(
 	}
 	if (path === '/auth/tokens' && method === 'GET') {
 		return await withDatabase(db, requiredDb => handleListTokens(request, requiredDb));
+	}
+	if (path === '/auth/session' && method === 'DELETE') {
+		return await withDatabase(db, requiredDb => handleRevokeCurrentToken(request, requiredDb));
 	}
 
 	return null;

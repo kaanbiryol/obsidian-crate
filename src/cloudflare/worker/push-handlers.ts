@@ -13,6 +13,14 @@ interface D1MutationResult {
 	};
 }
 
+function isValidPushEndpoint(endpoint: string): boolean {
+	try {
+		return new URL(endpoint).protocol === 'https:';
+	} catch {
+		return false;
+	}
+}
+
 function changedRows(result: unknown): number {
 	if (!result || typeof result !== 'object') {
 		return 0;
@@ -213,12 +221,7 @@ export async function handleSubscribe(request: Request, db: D1Database): Promise
 		return corsResponse({ error: 'Invalid deviceName' }, 400);
 	}
 
-	try {
-		const url = new URL(endpoint);
-		if (url.protocol !== 'https:') {
-			return corsResponse({ error: 'Invalid endpoint' }, 400);
-		}
-	} catch {
+	if (!isValidPushEndpoint(endpoint)) {
 		return corsResponse({ error: 'Invalid endpoint' }, 400);
 	}
 
@@ -263,9 +266,16 @@ export async function handleUnsubscribe(request: Request, db: D1Database): Promi
 	}
 
 	const id = parseOptionalString(parsedBody.value.id, 128);
-	if (!id) return corsResponse({ error: 'id required' }, 400);
+	const endpoint = parseOptionalString(parsedBody.value.endpoint, 2048);
+	if (!id && !endpoint) return corsResponse({ error: 'id or endpoint required' }, 400);
+	if (endpoint && !isValidPushEndpoint(endpoint)) {
+		return corsResponse({ error: 'Invalid endpoint' }, 400);
+	}
 
-	await db.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(id).run();
+	const statement = id
+		? db.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(id)
+		: db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint);
+	await statement.run();
 	return corsResponse({ success: true });
 }
 

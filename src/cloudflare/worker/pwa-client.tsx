@@ -48,6 +48,7 @@ function App() {
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [launchReminderId, setLaunchReminderId] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
+	const [loggingOut, setLoggingOut] = useState(false);
 	const [updateAvailable, setUpdateAvailable] = useState(false);
 	const [modal, setModal] = useState<ModalState | null>(null);
 	const { toast, showToast } = useToast();
@@ -64,7 +65,12 @@ function App() {
 		[authToken],
 	);
 	const reminderSync = useReminderSync({ apiFetch, authToken, bootstrapped, config, setSelectedProject });
-	const { push, refreshPushState, enablePushNotifications } = usePushNotifications({ apiFetch, showToast });
+	const {
+		push,
+		refreshPushState,
+		enablePushNotifications,
+		disablePushNotifications,
+	} = usePushNotifications({ apiFetch, showToast });
 	const {
 		reminders,
 		projects,
@@ -86,7 +92,7 @@ function App() {
 		setError,
 	} = reminderSync;
 
-	const logOut = useCallback((showMessage: boolean) => {
+	const clearLocalSession = useCallback((showMessage: boolean) => {
 		localStorage.removeItem(AUTH_TOKEN_KEY);
 		localStorage.removeItem(REMINDERS_CACHE_KEY);
 		setAuthToken(null);
@@ -100,8 +106,23 @@ function App() {
 	}, [resetReminderState, setError, showToast]);
 
 	useEffect(() => {
-		handleUnauthorizedRef.current = () => logOut(false);
-	}, [logOut]);
+		handleUnauthorizedRef.current = () => clearLocalSession(false);
+	}, [clearLocalSession]);
+
+	const logOut = useCallback(async () => {
+		if (loggingOut) return;
+		setLoggingOut(true);
+		try {
+			await disablePushNotifications();
+			const response = await apiFetch('/auth/session', { method: 'DELETE' });
+			if (!response.ok) throw new Error(await response.text());
+			clearLocalSession(true);
+		} catch (logoutError) {
+			showToast('error', logoutError instanceof Error ? logoutError.message : String(logoutError));
+		} finally {
+			setLoggingOut(false);
+		}
+	}, [apiFetch, clearLocalSession, disablePushNotifications, loggingOut, showToast]);
 
 	usePwaBootstrap({
 		authToken,
@@ -319,10 +340,11 @@ function App() {
 					<SettingsSheet
 						config={config}
 						push={push}
+						loggingOut={loggingOut}
 						onClose={() => setSettingsOpen(false)}
 						onEnablePush={enablePushNotifications}
 						onRefresh={() => void loadReminders()}
-						onLogout={() => logOut(true)}
+						onLogout={() => void logOut()}
 					/>
 				)}
 				{modal && (

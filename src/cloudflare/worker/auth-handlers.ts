@@ -1,4 +1,5 @@
 import { corsResponse } from './cors';
+import { sha256Hex } from './auth';
 import { initDb, queryRows } from './db';
 import { isSha256Hex, parseJsonObject, parseOptionalString } from './utils';
 
@@ -85,6 +86,19 @@ export async function handleRevokeToken(request: Request, db: D1Database): Promi
 		return corsResponse({ error: 'id required' }, 400);
 	}
 	await db.prepare('DELETE FROM auth_tokens WHERE id = ?').bind(id).run();
+	return corsResponse({ success: true });
+}
+
+export async function handleRevokeCurrentToken(request: Request, db: D1Database): Promise<Response> {
+	await initDb(db);
+	const authHeader = request.headers.get('Authorization') || '';
+	const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
+	if (!token) {
+		return corsResponse({ error: 'Unauthorized' }, 401);
+	}
+
+	const tokenHash = await sha256Hex(token);
+	await db.prepare('DELETE FROM auth_tokens WHERE token_hash = ?').bind(tokenHash).run();
 	return corsResponse({ success: true });
 }
 

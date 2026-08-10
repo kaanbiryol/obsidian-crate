@@ -299,4 +299,27 @@ describe('worker entrypoint', () => {
 		expect(db.tokens.size).toBe(0);
 		expect(db.subscriptions.size).toBe(1);
 	});
+
+	it('removes a push subscription by endpoint during authenticated logout', async () => {
+		const db = createDb({});
+		db.subscriptions.set('subscription-id', {
+			id: 'subscription-id',
+			endpoint: 'https://push.example/subscription',
+		});
+
+		const response = await worker.fetch(
+			new Request('https://worker.test/notifications/subscribe', {
+				method: 'DELETE',
+				headers: {
+					Authorization: 'Bearer secret-token',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ endpoint: 'https://push.example/subscription' }),
+			}),
+			createEnv({ DB: db.db as unknown as D1Database }) as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(db.subscriptions.size).toBe(0);
+	});
 });
