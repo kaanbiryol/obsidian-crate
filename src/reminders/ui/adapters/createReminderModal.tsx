@@ -141,7 +141,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     // Shared modal handles confirmation
     modal.close();
 
-    log.info(" handleDelete called for reminder:", reminderToDelete?.id, reminderToDelete?.content);
+    log.info(" Deleting reminder:", reminderToDelete?.id);
 
     try {
       // Use markdown writer directly (markdown-first is always enabled)

@@ -30,7 +30,7 @@ export type RemindersSettings = {
 };
 
 export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
-	debugLogging: true,
+	debugLogging: false,
 	taskCreationDefaultDueDate: 'none',
 	remindersFolderPath: DEFAULT_REMINDERS_FOLDER_PATH,
 	queryViewPreferences: {},

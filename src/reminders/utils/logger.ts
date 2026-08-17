@@ -26,7 +26,7 @@ export interface LoggerConfig {
 }
 
 let globalConfig: LoggerConfig = {
-  enabled: true,
+  enabled: false,
   minLevel: 'debug',
 };
 
