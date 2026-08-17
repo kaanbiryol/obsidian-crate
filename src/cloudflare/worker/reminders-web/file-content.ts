@@ -8,6 +8,7 @@ import {
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
 import type { buildReminderUpdate } from '@/reminders/data/storage-compat/shared';
+import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
 import { setReminderIdMarker } from '@/reminders/core/reminderIdentity';
 import {
 	appendReminderBlockToContent,
@@ -22,7 +23,7 @@ import type { RemoteReminderRecord } from './types';
 export { getInitialProjectFileContent } from '@/reminders/core/markdownReminderFile';
 
 export function getProjectFilePath(folderPath: string, project: string): string {
-	return `${folderPath}/${project}.md`;
+	return getReminderProjectFilePath(folderPath, project);
 }
 
 export function createReminderInFileContent(

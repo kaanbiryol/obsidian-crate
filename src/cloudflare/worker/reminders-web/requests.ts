@@ -1,4 +1,5 @@
 import type { RecurrenceRule } from '@/reminders/types/reminder';
+import { normalizeReminderProjectPath } from '@/reminders/core/reminderProjectPath';
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import { corsResponse } from '../cors';
 import { parseOptionalString, sanitizePath } from '../utils';
@@ -17,7 +18,7 @@ export function parseFolderPath(value: unknown): string | null {
 
 export function parseProjectPath(value: unknown): string | null {
 	const parsed = parseOptionalString(value, 256);
-	return parsed ? sanitizePath(parsed) : null;
+	return parsed ? normalizeReminderProjectPath(parsed) : null;
 }
 
 export function hasNonEmptyStringValue(value: unknown): boolean {

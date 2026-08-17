@@ -4,6 +4,10 @@ import { createLogger } from "@/reminders/utils/logger";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { IndexedReminder, ReminderIndex } from "../reminder-index";
 import { getInitialProjectFileContent } from "../../core/markdownReminderFile";
+import {
+  getReminderProjectFilePath,
+  normalizeReminderProjectPath,
+} from "../../core/reminderProjectPath";
 export {
   findReminderLineNumber,
 } from "../../core/markdownReminderFile";
@@ -27,23 +31,36 @@ export async function getFile(app: App, filePath: string): Promise<TFile | null>
   return null;
 }
 
+async function ensureFolderPath(app: App, folderPath: string): Promise<void> {
+  const segments = folderPath.split("/").filter(Boolean);
+  let currentPath = "";
+  for (const segment of segments) {
+    currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+    if (!await app.vault.adapter.exists(currentPath)) {
+      await app.vault.createFolder(currentPath);
+      log.info(` Created folder: ${currentPath}`);
+    }
+  }
+}
+
 export async function getOrCreateProjectFile(
   app: App,
   index: ReminderIndex,
   project: string,
 ): Promise<TFile> {
   const folderPath = index.remindersFolderPath;
-  const filePath = `${folderPath}/${project}.md`;
-
-  const folderExists = await app.vault.adapter.exists(folderPath);
-  if (!folderExists) {
-    await app.vault.createFolder(folderPath);
-    log.info(` Created folder: ${folderPath}`);
+  const normalizedProject = normalizeReminderProjectPath(project);
+  if (!normalizedProject) {
+    throw new Error(`Invalid reminder project: ${project}`);
   }
+  const filePath = getReminderProjectFilePath(folderPath, normalizedProject);
+  const projectFolderPath = filePath.slice(0, filePath.lastIndexOf("/"));
+
+  await ensureFolderPath(app, projectFolderPath);
 
   let file = await getFile(app, filePath);
   if (!file) {
-    await app.vault.create(filePath, getInitialProjectFileContent(project));
+    await app.vault.create(filePath, getInitialProjectFileContent(normalizedProject));
     file = await getFile(app, filePath);
     log.info(` Created project file: ${filePath}`);
   }

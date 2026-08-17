@@ -74,6 +74,37 @@ describe('markdownWriter', () => {
     expect(content).toContain('<!-- crate-id:rem-b -->');
   });
 
+  it('creates intermediate folders for nested reminder projects', async () => {
+    const { app, files, folders } = createMockAppWithVault();
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    await writer.createReminder(
+      'Personal/Health',
+      'Book appointment',
+      undefined,
+      4,
+      undefined,
+      undefined,
+      'rem-health',
+    );
+
+    expect(folders).toEqual(new Set(['Reminders', 'Reminders/Personal']));
+    expect(files.get('Reminders/Personal/Health.md')).toContain('Book appointment');
+  });
+
+  it('rejects unsafe reminder project paths before creating files', async () => {
+    const { app, files } = createMockAppWithVault();
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    await expect(
+      writer.createReminder('Personal//Health', 'Task', undefined, 4),
+    ).rejects.toThrow('Invalid reminder project path');
+
+    expect(files.size).toBe(0);
+  });
+
   it('updates a reminder when the line moved and rawLine no longer matches', async () => {
     const initial = '# Work\n\n- [ ] Task A Jan 1, 2026\n- [ ] Task B Jan 2, 2026\n';
     const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });

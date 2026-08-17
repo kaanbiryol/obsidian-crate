@@ -2,6 +2,7 @@ import { createReminderId } from "../../core/reminderIdentity";
 import { buildCreatedReminderFallback, buildCreateReminderArgs, buildReminderUpdate, toReminder } from "./shared";
 import type { StorageCompatContext } from "./types";
 import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
+import { getReminderProjectFilePath } from "@/reminders/core/reminderProjectPath";
 
 export function createStorageCompatMutations({ index, writer }: StorageCompatContext) {
   return {
@@ -99,7 +100,7 @@ export function createStorageCompatMutations({ index, writer }: StorageCompatCon
     },
 
     async reorder(project: string, orderedIds: string[]) {
-      const filePath = `${index.remindersFolderPath}/${project}.md`;
+      const filePath = getReminderProjectFilePath(index.remindersFolderPath, project);
       await writer.reorderReminders(filePath, orderedIds);
     },
 

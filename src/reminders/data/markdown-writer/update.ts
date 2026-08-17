@@ -17,6 +17,7 @@ import {
   deleteReminderBlockFromContent,
   replaceReminderBlockInContent,
 } from "../../core/markdownReminderFile";
+import { normalizeReminderProjectPath } from "../../core/reminderProjectPath";
 import type {
   MarkdownWriterContext,
   UpdateReminderInput,
@@ -53,7 +54,13 @@ export async function updateReminderInMarkdown(
   reminder: IndexedReminder,
   updates: UpdateReminderInput,
 ): Promise<void> {
-  const newProject = updates.project ?? reminder.project;
+  const requestedProject = updates.project ?? reminder.project;
+  const newProject = requestedProject
+    ? normalizeReminderProjectPath(requestedProject)
+    : requestedProject;
+  if (requestedProject && !newProject) {
+    throw new Error(`Invalid reminder project: ${requestedProject}`);
+  }
   const oldProject = reminder.project || "Inbox";
   const newRecurrence = Object.prototype.hasOwnProperty.call(updates, "recurrence")
     ? normalizeRecurrenceRule(updates.recurrence ?? undefined)

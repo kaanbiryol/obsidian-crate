@@ -10,6 +10,7 @@ import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import { createReminderId } from "../../core/reminderIdentity";
 import type { IndexedReminder } from "../reminder-index";
 import { appendReminderBlockToContent } from "../../core/markdownReminderFile";
+import { requireReminderProjectPath } from "../../core/reminderProjectPath";
 import type { MarkdownWriterContext } from "./types";
 import {
   markdownWriterLog,
@@ -28,9 +29,10 @@ export async function createReminderInMarkdown(
   reminderId?: string,
   description?: string,
 ): Promise<void> {
+  const normalizedProject = requireReminderProjectPath(project);
   const normalizedRecurrence = normalizeRecurrenceRule(recurrence);
   const stableReminderId = reminderId ?? createReminderId();
-  const file = await context.getOrCreateProjectFile(project);
+  const file = await context.getOrCreateProjectFile(normalizedProject);
 
   let effectiveDueDate = dueDate;
   if (normalizedRecurrence && !dueDate) {
@@ -61,7 +63,7 @@ export async function createReminderInMarkdown(
     dueDatetime: storedDates.dueDatetime,
     priority,
     completed: false,
-    project,
+    project: normalizedProject,
     recurrence: normalizedRecurrence,
     filePath: file.path,
     lineNumber: -1,
@@ -85,7 +87,7 @@ export async function createReminderInMarkdown(
       dueDatetime: storedDates.dueDatetime,
       priority,
       completed: false,
-      project,
+      project: normalizedProject,
       recurrence: normalizedRecurrence,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

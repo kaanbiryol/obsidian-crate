@@ -2,6 +2,7 @@ import {
 	buildInitialReminderContent,
 	rebuildReminderContent,
 } from '@/reminders/ui/reminder-modal/useReminderDraft';
+import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
 import type { Priority, Reminder as SharedReminder, RecurrenceRule } from '@/reminders/types/reminder';
 import { formatDueDate } from '@/reminders/utils/dateFormatting';
 import { formatLocalDateKey, parseReminderDateValue, serializeReminderDateValue } from '@/reminders/utils/reminderDate';
@@ -41,7 +42,7 @@ export function buildOptimisticReminder(body: ReminderMutationBody, id: string):
 		completed: false,
 		project,
 		recurrence: normalizeRecurrenceRule(body.recurrence ?? undefined),
-		filePath: `${body.folderPath}/${project}.md`,
+		filePath: getReminderProjectFilePath(body.folderPath, project),
 		createdAt: timestamp,
 		updatedAt: timestamp,
 	};
@@ -60,7 +61,9 @@ export function applyOptimisticReminderUpdate(reminder: ReminderRecord, body: Re
 		recurrence: Object.prototype.hasOwnProperty.call(body, 'recurrence')
 			? normalizeRecurrenceRule(body.recurrence ?? undefined)
 			: reminder.recurrence,
-		filePath: project === reminder.project ? reminder.filePath : `${body.folderPath}/${project}.md`,
+		filePath: project === reminder.project
+			? reminder.filePath
+			: getReminderProjectFilePath(body.folderPath, project),
 		updatedAt: new Date().toISOString(),
 	};
 }
