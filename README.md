@@ -107,6 +107,14 @@ After installing the plugin, open the Crate settings tab in Obsidian:
 
 Cross-device setup links copy sync credentials and sync preferences. Usage metrics use the same Cloudflare API token entered during setup.
 
+## Sync Scope and Limits
+
+- Crate syncs files inside the vault, including attachments. Hidden dotfiles and dot-folders can also be synced; they are not excluded as a group.
+- Files larger than 25 MiB (25 × 1024 × 1024 bytes) are skipped and reported as sync errors. They are not uploaded to or downloaded from the remote vault.
+- The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, and `.DS_Store`. Crate also ignores its own plugin data, conflict copies, and the active Obsidian configuration folder's `workspace*` files.
+- Change ignore patterns under **Settings → Crate → Sync → Ignore patterns**. A pattern ending in `/` ignores that directory tree; `*` and `?` wildcards are supported.
+- Cloudflare account and plan quotas still apply to R2, Workers, D1, and push-notification resources.
+
 ## Reminders
 
 Crate stores reminders as Markdown in a configurable vault folder. The plugin indexes those files, provides sidebar and full-screen reminder views, and registers commands for creating reminders, opening projects, and viewing reminder storage statistics.
