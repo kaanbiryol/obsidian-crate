@@ -45,6 +45,7 @@ abstract class BaseReminderModal extends Modal {
       position: "relative",
       "z-index": "10000",
     });
+    contentEl.addClass("crate-reminders-ui");
 
     const isDarkMode = document.body.classList.contains("theme-dark");
     const close = () => this.close();
@@ -66,6 +67,7 @@ abstract class BaseReminderModal extends Modal {
 
   onClose(): void {
     this.root?.unmount();
+    this.contentEl.removeClass("crate-reminders-ui");
   }
 }
 

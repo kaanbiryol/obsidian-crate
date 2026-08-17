@@ -1,20 +1,19 @@
-@use "tailwindcss";
+@use "tailwindcss/theme.css";
 @use "colors";
 @use "crate";
 @config "../../tailwind.config.js";
 
-body {
+.crate-reminders-ui {
+  @tailwind utilities;
+
   @each $name, $color in colors.$reminder-colors {
     --reminder-#{$name}: #{$color};
   }
-}
 
-/*
- * Typography variables - semantic abstraction layer
- * Maps to Obsidian's CSS variables for consistent theming
- */
-.reminders-view-container,
-.reminders-list-container {
+  /*
+   * Typography variables - semantic abstraction layer
+   * Maps to Obsidian's CSS variables for consistent theming
+   */
   /* Font sizes - mapped to Obsidian variables */
   --reminder-font-base: var(--font-text-size);
   --reminder-font-sm: var(--font-small);
@@ -34,14 +33,15 @@ body {
   --reminder-line-height-tight: 1.2;
   --reminder-line-height-normal: 1.4;
   --reminder-line-height-relaxed: 1.6;
-}
 
-/*
- * Plugin theme mapping to shared Tailwind theme
- * HeroUI generates CSS variables like --heroui-danger, --heroui-warning, etc.
- * We map Obsidian's theme classes to reference these shared theme values
- */
+  /*
+   * Plugin theme mapping to shared Tailwind theme
+   * HeroUI generates CSS variables like --heroui-danger, --heroui-warning, etc.
+   * We map Obsidian's theme classes to reference these shared theme values
+   */
 
+&.theme-dark,
+&.dark,
 .theme-dark,
 .dark {
   /* HeroUI semantic content colors - map to Obsidian theme */
@@ -90,7 +90,10 @@ body {
   --color-reminder-red: hsl(var(--heroui-danger-600) / 1);
 }
 
-.theme-light {
+&.theme-light,
+&.light,
+.theme-light,
+.light {
   /* HeroUI semantic content colors - map to Obsidian theme */
   --heroui-content1: var(--background-primary);
   --heroui-content2: var(--background-secondary);
@@ -289,50 +292,95 @@ body {
 }
 
 /* Dark theme adjustments */
-.theme-dark .rdp {
+&.theme-dark .rdp,
+&.dark .rdp,
+.theme-dark .rdp,
+.dark .rdp {
   --rdp-accent-color: hsl(var(--heroui-primary-500) / 1);
   color: var(--text-normal);
 }
 
+&.theme-dark .rdp-button_previous,
+&.theme-dark .rdp-button_next,
+&.dark .rdp-button_previous,
+&.dark .rdp-button_next,
 .theme-dark .rdp-button_previous,
-.theme-dark .rdp-button_next {
+.theme-dark .rdp-button_next,
+.dark .rdp-button_previous,
+.dark .rdp-button_next {
   color: var(--text-muted);
 }
 
+&.theme-dark .rdp-button_previous:hover,
+&.theme-dark .rdp-button_next:hover,
+&.dark .rdp-button_previous:hover,
+&.dark .rdp-button_next:hover,
 .theme-dark .rdp-button_previous:hover,
-.theme-dark .rdp-button_next:hover {
+.theme-dark .rdp-button_next:hover,
+.dark .rdp-button_previous:hover,
+.dark .rdp-button_next:hover {
   background-color: hsl(var(--heroui-default-100) / 0.5);
   color: var(--text-normal);
 }
 
-.theme-dark .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled) {
+&.theme-dark .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled),
+&.dark .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled),
+.theme-dark .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled),
+.dark .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled) {
   background-color: hsl(var(--heroui-default-200) / 0.3);
 }
 
+&.theme-dark .rdp-button_previous svg,
+&.theme-dark .rdp-button_next svg,
+&.dark .rdp-button_previous svg,
+&.dark .rdp-button_next svg,
 .theme-dark .rdp-button_previous svg,
-.theme-dark .rdp-button_next svg {
+.theme-dark .rdp-button_next svg,
+.dark .rdp-button_previous svg,
+.dark .rdp-button_next svg {
   stroke: currentColor;
 }
 
 /* Light theme adjustments */
-.theme-light .rdp {
+&.theme-light .rdp,
+&.light .rdp,
+.theme-light .rdp,
+.light .rdp {
   --rdp-accent-color: hsl(var(--heroui-primary) / 1);
   color: var(--text-normal);
 }
 
+&.theme-light .rdp-button_previous,
+&.theme-light .rdp-button_next,
+&.light .rdp-button_previous,
+&.light .rdp-button_next,
 .theme-light .rdp-button_previous,
-.theme-light .rdp-button_next {
+.theme-light .rdp-button_next,
+.light .rdp-button_previous,
+.light .rdp-button_next {
   color: var(--text-muted);
 }
 
+&.theme-light .rdp-button_previous:hover,
+&.theme-light .rdp-button_next:hover,
+&.light .rdp-button_previous:hover,
+&.light .rdp-button_next:hover,
 .theme-light .rdp-button_previous:hover,
-.theme-light .rdp-button_next:hover {
+.theme-light .rdp-button_next:hover,
+.light .rdp-button_previous:hover,
+.light .rdp-button_next:hover {
   background-color: hsl(var(--heroui-default-100) / 1);
   color: var(--text-normal);
 }
 
+&.theme-light .rdp-button_previous svg,
+&.theme-light .rdp-button_next svg,
+&.light .rdp-button_previous svg,
+&.light .rdp-button_next svg,
 .theme-light .rdp-button_previous svg,
-.theme-light .rdp-button_next svg {
+.theme-light .rdp-button_next svg,
+.light .rdp-button_previous svg,
+.light .rdp-button_next svg {
   stroke: currentColor;
 }
 
@@ -500,23 +548,24 @@ body {
 .dark [data-slot="input-wrapper"] {
   background-color: #3f3f46 !important; /* zinc-700 */
 }
+}
 
 /* Settings tab alignment fix */
-.vertical-tab-content .setting-item {
+.crate-settings .setting-item {
   display: flex;
   align-items: center;
 }
 
-.vertical-tab-content .setting-item-info {
+.crate-settings .setting-item-info {
   flex: 1;
   min-width: 0;
 }
 
-.vertical-tab-content .setting-item-control {
+.crate-settings .setting-item-control {
   flex-shrink: 0;
 }
 
-.vertical-tab-content .setting-item-name {
+.crate-settings .setting-item-name {
   padding-left: 0;
   margin-left: 0;
 }

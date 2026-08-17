@@ -32,6 +32,8 @@ export function createShadowRootMount(
   const shadowRoot = host.attachShadow({ mode: "open" });
   const mountPoint = document.createElement("div");
   mountPoint.className = options.mountClassName ?? "reminders-shadow-root";
+  mountPoint.classList.add("crate-reminders-ui");
+  mountPoint.classList.add(document.body.classList.contains("theme-dark") ? "dark" : "light");
   options.configureMountPoint?.(mountPoint);
   shadowRoot.appendChild(mountPoint);
   return { shadowRoot, mountPoint };

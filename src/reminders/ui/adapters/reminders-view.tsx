@@ -119,17 +119,15 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
         let portalContainer = shadowRoot.querySelector(".heroui-portal-container") as HTMLDivElement;
         if (!portalContainer) {
             portalContainer = document.createElement("div");
-            portalContainer.className = "heroui-portal-container";
+            portalContainer.className = "crate-reminders-ui heroui-portal-container";
             shadowRoot.appendChild(portalContainer);
         }
+        portalContainer.classList.add("crate-reminders-ui");
         portalContainerRef.current = portalContainer;
 
         // Update dark mode class on portal container
-        if (isDarkMode) {
-            portalContainer.classList.add("dark");
-        } else {
-            portalContainer.classList.remove("dark");
-        }
+        portalContainer.classList.toggle("dark", isDarkMode);
+        portalContainer.classList.toggle("light", !isDarkMode);
     }, [shadowRoot, isDarkMode]);
 
     // Subscribe to index changes for automatic refresh (replaces 5-second polling)

@@ -183,7 +183,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
       <div
         className={[
           "reminders-view",
-          isDarkMode ? "dark" : "",
+          isDarkMode ? "dark" : "light",
           isFullScreen ? "is-fullscreen" : "",
           isModal ? "is-modal" : "",
           isCompact || hideTabBar ? "is-compact" : "",
