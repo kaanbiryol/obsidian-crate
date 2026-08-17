@@ -31,7 +31,6 @@ export async function createReminderInMarkdown(
   const normalizedRecurrence = normalizeRecurrenceRule(recurrence);
   const stableReminderId = reminderId ?? createReminderId();
   const file = await context.getOrCreateProjectFile(project);
-  const fileContent = await context.app.vault.read(file);
 
   let effectiveDueDate = dueDate;
   if (normalizedRecurrence && !dueDate) {
@@ -72,14 +71,10 @@ export async function createReminderInMarkdown(
 
   context.index.applyOptimisticCreate(optimisticReminder);
 
-  const newContent = appendReminderBlockToContent(
-    fileContent,
-    newLine,
-    normalizedDescription,
-  );
-
   try {
-    await context.app.vault.modify(file, newContent);
+    await context.app.vault.process(file, (fileContent) =>
+      appendReminderBlockToContent(fileContent, newLine, normalizedDescription)
+    );
     markdownWriterLog.info(`Created reminder in ${file.path}`);
     await notifyFileWritten(context, file);
 

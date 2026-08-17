@@ -57,6 +57,23 @@ describe('markdownWriter', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
+  it('serializes concurrent reminder creation without losing either reminder', async () => {
+    const { app, files } = createMockAppWithVault();
+    const index = createMockIndex();
+    const writer = createMarkdownWriter(app, index);
+
+    await Promise.all([
+      writer.createReminder('Work', 'Task A', undefined, 4, undefined, undefined, 'rem-a'),
+      writer.createReminder('Work', 'Task B', undefined, 4, undefined, undefined, 'rem-b'),
+    ]);
+
+    const content = files.get('Reminders/Work.md') || '';
+    expect(content).toContain('Task A');
+    expect(content).toContain('<!-- crate-id:rem-a -->');
+    expect(content).toContain('Task B');
+    expect(content).toContain('<!-- crate-id:rem-b -->');
+  });
+
   it('updates a reminder when the line moved and rawLine no longer matches', async () => {
     const initial = '# Work\n\n- [ ] Task A Jan 1, 2026\n- [ ] Task B Jan 2, 2026\n';
     const { app, files, folders } = createMockAppWithVault({ 'Reminders/Work.md': initial });
@@ -309,7 +326,7 @@ describe('markdownWriter', () => {
       project: 'Personal',
     });
 
-    expect(vault.modify.mock.calls.map(([file]) => file.path)).toEqual([
+    expect(vault.process.mock.calls.map(([file]) => file.path)).toEqual([
       'Reminders/Personal.md',
       'Reminders/Work.md',
     ]);
@@ -336,11 +353,13 @@ describe('markdownWriter', () => {
     const index = createMockIndex({ clearOptimistic });
     const writer = createMarkdownWriter(app, index);
 
-    vault.modify.mockImplementation(async (file: { path: string }, content: string) => {
+    vault.process.mockImplementation(async (file, mutation) => {
       if (file.path === 'Reminders/Personal.md') {
         throw new Error('destination unavailable');
       }
-      files.set(file.path, content);
+      const nextContent = mutation(files.get(file.path) || '');
+      files.set(file.path, nextContent);
+      return nextContent;
     });
 
     const reminder = makeIndexedReminder({
@@ -357,10 +376,53 @@ describe('markdownWriter', () => {
       project: 'Personal',
     })).rejects.toThrow('destination unavailable');
 
-    expect(vault.modify.mock.calls.map(([file]) => file.path)).toEqual(['Reminders/Personal.md']);
+    expect(vault.process.mock.calls.map(([file]) => file.path)).toEqual(['Reminders/Personal.md']);
     expect(files.get('Reminders/Work.md') || '').toContain('Task Move');
     expect(files.get('Reminders/Personal.md') || '').not.toContain('Task Move');
     expect(clearOptimistic).toHaveBeenCalledWith('r-move-fail');
+  });
+
+  it('rolls back the destination copy when the source move write fails', async () => {
+    const initial = '# Work\n\n- [ ] Task Move Jan 1, 2026 <!-- crate-id:r-move-rollback -->\n';
+    const { app, files, folders, vault } = createMockAppWithVault({ 'Reminders/Work.md': initial });
+    folders.add('Reminders');
+
+    const clearOptimistic = vi.fn();
+    const index = createMockIndex({ clearOptimistic });
+    const writer = createMarkdownWriter(app, index);
+    let sourceAttempts = 0;
+
+    vault.process.mockImplementation(async (file, mutation) => {
+      if (file.path === 'Reminders/Work.md' && sourceAttempts++ === 0) {
+        throw new Error('source unavailable');
+      }
+      const nextContent = mutation(files.get(file.path) || '');
+      files.set(file.path, nextContent);
+      return nextContent;
+    });
+
+    const reminder = makeIndexedReminder({
+      id: 'r-move-rollback',
+      content: 'Task Move',
+      project: 'Work',
+      filePath: 'Reminders/Work.md',
+      lineNumber: 2,
+      rawLine: '- [ ] Task Move Jan 1, 2026 <!-- crate-id:r-move-rollback -->',
+      dueDate: '2026-01-01',
+    });
+
+    await expect(writer.updateReminder(reminder, {
+      project: 'Personal',
+    })).rejects.toThrow('source unavailable');
+
+    expect(vault.process.mock.calls.map(([file]) => file.path)).toEqual([
+      'Reminders/Personal.md',
+      'Reminders/Work.md',
+      'Reminders/Personal.md',
+    ]);
+    expect(files.get('Reminders/Work.md') || '').toContain('Task Move');
+    expect(files.get('Reminders/Personal.md') || '').not.toContain('Task Move');
+    expect(clearOptimistic).toHaveBeenCalledWith('r-move-rollback');
   });
 
   it('deletes the reminder line together with its description block', async () => {

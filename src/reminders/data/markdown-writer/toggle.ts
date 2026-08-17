@@ -62,49 +62,54 @@ export async function toggleReminderCompletionInMarkdown(
     dueDatetime: newDueDatetime,
   });
 
-  const fileContent = await context.app.vault.read(file);
-  const lines = fileContent.split("\n");
-  const lineNumber = findReminderLineNumber(lines, reminder);
-  if (lineNumber === -1) {
-    context.index.clearOptimistic(reminder.id);
-    throw new Error(`Cannot safely locate reminder line in ${reminder.filePath}`);
-  }
-
-  const line = lines[lineNumber];
-  let newLine: string;
-
-  if (reminder.completed) {
-    newLine = line.replace(/\[x\]/i, "[ ]");
-  } else if (recurrence) {
-    const nextDue = calculateNextOccurrence(currentDue, recurrence);
-
-    if (nextDue) {
-      const indentMatch = line.match(/^(\s*)/);
-      const indentation = indentMatch ? indentMatch[1] : "";
-      newLine = rebuildCheckboxLine(
-        indentation,
-        false,
-        reminder.content,
-        nextDue,
-        reminder.priority,
-        reminder.project,
-        recurrence,
-        currentHasTime,
-        reminder.id,
-      );
-      markdownWriterLog.info(`Recurring reminder: advancing to next occurrence ${nextDue.toISOString()}`);
-    } else {
-      newLine = line.replace(/\[ \]/, "[x]");
-      markdownWriterLog.info("Recurring reminder: no more occurrences, marking complete");
-    }
-  } else {
-    newLine = line.replace(/\[ \]/, "[x]");
-  }
-
-  lines[lineNumber] = setReminderIdMarker(newLine, reminder.id);
-
   try {
-    await context.app.vault.modify(file, lines.join("\n"));
+    let lineNumber = -1;
+    let recurrenceLogMessage: string | undefined;
+    await context.app.vault.process(file, (fileContent) => {
+      const lines = fileContent.split("\n");
+      lineNumber = findReminderLineNumber(lines, reminder);
+      if (lineNumber === -1) {
+        throw new Error(`Cannot safely locate reminder line in ${reminder.filePath}`);
+      }
+
+      const line = lines[lineNumber];
+      let newLine: string;
+
+      if (reminder.completed) {
+        newLine = line.replace(/\[x\]/i, "[ ]");
+      } else if (recurrence) {
+        const nextDue = calculateNextOccurrence(currentDue, recurrence);
+
+        if (nextDue) {
+          const indentMatch = line.match(/^(\s*)/);
+          const indentation = indentMatch ? indentMatch[1] : "";
+          newLine = rebuildCheckboxLine(
+            indentation,
+            false,
+            reminder.content,
+            nextDue,
+            reminder.priority,
+            reminder.project,
+            recurrence,
+            currentHasTime,
+            reminder.id,
+          );
+          recurrenceLogMessage = `Recurring reminder: advancing to next occurrence ${nextDue.toISOString()}`;
+        } else {
+          newLine = line.replace(/\[ \]/, "[x]");
+          recurrenceLogMessage = "Recurring reminder: no more occurrences, marking complete";
+        }
+      } else {
+        newLine = line.replace(/\[ \]/, "[x]");
+      }
+
+      lines[lineNumber] = setReminderIdMarker(newLine, reminder.id);
+      return lines.join("\n");
+    });
+
+    if (recurrenceLogMessage) {
+      markdownWriterLog.info(recurrenceLogMessage);
+    }
     await notifyFileWritten(context, file);
     markdownWriterLog.info(`Toggled completion for reminder in ${reminder.filePath} at line ${lineNumber}`);
 

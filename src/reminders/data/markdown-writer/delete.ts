@@ -19,17 +19,21 @@ export async function deleteReminderInMarkdown(
 
   context.index.applyOptimisticDelete(reminder.id);
 
-  const fileContent = await context.app.vault.read(file);
-  const deletion = deleteReminderBlockFromContent(fileContent, reminder);
-  if (!deletion.found) {
-    markdownWriterLog.warn(" Reminder line not found, may already be deleted");
-    context.index.clearOptimistic(reminder.id);
-    return;
-  }
-
   try {
-    await context.app.vault.modify(file, deletion.content);
-    markdownWriterLog.info(`Deleted reminder from ${reminder.filePath} at line ${deletion.lineNumber}`);
+    let deletedLineNumber = -1;
+    await context.app.vault.process(file, (fileContent) => {
+      const deletion = deleteReminderBlockFromContent(fileContent, reminder);
+      deletedLineNumber = deletion.lineNumber;
+      return deletion.content;
+    });
+
+    if (deletedLineNumber === -1) {
+      markdownWriterLog.warn(" Reminder line not found, may already be deleted");
+      context.index.clearOptimistic(reminder.id);
+      return;
+    }
+
+    markdownWriterLog.info(`Deleted reminder from ${reminder.filePath} at line ${deletedLineNumber}`);
     await notifyFileWritten(context, file);
     triggerReminderChange(context, toReminder(reminder), "delete");
   } catch (error) {

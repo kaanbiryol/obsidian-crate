@@ -27,6 +27,27 @@ import {
   triggerReminderChange,
 } from "./operation-shared";
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function rollbackDestinationReminder(
+  context: MarkdownWriterContext,
+  file: Awaited<ReturnType<MarkdownWriterContext["getOrCreateProjectFile"]>>,
+  reminder: IndexedReminder,
+): Promise<void> {
+  let removed = false;
+  await context.app.vault.process(file, (fileContent) => {
+    const deletion = deleteReminderBlockFromContent(fileContent, reminder);
+    removed = deletion.found;
+    return deletion.content;
+  });
+
+  if (!removed) {
+    throw new Error(`Cannot locate the destination copy in ${file.path}`);
+  }
+}
+
 export async function updateReminderInMarkdown(
   context: MarkdownWriterContext,
   reminder: IndexedReminder,
@@ -63,16 +84,7 @@ export async function updateReminderInMarkdown(
       throw new Error(`File not found: ${reminder.filePath}`);
     }
 
-    const oldFileContent = await context.app.vault.read(oldFile);
-    const deletion = deleteReminderBlockFromContent(oldFileContent, reminder);
-    if (!deletion.found) {
-      throw new Error(
-        `Cannot safely locate reminder line in ${reminder.filePath}. The file may have been modified.`,
-      );
-    }
-
     const newFile = await context.getOrCreateProjectFile(newProject);
-    const newFileContent = await context.app.vault.read(newFile);
     const newLine = rebuildCheckboxLine(
       "",
       reminder.completed,
@@ -84,13 +96,8 @@ export async function updateReminderInMarkdown(
       resolvedHasTime,
       reminder.id,
     );
-    const movedContent = appendReminderBlockToContent(
-      newFileContent,
-      newLine,
-      normalizedDescription,
-    );
-
-    context.index.applyOptimisticUpdate(reminder.id, {
+    const movedReminder: IndexedReminder = {
+      ...reminder,
       content: newContent,
       description: normalizedDescription,
       dueDate: storedDates.dueDate,
@@ -102,16 +109,50 @@ export async function updateReminderInMarkdown(
       filePath: newFile.path,
       lineNumber: -1,
       rawLine: newLine,
-    });
+      contentHash: generateContentHash(newContent),
+    };
+
+    context.index.applyOptimisticUpdate(reminder.id, movedReminder);
+
+    let destinationWritten = false;
+    try {
+      await context.app.vault.process(newFile, (fileContent) => {
+        if (findReminderLineNumber(fileContent.split("\n"), movedReminder) !== -1) {
+          throw new Error(`Reminder ${reminder.id} already exists in ${newFile.path}`);
+        }
+        return appendReminderBlockToContent(fileContent, newLine, normalizedDescription);
+      });
+      destinationWritten = true;
+
+      await context.app.vault.process(oldFile, (fileContent) => {
+        const deletion = deleteReminderBlockFromContent(fileContent, reminder);
+        if (!deletion.found) {
+          throw new Error(
+            `Cannot safely locate reminder line in ${reminder.filePath}. The file may have been modified.`,
+          );
+        }
+        return deletion.content;
+      });
+    } catch (error) {
+      context.index.clearOptimistic(reminder.id);
+      if (destinationWritten) {
+        try {
+          await rollbackDestinationReminder(context, newFile, movedReminder);
+        } catch (rollbackError) {
+          throw new Error(
+            `${errorMessage(error)} Destination rollback also failed: ${errorMessage(rollbackError)}`,
+          );
+        }
+      }
+      throw error;
+    }
 
     try {
-      await context.app.vault.modify(newFile, movedContent);
-      await notifyFileWritten(context, newFile);
+      await Promise.all([
+        notifyFileWritten(context, newFile),
+        notifyFileWritten(context, oldFile),
+      ]);
 
-      await context.app.vault.modify(oldFile, deletion.content);
-      await notifyFileWritten(context, oldFile);
-
-      const contentHash = generateContentHash(newContent);
       const updatedReminder: Reminder & { contentHash: string } = {
         id: reminder.id,
         content: newContent,
@@ -124,7 +165,7 @@ export async function updateReminderInMarkdown(
         recurrence: newRecurrence,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        contentHash,
+        contentHash: movedReminder.contentHash,
       };
       triggerReminderChange(context, updatedReminder, "update");
     } catch (error) {
@@ -137,15 +178,6 @@ export async function updateReminderInMarkdown(
   const file = await context.getFile(reminder.filePath);
   if (!file) {
     throw new Error(`File not found: ${reminder.filePath}`);
-  }
-
-  const fileContent = await context.app.vault.read(file);
-  const lines = fileContent.split("\n");
-  const lineNumber = findReminderLineNumber(lines, reminder);
-  if (lineNumber === -1) {
-    throw new Error(
-      `Cannot safely locate reminder line in ${reminder.filePath}. The file may have been modified.`,
-    );
   }
 
   const newContent = updates.content ?? reminder.content;
@@ -180,15 +212,23 @@ export async function updateReminderInMarkdown(
     reminder.id,
   );
 
-  const replacement = replaceReminderBlockInContent(
-    fileContent,
-    reminder,
-    [newLine, ...newDescLines],
-  );
-
   try {
-    await context.app.vault.modify(file, replacement.content);
-    markdownWriterLog.info(`Updated reminder in ${reminder.filePath} at line ${replacement.lineNumber}`);
+    let replacementLineNumber = -1;
+    await context.app.vault.process(file, (fileContent) => {
+      const replacement = replaceReminderBlockInContent(
+        fileContent,
+        reminder,
+        [newLine, ...newDescLines],
+      );
+      if (!replacement.found) {
+        throw new Error(
+          `Cannot safely locate reminder line in ${reminder.filePath}. The file may have been modified.`,
+        );
+      }
+      replacementLineNumber = replacement.lineNumber;
+      return replacement.content;
+    });
+    markdownWriterLog.info(`Updated reminder in ${reminder.filePath} at line ${replacementLineNumber}`);
     await notifyFileWritten(context, file);
 
     const contentHash = generateContentHash(newContent);

@@ -38,6 +38,16 @@ export function createMarkdownWriter(
 ): MarkdownWriter {
   let onReminderChange: OnReminderChangeCallback | undefined;
   let onFileWritten: OnFileWrittenCallback | undefined;
+  let mutationQueue: Promise<void> = Promise.resolve();
+
+  const enqueueMutation = <T>(mutation: () => Promise<T>): Promise<T> => {
+    const result = mutationQueue.then(mutation, mutation);
+    mutationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  };
 
   const context: MarkdownWriterContext = {
     app,
@@ -58,25 +68,27 @@ export function createMarkdownWriter(
       hasTime,
       reminderId,
       description,
-    ) => createReminderInMarkdown(
-      context,
-      project,
-      content,
-      dueDate,
-      priority,
-      recurrence,
-      hasTime,
-      reminderId,
-      description,
+    ) => enqueueMutation(() =>
+      createReminderInMarkdown(
+        context,
+        project,
+        content,
+        dueDate,
+        priority,
+        recurrence,
+        hasTime,
+        reminderId,
+        description,
+      )
     ),
     updateReminder: (reminder, updates) =>
-      updateReminderInMarkdown(context, reminder, updates),
+      enqueueMutation(() => updateReminderInMarkdown(context, reminder, updates)),
     deleteReminder: (reminder) =>
-      deleteReminderInMarkdown(context, reminder),
+      enqueueMutation(() => deleteReminderInMarkdown(context, reminder)),
     toggleComplete: (reminder) =>
-      toggleReminderCompletionInMarkdown(context, reminder),
+      enqueueMutation(() => toggleReminderCompletionInMarkdown(context, reminder)),
     reorderReminders: (filePath, orderedIds) =>
-      reorderRemindersInMarkdown(context, filePath, orderedIds),
+      enqueueMutation(() => reorderRemindersInMarkdown(context, filePath, orderedIds)),
     setOnReminderChange(callback: OnReminderChangeCallback): void {
       onReminderChange = callback;
     },

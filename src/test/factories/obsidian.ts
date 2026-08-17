@@ -10,6 +10,7 @@ type MockVault = {
 	create: ReturnType<typeof vi.fn<(path: string, content: string) => Promise<void>>>;
 	read: ReturnType<typeof vi.fn<(file: TFile) => Promise<string>>>;
 	modify: ReturnType<typeof vi.fn<(file: TFile, content: string) => Promise<void>>>;
+	process: ReturnType<typeof vi.fn<(file: TFile, fn: (content: string) => string) => Promise<string>>>;
 };
 
 export type MockAppResult = {
@@ -55,6 +56,11 @@ export function createMockAppWithVault(initialFiles: Record<string, string> = {}
 		read: vi.fn(async (file: { path: string }) => files.get(file.path) || ''),
 		modify: vi.fn(async (file: { path: string }, content: string) => {
 			files.set(file.path, content);
+		}),
+		process: vi.fn(async (file: { path: string }, fn: (content: string) => string) => {
+			const nextContent = fn(files.get(file.path) || '');
+			files.set(file.path, nextContent);
+			return nextContent;
 		}),
 	};
 
