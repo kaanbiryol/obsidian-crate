@@ -28,7 +28,8 @@ async function buildWorkerBundle(pwaClientJs) {
 		platform: 'neutral',
 		target: 'esnext',
 		write: false,
-		minify: false,
+		minify: true,
+		legalComments: 'none',
 		mainFields: ['module', 'main'],
 		conditions: ['worker', 'browser', 'import'],
 		define: {

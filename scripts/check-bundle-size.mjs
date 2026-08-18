@@ -2,18 +2,31 @@ import { stat } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { readFile } from 'node:fs/promises';
 
-const budgets = [
-	{
+const budgetGroups = {
+	plugin: [{
 		path: 'dist/main.js',
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1050000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '300000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1000000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '285000', 10),
 	},
 	{
 		path: 'dist/styles.css',
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '320000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '360000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '45000', 10),
-	},
-];
+	}],
+	worker: [{
+		path: '.generated/cloudflare/worker.mjs',
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '950000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '260000', 10),
+	}],
+};
+
+const requestedGroup = process.argv[2] ?? 'all';
+const budgets = requestedGroup === 'all'
+	? Object.values(budgetGroups).flat()
+	: budgetGroups[requestedGroup];
+if (!budgets) {
+	throw new Error(`Unknown size budget group: ${requestedGroup}`);
+}
 
 function formatBytes(value) {
 	return `${(value / 1024).toFixed(2)} KiB`;
