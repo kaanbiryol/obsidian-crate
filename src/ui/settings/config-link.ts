@@ -1,8 +1,8 @@
-import { Notice, requestUrl } from 'obsidian';
-import { generateAuthToken } from '../../cloudflare/api';
-import { computeTokenHash } from '../../cloudflare/infrastructure';
+import { Notice } from 'obsidian';
 import type CratePlugin from '../../main';
 import { SECRET_KEYS } from '../../plugin/types';
+import { SyncApiClient } from '../../sync/api';
+import { generateSecureToken, hashToken } from '../../sync/device-token';
 
 export async function buildSetupLink(plugin: CratePlugin): Promise<string | null> {
 	const currentAuthToken = plugin.secretStorage.get(SECRET_KEYS.AUTH_TOKEN);
@@ -11,39 +11,22 @@ export async function buildSetupLink(plugin: CratePlugin): Promise<string | null
 		return null;
 	}
 
-	const newToken = generateAuthToken();
-	const tokenHash = await computeTokenHash(newToken);
+	const enrollmentToken = generateSecureToken();
+	const enrollmentTokenHash = await hashToken(enrollmentToken);
 	const workerUrl = plugin.settings.workerUrl.replace(/\/$/, '');
 
+	let expiresAt: string;
 	try {
-		await requestUrl({
-			url: `${workerUrl}/auth/tokens`,
-			method: 'POST',
-			headers: {
-				'Authorization': `Bearer ${currentAuthToken}`,
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ token_hash: tokenHash, device_name: 'setup-link' }),
-		});
+		({ expiresAt } = await new SyncApiClient(workerUrl, currentAuthToken)
+			.authorizeDeviceEnrollment(enrollmentTokenHash));
 	} catch {
-		new Notice('Failed to register token for new device');
+		new Notice('Failed to create a setup link for the new device');
 		return null;
 	}
 
 	const params = new URLSearchParams();
-	params.set('workerUrl', plugin.settings.workerUrl);
-	params.set('authToken', newToken);
-	if (plugin.settings.workerName) {
-		params.set('workerName', plugin.settings.workerName);
-	}
-	if (plugin.settings.bucketName) {
-		params.set('bucketName', plugin.settings.bucketName);
-	}
-	if (plugin.settings.databaseId) {
-		params.set('databaseId', plugin.settings.databaseId);
-	}
-	if (plugin.settings.cloudflareAccountId) {
-		params.set('accountId', plugin.settings.cloudflareAccountId);
-	}
+	params.set('workerUrl', workerUrl);
+	params.set('enrollmentToken', enrollmentToken);
+	params.set('expiresAt', expiresAt);
 	return `obsidian://crate-setup?${params.toString()}`;
 }

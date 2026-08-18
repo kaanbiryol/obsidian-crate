@@ -1,5 +1,6 @@
 import { Notice, type TAbstractFile } from 'obsidian';
 import { CloudflareSessionManager } from '../cloudflare/session-manager';
+import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
 import type CratePlugin from '../main';
 import { type ForegroundSyncReason, SyncRuntime } from './runtime';
 import { notifyConflicts } from './conflict';
@@ -7,8 +8,8 @@ import { isHiddenPath } from './file-discovery';
 import { ActivityModal } from '../ui/activity-modal';
 import { openConfirmationModal } from '../ui/confirmation-modal';
 import { applySharedSettings } from './shared-settings';
-import { SyncApiClient } from './api';
 import { errorMessage } from '../plugin/logger';
+import { exchangeDeviceEnrollment } from './enrollment';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
 
@@ -155,9 +156,9 @@ export async function handleSyncSetupProtocol(
 	params: Record<string, string>,
 ): Promise<void> {
 	const workerUrl = params['workerUrl'];
-	const authToken = params['authToken'];
+	const enrollmentToken = params['enrollmentToken'];
 
-	if (!workerUrl || !authToken) {
+	if (!workerUrl || !enrollmentToken) {
 		new Notice('Setup link is missing required parameters.');
 		return;
 	}
@@ -176,26 +177,29 @@ export async function handleSyncSetupProtocol(
 	}
 
 	try {
-		try {
-			const tempClient = new SyncApiClient(workerUrl, authToken);
-			const { settings: shared } = await tempClient.getSharedSettings();
-			if (shared) {
-				applySharedSettings(plugin.settings, shared);
-			}
-		} catch { /* best-effort */ }
+		const enrollment = await exchangeDeviceEnrollment({
+			workerUrl,
+			enrollmentToken,
+			deviceId: plugin.settings.deviceId,
+			deviceName: getCurrentDeviceName(plugin.settings.deviceId),
+			platform: getCurrentPlatformCode(),
+		});
+		if (enrollment.sharedSettings) {
+			applySharedSettings(plugin.settings, enrollment.sharedSettings);
+		}
 
 		await plugin.syncRuntime.applyInfrastructureConfig({
-			workerUrl,
-			authToken,
-			workerName: params['workerName'] || '',
-			bucketName: params['bucketName'] || '',
-			databaseId: params['databaseId'] || '',
-			accountId: params['accountId'] || undefined,
+			workerUrl: enrollment.workerUrl,
+			authToken: enrollment.authToken,
+			workerName: enrollment.config.workerName || '',
+			bucketName: enrollment.config.bucketName || '',
+			databaseId: enrollment.config.databaseId || '',
+			accountId: enrollment.config.accountId || undefined,
 		});
 
 		plugin.syncRuntime.pushSharedSettings().catch(() => {});
 
-		new Notice('Crate configured from setup link');
+		new Notice('Crate connected from setup link');
 
 		const result = await plugin.syncRuntime.testConnection();
 		if (result.success) {

@@ -124,6 +124,20 @@ export class SyncApiClient {
 		return this.authApi.registerToken(tokenHash, device);
 	}
 
+	async authorizeDeviceEnrollment(enrollmentTokenHash: string): Promise<{ expiresAt: string }> {
+		return this.authApi.authorizeDeviceEnrollment(enrollmentTokenHash);
+	}
+
+	async enrollDevice(input: {
+		enrollmentToken: string;
+		deviceTokenHash: string;
+		deviceId?: string;
+		deviceName?: string;
+		platform?: string;
+	}): Promise<{ id: string }> {
+		return this.authApi.enrollDevice(input);
+	}
+
 	async revokeToken(id: string): Promise<{ success: boolean }> {
 		return this.authApi.revokeToken(id);
 	}

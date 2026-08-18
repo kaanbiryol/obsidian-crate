@@ -130,6 +130,26 @@ describe('SetupCoordinator', () => {
 		expect(await status.json()).toEqual({ claimed: true, enrollmentAvailable: false });
 	});
 
+	it('lets an authenticated device replace the pending enrollment token', async () => {
+		const coordinator = createCoordinator();
+		await claim(coordinator, 'initial-token');
+		const nextTokenHash = await sha256Hex('next-device-token');
+
+		const response = await coordinator.fetch(new Request('https://worker.test/setup/authorize-enrollment', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ enrollmentTokenHash: nextTokenHash }),
+		}));
+
+		expect(response.status).toBe(200);
+		const status = await coordinator.fetch(new Request('https://worker.test/setup/status'));
+		expect(await status.json()).toMatchObject({
+			claimed: true,
+			enrollmentAvailable: true,
+			enrollmentTokenHash: nextTokenHash,
+		});
+	});
+
 	it('restores enrollment when D1 registration fails', async () => {
 		const { db } = createDb({ failInsert: true });
 		const coordinator = createCoordinator(db);

@@ -160,12 +160,12 @@ describe('bootstrapPlugin', () => {
 		expect(typeof setupHandler).toBe('function');
 		expect(typeof remindersHandler).toBe('function');
 
-		setupHandler?.({ workerUrl: 'https://worker.example', authToken: 'token' });
+		setupHandler?.({ workerUrl: 'https://worker.example', enrollmentToken: 'token' });
 		remindersHandler?.({ project: 'Work' });
 
 		expect(handleSyncSetupProtocol).toHaveBeenCalledWith(plugin, {
 			workerUrl: 'https://worker.example',
-			authToken: 'token',
+			enrollmentToken: 'token',
 		});
 		expect(openFullScreenReminderModal).toHaveBeenCalledWith(plugin, 'Work');
 	});

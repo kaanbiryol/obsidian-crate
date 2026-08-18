@@ -4,6 +4,7 @@ import type {
 	WorkerBinding,
 } from './api';
 import { normalizeWorkerUrl } from '../sync/worker-url';
+import { hashToken } from '../sync/device-token';
 
 function requireWorkerUrl(value: string): string {
 	const normalized = normalizeWorkerUrl(value);
@@ -14,10 +15,7 @@ function requireWorkerUrl(value: string): string {
 }
 
 export async function computeTokenHash(token: string): Promise<string> {
-	const data = new TextEncoder().encode(token);
-	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-	const hashArray = new Uint8Array(hashBuffer);
-	return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
+	return hashToken(token);
 }
 
 export async function waitForWorkerReady(

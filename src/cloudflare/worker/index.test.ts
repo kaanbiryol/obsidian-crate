@@ -231,6 +231,35 @@ describe('worker entrypoint', () => {
 		expect(setupFetch).toHaveBeenCalledTimes(1);
 	});
 
+	it('lets an authenticated device authorize a new enrollment token', async () => {
+		const setupFetch = vi.fn(async (_request: Request) =>
+			corsResponse({ expiresAt: '2026-08-18T12:10:00.000Z' }));
+		const response = await worker.fetch(
+			new Request('https://worker.test/auth/enrollment', {
+				method: 'POST',
+				headers: {
+					Authorization: 'Bearer secret-token',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ enrollmentTokenHash: 'a'.repeat(64) }),
+			}),
+			createEnv({
+				SETUP: {
+					idFromName: vi.fn(() => ({ name: 'owner' })),
+					get: vi.fn(() => ({ fetch: setupFetch })),
+				} as unknown as DurableObjectNamespace,
+			}) as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ expiresAt: '2026-08-18T12:10:00.000Z' });
+		expect(setupFetch).toHaveBeenCalledTimes(1);
+		const forwardedRequest = setupFetch.mock.calls[0]?.[0];
+		expect(forwardedRequest && await forwardedRequest.json()).toEqual({
+			enrollmentTokenHash: 'a'.repeat(64),
+		});
+	});
+
 	it('publishes unauthenticated server compatibility metadata', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/.well-known/crate'),

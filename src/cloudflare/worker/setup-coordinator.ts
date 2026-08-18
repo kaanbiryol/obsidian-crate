@@ -40,6 +40,9 @@ export class SetupCoordinator implements DurableObject {
 		const path = new URL(request.url).pathname;
 		if (path === '/setup/status' && request.method === 'GET') return await this.handleStatus();
 		if (path === '/setup/claim' && request.method === 'POST') return await this.handleClaim(request);
+		if (path === '/setup/authorize-enrollment' && request.method === 'POST') {
+			return await this.handleAuthorizeEnrollment(request);
+		}
 		if (path === '/setup/enroll' && request.method === 'POST') return await this.handleEnroll(request);
 		return corsResponse({ error: 'Not found' }, 404);
 	}
@@ -90,6 +93,28 @@ export class SetupCoordinator implements DurableObject {
 			enrollmentExpiresAt: expiresAt,
 		});
 		return corsResponse({ claimed: true, expiresAt: new Date(expiresAt).toISOString() });
+	}
+
+	private async handleAuthorizeEnrollment(request: Request): Promise<Response> {
+		const state = await this.readState();
+		if (!state) {
+			return corsResponse({ error: 'Server is not claimed' }, 409);
+		}
+
+		const parsedBody = await parseJsonObject(request);
+		if (!parsedBody.ok) return parsedBody.response;
+		const enrollmentTokenHash = parseOptionalString(parsedBody.value.enrollmentTokenHash, 64)?.toLowerCase() || '';
+		if (!isSha256Hex(enrollmentTokenHash)) {
+			return corsResponse({ error: 'Valid enrollmentTokenHash required' }, 400);
+		}
+
+		const expiresAt = Date.now() + ENROLLMENT_TTL_MS;
+		await this.state.storage.put<SetupState>(SETUP_STATE_KEY, {
+			claimed: true,
+			enrollmentTokenHash,
+			enrollmentExpiresAt: expiresAt,
+		});
+		return corsResponse({ expiresAt: new Date(expiresAt).toISOString() });
 	}
 
 	private async handleEnroll(request: Request): Promise<Response> {

@@ -1,5 +1,4 @@
 import type { Plugin, TAbstractFile } from 'obsidian';
-import { computeTokenHash } from '../cloudflare/infrastructure-shared';
 import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
 import { createLogger } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
@@ -19,6 +18,7 @@ import {
 import { recordSyncHistory, resetStoredSyncState } from './runtime-history';
 import { emitStateChange, emitSyncProgress } from './runtime-listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from './sync-result';
+import { hashToken } from './device-token';
 
 const logger = createLogger('SyncRuntime');
 export const FOREGROUND_SYNC_DEBOUNCE_MS = 1_000;
@@ -281,7 +281,7 @@ export class SyncRuntime {
 		}
 
 		try {
-			await this.apiClient.registerToken(await computeTokenHash(authToken), {
+			await this.apiClient.registerToken(await hashToken(authToken), {
 				deviceId: this.settings.deviceId,
 				deviceName: getCurrentDeviceName(this.settings.deviceId),
 				platform: getCurrentPlatformCode(),

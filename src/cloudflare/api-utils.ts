@@ -1,3 +1,5 @@
+import { generateSecureToken } from '../sync/device-token';
+
 function randomBase36(length: number): string {
 	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
 	const bytes = new Uint8Array(length);
@@ -45,9 +47,7 @@ export function createMultipartBody(parts: Array<{
 }
 
 export function generateAuthToken(): string {
-	const array = new Uint8Array(32);
-	crypto.getRandomValues(array);
-	return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+	return generateSecureToken();
 }
 
 export function generateBucketName(prefix: string = 'crate'): string {

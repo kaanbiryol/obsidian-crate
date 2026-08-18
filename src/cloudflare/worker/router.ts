@@ -17,7 +17,7 @@ export async function handleAuthenticatedRoute(
 	const db = env.DB || null;
 
 	return await handleSyncRoute(request, env, path, method)
-		?? await handleAuthRoute(request, db, path, method)
+		?? await handleAuthRoute(request, env, path, method)
 		?? await handleRemindersRoute(request, env, path, method)
 		?? await handleNotificationsRoute(request, db, path, method);
 }

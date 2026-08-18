@@ -8,9 +8,12 @@ const generateAuthToken = vi.fn();
 const listAccessibleAccounts = vi.fn();
 const verifyToken = vi.fn();
 const computeTokenHash = vi.fn();
+const generateSecureToken = vi.fn();
+const hashToken = vi.fn();
 const quickSetup = vi.fn();
 const applySharedSettings = vi.fn();
 const getSharedSettings = vi.fn();
+const authorizeDeviceEnrollment = vi.fn();
 const syncApiClientCtor = vi.fn();
 
 async function loadConfigSectionModule() {
@@ -47,6 +50,10 @@ async function loadConfigSectionModule() {
 	vi.doMock('../../sync/api', () => ({
 		SyncApiClient: syncApiClientCtor,
 	}));
+	vi.doMock('../../sync/device-token', () => ({
+		generateSecureToken,
+		hashToken,
+	}));
 	vi.doMock('../../sync/shared-settings', () => ({
 		applySharedSettings,
 	}));
@@ -75,13 +82,17 @@ beforeEach(() => {
 	listAccessibleAccounts.mockReset();
 	verifyToken.mockReset();
 	computeTokenHash.mockReset();
+	generateSecureToken.mockReset();
+	hashToken.mockReset();
 	quickSetup.mockReset();
 	applySharedSettings.mockReset();
 	getSharedSettings.mockReset();
+	authorizeDeviceEnrollment.mockReset();
 	syncApiClientCtor.mockReset();
 	syncApiClientCtor.mockImplementation(function () {
 		return {
 			getSharedSettings,
+			authorizeDeviceEnrollment,
 		};
 	});
 });
@@ -93,6 +104,7 @@ afterEach(() => {
 	vi.doUnmock('../../cloudflare/api');
 	vi.doUnmock('../../cloudflare/infrastructure');
 	vi.doUnmock('../../sync/api');
+	vi.doUnmock('../../sync/device-token');
 	vi.doUnmock('../../sync/shared-settings');
 	vi.doUnmock('../confirmation-modal');
 	vi.doUnmock('../qr-modal');
@@ -231,12 +243,12 @@ describe('buildSetupLink', () => {
 		expect(noticeMessages).toEqual(['Auth token not found']);
 	});
 
-	it('registers a fresh setup token and includes infrastructure metadata in the setup link', async () => {
+	it('creates a short-lived enrollment link without permanent credentials', async () => {
 		const { buildSetupLink } = await loadConfigSectionModule();
 
-		generateAuthToken.mockReturnValue('new-device-token');
-		computeTokenHash.mockResolvedValue('hashed-token');
-		requestUrl.mockResolvedValue({ status: 200 });
+		generateSecureToken.mockReturnValue('one-time-enrollment-token');
+		hashToken.mockResolvedValue('hashed-enrollment-token');
+		authorizeDeviceEnrollment.mockResolvedValue({ expiresAt: '2026-08-18T12:10:00.000Z' });
 
 		const link = await buildSetupLink({
 			secretStorage: {
@@ -251,33 +263,25 @@ describe('buildSetupLink', () => {
 			},
 		} as never);
 
-		expect(computeTokenHash).toHaveBeenCalledWith('new-device-token');
-		expect(requestUrl).toHaveBeenCalledWith({
-			url: 'https://worker.example/auth/tokens',
-			method: 'POST',
-			headers: {
-				Authorization: 'Bearer current-auth-token',
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ token_hash: 'hashed-token', device_name: 'setup-link' }),
-		});
+		expect(hashToken).toHaveBeenCalledWith('one-time-enrollment-token');
+		expect(syncApiClientCtor).toHaveBeenCalledWith('https://worker.example', 'current-auth-token');
+		expect(authorizeDeviceEnrollment).toHaveBeenCalledWith('hashed-enrollment-token');
 		expect(link).toBeTruthy();
 
 		const params = new URLSearchParams(link?.split('?')[1]);
 		expect(params.get('workerUrl')).toBe('https://worker.example');
-		expect(params.get('authToken')).toBe('new-device-token');
-		expect(params.get('workerName')).toBe('crate-worker');
-		expect(params.get('bucketName')).toBe('crate-bucket');
-		expect(params.get('databaseId')).toBe('db-123');
-		expect(params.get('accountId')).toBe('acct-123');
+		expect(params.get('enrollmentToken')).toBe('one-time-enrollment-token');
+		expect(params.get('expiresAt')).toBe('2026-08-18T12:10:00.000Z');
+		expect(params.has('authToken')).toBe(false);
+		expect(params.has('accountId')).toBe(false);
 	});
 
-	it('returns null when the new device token cannot be registered', async () => {
+	it('returns null when a new-device enrollment cannot be authorized', async () => {
 		const { buildSetupLink } = await loadConfigSectionModule();
 
-		generateAuthToken.mockReturnValue('new-device-token');
-		computeTokenHash.mockResolvedValue('hashed-token');
-		requestUrl.mockRejectedValue(new Error('request failed'));
+		generateSecureToken.mockReturnValue('one-time-enrollment-token');
+		hashToken.mockResolvedValue('hashed-enrollment-token');
+		authorizeDeviceEnrollment.mockRejectedValue(new Error('request failed'));
 
 		const link = await buildSetupLink({
 			secretStorage: {
@@ -293,6 +297,6 @@ describe('buildSetupLink', () => {
 		} as never);
 
 		expect(link).toBeNull();
-		expect(noticeMessages).toEqual(['Failed to register token for new device']);
+		expect(noticeMessages).toEqual(['Failed to create a setup link for the new device']);
 	});
 });
