@@ -67,6 +67,7 @@ function createDeferred<T>(): Deferred<T> {
 function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 	return {
 		workerUrl: 'https://worker.example',
+		cloudflareDeployment: null,
 		lastSync: null,
 		lastSeq: 0,
 		deviceId: 'device-1',
@@ -462,6 +463,17 @@ describe('SyncRuntime operation wrappers', () => {
 
 	it('clears sync state when clearing configuration', async () => {
 		const { runtime, settings } = createRuntimeHarness({
+			cloudflareDeployment: {
+				deploymentId: '0123456789abcdef',
+				accountId: '0123456789abcdef0123456789abcdef',
+				accountName: 'Example',
+				workerName: 'crate-0123456789abcdef',
+				d1DatabaseName: 'crate-0123456789abcdef',
+				d1DatabaseId: '01234567-89ab-cdef-0123-456789abcdef',
+				r2BucketName: 'crate-0123456789abcdef',
+				workersSubdomain: 'crate-example',
+				lastDeployedVersion: '0.1.0',
+			},
 			lastSeq: 42,
 			lastSync: '2026-01-01T00:00:00.000Z',
 			syncHistory: [
@@ -485,6 +497,7 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(settings.lastSync).toBeNull();
 		expect(settings.syncHistory).toEqual([]);
 		expect(settings.workerUrl).toBe('');
+		expect(settings.cloudflareDeployment).toBeNull();
 	});
 
 	it('caps stored sync history entries', async () => {

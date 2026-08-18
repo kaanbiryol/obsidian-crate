@@ -3,6 +3,7 @@
  */
 
 import { Plugin } from 'obsidian';
+import { type CloudflareDeploymentService } from '../cloudflare/deployment-service';
 import { type ReminderIndex } from '../reminders/data/reminder-index';
 import { type MarkdownWriter } from '../reminders/data/markdown-writer';
 import { type StorageCompat } from '../reminders/data/storage-compat';
@@ -28,6 +29,7 @@ export default class CratePlugin extends Plugin {
 	settings!: CrateSettings;
 	secretStorage!: SecretStorageService;
 	syncRuntime!: SyncRuntime;
+	cloudflareDeploymentService!: CloudflareDeploymentService;
 	readonly settingsUiState: SettingsUiState = createSettingsUiState();
 
 	// Reminders

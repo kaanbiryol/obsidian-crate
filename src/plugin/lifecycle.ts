@@ -12,6 +12,10 @@ import {
 } from "../sync/plugin-integration";
 import { ensurePluginDeviceId } from "./deviceId";
 import type CratePlugin from "./CratePlugin";
+import {
+  createCloudflareDeploymentService,
+  handleCloudflareOAuthProtocol,
+} from "../cloudflare/plugin-integration";
 
 const logger = createLogger("Plugin");
 
@@ -33,6 +37,7 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
 
 export function shutdownPlugin(plugin: CratePlugin): void {
   plugin.syncRuntime?.destroy();
+  plugin.cloudflareDeploymentService?.destroy();
   plugin.remindersVaultWatcher?.unregister();
 }
 
@@ -40,6 +45,7 @@ async function initializePluginCore(plugin: CratePlugin): Promise<boolean> {
   try {
     plugin.secretStorage = new SecretStorageService(plugin.app);
     await plugin.loadSettings();
+    plugin.cloudflareDeploymentService = createCloudflareDeploymentService(plugin);
     initializeSyncManagers(plugin);
     await ensurePluginDeviceId(plugin);
     return true;
@@ -70,6 +76,9 @@ function registerPluginCommands(plugin: CratePlugin): void {
 }
 
 function registerPluginProtocols(plugin: CratePlugin): void {
+  plugin.registerObsidianProtocolHandler("crate-cloudflare-oauth", (params) => {
+    void handleCloudflareOAuthProtocol(plugin, params);
+  });
   plugin.registerObsidianProtocolHandler("crate-setup", (params) => {
     void handleSyncSetupProtocol(plugin, params);
   });

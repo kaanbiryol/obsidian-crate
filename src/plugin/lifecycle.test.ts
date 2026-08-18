@@ -16,6 +16,11 @@ const registerSyncCommands = vi.fn();
 const registerVaultSyncEventHandlers = vi.fn();
 const ensurePluginDeviceId = vi.fn();
 const openFullScreenReminderModal = vi.fn();
+const handleCloudflareOAuthProtocol = vi.fn();
+const cloudflareDeploymentDestroy = vi.fn();
+const createCloudflareDeploymentService = vi.fn(() => ({
+	destroy: cloudflareDeploymentDestroy,
+}));
 
 class FakeDocumentFragment {
 	readonly spans: string[] = [];
@@ -78,6 +83,10 @@ async function loadLifecycleModule() {
 	vi.doMock('./deviceId', () => ({
 		ensurePluginDeviceId,
 	}));
+	vi.doMock('../cloudflare/plugin-integration', () => ({
+		createCloudflareDeploymentService,
+		handleCloudflareOAuthProtocol,
+	}));
 
 	return import('./lifecycle');
 }
@@ -109,6 +118,9 @@ beforeEach(() => {
 	registerVaultSyncEventHandlers.mockReset();
 	ensurePluginDeviceId.mockReset();
 	openFullScreenReminderModal.mockReset();
+	handleCloudflareOAuthProtocol.mockReset();
+	cloudflareDeploymentDestroy.mockReset();
+	createCloudflareDeploymentService.mockClear();
 	vi.stubGlobal('DocumentFragment', FakeDocumentFragment as unknown as typeof DocumentFragment);
 });
 
@@ -124,6 +136,7 @@ afterEach(() => {
 	vi.doUnmock('../reminders/plugin-integration');
 	vi.doUnmock('../sync/plugin-integration');
 	vi.doUnmock('./deviceId');
+	vi.doUnmock('../cloudflare/plugin-integration');
 });
 
 describe('bootstrapPlugin', () => {
@@ -148,7 +161,8 @@ describe('bootstrapPlugin', () => {
 		expect(syncInitialize).toHaveBeenCalledTimes(1);
 		expect(registerSyncCommands).toHaveBeenCalledWith(plugin);
 		expect(initializeReminders).toHaveBeenCalledWith(plugin);
-		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(2);
+		expect(createCloudflareDeploymentService).toHaveBeenCalledWith(plugin);
+		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(3);
 
 		const setupHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
 			([name]) => name === 'crate-setup',
@@ -156,18 +170,27 @@ describe('bootstrapPlugin', () => {
 		const remindersHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
 			([name]) => name === 'crate-reminders',
 		)?.[1] as ProtocolHandler | undefined;
+		const cloudflareHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
+			([name]) => name === 'crate-cloudflare-oauth',
+		)?.[1] as ProtocolHandler | undefined;
 
 		expect(typeof setupHandler).toBe('function');
 		expect(typeof remindersHandler).toBe('function');
+		expect(typeof cloudflareHandler).toBe('function');
 
 		setupHandler?.({ workerUrl: 'https://worker.example', enrollmentToken: 'token' });
 		remindersHandler?.({ project: 'Work' });
+		cloudflareHandler?.({ code: 'authorization-code', state: 'oauth-state' });
 
 		expect(handleSyncSetupProtocol).toHaveBeenCalledWith(plugin, {
 			workerUrl: 'https://worker.example',
 			enrollmentToken: 'token',
 		});
 		expect(openFullScreenReminderModal).toHaveBeenCalledWith(plugin, 'Work');
+		expect(handleCloudflareOAuthProtocol).toHaveBeenCalledWith(plugin, {
+			code: 'authorization-code',
+			state: 'oauth-state',
+		});
 	});
 
 	it('shows the setup notice instead of starting sync when the plugin is not configured', async () => {
@@ -218,10 +241,12 @@ describe('shutdownPlugin', () => {
 
 		shutdownPlugin({
 			syncRuntime: { destroy },
+			cloudflareDeploymentService: { destroy: cloudflareDeploymentDestroy },
 			remindersVaultWatcher: { unregister },
 		} as never);
 
 		expect(destroy).toHaveBeenCalledTimes(1);
+		expect(cloudflareDeploymentDestroy).toHaveBeenCalledTimes(1);
 		expect(unregister).toHaveBeenCalledTimes(1);
 	});
 });

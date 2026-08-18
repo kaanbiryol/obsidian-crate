@@ -4,9 +4,11 @@ import { defineConfig } from "vite";
 import { resolve } from "node:path";
 import { builtinModules } from "node:module";
 import { testVaultDeployPlugin } from "./scripts/test-vault-vite-plugin.mjs";
+import { cloudflareArtifactsPlugin } from "./scripts/cloudflare-artifacts-vite-plugin.mjs";
 
 export default defineConfig(({ mode }) => ({
 	plugins: [
+		cloudflareArtifactsPlugin({ rootDir: __dirname }),
 		preact(),
 		replace({
 			"process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
@@ -14,6 +16,11 @@ export default defineConfig(({ mode }) => ({
 		}),
 		...(mode === "development" ? [testVaultDeployPlugin({ rootDir: __dirname })] : []),
 	],
+	define: {
+		__CRATE_CLOUDFLARE_OAUTH_CLIENT_ID__: JSON.stringify(
+			process.env.CRATE_CLOUDFLARE_OAUTH_CLIENT_ID || "not-configured",
+		),
+	},
 	build: {
 		minify: true,
 		lib: {

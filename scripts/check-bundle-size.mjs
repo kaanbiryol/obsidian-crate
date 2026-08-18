@@ -5,8 +5,9 @@ import { readFile } from 'node:fs/promises';
 const budgetGroups = {
 	plugin: [{
 		path: 'dist/main.js',
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1000000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '285000', 10),
+		// Includes the compressed, integrity-checked Worker used by OAuth deployment.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1400000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '550000', 10),
 	},
 	{
 		path: 'dist/styles.css',

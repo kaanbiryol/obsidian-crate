@@ -6,7 +6,7 @@ Crate is an Obsidian plugin for people who want to own the infrastructure behind
 
 Crate is not a hosted service and does not require a Crate account.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/kaanbiryol/obsidian-crate)
+[Deployment and OAuth setup](docs/deployment.md)
 
 ## Status
 
@@ -32,7 +32,7 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 
 The Obsidian plugin owns sync planning, change detection, conflict handling, and local settings. The independently deployed Cloudflare Worker is the storage API. It stores file contents in R2, metadata in D1, and reminder notification alarms in Durable Objects.
 
-The plugin never asks for a Cloudflare account API token. During setup, a short-lived enrollment link lets Obsidian register a permanent device credential whose plaintext is generated and kept on that device. Push and reminders web enrollment use separate short-lived tokens.
+The plugin never asks for a Cloudflare account API token. Deployment uses Cloudflare OAuth Authorization Code + PKCE, provisions inside Obsidian, and discards the temporary OAuth token when it finishes. During server claim, a short-lived enrollment link lets Obsidian register a permanent device credential whose plaintext is generated and kept on that device.
 
 ## Privacy and Security
 
@@ -40,6 +40,8 @@ The plugin never asks for a Cloudflare account API token. During setup, a short-
 - Sync metadata and registered device records are stored in your D1 database.
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
+- OAuth state and PKCE material exist only in memory during one deployment; authorization codes and OAuth access tokens are never stored or logged.
+- The Worker module and D1 migrations are versioned build-time artifacts inside the plugin. Crate does not fetch deployment code at runtime.
 - Initial, additional-device, push, and reminders web enrollment links are short-lived and scoped to one setup action.
 - Claim a new Worker promptly. Until the first device is enrolled, anyone who knows the Worker URL can claim an unowned deployment.
 - Remote code is not fetched or evaluated at runtime.
@@ -103,18 +105,19 @@ npm run deploy:plugin
 
 After installing the plugin, open the Crate settings tab in Obsidian:
 
-1. Select **Deploy to Cloudflare**. Review the imported repository and resources, then deploy it to your account.
-2. Open the deployed Worker URL and select **Claim server** promptly.
-3. Select **Open in Obsidian** on the claim page. The one-use setup link expires after 10 minutes.
-4. Return to Crate and run **Initial sync → Upload all** when you are ready to seed the remote vault.
+1. Select **Deploy to Cloudflare**. Your browser opens Cloudflare OAuth.
+2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
+3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate provisions the Worker, R2 bucket, D1 database, Durable Objects, endpoint, and migrations, then discards the OAuth token.
+4. On the Worker page, select **Claim server** promptly, then **Open in Obsidian**.
+5. Return to Crate and run **Initial sync → Upload all** when you are ready to seed the remote vault.
 
-Cloudflare provisions the Worker, R2 bucket, D1 database, and Durable Objects described in `wrangler.jsonc`. Crate verifies the server protocol before accepting the setup link. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered with the Worker.
+The OAuth deployment uses the build-time Worker and migrations included in the installed plugin. Crate verifies the server protocol before accepting the setup link. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered with the Worker.
 
 To add another device, use **Settings → Crate → Configuration → Set up another device** on a connected device. Each link can be used once and issuing a replacement invalidates the previous pending link.
 
 If deployment does not take you to the Worker, paste its `workers.dev` URL into **Open existing server**. An abandoned first claim becomes claimable again after its 10-minute enrollment window expires, provided no device was registered.
 
-For updates, recovery procedures, and the command-line fallback, see [Deploying and operating the server](docs/deployment.md). Update the existing Cloudflare project rather than selecting the deploy button again; a second deployment creates a separate server and storage set.
+For the one-time GitHub Pages and OAuth-client configuration, updates, recovery, and the retained GitHub/command-line fallbacks, see [Deploying and operating the server](docs/deployment.md). **Authorize update** reuses the resource IDs saved by the initial OAuth deployment.
 
 ## Sync Scope and Limits
 

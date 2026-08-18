@@ -174,6 +174,7 @@ export interface RegisteredDevice {
 
 export interface CrateSettings {
 	workerUrl: string;
+	cloudflareDeployment: CloudflareDeploymentMetadata | null;
 	lastSync: string | null;
 	lastSeq: number;
 	deviceId: string;
@@ -188,6 +189,22 @@ export interface CrateSettings {
 	debounceDelay: number; // seconds
 }
 
+/**
+ * Non-secret identifiers used to make Cloudflare deployment retries and updates
+ * converge on the same resources. OAuth credentials never belong in settings.
+ */
+export interface CloudflareDeploymentMetadata {
+	deploymentId: string;
+	accountId: string | null;
+	accountName: string | null;
+	workerName: string;
+	d1DatabaseName: string;
+	d1DatabaseId: string | null;
+	r2BucketName: string;
+	workersSubdomain: string | null;
+	lastDeployedVersion: string | null;
+}
+
 export interface SharedSettings {
 	ignorePatterns: string[];
 	syncOnStartup: boolean;
@@ -199,6 +216,7 @@ export interface SharedSettings {
 
 export const DEFAULT_SETTINGS: CrateSettings = {
 	workerUrl: '',
+	cloudflareDeployment: null,
 	lastSync: null,
 	lastSeq: 0,
 	deviceId: '',

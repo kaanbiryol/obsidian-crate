@@ -1,0 +1,141 @@
+import type { CloudflareDeploymentMetadata } from '../plugin/types';
+import { CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
+import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
+import { randomHex } from './pkce';
+
+const MIGRATIONS_TABLE = '_crate_migrations';
+
+async function ensureD1Database(
+	api: CloudflareApiClient,
+	accountId: string,
+	metadata: CloudflareDeploymentMetadata,
+): Promise<string> {
+	if (metadata.d1DatabaseId) {
+		const existingById = await api.getD1Database(accountId, metadata.d1DatabaseId);
+		if (existingById?.uuid) return existingById.uuid;
+	}
+
+	const existingByName = await api.findD1Database(accountId, metadata.d1DatabaseName);
+	if (existingByName?.uuid) return existingByName.uuid;
+	const created = await api.createD1Database(accountId, metadata.d1DatabaseName);
+	if (!created.uuid) throw new Error('Cloudflare did not return the new D1 database ID');
+	return created.uuid;
+}
+
+async function ensureR2Bucket(
+	api: CloudflareApiClient,
+	accountId: string,
+	bucketName: string,
+): Promise<void> {
+	try {
+		if (await api.getR2Bucket(accountId, bucketName)) return;
+		await api.createR2Bucket(accountId, bucketName);
+	} catch (error) {
+		if (error instanceof CloudflareApiError && error.code === 10042) {
+			throw new Error(
+				'R2 is not active for this Cloudflare account. Enable an R2 subscription in the Cloudflare dashboard, then select Deploy to Cloudflare again.',
+			);
+		}
+		throw error;
+	}
+}
+
+async function applyD1Migrations(input: {
+	api: CloudflareApiClient;
+	accountId: string;
+	databaseId: string;
+	artifacts: CloudflareDeploymentArtifacts;
+}): Promise<void> {
+	await input.api.queryD1(
+		input.accountId,
+		input.databaseId,
+		`CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (name TEXT PRIMARY KEY, sha256 TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT (datetime('now')));`,
+	);
+	const appliedResult = await input.api.queryD1(
+		input.accountId,
+		input.databaseId,
+		`SELECT name, sha256 FROM ${MIGRATIONS_TABLE};`,
+	);
+	const appliedRows = appliedResult.flatMap(result => result.results ?? []);
+	const applied = new Map(appliedRows.map(row => [String(row.name), String(row.sha256)]));
+
+	for (const migration of input.artifacts.d1Migrations) {
+		const previousHash = applied.get(migration.name);
+		if (previousHash === migration.sha256) continue;
+		if (previousHash) {
+			throw new Error(`D1 migration ${migration.name} changed after it was applied`);
+		}
+		await input.api.queryD1(input.accountId, input.databaseId, migration.sql);
+		await input.api.queryD1(
+			input.accountId,
+			input.databaseId,
+			`INSERT INTO ${MIGRATIONS_TABLE} (name, sha256) VALUES (?, ?);`,
+			[migration.name, migration.sha256],
+		);
+	}
+}
+
+async function ensureWorkersSubdomain(
+	api: CloudflareApiClient,
+	accountId: string,
+	metadata: CloudflareDeploymentMetadata,
+): Promise<string> {
+	const existing = await api.getWorkersSubdomain(accountId);
+	if (existing) return existing;
+
+	const candidates = [
+		metadata.workersSubdomain,
+		`crate-${metadata.deploymentId}`,
+		`crate-${metadata.deploymentId}-${randomHex(2)}`,
+	].filter((value): value is string => Boolean(value));
+	let lastError: unknown = null;
+	for (const candidate of candidates) {
+		try {
+			return await api.createWorkersSubdomain(accountId, candidate);
+		} catch (error) {
+			lastError = error;
+		}
+	}
+	if (lastError instanceof Error) throw lastError;
+	throw new Error('Cloudflare could not create a workers.dev subdomain');
+}
+
+export async function provisionCloudflareDeployment(input: {
+	api: CloudflareApiClient;
+	accountId: string;
+	metadata: CloudflareDeploymentMetadata;
+	artifacts: CloudflareDeploymentArtifacts;
+	onMetadataChanged: () => Promise<void>;
+}): Promise<string> {
+	const databaseId = await ensureD1Database(input.api, input.accountId, input.metadata);
+	if (input.metadata.d1DatabaseId !== databaseId) {
+		input.metadata.d1DatabaseId = databaseId;
+		await input.onMetadataChanged();
+	}
+
+	await ensureR2Bucket(input.api, input.accountId, input.metadata.r2BucketName);
+	await applyD1Migrations({
+		api: input.api,
+		accountId: input.accountId,
+		databaseId,
+		artifacts: input.artifacts,
+	});
+	await input.api.uploadWorker({
+		accountId: input.accountId,
+		workerName: input.metadata.workerName,
+		artifacts: input.artifacts,
+		d1DatabaseId: databaseId,
+		r2BucketName: input.metadata.r2BucketName,
+	});
+
+	const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata);
+	if (input.metadata.workersSubdomain !== workersSubdomain) {
+		input.metadata.workersSubdomain = workersSubdomain;
+		await input.onMetadataChanged();
+	}
+	await input.api.enableWorkerSubdomain(input.accountId, input.metadata.workerName);
+
+	input.metadata.lastDeployedVersion = input.artifacts.version;
+	await input.onMetadataChanged();
+	return `https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`;
+}

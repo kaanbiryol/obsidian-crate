@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Crate</title>
+  <rect width="96" height="96" rx="22" fill="#111827"/>
+  <path d="M23 31 48 18l25 13v34L48 79 23 65Z" fill="#f59e0b"/>
+  <path d="m23 31 25 14 25-14M48 45v34" fill="none" stroke="#fff7ed" stroke-width="6" stroke-linejoin="round"/>
+</svg>

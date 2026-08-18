@@ -10,6 +10,7 @@ import {
 const openConfirmationModal = vi.fn();
 const buildSetupLink = vi.fn();
 const qrModalOpen = vi.fn();
+const startCloudflareDeployment = vi.fn();
 
 async function flushMicrotasks(): Promise<void> {
 	await Promise.resolve();
@@ -21,6 +22,7 @@ async function loadConfigSectionModule() {
 	vi.doMock('../../cloudflare/deploy-button', () => ({
 		CRATE_CLOUDFLARE_DEPLOY_URL: 'https://deploy.example/',
 	}));
+	vi.doMock('../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment }));
 	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal }));
 	vi.doMock('../qr-modal', () => ({
 		QRModal: class QRModal {
@@ -45,6 +47,7 @@ beforeEach(() => {
 	openConfirmationModal.mockReset();
 	buildSetupLink.mockReset();
 	qrModalOpen.mockReset();
+	startCloudflareDeployment.mockReset();
 });
 
 afterEach(() => {
@@ -53,6 +56,7 @@ afterEach(() => {
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../../cloudflare/deploy-button');
+	vi.doUnmock('../../cloudflare/plugin-integration');
 	vi.doUnmock('../confirmation-modal');
 	vi.doUnmock('../qr-modal');
 	vi.doUnmock('./config-link');
@@ -67,15 +71,21 @@ describe('renderConfigSection integration', () => {
 
 		renderConfigSection({
 			containerEl: new FakeElement('div') as never,
-			plugin: { syncRuntime: { isConfigured: vi.fn(() => false) } } as never,
+			plugin: {
+				settings: { cloudflareDeployment: null },
+				syncRuntime: { isConfigured: vi.fn(() => false) },
+			} as never,
 			rerender: vi.fn(),
 		});
 
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
 			'Deploy sync server',
+			'GitHub deploy fallback',
 			'Open existing server',
 		]);
 		getSettingByName('Deploy sync server').buttons[0]?.click();
+		expect(startCloudflareDeployment).toHaveBeenCalledTimes(1);
+		getSettingByName('GitHub deploy fallback').buttons[0]?.click();
 		expect(open).toHaveBeenCalledWith('https://deploy.example/', '_blank', 'noopener,noreferrer');
 
 		const existingServer = getSettingByName('Open existing server');
@@ -96,6 +106,7 @@ describe('renderConfigSection integration', () => {
 		openConfirmationModal.mockResolvedValue(true);
 		const plugin = {
 			app: {},
+			settings: { cloudflareDeployment: null },
 			clearSettingsUiState: vi.fn(),
 			syncRuntime: {
 				isConfigured: vi.fn(() => true),
@@ -123,5 +134,20 @@ describe('renderConfigSection integration', () => {
 		await flushMicrotasks();
 		expect(clearSyncConfiguration).toHaveBeenCalledTimes(1);
 		expect(rerender).toHaveBeenCalledTimes(1);
+	});
+
+	it('offers an in-place server update when OAuth deployment metadata exists', async () => {
+		const { renderConfigSection } = await loadConfigSectionModule();
+		renderConfigSection({
+			containerEl: new FakeElement('div') as never,
+			plugin: {
+				settings: { cloudflareDeployment: { deploymentId: '0123456789abcdef' } },
+				syncRuntime: { isConfigured: vi.fn(() => true) },
+			} as never,
+			rerender: vi.fn(),
+		});
+
+		getSettingByName('Update Cloudflare server').buttons[0]?.click();
+		expect(startCloudflareDeployment).toHaveBeenCalledTimes(1);
 	});
 });

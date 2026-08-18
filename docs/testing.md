@@ -20,7 +20,7 @@ Run the release gate before publishing either deliverable:
 npm run release:check
 ```
 
-It builds and checks both TypeScript targets, runs lint and the complete test suite, creates production plugin and Worker artifacts, enforces independent raw/gzip size budgets, validates manifest/version consistency and required Wrangler bindings, and checks that Worker server code is absent from `dist/main.js`.
+It builds and checks both TypeScript targets, runs lint and the complete test suite, creates production plugin and Worker artifacts, enforces raw/gzip size budgets, validates manifest/version consistency and required Wrangler bindings, and checks for the OAuth and fallback deployment entry points.
 
 The individual size gates are also available as `npm run size-check:plugin` and `npm run size-check:worker`. A Cloudflare configuration change should additionally pass:
 
@@ -39,6 +39,27 @@ Run this before merging changes that touch sync orchestration, reminder parsing,
 - Add a reminders code block and verify reading view plus live preview render and update without duplicate roots or unstyled flashes.
 - Exercise sync event paths by creating, editing, deleting, and renaming a note, then confirm queued paths clear after sync.
 - If push or PWA code changed, run `npm run test:pwa-preview` and manually open the preview URL.
+
+## OAuth deployment test vault
+
+After the Pages site and a private or public Cloudflare OAuth client are configured:
+
+1. Build and watch with the real client ID:
+
+   ```bash
+   CRATE_CLOUDFLARE_OAUTH_CLIENT_ID=<client-id> npm run dev
+   ```
+
+2. Open `test-vault` in Obsidian, enable Crate under **Settings → Community plugins**, and reload it after the build is installed.
+3. Use a disposable Cloudflare test account with R2 already active. Open **Settings → Crate → Configuration → Deploy to Cloudflare**.
+4. Confirm the consent screen shows the expected verified publisher and exactly Workers Scripts Write, D1 Write, Workers R2 Storage Write, and Memberships Read. Select exactly one account.
+5. Confirm the browser lands at `/oauth/callback/`, its address bar no longer contains OAuth parameters, and Obsidian opens. If automatic launch is blocked, select **Open Obsidian**.
+6. Confirm Crate creates one `crate-<16 hex>` Worker, D1 database, and R2 bucket, applies the migration, enables the workers.dev endpoint, and opens the claim page.
+7. Claim the Worker, return to Obsidian, and exercise initial sync with non-critical notes only.
+8. Select **Authorize update** and confirm the same Worker, D1 database, R2 bucket, and Durable Object namespaces are reused.
+9. For the inactive-R2 case, use an account without an active R2 subscription and confirm Crate shows the activation message rather than a generic API error.
+
+The test creates real resources only when a person completes Cloudflare consent. Delete disposable resources manually from that test account after validation. Never paste OAuth codes, access tokens, or PKCE values into issue reports or test logs.
 
 ## Obsidian Mock
 

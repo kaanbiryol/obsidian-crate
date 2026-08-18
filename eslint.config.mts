@@ -19,6 +19,7 @@ export default tseslint.config(
 						'tailwind.theme.js',
 						'vite.config.mts',
 						'vitest.config.ts',
+						'site/assets/*.js',
 					]
 				},
 				tsconfigRootDir: import.meta.dirname,
@@ -40,7 +41,25 @@ export default tseslint.config(
 		plugins: { obsidianmd },
 		rules: {
 			'no-undef': 'off',
-			'obsidianmd/ui/sentence-case': [2, { ignoreWords: ['Cloudflare', 'R2', 'D1'] }],
+			'obsidianmd/ui/sentence-case': [2, { ignoreWords: [
+				'Cloudflare',
+				'Crate',
+				'D1',
+				'Durable',
+				'GitHub',
+				'HTTPS',
+				'Obsidian',
+				'OAuth',
+				'Objects',
+				'R2',
+				'Worker',
+			] }],
+		},
+	},
+	{
+		files: ['src/cloudflare/callback-page.test.ts'],
+		rules: {
+			'import/no-nodejs-modules': 'off',
 		},
 	},
 	{

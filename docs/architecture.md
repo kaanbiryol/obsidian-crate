@@ -38,7 +38,8 @@
 | **Cloudflare Worker** | HTTPS API - receives uploads, serves downloads, manages changelog, serves the reminders PWA |
 | **Cloudflare R2** | Object storage for vault file content and shared settings |
 | **Cloudflare D1** | SQLite database with sync metadata, auth tokens, push subscriptions, and reminder alarm records |
-| **Cloudflare deploy flow** | Imports the public server project and provisions its declared bindings without exposing an account token to the plugin |
+| **Cloudflare OAuth deployment** | Uses PKCE in Obsidian to provision build-time Worker and migration artifacts, then revokes the temporary token |
+| **Static GitHub Pages callback** | Removes OAuth parameters and hands the response to Obsidian; has no backend, analytics, or token exchange |
 | **OS Keychain** | Stores auth tokens via Obsidian's `secretStorage` API |
 
 ## Worker Bindings
@@ -70,6 +71,14 @@ CratePlugin (src/plugin/CratePlugin.ts)
 ```
 
 ## Authentication
+
+### Cloudflare deployment
+
+1. The plugin creates a cryptographically random OAuth `state` and a fresh PKCE S256 verifier/challenge in memory.
+2. Cloudflare redirects to `https://crate.kaanbiryol.com/oauth/callback/`. The static page immediately clears its query string and opens the `crate-cloudflare-oauth` Obsidian protocol.
+3. The plugin verifies `state` before exchanging the authorization code. The access token is held only in a local stack frame.
+4. The plugin uses the selected account to create or reuse D1 and R2, apply hash-tracked SQL migrations, upload the embedded Worker with declarative Durable Object bindings, and enable workers.dev.
+5. The token is revoked and discarded before the Worker claim page opens. Only non-secret resource identifiers remain in plugin settings for retries and updates.
 
 ### First-device setup
 
@@ -106,7 +115,9 @@ The plugin stores two local values through `SecretStorageService`:
 
 The Worker source lives in `src/cloudflare/worker/`. `scripts/build-worker.mjs` builds the PWA client first, injects that bundle into the Worker build, and writes the deployable module to `.generated/cloudflare/worker.mjs`.
 
-The Obsidian plugin and Worker are independent build products. `vite.config.mts` bundles only `src/main.ts` and its plugin dependencies into `dist/main.js`; it does not read or embed the generated Worker. `npm run release:check` enforces separate raw/gzip budgets and scans the plugin artifact for server-code markers.
+The Worker remains an independently deployable build product, but the production plugin also includes a gzip-compressed copy of `.generated/cloudflare/worker.mjs` and every ordered SQL file in `migrations/`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or migration is fetched from the network at runtime.
+
+`npm run release:check` enforces Worker and combined-plugin size budgets and checks that both the OAuth entry point and documented GitHub deploy fallback remain present.
 
 ## Status Bar
 

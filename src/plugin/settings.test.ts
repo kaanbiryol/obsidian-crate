@@ -3,6 +3,42 @@ import { buildPersistedCrateSettings, DEFAULT_SETTINGS, normalizeCrateSettings }
 import { MAX_SYNC_HISTORY_PATHS } from './types';
 
 describe('normalizeCrateSettings', () => {
+	it('keeps valid non-secret Cloudflare deployment metadata', () => {
+		const settings = normalizeCrateSettings({
+			cloudflareDeployment: {
+				deploymentId: '0123456789abcdef',
+				accountId: '0123456789abcdef0123456789abcdef',
+				accountName: 'Personal account',
+				workerName: 'crate-0123456789abcdef',
+				d1DatabaseName: 'crate-0123456789abcdef',
+				d1DatabaseId: '01234567-89ab-cdef-0123-456789abcdef',
+				r2BucketName: 'crate-0123456789abcdef',
+				workersSubdomain: 'my-workers-subdomain',
+				lastDeployedVersion: '0.1.0',
+			},
+		}, 'vault-config');
+
+		expect(settings.cloudflareDeployment?.workerName).toBe('crate-0123456789abcdef');
+	});
+
+	it('drops malformed Cloudflare deployment metadata', () => {
+		const settings = normalizeCrateSettings({
+			cloudflareDeployment: {
+				deploymentId: 'not-random',
+				accountId: null,
+				accountName: null,
+				workerName: 'shared-worker',
+				d1DatabaseName: 'shared-db',
+				d1DatabaseId: null,
+				r2BucketName: 'shared-bucket',
+				workersSubdomain: null,
+				lastDeployedVersion: null,
+			},
+		}, 'vault-config');
+
+		expect(settings.cloudflareDeployment).toBeNull();
+	});
+
 	it('normalizes persisted values and rejects unsafe runtime settings', () => {
 		const settings = normalizeCrateSettings({
 			workerUrl: ' http://worker.example/ ',

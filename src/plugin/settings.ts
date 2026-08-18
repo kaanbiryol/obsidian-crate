@@ -5,6 +5,7 @@
 import { normalizeWorkerUrl } from '../sync/worker-url';
 import {
 	type CrateSettings,
+	type CloudflareDeploymentMetadata,
 	DEFAULT_SETTINGS,
 	MAX_SYNC_HISTORY,
 	MAX_SYNC_HISTORY_PATHS,
@@ -34,6 +35,48 @@ function normalizeNullableString(value: unknown): string | null {
 
 function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
 	return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : fallback;
+}
+
+function normalizeCloudflareDeployment(value: unknown): CloudflareDeploymentMetadata | null {
+	if (!isRecord(value)) {
+		return null;
+	}
+
+	const deploymentId = normalizeString(value.deploymentId).toLowerCase();
+	const workerName = normalizeString(value.workerName).toLowerCase();
+	const d1DatabaseName = normalizeString(value.d1DatabaseName).toLowerCase();
+	const r2BucketName = normalizeString(value.r2BucketName).toLowerCase();
+	if (!/^[a-f0-9]{16}$/.test(deploymentId)
+		|| !/^crate-[a-f0-9]{16}$/.test(workerName)
+		|| !/^crate-[a-f0-9]{16}$/.test(d1DatabaseName)
+		|| !/^crate-[a-f0-9]{16}$/.test(r2BucketName)) {
+		return null;
+	}
+
+	const accountId = normalizeNullableString(value.accountId);
+	const d1DatabaseId = normalizeNullableString(value.d1DatabaseId);
+	const workersSubdomain = normalizeNullableString(value.workersSubdomain);
+	if (accountId !== null && !/^[a-f0-9]{32}$/i.test(accountId)) {
+		return null;
+	}
+	if (d1DatabaseId !== null && !/^[a-f0-9-]{32,36}$/i.test(d1DatabaseId)) {
+		return null;
+	}
+	if (workersSubdomain !== null && !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(workersSubdomain)) {
+		return null;
+	}
+
+	return {
+		deploymentId,
+		accountId,
+		accountName: normalizeNullableString(value.accountName),
+		workerName,
+		d1DatabaseName,
+		d1DatabaseId,
+		r2BucketName,
+		workersSubdomain,
+		lastDeployedVersion: normalizeNullableString(value.lastDeployedVersion),
+	};
 }
 
 function normalizeStringArray(value: unknown, fallback: string[]): string[] {
@@ -126,6 +169,7 @@ export function normalizeCrateSettings(
 	return {
 		...DEFAULT_SETTINGS,
 		workerUrl: normalizeWorkerUrl(normalizeString(value?.workerUrl)),
+		cloudflareDeployment: normalizeCloudflareDeployment(value?.cloudflareDeployment),
 		lastSync: normalizeNullableString(value?.lastSync),
 		lastSeq: normalizeNonNegativeInteger(value?.lastSeq, DEFAULT_SETTINGS.lastSeq),
 		deviceId: normalizeString(value?.deviceId),

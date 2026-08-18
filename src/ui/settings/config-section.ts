@@ -1,5 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import { CRATE_CLOUDFLARE_DEPLOY_URL } from '../../cloudflare/deploy-button';
+import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
 import { normalizeWorkerUrl } from '../../sync/worker-url';
 import { openConfirmationModal } from '../confirmation-modal';
 import { QRModal } from '../qr-modal';
@@ -16,10 +17,19 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 	if (!isConfigured) {
 		new Setting(containerEl)
 			.setName('Deploy sync server')
-			.setDesc('Create a private sync server in your own account, then claim it from the setup page')
+			.setDesc('Authorize Crate to create a private sync server in your Cloudflare account')
 			.addButton(button => button
 				.setButtonText('Deploy to Cloudflare')
 				.setCta()
+				.onClick(() => {
+					void startCloudflareDeployment(plugin);
+				}));
+
+		new Setting(containerEl)
+			.setName('GitHub deploy fallback')
+			.setDesc('Use the original repository-based deployment while the new authorization flow is verified')
+			.addButton(button => button
+				.setButtonText('Open fallback')
 				.onClick(() => {
 					window.open(CRATE_CLOUDFLARE_DEPLOY_URL, '_blank', 'noopener,noreferrer');
 				}));
@@ -38,10 +48,21 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				.onClick(() => {
 					const normalizedUrl = normalizeWorkerUrl(workerUrl);
 					if (!normalizedUrl) {
-					new Notice('Enter a valid HTTPS worker URL');
+						new Notice('Enter a valid HTTPS worker URL');
 						return;
 					}
 					window.open(`${normalizedUrl}/`, '_blank', 'noopener,noreferrer');
+				}));
+	}
+
+	if (isConfigured && plugin.settings.cloudflareDeployment) {
+		new Setting(containerEl)
+			.setName('Update Cloudflare server')
+			.setDesc('Reauthorize briefly and update the existing Worker, D1, R2, and Durable Objects')
+			.addButton(button => button
+				.setButtonText('Authorize update')
+				.onClick(() => {
+					void startCloudflareDeployment(plugin);
 				}));
 	}
 
