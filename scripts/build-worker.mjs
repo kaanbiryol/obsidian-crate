@@ -40,10 +40,13 @@ async function buildWorkerBundle(pwaClientJs) {
 	});
 
 	const code = result.outputFiles[0].text;
+	mkdirSync(generatedDir, { recursive: true });
+	writeFileSync(resolve(generatedDir, 'worker.mjs'), code, 'utf-8');
 	writeGeneratedJson('worker-script.json', {
 		version: buildVersion,
 		script: code,
 	});
+	console.log('Deployable Worker bundle written to .generated/cloudflare/worker.mjs');
 	console.log('Worker bundle written to .generated/cloudflare/worker-script.json');
 }
 

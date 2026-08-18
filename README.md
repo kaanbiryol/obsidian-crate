@@ -82,7 +82,7 @@ Then reload Obsidian and enable **Crate** in **Settings -> Community plugins**.
 For repeated local testing, save a vault path:
 
 ```bash
-npm run deploy:configure
+npm run deploy:plugin:configure
 ```
 
 This writes `deploy.local.json`, which is ignored by git.
@@ -90,10 +90,10 @@ This writes `deploy.local.json`, which is ignored by git.
 Deploy to that vault:
 
 ```bash
-npm run deploy
+npm run deploy:plugin
 ```
 
-`npm run deploy` builds the plugin and copies `dist/main.js`, `manifest.json`, and `dist/styles.css` into the configured vault plugin folder. You can also set `OBSIDIAN_VAULT` for one-off deploys.
+`npm run deploy:plugin` builds the plugin and copies `dist/main.js`, `manifest.json`, and `dist/styles.css` into the configured vault plugin folder. You can also set `OBSIDIAN_VAULT` for one-off deploys.
 
 ## Cloudflare Setup
 

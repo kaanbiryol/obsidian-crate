@@ -46,7 +46,7 @@ async function getDeployConfig() {
 
 	if (!process.stdin.isTTY || !process.stdout.isTTY) {
 		throw new Error(
-			`Missing ${relativeToRoot(configPath)}. Run "npm run deploy:configure" or set OBSIDIAN_VAULT.`,
+			`Missing ${relativeToRoot(configPath)}. Run "npm run deploy:plugin:configure" or set OBSIDIAN_VAULT.`,
 		);
 	}
 
@@ -134,7 +134,7 @@ async function replaceFile(sourcePath, destinationPath) {
 				[
 					`macOS refused to replace ${destinationPath}.`,
 					'If this file is inside an iCloud-backed Obsidian vault, remove the existing plugin folder in Finder',
-					'or grant Full Disk Access to your terminal app, then run "npm run deploy" again.',
+					'or grant Full Disk Access to your terminal app, then run "npm run deploy:plugin" again.',
 				].join(' '),
 				{ cause: error },
 			);
