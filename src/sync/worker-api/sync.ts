@@ -9,7 +9,6 @@ import type {
 	FileManifest,
 	HealthResponse,
 	UploadResult,
-	WorkerConfig,
 } from '../../plugin/types';
 import {
 	isCompatibleCrateServer,
@@ -103,10 +102,6 @@ export class SyncWorkerApi {
 
 	async getChanges(since: number): Promise<ChangesResponse> {
 		return this.http.requestJson<ChangesResponse>(`/sync/changes?since=${since}`);
-	}
-
-	async getConfig(): Promise<WorkerConfig> {
-		return this.http.requestJson<WorkerConfig>('/sync/config');
 	}
 
 	async batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse> {

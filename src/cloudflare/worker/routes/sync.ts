@@ -6,7 +6,6 @@ import {
 	handleDelete,
 	handleDownload,
 	handleGetChanges,
-	handleGetConfig,
 	handleGetManifest,
 	handleGetSettings,
 	handleHealth,
@@ -42,8 +41,6 @@ export async function handleSyncRoute(
 	if (path === '/sync/batch-upload' && method === 'POST') return await handleBatchUpload(request, bucket, db);
 	if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket, db);
 	if (path === '/sync/batch-delete' && method === 'POST') return await handleBatchDelete(request, bucket, db);
-	if (path === '/sync/config' && method === 'GET') return await handleGetConfig(env);
-
 	if (path === '/settings' && method === 'GET') return await handleGetSettings(bucket);
 	if (path === '/settings' && method === 'PUT') return await handlePutSettings(request, bucket);
 

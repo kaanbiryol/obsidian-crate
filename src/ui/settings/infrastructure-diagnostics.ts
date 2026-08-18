@@ -1,4 +1,4 @@
-import type { DiagnosticResult } from '../../cloudflare/infrastructure';
+import type { DiagnosticResult } from '../../sync/diagnostics';
 import { createSettingsSubsectionHeading } from './section-helpers';
 import { getDiagnosticStatusPrefix } from './infrastructure-helpers';
 

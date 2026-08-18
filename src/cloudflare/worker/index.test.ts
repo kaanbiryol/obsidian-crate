@@ -169,10 +169,6 @@ function createEnvDefaults(): Env {
 		BUCKET: {} as R2Bucket,
 		DB: null,
 		AUTH_TOKEN: 'secret-token',
-		CF_ACCOUNT_ID: '',
-		CF_WORKER_NAME: '',
-		CF_BUCKET_NAME: '',
-		CF_DATABASE_ID: '',
 		REMINDER_ALARMS: {
 			idFromName: vi.fn(),
 			get: vi.fn(),

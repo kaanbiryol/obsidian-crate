@@ -1,10 +1,5 @@
-import type { DiagnosticResult } from '../cloudflare/infrastructure-types';
-import type { CrateSettings, UsageResponse } from './types';
-
-interface CachedUsageState {
-	key: string;
-	data: UsageResponse;
-}
+import type { DiagnosticResult } from '../sync/diagnostics';
+import type { CrateSettings } from './types';
 
 interface CachedDiagnosticsState {
 	key: string;
@@ -12,36 +7,17 @@ interface CachedDiagnosticsState {
 }
 
 export interface SettingsUiState {
-	usage: CachedUsageState | null;
 	diagnostics: CachedDiagnosticsState | null;
 }
 
 export function createSettingsUiState(): SettingsUiState {
 	return {
-		usage: null,
 		diagnostics: null,
 	};
 }
 
-export function buildUsageSettingsStateKey(
-	settings: Pick<CrateSettings, 'cloudflareAccountId' | 'workerName' | 'bucketName' | 'databaseId'>
-): string {
-	return JSON.stringify([
-		settings.cloudflareAccountId,
-		settings.workerName,
-		settings.bucketName,
-		settings.databaseId,
-	]);
-}
-
 export function buildDiagnosticsSettingsStateKey(
-	settings: Pick<CrateSettings, 'cloudflareAccountId' | 'workerUrl' | 'workerName' | 'bucketName' | 'databaseId'>
+	settings: Pick<CrateSettings, 'workerUrl'>
 ): string {
-	return JSON.stringify([
-		settings.cloudflareAccountId,
-		settings.workerUrl,
-		settings.workerName,
-		settings.bucketName,
-		settings.databaseId,
-	]);
+	return settings.workerUrl;
 }

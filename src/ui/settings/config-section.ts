@@ -1,87 +1,54 @@
 import { Notice, Setting } from 'obsidian';
+import { CRATE_CLOUDFLARE_DEPLOY_URL } from '../../cloudflare/deploy-button';
+import { normalizeWorkerUrl } from '../../sync/worker-url';
 import { openConfirmationModal } from '../confirmation-modal';
 import { QRModal } from '../qr-modal';
-import { getErrorMessage, runButtonTask } from './action-helpers';
 import { buildSetupLink } from './config-link';
-import { getConfigSectionState } from './config-state';
-import {
-	createInfrastructureFromCredentials,
-	renderApiTokenSetup,
-	resolveCredentialsForSetup,
-	seedWizardState,
-} from './config-setup-workflows';
 import type { ConfigSectionContext } from './config-types';
 import { createSettingsSectionHeading } from './section-helpers';
 
 export function renderConfigSection(context: ConfigSectionContext): void {
-	const { containerEl, plugin, wizardState, rerender } = context;
-	seedWizardState(plugin, wizardState);
-
-	const hasCloudflareCredentials = plugin.cloudflareSession.hasCredentials();
+	const { containerEl, plugin, rerender } = context;
 	const isConfigured = plugin.syncRuntime.isConfigured();
-	const sectionState = getConfigSectionState({
-		hasCloudflareCredentials,
-		isConfigured,
-		wizardState,
-	});
 
 	createSettingsSectionHeading(containerEl, 'Configuration');
 
-	const setupProgress = containerEl.createEl('p', {
-		cls: 'crate-action-progress',
-	});
-	setupProgress.hide();
-
-	if (sectionState.showCreateToken) {
-		renderApiTokenSetup(containerEl, plugin, wizardState, rerender);
-	} else if (sectionState.showConnectedAccount) {
+	if (!isConfigured) {
 		new Setting(containerEl)
-			.setName('Connected account')
-			.setDesc(plugin.settings.cloudflareAccountId)
+			.setName('Deploy sync server')
+			.setDesc('Create a private sync server in your own account, then claim it from the setup page')
 			.addButton(button => button
-				.setButtonText('Log out')
-				.setWarning()
-				.onClick(async () => {
-					plugin.clearSettingsUiState();
-					await plugin.syncRuntime.clearSyncConfiguration({ clearCloudflareCredentials: true });
-					new Notice('Signed out and configuration cleared');
-					rerender();
-				}));
-	}
-
-	if (sectionState.showQuickSetup) {
-		new Setting(containerEl)
-			.setName('Set up sync')
-			.setDesc('Create Cloudflare sync infrastructure or reconnect to an existing setup')
-			.addButton(button => button
-				.setButtonText('Set up/reconnect')
+				.setButtonText('Deploy to Cloudflare')
 				.setCta()
-				.onClick(async () => {
-					await runButtonTask({
-						button,
-						idleText: 'Set up/reconnect',
-						runningText: 'Working...',
-						progressEl: setupProgress,
-						progressMessage: 'Starting setup...',
-						task: async ({ setProgress }) => {
-							const creds = await resolveCredentialsForSetup(plugin, wizardState);
-							await createInfrastructureFromCredentials(plugin, creds, setProgress);
-						},
-						onSuccess: () => {
-							new Notice('Infrastructure created and plugin configured');
-							rerender();
-						},
-						onError: (error) => {
-							new Notice(`Setup failed: ${getErrorMessage(error)}`);
-						},
-					});
+				.onClick(() => {
+					window.open(CRATE_CLOUDFLARE_DEPLOY_URL, '_blank', 'noopener,noreferrer');
+				}));
+
+		let workerUrl = '';
+		new Setting(containerEl)
+			.setName('Open existing server')
+			.setDesc('If deployment did not open the setup page, paste its workers.dev URL here')
+			.addText(text => text
+				.setPlaceholder('https://crate-sync.example.workers.dev')
+				.onChange(value => {
+					workerUrl = value;
+				}))
+			.addButton(button => button
+				.setButtonText('Open setup')
+				.onClick(() => {
+					const normalizedUrl = normalizeWorkerUrl(workerUrl);
+					if (!normalizedUrl) {
+					new Notice('Enter a valid HTTPS worker URL');
+						return;
+					}
+					window.open(`${normalizedUrl}/`, '_blank', 'noopener,noreferrer');
 				}));
 	}
 
-	if (sectionState.showDeviceSetup) {
+	if (isConfigured) {
 		new Setting(containerEl)
 			.setName('Set up another device')
-			.setDesc('Share a setup link for another device. The link contains sync credentials, so share it securely.')
+			.setDesc('Create a one-use setup link that expires after 10 minutes. Share it only with the device you are adding.')
 			.addButton(button => button
 				.setButtonText('Copy link')
 				.onClick(async () => {
@@ -99,7 +66,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 					}));
 	}
 
-	if (sectionState.showResetLocalConfiguration) {
+	if (isConfigured) {
 		new Setting(containerEl)
 			.setName('Reset local configuration')
 			.setDesc('Clears worker URL/auth token and local infrastructure metadata')
@@ -124,10 +91,5 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				}));
 	}
 }
-export type { CloudflareCredentials, ConfigSectionContext, SetupWizardState } from './config-types';
+export type { ConfigSectionContext } from './config-types';
 export { buildSetupLink } from './config-link';
-export {
-	createInfrastructureFromCredentials,
-	resolveCredentialsForSetup,
-	seedWizardState,
-} from './config-setup-workflows';

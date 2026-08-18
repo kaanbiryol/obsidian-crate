@@ -8,7 +8,7 @@ import {
 	FOREGROUND_SYNC_DEBOUNCE_MS,
 	SyncRuntime,
 } from './runtime';
-import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, SECRET_KEYS, type CrateSettings, type SyncResult, type SyncState } from '../plugin/types';
+import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, type CrateSettings, type SyncResult, type SyncState } from '../plugin/types';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
@@ -67,10 +67,6 @@ function createDeferred<T>(): Deferred<T> {
 function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 	return {
 		workerUrl: 'https://worker.example',
-		cloudflareAccountId: '',
-		workerName: '',
-		bucketName: '',
-		databaseId: '',
 		lastSync: null,
 		lastSeq: 0,
 		deviceId: 'device-1',
@@ -456,19 +452,11 @@ describe('SyncRuntime operation wrappers', () => {
 		await runtime.applyInfrastructureConfig({
 			workerUrl: 'https://worker.example',
 			authToken: ' new-auth-token ',
-			workerName: ' worker-name ',
-			bucketName: ' bucket-name ',
-			databaseId: ' db-id ',
-			accountId: ' acct-1 ',
 		});
 
 		expect(settings.lastSeq).toBe(0);
 		expect(settings.lastSync).toBeNull();
 		expect(settings.syncHistory).toEqual([]);
-		expect(settings.workerName).toBe('worker-name');
-		expect(settings.bucketName).toBe('bucket-name');
-		expect(settings.databaseId).toBe('db-id');
-		expect(settings.cloudflareAccountId).toBe('acct-1');
 		expect(initialize).toHaveBeenCalledTimes(1);
 	});
 
@@ -497,18 +485,6 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(settings.lastSync).toBeNull();
 		expect(settings.syncHistory).toEqual([]);
 		expect(settings.workerUrl).toBe('');
-	});
-
-	it('clears stored Cloudflare credentials when requested during reset', async () => {
-		const { runtime, settings, secretStorage } = createRuntimeHarness({
-			cloudflareAccountId: 'acct-123',
-		});
-
-		await runtime.clearSyncConfiguration({ clearCloudflareCredentials: true });
-
-		expect(settings.cloudflareAccountId).toBe('');
-		expect(secretStorage.delete).toHaveBeenCalledWith(SECRET_KEYS.AUTH_TOKEN);
-		expect(secretStorage.delete).toHaveBeenCalledWith(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
 	});
 
 	it('caps stored sync history entries', async () => {

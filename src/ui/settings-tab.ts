@@ -4,11 +4,10 @@
 
 import { App, PluginSettingTab } from 'obsidian';
 import type CratePlugin from '../main';
-import { renderConfigSection, type SetupWizardState } from './settings/config-section';
+import { renderConfigSection } from './settings/config-section';
 import { renderDevicesSection } from './settings/devices-section';
 import { renderInfrastructureSection } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
-import { renderUsageSection } from './settings/usage-section';
 import { renderRemindersSection } from './settings/reminders-section';
 import { renderNotificationsSection } from './settings/notifications-section';
 import { createSettingsRootHeading } from './settings/section-helpers';
@@ -16,11 +15,6 @@ import { getSettingsTabSections } from './settings/settings-tab-model';
 
 export class CrateSettingTab extends PluginSettingTab {
 	plugin: CratePlugin;
-	private readonly wizardState: SetupWizardState = {
-		wizardToken: '',
-		wizardTokenValidated: false,
-		wizardSelectedAccountId: '',
-	};
 	private cleanupFns: (() => void)[] = [];
 
 	constructor(app: App, plugin: CratePlugin) {
@@ -38,16 +32,13 @@ export class CrateSettingTab extends PluginSettingTab {
 		createSettingsRootHeading(containerEl, 'Crate settings');
 
 		const isConfigured = this.plugin.syncRuntime.isConfigured();
-		const hasCloudflareCredentials = this.plugin.cloudflareSession.hasCredentials();
 		const sections = getSettingsTabSections({
 			isConfigured,
-			hasCloudflareCredentials,
 		});
 
 		renderConfigSection({
 			containerEl,
 			plugin: this.plugin,
-			wizardState: this.wizardState,
 			rerender: () => this.display(),
 		});
 
@@ -78,13 +69,6 @@ export class CrateSettingTab extends PluginSettingTab {
 				containerEl,
 				plugin: this.plugin,
 				rerender: () => this.display(),
-			});
-		}
-
-		if (sections.showUsage) {
-			renderUsageSection({
-				containerEl,
-				plugin: this.plugin,
 			});
 		}
 

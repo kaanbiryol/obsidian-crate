@@ -1,4 +1,4 @@
-import type { SharedSettings, WorkerConfig } from '../plugin/types';
+import type { SharedSettings } from '../plugin/types';
 import { isCompatibleCrateServer, type CrateServerInfo } from '../protocol';
 import { SyncApiClient } from './api';
 import { generateSecureToken, hashToken } from './device-token';
@@ -17,7 +17,6 @@ interface DeviceEnrollmentInput {
 interface DeviceEnrollmentResult {
 	workerUrl: string;
 	authToken: string;
-	config: WorkerConfig;
 	sharedSettings: SharedSettings | null;
 }
 
@@ -31,7 +30,6 @@ interface EnrollmentClient {
 		platform?: string;
 	}): Promise<{ id: string }>;
 	testConnection(): Promise<{ success: boolean; error?: string }>;
-	getConfig(): Promise<WorkerConfig>;
 	getSharedSettings(): Promise<{ settings: SharedSettings | null }>;
 }
 
@@ -40,13 +38,6 @@ interface EnrollmentDependencies {
 	generateToken(): string;
 	hashToken(token: string): Promise<string>;
 }
-
-const DEFAULT_WORKER_CONFIG: WorkerConfig = Object.freeze({
-	accountId: null,
-	workerName: null,
-	bucketName: null,
-	databaseId: null,
-});
 
 const DEFAULT_DEPENDENCIES: EnrollmentDependencies = {
 	createClient: (workerUrl, authToken) => new SyncApiClient(workerUrl, authToken),
@@ -92,11 +83,7 @@ export async function exchangeDeviceEnrollment(
 		}
 	}
 
-	let config: WorkerConfig = DEFAULT_WORKER_CONFIG;
 	let sharedSettings: SharedSettings | null = null;
-	try {
-		config = await authenticatedClient.getConfig();
-	} catch { /* optional metadata */ }
 	try {
 		({ settings: sharedSettings } = await authenticatedClient.getSharedSettings());
 	} catch { /* optional shared settings */ }
@@ -104,7 +91,6 @@ export async function exchangeDeviceEnrollment(
 	return {
 		workerUrl,
 		authToken,
-		config,
 		sharedSettings,
 	};
 }

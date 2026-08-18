@@ -6,14 +6,6 @@ import { requireNormalizedWorkerUrl } from "./worker-url";
 interface ApplyInfrastructureConfigInput {
   workerUrl: string;
   authToken: string;
-  workerName: string;
-  bucketName: string;
-  databaseId: string;
-  accountId?: string;
-}
-
-interface ClearSyncConfigurationOptions {
-  clearCloudflareCredentials?: boolean;
 }
 
 export async function deleteManifestFile(plugin: Plugin): Promise<void> {
@@ -39,28 +31,15 @@ export function applyInfrastructureConfigState(
   }
 
   settings.workerUrl = requireNormalizedWorkerUrl(config.workerUrl);
-  settings.workerName = config.workerName.trim();
-  settings.bucketName = config.bucketName.trim();
-  settings.databaseId = config.databaseId.trim();
-  settings.cloudflareAccountId = config.accountId?.trim() || "";
   secretStorage.set(SECRET_KEYS.AUTH_TOKEN, authToken);
 }
 
 export function clearSyncConfigurationState(
   settings: CrateSettings,
   secretStorage: SecretStorageService,
-  options?: ClearSyncConfigurationOptions,
 ): void {
   settings.workerUrl = "";
-  settings.workerName = "";
-  settings.bucketName = "";
-  settings.databaseId = "";
   secretStorage.delete(SECRET_KEYS.AUTH_TOKEN);
-
-  if (options?.clearCloudflareCredentials) {
-    settings.cloudflareAccountId = "";
-    secretStorage.delete(SECRET_KEYS.CLOUDFLARE_API_TOKEN);
-  }
 }
 
 export function buildSharedSettings(settings: CrateSettings): SharedSettings {
@@ -74,4 +53,4 @@ export function buildSharedSettings(settings: CrateSettings): SharedSettings {
   };
 }
 
-export type { ApplyInfrastructureConfigInput, ClearSyncConfigurationOptions };
+export type { ApplyInfrastructureConfigInput };

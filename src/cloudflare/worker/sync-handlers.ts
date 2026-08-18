@@ -11,7 +11,6 @@ export {
 export {
 	handleCheckChanges,
 	handleGetChanges,
-	handleGetConfig,
 	handleGetManifest,
 	handleGetSettings,
 	handleHealth,

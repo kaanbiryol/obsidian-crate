@@ -126,10 +126,6 @@ export function normalizeCrateSettings(
 	return {
 		...DEFAULT_SETTINGS,
 		workerUrl: normalizeWorkerUrl(normalizeString(value?.workerUrl)),
-		cloudflareAccountId: normalizeString(value?.cloudflareAccountId),
-		workerName: normalizeString(value?.workerName),
-		bucketName: normalizeString(value?.bucketName),
-		databaseId: normalizeString(value?.databaseId),
 		lastSync: normalizeNullableString(value?.lastSync),
 		lastSeq: normalizeNonNegativeInteger(value?.lastSeq, DEFAULT_SETTINGS.lastSeq),
 		deviceId: normalizeString(value?.deviceId),

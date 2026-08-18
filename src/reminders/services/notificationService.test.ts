@@ -10,10 +10,6 @@ type ScheduleReminderPayload = Parameters<SyncApiClient['scheduleReminder']>[0];
 function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 	return {
 		workerUrl: 'https://crate.example.workers.dev',
-		cloudflareAccountId: '',
-		workerName: '',
-		bucketName: '',
-		databaseId: '',
 		lastSync: null,
 		lastSeq: 0,
 		deviceId: 'device-test',

@@ -29,10 +29,6 @@ import { createFullSyncPlan, getLocalChanges, getLocalDeletes, runIncrementalSyn
 function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 	return {
 		workerUrl: 'https://worker.example',
-		cloudflareAccountId: '',
-		workerName: '',
-		bucketName: '',
-		databaseId: '',
 		lastSync: null,
 		lastSeq: 10,
 		deviceId: 'dev-1',

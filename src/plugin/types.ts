@@ -158,46 +158,6 @@ export interface BatchDeleteResponse {
 	errors?: Array<{ path: string; error: string }>;
 }
 
-// ============================================================================
-// Usage Types
-// ============================================================================
-
-export interface UsageMetric {
-	current: number;
-	limit: number;
-	unit: string;
-}
-
-export interface UsageResponse {
-	available: boolean;
-	workers?: {
-		requests: UsageMetric;
-	};
-	r2?: {
-		storageBytes: UsageMetric;
-		classAOps: UsageMetric;
-		classBOps: UsageMetric;
-	};
-	d1?: {
-		rowsRead: UsageMetric;
-		rowsWritten: UsageMetric;
-		storageBytes: UsageMetric;
-	};
-	queriedAt?: string;
-	error?: string;
-}
-
-// ============================================================================
-// Worker Config Types
-// ============================================================================
-
-export interface WorkerConfig {
-	accountId: string | null;
-	workerName: string | null;
-	bucketName: string | null;
-	databaseId: string | null;
-}
-
 export interface RegisteredDevice {
 	id: string;
 	device_id: string | null;
@@ -214,10 +174,6 @@ export interface RegisteredDevice {
 
 export interface CrateSettings {
 	workerUrl: string;
-	cloudflareAccountId: string;
-	workerName: string;
-	bucketName: string;
-	databaseId: string;
 	lastSync: string | null;
 	lastSeq: number;
 	deviceId: string;
@@ -243,10 +199,6 @@ export interface SharedSettings {
 
 export const DEFAULT_SETTINGS: CrateSettings = {
 	workerUrl: '',
-	cloudflareAccountId: '',
-	workerName: '',
-	bucketName: '',
-	databaseId: '',
 	lastSync: null,
 	lastSeq: 0,
 	deviceId: '',
@@ -272,7 +224,6 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 
 export const SECRET_KEYS = {
 	AUTH_TOKEN: 'crate-auth-token',
-	CLOUDFLARE_API_TOKEN: 'crate-cloudflare-api-token',
 	DEVICE_ID: 'crate-device-id',
 } as const;
 

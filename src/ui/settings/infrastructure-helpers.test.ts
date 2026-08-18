@@ -2,21 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
 	getDiagnosticStatusPrefix,
 	getDiagnosticsNoticeMessage,
-	inferWorkerNameFromUrl,
 	summarizeDiagnosticResults,
 } from './infrastructure-helpers';
-
-describe('inferWorkerNameFromUrl', () => {
-	it('extracts the worker subdomain from workers.dev URLs', () => {
-		expect(inferWorkerNameFromUrl(' https://crate-sync.workers.dev/api/sync ')).toBe('crate-sync');
-	});
-
-	it('returns null for non-workers.dev hosts or invalid URLs', () => {
-		expect(inferWorkerNameFromUrl('https://example.com')).toBeNull();
-		expect(inferWorkerNameFromUrl('not a url')).toBeNull();
-		expect(inferWorkerNameFromUrl('')).toBeNull();
-	});
-});
 
 describe('diagnostic helpers', () => {
 	it('counts failures and warnings and formats the notice message', () => {

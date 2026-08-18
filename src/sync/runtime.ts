@@ -13,7 +13,6 @@ import {
 	clearSyncConfigurationState,
 	deleteManifestFile,
 	type ApplyInfrastructureConfigInput,
-	type ClearSyncConfigurationOptions,
 } from './runtime-config';
 import { recordSyncHistory, resetStoredSyncState } from './runtime-history';
 import { emitStateChange, emitSyncProgress } from './runtime-listeners';
@@ -199,12 +198,12 @@ export class SyncRuntime {
 		await this.initialize();
 	}
 
-	async clearSyncConfiguration(options?: ClearSyncConfigurationOptions): Promise<void> {
+	async clearSyncConfiguration(): Promise<void> {
 		this.destroy();
 		await deleteManifestFile(this.plugin);
 
 		resetStoredSyncState(this.settings);
-		clearSyncConfigurationState(this.settings, this.secretStorage, options);
+		clearSyncConfigurationState(this.settings, this.secretStorage);
 
 		await this.persistSettings();
 	}

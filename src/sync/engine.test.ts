@@ -135,10 +135,6 @@ function spyOnPrepareUploadsFromVaultFiles(
 function createSettings(): CrateSettings {
 	return {
 		workerUrl: 'https://worker.example',
-		cloudflareAccountId: '',
-		workerName: '',
-		bucketName: '',
-		databaseId: '',
 		lastSync: null,
 		lastSeq: 0,
 		deviceId: 'dev-1',

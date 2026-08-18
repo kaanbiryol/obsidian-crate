@@ -7,7 +7,7 @@ import { corsResponse } from './cors';
 
 declare const __CRATE_SERVER_VERSION__: string | undefined;
 
-export const CRATE_SERVER_VERSION =
+const CRATE_SERVER_VERSION =
 	typeof __CRATE_SERVER_VERSION__ === 'string' && __CRATE_SERVER_VERSION__.length > 0
 		? __CRATE_SERVER_VERSION__
 		: 'dev';

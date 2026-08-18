@@ -1,30 +1,8 @@
-import type { DiagnosticResult } from '../../cloudflare/infrastructure';
+import type { DiagnosticResult } from '../../sync/diagnostics';
 
 export interface DiagnosticSummary {
 	failures: number;
 	warnings: number;
-}
-
-export function inferWorkerNameFromUrl(workerUrl: string): string | null {
-	const normalized = workerUrl.trim();
-	if (!normalized) {
-		return null;
-	}
-
-	try {
-		const parsed = new URL(normalized);
-		const hostname = parsed.hostname.toLowerCase();
-		if (!hostname.endsWith('.workers.dev')) {
-			return null;
-		}
-		const parts = hostname.split('.');
-		if (parts.length < 3) {
-			return null;
-		}
-		return parts[0] ?? null;
-	} catch {
-		return null;
-	}
 }
 
 export function summarizeDiagnosticResults(results: DiagnosticResult[]): DiagnosticSummary {

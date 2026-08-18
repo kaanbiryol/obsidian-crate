@@ -2,7 +2,6 @@ import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
 import { corsResponse } from './cors';
 import { queryRows } from './db';
 import { parseJsonObject } from './utils';
-import type { Env } from './types';
 import { ensureSyncMetadata, getChangelogBounds } from './sync-storage';
 
 export async function handleHealth(): Promise<Response> {
@@ -56,15 +55,6 @@ export async function handleGetManifest(request: Request, db: D1Database): Promi
 	const lastSeq = seqRows[0]?.lastSeq || 0;
 
 	return corsResponse({ version: 1, files, lastSeq, ...(truncated && { truncated: true }) });
-}
-
-export async function handleGetConfig(env: Env): Promise<Response> {
-	return corsResponse({
-		accountId: env.CF_ACCOUNT_ID || null,
-		workerName: env.CF_WORKER_NAME || null,
-		bucketName: env.CF_BUCKET_NAME || null,
-		databaseId: env.CF_DATABASE_ID || null,
-	});
 }
 
 export async function handleGetSettings(bucket: R2Bucket): Promise<Response> {

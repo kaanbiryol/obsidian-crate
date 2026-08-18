@@ -166,10 +166,6 @@ function createEnv(input: {
 			BUCKET: bucket,
 			DB: db,
 			AUTH_TOKEN: 'secret-token',
-			CF_ACCOUNT_ID: '',
-			CF_WORKER_NAME: '',
-			CF_BUCKET_NAME: '',
-			CF_DATABASE_ID: '',
 			REMINDER_ALARMS: {
 				idFromName: vi.fn((name: string) => name),
 				get: vi.fn((name: string) => ({

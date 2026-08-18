@@ -30,7 +30,7 @@ function isNonEmptyStringArray(value: unknown): value is string[] {
 		&& value.every((item: unknown) => typeof item === 'string' && item.length > 0);
 }
 
-export function isValidProtocolRange(value: unknown): value is CrateProtocolRange {
+function isValidProtocolRange(value: unknown): value is CrateProtocolRange {
 	if (!value || typeof value !== 'object') return false;
 	const range = value as Partial<CrateProtocolRange>;
 	return isPositiveInteger(range.current)

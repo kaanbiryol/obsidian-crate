@@ -6,10 +6,6 @@ describe('normalizeCrateSettings', () => {
 	it('normalizes persisted values and rejects unsafe runtime settings', () => {
 		const settings = normalizeCrateSettings({
 			workerUrl: ' http://worker.example/ ',
-			cloudflareAccountId: ' acct ',
-			workerName: ' worker ',
-			bucketName: ' bucket ',
-			databaseId: ' db ',
 			lastSync: ' 2026-01-01T00:00:00.000Z ',
 			lastSeq: -5,
 			deviceId: ' device-1 ',
@@ -36,10 +32,6 @@ describe('normalizeCrateSettings', () => {
 		}, 'vault-config');
 
 		expect(settings.workerUrl).toBe('');
-		expect(settings.cloudflareAccountId).toBe('acct');
-		expect(settings.workerName).toBe('worker');
-		expect(settings.bucketName).toBe('bucket');
-		expect(settings.databaseId).toBe('db');
 		expect(settings.lastSync).toBe('2026-01-01T00:00:00.000Z');
 		expect(settings.lastSeq).toBe(DEFAULT_SETTINGS.lastSeq);
 		expect(settings.deviceId).toBe('device-1');

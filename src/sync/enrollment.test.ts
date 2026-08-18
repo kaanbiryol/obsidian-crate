@@ -18,12 +18,6 @@ function createClient(overrides?: Partial<EnrollmentClient>): EnrollmentClient {
 		getServerInfo: vi.fn(async () => COMPATIBLE_SERVER),
 		enrollDevice: vi.fn(async () => ({ id: 'device-token-id' })),
 		testConnection: vi.fn(async () => ({ success: true })),
-		getConfig: vi.fn(async () => ({
-			accountId: 'account-id',
-			workerName: 'crate-sync',
-			bucketName: 'crate-sync',
-			databaseId: 'database-id',
-		})),
 		getSharedSettings: vi.fn(async () => ({ settings: null })),
 		...overrides,
 	};
@@ -73,12 +67,6 @@ describe('exchangeDeviceEnrollment', () => {
 		}, dependencies)).resolves.toEqual({
 			workerUrl: 'https://worker.example',
 			authToken: 'permanent-device-token',
-			config: {
-				accountId: 'account-id',
-				workerName: 'crate-sync',
-				bucketName: 'crate-sync',
-				databaseId: 'database-id',
-			},
 			sharedSettings,
 		});
 

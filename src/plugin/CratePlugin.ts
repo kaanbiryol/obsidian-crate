@@ -3,8 +3,6 @@
  */
 
 import { Plugin } from 'obsidian';
-import { CloudflareSessionManager } from '../cloudflare/session-manager';
-import { CloudflareUsageService } from '../cloudflare/usage-service';
 import { type ReminderIndex } from '../reminders/data/reminder-index';
 import { type MarkdownWriter } from '../reminders/data/markdown-writer';
 import { type StorageCompat } from '../reminders/data/storage-compat';
@@ -29,9 +27,7 @@ import { buildPersistedCrateSettings, normalizeCrateSettings, type CrateSettings
 export default class CratePlugin extends Plugin {
 	settings!: CrateSettings;
 	secretStorage!: SecretStorageService;
-	cloudflareSession!: CloudflareSessionManager;
 	syncRuntime!: SyncRuntime;
-	readonly usageService = new CloudflareUsageService();
 	readonly settingsUiState: SettingsUiState = createSettingsUiState();
 
 	// Reminders
@@ -78,7 +74,6 @@ export default class CratePlugin extends Plugin {
 	}
 
 	clearSettingsUiState(): void {
-		this.settingsUiState.usage = null;
 		this.settingsUiState.diagnostics = null;
 	}
 }

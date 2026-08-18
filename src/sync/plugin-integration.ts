@@ -1,5 +1,4 @@
 import { Notice, type TAbstractFile } from 'obsidian';
-import { CloudflareSessionManager } from '../cloudflare/session-manager';
 import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
 import type CratePlugin from '../main';
 import { type ForegroundSyncReason, SyncRuntime } from './runtime';
@@ -14,11 +13,6 @@ import { exchangeDeviceEnrollment } from './enrollment';
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
 
 export function initializeSyncManagers(plugin: CratePlugin): void {
-	plugin.cloudflareSession = new CloudflareSessionManager(
-		plugin.settings,
-		plugin.secretStorage,
-		() => plugin.saveSettings(),
-	);
 	plugin.syncRuntime = new SyncRuntime(
 		plugin,
 		plugin.settings,
@@ -191,10 +185,6 @@ export async function handleSyncSetupProtocol(
 		await plugin.syncRuntime.applyInfrastructureConfig({
 			workerUrl: enrollment.workerUrl,
 			authToken: enrollment.authToken,
-			workerName: enrollment.config.workerName || '',
-			bucketName: enrollment.config.bucketName || '',
-			databaseId: enrollment.config.databaseId || '',
-			accountId: enrollment.config.accountId || undefined,
 		});
 
 		plugin.syncRuntime.pushSharedSettings().catch(() => {});

@@ -9,11 +9,6 @@ import {
 
 const openConfirmationModal = vi.fn();
 const buildSetupLink = vi.fn();
-const createInfrastructureFromCredentials = vi.fn();
-const renderApiTokenSetup = vi.fn();
-const resolveCredentialsForSetup = vi.fn();
-const seedWizardState = vi.fn();
-const runButtonTask = vi.fn();
 const qrModalOpen = vi.fn();
 
 async function flushMicrotasks(): Promise<void> {
@@ -23,43 +18,25 @@ async function flushMicrotasks(): Promise<void> {
 
 async function loadConfigSectionModule() {
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../confirmation-modal', () => ({
-		openConfirmationModal,
+	vi.doMock('../../cloudflare/deploy-button', () => ({
+		CRATE_CLOUDFLARE_DEPLOY_URL: 'https://deploy.example/',
 	}));
+	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal }));
 	vi.doMock('../qr-modal', () => ({
 		QRModal: class QRModal {
 			constructor(public readonly app: unknown, public readonly link: string) {}
-
-			open(): void {
-				qrModalOpen(this.link);
-			}
+			open(): void { qrModalOpen(this.link); }
 		},
 	}));
-	vi.doMock('./action-helpers', () => ({
-		getErrorMessage: vi.fn((error: unknown) => String(error)),
-		runButtonTask,
-	}));
-	vi.doMock('./config-link', () => ({
-		buildSetupLink,
-	}));
-	vi.doMock('./config-setup-workflows', () => ({
-		createInfrastructureFromCredentials,
-		renderApiTokenSetup,
-		resolveCredentialsForSetup,
-		seedWizardState,
-	}));
-	vi.doMock('./section-helpers', () => ({
-		createSettingsSectionHeading: vi.fn(),
-	}));
+	vi.doMock('./config-link', () => ({ buildSetupLink }));
+	vi.doMock('./section-helpers', () => ({ createSettingsSectionHeading: vi.fn() }));
 
 	return import('./config-section');
 }
 
 function getSettingByName(name: string): MockSetting {
-	const setting = MockSetting.instances.find((instance) => instance.nameEl.textContent === name);
-	if (!setting) {
-		throw new Error(`Setting not found: ${name}`);
-	}
+	const setting = MockSetting.instances.find(instance => instance.nameEl.textContent === name);
+	if (!setting) throw new Error(`Setting not found: ${name}`);
 	return setting;
 }
 
@@ -67,22 +44,7 @@ beforeEach(() => {
 	resetObsidianUiMocks();
 	openConfirmationModal.mockReset();
 	buildSetupLink.mockReset();
-	createInfrastructureFromCredentials.mockReset();
-	renderApiTokenSetup.mockReset();
-	resolveCredentialsForSetup.mockReset();
-	seedWizardState.mockReset();
-	runButtonTask.mockReset();
 	qrModalOpen.mockReset();
-	runButtonTask.mockImplementation(async (options: {
-		task?: (helpers: { setProgress: (message: string) => void; setButtonText: (text: string) => void }) => Promise<unknown>;
-		onSuccess?: (result: unknown) => void;
-	}) => {
-		const result = await options.task?.({
-			setProgress: vi.fn(),
-			setButtonText: vi.fn(),
-		});
-		options.onSuccess?.(result);
-	});
 });
 
 afterEach(() => {
@@ -90,142 +52,76 @@ afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
+	vi.doUnmock('../../cloudflare/deploy-button');
 	vi.doUnmock('../confirmation-modal');
 	vi.doUnmock('../qr-modal');
-	vi.doUnmock('./action-helpers');
 	vi.doUnmock('./config-link');
-	vi.doUnmock('./config-setup-workflows');
 	vi.doUnmock('./section-helpers');
 });
 
 describe('renderConfigSection integration', () => {
-	it('renders connected-account setup actions and runs quick setup through the configured workflow', async () => {
+	it('opens Cloudflare deployment and an existing Worker setup page', async () => {
 		const { renderConfigSection } = await loadConfigSectionModule();
-		const rerender = vi.fn();
-		const containerEl = new FakeElement('div');
-		const wizardState = {
-			wizardToken: '',
-			wizardTokenValidated: false,
-			wizardSelectedAccountId: '',
-		};
-		const plugin = {
-			settings: {
-				cloudflareAccountId: 'acct-123',
-			},
-			app: {},
-			clearSettingsUiState: vi.fn(),
-			cloudflareSession: {
-				hasCredentials: vi.fn(() => true),
-			},
-			syncRuntime: {
-				isConfigured: vi.fn(() => false),
-				clearSyncConfiguration: vi.fn(),
-			},
-		};
-
-		resolveCredentialsForSetup.mockResolvedValue({
-			accountId: 'acct-123',
-			apiToken: 'cloudflare-token',
-		});
-		createInfrastructureFromCredentials.mockResolvedValue(undefined);
+		const open = vi.fn();
+		vi.stubGlobal('window', { open });
 
 		renderConfigSection({
-			containerEl: containerEl as never,
-			plugin: plugin as never,
-			wizardState,
-			rerender,
+			containerEl: new FakeElement('div') as never,
+			plugin: { syncRuntime: { isConfigured: vi.fn(() => false) } } as never,
+			rerender: vi.fn(),
 		});
 
-		expect(seedWizardState).toHaveBeenCalledWith(plugin, wizardState);
-		expect(renderApiTokenSetup).not.toHaveBeenCalled();
-		expect(MockSetting.instances.map((setting) => setting.nameEl.textContent)).toEqual([
-			'Connected account',
-			'Set up sync',
-			'Reset local configuration',
+		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
+			'Deploy sync server',
+			'Open existing server',
 		]);
+		getSettingByName('Deploy sync server').buttons[0]?.click();
+		expect(open).toHaveBeenCalledWith('https://deploy.example/', '_blank', 'noopener,noreferrer');
 
-		getSettingByName('Set up sync').buttons[0]?.click();
-		await flushMicrotasks();
-
-		expect(resolveCredentialsForSetup).toHaveBeenCalledWith(plugin, wizardState);
-		expect(createInfrastructureFromCredentials).toHaveBeenCalledWith(
-			plugin,
-			{
-				accountId: 'acct-123',
-				apiToken: 'cloudflare-token',
-			},
-			expect.any(Function),
-		);
-		expect(rerender).toHaveBeenCalledTimes(1);
-		expect(noticeMessages).toContain('Infrastructure created and plugin configured');
+		const existingServer = getSettingByName('Open existing server');
+		existingServer.buttons[0]?.click();
+		expect(noticeMessages).toContain('Enter a valid HTTPS worker URL');
+		existingServer.texts[0]?.change(' https://worker.example/ ');
+		existingServer.buttons[0]?.click();
+		expect(open).toHaveBeenLastCalledWith('https://worker.example/', '_blank', 'noopener,noreferrer');
 	});
 
-	it('wires logout, copy link, show code, and reset confirmation actions when configured', async () => {
+	it('wires one-time device setup and local reset actions when configured', async () => {
 		const { renderConfigSection } = await loadConfigSectionModule();
 		const clearSyncConfiguration = vi.fn(async () => {});
 		const rerender = vi.fn();
 		const clipboardWriteText = vi.fn(async () => {});
-		const containerEl = new FakeElement('div');
+		vi.stubGlobal('navigator', { clipboard: { writeText: clipboardWriteText } });
+		buildSetupLink.mockResolvedValue('obsidian://crate-setup?workerUrl=https://worker.example');
+		openConfirmationModal.mockResolvedValue(true);
 		const plugin = {
-			settings: {
-				cloudflareAccountId: 'acct-123',
-			},
 			app: {},
 			clearSettingsUiState: vi.fn(),
-			cloudflareSession: {
-				hasCredentials: vi.fn(() => true),
-			},
 			syncRuntime: {
 				isConfigured: vi.fn(() => true),
 				clearSyncConfiguration,
 			},
 		};
 
-		vi.stubGlobal('navigator', {
-			clipboard: {
-				writeText: clipboardWriteText,
-			},
-		});
-		buildSetupLink.mockResolvedValue('obsidian://crate-setup?workerUrl=https://worker.example');
-		openConfirmationModal.mockResolvedValue(true);
-
 		renderConfigSection({
-			containerEl: containerEl as never,
+			containerEl: new FakeElement('div') as never,
 			plugin: plugin as never,
-			wizardState: {
-				wizardToken: '',
-				wizardTokenValidated: false,
-				wizardSelectedAccountId: '',
-			},
 			rerender,
 		});
 
-		expect(MockSetting.instances.map((setting) => setting.nameEl.textContent)).toEqual([
-			'Connected account',
+		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
 			'Set up another device',
 			'Reset local configuration',
 		]);
-
-		getSettingByName('Connected account').buttons[0]?.click();
-		await flushMicrotasks();
-		expect(clearSyncConfiguration).toHaveBeenCalledWith({ clearCloudflareCredentials: true });
-
 		getSettingByName('Set up another device').buttons[0]?.click();
 		await flushMicrotasks();
-		expect(buildSetupLink).toHaveBeenCalledWith(plugin);
-		expect(clipboardWriteText).toHaveBeenCalledWith('obsidian://crate-setup?workerUrl=https://worker.example');
-
+		expect(clipboardWriteText).toHaveBeenCalledTimes(1);
 		getSettingByName('Set up another device').buttons[1]?.click();
 		await flushMicrotasks();
-		expect(qrModalOpen).toHaveBeenCalledWith('obsidian://crate-setup?workerUrl=https://worker.example');
-
+		expect(qrModalOpen).toHaveBeenCalledTimes(1);
 		getSettingByName('Reset local configuration').buttons[0]?.click();
 		await flushMicrotasks();
-		expect(openConfirmationModal).toHaveBeenCalledTimes(1);
-		expect(clearSyncConfiguration).toHaveBeenLastCalledWith();
-		expect(rerender).toHaveBeenCalledTimes(2);
-		expect(noticeMessages).toContain('Signed out and configuration cleared');
-		expect(noticeMessages).toContain('Setup link copied to clipboard');
-		expect(noticeMessages).toContain('Local plugin configuration cleared');
+		expect(clearSyncConfiguration).toHaveBeenCalledTimes(1);
+		expect(rerender).toHaveBeenCalledTimes(1);
 	});
 });

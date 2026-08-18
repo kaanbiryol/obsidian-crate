@@ -14,7 +14,6 @@ import type {
 	RegisteredDevice,
 	SharedSettings,
 	UploadResult,
-	WorkerConfig,
 } from '../plugin/types';
 import type { CrateServerInfo } from '../protocol';
 import { AuthWorkerApi } from './worker-api/auth';
@@ -98,10 +97,6 @@ export class SyncApiClient {
 
 	async getChanges(since: number): Promise<ChangesResponse> {
 		return this.syncApi.getChanges(since);
-	}
-
-	async getConfig(): Promise<WorkerConfig> {
-		return this.syncApi.getConfig();
 	}
 
 	async batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse> {

@@ -35,11 +35,7 @@ describe('renderInfrastructureManagementSection', () => {
 		const { renderInfrastructureManagementSection } = await loadInfrastructureManagementSectionModule();
 		const containerEl = new FakeElement('div');
 		const settings = {
-			cloudflareAccountId: 'acct-1',
 			workerUrl: 'https://crate-worker.example.workers.dev',
-			workerName: 'crate-worker',
-			bucketName: 'crate-bucket',
-			databaseId: 'db-1',
 		};
 
 		renderInfrastructureManagementSection({
@@ -47,7 +43,6 @@ describe('renderInfrastructureManagementSection', () => {
 			plugin: {
 				settings,
 				settingsUiState: {
-					usage: null,
 					diagnostics: {
 						key: buildDiagnosticsSettingsStateKey(settings),
 						results: [
@@ -59,8 +54,8 @@ describe('renderInfrastructureManagementSection', () => {
 						],
 					},
 				},
-				cloudflareSession: {
-					hasCredentials: () => false,
+				syncRuntime: {
+					getApiClient: vi.fn(),
 				},
 			} as never,
 			isConfigured: true,
