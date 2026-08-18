@@ -1,20 +1,21 @@
 # Worker API
 
-The Worker is deployed via the Cloudflare API (not Wrangler). Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` bundles it and `vite.config.mts` injects the generated script into `src/cloudflare/worker-template.ts`.
+The Worker is deployed independently through Cloudflare's Git-based deploy flow or Wrangler. Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Worker is not embedded in the Obsidian plugin bundle.
 
 ## Authentication
 
 All non-public API endpoints require an `Authorization: Bearer <token>` header. The Worker validates the token in two steps:
 
 1. Hash the bearer token with SHA-256 and look up the hash in the `auth_tokens` D1 table
-2. If not found, fall back to timing-safe comparison against the `AUTH_TOKEN` secret binding
+2. If not found, optionally fall back to timing-safe comparison against a legacy `AUTH_TOKEN` secret binding
 
-This allows multiple devices to have independent tokens stored in D1, while maintaining backward compatibility with the single-token binding. Public PWA assets and enrollment-exchange endpoints are listed separately below. CORS headers are included on all JSON/API responses.
+New deployments use independent device tokens stored in D1 and do not configure the fallback binding. Public setup, compatibility, PWA assets, and enrollment-exchange endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
 ## Endpoints
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/.well-known/crate` | Public service, version, protocol range, and capability metadata |
 | `GET` | `/health` | Health check, returns `{ status, timestamp }` |
 | `GET` | `/sync/check?since=<seq>` | Lightweight check: are there changes since this sequence? |
 | `GET` | `/sync/changes?since=<seq>` | Paginated changelog entries (limit 5000 per page) |
@@ -25,7 +26,7 @@ This allows multiple devices to have independent tokens stored in D1, while main
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 50 files, 10 MB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths) |
 | `POST` | `/sync/batch-delete` | Batch delete `{ paths: [...] }` (max 50 paths) |
-| `GET` | `/sync/config` | Returns `{ accountId, workerName, bucketName, databaseId }` |
+| `POST` | `/auth/enrollment` | Authenticated: authorize one short-lived additional-device enrollment hash |
 | `POST` | `/auth/tokens` | Register or refresh a per-device auth token `{ token_hash, device_id?, device_name?, platform? }` |
 | `DELETE` | `/auth/tokens` | Revoke an auth token `{ id }` |
 | `GET` | `/auth/tokens` | List all registered auth tokens |
@@ -47,10 +48,15 @@ This allows multiple devices to have independent tokens stored in D1, while main
 | `GET` | `/notifications/subscriptions` | List push subscriptions |
 | `POST` | `/notifications/test` | Send a test push notification |
 
-## Public PWA Endpoints
+## Public Setup and PWA Endpoints
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/` | Serves the first-device claim page |
+| `GET` | `/setup/client.js` | Serves the claim-page client |
+| `GET` | `/setup/status` | Returns claim and pending-enrollment status without exposing token plaintext |
+| `POST` | `/setup/claim` | Atomically claim an unowned server with `{ enrollmentTokenHash }` |
+| `POST` | `/setup/enroll` | Consume `{ enrollmentToken, deviceTokenHash, device metadata? }` and register a device |
 | `GET` | `/notifications` | Serves the reminders PWA HTML |
 | `GET` | `/notifications/app.js` | Serves the bundled PWA client |
 | `GET` | `/notifications/sw.js` | Serves the PWA service worker |

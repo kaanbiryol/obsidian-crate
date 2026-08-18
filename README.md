@@ -2,9 +2,11 @@
 
 Self-hosted Obsidian vault sync and reminders using Cloudflare R2, Workers, D1, and push notifications.
 
-Crate is an Obsidian plugin for people who want to own the infrastructure behind their vault sync. You bring a Cloudflare account, Crate provisions the required resources, and your vault files sync through your own Worker and R2 bucket.
+Crate is an Obsidian plugin for people who want to own the infrastructure behind their vault sync. You bring a Cloudflare account, the deploy flow provisions the required resources, and your vault files sync through your own Worker and R2 bucket.
 
 Crate is not a hosted service and does not require a Crate account.
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/kaanbiryol/obsidian-crate)
 
 ## Status
 
@@ -19,7 +21,8 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 - Track sync metadata and registered devices in Cloudflare D1
 - Detect conflicts and preserve both versions instead of overwriting silently
 - Sync creates, edits, deletes, renames, and attachments
-- Manage devices, sync settings, usage, and Cloudflare infrastructure from Obsidian
+- Deploy the sync server through Cloudflare without giving the plugin an account API token
+- Add devices with short-lived, one-use setup links
 - Create and browse reminders stored as Markdown in your vault
 - Render reminder query blocks such as `reminders`, `reminders-today`, and `reminders-upcoming`
 - Schedule reminder push notifications through your own Worker
@@ -27,26 +30,27 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 
 ## How It Works
 
-The Obsidian plugin owns sync planning, change detection, conflict handling, and local settings. The Cloudflare Worker is the storage API. It stores file contents in R2, metadata in D1, and reminder notification alarms in Durable Objects.
+The Obsidian plugin owns sync planning, change detection, conflict handling, and local settings. The independently deployed Cloudflare Worker is the storage API. It stores file contents in R2, metadata in D1, and reminder notification alarms in Durable Objects.
 
-Your Cloudflare API token is used for setup and infrastructure management. Sync devices use separate bearer tokens. Push-notification enrollment uses short-lived one-time setup tokens instead of exposing the long-lived sync token in browser URLs or local storage.
+The plugin never asks for a Cloudflare account API token. During setup, a short-lived enrollment link lets Obsidian register a permanent device credential whose plaintext is generated and kept on that device. Push and reminders web enrollment use separate short-lived tokens.
 
 ## Privacy and Security
 
 - Vault files are sent to your Worker and stored in your R2 bucket.
 - Sync metadata and registered device records are stored in your D1 database.
 - Crate does not include hidden telemetry.
-- Cloudflare and sync secrets are stored through Obsidian's secret storage where available.
-- Push enrollment links are short-lived and scoped for setup.
+- Sync secrets are stored through Obsidian's secret storage.
+- Initial, additional-device, push, and reminders web enrollment links are short-lived and scoped to one setup action.
+- Claim a new Worker promptly. Until the first device is enrolled, anyone who knows the Worker URL can claim an unowned deployment.
 - Remote code is not fetched or evaluated at runtime.
 - Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker can access the synced data.
 
 ## Prerequisites
 
-- Node.js 20.19 or newer LTS (20.19+, 22.12+, or 24+)
-- npm
 - A Cloudflare account with R2 enabled
-- Obsidian desktop for local development and deployment
+- Obsidian 1.11.4 or newer
+
+Building from source additionally requires Node.js 20.19+, 22.12+, or 24+ and npm.
 
 ## Install From Source
 
@@ -99,13 +103,18 @@ npm run deploy:plugin
 
 After installing the plugin, open the Crate settings tab in Obsidian:
 
-1. Select **Open Cloudflare** to open a prefilled API token form.
-2. Review the token permissions, narrow the account scope if needed, create the token, and copy it.
-3. Paste the API token into Crate and select **Validate**.
-4. Select your Cloudflare account.
-5. Select **Create infrastructure** to provision the R2 bucket, D1 database, Worker, and required bindings.
+1. Select **Deploy to Cloudflare**. Review the imported repository and resources, then deploy it to your account.
+2. Open the deployed Worker URL and select **Claim server** promptly.
+3. Select **Open in Obsidian** on the claim page. The one-use setup link expires after 10 minutes.
+4. Return to Crate and run **Initial sync → Upload all** when you are ready to seed the remote vault.
 
-Cross-device setup links copy sync credentials and sync preferences. Usage metrics use the same Cloudflare API token entered during setup.
+Cloudflare provisions the Worker, R2 bucket, D1 database, and Durable Objects described in `wrangler.jsonc`. Crate verifies the server protocol before accepting the setup link. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered with the Worker.
+
+To add another device, use **Settings → Crate → Configuration → Set up another device** on a connected device. Each link can be used once and issuing a replacement invalidates the previous pending link.
+
+If deployment does not take you to the Worker, paste its `workers.dev` URL into **Open existing server**. An abandoned first claim becomes claimable again after its 10-minute enrollment window expires, provided no device was registered.
+
+For updates, recovery procedures, and the command-line fallback, see [Deploying and operating the server](docs/deployment.md). Update the existing Cloudflare project rather than selecting the deploy button again; a second deployment creates a separate server and storage set.
 
 ## Sync Scope and Limits
 
@@ -183,11 +192,18 @@ Run a production build:
 npm run build
 ```
 
+Run the complete first-release gate, including plugin and Worker size budgets plus artifact separation checks:
+
+```bash
+npm run release:check
+```
+
 Generated files under `.generated/`, `dist/`, and root-level release artifacts such as `main.js` are intentionally not tracked. Release assets should be built and attached separately.
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Deploying and operating the server](docs/deployment.md)
 - [Sync pipeline](docs/sync-pipeline.md)
 - [Worker API](docs/worker-api.md)
 - [Testing](docs/testing.md)

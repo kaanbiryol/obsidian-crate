@@ -12,6 +12,22 @@ npm test                                  # run all tests
 npx vitest run src/sync/planner.test.ts   # single test file
 ```
 
+## Release verification
+
+Run the release gate before publishing either deliverable:
+
+```bash
+npm run release:check
+```
+
+It builds and checks both TypeScript targets, runs lint and the complete test suite, creates production plugin and Worker artifacts, enforces independent raw/gzip size budgets, validates manifest/version consistency and required Wrangler bindings, and checks that Worker server code is absent from `dist/main.js`.
+
+The individual size gates are also available as `npm run size-check:plugin` and `npm run size-check:worker`. A Cloudflare configuration change should additionally pass:
+
+```bash
+npx --yes wrangler@4.123.0 deploy --dry-run
+```
+
 ## Manual Obsidian Smoke Test
 
 Run this before merging changes that touch sync orchestration, reminder parsing, markdown scanning, shadow DOM rendering, or reminder view styles:

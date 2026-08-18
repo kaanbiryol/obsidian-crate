@@ -22,8 +22,8 @@
 │              Cloudflare Worker                        │
 │                                                      │
 │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐   │
-│  │ R2 Bucket│  │ D1 (SQL) │  │ Auth Tokens       │   │
-│  │ (files)  │  │ metadata │  │ + fallback secret  │   │
+│  │ R2 Bucket│  │ D1 (SQL) │  │ Durable Objects   │   │
+│  │ (files)  │  │ metadata │  │ setup + reminders │   │
 │  │          │  │ + tokens │  │                   │   │
 │  └──────────┘  └──────────┘  └──────────────────┘   │
 └──────────────────────────────────────────────────────┘
@@ -38,7 +38,7 @@
 | **Cloudflare Worker** | HTTPS API - receives uploads, serves downloads, manages changelog, serves the reminders PWA |
 | **Cloudflare R2** | Object storage for vault file content and shared settings |
 | **Cloudflare D1** | SQLite database with sync metadata, auth tokens, push subscriptions, and reminder alarm records |
-| **Cloudflare API token** | User-provided token for infrastructure setup and redeploys |
+| **Cloudflare deploy flow** | Imports the public server project and provisions its declared bindings without exposing an account token to the plugin |
 | **OS Keychain** | Stores auth tokens via Obsidian's `secretStorage` API |
 
 ## Worker Bindings
@@ -47,20 +47,16 @@
 |---|---|---|
 | `BUCKET` | R2 Bucket | File storage |
 | `DB` | D1 Database | Changelog + file manifest |
-| `AUTH_TOKEN` | Secret | Request authentication |
-| `CF_ACCOUNT_ID` | Plain Text | Account ID (exposed via `/sync/config`) |
-| `CF_WORKER_NAME` | Plain Text | Worker name (exposed via `/sync/config`) |
-| `CF_BUCKET_NAME` | Plain Text | Bucket name (exposed via `/sync/config`) |
-| `CF_DATABASE_ID` | Plain Text | Database UUID (exposed via `/sync/config`) |
 | `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
+| `SETUP` | Durable Object Namespace | Atomic initial claim and one-time device enrollment state |
+
+An optional legacy `AUTH_TOKEN` binding is still accepted as an authentication fallback, but new deployments use only per-device D1 tokens.
 
 ## Component Ownership
 
 ```
 CratePlugin (src/plugin/CratePlugin.ts)
   ├── SecretStorageService   - OS keychain wrapper
-  ├── CloudflareSessionManager - Cloudflare API token/account storage
-  ├── CloudflareUsageService   - analytics via CF GraphQL API
   ├── CrateSettingTab          - settings UI (delegates to section modules)
   └── SyncRuntime (sync/runtime.ts) - lifecycle coordinator
         ├── SyncEngine (sync/engine.ts) - orchestrates sync operations
@@ -75,16 +71,19 @@ CratePlugin (src/plugin/CratePlugin.ts)
 
 ## Authentication
 
-### Token-Based Setup
+### First-device setup
 
-1. User creates a Cloudflare API token on the dashboard with permissions: Workers Scripts (Edit), Workers R2 Storage (Edit), D1 (Edit), Account Settings (Read)
-2. Plugin verifies the token via `GET /user/tokens/verify`
-3. Plugin lists accessible accounts via `GET /accounts`
-4. User selects an account; credentials are saved (token in keychain, account ID in settings)
+1. Cloudflare deploys the Worker and provisions its R2, D1, and Durable Object bindings from `wrangler.jsonc`.
+2. The browser claim page generates a 256-bit enrollment token locally and sends only its SHA-256 hash to the `SetupCoordinator` Durable Object.
+3. The Durable Object serializes claim requests. A pending initial claim expires after 10 minutes; if no device was registered, the deployment becomes claimable again.
+4. Obsidian receives the short-lived token through the `crate-setup` protocol, validates the server metadata and `enrollment-v1` capability, then generates a different permanent device secret locally.
+5. `POST /setup/enroll` consumes the one-time enrollment token and stores only the permanent device secret's hash in D1.
 
 ### Worker Authentication
 
-Authenticated requests carry a Bearer token in the `Authorization` header. The Worker hashes the bearer token and checks the `auth_tokens` D1 table first. If no D1 token matches, it falls back to a timing-safe comparison against the `AUTH_TOKEN` secret binding for backward compatibility. The setup token is a 256-bit random hex string generated during infrastructure setup.
+Authenticated requests carry a Bearer token in the `Authorization` header. The Worker hashes the bearer token and checks the `auth_tokens` D1 table. If no D1 token matches, it can fall back to a timing-safe comparison against an optional legacy `AUTH_TOKEN` secret binding.
+
+An authenticated device creates additional-device links by registering a new short-lived enrollment hash at `POST /auth/enrollment`. Creating a replacement link invalidates the previous pending link. Permanent device secrets never appear in setup URLs.
 
 Push-notification device enrollment is intentionally narrower: the plugin mints a short-lived, one-time push enrollment token from the worker and the notification PWA uses that scoped token only for `POST /notifications/subscribe`.
 
@@ -92,12 +91,12 @@ The reminders web app uses a separate short-lived web enrollment token in the `/
 
 ## Secret Storage
 
-Two keys stored in OS keychain via `SecretStorageService`:
+The plugin stores two local values through `SecretStorageService`:
 
 | Key | Value |
 |---|---|
 | `crate-auth-token` | Bearer token for worker authentication |
-| `crate-cloudflare-api-token` | Cloudflare API token (user-created) |
+| `crate-device-id` | Local device identity; kept out of vault-synced settings |
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes empty string to "delete" and treats empty strings as null on read.
 
@@ -105,9 +104,9 @@ Two keys stored in OS keychain via `SecretStorageService`:
 
 ## Worker and PWA build
 
-The Worker source lives in `src/cloudflare/worker/`. `scripts/build-worker.mjs` builds the PWA client first, injects that bundle into the Worker build, and writes generated artifacts under `.generated/cloudflare/`.
+The Worker source lives in `src/cloudflare/worker/`. `scripts/build-worker.mjs` builds the PWA client first, injects that bundle into the Worker build, and writes the deployable module to `.generated/cloudflare/worker.mjs`.
 
-The Obsidian plugin bundle does not import generated TypeScript files. Instead, `vite.config.mts` reads `.generated/cloudflare/worker-script.json` and injects the Worker script into `src/cloudflare/worker-template.ts` through the `__CRATE_WORKER_SCRIPT__` build constant. Source modules have test-safe fallbacks so unit tests do not depend on ignored generated `.gen.ts` files.
+The Obsidian plugin and Worker are independent build products. `vite.config.mts` bundles only `src/main.ts` and its plugin dependencies into `dist/main.js`; it does not read or embed the generated Worker. `npm run release:check` enforces separate raw/gzip budgets and scans the plugin artifact for server-code markers.
 
 ## Status Bar
 
