@@ -1,6 +1,7 @@
 import { sha256Hex, timingSafeEqual } from './auth';
 import { handleRegisterToken } from './auth-handlers';
 import { corsResponse } from './cors';
+import { initDb } from './db';
 import type { Env } from './types';
 import { isSha256Hex, parseJsonObject, parseOptionalString } from './utils';
 
@@ -51,15 +52,35 @@ export class SetupCoordinator implements DurableObject {
 		return normalizeSetupState(await this.state.storage.get(SETUP_STATE_KEY));
 	}
 
+	private async hasRegisteredDevice(): Promise<boolean | null> {
+		if (!this.env.DB) return null;
+		try {
+			await initDb(this.env.DB);
+			const device = await this.env.DB.prepare('SELECT id FROM auth_tokens LIMIT 1')
+				.first<{ id: string }>();
+			return typeof device?.id === 'string' && device.id.length > 0;
+		} catch {
+			return null;
+		}
+	}
+
+	private isEnrollmentAvailable(state: SetupState): boolean {
+		return state.enrollmentTokenHash !== null
+			&& state.enrollmentExpiresAt !== null
+			&& state.enrollmentExpiresAt > Date.now();
+	}
+
 	private async handleStatus(): Promise<Response> {
 		const state = await this.readState();
 		if (!state) {
 			return corsResponse({ claimed: false, enrollmentAvailable: false });
 		}
 
-		const enrollmentAvailable = state.enrollmentTokenHash !== null
-			&& state.enrollmentExpiresAt !== null
-			&& state.enrollmentExpiresAt > Date.now();
+		const enrollmentAvailable = this.isEnrollmentAvailable(state);
+		if (!enrollmentAvailable && await this.hasRegisteredDevice() === false) {
+			await this.state.storage.delete(SETUP_STATE_KEY);
+			return corsResponse({ claimed: false, enrollmentAvailable: false });
+		}
 		if (!enrollmentAvailable && state.enrollmentTokenHash !== null) {
 			await this.state.storage.put<SetupState>(SETUP_STATE_KEY, {
 				claimed: true,
@@ -75,8 +96,13 @@ export class SetupCoordinator implements DurableObject {
 	}
 
 	private async handleClaim(request: Request): Promise<Response> {
-		if (await this.readState()) {
-			return corsResponse({ error: 'Server already claimed' }, 409);
+		const existingState = await this.readState();
+		if (existingState) {
+			const mayRecoverAbandonedClaim = !this.isEnrollmentAvailable(existingState)
+				&& await this.hasRegisteredDevice() === false;
+			if (!mayRecoverAbandonedClaim) {
+				return corsResponse({ error: 'Server already claimed' }, 409);
+			}
 		}
 
 		const parsedBody = await parseJsonObject(request);

@@ -18,8 +18,9 @@ function createStorage() {
 	return { values, storage: storage as unknown as DurableObjectStorage };
 }
 
-function createDb(options?: { failInsert?: boolean }) {
+function createDb(options?: { failInsert?: boolean; hasRegisteredDevice?: boolean }) {
 	const statements: Array<{ sql: string; args: unknown[] }> = [];
+	let hasRegisteredDevice = options?.hasRegisteredDevice ?? false;
 	const db = {
 		prepare: vi.fn((sql: string) => {
 			const entry = { sql, args: [] as unknown[] };
@@ -29,10 +30,18 @@ function createDb(options?: { failInsert?: boolean }) {
 					entry.args = args;
 					return statement;
 				}),
-				first: vi.fn(async () => null),
+				first: vi.fn(async () => {
+					if (sql === 'SELECT id FROM auth_tokens LIMIT 1') {
+						return hasRegisteredDevice ? { id: 'registered-device' } : null;
+					}
+					return null;
+				}),
 				run: vi.fn(async () => {
 					if (options?.failInsert && sql.includes('INSERT INTO auth_tokens')) {
 						throw new Error('D1 insert failed');
+					}
+					if (sql.includes('INSERT INTO auth_tokens')) {
+						hasRegisteredDevice = true;
 					}
 					return {};
 				}),
@@ -94,6 +103,39 @@ describe('SetupCoordinator', () => {
 		const second = await claim(coordinator, 'second-enrollment-token');
 		expect(second.status).toBe(409);
 		expect(await second.json()).toEqual({ error: 'Server already claimed' });
+	});
+
+	it('lets an abandoned initial claim be recovered after its enrollment expires', async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-08-18T12:00:00.000Z'));
+		const { db } = createDb();
+		const coordinator = createCoordinator(db);
+		await claim(coordinator, 'abandoned-token');
+
+		vi.setSystemTime(new Date('2026-08-18T12:11:00.000Z'));
+		const status = await coordinator.fetch(new Request('https://worker.test/setup/status'));
+		expect(await status.json()).toEqual({ claimed: false, enrollmentAvailable: false });
+
+		const recovered = await claim(coordinator, 'replacement-token');
+		expect(recovered.status).toBe(200);
+		expect(await recovered.json()).toEqual({
+			claimed: true,
+			expiresAt: '2026-08-18T12:21:00.000Z',
+		});
+	});
+
+	it('keeps an enrolled server locked after temporary enrollment expires', async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-08-18T12:00:00.000Z'));
+		const { db } = createDb({ hasRegisteredDevice: true });
+		const coordinator = createCoordinator(db);
+		await claim(coordinator, 'temporary-token');
+
+		vi.setSystemTime(new Date('2026-08-18T12:11:00.000Z'));
+		const status = await coordinator.fetch(new Request('https://worker.test/setup/status'));
+		expect(await status.json()).toEqual({ claimed: true, enrollmentAvailable: false });
+		const reclaim = await claim(coordinator, 'attacker-token');
+		expect(reclaim.status).toBe(409);
 	});
 
 	it('exchanges the short-lived enrollment token for one device token', async () => {
