@@ -14,7 +14,8 @@
 	],
 	"ignoreFiles": [
 		"src/cloudflare/worker/cloudflare-env.d.ts",
-		"src/cloudflare/worker/pwa/raw-css.d.ts"
+		"src/cloudflare/worker/pwa/raw-css.d.ts",
+		"src/cloudflare/worker/raw-text.d.ts"
 	],
 	"ignoreDependencies": [
 		"preact"

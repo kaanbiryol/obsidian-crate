@@ -7,4 +7,5 @@ export interface Env {
 	CF_BUCKET_NAME: string;
 	CF_DATABASE_ID: string;
 	REMINDER_ALARMS: DurableObjectNamespace;
+	SETUP: DurableObjectNamespace;
 }

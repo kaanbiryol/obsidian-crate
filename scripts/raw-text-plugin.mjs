@@ -6,8 +6,8 @@ export function rawTextPlugin() {
 	return {
 		name: 'raw-text',
 		setup(build) {
-			build.onResolve({ filter: /\?raw-css$/ }, (args) => ({
-				path: resolve(args.resolveDir, args.path.slice(0, -'?raw-css'.length)),
+			build.onResolve({ filter: /\?raw-(?:css|text)$/ }, (args) => ({
+				path: resolve(args.resolveDir, args.path.replace(/\?raw-(?:css|text)$/, '')),
 				namespace: 'raw-text',
 			}));
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import { sha256Hex } from './auth';
+import { corsResponse } from './cors';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import { CRATE_SERVER_INFO } from './server-info';
 import type { Env } from './types';
@@ -176,6 +177,10 @@ function createEnvDefaults(): Env {
 			idFromName: vi.fn(),
 			get: vi.fn(),
 		} as unknown as DurableObjectNamespace,
+		SETUP: {
+			idFromName: vi.fn(),
+			get: vi.fn(),
+		} as unknown as DurableObjectNamespace,
 	};
 }
 
@@ -197,6 +202,35 @@ function createSubscriptionRequest(token: string): Request {
 }
 
 describe('worker entrypoint', () => {
+	it('serves the browser claim page without authentication', async () => {
+		const response = await worker.fetch(
+			new Request('https://worker.test/'),
+			createEnv({ AUTH_TOKEN: '' }) as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('Content-Type')).toBe('text/html; charset=utf-8');
+		expect(await response.text()).toContain('Claim server');
+	});
+
+	it('forwards public enrollment requests to the setup coordinator', async () => {
+		const setupFetch = vi.fn(async () => corsResponse({ claimed: false, enrollmentAvailable: false }));
+		const response = await worker.fetch(
+			new Request('https://worker.test/setup/status'),
+			createEnv({
+				AUTH_TOKEN: '',
+				SETUP: {
+					idFromName: vi.fn(() => ({ name: 'owner' })),
+					get: vi.fn(() => ({ fetch: setupFetch })),
+				} as unknown as DurableObjectNamespace,
+			}) as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ claimed: false, enrollmentAvailable: false });
+		expect(setupFetch).toHaveBeenCalledTimes(1);
+	});
+
 	it('publishes unauthenticated server compatibility metadata', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/.well-known/crate'),

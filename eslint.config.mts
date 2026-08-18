@@ -44,7 +44,11 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['src/cloudflare/worker/pwa-client.tsx', 'src/cloudflare/worker/pwa-client/**/*.{ts,tsx}'],
+		files: [
+			'src/cloudflare/worker/pwa-client.tsx',
+			'src/cloudflare/worker/pwa-client/**/*.{ts,tsx}',
+			'src/cloudflare/worker/setup-client.js',
+		],
 		rules: {
 			'no-restricted-globals': 'off',
 			'obsidianmd/platform': 'off',

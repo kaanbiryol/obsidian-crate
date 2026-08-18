@@ -4,6 +4,7 @@ import { handleAuthenticatedRoute, handlePublicRoute } from './router';
 import type { Env } from './types';
 
 export { ReminderAlarm } from './reminder-alarm';
+export { SetupCoordinator } from './setup-coordinator';
 
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
@@ -16,7 +17,7 @@ export default {
 		const method = request.method;
 		const db = env.DB || null;
 
-		const publicResponse = await handlePublicRoute(request, path, method, db);
+		const publicResponse = await handlePublicRoute(request, env, path, method);
 		if (publicResponse) {
 			return publicResponse;
 		}

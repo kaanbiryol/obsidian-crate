@@ -8,11 +8,16 @@ export function rawCssPlugin() {
 		name: 'raw-css',
 		enforce: 'pre',
 		resolveId(source, importer) {
-			if (!source.endsWith('.css?raw-css')) {
+			const suffix = source.endsWith('?raw-css')
+				? '?raw-css'
+				: source.endsWith('?raw-text')
+					? '?raw-text'
+					: null;
+			if (!suffix) {
 				return null;
 			}
 
-			const requestPath = source.slice(0, -'?raw-css'.length);
+			const requestPath = source.slice(0, -suffix.length);
 			const filePath = isAbsolute(requestPath)
 				? requestPath
 				: resolve(importer ? dirname(importer) : process.cwd(), requestPath);
