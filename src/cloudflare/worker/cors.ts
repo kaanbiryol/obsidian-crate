@@ -7,12 +7,17 @@ export function corsHeaders(): Record<string, string> {
 	};
 }
 
-export function corsResponse(body: unknown, status = 200): Response {
+export function corsResponse(
+	body: unknown,
+	status = 200,
+	headers: Record<string, string> = {},
+): Response {
 	return new Response(typeof body === 'string' ? body : JSON.stringify(body), {
 		status,
 		headers: {
 			'Content-Type': 'application/json',
 			...corsHeaders(),
+			...headers,
 		},
 	});
 }

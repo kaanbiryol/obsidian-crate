@@ -11,6 +11,7 @@ import {
 	handleSubscribe,
 	handleVapidPublicKey,
 } from '../push-handlers';
+import { handleServerInfo } from '../server-info';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';
 
@@ -20,6 +21,7 @@ export async function handlePublicRoute(
 	method: RouteMethod,
 	db: D1Database | null,
 ): Promise<Response | null> {
+	if (path === '/.well-known/crate' && method === 'GET') return handleServerInfo();
 	if (path === '/notifications' && method === 'GET') return handleNotificationsPage(request);
 	if (path === '/notifications/app.js' && method === 'GET') return handlePwaApp(request);
 	if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();

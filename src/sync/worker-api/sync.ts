@@ -12,6 +12,11 @@ import type {
 	WorkerConfig,
 } from '../../plugin/types';
 import {
+	isCompatibleCrateServer,
+	parseCrateServerInfo,
+	type CrateServerInfo,
+} from '../../protocol';
+import {
 	getHeader,
 	TRANSFER_TIMEOUT_MS,
 	type WorkerApiHttpClient,
@@ -24,8 +29,24 @@ export class SyncWorkerApi {
 		return this.http.requestJson<HealthResponse>('/health');
 	}
 
+	async getServerInfo(): Promise<CrateServerInfo> {
+		const value = await this.http.requestJson<unknown>('/.well-known/crate');
+		const info = parseCrateServerInfo(value);
+		if (!info) {
+			throw new Error('Server returned invalid Crate compatibility metadata');
+		}
+		return info;
+	}
+
 	async testConnection(): Promise<{ success: boolean; error?: string }> {
 		try {
+			const info = await this.getServerInfo();
+			if (!isCompatibleCrateServer(info)) {
+				return {
+					success: false,
+					error: `Incompatible Crate server protocol ${info.protocol.current}`,
+				};
+			}
 			const response = await this.health();
 			return { success: response.status === 'ok' };
 		} catch (error) {

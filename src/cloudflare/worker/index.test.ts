@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import { sha256Hex } from './auth';
 import { PWA_ASSET_VERSION } from './pwa-version';
+import { CRATE_SERVER_INFO } from './server-info';
 import type { Env } from './types';
 
 interface SubscriptionRecord {
@@ -196,6 +197,17 @@ function createSubscriptionRequest(token: string): Request {
 }
 
 describe('worker entrypoint', () => {
+	it('publishes unauthenticated server compatibility metadata', async () => {
+		const response = await worker.fetch(
+			new Request('https://worker.test/.well-known/crate'),
+			createEnv({ AUTH_TOKEN: '' }) as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('Cache-Control')).toBe('no-store');
+		expect(await response.json()).toEqual(CRATE_SERVER_INFO);
+	});
+
 	it('serves PWA version metadata without authentication', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/version.json'),

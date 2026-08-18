@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rawTextPlugin } from './raw-text-plugin.mjs';
@@ -8,6 +8,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const generatedDir = resolve(root, '.generated/cloudflare');
 const buildVersion = Date.now().toString(36);
+const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-8'));
+const serverVersion = typeof packageJson.version === 'string' ? packageJson.version : 'dev';
 
 function writeGeneratedJson(fileName, payload) {
 	mkdirSync(generatedDir, { recursive: true });
@@ -30,6 +32,7 @@ async function buildWorkerBundle(pwaClientJs) {
 		mainFields: ['module', 'main'],
 		conditions: ['worker', 'browser', 'import'],
 		define: {
+			__CRATE_SERVER_VERSION__: JSON.stringify(serverVersion),
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(buildVersion),
 			__CRATE_PWA_CLIENT_JS__: JSON.stringify(pwaClientJs),
 		},

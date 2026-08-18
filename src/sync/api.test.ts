@@ -125,6 +125,27 @@ describe('SyncApiClient', () => {
 		});
 	});
 
+	it('rejects a server with an incompatible protocol before the health check', async () => {
+		const requestUrlSpy = vi.spyOn(obsidian, 'requestUrl').mockResolvedValue(
+			createRequestUrlResponse({
+				status: 200,
+				text: JSON.stringify({
+					service: 'crate',
+					serverVersion: '9.0.0',
+					protocol: { current: 9, oldestCompatible: 9 },
+					capabilities: ['sync-v1'],
+				}),
+			}),
+		);
+
+		const client = new SyncApiClient('https://worker.example', 'token');
+		await expect(client.testConnection()).resolves.toEqual({
+			success: false,
+			error: 'Incompatible Crate server protocol 9',
+		});
+		expect(requestUrlSpy).toHaveBeenCalledTimes(1);
+	});
+
 	it('rejects insecure non-local worker URLs', () => {
 		const client = new SyncApiClient('http://worker.example', 'token');
 		expect(client.isConfigured()).toBe(false);

@@ -16,6 +16,7 @@ import type {
 	UploadResult,
 	WorkerConfig,
 } from '../plugin/types';
+import type { CrateServerInfo } from '../protocol';
 import { AuthWorkerApi } from './worker-api/auth';
 import { WorkerApiHttpClient } from './worker-api/http';
 import type {
@@ -59,6 +60,10 @@ export class SyncApiClient {
 
 	async health(): Promise<HealthResponse> {
 		return this.syncApi.health();
+	}
+
+	async getServerInfo(): Promise<CrateServerInfo> {
+		return this.syncApi.getServerInfo();
 	}
 
 	async testConnection(): Promise<{ success: boolean; error?: string }> {
