@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
 	],
 	define: {
 		__CRATE_CLOUDFLARE_OAUTH_CLIENT_ID__: JSON.stringify(
-			process.env.CRATE_CLOUDFLARE_OAUTH_CLIENT_ID || "not-configured",
+			process.env.CRATE_CLOUDFLARE_OAUTH_CLIENT_ID || "9c474af284e49ff0201106f3b42cca05",
 		),
 	},
 	build: {

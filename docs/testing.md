@@ -44,15 +44,17 @@ Run this before merging changes that touch sync orchestration, reminder parsing,
 
 After the Pages site and a private or public Cloudflare OAuth client are configured:
 
-1. Build and watch with the real client ID:
+1. Build and watch with the embedded public client ID:
 
    ```bash
-   CRATE_CLOUDFLARE_OAUTH_CLIENT_ID=<client-id> npm run dev
+   npm run dev
    ```
+
+   To test another OAuth client, prefix the command with `CRATE_CLOUDFLARE_OAUTH_CLIENT_ID=<client-id>`.
 
 2. Open `test-vault` in Obsidian, enable Crate under **Settings → Community plugins**, and reload it after the build is installed.
 3. Use a disposable Cloudflare test account with R2 already active. Open **Settings → Crate → Configuration → Deploy to Cloudflare**.
-4. Confirm the consent screen shows the expected verified publisher and exactly Workers Scripts Write, D1 Write, Workers R2 Storage Write, and Memberships Read. Select exactly one account.
+4. Confirm the consent screen shows the expected verified publisher and exactly Workers Scripts Write, D1 Write, Workers R2 Storage Write, and Memberships Read. Cloudflare may display the three write permissions using its legacy **Edit** label. Select exactly one account.
 5. Confirm the browser lands at `/oauth/callback/`, its address bar no longer contains OAuth parameters, and Obsidian opens. If automatic launch is blocked, select **Open Obsidian**.
 6. Confirm Crate creates one `crate-<16 hex>` Worker, D1 database, and R2 bucket, applies the migration, enables the workers.dev endpoint, and opens the claim page.
 7. Claim the Worker, return to Obsidian, and exercise initial sync with non-critical notes only.

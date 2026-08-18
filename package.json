@@ -17,6 +17,8 @@
 		"node": "^20.19.0 || ^22.12.0 || >=24.0.0"
 	},
 	"scripts": {
+		"build:site": "npx @tailwindcss/cli -i ./site/assets/site.css -o ./site/assets/site.generated.css --minify",
+		"dev:site": "npx @tailwindcss/cli -i ./site/assets/site.css -o ./site/assets/site.generated.css --watch",
 		"build:worker": "node scripts/build-worker.mjs",
 		"build:plugin": "vite build",
 		"build:plugin:dev": "vite build --mode development",
@@ -58,6 +60,7 @@
 		"@eslint/js": "9.30.1",
 		"@preact/preset-vite": "^2.10.2",
 		"@rollup/plugin-replace": "^6.0.2",
+		"@tailwindcss/cli": "4.1.17",
 		"@tailwindcss/postcss": "^4.1.17",
 		"@types/node": "^22.19.15",
 		"@types/react": "^19.2.5",

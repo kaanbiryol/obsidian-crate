@@ -31,6 +31,7 @@ test-vault/
 # Generated files
 *.gen.ts
 .generated
+site/assets/site.generated.css
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store

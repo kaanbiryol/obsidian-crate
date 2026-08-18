@@ -48,12 +48,12 @@ Select only these four scopes in the dashboard:
 
 | Cloudflare scope label | OAuth scope ID | Why Crate needs it |
 |---|---|---|
-| Workers Scripts Write | `workers-scripts.write` | Upload the Worker module, declare Durable Object bindings, configure the account workers.dev subdomain, and enable the script endpoint |
-| D1 Write | `d1.write` | Find/create the D1 database and run versioned migrations |
-| Workers R2 Storage Write | `workers-r2.write` | Find/create the R2 bucket |
+| Workers Scripts Write (shown as **Workers Scripts Edit** in some dashboard accounts) | `workers-scripts.write` | Upload the Worker module, declare Durable Object bindings, configure the account workers.dev subdomain, and enable the script endpoint |
+| D1 Write (may be shown as **D1 Edit**) | `d1.write` | Find/create the D1 database and run versioned migrations |
+| Workers R2 Storage Write (may be shown as **Workers R2 Storage Edit**) | `workers-r2.write` | Find/create the R2 bucket |
 | Memberships Read | `memberships.read` | Call `GET /memberships` to discover the account ID selected during consent |
 
-Cloudflare documents that OAuth scope names correspond to API-token permission names and that the scope ID returned by `GET /oauth/scopes` is the value used by the client. The IDs above are the dot-delimited IDs configured in Crate. Before promoting the client, confirm the four displayed labels and IDs against the authenticated `GET /oauth/scopes` response for the client-owner account; do not add broader account or zone scopes.
+Cloudflare is transitioning permission labels from **Edit** to **Write**. Its current permissions reference lists **Workers Scripts Edit** as granting write access, so select the **Edit** entry when the dashboard does not show **Write**. OAuth scope names correspond to API-token permission names, and the scope ID returned by `GET /oauth/scopes` is the value used by the client. The IDs above are the dot-delimited IDs configured in Crate. Before promoting the client, confirm the four displayed labels and IDs against the authenticated `GET /oauth/scopes` response for the client-owner account; do not add broader account or zone scopes.
 
 Create the client. It starts private, which means only members of its parent account can authorize it. Copy the **Client ID**; Crate neither needs nor accepts a client secret.
 
@@ -72,13 +72,13 @@ For public visibility:
 
 The apex TXT record can coexist with the existing blog's apex web records and does not require a change to that blog repository. Do not add the verification TXT at `crate`; that owner name is already the GitHub Pages CNAME.
 
-Build the plugin with the public Client ID embedded:
+The public Client ID is embedded in the repository's build configuration, so a normal production build is sufficient:
 
 ```bash
-CRATE_CLOUDFLARE_OAUTH_CLIENT_ID=<32-character-client-id> npm run build
+npm run build
 ```
 
-Release automation must set the same environment variable when producing `main.js`. A build without it remains usable, but **Deploy to Cloudflare** explains that OAuth is unconfigured and directs the user to the documented fallback.
+For private testing or a future client rotation, override the embedded ID for one build with `CRATE_CLOUDFLARE_OAUTH_CLIENT_ID=<32-character-client-id> npm run build`.
 
 Official references:
 
