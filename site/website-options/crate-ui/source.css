@@ -1,0 +1,73 @@
+@import "tailwindcss" source(none);
+@source "./index.html";
+
+@theme {
+	--font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+	--color-ink-950: #08090c;
+	--color-ink-900: #0d0e13;
+	--color-ink-850: #111218;
+	--color-ink-800: #15171e;
+	--color-ink-700: #20232c;
+	--color-crate-300: #c8baff;
+	--color-crate-400: #a78bfa;
+	--color-crate-500: #8b6cf6;
+	--color-crate-600: #7556e8;
+	--shadow-panel: 0 32px 100px rgb(0 0 0 / 45%), inset 0 1px 0 rgb(255 255 255 / 5%);
+	--shadow-phone: 0 28px 80px rgb(0 0 0 / 62%), inset 0 1px 0 rgb(255 255 255 / 7%);
+	--ease-smooth: cubic-bezier(.2, .8, .2, 1);
+}
+
+@layer base {
+	:root { color-scheme: dark; }
+	* { box-sizing: border-box; }
+	html { scroll-behavior: smooth; }
+	body { margin: 0; min-width: 320px; overflow-x: hidden; background: var(--color-ink-950); color: #f5f5f6; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+	a { color: inherit; text-decoration: none; }
+	button { font: inherit; }
+	::selection { background: rgb(139 108 246 / 32%); color: white; }
+	:focus-visible { outline: 2px solid rgb(167 139 250 / 80%); outline-offset: 4px; }
+}
+
+@utility page-grid {
+	background-image:
+		linear-gradient(rgb(255 255 255 / 2.4%) 1px, transparent 1px),
+		linear-gradient(90deg, rgb(255 255 255 / 2.4%) 1px, transparent 1px);
+	background-size: 72px 72px;
+	mask-image: linear-gradient(to bottom, black 0%, transparent 88%);
+}
+
+@utility violet-glow {
+	background: radial-gradient(circle, rgb(124 92 240 / 24%) 0%, rgb(124 92 240 / 6%) 42%, transparent 72%);
+}
+
+@utility panel-sheen {
+	background-image:
+		radial-gradient(circle at 12% -8%, rgb(139 108 246 / 10%), transparent 31%),
+		linear-gradient(145deg, rgb(255 255 255 / 5%), transparent 38%);
+	box-shadow: 0 24px 80px rgb(0 0 0 / 20%), inset 0 1px 0 rgb(255 255 255 / 5%);
+}
+
+@utility product-surface {
+	background-image:
+		linear-gradient(145deg, rgb(255 255 255 / 5%), transparent 34%),
+		linear-gradient(to bottom, #20232b, #15171d);
+	box-shadow: 0 32px 90px rgb(0 0 0 / 48%), inset 0 1px 0 rgb(255 255 255 / 7%);
+}
+
+@utility stage-surface {
+	background-image: linear-gradient(150deg, rgb(255 255 255 / 4%), transparent 45%);
+	box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
+}
+
+@utility text-pretty { text-wrap: pretty; }
+@utility text-balance { text-wrap: balance; }
+
+@media (hover: hover) {
+	.panel-sheen { transition: transform 240ms var(--ease-smooth), border-color 240ms var(--ease-smooth), box-shadow 240ms var(--ease-smooth); }
+	.panel-sheen:hover { transform: translateY(-2px); border-color: rgb(255 255 255 / 14%); box-shadow: 0 30px 90px rgb(0 0 0 / 28%), inset 0 1px 0 rgb(255 255 255 / 7%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html { scroll-behavior: auto; }
+	*, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+}

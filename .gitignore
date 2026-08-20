@@ -32,6 +32,7 @@ test-vault/
 *.gen.ts
 .generated
 site/assets/site.generated.css
+site/website-options/crate-ui/crate-ui.generated.css
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
