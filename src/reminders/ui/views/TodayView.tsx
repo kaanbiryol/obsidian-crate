@@ -8,12 +8,7 @@ import { ReminderCard } from '../../components/ReminderCard';
 import { EmptyState } from '../../components/EmptyState';
 import { ProjectCompletedSection } from './ProjectCompletedSection';
 import { buildTodayViewModel } from './viewModels';
-import {
-  CONTENT_PADDING_X,
-  CONTENT_PADDING_TOP,
-  SCROLL_PADDING_WITH_FAB_CSS,
-  CARD_ANIMATION
-} from '../layoutConstants';
+import { CARD_ANIMATION } from '../layoutConstants';
 
 export interface TodayViewProps {
   reminders: Reminder[];
@@ -69,20 +64,10 @@ export const TodayView = memo(function TodayView({
     );
   }
 
-  // Scroll container styles
-  const scrollStyle: React.CSSProperties = {
-    paddingLeft: `${CONTENT_PADDING_X}px`,
-    paddingRight: `${CONTENT_PADDING_X}px`,
-    paddingTop: `${CONTENT_PADDING_TOP}px`,
-    paddingBottom: hasFab ? SCROLL_PADDING_WITH_FAB_CSS : '16px',
-    touchAction: 'pan-y'
-  };
-
   return (
     <div className={`flex flex-col h-full relative ${className}`}>
       <div
-        className="flex-1 overflow-y-auto space-y-2 ios-scroll"
-        style={scrollStyle}
+        className={`flex-1 overflow-y-auto space-y-2 ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
       >
         <LayoutGroup>
           <AnimatePresence mode="popLayout" initial={false}>
@@ -93,7 +78,7 @@ export const TodayView = memo(function TodayView({
                 initial={animationConfig.enabled ? CARD_ANIMATION.initial : false}
                 animate={animationConfig.enabled ? CARD_ANIMATION.animate : { opacity: 1 }}
                 exit={animationConfig.enabled ? CARD_ANIMATION.exit : undefined}
-                style={{ marginBottom: '0.5rem' }}
+                className="mb-2"
               >
                 {cardRenderer(reminder, index)}
               </motion.div>

@@ -53,13 +53,12 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd }
     <Reorder.Item
       as="div"
       value={reminder}
-      className="reorderable-reminder-item"
       dragListener={false}
       dragControls={dragControls}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClickCapture={handleClickCapture}
-      style={{ marginBottom: '0.5rem' }}
+      className="reorderable-reminder-item mb-2"
       whileTap={{
         scale: 1,
       }}

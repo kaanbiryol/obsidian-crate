@@ -2,7 +2,7 @@
 	"id": "crate",
 	"name": "Crate",
 	"version": "0.1.0",
-	"minAppVersion": "1.11.4",
+	"minAppVersion": "1.13.0",
 	"description": "Sync vault files and reminders with Cloudflare R2.",
 	"author": "Kaan Biryol",
 	"authorUrl": "https://github.com/kaanbiryol",

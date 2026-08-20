@@ -50,7 +50,7 @@ The plugin never asks for a Cloudflare account API token. Deployment uses Cloudf
 ## Prerequisites
 
 - A Cloudflare account with R2 enabled
-- Obsidian 1.11.4 or newer
+- Obsidian 1.13.0 or newer
 
 Building from source additionally requires Node.js 20.19+, 22.12+, or 24+ and npm.
 

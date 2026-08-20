@@ -165,7 +165,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
         </motion.span>
       }
     >
-      <span className="text-sm font-semibold" style={{ color: "var(--text-muted)" }}>
+      <span className="text-sm font-semibold reminders-muted-label">
         Completed ({count})
       </span>
     </ShadowDOMButton>
@@ -203,7 +203,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
                 height: { duration: PAGE_TRANSITION_DURATION, ease: "easeOut" },
                 opacity: { duration: 0.18, ease: "easeOut" },
               }}
-              style={{ overflow: "hidden" }}
+              className="overflow-hidden"
             >
               <ViewHeader
                 {...currentHeader}

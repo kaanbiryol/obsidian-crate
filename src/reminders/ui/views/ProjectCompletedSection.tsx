@@ -38,10 +38,7 @@ export const ProjectCompletedSection = memo(function ProjectCompletedSection({
           </motion.span>
         }
       >
-        <span
-          className="text-sm font-semibold"
-          style={{ color: 'var(--text-muted)' }}
-        >
+        <span className="text-sm font-semibold reminders-muted-label">
           Completed ({reminders.length})
         </span>
       </ShadowDOMButton>

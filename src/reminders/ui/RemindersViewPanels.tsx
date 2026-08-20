@@ -48,11 +48,6 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
   onBackToProjects,
   onReorder,
 }) => {
-  const tabContainerStyle: React.CSSProperties = {
-    display: "flex",
-    height: "100%",
-    flexDirection: "column",
-  };
   const easeExpoOut = EASE_EXPO_OUT as unknown as Easing;
   const pageTransition = {
     initial: { opacity: 0 },
@@ -67,7 +62,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
   switch (viewMode) {
     case "inbox":
       return (
-        <motion.div key="inbox" style={tabContainerStyle} {...pageTransition}>
+        <motion.div key="inbox" className="reminders-view-panel" {...pageTransition}>
           <InboxView
             reminders={reminders}
             renderCard={renderCard}
@@ -79,13 +74,13 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
       );
     case "today":
       return (
-        <motion.div key="today" style={tabContainerStyle} {...pageTransition}>
+        <motion.div key="today" className="reminders-view-panel" {...pageTransition}>
           <TodayView reminders={reminders} renderCard={renderCard} hasFab={showFab} />
         </motion.div>
       );
     case "upcoming":
       return (
-        <motion.div key="upcoming" style={tabContainerStyle} {...pageTransition}>
+        <motion.div key="upcoming" className="reminders-view-panel" {...pageTransition}>
           <UpcomingView
             reminders={reminders}
             renderCard={renderCard}
@@ -97,7 +92,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
     case "browse":
       if (!selectedProject) {
         return (
-          <motion.div key="browse" style={tabContainerStyle} {...pageTransition}>
+          <motion.div key="browse" className="reminders-view-panel" {...pageTransition}>
             <BrowseView
               projects={projects}
               reminders={reminders}
@@ -112,7 +107,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
       }
 
       return (
-        <motion.div key={`project-${selectedProject}`} style={tabContainerStyle} {...pageTransition}>
+        <motion.div key={`project-${selectedProject}`} className="reminders-view-panel" {...pageTransition}>
           <ProjectDetailView
             project={selectedProject}
             reminders={reminders}

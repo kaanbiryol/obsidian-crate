@@ -11,6 +11,19 @@
     --reminder-#{$name}: #{$color};
   }
 
+  --crate-glass-back-bg: rgba(0, 0, 0, 0.03);
+  --crate-glass-back-border: rgba(0, 0, 0, 0.06);
+  --crate-glass-back-hover-bg: rgba(0, 0, 0, 0.06);
+  --crate-glass-back-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --crate-glass-back-hover-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
+  --crate-glass-surface-bg: rgba(0, 0, 0, 0.02);
+  --crate-glass-surface-border: rgba(0, 0, 0, 0.05);
+  --crate-glass-surface-hover-bg: rgba(0, 0, 0, 0.04);
+  --crate-glass-surface-hover-border: rgba(0, 0, 0, 0.08);
+  --crate-glass-text-secondary: rgba(0, 0, 0, 0.45);
+  --crate-glass-text-tertiary: rgba(0, 0, 0, 0.3);
+  --crate-picker-icon-color: rgba(0, 0, 0, 0.6);
+
   /*
    * Typography variables - semantic abstraction layer
    * Maps to Obsidian's CSS variables for consistent theming
@@ -45,6 +58,18 @@
 &.dark,
 .theme-dark,
 .dark {
+  --crate-glass-back-bg: rgba(255, 255, 255, 0.04);
+  --crate-glass-back-border: rgba(255, 255, 255, 0.08);
+  --crate-glass-back-hover-bg: rgba(255, 255, 255, 0.08);
+  --crate-glass-back-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --crate-glass-back-hover-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
+  --crate-glass-surface-bg: rgba(255, 255, 255, 0.03);
+  --crate-glass-surface-border: rgba(255, 255, 255, 0.06);
+  --crate-glass-surface-hover-bg: rgba(255, 255, 255, 0.06);
+  --crate-glass-surface-hover-border: rgba(255, 255, 255, 0.1);
+  --crate-glass-text-secondary: rgba(255, 255, 255, 0.5);
+  --crate-glass-text-tertiary: rgba(255, 255, 255, 0.35);
+  --crate-picker-icon-color: rgba(255, 255, 255, 0.7);
   /* HeroUI semantic content colors - map to Obsidian theme */
   --heroui-content1: var(--background-primary);
   --heroui-content2: var(--background-secondary);
@@ -137,60 +162,604 @@
   --color-reminder-red: hsl(var(--heroui-danger) / 1);
 }
 
+.picker-header-button {
+  background: var(--crate-glass-back-bg);
+  border: 1px solid var(--crate-glass-back-border);
+  color: var(--text-muted);
+  box-shadow: var(--crate-glass-back-shadow);
+  transition: transform 200ms ease-out, background-color 150ms ease, box-shadow 150ms ease;
+
+  &:hover {
+    background: var(--crate-glass-back-hover-bg);
+    box-shadow: var(--crate-glass-back-hover-shadow);
+  }
+}
+
+.picker-header-title {
+  color: var(--text-normal);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.picker-header-subtitle {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.picker-time-card,
+.recurrence-option-row {
+  padding: 14px 16px;
+  border: 1px solid var(--crate-glass-surface-border);
+  border-radius: 12px;
+  background: var(--crate-glass-surface-bg);
+}
+
+.picker-time-icon {
+  color: var(--interactive-accent);
+}
+
+.dark .picker-time-icon,
+&.dark .picker-time-icon {
+  filter: drop-shadow(0 0 4px var(--interactive-accent));
+}
+
+.picker-time-label {
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.recurrence-picker-content {
+  padding: 0 16px;
+}
+
+.recurrence-picker-time {
+  margin-top: 16px;
+}
+
+.recurrence-frequency-tabs {
+  position: relative;
+  display: flex;
+  padding: 4px;
+  border: 1px solid var(--crate-glass-surface-border);
+  border-radius: 14px;
+  background: var(--crate-glass-surface-bg);
+}
+
+.recurrence-frequency-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: calc(33.333333% - 8px);
+  border-radius: 10px;
+  background: hsl(var(--heroui-primary));
+  box-shadow: 0 2px 8px hsl(var(--heroui-primary) / 0.2);
+
+  &.is-daily {
+    left: 4px;
+  }
+
+  &.is-weekly {
+    left: calc(33.333333% + 4px);
+  }
+
+  &.is-monthly {
+    left: calc(66.666667% + 4px);
+  }
+}
+
+.dark .recurrence-frequency-indicator,
+&.dark .recurrence-frequency-indicator {
+  box-shadow: 0 2px 8px hsl(var(--heroui-primary) / 0.3);
+}
+
+.recurrence-frequency-button {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--crate-glass-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 150ms ease;
+
+  &.is-selected {
+    color: white;
+    font-weight: 600;
+  }
+}
+
+.recurrence-options {
+  min-height: 90px;
+  margin-top: 16px;
+}
+
+.recurrence-options-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 90px;
+}
+
+.recurrence-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.recurrence-option-label {
+  color: var(--crate-glass-text-secondary);
+  font-size: 14px;
+}
+
+.recurrence-option-heading {
+  margin-bottom: 10px;
+  color: var(--crate-glass-text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.recurrence-stepper-button {
+  border: 1px solid var(--crate-glass-surface-border);
+  background: var(--crate-glass-surface-hover-bg);
+  color: var(--text-normal);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.3;
+  }
+}
+
+.recurrence-stepper-value {
+  min-width: 32px;
+  color: var(--text-normal);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+
+  &.is-ordinal {
+    min-width: 40px;
+  }
+}
+
+.recurrence-day-list {
+  display: flex;
+  gap: 6px;
+}
+
+.recurrence-day-button {
+  flex: 1;
+  max-width: 44px;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 12px;
+  background: var(--crate-glass-surface-bg);
+  color: var(--crate-glass-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+
+  &.is-selected {
+    background: hsl(var(--heroui-primary));
+    color: white;
+  }
+}
+
+.date-quick-button {
+  border: 0;
+  background: var(--crate-glass-surface-bg);
+  color: var(--crate-glass-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--crate-glass-surface-hover-bg);
+  }
+
+  &.is-active {
+    background: hsl(var(--heroui-primary));
+    color: white;
+  }
+}
+
+.date-calendar-navigation-button {
+  padding: 0;
+  border: 1px solid var(--crate-glass-surface-border);
+  background: var(--crate-glass-surface-bg);
+  color: var(--crate-picker-icon-color);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--crate-glass-surface-hover-border);
+    background: var(--crate-glass-surface-hover-bg);
+  }
+}
+
+.date-calendar-title {
+  min-width: 140px;
+  color: var(--text-normal);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.date-calendar-stage {
+  min-height: 280px;
+}
+
+.project-picker-row-wrap {
+  margin-bottom: 8px;
+  padding: 0 16px;
+}
+
+.project-picker-row {
+  border: 1px solid var(--crate-glass-surface-border);
+  border-radius: 12px;
+  background: var(--crate-glass-surface-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: transform 200ms ease-out, background-color 150ms ease, border-color 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+
+  &:hover:not(.is-selected) {
+    border-color: var(--crate-glass-surface-hover-border);
+    background: var(--crate-glass-surface-hover-bg);
+  }
+
+  &.is-selected {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 1px var(--interactive-accent), 0 0 10px -6px var(--interactive-accent);
+  }
+}
+
+.dark .project-picker-row,
+&.dark .project-picker-row {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.project-picker-row-label {
+  color: var(--text-normal);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+
+  &.is-selected {
+    font-weight: 600;
+  }
+}
+
+.project-picker-row-check {
+  color: var(--interactive-accent);
+  filter: drop-shadow(0 0 6px var(--interactive-accent));
+}
+
+.project-picker-scroll {
+  max-height: calc(70vh - 100px);
+  overflow-scrolling: touch;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.reminder-editor-fields {
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.reminder-title-input {
+  max-height: 100px;
+  overflow-y: auto;
+  color: var(--text-normal);
+  font-size: var(--reminder-font-base);
+}
+
+.has-bottom-fade {
+  mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent);
+}
+
+.reminder-description-wrap {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.reminder-description-input {
+  display: block;
+  width: 100%;
+  max-height: 120px;
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(0, 0, 0, 0.45);
+  caret-color: rgba(0, 0, 0, 0.45);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  appearance: none;
+}
+
+.picker-done-button {
+  border: 0;
+  background: hsl(var(--heroui-primary));
+  box-shadow: 0 2px 6px hsl(var(--heroui-primary) / 0.15);
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: all 200ms ease-out;
+}
+
+.reminder-header-delete {
+  border: 1px solid rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.08);
+  color: rgba(239, 68, 68, 0.9);
+  transition: all 350ms ease-out;
+}
+
+.reminder-header-close,
+.reminder-header-submit {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.5);
+  transition: all 350ms ease-out;
+}
+
+.reminder-header-title {
+  color: var(--text-normal);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.reminder-header-submit {
+  color: rgba(0, 0, 0, 0.35);
+  cursor: default;
+  opacity: 1;
+
+  &.is-enabled {
+    border-color: transparent;
+    background: hsl(var(--heroui-primary));
+    box-shadow: 0 2px 8px hsl(var(--heroui-primary) / 0.2);
+    color: white;
+    cursor: pointer;
+  }
+}
+
+.reminder-action-chips {
+  gap: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.reminder-action-chip {
+  --reminder-chip-color: var(--heroui-primary);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.005em;
+  transition: all 200ms ease-out;
+
+  &.tone-secondary {
+    --reminder-chip-color: var(--heroui-secondary);
+  }
+
+  &.tone-danger {
+    --reminder-chip-color: var(--heroui-danger);
+  }
+
+  &.tone-warning {
+    --reminder-chip-color: var(--heroui-warning);
+  }
+
+  &.is-active {
+    border-color: hsl(var(--reminder-chip-color) / 0.18);
+    background: hsl(var(--reminder-chip-color) / 0.08);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    color: hsl(var(--reminder-chip-color));
+  }
+}
+
+.base-modal-container {
+  position: fixed;
+}
+
+.base-modal-surface {
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  background: rgb(255, 255, 255);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  color: var(--text-normal);
+  will-change: transform, opacity;
+
+  &.is-centered {
+    padding-bottom: 16px;
+  }
+
+  &.is-bottom-sheet {
+    padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  }
+}
+
+.base-modal-drag-region {
+  touch-action: none;
+}
+
+.base-modal-drag-handle {
+  width: 40px;
+  height: 5px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.modal-backdrop {
+  pointer-events: none;
+  will-change: opacity;
+
+  &.is-interactive {
+    pointer-events: auto;
+  }
+}
+
+.delete-confirmation-close {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dark .reminder-editor-fields,
+&.dark .reminder-editor-fields {
+  border-color: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dark .reminder-description-wrap,
+&.dark .reminder-description-wrap {
+  border-top-color: rgba(255, 255, 255, 0.04);
+}
+
+.dark .reminder-description-input,
+&.dark .reminder-description-input {
+  color: rgba(255, 255, 255, 0.45);
+  caret-color: rgba(255, 255, 255, 0.45);
+}
+
+.dark .reminder-header-close,
+.dark .reminder-header-submit,
+&.dark .reminder-header-close,
+&.dark .reminder-header-submit {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.dark .reminder-header-close,
+&.dark .reminder-header-close {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.dark .reminder-header-submit.is-enabled,
+&.dark .reminder-header-submit.is-enabled {
+  border-color: transparent;
+  background: hsl(var(--heroui-primary));
+  color: white;
+}
+
+.dark .reminder-action-chips,
+&.dark .reminder-action-chips {
+  border-top-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark .reminder-action-chip,
+&.dark .reminder-action-chip {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+
+  &.is-active {
+    border-color: hsl(var(--reminder-chip-color) / 0.18);
+    background: hsl(var(--reminder-chip-color) / 0.12);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    color: hsl(var(--reminder-chip-color));
+  }
+}
+
+.dark .base-modal-surface,
+&.dark .base-modal-surface {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgb(28, 28, 30);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark .base-modal-drag-handle,
+&.dark .base-modal-drag-handle {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 /* Fix HeroUI Popover positioning and visibility in Obsidian modals */
 /* Target popovers specifically using HeroUI's data attributes */
 [data-slot="base"][data-open="true"] {
-  z-index: 10000 !important;
-  position: fixed !important;
+  z-index: 10000;
+  position: fixed;
 }
 
 /* Ensure popover trigger is clickable */
 [data-slot="trigger"] {
-  cursor: pointer !important;
+  cursor: pointer;
 }
 
 /* Make sure popover content appears above modal */
 .heroui-popover,
 [role="dialog"][data-slot="base"],
 [aria-modal="true"][data-slot="base"] {
-  z-index: 10000 !important;
-  position: fixed !important;
+  z-index: 10000;
+  position: fixed;
 }
 
 /* Ensure HeroUI overlays and backdrops don't block interactions */
 [data-slot="backdrop"] {
-  z-index: 9998 !important;
+  z-index: 9998;
 }
 
 /* Make sure popover content container is properly positioned */
 [data-slot="content"][role="dialog"],
 .heroui-popover-content {
-  position: relative !important;
-  z-index: 10001 !important;
+  position: relative;
+  z-index: 10001;
 }
 
 /* Scale up delete and close buttons in modal header */
 /* Target all buttons in the header row */
 .flex.justify-between.items-center button {
-  min-width: 2.5rem !important;
-  min-height: 2.5rem !important;
-  width: 2.5rem !important;
-  height: 2.5rem !important;
-  padding: 0.5rem !important;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0.5rem;
 }
 
 /* Target icons inside header buttons */
 .flex.justify-between.items-center button svg {
-  width: 1.25rem !important;
-  height: 1.25rem !important;
-  min-width: 1.25rem !important;
-  min-height: 1.25rem !important;
+  width: 1.25rem;
+  height: 1.25rem;
+  min-width: 1.25rem;
+  min-height: 1.25rem;
 }
 
 /* Also target the wrapper divs to ensure they don't constrain button size */
 .flex.justify-between.items-center .w-10 {
-  width: auto !important;
-  min-width: 2.5rem !important;
+  width: auto;
+  min-width: 2.5rem;
 }
 
 /* React Day Picker styling to match theme */
@@ -240,10 +809,10 @@
 /* Custom chevron SVGs inside nav buttons */
 .rdp-button_previous svg,
 .rdp-button_next svg {
-  width: 28px !important;
-  height: 28px !important;
-  min-width: 28px !important;
-  min-height: 28px !important;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
 }
 
 .rdp-weekday {
@@ -273,8 +842,8 @@
 }
 
 .rdp-selected .rdp-day_button {
-  background-color: hsl(var(--heroui-primary) / 1) !important;
-  color: white !important;
+  background-color: hsl(var(--heroui-primary) / 1);
+  color: white;
   font-weight: var(--reminder-font-weight-medium);
 }
 
@@ -449,8 +1018,8 @@
 
 .theme-dark [data-slot="cell"] button[data-selected],
 .dark [data-slot="cell"] button[data-selected] {
-  background-color: hsl(var(--heroui-primary-500) / 1) !important;
-  color: white !important;
+  background-color: hsl(var(--heroui-primary-500) / 1);
+  color: white;
   font-weight: var(--reminder-font-weight-medium);
 }
 
@@ -506,8 +1075,8 @@
 }
 
 .theme-light [data-slot="cell"] button[data-selected] {
-  background-color: hsl(var(--heroui-primary) / 1) !important;
-  color: white !important;
+  background-color: hsl(var(--heroui-primary) / 1);
+  color: white;
   font-weight: var(--reminder-font-weight-medium);
 }
 
@@ -547,7 +1116,7 @@
 /* Force dark background on HeroUI TimeInput in dark mode */
 .theme-dark [data-slot="input-wrapper"],
 .dark [data-slot="input-wrapper"] {
-  background-color: #3f3f46 !important; /* zinc-700 */
+  background-color: #3f3f46; /* zinc-700 */
 }
 }
 

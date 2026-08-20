@@ -2,21 +2,11 @@ import React, { useCallback, useRef } from 'react';
 import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
 import { RichTextInput, type RichTextInputHandle } from '../../components/RichTextInput';
 import { useProjectAutocomplete } from './useProjectAutocomplete';
-import { getFontSize } from '../themes';
 import { autosizeTextarea, useAutosizeTextarea } from './useAutosizeTextarea';
 import { useBottomFade } from './useBottomFade';
 
-const FADE_MASK = 'linear-gradient(to bottom, black calc(100% - 40px), transparent)';
-const NO_FADE: React.CSSProperties = {};
-const FADE_STYLE: React.CSSProperties = {
-    maskImage: FADE_MASK,
-    WebkitMaskImage: FADE_MASK,
-};
-
 interface ReminderEditorFieldsProps {
     isEditing: boolean;
-    isDark: boolean;
-    textColor: string;
     content: string;
     onContentChange: (value: string) => void;
     description: string;
@@ -31,8 +21,6 @@ interface ReminderEditorFieldsProps {
 
 export function ReminderEditorFields({
     isEditing,
-    isDark,
-    textColor,
     content,
     onContentChange,
     description,
@@ -65,12 +53,7 @@ export function ReminderEditorFields({
     return (
         <div
             ref={containerRef}
-            className="relative rounded-lg"
-            style={{
-                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
-                border: isDark ? '1px solid rgba(255, 255, 255, 0.04)' : '1px solid rgba(0, 0, 0, 0.03)',
-                padding: '12px 14px',
-            }}
+            className="reminder-editor-fields relative rounded-lg"
         >
             <RichTextInput
                 ref={richTextInputRef}
@@ -84,14 +67,7 @@ export function ReminderEditorFields({
                 knownProjects={projects}
                 onAutocompleteQuery={handleAutocompleteQuery}
                 onAutocompleteKeyDown={autocomplete.handleKeyDown}
-                className="w-full px-0 py-0 bg-transparent border-none outline-none resize-none min-h-[32px] ios-scroll"
-                style={{
-                    fontSize: getFontSize('lg'),
-                    color: textColor,
-                    maxHeight: '100px',
-                    overflowY: 'auto',
-                    ...(titleFade ? FADE_STYLE : NO_FADE),
-                }}
+                className={`reminder-title-input w-full px-0 py-0 bg-transparent border-none outline-none resize-none min-h-[32px] ios-scroll${titleFade ? ' has-bottom-fade' : ''}`}
             />
             {autocomplete.isOpen && (
                 <ProjectAutocompleteDropdown
@@ -99,46 +75,18 @@ export function ReminderEditorFields({
                     highlightedIndex={autocomplete.highlightedIndex}
                     anchorRect={autocomplete.rect}
                     containerRef={containerRef}
-                    isDark={isDark}
                     onSelect={autocomplete.selectProject}
                 />
             )}
 
-            <div
-                style={{
-                    marginTop: '8px',
-                    paddingTop: '8px',
-                    borderTop: isDark
-                        ? '1px solid rgba(255, 255, 255, 0.04)'
-                        : '1px solid rgba(0, 0, 0, 0.04)',
-                }}
-            >
+            <div className="reminder-description-wrap">
                 <textarea
                     ref={descriptionRef}
                     value={description}
                     onChange={(event) => onDescriptionChange(event.target.value)}
                     placeholder="Add description..."
                     rows={1}
-                    className="ios-scroll focus:outline-none focus:ring-0 focus:shadow-none"
-                    style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: 0,
-                        background: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        boxShadow: 'none',
-                        WebkitAppearance: 'none',
-                        resize: 'none',
-                        fontSize: '13px',
-                        lineHeight: 1.5,
-                        color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
-                        caretColor: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
-                        fontFamily: 'inherit',
-                        maxHeight: '120px',
-                        overflowY: 'auto',
-                        ...(descFade ? FADE_STYLE : NO_FADE),
-                    }}
+                    className={`reminder-description-input ios-scroll focus:outline-none focus:ring-0 focus:shadow-none${descFade ? ' has-bottom-fade' : ''}`}
                     onInput={(event) => autosizeTextarea(event.currentTarget)}
                 />
             </div>

@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { BaseModal } from '../../components/BaseModal';
 import { AnimationConfig, prefersReducedMotion } from '../animations';
 import { RecurrenceRule } from '../../types';
-import { getGlassColors, getPickerModalProps } from '../glassStyles';
+import { getPickerModalProps } from '../glassStyles';
 import { PickerHeader } from './PickerHeader';
 import { PickerTimeCard } from './PickerTimeCard';
 import { RecurrenceFrequencyOptions } from './RecurrenceFrequencyOptions';
@@ -34,7 +34,6 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     onApply,
 }) => {
     const animationsEnabled = animationConfig.enabled && !prefersReducedMotion();
-    const glass = getGlassColors(isDark);
     const modalProps = getPickerModalProps(pickerMode);
 
     const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>(recurrence?.frequency || 'daily');
@@ -95,22 +94,18 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
             <div className={isDark ? 'dark text-foreground' : ''}>
                 <PickerHeader
                     onBack={onClose}
-                    isDark={isDark}
                     title={summaryText}
                 />
 
-                <div style={{ padding: '0 16px 0' }}>
+                <div className="recurrence-picker-content">
                     <RecurrenceFrequencyTabs
                         frequency={frequency}
-                        glass={glass}
-                        isDark={isDark}
                         onChange={setFrequency}
                     />
 
                     <RecurrenceFrequencyOptions
                         frequency={frequency}
                         animationsEnabled={animationsEnabled}
-                        glass={glass}
                         interval={interval}
                         selectedDays={selectedDays}
                         dayOfMonth={dayOfMonth}
@@ -120,9 +115,8 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                     />
 
                     {/* Time picker */}
-                    <div style={{ marginTop: 16 }}>
+                    <div className="recurrence-picker-time">
                         <PickerTimeCard
-                            isDark={isDark}
                             hour={hour}
                             minute={minute}
                             onChange={(h, m) => { setHour(h); setMinute(m); }}

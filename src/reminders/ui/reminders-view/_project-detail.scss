@@ -2,6 +2,8 @@
 // Project Detail View - Premium Dark UI
 // ============================================
 
+@mixin styles {
+
 // Premium glassmorphism back button
 .premium-back-button {
     display: inline-flex;
@@ -232,4 +234,5 @@
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.025);
         }
     }
+}
 }

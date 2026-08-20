@@ -4,28 +4,6 @@
  */
 
 // ============================================
-// Content padding (consistent across all views)
-// ============================================
-export const CONTENT_PADDING_X = 16; // Horizontal padding (1rem = 16px)
-export const CONTENT_PADDING_TOP = 16; // Top padding (matches horizontal spacing)
-
-// ============================================
-// Floating Action Button (FAB)
-// ============================================
-export const FAB_SIZE = 56; // w-14 h-14 = 56px
-const FAB_GAP = 24; // Gap between FAB and bottom nav (matches tab bar spacing)
-
-// ============================================
-// Scroll padding for views
-// ============================================
-
-// With FAB (Inbox, Today, Upcoming views) - need to clear both bottom nav and FAB
-export const SCROLL_PADDING_WITH_FAB_CSS = `calc(var(--reminders-tabbar-overlay, 0px) + var(--reminders-fab-gap, ${FAB_GAP}px) + var(--reminders-fab-size, ${FAB_SIZE}px) + var(--reminders-safe-area, env(safe-area-inset-bottom)))`;
-
-// Without FAB (Browse view) - just need to clear bottom nav
-export const SCROLL_PADDING_WITHOUT_FAB_CSS = `calc(var(--reminders-tabbar-overlay, 0px) + var(--reminders-bottom-gap, 16px) + var(--reminders-safe-area, env(safe-area-inset-bottom)))`;
-
-// ============================================
 // Animation constants
 // ============================================
 

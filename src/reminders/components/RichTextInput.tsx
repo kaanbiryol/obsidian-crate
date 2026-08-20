@@ -239,7 +239,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         <div
             onMouseDown={handleMouseDown}
             onTouchStart={handleTouchStart}
-            style={{ position: 'relative' }}
+            className="rich-text-input-shell"
         >
             <div
                 ref={refCallback}
@@ -256,18 +256,10 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 onPaste={handlePaste}
                 onFocus={onFocus}
                 onBlur={onBlur}
-                className={className}
+                className={`rich-text-input-editor${className ? ` ${className}` : ''}`}
                 data-placeholder={!value ? placeholder : ''}
                 suppressContentEditableWarning
-                style={{
-                    minHeight: '1.5rem',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    paddingTop: '0.25rem',
-                    paddingBottom: '0.25rem',
-                    lineHeight: '1.65',
-                    ...style
-                }}
+                style={style}
             />
         </div>
     );

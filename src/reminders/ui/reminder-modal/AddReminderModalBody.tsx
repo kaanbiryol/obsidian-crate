@@ -6,8 +6,6 @@ import { ReminderEditorFields } from './ReminderEditorFields';
 
 interface AddReminderModalBodyProps {
     isEditing: boolean;
-    isDark: boolean;
-    textColor: string;
     content: string;
     onContentChange: (value: string) => void;
     description: string;
@@ -36,8 +34,6 @@ interface AddReminderModalBodyProps {
 
 export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     isEditing,
-    isDark,
-    textColor,
     content,
     onContentChange,
     description,
@@ -67,8 +63,6 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
         <div className="px-5 pt-3 pb-3" onTouchEnd={onTouchEnd}>
             <ReminderEditorFields
                 isEditing={isEditing}
-                isDark={isDark}
-                textColor={textColor}
                 content={content}
                 onContentChange={onContentChange}
                 description={description}
@@ -82,7 +76,6 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
             />
 
             <ReminderActionChips
-                isDark={isDark}
                 dueDate={dueDate}
                 hasTime={hasTime}
                 project={project}

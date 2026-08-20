@@ -1,5 +1,5 @@
 /**
- * Wrapper around Obsidian's SecretStorage API (v1.11.4+)
+ * Wrapper around Obsidian's SecretStorage API (v1.13.0+)
  *
  * app.secretStorage provides cross-platform secure credential storage
  * using the OS keychain on desktop. The API is synchronous.

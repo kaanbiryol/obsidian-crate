@@ -131,8 +131,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
   return (
     <div
       ref={wrapperRef}
-      className="sidebar-reminder-card-wrapper"
-      style={{ cursor: 'pointer' }}
+      className="sidebar-reminder-card-wrapper is-interactive"
       role="group"
       tabIndex={0}
       aria-label={`${reminder.content}. Press Enter to edit reminder.`}

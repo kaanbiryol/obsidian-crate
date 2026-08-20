@@ -7,6 +7,5 @@ export {
 export {
     buildHTML,
     createChipHTML,
-    getChipStyle,
 } from './richTextRenderer';
 export { getPlainText } from './richTextPlainText';

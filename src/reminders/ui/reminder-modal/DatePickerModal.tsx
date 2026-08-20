@@ -4,7 +4,7 @@ import { format, addDays, isSameDay } from 'date-fns';
 
 import { BaseModal } from '../../components/BaseModal';
 import { AnimationConfig, prefersReducedMotion } from '../animations';
-import { getGlassColors, getPickerModalProps } from '../glassStyles';
+import { getPickerModalProps } from '../glassStyles';
 import { DateCalendarPanel } from './DateCalendarPanel';
 import { DateQuickButtons } from './DateQuickButtons';
 import { PickerHeader } from './PickerHeader';
@@ -36,7 +36,6 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
 }) => {
     const animationsEnabled = animationConfig.enabled && !prefersReducedMotion();
     const currentDate = parseReminderDateValue(dueDate, hasTime) ?? null;
-    const glass = getGlassColors(isDark);
     const modalProps = getPickerModalProps(pickerMode);
 
     const [calendarDirection, setCalendarDirection] = useState(0);
@@ -106,14 +105,12 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
             <div className={isDark ? 'dark text-foreground' : ''}>
                 <PickerHeader
                     onBack={onClose}
-                    isDark={isDark}
                     title={selectedDateDisplay || 'Select Date'}
                     subtitle={currentDate ? selectedTimeDisplay : undefined}
                 />
 
                 <DateQuickButtons
                     currentDate={currentDate}
-                    glass={glass}
                     onSelectDate={handleQuickDate}
                 />
 
@@ -122,8 +119,6 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                     displayMonth={displayMonth}
                     calendarDirection={calendarDirection}
                     animationsEnabled={animationsEnabled}
-                    glass={glass}
-                    isDark={isDark}
                     onPrevMonth={handlePrevMonth}
                     onNextMonth={handleNextMonth}
                     onDateChange={handleCalendarDateChange}
@@ -132,7 +127,6 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                 {/* Time Section */}
                 <div className="mx-4 mt-4">
                     <PickerTimeCard
-                        isDark={isDark}
                         hour={currentDate ? (hasTime ? currentDate.getHours() : 9) : 9}
                         minute={currentDate ? (hasTime ? currentDate.getMinutes() : 0) : 0}
                         onChange={handleTimeChange}

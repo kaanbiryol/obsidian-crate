@@ -248,7 +248,6 @@ export function ReminderSheet({
 									highlightedIndex={autocomplete.highlightedIndex}
 									anchorRect={autocomplete.rect}
 									containerRef={editorCardRef}
-									isDark
 									onSelect={autocomplete.selectProject}
 								/>
 							)}

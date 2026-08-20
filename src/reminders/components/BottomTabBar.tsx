@@ -31,9 +31,6 @@ const TabButton = memo(function TabButton({
   const Icon = IconMap[tab.iconName];
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  const activeColor = '#7c3aed';
-  const inactiveColor = 'var(--text-faint)';
-
   // Use capture-phase click handler for Shadow DOM
   useEffect(() => {
     const button = buttonRef.current;
@@ -48,29 +45,10 @@ const TabButton = memo(function TabButton({
     return () => button.removeEventListener('click', handleClick, true);
   }, [onTabChange, tab.id]);
 
-  // Inline styles for Shadow DOM compatibility
-  const buttonStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    padding: '10px 16px',
-    position: 'relative',
-    minHeight: '48px',
-    minWidth: 0,
-    background: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    outline: 'none',
-    WebkitAppearance: 'none',
-    appearance: 'none',
-  };
-
   return (
     <motion.button
       ref={buttonRef}
-      style={buttonStyle}
+      className={`bottom-tab-button${isActive ? ' is-active' : ''}`}
       whileTap={{ scale: 0.95 }}
       transition={{ duration: 0.1 }}
       data-action="switch-tab"
@@ -80,46 +58,21 @@ const TabButton = memo(function TabButton({
       {isActive && (
         <motion.div
           layoutId={layoutId}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            borderRadius: '12px',
-            background: 'rgba(124, 58, 237, 0.1)',
-          }}
+          className="bottom-tab-indicator"
           transition={{ type: 'spring', ...SPRING_CONFIG }}
         />
       )}
 
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '4px',
-        position: 'relative',
-        zIndex: 10,
-      }}>
-        <motion.div
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          animate={{ color: isActive ? activeColor : inactiveColor }}
-          transition={{ duration: 0.15 }}
-        >
+      <div className="bottom-tab-content">
+        <div className="bottom-tab-icon">
           <Icon
             size={24}
             strokeWidth={isActive ? 2.5 : 2}
           />
-        </motion.div>
-        <motion.span
-          animate={{ color: isActive ? activeColor : inactiveColor }}
-          transition={{ duration: 0.15 }}
-          style={{
-            fontSize: '13px',
-            fontWeight: isActive ? 600 : 500,
-            letterSpacing: '0.01em',
-            whiteSpace: 'nowrap',
-          }}
-        >
+        </div>
+        <span className="bottom-tab-label">
           {tab.label}
-        </motion.span>
+        </span>
       </div>
     </motion.button>
   );
@@ -130,7 +83,6 @@ interface BottomTabBarProps {
   onTabChange: (tab: TabId) => void;
   position?: 'top' | 'bottom';
   className?: string;
-  style?: React.CSSProperties;
 }
 
 /**
@@ -141,37 +93,14 @@ export const BottomTabBar = memo(function BottomTabBar({
   onTabChange,
   position = 'bottom',
   className = '',
-  style = {}
 }: BottomTabBarProps) {
   const layoutId = position === 'top' ? 'topActiveTabIndicator' : 'bottomActiveTabIndicator';
 
-  // Base styles
-  const containerStyle: React.CSSProperties = {
-    flexShrink: 0,
-    zIndex: 40,
-    background: 'var(--background-primary)',
-    borderTop: position === 'bottom'
-      ? '1px solid var(--background-modifier-border)'
-      : 'none',
-    ...style
-  };
-
   return (
     <div
-      className={`bottom-tab-bar ${className}`}
-      style={containerStyle}
+      className={`bottom-tab-bar${position === 'bottom' ? ' is-bottom' : ''} ${className}`}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-around',
-          width: '100%',
-          maxWidth: '42rem',
-          margin: '0 auto',
-          padding: '8px 12px',
-        }}
-      >
+      <div className="bottom-tab-items">
         {TABS.map((tab) => (
           <TabButton
             key={tab.id}

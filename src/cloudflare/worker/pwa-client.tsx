@@ -294,7 +294,7 @@ function App() {
 	}
 
 	return (
-		<div className="reminders-shadow-root pwa-shadow-root">
+		<div className="crate-reminders-ui reminders-shadow-root pwa-shadow-root dark">
 			<RemindersAppShell
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}

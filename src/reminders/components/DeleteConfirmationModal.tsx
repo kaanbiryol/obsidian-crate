@@ -114,7 +114,6 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
             {isOpen && (
                 <div
                     className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
                 >
                     {/* Backdrop - faster animation for perceived performance */}
                     <motion.div
@@ -144,13 +143,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                         {/* Close button - 44pt touch target per Apple HIG */}
                         <ShadowDOMNativeButton
                             onClick={onClose}
-                            className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center rounded-full text-default-400 hover:text-default-600 hover:bg-default-100 transition-colors z-10"
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
-                            }}
+                            className="delete-confirmation-close absolute top-2 right-2 w-11 h-11 flex items-center justify-center rounded-full text-default-400 hover:text-default-600 hover:bg-default-100 transition-colors z-10"
                         >
                             <X size={20} />
                         </ShadowDOMNativeButton>

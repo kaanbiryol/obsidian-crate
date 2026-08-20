@@ -1,12 +1,10 @@
 import React, { memo } from 'react';
 import { Plus } from 'lucide-react';
-import { FAB_SIZE } from '../ui/layoutConstants';
 import { ShadowDOMNativeMotionButton } from './ShadowDOMButton';
 
 interface FloatingActionButtonProps {
   onClick: () => void;
   className?: string;
-  style?: React.CSSProperties;
   icon?: React.ReactNode;
   'aria-label'?: string;
   'data-action'?: string;
@@ -19,14 +17,10 @@ interface FloatingActionButtonProps {
 export const FloatingActionButton = memo(function FloatingActionButton({
   onClick,
   className = '',
-  style = {},
   icon,
   'aria-label': ariaLabel = 'Add reminder',
   'data-action': dataAction,
 }: FloatingActionButtonProps) {
-  const backgroundColor = '#7c3aed';
-  const shadowColor = 'rgba(124, 58, 237, 0.4)';
-
   return (
     <ShadowDOMNativeMotionButton
       onClick={onClick}
@@ -39,21 +33,6 @@ export const FloatingActionButton = memo(function FloatingActionButton({
       whileHover={{ scale: 1.1 }}
       aria-label={ariaLabel}
       data-action={dataAction}
-      style={{
-        width: FAB_SIZE,
-        height: FAB_SIZE,
-        borderRadius: '50%',
-        background: backgroundColor,
-        color: 'white',
-        border: 'none',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: `0 4px 12px ${shadowColor}`,
-        zIndex: 50,
-        ...style
-      }}
     >
       {icon || <Plus size={24} strokeWidth={2.5} />}
     </ShadowDOMNativeMotionButton>

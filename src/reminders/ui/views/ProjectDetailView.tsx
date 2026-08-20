@@ -10,11 +10,6 @@ import { EmptyState } from '../../components/EmptyState';
 import { ProjectCompletedSection } from './ProjectCompletedSection';
 import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
-import {
-  CONTENT_PADDING_X,
-  CONTENT_PADDING_TOP,
-  SCROLL_PADDING_WITH_FAB_CSS,
-} from '../layoutConstants';
 
 
 export interface ProjectDetailViewProps {
@@ -88,16 +83,6 @@ export const ProjectDetailView = memo(function ProjectDetailView({
 
   const cardRenderer = renderCard || defaultRenderCard;
 
-  // Scroll container styles
-  const scrollStyle: React.CSSProperties = {
-    paddingLeft: `${CONTENT_PADDING_X}px`,
-    paddingRight: `${CONTENT_PADDING_X}px`,
-    paddingTop: `${CONTENT_PADDING_TOP}px`,
-    paddingBottom: hasFab ? SCROLL_PADDING_WITH_FAB_CSS : '16px',
-    touchAction: 'pan-y',
-    willChange: 'transform',
-  };
-
   return (
     <div className={`flex flex-col h-full ${className}`}>
       {/* Ghost back button */}
@@ -126,8 +111,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
         </div>
       ) : (
         <div
-          className="flex-1 overflow-y-scroll ios-scroll"
-          style={scrollStyle}
+          className={`flex-1 overflow-y-scroll ios-scroll reminders-view-scroll will-change-transform${hasFab ? ' has-fab' : ''}`}
         >
           {/* Active reminders */}
           <ReorderableReminderList

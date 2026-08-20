@@ -2,6 +2,8 @@
 // Premium Reminder Card (Glassmorphism)
 // ============================================
 
+@mixin styles {
+
 .premium-reminder-card {
     position: relative;
     margin-bottom: 10px;
@@ -120,10 +122,10 @@
 
 .premium-checkbox-icon {
     color: white;
-    animation: checkmarkPop 200ms ease-out;
+    animation: crate-checkmark-pop 200ms ease-out;
 }
 
-@keyframes checkmarkPop {
+@keyframes crate-checkmark-pop {
     0% {
         transform: scale(0);
         opacity: 0;
@@ -287,4 +289,5 @@
         background: rgba(0, 0, 0, 0.02);
         border-color: rgba(0, 0, 0, 0.05);
     }
+}
 }

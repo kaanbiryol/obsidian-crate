@@ -58,7 +58,7 @@ export class RemindersView extends ItemView {
         this.isOpen = true;
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass("reminders-view-container");
+        container.addClass("crate-reminders-view-container");
 
         // CRITICAL: Force height chain to work
         // Obsidian's container is a flex child, so height: 100% will resolve
@@ -181,7 +181,6 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
             topOverlay={onClose ? (
                 <>
                     <RemindersViewCloseButton
-                        isDarkMode={isDarkMode}
                         onClose={onClose}
                     />
                 </>

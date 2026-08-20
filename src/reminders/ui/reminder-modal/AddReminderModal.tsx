@@ -128,7 +128,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         onError,
     });
 
-    const textColor = 'var(--text-normal)';
     const keyboardPadding = keyboardOffset > 0 ? Math.max(0, keyboardOffset - 32) : 0;
 
     // Detect dark mode for input/dropdown styling
@@ -178,7 +177,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             onAnimationComplete={handleEntryAnimationComplete}
             animationConfig={animationConfig}
             variant={variant}
-            performanceMode={variant === 'bottom-sheet' ? 'reduced-effects' : 'standard'}
             showBackdrop={false}
             disableSwipeToDismiss={currentView !== 'main'}
             style={{
@@ -198,8 +196,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         >
             <AddReminderModalHeader
                 isEditing={isEditing}
-                isDark={isDark}
-                textColor={textColor}
                 canSubmit={!!content.trim()}
                 onDelete={handleDeleteClick}
                 onClose={handleClose}
@@ -210,8 +206,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             />
             <AddReminderModalBody
                 isEditing={isEditing}
-                isDark={isDark}
-                textColor={textColor}
                 content={content}
                 onContentChange={setContent}
                 description={description}

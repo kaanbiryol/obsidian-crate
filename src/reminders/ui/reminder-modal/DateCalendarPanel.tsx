@@ -1,4 +1,3 @@
-import React from 'react';
 import { Calendar } from '@heroui/react';
 import { CalendarDate, parseDate } from '@internationalized/date';
 import { format } from 'date-fns';
@@ -6,7 +5,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
 import { formatLocalDateKey } from '../../utils/reminderDate';
-import type { GlassColors } from '../glassStyles';
 
 const calendarVariants = {
 	enter: (direction: number) => ({
@@ -36,8 +34,6 @@ interface DateCalendarPanelProps {
 	displayMonth: CalendarDate;
 	calendarDirection: number;
 	animationsEnabled: boolean;
-	glass: GlassColors;
-	isDark: boolean;
 	onPrevMonth: () => void;
 	onNextMonth: () => void;
 	onDateChange: (date: CalendarDate) => void;
@@ -48,8 +44,6 @@ export function DateCalendarPanel({
 	displayMonth,
 	calendarDirection,
 	animationsEnabled,
-	glass,
-	isDark,
 	onPrevMonth,
 	onNextMonth,
 	onDateChange,
@@ -59,69 +53,30 @@ export function DateCalendarPanel({
 			<div className="flex items-center justify-center gap-4 mb-3">
 				<ShadowDOMNativeButton
 					onClick={onPrevMonth}
-					className="flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 active:scale-95"
-					style={{
-						background: glass.surface.bg,
-						border: `1px solid ${glass.surface.border}`,
-						cursor: 'pointer',
-						padding: 0,
-					}}
-					onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-						e.currentTarget.style.background = glass.surfaceHover.bg;
-						e.currentTarget.style.borderColor = glass.surfaceHover.border;
-					}}
-					onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-						e.currentTarget.style.background = glass.surface.bg;
-						e.currentTarget.style.borderColor = glass.surface.border;
-					}}
+					className="date-calendar-navigation-button flex items-center justify-center w-9 h-9 rounded-xl active:scale-95"
 				>
 					<ChevronLeft
 						size={18}
 						strokeWidth={2}
-						style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}
 					/>
 				</ShadowDOMNativeButton>
 
-				<span
-					style={{
-						fontSize: '16px',
-						fontWeight: 600,
-						color: 'var(--text-normal)',
-						letterSpacing: '-0.01em',
-						minWidth: '140px',
-						textAlign: 'center',
-					}}
-				>
+				<span className="date-calendar-title">
 					{format(new Date(displayMonth.year, displayMonth.month - 1), 'MMMM yyyy')}
 				</span>
 
 				<ShadowDOMNativeButton
 					onClick={onNextMonth}
-					className="flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 active:scale-95"
-					style={{
-						background: glass.surface.bg,
-						border: `1px solid ${glass.surface.border}`,
-						cursor: 'pointer',
-						padding: 0,
-					}}
-					onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-						e.currentTarget.style.background = glass.surfaceHover.bg;
-						e.currentTarget.style.borderColor = glass.surfaceHover.border;
-					}}
-					onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-						e.currentTarget.style.background = glass.surface.bg;
-						e.currentTarget.style.borderColor = glass.surface.border;
-					}}
+					className="date-calendar-navigation-button flex items-center justify-center w-9 h-9 rounded-xl active:scale-95"
 				>
 					<ChevronRight
 						size={18}
 						strokeWidth={2}
-						style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}
 					/>
 				</ShadowDOMNativeButton>
 			</div>
 
-			<div style={{ minHeight: '280px' }}>
+			<div className="date-calendar-stage">
 				<AnimatePresence mode="wait" custom={calendarDirection}>
 					<motion.div
 						key={`${displayMonth.year}-${displayMonth.month}`}

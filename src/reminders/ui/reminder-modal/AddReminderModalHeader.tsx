@@ -5,8 +5,6 @@ import { ShadowDOMButton } from '../../components/ShadowDOMButton';
 
 interface AddReminderModalHeaderProps {
     isEditing: boolean;
-    isDark: boolean;
-    textColor: string;
     canSubmit: boolean;
     onDelete: () => void;
     onClose: () => void;
@@ -16,8 +14,6 @@ interface AddReminderModalHeaderProps {
 
 export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
     isEditing,
-    isDark,
-    textColor,
     canSubmit,
     onDelete,
     onClose,
@@ -37,13 +33,7 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                     color="danger"
                     variant="light"
                     onPress={onDelete}
-                    className="min-w-9 w-9 h-9 rounded-xl"
-                    style={{
-                        backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                        border: '1px solid rgba(239, 68, 68, 0.12)',
-                        color: 'rgba(239, 68, 68, 0.9)',
-                        transition: 'all 0.35s ease-out',
-                    }}
+                    className="reminder-header-delete min-w-9 w-9 h-9 rounded-xl"
                 >
                     <Trash2 size={18} strokeWidth={2} />
                 </ShadowDOMButton>
@@ -53,13 +43,7 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                     size="sm"
                     variant="light"
                     onPress={onClose}
-                    className="min-w-9 w-9 h-9 rounded-xl"
-                    style={{
-                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
-                        border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.06)',
-                        color: isDark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.5)',
-                        transition: 'all 0.35s ease-out',
-                    }}
+                    className="reminder-header-close min-w-9 w-9 h-9 rounded-xl"
                 >
                     <X size={20} strokeWidth={2} />
                 </ShadowDOMButton>
@@ -68,14 +52,7 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
 
         {/* Title (center) - Refined typography */}
         <div className="flex-1 text-center">
-            <span
-                style={{
-                    fontSize: '20px',
-                    fontWeight: 600,
-                    color: textColor,
-                    letterSpacing: '-0.025em',
-                }}
-            >
+            <span className="reminder-header-title">
                 {isEditing ? 'Edit Reminder' : 'New Reminder'}
             </span>
         </div>
@@ -87,21 +64,8 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                 size="sm"
                 color="primary"
                 onPress={canSubmit ? onSubmit : () => {}}
-                className="w-9 h-9 min-w-9 rounded-xl"
+                className={`reminder-header-submit w-9 h-9 min-w-9 rounded-xl${canSubmit ? ' is-enabled' : ''}`}
                 disableAnimation={!canSubmit}
-                style={canSubmit ? {
-                    background: 'hsl(var(--heroui-primary))',
-                    boxShadow: '0 2px 8px hsl(var(--heroui-primary) / 0.2)',
-                    color: 'white',
-                    cursor: 'pointer',
-                    transition: 'all 0.35s ease-out',
-                } : {
-                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
-                    color: isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.35)',
-                    cursor: 'default',
-                    opacity: 1,
-                    transition: 'all 0.35s ease-out',
-                }}
             >
                 {isEditing ? <Check size={18} strokeWidth={2.5} /> : <ArrowUp size={18} strokeWidth={2.5} />}
             </ShadowDOMButton>

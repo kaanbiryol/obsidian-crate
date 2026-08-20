@@ -6,11 +6,6 @@ import type { Reminder } from '../../types/reminder';
 import { EmptyState } from '../../components/EmptyState';
 import { BrowseProjectCard } from './BrowseProjectCard';
 import { buildBrowseProjectCardsViewModel } from './viewModels';
-import {
-  CONTENT_PADDING_X,
-  CONTENT_PADDING_TOP,
-  SCROLL_PADDING_WITHOUT_FAB_CSS
-} from '../layoutConstants';
 
 export interface BrowseViewProps {
   projects: string[];
@@ -58,22 +53,12 @@ export const BrowseView = memo(function BrowseView({
     );
   }
 
-  // Scroll container styles
-  const scrollStyle: React.CSSProperties = {
-    paddingLeft: `${CONTENT_PADDING_X}px`,
-    paddingRight: `${CONTENT_PADDING_X}px`,
-    paddingTop: `${CONTENT_PADDING_TOP}px`,
-    paddingBottom: SCROLL_PADDING_WITHOUT_FAB_CSS,
-    touchAction: 'pan-y'
-  };
-
   return (
     <div className={`flex flex-col h-full ${className}`}>
       {showHeader && headerContent}
 
       <div
-        className="flex-1 overflow-y-scroll ios-scroll"
-        style={scrollStyle}
+        className="flex-1 overflow-y-scroll ios-scroll reminders-view-scroll is-tab-aware"
       >
         {/* Projects list */}
         <div className="premium-projects-list">

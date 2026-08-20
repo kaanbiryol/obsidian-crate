@@ -9,12 +9,7 @@ import { ReminderCard } from '../../components/ReminderCard';
 import { ReorderableReminderList } from '../../components/ReorderableReminderList';
 import { EmptyState } from '../../components/EmptyState';
 import { buildInboxViewModel } from './viewModels';
-import {
-  CONTENT_PADDING_X,
-  CONTENT_PADDING_TOP,
-  SCROLL_PADDING_WITH_FAB_CSS,
-  SPRING_CONFIG_BOUNCY
-} from '../layoutConstants';
+import { SPRING_CONFIG_BOUNCY } from '../layoutConstants';
 
 export interface InboxViewProps {
   reminders: Reminder[];
@@ -90,19 +85,10 @@ export const InboxView = memo(function InboxView({
     );
   }
 
-  const scrollStyle: React.CSSProperties = {
-    paddingLeft: `${CONTENT_PADDING_X}px`,
-    paddingRight: `${CONTENT_PADDING_X}px`,
-    paddingTop: `${CONTENT_PADDING_TOP}px`,
-    paddingBottom: hasFab ? SCROLL_PADDING_WITH_FAB_CSS : '16px',
-    touchAction: 'pan-y'
-  };
-
   return (
     <div className={`flex flex-col h-full relative ${className}`}>
       <div
-        className="flex-1 overflow-y-auto space-y-2 ios-scroll"
-        style={scrollStyle}
+        className={`flex-1 overflow-y-auto space-y-2 ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
       >
         <ReorderableReminderList
           reminders={localOrder}
@@ -137,8 +123,7 @@ export const InboxView = memo(function InboxView({
                 }
               >
                 <span
-                  className="text-sm font-semibold text-default-600"
-                  style={{ color: 'var(--text-muted)' }}
+                  className="text-sm font-semibold reminders-muted-label"
                 >
                   Completed ({completed.length})
                 </span>
@@ -188,7 +173,7 @@ export const InboxView = memo(function InboxView({
                           x: 20,
                           transition: { duration: 0.25, ease: [0.4, 0, 1, 1] as const }
                         } : undefined}
-                        style={{ marginBottom: '0.5rem' }}
+                        className="mb-2"
                       >
                         {cardRenderer(reminder, index)}
                       </motion.div>

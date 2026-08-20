@@ -1,11 +1,4 @@
-.reminders-view-container {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    // No background for code blocks - they inherit from Obsidian
-    // Modal/fullscreen modes set their own background
-}
+@mixin styles {
 
 // Shadow DOM root container
 // CSS custom properties from Obsidian inherit through shadow boundary
@@ -75,6 +68,147 @@
     }
 }
 
+.reminders-view-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.view-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 12px 16px 8px;
+    background: transparent;
+    border-bottom: 1px solid var(--background-modifier-border);
+
+    &.is-large {
+        padding: 16px 20px 12px;
+
+        .view-header-title {
+            font-size: 28px;
+        }
+    }
+}
+
+.view-header-copy {
+    flex: 1;
+}
+
+.view-header-title {
+    margin: 0;
+    color: var(--text-normal);
+    font-size: 20px;
+    font-weight: var(--reminder-font-weight-semibold);
+    line-height: 1.2;
+}
+
+.view-header-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    margin-top: 4px;
+}
+
+.view-header-count {
+    color: var(--text-muted);
+    font-size: var(--reminder-font-sm);
+}
+
+.view-header-overdue {
+    padding: 4px 12px;
+    border-radius: 12px;
+    background: var(--reminder-red, #e53935);
+    color: white;
+    font-size: 14px;
+    font-weight: var(--reminder-font-weight-semibold);
+}
+
+.view-header-actions {
+    flex-shrink: 0;
+}
+
+.bottom-tab-bar {
+    flex-shrink: 0;
+    z-index: 40;
+    background: var(--background-primary);
+
+    &.is-bottom {
+        border-top: 1px solid var(--background-modifier-border);
+    }
+}
+
+.bottom-tab-items {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 8px 12px;
+}
+
+.bottom-tab-button {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 48px;
+    padding: 10px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+
+    &.is-active {
+        color: #7c3aed;
+
+        .bottom-tab-label {
+            font-weight: var(--reminder-font-weight-semibold);
+        }
+    }
+}
+
+.bottom-tab-indicator {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    background: rgba(124, 58, 237, 0.1);
+}
+
+.bottom-tab-content {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.bottom-tab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 150ms ease;
+}
+
+.bottom-tab-label {
+    color: currentColor;
+    font-size: 13px;
+    font-weight: var(--reminder-font-weight-medium);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    transition: color 150ms ease;
+}
+
 // ============================================
 // Animated Tab Bar (Framer Motion)
 // ============================================
@@ -107,7 +241,7 @@
     &.is-transitioning {
         // WebKit: transparent scrollbar thumb
         &::-webkit-scrollbar-thumb {
-            background: transparent !important;
+            background: transparent;
         }
 
         // Firefox: hide via scrollbar-color
@@ -116,7 +250,7 @@
         // Hide inner view scrollbars during transitions (browse/project)
         .ios-scroll {
             scrollbar-color: transparent transparent;
-            overflow-y: hidden !important;
+            overflow-y: hidden;
         }
 
         .ios-scroll::-webkit-scrollbar {
@@ -128,7 +262,7 @@
         }
 
         .ios-scroll::-webkit-scrollbar-thumb {
-            background: transparent !important;
+            background: transparent;
         }
     }
 }
@@ -156,6 +290,33 @@
 
 .ios-scroll::-webkit-scrollbar-thumb:hover {
     background: var(--text-faint);
+}
+
+.reminders-view-scroll {
+    padding: 16px;
+    touch-action: pan-y;
+
+    &.has-fab {
+        padding-bottom: calc(var(--reminders-tabbar-overlay, 0px) + var(--reminders-fab-gap, 24px) + var(--reminders-fab-size, 56px) + var(--reminders-safe-area, env(safe-area-inset-bottom)));
+    }
+
+    &.is-tab-aware {
+        padding-bottom: calc(var(--reminders-tabbar-overlay, 0px) + var(--reminders-bottom-gap, 16px) + var(--reminders-safe-area, env(safe-area-inset-bottom)));
+    }
+}
+
+.upcoming-date-header {
+    margin-bottom: 12px;
+    padding-left: 4px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: var(--reminder-font-weight-semibold);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.reminders-muted-label {
+    color: var(--text-muted);
 }
 
 // ============================================
@@ -211,4 +372,219 @@
             background: rgba(0, 0, 0, 0.2);
         }
     }
+}
+
+// Shared rich text chips are used by both the Obsidian plugin and the PWA editor.
+.rich-text-input-shell {
+    position: relative;
+}
+
+.rich-text-input-editor {
+    min-height: 1.5rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+
+.rich-text-chip {
+    display: inline;
+    margin: 0 1px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: inherit;
+    font-weight: var(--reminder-font-weight-medium, 500);
+    letter-spacing: 0.01em;
+    vertical-align: baseline;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+.rich-text-chip-priority {
+    background: hsl(var(--heroui-danger) / 0.08);
+    color: hsl(var(--heroui-danger));
+}
+
+.rich-text-chip-date {
+    background: hsl(var(--heroui-success) / 0.08);
+    color: hsl(var(--heroui-success));
+}
+
+.rich-text-chip-project {
+    background: hsl(var(--heroui-primary) / 0.08);
+    color: hsl(var(--heroui-primary));
+}
+
+.reminders-empty-state {
+    gap: 4px;
+    padding-right: 28px;
+    padding-left: 28px;
+
+    &.is-compact {
+        padding-right: 20px;
+        padding-left: 20px;
+    }
+}
+
+.reminders-empty-state-icon {
+    --empty-state-color: var(--heroui-primary);
+
+    flex-shrink: 0;
+    width: 88px;
+    height: 88px;
+    margin-bottom: 10px;
+    background: hsl(var(--empty-state-color) / 0.1);
+    color: hsl(var(--empty-state-color));
+
+    &.tone-secondary {
+        --empty-state-color: var(--heroui-secondary);
+    }
+
+    &.tone-warning {
+        --empty-state-color: var(--heroui-warning);
+    }
+}
+
+.reminders-empty-state.is-compact .reminders-empty-state-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 8px;
+}
+
+.reminders-empty-state-title,
+.reminders-empty-state-description {
+    max-width: 320px;
+    margin: 0;
+}
+
+.reminders-empty-state-title {
+    margin-bottom: 4px;
+    color: var(--text-normal);
+    font-size: var(--reminder-font-base, var(--font-ui-medium, 14px));
+    font-weight: var(--reminder-font-weight-semibold, 600);
+    line-height: 1.3;
+}
+
+.reminders-empty-state-description {
+    color: var(--text-muted);
+    font-size: var(--reminder-font-base, var(--font-ui-medium, 14px));
+    line-height: 1.5;
+}
+
+.reminders-empty-state.is-compact {
+    .reminders-empty-state-title,
+    .reminders-empty-state-description {
+        max-width: 240px;
+    }
+
+    .reminders-empty-state-description {
+        font-size: var(--reminder-font-sm, var(--font-ui-small, 13px));
+    }
+}
+
+.reminders-view-close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    z-index: 100;
+    border: 1px solid var(--crate-glass-back-border, rgba(0, 0, 0, 0.06));
+    background: var(--crate-glass-back-bg, rgba(0, 0, 0, 0.03));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: var(--crate-glass-back-shadow, 0 2px 8px rgba(0, 0, 0, 0.04));
+    color: var(--text-muted);
+    transition: all 200ms ease-out;
+
+    &:hover {
+        background: var(--crate-glass-back-hover-bg, rgba(0, 0, 0, 0.06));
+        box-shadow: var(--crate-glass-back-hover-shadow, 0 0 12px rgba(0, 0, 0, 0.08));
+    }
+}
+
+.project-picker-dot {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+
+    .is-dark {
+        display: none;
+    }
+}
+
+.project-picker-dot-glow {
+    opacity: 0.4;
+    filter: blur(2px);
+}
+
+.dark .project-picker-dot,
+&.dark .project-picker-dot {
+    .is-light {
+        display: none;
+    }
+
+    .is-dark {
+        display: initial;
+    }
+
+    .project-picker-dot-glow {
+        opacity: 0.6;
+    }
+}
+
+.project-autocomplete-dropdown {
+    position: absolute;
+    right: 0;
+    left: 0;
+    z-index: 100;
+    max-height: 192px;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    border-top: 0;
+    border-radius: 0 0 12px 12px;
+    background: var(--background-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.project-autocomplete-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+
+    &:last-child {
+        border-bottom: 0;
+    }
+
+    &[aria-selected="true"] {
+        background: rgba(0, 0, 0, 0.05);
+    }
+}
+
+.project-autocomplete-label {
+    overflow: hidden;
+    color: var(--text-normal);
+    font-size: 13px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dark .project-autocomplete-dropdown,
+&.dark .project-autocomplete-dropdown {
+    border-color: rgba(255, 255, 255, 0.04);
+    background: var(--background-secondary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dark .project-autocomplete-option,
+&.dark .project-autocomplete-option {
+    border-bottom-color: rgba(255, 255, 255, 0.04);
+
+    &[aria-selected="true"] {
+        background: rgba(255, 255, 255, 0.06);
+    }
+}
 }

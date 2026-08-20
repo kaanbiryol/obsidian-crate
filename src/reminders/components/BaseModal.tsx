@@ -29,8 +29,6 @@ interface BaseModalProps {
     onAnimationComplete?: () => void;
     /** Disable swipe-to-dismiss gesture (default: false for bottom-sheet, true for centered) */
     disableSwipeToDismiss?: boolean;
-    /** Reduce heavy visual effects for smoother animation on low-power devices */
-    performanceMode?: 'standard' | 'reduced-effects';
 }
 
 // Swipe-to-dismiss threshold constants
@@ -63,16 +61,9 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     onExitComplete,
     onAnimationComplete,
     disableSwipeToDismiss,
-    performanceMode = 'standard',
 }) => {
     const isAnimationEnabled = animationConfig.enabled && !prefersReducedMotion();
     const isBottomSheet = variant === 'bottom-sheet';
-    // Always reduce effects (no backdrop blur) for consistent performance across all platforms
-    const reduceEffects = true;
-
-    // Detect dark mode for glass styling
-    const isDark = typeof document !== 'undefined' &&
-        document.body.classList.contains('theme-dark');
 
     // Swipe-to-dismiss is enabled by default for bottom-sheet, disabled for centered
     const swipeEnabled = disableSwipeToDismiss !== undefined
@@ -95,43 +86,8 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
     // Remove shadow/border classes - handled in modalStyle for glass effect
     const modalBaseClass = variant === 'centered'
-        ? "rounded-2xl max-w-lg w-full mx-4"
-        : "relative w-full rounded-t-3xl";
-
-    // Glass surface styling - refined, minimal glassmorphism
-    // GPU optimization: always set will-change on modal to prevent layer promotion/demotion during animation
-    const modalStyle: React.CSSProperties = {
-        // Glass surface
-        backgroundColor: isDark
-            ? 'rgba(28, 28, 30, 1)'
-            : 'rgba(255, 255, 255, 1)',
-        backdropFilter: reduceEffects ? 'none' : 'blur(20px)',
-        WebkitBackdropFilter: reduceEffects ? 'none' : 'blur(20px)',
-        // Refined border
-        border: isDark
-            ? '1px solid rgba(255, 255, 255, 0.06)'
-            : '1px solid rgba(0, 0, 0, 0.04)',
-        // Subtle shadow for depth
-        boxShadow: isDark
-            ? (reduceEffects
-                ? '0 6px 16px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04)'
-                : '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04)')
-            : (reduceEffects
-                ? '0 6px 16px rgba(0, 0, 0, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
-                : '0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8)'),
-        paddingBottom: variant === 'centered' ? '16px' : 'max(env(safe-area-inset-bottom), 16px)',
-        color: 'var(--text-normal)',
-        // Always promote to own layer for consistent GPU compositing
-        willChange: 'transform, opacity',
-    };
-
-    // Refined drag handle - slightly larger, more visible
-    const dragHandleStyle: React.CSSProperties = {
-        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
-        width: '40px',
-        height: '5px',
-        borderRadius: '9999px',
-    };
+        ? "base-modal-surface is-centered rounded-2xl max-w-lg w-full mx-4"
+        : "base-modal-surface is-bottom-sheet relative w-full rounded-t-3xl";
 
     // iOS-native bottom-sheet animation (UISheetPresentationController-style)
     const bottomSheetVariants = isAnimationEnabled ? {
@@ -194,14 +150,9 @@ export const BaseModal: React.FC<BaseModalProps> = ({
             {isOpen && (
                 <motion.div
                     key="modal-container"
-                    className={`fixed inset-0 ${containerClass}`}
+                    className={`base-modal-container fixed inset-0 ${containerClass}`}
                     style={{
                         zIndex,
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
                         ...style
                     }}
                     // Handle taps outside modal content to close
@@ -249,7 +200,6 @@ export const BaseModal: React.FC<BaseModalProps> = ({
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
                         style={{
-                            ...modalStyle,
                             ...contentStyle,
                             y: swipeEnabled ? dragY : undefined
                         }}
@@ -261,10 +211,9 @@ export const BaseModal: React.FC<BaseModalProps> = ({
                         {/* Drag Handle - only for bottom-sheet, serves as visual affordance for swipe */}
                         {showDragHandle && variant === 'bottom-sheet' && (
                             <div
-                                className="flex justify-center pt-3 pb-1"
-                                style={{ touchAction: 'none' }} // Improve drag gesture
+                                className="base-modal-drag-region flex justify-center pt-3 pb-1"
                             >
-                                <div style={dragHandleStyle} />
+                                <div className="base-modal-drag-handle" />
                             </div>
                         )}
 

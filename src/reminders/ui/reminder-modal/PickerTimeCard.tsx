@@ -3,51 +3,29 @@ import { Clock } from 'lucide-react';
 import { TimeInput } from '@heroui/react';
 import { Time } from '@internationalized/date';
 
-import { getGlassColors } from '../glassStyles';
-
 interface PickerTimeCardProps {
-    isDark: boolean;
     hour: number;
     minute: number;
     onChange: (hour: number, minute: number) => void;
 }
 
 export const PickerTimeCard: React.FC<PickerTimeCardProps> = ({
-    isDark,
     hour,
     minute,
     onChange,
 }) => {
-    const glass = getGlassColors(isDark);
-
     return (
-        <div
-            style={{
-                background: glass.surface.bg,
-                border: `1px solid ${glass.surface.border}`,
-                borderRadius: '12px',
-                padding: '14px 16px',
-            }}
-        >
+        <div className="picker-time-card">
             <div className="flex items-center gap-3">
                 <Clock
                     size={16}
                     strokeWidth={1.75}
-                    style={{
-                        color: 'var(--interactive-accent)',
-                        filter: isDark ? 'drop-shadow(0 0 4px var(--interactive-accent))' : 'none',
-                    }}
+                    className="picker-time-icon"
                 />
-                <span
-                    style={{
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        color: 'var(--text-normal)',
-                    }}
-                >
+                <span className="picker-time-label">
                     Time
                 </span>
-                <div className={`ml-auto ${isDark ? 'dark text-foreground' : ''}`}>
+                <div className="ml-auto">
                     <TimeInput
                         aria-label="Time"
                         size="sm"
@@ -64,8 +42,8 @@ export const PickerTimeCard: React.FC<PickerTimeCardProps> = ({
                             inputWrapper: [
                                 'shadow-none',
                                 'h-9 min-h-9 px-3 rounded-xl',
-                                `bg-[${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'}]`,
-                                `border border-[${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}]`,
+                                'bg-[var(--crate-glass-surface-bg)]',
+                                'border border-[var(--crate-glass-surface-border)]',
                             ].join(' '),
                             input: 'text-[14px] font-semibold text-[var(--text-normal)]',
                             segment: 'text-[14px] font-semibold data-[placeholder=true]:text-[var(--text-muted)]',

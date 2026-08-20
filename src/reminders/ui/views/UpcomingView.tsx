@@ -9,12 +9,7 @@ import { formatDateHeader } from '../../utils/dateFormatting';
 import { ReminderCard } from '../../components/ReminderCard';
 import { EmptyState } from '../../components/EmptyState';
 import { buildUpcomingViewModel } from './viewModels';
-import {
-  CONTENT_PADDING_X,
-  CONTENT_PADDING_TOP,
-  SCROLL_PADDING_WITH_FAB_CSS,
-  STAGGERED_CARD_ANIMATION
-} from '../layoutConstants';
+import { STAGGERED_CARD_ANIMATION } from '../layoutConstants';
 
 export interface UpcomingViewProps {
   reminders: Reminder[];
@@ -71,39 +66,17 @@ export const UpcomingView = memo(function UpcomingView({
     );
   }
 
-  // Scroll container styles
-  const scrollStyle: React.CSSProperties = {
-    paddingLeft: `${CONTENT_PADDING_X}px`,
-    paddingRight: `${CONTENT_PADDING_X}px`,
-    paddingTop: `${CONTENT_PADDING_TOP}px`,
-    paddingBottom: hasFab ? SCROLL_PADDING_WITH_FAB_CSS : '16px',
-    touchAction: 'pan-y'
-  };
-
-  // Date header styles
-  const dateHeaderStyle: React.CSSProperties = {
-    fontSize: '12px',
-    fontWeight: 600,
-    color: 'var(--text-muted)',
-    marginBottom: '12px',
-    paddingLeft: '4px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em'
-  };
-
   return (
     <div className={`flex flex-col h-full relative ${className}`}>
       <div
-        className="flex-1 overflow-y-auto ios-scroll"
-        style={scrollStyle}
+        className={`flex-1 overflow-y-auto ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
       >
         <div className="space-y-6">
           {dateGroups.map((group, groupIndex) => (
             <div key={group.date.toISOString()}>
               {groupIndex > 0 && <Divider className="my-4" />}
               <h2
-                className="text-default-600"
-                style={dateHeaderStyle}
+                className="upcoming-date-header"
               >
                 {formatDateHeader(group.date)}
               </h2>
@@ -117,7 +90,7 @@ export const UpcomingView = memo(function UpcomingView({
                       initial={animationConfig.enabled ? STAGGERED_CARD_ANIMATION.initial : false}
                       animate={animationConfig.enabled ? STAGGERED_CARD_ANIMATION.animate(index) : { opacity: 1 }}
                       exit={animationConfig.enabled ? STAGGERED_CARD_ANIMATION.exit : undefined}
-                      style={{ marginBottom: '0.5rem' }}
+                      className="mb-2"
                     >
                       {cardRenderer(reminder, index)}
                     </motion.div>

@@ -1,35 +1,10 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { getChipStyle, createChipHTML, buildHTML, findProjectMatches, findPriorityMatches, findLinkMatches, findAllMatches, getPlainText } from './richTextParsing';
-
-describe('getChipStyle', () => {
-    it('uses display: inline, not inline-flex', () => {
-        const style = getChipStyle('project', '#forge');
-        expect(style).toContain('display: inline;');
-        expect(style).not.toContain('inline-flex');
-        expect(style).not.toContain('align-items');
-    });
-
-    it('returns project-specific colors', () => {
-        const style = getChipStyle('project', '#work');
-        expect(style).toContain('--heroui-primary');
-    });
-
-    it('returns priority-specific colors', () => {
-        const style = getChipStyle('priority', '!');
-        expect(style).toContain('--heroui-danger');
-    });
-
-    it('returns date-specific colors', () => {
-        const style = getChipStyle('date', 'tomorrow');
-        expect(style).toContain('--heroui-success');
-    });
-});
+import { createChipHTML, buildHTML, findProjectMatches, findPriorityMatches, findLinkMatches, findAllMatches, getPlainText } from './richTextParsing';
 
 describe('createChipHTML', () => {
     it('wraps text in a rich-text-chip span', () => {
         const html = createChipHTML('project', '#forge');
-        expect(html).toMatch(/^<span class="rich-text-chip" style="[^"]+">.*<\/span>$/);
-        expect(html).toContain('#forge');
+        expect(html).toBe('<span class="rich-text-chip rich-text-chip-project">#forge</span>');
     });
 
     it('escapes HTML entities', () => {
@@ -74,7 +49,7 @@ describe('buildHTML', () => {
 
     it('wraps project tags in chip spans', () => {
         const html = buildHTML('buy milk #forge');
-        expect(html).toContain('<span class="rich-text-chip"');
+        expect(html).toContain('<span class="rich-text-chip rich-text-chip-project"');
         expect(html).toContain('#forge');
         expect(html).toMatch(/^buy milk /);
     });

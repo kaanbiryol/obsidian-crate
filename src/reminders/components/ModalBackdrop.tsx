@@ -54,16 +54,9 @@ export const ModalBackdrop: React.FC<ModalBackdropProps> = ({
                         duration: 0.33,
                         ease: [0.32, 0.72, 0, 1] // easeOut - smooth perceptual fade
                     } : { duration: 0 }}
-                    className={`fixed inset-0 bg-black/50 ${className}`}
+                    className={`modal-backdrop fixed inset-0 bg-black/50${onClick ? ' is-interactive' : ''}${className ? ` ${className}` : ''}`}
                     style={{
                         zIndex,
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        willChange: 'opacity',
-                        pointerEvents: onClick ? 'auto' : 'none',
                     }}
                     onClick={onClick}
                     onTouchStart={onClick ? (e) => { e.preventDefault(); onClick(); } : undefined}

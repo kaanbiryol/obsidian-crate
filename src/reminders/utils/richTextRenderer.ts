@@ -1,4 +1,3 @@
-import { getFontWeight } from '../ui/themes';
 import { findAllMatches } from './richTextMatchers';
 
 /**
@@ -15,51 +14,12 @@ const escapeHTML = (str: string): string => {
 };
 
 /**
- * Get chip styles for different types
- * Minimal, inline annotation style - subtle enough to not overpower text
- */
-export const getChipStyle = (type: string, _text: string): string => {
-    const fontWeight = getFontWeight('medium');
-    const baseStyle = `
-        padding: 1px 6px;
-        border-radius: 6px;
-        display: inline;
-        font-size: inherit;
-        font-weight: ${fontWeight};
-        letter-spacing: 0.01em;
-        margin: 0 1px;
-        box-decoration-break: clone;
-        -webkit-box-decoration-break: clone;
-        vertical-align: baseline;
-    `.replace(/\s+/g, ' ').trim();
-
-    // Refined, understated chips - color only, very subtle background
-    if (type === 'priority') {
-        return baseStyle + `
-            background: hsl(var(--heroui-danger) / 0.08);
-            color: hsl(var(--heroui-danger));
-        `.replace(/\s+/g, ' ').trim();
-    } else if (type === 'date') {
-        return baseStyle + `
-            background: hsl(var(--heroui-success) / 0.08);
-            color: hsl(var(--heroui-success));
-        `.replace(/\s+/g, ' ').trim();
-    } else if (type === 'project') {
-        return baseStyle + `
-            background: hsl(var(--heroui-primary) / 0.08);
-            color: hsl(var(--heroui-primary));
-        `.replace(/\s+/g, ' ').trim();
-    }
-    return baseStyle;
-};
-
-/**
  * Create HTML for a chip
  */
 export const createChipHTML = (type: string, text: string): string => {
     const escapedText = escapeHTML(text);
-    const style = getChipStyle(type, text);
-    return `<span class="rich-text-chip" style="${style}">${escapedText}</span>`;
+    const chipType = ['priority', 'date', 'project'].includes(type) ? type : 'default';
+    return `<span class="rich-text-chip rich-text-chip-${chipType}">${escapedText}</span>`;
 };
 
 /**

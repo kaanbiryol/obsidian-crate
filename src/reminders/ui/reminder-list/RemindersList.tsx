@@ -128,7 +128,6 @@ export const RemindersList: React.FC<Props> = ({
             color="primary"
             radius="full"
             aria-label="Add reminder"
-            style={{ minWidth: '44px', minHeight: '44px' }}
           >
             <ObsidianIcon size="s" id="plus" />
           </ShadowDOMButton>
@@ -145,7 +144,6 @@ export const RemindersList: React.FC<Props> = ({
             variant="flat"
             radius="full"
             aria-label={showCompletedState ? "Hide completed" : "Show completed"}
-            style={{ minWidth: '44px', minHeight: '44px' }}
           >
             <ObsidianIcon size="s" id={showCompletedState ? "eye-off" : "eye"} />
           </ShadowDOMButton>
@@ -171,7 +169,7 @@ export const RemindersList: React.FC<Props> = ({
                       initial={STAGGERED_CARD_ANIMATION.initial}
                       animate={STAGGERED_CARD_ANIMATION.animate(index)}
                       exit={STAGGERED_CARD_ANIMATION.exit}
-                      style={{ marginBottom: '0.5rem' }}
+                      className="mb-2"
                     >
                       <ReminderCardWrapper
                         reminder={reminder}

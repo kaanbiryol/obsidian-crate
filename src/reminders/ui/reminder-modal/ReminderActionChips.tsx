@@ -7,49 +7,7 @@ import type { RecurrenceRule } from '../../types';
 import { parseReminderDateValue } from '../../utils/reminderDate';
 import { formatRecurrence } from '../../utils/rruleConverter';
 
-const getPillStyle = (
-    isActive: boolean,
-    colorName: 'primary' | 'secondary' | 'danger' | 'warning',
-    isDark: boolean
-): React.CSSProperties => {
-    const baseStyle: React.CSSProperties = {
-        padding: '8px 12px',
-        gap: '6px',
-        lineHeight: 1,
-        height: '36px',
-        display: 'inline-flex',
-        alignItems: 'center',
-        borderRadius: '12px',
-        fontSize: '13px',
-        fontWeight: 500,
-        letterSpacing: '0.005em',
-        transition: 'all 0.2s ease-out',
-    };
-
-    if (isActive) {
-        return {
-            ...baseStyle,
-            backgroundColor: isDark
-                ? `hsl(var(--heroui-${colorName}) / 0.12)`
-                : `hsl(var(--heroui-${colorName}) / 0.08)`,
-            color: `hsl(var(--heroui-${colorName}))`,
-            border: `1px solid hsl(var(--heroui-${colorName}) / 0.18)`,
-            boxShadow: isDark
-                ? '0 1px 3px rgba(0, 0, 0, 0.2)'
-                : '0 1px 2px rgba(0, 0, 0, 0.05)',
-        };
-    }
-
-    return {
-        ...baseStyle,
-        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)',
-        color: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.45)',
-        border: '1px solid transparent',
-    };
-};
-
 interface ReminderActionChipsProps {
-    isDark: boolean;
     dueDate: string | null;
     hasTime?: boolean;
     project: string;
@@ -66,7 +24,6 @@ interface ReminderActionChipsProps {
 }
 
 export function ReminderActionChips({
-    isDark,
     dueDate,
     hasTime,
     project,
@@ -86,20 +43,11 @@ export function ReminderActionChips({
         : undefined;
 
     return (
-        <div
-            className="flex flex-wrap items-center mt-4 pt-3 pb-3"
-            style={{
-                gap: '10px',
-                borderTop: isDark
-                    ? '1px solid rgba(255, 255, 255, 0.05)'
-                    : '1px solid rgba(0, 0, 0, 0.04)',
-            }}
-        >
+        <div className="reminder-action-chips flex flex-wrap items-center mt-4 pt-3 pb-3">
             <ShadowDOMButton
                 variant="light"
                 onPress={onOpenDatePicker}
-                className="flex items-center h-auto min-w-0 px-0 gap-0"
-                style={getPillStyle(!!dueDate, 'primary', isDark)}
+                className={`reminder-action-chip tone-primary flex items-center h-auto min-w-0 px-0 gap-0${dueDate ? ' is-active' : ''}`}
             >
                 <motion.div
                     animate={{
@@ -127,8 +75,7 @@ export function ReminderActionChips({
             <ShadowDOMButton
                 variant="light"
                 onPress={onOpenProjectPicker}
-                className="flex items-center h-auto min-w-0 px-0 gap-0"
-                style={getPillStyle(project !== defaultProject, 'secondary', isDark)}
+                className={`reminder-action-chip tone-secondary flex items-center h-auto min-w-0 px-0 gap-0${project !== defaultProject ? ' is-active' : ''}`}
             >
                 <motion.div
                     animate={{
@@ -162,8 +109,7 @@ export function ReminderActionChips({
                     scale: priority === 1 ? [1, 1.1, 1] : 1,
                 } : {}}
                 transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-                className="flex items-center h-auto min-w-0 px-0"
-                style={getPillStyle(priority === 1, 'danger', isDark)}
+                className={`reminder-action-chip tone-danger flex items-center h-auto min-w-0 px-0${priority === 1 ? ' is-active' : ''}`}
             >
                 <motion.div
                     animate={hasMounted ? {
@@ -187,8 +133,7 @@ export function ReminderActionChips({
                 layout={hasMounted}
                 animate={hasMounted ? { scale: recurrence ? [1, 1.02, 1] : 1 } : {}}
                 transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                className="flex items-center h-auto min-w-0 px-0 gap-0"
-                style={getPillStyle(!!recurrence, 'warning', isDark)}
+                className={`reminder-action-chip tone-warning flex items-center h-auto min-w-0 px-0 gap-0${recurrence ? ' is-active' : ''}`}
             >
                 <motion.div
                     animate={hasMounted ? { rotate: recurrence ? 360 : 0 } : {}}

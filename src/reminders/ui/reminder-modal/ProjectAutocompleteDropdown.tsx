@@ -7,7 +7,6 @@ interface ProjectAutocompleteDropdownProps {
     highlightedIndex: number;
     anchorRect: DOMRect | null;
     containerRef: React.RefObject<HTMLElement | null>;
-    isDark: boolean;
     onSelect: (project: string) => void;
 }
 
@@ -16,7 +15,6 @@ export const ProjectAutocompleteDropdown: React.FC<ProjectAutocompleteDropdownPr
     highlightedIndex,
     anchorRect,
     containerRef,
-    isDark,
     onSelect,
 }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -34,30 +32,12 @@ export const ProjectAutocompleteDropdown: React.FC<ProjectAutocompleteDropdownPr
     const containerRect = containerRef.current.getBoundingClientRect();
     const top = anchorRect.bottom - containerRect.top + 6;
 
-    const highlightBg = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
-    const separatorColor = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
-
     return (
         <div
             ref={scrollRef}
             onMouseDown={(e) => e.preventDefault()}
-            style={{
-                position: 'absolute',
-                top,
-                left: 0,
-                right: 0,
-                zIndex: 100,
-                maxHeight: '192px',
-                overflowY: 'auto',
-                background: isDark ? 'var(--background-secondary)' : 'var(--background-primary)',
-                borderBottom: `1px solid ${separatorColor}`,
-                borderLeft: `1px solid ${separatorColor}`,
-                borderRight: `1px solid ${separatorColor}`,
-                borderRadius: '0 0 12px 12px',
-                boxShadow: isDark
-                    ? '0 4px 12px rgba(0, 0, 0, 0.3)'
-                    : '0 4px 12px rgba(0, 0, 0, 0.08)',
-            }}
+            className="project-autocomplete-dropdown"
+            style={{ top }}
         >
             {filteredProjects.map((project, index) => (
                 <div
@@ -65,29 +45,10 @@ export const ProjectAutocompleteDropdown: React.FC<ProjectAutocompleteDropdownPr
                     onClick={() => onSelect(project)}
                     role="option"
                     aria-selected={index === highlightedIndex}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '8px 14px',
-                        background: index === highlightedIndex ? highlightBg : 'transparent',
-                        borderBottom: index < filteredProjects.length - 1
-                            ? `1px solid ${separatorColor}`
-                            : 'none',
-                        cursor: 'pointer',
-                    }}
+                    className="project-autocomplete-option"
                 >
-                    <ProjectDot projectName={project} isDark={isDark} />
-                    <span
-                        style={{
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            color: 'var(--text-normal)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                        }}
-                    >
+                    <ProjectDot projectName={project} />
+                    <span className="project-autocomplete-label">
                         {project}
                     </span>
                 </div>

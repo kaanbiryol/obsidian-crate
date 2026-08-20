@@ -2,6 +2,8 @@
 // Premium Projects List Design (Glassmorphism)
 // ============================================
 
+@mixin styles {
+
 // Projects list container
 .premium-projects-list {
     display: flex;
@@ -76,7 +78,7 @@
 }
 
 .premium-project-card:hover .premium-project-accent {
-    box-shadow: 0 0 16px currentColor !important;
+    box-shadow: 0 0 16px currentColor;
 }
 
 .premium-project-info {
@@ -205,4 +207,5 @@
     .premium-mini-progress {
         background: rgba(0, 0, 0, 0.06);
     }
+}
 }

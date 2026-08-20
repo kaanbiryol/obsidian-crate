@@ -2,6 +2,8 @@
 // Floating Action Button
 // ============================================
 
+@mixin styles {
+
 .reminders-fab {
     position: absolute;
     right: 16px;
@@ -102,4 +104,5 @@
         flex-shrink: 0;
         margin-bottom: var(--reminders-tabbar-bottom-offset);
     }
+}
 }

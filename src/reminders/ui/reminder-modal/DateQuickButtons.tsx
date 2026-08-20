@@ -1,7 +1,5 @@
-import React from 'react';
 import { addDays, isSameDay, nextMonday } from 'date-fns';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
-import type { GlassColors } from '../glassStyles';
 
 interface QuickDateOption {
 	label: string;
@@ -16,13 +14,11 @@ const QUICK_DATES: QuickDateOption[] = [
 
 interface DateQuickButtonsProps {
 	currentDate: Date | null;
-	glass: GlassColors;
 	onSelectDate: (date: Date) => void;
 }
 
 export function DateQuickButtons({
 	currentDate,
-	glass,
 	onSelectDate,
 }: DateQuickButtonsProps) {
 	return (
@@ -34,25 +30,7 @@ export function DateQuickButtons({
 					<ShadowDOMNativeButton
 						key={label}
 						onClick={() => onSelectDate(optionDate)}
-						className="flex-1 h-9 rounded-xl transition-all duration-150 active:scale-95"
-						style={{
-							fontSize: '13px',
-							fontWeight: 500,
-							border: 'none',
-							cursor: 'pointer',
-							background: isActive ? glass.accent : glass.surface.bg,
-							color: isActive ? 'white' : glass.text.secondary,
-						}}
-						onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-							if (!isActive) {
-								e.currentTarget.style.background = glass.surfaceHover.bg;
-							}
-						}}
-						onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-							if (!isActive) {
-								e.currentTarget.style.background = glass.surface.bg;
-							}
-						}}
+						className={`date-quick-button flex-1 h-9 rounded-xl active:scale-95${isActive ? ' is-active' : ''}`}
 					>
 						{label}
 					</ShadowDOMNativeButton>
