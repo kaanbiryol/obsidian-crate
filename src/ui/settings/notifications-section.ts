@@ -1,5 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
+import { errorMessage } from '../../plugin/logger';
 import { reconcileReminderNotifications } from '../../reminders/plugin-integration';
 import { normalizeTimeString } from '../../reminders/settings';
 import type { SyncApiClient } from '../../sync/api';
@@ -74,23 +75,33 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 			.addButton(button => {
 				button.setButtonText('Copy app link');
 				button.onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText('Creating...');
 					try {
 						const url = await buildEnrollmentUrl(plugin);
 						await navigator.clipboard.writeText(url);
 						new Notice('App link copied to clipboard');
-					} catch {
-						new Notice('Failed to create app link');
+					} catch (error) {
+						new Notice(`Could not create app link: ${errorMessage(error)}`, 10000);
+					} finally {
+						button.setButtonText('Copy app link');
+						button.setDisabled(false);
 					}
 				});
 			})
 			.addButton(button => {
 				button.setButtonText('Show code');
 				button.onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText('Creating...');
 					try {
 						const url = await buildEnrollmentUrl(plugin);
 						new QRModal(plugin.app, url).open();
-					} catch {
-						new Notice('Failed to create app code');
+					} catch (error) {
+						new Notice(`Could not create app code: ${errorMessage(error)}`, 10000);
+					} finally {
+						button.setButtonText('Show code');
+						button.setDisabled(false);
 					}
 				});
 			});
@@ -106,7 +117,7 @@ async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 	}
 
 	const { token } = await apiClient.createRemindersEnrollmentToken();
-	const subscribeUrl = new URL('notifications', `${plugin.settings.workerUrl}/`);
+	const subscribeUrl = new URL('notifications', `${apiClient.getWorkerUrl()}/`);
 	subscribeUrl.searchParams.set('token', token);
 	subscribeUrl.searchParams.set('folder', plugin.remindersSettings.remindersFolderPath);
 	subscribeUrl.searchParams.set('upcomingDays', String(plugin.remindersSettings.upcomingDaysDefault ?? 7));

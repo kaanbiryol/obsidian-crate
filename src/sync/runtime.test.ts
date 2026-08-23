@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
-import { SyncApiClient } from './api';
 import { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
 import {
@@ -50,6 +49,7 @@ function setSyncEngine(runtime: SyncRuntime, syncEngine: RuntimeSyncEngineStub):
 function setApiClient(runtime: SyncRuntime, apiClient: {
 	testConnection(): Promise<{ success: boolean; error?: string }>;
 	putSharedSettings(shared: unknown): Promise<void>;
+	revokeCurrentToken?(): Promise<{ success: boolean }>;
 } | null): void {
 	(runtime as unknown as { apiClient: typeof apiClient }).apiClient = apiClient;
 }
@@ -138,7 +138,6 @@ describe('SyncRuntime startup event handling', () => {
 
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 		vi.spyOn(SyncEngine.prototype, 'sync').mockImplementation(async () => startupSync.promise);
-		vi.spyOn(SyncApiClient.prototype, 'registerToken').mockResolvedValue({ id: 'token-id' });
 		vi.spyOn(SyncQueueController.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 	});
 
@@ -302,7 +301,6 @@ describe('SyncRuntime teardown and reinitialization', () => {
 			const nextSync = queuedStartupSyncs.shift();
 			return nextSync ? nextSync.promise : createEmptySyncResult();
 		});
-		vi.spyOn(SyncApiClient.prototype, 'registerToken').mockResolvedValue({ id: 'token-id' });
 		vi.spyOn(SyncQueueController.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 	});
 
@@ -458,7 +456,7 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(settings.lastSeq).toBe(0);
 		expect(settings.lastSync).toBeNull();
 		expect(settings.syncHistory).toEqual([]);
-		expect(initialize).toHaveBeenCalledTimes(1);
+		expect(initialize).toHaveBeenCalledWith({ skipStartupSync: true });
 	});
 
 	it('clears sync state when clearing configuration', async () => {
@@ -490,6 +488,12 @@ describe('SyncRuntime operation wrappers', () => {
 				},
 			],
 		});
+		const revokeCurrentToken = vi.fn(async () => ({ success: true }));
+		setApiClient(runtime, {
+			putSharedSettings: vi.fn(async () => {}),
+			testConnection: vi.fn(async () => ({ success: true })),
+			revokeCurrentToken,
+		});
 
 		await runtime.clearSyncConfiguration();
 
@@ -497,7 +501,10 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(settings.lastSync).toBeNull();
 		expect(settings.syncHistory).toEqual([]);
 		expect(settings.workerUrl).toBe('');
-		expect(settings.cloudflareDeployment).toBeNull();
+		expect(revokeCurrentToken).toHaveBeenCalledTimes(1);
+		expect(settings.cloudflareDeployment).toEqual(expect.objectContaining({
+			workerName: 'crate-0123456789abcdef',
+		}));
 	});
 
 	it('caps stored sync history entries', async () => {

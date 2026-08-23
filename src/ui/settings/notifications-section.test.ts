@@ -7,6 +7,8 @@ import {
 	resetObsidianUiMocks,
 } from '../../test/fakes/obsidian-ui';
 
+let lastQrCodeData: string | null = null;
+
 async function flushMicrotasks(): Promise<void> {
 	await Promise.resolve();
 	await Promise.resolve();
@@ -19,7 +21,9 @@ async function loadNotificationsSectionModule() {
 	}));
 	vi.doMock('../qr-modal', () => ({
 		QRModal: class QRModal {
-			constructor(..._args: unknown[]) {}
+			constructor(_app: unknown, data: string) {
+				lastQrCodeData = data;
+			}
 			open(): void {}
 		},
 	}));
@@ -38,6 +42,7 @@ function getSettingByName(name: string): MockSetting {
 describe('renderNotificationsSection', () => {
 	beforeEach(() => {
 		resetObsidianUiMocks();
+		lastQrCodeData = null;
 	});
 
 	afterEach(() => {
@@ -132,6 +137,56 @@ describe('renderNotificationsSection', () => {
 
 		expect(noticeMessages).toContain('No enabled devices found. Enable notifications in the web app first.');
 	});
+
+	it('shows the Worker error when an app code cannot be created', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		renderNotificationsSection({
+			containerEl: new FakeElement('div') as never,
+			plugin: createPlugin({
+				createRemindersEnrollmentToken: vi.fn(async () => {
+					throw new Error('Invalid token');
+				}),
+				getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
+				deletePushSubscription: vi.fn(),
+				testPush: vi.fn(async () => ({ sent: 0, failed: 0, pruned: 0, errors: [] })),
+			}),
+			rerender: vi.fn(),
+		});
+		await flushMicrotasks();
+
+		const showCodeButton = getSettingByName('Reminders web app').buttons[1];
+		showCodeButton?.click();
+		await flushMicrotasks();
+
+		expect(noticeMessages).toContain('Could not create app code: Invalid token');
+		expect(showCodeButton?.buttonEl.textContent).toBe('Show code');
+		expect(showCodeButton?.buttonEl.classNames.has('is-disabled')).toBe(false);
+	});
+
+	it('builds the app code from the active API endpoint when persisted settings are stale', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const plugin = createPlugin({
+			getWorkerUrl: vi.fn(() => 'https://active-worker.example.com'),
+			getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
+			deletePushSubscription: vi.fn(),
+			testPush: vi.fn(async () => ({ sent: 0, failed: 0, pruned: 0, errors: [] })),
+		}) as unknown as { settings: { workerUrl: string } };
+		plugin.settings.workerUrl = '';
+
+		renderNotificationsSection({
+			containerEl: new FakeElement('div') as never,
+			plugin: plugin as never,
+			rerender: vi.fn(),
+		});
+		await flushMicrotasks();
+
+		getSettingByName('Reminders web app').buttons[1]?.click();
+		await flushMicrotasks();
+
+		expect(lastQrCodeData).toBe(
+			'https://active-worker.example.com/notifications?token=enroll-token&folder=Reminders&upcomingDays=7&allDayTime=09%3A00',
+		);
+	});
 });
 
 function createPlugin(apiClient: Record<string, unknown>): never {
@@ -150,6 +205,7 @@ function createPlugin(apiClient: Record<string, unknown>): never {
 		writeRemindersSettings: vi.fn(),
 		syncRuntime: {
 			getApiClient: () => ({
+				getWorkerUrl: vi.fn(() => 'https://worker.example.com'),
 				createRemindersEnrollmentToken: vi.fn(async () => ({
 					token: 'enroll-token',
 					expiresAt: '2026-06-13T12:00:00.000Z',

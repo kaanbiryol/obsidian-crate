@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import { sha256Hex } from './auth';
-import { corsResponse } from './cors';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import { CRATE_SERVER_INFO } from './server-info';
 import type { Env } from './types';
@@ -198,39 +197,31 @@ function createSubscriptionRequest(token: string): Request {
 }
 
 describe('worker entrypoint', () => {
-	it('serves the browser claim page without authentication', async () => {
+	it('serves server metadata at the root without a public claim page', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/'),
 			createEnv({ AUTH_TOKEN: '' }) as never,
 		);
 
 		expect(response.status).toBe(200);
-		expect(response.headers.get('Content-Type')).toBe('text/html; charset=utf-8');
-		expect(await response.text()).toContain('Claim server');
+		expect(response.headers.get('Content-Type')).toBe('application/json');
+		expect(await response.json()).toEqual(CRATE_SERVER_INFO);
 	});
 
-	it('forwards public enrollment requests to the setup coordinator', async () => {
-		const setupFetch = vi.fn(async () => corsResponse({ claimed: false, enrollmentAvailable: false }));
+	it('does not expose the legacy public device enrollment routes', async () => {
 		const response = await worker.fetch(
-			new Request('https://worker.test/setup/status'),
-			createEnv({
-				AUTH_TOKEN: '',
-				SETUP: {
-					idFromName: vi.fn(() => ({ name: 'owner' })),
-					get: vi.fn(() => ({ fetch: setupFetch })),
-				} as unknown as DurableObjectNamespace,
+			new Request('https://worker.test/setup/status', {
+				headers: { Authorization: 'Bearer secret-token' },
 			}) as never,
+			createEnv() as never,
 		);
 
-		expect(response.status).toBe(200);
-		expect(await response.json()).toEqual({ claimed: false, enrollmentAvailable: false });
-		expect(setupFetch).toHaveBeenCalledTimes(1);
+		expect(response.status).toBe(404);
+		expect(await response.json()).toEqual({ error: 'Not found' });
 	});
 
-	it('lets an authenticated device authorize a new enrollment token', async () => {
-		const setupFetch = vi.fn(async (_request: Request) =>
-			corsResponse({ expiresAt: '2026-08-18T12:10:00.000Z' }));
-		const response = await worker.fetch(
+	it('does not let an authenticated device mint another vault credential', async () => {
+		const enrollmentResponse = await worker.fetch(
 			new Request('https://worker.test/auth/enrollment', {
 				method: 'POST',
 				headers: {
@@ -239,21 +230,43 @@ describe('worker entrypoint', () => {
 				},
 				body: JSON.stringify({ enrollmentTokenHash: 'a'.repeat(64) }),
 			}),
-			createEnv({
-				SETUP: {
-					idFromName: vi.fn(() => ({ name: 'owner' })),
-					get: vi.fn(() => ({ fetch: setupFetch })),
-				} as unknown as DurableObjectNamespace,
-			}) as never,
+			createEnv() as never,
+		);
+		const tokenResponse = await worker.fetch(
+			new Request('https://worker.test/auth/tokens', {
+				method: 'POST',
+				headers: {
+					Authorization: 'Bearer secret-token',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ token_hash: 'a'.repeat(64) }),
+			}),
+			createEnv() as never,
+		);
+
+		expect(enrollmentResponse.status).toBe(404);
+		expect(await enrollmentResponse.json()).toEqual({ error: 'Not found' });
+		expect(tokenResponse.status).toBe(404);
+		expect(await tokenResponse.json()).toEqual({ error: 'Not found' });
+	});
+
+	it('lets an authenticated device create a reminders web app enrollment token', async () => {
+		const db = createDb({});
+		const response = await worker.fetch(
+			new Request('https://worker.test/notifications/reminders-enrollment-token', {
+				method: 'POST',
+				headers: { Authorization: 'Bearer secret-token' },
+			}),
+			createEnv({ DB: db.db as unknown as D1Database }) as never,
 		);
 
 		expect(response.status).toBe(200);
-		expect(await response.json()).toEqual({ expiresAt: '2026-08-18T12:10:00.000Z' });
-		expect(setupFetch).toHaveBeenCalledTimes(1);
-		const forwardedRequest = setupFetch.mock.calls[0]?.[0];
-		expect(forwardedRequest && await forwardedRequest.json()).toEqual({
-			enrollmentTokenHash: 'a'.repeat(64),
-		});
+		const result = await response.json() as { token: string; expiresAt: string };
+		expect(result.token).toHaveLength(64);
+		expect(Number.isNaN(Date.parse(result.expiresAt))).toBe(false);
+		expect(db.db.prepare).toHaveBeenCalledWith(
+			'INSERT INTO web_enrollment_tokens (token_hash, expires_at) VALUES (?, ?)',
+		);
 	});
 
 	it('publishes unauthenticated server compatibility metadata', async () => {

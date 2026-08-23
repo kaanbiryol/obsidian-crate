@@ -19,6 +19,7 @@ import {
 import { type VaultWatcher } from '../reminders/services/vaultWatcher';
 import { activateOrRevealRemindersLeaf } from '../reminders/ui/workspaceLayout';
 import { SyncRuntime } from '../sync/runtime';
+import type { CrateSettingTab } from '../ui/settings-tab';
 import { configureSyncLogger } from './logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
 import { createSettingsUiState, type SettingsUiState } from './settings-ui-state';
@@ -31,6 +32,7 @@ export default class CratePlugin extends Plugin {
 	syncRuntime!: SyncRuntime;
 	cloudflareDeploymentService!: CloudflareDeploymentService;
 	readonly settingsUiState: SettingsUiState = createSettingsUiState();
+	private settingTab?: CrateSettingTab;
 
 	// Reminders
 	reminderIndex!: ReminderIndex;
@@ -77,5 +79,27 @@ export default class CratePlugin extends Plugin {
 
 	clearSettingsUiState(): void {
 		this.settingsUiState.diagnostics = null;
+	}
+
+	registerSettingsTab(settingTab: CrateSettingTab): void {
+		this.settingTab = settingTab;
+		this.addSettingTab(settingTab);
+	}
+
+	openSettingsTab(): void {
+		type AppWithSettings = CratePlugin['app'] & {
+			setting: {
+				open: () => void;
+				openTabById: (id: string) => void;
+			};
+		};
+
+		const settings = (this.app as AppWithSettings).setting;
+		settings.open();
+		settings.openTabById(this.manifest.id);
+	}
+
+	refreshSettingsTab(): void {
+		this.settingTab?.display();
 	}
 }

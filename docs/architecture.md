@@ -23,7 +23,7 @@
 │                                                      │
 │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐   │
 │  │ R2 Bucket│  │ D1 (SQL) │  │ Durable Objects   │   │
-│  │ (files)  │  │ metadata │  │ setup + reminders │   │
+│  │ (files)  │  │ metadata │  │ reminder alarms   │   │
 │  │          │  │ + tokens │  │                   │   │
 │  └──────────┘  └──────────┘  └──────────────────┘   │
 └──────────────────────────────────────────────────────┘
@@ -49,7 +49,7 @@
 | `BUCKET` | R2 Bucket | File storage |
 | `DB` | D1 Database | Changelog + file manifest |
 | `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
-| `SETUP` | Durable Object Namespace | Atomic initial claim and one-time device enrollment state |
+| `SETUP` | Durable Object Namespace | Retained compatibility binding; legacy device enrollment is closed |
 
 An optional legacy `AUTH_TOKEN` binding is still accepted as an authentication fallback, but new deployments use only per-device D1 tokens.
 
@@ -77,22 +77,19 @@ CratePlugin (src/plugin/CratePlugin.ts)
 1. The plugin creates a cryptographically random OAuth `state` and a fresh PKCE S256 verifier/challenge in memory.
 2. Cloudflare redirects to `https://crate.kaanbiryol.com/oauth/callback/`. The static page immediately clears its query string and opens the `crate-cloudflare-oauth` Obsidian protocol.
 3. The plugin verifies `state` before exchanging the authorization code. The access token is held only in a local stack frame.
-4. The plugin uses the selected account to create or reuse D1 and R2, apply hash-tracked SQL migrations, upload the embedded Worker with declarative Durable Object bindings, and enable workers.dev.
-5. The token is revoked and discarded before Crate claims and enrolls the first device. Only non-secret resource identifiers remain in plugin settings for retries and updates.
+4. The plugin discovers Crate Workers in the selected account. It reuses the saved or selected deployment, or creates new D1 and R2 resources when none exists.
+5. The plugin generates a permanent device secret locally and writes only its hash and device metadata to the deployment's D1 database using the temporary Cloudflare authorization.
+6. The OAuth token is revoked and discarded. Only non-secret resource identifiers remain in plugin settings for reconnects and updates.
 
-### First-device setup
+### Device authorization
 
-1. Cloudflare deploys the Worker and provisions its R2, D1, and Durable Object bindings from `wrangler.jsonc`.
-2. Crate generates a 256-bit enrollment token locally and sends only its SHA-256 hash to the `SetupCoordinator` Durable Object.
-3. The Durable Object serializes claim requests. A pending initial claim expires after 10 minutes; if no device was registered, the deployment becomes claimable again.
-4. Crate validates the server metadata and `enrollment-v1` capability, then generates a different permanent device secret locally.
-5. `POST /setup/enroll` consumes the one-time enrollment token and stores only the permanent device secret's hash in D1.
+Cloudflare account authorization is the sole authority for adding a vault-sync device. A fresh device signs in through OAuth, discovers matching `crate-<deployment-id>` Workers and their D1/R2 bindings, and chooses a server only when the account contains more than one. Crate then inserts or rotates that device's hashed bearer token directly through the Cloudflare D1 API.
+
+Disconnecting locally preserves non-secret deployment metadata so reconnecting the same vault converges on the same Worker. The legacy `SETUP` Durable Object export remains only so existing deployments can update without a destructive Durable Object migration; its fetch handler always returns `410 Gone`.
 
 ### Worker Authentication
 
 Authenticated requests carry a Bearer token in the `Authorization` header. The Worker hashes the bearer token and checks the `auth_tokens` D1 table. If no D1 token matches, it can fall back to a timing-safe comparison against an optional legacy `AUTH_TOKEN` secret binding.
-
-An authenticated device creates additional-device links by registering a new short-lived enrollment hash at `POST /auth/enrollment`. Creating a replacement link invalidates the previous pending link. Permanent device secrets never appear in setup URLs.
 
 Push-notification device enrollment is intentionally narrower: the plugin mints a short-lived, one-time push enrollment token from the worker and the notification PWA uses that scoped token only for `POST /notifications/subscribe`.
 

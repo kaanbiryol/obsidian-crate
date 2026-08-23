@@ -22,7 +22,6 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 		'devices-v1',
 		'reminders-v1',
 		'notifications-v1',
-		'enrollment-v1',
 	]),
 });
 

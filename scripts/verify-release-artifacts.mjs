@@ -57,8 +57,11 @@ assert(
 	'Plugin bundle is missing the static OAuth callback URL',
 );
 
-for (const requiredMarker of ['/.well-known/crate', '/setup/enroll', 'enrollment-v1']) {
+for (const requiredMarker of ['/.well-known/crate', 'notifications-v1']) {
 	assert(workerBundle.includes(requiredMarker), `Worker bundle is missing required route/capability: ${requiredMarker}`);
+}
+for (const forbiddenMarker of ['/setup/enroll', '/setup/claim', '/auth/enrollment', 'enrollment-v1']) {
+	assert(!workerBundle.includes(forbiddenMarker), `Worker bundle exposes retired device enrollment: ${forbiddenMarker}`);
 }
 
 assert(wrangler.main === '.generated/cloudflare/worker.mjs', 'wrangler main must target the generated Worker bundle');

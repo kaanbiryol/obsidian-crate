@@ -88,49 +88,29 @@ Official references:
 - [Cloudflare memberships API](https://developers.cloudflare.com/api/resources/memberships/methods/list/)
 - [GitHub Pages custom domains](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site)
 
-## First OAuth deployment
+## OAuth connection and deployment
 
 1. Enable R2 in the target Cloudflare account. Cloudflare may require accepting the R2 subscription before its API permits bucket creation.
 2. Install the Client-ID-configured Crate build.
-3. Open **Settings → Crate → Configuration** and select **Deploy to Cloudflare**.
+3. Open **Settings → Crate → Configuration** and select **Connect with Cloudflare**.
 4. In Cloudflare, select exactly one account, review the four permissions, and authorize Crate.
 5. Cloudflare returns to the static callback page. It removes the OAuth query from the browser URL immediately and opens `obsidian://crate-cloudflare-oauth`.
 6. Crate verifies the random OAuth state before exchanging the code with its in-memory PKCE verifier.
-7. Crate creates or reuses one uniquely named Worker, D1 database, R2 bucket, the `REMINDER_ALARMS` and `SETUP` Durable Objects, the workers.dev endpoint, and the versioned D1 migrations.
-8. Crate revokes and discards the access token, then claims the new Worker and enrolls this device directly.
+7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, workers.dev endpoint, and versioned D1 migrations when none exists.
+8. Crate registers this device's hashed credential through the Cloudflare D1 API, then revokes and discards the access token.
 9. In Crate, run **Initial sync → Upload all** when ready.
 
 If the Cloudflare API returns R2 error `10042`, Crate tells the user to activate the R2 subscription and try again. Resource names and Cloudflare IDs are saved without credentials, so retries converge on the same deployment. Selecting **Authorize update** later reuses those same Worker, D1, R2, and Durable Object resources.
 
-Crate creates a random enrollment token locally and sends only its SHA-256 hash to the Worker. The token is valid for 10 minutes and one successful enrollment. If automatic setup is interrupted, the **Open existing server** recovery page can claim the Worker after its temporary enrollment window expires.
+Cloudflare account access is the source of truth for vault devices. The plugin never exposes a Worker claim page or a vault-device setup link. A device credential can be created or rotated only during a successful Cloudflare OAuth session.
 
-## Command-line fallback
+## Connecting another device
 
-Wrangler 4.123 requires Node.js 22 or newer. Authenticate and create the stateful resources once:
-
-```bash
-npx --yes wrangler@4.123.0 login
-npx --yes wrangler@4.123.0 d1 create crate-sync
-npx --yes wrangler@4.123.0 r2 bucket create crate-sync
-```
-
-Copy the D1 database ID into `wrangler.jsonc`. If the R2 name is taken, choose another and update `bucket_name`. Then run:
-
-```bash
-npm ci
-npm run deploy
-```
-
-The `postdeploy` script applies remote migrations. Reuse the same configured resource IDs and names for later updates.
-
-## Adding another device
-
-On a connected device, open **Settings → Crate → Configuration → Set up another device** and either copy the link or show its QR code. The link expires after 10 minutes and can be consumed once. Creating another link replaces any pending additional-device link.
+Install Crate on the other device, open **Settings → Crate → Configuration**, and select **Connect with Cloudflare**. Authorize the account that owns the vault's Crate server. When that account has multiple Crate servers, choose the matching Worker in Obsidian.
 
 ## Recovery and deletion
 
 - If the browser handoff fails, select **Open Obsidian** on the callback page.
 - If OAuth expires, return to Crate settings and start again. Authorization state and PKCE material are intentionally not recoverable after plugin reload.
-- If the first claim expires before any device is registered, reload the Worker and claim again.
-- Resetting local configuration clears the Worker URL, device secret, and saved infrastructure IDs only on that device. It never deletes Cloudflare resources.
+- **Disconnect this device** clears the Worker URL and device secret but retains the non-secret deployment identity, allowing a later Cloudflare sign-in to reuse the same Worker. It never deletes Cloudflare resources.
 - To destroy the server and synced data, explicitly delete its Worker, R2 bucket, D1 database, and Durable Object resources in the Cloudflare dashboard.

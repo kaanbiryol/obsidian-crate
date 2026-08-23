@@ -1,9 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
-import { normalizeWorkerUrl } from '../../sync/worker-url';
 import { openConfirmationModal } from '../confirmation-modal';
-import { QRModal } from '../qr-modal';
-import { buildSetupLink } from './config-link';
 import type { ConfigSectionContext } from './config-types';
 import { createSettingsSectionHeading } from './section-helpers';
 
@@ -15,33 +12,13 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 
 	if (!isConfigured) {
 		new Setting(containerEl)
-			.setName('Deploy sync server')
-			.setDesc('Authorize Crate to create a private sync server in your Cloudflare account')
+			.setName('Connect with Cloudflare')
+			.setDesc('Sign in to reuse an existing Crate server or create a new private sync server')
 			.addButton(button => button
-				.setButtonText('Deploy to Cloudflare')
+				.setButtonText('Connect with Cloudflare')
 				.setCta()
 				.onClick(() => {
 					void startCloudflareDeployment(plugin);
-				}));
-
-		let workerUrl = '';
-		new Setting(containerEl)
-			.setName('Open existing server')
-			.setDesc('If deployment did not open the setup page, paste its workers.dev URL here')
-			.addText(text => text
-				.setPlaceholder('https://crate-sync.example.workers.dev')
-				.onChange(value => {
-					workerUrl = value;
-				}))
-			.addButton(button => button
-				.setButtonText('Open setup')
-				.onClick(() => {
-					const normalizedUrl = normalizeWorkerUrl(workerUrl);
-					if (!normalizedUrl) {
-						new Notice('Enter a valid HTTPS worker URL');
-						return;
-					}
-					window.open(`${normalizedUrl}/`, '_blank', 'noopener,noreferrer');
 				}));
 	}
 
@@ -58,38 +35,17 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 
 	if (isConfigured) {
 		new Setting(containerEl)
-			.setName('Set up another device')
-			.setDesc('Create a one-use setup link that expires after 10 minutes. Share it only with the device you are adding.')
+			.setName('Disconnect this device')
+			.setDesc('Clears this device credential but remembers which Cloudflare server belongs to this vault')
 			.addButton(button => button
-				.setButtonText('Copy link')
-				.onClick(async () => {
-					const link = await buildSetupLink(plugin);
-					if (!link) return;
-					await navigator.clipboard.writeText(link);
-					new Notice('Setup link copied to clipboard');
-					}))
-				.addButton(button => button
-					.setButtonText('Show code')
-					.onClick(async () => {
-						const link = await buildSetupLink(plugin);
-						if (!link) return;
-						new QRModal(plugin.app, link).open();
-					}));
-	}
-
-	if (isConfigured) {
-		new Setting(containerEl)
-			.setName('Reset local configuration')
-			.setDesc('Clears worker URL/auth token and local infrastructure metadata')
-			.addButton(button => button
-				.setButtonText('Reset local data')
+				.setButtonText('Disconnect device')
 				.setWarning()
 				.onClick(async () => {
 					const confirmed = await openConfirmationModal(plugin.app, {
-						title: 'Reset local configuration',
-						message: 'Clear this device\'s Crate configuration?',
-						details: ['Remote Cloudflare resources will not be deleted.'],
-						confirmText: 'Reset local data',
+						title: 'Disconnect this device',
+						message: 'Disconnect this device from its Crate server?',
+						details: ['Cloudflare resources and synced data will not be deleted.'],
+						confirmText: 'Disconnect device',
 						warning: true,
 					});
 					if (!confirmed) {
@@ -97,10 +53,9 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 					}
 					plugin.clearSettingsUiState();
 					await plugin.syncRuntime.clearSyncConfiguration();
-					new Notice('Local plugin configuration cleared');
+					new Notice('This device was disconnected');
 					rerender();
 				}));
 	}
 }
 export type { ConfigSectionContext } from './config-types';
-export { buildSetupLink } from './config-link';

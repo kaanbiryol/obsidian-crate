@@ -57,6 +57,10 @@ export class SyncApiClient {
 		return this.http.isConfigured();
 	}
 
+	getWorkerUrl(): string {
+		return this.http.getWorkerUrl();
+	}
+
 	async health(): Promise<HealthResponse> {
 		return this.syncApi.health();
 	}
@@ -111,34 +115,12 @@ export class SyncApiClient {
 		return this.syncApi.batchDelete(paths);
 	}
 
-	async registerToken(tokenHash: string, device?: {
-		deviceId?: string;
-		deviceName?: string;
-		platform?: string;
-	}): Promise<{ id: string }> {
-		return this.authApi.registerToken(tokenHash, device);
-	}
-
-	async claimInitialServer(enrollmentTokenHash: string): Promise<{ expiresAt: string }> {
-		return this.authApi.claimInitialServer(enrollmentTokenHash);
-	}
-
-	async authorizeDeviceEnrollment(enrollmentTokenHash: string): Promise<{ expiresAt: string }> {
-		return this.authApi.authorizeDeviceEnrollment(enrollmentTokenHash);
-	}
-
-	async enrollDevice(input: {
-		enrollmentToken: string;
-		deviceTokenHash: string;
-		deviceId?: string;
-		deviceName?: string;
-		platform?: string;
-	}): Promise<{ id: string }> {
-		return this.authApi.enrollDevice(input);
-	}
-
 	async revokeToken(id: string): Promise<{ success: boolean }> {
 		return this.authApi.revokeToken(id);
+	}
+
+	async revokeCurrentToken(): Promise<{ success: boolean }> {
+		return this.authApi.revokeCurrentToken();
 	}
 
 	async listTokens(): Promise<{ tokens: RegisteredDevice[] }> {

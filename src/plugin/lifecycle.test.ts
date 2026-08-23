@@ -10,7 +10,6 @@ type SyncRuntimeTarget = {
 };
 
 const initializeReminders = vi.fn();
-const handleSyncSetupProtocol = vi.fn();
 const initializeSyncManagers = vi.fn<(target: SyncRuntimeTarget) => void>();
 const registerSyncCommands = vi.fn();
 const registerVaultSyncEventHandlers = vi.fn();
@@ -75,7 +74,6 @@ async function loadLifecycleModule() {
 		initializeReminders,
 	}));
 	vi.doMock('../sync/plugin-integration', () => ({
-		handleSyncSetupProtocol,
 		initializeSyncManagers,
 		registerSyncCommands,
 		registerVaultSyncEventHandlers,
@@ -103,7 +101,8 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 			id: 'crate',
 		},
 		loadSettings: vi.fn(async () => {}),
-		addSettingTab: vi.fn(),
+		registerSettingsTab: vi.fn(),
+		openSettingsTab: vi.fn(),
 		registerObsidianProtocolHandler: vi.fn(),
 		...overrides,
 	};
@@ -112,7 +111,6 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
 	noticeMessages.length = 0;
 	initializeReminders.mockReset();
-	handleSyncSetupProtocol.mockReset();
 	initializeSyncManagers.mockReset();
 	registerSyncCommands.mockReset();
 	registerVaultSyncEventHandlers.mockReset();
@@ -156,17 +154,14 @@ describe('bootstrapPlugin', () => {
 
 		expect(plugin.loadSettings).toHaveBeenCalledTimes(1);
 		expect(ensurePluginDeviceId).toHaveBeenCalledWith(plugin);
-		expect(plugin.addSettingTab).toHaveBeenCalledTimes(1);
+		expect(plugin.registerSettingsTab).toHaveBeenCalledTimes(1);
 		expect(registerVaultSyncEventHandlers).toHaveBeenCalledWith(plugin);
 		expect(syncInitialize).toHaveBeenCalledTimes(1);
 		expect(registerSyncCommands).toHaveBeenCalledWith(plugin);
 		expect(initializeReminders).toHaveBeenCalledWith(plugin);
 		expect(createCloudflareDeploymentService).toHaveBeenCalledWith(plugin);
-		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(3);
+		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(2);
 
-		const setupHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
-			([name]) => name === 'crate-setup',
-		)?.[1] as ProtocolHandler | undefined;
 		const remindersHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
 			([name]) => name === 'crate-reminders',
 		)?.[1] as ProtocolHandler | undefined;
@@ -174,18 +169,12 @@ describe('bootstrapPlugin', () => {
 			([name]) => name === 'crate-cloudflare-oauth',
 		)?.[1] as ProtocolHandler | undefined;
 
-		expect(typeof setupHandler).toBe('function');
 		expect(typeof remindersHandler).toBe('function');
 		expect(typeof cloudflareHandler).toBe('function');
 
-		setupHandler?.({ workerUrl: 'https://worker.example', enrollmentToken: 'token' });
 		remindersHandler?.({ project: 'Work' });
 		cloudflareHandler?.({ code: 'authorization-code', state: 'oauth-state' });
 
-		expect(handleSyncSetupProtocol).toHaveBeenCalledWith(plugin, {
-			workerUrl: 'https://worker.example',
-			enrollmentToken: 'token',
-		});
 		expect(openFullScreenReminderModal).toHaveBeenCalledWith(plugin, 'Work');
 		expect(handleCloudflareOAuthProtocol).toHaveBeenCalledWith(plugin, {
 			code: 'authorization-code',
@@ -225,7 +214,7 @@ describe('bootstrapPlugin', () => {
 
 		expect(initializeSyncManagers).not.toHaveBeenCalled();
 		expect(ensurePluginDeviceId).not.toHaveBeenCalled();
-		expect(plugin.addSettingTab).not.toHaveBeenCalled();
+		expect(plugin.registerSettingsTab).not.toHaveBeenCalled();
 		expect(registerVaultSyncEventHandlers).not.toHaveBeenCalled();
 		expect(registerSyncCommands).not.toHaveBeenCalled();
 		expect(initializeReminders).not.toHaveBeenCalled();

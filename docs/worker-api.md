@@ -1,6 +1,6 @@
 # Worker API
 
-Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the primary in-plugin OAuth deployment. The same Worker can still be deployed independently through the documented Wrangler fallback.
+Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment.
 
 ## Authentication
 
@@ -9,7 +9,7 @@ All non-public API endpoints require an `Authorization: Bearer <token>` header. 
 1. Hash the bearer token with SHA-256 and look up the hash in the `auth_tokens` D1 table
 2. If not found, optionally fall back to timing-safe comparison against a legacy `AUTH_TOKEN` secret binding
 
-New deployments use independent device tokens stored in D1 and do not configure the fallback binding. Public setup, compatibility, PWA assets, and enrollment-exchange endpoints are listed separately below. CORS headers are included on all JSON/API responses.
+New deployments use independent device tokens stored in D1 and do not configure the fallback binding. Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
 ## Endpoints
 
@@ -26,10 +26,9 @@ New deployments use independent device tokens stored in D1 and do not configure 
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 50 files, 10 MB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths) |
 | `POST` | `/sync/batch-delete` | Batch delete `{ paths: [...] }` (max 50 paths) |
-| `POST` | `/auth/enrollment` | Authenticated: authorize one short-lived additional-device enrollment hash |
-| `POST` | `/auth/tokens` | Register or refresh a per-device auth token `{ token_hash, device_id?, device_name?, platform? }` |
 | `DELETE` | `/auth/tokens` | Revoke an auth token `{ id }` |
 | `GET` | `/auth/tokens` | List all registered auth tokens |
+| `DELETE` | `/auth/session` | Revoke the current bearer token when disconnecting this device |
 | `GET` | `/settings` | Get shared settings from R2 |
 | `PUT` | `/settings` | Store shared settings to R2 |
 | `GET` | `/reminders/list?folderPath=<path>` | List reminders and projects from synced Markdown files |
@@ -48,15 +47,11 @@ New deployments use independent device tokens stored in D1 and do not configure 
 | `GET` | `/notifications/subscriptions` | List push subscriptions |
 | `POST` | `/notifications/test` | Send a test push notification |
 
-## Public Setup and PWA Endpoints
+## Public and PWA Endpoints
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/` | Serves the first-device claim page |
-| `GET` | `/setup/client.js` | Serves the claim-page client |
-| `GET` | `/setup/status` | Returns claim and pending-enrollment status without exposing token plaintext |
-| `POST` | `/setup/claim` | Atomically claim an unowned server with `{ enrollmentTokenHash }` |
-| `POST` | `/setup/enroll` | Consume `{ enrollmentToken, deviceTokenHash, device metadata? }` and register a device |
+| `GET` | `/` | Returns public service, version, protocol range, and capability metadata |
 | `GET` | `/notifications` | Serves the reminders PWA HTML |
 | `GET` | `/notifications/app.js` | Serves the bundled PWA client |
 | `GET` | `/notifications/sw.js` | Serves the PWA service worker |
@@ -146,14 +141,6 @@ Response (gzip-compressed when `Accept-Encoding: gzip`):
 }
 ```
 
-### POST /auth/tokens
-
-Register or refresh a per-device auth token. The token hash (SHA-256 hex) is stored in D1 - the plaintext token is never persisted.
-
-Request: `{ token_hash: "<sha256-hex>", device_id?: "device-abc123", device_name?: "Mac (abc1)", platform?: "macos" }`
-
-Response: `{ id: "<uuid>" }`
-
 ### DELETE /auth/tokens
 
 Revoke a token by its ID.
@@ -167,6 +154,12 @@ Response: `{ success: true }`
 List all registered tokens (does not expose hashes). The current token is marked with `is_current`.
 
 Response: `{ tokens: [{ id, device_id, device_name, platform, created_at, last_seen_at, is_current }] }`
+
+### DELETE /auth/session
+
+Revokes the bearer token used for the request. Crate calls this before clearing its local credential when the user disconnects the current device.
+
+Response: `{ success: true }`
 
 ### GET /settings
 

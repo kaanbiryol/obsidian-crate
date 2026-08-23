@@ -11,6 +11,14 @@ import {
 import { CloudflareOAuthClient } from './oauth-client';
 import { constantTimeEqual, createPkcePair, randomBase64Url, randomHex } from './pkce';
 import { provisionCloudflareDeployment } from './provisioner';
+import {
+	discoverCloudflareDeployments,
+	type DiscoveredCloudflareDeployment,
+} from './deployment-discovery';
+import {
+	registerCloudflareAuthorizedDevice,
+	type CloudflareAuthorizedDevice,
+} from './device-registration';
 
 const OAUTH_SESSION_MAX_AGE_MS = 10 * 60 * 1000;
 
@@ -23,6 +31,8 @@ interface PendingOAuthSession {
 	state: string;
 	verifier: string;
 	createdAt: number;
+	metadata: CloudflareDeploymentMetadata;
+	discoverExisting: boolean;
 }
 
 export interface CloudflareDeploymentResult {
@@ -36,10 +46,13 @@ export interface CloudflareDeploymentServiceOptions {
 	transport: HttpTransport;
 	loadArtifacts: () => Promise<CloudflareDeploymentArtifacts>;
 	openExternal: (url: string) => void;
+	selectDeployment: (
+		deployments: DiscoveredCloudflareDeployment[],
+	) => Promise<DiscoveredCloudflareDeployment | null>;
 	now?: () => number;
 }
 
-export function createCloudflareDeploymentMetadata(): CloudflareDeploymentMetadata {
+function createCloudflareDeploymentMetadata(): CloudflareDeploymentMetadata {
 	const deploymentId = randomHex(8);
 	const resourceName = `crate-${deploymentId}`;
 	return {
@@ -59,10 +72,13 @@ function selectAccount(
 	accounts: CloudflareAccount[],
 	metadata: CloudflareDeploymentMetadata,
 ): CloudflareAccount {
-	const previousAccount = metadata.accountId
-		? accounts.find(account => account.id === metadata.accountId)
-		: null;
-	if (previousAccount) return previousAccount;
+	if (metadata.accountId) {
+		const previousAccount = accounts.find(account => account.id === metadata.accountId);
+		if (previousAccount) return previousAccount;
+		throw new Error(`Authorize the Cloudflare account previously used by this vault${
+			metadata.accountName ? ` (${metadata.accountName})` : ''
+		}`);
+	}
 	if (accounts.length === 1) return accounts[0];
 	if (accounts.length === 0) {
 		throw new Error('Cloudflare did not grant access to an account');
@@ -81,15 +97,18 @@ export class CloudflareDeploymentService {
 	}
 
 	async startDeployment(): Promise<void> {
-		let metadata = this.options.settingsOwner.settings.cloudflareDeployment;
-		if (!metadata) {
-			metadata = createCloudflareDeploymentMetadata();
-			await this.persistMetadata(metadata);
-		}
+		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
+		const metadata = existingMetadata ?? createCloudflareDeploymentMetadata();
 
 		const { verifier, challenge } = await createPkcePair();
 		const state = randomBase64Url(32);
-		this.pendingSession = { verifier, state, createdAt: this.now() };
+		this.pendingSession = {
+			verifier,
+			state,
+			createdAt: this.now(),
+			metadata,
+			discoverExisting: existingMetadata === null,
+		};
 
 		const authorizationUrl = new URL(CLOUDFLARE_OAUTH_AUTHORIZE_URL);
 		authorizationUrl.search = new URLSearchParams({
@@ -104,7 +123,10 @@ export class CloudflareDeploymentService {
 		this.options.openExternal(authorizationUrl.toString());
 	}
 
-	async handleCallback(params: Record<string, string>): Promise<CloudflareDeploymentResult> {
+	async handleCallback(
+		params: Record<string, string>,
+		device?: CloudflareAuthorizedDevice,
+	): Promise<CloudflareDeploymentResult> {
 		const pending = this.pendingSession;
 		if (!pending) {
 			throw new Error('No Cloudflare deployment is waiting for authorization. Start again from Crate settings');
@@ -129,9 +151,18 @@ export class CloudflareDeploymentService {
 		let result: CloudflareDeploymentResult;
 		try {
 			const api = new CloudflareApiClient(accessToken, this.options.transport);
-			const metadata = this.options.settingsOwner.settings.cloudflareDeployment;
-			if (!metadata) throw new Error('Cloudflare deployment metadata is missing');
+			let metadata = pending.metadata;
 			const account = selectAccount(await api.listAuthorizedAccounts(), metadata);
+			if (pending.discoverExisting) {
+				const deployments = await discoverCloudflareDeployments(api, account);
+				if (deployments.length === 1) {
+					metadata = deployments[0].metadata;
+				} else if (deployments.length > 1) {
+					const selected = await this.options.selectDeployment(deployments);
+					if (!selected) throw new Error('No Cloudflare server was selected');
+					metadata = selected.metadata;
+				}
+			}
 			metadata.accountId = account.id;
 			metadata.accountName = account.name;
 			await this.persistMetadata(metadata);
@@ -143,6 +174,15 @@ export class CloudflareDeploymentService {
 				artifacts: await this.options.loadArtifacts(),
 				onMetadataChanged: () => this.persistMetadata(metadata),
 			});
+			if (device) {
+				if (!metadata.d1DatabaseId) throw new Error('Cloudflare deployment database is missing');
+				await registerCloudflareAuthorizedDevice({
+					api,
+					accountId: account.id,
+					databaseId: metadata.d1DatabaseId,
+					device,
+				});
+			}
 			result = { workerUrl, accountName: account.name };
 		} finally {
 			try {

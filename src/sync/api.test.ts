@@ -92,43 +92,7 @@ describe('SyncApiClient', () => {
 		}
 		expect(request.url).toBe('https://new.example/health');
 		expect(request.headers?.Authorization).toBe('Bearer new-token');
-	});
-
-	it('authorizes and exchanges one-time device enrollment tokens', async () => {
-		const requestUrlSpy = vi.spyOn(obsidian, 'requestUrl')
-			.mockResolvedValueOnce(createRequestUrlResponse({
-				status: 200,
-				text: '{"expiresAt":"2026-08-18T12:10:00.000Z"}',
-			}))
-			.mockResolvedValueOnce(createRequestUrlResponse({
-				status: 200,
-				text: '{"id":"device-token-id"}',
-			}));
-		const client = new SyncApiClient('https://worker.example', 'current-token');
-
-		await expect(client.authorizeDeviceEnrollment('enrollment-hash')).resolves.toEqual({
-			expiresAt: '2026-08-18T12:10:00.000Z',
-		});
-		await expect(client.enrollDevice({
-			enrollmentToken: 'one-time-token',
-			deviceTokenHash: 'device-token-hash',
-			deviceId: 'device-1',
-		})).resolves.toEqual({ id: 'device-token-id' });
-
-		expect(requestUrlSpy.mock.calls[0]?.[0]).toMatchObject({
-			url: 'https://worker.example/auth/enrollment',
-			method: 'POST',
-			body: JSON.stringify({ enrollmentTokenHash: 'enrollment-hash' }),
-		});
-		expect(requestUrlSpy.mock.calls[1]?.[0]).toMatchObject({
-			url: 'https://worker.example/setup/enroll',
-			method: 'POST',
-			body: JSON.stringify({
-				enrollmentToken: 'one-time-token',
-				deviceTokenHash: 'device-token-hash',
-				deviceId: 'device-1',
-			}),
-		});
+		expect(client.getWorkerUrl()).toBe('https://new.example');
 	});
 
 	it('rejects in-flight requests with an AbortError when the sync signal aborts', async () => {

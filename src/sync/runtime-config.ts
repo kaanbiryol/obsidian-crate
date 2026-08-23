@@ -39,7 +39,6 @@ export function clearSyncConfigurationState(
   secretStorage: SecretStorageService,
 ): void {
   settings.workerUrl = "";
-  settings.cloudflareDeployment = null;
   secretStorage.delete(SECRET_KEYS.AUTH_TOKEN);
 }
 

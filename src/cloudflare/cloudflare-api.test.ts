@@ -24,6 +24,7 @@ describe('CloudflareApiClient', () => {
 		expect(body).toContain('"name":"REMINDER_ALARMS","class_name":"ReminderAlarm"');
 		expect(body).toContain('"name":"SETUP","class_name":"SetupCoordinator"');
 		expect(body).toContain('"storage":"sqlite","state":"created"');
+		expect(body).toContain('"workers/tag":"crate"');
 		expect(body).toContain(artifacts.workerBundle);
 	});
 

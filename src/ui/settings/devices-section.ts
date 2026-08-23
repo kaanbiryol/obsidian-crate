@@ -45,7 +45,7 @@ async function loadDevices(container: HTMLElement, plugin: CratePlugin): Promise
 
 	try {
 		const { tokens } = await apiClient.listTokens();
-		const visibleTokens = orderDevices(tokens.filter(shouldDisplayToken));
+		const visibleTokens = orderDevices(tokens);
 		if (visibleTokens.length === 0) {
 			container.createEl('p', {
 				text: 'No connected devices found yet.',
@@ -71,7 +71,7 @@ async function loadDevices(container: HTMLElement, plugin: CratePlugin): Promise
 					const confirmed = await openConfirmationModal(plugin.app, {
 						title: 'Remove device',
 						message: `Remove sync access for ${label}?`,
-						details: ['That device will need a new setup link before it can sync again.'],
+						details: ['That device must sign in with Cloudflare before it can sync again.'],
 						confirmText: 'Remove device',
 						warning: true,
 					});
@@ -101,10 +101,6 @@ function orderDevices(tokens: RegisteredDevice[]): RegisteredDevice[] {
 	const currentTokens = tokens.filter((token) => token.is_current);
 	const otherTokens = tokens.filter((token) => !token.is_current);
 	return [...currentTokens, ...otherTokens];
-}
-
-function shouldDisplayToken(token: RegisteredDevice): boolean {
-	return token.device_name !== 'setup-link' || !!token.last_seen_at;
 }
 
 function formatDeviceDescription(token: RegisteredDevice): string {

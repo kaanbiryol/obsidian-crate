@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, type CrateSettings } from '../plugin/settings';
 import type { HttpTransport } from './http';
+import type { DiscoveredCloudflareDeployment } from './deployment-discovery';
 import {
 	CLOUDFLARE_OAUTH_REDIRECT_URL,
 	CLOUDFLARE_OAUTH_SCOPES,
@@ -9,6 +10,9 @@ import {
 const apiMocks = vi.hoisted(() => ({
 	accounts: [{ id: '0123456789abcdef0123456789abcdef', name: 'Personal' }],
 	constructedWithTokens: [] as string[],
+	workers: [] as Array<{ id: string; modified_on?: string }>,
+	workerSettings: new Map<string, unknown>(),
+	queryD1: vi.fn(async (..._args: unknown[]) => [{ results: [] }]),
 }));
 
 const provisionCloudflareDeployment = vi.hoisted(() => vi.fn(async (input: {
@@ -28,6 +32,18 @@ vi.mock('./cloudflare-api', () => ({
 
 		async listAuthorizedAccounts() {
 			return apiMocks.accounts;
+		}
+
+		async listWorkers() {
+			return apiMocks.workers;
+		}
+
+		async getWorkerSettings(_accountId: string, workerName: string) {
+			return apiMocks.workerSettings.get(workerName) ?? { bindings: [] };
+		}
+
+		async queryD1(...args: unknown[]) {
+			return apiMocks.queryD1(...args);
 		}
 	},
 }));
@@ -69,6 +85,7 @@ function createHarness() {
 			d1Migrations: [],
 		})),
 		openExternal: url => opened.push(url),
+		selectDeployment: vi.fn(async (deployments: DiscoveredCloudflareDeployment[]) => deployments[0] ?? null),
 		now: () => 1_000,
 	});
 	return { service, settings, settingsOwner, persisted, opened, transportCalls, transport };
@@ -77,6 +94,10 @@ function createHarness() {
 beforeEach(() => {
 	apiMocks.accounts = [{ id: '0123456789abcdef0123456789abcdef', name: 'Personal' }];
 	apiMocks.constructedWithTokens.length = 0;
+	apiMocks.workers = [];
+	apiMocks.workerSettings.clear();
+	apiMocks.queryD1.mockReset();
+	apiMocks.queryD1.mockResolvedValue([{ results: [] }]);
 	provisionCloudflareDeployment.mockClear();
 });
 
@@ -94,7 +115,7 @@ describe('CloudflareDeploymentService', () => {
 		expect(authorizationUrl.searchParams.get('state')).toMatch(/^[A-Za-z0-9_-]{43}$/);
 		expect(authorizationUrl.searchParams.get('code_challenge_method')).toBe('S256');
 		expect(authorizationUrl.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
-		expect(harness.settings.cloudflareDeployment?.workerName).toMatch(/^crate-[a-f0-9]{16}$/);
+		expect(harness.settings.cloudflareDeployment).toBeNull();
 	});
 
 	it('rejects a mismatched state before exchanging the authorization code', async () => {
@@ -138,6 +159,47 @@ describe('CloudflareDeploymentService', () => {
 		expect(persistedSettings).not.toContain('sensitive-authorization-code');
 		expect(persistedSettings).not.toContain('temporary-access-token');
 		expect(persistedSettings).not.toContain(verifier);
+	});
+
+	it('discovers an existing Crate deployment and registers this device through Cloudflare', async () => {
+		apiMocks.workers = [{
+			id: 'crate-fedcba9876543210',
+			modified_on: '2026-08-23T09:00:00.000Z',
+		}];
+		apiMocks.workerSettings.set('crate-fedcba9876543210', {
+			annotations: { 'workers/message': 'Crate 0.1.0' },
+			bindings: [
+				{ type: 'd1', name: 'DB', id: 'existing-database-id' },
+				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-fedcba9876543210' },
+				{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },
+				{ type: 'durable_object_namespace', name: 'SETUP', class_name: 'SetupCoordinator' },
+			],
+		});
+		const harness = createHarness();
+		await harness.service.startDeployment();
+		const state = new URL(harness.opened[0]).searchParams.get('state');
+		if (!state) throw new Error('Missing OAuth state');
+
+		await harness.service.handleCallback({ code: 'code', state }, {
+			tokenHash: 'device-token-hash',
+			deviceId: 'device-id',
+			deviceName: 'MacBook',
+			platform: 'macos',
+		});
+
+		expect(harness.settings.cloudflareDeployment).toEqual(expect.objectContaining({
+			workerName: 'crate-fedcba9876543210',
+			d1DatabaseId: 'existing-database-id',
+		}));
+		expect(apiMocks.queryD1).toHaveBeenCalledTimes(3);
+		expect(apiMocks.queryD1.mock.calls[2]?.[3]).toEqual([
+			expect.stringMatching(/^[a-f0-9]{32}$/),
+			'device-token-hash',
+			'device-id',
+			'MacBook',
+			'macos',
+		]);
+		expect(harness.persisted.join('\n')).not.toContain('device-token-hash');
 	});
 
 	it('requires a single newly authorized account and still revokes the token', async () => {

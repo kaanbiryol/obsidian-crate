@@ -53,13 +53,14 @@ After the Pages site and a private or public Cloudflare OAuth client are configu
    To test another OAuth client, prefix the command with `CRATE_CLOUDFLARE_OAUTH_CLIENT_ID=<client-id>`.
 
 2. Open `test-vault` in Obsidian, enable Crate under **Settings → Community plugins**, and reload it after the build is installed.
-3. Use a disposable Cloudflare test account with R2 already active. Open **Settings → Crate → Configuration → Deploy to Cloudflare**.
+3. Use a disposable Cloudflare test account with R2 already active. Open **Settings → Crate → Configuration → Connect with Cloudflare**.
 4. Confirm the consent screen shows the expected verified publisher and exactly Workers Scripts Write, D1 Write, Workers R2 Storage Write, and Memberships Read. Cloudflare may display the three write permissions using its legacy **Edit** label. Select exactly one account.
 5. Confirm the browser lands at `/oauth/callback/`, its address bar no longer contains OAuth parameters, and Obsidian opens. If automatic launch is blocked, select **Open Obsidian**.
-6. Confirm Crate creates one `crate-<16 hex>` Worker, D1 database, and R2 bucket, applies the migration, enables the workers.dev endpoint, and connects the current device without opening a Worker claim page.
-7. Exercise initial sync with non-critical notes only.
-8. Select **Authorize update** and confirm the same Worker, D1 database, R2 bucket, and Durable Object namespaces are reused.
-9. For the inactive-R2 case, use an account without an active R2 subscription and confirm Crate shows the activation message rather than a generic API error.
+6. Confirm Crate creates one `crate-<16 hex>` Worker, D1 database, and R2 bucket, applies the migration, enables the workers.dev endpoint, and connects the current device.
+7. Select **Disconnect this device**, connect with Cloudflare again, and confirm Crate reuses the same Worker instead of creating another deployment.
+8. Exercise initial sync with non-critical notes only.
+9. Select **Authorize update** and confirm the same Worker, D1 database, R2 bucket, and Durable Object namespaces are reused.
+10. For the inactive-R2 case, use an account without an active R2 subscription and confirm Crate shows the activation message rather than a generic API error.
 
 The test creates real resources only when a person completes Cloudflare consent. Delete disposable resources manually from that test account after validation. Never paste OAuth codes, access tokens, or PKCE values into issue reports or test logs.
 

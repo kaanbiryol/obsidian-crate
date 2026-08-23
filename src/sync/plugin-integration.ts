@@ -1,5 +1,4 @@
 import { Notice, type TAbstractFile } from 'obsidian';
-import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
 import type CratePlugin from '../main';
 import { type ForegroundSyncReason, SyncRuntime } from './runtime';
 import { notifyConflicts } from './conflict';
@@ -7,9 +6,7 @@ import { isHiddenPath } from './file-discovery';
 import { ActivityModal } from '../ui/activity-modal';
 import { openConfirmationModal } from '../ui/confirmation-modal';
 import { applySharedSettings } from './shared-settings';
-import { errorMessage } from '../plugin/logger';
-import { exchangeDeviceEnrollment } from './enrollment';
-import { claimAndEnrollInitialDevice } from './initial-server-setup';
+import { SyncApiClient } from './api';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
 
@@ -146,91 +143,22 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 	});
 }
 
-export async function handleSyncSetupProtocol(
-	plugin: CratePlugin,
-	params: Record<string, string>,
-): Promise<void> {
-	const workerUrl = params['workerUrl'];
-	const enrollmentToken = params['enrollmentToken'];
-
-	if (!workerUrl || !enrollmentToken) {
-		new Notice('Setup link is missing required parameters.');
-		return;
-	}
-
-	if (plugin.syncRuntime.isConfigured()) {
-		const confirmed = await openConfirmationModal(plugin.app, {
-			title: 'Overwrite existing configuration',
-			message: 'Crate is already configured on this device.',
-			details: ['Applying the setup link will replace the current sync credentials.'],
-			confirmText: 'Overwrite configuration',
-			warning: true,
-		});
-		if (!confirmed) {
-			return;
-		}
-	}
-
-	try {
-		const testResult = await configureDeviceEnrollment(plugin, {
-			workerUrl,
-			enrollmentToken,
-		});
-		new Notice('Crate connected from setup link');
-		if (testResult.success) {
-			new Notice('Connection test successful!');
-		} else {
-			new Notice(`Configured but connection test failed: ${testResult.error}`);
-		}
-	} catch (error) {
-		const msg = errorMessage(error);
-		new Notice(`Setup link failed: ${msg}`);
-	}
-}
-
-export async function configureInitialCloudflareDevice(
+export async function configureCloudflareAuthorizedDevice(
 	plugin: CratePlugin,
 	workerUrl: string,
+	authToken: string,
 ): Promise<{ success: boolean; error?: string }> {
-	if (plugin.syncRuntime.isConfigured()) {
-		return { success: true };
-	}
-
-	const enrollment = await claimAndEnrollInitialDevice({
-		workerUrl,
-		deviceId: plugin.settings.deviceId,
-		deviceName: getCurrentDeviceName(plugin.settings.deviceId),
-		platform: getCurrentPlatformCode(),
-	});
-
-	return await applyDeviceEnrollment(plugin, enrollment);
-}
-
-async function configureDeviceEnrollment(
-	plugin: CratePlugin,
-	input: Parameters<typeof exchangeDeviceEnrollment>[0],
-): Promise<{ success: boolean; error?: string }> {
-	const enrollment = await exchangeDeviceEnrollment({
-		...input,
-		deviceId: plugin.settings.deviceId,
-		deviceName: getCurrentDeviceName(plugin.settings.deviceId),
-		platform: getCurrentPlatformCode(),
-	});
-
-	return await applyDeviceEnrollment(plugin, enrollment);
-}
-
-async function applyDeviceEnrollment(
-	plugin: CratePlugin,
-	enrollment: Awaited<ReturnType<typeof exchangeDeviceEnrollment>>,
-): Promise<{ success: boolean; error?: string }> {
-	if (enrollment.sharedSettings) {
-		applySharedSettings(plugin.settings, enrollment.sharedSettings);
+	const api = new SyncApiClient(workerUrl, authToken);
+	try {
+		const { settings } = await api.getSharedSettings();
+		if (settings) applySharedSettings(plugin.settings, settings);
+	} catch {
+		// Shared settings are optional during first connection.
 	}
 
 	await plugin.syncRuntime.applyInfrastructureConfig({
-		workerUrl: enrollment.workerUrl,
-		authToken: enrollment.authToken,
+		workerUrl,
+		authToken,
 	});
 
 	plugin.syncRuntime.pushSharedSettings().catch(() => {});

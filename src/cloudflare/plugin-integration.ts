@@ -3,7 +3,11 @@ import type CratePlugin from '../plugin/CratePlugin';
 import { CloudflareDeploymentService } from './deployment-service';
 import { loadEmbeddedCloudflareArtifacts } from './embedded-artifacts';
 import { obsidianHttpTransport } from './http';
-import { configureInitialCloudflareDevice } from '../sync/plugin-integration';
+import { configureCloudflareAuthorizedDevice } from '../sync/plugin-integration';
+import { generateSecureToken, hashToken } from '../sync/device-token';
+import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
+import { openCloudflareDeploymentModal } from '../ui/cloudflare-deployment-modal';
+import { selectCloudflareServer } from '../ui/cloudflare-server-picker-modal';
 import {
 	CLOUDFLARE_OAUTH_CLIENT_ID,
 	isCloudflareOAuthConfigured,
@@ -18,6 +22,7 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 		openExternal: url => {
 			window.open(url, '_blank', 'noopener,noreferrer');
 		},
+		selectDeployment: deployments => selectCloudflareServer(plugin.app, deployments),
 	});
 }
 
@@ -37,32 +42,97 @@ export async function handleCloudflareOAuthProtocol(
 	plugin: CratePlugin,
 	params: Record<string, string>,
 ): Promise<void> {
-	new Notice('Cloudflare authorized. Crate is deploying your sync server…', 10000);
+	plugin.openSettingsTab();
+	const progress = openCloudflareDeploymentModal(plugin.app);
+	const shouldConnectDevice = !plugin.syncRuntime.isConfigured();
+	const deviceToken = shouldConnectDevice ? generateSecureToken() : null;
 	let deployment;
 	try {
-		deployment = await plugin.cloudflareDeploymentService.handleCallback(params);
+		deployment = await plugin.cloudflareDeploymentService.handleCallback(
+			params,
+			deviceToken ? {
+				tokenHash: await hashToken(deviceToken),
+				deviceId: plugin.settings.deviceId,
+				deviceName: getCurrentDeviceName(plugin.settings.deviceId),
+				platform: getCurrentPlatformCode(),
+			} : undefined,
+		);
 	} catch (error) {
-		new Notice(`Cloudflare deployment failed: ${deploymentErrorMessage(error)}`, 15000);
+		progress.fail(
+			'Could not prepare your Cloudflare server',
+			deploymentErrorMessage(error),
+			['Select “Connect with Cloudflare” in Crate settings to start again.'],
+		);
 		return;
 	}
 
-	if (plugin.syncRuntime.isConfigured()) {
-		new Notice(`Cloudflare server updated in ${deployment.accountName}`);
+	if (!shouldConnectDevice) {
+		plugin.refreshSettingsTab();
+		progress.succeed(
+			'Cloudflare server updated',
+			'Your private Cloudflare sync server is up to date.',
+		);
 		return;
 	}
 
-	new Notice('Cloudflare server created. Connecting this device…', 10000);
+	progress.setWorking(
+		'Connecting this device',
+		'Creating a private credential for this device. Keep Obsidian open.',
+	);
+	let connection: { success: boolean; error?: string };
 	try {
-		const connection = await configureInitialCloudflareDevice(plugin, deployment.workerUrl);
-		if (connection.success) {
-			new Notice(`Cloudflare deployment completed in ${deployment.accountName}`);
-		} else {
-			new Notice(`Crate is connected, but its connection test failed: ${connection.error}`);
-		}
+		if (!deviceToken) throw new Error('Device credential was not created');
+		connection = await configureCloudflareAuthorizedDevice(
+			plugin,
+			deployment.workerUrl,
+			deviceToken,
+		);
 	} catch (error) {
-		new Notice(
-			`Cloudflare server was created, but connecting this device failed: ${deploymentErrorMessage(error)}`,
-			15000,
+		plugin.refreshSettingsTab();
+		progress.fail(
+			'Could not connect this device',
+			deploymentErrorMessage(error),
+			['Select “Connect with Cloudflare” in Crate settings to try again.'],
+		);
+		return;
+	}
+
+	plugin.refreshSettingsTab();
+	if (!connection.success) {
+		progress.fail(
+			'Crate is connected with a warning',
+			`The connection test failed: ${connection.error ?? 'Unknown error'}`,
+			['Your device credentials were saved. You can retry the connection test from Crate settings.'],
+		);
+		return;
+	}
+
+	progress.setWorking(
+		'Syncing your vault',
+		'Your server is connected. Running the first sync now.',
+	);
+	try {
+		const syncResult = await plugin.syncRuntime.sync();
+		plugin.refreshSettingsTab();
+		if (!syncResult.success) {
+			progress.fail(
+				'Crate is connected with a sync warning',
+				`The first sync failed: ${syncResult.errors[0] ?? 'Unknown sync error'}`,
+				['Your device is connected. Select “Sync now” to try again.'],
+			);
+			return;
+		}
+
+		progress.succeed(
+			'Crate is ready',
+			'Your vault is synced and this device is ready to use.',
+		);
+	} catch (error) {
+		plugin.refreshSettingsTab();
+		progress.fail(
+			'Crate is connected with a sync warning',
+			`The first sync failed: ${deploymentErrorMessage(error)}`,
+			['Your device is connected. Select “Sync now” to try again.'],
 		);
 	}
 }

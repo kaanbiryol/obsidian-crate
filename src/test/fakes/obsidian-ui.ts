@@ -88,6 +88,8 @@ export class FakeElement {
 		this.attributes.set(name, value);
 	}
 
+	addEventListener(_type: string, _listener: (event: Event) => unknown): void {}
+
 	show(): void {
 		this.setCssProps({ display: '' });
 	}
@@ -329,6 +331,7 @@ export function createObsidianUiModule(): Record<string, unknown> {
 	return {
 		Modal: MockModal,
 		Setting: MockSetting,
+		setIcon: () => {},
 		ButtonComponent: MockButtonComponent,
 		ExtraButtonComponent: MockButtonComponent,
 		Notice: class Notice {

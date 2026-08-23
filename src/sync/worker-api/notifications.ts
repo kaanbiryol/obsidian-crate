@@ -60,12 +60,14 @@ export class NotificationsWorkerApi {
 	async createPushEnrollmentToken(): Promise<{ token: string; expiresAt: string }> {
 		return this.http.requestJson('/notifications/enrollment-token', {
 			method: 'POST',
+			body: '{}',
 		});
 	}
 
 	async createRemindersEnrollmentToken(): Promise<{ token: string; expiresAt: string }> {
 		return this.http.requestJson('/notifications/reminders-enrollment-token', {
 			method: 'POST',
+			body: '{}',
 		});
 	}
 

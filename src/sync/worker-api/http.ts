@@ -86,6 +86,10 @@ export class WorkerApiHttpClient {
 		return this.workerUrl.length > 0 && this.authToken.length > 0;
 	}
 
+	getWorkerUrl(): string {
+		return this.workerUrl;
+	}
+
 	private async runRequest(
 		path: string,
 		options: ApiRequestOptions,

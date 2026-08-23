@@ -1,5 +1,4 @@
 import type { Plugin, TAbstractFile } from 'obsidian';
-import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
 import { createLogger } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../plugin/types';
@@ -17,7 +16,6 @@ import {
 import { recordSyncHistory, resetStoredSyncState } from './runtime-history';
 import { emitStateChange, emitSyncProgress } from './runtime-listeners';
 import { createSyncFailureResult, SYNC_ERROR_MESSAGES } from './sync-result';
-import { hashToken } from './device-token';
 
 const logger = createLogger('SyncRuntime');
 export const FOREGROUND_SYNC_DEBOUNCE_MS = 1_000;
@@ -90,7 +88,7 @@ export class SyncRuntime {
 		return this.apiClient;
 	}
 
-	async initialize(): Promise<void> {
+	async initialize(options: { skipStartupSync?: boolean } = {}): Promise<void> {
 		logger.info('Initializing sync engine');
 
 		const initializationRevision = ++this.initializationRevision;
@@ -121,10 +119,9 @@ export class SyncRuntime {
 		if (this.initializationRevision !== initializationRevision || this.syncEngine !== syncEngine) {
 			return;
 		}
-		await this.registerCurrentDevice();
 		this.statusBar?.update(this.syncEngine.getState());
 
-		if (this.settings.syncOnStartup) {
+		if (this.settings.syncOnStartup && !options.skipStartupSync) {
 			this.sync()
 				.then(result => {
 					notifyConflicts(result.conflicts);
@@ -195,10 +192,15 @@ export class SyncRuntime {
 		await deleteManifestFile(this.plugin);
 		resetStoredSyncState(this.settings);
 		await this.persistSettings();
-		await this.initialize();
+		await this.initialize({ skipStartupSync: true });
 	}
 
 	async clearSyncConfiguration(): Promise<void> {
+		try {
+			await this.apiClient?.revokeCurrentToken();
+		} catch (error) {
+			logger.warn('Failed to revoke the current device credential:', error);
+		}
 		this.destroy();
 		await deleteManifestFile(this.plugin);
 
@@ -266,27 +268,6 @@ export class SyncRuntime {
 			notifyConflicts(result.conflicts);
 		} catch (error) {
 			logger.warn('Foreground sync failed:', error);
-		}
-	}
-
-	private async registerCurrentDevice(): Promise<void> {
-		if (!this.apiClient) {
-			return;
-		}
-
-		const authToken = this.secretStorage.get(SECRET_KEYS.AUTH_TOKEN)?.trim();
-		if (!authToken) {
-			return;
-		}
-
-		try {
-			await this.apiClient.registerToken(await hashToken(authToken), {
-				deviceId: this.settings.deviceId,
-				deviceName: getCurrentDeviceName(this.settings.deviceId),
-				platform: getCurrentPlatformCode(),
-			});
-		} catch (error) {
-			logger.warn('Failed to register current device metadata:', error);
 		}
 	}
 

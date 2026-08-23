@@ -7,7 +7,7 @@
  */
 
 import type { App } from 'obsidian';
-import type { SecretKey } from './types';
+import { SECRET_KEYS, type SecretKey } from './types';
 
 interface SecretStorage {
 	getSecret(id: string): string | null;
@@ -24,7 +24,10 @@ declare module 'obsidian' {
 export class SecretStorageService {
 	private secretStorage: SecretStorage;
 
-	constructor(app: App) {
+	constructor(
+		app: App,
+		private readonly authScopeProvider: () => string | null = () => null,
+	) {
 		if (!app.secretStorage) {
 			throw new Error('Obsidian secret storage is unavailable on this platform or app version');
 		}
@@ -32,19 +35,42 @@ export class SecretStorageService {
 	}
 
 	get(key: SecretKey): string | null {
-		const value = this.secretStorage.getSecret(key);
+		const value = this.secretStorage.getSecret(this.storageId(key));
 		return value || null;
 	}
 
 	set(key: SecretKey, value: string): void {
-		this.secretStorage.setSecret(key, value);
+		this.secretStorage.setSecret(this.storageId(key), value);
 	}
 
 	delete(key: SecretKey): void {
-		this.secretStorage.setSecret(key, '');
+		this.secretStorage.setSecret(this.storageId(key), '');
 	}
 
 	has(key: SecretKey): boolean {
 		return !!this.get(key);
 	}
+
+	getLegacy(key: SecretKey): string | null {
+		const value = this.secretStorage.getSecret(key);
+		return value || null;
+	}
+
+	private storageId(key: SecretKey): string {
+		if (key !== SECRET_KEYS.AUTH_TOKEN) {
+			return key;
+		}
+
+		const scope = this.authScopeProvider()?.trim();
+		return scope ? `crate-${hashSecretScope(scope)}-auth-token` : key;
+	}
+}
+
+function hashSecretScope(value: string): string {
+	let hash = 0xcbf29ce484222325n;
+	for (const byte of new TextEncoder().encode(value)) {
+		hash ^= BigInt(byte);
+		hash = BigInt.asUintN(64, hash * 0x100000001b3n);
+	}
+	return hash.toString(16).padStart(16, '0');
 }

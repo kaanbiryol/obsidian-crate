@@ -107,39 +107,6 @@ describe('renderDevicesSection', () => {
 		expect(noticeMessages).toContain('Removed Android device (5678)');
 	});
 
-	it('hides unused setup-link placeholders from the devices list', async () => {
-		const { renderDevicesSection } = await loadDevicesSectionModule();
-
-		renderDevicesSection({
-			containerEl: new FakeElement('div') as never,
-			plugin: {
-				app: {},
-				syncRuntime: {
-					getApiClient: () => ({
-						listTokens: vi.fn(async () => ({
-							tokens: [
-								{
-									id: 'placeholder-id',
-									device_id: null,
-									device_name: 'setup-link',
-									platform: null,
-									created_at: '2026-04-18 09:00:00',
-									last_seen_at: null,
-									is_current: false,
-								},
-							],
-						})),
-						revokeToken: vi.fn(),
-					}),
-				},
-			} as never,
-		});
-		await flushMicrotasks();
-
-		expect(() => getSettingByName('setup-link')).toThrow('Setting not found: setup-link');
-		expect(MockSetting.instances.map((setting) => setting.nameEl.textContent)).toEqual(['Connected devices']);
-	});
-
 	it('renders a failure message when device loading fails', async () => {
 		const { renderDevicesSection } = await loadDevicesSectionModule();
 		const containerEl = new FakeElement('div');

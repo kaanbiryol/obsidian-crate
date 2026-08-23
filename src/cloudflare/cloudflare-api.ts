@@ -26,6 +26,28 @@ interface D1Database {
 	name?: string;
 }
 
+export interface CloudflareWorkerScript {
+	id?: string;
+	created_on?: string;
+	modified_on?: string;
+}
+
+export interface CloudflareWorkerBinding {
+	type?: string;
+	name?: string;
+	id?: string;
+	bucket_name?: string;
+	class_name?: string;
+}
+
+export interface CloudflareWorkerSettings {
+	annotations?: {
+		'workers/message'?: string;
+		'workers/tag'?: string;
+	};
+	bindings?: CloudflareWorkerBinding[];
+}
+
 interface R2Bucket {
 	name?: string;
 }
@@ -82,7 +104,7 @@ export function buildWorkerMultipartBody(input: {
 		compatibility_date: '2026-08-18',
 		annotations: {
 			'workers/message': `Crate ${input.artifacts.version}`,
-			'workers/tag': input.artifacts.version,
+			'workers/tag': 'crate',
 		},
 		bindings: [
 			{ type: 'd1', name: 'DB', id: input.d1DatabaseId },
@@ -121,6 +143,16 @@ export class CloudflareApiClient {
 		return result
 			.filter(item => item.status === 'accepted' && item.account?.id && item.account.name)
 			.map(item => ({ id: item.account!.id!, name: item.account!.name! }));
+	}
+
+	async listWorkers(accountId: string): Promise<CloudflareWorkerScript[]> {
+		return this.request<CloudflareWorkerScript[]>(`/accounts/${accountId}/workers/scripts`);
+	}
+
+	async getWorkerSettings(accountId: string, workerName: string): Promise<CloudflareWorkerSettings> {
+		return this.request<CloudflareWorkerSettings>(
+			`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/settings`,
+		);
 	}
 
 	async getD1Database(accountId: string, databaseId: string): Promise<D1Database | null> {

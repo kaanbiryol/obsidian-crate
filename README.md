@@ -22,7 +22,7 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 - Detect conflicts and preserve both versions instead of overwriting silently
 - Sync creates, edits, deletes, renames, and attachments
 - Deploy the sync server through Cloudflare without giving the plugin an account API token
-- Add devices with short-lived, one-use setup links
+- Connect devices by signing in to the Cloudflare account that owns the server
 - Create and browse reminders stored as Markdown in your vault
 - Render reminder query blocks such as `reminders`, `reminders-today`, and `reminders-upcoming`
 - Schedule reminder push notifications through your own Worker
@@ -32,7 +32,7 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 
 The Obsidian plugin owns sync planning, change detection, conflict handling, and local settings. The independently deployed Cloudflare Worker is the storage API. It stores file contents in R2, metadata in D1, and reminder notification alarms in Durable Objects.
 
-The plugin never asks for a Cloudflare account API token. Deployment uses Cloudflare OAuth Authorization Code + PKCE, provisions inside Obsidian, and discards the temporary OAuth token when it finishes. During server claim, a short-lived enrollment link lets Obsidian register a permanent device credential whose plaintext is generated and kept on that device.
+The plugin never asks for a Cloudflare account API token. Deployment and device connection use Cloudflare OAuth Authorization Code + PKCE. Crate discovers or creates the account's server, registers a permanent device credential whose plaintext stays in Obsidian, and then revokes the temporary OAuth token.
 
 ## Privacy and Security
 
@@ -42,8 +42,8 @@ The plugin never asks for a Cloudflare account API token. Deployment uses Cloudf
 - Sync secrets are stored through Obsidian's secret storage.
 - OAuth state and PKCE material exist only in memory during one deployment; authorization codes and OAuth access tokens are never stored or logged.
 - The Worker module and D1 migrations are versioned build-time artifacts inside the plugin. Crate does not fetch deployment code at runtime.
-- Initial, additional-device, push, and reminders web enrollment links are short-lived and scoped to one setup action.
-- Claim a new Worker promptly. Until the first device is enrolled, anyone who knows the Worker URL can claim an unowned deployment.
+- Vault devices can be authorized only through the Cloudflare account that owns the server.
+- Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - Remote code is not fetched or evaluated at runtime.
 - Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker can access the synced data.
 
@@ -105,19 +105,19 @@ npm run deploy:plugin
 
 After installing the plugin, open the Crate settings tab in Obsidian:
 
-1. Select **Deploy to Cloudflare**. Your browser opens Cloudflare OAuth.
+1. Select **Connect with Cloudflare**. Your browser opens Cloudflare OAuth.
 2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
-3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate provisions the Worker, R2 bucket, D1 database, Durable Objects, endpoint, and migrations, then discards the OAuth token.
-4. Crate claims the new server and connects this device automatically.
+3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate reuses an existing Crate server in that account or provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and migrations.
+4. Crate registers this device through the Cloudflare-authorized D1 API, revokes the temporary OAuth token, and connects automatically.
 5. Run **Initial sync → Upload all** when you are ready to seed the remote vault.
 
-The OAuth deployment uses the build-time Worker and migrations included in the installed plugin. Crate verifies the server protocol before accepting the setup link. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered with the Worker.
+The OAuth deployment uses the build-time Worker and migrations included in the installed plugin. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered in D1.
 
-To add another device, use **Settings → Crate → Configuration → Set up another device** on a connected device. Each link can be used once and issuing a replacement invalidates the previous pending link.
+To connect another computer or mobile device, install Crate there and select **Connect with Cloudflare**. Access to the Cloudflare account is the source of truth for vault membership. If the account contains more than one Crate server, Obsidian asks which one belongs to the vault.
 
-If automatic first-device setup fails, paste its `workers.dev` URL into **Open existing server** to use the recovery claim page. An abandoned first claim becomes claimable again after its 10-minute enrollment window expires, provided no device was registered.
+**Disconnect this device** removes the local sync credential while retaining the non-secret deployment identity. Signing in to Cloudflare again reconnects the same server.
 
-For the one-time GitHub Pages and OAuth-client configuration, updates, recovery, and command-line deployment instructions, see [Deploying and operating the server](docs/deployment.md). **Authorize update** reuses the resource IDs saved by the initial OAuth deployment.
+For the one-time GitHub Pages and OAuth-client configuration, updates, and recovery instructions, see [Deploying and operating the server](docs/deployment.md). **Authorize update** reuses the resource IDs saved by the initial OAuth deployment.
 
 ## Sync Scope and Limits
 

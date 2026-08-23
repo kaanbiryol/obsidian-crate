@@ -33,7 +33,7 @@ async function ensureR2Bucket(
 	} catch (error) {
 		if (error instanceof CloudflareApiError && error.code === 10042) {
 			throw new Error(
-				'R2 is not active for this Cloudflare account. Enable an R2 subscription in the Cloudflare dashboard, then select Deploy to Cloudflare again.',
+				'R2 is not active for this Cloudflare account. Enable an R2 subscription in the Cloudflare dashboard, then select Connect with Cloudflare again.',
 			);
 		}
 		throw error;
