@@ -33,4 +33,16 @@ describe('CloudflareDeploymentModal', () => {
 		expect(MockModal.instances[0]?.contentEl.collectText()).toContain('This server was already claimed.');
 		expect(MockModal.instances[0]?.contentEl.collectText()).toContain('Wait and try again.');
 	});
+
+	it('uses update-specific progress copy for an existing server', async () => {
+		vi.doMock('obsidian', () => createObsidianUiModule());
+		const { openCloudflareDeploymentModal } = await import('./cloudflare-deployment-modal');
+
+		openCloudflareDeploymentModal({} as never, 'update');
+
+		expect(MockModal.instances[0]?.titleEl.textContent).toBe('Updating Cloudflare server');
+		expect(MockModal.instances[0]?.contentEl.collectText()).toContain(
+			'Preparing your Worker and web app update',
+		);
+	});
 });

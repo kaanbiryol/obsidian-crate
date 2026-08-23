@@ -65,6 +65,7 @@ function createCloudflareDeploymentMetadata(): CloudflareDeploymentMetadata {
 		r2BucketName: resourceName,
 		workersSubdomain: null,
 		lastDeployedVersion: null,
+		lastDeployedFingerprint: null,
 	};
 }
 

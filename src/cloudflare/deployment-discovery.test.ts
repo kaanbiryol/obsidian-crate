@@ -9,7 +9,7 @@ describe('discoverCloudflareDeployments', () => {
 				{ id: 'crate-0123456789abcdef', modified_on: '2026-08-23T09:00:00.000Z' },
 			]),
 			getWorkerSettings: vi.fn(async () => ({
-				annotations: { 'workers/message': 'Crate 0.1.0' },
+				annotations: { 'workers/message': `Crate 0.1.0 ${'f'.repeat(64)}` },
 				bindings: [
 					{ type: 'd1', name: 'DB', id: 'database-id' },
 					{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-0123456789abcdef' },
@@ -35,6 +35,7 @@ describe('discoverCloudflareDeployments', () => {
 				r2BucketName: 'crate-0123456789abcdef',
 				workersSubdomain: null,
 				lastDeployedVersion: '0.1.0',
+				lastDeployedFingerprint: 'f'.repeat(64),
 			},
 			modifiedOn: '2026-08-23T09:00:00.000Z',
 		}]);

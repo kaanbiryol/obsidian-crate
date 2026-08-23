@@ -21,6 +21,7 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
 
 			const packageJson = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf8'));
 			const workerBundle = readFileSync(resolve(rootDir, '.generated/cloudflare/worker.mjs'));
+			const workerBundleSha256 = sha256(workerBundle);
 			const migrationsDir = resolve(rootDir, 'migrations');
 			const migrations = readdirSync(migrationsDir)
 				.filter(name => name.endsWith('.sql'))
@@ -29,11 +30,19 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
 					const sql = readFileSync(resolve(migrationsDir, name), 'utf8');
 					return { name, sql, sha256: sha256(sql) };
 				});
+			const artifactFingerprint = sha256(JSON.stringify({
+				workerBundleSha256,
+				migrations: migrations.map(({ name, sha256: migrationSha256 }) => ({
+					name,
+					sha256: migrationSha256,
+				})),
+			}));
 
 			return [
 				`export const artifactVersion = ${JSON.stringify(packageJson.version)};`,
 				`export const workerBundleGzipBase64 = ${JSON.stringify(gzipSync(workerBundle).toString('base64'))};`,
-				`export const workerBundleSha256 = ${JSON.stringify(sha256(workerBundle))};`,
+				`export const workerBundleSha256 = ${JSON.stringify(workerBundleSha256)};`,
+				`export const artifactFingerprint = ${JSON.stringify(artifactFingerprint)};`,
 				`export const d1Migrations = ${JSON.stringify(migrations)};`,
 			].join('\n');
 		},

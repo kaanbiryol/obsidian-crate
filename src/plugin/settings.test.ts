@@ -15,6 +15,7 @@ describe('normalizeCrateSettings', () => {
 				r2BucketName: 'crate-0123456789abcdef',
 				workersSubdomain: 'my-workers-subdomain',
 				lastDeployedVersion: '0.1.0',
+				lastDeployedFingerprint: 'f'.repeat(64),
 			},
 		}, 'vault-config');
 
@@ -33,6 +34,7 @@ describe('normalizeCrateSettings', () => {
 				r2BucketName: 'shared-bucket',
 				workersSubdomain: null,
 				lastDeployedVersion: null,
+				lastDeployedFingerprint: null,
 			},
 		}, 'vault-config');
 

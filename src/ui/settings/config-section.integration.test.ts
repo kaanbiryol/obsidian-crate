@@ -8,6 +8,10 @@ import {
 
 const openConfirmationModal = vi.fn();
 const startCloudflareDeployment = vi.fn();
+const embeddedArtifact = {
+	version: '0.1.0',
+	fingerprint: 'f'.repeat(64),
+};
 
 async function flushMicrotasks(): Promise<void> {
 	await Promise.resolve();
@@ -17,6 +21,9 @@ async function flushMicrotasks(): Promise<void> {
 async function loadConfigSectionModule() {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment }));
+	vi.doMock('../../cloudflare/embedded-artifacts', () => ({
+		EMBEDDED_CLOUDFLARE_ARTIFACT: embeddedArtifact,
+	}));
 	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal }));
 	vi.doMock('./section-helpers', () => ({ createSettingsSectionHeading: vi.fn() }));
 
@@ -41,6 +48,7 @@ afterEach(() => {
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
 	vi.doUnmock('../../cloudflare/plugin-integration');
+	vi.doUnmock('../../cloudflare/embedded-artifacts');
 	vi.doUnmock('../confirmation-modal');
 	vi.doUnmock('./section-helpers');
 });
@@ -100,13 +108,41 @@ describe('renderConfigSection integration', () => {
 		renderConfigSection({
 			containerEl: new FakeElement('div') as never,
 			plugin: {
-				settings: { cloudflareDeployment: { deploymentId: '0123456789abcdef' } },
+				settings: {
+					cloudflareDeployment: {
+						deploymentId: '0123456789abcdef',
+						lastDeployedVersion: '0.1.0',
+						lastDeployedFingerprint: 'a'.repeat(64),
+					},
+				},
 				syncRuntime: { isConfigured: vi.fn(() => true) },
 			} as never,
 			rerender: vi.fn(),
 		});
 
-		getSettingByName('Update Cloudflare server').buttons[0]?.click();
+		getSettingByName('Cloudflare update available').buttons[0]?.click();
 		expect(startCloudflareDeployment).toHaveBeenCalledTimes(1);
+	});
+
+	it('shows an up-to-date status without an authorization action', async () => {
+		const { renderConfigSection } = await loadConfigSectionModule();
+		renderConfigSection({
+			containerEl: new FakeElement('div') as never,
+			plugin: {
+				settings: {
+					cloudflareDeployment: {
+						deploymentId: '0123456789abcdef',
+						lastDeployedVersion: embeddedArtifact.version,
+						lastDeployedFingerprint: embeddedArtifact.fingerprint,
+					},
+				},
+				syncRuntime: { isConfigured: vi.fn(() => true) },
+			} as never,
+			rerender: vi.fn(),
+		});
+
+		const serverSetting = getSettingByName('Cloudflare server');
+		expect(serverSetting.descEl.textContent).toBe('Your Worker and web app are up to date');
+		expect(serverSetting.buttons).toHaveLength(0);
 	});
 });

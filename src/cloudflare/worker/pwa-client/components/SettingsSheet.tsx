@@ -9,6 +9,7 @@ export function SettingsSheet({
 	config,
 	push,
 	loggingOut,
+	isClosing,
 	onClose,
 	onEnablePush,
 	onRefresh,
@@ -17,6 +18,7 @@ export function SettingsSheet({
 	config: StoredConfig;
 	push: PushState;
 	loggingOut: boolean;
+	isClosing: boolean;
 	onClose: () => void;
 	onEnablePush: () => void;
 	onRefresh: () => void;
@@ -29,22 +31,22 @@ export function SettingsSheet({
 			: 'You can also install this app from your browser for faster access.';
 	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
 		activeKey: 'settings',
-		escapeDisabled: loggingOut,
+		escapeDisabled: loggingOut || isClosing,
 		onEscape: onClose,
 	});
 
 	return (
-		<div className="settings-backdrop" onClick={(event) => {
-			if (!loggingOut && event.target === event.currentTarget) onClose();
+		<div className={`settings-backdrop${isClosing ? ' is-closing' : ''}`} onClick={(event) => {
+			if (!loggingOut && !isClosing && event.target === event.currentTarget) onClose();
 		}}>
-			<aside ref={setDialogRef} className="settings-sheet" role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut} tabIndex={-1} onKeyDown={handleDialogKeyDown}>
+			<aside ref={setDialogRef} className={`settings-sheet${isClosing ? ' is-closing' : ''}`} role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut || isClosing} tabIndex={-1} onKeyDown={handleDialogKeyDown}>
 				<div className="settings-handle" aria-hidden="true" />
 				<div className="settings-sheet__header">
 					<div>
 						<h2>Settings</h2>
 						<p>Notifications, install status, and the current reminder sync target for this device.</p>
 					</div>
-					<Button isIconOnly className="icon-button" type="button" data-action="close-settings" aria-label="Close settings" isDisabled={loggingOut} onClick={onClose}>
+					<Button isIconOnly className="icon-button" type="button" data-action="close-settings" aria-label="Close settings" isDisabled={loggingOut || isClosing} onClick={onClose}>
 						<X size={20} />
 					</Button>
 				</div>

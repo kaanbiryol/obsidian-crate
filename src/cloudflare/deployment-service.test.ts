@@ -80,6 +80,7 @@ function createHarness() {
 		transport,
 		loadArtifacts: vi.fn(async () => ({
 			version: '0.1.0',
+			fingerprint: 'f'.repeat(64),
 			workerBundle: 'export default {};',
 			workerBundleSha256: 'worker-hash',
 			d1Migrations: [],

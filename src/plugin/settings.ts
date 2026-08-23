@@ -56,6 +56,10 @@ function normalizeCloudflareDeployment(value: unknown): CloudflareDeploymentMeta
 	const accountId = normalizeNullableString(value.accountId);
 	const d1DatabaseId = normalizeNullableString(value.d1DatabaseId);
 	const workersSubdomain = normalizeNullableString(value.workersSubdomain);
+	const normalizedFingerprint = normalizeNullableString(value.lastDeployedFingerprint)?.toLowerCase() ?? null;
+	const lastDeployedFingerprint = normalizedFingerprint && /^[a-f0-9]{64}$/.test(normalizedFingerprint)
+		? normalizedFingerprint
+		: null;
 	if (accountId !== null && !/^[a-f0-9]{32}$/i.test(accountId)) {
 		return null;
 	}
@@ -65,7 +69,6 @@ function normalizeCloudflareDeployment(value: unknown): CloudflareDeploymentMeta
 	if (workersSubdomain !== null && !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(workersSubdomain)) {
 		return null;
 	}
-
 	return {
 		deploymentId,
 		accountId,
@@ -76,6 +79,7 @@ function normalizeCloudflareDeployment(value: unknown): CloudflareDeploymentMeta
 		r2BucketName,
 		workersSubdomain,
 		lastDeployedVersion: normalizeNullableString(value.lastDeployedVersion),
+		lastDeployedFingerprint,
 	};
 }
 

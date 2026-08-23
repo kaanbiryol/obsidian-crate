@@ -203,6 +203,7 @@ export interface CloudflareDeploymentMetadata {
 	r2BucketName: string;
 	workersSubdomain: string | null;
 	lastDeployedVersion: string | null;
+	lastDeployedFingerprint: string | null;
 }
 
 export interface SharedSettings {

@@ -82,7 +82,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		});
 
 		expect(plugin.openSettingsTab).toHaveBeenCalledTimes(1);
-		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app);
+		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'setup');
 		expect(plugin.openSettingsTab.mock.invocationCallOrder[0])
 			.toBeLessThan(openCloudflareDeploymentModal.mock.invocationCallOrder[0] ?? 0);
 		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledWith(
@@ -119,7 +119,27 @@ describe('handleCloudflareOAuthProtocol', () => {
 		expect(plugin.refreshSettingsTab).toHaveBeenCalledTimes(1);
 		expect(progress.succeed).toHaveBeenCalledWith(
 			'Cloudflare server updated',
-			'Your private Cloudflare sync server is up to date.',
+			'Your Worker and Crate web app are now up to date.',
+		);
+		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'update');
+	});
+
+	it('uses update-specific recovery copy when an existing server update fails', async () => {
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const plugin = createPlugin(true);
+		plugin.cloudflareDeploymentService.handleCallback.mockRejectedValue(
+			new Error('Cloudflare upload failed'),
+		);
+
+		await handleCloudflareOAuthProtocol(plugin as never, {
+			code: 'authorization-code',
+			state: 'oauth-state',
+		});
+
+		expect(progress.fail).toHaveBeenCalledWith(
+			'Could not update your Cloudflare server',
+			'Cloudflare upload failed',
+			['Select “Authorize update” in Crate settings to try again.'],
 		);
 	});
 

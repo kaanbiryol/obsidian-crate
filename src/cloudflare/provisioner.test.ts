@@ -14,11 +14,13 @@ function createMetadata(): CloudflareDeploymentMetadata {
 		r2BucketName: 'crate-0123456789abcdef',
 		workersSubdomain: 'personal-crate',
 		lastDeployedVersion: null,
+		lastDeployedFingerprint: null,
 	};
 }
 
 const artifacts = {
 	version: '0.1.0',
+	fingerprint: 'f'.repeat(64),
 	workerBundle: 'export default {};',
 	workerBundleSha256: 'worker-hash',
 	d1Migrations: [{ name: '0001.sql', sql: 'CREATE TABLE example (id TEXT);', sha256: 'migration-hash' }],
@@ -68,6 +70,7 @@ describe('provisionCloudflareDeployment', () => {
 		}));
 		expect(api.enableWorkerSubdomain).toHaveBeenCalledTimes(1);
 		expect(metadata.lastDeployedVersion).toBe('0.1.0');
+		expect(metadata.lastDeployedFingerprint).toBe('f'.repeat(64));
 		expect(workerUrl).toBe('https://crate-0123456789abcdef.personal-crate.workers.dev');
 	});
 

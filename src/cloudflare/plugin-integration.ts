@@ -43,8 +43,11 @@ export async function handleCloudflareOAuthProtocol(
 	params: Record<string, string>,
 ): Promise<void> {
 	plugin.openSettingsTab();
-	const progress = openCloudflareDeploymentModal(plugin.app);
 	const shouldConnectDevice = !plugin.syncRuntime.isConfigured();
+	const progress = openCloudflareDeploymentModal(
+		plugin.app,
+		shouldConnectDevice ? 'setup' : 'update',
+	);
 	const deviceToken = shouldConnectDevice ? generateSecureToken() : null;
 	let deployment;
 	try {
@@ -59,9 +62,13 @@ export async function handleCloudflareOAuthProtocol(
 		);
 	} catch (error) {
 		progress.fail(
-			'Could not prepare your Cloudflare server',
+			shouldConnectDevice
+				? 'Could not prepare your Cloudflare server'
+				: 'Could not update your Cloudflare server',
 			deploymentErrorMessage(error),
-			['Select “Connect with Cloudflare” in Crate settings to start again.'],
+			[shouldConnectDevice
+				? 'Select “Connect with Cloudflare” in Crate settings to start again.'
+				: 'Select “Authorize update” in Crate settings to try again.'],
 		);
 		return;
 	}
@@ -70,7 +77,7 @@ export async function handleCloudflareOAuthProtocol(
 		plugin.refreshSettingsTab();
 		progress.succeed(
 			'Cloudflare server updated',
-			'Your private Cloudflare sync server is up to date.',
+			'Your Worker and Crate web app are now up to date.',
 		);
 		return;
 	}

@@ -1,4 +1,5 @@
 import {
+	artifactFingerprint,
 	artifactVersion,
 	d1Migrations,
 	workerBundleGzipBase64,
@@ -8,9 +9,15 @@ import { decodeAndVerifyArtifacts, type CloudflareDeploymentArtifacts } from './
 
 let decodedArtifacts: Promise<CloudflareDeploymentArtifacts> | null = null;
 
+export const EMBEDDED_CLOUDFLARE_ARTIFACT = Object.freeze({
+	version: artifactVersion,
+	fingerprint: artifactFingerprint,
+});
+
 export function loadEmbeddedCloudflareArtifacts(): Promise<CloudflareDeploymentArtifacts> {
 	decodedArtifacts ??= decodeAndVerifyArtifacts({
 		version: artifactVersion,
+		fingerprint: artifactFingerprint,
 		workerBundleGzipBase64,
 		workerBundleSha256,
 		d1Migrations,

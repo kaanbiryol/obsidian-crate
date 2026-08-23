@@ -49,6 +49,7 @@ async function initializePluginCore(plugin: CratePlugin): Promise<boolean> {
       () => plugin.settings?.cloudflareDeployment?.deploymentId ?? plugin.settings?.workerUrl ?? null,
     );
     await plugin.loadSettings();
+    await restoreManagedWorkerConnection(plugin);
     await migrateLegacyAuthToken(plugin);
     plugin.cloudflareDeploymentService = createCloudflareDeploymentService(plugin);
     initializeSyncManagers(plugin);
@@ -60,6 +61,20 @@ async function initializePluginCore(plugin: CratePlugin): Promise<boolean> {
     new Notice(`Crate failed to initialize: ${message}`);
     return false;
   }
+}
+
+async function restoreManagedWorkerConnection(plugin: CratePlugin): Promise<void> {
+  const deployment = plugin.settings?.cloudflareDeployment;
+  if (
+    plugin.settings?.workerUrl
+    || !deployment?.workersSubdomain
+    || !plugin.secretStorage.has(SECRET_KEYS.AUTH_TOKEN)
+  ) {
+    return;
+  }
+
+  plugin.settings.workerUrl = `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`;
+  await plugin.saveSettings();
 }
 
 async function migrateLegacyAuthToken(plugin: CratePlugin): Promise<void> {

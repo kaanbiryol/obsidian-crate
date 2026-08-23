@@ -6,6 +6,7 @@ export interface D1MigrationArtifact {
 
 export interface CloudflareDeploymentArtifacts {
 	version: string;
+	fingerprint: string;
 	workerBundle: string;
 	workerBundleSha256: string;
 	d1Migrations: D1MigrationArtifact[];
@@ -29,6 +30,7 @@ export async function sha256Hex(content: string): Promise<string> {
 
 export async function decodeAndVerifyArtifacts(input: {
 	version: string;
+	fingerprint: string;
 	workerBundleGzipBase64: string;
 	workerBundleSha256: string;
 	d1Migrations: D1MigrationArtifact[];
@@ -54,6 +56,7 @@ export async function decodeAndVerifyArtifacts(input: {
 
 	return {
 		version: input.version,
+		fingerprint: input.fingerprint,
 		workerBundle,
 		workerBundleSha256: input.workerBundleSha256,
 		d1Migrations: input.d1Migrations,

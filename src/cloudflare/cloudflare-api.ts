@@ -103,7 +103,7 @@ export function buildWorkerMultipartBody(input: {
 		main_module: 'worker.mjs',
 		compatibility_date: '2026-08-18',
 		annotations: {
-			'workers/message': `Crate ${input.artifacts.version}`,
+			'workers/message': `Crate ${input.artifacts.version} ${input.artifacts.fingerprint}`,
 			'workers/tag': 'crate',
 		},
 		bindings: [

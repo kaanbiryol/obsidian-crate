@@ -100,7 +100,7 @@ Official references:
 8. Crate registers this device's hashed credential through the Cloudflare D1 API, then revokes and discards the access token.
 9. In Crate, run **Initial sync → Upload all** when ready.
 
-If the Cloudflare API returns R2 error `10042`, Crate tells the user to activate the R2 subscription and try again. Resource names and Cloudflare IDs are saved without credentials, so retries converge on the same deployment. Selecting **Authorize update** later reuses those same Worker, D1, R2, and Durable Object resources.
+If the Cloudflare API returns R2 error `10042`, Crate tells the user to activate the R2 subscription and try again. Resource names and Cloudflare IDs are saved without credentials, so retries converge on the same deployment. When the installed plugin contains different Worker, web app, or migration artifacts, **Authorize update** appears and reuses those same Worker, D1, R2, and Durable Object resources. It is hidden when the server already has the exact embedded artifact or was deployed by a newer plugin version.
 
 Cloudflare account access is the source of truth for vault devices. The plugin never exposes a Worker claim page or a vault-device setup link. A device credential can be created or rotated only during a successful Cloudflare OAuth session.
 

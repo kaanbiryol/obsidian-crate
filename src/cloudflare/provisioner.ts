@@ -135,7 +135,13 @@ export async function provisionCloudflareDeployment(input: {
 	}
 	await input.api.enableWorkerSubdomain(input.accountId, input.metadata.workerName);
 
-	input.metadata.lastDeployedVersion = input.artifacts.version;
-	await input.onMetadataChanged();
+	if (
+		input.metadata.lastDeployedVersion !== input.artifacts.version
+		|| input.metadata.lastDeployedFingerprint !== input.artifacts.fingerprint
+	) {
+		input.metadata.lastDeployedVersion = input.artifacts.version;
+		input.metadata.lastDeployedFingerprint = input.artifacts.fingerprint;
+		await input.onMetadataChanged();
+	}
 	return `https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`;
 }

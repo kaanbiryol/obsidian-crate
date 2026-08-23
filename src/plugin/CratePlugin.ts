@@ -57,7 +57,8 @@ export default class CratePlugin extends Plugin {
 	}
 
 	async saveSettings(): Promise<void> {
-		this.settings = normalizeCrateSettings(this.settings, this.app.vault.configDir);
+		const normalizedSettings = normalizeCrateSettings(this.settings, this.app.vault.configDir);
+		Object.assign(this.settings, normalizedSettings);
 		await this.saveData(buildPersistedCrateSettings(this.settings));
 	}
 

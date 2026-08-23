@@ -1,4 +1,6 @@
 import { Notice, Setting } from 'obsidian';
+import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
+import { isCloudflareServerUpdateAvailable } from '../../cloudflare/deployment-update';
 import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
 import { openConfirmationModal } from '../confirmation-modal';
 import type { ConfigSectionContext } from './config-types';
@@ -22,15 +24,26 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				}));
 	}
 
-	if (isConfigured && plugin.settings.cloudflareDeployment) {
-		new Setting(containerEl)
-			.setName('Update Cloudflare server')
-			.setDesc('Reauthorize briefly and update the existing Worker, D1, R2, and Durable Objects')
-			.addButton(button => button
+	const deployment = plugin.settings.cloudflareDeployment;
+	if (isConfigured && deployment) {
+		const updateAvailable = isCloudflareServerUpdateAvailable(
+			deployment,
+			EMBEDDED_CLOUDFLARE_ARTIFACT,
+		);
+		const updateSetting = new Setting(containerEl)
+			.setName(updateAvailable ? 'Cloudflare update available' : 'Cloudflare server')
+			.setDesc(updateAvailable
+				? 'An updated Worker and web app are included with this Crate build'
+				: 'Your Worker and web app are up to date');
+
+		if (updateAvailable) {
+			updateSetting.addButton(button => button
 				.setButtonText('Authorize update')
+				.setCta()
 				.onClick(() => {
 					void startCloudflareDeployment(plugin);
 				}));
+		}
 	}
 
 	if (isConfigured) {

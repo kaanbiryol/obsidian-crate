@@ -29,6 +29,7 @@ export function ReminderSheet({
 	modal,
 	projects,
 	saving,
+	isClosing,
 	onChange,
 	onClose,
 	onSave,
@@ -37,6 +38,7 @@ export function ReminderSheet({
 	modal: ModalState;
 	projects: string[];
 	saving: boolean;
+	isClosing: boolean;
 	onChange: React.Dispatch<React.SetStateAction<ModalState | null>>;
 	onClose: () => void;
 	onSave: (modal: ModalState) => void;
@@ -52,10 +54,10 @@ export function ReminderSheet({
 	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 	const isEditing = modal.mode === 'edit';
 	const title = isEditing ? 'Edit Reminder' : 'New Reminder';
-	const canSubmit = !saving && Boolean(draft.content.trim());
+	const canSubmit = !saving && !isClosing && Boolean(draft.content.trim());
 
 	useLayoutEffect(() => {
-		if (saving || draft.activePicker || pendingPicker || returningToEditor) return;
+		if (saving || isClosing || draft.activePicker || pendingPicker || returningToEditor) return;
 		const initialContent = draft.content.trim();
 		const focusTitle = () => {
 			const element = richTextInputRef.current?.getElement();
@@ -74,7 +76,7 @@ export function ReminderSheet({
 			window.cancelAnimationFrame(frame);
 			for (const timer of timers) window.clearTimeout(timer);
 		};
-	}, [draft.activePicker, draft.content, modal.mode, modal.reminderId, pendingPicker, returningToEditor, saving]);
+	}, [draft.activePicker, draft.content, isClosing, modal.mode, modal.reminderId, pendingPicker, returningToEditor, saving]);
 
 	useEffect(() => () => {
 		if (switchTimerRef.current !== null) window.clearTimeout(switchTimerRef.current);
@@ -161,8 +163,8 @@ export function ReminderSheet({
 	});
 
 	return (
-		<div className="modal-backdrop pwa-reminder-editor-backdrop" onKeyDown={handleDialogKeyDown} onClick={(event) => {
-			if (saving) return;
+		<div className={`modal-backdrop pwa-reminder-editor-backdrop${isClosing ? ' is-closing' : ''}`} onKeyDown={handleDialogKeyDown} onClick={(event) => {
+			if (saving || isClosing) return;
 			if (event.target !== event.currentTarget) return;
 			if (draft.activePicker) returnToEditor();
 			else onClose();
@@ -172,13 +174,13 @@ export function ReminderSheet({
 					draft={draft}
 					dialogRef={setDialogRef}
 					projectOptions={projectOptions}
-					isSwitchingOut={returningToEditor}
+					isSwitchingOut={returningToEditor || isClosing}
 					onPatch={patchDraft}
 					onSelect={returnToEditor}
 					onClose={() => returnToEditor()}
 				/>
 			) : (
-				<div ref={setDialogRef} className={`modal-card pwa-reminder-editor${pendingPicker ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label={title} aria-busy={saving} tabIndex={-1}>
+				<div ref={setDialogRef} className={`modal-card pwa-reminder-editor${pendingPicker ? ' is-switching-out' : ''}${isClosing ? ' is-closing' : ''}`} role="dialog" aria-modal="true" aria-label={title} aria-busy={saving || isClosing} tabIndex={-1}>
 					<form className="modal-form" onSubmit={(event) => {
 						event.preventDefault();
 						if (saving) return;

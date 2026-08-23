@@ -24,8 +24,10 @@ import { usePushNotifications } from './pwa-client/hooks/usePushNotifications';
 import { usePwaBootstrap } from './pwa-client/hooks/usePwaBootstrap';
 import { usePwaStatus } from './pwa-client/hooks/usePwaStatus';
 import { useLaunchReminderModal } from './pwa-client/hooks/useLaunchReminderModal';
+import { usePwaZoomLock } from './pwa-client/hooks/usePwaZoomLock';
 import { useReminderSync } from './pwa-client/hooks/useReminderSync';
 import { useReminderMutations } from './pwa-client/hooks/useReminderMutations';
+import { useSheetTransition } from './pwa-client/hooks/useSheetTransition';
 import { usePullToRefresh } from './pwa-client/hooks/usePullToRefresh';
 import { useToast } from './pwa-client/hooks/useToast';
 import {
@@ -53,8 +55,13 @@ function App() {
 	const [modal, setModal] = useState<ModalState | null>(null);
 	const { toast, showToast } = useToast();
 	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
+	const finalizeModalClose = useCallback(() => setModal(null), []);
+	const finalizeSettingsClose = useCallback(() => setSettingsOpen(false), []);
+	const modalTransition = useSheetTransition(finalizeModalClose);
+	const settingsTransition = useSheetTransition(finalizeSettingsClose);
 
 	useKeyboardInset();
+	usePwaZoomLock();
 
 	useEffect(() => {
 		void registerPwaServiceWorker().catch(() => undefined);
@@ -97,13 +104,15 @@ function App() {
 		localStorage.removeItem(REMINDERS_CACHE_KEY);
 		setAuthToken(null);
 		resetReminderState();
+		settingsTransition.cancelClose();
+		modalTransition.cancelClose();
 		setSettingsOpen(false);
 		setModal(null);
 		if (showMessage) {
 			setError(null);
 			showToast('info', 'Logged out');
 		}
-	}, [resetReminderState, setError, showToast]);
+	}, [modalTransition.cancelClose, resetReminderState, setError, settingsTransition.cancelClose, showToast]);
 
 	useEffect(() => {
 		handleUnauthorizedRef.current = () => clearLocalSession(false);
@@ -240,15 +249,27 @@ function App() {
 	const openModal = useCallback((mode: ModalMode, reminderId?: string, defaultProject?: string) => {
 		if (!ensureCanMutate()) return;
 		const reminder = reminderId ? reminders.find((item) => item.id === reminderId) ?? null : null;
+		settingsTransition.cancelClose();
+		modalTransition.cancelClose();
 		setSettingsOpen(false);
 		setSaving(false);
 		setModal({ mode, reminderId, draft: buildModalDraft(reminder, defaultProject ?? selectedProject) });
-	}, [ensureCanMutate, reminders, selectedProject]);
+	}, [ensureCanMutate, modalTransition.cancelClose, reminders, selectedProject, settingsTransition.cancelClose]);
 
 	const closeModal = useCallback(() => {
-		setModal(null);
+		if (!modal) return;
 		setSaving(false);
-	}, []);
+		modalTransition.requestClose();
+	}, [modal, modalTransition.requestClose]);
+
+	const toggleSettings = useCallback(() => {
+		if (settingsOpen) {
+			settingsTransition.requestClose();
+			return;
+		}
+		settingsTransition.cancelClose();
+		setSettingsOpen(true);
+	}, [settingsOpen, settingsTransition.cancelClose, settingsTransition.requestClose]);
 
 	const {
 		saveReminder,
@@ -314,7 +335,7 @@ function App() {
 						statusKind={statusKind}
 						refreshing={refreshing}
 						onRefresh={() => void loadReminders({ silent: true })}
-						onToggleSettings={() => setSettingsOpen((open) => !open)}
+						onToggleSettings={toggleSettings}
 					/>
 				}
 				belowHeaderContent={
@@ -341,7 +362,8 @@ function App() {
 						config={config}
 						push={push}
 						loggingOut={loggingOut}
-						onClose={() => setSettingsOpen(false)}
+						isClosing={settingsTransition.isClosing}
+						onClose={settingsTransition.requestClose}
 						onEnablePush={enablePushNotifications}
 						onRefresh={() => void loadReminders()}
 						onLogout={() => void logOut()}
@@ -352,6 +374,7 @@ function App() {
 						modal={modal}
 						projects={projects}
 						saving={saving}
+						isClosing={modalTransition.isClosing}
 						onChange={setModal}
 						onClose={closeModal}
 						onSave={saveReminder}

@@ -471,6 +471,7 @@ describe('SyncRuntime operation wrappers', () => {
 				r2BucketName: 'crate-0123456789abcdef',
 				workersSubdomain: 'crate-example',
 				lastDeployedVersion: '0.1.0',
+				lastDeployedFingerprint: 'f'.repeat(64),
 			},
 			lastSeq: 42,
 			lastSync: '2026-01-01T00:00:00.000Z',

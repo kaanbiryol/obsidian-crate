@@ -1,6 +1,7 @@
 import { Modal, setIcon, type App } from 'obsidian';
 
 type DeploymentProgressState = 'working' | 'success' | 'error';
+export type CloudflareDeploymentMode = 'setup' | 'update';
 
 interface DeploymentProgressContent {
 	state: DeploymentProgressState;
@@ -15,15 +16,22 @@ interface DeploymentProgressContent {
  * easy to miss, especially when Obsidian regains focus in the background.
  */
 export class CloudflareDeploymentModal extends Modal {
-	private content: DeploymentProgressContent = {
-		state: 'working',
-		title: 'Setting up Crate',
-		description: 'Finding your Crate server in Cloudflare. This usually takes less than a minute.',
-	};
+	private content: DeploymentProgressContent;
 	private closed = false;
 
-	constructor(app: App) {
+	constructor(app: App, mode: CloudflareDeploymentMode = 'setup') {
 		super(app);
+		this.content = mode === 'update'
+			? {
+				state: 'working',
+				title: 'Updating Cloudflare server',
+				description: 'Preparing your Worker and web app update. This usually takes less than a minute.',
+			}
+			: {
+				state: 'working',
+				title: 'Setting up Crate',
+				description: 'Finding your Crate server in Cloudflare. This usually takes less than a minute.',
+			};
 	}
 
 	onOpen(): void {
@@ -106,8 +114,11 @@ export class CloudflareDeploymentModal extends Modal {
 	}
 }
 
-export function openCloudflareDeploymentModal(app: App): CloudflareDeploymentModal {
-	const modal = new CloudflareDeploymentModal(app);
+export function openCloudflareDeploymentModal(
+	app: App,
+	mode: CloudflareDeploymentMode = 'setup',
+): CloudflareDeploymentModal {
+	const modal = new CloudflareDeploymentModal(app, mode);
 	modal.open();
 	return modal;
 }

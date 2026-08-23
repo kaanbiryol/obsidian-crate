@@ -22,11 +22,25 @@ function findBinding(
 	return settings.bindings?.find(binding => binding.type === type && binding.name === name) ?? null;
 }
 
-function deployedVersion(settings: CloudflareWorkerSettings): string | null {
+function deployedArtifact(settings: CloudflareWorkerSettings): {
+	version: string | null;
+	fingerprint: string | null;
+} {
 	const message = settings.annotations?.['workers/message']?.trim() ?? '';
-	if (message.startsWith('Crate ')) return message.slice('Crate '.length).trim() || null;
+	if (message.startsWith('Crate ')) {
+		const [version, fingerprint] = message.slice('Crate '.length).trim().split(/\s+/, 2);
+		return {
+			version: version || null,
+			fingerprint: fingerprint && /^[a-f0-9]{64}$/i.test(fingerprint)
+				? fingerprint.toLowerCase()
+				: null,
+		};
+	}
 	const tag = settings.annotations?.['workers/tag']?.trim() ?? '';
-	return tag && tag !== 'crate' ? tag : null;
+	return {
+		version: tag && tag !== 'crate' ? tag : null,
+		fingerprint: null,
+	};
 }
 
 function toDeployment(
@@ -44,6 +58,7 @@ function toDeployment(
 	const setupBinding = findBinding(settings, 'durable_object_namespace', 'SETUP');
 	const message = settings.annotations?.['workers/message']?.trim() ?? '';
 	const tag = settings.annotations?.['workers/tag']?.trim() ?? '';
+	const deployed = deployedArtifact(settings);
 	if (
 		!d1Binding?.id
 		|| !r2Binding?.bucket_name
@@ -62,7 +77,8 @@ function toDeployment(
 			d1DatabaseId: d1Binding.id,
 			r2BucketName: r2Binding.bucket_name,
 			workersSubdomain: null,
-			lastDeployedVersion: deployedVersion(settings),
+			lastDeployedVersion: deployed.version,
+			lastDeployedFingerprint: deployed.fingerprint,
 		},
 		modifiedOn: worker.modified_on ?? null,
 	};

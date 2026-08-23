@@ -20,6 +20,9 @@ const cloudflareDeploymentDestroy = vi.fn();
 const createCloudflareDeploymentService = vi.fn(() => ({
 	destroy: cloudflareDeploymentDestroy,
 }));
+const secretStorageHas = vi.fn(() => false);
+const secretStorageGetLegacy = vi.fn(() => null);
+const secretStorageSet = vi.fn();
 
 class FakeDocumentFragment {
 	readonly spans: string[] = [];
@@ -53,6 +56,9 @@ async function loadLifecycleModule() {
 	vi.doMock('./secret-storage', () => ({
 		SecretStorageService: class SecretStorageService {
 			constructor(public readonly app: unknown) {}
+			has = secretStorageHas;
+			getLegacy = secretStorageGetLegacy;
+			set = secretStorageSet;
 		},
 	}));
 	vi.doMock('./logger', () => ({
@@ -119,6 +125,9 @@ beforeEach(() => {
 	handleCloudflareOAuthProtocol.mockReset();
 	cloudflareDeploymentDestroy.mockReset();
 	createCloudflareDeploymentService.mockClear();
+	secretStorageHas.mockReset().mockReturnValue(false);
+	secretStorageGetLegacy.mockReset().mockReturnValue(null);
+	secretStorageSet.mockReset();
 	vi.stubGlobal('DocumentFragment', FakeDocumentFragment as unknown as typeof DocumentFragment);
 });
 
@@ -200,6 +209,38 @@ describe('bootstrapPlugin', () => {
 		expect(initializeReminders).toHaveBeenCalledWith(plugin);
 		expect(noticeMessages).toHaveLength(1);
 		expect(noticeMessages[0]).toBeInstanceOf(FakeDocumentFragment);
+	});
+
+	it('restores a managed Worker URL when an earlier save kept only the scoped credential', async () => {
+		const { bootstrapPlugin } = await loadLifecycleModule();
+		const settings = {
+			workerUrl: '',
+			cloudflareDeployment: {
+				deploymentId: '0123456789abcdef',
+				workerName: 'crate-0123456789abcdef',
+				workersSubdomain: 'example-account',
+			},
+		};
+		const saveSettings = vi.fn(async () => {});
+		const plugin = createPlugin({
+			settings,
+			loadSettings: vi.fn(async () => {}),
+			saveSettings,
+		});
+		secretStorageHas.mockReturnValue(true);
+		initializeSyncManagers.mockImplementation((target) => {
+			target.syncRuntime = {
+				isConfigured: vi.fn(() => true),
+				initialize: vi.fn(async () => {}),
+			};
+		});
+
+		await bootstrapPlugin(plugin as never);
+
+		expect(settings.workerUrl).toBe(
+			'https://crate-0123456789abcdef.example-account.workers.dev',
+		);
+		expect(saveSettings).toHaveBeenCalledTimes(1);
 	});
 
 	it('stops bootstrapping when core initialization fails', async () => {

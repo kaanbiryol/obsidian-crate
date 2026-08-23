@@ -53,13 +53,11 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('<link rel="manifest" href="/notifications/manifest.json?token=install-token&folder=Reminders&upcomingDays=7&v=');
 	});
 
-	it('allows users to zoom the PWA shell', () => {
+	it('locks the PWA shell to the native app scale', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('initial-scale=1, viewport-fit=cover');
-		expect(html).not.toContain('maximum-scale');
-		expect(html).not.toContain('user-scalable=no');
-		expect(html).not.toContain('blockZoom');
+		expect(html).toContain('initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+		expect(html).not.toContain('height=device-height');
 	});
 
 	it('exposes the current PWA asset version', () => {
@@ -69,16 +67,17 @@ describe('PWA activation metadata', () => {
 	it('keeps standalone safe areas outside visible navigation chrome', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('height=device-height');
 		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black">');
 		expect(html).toContain('<meta name="theme-color" content="#080808">');
 		expect(html).toContain('<meta name="format-detection" content="telephone=no,date=no,email=no,address=no">');
-		expect(html).toContain('html,body{margin:0;padding:0;background:linear-gradient(180deg,#131820 0%,#0c0f14 44%,#090a0d 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;height:100%;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
-		expect(html).toContain('body{width:100%;min-height:100%;overflow:hidden;touch-action:manipulation}');
+		expect(html).toContain('height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
+		expect(html).toContain('body{min-height:100%;min-height:100dvh;overflow:hidden;touch-action:manipulation}');
 		expect(html).toContain('button{cursor:pointer;border:none;background:transparent;color:inherit;touch-action:manipulation;user-select:none;-webkit-user-select:none}');
-		expect(html).toContain('#app{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden}');
-		expect(html).toContain('.reminders-shadow-root{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:visible;');
-		expect(html).toContain('.pwa-reminders-view{position:fixed;inset:0;flex:1;min-height:0;width:100%;max-width:100vw;height:auto;display:flex;flex-direction:column;overflow:visible;');
+		expect(html).toContain('#app{height:100%;height:100dvh;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden}');
+		expect(html).toContain('.reminders-shadow-root{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden;');
+		expect(html).toContain('.pwa-shadow-root>[data-overlay-container="true"]{display:flex;flex:1;min-height:0;width:100%;height:100%;flex-direction:column;overflow:hidden}');
+		expect(html).toContain('.crate-reminders-ui.pwa-shadow-root .pwa-reminders-view{flex:1;min-height:0;width:100%;max-width:100vw;height:100%;display:flex;flex-direction:column;');
+		expect(html).toContain('.crate-reminders-ui.pwa-shadow-root .pwa-reminders-view.is-modal.is-fullscreen .animated-tab-bar-bottom{margin-bottom:0}');
 		expect(html).toContain('--pwa-tabbar-content-height:64px');
 		expect(html).toContain('--pwa-tabbar-safe-area:env(safe-area-inset-bottom)');
 		expect(html).toContain('--pwa-tabbar-content-offset:min(4px,var(--pwa-tabbar-safe-area))');
@@ -106,13 +105,18 @@ describe('PWA activation metadata', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('.pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);');
+		expect(html).toContain('.pwa-reminder-editor-backdrop::after{content:"";position:absolute;right:0;bottom:0;left:0;height:var(--keyboard-offset);background:var(--pwa-sheet-surface);');
+		expect(html).toContain('html.pwa-keyboard-open,html.pwa-keyboard-open body{background:var(--pwa-sheet-surface)}');
+		expect(html).toContain('.modal-card.pwa-reminder-editor.is-closing{pointer-events:none;animation:pwa-sheet-out .3s cubic-bezier(.4,0,1,1) forwards}');
+		expect(html).toContain('.settings-sheet.is-closing{pointer-events:none;animation:pwa-sheet-out .3s cubic-bezier(.4,0,1,1) forwards}');
+		expect(html).toContain('@keyframes pwa-backdrop-out{from{background-color:rgba(0,0,0,.56);backdrop-filter:blur(8px)}to{background-color:rgba(0,0,0,0);backdrop-filter:blur(0)}}');
 		expect(html).toContain('.settings-backdrop{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);');
 		expect(html).toContain('.pwa-reminder-editor .modal-form{gap:0;display:flex;flex:1;min-height:0;flex-direction:column}');
-		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 72px);max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);padding-bottom:8px}');
+		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 72px);max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);padding-bottom:16px}');
 		expect(html).toContain('.pwa-keyboard-open .pwa-editor-card{flex:0 1 auto;min-height:0;padding:16px 18px 18px}');
 		expect(html).toContain('.pwa-keyboard-open .pwa-editor-description-input{flex:0 1 auto;min-height:42px;max-height:88px}');
 		expect(html).toContain('.pwa-keyboard-open .pwa-editor-chip-row{flex-wrap:nowrap;gap:8px;margin-top:auto;padding-top:14px;overflow-x:auto;scrollbar-width:none}');
-		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 28px);max-height:calc(var(--keyboard-usable-height,100dvh) - 28px);padding-bottom:8px}');
+		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 28px);max-height:calc(var(--keyboard-usable-height,100dvh) - 28px);padding-bottom:16px}');
 		expect(html).toContain('box-shadow:0 -1px 0 rgba(255,255,255,.035)');
 		expect(html).not.toContain('box-shadow:0 -6px 20px rgba(0,0,0,.22)');
 		expect(html).not.toContain('box-shadow:0 -12px 48px rgba(0,0,0,.38)');

@@ -13,6 +13,7 @@ describe('embedded Cloudflare deployment artifacts', () => {
 		const migrationSql = 'CREATE TABLE example (id TEXT PRIMARY KEY);';
 		const artifacts = await decodeAndVerifyArtifacts({
 			version: '0.1.0',
+			fingerprint: 'f'.repeat(64),
 			workerBundleGzipBase64: await gzipBase64(workerBundle),
 			workerBundleSha256: await sha256Hex(workerBundle),
 			d1Migrations: [{
@@ -23,12 +24,14 @@ describe('embedded Cloudflare deployment artifacts', () => {
 		});
 
 		expect(artifacts.workerBundle).toBe(workerBundle);
+		expect(artifacts.fingerprint).toBe('f'.repeat(64));
 		expect(artifacts.d1Migrations[0]?.sql).toBe(migrationSql);
 	});
 
 	it('rejects an artifact whose declared hash does not match', async () => {
 		await expect(decodeAndVerifyArtifacts({
 			version: '0.1.0',
+			fingerprint: 'f'.repeat(64),
 			workerBundleGzipBase64: await gzipBase64('worker-code'),
 			workerBundleSha256: '0'.repeat(64),
 			d1Migrations: [],
