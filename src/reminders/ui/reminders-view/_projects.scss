@@ -42,16 +42,16 @@
     padding: 14px 16px;
     border-radius: 14px;
 
-    background: rgba(255, 255, 255, 0.015);
-    border: 1px solid rgba(255, 255, 255, 0.03);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    background: var(--crate-surface-bg);
+    border: 1px solid var(--crate-surface-border);
+    box-shadow: 0 2px 8px var(--crate-shadow-color);
 
     transition: background 200ms ease-out, border-color 200ms ease-out, transform 200ms ease-out;
 }
 
 .premium-project-card:hover .premium-project-content {
-    background: rgba(255, 255, 255, 0.035);
-    border-color: rgba(255, 255, 255, 0.06);
+    background: var(--crate-surface-hover-bg);
+    border-color: var(--crate-surface-border-hover);
 }
 
 .premium-project-card:active .premium-project-content {
@@ -119,7 +119,7 @@
 }
 
 .premium-project-stat-done {
-    color: #22c55e;
+    color: var(--crate-success);
 
     svg {
         opacity: 1;
@@ -138,7 +138,7 @@
     gap: 4px;
     font-size: 12px;
     font-weight: 500;
-    color: #22c55e;
+    color: var(--crate-success);
 }
 
 .premium-project-right {
@@ -160,7 +160,7 @@
     width: 48px;
     height: 4px;
     border-radius: 2px;
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--background-modifier-border);
     overflow: hidden;
 }
 
@@ -188,24 +188,4 @@
     transform: translateX(2px);
 }
 
-// ============================================
-// Light theme adjustments for Browse View
-// ============================================
-
-.theme-light {
-    .premium-project-content {
-        background: rgba(0, 0, 0, 0.01);
-        border-color: rgba(0, 0, 0, 0.03);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.025);
-    }
-
-    .premium-project-card:hover .premium-project-content {
-        background: rgba(0, 0, 0, 0.025);
-        border-color: rgba(0, 0, 0, 0.06);
-    }
-
-    .premium-mini-progress {
-        background: rgba(0, 0, 0, 0.06);
-    }
-}
 }

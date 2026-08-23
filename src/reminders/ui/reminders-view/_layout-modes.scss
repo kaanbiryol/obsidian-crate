@@ -12,23 +12,23 @@
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: #7c3aed;
-    color: white;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
     border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
     z-index: 50;
     transition: box-shadow 0.2s ease;
 
     &:hover {
-        box-shadow: 0 6px 16px rgba(124, 58, 237, 0.5);
+        box-shadow: 0 6px 16px color-mix(in srgb, var(--interactive-accent) 50%, transparent);
     }
 
     &:active {
-        box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
     }
 }
 

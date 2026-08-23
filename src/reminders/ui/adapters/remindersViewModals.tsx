@@ -95,7 +95,7 @@ class CompactReminderModal extends Modal {
       display: "flex",
       "align-items": "center",
       "justify-content": "center",
-      background: "rgba(0, 0, 0, 0.5)",
+      background: "var(--background-modifier-cover)",
     });
     hideNativeModalCloseButton(this.modalEl);
 
@@ -110,7 +110,7 @@ class CompactReminderModal extends Modal {
       "max-height": "700px",
       "border-radius": "12px",
       background: "var(--background-primary)",
-      "box-shadow": "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+      "box-shadow": "0 25px 50px -12px var(--background-modifier-box-shadow)",
     });
 
     const shadowMount = await createShadowReactMount(this.plugin, contentEl, {

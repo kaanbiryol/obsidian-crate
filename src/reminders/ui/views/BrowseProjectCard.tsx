@@ -14,14 +14,18 @@ const MiniProgressBar = memo(function MiniProgressBar({
   accentColor: string;
   isComplete: boolean;
 }) {
+  const progressColor = isComplete ? 'var(--text-success)' : accentColor;
+
   return (
     <div className="premium-mini-progress">
       <div
         className="premium-mini-progress-fill"
         style={{
           width: `${percentage}%`,
-          backgroundColor: isComplete ? '#22c55e' : accentColor,
-          boxShadow: percentage > 0 ? `0 0 4px ${isComplete ? '#22c55e' : accentColor}30` : 'none',
+          backgroundColor: progressColor,
+          boxShadow: percentage > 0
+            ? `0 0 4px color-mix(in srgb, ${progressColor} 30%, transparent)`
+            : 'none',
         }}
       />
     </div>

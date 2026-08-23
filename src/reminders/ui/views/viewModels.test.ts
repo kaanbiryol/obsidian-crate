@@ -10,6 +10,7 @@ import {
   buildUpcomingViewModel,
   getProjectStats,
 } from "./viewModels";
+import { getProjectColor } from "@/reminders/utils/projectColors";
 
 function makeReminder(overrides: Partial<Reminder>): Reminder {
   return {
@@ -124,6 +125,16 @@ describe("reminder view models", () => {
         isComplete: false,
       },
     ]);
+  });
+
+  it("uses the project palette variant for the active color scheme", () => {
+    const reminders = [makeReminder({ id: "work", project: "Work" })];
+    const expected = getProjectColor("Work");
+
+    expect(buildBrowseProjectCardsViewModel(["Work"], reminders, "light")[0].accentColor)
+      .toBe(expected.light.accent);
+    expect(buildProjectDetailViewModel(reminders, "Work", "dark").accentColor)
+      .toBe(expected.dark.accent);
   });
 
   it("builds compact project detail header state including all-done status", () => {

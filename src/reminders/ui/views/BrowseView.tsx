@@ -6,6 +6,7 @@ import type { Reminder } from '../../types/reminder';
 import { EmptyState } from '../../components/EmptyState';
 import { BrowseProjectCard } from './BrowseProjectCard';
 import { buildBrowseProjectCardsViewModel } from './viewModels';
+import type { ProjectColorScheme } from '../../utils/projectColors';
 
 export interface BrowseViewProps {
   projects: string[];
@@ -18,11 +19,12 @@ export interface BrowseViewProps {
   showHeader?: boolean;
   /** Custom class name for the container */
   className?: string;
+  colorScheme?: ProjectColorScheme;
 }
 
 /**
  * Shared Browse view component
- * Premium dark glassmorphism design - displays projects as elegant glass cards
+ * Displays projects using host-theme surfaces and curated project accents.
  */
 export const BrowseView = memo(function BrowseView({
   projects,
@@ -31,9 +33,13 @@ export const BrowseView = memo(function BrowseView({
   animationConfig = { enabled: true },
   headerContent,
   showHeader = false,
-  className = ''
+  className = '',
+  colorScheme = 'dark',
 }: BrowseViewProps) {
-  const cards = useMemo(() => buildBrowseProjectCardsViewModel(projects, reminders), [projects, reminders]);
+  const cards = useMemo(
+    () => buildBrowseProjectCardsViewModel(projects, reminders, colorScheme),
+    [colorScheme, projects, reminders],
+  );
 
   // Empty state
   if (projects.length === 0) {

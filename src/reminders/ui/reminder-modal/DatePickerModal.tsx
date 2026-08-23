@@ -102,7 +102,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
             animationConfig={animationConfig}
             {...modalProps}
         >
-            <div className={isDark ? 'dark text-foreground' : ''}>
+            <div className={isDark ? 'dark' : ''}>
                 <PickerHeader
                     onBack={onClose}
                     title={selectedDateDisplay || 'Select Date'}

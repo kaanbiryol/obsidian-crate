@@ -77,7 +77,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     // Transform drag position to backdrop opacity (fade out as modal drags down)
     const backdropOpacity = useTransform(dragY, [0, 300], [1, 0.3]);
 
-    const backdropClass = "absolute inset-0 bg-black/50";
+    const backdropClass = "modal-backdrop absolute inset-0";
 
     // Different styling based on variant
     const containerClass = variant === 'centered'

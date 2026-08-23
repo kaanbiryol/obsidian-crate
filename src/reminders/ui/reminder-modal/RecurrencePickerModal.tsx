@@ -91,7 +91,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
             animationConfig={animationConfig}
             {...modalProps}
         >
-            <div className={isDark ? 'dark text-foreground' : ''}>
+            <div className={isDark ? 'dark' : ''}>
                 <PickerHeader
                     onBack={onClose}
                     title={summaryText}

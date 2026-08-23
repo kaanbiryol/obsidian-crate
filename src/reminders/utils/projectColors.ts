@@ -13,6 +13,8 @@ interface ProjectColorDef {
     dark: string;   // Hex for dark mode
 }
 
+export type ProjectColorScheme = 'light' | 'dark';
+
 /**
  * The curated 50-color palette
  * Colors distributed across the spectrum to maximize visual distinction

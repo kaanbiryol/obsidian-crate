@@ -234,6 +234,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
                 onProjectSelect={handleProjectSelect}
                 onBackToProjects={handleBackToProjects}
                 onReorder={handleReorder}
+                colorScheme={isDarkMode ? "dark" : "light"}
               />
             </AnimatePresence>
           )}

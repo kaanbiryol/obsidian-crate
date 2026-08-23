@@ -10,7 +10,7 @@ export const ProjectDetailHeader = memo(function ProjectDetailHeader({
   project: string;
   header: ProjectDetailHeaderViewModel;
 }) {
-  const progressColor = header.isComplete ? '#22c55e' : header.accentColor;
+  const progressColor = header.isComplete ? 'var(--text-success)' : header.accentColor;
 
   return (
     <div className="project-detail-header">
@@ -47,7 +47,7 @@ export const ProjectDetailHeader = memo(function ProjectDetailHeader({
                 width: `${header.completionPercentage}%`,
                 backgroundColor: progressColor,
                 boxShadow: header.completionPercentage > 0
-                  ? `0 0 4px ${progressColor}30`
+                  ? `0 0 4px color-mix(in srgb, ${progressColor} 30%, transparent)`
                   : 'none',
               }}
             />

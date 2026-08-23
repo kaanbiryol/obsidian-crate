@@ -37,7 +37,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
     };
 
     const styles = {
-        backdrop: 'bg-black/60 backdrop-blur-sm',
+        backdrop: 'modal-backdrop is-interactive backdrop-blur-sm',
         container: 'bg-[var(--background-primary)] border-[var(--background-modifier-border)]',
         title: 'text-[var(--text-normal)]',
         message: 'text-[var(--text-muted)]',
@@ -143,7 +143,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                         {/* Close button - 44pt touch target per Apple HIG */}
                         <ShadowDOMNativeButton
                             onClick={onClose}
-                            className="delete-confirmation-close absolute top-2 right-2 w-11 h-11 flex items-center justify-center rounded-full text-default-400 hover:text-default-600 hover:bg-default-100 transition-colors z-10"
+                            className="delete-confirmation-close absolute top-2 right-2 w-11 h-11 flex items-center justify-center rounded-full transition-colors z-10"
                         >
                             <X size={20} />
                         </ShadowDOMNativeButton>
@@ -203,7 +203,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                                 size="lg"
                                 variant="flat"
                                 onPress={onClose}
-                                className="flex-1 font-medium text-base h-12 bg-default-100 hover:bg-default-200"
+                                className="delete-confirmation-cancel flex-1 font-medium text-base h-12"
                                 isDisabled={isLoading}
                             >
                                 {cancelLabel}
@@ -212,7 +212,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                                 size="lg"
                                 color="danger"
                                 onPress={handleConfirm}
-                                className="flex-1 font-medium text-base h-12"
+                                className="delete-confirmation-confirm flex-1 font-medium text-base h-12"
                                 isLoading={isLoading}
                                 startContent={!isLoading && <Trash2 size={18} />}
                             >

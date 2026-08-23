@@ -10,6 +10,7 @@ import { ReminderCard } from '../../components/ReminderCard';
 import { EmptyState } from '../../components/EmptyState';
 import { buildUpcomingViewModel } from './viewModels';
 import { STAGGERED_CARD_ANIMATION } from '../layoutConstants';
+import type { ProjectColorScheme } from '../../utils/projectColors';
 
 export interface UpcomingViewProps {
   reminders: Reminder[];
@@ -22,6 +23,7 @@ export interface UpcomingViewProps {
   hasFab?: boolean;
   /** Custom class name for the container */
   className?: string;
+  colorScheme?: ProjectColorScheme;
 }
 
 /**
@@ -34,7 +36,8 @@ export const UpcomingView = memo(function UpcomingView({
   days = 7,
   renderCard,
   hasFab = true,
-  className = ''
+  className = '',
+  colorScheme = 'dark',
 }: UpcomingViewProps) {
   const { upcomingReminders, dateGroups } = useMemo(() => {
     return buildUpcomingViewModel(reminders, days);
@@ -46,6 +49,7 @@ export const UpcomingView = memo(function UpcomingView({
       reminder={reminder}
       index={index}
       animationConfig={{ enabled: false }}
+      colorScheme={colorScheme}
     />
   );
 

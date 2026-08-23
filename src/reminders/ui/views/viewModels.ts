@@ -1,5 +1,5 @@
 import { type Reminder } from "@/reminders/types/reminder";
-import { getProjectColor } from "@/reminders/utils/projectColors";
+import { getProjectColor, type ProjectColorScheme } from "@/reminders/utils/projectColors";
 import {
   getCompletedTodayReminders,
   getOverdueReminders,
@@ -132,6 +132,7 @@ export function getProjectStats(
 export function buildBrowseProjectCardsViewModel(
   projects: string[],
   reminders: Reminder[],
+  colorScheme: ProjectColorScheme = "dark",
 ): BrowseProjectCardViewModel[] {
   const projectStatsMap = buildProjectStatsMap(reminders);
 
@@ -141,7 +142,7 @@ export function buildBrowseProjectCardsViewModel(
     return {
       project,
       stats,
-      accentColor: getProjectColor(project).dark.accent,
+      accentColor: getProjectColor(project)[colorScheme].accent,
       isComplete: stats.total > 0 && stats.active === 0,
     };
   });
@@ -150,6 +151,7 @@ export function buildBrowseProjectCardsViewModel(
 export function buildProjectDetailViewModel(
   reminders: Reminder[],
   project: string,
+  colorScheme: ProjectColorScheme = "dark",
 ): {
   active: Reminder[];
   completed: Reminder[];
@@ -166,7 +168,7 @@ export function buildProjectDetailViewModel(
   return {
     active,
     completed,
-    accentColor: getProjectColor(project).dark.accent,
+    accentColor: getProjectColor(project)[colorScheme].accent,
     total,
     completionPercentage: total > 0 ? Math.round((completed.length / total) * 100) : 0,
   };
@@ -175,8 +177,9 @@ export function buildProjectDetailViewModel(
 export function buildProjectDetailHeaderViewModel(
   reminders: Reminder[],
   project: string,
+  colorScheme: ProjectColorScheme = "dark",
 ): ProjectDetailHeaderViewModel {
-  const detail = buildProjectDetailViewModel(reminders, project);
+  const detail = buildProjectDetailViewModel(reminders, project, colorScheme);
 
   return {
     activeCount: detail.active.length,

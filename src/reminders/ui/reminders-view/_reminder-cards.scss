@@ -18,21 +18,21 @@
     border-radius: 12px;
     cursor: pointer;
 
-    background: rgba(255, 255, 255, 0.015);
-    border: 1px solid rgba(255, 255, 255, 0.03);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    background: var(--crate-surface-bg);
+    border: 1px solid var(--crate-surface-border);
+    box-shadow: 0 2px 8px var(--crate-shadow-color);
 
     transition: background 200ms ease-out, border-color 200ms ease-out;
 }
 
 .premium-reminder-card:hover .premium-reminder-content {
-    background: rgba(255, 255, 255, 0.035);
-    border-color: rgba(255, 255, 255, 0.06);
+    background: var(--crate-surface-hover-bg);
+    border-color: var(--crate-surface-border-hover);
 }
 
 .premium-reminder-card.is-completed .premium-reminder-content {
     opacity: 0.6;
-    background: rgba(255, 255, 255, 0.01);
+    background: var(--crate-surface-bg);
 }
 
 .reorderable-reminder-list {
@@ -70,7 +70,7 @@
     &:active {
         cursor: grabbing;
         color: var(--text-muted);
-        background: rgba(255, 255, 255, 0.04);
+        background: var(--crate-surface-hover-bg);
     }
 
     svg {
@@ -84,7 +84,7 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid var(--background-modifier-border-hover);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -97,7 +97,7 @@
     margin-top: 1px;
 
     &:hover {
-        border-color: rgba(255, 255, 255, 0.4);
+        border-color: var(--text-muted);
         transform: scale(1.05);
     }
 
@@ -111,17 +111,17 @@
     }
 
     &.is-checked {
-        border-color: #22c55e;
-        background: #22c55e;
+        border-color: var(--crate-success);
+        background: var(--crate-success);
 
         &:hover {
-            border-color: #22c55e;
+            border-color: var(--crate-success);
         }
     }
 }
 
 .premium-checkbox-icon {
-    color: white;
+    color: var(--text-on-accent);
     animation: crate-checkmark-pop 200ms ease-out;
 }
 
@@ -178,7 +178,7 @@
 
 .premium-reminder-description {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--text-muted);
     margin-top: 2px;
     line-height: 1.4;
     overflow: hidden;
@@ -189,14 +189,14 @@
 }
 
 .reminder-markdown-link {
-    color: hsl(var(--heroui-primary));
+    color: var(--interactive-accent);
     text-decoration: none;
     cursor: pointer;
-    border-bottom: 1px solid hsl(var(--heroui-primary) / 0.3);
+    border-bottom: 1px solid color-mix(in srgb, var(--interactive-accent) 30%, transparent);
     transition: border-color 200ms ease-out, color 200ms ease-out;
 
     &:hover {
-        border-bottom-color: hsl(var(--heroui-primary) / 0.7);
+        border-bottom-color: color-mix(in srgb, var(--interactive-accent) 70%, transparent);
     }
 
     .is-completed & {
@@ -211,7 +211,7 @@
 
 .premium-priority-flag {
     flex-shrink: 0;
-    color: #ef4444;
+    color: var(--crate-danger);
 }
 
 // Metadata pills
@@ -233,8 +233,8 @@
     line-height: 1;
 
     // Default glass pill style
-    background: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--crate-surface-bg);
+    border: 1px solid var(--crate-surface-border);
     color: var(--text-muted);
 
     svg {
@@ -257,37 +257,4 @@
     }
 }
 
-// ============================================
-// Light theme adjustments for Reminder Card
-// ============================================
-
-.theme-light {
-    .premium-reminder-content {
-        background: rgba(0, 0, 0, 0.01);
-        border-color: rgba(0, 0, 0, 0.03);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.025);
-    }
-
-    .premium-reminder-card:hover .premium-reminder-content {
-        background: rgba(0, 0, 0, 0.025);
-        border-color: rgba(0, 0, 0, 0.06);
-    }
-
-    .premium-reminder-card.is-completed .premium-reminder-content {
-        background: rgba(0, 0, 0, 0.01);
-    }
-
-    .premium-checkbox {
-        border-color: rgba(0, 0, 0, 0.2);
-
-        &:hover {
-            border-color: rgba(0, 0, 0, 0.4);
-        }
-    }
-
-    .premium-pill {
-        background: rgba(0, 0, 0, 0.02);
-        border-color: rgba(0, 0, 0, 0.05);
-    }
-}
 }

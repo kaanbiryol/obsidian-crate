@@ -7,22 +7,66 @@
 .crate-reminders-ui {
   @tailwind utilities;
 
+  // Let Obsidian own the surrounding surface instead of HeroUI's theme background.
+  background-color: transparent;
+
   @each $name, $color in colors.$reminder-colors {
     --reminder-#{$name}: #{$color};
   }
 
-  --crate-glass-back-bg: rgba(0, 0, 0, 0.03);
-  --crate-glass-back-border: rgba(0, 0, 0, 0.06);
-  --crate-glass-back-hover-bg: rgba(0, 0, 0, 0.06);
-  --crate-glass-back-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  --crate-glass-back-hover-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
-  --crate-glass-surface-bg: rgba(0, 0, 0, 0.02);
-  --crate-glass-surface-border: rgba(0, 0, 0, 0.05);
-  --crate-glass-surface-hover-bg: rgba(0, 0, 0, 0.04);
-  --crate-glass-surface-hover-border: rgba(0, 0, 0, 0.08);
-  --crate-glass-text-secondary: rgba(0, 0, 0, 0.45);
-  --crate-glass-text-tertiary: rgba(0, 0, 0, 0.3);
-  --crate-picker-icon-color: rgba(0, 0, 0, 0.6);
+  /* Plugin chrome follows the active Obsidian theme. */
+  --crate-surface-bg: var(--background-primary-alt, var(--background-primary));
+  --crate-surface-hover-bg: var(--background-modifier-hover);
+  --crate-surface-active-bg: var(--background-modifier-active-hover, var(--background-modifier-hover));
+  --crate-surface-border: var(--background-modifier-border);
+  --crate-surface-border-hover: var(--background-modifier-border-hover, var(--background-modifier-border));
+  --crate-shadow-color: var(--background-modifier-box-shadow);
+  --crate-accent: var(--interactive-accent);
+  --crate-accent-hover: var(--interactive-accent-hover);
+  --crate-danger: var(--text-error);
+  --crate-warning: var(--text-warning);
+  --crate-success: var(--text-success);
+  --crate-on-accent: var(--text-on-accent);
+
+  --crate-glass-back-bg: var(--crate-surface-bg);
+  --crate-glass-back-border: var(--crate-surface-border);
+  --crate-glass-back-hover-bg: var(--crate-surface-hover-bg);
+  --crate-glass-back-shadow: 0 2px 8px var(--crate-shadow-color);
+  --crate-glass-back-hover-shadow: var(--shadow-s);
+  --crate-glass-surface-bg: var(--crate-surface-bg);
+  --crate-glass-surface-border: var(--crate-surface-border);
+  --crate-glass-surface-hover-bg: var(--crate-surface-hover-bg);
+  --crate-glass-surface-hover-border: var(--crate-surface-border-hover);
+  --crate-glass-text-secondary: var(--text-muted);
+  --crate-glass-text-tertiary: var(--text-faint);
+  --crate-picker-icon-color: var(--text-muted);
+
+  /* Reminder semantics also inherit the theme instead of HeroUI's palette. */
+  --reminder-p1-border: var(--crate-danger);
+  --reminder-p1-border-hover: color-mix(in srgb, var(--crate-danger) 50%, transparent);
+  --reminder-p1-background: color-mix(in srgb, var(--crate-danger) 10%, transparent);
+  --reminder-p2-border: var(--crate-warning);
+  --reminder-p2-border-hover: color-mix(in srgb, var(--crate-warning) 50%, transparent);
+  --reminder-p2-background: color-mix(in srgb, var(--crate-warning) 10%, transparent);
+  --reminder-p3-border: var(--crate-accent);
+  --reminder-p3-border-hover: color-mix(in srgb, var(--crate-accent) 50%, transparent);
+  --reminder-p3-background: color-mix(in srgb, var(--crate-accent) 10%, transparent);
+  --reminder-p4-border: var(--crate-surface-border);
+  --reminder-p4-border-hover: var(--crate-surface-border-hover);
+  --reminder-p4-background: unset;
+  --reminder-red: var(--crate-danger);
+  --reminder-task-separator-color: var(--crate-surface-border);
+  --color-p1-bg: color-mix(in srgb, var(--crate-danger) 10%, transparent);
+  --color-p1-border: var(--crate-danger);
+  --color-p2-bg: color-mix(in srgb, var(--crate-warning) 10%, transparent);
+  --color-p2-border: var(--crate-warning);
+  --color-p3-bg: color-mix(in srgb, var(--crate-accent) 10%, transparent);
+  --color-p3-border: var(--crate-accent);
+  --color-p4-bg: var(--crate-surface-bg);
+  --color-p4-border: var(--crate-surface-border);
+  --color-primary: var(--crate-accent);
+  --color-primary-hover: var(--crate-accent-hover);
+  --color-reminder-red: var(--crate-danger);
 
   /*
    * Typography variables - semantic abstraction layer
@@ -58,18 +102,6 @@
 &.dark,
 .theme-dark,
 .dark {
-  --crate-glass-back-bg: rgba(255, 255, 255, 0.04);
-  --crate-glass-back-border: rgba(255, 255, 255, 0.08);
-  --crate-glass-back-hover-bg: rgba(255, 255, 255, 0.08);
-  --crate-glass-back-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  --crate-glass-back-hover-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
-  --crate-glass-surface-bg: rgba(255, 255, 255, 0.03);
-  --crate-glass-surface-border: rgba(255, 255, 255, 0.06);
-  --crate-glass-surface-hover-bg: rgba(255, 255, 255, 0.06);
-  --crate-glass-surface-hover-border: rgba(255, 255, 255, 0.1);
-  --crate-glass-text-secondary: rgba(255, 255, 255, 0.5);
-  --crate-glass-text-tertiary: rgba(255, 255, 255, 0.35);
-  --crate-picker-icon-color: rgba(255, 255, 255, 0.7);
   /* HeroUI semantic content colors - map to Obsidian theme */
   --heroui-content1: var(--background-primary);
   --heroui-content2: var(--background-secondary);
@@ -82,38 +114,6 @@
   --heroui-foreground: var(--text-normal);
   color: var(--text-normal);
 
-  /* Priority colors - reference shared theme (danger = P1, warning = P2, secondary = P3) */
-  --reminder-p1-border: hsl(var(--heroui-danger-600) / 1);
-  --reminder-p1-border-hover: hsl(var(--heroui-danger-600) / 0.5);
-  --reminder-p1-background: hsl(var(--heroui-danger-600) / 0.1);
-
-  --reminder-p2-border: hsl(var(--heroui-warning-600) / 1);
-  --reminder-p2-border-hover: hsl(var(--heroui-warning-600) / 0.5);
-  --reminder-p2-background: hsl(var(--heroui-warning-600) / 0.1);
-
-  --reminder-p3-border: hsl(var(--heroui-secondary-600) / 1);
-  --reminder-p3-border-hover: hsl(var(--heroui-secondary-600) / 0.5);
-  --reminder-p3-background: hsl(var(--heroui-secondary-600) / 0.1);
-
-  --reminder-p4-border: var(--color-base-50);
-  --reminder-p4-border-hover: var(--color-base-50);
-  --reminder-p4-background: unset;
-
-  --reminder-red: hsl(var(--heroui-danger-600) / 1);
-  --reminder-task-separator-color: var(--color-base-30);
-
-  /* RichTextInput chip colors - reference shared theme */
-  --color-p1-bg: hsl(var(--heroui-danger-50) / 1);
-  --color-p1-border: hsl(var(--heroui-danger-600) / 1);
-  --color-p2-bg: hsl(var(--heroui-warning-50) / 1);
-  --color-p2-border: hsl(var(--heroui-warning-600) / 1);
-  --color-p3-bg: hsl(var(--heroui-secondary-50) / 1);
-  --color-p3-border: hsl(var(--heroui-secondary-600) / 1);
-  --color-p4-bg: hsl(var(--heroui-default-100) / 1);
-  --color-p4-border: hsl(var(--heroui-default-400) / 1);
-  --color-primary: hsl(var(--heroui-primary-500) / 1);
-  --color-primary-hover: hsl(var(--heroui-primary-600) / 1);
-  --color-reminder-red: hsl(var(--heroui-danger-600) / 1);
 }
 
 &.theme-light,
@@ -128,38 +128,6 @@
   --heroui-default-100: var(--background-secondary);
   --heroui-default-200: var(--background-modifier-border);
 
-  /* Priority colors - reference shared theme (danger = P1, warning = P2, secondary = P3) */
-  --reminder-p1-border: hsl(var(--heroui-danger) / 1);
-  --reminder-p1-border-hover: hsl(var(--heroui-danger) / 0.5);
-  --reminder-p1-background: hsl(var(--heroui-danger) / 0.1);
-
-  --reminder-p2-border: hsl(var(--heroui-warning) / 1);
-  --reminder-p2-border-hover: hsl(var(--heroui-warning) / 0.5);
-  --reminder-p2-background: hsl(var(--heroui-warning) / 0.1);
-
-  --reminder-p3-border: hsl(var(--heroui-secondary) / 1);
-  --reminder-p3-border-hover: hsl(var(--heroui-secondary) / 0.5);
-  --reminder-p3-background: hsl(var(--heroui-secondary) / 0.1);
-
-  --reminder-p4-border: var(--color-base-50);
-  --reminder-p4-border-hover: var(--color-base-50);
-  --reminder-p4-background: unset;
-
-  --reminder-red: hsl(var(--heroui-danger) / 1);
-  --reminder-task-separator-color: var(--color-base-25);
-
-  /* RichTextInput chip colors - reference shared theme */
-  --color-p1-bg: hsl(var(--heroui-danger-50) / 1);
-  --color-p1-border: hsl(var(--heroui-danger) / 1);
-  --color-p2-bg: hsl(var(--heroui-warning-50) / 1);
-  --color-p2-border: hsl(var(--heroui-warning) / 1);
-  --color-p3-bg: hsl(var(--heroui-secondary-50) / 1);
-  --color-p3-border: hsl(var(--heroui-secondary) / 1);
-  --color-p4-bg: hsl(var(--heroui-default-100) / 1);
-  --color-p4-border: hsl(var(--heroui-default-400) / 1);
-  --color-primary: hsl(var(--heroui-primary) / 1);
-  --color-primary-hover: hsl(var(--heroui-primary-600) / 1);
-  --color-reminder-red: hsl(var(--heroui-danger) / 1);
 }
 
 .picker-header-button {
@@ -236,8 +204,8 @@
   bottom: 4px;
   width: calc(33.333333% - 8px);
   border-radius: 10px;
-  background: hsl(var(--heroui-primary));
-  box-shadow: 0 2px 8px hsl(var(--heroui-primary) / 0.2);
+  background: var(--crate-accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--crate-accent) 20%, transparent);
 
   &.is-daily {
     left: 4px;
@@ -254,7 +222,7 @@
 
 .dark .recurrence-frequency-indicator,
 &.dark .recurrence-frequency-indicator {
-  box-shadow: 0 2px 8px hsl(var(--heroui-primary) / 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--crate-accent) 30%, transparent);
 }
 
 .recurrence-frequency-button {
@@ -272,7 +240,7 @@
   transition: color 150ms ease;
 
   &.is-selected {
-    color: white;
+    color: var(--crate-on-accent);
     font-weight: 600;
   }
 }
@@ -355,8 +323,8 @@
   transition: background-color 150ms ease, color 150ms ease;
 
   &.is-selected {
-    background: hsl(var(--heroui-primary));
-    color: white;
+    background: var(--crate-accent);
+    color: var(--crate-on-accent);
   }
 }
 
@@ -373,8 +341,8 @@
   }
 
   &.is-active {
-    background: hsl(var(--heroui-primary));
-    color: white;
+    background: var(--crate-accent);
+    color: var(--crate-on-accent);
   }
 }
 
@@ -413,7 +381,7 @@
   border: 1px solid var(--crate-glass-surface-border);
   border-radius: 12px;
   background: var(--crate-glass-surface-bg);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 2px 8px var(--crate-shadow-color);
   transition: transform 200ms ease-out, background-color 150ms ease, border-color 150ms ease;
   -webkit-tap-highlight-color: transparent;
 
@@ -426,11 +394,6 @@
     border-color: var(--interactive-accent);
     box-shadow: 0 0 0 1px var(--interactive-accent), 0 0 10px -6px var(--interactive-accent);
   }
-}
-
-.dark .project-picker-row,
-&.dark .project-picker-row {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .project-picker-row-label {
@@ -459,8 +422,8 @@
 
 .reminder-editor-fields {
   padding: 12px 14px;
-  border: 1px solid rgba(0, 0, 0, 0.03);
-  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--crate-surface-border);
+  background: var(--crate-surface-bg);
 }
 
 .reminder-title-input {
@@ -478,7 +441,7 @@
 .reminder-description-wrap {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  border-top: 1px solid var(--crate-surface-border);
 }
 
 .reminder-description-input {
@@ -491,8 +454,8 @@
   outline: 0;
   background: transparent;
   box-shadow: none;
-  color: rgba(0, 0, 0, 0.45);
-  caret-color: rgba(0, 0, 0, 0.45);
+  color: var(--text-muted);
+  caret-color: var(--text-muted);
   font-family: inherit;
   font-size: 13px;
   line-height: 1.5;
@@ -502,9 +465,9 @@
 
 .picker-done-button {
   border: 0;
-  background: hsl(var(--heroui-primary));
-  box-shadow: 0 2px 6px hsl(var(--heroui-primary) / 0.15);
-  color: white;
+  background: var(--crate-accent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--crate-accent) 15%, transparent);
+  color: var(--crate-on-accent);
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -513,17 +476,17 @@
 }
 
 .reminder-header-delete {
-  border: 1px solid rgba(239, 68, 68, 0.12);
-  background: rgba(239, 68, 68, 0.08);
-  color: rgba(239, 68, 68, 0.9);
+  border: 1px solid color-mix(in srgb, var(--crate-danger) 20%, transparent);
+  background: color-mix(in srgb, var(--crate-danger) 10%, transparent);
+  color: var(--crate-danger);
   transition: all 350ms ease-out;
 }
 
 .reminder-header-close,
 .reminder-header-submit {
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(0, 0, 0, 0.05);
-  color: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--crate-surface-border);
+  background: var(--crate-surface-bg);
+  color: var(--text-muted);
   transition: all 350ms ease-out;
 }
 
@@ -535,26 +498,26 @@
 }
 
 .reminder-header-submit {
-  color: rgba(0, 0, 0, 0.35);
+  color: var(--text-faint);
   cursor: default;
   opacity: 1;
 
   &.is-enabled {
     border-color: transparent;
-    background: hsl(var(--heroui-primary));
-    box-shadow: 0 2px 8px hsl(var(--heroui-primary) / 0.2);
-    color: white;
+    background: var(--crate-accent);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--crate-accent) 20%, transparent);
+    color: var(--crate-on-accent);
     cursor: pointer;
   }
 }
 
 .reminder-action-chips {
   gap: 10px;
-  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  border-top: 1px solid var(--crate-surface-border);
 }
 
 .reminder-action-chip {
-  --reminder-chip-color: var(--heroui-primary);
+  --reminder-chip-color: var(--crate-accent);
 
   display: inline-flex;
   align-items: center;
@@ -563,8 +526,8 @@
   padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.03);
-  color: rgba(0, 0, 0, 0.45);
+  background: var(--crate-surface-bg);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
   line-height: 1;
@@ -572,22 +535,22 @@
   transition: all 200ms ease-out;
 
   &.tone-secondary {
-    --reminder-chip-color: var(--heroui-secondary);
+    --reminder-chip-color: var(--color-cyan);
   }
 
   &.tone-danger {
-    --reminder-chip-color: var(--heroui-danger);
+    --reminder-chip-color: var(--crate-danger);
   }
 
   &.tone-warning {
-    --reminder-chip-color: var(--heroui-warning);
+    --reminder-chip-color: var(--crate-warning);
   }
 
   &.is-active {
-    border-color: hsl(var(--reminder-chip-color) / 0.18);
-    background: hsl(var(--reminder-chip-color) / 0.08);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    color: hsl(var(--reminder-chip-color));
+    border-color: color-mix(in srgb, var(--reminder-chip-color) 20%, transparent);
+    background: color-mix(in srgb, var(--reminder-chip-color) 10%, transparent);
+    box-shadow: 0 1px 2px var(--crate-shadow-color);
+    color: var(--reminder-chip-color);
   }
 }
 
@@ -596,9 +559,9 @@
 }
 
 .base-modal-surface {
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  background: rgb(255, 255, 255);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--crate-surface-border);
+  background: var(--background-primary);
+  box-shadow: var(--shadow-l);
   color: var(--text-normal);
   will-change: transform, opacity;
 
@@ -619,10 +582,11 @@
   width: 40px;
   height: 5px;
   border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--crate-surface-border);
 }
 
 .modal-backdrop {
+  background: var(--background-modifier-cover);
   pointer-events: none;
   will-change: opacity;
 
@@ -635,75 +599,27 @@
   padding: 0;
   border: 0;
   background: transparent;
+  color: var(--text-muted);
   cursor: pointer;
-}
 
-.dark .reminder-editor-fields,
-&.dark .reminder-editor-fields {
-  border-color: rgba(255, 255, 255, 0.04);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.dark .reminder-description-wrap,
-&.dark .reminder-description-wrap {
-  border-top-color: rgba(255, 255, 255, 0.04);
-}
-
-.dark .reminder-description-input,
-&.dark .reminder-description-input {
-  color: rgba(255, 255, 255, 0.45);
-  caret-color: rgba(255, 255, 255, 0.45);
-}
-
-.dark .reminder-header-close,
-.dark .reminder-header-submit,
-&.dark .reminder-header-close,
-&.dark .reminder-header-submit {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.dark .reminder-header-close,
-&.dark .reminder-header-close {
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.dark .reminder-header-submit.is-enabled,
-&.dark .reminder-header-submit.is-enabled {
-  border-color: transparent;
-  background: hsl(var(--heroui-primary));
-  color: white;
-}
-
-.dark .reminder-action-chips,
-&.dark .reminder-action-chips {
-  border-top-color: rgba(255, 255, 255, 0.05);
-}
-
-.dark .reminder-action-chip,
-&.dark .reminder-action-chip {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.5);
-
-  &.is-active {
-    border-color: hsl(var(--reminder-chip-color) / 0.18);
-    background: hsl(var(--reminder-chip-color) / 0.12);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-    color: hsl(var(--reminder-chip-color));
+  &:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
   }
 }
 
-.dark .base-modal-surface,
-&.dark .base-modal-surface {
-  border-color: rgba(255, 255, 255, 0.06);
-  background: rgb(28, 28, 30);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+.delete-confirmation-cancel {
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+
+  &:hover {
+    background: var(--interactive-hover);
+  }
 }
 
-.dark .base-modal-drag-handle,
-&.dark .base-modal-drag-handle {
-  background: rgba(255, 255, 255, 0.12);
+.delete-confirmation-confirm {
+  background: var(--text-error);
+  color: var(--text-on-accent);
 }
 
 /* Fix HeroUI Popover positioning and visibility in Obsidian modals */
@@ -764,8 +680,8 @@
 
 /* React Day Picker styling to match theme */
 .rdp {
-  --rdp-accent-color: hsl(var(--heroui-primary) / 1);
-  --rdp-accent-background-color: hsl(var(--heroui-primary) / 0.1);
+  --rdp-accent-color: var(--interactive-accent);
+  --rdp-accent-background-color: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
   --rdp-day-height: 36px;
   --rdp-day-width: 36px;
   --rdp-selected-font: inherit;
@@ -781,8 +697,8 @@
 }
 
 .rdp-root {
-  --rdp-accent-color: hsl(var(--heroui-primary) / 1);
-  --rdp-accent-background-color: hsl(var(--heroui-primary) / 0.1);
+  --rdp-accent-color: var(--interactive-accent);
+  --rdp-accent-background-color: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
 }
 
 .rdp-month_caption {
@@ -804,6 +720,13 @@
   align-items: center;
   justify-content: center;
   transition: background-color 0.15s;
+  color: var(--text-muted);
+}
+
+.rdp-button_previous:hover,
+.rdp-button_next:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
 /* Custom chevron SVGs inside nav buttons */
@@ -838,18 +761,18 @@
 }
 
 .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled) {
-  background-color: hsl(var(--heroui-default-100) / 1);
+  background-color: var(--background-modifier-hover);
 }
 
 .rdp-selected .rdp-day_button {
-  background-color: hsl(var(--heroui-primary) / 1);
-  color: white;
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
   font-weight: var(--reminder-font-weight-medium);
 }
 
 .rdp-today:not(.rdp-selected) .rdp-day_button {
   font-weight: var(--reminder-font-weight-semibold);
-  color: hsl(var(--heroui-primary) / 1);
+  color: var(--interactive-accent);
 }
 
 .rdp-outside .rdp-day_button {
@@ -861,96 +784,12 @@
   cursor: not-allowed;
 }
 
-/* Dark theme adjustments */
-&.theme-dark .rdp,
-&.dark .rdp,
-.theme-dark .rdp,
-.dark .rdp {
-  --rdp-accent-color: hsl(var(--heroui-primary-500) / 1);
+.rdp {
   color: var(--text-normal);
 }
 
-&.theme-dark .rdp-button_previous,
-&.theme-dark .rdp-button_next,
-&.dark .rdp-button_previous,
-&.dark .rdp-button_next,
-.theme-dark .rdp-button_previous,
-.theme-dark .rdp-button_next,
-.dark .rdp-button_previous,
-.dark .rdp-button_next {
-  color: var(--text-muted);
-}
-
-&.theme-dark .rdp-button_previous:hover,
-&.theme-dark .rdp-button_next:hover,
-&.dark .rdp-button_previous:hover,
-&.dark .rdp-button_next:hover,
-.theme-dark .rdp-button_previous:hover,
-.theme-dark .rdp-button_next:hover,
-.dark .rdp-button_previous:hover,
-.dark .rdp-button_next:hover {
-  background-color: hsl(var(--heroui-default-100) / 0.5);
-  color: var(--text-normal);
-}
-
-&.theme-dark .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled),
-&.dark .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled),
-.theme-dark .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled),
-.dark .rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled) {
-  background-color: hsl(var(--heroui-default-200) / 0.3);
-}
-
-&.theme-dark .rdp-button_previous svg,
-&.theme-dark .rdp-button_next svg,
-&.dark .rdp-button_previous svg,
-&.dark .rdp-button_next svg,
-.theme-dark .rdp-button_previous svg,
-.theme-dark .rdp-button_next svg,
-.dark .rdp-button_previous svg,
-.dark .rdp-button_next svg {
-  stroke: currentColor;
-}
-
-/* Light theme adjustments */
-&.theme-light .rdp,
-&.light .rdp,
-.theme-light .rdp,
-.light .rdp {
-  --rdp-accent-color: hsl(var(--heroui-primary) / 1);
-  color: var(--text-normal);
-}
-
-&.theme-light .rdp-button_previous,
-&.theme-light .rdp-button_next,
-&.light .rdp-button_previous,
-&.light .rdp-button_next,
-.theme-light .rdp-button_previous,
-.theme-light .rdp-button_next,
-.light .rdp-button_previous,
-.light .rdp-button_next {
-  color: var(--text-muted);
-}
-
-&.theme-light .rdp-button_previous:hover,
-&.theme-light .rdp-button_next:hover,
-&.light .rdp-button_previous:hover,
-&.light .rdp-button_next:hover,
-.theme-light .rdp-button_previous:hover,
-.theme-light .rdp-button_next:hover,
-.light .rdp-button_previous:hover,
-.light .rdp-button_next:hover {
-  background-color: hsl(var(--heroui-default-100) / 1);
-  color: var(--text-normal);
-}
-
-&.theme-light .rdp-button_previous svg,
-&.theme-light .rdp-button_next svg,
-&.light .rdp-button_previous svg,
-&.light .rdp-button_next svg,
-.theme-light .rdp-button_previous svg,
-.theme-light .rdp-button_next svg,
-.light .rdp-button_previous svg,
-.light .rdp-button_next svg {
+.rdp-button_previous svg,
+.rdp-button_next svg {
   stroke: currentColor;
 }
 
@@ -1005,118 +844,55 @@
   height: 28px;
 }
 
-/* Dark theme for HeroUI Calendar */
-.theme-dark [data-slot="cell"] button,
-.dark [data-slot="cell"] button {
+[data-slot="cell"] button {
   color: var(--text-normal);
 }
 
-.theme-dark [data-slot="cell"] button:hover:not([data-selected]):not([data-disabled]),
-.dark [data-slot="cell"] button:hover:not([data-selected]):not([data-disabled]) {
-  background-color: hsl(var(--heroui-default-200) / 0.3);
+[data-slot="cell"] button:hover:not([data-selected]):not([data-disabled]) {
+  background-color: var(--background-modifier-hover);
 }
 
-.theme-dark [data-slot="cell"] button[data-selected],
-.dark [data-slot="cell"] button[data-selected] {
-  background-color: hsl(var(--heroui-primary-500) / 1);
-  color: white;
+[data-slot="cell"] button[data-selected] {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
   font-weight: var(--reminder-font-weight-medium);
 }
 
-.theme-dark [data-slot="cell"] button[data-today]:not([data-selected]),
-.dark [data-slot="cell"] button[data-today]:not([data-selected]) {
+[data-slot="cell"] button[data-today]:not([data-selected]) {
   font-weight: var(--reminder-font-weight-semibold);
-  color: hsl(var(--heroui-primary-500) / 1);
+  color: var(--interactive-accent);
 }
 
-.theme-dark [data-slot="cell"] button[data-outside-month],
-.dark [data-slot="cell"] button[data-outside-month] {
+[data-slot="cell"] button[data-outside-month] {
   opacity: 0.4;
 }
 
-.theme-dark [data-slot="cell"] button[data-disabled],
-.dark [data-slot="cell"] button[data-disabled] {
+[data-slot="cell"] button[data-disabled] {
   opacity: 0.3;
   cursor: not-allowed;
 }
 
-.theme-dark [data-slot="prev-button"],
-.theme-dark [data-slot="next-button"],
-.dark [data-slot="prev-button"],
-.dark [data-slot="next-button"] {
+[data-slot="prev-button"],
+[data-slot="next-button"] {
   color: var(--text-muted);
 }
 
-.theme-dark [data-slot="prev-button"]:hover,
-.theme-dark [data-slot="next-button"]:hover,
-.dark [data-slot="prev-button"]:hover,
-.dark [data-slot="next-button"]:hover {
-  background-color: hsl(var(--heroui-default-100) / 0.5);
+[data-slot="prev-button"]:hover,
+[data-slot="next-button"]:hover {
+  background-color: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.theme-dark [data-slot="title"],
-.dark [data-slot="title"] {
+[data-slot="title"] {
   color: var(--text-normal);
 }
 
-.theme-dark [data-slot="grid-header-cell"],
-.dark [data-slot="grid-header-cell"] {
+[data-slot="grid-header-cell"] {
   color: var(--text-muted);
 }
 
-/* Light theme for HeroUI Calendar */
-.theme-light [data-slot="cell"] button {
-  color: var(--text-normal);
-}
-
-.theme-light [data-slot="cell"] button:hover:not([data-selected]):not([data-disabled]) {
-  background-color: hsl(var(--heroui-default-100) / 1);
-}
-
-.theme-light [data-slot="cell"] button[data-selected] {
-  background-color: hsl(var(--heroui-primary) / 1);
-  color: white;
-  font-weight: var(--reminder-font-weight-medium);
-}
-
-.theme-light [data-slot="cell"] button[data-today]:not([data-selected]) {
-  font-weight: var(--reminder-font-weight-semibold);
-  color: hsl(var(--heroui-primary) / 1);
-}
-
-.theme-light [data-slot="cell"] button[data-outside-month] {
-  opacity: 0.4;
-}
-
-.theme-light [data-slot="cell"] button[data-disabled] {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.theme-light [data-slot="prev-button"],
-.theme-light [data-slot="next-button"] {
-  color: var(--text-muted);
-}
-
-.theme-light [data-slot="prev-button"]:hover,
-.theme-light [data-slot="next-button"]:hover {
-  background-color: hsl(var(--heroui-default-100) / 1);
-  color: var(--text-normal);
-}
-
-.theme-light [data-slot="title"] {
-  color: var(--text-normal);
-}
-
-.theme-light [data-slot="grid-header-cell"] {
-  color: var(--text-muted);
-}
-
-/* Force dark background on HeroUI TimeInput in dark mode */
-.theme-dark [data-slot="input-wrapper"],
-.dark [data-slot="input-wrapper"] {
-  background-color: #3f3f46; /* zinc-700 */
+[data-slot="input-wrapper"] {
+  background-color: var(--background-modifier-form-field);
 }
 }
 

@@ -10,6 +10,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { ProjectCompletedSection } from './ProjectCompletedSection';
 import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
+import type { ProjectColorScheme } from '../../utils/projectColors';
 
 
 export interface ProjectDetailViewProps {
@@ -25,13 +26,14 @@ export interface ProjectDetailViewProps {
   className?: string;
   /** Callback when reminders are reordered via drag */
   onReorder?: (orderedIds: string[]) => void;
+  colorScheme?: ProjectColorScheme;
 }
 
 
 /**
  * Shared Project Detail view component
  * Displays reminders for a specific project with back navigation
- * Premium dark UI with glassmorphism and glow effects
+ * Uses host-theme surfaces with a theme-adjusted project accent.
  */
 export const ProjectDetailView = memo(function ProjectDetailView({
   project,
@@ -42,13 +44,17 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   hasFab = true,
   className = '',
   onReorder,
+  colorScheme = 'dark',
 }: ProjectDetailViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
 
   const detail = useMemo(() => {
-    return buildProjectDetailViewModel(reminders, project);
-  }, [reminders, project]);
-  const header = useMemo(() => buildProjectDetailHeaderViewModel(reminders, project), [reminders, project]);
+    return buildProjectDetailViewModel(reminders, project, colorScheme);
+  }, [colorScheme, reminders, project]);
+  const header = useMemo(
+    () => buildProjectDetailHeaderViewModel(reminders, project, colorScheme),
+    [colorScheme, reminders, project],
+  );
   const { active, completed } = detail;
 
   // Local state for optimistic reorder (visual only during drag)
@@ -78,6 +84,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
       index={index}
       animationConfig={{ enabled: false }}
       hideProject // Hide project tag since we're already in project view
+      colorScheme={colorScheme}
     />
   );
 

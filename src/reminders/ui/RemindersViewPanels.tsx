@@ -14,6 +14,7 @@ import {
 import type { Reminder as SharedReminder } from "@/reminders/types/reminder";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import type { ViewMode } from "./remindersViewModel";
+import type { ProjectColorScheme } from "@/reminders/utils/projectColors";
 
 interface RemindersViewPanelsProps {
   viewMode: ViewMode;
@@ -32,6 +33,7 @@ interface RemindersViewPanelsProps {
   onProjectSelect: (project: string) => void;
   onBackToProjects: () => void;
   onReorder: (orderedIds: string[]) => void;
+  colorScheme: ProjectColorScheme;
 }
 
 export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
@@ -47,6 +49,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
   onProjectSelect,
   onBackToProjects,
   onReorder,
+  colorScheme,
 }) => {
   const easeExpoOut = EASE_EXPO_OUT as unknown as Easing;
   const pageTransition = {
@@ -69,13 +72,14 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
             renderToggleButton={renderToggleButton}
             hasFab={showFab}
             onReorder={onReorder}
+            colorScheme={colorScheme}
           />
         </motion.div>
       );
     case "today":
       return (
         <motion.div key="today" className="reminders-view-panel" {...pageTransition}>
-          <TodayView reminders={reminders} renderCard={renderCard} hasFab={showFab} />
+          <TodayView reminders={reminders} renderCard={renderCard} hasFab={showFab} colorScheme={colorScheme} />
         </motion.div>
       );
     case "upcoming":
@@ -86,6 +90,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
             renderCard={renderCard}
             days={upcomingDays}
             hasFab={showFab}
+            colorScheme={colorScheme}
           />
         </motion.div>
       );
@@ -97,6 +102,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
               projects={projects}
               reminders={reminders}
               onProjectSelect={onProjectSelect}
+              colorScheme={colorScheme}
             />
           </motion.div>
         );
@@ -116,6 +122,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
             renderCard={renderCard}
             hasFab={showFab}
             onReorder={onReorder}
+            colorScheme={colorScheme}
           />
         </motion.div>
       );

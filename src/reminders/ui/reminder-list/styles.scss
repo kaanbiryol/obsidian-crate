@@ -70,8 +70,8 @@ $reminder-motion-curve: cubic-bezier(0.33, 1, 0.68, 1); // Smooth ease-out
       }
 
       .reminders-count-overdue {
-        background-color: var(--reminder-red, #e53935);
-        color: white;
+        background-color: var(--text-error);
+        color: var(--text-on-accent);
         padding: 2px 8px;
         border-radius: 10px;
         font-size: var(--reminder-font-sm); // Apple HIG 14pt minimum for labels
@@ -99,6 +99,15 @@ $reminder-motion-curve: cubic-bezier(0.33, 1, 0.68, 1); // Smooth ease-out
       padding: 0;
       margin: 1px; // Add small margin to prevent borders from being cut
 
+    }
+
+    .reminders-add-button {
+      background: var(--interactive-accent);
+      color: var(--text-on-accent);
+
+      &:hover {
+        background: var(--interactive-accent-hover);
+      }
     }
 
     // Make borders more visible for flat variant buttons

@@ -54,7 +54,7 @@ export const ModalBackdrop: React.FC<ModalBackdropProps> = ({
                         duration: 0.33,
                         ease: [0.32, 0.72, 0, 1] // easeOut - smooth perceptual fade
                     } : { duration: 0 }}
-                    className={`modal-backdrop fixed inset-0 bg-black/50${onClick ? ' is-interactive' : ''}${className ? ` ${className}` : ''}`}
+                    className={`modal-backdrop fixed inset-0${onClick ? ' is-interactive' : ''}${className ? ` ${className}` : ''}`}
                     style={{
                         zIndex,
                     }}

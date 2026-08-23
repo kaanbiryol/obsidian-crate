@@ -156,8 +156,9 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
             onUpdate={triggerRefresh}
             index={index}
             hideProject={hideProject}
+            colorScheme={isDarkMode ? "dark" : "light"}
         />
-    ), [triggerRefresh]);
+    ), [isDarkMode, triggerRefresh]);
 
     const handleReorder = useCallback(async (project: string, orderedIds: string[]) => {
         await plugin.storage.reorder(project, orderedIds);

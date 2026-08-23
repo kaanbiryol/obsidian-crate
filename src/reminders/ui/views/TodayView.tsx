@@ -9,6 +9,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { ProjectCompletedSection } from './ProjectCompletedSection';
 import { buildTodayViewModel } from './viewModels';
 import { CARD_ANIMATION } from '../layoutConstants';
+import type { ProjectColorScheme } from '../../utils/projectColors';
 
 export interface TodayViewProps {
   reminders: Reminder[];
@@ -19,6 +20,7 @@ export interface TodayViewProps {
   hasFab?: boolean;
   /** Custom class name for the container */
   className?: string;
+  colorScheme?: ProjectColorScheme;
 }
 
 /**
@@ -30,7 +32,8 @@ export const TodayView = memo(function TodayView({
   animationConfig = { enabled: true },
   renderCard,
   hasFab = true,
-  className = ''
+  className = '',
+  colorScheme = 'dark',
 }: TodayViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
   const { active, completed } = useMemo(() => buildTodayViewModel(reminders), [reminders]);
@@ -42,6 +45,7 @@ export const TodayView = memo(function TodayView({
       reminder={reminder}
       index={index}
       animationConfig={{ enabled: false }}
+      colorScheme={colorScheme}
     />
   );
 

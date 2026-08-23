@@ -14,6 +14,7 @@ const log = createLogger('ReminderCardWrapper');
 import type { Reminder } from '@/reminders/types/plugin-reminder';
 import { PluginContext } from '@/reminders/ui/reminders-context';
 import { openReminderEditModal } from '@/reminders/ui/adapters/modals';
+import type { ProjectColorScheme } from '@/reminders/utils/projectColors';
 
 interface ReminderCardWrapperProps {
   reminder: Reminder;
@@ -22,6 +23,7 @@ interface ReminderCardWrapperProps {
   onEditOverride?: () => void;
   index?: number;
   hideProject?: boolean;
+  colorScheme?: ProjectColorScheme;
 }
 
 /**
@@ -37,6 +39,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
   onEditOverride,
   index,
   hideProject = false,
+  colorScheme = 'dark',
 }) => {
   const plugin = PluginContext.use();
 
@@ -153,6 +156,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
         animationConfig={{ enabled: false }}
         index={index}
         hideProject={hideProject}
+        colorScheme={colorScheme}
       />
     </div>
   );

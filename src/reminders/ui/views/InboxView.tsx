@@ -10,6 +10,7 @@ import { ReorderableReminderList } from '../../components/ReorderableReminderLis
 import { EmptyState } from '../../components/EmptyState';
 import { buildInboxViewModel } from './viewModels';
 import { SPRING_CONFIG_BOUNCY } from '../layoutConstants';
+import type { ProjectColorScheme } from '../../utils/projectColors';
 
 export interface InboxViewProps {
   reminders: Reminder[];
@@ -28,6 +29,7 @@ export interface InboxViewProps {
   }) => React.ReactNode;
   /** Callback when reminders are reordered via drag */
   onReorder?: (orderedIds: string[]) => void;
+  colorScheme?: ProjectColorScheme;
 }
 
 /**
@@ -42,6 +44,7 @@ export const InboxView = memo(function InboxView({
   className = '',
   renderToggleButton,
   onReorder,
+  colorScheme = 'dark',
 }: InboxViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
 
@@ -66,6 +69,7 @@ export const InboxView = memo(function InboxView({
       reminder={reminder}
       index={index}
       animationConfig={{ enabled: false }}
+      colorScheme={colorScheme}
     />
   );
 

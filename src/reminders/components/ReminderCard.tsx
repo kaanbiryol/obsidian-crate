@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Flag, Check, Hash, Repeat } from 'lucide-react';
-import { getProjectColor } from '../utils/projectColors';
+import { getProjectColor, type ProjectColorScheme } from '../utils/projectColors';
 import { formatDueDate, isReminderOverdue } from '../utils/dateFormatting';
 import { parseMarkdownLinks, isSafeUrl } from '../utils/markdownLinks';
 import type { AnimationConfig } from '../types/componentAdapter';
@@ -65,27 +65,27 @@ interface ReminderCardProps {
     animationConfig?: AnimationConfig;
     className?: string;
     hideProject?: boolean; // Hide project tag (useful when viewing within a project)
+    colorScheme?: ProjectColorScheme;
 }
 
 
 /**
- * Premium Glassmorphism Reminder Card
- * Luxury dark UI with glass effects and subtle glows
+ * Shared reminder card using host-theme surfaces and semantic status colors.
  */
 const ReminderCard: React.FC<ReminderCardProps> = ({
     reminder,
     index = 0,
     animationConfig = { enabled: true },
     className = '',
-    hideProject = false
+    hideProject = false,
+    colorScheme = 'dark',
 }) => {
     const dueDate = reminder.dueDatetime || reminder.dueDate;
     const isOverdue = isReminderOverdue(reminder);
     const isImportant = reminder.priority === 1;
 
-    // Get project color for accent (using dark theme colors for premium UI)
     const projectColors = reminder.project ? getProjectColor(reminder.project) : null;
-    const projectAccentRgb = projectColors?.dark.accentRgb;
+    const projectThemeColors = projectColors?.[colorScheme];
 
     // Check if we have metadata pills to display
     const hasPills = dueDate || reminder.recurrence || (reminder.project && !hideProject);
@@ -128,12 +128,16 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                         ? `Mark ${reminder.content} incomplete`
                         : `Mark ${reminder.content} complete`}
                     style={{
-                        borderColor: reminder.completed ? '#22c55e' : (isImportant ? '#ef4444' : 'rgba(255,255,255,0.2)'),
-                        backgroundColor: reminder.completed ? '#22c55e' : 'transparent',
+                        borderColor: reminder.completed
+                            ? 'var(--text-success)'
+                            : (isImportant
+                                ? 'var(--text-error)'
+                                : 'var(--background-modifier-border-hover, var(--background-modifier-border))'),
+                        backgroundColor: reminder.completed ? 'var(--text-success)' : 'transparent',
                         boxShadow: reminder.completed
-                            ? '0 0 6px rgba(34, 197, 94, 0.35)'
+                            ? '0 0 6px color-mix(in srgb, var(--text-success) 35%, transparent)'
                             : isImportant
-                                ? '0 0 4px rgba(239, 68, 68, 0.25)'
+                                ? '0 0 4px color-mix(in srgb, var(--text-error) 25%, transparent)'
                                 : 'none',
                     }}
                 >
@@ -173,9 +177,9 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                                 <span
                                     className={`premium-pill ${isOverdue && !reminder.recurrence ? 'is-overdue' : ''}`}
                                     style={isOverdue && !reminder.recurrence ? {
-                                        backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                                        color: '#ef4444',
-                                        borderColor: 'rgba(239, 68, 68, 0.2)',
+                                        backgroundColor: 'color-mix(in srgb, var(--text-error) 12%, transparent)',
+                                        color: 'var(--text-error)',
+                                        borderColor: 'color-mix(in srgb, var(--text-error) 20%, transparent)',
                                     } : undefined}
                                 >
                                     {reminder.recurrence ? (
@@ -188,19 +192,19 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                             )}
 
                             {/* Project pill */}
-                            {reminder.project && !hideProject && projectColors && projectAccentRgb && (
+                            {reminder.project && !hideProject && projectThemeColors && (
                                 <span
                                     className="premium-pill premium-pill-project"
                                     style={{
-                                        backgroundColor: `rgba(${projectAccentRgb}, 0.08)`,
-                                        color: projectColors.dark.accent,
-                                        borderColor: `rgba(${projectAccentRgb}, 0.15)`,
+                                        backgroundColor: projectThemeColors.background,
+                                        color: projectThemeColors.text,
+                                        borderColor: `color-mix(in srgb, ${projectThemeColors.accent} 20%, transparent)`,
                                     }}
                                 >
                                     <Hash
                                         size={10}
                                         strokeWidth={2.5}
-                                        style={{ color: projectColors.dark.accent, flexShrink: 0 }}
+                                        style={{ color: projectThemeColors.accent, flexShrink: 0 }}
                                     />
                                     <span>{reminder.project}</span>
                                 </span>
