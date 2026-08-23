@@ -78,14 +78,14 @@ CratePlugin (src/plugin/CratePlugin.ts)
 2. Cloudflare redirects to `https://crate.kaanbiryol.com/oauth/callback/`. The static page immediately clears its query string and opens the `crate-cloudflare-oauth` Obsidian protocol.
 3. The plugin verifies `state` before exchanging the authorization code. The access token is held only in a local stack frame.
 4. The plugin uses the selected account to create or reuse D1 and R2, apply hash-tracked SQL migrations, upload the embedded Worker with declarative Durable Object bindings, and enable workers.dev.
-5. The token is revoked and discarded before the Worker claim page opens. Only non-secret resource identifiers remain in plugin settings for retries and updates.
+5. The token is revoked and discarded before Crate claims and enrolls the first device. Only non-secret resource identifiers remain in plugin settings for retries and updates.
 
 ### First-device setup
 
 1. Cloudflare deploys the Worker and provisions its R2, D1, and Durable Object bindings from `wrangler.jsonc`.
-2. The browser claim page generates a 256-bit enrollment token locally and sends only its SHA-256 hash to the `SetupCoordinator` Durable Object.
+2. Crate generates a 256-bit enrollment token locally and sends only its SHA-256 hash to the `SetupCoordinator` Durable Object.
 3. The Durable Object serializes claim requests. A pending initial claim expires after 10 minutes; if no device was registered, the deployment becomes claimable again.
-4. Obsidian receives the short-lived token through the `crate-setup` protocol, validates the server metadata and `enrollment-v1` capability, then generates a different permanent device secret locally.
+4. Crate validates the server metadata and `enrollment-v1` capability, then generates a different permanent device secret locally.
 5. `POST /setup/enroll` consumes the one-time enrollment token and stores only the permanent device secret's hash in D1.
 
 ### Worker Authentication
@@ -117,7 +117,7 @@ The Worker source lives in `src/cloudflare/worker/`. `scripts/build-worker.mjs` 
 
 The Worker remains an independently deployable build product, but the production plugin also includes a gzip-compressed copy of `.generated/cloudflare/worker.mjs` and every ordered SQL file in `migrations/`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or migration is fetched from the network at runtime.
 
-`npm run release:check` enforces Worker and combined-plugin size budgets and checks that both the OAuth entry point and documented GitHub deploy fallback remain present.
+`npm run release:check` enforces Worker and combined-plugin size budgets and checks that the OAuth entry point remains present.
 
 ## Status Bar
 

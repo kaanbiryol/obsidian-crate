@@ -19,9 +19,6 @@ async function flushMicrotasks(): Promise<void> {
 
 async function loadConfigSectionModule() {
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../../cloudflare/deploy-button', () => ({
-		CRATE_CLOUDFLARE_DEPLOY_URL: 'https://deploy.example/',
-	}));
 	vi.doMock('../../cloudflare/plugin-integration', () => ({ startCloudflareDeployment }));
 	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal }));
 	vi.doMock('../qr-modal', () => ({
@@ -55,7 +52,6 @@ afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
-	vi.doUnmock('../../cloudflare/deploy-button');
 	vi.doUnmock('../../cloudflare/plugin-integration');
 	vi.doUnmock('../confirmation-modal');
 	vi.doUnmock('../qr-modal');
@@ -80,13 +76,10 @@ describe('renderConfigSection integration', () => {
 
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
 			'Deploy sync server',
-			'GitHub deploy fallback',
 			'Open existing server',
 		]);
 		getSettingByName('Deploy sync server').buttons[0]?.click();
 		expect(startCloudflareDeployment).toHaveBeenCalledTimes(1);
-		getSettingByName('GitHub deploy fallback').buttons[0]?.click();
-		expect(open).toHaveBeenCalledWith('https://deploy.example/', '_blank', 'noopener,noreferrer');
 
 		const existingServer = getSettingByName('Open existing server');
 		existingServer.buttons[0]?.click();

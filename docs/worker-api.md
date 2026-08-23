@@ -1,6 +1,6 @@
 # Worker API
 
-Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the primary in-plugin OAuth deployment. The same Worker can still be deployed independently through the documented GitHub or Wrangler fallbacks.
+Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the primary in-plugin OAuth deployment. The same Worker can still be deployed independently through the documented Wrangler fallback.
 
 ## Authentication
 

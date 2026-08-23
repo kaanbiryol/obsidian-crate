@@ -119,6 +119,10 @@ export class SyncApiClient {
 		return this.authApi.registerToken(tokenHash, device);
 	}
 
+	async claimInitialServer(enrollmentTokenHash: string): Promise<{ expiresAt: string }> {
+		return this.authApi.claimInitialServer(enrollmentTokenHash);
+	}
+
 	async authorizeDeviceEnrollment(enrollmentTokenHash: string): Promise<{ expiresAt: string }> {
 		return this.authApi.authorizeDeviceEnrollment(enrollmentTokenHash);
 	}

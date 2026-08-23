@@ -4,6 +4,13 @@ import type { WorkerApiHttpClient } from './http';
 export class AuthWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}
 
+	async claimInitialServer(enrollmentTokenHash: string): Promise<{ expiresAt: string }> {
+		return this.http.requestJson<{ expiresAt: string }>('/setup/claim', {
+			method: 'POST',
+			body: JSON.stringify({ enrollmentTokenHash }),
+		});
+	}
+
 	async authorizeDeviceEnrollment(enrollmentTokenHash: string): Promise<{ expiresAt: string }> {
 		return this.http.requestJson<{ expiresAt: string }>('/auth/enrollment', {
 			method: 'POST',

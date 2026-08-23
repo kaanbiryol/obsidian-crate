@@ -126,7 +126,7 @@ describe('CloudflareDeploymentService', () => {
 			'https://dash.cloudflare.com/oauth2/token',
 			'https://dash.cloudflare.com/oauth2/revoke',
 		]);
-		expect(harness.opened.at(-1)).toBe(`${result.workerUrl}/`);
+		expect(harness.opened).toHaveLength(1);
 
 		const tokenRequestBody = harness.transportCalls[0].body;
 		if (typeof tokenRequestBody !== 'string') throw new Error('Expected form-encoded token request');

@@ -152,7 +152,6 @@ export class CloudflareDeploymentService {
 			}
 		}
 
-		this.options.openExternal(`${result.workerUrl}/`);
 		return result;
 	}
 

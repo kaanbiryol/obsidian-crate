@@ -97,22 +97,12 @@ Official references:
 5. Cloudflare returns to the static callback page. It removes the OAuth query from the browser URL immediately and opens `obsidian://crate-cloudflare-oauth`.
 6. Crate verifies the random OAuth state before exchanging the code with its in-memory PKCE verifier.
 7. Crate creates or reuses one uniquely named Worker, D1 database, R2 bucket, the `REMINDER_ALARMS` and `SETUP` Durable Objects, the workers.dev endpoint, and the versioned D1 migrations.
-8. Crate revokes and discards the access token, then opens the Worker claim page.
-9. Select **Claim server**, then **Open in Obsidian**. In Crate, run **Initial sync → Upload all** when ready.
+8. Crate revokes and discards the access token, then claims the new Worker and enrolls this device directly.
+9. In Crate, run **Initial sync → Upload all** when ready.
 
 If the Cloudflare API returns R2 error `10042`, Crate tells the user to activate the R2 subscription and try again. Resource names and Cloudflare IDs are saved without credentials, so retries converge on the same deployment. Selecting **Authorize update** later reuses those same Worker, D1, R2, and Durable Object resources.
 
-The claim page creates a random enrollment token in the browser and sends only its SHA-256 hash to the Worker. The link is valid for 10 minutes and one successful enrollment. Until the first device finishes enrollment, anyone who knows the Worker URL could claim it, so complete this step promptly.
-
-## GitHub deploy fallback
-
-The original GitHub-dependent Cloudflare deploy button remains available under **GitHub deploy fallback** until the OAuth path is verified in production:
-
-1. Open **Settings → Crate → Configuration → GitHub deploy fallback**.
-2. Review the imported repository and bindings in Cloudflare, then deploy.
-3. Open and claim the resulting Worker.
-
-This path imports the public GitHub repository and uses `wrangler.jsonc`. It is not the primary OAuth path and may create a separate resource set. Keep its Cloudflare project identifiers if you use it for later updates.
+Crate creates a random enrollment token locally and sends only its SHA-256 hash to the Worker. The token is valid for 10 minutes and one successful enrollment. If automatic setup is interrupted, the **Open existing server** recovery page can claim the Worker after its temporary enrollment window expires.
 
 ## Command-line fallback
 

@@ -108,16 +108,16 @@ After installing the plugin, open the Crate settings tab in Obsidian:
 1. Select **Deploy to Cloudflare**. Your browser opens Cloudflare OAuth.
 2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
 3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate provisions the Worker, R2 bucket, D1 database, Durable Objects, endpoint, and migrations, then discards the OAuth token.
-4. On the Worker page, select **Claim server** promptly, then **Open in Obsidian**.
-5. Return to Crate and run **Initial sync → Upload all** when you are ready to seed the remote vault.
+4. Crate claims the new server and connects this device automatically.
+5. Run **Initial sync → Upload all** when you are ready to seed the remote vault.
 
 The OAuth deployment uses the build-time Worker and migrations included in the installed plugin. Crate verifies the server protocol before accepting the setup link. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered with the Worker.
 
 To add another device, use **Settings → Crate → Configuration → Set up another device** on a connected device. Each link can be used once and issuing a replacement invalidates the previous pending link.
 
-If deployment does not take you to the Worker, paste its `workers.dev` URL into **Open existing server**. An abandoned first claim becomes claimable again after its 10-minute enrollment window expires, provided no device was registered.
+If automatic first-device setup fails, paste its `workers.dev` URL into **Open existing server** to use the recovery claim page. An abandoned first claim becomes claimable again after its 10-minute enrollment window expires, provided no device was registered.
 
-For the one-time GitHub Pages and OAuth-client configuration, updates, recovery, and the retained GitHub/command-line fallbacks, see [Deploying and operating the server](docs/deployment.md). **Authorize update** reuses the resource IDs saved by the initial OAuth deployment.
+For the one-time GitHub Pages and OAuth-client configuration, updates, recovery, and command-line deployment instructions, see [Deploying and operating the server](docs/deployment.md). **Authorize update** reuses the resource IDs saved by the initial OAuth deployment.
 
 ## Sync Scope and Limits
 

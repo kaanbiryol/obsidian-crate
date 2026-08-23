@@ -20,7 +20,7 @@ Run the release gate before publishing either deliverable:
 npm run release:check
 ```
 
-It builds and checks both TypeScript targets, runs lint and the complete test suite, creates production plugin and Worker artifacts, enforces raw/gzip size budgets, validates manifest/version consistency and required Wrangler bindings, and checks for the OAuth and fallback deployment entry points.
+It builds and checks both TypeScript targets, runs lint and the complete test suite, creates production plugin and Worker artifacts, enforces raw/gzip size budgets, validates manifest/version consistency and required Wrangler bindings, and checks for the OAuth deployment entry point.
 
 The individual size gates are also available as `npm run size-check:plugin` and `npm run size-check:worker`. A Cloudflare configuration change should additionally pass:
 
@@ -56,8 +56,8 @@ After the Pages site and a private or public Cloudflare OAuth client are configu
 3. Use a disposable Cloudflare test account with R2 already active. Open **Settings → Crate → Configuration → Deploy to Cloudflare**.
 4. Confirm the consent screen shows the expected verified publisher and exactly Workers Scripts Write, D1 Write, Workers R2 Storage Write, and Memberships Read. Cloudflare may display the three write permissions using its legacy **Edit** label. Select exactly one account.
 5. Confirm the browser lands at `/oauth/callback/`, its address bar no longer contains OAuth parameters, and Obsidian opens. If automatic launch is blocked, select **Open Obsidian**.
-6. Confirm Crate creates one `crate-<16 hex>` Worker, D1 database, and R2 bucket, applies the migration, enables the workers.dev endpoint, and opens the claim page.
-7. Claim the Worker, return to Obsidian, and exercise initial sync with non-critical notes only.
+6. Confirm Crate creates one `crate-<16 hex>` Worker, D1 database, and R2 bucket, applies the migration, enables the workers.dev endpoint, and connects the current device without opening a Worker claim page.
+7. Exercise initial sync with non-critical notes only.
 8. Select **Authorize update** and confirm the same Worker, D1 database, R2 bucket, and Durable Object namespaces are reused.
 9. For the inactive-R2 case, use an account without an active R2 subscription and confirm Crate shows the activation message rather than a generic API error.
 

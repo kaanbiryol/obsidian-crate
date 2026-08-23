@@ -58,11 +58,13 @@ export class CrateSettingTab extends PluginSettingTab {
 			this.cleanupFns.push(syncCleanup);
 		}
 
-		renderRemindersSection({
-			containerEl,
-			plugin: this.plugin,
-			rerender: () => this.display(),
-		});
+		if (sections.showReminders) {
+			renderRemindersSection({
+				containerEl,
+				plugin: this.plugin,
+				rerender: () => this.display(),
+			});
+		}
 
 		if (sections.showNotifications) {
 			renderNotificationsSection({

@@ -9,6 +9,7 @@ import { openConfirmationModal } from '../ui/confirmation-modal';
 import { applySharedSettings } from './shared-settings';
 import { errorMessage } from '../plugin/logger';
 import { exchangeDeviceEnrollment } from './enrollment';
+import { claimAndEnrollInitialDevice } from './initial-server-setup';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
 
@@ -171,34 +172,67 @@ export async function handleSyncSetupProtocol(
 	}
 
 	try {
-		const enrollment = await exchangeDeviceEnrollment({
+		const testResult = await configureDeviceEnrollment(plugin, {
 			workerUrl,
 			enrollmentToken,
-			deviceId: plugin.settings.deviceId,
-			deviceName: getCurrentDeviceName(plugin.settings.deviceId),
-			platform: getCurrentPlatformCode(),
 		});
-		if (enrollment.sharedSettings) {
-			applySharedSettings(plugin.settings, enrollment.sharedSettings);
-		}
-
-		await plugin.syncRuntime.applyInfrastructureConfig({
-			workerUrl: enrollment.workerUrl,
-			authToken: enrollment.authToken,
-		});
-
-		plugin.syncRuntime.pushSharedSettings().catch(() => {});
-
 		new Notice('Crate connected from setup link');
-
-		const result = await plugin.syncRuntime.testConnection();
-		if (result.success) {
+		if (testResult.success) {
 			new Notice('Connection test successful!');
 		} else {
-			new Notice(`Configured but connection test failed: ${result.error}`);
+			new Notice(`Configured but connection test failed: ${testResult.error}`);
 		}
 	} catch (error) {
 		const msg = errorMessage(error);
 		new Notice(`Setup link failed: ${msg}`);
 	}
+}
+
+export async function configureInitialCloudflareDevice(
+	plugin: CratePlugin,
+	workerUrl: string,
+): Promise<{ success: boolean; error?: string }> {
+	if (plugin.syncRuntime.isConfigured()) {
+		return { success: true };
+	}
+
+	const enrollment = await claimAndEnrollInitialDevice({
+		workerUrl,
+		deviceId: plugin.settings.deviceId,
+		deviceName: getCurrentDeviceName(plugin.settings.deviceId),
+		platform: getCurrentPlatformCode(),
+	});
+
+	return await applyDeviceEnrollment(plugin, enrollment);
+}
+
+async function configureDeviceEnrollment(
+	plugin: CratePlugin,
+	input: Parameters<typeof exchangeDeviceEnrollment>[0],
+): Promise<{ success: boolean; error?: string }> {
+	const enrollment = await exchangeDeviceEnrollment({
+		...input,
+		deviceId: plugin.settings.deviceId,
+		deviceName: getCurrentDeviceName(plugin.settings.deviceId),
+		platform: getCurrentPlatformCode(),
+	});
+
+	return await applyDeviceEnrollment(plugin, enrollment);
+}
+
+async function applyDeviceEnrollment(
+	plugin: CratePlugin,
+	enrollment: Awaited<ReturnType<typeof exchangeDeviceEnrollment>>,
+): Promise<{ success: boolean; error?: string }> {
+	if (enrollment.sharedSettings) {
+		applySharedSettings(plugin.settings, enrollment.sharedSettings);
+	}
+
+	await plugin.syncRuntime.applyInfrastructureConfig({
+		workerUrl: enrollment.workerUrl,
+		authToken: enrollment.authToken,
+	});
+
+	plugin.syncRuntime.pushSharedSettings().catch(() => {});
+	return await plugin.syncRuntime.testConnection();
 }

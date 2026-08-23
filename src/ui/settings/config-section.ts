@@ -1,5 +1,4 @@
 import { Notice, Setting } from 'obsidian';
-import { CRATE_CLOUDFLARE_DEPLOY_URL } from '../../cloudflare/deploy-button';
 import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
 import { normalizeWorkerUrl } from '../../sync/worker-url';
 import { openConfirmationModal } from '../confirmation-modal';
@@ -23,15 +22,6 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				.setCta()
 				.onClick(() => {
 					void startCloudflareDeployment(plugin);
-				}));
-
-		new Setting(containerEl)
-			.setName('GitHub deploy fallback')
-			.setDesc('Use the original repository-based deployment while the new authorization flow is verified')
-			.addButton(button => button
-				.setButtonText('Open fallback')
-				.onClick(() => {
-					window.open(CRATE_CLOUDFLARE_DEPLOY_URL, '_blank', 'noopener,noreferrer');
 				}));
 
 		let workerUrl = '';

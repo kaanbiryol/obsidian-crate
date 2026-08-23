@@ -51,7 +51,6 @@ assert(
 	pluginBundle.includes('CREATE TABLE IF NOT EXISTS auth_tokens'),
 	'Plugin bundle is missing the versioned D1 migration artifact',
 );
-assert(pluginBundle.includes('deploy.workers.cloudflare.com'), 'Plugin bundle is missing the Cloudflare deploy entry point');
 assert(pluginBundle.includes('https://dash.cloudflare.com/oauth2/auth'), 'Plugin bundle is missing the Cloudflare OAuth entry point');
 assert(
 	pluginBundle.includes('https://crate.kaanbiryol.com/oauth/callback/'),
