@@ -4,6 +4,11 @@ import type { PullRefreshState } from '../types';
 const PULL_REFRESH_THRESHOLD = 70;
 const PULL_REFRESH_MAX_DISTANCE = 120;
 const PULL_REFRESH_SNAP_DISTANCE = 58;
+const ACTIVE_REORDER_SELECTOR = '.reorderable-reminder-item.is-long-press-armed, .reorderable-reminder-item.is-reordering';
+
+function isReorderGestureActive(): boolean {
+	return Boolean(document.querySelector(ACTIVE_REORDER_SELECTOR));
+}
 
 function findPullScrollTarget(target: EventTarget | null): HTMLElement | null {
 	if (!(target instanceof Element)) return null;
@@ -62,6 +67,11 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 
 		const handleTouchMove = (event: TouchEvent) => {
 			if (!active || event.touches.length !== 1) return;
+			if (isReorderGestureActive()) {
+				event.preventDefault();
+				reset();
+				return;
+			}
 			const scrollTarget = findPullScrollTarget(event.target);
 			if (!scrollTarget || scrollTarget.scrollTop > 0) {
 				reset();
@@ -91,6 +101,10 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 		};
 
 		const handleTouchEnd = () => {
+			if (isReorderGestureActive()) {
+				reset();
+				return;
+			}
 			if (animationFrame !== null) {
 				window.cancelAnimationFrame(animationFrame);
 				animationFrame = null;

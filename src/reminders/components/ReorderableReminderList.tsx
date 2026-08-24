@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { GripVertical } from 'lucide-react';
 import type { Reminder } from '../types/reminder';
@@ -9,6 +9,7 @@ interface ReorderableReminderListProps {
   onReorderCommit: (orderedIds: string[]) => void;
   onDragActiveChange?: (active: boolean) => void;
   renderCard: (reminder: Reminder, index: number) => React.ReactNode;
+  interaction?: 'handle' | 'long-press';
 }
 
 interface ReorderableItemProps {
@@ -17,18 +18,41 @@ interface ReorderableItemProps {
   renderCard: (reminder: Reminder, index: number) => React.ReactNode;
   onDragStart: () => void;
   onDragEnd: () => void;
+  interaction: 'handle' | 'long-press';
 }
 
-function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd }: ReorderableItemProps) {
+const LONG_PRESS_DELAY_MS = 380;
+const LONG_PRESS_MOVE_TOLERANCE = 9;
+const LONG_PRESS_INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, [contenteditable="true"], [role="checkbox"]';
+
+function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction }: ReorderableItemProps) {
   const didDragRef = useRef(false);
   const dragControls = useDragControls();
+  const longPressTimerRef = useRef<number | null>(null);
+  const pressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [isLongPressArmed, setIsLongPressArmed] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pressStartRef.current = null;
+    setIsLongPressArmed(false);
+  }, []);
+
+  useEffect(() => cancelLongPress, [cancelLongPress]);
 
   const handleDragStart = useCallback(() => {
+    cancelLongPress();
     didDragRef.current = true;
+    setIsReordering(true);
     onDragStart();
-  }, [onDragStart]);
+  }, [cancelLongPress, onDragStart]);
 
   const handleDragEnd = useCallback(() => {
+    setIsReordering(false);
     onDragEnd();
     // Suppress the click event that fires after drag release
     // Use requestAnimationFrame so the flag clears after the click event
@@ -49,6 +73,32 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd }
     dragControls.start(e);
   }, [dragControls]);
 
+  const handleItemPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (interaction !== 'long-press' || !event.isPrimary || event.button !== 0) return;
+    const target = event.target as Element;
+    if (target.closest(LONG_PRESS_INTERACTIVE_SELECTOR)) return;
+
+    cancelLongPress();
+    pressStartRef.current = { x: event.clientX, y: event.clientY };
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTimerRef.current = null;
+      pressStartRef.current = null;
+      setIsLongPressArmed(true);
+      dragControls.start(event);
+    }, LONG_PRESS_DELAY_MS);
+  }, [cancelLongPress, dragControls, interaction]);
+
+  const handleItemPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const start = pressStartRef.current;
+    if (!start) return;
+    if (
+      Math.abs(event.clientX - start.x) > LONG_PRESS_MOVE_TOLERANCE
+      || Math.abs(event.clientY - start.y) > LONG_PRESS_MOVE_TOLERANCE
+    ) {
+      cancelLongPress();
+    }
+  }, [cancelLongPress]);
+
   return (
     <Reorder.Item
       as="div"
@@ -58,12 +108,18 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd }
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClickCapture={handleClickCapture}
-      className="reorderable-reminder-item mb-2"
+      onPointerDown={handleItemPointerDown}
+      onPointerMove={handleItemPointerMove}
+      onPointerUp={cancelLongPress}
+      onPointerCancel={cancelLongPress}
+      onContextMenu={interaction === 'long-press' ? (event) => event.preventDefault() : undefined}
+      data-reorder-interaction={interaction}
+      className={`reorderable-reminder-item mb-2${isLongPressArmed ? ' is-long-press-armed' : ''}${isReordering ? ' is-reordering' : ''}`}
       whileTap={{
         scale: 1,
       }}
       whileDrag={{
-        scale: 1.02,
+        scale: interaction === 'long-press' ? 1.045 : 1.02,
         zIndex: 50,
       }}
       transition={{
@@ -71,18 +127,20 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd }
       }}
     >
       {renderCard(reminder, index)}
-      <button
-        className="reorder-drag-handle"
-        type="button"
-        aria-label="Reorder reminder"
-        onPointerDown={handleDragHandlePointerDown}
-        onClick={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-        }}
-      >
-        <GripVertical size={18} strokeWidth={2} aria-hidden="true" />
-      </button>
+      {interaction === 'handle' && (
+        <button
+          className="reorder-drag-handle"
+          type="button"
+          aria-label="Reorder reminder"
+          onPointerDown={handleDragHandlePointerDown}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+        >
+          <GripVertical size={18} strokeWidth={2} aria-hidden="true" />
+        </button>
+      )}
     </Reorder.Item>
   );
 }
@@ -93,6 +151,7 @@ export function ReorderableReminderList({
   onReorderCommit,
   onDragActiveChange,
   renderCard,
+  interaction = 'handle',
 }: ReorderableReminderListProps) {
   const latestOrderRef = useRef(reminders);
   latestOrderRef.current = reminders;
@@ -129,6 +188,7 @@ export function ReorderableReminderList({
           renderCard={renderCard}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          interaction={interaction}
         />
       ))}
     </Reorder.Group>

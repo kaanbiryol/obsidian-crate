@@ -1,6 +1,9 @@
 import { corsResponse } from '../cors';
 import {
 	handleExchangeRemindersEnrollmentToken,
+	handleAppleStartup1179x2556,
+	handleAppleStartup1290x2796,
+	handleAppleTouchIcon,
 	handleIcon,
 	handleManifest,
 	handleNotificationsPage,
@@ -31,6 +34,9 @@ export async function handlePublicRoute(
 	if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest(request);
 	if (path === '/notifications/version.json' && method === 'GET') return handlePwaVersion();
 	if (path === '/notifications/icon.svg' && method === 'GET') return handleIcon(request);
+	if (path === '/notifications/apple-touch-icon-180.png' && method === 'GET') return handleAppleTouchIcon(request);
+	if (path === '/notifications/apple-startup-1179x2556.png' && method === 'GET') return handleAppleStartup1179x2556(request);
+	if (path === '/notifications/apple-startup-1290x2796.png' && method === 'GET') return handleAppleStartup1290x2796(request);
 	if (path === '/notifications/open-obsidian' && method === 'GET') return handleOpenObsidian();
 	if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);
 	if (path === '/notifications/reminders-exchange' && method === 'POST') {

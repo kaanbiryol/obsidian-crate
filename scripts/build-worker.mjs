@@ -37,6 +37,7 @@ async function buildWorkerBundle(pwaClientJs, pwaAssetVersion) {
 		legalComments: 'none',
 		mainFields: ['module', 'main'],
 		conditions: ['worker', 'browser', 'import'],
+		loader: { '.png': 'binary' },
 		define: {
 			__CRATE_SERVER_VERSION__: JSON.stringify(serverVersion),
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(pwaAssetVersion),

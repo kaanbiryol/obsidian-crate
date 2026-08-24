@@ -303,10 +303,16 @@ describe('worker entrypoint', () => {
 			new Request(`https://worker.test/notifications/icon.svg?v=${PWA_ASSET_VERSION}`),
 			createEnv() as never,
 		);
+		const versionedTouchIconResponse = await worker.fetch(
+			new Request(`https://worker.test/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}`),
+			createEnv() as never,
+		);
 
 		expect(versionedAppResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(unversionedAppResponse.headers.get('Cache-Control')).toBe('no-store');
 		expect(versionedIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+		expect(versionedTouchIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+		expect(versionedTouchIconResponse.headers.get('Content-Type')).toBe('image/png');
 	});
 
 	it('rejects blank bearer tokens when no fallback auth token is configured', async () => {

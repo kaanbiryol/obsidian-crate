@@ -7,6 +7,9 @@ const PWA_PRECACHE_URLS = [
 	PWA_SHELL_URL,
 	'/notifications/app.js?v=${PWA_ASSET_VERSION}',
 	'/notifications/icon.svg?v=${PWA_ASSET_VERSION}',
+	'/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}',
+	'/notifications/apple-startup-1179x2556.png?v=${PWA_ASSET_VERSION}',
+	'/notifications/apple-startup-1290x2796.png?v=${PWA_ASSET_VERSION}',
 ];
 
 self.addEventListener('install', function(event) {
@@ -65,7 +68,13 @@ self.addEventListener('fetch', function(event) {
 		return;
 	}
 
-	if (url.pathname === '/notifications/app.js' || url.pathname === '/notifications/icon.svg') {
+	if (
+		url.pathname === '/notifications/app.js'
+		|| url.pathname === '/notifications/icon.svg'
+		|| url.pathname === '/notifications/apple-touch-icon-180.png'
+		|| url.pathname === '/notifications/apple-startup-1179x2556.png'
+		|| url.pathname === '/notifications/apple-startup-1290x2796.png'
+	) {
 		event.respondWith(
 			caches.match(event.request).then(function(cached) {
 				if (cached) return cached;

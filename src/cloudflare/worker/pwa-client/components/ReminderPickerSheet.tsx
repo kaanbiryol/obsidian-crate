@@ -17,12 +17,15 @@ import {
 	applyReminderTextUpdate,
 } from '../reminder-state';
 import type { ModalDraft } from '../types';
+import type { SheetDragHandleProps } from '../hooks/useSheetDrag';
 
 interface ReminderPickerSheetProps {
 	draft: ModalDraft;
 	dialogRef: (element: HTMLElement | null) => void;
 	projectOptions: string[];
 	isSwitchingOut: boolean;
+	dragClassName: string;
+	dragHandleProps: SheetDragHandleProps;
 	onPatch: (patch: Partial<ModalDraft>) => void;
 	onSelect: (patch?: Partial<ModalDraft>) => void;
 	onClose: () => void;
@@ -33,6 +36,8 @@ export function ReminderPickerSheet({
 	dialogRef,
 	projectOptions,
 	isSwitchingOut,
+	dragClassName,
+	dragHandleProps,
 	onPatch,
 	onSelect,
 	onClose,
@@ -48,7 +53,8 @@ export function ReminderPickerSheet({
 
 	if (draft.activePicker === 'date') {
 		return (
-			<section ref={dialogRef} className={`pwa-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Schedule reminder" tabIndex={-1}>
+			<section ref={dialogRef} className={`pwa-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}${dragClassName}`} role="dialog" aria-modal="true" aria-label="Schedule reminder" tabIndex={-1}>
+				<div className="pwa-sheet-grabber" aria-hidden="true" {...dragHandleProps}><span /></div>
 				<div className="pwa-picker-header">
 					<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Close schedule" onClick={onClose}>
 						<X size={20} />
@@ -107,12 +113,13 @@ export function ReminderPickerSheet({
 
 	if (draft.activePicker === 'project') {
 		return (
-			<section ref={dialogRef} className={`pwa-picker-sheet pwa-project-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Select project" tabIndex={-1}>
+			<section ref={dialogRef} className={`pwa-picker-sheet pwa-project-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}${dragClassName}`} role="dialog" aria-modal="true" aria-label="Select project" tabIndex={-1}>
+				<div className="pwa-sheet-grabber" aria-hidden="true" {...dragHandleProps}><span /></div>
 				<div className="pwa-picker-header pwa-project-picker-header">
 					<Button isIconOnly className="pwa-picker-icon-button pwa-project-picker-back" type="button" aria-label="Back to reminder" onClick={onClose}>
 						<ChevronLeft size={22} />
 					</Button>
-					<h3>Select Project</h3>
+					<h3>Select project</h3>
 					<span aria-hidden="true" />
 				</div>
 				<div className="pwa-picker-content">
@@ -150,7 +157,8 @@ export function ReminderPickerSheet({
 	}
 
 	return (
-		<section ref={dialogRef} className={`pwa-picker-sheet pwa-recurrence-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}`} role="dialog" aria-modal="true" aria-label="Repeat reminder" tabIndex={-1}>
+		<section ref={dialogRef} className={`pwa-picker-sheet pwa-recurrence-picker-sheet${isSwitchingOut ? ' is-switching-out' : ''}${dragClassName}`} role="dialog" aria-modal="true" aria-label="Repeat reminder" tabIndex={-1}>
+			<div className="pwa-sheet-grabber" aria-hidden="true" {...dragHandleProps}><span /></div>
 			<div className="pwa-picker-header">
 				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Back to reminder" onClick={onClose}>
 					<ChevronLeft size={20} />

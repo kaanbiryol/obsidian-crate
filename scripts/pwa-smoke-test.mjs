@@ -50,6 +50,20 @@ try {
 	const serviceWorkerJs = await serviceWorkerResponse.text();
 	if (!serviceWorkerJs.includes('crate-reminders-shell-')) throw new Error('Service worker shell cache name is missing');
 
+	for (const path of [
+		'/notifications/apple-touch-icon-180.png?v=smoke',
+		'/notifications/apple-startup-1179x2556.png?v=smoke',
+		'/notifications/apple-startup-1290x2796.png?v=smoke',
+	]) {
+		const imageResponse = await fetchOk(`${origin}${path}`);
+		if (imageResponse.headers.get('Content-Type') !== 'image/png') {
+			throw new Error(`${path} is not served as image/png`);
+		}
+		if ((await imageResponse.arrayBuffer()).byteLength < 10_000) {
+			throw new Error(`${path} is unexpectedly small`);
+		}
+	}
+
 	const exchangeResponse = await fetchOk(`${origin}/notifications/reminders-exchange`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },

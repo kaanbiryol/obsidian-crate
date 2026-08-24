@@ -51,6 +51,8 @@ interface RemindersAppShellProps {
   renderCard: ReminderCardRenderer;
   onAdd: (defaultProject: string) => void;
   onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
+  onReorderDragActiveChange?: (active: boolean) => void;
+  reorderInteraction?: 'handle' | 'long-press';
 }
 
 export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
@@ -75,6 +77,8 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
   renderCard,
   onAdd,
   onReorder,
+  onReorderDragActiveChange,
+  reorderInteraction = 'handle',
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? "browse" : (initialTab ?? "inbox"));
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -234,7 +238,9 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
                 onProjectSelect={handleProjectSelect}
                 onBackToProjects={handleBackToProjects}
                 onReorder={handleReorder}
+                onReorderDragActiveChange={onReorderDragActiveChange}
                 colorScheme={isDarkMode ? "dark" : "light"}
+                reorderInteraction={reorderInteraction}
               />
             </AnimatePresence>
           )}

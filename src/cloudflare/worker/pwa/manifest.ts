@@ -40,6 +40,12 @@ export function createManifestJson(requestUrl?: string): string {
 		],
 		icons: [
 			{
+				src: `/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}`,
+				sizes: '180x180',
+				type: 'image/png',
+				purpose: 'any',
+			},
+			{
 				src: `/notifications/icon.svg?v=${PWA_ASSET_VERSION}`,
 				sizes: 'any',
 				type: 'image/svg+xml',

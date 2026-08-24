@@ -53,6 +53,7 @@ function App() {
 	const [loggingOut, setLoggingOut] = useState(false);
 	const [updateAvailable, setUpdateAvailable] = useState(false);
 	const [modal, setModal] = useState<ModalState | null>(null);
+	const [reorderDragging, setReorderDragging] = useState(false);
 	const { toast, showToast } = useToast();
 	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
 	const finalizeModalClose = useCallback(() => setModal(null), []);
@@ -223,7 +224,7 @@ function App() {
 	}, [readOnlyMessage, showToast]);
 
 	const pullRefresh = usePullToRefresh(
-		Boolean(authToken && bootstrapped && !loading && !modal && !settingsOpen),
+		Boolean(authToken && bootstrapped && !loading && !modal && !settingsOpen && !reorderDragging),
 		useCallback(() => loadReminders({ silent: true }), [loadReminders]),
 	);
 
@@ -328,7 +329,7 @@ function App() {
 				initialProject={selectedProject ?? undefined}
 				upcomingDays={config.upcomingDays}
 				className="app-shell pwa-reminders-view"
-				headerRightContent={
+				headerRightContent={(
 					<PwaHeaderActions
 						settingsOpen={settingsOpen}
 						statusText={statusText}
@@ -337,7 +338,8 @@ function App() {
 						onRefresh={() => void loadReminders({ silent: true })}
 						onToggleSettings={toggleSettings}
 					/>
-				}
+				)}
+				reorderInteraction="long-press"
 				belowHeaderContent={
 					<>
 						<PwaPullRefreshIndicator pullRefresh={pullRefresh} />
@@ -356,6 +358,7 @@ function App() {
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
 				onReorder={persistReorder}
+				onReorderDragActiveChange={setReorderDragging}
 			>
 				{settingsOpen && (
 					<SettingsSheet

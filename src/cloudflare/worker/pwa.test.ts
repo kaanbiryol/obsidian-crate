@@ -19,8 +19,8 @@ describe('PWA activation metadata', () => {
 
 		expect(manifest.display).toBe('standalone');
 		expect(manifest.display_override).toEqual(['standalone', 'minimal-ui']);
-		expect(manifest.background_color).toBe('#080808');
-		expect(manifest.theme_color).toBe('#080808');
+		expect(manifest.background_color).toBe('#1e1e1e');
+		expect(manifest.theme_color).toBe('#1e1e1e');
 	});
 
 	it('carries activation params into the manifest start URL', () => {
@@ -67,8 +67,11 @@ describe('PWA activation metadata', () => {
 	it('keeps standalone safe areas outside visible navigation chrome', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black">');
-		expect(html).toContain('<meta name="theme-color" content="#080808">');
+		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
+		expect(html).toContain('<meta name="theme-color" content="#1e1e1e">');
+		expect(html).toContain('<link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=');
+		expect(html).toContain('<link rel="apple-touch-startup-image" href="/notifications/apple-startup-1179x2556.png?v=');
+		expect(html).toContain('<link rel="apple-touch-startup-image" href="/notifications/apple-startup-1290x2796.png?v=');
 		expect(html).toContain('<meta name="format-detection" content="telephone=no,date=no,email=no,address=no">');
 		expect(html).toContain('height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
 		expect(html).toContain('body{min-height:100%;min-height:100dvh;overflow:hidden;touch-action:manipulation}');
@@ -84,7 +87,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--reminders-tabbar-height:calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area))');
 		expect(html).toContain('--reminders-tabbar-overlay:var(--reminders-tabbar-height)');
 		expect(html).toContain('--pwa-tabbar-bleed:0px');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none}');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none;');
 		expect(html).toContain('display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--pwa-tabbar-content-height);max-width:42rem!important;margin:0 auto!important;padding:0!important;transform:translate3d(0,var(--pwa-tabbar-content-offset),0)!important');
 		expect(html).toContain('height:100%!important;min-height:0!important;padding:0!important');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}');
@@ -111,15 +114,30 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.settings-sheet.is-closing{pointer-events:none;animation:pwa-sheet-out .3s cubic-bezier(.4,0,1,1) forwards}');
 		expect(html).toContain('@keyframes pwa-backdrop-out{from{background-color:rgba(0,0,0,.56);backdrop-filter:blur(8px)}to{background-color:rgba(0,0,0,0);backdrop-filter:blur(0)}}');
 		expect(html).toContain('.settings-backdrop{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);');
-		expect(html).toContain('.pwa-reminder-editor .modal-form{gap:0;display:flex;flex:1;min-height:0;flex-direction:column}');
+		expect(html).toContain('.pwa-reminder-editor .modal-form{gap:0;display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}');
+		expect(html).toContain('max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);overflow:hidden;background:var(--pwa-sheet-surface)');
 		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 72px);max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);padding-bottom:16px}');
-		expect(html).toContain('.pwa-keyboard-open .pwa-editor-card{flex:0 1 auto;min-height:0;padding:16px 18px 18px}');
+		expect(html).toContain('.pwa-editor-actions{flex:0 0 auto;min-width:0}');
+		expect(html).toContain('.pwa-keyboard-open .pwa-editor-card{flex:1 1 auto;min-height:0;padding:16px 18px 18px}');
 		expect(html).toContain('.pwa-keyboard-open .pwa-editor-description-input{flex:0 1 auto;min-height:42px;max-height:88px}');
-		expect(html).toContain('.pwa-keyboard-open .pwa-editor-chip-row{flex-wrap:nowrap;gap:8px;margin-top:auto;padding-top:14px;overflow-x:auto;scrollbar-width:none}');
+		expect(html).toContain('.pwa-keyboard-open .pwa-editor-chip-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px 44px;gap:8px;margin-top:14px;padding-top:14px;overflow:visible}');
 		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 28px);max-height:calc(var(--keyboard-usable-height,100dvh) - 28px);padding-bottom:16px}');
 		expect(html).toContain('box-shadow:0 -1px 0 rgba(255,255,255,.035)');
 		expect(html).not.toContain('box-shadow:0 -6px 20px rgba(0,0,0,.22)');
 		expect(html).not.toContain('box-shadow:0 -12px 48px rgba(0,0,0,.38)');
+	});
+
+	it('uses native-feeling sheet and list interaction affordances', () => {
+		const html = createPwaHtml('https://worker.test/notifications');
+
+		expect(html).toContain('.pwa-sheet-grabber{width:100%;height:28px;min-height:28px;');
+		expect(html).toContain('touch-action:none;cursor:grab;');
+		expect(html).toContain('.reorderable-reminder-item[data-reorder-interaction="long-press"]{-webkit-touch-callout:none;user-select:none;');
+		expect(html).toContain('.reorderable-reminder-item[data-reorder-interaction="long-press"].is-reordering .premium-reminder-content');
+		expect(html).toContain('--reminders-fab-gap:18px;--reminders-fab-size:56px;');
+		expect(html).toContain('.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;');
+		expect(html).not.toContain('.pwa-header-add-button');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none;background:rgba(30,30,30,.74);');
 	});
 
 	it('ships an offline-capable installed app shell service worker', () => {
@@ -128,7 +146,11 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("cache.addAll(PWA_PRECACHE_URLS)");
 		expect(SERVICE_WORKER_JS).toContain("event.request.mode === 'navigate' || url.pathname === PWA_SHELL_URL");
 		expect(SERVICE_WORKER_JS).toContain("return caches.match(PWA_SHELL_URL).then(function(cached)");
-		expect(SERVICE_WORKER_JS).toContain("url.pathname === '/notifications/app.js' || url.pathname === '/notifications/icon.svg'");
+		expect(SERVICE_WORKER_JS).toContain("url.pathname === '/notifications/app.js'");
+		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/icon.svg'");
+		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-touch-icon-180.png'");
+		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-startup-1179x2556.png'");
+		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-startup-1290x2796.png'");
 	});
 
 	it('deep links notification clicks to the reminder and project', () => {

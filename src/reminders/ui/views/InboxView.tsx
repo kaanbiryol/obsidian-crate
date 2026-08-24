@@ -29,6 +29,8 @@ export interface InboxViewProps {
   }) => React.ReactNode;
   /** Callback when reminders are reordered via drag */
   onReorder?: (orderedIds: string[]) => void;
+  onReorderDragActiveChange?: (active: boolean) => void;
+  reorderInteraction?: 'handle' | 'long-press';
   colorScheme?: ProjectColorScheme;
 }
 
@@ -44,6 +46,8 @@ export const InboxView = memo(function InboxView({
   className = '',
   renderToggleButton,
   onReorder,
+  onReorderDragActiveChange,
+  reorderInteraction = 'handle',
   colorScheme = 'dark',
 }: InboxViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
@@ -98,7 +102,9 @@ export const InboxView = memo(function InboxView({
           reminders={localOrder}
           onReorder={setLocalOrder}
           onReorderCommit={handleReorderCommit}
+          onDragActiveChange={onReorderDragActiveChange}
           renderCard={cardRenderer}
+          interaction={reorderInteraction}
         />
 
         {/* Completed section */}

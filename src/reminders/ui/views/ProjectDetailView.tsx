@@ -26,6 +26,8 @@ export interface ProjectDetailViewProps {
   className?: string;
   /** Callback when reminders are reordered via drag */
   onReorder?: (orderedIds: string[]) => void;
+  onReorderDragActiveChange?: (active: boolean) => void;
+  reorderInteraction?: 'handle' | 'long-press';
   colorScheme?: ProjectColorScheme;
 }
 
@@ -44,6 +46,8 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   hasFab = true,
   className = '',
   onReorder,
+  onReorderDragActiveChange,
+  reorderInteraction = 'handle',
   colorScheme = 'dark',
 }: ProjectDetailViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
@@ -69,7 +73,8 @@ export const ProjectDetailView = memo(function ProjectDetailView({
 
   const handleDragActiveChange = useCallback((active: boolean) => {
     isDraggingRef.current = active;
-  }, []);
+    onReorderDragActiveChange?.(active);
+  }, [onReorderDragActiveChange]);
 
   const handleReorderCommit = useCallback((orderedIds: string[]) => {
     onReorder?.(orderedIds);
@@ -127,6 +132,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
             onReorderCommit={handleReorderCommit}
             onDragActiveChange={handleDragActiveChange}
             renderCard={cardRenderer}
+            interaction={reorderInteraction}
           />
 
           <ProjectCompletedSection

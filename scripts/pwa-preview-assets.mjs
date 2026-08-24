@@ -43,6 +43,7 @@ export async function buildPwaPreviewAssets() {
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(pwaClient.version),
 			__CRATE_PWA_CLIENT_JS__: JSON.stringify(pwaClient.script),
 		},
+		loader: { '.png': 'binary' },
 		plugins: [rawTextPlugin()],
 	});
 	const code = pwaBundle.outputFiles[0].text;

@@ -3,6 +3,11 @@ import { PWA_ASSET_VERSION } from './pwa-version';
 
 export { createPwaHtml } from './pwa/html';
 export { ICON_SVG } from './pwa/icons';
+export {
+	APPLE_STARTUP_1179X2556_PNG,
+	APPLE_STARTUP_1290X2796_PNG,
+	APPLE_TOUCH_ICON_180_PNG,
+} from './pwa/install-assets';
 export { createManifestJson } from './pwa/manifest';
 export { OPEN_OBSIDIAN_HTML } from './pwa/open-obsidian';
 export { SERVICE_WORKER_JS } from './pwa/service-worker';

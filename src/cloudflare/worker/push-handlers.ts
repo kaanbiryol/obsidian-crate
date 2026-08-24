@@ -4,7 +4,18 @@ import { initDb, queryRows } from './db';
 import { getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
 import { issuePushEnrollmentToken, purgeExpiredPushEnrollmentTokens } from './push-enrollment';
 import { consumeWebEnrollmentToken, issueWebEnrollmentToken } from './web-enrollment';
-import { PWA_APP_JS, SERVICE_WORKER_JS, ICON_SVG, OPEN_OBSIDIAN_HTML, createManifestJson, createPwaHtml, createPwaVersionJson } from './pwa';
+import {
+	APPLE_STARTUP_1179X2556_PNG,
+	APPLE_STARTUP_1290X2796_PNG,
+	APPLE_TOUCH_ICON_180_PNG,
+	PWA_APP_JS,
+	SERVICE_WORKER_JS,
+	ICON_SVG,
+	OPEN_OBSIDIAN_HTML,
+	createManifestJson,
+	createPwaHtml,
+	createPwaVersionJson,
+} from './pwa';
 import { parseJsonObject, parseOptionalString } from './utils';
 
 interface D1MutationResult {
@@ -136,6 +147,28 @@ export function handleIcon(request: Request): Response {
 			...corsHeaders(),
 		},
 	});
+}
+
+function pngAssetResponse(request: Request, asset: Uint8Array): Response {
+	return new Response(asset, {
+		headers: {
+			'Content-Type': 'image/png',
+			...versionedAssetHeaders(request),
+			...corsHeaders(),
+		},
+	});
+}
+
+export function handleAppleTouchIcon(request: Request): Response {
+	return pngAssetResponse(request, APPLE_TOUCH_ICON_180_PNG);
+}
+
+export function handleAppleStartup1179x2556(request: Request): Response {
+	return pngAssetResponse(request, APPLE_STARTUP_1179X2556_PNG);
+}
+
+export function handleAppleStartup1290x2796(request: Request): Response {
+	return pngAssetResponse(request, APPLE_STARTUP_1290X2796_PNG);
 }
 
 export async function handleVapidPublicKey(db: D1Database | null): Promise<Response> {

@@ -3,6 +3,7 @@ import { Button } from '@heroui/react';
 import { RefreshCw, X } from 'lucide-react';
 import { isStandaloneApp } from '../config';
 import { useDialogFocus } from '../hooks/useDialogFocus';
+import { useSheetDrag } from '../hooks/useSheetDrag';
 import type { PushState, StoredConfig } from '../types';
 
 export function SettingsSheet({
@@ -34,13 +35,14 @@ export function SettingsSheet({
 		escapeDisabled: loggingOut || isClosing,
 		onEscape: onClose,
 	});
+	const sheetDrag = useSheetDrag({ disabled: loggingOut || isClosing, onDismiss: onClose });
 
 	return (
-		<div className={`settings-backdrop${isClosing ? ' is-closing' : ''}`} onClick={(event) => {
+		<div style={sheetDrag.backdropStyle} className={`settings-backdrop${isClosing ? ' is-closing' : ''}`} onClick={(event) => {
 			if (!loggingOut && !isClosing && event.target === event.currentTarget) onClose();
 		}}>
-			<aside ref={setDialogRef} className={`settings-sheet${isClosing ? ' is-closing' : ''}`} role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut || isClosing} tabIndex={-1} onKeyDown={handleDialogKeyDown}>
-				<div className="settings-handle" aria-hidden="true" />
+			<aside ref={setDialogRef} className={`settings-sheet${isClosing ? ' is-closing' : ''}${sheetDrag.dragClassName}`} role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut || isClosing} tabIndex={-1} onKeyDown={handleDialogKeyDown}>
+				<div className="pwa-sheet-grabber" aria-hidden="true" {...sheetDrag.handleProps}><span /></div>
 				<div className="settings-sheet__header">
 					<div>
 						<h2>Settings</h2>

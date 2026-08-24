@@ -15,6 +15,7 @@ import { ProjectAutocompleteDropdown } from '@/reminders/ui/reminder-modal/Proje
 import { useProjectAutocomplete } from '@/reminders/ui/reminder-modal/useProjectAutocomplete';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
 import { useDialogFocus } from '../hooks/useDialogFocus';
+import { useSheetDrag } from '../hooks/useSheetDrag';
 import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
@@ -152,6 +153,13 @@ export function ReminderSheet({
 			patchDraft({ activePicker: null, deleteConfirm: false });
 		}, SHEET_SWITCH_DELAY_MS);
 	};
+	const sheetDrag = useSheetDrag({
+		disabled: saving || isClosing || pendingPicker !== null || returningToEditor,
+		onDismiss: () => {
+			if (draft.activePicker) returnToEditor();
+			else onClose();
+		},
+	});
 
 	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
 		activeKey: draft.activePicker ?? 'editor',
@@ -163,7 +171,7 @@ export function ReminderSheet({
 	});
 
 	return (
-		<div className={`modal-backdrop pwa-reminder-editor-backdrop${isClosing ? ' is-closing' : ''}`} onKeyDown={handleDialogKeyDown} onClick={(event) => {
+		<div style={sheetDrag.backdropStyle} className={`modal-backdrop pwa-reminder-editor-backdrop${isClosing ? ' is-closing' : ''}`} onKeyDown={handleDialogKeyDown} onClick={(event) => {
 			if (saving || isClosing) return;
 			if (event.target !== event.currentTarget) return;
 			if (draft.activePicker) returnToEditor();
@@ -175,12 +183,15 @@ export function ReminderSheet({
 					dialogRef={setDialogRef}
 					projectOptions={projectOptions}
 					isSwitchingOut={returningToEditor || isClosing}
+					dragClassName={sheetDrag.dragClassName}
+					dragHandleProps={sheetDrag.handleProps}
 					onPatch={patchDraft}
 					onSelect={returnToEditor}
 					onClose={() => returnToEditor()}
 				/>
 			) : (
-				<div ref={setDialogRef} className={`modal-card pwa-reminder-editor${pendingPicker ? ' is-switching-out' : ''}${isClosing ? ' is-closing' : ''}`} role="dialog" aria-modal="true" aria-label={title} aria-busy={saving || isClosing} tabIndex={-1}>
+				<div ref={setDialogRef} className={`modal-card pwa-reminder-editor${pendingPicker ? ' is-switching-out' : ''}${isClosing ? ' is-closing' : ''}${sheetDrag.dragClassName}`} role="dialog" aria-modal="true" aria-label={title} aria-busy={saving || isClosing} tabIndex={-1}>
+					<div className="pwa-sheet-grabber" aria-hidden="true" {...sheetDrag.handleProps}><span /></div>
 					<form className="modal-form" onSubmit={(event) => {
 						event.preventDefault();
 						if (saving) return;
@@ -267,7 +278,8 @@ export function ReminderSheet({
 							/>
 						</div>
 
-						<div className="pwa-editor-chip-row">
+						<div className="pwa-editor-actions">
+							<div className="pwa-editor-chip-row">
 							<Button
 								className={`pwa-editor-chip${draft.dueDate ? ' is-active' : ''}`}
 								type="button"
@@ -316,20 +328,21 @@ export function ReminderSheet({
 							>
 								<Repeat size={16} />
 							</Button>
-						</div>
-
-						{isEditing && draft.deleteConfirm && (
-							<div className="delete-confirm">
-								<div>
-									<strong>Delete this reminder?</strong>
-									<p>This removes it from the original markdown file and cancels its scheduled notification.</p>
-								</div>
-								<div className="delete-confirm__actions">
-									<Button className="secondary-button" type="button" isDisabled={saving} onClick={() => patchDraft({ deleteConfirm: false })}>Keep it</Button>
-									<Button className="secondary-button is-danger" type="button" data-action="delete-reminder" isDisabled={saving} onClick={() => modal.reminderId && onDelete(modal.reminderId)}>Delete</Button>
-								</div>
 							</div>
-						)}
+
+							{isEditing && draft.deleteConfirm && (
+								<div className="delete-confirm">
+									<div>
+										<strong>Delete this reminder?</strong>
+										<p>This removes it from the original markdown file and cancels its scheduled notification.</p>
+									</div>
+									<div className="delete-confirm__actions">
+										<Button className="secondary-button" type="button" isDisabled={saving} onClick={() => patchDraft({ deleteConfirm: false })}>Keep it</Button>
+										<Button className="secondary-button is-danger" type="button" data-action="delete-reminder" isDisabled={saving} onClick={() => modal.reminderId && onDelete(modal.reminderId)}>Delete</Button>
+									</div>
+								</div>
+							)}
+						</div>
 					</form>
 				</div>
 			)}
