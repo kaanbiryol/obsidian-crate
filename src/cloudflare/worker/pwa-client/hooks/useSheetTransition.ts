@@ -1,37 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-
-export const PWA_SHEET_EXIT_MS = 300;
+import { useCallback, useRef, useState } from 'react';
 
 export function useSheetTransition(onClosed: () => void): {
 	isClosing: boolean;
 	requestClose: () => void;
 	cancelClose: () => void;
+	finishClose: () => void;
 } {
 	const [isClosing, setIsClosing] = useState(false);
-	const closeTimerRef = useRef<number | null>(null);
+	const closingRef = useRef(false);
 
 	const cancelClose = useCallback(() => {
-		if (closeTimerRef.current !== null) {
-			window.clearTimeout(closeTimerRef.current);
-			closeTimerRef.current = null;
-		}
+		closingRef.current = false;
 		setIsClosing(false);
 	}, []);
 
 	const requestClose = useCallback(() => {
-		if (closeTimerRef.current !== null) return;
+		if (closingRef.current) return;
+		closingRef.current = true;
 		setIsClosing(true);
-		const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-		closeTimerRef.current = window.setTimeout(() => {
-			closeTimerRef.current = null;
-			setIsClosing(false);
-			onClosed();
-		}, reduceMotion ? 0 : PWA_SHEET_EXIT_MS);
-	}, [onClosed]);
-
-	useEffect(() => () => {
-		if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
 	}, []);
 
-	return { isClosing, requestClose, cancelClose };
+	const finishClose = useCallback(() => {
+		if (!closingRef.current) return;
+		closingRef.current = false;
+		setIsClosing(false);
+		onClosed();
+	}, [onClosed]);
+
+	return { isClosing, requestClose, cancelClose, finishClose };
 }

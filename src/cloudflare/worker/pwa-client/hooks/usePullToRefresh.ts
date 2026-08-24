@@ -55,7 +55,7 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 
 		const handleTouchStart = (event: TouchEvent) => {
 			if (event.touches.length !== 1) return;
-			if ((event.target as Element | null)?.closest('.modal-backdrop, .settings-sheet, .settings-backdrop')) return;
+			if ((event.target as Element | null)?.closest('.react-modal-sheet-root')) return;
 			const scrollTarget = findPullScrollTarget(event.target);
 			if (!scrollTarget || scrollTarget.scrollTop > 0) return;
 

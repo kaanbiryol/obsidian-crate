@@ -19,7 +19,7 @@ export interface RichTextInputHandle {
     /** Select all editable content */
     selectAll: () => void;
     /** Set a pending cursor position to be applied on next content update */
-    setCursorPosition: (pos: number) => void;
+    setCursorPosition: (pos: number, options?: { scrollTop?: number }) => void;
 }
 
 interface RichTextInputProps {
@@ -28,6 +28,7 @@ interface RichTextInputProps {
     onKeyDown?: (e: React.KeyboardEvent) => void;
     onFocus?: (e: React.FocusEvent) => void;
     onBlur?: (e: React.FocusEvent) => void;
+    onPointerDown?: (e: React.PointerEvent<HTMLDivElement>) => void;
     placeholder?: string;
     ariaLabel?: string;
     inputRef?: React.RefObject<HTMLDivElement | null>;
@@ -51,6 +52,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     onKeyDown,
     onFocus,
     onBlur,
+    onPointerDown,
     placeholder,
     ariaLabel,
     inputRef,
@@ -67,6 +69,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const hasInitializedRef = useRef(false);
     const knownProjectsKeyRef = useRef<string | null>(null);
     const pendingCursorRef = useRef<number | null>(null);
+    const pendingScrollTopRef = useRef<number | null>(null);
     const restoreRequestIdRef = useRef(0);
 
     // Use provided ref or internal one
@@ -100,8 +103,9 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 selectElementContents(actualRef.current);
             }
         },
-        setCursorPosition: (pos: number) => {
+        setCursorPosition: (pos: number, options = {}) => {
             pendingCursorRef.current = pos;
+            pendingScrollTopRef.current = options.scrollTop ?? null;
         },
     }));
 
@@ -198,8 +202,14 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
         if (pendingCursorRef.current !== null) {
             const pendingPos = pendingCursorRef.current;
+            const pendingScrollTop = pendingScrollTopRef.current;
             pendingCursorRef.current = null;
-            scheduleSelectionRestore(pendingPos);
+            pendingScrollTopRef.current = null;
+            scheduleSelectionRestore(pendingPos, () => {
+                if (pendingScrollTop !== null && actualRef.current) {
+                    actualRef.current.scrollTop = pendingScrollTop;
+                }
+            });
         } else if (shouldPreserveCursor) {
             scheduleSelectionRestore(cursorPos);
         }
@@ -256,6 +266,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 onPaste={handlePaste}
                 onFocus={onFocus}
                 onBlur={onBlur}
+                onPointerDown={onPointerDown}
                 className={`rich-text-input-editor${className ? ` ${className}` : ''}`}
                 data-placeholder={!value ? placeholder : ''}
                 suppressContentEditableWarning

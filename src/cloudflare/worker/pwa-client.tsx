@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
 import { RemindersAppShell, type ReminderCardRenderer } from '@/reminders/ui/RemindersAppShell';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import {
@@ -19,7 +20,6 @@ import { PwaHeaderActions, PwaLoadingSkeleton, PwaPullRefreshIndicator, PwaTopNo
 import { ReminderSheet } from './pwa-client/components/ReminderSheet';
 import { SettingsSheet } from './pwa-client/components/SettingsSheet';
 import { WebReminderCard } from './pwa-client/components/WebReminderCard';
-import { useKeyboardInset } from './pwa-client/hooks/useKeyboardInset';
 import { usePushNotifications } from './pwa-client/hooks/usePushNotifications';
 import { usePwaBootstrap } from './pwa-client/hooks/usePwaBootstrap';
 import { usePwaStatus } from './pwa-client/hooks/usePwaStatus';
@@ -61,7 +61,6 @@ function App() {
 	const modalTransition = useSheetTransition(finalizeModalClose);
 	const settingsTransition = useSheetTransition(finalizeSettingsClose);
 
-	useKeyboardInset();
 	usePwaZoomLock();
 
 	useEffect(() => {
@@ -254,7 +253,9 @@ function App() {
 		modalTransition.cancelClose();
 		setSettingsOpen(false);
 		setSaving(false);
-		setModal({ mode, reminderId, draft: buildModalDraft(reminder, defaultProject ?? selectedProject) });
+		flushSync(() => {
+			setModal({ mode, reminderId, draft: buildModalDraft(reminder, defaultProject ?? selectedProject) });
+		});
 	}, [ensureCanMutate, modalTransition.cancelClose, reminders, selectedProject, settingsTransition.cancelClose]);
 
 	const closeModal = useCallback(() => {
@@ -316,7 +317,7 @@ function App() {
 	}
 
 	return (
-		<div className="crate-reminders-ui reminders-shadow-root pwa-shadow-root dark">
+		<div className={`crate-reminders-ui reminders-shadow-root pwa-shadow-root dark${modal || settingsOpen ? ' has-open-sheet' : ''}`}>
 			<RemindersAppShell
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}
@@ -367,6 +368,7 @@ function App() {
 						loggingOut={loggingOut}
 						isClosing={settingsTransition.isClosing}
 						onClose={settingsTransition.requestClose}
+						onClosed={settingsTransition.finishClose}
 						onEnablePush={enablePushNotifications}
 						onRefresh={() => void loadReminders()}
 						onLogout={() => void logOut()}
@@ -380,6 +382,7 @@ function App() {
 						isClosing={modalTransition.isClosing}
 						onChange={setModal}
 						onClose={closeModal}
+						onClosed={modalTransition.finishClose}
 						onSave={saveReminder}
 						onDelete={deleteReminder}
 					/>

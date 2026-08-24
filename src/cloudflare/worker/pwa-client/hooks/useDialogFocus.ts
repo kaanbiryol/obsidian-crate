@@ -51,10 +51,12 @@ function trapDialogFocus(event: ReactKeyboardEvent<HTMLElement>, dialog: HTMLEle
 
 export function useDialogFocus({
 	activeKey,
+	autoFocus = true,
 	escapeDisabled = false,
 	onEscape,
 }: {
 	activeKey: string;
+	autoFocus?: boolean;
 	escapeDisabled?: boolean;
 	onEscape: () => void;
 }) {
@@ -78,11 +80,12 @@ export function useDialogFocus({
 	}, []);
 
 	useLayoutEffect(() => {
+		if (!autoFocus) return;
 		const frame = window.requestAnimationFrame(() => {
 			if (dialogRef.current) focusDialog(dialogRef.current);
 		});
 		return () => window.cancelAnimationFrame(frame);
-	}, [activeKey]);
+	}, [activeKey, autoFocus]);
 
 	const setDialogRef = useCallback((element: HTMLElement | null) => {
 		dialogRef.current = element;

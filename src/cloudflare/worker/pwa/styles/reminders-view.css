@@ -18,8 +18,8 @@
 	--text-warning:#f59e0b;
 	--text-success:#22c55e;
 	--text-on-accent:#ffffff;
-	--interactive-accent:#a78bfa;
-	--interactive-accent-hover:#b9a3ff;
+	--interactive-accent:#7c3aed;
+	--interactive-accent-hover:#7c3aed;
 	--interactive-normal:rgba(255,255,255,.045);
 	--interactive-hover:rgba(255,255,255,.07);
 	--shadow-s:0 2px 8px rgba(0,0,0,.18);
@@ -38,9 +38,9 @@
 	--crate-on-accent:var(--text-on-accent);
 	--font-interface:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
 	--reminder-red:#e53935;
-	--accent:#a78bfa;
-	--accent-rgb:167,139,250;
-	--accent-strong:#8e7cf4;
+	--accent:#7c3aed;
+	--accent-rgb:124,58,237;
+	--accent-strong:#7c3aed;
 	--shadow:none;
 	--tabbar-h:80px;
 	--reminders-tabbar-height:80px;
@@ -57,7 +57,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .header-meta{gap:8px;margin-top:4px;min-height:28px;font-size:14px;color:var(--text-muted)}
 .overdue-pill{padding:4px 12px;background:var(--reminder-red);border:none;border-radius:12px;color:white;font-size:14px;font-weight:600}
 .icon-button{width:44px;height:44px;min-width:44px;border-radius:14px;background:rgba(255,255,255,.045);color:var(--text-muted)}
-.icon-button.is-active{background:rgba(124,58,237,.10);color:#7c3aed}
+.icon-button.is-active{background:rgba(var(--accent-rgb),.10);color:var(--accent)}
 .app-content{background:var(--background-primary);padding:16px 16px calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + var(--reminders-fab-size) + env(safe-area-inset-bottom));overflow-x:hidden}
 .view-transition{will-change:transform,opacity;transform-origin:center top}
 .view-transition--forward{animation:view-slide-forward 280ms cubic-bezier(.16,1,.3,1)}
@@ -74,7 +74,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .reminder-card,.premium-reminder-card{position:relative;margin-bottom:10px;background:transparent;border:none;border-radius:12px;box-shadow:none;overflow:visible}
 .reminder-card[data-drag-handle="true"]{cursor:grab}
 .reminder-card[data-drag-handle="true"]:active{cursor:grabbing}
-.reminder-card__main,.premium-reminder-content{position:relative;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:transform 160ms ease,background 200ms ease-out,border-color 200ms ease-out}
+.reminder-card__main,.premium-reminder-content{position:relative;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:transform 220ms cubic-bezier(.16,1,.3,1),background-color 220ms cubic-bezier(.16,1,.3,1),border-color 220ms cubic-bezier(.16,1,.3,1),box-shadow 280ms cubic-bezier(.16,1,.3,1)}
 .premium-reminder-card:active{transform:none}
 .premium-reminder-card:hover .premium-reminder-content{background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.06)}
 .premium-reminder-card:active .premium-reminder-content{transform:scale(.985);background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.07)}
@@ -85,9 +85,8 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .reorderable-reminder-item[data-reorder-interaction="long-press"]{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;transform-origin:center;will-change:transform}
 .reorderable-reminder-item[data-reorder-interaction="long-press"] .premium-reminder-content,.reorderable-reminder-item[data-reorder-interaction="long-press"] .reminder-card__main{padding-right:16px}
 .reorderable-reminder-item[data-reorder-interaction="long-press"].is-long-press-armed{z-index:45}
-.reorderable-reminder-item[data-reorder-interaction="long-press"].is-reordering{z-index:50}
-.reorderable-reminder-item[data-reorder-interaction="long-press"].is-long-press-armed .premium-reminder-content,.reorderable-reminder-item[data-reorder-interaction="long-press"].is-long-press-armed .reminder-card__main{transform:scale(1.025);background:rgba(48,45,56,.98);border-color:rgba(167,139,250,.48);box-shadow:0 16px 34px rgba(0,0,0,.42),0 0 0 1px rgba(167,139,250,.12)}
-.reorderable-reminder-item[data-reorder-interaction="long-press"].is-reordering .premium-reminder-content,.reorderable-reminder-item[data-reorder-interaction="long-press"].is-reordering .reminder-card__main{background:rgba(48,45,56,.98);border-color:rgba(167,139,250,.58);box-shadow:0 22px 46px rgba(0,0,0,.52),0 0 0 1px rgba(167,139,250,.16)}
+.reorderable-reminder-item[data-reorder-interaction="long-press"].is-reordering{z-index:50;cursor:grabbing}
+.reorderable-reminder-item[data-reorder-interaction="long-press"].is-long-press-armed .premium-reminder-content,.reorderable-reminder-item[data-reorder-interaction="long-press"].is-long-press-armed .reminder-card__main,.reorderable-reminder-item[data-reorder-interaction="long-press"].is-reordering .premium-reminder-content,.reorderable-reminder-item[data-reorder-interaction="long-press"].is-reordering .reminder-card__main{transform:scale(1);background:rgba(43,41,49,.98);border-color:rgba(var(--accent-rgb),.34);box-shadow:0 16px 36px -8px rgba(0,0,0,.52),0 5px 14px rgba(0,0,0,.24),0 0 0 .5px rgba(var(--accent-rgb),.12)}
 .reorder-drag-handle{position:absolute;top:50%;right:8px;z-index:2;width:40px;height:44px;display:grid;place-items:center;padding:0;border:none;border-radius:12px;color:var(--text-faint);background:transparent;cursor:grab;touch-action:none;transform:translateY(-50%)}
 .reorder-drag-handle:active{cursor:grabbing;color:var(--text-muted);background:rgba(255,255,255,.04)}
 .reorder-drag-handle svg{display:block}
@@ -116,14 +115,14 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .tab-button{position:relative;width:100%;min-height:48px;padding:10px 16px;border-radius:12px;background:transparent;color:var(--text-faint);font-size:13px;font-weight:500;letter-spacing:.01em;gap:4px;transition:color 180ms ease,background 260ms cubic-bezier(.16,1,.3,1),transform 180ms ease}
 .tab-button:active{transform:scale(.96)}
 .tab-button__icon{width:24px;height:24px;border-radius:0;background:transparent;transition:transform 260ms cubic-bezier(.16,1,.3,1),color 180ms ease}
-.tab-button.is-active{background:transparent;color:#a78bfa;font-weight:600;animation:tab-active-pop 260ms cubic-bezier(.16,1,.3,1)}
+.tab-button.is-active{background:transparent;color:var(--accent);font-weight:600;animation:tab-active-pop 260ms cubic-bezier(.16,1,.3,1)}
 .tab-button.is-active .tab-button__icon{background:transparent;transform:translateY(-1px) scale(1.04)}
-.fab{right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:56px;height:56px;min-width:56px;border-radius:50%;background:#7c3aed;color:white;box-shadow:0 4px 12px rgba(124,58,237,.4);display:flex;align-items:center;justify-content:center}
-.fab:hover{box-shadow:0 6px 16px rgba(124,58,237,.5)}
+.fab{right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:56px;height:56px;min-width:56px;border-radius:50%;background:var(--accent);color:white;box-shadow:0 4px 12px rgba(var(--accent-rgb),.4);display:flex;align-items:center;justify-content:center}
+.fab:hover{box-shadow:0 6px 16px rgba(var(--accent-rgb),.5)}
 .modal-card,.settings-sheet{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:24px 24px 0 0}
 .composer-surface,.composer-panel{background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03);border-radius:14px}
 .field input,.field textarea,.field select{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08);color:var(--text-normal)}
-.placeholder-card{min-height:64px;background:rgba(124,58,237,.08);border:1px dashed rgba(124,58,237,.35);border-radius:12px}
+.placeholder-card{min-height:64px;background:rgba(var(--accent-rgb),.08);border:1px dashed rgba(var(--accent-rgb),.35);border-radius:12px}
 .is-dragging{opacity:.98;box-shadow:0 10px 24px rgba(0,0,0,.25)}
 .reminders-shadow-root{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden;color:var(--text-normal);font-family:var(--font-interface);font-size:var(--font-ui-medium,14px);background:var(--background-primary)}
 .pwa-shadow-root>[data-overlay-container="true"]{display:flex;flex:1;min-height:0;width:100%;height:100%;flex-direction:column;overflow:hidden}
@@ -153,26 +152,26 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-status-line.is-live{background:rgba(255,255,255,.018)}
 .pwa-update-banner{align-self:stretch;min-width:0;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;border-radius:13px;color:var(--text-normal);background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);box-shadow:none;animation:pwa-update-slide-in .2s cubic-bezier(.32,.72,0,1) both}
 .pwa-update-banner__label{min-width:0;display:flex;align-items:center;gap:10px}
-.pwa-update-banner__dot{width:7px;height:7px;min-width:7px;border-radius:50%;background:#a78bfa;box-shadow:0 0 0 3px rgba(167,139,250,.13)}
+.pwa-update-banner__dot{width:7px;height:7px;min-width:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.13)}
 .pwa-update-banner__text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:650;line-height:1.2;color:rgba(220,221,222,.90)}
-.pwa-inline-button{height:44px;min-height:44px;border-radius:12px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;background:#8e7cf4;color:white;font-size:13px;font-weight:700;white-space:nowrap}
-.pwa-update-button{height:44px;min-height:44px;border-radius:11px;padding:0 10px;background:transparent;border:0;color:#a78bfa;font-size:15px;font-weight:650;line-height:1;white-space:nowrap}
-.pwa-update-button:active{background:rgba(124,58,237,.12);transform:scale(.98)}
+.pwa-inline-button{height:44px;min-height:44px;border-radius:12px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:white;font-size:13px;font-weight:700;white-space:nowrap}
+.pwa-update-button{height:44px;min-height:44px;border-radius:11px;padding:0 10px;background:transparent;border:0;color:var(--accent);font-size:15px;font-weight:650;line-height:1;white-space:nowrap}
+.pwa-update-button:active{background:rgba(var(--accent-rgb),.12);transform:scale(.98)}
 .pwa-inline-button:active,.primary-button:active,.secondary-button:active,.pwa-picker-option:active,.pwa-project-option:active,.pwa-recurrence-segment:active,.pwa-recurrence-stepper__button:active,.pwa-recurrence-day:active{transform:scale(.97)}
 .pwa-inline-button svg{width:14px;height:14px;display:block}
 .pwa-notification-prompt{display:flex;align-items:center;gap:10px;padding:10px}
-.pwa-notification-prompt__icon{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border-radius:10px;background:rgba(124,58,237,.14);color:#a78bfa}
+.pwa-notification-prompt__icon{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border-radius:10px;background:rgba(var(--accent-rgb),.14);color:var(--accent)}
 .pwa-notification-prompt__copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .pwa-notification-prompt__copy strong{font-size:13px;font-weight:700;color:var(--text-normal);line-height:1.25}
 .pwa-notification-prompt__copy span{font-size:12px;color:var(--text-muted);line-height:1.35}
 .pwa-pull-refresh{flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--background-primary);opacity:0;transition:height .32s cubic-bezier(.32,.72,0,1),opacity .16s ease}
 .pwa-pull-refresh.is-visible{opacity:1}
 .pwa-pull-refresh__inner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:44px;transform:translateY(-2px)}
-.pwa-pull-refresh__glyph{width:28px;height:28px;display:grid;place-items:center;border-radius:50%;color:#a78bfa;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.16);box-shadow:0 4px 14px rgba(0,0,0,.14);transition:transform .18s cubic-bezier(.32,.72,0,1),color .16s ease,background .16s ease,border-color .16s ease}
-.pwa-pull-refresh.is-ready .pwa-pull-refresh__glyph,.pwa-pull-refresh.is-refreshing .pwa-pull-refresh__glyph{color:white;background:#7c3aed;border-color:rgba(124,58,237,.55);box-shadow:0 6px 18px rgba(124,58,237,.24)}
+.pwa-pull-refresh__glyph{width:28px;height:28px;display:grid;place-items:center;border-radius:50%;color:var(--accent);background:rgba(var(--accent-rgb),.10);border:1px solid rgba(var(--accent-rgb),.16);box-shadow:0 4px 14px rgba(0,0,0,.14);transition:transform .18s cubic-bezier(.32,.72,0,1),color .16s ease,background .16s ease,border-color .16s ease}
+.pwa-pull-refresh.is-ready .pwa-pull-refresh__glyph,.pwa-pull-refresh.is-refreshing .pwa-pull-refresh__glyph{color:white;background:var(--accent);border-color:rgba(var(--accent-rgb),.55);box-shadow:0 6px 18px rgba(var(--accent-rgb),.24)}
 .pwa-pull-refresh__glyph svg{width:19px;height:19px;display:block}
 .pwa-pull-refresh.is-refreshing .pwa-pull-refresh__glyph svg{animation:pwa-spin .82s linear infinite}
-.pwa-pull-refresh__label{font-size:10.5px;font-weight:650;line-height:1;color:#a78bfa;white-space:nowrap}
+.pwa-pull-refresh__label{font-size:10.5px;font-weight:650;line-height:1;color:var(--accent);white-space:nowrap}
 .pwa-loading-state{height:100%;padding:16px}
 .pwa-skeleton-header{padding:2px 4px 16px}
 .pwa-skeleton-list{display:flex;flex-direction:column;gap:10px}
@@ -189,8 +188,8 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}
 .pwa-reminders-view .bottom-tab-indicator{background:transparent!important}
 .pwa-reminders-view .bottom-tab-button{color:var(--text-faint)}
-.pwa-reminders-view .bottom-tab-button.is-active{color:#a78bfa}
+.pwa-reminders-view .bottom-tab-button.is-active{color:var(--accent)}
 .pwa-reminders-view .bottom-tab-button.is-active svg{fill:currentColor;fill-opacity:.14}
 .pwa-reminders-view .bottom-tab-label{font-size:11px;font-weight:500;letter-spacing:0}
 .pwa-reminders-view .bottom-tab-button.is-active .bottom-tab-label{font-weight:600}
-.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))}
+.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed));background:var(--accent);box-shadow:0 4px 12px rgba(var(--accent-rgb),.4)}

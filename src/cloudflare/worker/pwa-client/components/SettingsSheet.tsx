@@ -3,8 +3,8 @@ import { Button } from '@heroui/react';
 import { RefreshCw, X } from 'lucide-react';
 import { isStandaloneApp } from '../config';
 import { useDialogFocus } from '../hooks/useDialogFocus';
-import { useSheetDrag } from '../hooks/useSheetDrag';
 import type { PushState, StoredConfig } from '../types';
+import { PwaModalSheet } from './PwaModalSheet';
 
 export function SettingsSheet({
 	config,
@@ -12,6 +12,7 @@ export function SettingsSheet({
 	loggingOut,
 	isClosing,
 	onClose,
+	onClosed,
 	onEnablePush,
 	onRefresh,
 	onLogout,
@@ -21,6 +22,7 @@ export function SettingsSheet({
 	loggingOut: boolean;
 	isClosing: boolean;
 	onClose: () => void;
+	onClosed: () => void;
 	onEnablePush: () => void;
 	onRefresh: () => void;
 	onLogout: () => void;
@@ -35,14 +37,17 @@ export function SettingsSheet({
 		escapeDisabled: loggingOut || isClosing,
 		onEscape: onClose,
 	});
-	const sheetDrag = useSheetDrag({ disabled: loggingOut || isClosing, onDismiss: onClose });
-
 	return (
-		<div style={sheetDrag.backdropStyle} className={`settings-backdrop${isClosing ? ' is-closing' : ''}`} onClick={(event) => {
-			if (!loggingOut && !isClosing && event.target === event.currentTarget) onClose();
-		}}>
-			<aside ref={setDialogRef} className={`settings-sheet${isClosing ? ' is-closing' : ''}${sheetDrag.dragClassName}`} role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut || isClosing} tabIndex={-1} onKeyDown={handleDialogKeyDown}>
-				<div className="pwa-sheet-grabber" aria-hidden="true" {...sheetDrag.handleProps}><span /></div>
+		<PwaModalSheet
+			isOpen={!isClosing}
+			onClose={onClose}
+			onCloseEnd={onClosed}
+			variant="settings"
+			detent="content"
+			closeOnBackdrop={!loggingOut && !isClosing}
+			onKeyDown={handleDialogKeyDown}
+		>
+			<aside ref={setDialogRef} className="settings-sheet" role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut || isClosing} tabIndex={-1}>
 				<div className="settings-sheet__header">
 					<div>
 						<h2>Settings</h2>
@@ -81,6 +86,6 @@ export function SettingsSheet({
 					</div>
 				</div>
 			</aside>
-		</div>
+		</PwaModalSheet>
 	);
 }

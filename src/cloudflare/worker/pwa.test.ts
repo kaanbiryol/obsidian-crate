@@ -60,6 +60,23 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('height=device-height');
 	});
 
+	it('uses the Obsidian purple for every PWA interaction accent', () => {
+		const html = createPwaHtml('https://worker.test/notifications');
+
+		expect(html).toContain('--interactive-accent:#7c3aed;');
+		expect(html).toContain('--interactive-accent-hover:#7c3aed;');
+		expect(html).toContain('--accent:#7c3aed;');
+		expect(html).toContain('--accent-rgb:124,58,237;');
+		expect(html).toContain('--accent-strong:#7c3aed;');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-button.is-active{color:var(--accent)}');
+		expect(html).toContain('.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;');
+		expect(html).toContain('background:var(--accent);box-shadow:0 4px 12px rgba(var(--accent-rgb),.4)');
+		expect(html).toContain('.pwa-editor-icon-button--save{background:var(--accent);');
+		expect(html).not.toContain('--interactive-accent:#a78bfa');
+		expect(html).not.toContain('--accent:#9b7cff');
+		expect(html).not.toContain('--accent-strong:#8e7cf4');
+	});
+
 	it('exposes the current PWA asset version', () => {
 		expect(JSON.parse(createPwaVersionJson())).toEqual({ assetVersion: PWA_ASSET_VERSION });
 	});
@@ -104,24 +121,33 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('pwa-safe-area-debug');
 	});
 
-	it('keeps reminder sheet controls close to the keyboard while keeping settings above it', () => {
+	it('keeps library-backed sheets fixed while their inner fields handle scrolling', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('.pwa-reminder-editor-backdrop{align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);');
-		expect(html).toContain('.pwa-reminder-editor-backdrop::after{content:"";position:absolute;right:0;bottom:0;left:0;height:var(--keyboard-offset);background:var(--pwa-sheet-surface);');
-		expect(html).toContain('html.pwa-keyboard-open,html.pwa-keyboard-open body{background:var(--pwa-sheet-surface)}');
-		expect(html).toContain('.modal-card.pwa-reminder-editor.is-closing{pointer-events:none;animation:pwa-sheet-out .3s cubic-bezier(.4,0,1,1) forwards}');
-		expect(html).toContain('.settings-sheet.is-closing{pointer-events:none;animation:pwa-sheet-out .3s cubic-bezier(.4,0,1,1) forwards}');
-		expect(html).toContain('@keyframes pwa-backdrop-out{from{background-color:rgba(0,0,0,.56);backdrop-filter:blur(8px)}to{background-color:rgba(0,0,0,0);backdrop-filter:blur(0)}}');
-		expect(html).toContain('.settings-backdrop{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;padding:0 18px var(--keyboard-offset);');
+		expect(html).toContain('.pwa-shadow-root.has-open-sheet .reminders-content,.pwa-shadow-root.has-open-sheet .reminders-view-scroll{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}');
+		expect(html).toContain('.pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.56);backdrop-filter:blur(8px);');
+		expect(html).toContain('.pwa-modal-sheet__container--reminder{width:min(1120px,calc(100vw - 36px))!important;height:calc(100% - env(safe-area-inset-top) - 28px)!important;');
+		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-reminder-sheet-stage{height:calc(100% - var(--pwa-keyboard-inset,0px));flex:0 0 calc(100% - var(--pwa-keyboard-inset,0px))}');
+		expect(html).not.toContain('.pwa-modal-sheet.is-keyboard-open .pwa-modal-sheet__container--reminder{bottom:');
+		expect(html).toContain('.pwa-modal-sheet__content,.pwa-modal-sheet__scroller{height:100%;min-height:0;overflow:hidden!important}');
+		expect(html).toContain('.pwa-picker-sheet{position:relative;z-index:1;display:flex;width:100%;height:100%;');
+		expect(html).not.toContain('@keyframes pwa-nested-sheet-in');
+		expect(html).toContain('.settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;');
+		expect(html).toContain('.settings-panel{min-height:0;overflow-y:auto;overscroll-behavior-y:contain;');
 		expect(html).toContain('.pwa-reminder-editor .modal-form{gap:0;display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}');
-		expect(html).toContain('max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);overflow:hidden;background:var(--pwa-sheet-surface)');
-		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 72px);max-height:calc(var(--keyboard-usable-height,100dvh) - 72px);padding-bottom:16px}');
+		expect(html).toContain('.pwa-editor-card{position:relative;display:flex;flex:1 1 420px;min-height:160px;flex-direction:column;overflow:hidden;overscroll-behavior:none;');
 		expect(html).toContain('.pwa-editor-actions{flex:0 0 auto;min-width:0}');
-		expect(html).toContain('.pwa-keyboard-open .pwa-editor-card{flex:1 1 auto;min-height:0;padding:16px 18px 18px}');
-		expect(html).toContain('.pwa-keyboard-open .pwa-editor-description-input{flex:0 1 auto;min-height:42px;max-height:88px}');
-		expect(html).toContain('.pwa-keyboard-open .pwa-editor-chip-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px 44px;gap:8px;margin-top:14px;padding-top:14px;overflow:visible}');
-		expect(html).toContain('.pwa-keyboard-open .modal-card.pwa-reminder-editor{height:calc(var(--keyboard-usable-height,100dvh) - 28px);max-height:calc(var(--keyboard-usable-height,100dvh) - 28px);padding-bottom:16px}');
+		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-card{flex:1 1 auto;min-height:0;padding:16px 18px 18px}');
+		expect(html).toContain('.pwa-editor-title-input{flex:1 1 0;min-height:42px;max-height:120px;');
+		expect(html).toContain('.pwa-editor-description-input{flex:1.15 1 0;height:auto;min-height:60px;max-height:260px;');
+		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-title-input{flex:.9 1 0;min-height:42px;max-height:96px}');
+		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-description-input{flex:1.1 1 0;height:auto;min-height:42px;max-height:none}');
+		expect(html).not.toContain('transition:padding-bottom');
+		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-chip-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:12px;padding:4px;overflow:visible}');
+		expect(html).toContain('.pwa-editor-chip .pwa-editor-chip__mobile-label{display:block}');
+		expect(html).not.toContain('pwa-reminder-editor-backdrop');
+		expect(html).toContain('.pwa-editor-focus-bridge{position:fixed;top:calc(env(safe-area-inset-top) + 1px);left:1px;width:1px;height:1px;');
+		expect(html).not.toContain('--keyboard-usable-height');
 		expect(html).toContain('box-shadow:0 -1px 0 rgba(255,255,255,.035)');
 		expect(html).not.toContain('box-shadow:0 -6px 20px rgba(0,0,0,.22)');
 		expect(html).not.toContain('box-shadow:0 -12px 48px rgba(0,0,0,.38)');
@@ -130,10 +156,12 @@ describe('PWA activation metadata', () => {
 	it('uses native-feeling sheet and list interaction affordances', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('.pwa-sheet-grabber{width:100%;height:28px;min-height:28px;');
-		expect(html).toContain('touch-action:none;cursor:grab;');
+		expect(html).not.toContain('pwa-sheet-grabber');
+		expect(html).not.toContain('--pwa-sheet-drag-');
 		expect(html).toContain('.reorderable-reminder-item[data-reorder-interaction="long-press"]{-webkit-touch-callout:none;user-select:none;');
 		expect(html).toContain('.reorderable-reminder-item[data-reorder-interaction="long-press"].is-reordering .premium-reminder-content');
+		expect(html).toContain('box-shadow 280ms cubic-bezier(.16,1,.3,1)');
+		expect(html).not.toContain('transform:scale(1.025)');
 		expect(html).toContain('--reminders-fab-gap:18px;--reminders-fab-size:56px;');
 		expect(html).toContain('.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;');
 		expect(html).not.toContain('.pwa-header-add-button');
