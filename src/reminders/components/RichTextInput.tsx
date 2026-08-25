@@ -71,6 +71,11 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const pendingCursorRef = useRef<number | null>(null);
     const pendingScrollTopRef = useRef<number | null>(null);
     const restoreRequestIdRef = useRef(0);
+    const initialHtmlRef = useRef<{ html: string } | null>(null);
+
+    if (!initialHtmlRef.current) {
+        initialHtmlRef.current = { html: buildHTML(value, knownProjects) || '' };
+    }
 
     // Use provided ref or internal one
     const actualRef = inputRef || editableRef;
@@ -269,6 +274,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 onPointerDown={onPointerDown}
                 className={`rich-text-input-editor${className ? ` ${className}` : ''}`}
                 data-placeholder={!value ? placeholder : ''}
+                dangerouslySetInnerHTML={{ __html: initialHtmlRef.current.html }}
                 suppressContentEditableWarning
                 style={style}
             />

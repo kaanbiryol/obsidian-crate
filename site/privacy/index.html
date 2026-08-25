@@ -7,12 +7,12 @@
 	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'">
 	<title>Crate privacy</title>
 	<link rel="icon" href="/assets/logo.png" type="image/png" sizes="192x192">
-	<link rel="stylesheet" href="/assets/site.css">
+	<link rel="stylesheet" href="/assets/callback.css">
 </head>
 <body>
 	<main>
 		<div class="card">
-			<img class="logo" src="/assets/logo.png" alt="">
+			<div class="brand-logo-tile" aria-hidden="true"><img class="logo" src="/assets/logo.png" alt=""></div>
 			<h1>Privacy</h1>
 			<p>This site is static. It has no analytics, cookies, forms, or third-party scripts. The OAuth callback passes Cloudflare's short-lived response directly to the Crate plugin and immediately removes it from the browser address bar.</p>
 			<p>Crate uses a temporary Cloudflare OAuth token only while provisioning your resources. It does not store that token or send it to a Crate-operated service.</p>
