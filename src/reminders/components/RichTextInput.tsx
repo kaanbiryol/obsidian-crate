@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { buildHTML, getPlainText } from '../utils/richTextParsing';
 import { saveCursorPosition, restoreCursorPosition, moveCursorToEnd } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
@@ -164,7 +164,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     };
 
     // Update content when value changes externally (e.g., from parent reset)
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!actualRef.current) return;
 
         const currentPlainText = getPlainText(actualRef.current);
