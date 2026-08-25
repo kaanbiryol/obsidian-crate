@@ -76,15 +76,6 @@ export function useReminderSync({
 		else setLoading(true);
 		setError(null);
 		try {
-			if (!navigator.onLine) {
-				const cached = loadCachedReminderSnapshot(config.folderPath);
-				if (cached) {
-					hydrateCachedSnapshot(cached);
-					return;
-				}
-				throw new Error('Offline');
-			}
-
 			const response = await apiFetch(`/reminders/list?folderPath=${encodeURIComponent(config.folderPath)}`);
 			if (!response.ok) throw new Error(await response.text());
 			const result = await response.json() as { reminders?: ReminderRecord[]; projects?: string[] };

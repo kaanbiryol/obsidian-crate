@@ -45,6 +45,8 @@ function applyTime(rule: RecurrenceRule, timeText: string | undefined): void {
  * - "every Monday" or "every Mon" (specific day, optionally with time)
  * - "every Monday and Wednesday" or "every Mon, Wed, Fri" (multiple days)
  * - "every 2 weeks" or "every 3 days" (intervals, optionally with time)
+ * - "every 2 weeks on Mon, Wed" (weekly interval with specific days)
+ * - "every 2 months on the 15th" (monthly interval with a specific day)
  * - "monthly on 15th" or "monthly on the 1st" (specific day of month, optionally with time)
  *
  * @returns Object with matched string and parsed rule, or null if no match
@@ -52,6 +54,47 @@ function applyTime(rule: RecurrenceRule, timeText: string | undefined): void {
 export function parseRecurrenceFromContent(content: string): { matched: string; rule: RecurrenceRule } | null {
   // Optional time pattern: matches " HH:MM" or " H:MM" at the end
   const timePattern = '(?:\\s+(\\d{1,2}:\\d{2}))?';
+
+  // Pattern 1a: "every N weeks on Mon, Wed" (with optional time)
+  const weeklyIntervalDaysPattern = /\bevery\s+(\d+)\s+weeks?\s+on\s+((?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)(?:\s*(?:,|and)\s*)?)+)(?:\s+(\d{1,2}:\d{2}))?\b/i;
+  const weeklyIntervalDaysMatch = content.match(weeklyIntervalDaysPattern);
+  if (weeklyIntervalDaysMatch) {
+    const interval = parseInt(weeklyIntervalDaysMatch[1], 10);
+    const dayMatches = weeklyIntervalDaysMatch[2].match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/gi);
+    if (dayMatches && dayMatches.length > 0) {
+      const daysOfWeek = [...new Set(dayMatches.map(d => DAY_NAME_MAP[d.toLowerCase()]))].sort((a, b) => a - b);
+      const rule = normalizeRecurrenceRule({
+        frequency: 'weekly',
+        interval: interval > 1 ? interval : undefined,
+        daysOfWeek,
+      })!;
+      applyTime(rule, weeklyIntervalDaysMatch[3]);
+      return {
+        matched: weeklyIntervalDaysMatch[0],
+        rule,
+      };
+    }
+  }
+
+  // Pattern 1b: "every N months on the 15th" (with optional time)
+  const monthlyIntervalDayPattern = /\bevery\s+(\d+)\s+months?\s+on\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{1,2}:\d{2}))?\b/i;
+  const monthlyIntervalDayMatch = content.match(monthlyIntervalDayPattern);
+  if (monthlyIntervalDayMatch) {
+    const interval = parseInt(monthlyIntervalDayMatch[1], 10);
+    const dayOfMonth = parseInt(monthlyIntervalDayMatch[2], 10);
+    if (dayOfMonth >= 1 && dayOfMonth <= 31) {
+      const rule = normalizeRecurrenceRule({
+        frequency: 'monthly',
+        interval: interval > 1 ? interval : undefined,
+        dayOfMonth,
+      })!;
+      applyTime(rule, monthlyIntervalDayMatch[3]);
+      return {
+        matched: monthlyIntervalDayMatch[0],
+        rule,
+      };
+    }
+  }
 
   // Pattern 1: "every N days/weeks/months" (with interval, optionally with time)
   const intervalMatch = content.match(new RegExp(`\\bevery\\s+(\\d+)\\s+(day|week|month)s?${timePattern}\\b`, 'i'));

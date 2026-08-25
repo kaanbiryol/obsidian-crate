@@ -66,8 +66,23 @@
 	.delete-confirm__actions{width:100%;display:grid;grid-template-columns:1fr 1fr}
 	.modal-actions{flex-direction:column-reverse;align-items:stretch}
 	.modal-actions__primary{display:grid;grid-template-columns:1fr 1fr}
-	.settings-panel__row{align-items:flex-start;flex-direction:column}
-	.settings-panel__row code{max-width:100%;text-align:left}
+	.settings-sheet__header{padding:18px 16px 16px}
+	.settings-sheet__header h2{font-size:26px}
+	.settings-panel{gap:20px;padding:16px 12px 18px}
+	.settings-feature-row{padding:13px 12px}
+	.settings-feature-row__icon{width:40px;height:40px;min-width:40px}
+	.settings-action-button{min-width:70px;padding:0 10px}
+	.settings-feature-row--install{display:grid;grid-template-columns:40px minmax(0,1fr);align-items:start}
+	.settings-feature-row--install .settings-status-badge{grid-column:2;justify-self:start}
+	.settings-sheet__footer{padding-right:12px;padding-left:12px}
+	.pwa-picker-sheet.pwa-date-picker-sheet{padding-right:14px;padding-left:14px}
+	.pwa-picker-sheet.pwa-repeat-picker-sheet{padding-right:14px;padding-left:14px}
+	.pwa-schedule-content{gap:18px}
+	.pwa-repeat-content{gap:18px}
+	.pwa-schedule-preset{min-height:72px;padding:9px}
+	.pwa-schedule-field{padding-right:11px;padding-left:11px}
+	.pwa-repeat-control-card,.pwa-repeat-time-card{padding-right:11px;padding-left:11px}
+	.pwa-repeat-days{gap:4px;padding:8px}
 }
 @media (max-width: 392px){
 	:root{--tabbar-h:64px}
@@ -79,6 +94,7 @@
 	.card-title{font-size:13.5px}
 	.bottom-tabs{padding-left:6px;padding-right:6px}
 	.fab{width:46px;height:46px;min-width:46px;right:10px;bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px)}
+	.settings-list__value{max-width:40%}
 }
 @media (max-width: 420px){
 	.pwa-reminders-view .view-header{padding:calc(env(safe-area-inset-top) + 16px) 20px 12px!important}

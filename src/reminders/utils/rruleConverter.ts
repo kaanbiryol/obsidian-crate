@@ -101,9 +101,14 @@ export function recurrenceToText(rule: RecurrenceRule): string {
   }
 
   if (rule.frequency === 'weekly') {
+    const days = rule.daysOfWeek && rule.daysOfWeek.length > 0
+      ? rule.daysOfWeek.map(d => DAY_NAMES[d]).join(', ')
+      : '';
+    if (interval > 1 && days) {
+      return `every ${interval} weeks on ${days}${timeStr}`;
+    }
     // If specific days are set, use "every Mon, Wed, Fri" format
     if (rule.daysOfWeek && rule.daysOfWeek.length > 0) {
-      const days = rule.daysOfWeek.map(d => DAY_NAMES[d]).join(', ');
       return `every ${days}${timeStr}`;
     }
     // Otherwise use simple weekly/every N weeks

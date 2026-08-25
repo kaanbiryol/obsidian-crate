@@ -157,7 +157,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-inline-button{height:44px;min-height:44px;border-radius:12px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:white;font-size:13px;font-weight:700;white-space:nowrap}
 .pwa-update-button{height:44px;min-height:44px;border-radius:11px;padding:0 10px;background:transparent;border:0;color:var(--accent);font-size:15px;font-weight:650;line-height:1;white-space:nowrap}
 .pwa-update-button:active{background:rgba(var(--accent-rgb),.12);transform:scale(.98)}
-.pwa-inline-button:active,.primary-button:active,.secondary-button:active,.pwa-picker-option:active,.pwa-project-option:active,.pwa-recurrence-segment:active,.pwa-recurrence-stepper__button:active,.pwa-recurrence-day:active{transform:scale(.97)}
+.pwa-inline-button:active,.primary-button:active,.secondary-button:active,.pwa-picker-option:active,.pwa-project-option:active,.pwa-repeat-frequency:active,.pwa-repeat-stepper__button:active,.pwa-repeat-day:active{transform:scale(.97)}
 .pwa-inline-button svg{width:14px;height:14px;display:block}
 .pwa-notification-prompt{display:flex;align-items:center;gap:10px;padding:10px}
 .pwa-notification-prompt__icon{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border-radius:10px;background:rgba(var(--accent-rgb),.14);color:var(--accent)}
