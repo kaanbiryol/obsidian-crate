@@ -7,6 +7,9 @@ export {
 	APPLE_STARTUP_1179X2556_PNG,
 	APPLE_STARTUP_1290X2796_PNG,
 	APPLE_TOUCH_ICON_180_PNG,
+	CRATE_ICON_192_PNG,
+	CRATE_ICON_512_PNG,
+	CRATE_MARK_256_PNG,
 } from './pwa/install-assets';
 export { createManifestJson } from './pwa/manifest';
 export { OPEN_OBSIDIAN_HTML } from './pwa/open-obsidian';

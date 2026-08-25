@@ -47,19 +47,25 @@ try {
 	if (appJs.length < 100_000) throw new Error(`PWA app bundle is unexpectedly small: ${appJs.length} bytes`);
 
 	const serviceWorkerResponse = await fetchOk(`${origin}/notifications/sw.js`);
+	if (serviceWorkerResponse.headers.get('service-worker-allowed') !== '/notifications') {
+		throw new Error('Service worker scope header is missing');
+	}
 	const serviceWorkerJs = await serviceWorkerResponse.text();
 	if (!serviceWorkerJs.includes('crate-reminders-shell-')) throw new Error('Service worker shell cache name is missing');
 
-	for (const path of [
-		'/notifications/apple-touch-icon-180.png?v=smoke',
-		'/notifications/apple-startup-1179x2556.png?v=smoke',
-		'/notifications/apple-startup-1290x2796.png?v=smoke',
+	for (const [path, minimumBytes] of [
+		['/notifications/crate-mark-256.png?v=smoke', 5_000],
+		['/notifications/crate-icon-192.png?v=smoke', 5_000],
+		['/notifications/crate-icon-512.png?v=smoke', 20_000],
+		['/notifications/apple-touch-icon-180.png?v=smoke', 5_000],
+		['/notifications/apple-startup-1179x2556.png?v=smoke', 20_000],
+		['/notifications/apple-startup-1290x2796.png?v=smoke', 20_000],
 	]) {
 		const imageResponse = await fetchOk(`${origin}${path}`);
 		if (imageResponse.headers.get('Content-Type') !== 'image/png') {
 			throw new Error(`${path} is not served as image/png`);
 		}
-		if ((await imageResponse.arrayBuffer()).byteLength < 10_000) {
+		if ((await imageResponse.arrayBuffer()).byteLength < minimumBytes) {
 			throw new Error(`${path} is unexpectedly small`);
 		}
 	}

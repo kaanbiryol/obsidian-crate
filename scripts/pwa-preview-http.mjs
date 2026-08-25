@@ -12,9 +12,10 @@ export function sendJson(res, statusCode, payload) {
 	});
 }
 
-export function sendText(res, statusCode, body, contentType) {
+export function sendText(res, statusCode, body, contentType, headers = {}) {
 	send(res, statusCode, body, {
 		'Content-Type': contentType,
+		...headers,
 	});
 }
 

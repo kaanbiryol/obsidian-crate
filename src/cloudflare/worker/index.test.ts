@@ -290,6 +290,16 @@ describe('worker entrypoint', () => {
 		expect(await response.json()).toEqual({ assetVersion: PWA_ASSET_VERSION });
 	});
 
+	it('allows the service worker to control the exact notifications route', async () => {
+		const response = await worker.fetch(
+			new Request('https://worker.test/notifications/sw.js'),
+			createEnv() as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('Service-Worker-Allowed')).toBe('/notifications');
+	});
+
 	it('uses immutable caching for versioned PWA app assets only', async () => {
 		const versionedAppResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/app.js?v=${PWA_ASSET_VERSION}`),
@@ -303,6 +313,10 @@ describe('worker entrypoint', () => {
 			new Request(`https://worker.test/notifications/icon.svg?v=${PWA_ASSET_VERSION}`),
 			createEnv() as never,
 		);
+		const versionedCrateIconResponse = await worker.fetch(
+			new Request(`https://worker.test/notifications/crate-icon-512.png?v=${PWA_ASSET_VERSION}`),
+			createEnv() as never,
+		);
 		const versionedTouchIconResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}`),
 			createEnv() as never,
@@ -311,6 +325,8 @@ describe('worker entrypoint', () => {
 		expect(versionedAppResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(unversionedAppResponse.headers.get('Cache-Control')).toBe('no-store');
 		expect(versionedIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+		expect(versionedCrateIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+		expect(versionedCrateIconResponse.headers.get('Content-Type')).toBe('image/png');
 		expect(versionedTouchIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedTouchIconResponse.headers.get('Content-Type')).toBe('image/png');
 	});

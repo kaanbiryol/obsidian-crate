@@ -19,8 +19,8 @@ describe('PWA activation metadata', () => {
 
 		expect(manifest.display).toBe('standalone');
 		expect(manifest.display_override).toEqual(['standalone', 'minimal-ui']);
-		expect(manifest.background_color).toBe('#1e1e1e');
-		expect(manifest.theme_color).toBe('#1e1e1e');
+		expect(manifest.background_color).toBe('#0b0d11');
+		expect(manifest.theme_color).toBe('#0b0d11');
 	});
 
 	it('carries activation params into the manifest start URL', () => {
@@ -34,6 +34,7 @@ describe('PWA activation metadata', () => {
 	it('adds mobile launcher metadata and shortcuts', () => {
 		const manifest = JSON.parse(createManifestJson('https://worker.test/notifications/manifest.json?v=asset')) as {
 			categories: string[];
+			icons: Array<{ sizes: string; purpose: string; src: string; type: string }>;
 			launch_handler: { client_mode: string };
 			shortcuts: Array<{ name: string; url: string }>;
 		};
@@ -44,6 +45,26 @@ describe('PWA activation metadata', () => {
 			['Inbox', '/notifications'],
 			['Today', '/notifications?tab=today'],
 			['Upcoming', '/notifications?tab=upcoming'],
+		]);
+		expect(manifest.icons).toEqual([
+			{
+				src: `/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}`,
+				sizes: '180x180',
+				type: 'image/png',
+				purpose: 'any',
+			},
+			{
+				src: `/notifications/crate-icon-192.png?v=${PWA_ASSET_VERSION}`,
+				sizes: '192x192',
+				type: 'image/png',
+				purpose: 'any',
+			},
+			{
+				src: `/notifications/crate-icon-512.png?v=${PWA_ASSET_VERSION}`,
+				sizes: '512x512',
+				type: 'image/png',
+				purpose: 'any maskable',
+			},
 		]);
 	});
 
@@ -85,7 +106,8 @@ describe('PWA activation metadata', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
-		expect(html).toContain('<meta name="theme-color" content="#1e1e1e">');
+		expect(html).toContain('<meta name="theme-color" content="#0b0d11">');
+		expect(html).toContain('<link rel="icon" type="image/png" sizes="192x192" href="/notifications/crate-icon-192.png?v=');
 		expect(html).toContain('<link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=');
 		expect(html).toContain('<link rel="apple-touch-startup-image" href="/notifications/apple-startup-1179x2556.png?v=');
 		expect(html).toContain('<link rel="apple-touch-startup-image" href="/notifications/apple-startup-1290x2796.png?v=');
@@ -182,16 +204,36 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("return caches.match(PWA_SHELL_URL).then(function(cached)");
 		expect(SERVICE_WORKER_JS).toContain("url.pathname === '/notifications/app.js'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/icon.svg'");
+		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-icon-192.png'");
+		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-icon-512.png'");
+		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-mark-256.png'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-touch-icon-180.png'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-startup-1179x2556.png'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-startup-1290x2796.png'");
 	});
 
 	it('deep links notification clicks to the reminder and project', () => {
-		expect(SERVICE_WORKER_JS).toContain("var reminderId = (event.notification.data && event.notification.data.reminderId) || ''");
+		expect(SERVICE_WORKER_JS).toContain("var reminderId = notificationData.reminderId || ''");
 		expect(SERVICE_WORKER_JS).toContain("if (project) params.set('project', project)");
 		expect(SERVICE_WORKER_JS).toContain("if (reminderId) params.set('reminderId', reminderId)");
-		expect(SERVICE_WORKER_JS).toContain("clients.openWindow(url)");
+		expect(SERVICE_WORKER_JS).toContain("var url = notificationData.navigate || '/notifications'");
+		expect(SERVICE_WORKER_JS).toContain("clients.matchAll({ type: 'window', includeUncontrolled: true })");
+		expect(SERVICE_WORKER_JS).toContain('return client.navigate(url)');
+		expect(SERVICE_WORKER_JS).toContain('return (navigatedClient || client).focus()');
+		expect(SERVICE_WORKER_JS).toContain('return clients.openWindow(url)');
+	});
+
+	it('supports declarative push with a fallback notification handler', () => {
+		expect(SERVICE_WORKER_JS).toContain('var notification = payload.notification || payload');
+		expect(SERVICE_WORKER_JS).toContain("navigate: notification.navigate || ''");
+	});
+
+	it('uses the Crate mark in a dedicated native-style startup state', () => {
+		const html = createPwaHtml('https://worker.test/notifications');
+
+		expect(html).toContain('.auth-card--loading{position:relative;isolation:isolate;');
+		expect(html).toContain('.auth-loading__mark-stage img{position:relative;width:112px;height:112px;');
+		expect(html).toContain('@keyframes auth-loading-progress');
 	});
 
 });

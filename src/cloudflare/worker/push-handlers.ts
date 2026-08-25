@@ -8,6 +8,9 @@ import {
 	APPLE_STARTUP_1179X2556_PNG,
 	APPLE_STARTUP_1290X2796_PNG,
 	APPLE_TOUCH_ICON_180_PNG,
+	CRATE_ICON_192_PNG,
+	CRATE_ICON_512_PNG,
+	CRATE_MARK_256_PNG,
 	PWA_APP_JS,
 	SERVICE_WORKER_JS,
 	ICON_SVG,
@@ -161,6 +164,18 @@ function pngAssetResponse(request: Request, asset: Uint8Array): Response {
 
 export function handleAppleTouchIcon(request: Request): Response {
 	return pngAssetResponse(request, APPLE_TOUCH_ICON_180_PNG);
+}
+
+export function handleCrateIcon192(request: Request): Response {
+	return pngAssetResponse(request, CRATE_ICON_192_PNG);
+}
+
+export function handleCrateIcon512(request: Request): Response {
+	return pngAssetResponse(request, CRATE_ICON_512_PNG);
+}
+
+export function handleCrateMark256(request: Request): Response {
+	return pngAssetResponse(request, CRATE_MARK_256_PNG);
 }
 
 export function handleAppleStartup1179x2556(request: Request): Response {

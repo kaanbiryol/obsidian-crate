@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { detectDeviceName, isStandaloneApp } from '../config';
+import { detectDeviceName, isIosOrIpados, isStandaloneApp } from '../config';
 import { registerPwaServiceWorker, urlBase64ToUint8Array } from '../api';
 import type { PushState, ToastKind } from '../types';
 
@@ -27,8 +27,12 @@ export function usePushNotifications({
 			return;
 		}
 
-		if (!standalone && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-			setPush({ supported: true, subscribed: false, status: 'Install this app on your home screen to enable push notifications on iOS.' });
+		if (!standalone && isIosOrIpados()) {
+			setPush({
+				supported: true,
+				subscribed: false,
+				status: 'Add Crate to your Home Screen as a web app to enable notifications on iPhone and iPad.',
+			});
 			return;
 		}
 

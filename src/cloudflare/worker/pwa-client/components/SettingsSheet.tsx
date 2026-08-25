@@ -11,7 +11,7 @@ import {
 	Smartphone,
 	X,
 } from 'lucide-react';
-import { isStandaloneApp } from '../config';
+import { isIosOrIpados, isStandaloneApp } from '../config';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import type { PushState, StoredConfig } from '../types';
 import { PwaModalSheet } from './PwaModalSheet';
@@ -38,11 +38,11 @@ export function SettingsSheet({
 	onLogout: () => void;
 }) {
 	const installed = isStandaloneApp();
-	const installHint = /iPad|iPhone|iPod/.test(navigator.userAgent) && !installed
-		? 'Add this app to your Home Screen from Safari to enable the best mobile experience and notifications on iPhone.'
+	const installHint = isIosOrIpados() && !installed
+		? 'In Safari, choose Add to Home Screen from the Share menu. If asked, keep Open as Web App turned on.'
 		: installed
-			? 'This device is using the installed app experience.'
-			: 'You can also install this app from your browser for faster access.';
+			? 'Crate is running as an installed app on this device.'
+			: 'Install Crate from your browser menu for faster access and an app-like experience.';
 	const upcomingDays = `${config.upcomingDays} ${config.upcomingDays === 1 ? 'day' : 'days'}`;
 	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
 		activeKey: 'settings',

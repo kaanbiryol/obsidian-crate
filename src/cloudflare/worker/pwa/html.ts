@@ -18,6 +18,7 @@ export function createPwaHtml(requestUrl?: string): string {
 <meta name="format-detection" content="telephone=no,date=no,email=no,address=no">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="${manifestHref}">
+<link rel="icon" type="image/png" sizes="192x192" href="/notifications/crate-icon-192.png?v=${PWA_ASSET_VERSION}">
 <link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}">
 <link rel="apple-touch-startup-image" href="/notifications/apple-startup-1179x2556.png?v=${PWA_ASSET_VERSION}" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
 <link rel="apple-touch-startup-image" href="/notifications/apple-startup-1290x2796.png?v=${PWA_ASSET_VERSION}" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">

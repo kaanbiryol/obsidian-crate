@@ -20,6 +20,50 @@ interface PushSubscriptionRow {
 
 const VAPID_EMAIL = 'crate-push@example.com';
 
+export interface PushNotificationPayload {
+	title: string;
+	body: string;
+	tag?: string;
+	project?: string;
+	reminderId?: string;
+}
+
+interface DeclarativePushPayload {
+	web_push: 8030;
+	notification: {
+		title: string;
+		body: string;
+		navigate: string;
+		tag?: string;
+		icon: string;
+		data: {
+			project: string;
+			reminderId: string;
+		};
+	};
+}
+
+export function createDeclarativePushPayload(payload: PushNotificationPayload): DeclarativePushPayload {
+	const params = new URLSearchParams();
+	if (payload.project) params.set('project', payload.project);
+	if (payload.reminderId) params.set('reminderId', payload.reminderId);
+
+	return {
+		web_push: 8030,
+		notification: {
+			title: payload.title,
+			body: payload.body,
+			navigate: `/notifications${params.size > 0 ? `?${params.toString()}` : ''}`,
+			...(payload.tag ? { tag: payload.tag } : {}),
+			icon: '/notifications/crate-icon-192.png',
+			data: {
+				project: payload.project ?? '',
+				reminderId: payload.reminderId ?? '',
+			},
+		},
+	};
+}
+
 export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVapidKeys> {
 	await initDb(db);
 	const rows = await queryRows<{ public_key: string; private_key: string }>(
@@ -42,7 +86,7 @@ export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVa
 
 export async function sendToAllSubscriptions(
 	db: D1Database,
-	payload: { title: string; body: string; tag?: string; project?: string; reminderId?: string },
+	payload: PushNotificationPayload,
 ): Promise<{ sent: number; failed: number; pruned: number; errors: string[] }> {
 	await initDb(db);
 
@@ -57,7 +101,7 @@ export async function sendToAllSubscriptions(
 		return { sent: 0, failed: 0, pruned: 0, errors: ['no subscriptions in db'] };
 	}
 
-	const payloadStr = JSON.stringify(payload);
+	const payloadStr = JSON.stringify(createDeclarativePushPayload(payload));
 	let sent = 0;
 	let failed = 0;
 	let pruned = 0;

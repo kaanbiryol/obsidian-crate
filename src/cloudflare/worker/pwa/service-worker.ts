@@ -6,7 +6,9 @@ const PWA_SHELL_URL = '/notifications';
 const PWA_PRECACHE_URLS = [
 	PWA_SHELL_URL,
 	'/notifications/app.js?v=${PWA_ASSET_VERSION}',
-	'/notifications/icon.svg?v=${PWA_ASSET_VERSION}',
+	'/notifications/crate-icon-192.png?v=${PWA_ASSET_VERSION}',
+	'/notifications/crate-icon-512.png?v=${PWA_ASSET_VERSION}',
+	'/notifications/crate-mark-256.png?v=${PWA_ASSET_VERSION}',
 	'/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}',
 	'/notifications/apple-startup-1179x2556.png?v=${PWA_ASSET_VERSION}',
 	'/notifications/apple-startup-1290x2796.png?v=${PWA_ASSET_VERSION}',
@@ -71,6 +73,9 @@ self.addEventListener('fetch', function(event) {
 	if (
 		url.pathname === '/notifications/app.js'
 		|| url.pathname === '/notifications/icon.svg'
+		|| url.pathname === '/notifications/crate-icon-192.png'
+		|| url.pathname === '/notifications/crate-icon-512.png'
+		|| url.pathname === '/notifications/crate-mark-256.png'
 		|| url.pathname === '/notifications/apple-touch-icon-180.png'
 		|| url.pathname === '/notifications/apple-startup-1179x2556.png'
 		|| url.pathname === '/notifications/apple-startup-1290x2796.png'
@@ -93,29 +98,56 @@ self.addEventListener('fetch', function(event) {
 });
 
 self.addEventListener('push', function(event) {
-	const data = event.data ? event.data.json() : {};
+	var payload = event.data ? event.data.json() : {};
+	var notification = payload.notification || payload;
+	var notificationData = notification.data || {};
 	event.waitUntil(
-		self.registration.showNotification(data.title || 'Reminder', {
-			body: data.body || '',
-			tag: data.tag || 'crate-reminder',
-			icon: '/notifications/icon.svg?v=${PWA_ASSET_VERSION}',
+		self.registration.showNotification(notification.title || 'Reminder', {
+			body: notification.body || '',
+			tag: notification.tag || 'crate-reminder',
+			icon: notification.icon || '/notifications/crate-icon-192.png?v=${PWA_ASSET_VERSION}',
 			data: {
-				project: data.project || '',
-				reminderId: data.reminderId || '',
+				project: notificationData.project || payload.project || '',
+				reminderId: notificationData.reminderId || payload.reminderId || '',
+				navigate: notification.navigate || '',
 			},
 		})
 	);
 });
 
+function focusOrOpenNotificationTarget(url) {
+	return clients.matchAll({ type: 'window', includeUncontrolled: true })
+		.then(function(windowClients) {
+			for (var index = 0; index < windowClients.length; index++) {
+				var client = windowClients[index];
+				var clientUrl = new URL(client.url);
+				if (clientUrl.pathname !== PWA_SHELL_URL && clientUrl.pathname.indexOf(PWA_SHELL_URL + '/') !== 0) {
+					continue;
+				}
+
+				return client.navigate(url)
+					.then(function(navigatedClient) {
+						return (navigatedClient || client).focus();
+					})
+					.catch(function() {
+						return client.focus();
+					});
+			}
+
+			return clients.openWindow(url);
+		});
+}
+
 self.addEventListener('notificationclick', function(event) {
 	event.notification.close();
-	var project = (event.notification.data && event.notification.data.project) || '';
-	var reminderId = (event.notification.data && event.notification.data.reminderId) || '';
+	var notificationData = event.notification.data || {};
+	var project = notificationData.project || '';
+	var reminderId = notificationData.reminderId || '';
 	var params = new URLSearchParams();
 	if (project) params.set('project', project);
 	if (reminderId) params.set('reminderId', reminderId);
-	var url = '/notifications' + (params.toString() ? '?' + params.toString() : '');
-	event.waitUntil(clients.openWindow(url));
+	var url = notificationData.navigate || '/notifications' + (params.toString() ? '?' + params.toString() : '');
+	event.waitUntil(focusOrOpenNotificationTarget(url));
 });
 
 self.addEventListener('pushsubscriptionchange', function() {

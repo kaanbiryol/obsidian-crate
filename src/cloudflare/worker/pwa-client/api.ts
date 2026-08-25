@@ -90,7 +90,9 @@ export async function fetchPwaAssetVersion(): Promise<string | null> {
 
 export async function registerPwaServiceWorker(): Promise<ServiceWorkerRegistration | null> {
 	if (!('serviceWorker' in navigator)) return null;
-	return navigator.serviceWorker.register(`/notifications/sw.js?v=${PWA_ASSET_VERSION}`);
+	return navigator.serviceWorker.register(`/notifications/sw.js?v=${PWA_ASSET_VERSION}`, {
+		scope: '/notifications',
+	});
 }
 
 export function urlBase64ToUint8Array(base64String: string): Uint8Array {

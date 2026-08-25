@@ -19,11 +19,15 @@ function isAuthorized(req) {
 export function createPwaPreviewServer({ assets, origin }) {
 	let state = createInitialState();
 	let forcePreviewUpdate = false;
+	let previewLoadingUntil = 0;
 
 	const {
 		APPLE_STARTUP_1179X2556_PNG,
 		APPLE_STARTUP_1290X2796_PNG,
 		APPLE_TOUCH_ICON_180_PNG,
+		CRATE_ICON_192_PNG,
+		CRATE_ICON_512_PNG,
+		CRATE_MARK_256_PNG,
 		PWA_APP_JS,
 		SERVICE_WORKER_JS,
 		ICON_SVG,
@@ -53,6 +57,8 @@ export function createPwaPreviewServer({ assets, origin }) {
 			const action = url.searchParams.get('previewAction');
 			const project = url.searchParams.get('previewProject');
 			forcePreviewUpdate = action === 'update' || url.searchParams.get('previewUpdate') === '1';
+			if (action === 'loading') previewLoadingUntil = Date.now() + 5_000;
+			else if (action) previewLoadingUntil = 0;
 			sendText(res, 200, withPreviewAction(createPwaHtml(url.toString()), action, project), 'text/html; charset=utf-8');
 			return;
 		}
@@ -63,7 +69,9 @@ export function createPwaPreviewServer({ assets, origin }) {
 		}
 
 		if (method === 'GET' && path === '/notifications/sw.js') {
-			sendText(res, 200, SERVICE_WORKER_JS, 'application/javascript; charset=utf-8');
+			sendText(res, 200, SERVICE_WORKER_JS, 'application/javascript; charset=utf-8', {
+				'Service-Worker-Allowed': '/notifications',
+			});
 			return;
 		}
 
@@ -91,6 +99,21 @@ export function createPwaPreviewServer({ assets, origin }) {
 			return;
 		}
 
+		if (method === 'GET' && path === '/notifications/crate-icon-192.png') {
+			send(res, 200, CRATE_ICON_192_PNG, { 'Content-Type': 'image/png' });
+			return;
+		}
+
+		if (method === 'GET' && path === '/notifications/crate-icon-512.png') {
+			send(res, 200, CRATE_ICON_512_PNG, { 'Content-Type': 'image/png' });
+			return;
+		}
+
+		if (method === 'GET' && path === '/notifications/crate-mark-256.png') {
+			send(res, 200, CRATE_MARK_256_PNG, { 'Content-Type': 'image/png' });
+			return;
+		}
+
 		if (method === 'GET' && path === '/notifications/apple-startup-1179x2556.png') {
 			send(res, 200, APPLE_STARTUP_1179X2556_PNG, { 'Content-Type': 'image/png' });
 			return;
@@ -103,6 +126,13 @@ export function createPwaPreviewServer({ assets, origin }) {
 
 		if (method === 'GET' && path === '/notifications/vapid-public-key') {
 			sendJson(res, 200, { publicKey: '' });
+			return;
+		}
+
+		if (method === 'GET' && path === '/health') {
+			const delay = Math.max(0, previewLoadingUntil - Date.now());
+			if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+			sendJson(res, 200, { ok: true });
 			return;
 		}
 
