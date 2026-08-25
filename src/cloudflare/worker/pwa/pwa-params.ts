@@ -1,6 +1,6 @@
 import { PWA_ASSET_VERSION } from '../pwa-version';
 
-export const PWA_CHROME_COLOR = '#0b0d11';
+export const PWA_CHROME_COLOR = '#0b0b0d';
 const PWA_START_PARAM_KEYS = ['token', 'folder', 'upcomingDays', 'allDayTime', 'project', 'tab'] as const;
 
 export function pwaStartSearchFromUrl(requestUrl?: string): string {

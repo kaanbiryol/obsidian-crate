@@ -1,7 +1,7 @@
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rawTextPlugin } from './raw-text-plugin.mjs';
 
@@ -12,8 +12,23 @@ const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-
 const serverVersion = typeof packageJson.version === 'string' ? packageJson.version : 'dev';
 const PWA_VERSION_PLACEHOLDER = 'crate-pwa-version-placeholder';
 
-function sha256(content) {
-	return createHash('sha256').update(content).digest('hex');
+function listFiles(directory) {
+	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+		const path = resolve(directory, entry.name);
+		return entry.isDirectory() ? listFiles(path) : [path];
+	});
+}
+
+function createPwaAssetVersion(clientTemplate) {
+	const hash = createHash('sha256').update(clientTemplate);
+	const pwaSourceRoot = resolve(root, 'src/cloudflare/worker/pwa');
+
+	for (const path of listFiles(pwaSourceRoot).sort()) {
+		hash.update(relative(root, path));
+		hash.update(readFileSync(path));
+	}
+
+	return hash.digest('hex').slice(0, 16);
 }
 
 function writeGeneratedJson(fileName, payload) {
@@ -78,7 +93,7 @@ async function bundlePwaClient(assetVersion) {
 
 async function buildPwaClientBundle() {
 	const versionTemplate = await bundlePwaClient(PWA_VERSION_PLACEHOLDER);
-	const version = sha256(versionTemplate).slice(0, 16);
+	const version = createPwaAssetVersion(versionTemplate);
 	const code = await bundlePwaClient(version);
 	writeGeneratedJson('pwa-client.json', {
 		version,

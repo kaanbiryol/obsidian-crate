@@ -29,15 +29,15 @@
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{width:100vw!important;border-right:0;border-left:0}
 	.modal-card.pwa-reminder-editor{padding:16px 24px calc(28px + env(safe-area-inset-bottom))}
 	.pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor{padding-bottom:16px}
-	.pwa-editor-header{grid-template-columns:minmax(72px,1fr) minmax(0,1.4fr) minmax(72px,1fr);margin-bottom:24px}
-	.pwa-editor-icon-button{width:44px;height:44px;min-width:44px}
-	.pwa-editor-card{flex:1 1 auto;min-height:0;padding:16px 20px 18px}
-	.pwa-editor-title-input{font-size:20px;min-height:38px}
+	.pwa-editor-header{grid-template-columns:minmax(64px,1fr) minmax(0,1.4fr) minmax(64px,1fr);margin-bottom:22px}
+	.pwa-editor-icon-button{width:40px;height:40px;min-width:40px}
+	.pwa-editor-card{flex:1 1 auto;min-height:0;padding:15px 18px 17px}
+	.pwa-editor-title-input{font-size:19px;min-height:38px}
 	.pwa-editor-description-input{flex:0 1 auto;min-height:52px;max-height:120px}
 	.pwa-editor-divider{margin:14px 0 16px}
-	.pwa-editor-chip-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:18px;padding:4px;overflow:visible;border:1px solid rgba(255,255,255,.055);border-radius:16px;background:rgba(255,255,255,.025)}
+	.pwa-editor-chip-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin-top:16px;padding:4px;overflow:visible;border:1px solid rgba(255,255,255,.055);border-radius:12px;background:rgba(255,255,255,.02)}
 	.pwa-editor-chip-row::-webkit-scrollbar{display:none}
-	.pwa-editor-chip{width:100%;height:52px;min-width:0;border-color:transparent;border-radius:12px;background:transparent;flex-direction:column;gap:4px;padding:5px 4px 4px;font-size:11px}
+	.pwa-editor-chip{width:100%;height:48px;min-width:0;border-color:transparent;border-radius:9px;background:transparent;flex-direction:column;gap:4px;padding:4px;font-size:10.5px}
 	.pwa-editor-chip:not(.pwa-editor-chip--icon){max-width:none}
 	.pwa-editor-chip--icon{width:100%;min-width:0;padding:5px 4px 4px}
 	.pwa-editor-chip .pwa-editor-chip__mobile-label{display:block}
@@ -71,11 +71,11 @@
 	.modal-actions__primary{display:grid;grid-template-columns:1fr 1fr}
 	.settings-sheet__header{padding:18px 16px 16px}
 	.settings-sheet__header h2{font-size:26px}
-	.settings-panel{gap:20px;padding:16px 12px 18px}
+	.settings-panel{gap:17px;padding:14px 12px 16px}
 	.settings-feature-row{padding:13px 12px}
-	.settings-feature-row__icon{width:40px;height:40px;min-width:40px}
+	.settings-feature-row__icon{width:38px;height:38px;min-width:38px}
 	.settings-action-button{min-width:70px;padding:0 10px}
-	.settings-feature-row--install{display:grid;grid-template-columns:40px minmax(0,1fr);align-items:start}
+	.settings-feature-row--install{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:start}
 	.settings-feature-row--install .settings-status-badge{grid-column:2;justify-self:start}
 	.settings-sheet__footer{padding-right:12px;padding-left:12px}
 	.pwa-picker-sheet.pwa-date-picker-sheet{padding-right:14px;padding-left:14px}
@@ -100,27 +100,27 @@
 	.settings-list__value{max-width:40%}
 }
 @media (max-width: 420px){
-	.pwa-reminders-view .view-header{padding:calc(env(safe-area-inset-top) + 16px) 20px 12px!important}
-	.pwa-header-settings-button,.pwa-header-sync-button{width:44px;height:44px;min-width:44px}
-	.app-header{padding:calc(env(safe-area-inset-top) + 16px) 20px 12px}
-	.app-header__body h1{font-size:28px}
-	.header-meta{font-size:14px}
-	.card-title,.premium-reminder-title{font-size:17px}
-	.card-description,.premium-reminder-description{font-size:15px}
-	.meta-pill,.tag-pill,.premium-pill{font-size:12px}
-	.tab-button{font-size:13px;min-height:48px}
+	.pwa-reminders-view .view-header{padding:calc(env(safe-area-inset-top) + 17px) 18px 11px!important}
+	.pwa-header-settings-button,.pwa-header-sync-button{width:40px;height:40px;min-width:40px}
+	.app-header{padding:calc(env(safe-area-inset-top) + 17px) 18px 11px}
+	.app-header__body h1{font-size:30px}
+	.header-meta{font-size:12.5px}
+	.card-title,.premium-reminder-title{font-size:15.5px}
+	.card-description,.premium-reminder-description{font-size:13.25px}
+	.meta-pill,.tag-pill,.premium-pill{font-size:10.5px}
+	.tab-button{font-size:11px;min-height:46px}
 }
 @media (max-width: 392px){
-	:root{--tabbar-h:80px}
-	.app-content{padding:16px 16px calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + var(--reminders-fab-size) + env(safe-area-inset-bottom))}
-	.reminder-card__main,.premium-reminder-content{padding:14px 16px}
-	.checkbox,.premium-checkbox{width:20px;height:20px;min-width:20px;flex-basis:20px}
-	.bottom-tabs{padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
-	.fab{right:16px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:56px;height:56px;min-width:56px}
+	:root{--tabbar-h:72px}
+	.app-content{padding:12px 14px calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + var(--reminders-fab-size) + env(safe-area-inset-bottom))}
+	.reminder-card__main,.premium-reminder-content{padding:12px 13px}
+	.checkbox,.premium-checkbox{width:18px;height:18px;min-width:18px;flex-basis:18px}
+	.bottom-tabs{padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+	.fab{right:14px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:48px;height:48px;min-width:48px;border-radius:15px}
 }
 
 .pwa-reminders-view.is-fullscreen .animated-tab-bar-bottom{position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none}
-.crate-reminders-ui .pwa-reminders-view .premium-reminder-title{font-size:17px;line-height:1.3}
-.crate-reminders-ui .pwa-reminders-view .premium-reminder-description{font-size:15px;line-height:1.4}
-.crate-reminders-ui .pwa-reminders-view .premium-pill{min-height:24px;font-size:12px}
-.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:rgba(30,30,30,.74);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border-top:.5px solid rgba(255,255,255,.14)}
+.crate-reminders-ui .pwa-reminders-view .premium-reminder-title{font-size:15.5px;line-height:1.32}
+.crate-reminders-ui .pwa-reminders-view .premium-reminder-description{font-size:13.25px;line-height:1.42}
+.crate-reminders-ui .pwa-reminders-view .premium-pill{min-height:21px;font-size:10.5px}
+.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:rgba(13,13,15,.9);backdrop-filter:blur(28px) saturate(150%);-webkit-backdrop-filter:blur(28px) saturate(150%);border-top:1px solid rgba(255,255,255,.065)}

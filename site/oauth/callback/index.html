@@ -7,19 +7,19 @@
 	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-Bt4A3TFQUYFHJlj4hdh2LJuYIy8CcK+lrPjjP4Cnsn4='; style-src 'self'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'">
 	<script>window.__crateOAuthCallback = window.location.search; history.replaceState(null, '', '/oauth/callback/');</script>
 	<title>Return to Crate</title>
-	<link rel="icon" href="/assets/logo.png" type="image/png" sizes="192x192">
-	<link rel="stylesheet" href="/assets/callback.css">
-	<script src="/assets/callback.js" defer></script>
+	<link rel="icon" href="/assets/logo.png?v=20260826" type="image/png" sizes="192x192">
+	<link rel="stylesheet" href="/assets/callback.css?v=20260826">
+	<script src="/assets/callback.js?v=20260826" defer></script>
 </head>
 <body>
 	<main>
-		<div class="card">
-			<div class="brand-logo-tile" aria-hidden="true"><img class="logo" src="/assets/logo.png" alt=""></div>
-			<h1>Return to Crate</h1>
-			<p data-callback-status>Finishing Cloudflare authorization…</p>
-			<a class="button" data-callback-fallback href="obsidian://crate-cloudflare-oauth" hidden>Open Obsidian</a>
-			<p>If Obsidian does not open automatically, select the button above on the device where Crate is installed.</p>
-		</div>
+		<section class="card" aria-labelledby="callback-title">
+			<div class="brand-mark" aria-hidden="true"><img class="logo" src="/assets/logo.png?v=20260826" alt=""></div>
+			<h1 id="callback-title">Return to Crate</h1>
+			<p class="status-copy" data-callback-status>Continue in Obsidian to finish setting up Crate.</p>
+			<a class="button" data-callback-fallback href="obsidian://crate-cloudflare-oauth" hidden>Open Obsidian <span aria-hidden="true">↗</span></a>
+			<p class="helper">You can safely close this window.</p>
+		</section>
 	</main>
 </body>
 </html>

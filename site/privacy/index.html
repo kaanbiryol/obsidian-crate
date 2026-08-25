@@ -6,18 +6,20 @@
 	<meta name="referrer" content="no-referrer">
 	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'">
 	<title>Crate privacy</title>
-	<link rel="icon" href="/assets/logo.png" type="image/png" sizes="192x192">
-	<link rel="stylesheet" href="/assets/callback.css">
+	<link rel="icon" href="/assets/logo.png?v=20260826" type="image/png" sizes="192x192">
+	<link rel="stylesheet" href="/assets/callback.css?v=20260826">
 </head>
 <body>
 	<main>
-		<div class="card">
-			<div class="brand-logo-tile" aria-hidden="true"><img class="logo" src="/assets/logo.png" alt=""></div>
-			<h1>Privacy</h1>
-			<p>This site is static. It has no analytics, cookies, forms, or third-party scripts. The OAuth callback passes Cloudflare's short-lived response directly to the Crate plugin and immediately removes it from the browser address bar.</p>
-			<p>Crate uses a temporary Cloudflare OAuth token only while provisioning your resources. It does not store that token or send it to a Crate-operated service.</p>
-			<div class="links"><a href="/">Back to Crate</a></div>
-		</div>
+		<a class="brand-lockup" href="/" aria-label="Crate home"><img src="/assets/logo.png?v=20260826" alt=""><span>Crate</span></a>
+		<article class="card" aria-labelledby="privacy-title">
+			<div class="brand-mark" aria-hidden="true"><img class="logo" src="/assets/logo.png?v=20260826" alt=""></div>
+			<p class="eyebrow">Data handling</p>
+			<h1 id="privacy-title">Privacy</h1>
+			<p class="privacy-copy">This site is static. It has no analytics, cookies, forms, or third-party scripts. The OAuth callback passes Cloudflare's short-lived response directly to the Crate plugin and immediately removes it from the browser address bar.</p>
+			<p class="privacy-copy">Crate uses a temporary Cloudflare OAuth token only while provisioning your resources. It does not store that token or send it to a Crate-operated service.</p>
+			<div class="links"><a href="/">Back to Crate <span aria-hidden="true">↗</span></a></div>
+		</article>
 	</main>
 </body>
 </html>

@@ -32,30 +32,32 @@
 		<div class="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-b from-transparent to-ink-950"></div>
 	</div>
 
-	<header class="relative z-20 mx-auto flex h-18 w-[min(100%-2rem,76rem)] items-center justify-between border-b border-white/10 sm:w-[min(100%-3rem,76rem)]">
+	<div class="site-header-shell">
+	<header class="site-header mx-auto flex h-18 w-[min(100%-2rem,76rem)] items-center justify-between sm:w-[min(100%-3rem,76rem)]">
 		<a class="group inline-flex items-center gap-2.5" href="/" aria-label="Crate home">
 			<span class="brand-tile" aria-hidden="true">
 				<img class="brand-tile__mark" src="/assets/logo.png" alt="">
 			</span>
 			<span class="text-sm font-semibold tracking-[-0.02em]">Crate</span>
 		</a>
-		<nav class="hidden items-center gap-7 text-[13px] font-medium text-zinc-500 md:flex" aria-label="Primary navigation">
-			<a class="transition-colors hover:text-zinc-200" href="#features">Features</a>
-			<a class="transition-colors hover:text-zinc-200" href="#reminders">Reminders</a>
-			<a class="transition-colors hover:text-zinc-200" href="#setup">Setup</a>
+		<nav class="site-nav hidden items-center text-[13px] font-medium text-zinc-500 md:flex" aria-label="Primary navigation">
+			<a class="site-nav__link" href="#features">Features</a>
+			<a class="site-nav__link" href="#reminders">Reminders</a>
+			<a class="site-nav__link" href="#setup">Setup</a>
 		</nav>
-		<a class="inline-flex h-9 items-center gap-2 rounded-lg border border-white/12 bg-gradient-to-b from-white/[0.06] to-white/[0.025] px-3.5 text-xs font-semibold text-zinc-300 shadow-[0_8px_24px_rgb(0_0_0/0.15),inset_0_1px_0_rgb(255_255_255/0.06)] transition-all hover:border-white/20 hover:from-white/[0.09] hover:to-white/[0.04] hover:text-white" href="https://github.com/kaanbiryol/obsidian-crate">GitHub <span class="text-zinc-500" aria-hidden="true">↗</span></a>
+		<a class="header-action inline-flex h-9 items-center gap-2 rounded-lg px-3.5 text-xs font-semibold text-zinc-300" href="https://github.com/kaanbiryol/obsidian-crate">GitHub <span class="text-zinc-500" aria-hidden="true">↗</span></a>
 	</header>
+	</div>
 
 	<main id="main">
-		<section class="mx-auto grid min-h-[46rem] w-[min(100%-2rem,76rem)] items-center gap-12 py-16 sm:w-[min(100%-3rem,76rem)] lg:grid-cols-[0.8fr_1.2fr] lg:gap-12 lg:py-24 xl:gap-20" aria-labelledby="hero-title">
+		<section class="hero-section mx-auto grid min-h-[44rem] w-[min(100%-2rem,76rem)] items-center gap-12 py-16 sm:w-[min(100%-3rem,76rem)] lg:grid-cols-[0.82fr_1.18fr] lg:gap-12 lg:py-20 xl:gap-18" aria-labelledby="hero-title">
 			<div class="relative z-10 max-w-xl">
-				<p class="mb-6 inline-flex items-center gap-2.5 rounded-full border border-crate-400/25 bg-gradient-to-r from-crate-400/[0.1] to-crate-400/[0.035] px-3 py-1.5 text-[11px] font-semibold tracking-[0.08em] text-crate-300 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)] uppercase"><span class="size-1.5 rounded-full bg-crate-400 shadow-[0_0_14px_#a78bfa]"></span> Sync + reminders for Obsidian</p>
-				<h1 id="hero-title" class="text-balance text-[clamp(3.65rem,7vw,6.4rem)] leading-[0.91] font-semibold tracking-[-0.075em] text-white">Your vault stays with you.</h1>
+				<p class="product-eyebrow mb-6 inline-flex items-center gap-2.5 rounded-full px-3 py-1.5 text-[10px] font-semibold tracking-[0.1em] text-crate-300 uppercase"><span class="size-1.5 rounded-full bg-crate-400"></span> Sync + reminders for Obsidian</p>
+				<h1 id="hero-title" class="hero-heading text-balance text-[clamp(3.4rem,6.2vw,5.75rem)] leading-[0.93] font-semibold tracking-[-0.07em] text-white">Your vault stays with you.</h1>
 				<p class="text-pretty mt-7 max-w-[37rem] text-[15px] leading-7 text-zinc-300 sm:text-base">Sync notes and attachments across your computers and phone. Write reminders in Markdown and get notified when they’re due.</p>
 				<div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-					<a class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-4 text-[13px] font-bold text-ink-950 shadow-[0_12px_32px_rgb(0_0_0/0.24),0_1px_0_rgb(255_255_255/0.65)_inset] transition-all hover:-translate-y-0.5 hover:bg-zinc-100 hover:shadow-[0_16px_38px_rgb(0_0_0/0.3),0_1px_0_rgb(255_255_255/0.65)_inset]" href="https://github.com/kaanbiryol/obsidian-crate#install-from-source">Read installation guide <span aria-hidden="true">↗</span></a>
-					<a class="inline-flex min-h-11 items-center justify-center gap-2 px-4 text-[13px] font-semibold text-zinc-400 transition-colors hover:text-white" href="#features">See how it works <span class="text-zinc-600" aria-hidden="true">↓</span></a>
+					<a class="primary-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-bold text-ink-950" href="https://github.com/kaanbiryol/obsidian-crate#install-from-source">Read installation guide <span aria-hidden="true">↗</span></a>
+					<a class="secondary-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-semibold text-zinc-400" href="#features">See how it works <span class="text-zinc-600" aria-hidden="true">↓</span></a>
 				</div>
 				<div class="mt-7 border-t border-white/8 pt-4 text-[10px] font-medium text-zinc-500"><p class="font-bold tracking-[0.1em] text-crate-300 uppercase">Early release</p><p class="mt-2">Desktop + mobile <span class="mx-1.5 text-zinc-700">·</span> No Crate account <span class="mx-1.5 text-zinc-700">·</span> Open source</p></div>
 			</div>
@@ -84,20 +86,20 @@
 			</div>
 		</section>
 
-		<section class="mx-auto hidden w-[min(100%-3rem,76rem)] divide-x divide-white/8 border-y border-white/8 md:grid md:grid-cols-3" aria-label="Product highlights">
+		<section class="product-proof mx-auto hidden w-[min(100%-3rem,76rem)] divide-x divide-white/8 border-y border-white/8 md:grid md:grid-cols-3" aria-label="Product highlights">
 			<p class="grid grid-cols-[2rem_1fr] gap-x-3 py-5 pr-6"><span class="row-span-2 pt-0.5 text-[9px] font-bold text-crate-400">01</span><b class="text-xs font-semibold">Desktop + mobile</b><small class="mt-1 text-[11px] leading-5 text-zinc-500">The same vault on every screen.</small></p>
 			<p class="grid grid-cols-[2rem_1fr] gap-x-3 px-6 py-5"><span class="row-span-2 pt-0.5 text-[9px] font-bold text-crate-400">02</span><b class="text-xs font-semibold">Reminder notifications</b><small class="mt-1 text-[11px] leading-5 text-zinc-500">Write once, get notified anywhere.</small></p>
 			<p class="grid grid-cols-[2rem_1fr] gap-x-3 py-5 pl-6"><span class="row-span-2 pt-0.5 text-[9px] font-bold text-crate-400">03</span><b class="text-xs font-semibold">Storage you choose</b><small class="mt-1 text-[11px] leading-5 text-zinc-500">Files stay in your Cloudflare account.</small></p>
 		</section>
 
-		<section class="mx-auto w-[min(100%-2rem,76rem)] py-24 sm:w-[min(100%-3rem,76rem)] sm:py-32" id="features" aria-labelledby="features-title">
+		<section class="mx-auto w-[min(100%-2rem,76rem)] py-22 sm:w-[min(100%-3rem,76rem)] sm:py-28" id="features" aria-labelledby="features-title">
 			<div class="grid gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
-				<div><p class="text-[10px] font-bold tracking-[0.15em] text-crate-400 uppercase">What Crate does</p><h2 id="features-title" class="text-balance mt-4 max-w-2xl text-[clamp(2.7rem,5vw,4.8rem)] leading-[0.95] font-semibold tracking-[-0.065em]">Your notes move. Your reminders follow.</h2></div>
+				<div><p class="text-[10px] font-bold tracking-[0.15em] text-crate-400 uppercase">What Crate does</p><h2 id="features-title" class="section-heading text-balance mt-4 max-w-2xl font-semibold">Your notes move. Your reminders follow.</h2></div>
 				<p class="max-w-lg text-sm leading-7 text-zinc-400 lg:justify-self-end">Keep one vault current across devices, with reminders that stay beside the notes where you wrote them.</p>
 			</div>
 
 			<div class="mt-12 grid gap-4 lg:grid-cols-12">
-				<article class="panel-sheen relative overflow-hidden rounded-[18px] border border-white/11 bg-ink-850 p-6 sm:p-8 lg:col-span-12" id="reminders">
+				<article class="product-panel panel-sheen relative overflow-hidden border bg-ink-850 p-6 sm:p-8 lg:col-span-12" id="reminders">
 					<div class="pointer-events-none absolute -right-20 -top-36 size-96 rounded-full bg-crate-500/[0.09] blur-3xl" aria-hidden="true"></div>
 					<div class="relative z-10 grid gap-5 lg:grid-cols-[1.08fr_0.92fr] lg:items-end">
 						<div><span class="text-[9px] font-bold tracking-[0.14em] text-zinc-500">01 / REMINDERS</span><h3 class="mt-5 text-3xl font-semibold tracking-[-0.055em] sm:text-4xl">Keep the reminder with the note.</h3></div>
@@ -149,7 +151,7 @@
 					</ol>
 				</article>
 
-				<article class="panel-sheen relative overflow-hidden rounded-[18px] border border-white/11 bg-ink-850 p-6 sm:p-8 lg:col-span-7">
+				<article class="product-panel panel-sheen relative overflow-hidden border bg-ink-850 p-6 sm:p-8 lg:col-span-7">
 					<div class="relative z-10 max-w-md"><span class="text-[9px] font-bold tracking-[0.14em] text-zinc-500">02 / VAULT SYNC</span><h3 class="mt-5 text-3xl font-semibold tracking-[-0.055em] sm:text-4xl">Change it here.<br>Find it there.</h3><p class="mt-4 text-sm leading-6 text-zinc-400">Notes, attachments, renames, and deletes stay current on every connected device.</p></div>
 					<div class="relative mt-9 overflow-hidden rounded-xl border border-white/8 bg-[#0d0e12] shadow-[0_20px_55px_rgb(0_0_0/0.3)]">
 						<div class="flex h-11 items-center justify-between border-b border-white/7 px-4"><b class="text-[11px] font-semibold text-zinc-300">Recent sync</b><span class="inline-flex items-center gap-1.5 text-[8px] font-semibold text-emerald-400"><i class="size-1.5 rounded-full bg-emerald-400"></i> LIVE</span></div>
@@ -157,7 +159,7 @@
 					</div>
 				</article>
 
-				<article class="panel-sheen flex flex-col rounded-[18px] border border-white/11 bg-ink-850 p-6 sm:p-8 lg:col-span-5">
+				<article class="product-panel panel-sheen flex flex-col border bg-ink-850 p-6 sm:p-8 lg:col-span-5">
 					<div><span class="text-[9px] font-bold tracking-[0.14em] text-zinc-500">03 / CONFLICT SAFETY</span><h3 class="mt-5 text-3xl font-semibold tracking-[-0.055em] sm:text-4xl">Nothing quietly disappears.</h3><p class="mt-4 text-sm leading-6 text-zinc-400">If two devices change the same note, Crate keeps both versions so you can choose what stays.</p></div>
 					<div class="mt-9 grid gap-2"><div class="rounded-xl border border-white/8 bg-black/20 p-4"><small class="text-[8px] font-bold tracking-[0.08em] text-zinc-500">MACBOOK · 18:42</small><b class="mt-3 block text-xs font-semibold">Your edit</b><p class="mt-1 text-[9px] text-zinc-500">Saved as the current note</p></div><span class="justify-self-center rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1 text-[8px] font-bold text-emerald-300">BOTH KEPT</span><div class="rounded-xl border border-white/8 bg-black/20 p-4"><small class="text-[8px] font-bold tracking-[0.08em] text-zinc-500">IPHONE · 18:41</small><b class="mt-3 block text-xs font-semibold">Other edit</b><p class="mt-1 text-[9px] text-zinc-500">Saved as a conflict copy</p></div></div>
 				</article>
@@ -166,7 +168,7 @@
 
 		<section class="border-y border-white/8 bg-white/[0.018]" id="setup" aria-labelledby="setup-title">
 			<div class="mx-auto w-[min(100%-2rem,76rem)] py-20 sm:w-[min(100%-3rem,76rem)] sm:py-24">
-				<div class="grid gap-6 lg:grid-cols-2 lg:items-end"><div><p class="text-[10px] font-bold tracking-[0.15em] text-crate-400 uppercase">Three short steps</p><h2 id="setup-title" class="text-balance mt-4 text-[clamp(2.7rem,5vw,4.8rem)] leading-[0.95] font-semibold tracking-[-0.065em]">From install to synced.</h2></div><p class="max-w-lg text-sm leading-7 text-zinc-400 lg:justify-self-end">Choose your storage account once. Crate prepares everything it needs—you do not configure a server by hand.</p></div>
+				<div class="grid gap-6 lg:grid-cols-2 lg:items-end"><div><p class="text-[10px] font-bold tracking-[0.15em] text-crate-400 uppercase">Three short steps</p><h2 id="setup-title" class="section-heading text-balance mt-4 font-semibold">From install to synced.</h2></div><p class="max-w-lg text-sm leading-7 text-zinc-400 lg:justify-self-end">Choose your storage account once. Crate prepares everything it needs—you do not configure a server by hand.</p></div>
 				<ol class="mt-12 grid divide-y divide-white/8 border-y border-white/8 md:grid-cols-3 md:divide-x md:divide-y-0">
 					<li class="py-6 md:px-7 md:first:pl-0"><span class="text-[9px] font-bold text-zinc-500">01</span><div class="mt-10 grid size-9 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-sm text-crate-300">↓</div><h3 class="mt-5 text-lg font-semibold tracking-[-0.035em]">Install Crate</h3><p class="mt-2 max-w-xs text-xs leading-5 text-zinc-400">Add the plugin to Obsidian and open its settings.</p></li>
 					<li class="py-6 md:px-7"><span class="text-[9px] font-bold text-zinc-500">02</span><div class="mt-10 grid size-9 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-xs font-bold text-crate-300">C</div><h3 class="mt-5 text-lg font-semibold tracking-[-0.035em]">Connect your storage</h3><p class="mt-2 max-w-xs text-xs leading-5 text-zinc-400">Sign in with Cloudflare and choose an account.</p></li>
@@ -176,8 +178,8 @@
 		</section>
 
 		<section class="mx-auto grid w-[min(100%-2rem,76rem)] gap-12 py-24 sm:w-[min(100%-3rem,76rem)] sm:py-28 lg:grid-cols-[0.82fr_1.18fr] lg:items-start" aria-labelledby="storage-title">
-			<div><p class="text-[10px] font-bold tracking-[0.15em] text-crate-400 uppercase">Where your vault lives</p><h2 id="storage-title" class="text-balance mt-4 text-[clamp(2.7rem,5vw,4.8rem)] leading-[0.95] font-semibold tracking-[-0.065em]">Storage in an account you control.</h2><p class="mt-6 max-w-lg text-sm leading-7 text-zinc-400">Crate uses Cloudflare to sync and store your files. Connect your own account during setup—there is no separate Crate account or storage service.</p><a class="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-zinc-300 transition-colors hover:text-white" href="/privacy/">Read how data is handled <span class="text-zinc-600" aria-hidden="true">↗</span></a></div>
-			<dl class="panel-sheen overflow-hidden rounded-[18px] border border-white/11 bg-ink-850">
+			<div><p class="text-[10px] font-bold tracking-[0.15em] text-crate-400 uppercase">Where your vault lives</p><h2 id="storage-title" class="section-heading text-balance mt-4 font-semibold">Storage in an account you control.</h2><p class="mt-6 max-w-lg text-sm leading-7 text-zinc-400">Crate uses Cloudflare to sync and store your files. Connect your own account during setup—there is no separate Crate account or storage service.</p><a class="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-zinc-300 transition-colors hover:text-white" href="/privacy/">Read how data is handled <span class="text-zinc-600" aria-hidden="true">↗</span></a></div>
+			<dl class="product-panel panel-sheen overflow-hidden border bg-ink-850">
 				<div class="group grid grid-cols-[2rem_1fr] gap-2 border-b border-white/8 p-5 transition-colors hover:bg-white/[0.018] sm:grid-cols-[2rem_0.72fr_1.28fr] sm:gap-6 sm:p-6"><span class="pt-0.5 text-[9px] font-bold text-crate-400" aria-hidden="true">01</span><dt class="text-sm font-semibold tracking-[-0.02em]">Do I need Cloudflare?</dt><dd class="col-start-2 m-0 text-xs leading-6 text-zinc-400 sm:col-auto">Yes. Crate guides you through signing in and choosing an account during setup.</dd></div>
 				<div class="group grid grid-cols-[2rem_1fr] gap-2 border-b border-white/8 p-5 transition-colors hover:bg-white/[0.018] sm:grid-cols-[2rem_0.72fr_1.28fr] sm:gap-6 sm:p-6"><span class="pt-0.5 text-[9px] font-bold text-crate-400" aria-hidden="true">02</span><dt class="text-sm font-semibold tracking-[-0.02em]">Does it work on mobile?</dt><dd class="col-start-2 m-0 text-xs leading-6 text-zinc-400 sm:col-auto">Yes. Sync works in Obsidian mobile, and the reminders web app can send notifications to connected devices.</dd></div>
 				<div class="group grid grid-cols-[2rem_1fr] gap-2 p-5 transition-colors hover:bg-white/[0.018] sm:grid-cols-[2rem_0.72fr_1.28fr] sm:gap-6 sm:p-6"><span class="pt-0.5 text-[9px] font-bold text-crate-400" aria-hidden="true">03</span><dt class="text-sm font-semibold tracking-[-0.02em]">Where are my files stored?</dt><dd class="col-start-2 m-0 text-xs leading-6 text-zinc-400 sm:col-auto">In storage created inside the Cloudflare account you choose. Crate does not add end-to-end encryption.</dd></div>

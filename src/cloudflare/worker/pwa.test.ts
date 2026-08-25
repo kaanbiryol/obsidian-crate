@@ -19,8 +19,8 @@ describe('PWA activation metadata', () => {
 
 		expect(manifest.display).toBe('standalone');
 		expect(manifest.display_override).toEqual(['standalone', 'minimal-ui']);
-		expect(manifest.background_color).toBe('#0b0d11');
-		expect(manifest.theme_color).toBe('#0b0d11');
+		expect(manifest.background_color).toBe('#0b0b0d');
+		expect(manifest.theme_color).toBe('#0b0b0d');
 	});
 
 	it('carries activation params into the manifest start URL', () => {
@@ -81,18 +81,18 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('height=device-height');
 	});
 
-	it('uses the Obsidian purple for every PWA interaction accent', () => {
+	it('uses a restrained violet for every PWA interaction accent', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('--interactive-accent:#7c3aed;');
-		expect(html).toContain('--interactive-accent-hover:#7c3aed;');
-		expect(html).toContain('--accent:#7c3aed;');
-		expect(html).toContain('--accent-rgb:124,58,237;');
-		expect(html).toContain('--accent-strong:#7c3aed;');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-button.is-active{color:var(--accent)}');
+		expect(html).toContain('--interactive-accent:#8b5cf6;');
+		expect(html).toContain('--interactive-accent-hover:#9b75f7;');
+		expect(html).toContain('--accent:#8b5cf6;');
+		expect(html).toContain('--accent-rgb:139,92,246;');
+		expect(html).toContain('--accent-strong:#8b5cf6;');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-button.is-active{color:#bda7ff}');
 		expect(html).toContain('.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;');
-		expect(html).toContain('background:var(--accent);box-shadow:0 4px 12px rgba(var(--accent-rgb),.4)');
-		expect(html).toContain('.pwa-editor-icon-button--save{background:var(--accent);');
+		expect(html).toContain('border-radius:15px;background:linear-gradient(145deg,#9b75f7,#7c4ce5);');
+		expect(html).toContain('.pwa-editor-icon-button--save{background:linear-gradient(145deg,#9b75f7,#7c4ce5);');
 		expect(html).not.toContain('--interactive-accent:#a78bfa');
 		expect(html).not.toContain('--accent:#9b7cff');
 		expect(html).not.toContain('--accent-strong:#8e7cf4');
@@ -106,7 +106,7 @@ describe('PWA activation metadata', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
-		expect(html).toContain('<meta name="theme-color" content="#0b0d11">');
+		expect(html).toContain('<meta name="theme-color" content="#0b0b0d">');
 		expect(html).toContain('<link rel="icon" type="image/png" sizes="192x192" href="/notifications/crate-icon-192.png?v=');
 		expect(html).toContain('<link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=');
 		expect(html).toContain('<link rel="apple-touch-startup-image" href="/notifications/apple-startup-1179x2556.png?v=');
@@ -133,7 +133,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('height:100%!important;min-height:0!important;padding:0!important');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}');
 		expect(html).toContain('bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))');
-		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;');
+		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:40px;height:40px;min-width:40px;');
 		expect(html).toContain('.pwa-reminders-view .ios-scroll{scrollbar-width:none;overscroll-behavior-y:contain}');
 		expect(html).toContain('position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none');
 		expect(html).toContain('.pwa-reminders-view .premium-back-button{margin-top:calc(env(safe-area-inset-top) + 12px)}');
@@ -149,7 +149,7 @@ describe('PWA activation metadata', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('.pwa-shadow-root.has-open-sheet .reminders-content,.pwa-shadow-root.has-open-sheet .reminders-view-scroll{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}');
-		expect(html).toContain('.pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.56);backdrop-filter:blur(8px);');
+		expect(html).toContain('.pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.66);backdrop-filter:blur(10px);');
 		expect(html).toContain('.pwa-modal-sheet__container--reminder{width:min(1120px,calc(100vw - 36px))!important;height:calc(100% - env(safe-area-inset-top) - 28px)!important;');
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-reminder-sheet-stage{height:calc(100% - var(--pwa-keyboard-inset,0px));flex:0 0 calc(100% - var(--pwa-keyboard-inset,0px))}');
 		expect(html).not.toContain('.pwa-modal-sheet.is-keyboard-open .pwa-modal-sheet__container--reminder{bottom:');
@@ -176,7 +176,7 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('pwa-reminder-editor-backdrop');
 		expect(html).toContain('.pwa-editor-focus-bridge{position:fixed;top:calc(env(safe-area-inset-top) + 1px);left:1px;width:1px;height:1px;');
 		expect(html).not.toContain('--keyboard-usable-height');
-		expect(html).toContain('box-shadow:0 -1px 0 rgba(255,255,255,.035)');
+		expect(html).toContain('box-shadow:0 -1px 0 rgba(255,255,255,.025),0 -24px 70px rgba(0,0,0,.28)');
 		expect(html).not.toContain('box-shadow:0 -6px 20px rgba(0,0,0,.22)');
 		expect(html).not.toContain('box-shadow:0 -12px 48px rgba(0,0,0,.38)');
 	});
@@ -188,12 +188,12 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('--pwa-sheet-drag-');
 		expect(html).toContain('.reorderable-reminder-item[data-reorder-interaction="long-press"]{-webkit-touch-callout:none;user-select:none;');
 		expect(html).toContain('.reorderable-reminder-item[data-reorder-interaction="long-press"].is-reordering .premium-reminder-content');
-		expect(html).toContain('box-shadow 280ms cubic-bezier(.16,1,.3,1)');
+		expect(html).toContain('box-shadow 220ms cubic-bezier(.16,1,.3,1)');
 		expect(html).not.toContain('transform:scale(1.025)');
-		expect(html).toContain('--reminders-fab-gap:18px;--reminders-fab-size:56px;');
+		expect(html).toContain('--reminders-fab-gap:16px;--reminders-fab-size:48px;');
 		expect(html).toContain('.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;');
 		expect(html).not.toContain('.pwa-header-add-button');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none;background:rgba(30,30,30,.74);');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none;background:rgba(13,13,15,.9);');
 	});
 
 	it('ships an offline-capable installed app shell service worker', () => {

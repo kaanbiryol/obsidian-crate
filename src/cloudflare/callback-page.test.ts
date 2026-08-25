@@ -10,7 +10,7 @@ describe('static OAuth callback page', () => {
 		const html = await readFile(resolve(root, 'site/oauth/callback/index.html'), 'utf8');
 		const captureIndex = html.indexOf('window.__crateOAuthCallback = window.location.search');
 		const clearIndex = html.indexOf("history.replaceState(null, '', '/oauth/callback/')");
-		const handlerIndex = html.indexOf('src="/assets/callback.js"');
+		const handlerIndex = html.indexOf('src="/assets/callback.js?');
 
 		expect(captureIndex).toBeGreaterThan(0);
 		expect(clearIndex).toBeGreaterThan(captureIndex);
@@ -32,6 +32,9 @@ describe('static OAuth callback page', () => {
 		expect(script).not.toContain('console.');
 		expect(script).toContain('obsidian://crate-cloudflare-oauth');
 		expect(script).toContain('window.location.replace(obsidianUrl)');
+		expect(script).not.toContain('Connection incomplete');
+		expect(html).not.toContain('data-callback-state-label');
+		expect(html).toContain('Continue in Obsidian to finish setting up Crate.');
 		expect(html).toContain('Open Obsidian');
 	});
 });
