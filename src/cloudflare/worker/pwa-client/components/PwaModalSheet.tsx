@@ -42,6 +42,7 @@ const CLOSE_TWEEN: SheetTweenConfig = {
 export function PwaModalSheet({
 	isOpen,
 	onClose,
+	onOpenStart,
 	onOpenEnd,
 	onCloseEnd,
 	children,
@@ -53,6 +54,7 @@ export function PwaModalSheet({
 }: {
 	isOpen: boolean;
 	onClose: () => void;
+	onOpenStart?: () => void;
 	onOpenEnd?: () => void;
 	onCloseEnd: () => void;
 	children: React.ReactNode;
@@ -100,6 +102,7 @@ export function PwaModalSheet({
 		<Sheet
 			isOpen={isOpen}
 			onClose={onClose}
+			onOpenStart={onOpenStart}
 			onOpenEnd={onOpenEnd}
 			onCloseEnd={onCloseEnd}
 			mountPoint={mountPoint}

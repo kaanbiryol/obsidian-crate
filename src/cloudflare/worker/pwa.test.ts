@@ -167,6 +167,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;');
 		expect(html).toContain('.settings-panel{display:flex;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;');
 		expect(html).toContain('.pwa-reminder-editor .modal-form{gap:0;display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}');
+		expect(html).toContain('padding:16px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:none;animation:none}');
+		expect(html).not.toContain('box-shadow:none;backface-visibility:hidden;transform:translate3d(0,0,0);animation:none}');
 		expect(html).toContain('.pwa-editor-card{position:relative;display:flex;flex:1 1 420px;min-height:160px;flex-direction:column;overflow:hidden;overscroll-behavior:none;');
 		expect(html).toContain('.pwa-editor-actions{flex:0 0 auto;min-width:0}');
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-card{flex:1 1 auto;min-height:0;padding:16px 18px 18px}');

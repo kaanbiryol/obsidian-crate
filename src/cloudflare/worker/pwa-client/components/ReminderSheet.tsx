@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Button } from '@heroui/react';
 import { useVirtualKeyboard } from 'react-modal-sheet';
@@ -43,6 +43,11 @@ function focusWithoutScrolling(element: HTMLElement): void {
 	if (window.scrollX !== scrollX || window.scrollY !== scrollY) {
 		window.scrollTo(scrollX, scrollY);
 	}
+}
+
+function activeElementFor(element: HTMLElement): Element | null {
+	const root = element.getRootNode();
+	return root instanceof ShadowRoot ? root.activeElement : element.ownerDocument.activeElement;
 }
 
 export function ReminderSheet({
@@ -123,6 +128,7 @@ export function ReminderSheet({
 	const focusLastField = useCallback((fallbackTitlePosition: number) => {
 		if (lastFocusedFieldRef.current === 'description' && descriptionRef.current) {
 			const field = descriptionRef.current;
+			if (activeElementFor(field) === field) return;
 			focusWithoutScrolling(field);
 			const selection = descriptionSelectionRef.current;
 			if (selection) field.setSelectionRange(selection.start, selection.end, selection.direction);
@@ -133,13 +139,15 @@ export function ReminderSheet({
 		const titleInput = richTextInputRef.current;
 		const element = titleInput?.getElement();
 		if (!titleInput || !element) return;
+		if (activeElementFor(element) === element) return;
 		focusWithoutScrolling(element);
 		restoreCursorPosition(element, titleCursorRef.current ?? fallbackTitlePosition);
 		element.scrollTop = titleScrollTopRef.current;
 	}, []);
-	useLayoutEffect(() => {
-		if (focusBridgeRef.current) focusWithoutScrolling(focusBridgeRef.current);
-	}, [modal.mode, modal.reminderId]);
+	const handleSheetOpenStart = () => {
+		if (saving || isClosing || activeScreen !== 'editor' || !sheetOpen) return;
+		focusLastField(draft.content.length);
+	};
 	const handleSheetOpenEnd = () => {
 		if (saving || isClosing || activeScreen !== 'editor' || !sheetOpen) return;
 		focusLastField(draft.content.length);
@@ -277,6 +285,7 @@ export function ReminderSheet({
 					else onClose();
 				}}
 				onCloseEnd={handleSheetCloseEnd}
+				onOpenStart={handleSheetOpenStart}
 				onOpenEnd={handleSheetOpenEnd}
 				variant="reminder"
 				keyboardInset={keyboardInset}
