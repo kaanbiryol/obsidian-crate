@@ -114,9 +114,9 @@
 	:root{--tabbar-h:72px}
 	.app-content{padding:12px 14px calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + var(--reminders-fab-size) + env(safe-area-inset-bottom))}
 	.reminder-card__main,.premium-reminder-content{padding:12px 13px}
-	.checkbox,.premium-checkbox{width:18px;height:18px;min-width:18px;flex-basis:18px}
+	.checkbox,.crate-reminders-ui .pwa-reminders-view .premium-checkbox{width:20px;height:20px;min-width:20px;flex-basis:20px;aspect-ratio:1}
 	.bottom-tabs{padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
-	.fab{right:14px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:48px;height:48px;min-width:48px;border-radius:15px}
+	.fab{right:14px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:48px;height:48px;min-width:48px;border-radius:50%}
 }
 
 .pwa-reminders-view.is-fullscreen .animated-tab-bar-bottom{position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none}

@@ -91,7 +91,11 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--accent-strong:#8b5cf6;');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-button.is-active{color:#bda7ff}');
 		expect(html).toContain('.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;');
-		expect(html).toContain('border-radius:15px;background:linear-gradient(145deg,#9b75f7,#7c4ce5);');
+		expect(html).toContain('border-radius:50%;background:linear-gradient(145deg,#9b75f7,#7c4ce5);');
+		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:40px;height:40px;min-width:40px;border-radius:50%;');
+		expect(html).toContain('.pwa-editor-icon-button{width:40px;height:40px;min-width:40px;border-radius:50%;');
+		expect(html).toContain('.pwa-picker-icon-button{width:40px;height:40px;min-width:40px;border-radius:50%;');
+		expect(html).toContain('.settings-sheet__close{width:40px;height:40px;min-width:40px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.075);border-radius:50%;');
 		expect(html).toContain('.pwa-editor-icon-button--save{background:linear-gradient(145deg,#9b75f7,#7c4ce5);');
 		expect(html).not.toContain('--interactive-accent:#a78bfa');
 		expect(html).not.toContain('--accent:#9b7cff');
@@ -190,6 +194,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.reorderable-reminder-item[data-reorder-interaction="long-press"].is-reordering .premium-reminder-content');
 		expect(html).toContain('box-shadow 220ms cubic-bezier(.16,1,.3,1)');
 		expect(html).not.toContain('transform:scale(1.025)');
+		expect(html).toContain('.checkbox,.crate-reminders-ui .pwa-reminders-view .premium-checkbox{flex-shrink:0;width:20px;height:20px;min-width:20px;flex-basis:20px;aspect-ratio:1;border-radius:50%;border:2px solid');
 		expect(html).toContain('--reminders-fab-gap:16px;--reminders-fab-size:48px;');
 		expect(html).toContain('.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;');
 		expect(html).not.toContain('.pwa-header-add-button');

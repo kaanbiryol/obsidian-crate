@@ -16,7 +16,7 @@
 .pwa-editor-header__side{display:flex;align-items:center;justify-content:flex-start}
 .pwa-editor-header__side--right{justify-content:flex-end}
 .pwa-editor-title{margin:0;text-align:center;font-size:18px;font-weight:650;line-height:1.2;letter-spacing:-.02em;color:var(--text-normal)}
-.pwa-editor-icon-button{width:40px;height:40px;min-width:40px;border-radius:11px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:var(--text-muted);padding:0}
+.pwa-editor-icon-button{width:40px;height:40px;min-width:40px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:var(--text-muted);padding:0}
 .pwa-editor-icon-button svg{width:22px;height:22px}
 .pwa-editor-icon-button--danger{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.16);color:#ff4d4d}
 .pwa-editor-icon-button--danger.is-active{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.28)}
@@ -46,7 +46,7 @@
 .pwa-picker-header{display:grid;grid-template-columns:minmax(72px,1fr) minmax(0,1.4fr) minmax(72px,1fr);align-items:center;gap:8px;margin-bottom:18px}
 .pwa-picker-header>:last-child{justify-self:end}
 .pwa-picker-header h3{margin:0;text-align:center;font-size:18px;font-weight:650;line-height:1.2;letter-spacing:-.02em;color:var(--text-normal)}
-.pwa-picker-icon-button{width:40px;height:40px;min-width:40px;border-radius:11px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:var(--text-muted);padding:0}
+.pwa-picker-icon-button{width:40px;height:40px;min-width:40px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:var(--text-muted);padding:0}
 .pwa-picker-icon-button--done{background:linear-gradient(145deg,#9b75f7,#7c4ce5);border-color:rgba(255,255,255,.11);color:white;box-shadow:inset 0 1px 0 rgba(255,255,255,.17),0 8px 22px rgba(var(--accent-rgb),.18)}
 .pwa-picker-content{display:flex;flex:1;min-height:0;overflow:auto;overscroll-behavior-y:contain;flex-direction:column;gap:14px}
 .pwa-picker-presets,.pwa-project-list{display:flex;flex-direction:column;gap:8px}
@@ -60,7 +60,7 @@
 .pwa-project-picker-sheet .pwa-picker-content{gap:0}
 .pwa-project-picker-header{grid-template-columns:72px minmax(0,1fr) 72px;margin-bottom:28px}
 .pwa-project-picker-header h3{font-size:20px;font-weight:700}
-.pwa-project-picker-back{width:40px;height:40px;min-width:40px;border-radius:11px;background:rgba(255,255,255,.045);color:var(--text-muted)}
+.pwa-project-picker-back{width:40px;height:40px;min-width:40px;border-radius:50%;background:rgba(255,255,255,.045);color:var(--text-muted)}
 .pwa-project-picker-back svg{width:22px;height:22px}
 .pwa-project-picker-sheet .pwa-project-list{flex:1;gap:8px;max-height:none;padding-right:0}
 .pwa-project-picker-sheet .pwa-project-option{min-height:52px;height:auto;padding:0 18px;border-radius:11px;background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.06);box-shadow:none;color:var(--text-normal);font-size:13.5px;font-weight:600}
