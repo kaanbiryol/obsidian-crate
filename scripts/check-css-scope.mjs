@@ -53,6 +53,7 @@ function isInsideKeyframes(rule) {
 
 const stylesheet = postcss.parse(await readFile(STYLES_PATH, 'utf8'), { from: STYLES_PATH });
 const unownedSelectors = new Set();
+const generatedSelectors = new Set();
 
 stylesheet.walkRules((rule) => {
 	if (isInsideKeyframes(rule)) {
@@ -60,6 +61,7 @@ stylesheet.walkRules((rule) => {
 	}
 
 	for (const selector of splitSelectorList(rule.selector)) {
+		generatedSelectors.add(selector);
 		if (!selector.includes(OWNED_SELECTOR_FRAGMENT)) {
 			unownedSelectors.add(selector);
 		}
@@ -74,4 +76,22 @@ if (unownedSelectors.size > 0) {
 	process.exitCode = 1;
 } else {
 	console.log(`All selectors in ${STYLES_PATH} are scoped to Crate-owned classes.`);
+}
+
+const requiredSameNodeSelectors = [
+	'.crate-reminders-ui.reminders-shadow-root',
+	'.crate-reminders-ui.heroui-portal-container',
+];
+const missingSameNodeSelectors = requiredSameNodeSelectors.filter(
+	(selector) => !generatedSelectors.has(selector),
+);
+
+if (missingSameNodeSelectors.length > 0) {
+	console.error('Missing same-node selectors required by Shadow DOM mounts:');
+	for (const selector of missingSameNodeSelectors) {
+		console.error(`- ${selector}`);
+	}
+	process.exitCode = 1;
+} else {
+	console.log('Shadow DOM mount selectors target their classes on the same element.');
 }

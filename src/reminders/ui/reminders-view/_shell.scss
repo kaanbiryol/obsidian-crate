@@ -2,7 +2,7 @@
 
 // Shadow DOM root container
 // CSS custom properties from Obsidian inherit through shadow boundary
-.reminders-shadow-root {
+&.reminders-shadow-root {
     height: 100%;
     width: 100%; // Shadow DOM needs explicit width
     display: flex;
@@ -27,7 +27,7 @@
 }
 
 // Portal container inside shadow DOM for HeroUI components
-.heroui-portal-container {
+&.heroui-portal-container {
     position: relative;
     z-index: 1000;
 }

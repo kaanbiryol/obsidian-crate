@@ -33,7 +33,7 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
   const [isLongPressArmed, setIsLongPressArmed] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const isLifted = isLongPressArmed || isReordering;
-  const liftedScale = interaction === 'long-press' ? 1.02 : 1.015;
+  const usesLongPress = interaction === 'long-press';
 
   const cancelLongPress = useCallback(() => {
     if (longPressTimerRef.current !== null) {
@@ -117,14 +117,17 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
       onContextMenu={interaction === 'long-press' ? (event) => event.preventDefault() : undefined}
       data-reorder-interaction={interaction}
       className={`reorderable-reminder-item mb-2${isLongPressArmed ? ' is-long-press-armed' : ''}${isReordering ? ' is-reordering' : ''}`}
-      animate={{
-        scale: isLifted ? liftedScale : 1,
-      }}
-      whileDrag={{ zIndex: 50 }}
-      transition={{
-        layout: { type: 'spring', stiffness: 350, damping: 35 },
-        scale: { type: 'spring', stiffness: 420, damping: 31, mass: 0.68 },
-      }}
+      animate={usesLongPress ? { scale: isLifted ? 1.02 : 1 } : undefined}
+      whileTap={usesLongPress ? undefined : { scale: 1 }}
+      whileDrag={usesLongPress ? { zIndex: 50 } : { scale: 1.02, zIndex: 50 }}
+      transition={usesLongPress
+        ? {
+            layout: { type: 'spring', stiffness: 350, damping: 35 },
+            scale: { type: 'spring', stiffness: 420, damping: 31, mass: 0.68 },
+          }
+        : {
+            layout: { type: 'spring', stiffness: 350, damping: 35 },
+          }}
     >
       {renderCard(reminder, index)}
       {interaction === 'handle' && (

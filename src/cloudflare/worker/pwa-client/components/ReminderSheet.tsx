@@ -352,6 +352,7 @@ export function ReminderSheet({
 								readOnly={saving}
 								inputRef={contentRef}
 								preserveSelection
+								syncContentBeforePaint
 								knownProjects={projectOptions}
 								onAutocompleteQuery={autocomplete.updateAutocomplete}
 								onAutocompleteKeyDown={autocomplete.handleKeyDown}

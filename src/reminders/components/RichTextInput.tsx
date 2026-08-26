@@ -44,6 +44,8 @@ interface RichTextInputProps {
     onAutocompleteQuery?: (query: string | null, rect: DOMRect | null) => void;
     /** Handler for autocomplete keyboard navigation. Return true if handled. */
     onAutocompleteKeyDown?: (e: React.KeyboardEvent) => boolean;
+    /** Synchronize external values before paint for the standalone PWA editor. */
+    syncContentBeforePaint?: boolean;
 }
 
 export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>(({
@@ -63,7 +65,8 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     preserveSelection = true,
     knownProjects,
     onAutocompleteQuery,
-    onAutocompleteKeyDown
+    onAutocompleteKeyDown,
+    syncContentBeforePaint = false,
 }, ref) => {
     const editableRef = useRef<HTMLDivElement>(null);
     const hasInitializedRef = useRef(false);
@@ -73,7 +76,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const restoreRequestIdRef = useRef(0);
     const initialHtmlRef = useRef<{ html: string } | null>(null);
 
-    if (!initialHtmlRef.current) {
+    if (syncContentBeforePaint && !initialHtmlRef.current) {
         initialHtmlRef.current = { html: buildHTML(value, knownProjects) || '' };
     }
 
@@ -168,8 +171,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         updateAutocompleteQuery();
     };
 
-    // Update content when value changes externally (e.g., from parent reset)
-    useLayoutEffect(() => {
+    const syncExternalContent = useCallback(() => {
         if (!actualRef.current) return;
 
         const currentPlainText = getPlainText(actualRef.current);
@@ -218,7 +220,21 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         } else if (shouldPreserveCursor) {
             scheduleSelectionRestore(cursorPos);
         }
-    }, [value, autoFocus, knownProjects, preserveSelection, scheduleSelectionRestore]);
+    }, [actualRef, autoFocus, knownProjects, preserveSelection, scheduleSelectionRestore, value]);
+
+    // Keep the plugin's existing passive update behavior. The standalone PWA opts
+    // into a pre-paint sync to avoid showing the previous reminder for one frame.
+    useEffect(() => {
+        if (!syncContentBeforePaint) {
+            syncExternalContent();
+        }
+    }, [syncContentBeforePaint, syncExternalContent]);
+
+    useLayoutEffect(() => {
+        if (syncContentBeforePaint) {
+            syncExternalContent();
+        }
+    }, [syncContentBeforePaint, syncExternalContent]);
 
     // Handle auto-focus on mount (more reliable than HTML autoFocus for contentEditable)
     useEffect(() => {
@@ -274,7 +290,9 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 onPointerDown={onPointerDown}
                 className={`rich-text-input-editor${className ? ` ${className}` : ''}`}
                 data-placeholder={!value ? placeholder : ''}
-                dangerouslySetInnerHTML={{ __html: initialHtmlRef.current.html }}
+                dangerouslySetInnerHTML={initialHtmlRef.current
+                    ? { __html: initialHtmlRef.current.html }
+                    : undefined}
                 suppressContentEditableWarning
                 style={style}
             />
