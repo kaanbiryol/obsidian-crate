@@ -67,7 +67,7 @@ const TabButton = memo(function TabButton({
         <div className="bottom-tab-icon">
           <Icon
             size={24}
-            strokeWidth={isActive ? 2.5 : 2}
+            strokeWidth={2}
           />
         </div>
         <span className="bottom-tab-label">

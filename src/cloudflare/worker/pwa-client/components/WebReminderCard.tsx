@@ -1,6 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
+
+const COMPLETION_FEEDBACK_MS = 360;
+const REDUCED_MOTION_FEEDBACK_MS = 80;
 
 export function WebReminderCard({
 	reminder,
@@ -13,9 +16,45 @@ export function WebReminderCard({
 	index: number;
 	hideProject: boolean;
 	onEdit: (id: string) => void;
-	onToggleComplete: (id: string, completed: boolean) => void;
+	onToggleComplete: (id: string, completed: boolean) => void | Promise<void>;
 }) {
 	const wrapperRef = useRef<HTMLDivElement | null>(null);
+	const mountedRef = useRef(true);
+	const isCompletingRef = useRef(false);
+	const [completionPreview, setCompletionPreview] = useState(false);
+
+	useEffect(() => {
+		mountedRef.current = true;
+		return () => {
+			mountedRef.current = false;
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!reminder.completed) return;
+		isCompletingRef.current = false;
+		setCompletionPreview(false);
+	}, [reminder.completed]);
+
+	const toggleComplete = useCallback(() => {
+		if (isCompletingRef.current) return;
+		if (reminder.completed) {
+			void onToggleComplete(reminder.id, true);
+			return;
+		}
+
+		isCompletingRef.current = true;
+		setCompletionPreview(true);
+		const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+		window.setTimeout(() => {
+			void Promise.resolve()
+				.then(() => onToggleComplete(reminder.id, false))
+				.finally(() => {
+					isCompletingRef.current = false;
+					if (mountedRef.current) setCompletionPreview(false);
+				});
+		}, reduceMotion ? REDUCED_MOTION_FEEDBACK_MS : COMPLETION_FEEDBACK_MS);
+	}, [onToggleComplete, reminder.completed, reminder.id]);
 
 	useEffect(() => {
 		const wrapper = wrapperRef.current;
@@ -23,6 +62,10 @@ export function WebReminderCard({
 
 		const handleClick = (event: MouseEvent) => {
 			const target = event.target as HTMLElement;
+			if (isCompletingRef.current) {
+				event.stopPropagation();
+				return;
+			}
 			if (target.closest('.reorder-drag-handle')) {
 				event.stopPropagation();
 				return;
@@ -30,7 +73,7 @@ export function WebReminderCard({
 
 			if (target.closest('.premium-checkbox') || target.closest('[role="checkbox"]')) {
 				event.stopPropagation();
-				onToggleComplete(reminder.id, reminder.completed);
+				toggleComplete();
 				return;
 			}
 
@@ -42,6 +85,7 @@ export function WebReminderCard({
 			onEdit(reminder.id);
 		};
 		const handleKeyDown = (event: KeyboardEvent) => {
+			if (isCompletingRef.current) return;
 			if (event.target !== wrapper || (event.key !== 'Enter' && event.key !== ' ')) return;
 			event.preventDefault();
 			onEdit(reminder.id);
@@ -53,7 +97,7 @@ export function WebReminderCard({
 			wrapper.removeEventListener('click', handleClick, true);
 			wrapper.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [onEdit, onToggleComplete, reminder.completed, reminder.id]);
+	}, [onEdit, reminder.id, toggleComplete]);
 
 	return (
 		<div
@@ -66,6 +110,7 @@ export function WebReminderCard({
 		>
 			<SharedReminderCard
 				reminder={reminder}
+				completionPreview={completionPreview}
 				animationConfig={{ enabled: false }}
 				index={index}
 				hideProject={hideProject}

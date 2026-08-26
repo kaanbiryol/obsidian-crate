@@ -11,6 +11,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { buildUpcomingViewModel } from './viewModels';
 import { STAGGERED_CARD_ANIMATION } from '../layoutConstants';
 import type { ProjectColorScheme } from '../../utils/projectColors';
+import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 
 export interface UpcomingViewProps {
   reminders: Reminder[];
@@ -39,6 +40,7 @@ export const UpcomingView = memo(function UpcomingView({
   className = '',
   colorScheme = 'dark',
 }: UpcomingViewProps) {
+  const scrollRef = useStableReminderScroll();
   const { upcomingReminders, dateGroups } = useMemo(() => {
     return buildUpcomingViewModel(reminders, days);
   }, [reminders, days]);
@@ -73,6 +75,7 @@ export const UpcomingView = memo(function UpcomingView({
   return (
     <div className={`flex flex-col h-full relative ${className}`}>
       <div
+        ref={scrollRef}
         className={`flex-1 overflow-y-auto ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
       >
         <div className="space-y-6">
@@ -95,6 +98,9 @@ export const UpcomingView = memo(function UpcomingView({
                       animate={animationConfig.enabled ? STAGGERED_CARD_ANIMATION.animate(index) : { opacity: 1 }}
                       exit={animationConfig.enabled ? STAGGERED_CARD_ANIMATION.exit : undefined}
                       className="mb-2"
+                      data-reminder-scroll-anchor="true"
+                      data-reminder-id={reminder.id}
+                      data-reminder-section="active"
                     >
                       {cardRenderer(reminder, index)}
                     </motion.div>

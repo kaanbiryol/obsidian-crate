@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
+import { LayoutGroup } from 'framer-motion';
 import { ChevronLeft, FolderOpen } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
@@ -11,6 +12,7 @@ import { ProjectCompletedSection } from './ProjectCompletedSection';
 import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../../utils/projectColors';
+import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 
 
 export interface ProjectDetailViewProps {
@@ -51,6 +53,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   colorScheme = 'dark',
 }: ProjectDetailViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
+  const scrollRef = useStableReminderScroll();
 
   const detail = useMemo(() => {
     return buildProjectDetailViewModel(reminders, project, colorScheme);
@@ -123,24 +126,27 @@ export const ProjectDetailView = memo(function ProjectDetailView({
         </div>
       ) : (
         <div
+          ref={scrollRef}
           className={`flex-1 overflow-y-scroll ios-scroll reminders-view-scroll will-change-transform${hasFab ? ' has-fab' : ''}`}
         >
-          {/* Active reminders */}
-          <ReorderableReminderList
-            reminders={localOrder}
-            onReorder={setLocalOrder}
-            onReorderCommit={handleReorderCommit}
-            onDragActiveChange={handleDragActiveChange}
-            renderCard={cardRenderer}
-            interaction={reorderInteraction}
-          />
+          <LayoutGroup id={`project-${project}-reminder-sections`}>
+            {/* Active reminders */}
+            <ReorderableReminderList
+              reminders={localOrder}
+              onReorder={setLocalOrder}
+              onReorderCommit={handleReorderCommit}
+              onDragActiveChange={handleDragActiveChange}
+              renderCard={cardRenderer}
+              interaction={reorderInteraction}
+            />
 
-          <ProjectCompletedSection
-            reminders={completed}
-            showCompleted={showCompleted}
-            onToggle={() => setShowCompleted((prev) => !prev)}
-            renderCard={cardRenderer}
-          />
+            <ProjectCompletedSection
+              reminders={completed}
+              showCompleted={showCompleted}
+              onToggle={() => setShowCompleted((prev) => !prev)}
+              renderCard={cardRenderer}
+            />
+          </LayoutGroup>
         </div>
       )}
     </div>

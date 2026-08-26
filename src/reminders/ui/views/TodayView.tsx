@@ -10,6 +10,7 @@ import { ProjectCompletedSection } from './ProjectCompletedSection';
 import { buildTodayViewModel } from './viewModels';
 import { CARD_ANIMATION } from '../layoutConstants';
 import type { ProjectColorScheme } from '../../utils/projectColors';
+import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 
 export interface TodayViewProps {
   reminders: Reminder[];
@@ -36,6 +37,7 @@ export const TodayView = memo(function TodayView({
   colorScheme = 'dark',
 }: TodayViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
+  const scrollRef = useStableReminderScroll();
   const { active, completed } = useMemo(() => buildTodayViewModel(reminders), [reminders]);
   const hasContent = active.length > 0 || completed.length > 0;
 
@@ -71,31 +73,36 @@ export const TodayView = memo(function TodayView({
   return (
     <div className={`flex flex-col h-full relative ${className}`}>
       <div
+        ref={scrollRef}
         className={`flex-1 overflow-y-auto space-y-2 ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
       >
-        <LayoutGroup>
+        <LayoutGroup id="today-reminder-sections">
           <AnimatePresence mode="popLayout" initial={false}>
             {active.map((reminder, index) => (
               <motion.div
                 key={reminder.id}
+                layoutId={`reminder-card-${reminder.id}`}
                 layout="position"
                 initial={animationConfig.enabled ? CARD_ANIMATION.initial : false}
                 animate={animationConfig.enabled ? CARD_ANIMATION.animate : { opacity: 1 }}
                 exit={animationConfig.enabled ? CARD_ANIMATION.exit : undefined}
                 className="mb-2"
+                data-reminder-scroll-anchor="true"
+                data-reminder-id={reminder.id}
+                data-reminder-section="active"
               >
                 {cardRenderer(reminder, index)}
               </motion.div>
             ))}
           </AnimatePresence>
-        </LayoutGroup>
 
-        <ProjectCompletedSection
-          reminders={completed}
-          showCompleted={showCompleted}
-          onToggle={() => setShowCompleted((previous) => !previous)}
-          renderCard={cardRenderer}
-        />
+          <ProjectCompletedSection
+            reminders={completed}
+            showCompleted={showCompleted}
+            onToggle={() => setShowCompleted((previous) => !previous)}
+            renderCard={cardRenderer}
+          />
+        </LayoutGroup>
       </div>
     </div>
   );

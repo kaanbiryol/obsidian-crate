@@ -22,7 +22,12 @@ export const ProjectCompletedSection = memo(function ProjectCompletedSection({
   }
 
   return (
-    <div className="mt-6 pb-4">
+    <div
+      className="mt-6 pb-4"
+      data-reminder-scroll-anchor="true"
+      data-reminder-id="completed-section"
+      data-reminder-section="section"
+    >
       <div className="premium-divider" />
       <ShadowDOMButton
         variant="light"
@@ -69,10 +74,15 @@ export const ProjectCompletedSection = memo(function ProjectCompletedSection({
               {reminders.map((reminder, index) => (
                 <motion.div
                   key={reminder.id}
+                  layoutId={`reminder-card-${reminder.id}`}
+                  layout="position"
                   initial={false}
                   animate={{ opacity: 1 }}
                   exit={{ ...CARD_ANIMATION.exit, x: 20 }}
                   className="premium-reminder-card-wrapper"
+                  data-reminder-scroll-anchor="true"
+                  data-reminder-id={reminder.id}
+                  data-reminder-section="completed"
                 >
                   {renderCard(reminder, index)}
                 </motion.div>

@@ -10,7 +10,7 @@
 @keyframes auth-loading-glow{0%,100%{opacity:.55;transform:scale(.92)}50%{opacity:1;transform:scale(1.08)}}
 @keyframes auth-loading-progress{0%{transform:translateX(-115%)}55%{transform:translateX(82%)}100%{transform:translateX(235%)}}
 @media (prefers-reduced-motion: reduce){
-	.view-transition,.app-header__body,.tab-button.is-active,.modal-card,.settings-sheet,.pwa-picker-sheet,.pwa-skeleton-line,.pwa-pull-refresh__glyph svg,.pwa-update-banner,.auth-loading__mark-stage::before,.auth-loading__mark-stage img,.auth-loading__progress span{animation:none!important}
+	.view-transition,.app-header__body,.tab-button.is-active,.modal-card,.settings-sheet,.pwa-picker-sheet,.pwa-skeleton-line,.pwa-pull-refresh__glyph svg,.pwa-update-banner,.auth-loading__mark-stage::before,.auth-loading__mark-stage img,.auth-loading__progress span,.premium-checkbox.is-completing,.premium-checkbox-icon{animation:none!important}
 	.tab-button,.tab-button__icon,.premium-reminder-content,.fab,.pwa-pull-refresh,.pwa-pull-refresh__glyph,.modal-card.pwa-reminder-editor{transition:none!important}
 }
 @keyframes sheet-in{from{translate:0 18px;opacity:.92}to{translate:0 0;opacity:1}}
@@ -27,6 +27,7 @@
 }
 @media (max-width: 640px){
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{width:100vw!important;border-right:0;border-left:0}
+	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{max-height:90dvh!important}
 	.modal-card.pwa-reminder-editor{padding:16px 24px calc(28px + env(safe-area-inset-bottom))}
 	.pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor{padding-bottom:16px}
 	.pwa-editor-header{grid-template-columns:minmax(64px,1fr) minmax(0,1.4fr) minmax(64px,1fr);margin-bottom:22px}

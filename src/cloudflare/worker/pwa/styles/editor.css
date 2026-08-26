@@ -26,6 +26,8 @@
 .pwa-editor-title-input,.pwa-editor-description-input{display:block;width:100%;padding:0;margin:0;background:transparent;border:none;outline:none;box-shadow:none;color:var(--text-normal);font-family:inherit;resize:none;-webkit-appearance:none}
 .pwa-editor-title-input{flex:1 1 0;min-height:42px;max-height:120px;font-size:19px;font-weight:600;line-height:1.35;letter-spacing:-.015em;overflow-y:auto;overscroll-behavior-y:contain}
 .pwa-editor-title-rich-input{white-space:pre-wrap;word-break:break-word;caret-color:var(--text-normal)}
+.rich-text-input-shell.has-paint-stabilizer>.pwa-editor-title-rich-input{opacity:0}
+.rich-text-input-paint-stabilizer{position:absolute;inset:0;pointer-events:none}
 .pwa-editor-title-rich-input:empty::before{content:attr(data-placeholder);color:rgba(255,255,255,.32);pointer-events:none}
 .pwa-editor-title-rich-input .rich-text-chip{line-height:1.45}
 .pwa-editor-description-input{flex:1.15 1 0;height:auto;min-height:60px;max-height:260px;font-size:14.5px;font-weight:450;line-height:1.55;color:var(--text-muted);overflow-y:auto;overscroll-behavior-y:contain}

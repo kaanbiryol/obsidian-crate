@@ -46,6 +46,8 @@ interface RichTextInputProps {
     onAutocompleteKeyDown?: (e: React.KeyboardEvent) => boolean;
     /** Synchronize external values before paint for the standalone PWA editor. */
     syncContentBeforePaint?: boolean;
+    /** Keep a non-editable copy visible while a transformed sheet settles. */
+    stabilizeInitialPaint?: boolean;
 }
 
 export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>(({
@@ -67,10 +69,11 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     onAutocompleteQuery,
     onAutocompleteKeyDown,
     syncContentBeforePaint = false,
+    stabilizeInitialPaint = false,
 }, ref) => {
     const editableRef = useRef<HTMLDivElement>(null);
     const hasInitializedRef = useRef(false);
-    const knownProjectsKeyRef = useRef<string | null>(null);
+    const knownProjectsKeyRef = useRef(knownProjects ? knownProjects.join('\u0000') : '');
     const pendingCursorRef = useRef<number | null>(null);
     const pendingScrollTopRef = useRef<number | null>(null);
     const restoreRequestIdRef = useRef(0);
@@ -82,6 +85,9 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
     // Use provided ref or internal one
     const actualRef = inputRef || editableRef;
+    const paintStabilizerHtml = stabilizeInitialPaint
+        ? initialHtmlRef.current?.html ?? (buildHTML(value, knownProjects) || '')
+        : null;
 
     // Ref callback to update refs when element attaches to DOM
     const refCallback = useCallback((el: HTMLDivElement | null) => {
@@ -90,7 +96,21 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         } else {
             editableRef.current = el;
         }
-    }, [inputRef]);
+
+        if (!el || !autoFocus) return;
+        const focusAttachedEditor = () => {
+            if (!el.isConnected) return;
+            const root = el.getRootNode();
+            const activeElement = root instanceof ShadowRoot
+                ? root.activeElement
+                : el.ownerDocument.activeElement;
+            if (activeElement !== el) el.focus({ preventScroll: true });
+            moveCursorToEnd(el);
+            hasInitializedRef.current = true;
+        };
+        queueMicrotask(focusAttachedEditor);
+        requestAnimationFrame(focusAttachedEditor);
+    }, [autoFocus, inputRef]);
 
     // Expose methods to parent via ref
     useImperativeHandle(ref, () => ({
@@ -190,7 +210,11 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             return;
         }
 
-        const isFocused = document.activeElement === actualRef.current;
+        const root = actualRef.current.getRootNode();
+        const activeElement = root instanceof ShadowRoot
+            ? root.activeElement
+            : actualRef.current.ownerDocument.activeElement;
+        const isFocused = activeElement === actualRef.current;
         const shouldPreserveCursor = preserveSelection && isFocused;
         const cursorPos = shouldPreserveCursor ? saveCursorPosition(actualRef.current) : null;
 
@@ -236,24 +260,6 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         }
     }, [syncContentBeforePaint, syncExternalContent]);
 
-    // Handle auto-focus on mount (more reliable than HTML autoFocus for contentEditable)
-    useEffect(() => {
-        if (autoFocus && actualRef.current) {
-            // Small delay to ensure modal is fully rendered
-            const timer = setTimeout(() => {
-                if (!actualRef.current) return;
-                if (document.activeElement !== actualRef.current) {
-                    actualRef.current.focus();
-                }
-                // If there's no content, still need to set cursor position
-                if (!getPlainText(actualRef.current)) {
-                    moveCursorToEnd(actualRef.current);
-                }
-            }, 50);
-            return () => clearTimeout(timer);
-        }
-    }, [autoFocus]);
-
     const {
         handleClick,
         handleKeyDownInternal,
@@ -270,7 +276,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         <div
             onMouseDown={handleMouseDown}
             onTouchStart={handleTouchStart}
-            className="rich-text-input-shell"
+            className={`rich-text-input-shell${paintStabilizerHtml !== null ? ' has-paint-stabilizer' : ''}`}
         >
             <div
                 ref={refCallback}
@@ -296,6 +302,14 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 suppressContentEditableWarning
                 style={style}
             />
+            {paintStabilizerHtml !== null && (
+                <div
+                    className={`rich-text-input-paint-stabilizer${className ? ` ${className}` : ''}`}
+                    aria-hidden="true"
+                    dangerouslySetInnerHTML={{ __html: paintStabilizerHtml }}
+                    style={style}
+                />
+            )}
         </div>
     );
 });

@@ -75,6 +75,12 @@ export function ReminderSheet({
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 	const focusBridgeRef = useRef<HTMLInputElement | null>(null);
+	const setFocusBridgeRef = useCallback((element: HTMLInputElement | null) => {
+		focusBridgeRef.current = element;
+		if (!element) return;
+
+		focusWithoutScrolling(element);
+	}, []);
 	const lastFocusedFieldRef = useRef<'title' | 'description'>('title');
 	const titleCursorRef = useRef<number | null>(null);
 	const titleScrollTopRef = useRef(0);
@@ -96,6 +102,8 @@ export function ReminderSheet({
 	const draft = modal.draft;
 	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 	const isEditing = modal.mode === 'edit';
+	const editorIdentity = `${modal.mode}:${modal.reminderId ?? 'new'}`;
+	const [settledEditorIdentity, setSettledEditorIdentity] = useState<string | null>(null);
 	const title = isEditing ? 'Edit Reminder' : 'New Reminder';
 	const canSubmit = !saving && !isClosing && Boolean(draft.content.trim());
 	const captureTitleSelection = useCallback(() => {
@@ -150,9 +158,9 @@ export function ReminderSheet({
 	};
 	const handleSheetOpenEnd = () => {
 		if (saving || isClosing || activeScreen !== 'editor' || !sheetOpen) return;
+		setSettledEditorIdentity(editorIdentity);
 		focusLastField(draft.content.length);
 	};
-
 	useEffect(() => () => {
 		if (reopenFrameRef.current !== null) window.cancelAnimationFrame(reopenFrameRef.current);
 	}, []);
@@ -268,7 +276,7 @@ export function ReminderSheet({
 	return (
 		<>
 			<input
-				ref={focusBridgeRef}
+				ref={setFocusBridgeRef}
 				className="pwa-editor-focus-bridge"
 				type="text"
 				inputMode="text"
@@ -362,6 +370,8 @@ export function ReminderSheet({
 								inputRef={contentRef}
 								preserveSelection
 								syncContentBeforePaint
+								autoFocus={!saving && !isClosing}
+								stabilizeInitialPaint={isEditing && settledEditorIdentity !== editorIdentity}
 								knownProjects={projectOptions}
 								onAutocompleteQuery={autocomplete.updateAutocomplete}
 								onAutocompleteKeyDown={autocomplete.handleKeyDown}

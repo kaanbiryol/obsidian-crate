@@ -112,10 +112,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     startTransition();
     setViewMode(mode);
-
-    if (mode !== "browse") {
-      setSelectedProject(null);
-    }
+    setSelectedProject(null);
   }, [startTransition]);
 
   const handleProjectSelect = useCallback((project: string) => {

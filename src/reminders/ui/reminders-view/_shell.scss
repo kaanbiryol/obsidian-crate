@@ -295,6 +295,7 @@
 .reminders-view-scroll {
     padding: 16px;
     touch-action: pan-y;
+    overflow-anchor: none;
 
     &.has-fab {
         padding-bottom: calc(var(--reminders-tabbar-overlay, 0px) + var(--reminders-fab-gap, 24px) + var(--reminders-fab-size, 56px) + var(--reminders-safe-area, env(safe-area-inset-bottom)));
@@ -350,6 +351,16 @@
 // Shared rich text chips are used by both the Obsidian plugin and the PWA editor.
 .rich-text-input-shell {
     position: relative;
+
+    &.has-paint-stabilizer > .rich-text-input-editor {
+        opacity: 0;
+    }
+}
+
+.rich-text-input-paint-stabilizer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
 }
 
 .rich-text-input-editor {

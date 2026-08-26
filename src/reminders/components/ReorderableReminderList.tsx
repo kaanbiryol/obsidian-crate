@@ -115,6 +115,11 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
       onPointerUp={cancelLongPress}
       onPointerCancel={cancelLongPress}
       onContextMenu={interaction === 'long-press' ? (event) => event.preventDefault() : undefined}
+      layoutId={`reminder-card-${reminder.id}`}
+      layout="position"
+      data-reminder-scroll-anchor="true"
+      data-reminder-id={reminder.id}
+      data-reminder-section="active"
       data-reorder-interaction={interaction}
       className={`reorderable-reminder-item mb-2${isLongPressArmed ? ' is-long-press-armed' : ''}${isReordering ? ' is-reordering' : ''}`}
       animate={usesLongPress ? { scale: isLifted ? 1.02 : 1 } : undefined}

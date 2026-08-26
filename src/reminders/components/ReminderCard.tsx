@@ -66,6 +66,7 @@ interface ReminderCardProps {
     className?: string;
     hideProject?: boolean; // Hide project tag (useful when viewing within a project)
     colorScheme?: ProjectColorScheme;
+    completionPreview?: boolean;
 }
 
 
@@ -79,10 +80,12 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     className = '',
     hideProject = false,
     colorScheme = 'dark',
+    completionPreview = false,
 }) => {
     const dueDate = reminder.dueDatetime || reminder.dueDate;
     const isOverdue = isReminderOverdue(reminder);
     const isImportant = reminder.priority === 1;
+    const isCheckboxChecked = reminder.completed || completionPreview;
 
     const projectColors = reminder.project ? getProjectColor(reminder.project) : null;
     const projectThemeColors = projectColors?.[colorScheme];
@@ -121,27 +124,30 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                 {/* Custom checkbox */}
                 <button
                     type="button"
-                    className={`premium-checkbox ${reminder.completed ? 'is-checked' : ''}`}
+                    className={`premium-checkbox${isCheckboxChecked ? ' is-checked' : ''}${completionPreview ? ' is-completing' : ''}`}
                     role="checkbox"
-                    aria-checked={reminder.completed}
-                    aria-label={reminder.completed
-                        ? `Mark ${reminder.content} incomplete`
-                        : `Mark ${reminder.content} complete`}
+                    aria-checked={isCheckboxChecked}
+                    aria-disabled={completionPreview}
+                    aria-label={completionPreview
+                        ? `Completing ${reminder.content}`
+                        : reminder.completed
+                            ? `Mark ${reminder.content} incomplete`
+                            : `Mark ${reminder.content} complete`}
                     style={{
-                        borderColor: reminder.completed
+                        borderColor: isCheckboxChecked
                             ? 'var(--text-success)'
                             : (isImportant
                                 ? 'var(--text-error)'
                                 : 'var(--background-modifier-border-hover, var(--background-modifier-border))'),
-                        backgroundColor: reminder.completed ? 'var(--text-success)' : 'transparent',
-                        boxShadow: reminder.completed
+                        backgroundColor: isCheckboxChecked ? 'var(--text-success)' : 'transparent',
+                        boxShadow: isCheckboxChecked
                             ? '0 0 6px color-mix(in srgb, var(--text-success) 35%, transparent)'
                             : isImportant
                                 ? '0 0 4px color-mix(in srgb, var(--text-error) 25%, transparent)'
                                 : 'none',
                     }}
                 >
-                    {reminder.completed && (
+                    {isCheckboxChecked && (
                         <Check size={12} strokeWidth={3} className="premium-checkbox-icon" />
                     )}
                 </button>

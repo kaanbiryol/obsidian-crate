@@ -11,6 +11,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { buildInboxViewModel } from './viewModels';
 import { SPRING_CONFIG_BOUNCY } from '../layoutConstants';
 import type { ProjectColorScheme } from '../../utils/projectColors';
+import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 
 export interface InboxViewProps {
   reminders: Reminder[];
@@ -51,6 +52,7 @@ export const InboxView = memo(function InboxView({
   colorScheme = 'dark',
 }: InboxViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
+  const scrollRef = useStableReminderScroll();
 
   const { active, completed } = useMemo(() => buildInboxViewModel(reminders), [reminders]);
 
@@ -96,20 +98,27 @@ export const InboxView = memo(function InboxView({
   return (
     <div className={`flex flex-col h-full relative ${className}`}>
       <div
+        ref={scrollRef}
         className={`flex-1 overflow-y-auto space-y-2 ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
       >
-        <ReorderableReminderList
-          reminders={localOrder}
-          onReorder={setLocalOrder}
-          onReorderCommit={handleReorderCommit}
-          onDragActiveChange={onReorderDragActiveChange}
-          renderCard={cardRenderer}
-          interaction={reorderInteraction}
-        />
+        <LayoutGroup id="inbox-reminder-sections">
+          <ReorderableReminderList
+            reminders={localOrder}
+            onReorder={setLocalOrder}
+            onReorderCommit={handleReorderCommit}
+            onDragActiveChange={onReorderDragActiveChange}
+            renderCard={cardRenderer}
+            interaction={reorderInteraction}
+          />
 
-        {/* Completed section */}
-        {completed.length > 0 && (
-          <div className="mt-6 pb-4">
+          {/* Completed section */}
+          {completed.length > 0 && (
+            <div
+              className="mt-6 pb-4"
+              data-reminder-scroll-anchor="true"
+              data-reminder-id="completed-section"
+              data-reminder-section="section"
+            >
             <Divider className="mb-3" />
             {renderToggleButton ? (
               renderToggleButton({
@@ -162,11 +171,11 @@ export const InboxView = memo(function InboxView({
                   }}
                   className="mt-3 overflow-hidden"
                 >
-                  <LayoutGroup>
                   <AnimatePresence mode="popLayout" initial={false}>
                     {completed.map((reminder, index) => (
                       <motion.div
                         key={reminder.id}
+                        layoutId={`reminder-card-${reminder.id}`}
                         layout="position"
                         initial={animationConfig.enabled ? { opacity: 0, y: 6 } : false}
                         animate={animationConfig.enabled ? {
@@ -184,17 +193,20 @@ export const InboxView = memo(function InboxView({
                           transition: { duration: 0.25, ease: [0.4, 0, 1, 1] as const }
                         } : undefined}
                         className="mb-2"
+                        data-reminder-scroll-anchor="true"
+                        data-reminder-id={reminder.id}
+                        data-reminder-section="completed"
                       >
                         {cardRenderer(reminder, index)}
                       </motion.div>
                     ))}
                   </AnimatePresence>
-                </LayoutGroup>
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-        )}
+            </div>
+          )}
+        </LayoutGroup>
       </div>
     </div>
   );
