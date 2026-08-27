@@ -21,6 +21,7 @@ import { ReminderSheet } from './pwa-client/components/ReminderSheet';
 import { SettingsSheet } from './pwa-client/components/SettingsSheet';
 import { WebReminderCard } from './pwa-client/components/WebReminderCard';
 import { usePushNotifications } from './pwa-client/hooks/usePushNotifications';
+import { useInitialLoadingGate } from './pwa-client/hooks/useInitialLoadingGate';
 import { usePwaBootstrap } from './pwa-client/hooks/usePwaBootstrap';
 import { usePwaStatus } from './pwa-client/hooks/usePwaStatus';
 import { useLaunchReminderModal } from './pwa-client/hooks/useLaunchReminderModal';
@@ -54,6 +55,7 @@ function App() {
 	const [updateAvailable, setUpdateAvailable] = useState(false);
 	const [modal, setModal] = useState<ModalState | null>(null);
 	const [reorderDragging, setReorderDragging] = useState(false);
+	const initialLoadingComplete = useInitialLoadingGate(bootstrapped);
 	const { toast, showToast } = useToast();
 	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
 	const finalizeModalClose = useCallback(() => setModal(null), []);
@@ -306,7 +308,7 @@ function App() {
 		/>
 	), [openModal, toggleReminderCompleted]);
 
-	if (!bootstrapped) {
+	if (!initialLoadingComplete) {
 		return <LoadingAuthState />;
 	}
 
