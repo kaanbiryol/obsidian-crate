@@ -260,12 +260,5 @@ export const restoreCursorPosition = (element: HTMLElement | null, position: num
 export const moveCursorToEnd = (element: HTMLElement | null): void => {
     if (!element) return;
 
-    const range = document.createRange();
-    const sel = window.getSelection();
-    if (!sel) return;
-
-    range.selectNodeContents(element);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
+    restoreCursorPosition(element, getLogicalTextLength(element));
 };

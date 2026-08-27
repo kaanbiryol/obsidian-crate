@@ -8,7 +8,7 @@ describe('focusRichTextElement', () => {
 
   it('focuses once and moves the caret without delayed retries', () => {
     const range = {
-      selectNodeContents: vi.fn(),
+      setStart: vi.fn(),
       collapse: vi.fn(),
     };
     const selection = {
@@ -17,7 +17,19 @@ describe('focusRichTextElement', () => {
     };
     const setTimeoutSpy = vi.fn();
     const focus = vi.fn();
-    const element = { focus } as unknown as HTMLDivElement;
+    const trailingText = {
+      nodeType: 3,
+      nodeName: '#text',
+      textContent: ' ',
+      childNodes: [],
+    };
+    const element = {
+      focus,
+      nodeType: 1,
+      nodeName: 'DIV',
+      textContent: null,
+      childNodes: [trailingText],
+    } as unknown as HTMLDivElement;
 
     vi.stubGlobal('document', { createRange: () => range });
     vi.stubGlobal('window', {
@@ -29,8 +41,8 @@ describe('focusRichTextElement', () => {
 
     expect(focus).toHaveBeenCalledOnce();
     expect(focus).toHaveBeenCalledWith({ preventScroll: true });
-    expect(range.selectNodeContents).toHaveBeenCalledWith(element);
-    expect(range.collapse).toHaveBeenCalledWith(false);
+    expect(range.setStart).toHaveBeenCalledWith(trailingText, 1);
+    expect(range.collapse).toHaveBeenCalledWith(true);
     expect(selection.removeAllRanges).toHaveBeenCalledOnce();
     expect(selection.addRange).toHaveBeenCalledWith(range);
     expect(setTimeoutSpy).not.toHaveBeenCalled();

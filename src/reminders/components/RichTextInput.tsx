@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { buildHTML, getPlainText } from '../utils/richTextParsing';
-import { saveCursorPosition, restoreCursorPosition } from '../utils/cursorPosition';
+import { getLogicalTextLength, saveCursorPosition, restoreCursorPosition } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
 import {
     focusRichTextElement,
@@ -38,6 +38,8 @@ interface RichTextInputProps {
     readOnly?: boolean;
     /** Preserve cursor position when value is updated externally */
     preserveSelection?: boolean;
+    /** Choose where to restore the cursor after an external value update. */
+    externalChangeCursor?: 'preserve' | 'end';
     /** Known project names for multi-word project highlighting */
     knownProjects?: string[];
     /** Callback when a # autocomplete query changes. null = no active autocomplete. */
@@ -63,6 +65,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     autoFocus = false,
     readOnly = false,
     preserveSelection = true,
+    externalChangeCursor = 'preserve',
     knownProjects,
     onAutocompleteQuery,
     onAutocompleteKeyDown,
@@ -215,9 +218,13 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 }
             });
         } else if (shouldPreserveCursor) {
-            scheduleSelectionRestore(cursorPos);
+            scheduleSelectionRestore(
+                externalChangeCursor === 'end'
+                    ? getLogicalTextLength(actualRef.current)
+                    : cursorPos,
+            );
         }
-    }, [actualRef, knownProjects, preserveSelection, scheduleSelectionRestore, value]);
+    }, [actualRef, externalChangeCursor, knownProjects, preserveSelection, scheduleSelectionRestore, value]);
 
     // Keep the plugin's existing passive update behavior. The standalone PWA opts
     // into a pre-paint sync to avoid showing the previous reminder for one frame.

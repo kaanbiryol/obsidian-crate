@@ -87,6 +87,22 @@ describe('cursorPosition logical offsets', () => {
 		}
 	});
 
+	it('resolves the logical end into trailing editable text after a chip', () => {
+		const chip = element('span', text('Aug 28, 2026 18:00'));
+		const trailingSpace = text(' ');
+		const root = element('div', text('Tighten the PWA layout '), chip, trailingSpace);
+		const resolved = resolveLogicalCursorPosition(
+			asNode(root),
+			getLogicalTextLength(asNode(root)),
+		);
+
+		expect(resolved).toEqual({
+			type: 'node',
+			container: trailingSpace,
+			offset: 1,
+		});
+	});
+
 	it('round-trips offsets across line breaks', () => {
 		const first = text('ab');
 		const br = lineBreak();

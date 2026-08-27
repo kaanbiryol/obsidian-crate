@@ -1,5 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Button } from '@heroui/react';
 import { useVirtualKeyboard } from 'react-modal-sheet';
 import {
@@ -17,23 +16,17 @@ import { ProjectAutocompleteDropdown } from '@/reminders/ui/reminder-modal/Proje
 import { useProjectAutocomplete } from '@/reminders/ui/reminder-modal/useProjectAutocomplete';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
 import { useDialogFocus } from '../hooks/useDialogFocus';
+import { useReminderSheetNavigation } from '../hooks/useReminderSheetNavigation';
 import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
 	formatModalDueSummary,
 } from '../reminder-state';
-import type { ModalDraft, ModalPickerId, ModalState } from '../types';
+import type { ModalDraft, ModalState } from '../types';
 import { PwaModalSheet } from './PwaModalSheet';
 import { ReminderPickerSheet } from './ReminderPickerSheet';
 
-type ReminderSheetScreen = 'editor' | ModalPickerId;
-
 const MIN_RELIABLE_KEYBOARD_HEIGHT = 120;
-
-interface PendingSheetTransition {
-	screen: ReminderSheetScreen;
-	patch?: Partial<ModalDraft>;
-}
 
 export function ReminderSheet({
 	modal,
@@ -60,10 +53,6 @@ export function ReminderSheet({
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 	const editorCardRef = useRef<HTMLDivElement | null>(null);
-	const pendingTransitionRef = useRef<PendingSheetTransition | null>(null);
-	const reopenFrameRef = useRef<number | null>(null);
-	const [activeScreen, setActiveScreen] = useState<ReminderSheetScreen>('editor');
-	const [sheetOpen, setSheetOpen] = useState(true);
 	const closedViewportHeightRef = useRef(typeof window === 'undefined'
 		? 0
 		: Math.max(window.innerHeight, window.visualViewport?.height ?? 0));
@@ -81,23 +70,23 @@ export function ReminderSheet({
 		richTextInputRef.current?.getElement()?.blur();
 		descriptionRef.current?.blur();
 	}, []);
-	useEffect(() => () => {
-		if (reopenFrameRef.current !== null) window.cancelAnimationFrame(reopenFrameRef.current);
-	}, []);
-
-	useEffect(() => {
-		pendingTransitionRef.current = null;
-		setActiveScreen('editor');
-		setSheetOpen(true);
-		if (reopenFrameRef.current !== null) {
-			window.cancelAnimationFrame(reopenFrameRef.current);
-			reopenFrameRef.current = null;
-		}
-	}, [modal.mode, modal.reminderId]);
-
-	const patchDraft = (patch: Partial<ModalDraft>) => {
+	const patchDraft = useCallback((patch: Partial<ModalDraft>) => {
 		onChange((current) => current ? ({ ...current, draft: { ...current.draft, ...patch } }) : current);
-	};
+	}, [onChange]);
+	const {
+		activeScreen,
+		sheetOpen,
+		openPicker,
+		returnToEditor,
+		handleCloseEnd,
+	} = useReminderSheetNavigation({
+		mode: modal.mode,
+		reminderId: modal.reminderId,
+		isClosing,
+		onBeforeOpenPicker: dismissEditorKeyboard,
+		onPatchDraft: patchDraft,
+		onClosed,
+	});
 
 	const autocomplete = useProjectAutocomplete({
 		content: draft.content,
@@ -130,20 +119,6 @@ export function ReminderSheet({
 		};
 	};
 
-	const togglePicker = (picker: ModalPickerId) => {
-		if (isClosing || !sheetOpen || pendingTransitionRef.current) return;
-
-		dismissEditorKeyboard();
-		pendingTransitionRef.current = { screen: picker };
-		setSheetOpen(false);
-	};
-
-	const returnToEditor = (patch: Partial<ModalDraft> = {}) => {
-		if (isClosing || !sheetOpen || pendingTransitionRef.current) return;
-		pendingTransitionRef.current = { screen: 'editor', patch };
-		setSheetOpen(false);
-	};
-
 	const togglePriority = () => {
 		const patch = applyReminderTextUpdate(draft, projectOptions, {
 			priority: draft.priority === 1 ? 4 : 1,
@@ -156,25 +131,6 @@ export function ReminderSheet({
 		patchDraft({ ...patch, activePicker: null });
 	};
 
-	const handleSheetCloseEnd = () => {
-		const transition = pendingTransitionRef.current;
-		if (!transition) {
-			if (isClosing) onClosed();
-			return;
-		}
-
-		pendingTransitionRef.current = null;
-		flushSync(() => {
-			setActiveScreen(transition.screen);
-			patchDraft(transition.screen === 'editor'
-				? { ...transition.patch, activePicker: null, deleteConfirm: false }
-				: { activePicker: transition.screen, deleteConfirm: false });
-		});
-		reopenFrameRef.current = window.requestAnimationFrame(() => {
-			reopenFrameRef.current = null;
-			setSheetOpen(true);
-		});
-	};
 	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
 		activeKey: activeScreen,
 		autoFocus: false,
@@ -194,7 +150,7 @@ export function ReminderSheet({
 					if (activeScreen !== 'editor') returnToEditor();
 					else onClose();
 				}}
-				onCloseEnd={handleSheetCloseEnd}
+				onCloseEnd={handleCloseEnd}
 				variant="reminder"
 				keyboardInset={keyboardInset}
 				closeOnBackdrop={!saving && !isClosing && sheetOpen}
@@ -269,8 +225,9 @@ export function ReminderSheet({
 								readOnly={saving}
 								inputRef={contentRef}
 								preserveSelection
+								externalChangeCursor="end"
 								syncContentBeforePaint
-								autoFocus={!saving && !isClosing}
+								autoFocus={sheetOpen && !saving && !isClosing}
 								knownProjects={projectOptions}
 								onAutocompleteQuery={autocomplete.updateAutocomplete}
 								onAutocompleteKeyDown={autocomplete.handleKeyDown}
@@ -309,7 +266,7 @@ export function ReminderSheet({
 								data-picker="date"
 								isDisabled={saving || !sheetOpen}
 								onPointerDown={(event) => event.preventDefault()}
-								onClick={() => togglePicker('date')}
+								onClick={() => openPicker('date')}
 							>
 								<Calendar size={16} />
 								<span>{draft.dueDate ? formatModalDueSummary(draft) : 'Date'}</span>
@@ -321,7 +278,7 @@ export function ReminderSheet({
 								data-picker="project"
 								isDisabled={saving || !sheetOpen}
 								onPointerDown={(event) => event.preventDefault()}
-								onClick={() => togglePicker('project')}
+								onClick={() => openPicker('project')}
 							>
 								<Hash size={16} />
 								<span>{draft.project || 'Inbox'}</span>
@@ -348,7 +305,7 @@ export function ReminderSheet({
 								isDisabled={saving || !sheetOpen}
 								aria-label={draft.recurrence ? formatRecurrence(draft.recurrence) : 'Recurrence'}
 								onPointerDown={(event) => event.preventDefault()}
-								onClick={() => togglePicker('recurrence')}
+								onClick={() => openPicker('recurrence')}
 							>
 								<Repeat size={16} />
 								<span className="pwa-editor-chip__mobile-label">Repeat</span>
