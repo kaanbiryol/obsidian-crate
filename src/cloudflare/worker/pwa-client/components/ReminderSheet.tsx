@@ -18,6 +18,7 @@ import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { useReminderSheetNavigation } from '../hooks/useReminderSheetNavigation';
+import { shouldSaveFromKeyboardDone } from '../keyboard-done-save';
 import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
@@ -52,6 +53,9 @@ export function ReminderSheet({
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 	const editorCardRef = useRef<HTMLDivElement | null>(null);
+	const keyboardDoneTimerRef = useRef<number | null>(null);
+	const lastPagePointerAtRef = useRef(Number.NEGATIVE_INFINITY);
+	const suppressKeyboardDoneSaveRef = useRef(false);
 	const keyboardInset = useKeyboardHeight();
 	const prefersReducedMotion = useReducedMotion();
 	const draft = modal.draft;
@@ -59,9 +63,17 @@ export function ReminderSheet({
 	const isEditing = modal.mode === 'edit';
 	const title = isEditing ? 'Edit Reminder' : 'New Reminder';
 	const canSubmit = !saving && !isClosing && Boolean(draft.content.trim());
+	const saveReminder = useCallback(() => {
+		if (!canSubmit) return;
+		onSave(modal);
+	}, [canSubmit, modal, onSave]);
 	const dismissEditorKeyboard = useCallback(() => {
+		suppressKeyboardDoneSaveRef.current = true;
 		richTextInputRef.current?.getElement()?.blur();
 		descriptionRef.current?.blur();
+		window.setTimeout(() => {
+			suppressKeyboardDoneSaveRef.current = false;
+		}, 0);
 	}, []);
 	const patchDraft = useCallback((patch: Partial<ModalDraft>) => {
 		onChange((current) => current ? ({ ...current, draft: { ...current.draft, ...patch } }) : current);
@@ -101,6 +113,50 @@ export function ReminderSheet({
 	}, [activeScreen, canInteract, draft.content, projectOptions.join('\u0000')]);
 
 	const editorInteractive = activeScreen === 'editor' || isReturningToEditor;
+
+	useEffect(() => {
+		const recordPagePointer = () => {
+			lastPagePointerAtRef.current = performance.now();
+		};
+		document.addEventListener('pointerdown', recordPagePointer, true);
+		return () => document.removeEventListener('pointerdown', recordPagePointer, true);
+	}, []);
+
+	useEffect(() => () => {
+		if (keyboardDoneTimerRef.current !== null) {
+			window.clearTimeout(keyboardDoneTimerRef.current);
+		}
+	}, []);
+
+	const handleEditorFieldFocus = useCallback(() => {
+		if (keyboardDoneTimerRef.current !== null) {
+			window.clearTimeout(keyboardDoneTimerRef.current);
+			keyboardDoneTimerRef.current = null;
+		}
+	}, []);
+
+	const handleEditorFieldBlur = useCallback((event: React.FocusEvent<HTMLElement>) => {
+		const relatedTargetWasNull = event.relatedTarget === null;
+		const hadRecentPagePointer = performance.now() - lastPagePointerAtRef.current < 750;
+		if (keyboardDoneTimerRef.current !== null) {
+			window.clearTimeout(keyboardDoneTimerRef.current);
+		}
+		keyboardDoneTimerRef.current = window.setTimeout(() => {
+			keyboardDoneTimerRef.current = null;
+			const hasEditorFocus = Boolean(
+				contentRef.current?.matches(':focus') || descriptionRef.current?.matches(':focus'),
+			);
+			if (suppressKeyboardDoneSaveRef.current || !shouldSaveFromKeyboardDone({
+				canSubmit,
+				documentHasFocus: document.hasFocus(),
+				documentIsVisible: document.visibilityState === 'visible',
+				hadRecentPagePointer,
+				hasEditorFocus,
+				relatedTargetWasNull,
+			})) return;
+			saveReminder();
+		}, 0);
+	}, [canSubmit, saveReminder]);
 
 	const togglePriority = () => {
 		const patch = applyReminderTextUpdate(draft, projectOptions, {
@@ -161,10 +217,9 @@ export function ReminderSheet({
 							inert={!editorInteractive}
 							tabIndex={-1}
 						>
-							<form className="modal-form" onSubmit={(event) => {
+							<form className="modal-form" autoComplete="off" onSubmit={(event) => {
 							event.preventDefault();
-							if (saving) return;
-							onSave(modal);
+							saveReminder();
 						}}>
 						<div className="pwa-editor-header">
 							<div className="pwa-editor-header__side">
@@ -222,6 +277,11 @@ export function ReminderSheet({
 								externalChangeCursor="end"
 								syncContentBeforePaint
 								autoFocus={!saving && !isClosing}
+								autoComplete="off"
+								autoCorrect="off"
+								spellCheck={false}
+								onFocus={handleEditorFieldFocus}
+								onBlur={handleEditorFieldBlur}
 								focusRequestKey={editorFocusRequest}
 								knownProjects={projectOptions}
 								onAutocompleteQuery={autocomplete.updateAutocomplete}
@@ -245,8 +305,13 @@ export function ReminderSheet({
 								maxLength={4096}
 								placeholder="Add description..."
 								aria-label="Reminder description"
+								autoComplete="off"
+								autoCorrect="off"
+								spellCheck={false}
 								value={draft.description}
 								disabled={saving || !editorInteractive}
+								onFocus={handleEditorFieldFocus}
+								onBlur={handleEditorFieldBlur}
 								onChange={(event) => patchDraft({ description: event.currentTarget.value })}
 							/>
 						</div>

@@ -35,6 +35,9 @@ interface RichTextInputProps {
     className?: string;
     style?: React.CSSProperties;
     autoFocus?: boolean;
+    autoComplete?: string;
+    autoCorrect?: 'on' | 'off';
+    spellCheck?: boolean;
     /** Increment to synchronously refocus the mounted editor from a user interaction. */
     focusRequestKey?: number;
     readOnly?: boolean;
@@ -65,6 +68,9 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     className,
     style,
     autoFocus = false,
+    autoComplete,
+    autoCorrect,
+    spellCheck,
     focusRequestKey = 0,
     readOnly = false,
     preserveSelection = true,
@@ -98,10 +104,16 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             editableRef.current = el;
         }
 
+        if (el && autoComplete) {
+            // React's div typings omit autocomplete even though WebKit accepts
+            // the hint on editable content.
+            el.setAttribute('autocomplete', autoComplete);
+        }
+
         if (!el || !autoFocus || hasInitializedRef.current) return;
         hasInitializedRef.current = true;
         focusRichTextElement(el);
-    }, [autoFocus, inputRef]);
+    }, [autoComplete, autoFocus, inputRef]);
 
     // Expose methods to parent via ref
     useImperativeHandle(ref, () => ({
@@ -278,6 +290,8 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 aria-multiline="true"
                 aria-readonly={readOnly}
                 inputMode="text"
+                autoCorrect={autoCorrect}
+                spellCheck={spellCheck}
                 onInput={handleInput}
                 onClick={handleClick}
                 onKeyDown={handleKeyDownInternal}
