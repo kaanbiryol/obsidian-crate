@@ -55,7 +55,7 @@ function App() {
 	const [updateAvailable, setUpdateAvailable] = useState(false);
 	const [modal, setModal] = useState<ModalState | null>(null);
 	const [reorderDragging, setReorderDragging] = useState(false);
-	const initialLoadingComplete = useInitialLoadingGate(bootstrapped);
+	const initialLoading = useInitialLoadingGate(bootstrapped);
 	const { toast, showToast } = useToast();
 	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
 	const finalizeModalClose = useCallback(() => setModal(null), []);
@@ -308,19 +308,27 @@ function App() {
 		/>
 	), [openModal, toggleReminderCompleted]);
 
-	if (!initialLoadingComplete) {
+	if (!initialLoading.canReveal) {
 		return <LoadingAuthState />;
 	}
 
 	if (!authToken) {
-		return error
-			? <ErrorState error={error} config={config} onRetry={() => window.location.reload()} />
-			: <EmptyAuthState config={config} />;
+		return (
+			<>
+				<div className="pwa-initial-content">
+					{error
+						? <ErrorState error={error} config={config} onRetry={() => window.location.reload()} />
+						: <EmptyAuthState config={config} />}
+				</div>
+				{initialLoading.isLoadingVisible && <LoadingAuthState isExiting />}
+			</>
+		);
 	}
 
 	return (
-		<div className={`crate-reminders-ui reminders-shadow-root pwa-shadow-root dark${modal || settingsOpen ? ' has-open-sheet' : ''}`}>
-			<RemindersAppShell
+		<>
+			<div className={`crate-reminders-ui reminders-shadow-root pwa-shadow-root pwa-initial-content dark${modal || settingsOpen ? ' has-open-sheet' : ''}`}>
+				<RemindersAppShell
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}
 				projects={projects}
@@ -397,8 +405,10 @@ function App() {
 						{toast.message}
 					</div>
 				)}
-			</RemindersAppShell>
-		</div>
+				</RemindersAppShell>
+			</div>
+			{initialLoading.isLoadingVisible && <LoadingAuthState isExiting />}
+		</>
 	);
 }
 
