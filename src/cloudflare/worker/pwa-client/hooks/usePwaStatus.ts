@@ -2,6 +2,31 @@ import { useEffect, useMemo, useState } from 'react';
 import { formatLastUpdated, isStandaloneApp } from '../config';
 import type { DataMode, PushState } from '../types';
 
+export function getPwaStatusText({
+	dataMode,
+	error,
+	isOffline,
+	lastUpdatedAt,
+	now,
+	refreshing,
+}: {
+	dataMode: DataMode;
+	error: string | null;
+	isOffline: boolean;
+	lastUpdatedAt: number | null;
+	now: number;
+	refreshing: boolean;
+}): string | null {
+	const lastUpdated = formatLastUpdated(lastUpdatedAt, now);
+	if (isOffline) return lastUpdatedAt ? `Offline - ${lastUpdated}` : 'Offline';
+	// Cached data is hydrated before the initial live refresh starts. Keep that
+	// normal startup handoff quiet unless the refresh actually fails.
+	if (dataMode === 'cached') return error ? `${lastUpdated} - stale` : null;
+	if (dataMode === 'error') return error ? `Refresh failed - ${error}` : 'Refresh failed';
+	if (refreshing) return lastUpdatedAt ? `Refreshing - ${lastUpdated}` : 'Refreshing';
+	return lastUpdatedAt ? lastUpdated : null;
+}
+
 export function usePwaStatus({
 	authToken,
 	bootstrapped,
@@ -42,14 +67,14 @@ export function usePwaStatus({
 	}, [dataMode, isOffline]);
 	const readOnly = Boolean(readOnlyMessage);
 	const canShowNotificationPrompt = Boolean(authToken && bootstrapped && push.supported && !push.subscribed && isStandaloneApp());
-	const statusText = useMemo(() => {
-		const lastUpdated = formatLastUpdated(lastUpdatedAt, statusNow);
-		if (isOffline) return lastUpdatedAt ? `Offline - ${lastUpdated}` : 'Offline';
-		if (dataMode === 'cached') return `${lastUpdated} - stale`;
-		if (dataMode === 'error') return error ? `Refresh failed - ${error}` : 'Refresh failed';
-		if (refreshing) return lastUpdatedAt ? `Refreshing - ${lastUpdated}` : 'Refreshing';
-		return lastUpdatedAt ? lastUpdated : null;
-	}, [dataMode, error, isOffline, lastUpdatedAt, refreshing, statusNow]);
+	const statusText = useMemo(() => getPwaStatusText({
+		dataMode,
+		error,
+		isOffline,
+		lastUpdatedAt,
+		now: statusNow,
+		refreshing,
+	}), [dataMode, error, isOffline, lastUpdatedAt, refreshing, statusNow]);
 	const statusKind = isOffline ? 'offline' : dataMode === 'live' ? 'live' : dataMode;
 
 	return {
