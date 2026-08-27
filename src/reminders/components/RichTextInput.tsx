@@ -46,8 +46,6 @@ interface RichTextInputProps {
     onAutocompleteKeyDown?: (e: React.KeyboardEvent) => boolean;
     /** Synchronize external values before paint for the standalone PWA editor. */
     syncContentBeforePaint?: boolean;
-    /** Keep a non-editable copy visible while a transformed sheet settles. */
-    stabilizeInitialPaint?: boolean;
 }
 
 export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>(({
@@ -69,7 +67,6 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     onAutocompleteQuery,
     onAutocompleteKeyDown,
     syncContentBeforePaint = false,
-    stabilizeInitialPaint = false,
 }, ref) => {
     const editableRef = useRef<HTMLDivElement>(null);
     const hasInitializedRef = useRef(false);
@@ -85,9 +82,6 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
     // Use provided ref or internal one
     const actualRef = inputRef || editableRef;
-    const paintStabilizerHtml = stabilizeInitialPaint
-        ? initialHtmlRef.current?.html ?? (buildHTML(value, knownProjects) || '')
-        : null;
 
     // Ref callback to update refs when element attaches to DOM
     const refCallback = useCallback((el: HTMLDivElement | null) => {
@@ -276,7 +270,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         <div
             onMouseDown={handleMouseDown}
             onTouchStart={handleTouchStart}
-            className={`rich-text-input-shell${paintStabilizerHtml !== null ? ' has-paint-stabilizer' : ''}`}
+            className="rich-text-input-shell"
         >
             <div
                 ref={refCallback}
@@ -302,14 +296,6 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 suppressContentEditableWarning
                 style={style}
             />
-            {paintStabilizerHtml !== null && (
-                <div
-                    className={`rich-text-input-paint-stabilizer${className ? ` ${className}` : ''}`}
-                    aria-hidden="true"
-                    dangerouslySetInnerHTML={{ __html: paintStabilizerHtml }}
-                    style={style}
-                />
-            )}
         </div>
     );
 });

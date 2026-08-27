@@ -9,7 +9,6 @@
 .pwa-modal-sheet__scroller{display:flex;flex-direction:column}
 .pwa-reminder-sheet-stage{position:relative;display:flex;flex:1;min-height:0;overflow:hidden;background:var(--pwa-sheet-surface)}
 .pwa-modal-sheet.is-keyboard-open .pwa-reminder-sheet-stage{height:calc(100% - var(--pwa-keyboard-inset,0px));flex:0 0 calc(100% - var(--pwa-keyboard-inset,0px))}
-.pwa-editor-focus-bridge{position:fixed;top:calc(env(safe-area-inset-top) + 1px);left:1px;width:1px;height:1px;min-width:0;margin:0;padding:0;border:0;opacity:0;pointer-events:none;font-size:16px}
 .modal-card.pwa-reminder-editor{position:relative;z-index:1;display:flex;width:100%;height:100%;max-height:none;overflow:hidden;flex-direction:column;background:transparent;border:0;border-radius:0;padding:16px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:none;animation:none}
 .pwa-reminder-editor .modal-form{gap:0;display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}
 .pwa-editor-header{display:grid;grid-template-columns:minmax(72px,1fr) minmax(0,1.4fr) minmax(72px,1fr);align-items:center;flex:0 0 auto;margin-bottom:112px}
@@ -26,8 +25,6 @@
 .pwa-editor-title-input,.pwa-editor-description-input{display:block;width:100%;padding:0;margin:0;background:transparent;border:none;outline:none;box-shadow:none;color:var(--text-normal);font-family:inherit;resize:none;-webkit-appearance:none}
 .pwa-editor-title-input{flex:1 1 0;min-height:42px;max-height:120px;font-size:19px;font-weight:600;line-height:1.35;letter-spacing:-.015em;overflow-y:auto;overscroll-behavior-y:contain}
 .pwa-editor-title-rich-input{white-space:pre-wrap;word-break:break-word;caret-color:var(--text-normal)}
-.rich-text-input-shell.has-paint-stabilizer>.pwa-editor-title-rich-input{opacity:0}
-.rich-text-input-paint-stabilizer{position:absolute;inset:0;pointer-events:none}
 .pwa-editor-title-rich-input:empty::before{content:attr(data-placeholder);color:rgba(255,255,255,.32);pointer-events:none}
 .pwa-editor-title-rich-input .rich-text-chip{line-height:1.45}
 .pwa-editor-description-input{flex:1.15 1 0;height:auto;min-height:60px;max-height:260px;font-size:14.5px;font-weight:450;line-height:1.55;color:var(--text-muted);overflow-y:auto;overscroll-behavior-y:contain}

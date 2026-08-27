@@ -186,7 +186,6 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-chip-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:12px;padding:4px;overflow:visible}');
 		expect(html).toContain('.pwa-editor-chip .pwa-editor-chip__mobile-label{display:block}');
 		expect(html).not.toContain('pwa-reminder-editor-backdrop');
-		expect(html).toContain('.pwa-editor-focus-bridge{position:fixed;top:calc(env(safe-area-inset-top) + 1px);left:1px;width:1px;height:1px;');
 		expect(html).not.toContain('--keyboard-usable-height');
 		expect(html).toContain('box-shadow:0 -1px 0 rgba(255,255,255,.025),0 -24px 70px rgba(0,0,0,.28)');
 		expect(html).not.toContain('box-shadow:0 -6px 20px rgba(0,0,0,.22)');

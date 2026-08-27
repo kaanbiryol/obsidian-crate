@@ -13,7 +13,7 @@ import {
 	X,
 } from 'lucide-react';
 import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/RichTextInput';
-import { restoreCursorPosition, saveCursorPosition } from '@/reminders/utils/cursorPosition';
+import { moveCursorToEnd } from '@/reminders/utils/cursorPosition';
 import { ProjectAutocompleteDropdown } from '@/reminders/ui/reminder-modal/ProjectAutocompleteDropdown';
 import { useProjectAutocomplete } from '@/reminders/ui/reminder-modal/useProjectAutocomplete';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
@@ -34,20 +34,6 @@ const MIN_RELIABLE_KEYBOARD_HEIGHT = 120;
 interface PendingSheetTransition {
 	screen: ReminderSheetScreen;
 	patch?: Partial<ModalDraft>;
-}
-
-function focusWithoutScrolling(element: HTMLElement): void {
-	const scrollX = window.scrollX;
-	const scrollY = window.scrollY;
-	element.focus({ preventScroll: true });
-	if (window.scrollX !== scrollX || window.scrollY !== scrollY) {
-		window.scrollTo(scrollX, scrollY);
-	}
-}
-
-function activeElementFor(element: HTMLElement): Element | null {
-	const root = element.getRootNode();
-	return root instanceof ShadowRoot ? root.activeElement : element.ownerDocument.activeElement;
 }
 
 export function ReminderSheet({
@@ -74,21 +60,10 @@ export function ReminderSheet({
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-	const focusBridgeRef = useRef<HTMLInputElement | null>(null);
-	const setFocusBridgeRef = useCallback((element: HTMLInputElement | null) => {
-		focusBridgeRef.current = element;
-		if (!element) return;
-
-		focusWithoutScrolling(element);
-	}, []);
-	const lastFocusedFieldRef = useRef<'title' | 'description'>('title');
-	const titleCursorRef = useRef<number | null>(null);
-	const titleScrollTopRef = useRef(0);
-	const descriptionSelectionRef = useRef<{ start: number; end: number; direction: 'forward' | 'backward' | 'none' } | null>(null);
-	const descriptionScrollTopRef = useRef(0);
 	const editorCardRef = useRef<HTMLDivElement | null>(null);
 	const pendingTransitionRef = useRef<PendingSheetTransition | null>(null);
 	const reopenFrameRef = useRef<number | null>(null);
+	const hasFocusedTitleRef = useRef(false);
 	const [activeScreen, setActiveScreen] = useState<ReminderSheetScreen>('editor');
 	const [sheetOpen, setSheetOpen] = useState(true);
 	const closedViewportHeightRef = useRef(typeof window === 'undefined'
@@ -102,65 +77,25 @@ export function ReminderSheet({
 	const draft = modal.draft;
 	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 	const isEditing = modal.mode === 'edit';
-	const editorIdentity = `${modal.mode}:${modal.reminderId ?? 'new'}`;
-	const [settledEditorIdentity, setSettledEditorIdentity] = useState<string | null>(null);
 	const title = isEditing ? 'Edit Reminder' : 'New Reminder';
 	const canSubmit = !saving && !isClosing && Boolean(draft.content.trim());
-	const captureTitleSelection = useCallback(() => {
-		const titleElement = richTextInputRef.current?.getElement() ?? null;
-		titleCursorRef.current = saveCursorPosition(titleElement);
-		titleScrollTopRef.current = titleElement?.scrollTop ?? 0;
-	}, []);
-	const captureDescriptionSelection = useCallback(() => {
-		const field = descriptionRef.current;
-		if (!field) return;
-		descriptionScrollTopRef.current = field.scrollTop;
-		descriptionSelectionRef.current = {
-			start: field.selectionStart,
-			end: field.selectionEnd,
-			direction: field.selectionDirection ?? 'none',
-		};
-	}, []);
-	const captureEditorSelection = useCallback(() => {
-		if (lastFocusedFieldRef.current === 'description' && descriptionRef.current) {
-			captureDescriptionSelection();
-			return;
-		}
-		captureTitleSelection();
-	}, [captureDescriptionSelection, captureTitleSelection]);
 	const dismissEditorKeyboard = useCallback(() => {
 		richTextInputRef.current?.getElement()?.blur();
 		descriptionRef.current?.blur();
-		focusBridgeRef.current?.blur();
 	}, []);
-	const focusLastField = useCallback((fallbackTitlePosition: number) => {
-		if (lastFocusedFieldRef.current === 'description' && descriptionRef.current) {
-			const field = descriptionRef.current;
-			if (activeElementFor(field) === field) return;
-			focusWithoutScrolling(field);
-			const selection = descriptionSelectionRef.current;
-			if (selection) field.setSelectionRange(selection.start, selection.end, selection.direction);
-			field.scrollTop = descriptionScrollTopRef.current;
-			return;
-		}
-
-		const titleInput = richTextInputRef.current;
-		const element = titleInput?.getElement();
-		if (!titleInput || !element) return;
-		if (activeElementFor(element) === element) return;
-		focusWithoutScrolling(element);
-		restoreCursorPosition(element, titleCursorRef.current ?? fallbackTitlePosition);
-		element.scrollTop = titleScrollTopRef.current;
+	const handleTitleFocus = useCallback(() => {
+		if (hasFocusedTitleRef.current) return;
+		hasFocusedTitleRef.current = true;
+		window.requestAnimationFrame(() => {
+			const element = richTextInputRef.current?.getElement() ?? null;
+			if (!element?.isConnected) return;
+			const root = element.getRootNode();
+			const activeElement = root instanceof ShadowRoot
+				? root.activeElement
+				: element.ownerDocument.activeElement;
+			if (activeElement === element) moveCursorToEnd(element);
+		});
 	}, []);
-	const handleSheetOpenStart = () => {
-		if (saving || isClosing || activeScreen !== 'editor' || !sheetOpen) return;
-		focusLastField(draft.content.length);
-	};
-	const handleSheetOpenEnd = () => {
-		if (saving || isClosing || activeScreen !== 'editor' || !sheetOpen) return;
-		setSettledEditorIdentity(editorIdentity);
-		focusLastField(draft.content.length);
-	};
 	useEffect(() => () => {
 		if (reopenFrameRef.current !== null) window.cancelAnimationFrame(reopenFrameRef.current);
 	}, []);
@@ -169,11 +104,7 @@ export function ReminderSheet({
 		pendingTransitionRef.current = null;
 		setActiveScreen('editor');
 		setSheetOpen(true);
-		lastFocusedFieldRef.current = 'title';
-		titleCursorRef.current = null;
-		titleScrollTopRef.current = 0;
-		descriptionSelectionRef.current = null;
-		descriptionScrollTopRef.current = 0;
+		hasFocusedTitleRef.current = false;
 		if (reopenFrameRef.current !== null) {
 			window.cancelAnimationFrame(reopenFrameRef.current);
 			reopenFrameRef.current = null;
@@ -218,7 +149,6 @@ export function ReminderSheet({
 	const togglePicker = (picker: ModalPickerId) => {
 		if (isClosing || !sheetOpen || pendingTransitionRef.current) return;
 
-		captureEditorSelection();
 		dismissEditorKeyboard();
 		pendingTransitionRef.current = { screen: picker };
 		setSheetOpen(false);
@@ -226,7 +156,6 @@ export function ReminderSheet({
 
 	const returnToEditor = (patch: Partial<ModalDraft> = {}) => {
 		if (isClosing || !sheetOpen || pendingTransitionRef.current) return;
-		if (focusBridgeRef.current) focusWithoutScrolling(focusBridgeRef.current);
 		pendingTransitionRef.current = { screen: 'editor', patch };
 		setSheetOpen(false);
 	};
@@ -236,7 +165,6 @@ export function ReminderSheet({
 			priority: draft.priority === 1 ? 4 : 1,
 		});
 		if (typeof patch.content === 'string') {
-			titleCursorRef.current = patch.content.length;
 			richTextInputRef.current?.setCursorPosition(patch.content.length, {
 				scrollTop: richTextInputRef.current.getElement()?.scrollTop ?? 0,
 			});
@@ -274,17 +202,7 @@ export function ReminderSheet({
 	});
 
 	return (
-		<>
-			<input
-				ref={setFocusBridgeRef}
-				className="pwa-editor-focus-bridge"
-				type="text"
-				inputMode="text"
-				autoComplete="off"
-				tabIndex={-1}
-				aria-hidden="true"
-			/>
-			<PwaModalSheet
+		<PwaModalSheet
 				key={activeScreen}
 				isOpen={sheetOpen && !isClosing}
 				onClose={() => {
@@ -293,8 +211,6 @@ export function ReminderSheet({
 					else onClose();
 				}}
 				onCloseEnd={handleSheetCloseEnd}
-				onOpenStart={handleSheetOpenStart}
-				onOpenEnd={handleSheetOpenEnd}
 				variant="reminder"
 				keyboardInset={keyboardInset}
 				closeOnBackdrop={!saving && !isClosing && sheetOpen}
@@ -370,15 +286,10 @@ export function ReminderSheet({
 								inputRef={contentRef}
 								preserveSelection
 								syncContentBeforePaint
-								autoFocus={!saving && !isClosing}
-								stabilizeInitialPaint={isEditing && settledEditorIdentity !== editorIdentity}
 								knownProjects={projectOptions}
 								onAutocompleteQuery={autocomplete.updateAutocomplete}
 								onAutocompleteKeyDown={autocomplete.handleKeyDown}
-								onFocus={() => {
-									lastFocusedFieldRef.current = 'title';
-								}}
-								onBlur={captureTitleSelection}
+								onFocus={handleTitleFocus}
 								className="pwa-editor-title-input pwa-editor-title-rich-input ios-scroll"
 							/>
 							{!saving && autocomplete.isOpen && (
@@ -401,10 +312,6 @@ export function ReminderSheet({
 								aria-label="Reminder description"
 								value={draft.description}
 								disabled={saving}
-								onFocus={() => {
-									lastFocusedFieldRef.current = 'description';
-								}}
-								onBlur={captureDescriptionSelection}
 								onChange={(event) => patchDraft({ description: event.currentTarget.value })}
 							/>
 						</div>
@@ -490,7 +397,6 @@ export function ReminderSheet({
 						/>
 					)}
 				</div>
-			</PwaModalSheet>
-		</>
+		</PwaModalSheet>
 	);
 }

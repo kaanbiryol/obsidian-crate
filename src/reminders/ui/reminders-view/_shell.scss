@@ -348,21 +348,6 @@
     }
 }
 
-// Shared rich text chips are used by both the Obsidian plugin and the PWA editor.
-.rich-text-input-shell {
-    position: relative;
-
-    &.has-paint-stabilizer > .rich-text-input-editor {
-        opacity: 0;
-    }
-}
-
-.rich-text-input-paint-stabilizer {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-}
-
 .rich-text-input-editor {
     min-height: 1.5rem;
     padding-top: 0.25rem;
