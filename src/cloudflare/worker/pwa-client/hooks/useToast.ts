@@ -20,10 +20,11 @@ export function useToast(): {
 	const showToast = useCallback((kind: ToastKind, message: string) => {
 		setToast({ kind, message });
 		if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+		const duration = kind === 'success' ? 1800 : kind === 'error' ? 4200 : 3200;
 		timerRef.current = window.setTimeout(() => {
 			timerRef.current = null;
 			setToast(null);
-		}, 3200);
+		}, duration);
 	}, []);
 
 	useEffect(() => () => {

@@ -61,7 +61,7 @@ export function ReminderSheet({
 	const draft = modal.draft;
 	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 	const isEditing = modal.mode === 'edit';
-	const title = isEditing ? 'Edit Reminder' : 'New Reminder';
+	const title = isEditing ? 'Edit reminder' : 'New reminder';
 	const canSubmit = !saving && !isClosing && Boolean(draft.content.trim());
 	const saveReminder = useCallback(() => {
 		if (!canSubmit) return;
@@ -269,7 +269,7 @@ export function ReminderSheet({
 								ref={richTextInputRef}
 								value={draft.content}
 								onChange={(content) => patchDraft({ content })}
-								placeholder={isEditing ? 'Edit your reminder...' : 'What do you need to remember?'}
+								placeholder="Reminder title"
 								ariaLabel="Reminder title"
 								readOnly={saving || !editorInteractive}
 								inputRef={contentRef}
@@ -303,7 +303,7 @@ export function ReminderSheet({
 								className="pwa-editor-description-input ios-scroll"
 								rows={3}
 								maxLength={4096}
-								placeholder="Add description..."
+								placeholder="Description"
 								aria-label="Reminder description"
 								autoComplete="off"
 								autoCorrect="off"

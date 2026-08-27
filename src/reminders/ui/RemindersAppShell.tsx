@@ -188,7 +188,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
           isFullScreen ? "is-fullscreen" : "",
           isModal ? "is-modal" : "",
           isCompact || hideTabBar ? "is-compact" : "",
-          `is-${viewMode}`,
+          viewMode === "browse" && selectedProject ? "is-project-detail" : `is-${viewMode}`,
           className,
         ].filter(Boolean).join(" ")}
       >

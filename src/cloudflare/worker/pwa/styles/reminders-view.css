@@ -190,26 +190,6 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view.is-browse .premium-project-progress{min-width:42px;gap:3px}
 .pwa-reminders-view.is-browse .premium-mini-progress{width:42px;height:3px}
 .pwa-reminders-view.is-browse .premium-project-percentage{font-size:10.5px;font-weight:580}
-.pwa-reminders-view.is-browse .project-detail-toolbar{min-height:80px;display:flex;align-items:flex-start;gap:10px;padding:14px 14px 11px;border-bottom:1px solid rgba(255,255,255,.055)}
-.pwa-reminders-view.is-browse .project-detail-toolbar .premium-back-button{width:36px;height:36px;min-width:36px;display:grid;place-items:center;margin:0!important;padding:0;border:1px solid rgba(255,255,255,.055);border-radius:50%;background:rgba(255,255,255,.025);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none;color:var(--text-faint)}
-.pwa-reminders-view.is-browse .project-detail-toolbar .premium-back-button:hover{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.085);box-shadow:none;color:var(--text-normal)}
-.pwa-reminders-view.is-browse .project-detail-toolbar .premium-back-button svg{width:17px;height:17px}
-.pwa-reminders-view.is-browse .project-detail-header{flex:1;min-width:0;margin:0!important;padding-top:1px}
-.pwa-reminders-view.is-browse .project-detail-header-top{gap:10px}
-.pwa-reminders-view.is-browse .project-detail-title{font-size:17px;font-weight:620;line-height:1.25;letter-spacing:-.02em}
-.pwa-reminders-view.is-browse .project-detail-percentage{font-size:12px;font-weight:600;line-height:1.25}
-.pwa-reminders-view.is-browse .project-detail-header-bottom{gap:10px;margin-top:5px}
-.pwa-reminders-view.is-browse .project-detail-stats-text{gap:4px}
-.pwa-reminders-view.is-browse .project-detail-stat{gap:3px;font-size:10.5px;font-weight:500;color:var(--text-faint)}
-.pwa-reminders-view.is-browse .project-detail-stat-label{color:var(--text-faint)}
-.pwa-reminders-view.is-browse .project-detail-stat-done{color:#65b985}
-.pwa-reminders-view.is-browse .project-detail-progress-bar{width:42px;height:3px;border-radius:999px;background:rgba(255,255,255,.06)}
-.pwa-reminders-view.is-browse .project-detail-progress-fill{border-radius:inherit;box-shadow:none!important}
-.pwa-reminders-view.is-browse .project-detail-shell [data-reminder-id="completed-section"]{margin-top:16px;padding-bottom:12px}
-.pwa-reminders-view.is-browse .project-detail-shell .premium-divider{height:1px;margin:0 0 4px;background:rgba(255,255,255,.055)}
-.pwa-reminders-view.is-browse .project-detail-shell [data-reminder-id="completed-section"]>button{height:36px;min-height:36px;color:var(--text-faint)}
-.pwa-reminders-view.is-browse .project-detail-shell [data-reminder-id="completed-section"] .reminders-muted-label{font-size:12px;font-weight:560}
-.pwa-reminders-view.is-browse .project-detail-shell [data-reminder-section="completed"]+[data-reminder-section="completed"]{margin-top:8px}
 .pwa-top-notices{flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding:12px 20px 4px;background:var(--background-primary)}
 .pwa-top-notices:empty{display:none}
 .pwa-status-line,.pwa-notification-prompt{width:100%;border-radius:12px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);color:var(--text-muted)}

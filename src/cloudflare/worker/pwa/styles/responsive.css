@@ -6,11 +6,12 @@
 @keyframes pwa-spin{to{transform:rotate(360deg)}}
 @keyframes pwa-skeleton-shimmer{0%{background-position:120% 0}100%{background-position:-120% 0}}
 @keyframes pwa-update-slide-in{from{opacity:0;transform:translate3d(0,-10px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@keyframes pwa-toast-in{from{opacity:0;transform:translate3d(-50%,6px,0) scale(.98)}to{opacity:1;transform:translate3d(-50%,0,0) scale(1)}}
 @keyframes auth-loading-progress{0%{transform:translateX(-115%)}55%{transform:translateX(82%)}100%{transform:translateX(235%)}}
 @keyframes pwa-initial-loading-out{from{opacity:1}to{opacity:0}}
 @keyframes pwa-initial-content-in{from{opacity:0;transform:translate3d(0,5px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @media (prefers-reduced-motion: reduce){
-	.view-transition,.app-header__body,.tab-button.is-active,.modal-card,.settings-sheet,.pwa-picker-sheet,.pwa-skeleton-line,.pwa-pull-refresh__glyph svg,.pwa-update-banner,.auth-loading__progress span,.pwa-initial-content,.premium-checkbox.is-completing,.premium-checkbox-icon{animation:none!important}
+	.view-transition,.app-header__body,.tab-button.is-active,.modal-card,.settings-sheet,.pwa-picker-sheet,.pwa-skeleton-line,.pwa-pull-refresh__glyph svg,.pwa-update-banner,.toast,.auth-loading__progress span,.pwa-initial-content,.premium-checkbox.is-completing,.premium-checkbox-icon{animation:none!important}
 	.auth-card--loading.is-exiting{display:none}
 	.tab-button,.tab-button__icon,.pwa-reminders-view .bottom-tab-button,.pwa-reminders-view .bottom-tab-icon,.pwa-reminders-view .bottom-tab-label,.premium-reminder-content,.fab,.pwa-pull-refresh,.pwa-pull-refresh__glyph,.modal-card.pwa-reminder-editor,.pwa-modal-sheet__backdrop{transition:none!important}
 }
@@ -23,27 +24,27 @@
 	.app-content{padding-left:40px;padding-right:40px}
 	.bottom-tabs{left:50%;transform:translateX(-50%);width:min(640px,100vw)}
 	.fab{right:18px}
-	.toast{left:50%;right:auto;transform:translateX(-50%);width:min(420px,calc(100vw - 24px))}
+	.toast{width:max-content;max-width:calc(100vw - 28px)}
 	.pwa-modal-sheet__container--settings{width:min(520px,calc(100vw - 80px))!important}
 }
 @media (max-width: 640px){
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{width:100vw!important;border-right:0;border-left:0}
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{max-height:90dvh!important}
-	.modal-card.pwa-reminder-editor{padding:16px 24px calc(28px + env(safe-area-inset-bottom))}
+	.modal-card.pwa-reminder-editor{padding:0 18px calc(20px + env(safe-area-inset-bottom))}
 	.pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor{padding-bottom:16px}
-	.pwa-editor-header{grid-template-columns:minmax(64px,1fr) minmax(0,1.4fr) minmax(64px,1fr);margin-bottom:22px}
-	.pwa-editor-icon-button{width:40px;height:40px;min-width:40px}
-	.pwa-editor-card{flex:1 1 auto;min-height:0;padding:15px 18px 17px}
-	.pwa-editor-title-input{font-size:19px;min-height:38px}
-	.pwa-editor-description-input{flex:0 1 auto;min-height:52px;max-height:120px}
-	.pwa-editor-divider{margin:14px 0 16px}
-	.pwa-editor-chip-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin-top:16px;padding:4px;overflow:visible;border:1px solid rgba(255,255,255,.055);border-radius:12px;background:rgba(255,255,255,.02)}
+	.pwa-editor-header{grid-template-columns:minmax(56px,1fr) minmax(0,1.7fr) minmax(56px,1fr);min-height:68px;margin:0 -18px 16px;padding:0 18px}
+	.pwa-editor-icon-button{width:36px;height:36px;min-width:36px}
+	.pwa-editor-card{flex:0 1 auto;min-height:196px;max-height:300px;padding:14px 16px 16px}
+	.pwa-editor-title-input{font-size:17px;min-height:42px}
+	.pwa-editor-description-input{flex:1 1 auto;min-height:82px;max-height:140px}
+	.pwa-editor-divider{margin:11px 0 13px}
+	.pwa-editor-chip-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;margin-top:12px;padding:3px;overflow:visible;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(255,255,255,.018)}
 	.pwa-editor-chip-row::-webkit-scrollbar{display:none}
-	.pwa-editor-chip{width:100%;height:48px;min-width:0;border-color:transparent;border-radius:9px;background:transparent;flex-direction:column;gap:4px;padding:4px;font-size:10.5px}
+	.pwa-editor-chip{width:100%;height:46px;min-width:0;border-color:transparent;border-radius:7px;background:transparent;flex-direction:column;gap:3px;padding:3px;font-size:10px}
 	.pwa-editor-chip:not(.pwa-editor-chip--icon){max-width:none}
 	.pwa-editor-chip--icon{width:100%;min-width:0;padding:5px 4px 4px}
 	.pwa-editor-chip .pwa-editor-chip__mobile-label{display:block}
-	.pwa-editor-chip svg{width:17px;height:17px;flex:0 0 auto}
+	.pwa-editor-chip svg{width:16px;height:16px;flex:0 0 auto}
 	.pwa-picker-sheet{padding:16px 24px calc(24px + env(safe-area-inset-bottom))}
 }
 @media (max-height: 900px) and (min-width: 641px){

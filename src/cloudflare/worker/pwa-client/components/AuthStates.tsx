@@ -41,9 +41,7 @@ export function LoadingAuthState({ isExiting = false }: { isExiting?: boolean })
 				<div className="auth-loading__mark-stage" aria-hidden="true">
 					<img src={brandMarkSrc} alt="" />
 				</div>
-				<span className="auth-loading__eyebrow">Crate</span>
 				<h1>Loading reminders</h1>
-				<p>Getting your reminder library ready.</p>
 				<div className="auth-loading__progress" aria-hidden="true"><span /></div>
 			</div>
 		</div>
