@@ -168,7 +168,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-notification-prompt__copy span{font-size:12px;color:var(--text-muted);line-height:1.35}
 .pwa-pull-refresh{flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:transparent;opacity:0;transition:height .32s cubic-bezier(.32,.72,0,1),opacity .14s ease}
 .pwa-pull-refresh.is-visible{opacity:1}
-.pwa-pull-refresh__inner{display:flex;min-height:36px;align-items:center;justify-content:center;gap:6px;color:var(--text-faint)}
+.pwa-pull-refresh__inner{display:flex;min-height:36px;align-items:center;justify-content:center;gap:6px;color:var(--text-faint);transform:translateY(8px)}
 .pwa-pull-refresh__glyph{width:18px;height:18px;display:grid;place-items:center;color:currentColor;transition:transform .18s cubic-bezier(.32,.72,0,1),color .16s ease}
 .pwa-pull-refresh.is-ready .pwa-pull-refresh__inner{color:#bda7ff}
 .pwa-pull-refresh.is-refreshing .pwa-pull-refresh__inner{color:var(--text-muted)}
