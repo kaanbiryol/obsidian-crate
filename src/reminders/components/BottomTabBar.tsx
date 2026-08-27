@@ -15,7 +15,6 @@ interface TabButtonProps {
   tab: typeof TABS[number];
   isActive: boolean;
   onTabChange: (id: TabId) => void;
-  layoutId: string;
 }
 
 /**
@@ -26,7 +25,6 @@ const TabButton = memo(function TabButton({
   tab,
   isActive,
   onTabChange,
-  layoutId
 }: TabButtonProps) {
   const Icon = IconMap[tab.iconName];
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -46,23 +44,12 @@ const TabButton = memo(function TabButton({
   }, [onTabChange, tab.id]);
 
   return (
-    <motion.button
+    <button
       ref={buttonRef}
       className={`bottom-tab-button${isActive ? ' is-active' : ''}`}
-      whileTap={{ scale: 0.95 }}
-      transition={{ duration: 0.1 }}
       data-action="switch-tab"
       data-tab={tab.id === 'browse' ? 'projects' : tab.id}
     >
-      {/* Active indicator with layoutId for smooth sliding */}
-      {isActive && (
-        <motion.div
-          layoutId={layoutId}
-          className="bottom-tab-indicator"
-          transition={{ type: 'spring', ...SPRING_CONFIG }}
-        />
-      )}
-
       <div className="bottom-tab-content">
         <div className="bottom-tab-icon">
           <Icon
@@ -74,7 +61,7 @@ const TabButton = memo(function TabButton({
           {tab.label}
         </span>
       </div>
-    </motion.button>
+    </button>
   );
 });
 
@@ -94,20 +81,28 @@ export const BottomTabBar = memo(function BottomTabBar({
   position = 'bottom',
   className = '',
 }: BottomTabBarProps) {
-  const layoutId = position === 'top' ? 'topActiveTabIndicator' : 'bottomActiveTabIndicator';
+  const activeIndex = Math.max(0, TABS.findIndex((tab) => tab.id === activeTab));
 
   return (
     <div
       className={`bottom-tab-bar${position === 'bottom' ? ' is-bottom' : ''} ${className}`}
     >
       <div className="bottom-tab-items">
+        <div className="bottom-tab-slider-track" aria-hidden="true">
+          <motion.div
+            layout
+            initial={false}
+            className="bottom-tab-slider"
+            style={{ gridColumn: activeIndex + 1 }}
+            transition={{ type: 'spring', ...SPRING_CONFIG }}
+          />
+        </div>
         {TABS.map((tab) => (
           <TabButton
             key={tab.id}
             tab={tab}
             isActive={activeTab === tab.id}
             onTabChange={onTabChange}
-            layoutId={layoutId}
           />
         ))}
       </div>

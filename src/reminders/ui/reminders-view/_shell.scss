@@ -141,6 +141,7 @@
 }
 
 .bottom-tab-items {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-around;
@@ -177,9 +178,16 @@
     }
 }
 
-.bottom-tab-indicator {
+.bottom-tab-slider-track {
     position: absolute;
-    inset: 0;
+    inset: 8px 12px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    pointer-events: none;
+}
+
+.bottom-tab-slider {
+    grid-row: 1;
     border-radius: 12px;
     background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
 }

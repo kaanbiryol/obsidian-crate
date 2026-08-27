@@ -89,9 +89,12 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--accent:#8b5cf6;');
 		expect(html).toContain('--accent-rgb:139,92,246;');
 		expect(html).toContain('--accent-strong:#8b5cf6;');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-button{color:var(--text-faint);transition:color 220ms cubic-bezier(.2,.8,.2,1)}');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-button.is-active{color:#bda7ff}');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-content{width:100%;height:100%;justify-content:center}');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-icon{width:24px;height:24px;flex:0 0 24px}');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-icon{width:24px;height:24px;flex:0 0 24px;contain:paint;isolation:isolate;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:translateZ(0);will-change:transform;transition:color 220ms');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-icon svg{display:block;width:24px;height:24px;fill:none;backface-visibility:hidden;-webkit-backface-visibility:hidden}');
+		expect(html).not.toContain('.pwa-reminders-view .bottom-tab-button.is-active svg{');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-label{font-size:10.5px;font-weight:600;line-height:13px;');
 		expect(html).toContain('.pwa-reminders-view .reminders-fab.fab{position:absolute;right:16px;');
 		expect(html).toContain('border-radius:50%;background:linear-gradient(145deg,#9b75f7,#7c4ce5);');
@@ -137,7 +140,11 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--pwa-tabbar-bleed:0px');
 		expect(html).toContain('.pwa-reminders-view .reminders-view-scroll{overflow-anchor:none}');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none;');
+		expect(html).toContain('border-top:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.065)');
+		expect(html).not.toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none;background:rgba(13,13,15,.9);backdrop-filter:blur(28px) saturate(150%);-webkit-backdrop-filter:blur(28px) saturate(150%);border-top:1px');
 		expect(html).toContain('display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--pwa-tabbar-content-height);max-width:42rem!important;margin:0 auto!important;padding:0!important;transform:translate3d(0,var(--pwa-tabbar-content-offset),0)!important');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-slider-track{inset:6px 8px!important;column-gap:16px}');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-slider{border:1px solid rgba(var(--accent-rgb),.13);');
 		expect(html).toContain('height:100%!important;min-height:0!important;padding:0!important');
 		expect(html).toContain('padding:0!important;transform:none!important');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}');
