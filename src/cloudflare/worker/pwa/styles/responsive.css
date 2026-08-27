@@ -73,12 +73,12 @@
 	.settings-sheet__header{padding-right:16px;padding-left:16px}
 	.settings-panel{padding-right:14px;padding-left:14px}
 	.settings-row{padding-right:13px;padding-left:13px}
-	.pwa-picker-sheet.pwa-repeat-picker-sheet{padding-right:14px;padding-left:14px}
+	.pwa-project-picker-header{padding-right:16px;padding-left:16px}
+	.pwa-project-picker-sheet .pwa-picker-content{padding-right:14px;padding-left:14px}
 	.pwa-schedule-header{padding-right:16px;padding-left:16px}
 	.pwa-schedule-content{padding-right:14px;padding-left:14px}
-	.pwa-repeat-content{gap:18px}
-	.pwa-repeat-control-card,.pwa-repeat-time-card{padding-right:11px;padding-left:11px}
-	.pwa-repeat-days{gap:4px;padding:8px}
+	.pwa-repeat-header{padding-right:16px;padding-left:16px}
+	.pwa-repeat-content{padding-right:14px;padding-left:14px}
 }
 @media (max-width: 392px){
 	:root{--tabbar-h:64px}

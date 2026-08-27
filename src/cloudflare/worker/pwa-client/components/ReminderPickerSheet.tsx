@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@heroui/react';
-import { Check, ChevronLeft } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { getProjectColor } from '@/reminders/utils/projectColors';
 import {
 	applyReminderTextUpdate,
@@ -45,11 +45,10 @@ export function ReminderPickerSheet({
 		return (
 			<section ref={dialogRef} className="pwa-picker-sheet pwa-project-picker-sheet" role="dialog" aria-modal="true" aria-label="Select project" tabIndex={-1}>
 				<div className="pwa-picker-header pwa-project-picker-header">
-					<Button isIconOnly className="pwa-picker-icon-button pwa-project-picker-back" type="button" aria-label="Back to reminder" onClick={onClose}>
-						<ChevronLeft size={22} />
+					<h3>Project</h3>
+					<Button isIconOnly className="pwa-picker-icon-button pwa-project-picker-close" type="button" aria-label="Close project selection" onClick={onClose}>
+						<X size={18} />
 					</Button>
-					<h3>Select project</h3>
-					<span aria-hidden="true" />
 				</div>
 				<div className="pwa-picker-content">
 					<div className="pwa-project-list ios-scroll" role="listbox" aria-label="Project selection">

@@ -1,15 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@heroui/react';
 import {
-	CalendarDays,
-	CalendarRange,
-	Check,
-	ChevronLeft,
-	Clock3,
 	Minus,
 	Plus,
-	Repeat2,
-	Sun,
 	X,
 } from 'lucide-react';
 import {
@@ -26,9 +19,9 @@ import type { ModalDraft } from '../types';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 const FREQUENCY_DETAILS = {
-	daily: { label: 'Daily', unit: 'day', Icon: Sun },
-	weekly: { label: 'Weekly', unit: 'week', Icon: CalendarDays },
-	monthly: { label: 'Monthly', unit: 'month', Icon: CalendarRange },
+	daily: { label: 'Daily', unit: 'day' },
+	weekly: { label: 'Weekly', unit: 'week' },
+	monthly: { label: 'Monthly', unit: 'month' },
 } as const;
 
 function RepeatStepper({
@@ -50,7 +43,6 @@ function RepeatStepper({
 }) {
 	return (
 		<div className="pwa-repeat-control-card">
-			<div className="pwa-repeat-control-card__icon" aria-hidden="true"><Repeat2 size={18} /></div>
 			<div className="pwa-repeat-control-card__copy"><strong>{label}</strong><span>{detail}</span></div>
 			<div className="pwa-repeat-stepper">
 				<Button isIconOnly className="pwa-repeat-stepper__button" type="button" aria-label={`Decrease ${label.toLowerCase()}`} isDisabled={decreaseDisabled} onClick={onDecrease}><Minus size={16} /></Button>
@@ -92,36 +84,28 @@ export function ReminderRecurrencePicker({
 	return (
 		<section ref={dialogRef} className="pwa-picker-sheet pwa-repeat-picker-sheet" role="dialog" aria-modal="true" aria-label="Repeat reminder" tabIndex={-1}>
 			<div className="pwa-picker-header pwa-repeat-header">
-				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Back to reminder" onClick={onClose}>
-					<ChevronLeft size={20} />
+				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Close repeat" onClick={onClose}>
+					<X size={18} />
 				</Button>
-				<div className="pwa-repeat-header__title">
-					<span>Reminder</span>
-					<h3>Repeat</h3>
-				</div>
-				<Button isIconOnly className="pwa-picker-icon-button pwa-picker-icon-button--done" type="button" aria-label="Apply repeat" onClick={applyRepeat}>
-					<Check size={20} />
+				<h3>Repeat</h3>
+				<Button className="pwa-repeat-apply" type="button" onClick={applyRepeat}>
+					Apply
 				</Button>
 			</div>
 
 			<div className="pwa-picker-content pwa-repeat-content">
-				<div className="pwa-repeat-summary">
-					<div className="pwa-repeat-summary__icon" aria-hidden="true"><Repeat2 size={22} /></div>
-					<div className="pwa-repeat-summary__copy">
-						<span>Repeats</span>
-						<strong>{formatRecurrence(liveRule)}</strong>
-					</div>
-					<Check className="pwa-repeat-summary__check" size={18} aria-hidden="true" />
+				<div className="pwa-repeat-summary" aria-live="polite">
+					<span>Repeats</span>
+					<strong>{formatRecurrence(liveRule)}</strong>
 				</div>
 
 				<section className="pwa-repeat-section" aria-labelledby="repeat-frequency-title">
 					<div className="pwa-repeat-section__heading">
 						<h4 id="repeat-frequency-title">Frequency</h4>
-						<span>Choose cadence</span>
 					</div>
 					<div className="pwa-repeat-frequency-grid" role="tablist" aria-label="Repeat frequency">
 						{RECURRENCE_FREQUENCIES.map((option) => {
-							const { label, Icon } = FREQUENCY_DETAILS[option];
+							const { label } = FREQUENCY_DETAILS[option];
 							const selected = recurrenceDraft.frequency === option;
 							return (
 								<Button
@@ -132,7 +116,6 @@ export function ReminderRecurrencePicker({
 									aria-selected={selected}
 									onClick={() => setRecurrenceDraft((current) => ({ ...current, frequency: option }))}
 								>
-									<Icon size={18} aria-hidden="true" />
 									<span>{label}</span>
 								</Button>
 							);
@@ -143,7 +126,6 @@ export function ReminderRecurrencePicker({
 				<section className="pwa-repeat-section" aria-labelledby="repeat-interval-title">
 					<div className="pwa-repeat-section__heading">
 						<h4 id="repeat-interval-title">Interval</h4>
-						<span>How often</span>
 					</div>
 					<RepeatStepper
 						label="Every"
@@ -160,7 +142,6 @@ export function ReminderRecurrencePicker({
 					<section className="pwa-repeat-section" aria-labelledby="repeat-days-title">
 						<div className="pwa-repeat-section__heading">
 							<h4 id="repeat-days-title">Days</h4>
-							<span>Select any</span>
 						</div>
 						<div className="pwa-repeat-days" aria-label="Repeat days">
 							{RECURRENCE_DAY_LABELS.map((label, index) => {
@@ -192,7 +173,6 @@ export function ReminderRecurrencePicker({
 					<section className="pwa-repeat-section" aria-labelledby="repeat-month-day-title">
 						<div className="pwa-repeat-section__heading">
 							<h4 id="repeat-month-day-title">Month day</h4>
-							<span>Calendar date</span>
 						</div>
 						<RepeatStepper
 							label="Day of month"
@@ -209,18 +189,16 @@ export function ReminderRecurrencePicker({
 				<section className="pwa-repeat-section" aria-labelledby="repeat-time-title">
 					<div className="pwa-repeat-section__heading">
 						<h4 id="repeat-time-title">Time</h4>
-						<span>Notification</span>
 					</div>
 					<label className="pwa-repeat-time-card">
-						<span className="pwa-repeat-time-card__icon" aria-hidden="true"><Clock3 size={18} /></span>
-						<span className="pwa-repeat-time-card__copy"><strong>Reminder time</strong><small>Required</small></span>
+						<span className="pwa-repeat-time-card__copy"><strong>Reminder time</strong></span>
 						<input type="time" value={recurrenceDraft.time} onChange={(event) => setRecurrenceDraft((current) => ({ ...current, time: event.currentTarget.value }))} />
 					</label>
 				</section>
 
 				{draft.recurrence && (
 					<Button className="pwa-repeat-remove" type="button" onClick={() => onSelect(applyReminderTextUpdate(draft, projectOptions, { recurrence: null, dueDateValue: null, hasTime: false }))}>
-						<X size={16} /> Remove repeat
+						<X size={15} /> Remove repeat
 					</Button>
 				)}
 			</div>
