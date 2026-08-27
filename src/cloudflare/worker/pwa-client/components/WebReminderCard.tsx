@@ -2,9 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
 
-const COMPLETION_FEEDBACK_MS = 360;
-const REDUCED_MOTION_FEEDBACK_MS = 80;
-
 export function WebReminderCard({
 	reminder,
 	index,
@@ -45,15 +42,11 @@ export function WebReminderCard({
 
 		isCompletingRef.current = true;
 		setCompletionPreview(true);
-		const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-		window.setTimeout(() => {
-			void Promise.resolve()
-				.then(() => onToggleComplete(reminder.id, false))
-				.finally(() => {
-					isCompletingRef.current = false;
-					if (mountedRef.current) setCompletionPreview(false);
-				});
-		}, reduceMotion ? REDUCED_MOTION_FEEDBACK_MS : COMPLETION_FEEDBACK_MS);
+		void Promise.resolve(onToggleComplete(reminder.id, false))
+			.finally(() => {
+				isCompletingRef.current = false;
+				if (mountedRef.current) setCompletionPreview(false);
+			});
 	}, [onToggleComplete, reminder.completed, reminder.id]);
 
 	useEffect(() => {
