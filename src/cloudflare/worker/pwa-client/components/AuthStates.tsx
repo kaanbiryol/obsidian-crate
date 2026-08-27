@@ -37,12 +37,8 @@ export function LoadingAuthState({ isExiting = false }: { isExiting?: boolean })
 			aria-live="polite"
 			aria-label="Loading reminders"
 		>
-			<div className="auth-loading__content">
-				<div className="auth-loading__mark-stage" aria-hidden="true">
-					<img src={brandMarkSrc} alt="" />
-				</div>
-				<h1>Loading reminders</h1>
-				<div className="auth-loading__progress" aria-hidden="true"><span /></div>
+			<div className="auth-loading__mark-stage" aria-hidden="true">
+				<img src={brandMarkSrc} alt="" />
 			</div>
 		</div>
 	);

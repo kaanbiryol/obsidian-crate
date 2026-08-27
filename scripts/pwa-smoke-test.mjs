@@ -33,7 +33,7 @@ const { server, origin } = await listenPwaPreviewServer({ port, assets });
 try {
 	const pageResponse = await fetchOk(`${origin}/notifications?token=preview-install-token&folder=Reminders&upcomingDays=7`);
 	const pageHtml = await pageResponse.text();
-	if (!pageHtml.includes('<div id="app"></div>')) throw new Error('PWA page is missing the app root');
+	if (!pageHtml.includes('<div id="app">')) throw new Error('PWA page is missing the app root');
 	if (!pageHtml.includes('/notifications/app.js?v=')) throw new Error('PWA page is missing the versioned app script');
 
 	const manifestResponse = await fetchOk(`${origin}/notifications/manifest.json?token=preview-install-token&folder=Reminders&upcomingDays=7`);

@@ -249,14 +249,16 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("navigate: notification.navigate || ''");
 	});
 
-	it('uses the Crate mark in a compact native-style startup state', () => {
+	it('continues the native launch screen with a logo-only startup state', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('max-width:none;align-items:center;padding:calc(env(safe-area-inset-top) + 24px)');
-		expect(html).toContain('.auth-loading__mark-stage img{width:58px;height:58px;');
-		expect(html).toContain('.auth-card--loading h1{font-size:17px;');
-		expect(html).toContain('@keyframes auth-loading-progress');
-		expect(html).not.toContain('@keyframes auth-loading-glow');
+		expect(html).toContain('<link rel="preload" as="image" href="/notifications/crate-mark-256.png?v=');
+		expect(html).toContain('<div id="app"><div class="auth-card auth-card--loading" role="status"');
+		expect(html).toContain('max-width:none;align-items:center;padding:0;text-align:center;background:#000;box-shadow:none');
+		expect(html).toContain('.auth-loading__mark-stage{display:grid;width:min(32.5vw,140px);aspect-ratio:1;place-items:center;transform:translateY(-3.15dvh)}');
+		expect(html).toContain('.auth-loading__mark-stage img{width:100%;height:100%;object-fit:contain}');
+		expect(html).not.toContain('auth-loading__progress');
+		expect(html).not.toContain('>Loading reminders</h1>');
 	});
 
 });

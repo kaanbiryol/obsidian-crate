@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
+import { hydrateRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { RemindersAppShell, type ReminderCardRenderer } from '@/reminders/ui/RemindersAppShell';
 import { PWA_ASSET_VERSION } from './pwa-version';
@@ -55,7 +55,6 @@ function App() {
 	const [updateAvailable, setUpdateAvailable] = useState(false);
 	const [modal, setModal] = useState<ModalState | null>(null);
 	const [reorderDragging, setReorderDragging] = useState(false);
-	const initialLoading = useInitialLoadingGate(bootstrapped);
 	const { toast, showToast } = useToast();
 	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
 	const finalizeModalClose = useCallback(() => setModal(null), []);
@@ -100,6 +99,8 @@ function App() {
 		setLoading,
 		setError,
 	} = reminderSync;
+	const initialContentReady = bootstrapped && (!authToken || !loading);
+	const initialLoading = useInitialLoadingGate(initialContentReady);
 
 	const clearLocalSession = useCallback((showMessage: boolean) => {
 		localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -414,4 +415,4 @@ function App() {
 
 const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app root');
-createRoot(root).render(<App />);
+hydrateRoot(root, <App />);

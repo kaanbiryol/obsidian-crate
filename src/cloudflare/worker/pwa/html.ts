@@ -20,6 +20,7 @@ export function createPwaHtml(requestUrl?: string): string {
 <link rel="manifest" href="${manifestHref}">
 <link rel="icon" type="image/png" sizes="192x192" href="/notifications/crate-icon-192.png?v=${PWA_ASSET_VERSION}">
 <link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}">
+<link rel="preload" as="image" href="/notifications/crate-mark-256.png?v=${PWA_ASSET_VERSION}">
 <link rel="apple-touch-startup-image" href="/notifications/apple-startup-1179x2556.png?v=${PWA_ASSET_VERSION}" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
 <link rel="apple-touch-startup-image" href="/notifications/apple-startup-1290x2796.png?v=${PWA_ASSET_VERSION}" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
 <title>Crate Reminders</title>
@@ -28,7 +29,7 @@ ${PWA_STYLES}
 </style>
 </head>
 	<body>
-	<div id="app"></div>
+	<div id="app"><div class="auth-card auth-card--loading" role="status" aria-live="polite" aria-label="Loading reminders"><div class="auth-loading__mark-stage" aria-hidden="true"><img src="/notifications/crate-mark-256.png?v=${PWA_ASSET_VERSION}" alt=""></div></div></div>
 	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
 	</body>
 	</html>`;
