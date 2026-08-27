@@ -1,7 +1,25 @@
 import { format } from 'date-fns';
-import type { Reminder, RecurrenceRule } from '../../types';
+import type { Priority, Reminder, RecurrenceRule } from '../../types';
 import { recurrenceToText } from '../../utils/rruleConverter';
 import { parseReminderDateValue } from '../../utils/reminderDate';
+import { parseReminderContent } from '../../utils/reminderParser';
+
+export interface ReminderDraftContentState {
+	content: string;
+	dueDate: string | null;
+	recurrence: RecurrenceRule | undefined;
+	project: string;
+	priority: Priority;
+	hasTime: boolean;
+}
+
+export interface ReminderDraftContentPatch {
+	dueDate?: string | null;
+	recurrence?: RecurrenceRule | null;
+	project?: string;
+	priority?: Priority;
+	hasTime?: boolean;
+}
 
 export function getDefaultProject(defaultProject: string): string {
 	return defaultProject || 'Inbox';
@@ -78,4 +96,33 @@ export function rebuildReminderContent(
 	}
 
 	return `${result} `;
+}
+
+export function applyReminderDraftContentUpdate(
+	current: ReminderDraftContentState,
+	patch: ReminderDraftContentPatch,
+	projects: string[],
+	defaultProject: string,
+): ReminderDraftContentState {
+	const parsed = parseReminderContent(current.content, projects);
+	const cleanText = parsed.cleanContent ?? current.content.trim();
+	const next: ReminderDraftContentState = {
+		content: current.content,
+		dueDate: patch.dueDate !== undefined ? patch.dueDate : current.dueDate,
+		recurrence: patch.recurrence !== undefined ? (patch.recurrence ?? undefined) : current.recurrence,
+		project: patch.project !== undefined ? patch.project : current.project,
+		priority: patch.priority !== undefined ? patch.priority : current.priority,
+		hasTime: patch.hasTime !== undefined ? patch.hasTime : current.hasTime,
+	};
+
+	next.content = rebuildReminderContent(
+		cleanText,
+		next.dueDate,
+		next.recurrence,
+		next.project,
+		next.priority,
+		defaultProject,
+		next.hasTime,
+	);
+	return next;
 }

@@ -12,7 +12,6 @@ interface AddReminderModalBodyProps {
     onDescriptionChange: (value: string) => void;
     onKeyDown: (event: React.KeyboardEvent) => void;
     allowAutoFocus: boolean;
-    preserveSelection: boolean;
     projects: string[];
     textareaRef: React.RefObject<HTMLDivElement | null>;
     richTextInputRef: React.RefObject<RichTextInputHandle | null>;
@@ -39,7 +38,6 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     onDescriptionChange,
     onKeyDown,
     allowAutoFocus,
-    preserveSelection,
     projects,
     textareaRef,
     richTextInputRef,
@@ -67,7 +65,6 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                 onDescriptionChange={onDescriptionChange}
                 onKeyDown={onKeyDown}
                 allowAutoFocus={allowAutoFocus}
-                preserveSelection={preserveSelection}
                 projects={projects}
                 textareaRef={textareaRef}
                 richTextInputRef={richTextInputRef}

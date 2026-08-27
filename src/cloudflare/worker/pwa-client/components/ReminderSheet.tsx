@@ -333,7 +333,7 @@ export function ReminderSheet({
 								data-action="toggle-priority"
 								aria-label={draft.priority === 1 ? 'Remove priority' : 'Set priority'}
 								isDisabled={saving}
-								onPointerDown={(event) => event.preventDefault()}
+								preventFocusOnPress
 								onClick={togglePriority}
 							>
 								<Flag size={16} fill={draft.priority === 1 ? 'currentColor' : 'none'} />

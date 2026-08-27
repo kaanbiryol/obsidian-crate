@@ -13,7 +13,6 @@ interface ReminderEditorFieldsProps {
     onDescriptionChange: (value: string) => void;
     onKeyDown: (event: React.KeyboardEvent) => void;
     allowAutoFocus: boolean;
-    preserveSelection: boolean;
     projects: string[];
     textareaRef: React.RefObject<HTMLDivElement | null>;
     richTextInputRef: React.RefObject<RichTextInputHandle | null>;
@@ -27,7 +26,6 @@ export function ReminderEditorFields({
     onDescriptionChange,
     onKeyDown,
     allowAutoFocus,
-    preserveSelection,
     projects,
     textareaRef,
     richTextInputRef,
@@ -63,7 +61,6 @@ export function ReminderEditorFields({
                 placeholder={isEditing ? "Edit your reminder..." : "What do you need to remember?"}
                 inputRef={textareaRef}
                 autoFocus={allowAutoFocus}
-                preserveSelection={preserveSelection}
                 knownProjects={projects}
                 onAutocompleteQuery={handleAutocompleteQuery}
                 onAutocompleteKeyDown={autocomplete.handleKeyDown}

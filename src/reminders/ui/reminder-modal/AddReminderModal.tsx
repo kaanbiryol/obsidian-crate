@@ -9,7 +9,6 @@ import { AddReminderModalOverlays } from './AddReminderModalOverlays';
 import { useReminderModalActions } from './useReminderModalActions';
 import { useReminderDraft } from './useReminderDraft';
 import { useReminderModalPresentation } from './useReminderModalPresentation';
-import { moveCursorToEnd } from '../../utils/cursorPosition';
 import { AnimationConfig } from '../animations';
 import { Reminder, RecurrenceRule } from '../../types';
 
@@ -72,7 +71,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         dueDate,
         hasTime,
         recurrence,
-        isUpdatingFromButtons,
         applyDateSelection,
         applyProjectSelection,
         applyRecurrenceSelection,
@@ -134,10 +132,9 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     const isDark = document.body.classList.contains('theme-dark');
 
     const handlePriorityToggle = useCallback(() => {
-        togglePriority(() => {
-            if (textareaRef.current) {
-                moveCursorToEnd(textareaRef.current);
-            }
+        const nextContent = togglePriority();
+        richTextInputRef.current?.setCursorPosition(nextContent.length, {
+            scrollTop: textareaRef.current?.scrollTop ?? 0,
         });
     }, [togglePriority]);
 
@@ -205,7 +202,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 onDescriptionChange={setDescription}
                 onKeyDown={handleKeyDown}
                 allowAutoFocus={allowAutoFocus}
-                preserveSelection={!isUpdatingFromButtons}
                 projects={projects}
                 textareaRef={textareaRef}
                 richTextInputRef={richTextInputRef}
