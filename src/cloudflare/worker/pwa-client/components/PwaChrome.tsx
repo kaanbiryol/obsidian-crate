@@ -113,25 +113,31 @@ export function PwaTopNotices({
 
 export function PwaPullRefreshIndicator({ pullRefresh }: { pullRefresh: PullRefreshState }) {
 	const visible = pullRefresh.distance > 0 || pullRefresh.refreshing;
-	const height = visible ? Math.min(82, Math.max(0, pullRefresh.distance)) : 0;
-	const label = pullRefresh.refreshing ? 'Refreshing' : pullRefresh.ready ? 'Release to refresh' : null;
+	const height = visible ? Math.min(56, Math.max(0, pullRefresh.distance)) : 0;
+	const label = pullRefresh.refreshing
+		? 'Refreshing'
+		: pullRefresh.ready
+			? 'Release to refresh'
+			: 'Pull to refresh';
 	const iconStyle: React.CSSProperties = pullRefresh.refreshing
 		? {}
 		: {
-			transform: `rotate(${Math.round(pullRefresh.progress * 360)}deg) scale(${pullRefresh.ready ? 1.08 : 1})`,
+			transform: `rotate(${Math.round(pullRefresh.progress * 180)}deg)`,
 		};
 
 	return (
 		<div
 			className={`pwa-pull-refresh${visible ? ' is-visible' : ''}${pullRefresh.ready ? ' is-ready' : ''}${pullRefresh.refreshing ? ' is-refreshing' : ''}`}
 			style={{ height: `${height}px` }}
+			role="status"
+			aria-label={visible ? label : undefined}
 			aria-hidden={!visible}
 		>
 			<div className="pwa-pull-refresh__inner">
 				<div className="pwa-pull-refresh__glyph" style={iconStyle}>
-					{pullRefresh.refreshing ? <RefreshCw size={19} /> : <ArrowDown size={19} />}
+					{pullRefresh.refreshing ? <RefreshCw size={16} /> : <ArrowDown size={16} />}
 				</div>
-				{label && <div className="pwa-pull-refresh__label">{label}</div>}
+				<div className="pwa-pull-refresh__label">{label}</div>
 			</div>
 		</div>
 	);
