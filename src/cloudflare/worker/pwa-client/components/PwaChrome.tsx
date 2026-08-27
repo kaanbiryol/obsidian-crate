@@ -83,10 +83,7 @@ export function PwaTopNotices({
 		<div className="pwa-top-notices">
 			{updateAvailable && (
 				<div className="pwa-update-banner" role="status">
-					<div className="pwa-update-banner__label">
-						<span className="pwa-update-banner__dot" aria-hidden="true" />
-						<span className="pwa-update-banner__text">Update available</span>
-					</div>
+					<span className="pwa-update-banner__text">Update available</span>
 					<button className="pwa-update-button" type="button" onClick={onReload} aria-label="Update to the latest version">
 						Update
 					</button>
