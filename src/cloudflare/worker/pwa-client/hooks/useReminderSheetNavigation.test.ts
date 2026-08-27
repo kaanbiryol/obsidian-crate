@@ -50,7 +50,7 @@ describe('reminder sheet navigation', () => {
 		expect(repeated.pendingTransition).toEqual({ screen: 'date' });
 	});
 
-	it('closes the picker before returning to the editor with the selected draft patch', () => {
+	it('returns to the editor immediately so autofocus stays in the picker interaction', () => {
 		const pickerState = {
 			activeScreen: 'project' as const,
 			phase: 'open' as const,
@@ -61,27 +61,29 @@ describe('reminder sheet navigation', () => {
 			patch: { project: 'Work', activePicker: 'project' as const, deleteConfirm: true },
 		};
 
-		const requested = reduceReminderSheetNavigation(pickerState, {
-			type: 'request-transition',
-			transition,
+		const returned = reduceReminderSheetNavigation(pickerState, {
+			type: 'return-to-editor',
 			isClosing: false,
 		});
-		expect(requested).toEqual({
-			activeScreen: 'project',
-			phase: 'closing-for-transition',
-			pendingTransition: transition,
-		});
-
-		expect(reduceReminderSheetNavigation(requested, { type: 'finish-transition' })).toEqual({
-			activeScreen: 'editor',
-			phase: 'awaiting-reopen',
-			pendingTransition: null,
-		});
+		expect(returned).toBe(INITIAL_REMINDER_SHEET_NAVIGATION_STATE);
 		expect(getReminderSheetTransitionPatch(transition)).toEqual({
 			project: 'Work',
 			activePicker: null,
 			deleteConfirm: false,
 		});
+	});
+
+	it('does not return to the editor while the sheet is closing', () => {
+		const pickerState = {
+			activeScreen: 'date' as const,
+			phase: 'open' as const,
+			pendingTransition: null,
+		};
+
+		expect(reduceReminderSheetNavigation(pickerState, {
+			type: 'return-to-editor',
+			isClosing: true,
+		})).toBe(pickerState);
 	});
 
 	it('lets an external close cancel a pending picker transition', () => {

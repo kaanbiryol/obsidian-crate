@@ -17,6 +17,7 @@ export interface ReminderSheetNavigationState {
 
 export type ReminderSheetNavigationAction =
 	| { type: 'request-transition'; transition: ReminderSheetTransition; isClosing: boolean }
+	| { type: 'return-to-editor'; isClosing: boolean }
 	| { type: 'finish-transition' }
 	| { type: 'finish-external-close' }
 	| { type: 'reopen' }
@@ -36,6 +37,14 @@ export function reduceReminderSheetNavigation(
 		case 'request-transition':
 			if (action.isClosing || state.phase !== 'open' || state.pendingTransition) return state;
 			return { ...state, phase: 'closing-for-transition', pendingTransition: action.transition };
+		case 'return-to-editor':
+			if (
+				action.isClosing
+				|| state.phase !== 'open'
+				|| state.activeScreen === 'editor'
+				|| state.pendingTransition
+			) return state;
+			return INITIAL_REMINDER_SHEET_NAVIGATION_STATE;
 		case 'finish-transition':
 			if (state.phase !== 'closing-for-transition' || !state.pendingTransition) return state;
 			return {
@@ -113,9 +122,11 @@ export function useReminderSheetNavigation({
 	}, [onBeforeOpenPicker, requestTransition]);
 
 	const returnToEditor = useCallback((patch: Partial<ModalDraft> = {}) => {
-		if (isClosingRef.current) return;
-		requestTransition({ screen: 'editor', patch });
-	}, [requestTransition]);
+		flushSync(() => {
+			if (!applyAction({ type: 'return-to-editor', isClosing: isClosingRef.current })) return;
+			onPatchDraft(getReminderSheetTransitionPatch({ screen: 'editor', patch }));
+		});
+	}, [applyAction, onPatchDraft]);
 
 	const handleCloseEnd = useCallback(() => {
 		if (isClosingRef.current) {
