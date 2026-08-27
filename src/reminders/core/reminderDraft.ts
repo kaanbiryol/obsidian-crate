@@ -1,8 +1,8 @@
 import { format } from 'date-fns';
-import type { Priority, Reminder, RecurrenceRule } from '../../types';
-import { recurrenceToText } from '../../utils/rruleConverter';
-import { parseReminderDateValue } from '../../utils/reminderDate';
-import { parseReminderContent } from '../../utils/reminderParser';
+import type { Priority, Reminder, RecurrenceRule } from '../types';
+import { recurrenceToText } from '../utils/rruleConverter';
+import { parseReminderDateValue, serializeReminderDateValue } from '../utils/reminderDate';
+import { parseReminderContent } from '../utils/reminderParser';
 
 export interface ReminderDraftContentState {
 	content: string;
@@ -21,8 +21,45 @@ export interface ReminderDraftContentPatch {
 	hasTime?: boolean;
 }
 
+export interface ReminderDraftContentMetadata {
+	cleanContent: string;
+	dueDate: string | null;
+	hasDate: boolean;
+	recurrence: RecurrenceRule | undefined;
+	project: string;
+	hasProject: boolean;
+	priority: Priority;
+	hasPriorityMarker: boolean;
+	hasTime: boolean;
+}
+
 export function getDefaultProject(defaultProject: string): string {
 	return defaultProject || 'Inbox';
+}
+
+export function deriveReminderDraftContentMetadata(
+	content: string,
+	projects: string[],
+	defaultProject: string,
+): ReminderDraftContentMetadata {
+	const parsed = parseReminderContent(content, projects);
+	const recurrence = parsed.recurrence;
+	const hasTime = !recurrence && Boolean(parsed.dueDate && parsed.hasTime);
+	const dueDate = !recurrence && parsed.dueDate
+		? (serializeReminderDateValue(parsed.dueDate, hasTime) ?? null)
+		: null;
+
+	return {
+		cleanContent: parsed.cleanContent ?? content.trim(),
+		dueDate,
+		hasDate: parsed.dueDate !== undefined,
+		recurrence,
+		project: parsed.project ?? getDefaultProject(defaultProject),
+		hasProject: parsed.project !== undefined,
+		priority: parsed.priorityPart ? parsed.priority : 4,
+		hasPriorityMarker: Boolean(parsed.priorityPart),
+		hasTime,
+	};
 }
 
 export function buildInitialReminderContent(
@@ -104,8 +141,7 @@ export function applyReminderDraftContentUpdate(
 	projects: string[],
 	defaultProject: string,
 ): ReminderDraftContentState {
-	const parsed = parseReminderContent(current.content, projects);
-	const cleanText = parsed.cleanContent ?? current.content.trim();
+	const metadata = deriveReminderDraftContentMetadata(current.content, projects, defaultProject);
 	const next: ReminderDraftContentState = {
 		content: current.content,
 		dueDate: patch.dueDate !== undefined ? patch.dueDate : current.dueDate,
@@ -115,8 +151,16 @@ export function applyReminderDraftContentUpdate(
 		hasTime: patch.hasTime !== undefined ? patch.hasTime : current.hasTime,
 	};
 
+	if (patch.recurrence) {
+		next.dueDate = null;
+		next.hasTime = false;
+	} else if (patch.dueDate !== undefined) {
+		next.recurrence = undefined;
+		if (!patch.dueDate) next.hasTime = false;
+	}
+
 	next.content = rebuildReminderContent(
-		cleanText,
+		metadata.cleanContent,
 		next.dueDate,
 		next.recurrence,
 		next.project,

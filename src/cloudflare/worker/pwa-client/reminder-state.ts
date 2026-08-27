@@ -1,12 +1,12 @@
 import {
+	applyReminderDraftContentUpdate,
 	buildInitialReminderContent,
-	rebuildReminderContent,
-} from '@/reminders/ui/reminder-modal/useReminderDraft';
+	deriveReminderDraftContentMetadata,
+} from '@/reminders/core/reminderDraft';
 import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
 import type { Priority, Reminder as SharedReminder, RecurrenceRule } from '@/reminders/types/reminder';
 import { formatDueDate } from '@/reminders/utils/dateFormatting';
-import { formatLocalDateKey, parseReminderDateValue, serializeReminderDateValue } from '@/reminders/utils/reminderDate';
-import { parseReminderContent } from '@/reminders/utils/reminderParser';
+import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/utils/reminderDate';
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import type { ModalDraft, ReminderMutationBody, ReminderRecord } from './types';
 
@@ -158,71 +158,64 @@ export function applyReminderTextUpdate(
 	projectOptions: string[],
 	update: ReminderTextUpdate,
 ): Partial<ModalDraft> {
-	const parsed = parseReminderContent(draft.content, projectOptions);
-	const cleanText = parsed.cleanContent?.trim() ?? draft.content.trim();
-	const parsedDateValue = parsed.dueDate
-		? serializeReminderDateValue(parsed.dueDate, parsed.hasTime)
-		: undefined;
-	const hasDueDateUpdate = Object.prototype.hasOwnProperty.call(update, 'dueDateValue');
-	const hasRecurrenceUpdate = Object.prototype.hasOwnProperty.call(update, 'recurrence');
-	let nextDueDateValue = hasDueDateUpdate
-		? update.dueDateValue ?? null
-		: parsedDateValue ?? getDraftDueValue(draft);
-	let nextHasTime = Object.prototype.hasOwnProperty.call(update, 'hasTime')
-		? Boolean(update.hasTime)
-		: parsed.dueDate
-			? Boolean(parsed.hasTime)
-			: draftHasTime(draft);
-	let nextRecurrence = hasRecurrenceUpdate
-		? normalizeRecurrenceRule(update.recurrence ?? undefined)
-		: normalizeRecurrenceRule(parsed.recurrence ?? draft.recurrence);
-
-	if (hasRecurrenceUpdate && nextRecurrence) {
-		nextDueDateValue = null;
-		nextHasTime = false;
-	} else if (hasDueDateUpdate) {
-		nextRecurrence = undefined;
-		if (!nextDueDateValue) nextHasTime = false;
-	}
-
-	const nextProject = update.project ?? parsed.project ?? draft.project ?? draft.defaultProject;
-	const nextPriority = update.priority ?? (parsed.priorityPart ? parsed.priority : draft.priority);
-	const dateFields = splitDraftDateValue(nextDueDateValue, nextHasTime);
+	const metadata = deriveReminderDraftContentMetadata(
+		draft.content,
+		projectOptions,
+		draft.defaultProject,
+	);
+	const next = applyReminderDraftContentUpdate(
+		{
+			content: draft.content,
+			dueDate: metadata.dueDate ?? getDraftDueValue(draft),
+			recurrence: normalizeRecurrenceRule(metadata.recurrence ?? draft.recurrence),
+			project: metadata.hasProject ? metadata.project : (draft.project || draft.defaultProject),
+			priority: metadata.hasPriorityMarker ? metadata.priority : draft.priority,
+			hasTime: metadata.dueDate ? metadata.hasTime : draftHasTime(draft),
+		},
+		{
+			dueDate: update.dueDateValue,
+			hasTime: update.hasTime,
+			recurrence: update.recurrence === undefined
+				? undefined
+				: normalizeRecurrenceRule(update.recurrence ?? undefined),
+			project: update.project,
+			priority: update.priority,
+		},
+		projectOptions,
+		draft.defaultProject,
+	);
+	const dateFields = splitDraftDateValue(next.dueDate, next.hasTime);
 
 	return {
-		content: rebuildReminderContent(
-			cleanText,
-			nextDueDateValue,
-			nextRecurrence,
-			nextProject,
-			nextPriority,
-			draft.defaultProject,
-			nextHasTime,
-		),
-		project: nextProject,
-		priority: nextPriority,
-		recurrence: nextRecurrence,
+		content: next.content,
+		project: next.project,
+		priority: next.priority,
+		recurrence: next.recurrence,
 		...dateFields,
 		deleteConfirm: false,
 	};
 }
 
 export function deriveDraftPatchFromContent(draft: ModalDraft, projectOptions: string[]): Partial<ModalDraft> {
-	const parsed = parseReminderContent(draft.content, projectOptions);
+	const metadata = deriveReminderDraftContentMetadata(
+		draft.content,
+		projectOptions,
+		draft.defaultProject,
+	);
 	const patch: Partial<ModalDraft> = {};
-	const nextProject = parsed.project ?? draft.defaultProject;
+	const nextProject = metadata.project;
 
 	if (nextProject !== draft.project) {
 		patch.project = nextProject;
 	}
 
-	const nextPriority = parsed.priorityPart ? parsed.priority : 4;
+	const nextPriority = metadata.priority;
 	if (nextPriority !== draft.priority) {
 		patch.priority = nextPriority;
 	}
 
-	if (parsed.recurrence) {
-		const nextRecurrence = normalizeRecurrenceRule(parsed.recurrence);
+	if (metadata.recurrence) {
+		const nextRecurrence = normalizeRecurrenceRule(metadata.recurrence);
 		if (JSON.stringify(nextRecurrence) !== JSON.stringify(draft.recurrence)) {
 			patch.recurrence = nextRecurrence;
 		}
@@ -237,10 +230,8 @@ export function deriveDraftPatchFromContent(draft: ModalDraft, projectOptions: s
 		patch.recurrence = undefined;
 	}
 
-	if (parsed.dueDate) {
-		const hasTime = Boolean(parsed.hasTime);
-		const serialized = serializeReminderDateValue(parsed.dueDate, hasTime);
-		const dateFields = splitDraftDateValue(serialized, hasTime);
+	if (metadata.dueDate) {
+		const dateFields = splitDraftDateValue(metadata.dueDate, metadata.hasTime);
 		if (dateFields.dueDate !== draft.dueDate) patch.dueDate = dateFields.dueDate;
 		if (dateFields.dueTime !== draft.dueTime) patch.dueTime = dateFields.dueTime;
 		return patch;

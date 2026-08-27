@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Reminder } from '../../types';
+import type { Reminder } from '../types';
 import {
 	applyReminderDraftContentUpdate,
 	buildInitialReminderContent,
+	deriveReminderDraftContentMetadata,
 	rebuildReminderContent,
-} from './reminderDraftContent';
+} from './reminderDraft';
 
 function makeReminder(overrides: Partial<Reminder> = {}): Reminder {
 	return {
@@ -47,6 +48,38 @@ describe('reminder draft content helpers', () => {
 
 		expect(content).toContain('daily 09:00');
 		expect(content).not.toContain('Apr 3, 2026');
+	});
+
+	it('derives inline metadata through one shared parser boundary', () => {
+		const metadata = deriveReminderDraftContentMetadata(
+			'Finish report #Work ! 2026-04-03',
+			['Inbox', 'Work'],
+			'Inbox',
+		);
+
+		expect(metadata).toMatchObject({
+			cleanContent: 'Finish report',
+			dueDate: '2026-04-03',
+			hasDate: true,
+			recurrence: undefined,
+			project: 'Work',
+			hasProject: true,
+			priority: 1,
+			hasPriorityMarker: true,
+			hasTime: false,
+		});
+	});
+
+	it('treats recurrence as mutually exclusive with a due date', () => {
+		const metadata = deriveReminderDraftContentMetadata(
+			'Plan daily 09:00',
+			['Inbox'],
+			'Inbox',
+		);
+
+		expect(metadata.dueDate).toBeNull();
+		expect(metadata.recurrence).toMatchObject({ frequency: 'daily', hour: 9, minute: 0 });
+		expect(metadata.hasTime).toBe(false);
 	});
 
 	it('rebuilds content with selected metadata and trailing edit space', () => {

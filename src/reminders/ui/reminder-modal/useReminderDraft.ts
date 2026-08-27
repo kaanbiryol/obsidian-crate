@@ -1,21 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Reminder, RecurrenceRule } from '../../types';
-import { parseReminderContent } from '../../utils/reminderParser';
-import { findStandalonePriorityMarkerIndexes } from '../../utils/priorityMarker';
-import { serializeReminderDateValue } from '../../utils/reminderDate';
 import {
 	applyReminderDraftContentUpdate,
 	buildInitialReminderContent,
+	deriveReminderDraftContentMetadata,
 	getDefaultProject,
 	rebuildReminderContent,
 	type ReminderDraftContentPatch,
 	type ReminderDraftContentState,
-} from './reminderDraftContent';
-
-export {
-	buildInitialReminderContent,
-	rebuildReminderContent,
-} from './reminderDraftContent';
+} from '../../core/reminderDraft';
 
 interface UseReminderDraftOptions {
 	reminder?: Reminder;
@@ -71,9 +64,13 @@ export function useReminderDraft({
 	}, [content, dueDate, hasTime, priority, project, recurrence]);
 
 	const initialContentHadDate = useMemo(() => {
-		const parsed = parseReminderContent(initialContent, projects);
-		return !!parsed.dueDate;
-	}, [initialContent, projects]);
+		const metadata = deriveReminderDraftContentMetadata(
+			initialContent,
+			projects,
+			resolvedDefaultProject,
+		);
+		return metadata.dueDate !== null;
+	}, [initialContent, projects, resolvedDefaultProject]);
 
 	const applyContentUpdate = useCallback((patch: ReminderDraftContentPatch) => {
 		const next = applyReminderDraftContentUpdate(
@@ -93,41 +90,34 @@ export function useReminderDraft({
 	}, [projects, resolvedDefaultProject, setContentIfChanged]);
 
 	useEffect(() => {
-		const parsed = parseReminderContent(content, projects);
-		const detectedPriority = parsed.priority;
-		const hasPriorityMarker = !!parsed.priorityPart;
+		const metadata = deriveReminderDraftContentMetadata(
+			content,
+			projects,
+			resolvedDefaultProject,
+		);
 
-		if (hasPriorityMarker && detectedPriority !== priority) {
-			setPriority(detectedPriority);
-		} else if (!hasPriorityMarker && priority !== 4) {
-			const hadImportantMarker = findStandalonePriorityMarkerIndexes(content).length > 0;
-			if (!hadImportantMarker) {
-				setPriority(4);
-			}
+		if (metadata.priority !== priority) {
+			setPriority(metadata.priority);
 		}
 
-		const detectedProject = parsed.project;
-		if (detectedProject && detectedProject !== project) {
-			setProject(detectedProject);
-		} else if (!detectedProject && project !== resolvedDefaultProject) {
-			setProject(resolvedDefaultProject);
+		if (metadata.project !== project) {
+			setProject(metadata.project);
 		}
 
-		const detectedRecurrence = parsed.recurrence;
+		const detectedRecurrence = metadata.recurrence;
 		if (detectedRecurrence) {
 			const currentJson = recurrence ? JSON.stringify(recurrence) : null;
 			const detectedJson = JSON.stringify(detectedRecurrence);
 			if (currentJson !== detectedJson) {
 				recurrenceSetFromText.current = true;
 				setRecurrence(detectedRecurrence);
-				if (dueDate || parsed.dueDate) {
+				if (dueDate || metadata.hasDate) {
 					setDueDate(null);
 					setHasTime(false);
 					dueDateSetFromText.current = false;
-					const cleanText = parsed.cleanContent ?? content.trim();
 					setContentIfChanged(
 						rebuildReminderContent(
-							cleanText,
+							metadata.cleanContent,
 							null,
 							detectedRecurrence,
 							project,
@@ -143,16 +133,14 @@ export function useReminderDraft({
 			recurrenceSetFromText.current = false;
 		}
 
-		const detectedDueDate = parsed.dueDate;
+		const detectedDueDate = metadata.dueDate;
 		if (detectedDueDate && !detectedRecurrence) {
-			const newHasTime = parsed.hasTime ?? false;
-			const newDueDateStr = serializeReminderDateValue(detectedDueDate, newHasTime) ?? null;
-			if (dueDate !== newDueDateStr) {
+			if (dueDate !== detectedDueDate) {
 				dueDateSetFromText.current = true;
-				setDueDate(newDueDateStr);
+				setDueDate(detectedDueDate);
 			}
-			if (hasTime !== newHasTime) {
-				setHasTime(newHasTime);
+			if (hasTime !== metadata.hasTime) {
+				setHasTime(metadata.hasTime);
 			}
 		} else if (
 			!detectedDueDate &&
