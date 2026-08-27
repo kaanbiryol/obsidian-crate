@@ -125,24 +125,19 @@ class RemindersBlockWidget extends WidgetType {
   }
 
   private toggleShowCompleted = (newValue: boolean) => {
-    // Small delay to ensure React state update completes before document edit
-    // Widget will update in place via updateDOM() - no recreation, no flicker
-    setTimeout(() => {
-      const blockText = this.view.state.doc.sliceString(this.from, this.to);
-      const newContent = setRemindersBlockShowCompleted(blockText, newValue);
-      if (!newContent) {
-        return;
-      }
+    const blockText = this.view.state.doc.sliceString(this.from, this.to);
+    const newContent = setRemindersBlockShowCompleted(blockText, newValue);
+    if (!newContent) {
+      return;
+    }
 
-      // Apply the edit
-      this.view.dispatch({
-        changes: {
-          from: this.from,
-          to: this.to,
-          insert: newContent,
-        }
-      });
-    }, 50); // Minimal delay for smooth state transition
+    this.view.dispatch({
+      changes: {
+        from: this.from,
+        to: this.to,
+        insert: newContent,
+      },
+    });
   };
 
   toDOM(): HTMLElement {

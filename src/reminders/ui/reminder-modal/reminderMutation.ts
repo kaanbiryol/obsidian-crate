@@ -35,7 +35,6 @@ interface ExecuteReminderActionOptions {
 	close: () => void;
 	action: () => Promise<void>;
 	onError?: (error: Error) => void;
-	delayMs?: number;
 	beforeClose?: () => void;
 	beforeRun?: () => void;
 	afterSuccess?: () => void;
@@ -124,10 +123,8 @@ export async function executeReminderAction(options: ExecuteReminderActionOption
 
 	if (options.optimistic) {
 		options.beforeClose?.();
+		void run();
 		options.close();
-		window.setTimeout(() => {
-			void run();
-		}, options.delayMs ?? 0);
 		return;
 	}
 

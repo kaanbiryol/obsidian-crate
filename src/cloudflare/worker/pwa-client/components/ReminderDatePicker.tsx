@@ -125,7 +125,6 @@ export function ReminderDatePicker({
 						<label className="pwa-schedule-field">
 							<span className="pwa-schedule-field__copy"><strong>Date</strong></span>
 							<input
-								data-draft-field="dueDate"
 								type="date"
 								value={draft.dueDate}
 								onChange={(event) => onPatch(applyDateFieldsToDraft(draft, projectOptions, event.currentTarget.value, draft.dueTime))}
@@ -134,7 +133,6 @@ export function ReminderDatePicker({
 						<label className="pwa-schedule-field">
 							<span className="pwa-schedule-field__copy"><strong>Time <small>Optional</small></strong></span>
 							<input
-								data-draft-field="dueTime"
 								type="time"
 								value={draft.dueTime}
 								onChange={(event) => onPatch(applyDateFieldsToDraft(draft, projectOptions, draft.dueDate || formatLocalDateKey(new Date()), event.currentTarget.value))}

@@ -103,22 +103,6 @@ export function ReminderSheet({
 		}
 	}, [activeScreen, draft.content, projectOptions.join('\u0000'), sheetOpen]);
 
-	const draftFromForm = (form: HTMLFormElement): ModalDraft => {
-		const readField = (field: string) => {
-			const input = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-draft-field="${field}"]`);
-			return input?.value ?? '';
-		};
-
-		return {
-			...draft,
-			content: draft.content,
-			description: readField('description') || draft.description,
-			project: readField('project') || draft.project,
-			dueDate: readField('dueDate') || draft.dueDate,
-			dueTime: readField('dueTime') || draft.dueTime,
-		};
-	};
-
 	const togglePriority = () => {
 		const patch = applyReminderTextUpdate(draft, projectOptions, {
 			priority: draft.priority === 1 ? 4 : 1,
@@ -170,7 +154,7 @@ export function ReminderSheet({
 							<form className="modal-form" onSubmit={(event) => {
 							event.preventDefault();
 							if (saving) return;
-							onSave({ ...modal, draft: draftFromForm(event.currentTarget) });
+							onSave(modal);
 						}}>
 						<div className="pwa-editor-header">
 							<div className="pwa-editor-header__side">
@@ -245,7 +229,6 @@ export function ReminderSheet({
 							<div className="pwa-editor-divider" />
 							<textarea
 								ref={descriptionRef}
-								data-draft-field="description"
 								className="pwa-editor-description-input ios-scroll"
 								rows={3}
 								maxLength={4096}

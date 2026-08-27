@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { ModalDraft, ModalMode, ModalPickerId } from '../types';
 
-export type ReminderSheetScreen = 'editor' | ModalPickerId;
+type ReminderSheetScreen = 'editor' | ModalPickerId;
 
 export interface ReminderSheetTransition {
 	screen: ReminderSheetScreen;

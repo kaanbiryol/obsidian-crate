@@ -65,7 +65,6 @@ export function useReminderModalActions({
 		await executeReminderAction({
 			optimistic,
 			close: onClose,
-			delayMs: 300,
 			action: async () => {
 				if (submission.updatedReminder && onSave) {
 					await onSave(submission.updatedReminder);

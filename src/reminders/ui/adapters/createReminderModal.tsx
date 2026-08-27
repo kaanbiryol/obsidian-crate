@@ -56,9 +56,6 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
   }, [reminder, settings.taskCreationDefaultDueDate]);
 
   const handleAdd = async (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean, description?: string) => {
-    // Close modal immediately for better UX
-    modal.close();
-
     // Parse due date
     const parsedDueDate = parseReminderDateValue(dueDate, hasTime);
 
@@ -87,9 +84,6 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
   };
 
   const handleSave = async (updatedReminder: Reminder) => {
-    // Close modal immediately
-    modal.close();
-
     try {
       // Parse due date for markdown writer
       const parsedDueDate = updatedReminder.dueDatetime
@@ -139,8 +133,6 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
   const handleDelete = async (reminderToDelete: Reminder) => {
     // Shared modal handles confirmation
-    modal.close();
-
     log.info(" Deleting reminder:", reminderToDelete?.id);
 
     try {

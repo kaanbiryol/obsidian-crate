@@ -119,7 +119,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         recurrence,
         reminder,
         optimistic,
-        onClose,
+        onClose: handleClose,
         onAdd,
         onSave,
         onDelete,

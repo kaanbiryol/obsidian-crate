@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { Check } from 'lucide-react';
 
 import { BaseModal } from '../../components/BaseModal';
@@ -37,16 +37,19 @@ interface ProjectRowProps {
     projectName: string;
     isSelected: boolean;
     onSelect: () => void;
+    rowRef?: React.Ref<HTMLButtonElement>;
 }
 
 const ProjectRow: React.FC<ProjectRowProps> = ({
     projectName,
     isSelected,
     onSelect,
+    rowRef,
 }) => {
     return (
         <div className="project-picker-row-wrap">
             <ShadowDOMNativeButton
+                ref={rowRef}
                 onClick={onSelect}
                 className={`project-picker-row w-full flex items-center gap-3 px-4 min-h-[52px] focus:outline-none${isSelected ? ' is-selected' : ''}`}
             >
@@ -77,24 +80,24 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
 }) => {
     const selectedProject = project || defaultProject || 'Inbox';
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const selectedRowRef = useRef<HTMLButtonElement>(null);
     const modalProps = getPickerModalProps(pickerMode);
 
     // Scroll selected item into view when modal opens
-    useEffect(() => {
-        if (isOpen && scrollContainerRef.current) {
-            const selectedIndex = projects.indexOf(selectedProject);
-            if (selectedIndex > 0) {
-                const timeout = setTimeout(() => {
-                    const container = scrollContainerRef.current;
-                    if (container) {
-                        const rowHeight = 60;
-                        const scrollTop = Math.max(0, (selectedIndex * rowHeight) - (container.clientHeight / 2) + (rowHeight / 2));
-                        container.scrollTop = scrollTop;
-                    }
-                }, 50);
-                return () => clearTimeout(timeout);
-            }
-        }
+    useLayoutEffect(() => {
+        const container = scrollContainerRef.current;
+        const selectedRow = selectedRowRef.current;
+        if (!isOpen || !container || !selectedRow) return;
+
+        const containerRect = container.getBoundingClientRect();
+        const rowRect = selectedRow.getBoundingClientRect();
+        container.scrollTop = Math.max(
+            0,
+            container.scrollTop
+                + rowRect.top
+                - containerRect.top
+                - ((container.clientHeight - rowRect.height) / 2),
+        );
     }, [isOpen, projects, selectedProject]);
 
     const handleSelectProject = (projectName: string) => {
@@ -126,6 +129,7 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
                                 key={p}
                                 projectName={p}
                                 isSelected={p === selectedProject}
+                                rowRef={p === selectedProject ? selectedRowRef : undefined}
                                 onSelect={() => handleSelectProject(p)}
                             />
                         ))}

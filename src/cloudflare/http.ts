@@ -6,7 +6,7 @@ export interface HttpRequest {
 	body?: string | ArrayBuffer;
 }
 
-export interface HttpResponse {
+interface HttpResponse {
 	status: number;
 	text: string;
 }
