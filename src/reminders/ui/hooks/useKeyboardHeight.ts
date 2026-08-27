@@ -1,72 +1,121 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-// Fixed iOS keyboard height that works well for most devices
-const IOS_KEYBOARD_HEIGHT = 300;
+interface KeyboardViewportMetrics {
+  layoutHeight: number;
+  visualHeight: number;
+  visualOffsetTop: number;
+}
+
+export function calculateKeyboardInset({
+  layoutHeight,
+  visualHeight,
+  visualOffsetTop,
+}: KeyboardViewportMetrics): number {
+  return Math.max(0, Math.round(layoutHeight - visualHeight - visualOffsetTop));
+}
+
+function isEditableElement(target: EventTarget | null): target is HTMLElement {
+  return target instanceof HTMLElement && (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.isContentEditable ||
+    target.getAttribute('contenteditable') === 'true'
+  );
+}
+
+function getEditableEventTarget(event: FocusEvent): HTMLElement | null {
+  return event.composedPath().find(isEditableElement) ?? null;
+}
+
+function getDeepActiveElement(): Element | null {
+  let activeElement: Element | null = document.activeElement;
+  while (activeElement?.shadowRoot?.activeElement) {
+    activeElement = activeElement.shadowRoot.activeElement;
+  }
+  return activeElement;
+}
+
+function getLayoutHeight(): number {
+  return Math.max(
+    window.innerHeight,
+    document.documentElement.clientHeight,
+    (window.visualViewport?.height ?? 0) + (window.visualViewport?.offsetTop ?? 0),
+  );
+}
 
 /**
  * Hook to track keyboard visibility on mobile devices.
  *
- * On iOS in Obsidian, the keyboard overlays content without resizing the viewport,
- * so we detect keyboard by tracking focus on input elements and return a fixed offset.
+ * On iOS, the layout viewport remains full-height while visualViewport describes
+ * the visible area above the software keyboard. Focus gates the measurement so
+ * browser chrome changes are not mistaken for a keyboard.
  */
 export function useKeyboardHeight(enabled: boolean = true): number {
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
+  const hasEditableFocusRef = useRef(false);
+  const layoutHeightRef = useRef(0);
+  const layoutWidthRef = useRef(0);
 
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') {
+      setKeyboardInset(0);
       return;
     }
 
-    // Track focus/blur on any input element to detect keyboard
-    const handleFocusIn = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      // Check if focused element is an input, textarea, or contenteditable
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable ||
-        target.getAttribute('contenteditable') === 'true'
-      ) {
-        setIsKeyboardVisible(true);
+    const updateLayoutBaseline = () => {
+      const width = window.innerWidth;
+      if (layoutWidthRef.current !== width) {
+        layoutWidthRef.current = width;
+        layoutHeightRef.current = getLayoutHeight();
+        return;
       }
+      layoutHeightRef.current = Math.max(layoutHeightRef.current, getLayoutHeight());
     };
 
-    const handleFocusOut = () => {
-      // Small delay to check if focus moved to another input
-      setTimeout(() => {
-        const activeElement = document.activeElement as HTMLElement;
-        if (
-          !activeElement ||
-          (activeElement.tagName !== 'INPUT' &&
-            activeElement.tagName !== 'TEXTAREA' &&
-            !activeElement.isContentEditable &&
-            activeElement.getAttribute('contenteditable') !== 'true')
-        ) {
-          setIsKeyboardVisible(false);
-        }
-      }, 100);
+    const measure = () => {
+      if (!hasEditableFocusRef.current || !window.visualViewport) {
+        updateLayoutBaseline();
+        setKeyboardInset(0);
+        return;
+      }
+
+      setKeyboardInset(calculateKeyboardInset({
+        layoutHeight: Math.max(layoutHeightRef.current, getLayoutHeight()),
+        visualHeight: window.visualViewport.height,
+        visualOffsetTop: window.visualViewport.offsetTop,
+      }));
     };
+
+    const handleFocusIn = (event: FocusEvent) => {
+      if (!getEditableEventTarget(event)) return;
+      hasEditableFocusRef.current = true;
+      measure();
+    };
+
+    const handleFocusOut = (event: FocusEvent) => {
+      if (isEditableElement(event.relatedTarget)) return;
+      hasEditableFocusRef.current = false;
+      setKeyboardInset(0);
+    };
+
+    updateLayoutBaseline();
+    hasEditableFocusRef.current = isEditableElement(getDeepActiveElement());
+    measure();
 
     document.addEventListener('focusin', handleFocusIn);
     document.addEventListener('focusout', handleFocusOut);
-
-    // Check initial state
-    const activeElement = document.activeElement as HTMLElement;
-    if (
-      activeElement &&
-      (activeElement.tagName === 'INPUT' ||
-        activeElement.tagName === 'TEXTAREA' ||
-        activeElement.isContentEditable ||
-        activeElement.getAttribute('contenteditable') === 'true')
-    ) {
-      setIsKeyboardVisible(true);
-    }
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('scroll', measure);
 
     return () => {
       document.removeEventListener('focusin', handleFocusIn);
       document.removeEventListener('focusout', handleFocusOut);
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('scroll', measure);
     };
   }, [enabled]);
 
-  return isKeyboardVisible ? IOS_KEYBOARD_HEIGHT : 0;
+  return enabled ? keyboardInset : 0;
 }

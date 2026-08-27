@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Button } from '@heroui/react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { useVirtualKeyboard } from 'react-modal-sheet';
 import {
 	ArrowUp,
 	Calendar,
@@ -15,6 +14,7 @@ import {
 import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/RichTextInput';
 import { ProjectAutocompleteDropdown } from '@/reminders/ui/reminder-modal/ProjectAutocompleteDropdown';
 import { useProjectAutocomplete } from '@/reminders/ui/reminder-modal/useProjectAutocomplete';
+import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { useReminderSheetNavigation } from '../hooks/useReminderSheetNavigation';
@@ -26,8 +26,6 @@ import {
 import type { ModalDraft, ModalState } from '../types';
 import { PwaModalSheet } from './PwaModalSheet';
 import { ReminderPickerSheet } from './ReminderPickerSheet';
-
-const MIN_RELIABLE_KEYBOARD_HEIGHT = 120;
 
 export function ReminderSheet({
 	modal,
@@ -54,15 +52,8 @@ export function ReminderSheet({
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 	const editorCardRef = useRef<HTMLDivElement | null>(null);
-	const closedViewportHeightRef = useRef(typeof window === 'undefined'
-		? 0
-		: Math.max(window.innerHeight, window.visualViewport?.height ?? 0));
-	const { isKeyboardOpen, keyboardHeight } = useVirtualKeyboard({ isEnabled: true, debounceDelay: 60 });
+	const keyboardInset = useKeyboardHeight();
 	const prefersReducedMotion = useReducedMotion();
-	const fallbackKeyboardInset = Math.round(Math.min(360, Math.max(260, closedViewportHeightRef.current * 0.36)));
-	const keyboardInset = isKeyboardOpen
-		? (keyboardHeight >= MIN_RELIABLE_KEYBOARD_HEIGHT ? keyboardHeight : fallbackKeyboardInset)
-		: 0;
 	const draft = modal.draft;
 	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 	const isEditing = modal.mode === 'edit';

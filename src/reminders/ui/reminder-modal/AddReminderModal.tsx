@@ -126,8 +126,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         onError,
     });
 
-    const keyboardPadding = keyboardOffset > 0 ? Math.max(0, keyboardOffset - 32) : 0;
-
     // Detect dark mode for input/dropdown styling
     const isDark = document.body.classList.contains('theme-dark');
 
@@ -181,7 +179,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             }}
             contentStyle={{
                 // Lift modal with keyboard (animate margin for smoother sync)
-                ...(keyboardPadding > 0 ? { marginBottom: keyboardPadding } : {}),
+                ...(keyboardOffset > 0 ? { marginBottom: keyboardOffset } : {}),
                 transition: 'margin-bottom 220ms ease-out',
             }}
         >
