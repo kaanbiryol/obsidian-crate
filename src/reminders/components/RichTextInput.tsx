@@ -35,6 +35,8 @@ interface RichTextInputProps {
     className?: string;
     style?: React.CSSProperties;
     autoFocus?: boolean;
+    /** Increment to synchronously refocus the mounted editor from a user interaction. */
+    focusRequestKey?: number;
     readOnly?: boolean;
     /** Preserve cursor position when value is updated externally */
     preserveSelection?: boolean;
@@ -63,6 +65,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     className,
     style,
     autoFocus = false,
+    focusRequestKey = 0,
     readOnly = false,
     preserveSelection = true,
     externalChangeCursor = 'preserve',
@@ -78,6 +81,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const pendingScrollTopRef = useRef<number | null>(null);
     const restoreRequestIdRef = useRef(0);
     const initialHtmlRef = useRef<{ html: string } | null>(null);
+    const lastFocusRequestRef = useRef(focusRequestKey);
 
     if ((syncContentBeforePaint || autoFocus) && !initialHtmlRef.current) {
         initialHtmlRef.current = { html: buildHTML(value, knownProjects) || '' };
@@ -239,6 +243,14 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             syncExternalContent();
         }
     }, [syncContentBeforePaint, syncExternalContent]);
+
+    useLayoutEffect(() => {
+        if (focusRequestKey === lastFocusRequestRef.current) return;
+        lastFocusRequestRef.current = focusRequestKey;
+        if (actualRef.current) {
+            focusRichTextElement(actualRef.current);
+        }
+    }, [actualRef, focusRequestKey]);
 
     const {
         handleClick,

@@ -11,7 +11,7 @@
 @keyframes auth-loading-progress{0%{transform:translateX(-115%)}55%{transform:translateX(82%)}100%{transform:translateX(235%)}}
 @media (prefers-reduced-motion: reduce){
 	.view-transition,.app-header__body,.tab-button.is-active,.modal-card,.settings-sheet,.pwa-picker-sheet,.pwa-skeleton-line,.pwa-pull-refresh__glyph svg,.pwa-update-banner,.auth-loading__mark-stage::before,.auth-loading__mark-stage img,.auth-loading__progress span,.premium-checkbox.is-completing,.premium-checkbox-icon{animation:none!important}
-	.tab-button,.tab-button__icon,.premium-reminder-content,.fab,.pwa-pull-refresh,.pwa-pull-refresh__glyph,.modal-card.pwa-reminder-editor{transition:none!important}
+	.tab-button,.tab-button__icon,.premium-reminder-content,.fab,.pwa-pull-refresh,.pwa-pull-refresh__glyph,.modal-card.pwa-reminder-editor,.pwa-modal-sheet__backdrop{transition:none!important}
 }
 @keyframes sheet-in{from{translate:0 18px;opacity:.92}to{translate:0 0;opacity:1}}
 @media (min-width: 760px){

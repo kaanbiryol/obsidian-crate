@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Button } from '@heroui/react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useVirtualKeyboard } from 'react-modal-sheet';
 import {
 	ArrowUp,
@@ -57,6 +58,7 @@ export function ReminderSheet({
 		? 0
 		: Math.max(window.innerHeight, window.visualViewport?.height ?? 0));
 	const { isKeyboardOpen, keyboardHeight } = useVirtualKeyboard({ isEnabled: true, debounceDelay: 60 });
+	const prefersReducedMotion = useReducedMotion();
 	const fallbackKeyboardInset = Math.round(Math.min(360, Math.max(260, closedViewportHeightRef.current * 0.36)));
 	const keyboardInset = isKeyboardOpen
 		? (keyboardHeight >= MIN_RELIABLE_KEYBOARD_HEIGHT ? keyboardHeight : fallbackKeyboardInset)
@@ -75,9 +77,13 @@ export function ReminderSheet({
 	}, [onChange]);
 	const {
 		activeScreen,
-		sheetOpen,
+		canInteract,
+		editorFocusRequest,
+		isReturningToEditor,
+		isStageClosing,
 		openPicker,
 		returnToEditor,
+		handleStageAnimationComplete,
 		handleCloseEnd,
 	} = useReminderSheetNavigation({
 		mode: modal.mode,
@@ -96,12 +102,14 @@ export function ReminderSheet({
 	});
 
 	useEffect(() => {
-		if (activeScreen !== 'editor' || !sheetOpen) return;
+		if (activeScreen !== 'editor' || !canInteract) return;
 		const patch = deriveDraftPatchFromContent(draft, projectOptions);
 		if (Object.keys(patch).length > 0) {
 			patchDraft(patch);
 		}
-	}, [activeScreen, draft.content, projectOptions.join('\u0000'), sheetOpen]);
+	}, [activeScreen, canInteract, draft.content, projectOptions.join('\u0000')]);
+
+	const editorInteractive = activeScreen === 'editor' || isReturningToEditor;
 
 	const togglePriority = () => {
 		const patch = applyReminderTextUpdate(draft, projectOptions, {
@@ -127,28 +135,39 @@ export function ReminderSheet({
 
 	return (
 		<PwaModalSheet
-				key={activeScreen}
-				isOpen={sheetOpen && !isClosing}
+				isOpen={!isClosing}
 				onClose={() => {
-					if (saving || isClosing || !sheetOpen) return;
+					if (saving || isClosing || !canInteract) return;
 					if (activeScreen !== 'editor') returnToEditor();
 					else onClose();
 				}}
 				onCloseEnd={handleCloseEnd}
 				variant="reminder"
 				keyboardInset={keyboardInset}
-				closeOnBackdrop={!saving && !isClosing && sheetOpen}
+				closeOnBackdrop={!saving && !isClosing && canInteract}
+				screenTransitionClosing={isStageClosing}
 				onKeyDown={handleDialogKeyDown}
 			>
-				<div className="pwa-reminder-sheet-stage">
-					{activeScreen === 'editor' ? (
+				<motion.div
+					className="pwa-reminder-sheet-stage"
+					initial={false}
+					animate={{ y: isStageClosing ? '100%' : '0%' }}
+					transition={prefersReducedMotion
+						? { duration: 0 }
+						: isStageClosing
+							? { duration: 0.26, ease: [0.4, 0, 1, 1] }
+							: { duration: 0.36, ease: [0.32, 0.72, 0, 1] }}
+					onAnimationComplete={handleStageAnimationComplete}
+				>
 						<div
-							ref={setDialogRef}
-							className="modal-card pwa-reminder-editor"
+							ref={activeScreen === 'editor' ? setDialogRef : undefined}
+							className={`pwa-reminder-sheet-screen pwa-reminder-sheet-screen--editor modal-card pwa-reminder-editor${activeScreen === 'editor' ? ' is-active' : ''}${isReturningToEditor ? ' is-focus-target' : ''}`}
 							role="dialog"
 							aria-modal="true"
 							aria-label={title}
 							aria-busy={saving || isClosing}
+							aria-hidden={!editorInteractive}
+							inert={!editorInteractive}
 							tabIndex={-1}
 						>
 							<form className="modal-form" onSubmit={(event) => {
@@ -206,12 +225,13 @@ export function ReminderSheet({
 								onChange={(content) => patchDraft({ content })}
 								placeholder={isEditing ? 'Edit your reminder...' : 'What do you need to remember?'}
 								ariaLabel="Reminder title"
-								readOnly={saving}
+								readOnly={saving || !editorInteractive}
 								inputRef={contentRef}
 								preserveSelection
 								externalChangeCursor="end"
 								syncContentBeforePaint
-								autoFocus={sheetOpen && !saving && !isClosing}
+								autoFocus={!saving && !isClosing}
+								focusRequestKey={editorFocusRequest}
 								knownProjects={projectOptions}
 								onAutocompleteQuery={autocomplete.updateAutocomplete}
 								onAutocompleteKeyDown={autocomplete.handleKeyDown}
@@ -235,7 +255,7 @@ export function ReminderSheet({
 								placeholder="Add description..."
 								aria-label="Reminder description"
 								value={draft.description}
-								disabled={saving}
+								disabled={saving || !editorInteractive}
 								onChange={(event) => patchDraft({ description: event.currentTarget.value })}
 							/>
 						</div>
@@ -247,7 +267,7 @@ export function ReminderSheet({
 								type="button"
 								data-action="toggle-picker"
 								data-picker="date"
-								isDisabled={saving || !sheetOpen}
+								isDisabled={saving || !canInteract}
 								onPointerDown={(event) => event.preventDefault()}
 								onClick={() => openPicker('date')}
 							>
@@ -259,7 +279,7 @@ export function ReminderSheet({
 								type="button"
 								data-action="toggle-picker"
 								data-picker="project"
-								isDisabled={saving || !sheetOpen}
+								isDisabled={saving || !canInteract}
 								onPointerDown={(event) => event.preventDefault()}
 								onClick={() => openPicker('project')}
 							>
@@ -285,7 +305,7 @@ export function ReminderSheet({
 								type="button"
 								data-action="toggle-picker"
 								data-picker="recurrence"
-								isDisabled={saving || !sheetOpen}
+								isDisabled={saving || !canInteract}
 								aria-label={draft.recurrence ? formatRecurrence(draft.recurrence) : 'Recurrence'}
 								onPointerDown={(event) => event.preventDefault()}
 								onClick={() => openPicker('recurrence')}
@@ -310,17 +330,19 @@ export function ReminderSheet({
 						</div>
 							</form>
 						</div>
-					) : (
-						<ReminderPickerSheet
-							draft={draft}
-							dialogRef={setDialogRef}
-							projectOptions={projectOptions}
-							onPatch={patchDraft}
-							onSelect={returnToEditor}
-							onClose={() => returnToEditor()}
-						/>
+					{activeScreen !== 'editor' && (
+						<div className="pwa-reminder-sheet-screen pwa-reminder-sheet-screen--picker is-active">
+							<ReminderPickerSheet
+								draft={draft}
+								dialogRef={setDialogRef}
+								projectOptions={projectOptions}
+								onPatch={patchDraft}
+								onSelect={returnToEditor}
+								onClose={() => returnToEditor()}
+							/>
+						</div>
 					)}
-				</div>
+				</motion.div>
 		</PwaModalSheet>
 	);
 }

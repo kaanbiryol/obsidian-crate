@@ -1,13 +1,19 @@
 
 .pwa-shadow-root.has-open-sheet .reminders-content,.pwa-shadow-root.has-open-sheet .reminders-view-scroll{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}
 .pwa-modal-sheet{color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;color-scheme:dark}
-.pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.66);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.66);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:opacity .36s cubic-bezier(.32,.72,0,1)}
+.pwa-modal-sheet.is-screen-transition-closing .pwa-modal-sheet__backdrop{opacity:0!important;transition-duration:.26s;transition-timing-function:cubic-bezier(.4,0,1,1)}
 .pwa-modal-sheet__container{right:0;margin:0 auto;overflow:hidden;background:var(--pwa-sheet-surface);border:1px solid rgba(255,255,255,.07);border-bottom:0;border-radius:20px 20px 0 0;box-shadow:0 -1px 0 rgba(255,255,255,.025),0 -24px 70px rgba(0,0,0,.28);backface-visibility:hidden;will-change:transform}
-.pwa-modal-sheet__container--reminder{width:min(1120px,calc(100vw - 36px))!important;height:calc(100% - env(safe-area-inset-top) - 28px)!important;max-height:calc(100% - env(safe-area-inset-top) - 28px)!important}
+.pwa-modal-sheet__container--reminder{width:min(1120px,calc(100vw - 36px))!important;height:calc(100% - env(safe-area-inset-top) - 28px)!important;max-height:calc(100% - env(safe-area-inset-top) - 28px)!important;background:transparent;border:0;box-shadow:none}
+.pwa-modal-sheet.is-keyboard-open .pwa-modal-sheet__container--reminder::after{content:"";position:absolute;right:0;bottom:0;left:0;height:var(--pwa-keyboard-inset,0px);background:var(--pwa-sheet-surface);pointer-events:none}
 .pwa-modal-sheet__container--settings{width:min(520px,calc(100vw - 36px))!important;max-height:calc(100% - env(safe-area-inset-top) - 28px)!important}
 .pwa-modal-sheet__content,.pwa-modal-sheet__scroller{height:100%;min-height:0;overflow:hidden!important}
 .pwa-modal-sheet__scroller{display:flex;flex-direction:column}
-.pwa-reminder-sheet-stage{position:relative;display:flex;flex:1;min-height:0;overflow:hidden;background:var(--pwa-sheet-surface)}
+.pwa-reminder-sheet-stage{position:relative;z-index:1;display:grid;width:100%;height:100%;flex:1;min-height:0;overflow:hidden;background:var(--pwa-sheet-surface);border:1px solid rgba(255,255,255,.07);border-bottom:0;border-radius:20px 20px 0 0;box-shadow:0 -1px 0 rgba(255,255,255,.025),0 -24px 70px rgba(0,0,0,.28);backface-visibility:hidden;will-change:transform}
+.pwa-reminder-sheet-screen{position:relative;grid-area:1/1;display:flex;width:100%;height:100%;min-width:0;min-height:0;visibility:hidden;opacity:0;pointer-events:none}
+.pwa-reminder-sheet-screen.is-active{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+.pwa-reminder-sheet-screen.is-focus-target{visibility:visible;z-index:0}
+.pwa-reminder-sheet-screen--picker>.pwa-picker-sheet{flex:1}
 .pwa-modal-sheet.is-keyboard-open .pwa-reminder-sheet-stage{height:calc(100% - var(--pwa-keyboard-inset,0px));flex:0 0 calc(100% - var(--pwa-keyboard-inset,0px))}
 .modal-card.pwa-reminder-editor{position:relative;z-index:1;display:flex;width:100%;height:100%;max-height:none;overflow:hidden;flex-direction:column;background:transparent;border:0;border-radius:0;padding:16px 44px calc(76px + env(safe-area-inset-bottom));box-shadow:none;animation:none}
 .pwa-reminder-editor .modal-form{gap:0;display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}

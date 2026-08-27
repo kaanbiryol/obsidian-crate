@@ -11,16 +11,15 @@ export interface ReminderSheetTransition {
 
 export interface ReminderSheetNavigationState {
 	activeScreen: ReminderSheetScreen;
-	phase: 'open' | 'closing-for-transition' | 'awaiting-reopen' | 'closed';
+	phase: 'open' | 'closing-for-transition' | 'opening-after-transition' | 'closed';
 	pendingTransition: ReminderSheetTransition | null;
 }
 
 export type ReminderSheetNavigationAction =
 	| { type: 'request-transition'; transition: ReminderSheetTransition; isClosing: boolean }
-	| { type: 'return-to-editor'; isClosing: boolean }
 	| { type: 'finish-transition' }
+	| { type: 'finish-opening' }
 	| { type: 'finish-external-close' }
-	| { type: 'reopen' }
 	| { type: 'reset' };
 
 export const INITIAL_REMINDER_SHEET_NAVIGATION_STATE: ReminderSheetNavigationState = {
@@ -37,25 +36,17 @@ export function reduceReminderSheetNavigation(
 		case 'request-transition':
 			if (action.isClosing || state.phase !== 'open' || state.pendingTransition) return state;
 			return { ...state, phase: 'closing-for-transition', pendingTransition: action.transition };
-		case 'return-to-editor':
-			if (
-				action.isClosing
-				|| state.phase !== 'open'
-				|| state.activeScreen === 'editor'
-				|| state.pendingTransition
-			) return state;
-			return INITIAL_REMINDER_SHEET_NAVIGATION_STATE;
 		case 'finish-transition':
 			if (state.phase !== 'closing-for-transition' || !state.pendingTransition) return state;
 			return {
 				activeScreen: state.pendingTransition.screen,
-				phase: 'awaiting-reopen',
+				phase: 'opening-after-transition',
 				pendingTransition: null,
 			};
+		case 'finish-opening':
+			return state.phase === 'opening-after-transition' ? { ...state, phase: 'open' } : state;
 		case 'finish-external-close':
 			return { ...state, phase: 'closed', pendingTransition: null };
-		case 'reopen':
-			return state.phase === 'awaiting-reopen' ? { ...state, phase: 'open' } : state;
 		case 'reset':
 			return INITIAL_REMINDER_SHEET_NAVIGATION_STATE;
 	}
@@ -67,6 +58,13 @@ export function getReminderSheetTransitionPatch(
 	return transition.screen === 'editor'
 		? { ...transition.patch, activePicker: null, deleteConfirm: false }
 		: { activePicker: transition.screen, deleteConfirm: false };
+}
+
+export function getImmediateEditorTransitionPatch(
+	activePicker: ModalPickerId,
+	patch: Partial<ModalDraft>,
+): Partial<ModalDraft> {
+	return { ...patch, activePicker, deleteConfirm: false };
 }
 
 export function useReminderSheetNavigation({
@@ -85,9 +83,9 @@ export function useReminderSheetNavigation({
 	onClosed: () => void;
 }) {
 	const [navigation, setNavigation] = useState(INITIAL_REMINDER_SHEET_NAVIGATION_STATE);
+	const [editorFocusRequest, setEditorFocusRequest] = useState(0);
 	const navigationRef = useRef(navigation);
 	const isClosingRef = useRef(isClosing);
-	const reopenFrameRef = useRef<number | null>(null);
 	isClosingRef.current = isClosing;
 
 	const applyAction = useCallback((action: ReminderSheetNavigationAction) => {
@@ -99,18 +97,10 @@ export function useReminderSheetNavigation({
 		return true;
 	}, []);
 
-	const cancelReopen = useCallback(() => {
-		if (reopenFrameRef.current === null) return;
-		window.cancelAnimationFrame(reopenFrameRef.current);
-		reopenFrameRef.current = null;
-	}, []);
-
-	useEffect(() => () => cancelReopen(), [cancelReopen]);
-
 	useEffect(() => {
-		cancelReopen();
 		applyAction({ type: 'reset' });
-	}, [applyAction, cancelReopen, mode, reminderId]);
+		setEditorFocusRequest(0);
+	}, [applyAction, mode, reminderId]);
 
 	const requestTransition = useCallback((transition: ReminderSheetTransition) => (
 		applyAction({ type: 'request-transition', transition, isClosing })
@@ -122,39 +112,53 @@ export function useReminderSheetNavigation({
 	}, [onBeforeOpenPicker, requestTransition]);
 
 	const returnToEditor = useCallback((patch: Partial<ModalDraft> = {}) => {
+		const activeScreen = navigationRef.current.activeScreen;
+		if (activeScreen === 'editor') return;
+
 		flushSync(() => {
-			if (!applyAction({ type: 'return-to-editor', isClosing: isClosingRef.current })) return;
-			onPatchDraft(getReminderSheetTransitionPatch({ screen: 'editor', patch }));
+			if (!applyAction({
+				type: 'request-transition',
+				transition: { screen: 'editor', patch },
+				isClosing: isClosingRef.current,
+			})) return;
+			onPatchDraft(getImmediateEditorTransitionPatch(activeScreen, patch));
+			setEditorFocusRequest((request) => request + 1);
 		});
 	}, [applyAction, onPatchDraft]);
 
-	const handleCloseEnd = useCallback(() => {
-		if (isClosingRef.current) {
-			cancelReopen();
-			applyAction({ type: 'finish-external-close' });
-			onClosed();
+	const handleStageAnimationComplete = useCallback(() => {
+		if (isClosingRef.current) return;
+
+		const current = navigationRef.current;
+		if (current.phase === 'opening-after-transition') {
+			applyAction({ type: 'finish-opening' });
 			return;
 		}
+		if (current.phase !== 'closing-for-transition' || !current.pendingTransition) return;
 
-		const transition = navigationRef.current.pendingTransition;
-		if (!transition) return;
-
+		const transition = current.pendingTransition;
 		flushSync(() => {
 			applyAction({ type: 'finish-transition' });
 			onPatchDraft(getReminderSheetTransitionPatch(transition));
 		});
-		reopenFrameRef.current = window.requestAnimationFrame(() => {
-			reopenFrameRef.current = null;
-			if (isClosingRef.current) return;
-			applyAction({ type: 'reopen' });
-		});
-	}, [applyAction, cancelReopen, onClosed, onPatchDraft]);
+	}, [applyAction, onPatchDraft]);
+
+	const handleCloseEnd = useCallback(() => {
+		if (!isClosingRef.current) return;
+		applyAction({ type: 'finish-external-close' });
+		onClosed();
+	}, [applyAction, onClosed]);
 
 	return {
 		activeScreen: navigation.activeScreen,
-		sheetOpen: navigation.phase === 'open',
+		canInteract: navigation.phase === 'open',
+		editorFocusRequest,
+		isReturningToEditor: navigation.phase === 'closing-for-transition'
+			&& navigation.pendingTransition?.screen === 'editor',
+		isStageClosing: navigation.phase === 'closing-for-transition',
 		openPicker,
 		returnToEditor,
+		handleStageAnimationComplete,
 		handleCloseEnd,
 	};
 }
