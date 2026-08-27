@@ -29,9 +29,14 @@ export function EmptyAuthState({ config }: { config: StoredConfig }) {
 	);
 }
 
-export function LoadingAuthState() {
+export function LoadingAuthState({ isExiting = false }: { isExiting?: boolean }) {
 	return (
-		<div className="auth-card auth-card--loading" role="status" aria-live="polite" aria-label="Loading reminders">
+		<div
+			className={`auth-card auth-card--loading${isExiting ? ' is-exiting' : ''}`}
+			role="status"
+			aria-live="polite"
+			aria-label="Loading reminders"
+		>
 			<div className="auth-loading__content">
 				<div className="auth-loading__mark-stage" aria-hidden="true">
 					<img src={brandMarkSrc} alt="" />

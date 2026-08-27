@@ -45,10 +45,11 @@ export function ReminderPickerSheet({
 		return (
 			<section ref={dialogRef} className="pwa-picker-sheet pwa-project-picker-sheet" role="dialog" aria-modal="true" aria-label="Select project" tabIndex={-1}>
 				<div className="pwa-picker-header pwa-project-picker-header">
-					<h3>Project</h3>
 					<Button isIconOnly className="pwa-picker-icon-button pwa-project-picker-close" type="button" aria-label="Close project selection" onClick={onClose}>
 						<X size={18} />
 					</Button>
+					<h3>Project</h3>
+					<span className="pwa-project-picker-header__spacer" aria-hidden="true" />
 				</div>
 				<div className="pwa-picker-content">
 					<div className="pwa-project-list ios-scroll" role="listbox" aria-label="Project selection">

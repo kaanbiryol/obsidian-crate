@@ -61,11 +61,12 @@
 .pwa-picker-option.is-danger{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.16);color:#ff8f8f}
 .pwa-project-option.is-active{background:rgba(var(--accent-rgb),.16);border-color:rgba(var(--accent-rgb),.38);color:var(--accent)}
 .pwa-project-option span{display:flex;align-items:center;gap:9px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pwa-project-picker-sheet{padding:0 0 calc(18px + env(safe-area-inset-bottom));background:#0f0f12}
+.pwa-picker-sheet.pwa-project-picker-sheet{padding:0 0 calc(18px + env(safe-area-inset-bottom));background:#0f0f12}
 .pwa-project-picker-sheet .pwa-picker-content{gap:0;padding:22px 18px 2px}
-.pwa-project-picker-header{display:flex;min-height:68px;align-items:center;justify-content:space-between;gap:18px;margin-bottom:0;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.055)}
+.pwa-project-picker-header{min-height:68px;margin-bottom:0;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.055)}
 .pwa-project-picker-header h3{margin:0;font-size:20px;font-weight:650;letter-spacing:-.025em}
-.pwa-project-picker-close{width:32px;height:32px;min-width:32px;border:0;border-radius:8px;background:transparent;color:var(--text-faint)}
+.pwa-project-picker-close,.pwa-project-picker-header__spacer{width:32px;height:32px;min-width:32px}
+.pwa-project-picker-close{border:0;border-radius:8px;background:transparent;color:var(--text-faint)}
 .pwa-project-picker-close:hover{background:rgba(255,255,255,.055);color:var(--text-normal)}
 .pwa-project-picker-close svg{width:18px;height:18px}
 .pwa-project-picker-sheet .pwa-project-list{flex:0 1 auto;gap:0;max-height:100%;overflow:hidden auto;padding-right:0;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.018)}

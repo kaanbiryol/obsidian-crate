@@ -249,12 +249,14 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("navigate: notification.navigate || ''");
 	});
 
-	it('uses the Crate mark in a dedicated native-style startup state', () => {
+	it('uses the Crate mark in a compact native-style startup state', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('.auth-card--loading{position:relative;isolation:isolate;');
-		expect(html).toContain('.auth-loading__mark-stage img{position:relative;width:112px;height:112px;');
+		expect(html).toContain('max-width:none;align-items:center;padding:calc(env(safe-area-inset-top) + 24px)');
+		expect(html).toContain('.auth-loading__mark-stage img{width:58px;height:58px;');
+		expect(html).toContain('.auth-card--loading h1{font-size:17px;');
 		expect(html).toContain('@keyframes auth-loading-progress');
+		expect(html).not.toContain('@keyframes auth-loading-glow');
 	});
 
 });

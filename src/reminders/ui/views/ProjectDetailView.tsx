@@ -99,19 +99,18 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   const cardRenderer = renderCard || defaultRenderCard;
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
-      {/* Ghost back button */}
-      <div>
+    <div className={`project-detail-shell flex flex-col h-full ${className}`}>
+      <div className="project-detail-toolbar">
         <ShadowDOMNativeButton
           onClick={onBack}
           className="premium-back-button"
+          aria-label="Back to projects"
         >
-          <ChevronLeft size={14} />
-          <span>Projects</span>
+          <ChevronLeft size={17} />
         </ShadowDOMNativeButton>
-      </div>
 
-      <ProjectDetailHeader project={project} header={header} />
+        <ProjectDetailHeader project={project} header={header} />
+      </div>
 
       {/* Content */}
       {!hasContent ? (
