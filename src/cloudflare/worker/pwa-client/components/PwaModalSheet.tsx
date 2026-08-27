@@ -112,6 +112,7 @@ export function PwaModalSheet({
 			avoidKeyboard={false}
 			unstyled
 			tweenConfig={isOpen ? OPEN_TWEEN : CLOSE_TWEEN}
+			style={isOpen ? { visibility: 'visible' } : undefined}
 			className={`pwa-modal-sheet pwa-modal-sheet--${variant}${keyboardInset > 0 ? ' is-keyboard-open' : ''}`}
 			onKeyDown={onKeyDown}
 		>

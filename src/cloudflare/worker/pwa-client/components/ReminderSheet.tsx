@@ -13,7 +13,6 @@ import {
 	X,
 } from 'lucide-react';
 import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/RichTextInput';
-import { moveCursorToEnd } from '@/reminders/utils/cursorPosition';
 import { ProjectAutocompleteDropdown } from '@/reminders/ui/reminder-modal/ProjectAutocompleteDropdown';
 import { useProjectAutocomplete } from '@/reminders/ui/reminder-modal/useProjectAutocomplete';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
@@ -63,7 +62,6 @@ export function ReminderSheet({
 	const editorCardRef = useRef<HTMLDivElement | null>(null);
 	const pendingTransitionRef = useRef<PendingSheetTransition | null>(null);
 	const reopenFrameRef = useRef<number | null>(null);
-	const hasFocusedTitleRef = useRef(false);
 	const [activeScreen, setActiveScreen] = useState<ReminderSheetScreen>('editor');
 	const [sheetOpen, setSheetOpen] = useState(true);
 	const closedViewportHeightRef = useRef(typeof window === 'undefined'
@@ -83,19 +81,6 @@ export function ReminderSheet({
 		richTextInputRef.current?.getElement()?.blur();
 		descriptionRef.current?.blur();
 	}, []);
-	const handleTitleFocus = useCallback(() => {
-		if (hasFocusedTitleRef.current) return;
-		hasFocusedTitleRef.current = true;
-		window.requestAnimationFrame(() => {
-			const element = richTextInputRef.current?.getElement() ?? null;
-			if (!element?.isConnected) return;
-			const root = element.getRootNode();
-			const activeElement = root instanceof ShadowRoot
-				? root.activeElement
-				: element.ownerDocument.activeElement;
-			if (activeElement === element) moveCursorToEnd(element);
-		});
-	}, []);
 	useEffect(() => () => {
 		if (reopenFrameRef.current !== null) window.cancelAnimationFrame(reopenFrameRef.current);
 	}, []);
@@ -104,7 +89,6 @@ export function ReminderSheet({
 		pendingTransitionRef.current = null;
 		setActiveScreen('editor');
 		setSheetOpen(true);
-		hasFocusedTitleRef.current = false;
 		if (reopenFrameRef.current !== null) {
 			window.cancelAnimationFrame(reopenFrameRef.current);
 			reopenFrameRef.current = null;
@@ -286,10 +270,10 @@ export function ReminderSheet({
 								inputRef={contentRef}
 								preserveSelection
 								syncContentBeforePaint
+								autoFocus={!saving && !isClosing}
 								knownProjects={projectOptions}
 								onAutocompleteQuery={autocomplete.updateAutocomplete}
 								onAutocompleteKeyDown={autocomplete.handleKeyDown}
-								onFocus={handleTitleFocus}
 								className="pwa-editor-title-input pwa-editor-title-rich-input ios-scroll"
 							/>
 							{!saving && autocomplete.isOpen && (
