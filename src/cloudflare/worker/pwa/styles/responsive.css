@@ -23,7 +23,7 @@
 	.bottom-tabs{left:50%;transform:translateX(-50%);width:min(640px,100vw)}
 	.fab{right:18px}
 	.toast{left:50%;right:auto;transform:translateX(-50%);width:min(420px,calc(100vw - 24px))}
-	.pwa-modal-sheet__container--settings{width:min(640px,calc(100vw - 80px))!important}
+	.pwa-modal-sheet__container--settings{width:min(520px,calc(100vw - 80px))!important}
 }
 @media (max-width: 640px){
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{width:100vw!important;border-right:0;border-left:0}
@@ -70,21 +70,13 @@
 	.delete-confirm__actions{width:100%;display:grid;grid-template-columns:1fr 1fr}
 	.modal-actions{flex-direction:column-reverse;align-items:stretch}
 	.modal-actions__primary{display:grid;grid-template-columns:1fr 1fr}
-	.settings-sheet__header{padding:18px 16px 16px}
-	.settings-sheet__header h2{font-size:26px}
-	.settings-panel{gap:17px;padding:14px 12px 16px}
-	.settings-feature-row{padding:13px 12px}
-	.settings-feature-row__icon{width:38px;height:38px;min-width:38px}
-	.settings-action-button{min-width:70px;padding:0 10px}
-	.settings-feature-row--install{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:start}
-	.settings-feature-row--install .settings-status-badge{grid-column:2;justify-self:start}
-	.settings-sheet__footer{padding-right:12px;padding-left:12px}
-	.pwa-picker-sheet.pwa-date-picker-sheet{padding-right:14px;padding-left:14px}
+	.settings-sheet__header{padding-right:16px;padding-left:16px}
+	.settings-panel{padding-right:14px;padding-left:14px}
+	.settings-row{padding-right:13px;padding-left:13px}
 	.pwa-picker-sheet.pwa-repeat-picker-sheet{padding-right:14px;padding-left:14px}
-	.pwa-schedule-content{gap:18px}
+	.pwa-schedule-header{padding-right:16px;padding-left:16px}
+	.pwa-schedule-content{padding-right:14px;padding-left:14px}
 	.pwa-repeat-content{gap:18px}
-	.pwa-schedule-preset{min-height:72px;padding:9px}
-	.pwa-schedule-field{padding-right:11px;padding-left:11px}
 	.pwa-repeat-control-card,.pwa-repeat-time-card{padding-right:11px;padding-left:11px}
 	.pwa-repeat-days{gap:4px;padding:8px}
 }
@@ -98,7 +90,6 @@
 	.card-title{font-size:13.5px}
 	.bottom-tabs{padding-left:6px;padding-right:6px}
 	.fab{width:46px;height:46px;min-width:46px;right:10px;bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px)}
-	.settings-list__value{max-width:40%}
 }
 @media (max-width: 420px){
 	.pwa-reminders-view .view-header{padding:calc(env(safe-area-inset-top) + 17px) 18px 11px!important}

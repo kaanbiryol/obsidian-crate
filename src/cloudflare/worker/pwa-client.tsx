@@ -370,7 +370,6 @@ function App() {
 						onClose={settingsTransition.requestClose}
 						onClosed={settingsTransition.finishClose}
 						onEnablePush={enablePushNotifications}
-						onRefresh={() => void loadReminders()}
 						onLogout={() => void logOut()}
 					/>
 				)}

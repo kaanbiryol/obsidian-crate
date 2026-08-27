@@ -1,15 +1,7 @@
 import React from 'react';
 import { Button } from '@heroui/react';
 import {
-	CalendarClock,
-	CalendarDays,
-	CalendarPlus,
-	CalendarRange,
 	Check,
-	Clock3,
-	MoonStar,
-	Sun,
-	Sunrise,
 	X,
 } from 'lucide-react';
 import { formatLocalDateKey } from '@/reminders/utils/reminderDate';
@@ -23,10 +15,10 @@ import type { ModalDraft } from '../types';
 type DatePreset = 'today' | 'tomorrow' | 'evening' | 'next-week';
 
 const DATE_PRESETS = [
-	{ preset: 'today', label: 'Today', Icon: Sun },
-	{ preset: 'tomorrow', label: 'Tomorrow', Icon: Sunrise },
-	{ preset: 'evening', label: 'This evening', Icon: MoonStar },
-	{ preset: 'next-week', label: 'Next week', Icon: CalendarRange },
+	{ preset: 'today', label: 'Today' },
+	{ preset: 'tomorrow', label: 'Tomorrow' },
+	{ preset: 'evening', label: 'This evening' },
+	{ preset: 'next-week', label: 'Next week' },
 ] as const;
 
 function dateForPreset(preset: DatePreset, now: Date): Date {
@@ -80,36 +72,28 @@ export function ReminderDatePicker({
 		<section ref={dialogRef} className="pwa-picker-sheet pwa-date-picker-sheet" role="dialog" aria-modal="true" aria-label="Schedule reminder" tabIndex={-1}>
 			<div className="pwa-picker-header pwa-schedule-header">
 				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Close schedule" onClick={onClose}>
-					<X size={20} />
+					<X size={18} />
 				</Button>
-				<div className="pwa-schedule-header__title">
-					<span>Reminder</span>
-					<h3>Schedule</h3>
-				</div>
-				<Button isIconOnly className="pwa-picker-icon-button pwa-picker-icon-button--done" type="button" aria-label="Done" onClick={onClose}>
-					<Check size={20} />
+				<h3>Schedule</h3>
+				<Button className="pwa-schedule-done" type="button" onClick={onClose}>
+					Done
 				</Button>
 			</div>
 
 			<div className="pwa-picker-content pwa-schedule-content">
-				<div className={`pwa-schedule-summary${hasSchedule ? ' is-scheduled' : ''}`}>
-					<div className="pwa-schedule-summary__icon" aria-hidden="true">
-						{hasSchedule ? <CalendarClock size={22} /> : <CalendarPlus size={22} />}
+				{hasSchedule && (
+					<div className="pwa-schedule-current" aria-live="polite">
+						<span>Scheduled</span>
+						<strong>{formatModalDueSummary(draft)}</strong>
 					</div>
-					<div className="pwa-schedule-summary__copy">
-						<span>{hasSchedule ? 'Scheduled for' : 'No schedule'}</span>
-						<strong>{hasSchedule ? formatModalDueSummary(draft) : 'Choose when to be reminded'}</strong>
-					</div>
-					{hasSchedule && <Check className="pwa-schedule-summary__check" size={18} aria-hidden="true" />}
-				</div>
+				)}
 
 				<section className="pwa-schedule-section" aria-labelledby="quick-schedule-title">
 					<div className="pwa-schedule-section__heading">
-						<h4 id="quick-schedule-title">Quick schedule</h4>
-						<span>One tap</span>
+						<h4 id="quick-schedule-title">Quick options</h4>
 					</div>
 					<div className="pwa-schedule-preset-grid">
-						{DATE_PRESETS.map(({ preset, label, Icon }) => {
+						{DATE_PRESETS.map(({ preset, label }) => {
 							const presetDate = dateForPreset(preset, now);
 							const detail = preset === 'evening'
 								? `${weekdayFormatter.format(presetDate)}, ${timeFormatter.format(presetDate)}`
@@ -125,7 +109,6 @@ export function ReminderDatePicker({
 									data-preset={preset}
 									onClick={() => onSelect(applyDatePresetToDraft(draft, projectOptions, preset))}
 								>
-									<span className="pwa-schedule-preset__icon" aria-hidden="true"><Icon size={18} /></span>
 									<span className="pwa-schedule-preset__copy"><strong>{label}</strong><small>{detail}</small></span>
 									{selected && <Check className="pwa-schedule-preset__check" size={15} aria-hidden="true" />}
 								</Button>
@@ -137,12 +120,10 @@ export function ReminderDatePicker({
 				<section className="pwa-schedule-section" aria-labelledby="custom-schedule-title">
 					<div className="pwa-schedule-section__heading">
 						<h4 id="custom-schedule-title">Custom</h4>
-						<span>Date and time</span>
 					</div>
 					<div className="pwa-schedule-fields">
 						<label className="pwa-schedule-field">
-							<span className="pwa-schedule-field__icon" aria-hidden="true"><CalendarDays size={18} /></span>
-							<span className="pwa-schedule-field__copy"><strong>Date</strong><small>Required</small></span>
+							<span className="pwa-schedule-field__copy"><strong>Date</strong></span>
 							<input
 								data-draft-field="dueDate"
 								type="date"
@@ -151,8 +132,7 @@ export function ReminderDatePicker({
 							/>
 						</label>
 						<label className="pwa-schedule-field">
-							<span className="pwa-schedule-field__icon" aria-hidden="true"><Clock3 size={18} /></span>
-							<span className="pwa-schedule-field__copy"><strong>Time</strong><small>Optional</small></span>
+							<span className="pwa-schedule-field__copy"><strong>Time <small>Optional</small></strong></span>
 							<input
 								data-draft-field="dueTime"
 								type="time"
@@ -171,7 +151,7 @@ export function ReminderDatePicker({
 						data-preset="clear"
 						onClick={() => onSelect(applyDatePresetToDraft(draft, projectOptions, 'clear'))}
 					>
-						<X size={16} /> Clear schedule
+						<X size={15} /> Remove schedule
 					</Button>
 				)}
 			</div>

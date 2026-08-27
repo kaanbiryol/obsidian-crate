@@ -98,7 +98,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:40px;height:40px;min-width:40px;border-radius:50%;');
 		expect(html).toContain('.pwa-editor-icon-button{width:40px;height:40px;min-width:40px;border-radius:50%;');
 		expect(html).toContain('.pwa-picker-icon-button{width:40px;height:40px;min-width:40px;border-radius:50%;');
-		expect(html).toContain('.settings-sheet__close{width:40px;height:40px;min-width:40px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.075);border-radius:50%;');
+		expect(html).toContain('.settings-sheet__close{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border:0;border-radius:8px;');
 		expect(html).toContain('.pwa-editor-icon-button--save{background:linear-gradient(145deg,#9b75f7,#7c4ce5);');
 		expect(html).not.toContain('--interactive-accent:#a78bfa');
 		expect(html).not.toContain('--accent:#9b7cff');
@@ -165,8 +165,8 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('.pwa-modal-sheet.is-keyboard-open .pwa-modal-sheet__container--reminder{bottom:');
 		expect(html).toContain('.pwa-modal-sheet__content,.pwa-modal-sheet__scroller{height:100%;min-height:0;overflow:hidden!important}');
 		expect(html).toContain('.pwa-picker-sheet{position:relative;z-index:1;display:flex;width:100%;height:100%;');
-		expect(html).toContain('.pwa-schedule-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}');
-		expect(html).toContain('.pwa-schedule-fields{overflow:hidden;border:1px solid rgba(255,255,255,.07);border-radius:18px;');
+		expect(html).toContain('.pwa-schedule-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:hidden;');
+		expect(html).toContain('.pwa-schedule-fields{overflow:hidden;border:1px solid rgba(255,255,255,.07);border-radius:12px;');
 		expect(html).toContain('.pwa-repeat-frequency-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}');
 		expect(html).toContain('.pwa-repeat-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;');
 		expect(html).not.toContain('@keyframes pwa-nested-sheet-in');
