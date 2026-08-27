@@ -24,4 +24,16 @@ describe('RichTextInput', () => {
 
         expect(markup).toContain('Check this article');
     });
+
+    it('renders initial content before handling autofocus', () => {
+        const markup = renderToStaticMarkup(React.createElement(RichTextInput, {
+            value: 'Edit this reminder',
+            onChange: vi.fn(),
+            ariaLabel: 'Reminder title',
+            autoFocus: true,
+        }));
+
+        expect(markup).toContain('Edit this reminder');
+        expect(markup).not.toContain('autofocus');
+    });
 });

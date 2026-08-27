@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { buildHTML, getPlainText } from '../utils/richTextParsing';
-import { saveCursorPosition, restoreCursorPosition, moveCursorToEnd } from '../utils/cursorPosition';
+import { saveCursorPosition, restoreCursorPosition } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
 import {
     focusRichTextElement,
@@ -76,7 +76,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const restoreRequestIdRef = useRef(0);
     const initialHtmlRef = useRef<{ html: string } | null>(null);
 
-    if (syncContentBeforePaint && !initialHtmlRef.current) {
+    if ((syncContentBeforePaint || autoFocus) && !initialHtmlRef.current) {
         initialHtmlRef.current = { html: buildHTML(value, knownProjects) || '' };
     }
 
@@ -91,19 +91,9 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             editableRef.current = el;
         }
 
-        if (!el || !autoFocus) return;
-        const focusAttachedEditor = () => {
-            if (!el.isConnected) return;
-            const root = el.getRootNode();
-            const activeElement = root instanceof ShadowRoot
-                ? root.activeElement
-                : el.ownerDocument.activeElement;
-            if (activeElement !== el) el.focus({ preventScroll: true });
-            moveCursorToEnd(el);
-            hasInitializedRef.current = true;
-        };
-        queueMicrotask(focusAttachedEditor);
-        requestAnimationFrame(focusAttachedEditor);
+        if (!el || !autoFocus || hasInitializedRef.current) return;
+        hasInitializedRef.current = true;
+        focusRichTextElement(el);
     }, [autoFocus, inputRef]);
 
     // Expose methods to parent via ref
@@ -214,17 +204,6 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
         renderRichText(actualRef.current, normalizedHtml);
 
-        // If autoFocus is enabled and this is initial content, move cursor to end
-        if (autoFocus && !hasInitializedRef.current && value) {
-            hasInitializedRef.current = true;
-            requestAnimationFrame(() => {
-                if (actualRef.current) {
-                    moveCursorToEnd(actualRef.current);
-                }
-            });
-            return;
-        }
-
         if (pendingCursorRef.current !== null) {
             const pendingPos = pendingCursorRef.current;
             const pendingScrollTop = pendingScrollTopRef.current;
@@ -238,7 +217,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         } else if (shouldPreserveCursor) {
             scheduleSelectionRestore(cursorPos);
         }
-    }, [actualRef, autoFocus, knownProjects, preserveSelection, scheduleSelectionRestore, value]);
+    }, [actualRef, knownProjects, preserveSelection, scheduleSelectionRestore, value]);
 
     // Keep the plugin's existing passive update behavior. The standalone PWA opts
     // into a pre-paint sync to avoid showing the previous reminder for one frame.
@@ -280,7 +259,6 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 aria-multiline="true"
                 aria-readonly={readOnly}
                 inputMode="text"
-                autoFocus={autoFocus}
                 onInput={handleInput}
                 onClick={handleClick}
                 onKeyDown={handleKeyDownInternal}

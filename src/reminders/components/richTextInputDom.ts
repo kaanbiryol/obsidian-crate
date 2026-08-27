@@ -76,23 +76,9 @@ export function selectElementContents(element: HTMLElement): void {
 export function focusRichTextElement(element: HTMLDivElement, options: RichTextFocusOptions = {}): void {
   element.focus({ preventScroll: true });
   if (options.select) {
-    requestAnimationFrame(() => {
-      selectElementContents(element);
-    });
+    selectElementContents(element);
     return;
   }
 
-  const moveActiveCursorToEnd = () => {
-    if (document.activeElement !== element) {
-      return;
-    }
-
-    moveCursorToEnd(element);
-  };
-
-  moveActiveCursorToEnd();
-  requestAnimationFrame(moveActiveCursorToEnd);
-  for (const delay of [50, 140, 320, 650]) {
-    window.setTimeout(moveActiveCursorToEnd, delay);
-  }
+  moveCursorToEnd(element);
 }

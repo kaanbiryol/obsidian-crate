@@ -16,7 +16,6 @@ interface AddReminderModalBodyProps {
     projects: string[];
     textareaRef: React.RefObject<HTMLDivElement | null>;
     richTextInputRef: React.RefObject<RichTextInputHandle | null>;
-    onTouchEnd: () => void;
     dueDate: string | null;
     hasTime?: boolean;
     project: string;
@@ -44,7 +43,6 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     projects,
     textareaRef,
     richTextInputRef,
-    onTouchEnd,
     dueDate,
     hasTime,
     project,
@@ -60,7 +58,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     onTogglePriority,
 }) => {
     return (
-        <div className="px-5 pt-3 pb-3" onTouchEnd={onTouchEnd}>
+        <div className="px-5 pt-3 pb-3">
             <ReminderEditorFields
                 isEditing={isEditing}
                 content={content}

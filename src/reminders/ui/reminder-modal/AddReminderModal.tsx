@@ -133,12 +133,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     // Detect dark mode for input/dropdown styling
     const isDark = document.body.classList.contains('theme-dark');
 
-    // Handle touch on modal content to focus input (required for iOS keyboard)
-    // iOS only opens keyboard on direct user gesture, so first tap in modal opens it
-    const handleModalContentTouch = useCallback(() => {
-        richTextInputRef.current?.focus();
-    }, []);
-
     const handlePriorityToggle = useCallback(() => {
         togglePriority(() => {
             if (textareaRef.current) {
@@ -202,7 +196,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 onSubmit={() => {
                     void handleSubmit();
                 }}
-                onTouchEnd={handleModalContentTouch}
             />
             <AddReminderModalBody
                 isEditing={isEditing}
@@ -216,7 +209,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 projects={projects}
                 textareaRef={textareaRef}
                 richTextInputRef={richTextInputRef}
-                onTouchEnd={handleModalContentTouch}
                 dueDate={dueDate}
                 hasTime={hasTime}
                 project={project}

@@ -9,7 +9,6 @@ interface AddReminderModalHeaderProps {
     onDelete: () => void;
     onClose: () => void;
     onSubmit: () => void;
-    onTouchEnd?: () => void;
 }
 
 export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
@@ -17,13 +16,9 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
     canSubmit,
     onDelete,
     onClose,
-    onSubmit,
-    onTouchEnd
+    onSubmit
 }) => (
-    <div
-        className="flex justify-between items-center px-5 pt-3 pb-4"
-        onTouchEnd={onTouchEnd}
-    >
+    <div className="flex justify-between items-center px-5 pt-3 pb-4">
         {/* Left side - Delete (when editing) or Cancel */}
         <div className="w-16">
             {isEditing ? (
