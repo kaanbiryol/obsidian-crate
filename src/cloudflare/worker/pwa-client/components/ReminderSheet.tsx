@@ -54,6 +54,8 @@ export function ReminderSheet({
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 	const editorCardRef = useRef<HTMLDivElement | null>(null);
 	const keyboardDoneTimerRef = useRef<number | null>(null);
+	const titleFocusFrameRef = useRef<number | null>(null);
+	const lastFocusedEditorFieldRef = useRef<'title' | 'description' | null>(null);
 	const lastPagePointerAtRef = useRef(Number.NEGATIVE_INFINITY);
 	const suppressKeyboardDoneSaveRef = useRef(false);
 	const keyboardInset = useKeyboardHeight();
@@ -126,6 +128,9 @@ export function ReminderSheet({
 		if (keyboardDoneTimerRef.current !== null) {
 			window.clearTimeout(keyboardDoneTimerRef.current);
 		}
+		if (titleFocusFrameRef.current !== null) {
+			window.cancelAnimationFrame(titleFocusFrameRef.current);
+		}
 	}, []);
 
 	const handleEditorFieldFocus = useCallback(() => {
@@ -134,6 +139,26 @@ export function ReminderSheet({
 			keyboardDoneTimerRef.current = null;
 		}
 	}, []);
+	const handleTitleFocus = useCallback(() => {
+		handleEditorFieldFocus();
+		const shouldMoveToEnd = lastFocusedEditorFieldRef.current === 'description';
+		lastFocusedEditorFieldRef.current = 'title';
+		if (!shouldMoveToEnd) return;
+
+		if (titleFocusFrameRef.current !== null) {
+			window.cancelAnimationFrame(titleFocusFrameRef.current);
+		}
+		titleFocusFrameRef.current = window.requestAnimationFrame(() => {
+			titleFocusFrameRef.current = null;
+			const titleElement = richTextInputRef.current?.getElement();
+			if (!titleElement?.matches(':focus')) return;
+			richTextInputRef.current?.focus();
+		});
+	}, [handleEditorFieldFocus]);
+	const handleDescriptionFocus = useCallback(() => {
+		handleEditorFieldFocus();
+		lastFocusedEditorFieldRef.current = 'description';
+	}, [handleEditorFieldFocus]);
 
 	const handleEditorFieldBlur = useCallback((event: React.FocusEvent<HTMLElement>) => {
 		const relatedTargetWasNull = event.relatedTarget === null;
@@ -280,7 +305,7 @@ export function ReminderSheet({
 								autoComplete="off"
 								autoCorrect="off"
 								spellCheck={false}
-								onFocus={handleEditorFieldFocus}
+								onFocus={handleTitleFocus}
 								onBlur={handleEditorFieldBlur}
 								focusRequestKey={editorFocusRequest}
 								knownProjects={projectOptions}
@@ -310,7 +335,7 @@ export function ReminderSheet({
 								spellCheck={false}
 								value={draft.description}
 								disabled={saving || !editorInteractive}
-								onFocus={handleEditorFieldFocus}
+								onFocus={handleDescriptionFocus}
 								onBlur={handleEditorFieldBlur}
 								onChange={(event) => patchDraft({ description: event.currentTarget.value })}
 							/>
