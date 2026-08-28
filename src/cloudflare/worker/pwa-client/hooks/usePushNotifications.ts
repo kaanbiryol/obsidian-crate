@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { detectDeviceName, isIosOrIpados, isStandaloneApp } from '../config';
-import { registerPwaServiceWorker, urlBase64ToUint8Array } from '../api';
+import { getPwaPushManager, urlBase64ToUint8Array } from '../api';
 import type { PushState, ToastKind } from '../types';
 
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
@@ -21,12 +21,6 @@ export function usePushNotifications({
 
 	const refreshPushState = useCallback(async () => {
 		const standalone = isStandaloneApp();
-		const supported = 'serviceWorker' in navigator && 'PushManager' in window;
-		if (!supported) {
-			setPush({ supported: false, subscribed: false, status: 'Push notifications are not supported in this browser.' });
-			return;
-		}
-
 		if (!standalone && isIosOrIpados()) {
 			setPush({
 				supported: true,
@@ -36,28 +30,32 @@ export function usePushNotifications({
 			return;
 		}
 
-		const registration = await registerPwaServiceWorker();
-		if (!registration) {
-			setPush({ supported: false, subscribed: false, status: 'Push notifications are not supported in this browser.' });
-			return;
+		try {
+			const pushManager = await getPwaPushManager();
+			if (!pushManager) {
+				setPush({ supported: false, subscribed: false, status: 'Push notifications are not supported in this browser.' });
+				return;
+			}
+			const subscription = await pushManager.getSubscription();
+			setPush({
+				supported: true,
+				subscribed: !!subscription,
+				status: subscription ? 'Notifications enabled on this device.' : null,
+			});
+		} catch (pushError) {
+			const message = pushError instanceof Error ? pushError.message : String(pushError);
+			setPush({ supported: false, subscribed: false, status: `Notification setup failed: ${message}` });
 		}
-		const subscription = await registration.pushManager.getSubscription();
-		setPush({
-			supported: true,
-			subscribed: !!subscription,
-			status: subscription ? 'Notifications enabled on this device.' : null,
-		});
 	}, []);
 
 	const enablePushNotifications = useCallback(async () => {
 		try {
-			if (!push.supported) throw new Error('Push is not supported on this device.');
-			const registration = await registerPwaServiceWorker();
-			if (!registration) throw new Error('Push is not supported on this device.');
+			const pushManager = await getPwaPushManager();
+			if (!pushManager) throw new Error('Push is not supported on this device.');
 			const keyResponse = await fetch('/notifications/vapid-public-key');
 			const { publicKey } = await keyResponse.json() as { publicKey?: string };
 			if (!publicKey) throw new Error('Missing VAPID public key');
-			const subscription = await registration.pushManager.subscribe({
+			const subscription = await pushManager.subscribe({
 				userVisibleOnly: true,
 				applicationServerKey: urlBase64ToUint8Array(publicKey),
 			});
@@ -78,12 +76,11 @@ export function usePushNotifications({
 			setPush((current) => ({ ...current, status: message }));
 			showToast('error', message);
 		}
-	}, [apiFetch, push.supported, showToast]);
+	}, [apiFetch, showToast]);
 
 	const disablePushNotifications = useCallback(async () => {
-		if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-		const registration = await navigator.serviceWorker.getRegistration();
-		const subscription = await registration?.pushManager.getSubscription();
+		const pushManager = await getPwaPushManager();
+		const subscription = await pushManager?.getSubscription();
 		if (!subscription) return;
 
 		const response = await apiFetch('/notifications/subscribe', {

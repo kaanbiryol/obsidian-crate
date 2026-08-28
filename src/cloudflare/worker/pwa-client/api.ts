@@ -95,6 +95,29 @@ export async function registerPwaServiceWorker(): Promise<ServiceWorkerRegistrat
 	});
 }
 
+type WindowWithPushManager = Window & {
+	readonly pushManager?: PushManager;
+};
+
+interface PwaPushManagerOptions {
+	windowPushManager?: PushManager | null;
+	registerServiceWorker?: () => Promise<ServiceWorkerRegistration | null>;
+}
+
+function getWindowPushManager(): PushManager | null {
+	if (typeof window === 'undefined') return null;
+	return (window as WindowWithPushManager).pushManager ?? null;
+}
+
+export async function getPwaPushManager({
+	windowPushManager = getWindowPushManager(),
+	registerServiceWorker = registerPwaServiceWorker,
+}: PwaPushManagerOptions = {}): Promise<PushManager | null> {
+	if (windowPushManager) return windowPushManager;
+	const registration = await registerServiceWorker();
+	return registration?.pushManager ?? null;
+}
+
 export function urlBase64ToUint8Array(base64String: string): Uint8Array {
 	const padding = '='.repeat((4 - base64String.length % 4) % 4);
 	const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
