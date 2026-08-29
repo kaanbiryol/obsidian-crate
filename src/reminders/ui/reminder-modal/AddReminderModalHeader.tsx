@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUp, Check, Trash2, X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 
 import { ShadowDOMButton } from '../../components/ShadowDOMButton';
 
@@ -28,9 +28,10 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                     color="danger"
                     variant="light"
                     onPress={onDelete}
-                    className="reminder-header-delete min-w-9 w-9 h-9 rounded-xl"
+                    aria-label="Delete reminder"
+                    className="reminder-header-delete min-w-8 w-8 h-8 rounded-full"
                 >
-                    <Trash2 size={18} strokeWidth={2} />
+                    <Trash2 size={16} strokeWidth={2} />
                 </ShadowDOMButton>
             ) : (
                 <ShadowDOMButton
@@ -38,9 +39,10 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                     size="sm"
                     variant="light"
                     onPress={onClose}
-                    className="reminder-header-close min-w-9 w-9 h-9 rounded-xl"
+                    aria-label="Close reminder editor"
+                    className="reminder-header-close min-w-8 w-8 h-8 rounded-full"
                 >
-                    <X size={20} strokeWidth={2} />
+                    <X size={18} strokeWidth={2} />
                 </ShadowDOMButton>
             )}
         </div>
@@ -48,21 +50,22 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
         {/* Title (center) - Refined typography */}
         <div className="flex-1 text-center">
             <span className="reminder-header-title">
-                {isEditing ? 'Edit Reminder' : 'New Reminder'}
+                {isEditing ? 'Edit reminder' : 'New reminder'}
             </span>
         </div>
 
-        {/* Right side - Send button with subtle shadow (no glow) */}
+        {/* Right side - explicit text keeps the primary action unambiguous */}
         <div className="w-16 flex justify-end">
             <ShadowDOMButton
-                isIconOnly
                 size="sm"
-                color="primary"
-                onPress={canSubmit ? onSubmit : () => {}}
-                className={`reminder-header-submit w-9 h-9 min-w-9 rounded-xl${canSubmit ? ' is-enabled' : ''}`}
+                variant="light"
+                onPress={onSubmit}
+                isDisabled={!canSubmit}
+                aria-label={isEditing ? 'Save reminder' : 'Add reminder'}
+                className={`reminder-header-submit h-9 min-w-0 rounded-lg${canSubmit ? ' is-enabled' : ''}`}
                 disableAnimation={!canSubmit}
             >
-                {isEditing ? <Check size={18} strokeWidth={2.5} /> : <ArrowUp size={18} strokeWidth={2.5} />}
+                {isEditing ? 'Save' : 'Add'}
             </ShadowDOMButton>
         </div>
     </div>

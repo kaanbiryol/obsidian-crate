@@ -14,7 +14,7 @@ function makeReminder(content: string): Reminder {
 describe("buildDeleteConfirmationMessage", () => {
   it("keeps short reminder content intact", () => {
     expect(buildDeleteConfirmationMessage(makeReminder("Buy milk"))).toBe(
-      'Are you sure you want to delete "Buy milk"? This action cannot be undone.',
+      'Delete "Buy milk"? This can\'t be undone.',
     );
   });
 
@@ -24,7 +24,7 @@ describe("buildDeleteConfirmationMessage", () => {
         makeReminder("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"),
       ),
     ).toBe(
-      'Are you sure you want to delete "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX..."? This action cannot be undone.',
+      'Delete "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX..."? This can\'t be undone.',
     );
   });
 });

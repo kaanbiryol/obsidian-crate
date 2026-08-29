@@ -69,8 +69,8 @@ export function findReminderLineNumber(lines: string[], reminder: ReminderLineRe
 		return reminder.lineNumber;
 	}
 
-	for (let index = 0; index < lines.length; index++) {
-		if (extractReminderId(lines[index]) === reminder.id) {
+	for (const [index, line] of lines.entries()) {
+		if (extractReminderId(line) === reminder.id) {
 			return index;
 		}
 	}
@@ -82,17 +82,17 @@ export function findReminderLineNumber(lines: string[], reminder: ReminderLineRe
 		}
 	}
 	if (exactMatches.length === 1) {
-		return exactMatches[0];
+		return exactMatches[0] ?? -1;
 	}
 
 	const semanticMatches: number[] = [];
-	for (let index = 0; index < lines.length; index++) {
-		if (lineMatchesReminder(lines[index], reminder)) {
+	for (const [index, line] of lines.entries()) {
+		if (lineMatchesReminder(line, reminder)) {
 			semanticMatches.push(index);
 		}
 	}
 	if (semanticMatches.length === 1) {
-		return semanticMatches[0];
+		return semanticMatches[0] ?? -1;
 	}
 
 	return -1;
@@ -113,10 +113,11 @@ function countDescriptionBlockLines(
 	checkboxLineNumber: number,
 ): number {
 	const nextIndex = checkboxLineNumber + 1;
-	if (nextIndex >= lines.length || !lines[nextIndex].startsWith("<!-- crate-desc:")) return 0;
+	const nextLine = lines[nextIndex];
+	if (!nextLine?.startsWith("<!-- crate-desc:")) return 0;
 
 	for (let index = nextIndex; index < lines.length; index++) {
-		if (lines[index].includes("-->")) return index - nextIndex + 1;
+		if (lines[index]?.includes("-->")) return index - nextIndex + 1;
 	}
 
 	return 0;
@@ -190,28 +191,31 @@ export function reorderReminderBlocksInContent(fileContent: string, orderedIds: 
 	let nonBlockAccum: string[] = [];
 
 	while (index < lines.length) {
-		const parsed = parseCheckboxLine(lines[index]);
+		const line = lines[index];
+		if (line === undefined) break;
+		const parsed = parseCheckboxLine(line);
 		if (parsed) {
 			if (nonBlockAccum.length > 0) {
 				segments.push({ isBlock: false, lines: [...nonBlockAccum] });
 				nonBlockAccum = [];
 			}
 
-			const blockLines = [lines[index]];
+			const blockLines = [line];
 			const descCount = countDescriptionBlockLines(lines, index);
 			for (let descIndex = 1; descIndex <= descCount; descIndex++) {
-				blockLines.push(lines[index + descIndex]);
+				const descriptionLine = lines[index + descIndex];
+				if (descriptionLine !== undefined) blockLines.push(descriptionLine);
 			}
 
 			segments.push({
 				isBlock: true,
 				lines: blockLines,
-				id: extractReminderId(lines[index]),
+				id: extractReminderId(line),
 				isCompleted: parsed.isCompleted,
 			});
 			index += 1 + descCount;
 		} else {
-			nonBlockAccum.push(lines[index]);
+			nonBlockAccum.push(line);
 			index++;
 		}
 	}
@@ -247,8 +251,9 @@ export function reorderReminderBlocksInContent(fileContent: string, orderedIds: 
 	const result: string[] = [];
 	for (const segment of segments) {
 		if (segment.isBlock) {
-			if (blockIndex < reorderedBlocks.length) {
-				result.push(...reorderedBlocks[blockIndex].lines);
+			const reorderedBlock = reorderedBlocks[blockIndex];
+			if (reorderedBlock) {
+				result.push(...reorderedBlock.lines);
 				blockIndex++;
 			}
 		} else {

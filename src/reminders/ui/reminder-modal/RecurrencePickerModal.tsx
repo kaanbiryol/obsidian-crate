@@ -76,6 +76,11 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
         onClose();
     };
 
+    const handleRemoveRepeat = () => {
+        onApply(undefined);
+        onClose();
+    };
+
     const toggleDay = (dayIndex: number) => {
         setSelectedDays(prev =>
             prev.includes(dayIndex)
@@ -124,7 +129,13 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                     </div>
                 </div>
 
-                <PickerDoneButton onClick={handleDone} />
+                <PickerDoneButton
+                    onClick={handleDone}
+                    removeAction={recurrence ? {
+                        label: 'Remove repeat',
+                        onClick: handleRemoveRepeat,
+                    } : undefined}
+                />
             </div>
         </BaseModal>
     );

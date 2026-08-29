@@ -128,7 +128,7 @@ describe("reminder view models", () => {
     const reminders = [makeReminder({ id: "work", project: "Work" })];
     const expected = getProjectColor("Work");
 
-    expect(buildBrowseProjectCardsViewModel(["Work"], reminders, "light")[0].accentColor)
+	expect(buildBrowseProjectCardsViewModel(["Work"], reminders, "light")[0]?.accentColor)
       .toBe(expected.light.accent);
     expect(buildProjectDetailViewModel(reminders, "Work", "dark").accentColor)
       .toBe(expected.dark.accent);

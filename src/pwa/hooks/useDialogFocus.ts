@@ -37,8 +37,9 @@ function trapDialogFocus(event: ReactKeyboardEvent<HTMLElement>, dialog: HTMLEle
 		return;
 	}
 
-	const firstControl = controls[0];
-	const lastControl = controls[controls.length - 1];
+	const firstControl = controls.at(0);
+	const lastControl = controls.at(-1);
+	if (!firstControl || !lastControl) return;
 	const activeElement = activeElementWithin(dialog);
 	if (event.shiftKey && (activeElement === firstControl || !dialog.contains(activeElement))) {
 		event.preventDefault();

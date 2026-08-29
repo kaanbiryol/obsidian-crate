@@ -102,9 +102,9 @@ export function ReminderActionChips({
 
             <ShadowDOMMotionButton
                 variant="light"
-                isIconOnly
                 onMouseDown={(event: React.MouseEvent) => event.preventDefault()}
                 onPress={onTogglePriority}
+                aria-label={priority === 1 ? 'Remove priority' : 'Set priority'}
                 animate={hasMounted ? {
                     scale: priority === 1 ? [1, 1.1, 1] : 1,
                 } : {}}
@@ -125,6 +125,7 @@ export function ReminderActionChips({
                         stroke="currentColor"
                     />
                 </motion.div>
+                <span className="reminder-action-label">Priority</span>
             </ShadowDOMMotionButton>
 
             <ShadowDOMMotionButton
@@ -141,18 +142,17 @@ export function ReminderActionChips({
                 >
                     <Repeat size={14} strokeWidth={1.5} />
                 </motion.div>
-                <AnimatePresence mode="popLayout">
-                    {recurrence && (
-                        <motion.span
-                            key="recurrence-value"
-                            initial={hasMounted ? { opacity: 0, width: 0, x: -8 } : false}
-                            animate={{ opacity: 1, width: 'auto', x: 0 }}
-                            exit={{ opacity: 0, width: 0, x: -8 }}
-                            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                        >
-                            {formatRecurrence(recurrence)}
-                        </motion.span>
-                    )}
+                <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.span
+                        key={recurrence ? 'recurrence-value' : 'recurrence-label'}
+                        initial={hasMounted ? { opacity: 0, width: 0, x: -8 } : false}
+                        animate={{ opacity: 1, width: 'auto', x: 0 }}
+                        exit={{ opacity: 0, width: 0, x: -8 }}
+                        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                        className="reminder-action-label"
+                    >
+                        {recurrence ? formatRecurrence(recurrence) : 'Repeat'}
+                    </motion.span>
                 </AnimatePresence>
             </ShadowDOMMotionButton>
         </div>

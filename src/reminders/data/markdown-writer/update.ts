@@ -203,8 +203,8 @@ export async function updateReminderInMarkdown(
     recurrence: newRecurrence,
   });
 
-  const indentMatch = reminder.rawLine.match(/^(\s*)/);
-  const indentation = indentMatch ? indentMatch[1] : "";
+	const indentMatch = reminder.rawLine.match(/^(\s*)/);
+	const indentation = indentMatch?.[1] ?? "";
   const newLine = rebuildCheckboxLine(
     indentation,
     reminder.completed,

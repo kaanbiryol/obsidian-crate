@@ -18,14 +18,14 @@ describe('findProjectMatches', () => {
     it('matches single-word project tags', () => {
         const matches = findProjectMatches('buy milk #forge');
         expect(matches).toHaveLength(1);
-        expect(matches[0].text).toBe('#forge');
-        expect(matches[0].index).toBe(9);
+		expect(matches[0]?.text).toBe('#forge');
+		expect(matches[0]?.index).toBe(9);
     });
 
     it('matches known multi-word projects', () => {
         const matches = findProjectMatches('task #my project done', ['my project']);
         expect(matches).toHaveLength(1);
-        expect(matches[0].text).toBe('#my project');
+		expect(matches[0]?.text).toBe('#my project');
     });
 
     it('skips purely numeric tags', () => {
@@ -38,7 +38,7 @@ describe('findPriorityMatches', () => {
     it('matches standalone !', () => {
         const matches = findPriorityMatches('important !');
         expect(matches).toHaveLength(1);
-        expect(matches[0].text).toBe('!');
+		expect(matches[0]?.text).toBe('!');
     });
 });
 
@@ -91,9 +91,9 @@ describe('findLinkMatches', () => {
     it('finds markdown links with safe URLs', () => {
         const matches = findLinkMatches('click [here](https://example.com)');
         expect(matches).toHaveLength(1);
-        expect(matches[0].type).toBe('link');
-        expect(matches[0].linkText).toBe('here');
-        expect(matches[0].linkUrl).toBe('https://example.com');
+		expect(matches[0]?.type).toBe('link');
+		expect(matches[0]?.linkText).toBe('here');
+		expect(matches[0]?.linkUrl).toBe('https://example.com');
     });
 
     it('excludes links with unsafe URLs', () => {

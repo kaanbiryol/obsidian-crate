@@ -9,7 +9,7 @@ interface QuickDateOption {
 const QUICK_DATES: QuickDateOption[] = [
 	{ label: 'Today', getDate: () => new Date() },
 	{ label: 'Tomorrow', getDate: () => addDays(new Date(), 1) },
-	{ label: 'Next Week', getDate: () => nextMonday(new Date()) },
+	{ label: 'Next week', getDate: () => nextMonday(new Date()) },
 ];
 
 interface DateQuickButtonsProps {

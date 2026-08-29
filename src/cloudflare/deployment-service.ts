@@ -80,7 +80,8 @@ function selectAccount(
 			metadata.accountName ? ` (${metadata.accountName})` : ''
 		}`);
 	}
-	if (accounts.length === 1) return accounts[0];
+	const [onlyAccount] = accounts;
+	if (accounts.length === 1 && onlyAccount) return onlyAccount;
 	if (accounts.length === 0) {
 		throw new Error('Cloudflare did not grant access to an account');
 	}
@@ -158,8 +159,9 @@ export class CloudflareDeploymentService {
 			const account = selectAccount(await api.listAuthorizedAccounts(), metadata);
 			if (pending.discoverExisting) {
 				const deployments = await discoverCloudflareDeployments(api, account);
-				if (deployments.length === 1) {
-					metadata = deployments[0].metadata;
+				const [onlyDeployment] = deployments;
+				if (deployments.length === 1 && onlyDeployment) {
+					metadata = onlyDeployment.metadata;
 				} else if (deployments.length > 1) {
 					const selected = await this.options.selectDeployment(deployments);
 					if (!selected) throw new Error('No Cloudflare server was selected');

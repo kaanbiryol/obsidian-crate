@@ -54,6 +54,7 @@ export function normalizeReminderIds(content: string): ReminderIdNormalizationRe
 
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
+    if (line === undefined) continue;
     const parsed = parseCheckboxLine(line);
     if (!parsed || !parsed.parsed.cleanContent.trim() || parsed.reminderId) {
       continue;

@@ -72,8 +72,11 @@ export async function toggleReminderCompletionInMarkdown(
         throw new Error(`Cannot safely locate reminder line in ${reminder.filePath}`);
       }
 
-      const line = lines[lineNumber];
-      let newLine: string;
+		const line = lines[lineNumber];
+		if (line === undefined) {
+			throw new Error(`Cannot read reminder line in ${reminder.filePath}`);
+		}
+		let newLine: string;
 
       if (reminder.completed) {
         newLine = line.replace(/\[x\]/i, "[ ]");
@@ -82,7 +85,7 @@ export async function toggleReminderCompletionInMarkdown(
 
         if (nextDue) {
           const indentMatch = line.match(/^(\s*)/);
-          const indentation = indentMatch ? indentMatch[1] : "";
+			const indentation = indentMatch?.[1] ?? "";
           newLine = rebuildCheckboxLine(
             indentation,
             false,

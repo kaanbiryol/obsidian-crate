@@ -56,7 +56,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     onTogglePriority,
 }) => {
     return (
-        <div className="px-5 pt-3 pb-3">
+        <div className="reminder-modal-body px-5 pt-3 pb-3">
             <ReminderEditorFields
                 isEditing={isEditing}
                 content={content}

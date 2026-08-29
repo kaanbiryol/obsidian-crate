@@ -93,6 +93,12 @@ function createHarness() {
 	return { service, settings, settingsOwner, persisted, opened, transportCalls, transport };
 }
 
+function firstOpenedUrl(opened: string[]): URL {
+	const url = opened[0];
+	if (!url) throw new Error('Expected Cloudflare authorization URL to open');
+	return new URL(url);
+}
+
 beforeEach(() => {
 	apiMocks.accounts = [{ id: '0123456789abcdef0123456789abcdef', name: 'Personal' }];
 	apiMocks.constructedWithTokens.length = 0;
@@ -108,7 +114,7 @@ describe('CloudflareDeploymentService', () => {
 		const harness = createHarness();
 		await harness.service.startDeployment();
 
-		const authorizationUrl = new URL(harness.opened[0]);
+		const authorizationUrl = firstOpenedUrl(harness.opened);
 		expect(authorizationUrl.origin + authorizationUrl.pathname).toBe('https://dash.cloudflare.com/oauth2/auth');
 		expect(authorizationUrl.searchParams.get('response_type')).toBe('code');
 		expect(authorizationUrl.searchParams.get('client_id')).toBe(CLIENT_ID);
@@ -134,7 +140,7 @@ describe('CloudflareDeploymentService', () => {
 	it('exchanges, provisions, revokes, and never persists OAuth credentials', async () => {
 		const harness = createHarness();
 		await harness.service.startDeployment();
-		const state = new URL(harness.opened[0]).searchParams.get('state');
+		const state = firstOpenedUrl(harness.opened).searchParams.get('state');
 		if (!state) throw new Error('Missing OAuth state');
 
 		const result = await harness.service.handleCallback({
@@ -151,7 +157,7 @@ describe('CloudflareDeploymentService', () => {
 		]);
 		expect(harness.opened).toHaveLength(1);
 
-		const tokenRequestBody = harness.transportCalls[0].body;
+		const tokenRequestBody = harness.transportCalls[0]?.body;
 		if (typeof tokenRequestBody !== 'string') throw new Error('Expected form-encoded token request');
 		const tokenRequest = new URLSearchParams(tokenRequestBody);
 		const verifier = tokenRequest.get('code_verifier');
@@ -179,7 +185,7 @@ describe('CloudflareDeploymentService', () => {
 		};
 		harness.settingsOwner.writeSettings.mockRejectedValueOnce(new Error('disk full'));
 		await harness.service.startDeployment();
-		const state = new URL(harness.opened[0]).searchParams.get('state');
+		const state = firstOpenedUrl(harness.opened).searchParams.get('state');
 		if (!state) throw new Error('Missing OAuth state');
 
 		await expect(harness.service.handleCallback({ code: 'code', state }))
@@ -207,7 +213,7 @@ describe('CloudflareDeploymentService', () => {
 		});
 		const harness = createHarness();
 		await harness.service.startDeployment();
-		const state = new URL(harness.opened[0]).searchParams.get('state');
+		const state = firstOpenedUrl(harness.opened).searchParams.get('state');
 		if (!state) throw new Error('Missing OAuth state');
 
 		await harness.service.handleCallback({ code: 'code', state }, {
@@ -239,7 +245,7 @@ describe('CloudflareDeploymentService', () => {
 		];
 		const harness = createHarness();
 		await harness.service.startDeployment();
-		const state = new URL(harness.opened[0]).searchParams.get('state');
+		const state = firstOpenedUrl(harness.opened).searchParams.get('state');
 		if (!state) throw new Error('Missing OAuth state');
 
 		await expect(harness.service.handleCallback({ code: 'code', state }))

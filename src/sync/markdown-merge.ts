@@ -306,6 +306,7 @@ function mergeHunks(
 		const remoteHunk = remoteHunks[remoteIndex];
 
 		if (!localHunk) {
+			if (!remoteHunk) break;
 			appendBaseAndHunk(merged, baseLines, baseIndex, remoteHunk);
 			baseIndex = remoteHunk.end;
 			remoteIndex++;

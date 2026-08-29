@@ -52,6 +52,9 @@ export function parseCheckboxLine(line: string): ParsedCheckbox | null {
   }
 
   const [, indentation, state, rawContentWithMetadata] = match;
+  if (indentation === undefined || state === undefined || rawContentWithMetadata === undefined) {
+    return null;
+  }
   const isCompleted = state.toLowerCase() === 'x';
   const reminderId = extractReminderId(rawContentWithMetadata);
   const rawContent = stripReminderIdMarker(rawContentWithMetadata);

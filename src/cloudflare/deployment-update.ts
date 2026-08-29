@@ -8,11 +8,13 @@ export interface CloudflareArtifactIdentity {
 function semanticVersionCore(version: string): [number, number, number] | null {
 	const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(version.trim());
 	if (!match) return null;
-	return [Number(match[1]), Number(match[2]), Number(match[3])];
+	const [, major, minor, patch] = match;
+	if (major === undefined || minor === undefined || patch === undefined) return null;
+	return [Number(major), Number(minor), Number(patch)];
 }
 
 function compareVersionCore(left: [number, number, number], right: [number, number, number]): number {
-	for (let index = 0; index < left.length; index++) {
+	for (const index of [0, 1, 2] as const) {
 		const difference = left[index] - right[index];
 		if (difference !== 0) return difference;
 	}

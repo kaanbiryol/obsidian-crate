@@ -34,7 +34,8 @@ export function extractRemindersBlockInfo(blockText: string): RemindersBlockInfo
     return null;
   }
 
-  const opening = lines[0].trim();
+	const opening = lines[0]?.trim();
+	if (!opening) return null;
   if (!opening.startsWith("```")) {
     return null;
   }

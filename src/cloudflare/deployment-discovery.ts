@@ -51,6 +51,8 @@ function toDeployment(
 	const workerName = worker.id?.trim().toLowerCase() ?? '';
 	const nameMatch = CRATE_RESOURCE_NAME.exec(workerName);
 	if (!nameMatch) return null;
+	const deploymentId = nameMatch[1];
+	if (!deploymentId) return null;
 
 	const d1Binding = findBinding(settings, 'd1', 'DB');
 	const r2Binding = findBinding(settings, 'r2_bucket', 'BUCKET');
@@ -67,7 +69,7 @@ function toDeployment(
 
 	return {
 		metadata: {
-			deploymentId: nameMatch[1],
+			deploymentId,
 			accountId: account.id,
 			accountName: account.name,
 			workerName,

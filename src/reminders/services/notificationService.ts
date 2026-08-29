@@ -54,8 +54,9 @@ export class ReminderNotificationService {
 		}
 
 		const [hours, minutes] = allDayTime.split(':').map(Number);
+		if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return undefined;
 		const date = parseLocalDateKey(reminder.dueDate);
-		date.setHours(hours, minutes, 0, 0);
+		date.setHours(hours ?? 0, minutes ?? 0, 0, 0);
 		return date.toISOString();
 	}
 
@@ -168,8 +169,9 @@ export class ReminderNotificationService {
 
 			const results = await Promise.allSettled(operations);
 			const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
-			if (failures.length > 0) {
-				throw failures[0].reason;
+			const [firstFailure] = failures;
+			if (firstFailure) {
+				throw firstFailure.reason;
 			}
 		} catch (err) {
 			log.error('Failed to reconcile reminders:', err);

@@ -18,6 +18,14 @@ interface PushSubscriptionRow {
 	created_at: string;
 }
 
+export interface PushDeliveryResult {
+	sent: number;
+	failed: number;
+	pruned: number;
+	errors: string[];
+	failedSubscriptionIds: string[];
+}
+
 const VAPID_EMAIL = 'crate-push@example.com';
 
 export interface PushNotificationPayload {
@@ -65,38 +73,63 @@ export function createDeclarativePushPayload(payload: PushNotificationPayload): 
 }
 
 export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVapidKeys> {
-	const rows = await queryRows<{ public_key: string; private_key: string }>(
-		db.prepare('SELECT public_key, private_key FROM vapid_keys WHERE id = 1')
-	);
+	const readPersistedKeys = async (): Promise<SerializedVapidKeys | null> => {
+		const rows = await queryRows<{ public_key: string; private_key: string }>(
+			db.prepare('SELECT public_key, private_key FROM vapid_keys WHERE id = 1')
+		);
+		const row = rows[0];
+		return row ? { publicKey: row.public_key, privateKey: row.private_key } : null;
+	};
 
-	if (rows.length > 0) {
-		return { publicKey: rows[0].public_key, privateKey: rows[0].private_key };
-	}
+	const existingKeys = await readPersistedKeys();
+	if (existingKeys) return existingKeys;
 
 	const keyPair = await generateVapidKeys();
 	const serialized = await serializeVapidKeys(keyPair);
 
 	await db.prepare(
-		'INSERT INTO vapid_keys (id, public_key, private_key) VALUES (1, ?, ?)'
+		'INSERT OR IGNORE INTO vapid_keys (id, public_key, private_key) VALUES (1, ?, ?)'
 	).bind(serialized.publicKey, serialized.privateKey).run();
 
-	return serialized;
+	const persistedKeys = await readPersistedKeys();
+	if (!persistedKeys) {
+		throw new Error('Failed to persist VAPID keys');
+	}
+	return persistedKeys;
+}
+
+export async function listPushSubscriptionIds(db: D1Database): Promise<string[]> {
+	const rows = await queryRows<{ id: string }>(
+		db.prepare('SELECT id FROM push_subscriptions')
+	);
+	return rows.map((row) => row.id);
 }
 
 export async function sendToAllSubscriptions(
 	db: D1Database,
 	payload: PushNotificationPayload,
-): Promise<{ sent: number; failed: number; pruned: number; errors: string[] }> {
+	options: { subscriptionIds?: readonly string[] } = {},
+): Promise<PushDeliveryResult> {
 
 	const serializedKeys = await getOrCreateVapidKeys(db);
 	const keys = await deserializeVapidKeys(serializedKeys);
 
-	const subs = await queryRows<PushSubscriptionRow>(
+	const allSubscriptions = await queryRows<PushSubscriptionRow>(
 		db.prepare('SELECT id, endpoint, p256dh, auth FROM push_subscriptions')
 	);
+	const requestedIds = options.subscriptionIds ? new Set(options.subscriptionIds) : null;
+	const subs = requestedIds
+		? allSubscriptions.filter((subscription) => requestedIds.has(subscription.id))
+		: allSubscriptions;
 
 	if (subs.length === 0) {
-		return { sent: 0, failed: 0, pruned: 0, errors: ['no subscriptions in db'] };
+		return {
+			sent: 0,
+			failed: 0,
+			pruned: 0,
+			errors: requestedIds?.size ? [] : ['no subscriptions in db'],
+			failedSubscriptionIds: [],
+		};
 	}
 
 	const payloadStr = JSON.stringify(createDeclarativePushPayload(payload));
@@ -104,6 +137,7 @@ export async function sendToAllSubscriptions(
 	let failed = 0;
 	let pruned = 0;
 	const errors: string[] = [];
+	const failedSubscriptionIds: string[] = [];
 
 	await Promise.all(subs.map(async (sub) => {
 		try {
@@ -125,14 +159,16 @@ export async function sendToAllSubscriptions(
 				console.error('Push failed:', msg);
 				errors.push(msg);
 				failed++;
+				failedSubscriptionIds.push(sub.id);
 			}
 		} catch (err) {
 			const msg = `${sub.id}: ${err instanceof Error ? err.message : String(err)}`;
 			console.error('Push error:', msg);
 			errors.push(msg);
 			failed++;
+			failedSubscriptionIds.push(sub.id);
 		}
 	}));
 
-	return { sent, failed, pruned, errors };
+	return { sent, failed, pruned, errors, failedSubscriptionIds };
 }

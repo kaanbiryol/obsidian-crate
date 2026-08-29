@@ -237,9 +237,10 @@ describe('markdownWriter', () => {
     expect(content).toContain('Jan 2, 2026');
 
     expect(onChange).toHaveBeenCalledTimes(1);
-    const updated = onChange.mock.calls[0]?.[0];
-    expect(updated).toBeDefined();
-    expect(updated.completed).toBe(false);
+	const updated = onChange.mock.calls[0]?.[0];
+	expect(updated).toBeDefined();
+	if (!updated) throw new Error('Expected reminder change callback');
+	expect(updated.completed).toBe(false);
     expect(updated.dueDate).toBe('2026-01-02');
   });
 

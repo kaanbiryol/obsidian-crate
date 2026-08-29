@@ -70,9 +70,10 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
     // also extract the date for the first occurrence
     if (!dueDate && recurrencePart) {
       const parsed = chrono.parse(recurrencePart, new Date(), { forwardDate: true });
-      if (parsed.length > 0) {
-        dueDate = parsed[0].start.date();
-        hasTime = parsed[0].start.isCertain('hour');
+      const firstResult = parsed[0];
+      if (firstResult) {
+        dueDate = firstResult.start.date();
+        hasTime = firstResult.start.isCertain('hour');
         if (!hasTime) {
           dueDate.setHours(0, 0, 0, 0);
         }
@@ -88,8 +89,10 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
     /@?(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?(?:Z|[+-]\d{2}:\d{2})?)?)/
   );
   if (isoDateMatch) {
-    hasTime = isoDateMatch[1].includes('T');
-    dueDate = hasTime ? new Date(isoDateMatch[1]) : parseLocalDateKey(isoDateMatch[1]);
+    const isoDateText = isoDateMatch[1];
+    if (!isoDateText) return { cleanContent: taskContent.trim(), priority };
+    hasTime = isoDateText.includes('T');
+    dueDate = hasTime ? new Date(isoDateText) : parseLocalDateKey(isoDateText);
     if (isNaN(dueDate.getTime())) {
       dueDate = undefined;
       hasTime = undefined;
@@ -104,8 +107,8 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
     // Chrono handles: tomorrow, today, next Monday, in 2 hours, Jul 25 2026, etc.
     const parsed = chrono.parse(dateParseContent, new Date(), { forwardDate: true });
 
-    if (parsed.length > 0) {
-      const result = parsed[0];
+    const result = parsed[0];
+    if (result) {
       if (taskContent.includes(result.text)) {
         dueDate = result.start.date();
         hasTime = result.start.isCertain('hour');
@@ -166,8 +169,9 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
   // Only if no project was matched from knownProjects
   if (!project) {
     const projectMatch = contentWithoutLinks.match(/#([a-zA-Z][a-zA-Z0-9_/-]*)/);
-    if (projectMatch) {
-      project = projectMatch[1].trim();
+    const matchedProject = projectMatch?.[1];
+    if (matchedProject) {
+      project = matchedProject.trim();
       // Remove from the content with links intact
       // Escape special regex characters in the project name (particularly / for nested tags)
       const escapedProject = project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

@@ -25,7 +25,7 @@ function resolveNotificationDatetime(
 		return undefined;
 	}
 
-	date.setHours(hours, minutes, 0, 0);
+	date.setHours(hours ?? 0, minutes ?? 0, 0, 0);
 	return date.toISOString();
 }
 

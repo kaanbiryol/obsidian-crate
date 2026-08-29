@@ -34,8 +34,9 @@ export function useIndexRefresh(): {
         triggerRefresh();
       });
 
-      return unsubscribe;
-    }
+		return unsubscribe;
+	}
+	return undefined;
   }, [plugin.reminderIndex, triggerRefresh]);
 
   return { refreshToken, triggerRefresh };

@@ -95,7 +95,7 @@ export function updateReminderInFileContent(
 		: reminder.description;
 	const newDescLines = buildDescriptionBlock(newDescription);
 	const indentMatch = reminder.rawLine.match(/^(\s*)/);
-	const indentation = indentMatch ? indentMatch[1] : '';
+	const indentation = indentMatch?.[1] ?? '';
 	const newLine = rebuildCheckboxLine(
 		indentation,
 		reminder.completed,
@@ -131,6 +131,9 @@ export function setReminderCompletedInFileContent(
 	}
 
 	const line = lines[lineNumber];
+	if (line === undefined) {
+		throw new Error(`Cannot read reminder line in ${reminder.filePath}`);
+	}
 	const currentDue = parseStoredReminderDate(reminder) ?? new Date();
 	const currentHasTime = reminderHasTime(reminder) ?? false;
 	const recurrence = normalizeRecurrenceRule(reminder.recurrence);
@@ -142,7 +145,7 @@ export function setReminderCompletedInFileContent(
 		const nextDue = calculateNextOccurrence(currentDue, recurrence);
 		if (nextDue) {
 			const indentMatch = line.match(/^(\s*)/);
-			const indentation = indentMatch ? indentMatch[1] : '';
+			const indentation = indentMatch?.[1] ?? '';
 			newLine = rebuildCheckboxLine(
 				indentation,
 				false,

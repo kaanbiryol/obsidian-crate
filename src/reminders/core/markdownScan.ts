@@ -52,6 +52,7 @@ export function scanReminderMarkdownContent(
 
   for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
     const line = lines[lineNumber];
+    if (line === undefined) continue;
     const parsed = parseCheckboxLine(line);
     if (!parsed || !parsed.parsed.cleanContent.trim() || !parsed.reminderId) {
       continue;
@@ -61,23 +62,25 @@ export function scanReminderMarkdownContent(
     let description: string | undefined;
     let descBlockLineCount = 0;
     const nextIndex = lineNumber + 1;
-    if (nextIndex < lines.length && lines[nextIndex].startsWith("<!-- crate-desc:")) {
-      let descContent = lines[nextIndex].slice("<!-- crate-desc:".length);
+    const nextLine = lines[nextIndex];
+    if (nextLine?.startsWith("<!-- crate-desc:")) {
+      let descContent = nextLine.slice("<!-- crate-desc:".length);
       let endIndex = nextIndex;
       while (endIndex < lines.length) {
         const source = endIndex === nextIndex ? descContent : lines[endIndex];
+        if (source === undefined) break;
         const closingPos = source.indexOf("-->");
         if (closingPos !== -1) {
           if (endIndex === nextIndex) {
             descContent = descContent.slice(0, closingPos).trimEnd();
           } else {
-            descContent += "\n" + lines[endIndex].slice(0, closingPos).trimEnd();
+            descContent += "\n" + source.slice(0, closingPos).trimEnd();
           }
           descBlockLineCount = endIndex - nextIndex + 1;
           break;
         }
         if (endIndex > nextIndex) {
-          descContent += "\n" + lines[endIndex];
+          descContent += "\n" + source;
         }
         endIndex++;
       }

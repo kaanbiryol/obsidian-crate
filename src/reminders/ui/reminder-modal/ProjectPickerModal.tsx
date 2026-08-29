@@ -47,23 +47,23 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
     rowRef,
 }) => {
     return (
-        <div className="project-picker-row-wrap">
-            <ShadowDOMNativeButton
-                ref={rowRef}
-                onClick={onSelect}
-                className={`project-picker-row w-full flex items-center gap-3 px-4 min-h-[52px] focus:outline-none${isSelected ? ' is-selected' : ''}`}
+        <ShadowDOMNativeButton
+            ref={rowRef}
+            role="option"
+            aria-selected={isSelected}
+            onClick={onSelect}
+            className={`project-picker-row w-full flex items-center gap-3 px-4 min-h-[52px] focus:outline-none${isSelected ? ' is-selected' : ''}`}
+        >
+            <ProjectDot projectName={projectName} />
+            <span
+                className={`project-picker-row-label flex-1 text-left truncate${isSelected ? ' is-selected' : ''}`}
             >
-                <ProjectDot projectName={projectName} />
-                <span
-                    className={`project-picker-row-label flex-1 text-left truncate${isSelected ? ' is-selected' : ''}`}
-                >
-                    {projectName}
-                </span>
-                {isSelected && (
-                    <Check size={18} strokeWidth={2.5} className="project-picker-row-check flex-shrink-0" />
-                )}
-            </ShadowDOMNativeButton>
-        </div>
+                {projectName}
+            </span>
+            {isSelected && (
+                <Check size={18} strokeWidth={2.5} className="project-picker-row-check flex-shrink-0" />
+            )}
+        </ShadowDOMNativeButton>
     );
 };
 
@@ -115,15 +115,15 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
             <div className={isDark ? 'dark' : ''}>
                 <PickerHeader
                     onBack={onClose}
-                    title="Select Project"
+                    title="Project"
                 />
 
                 {/* Project List */}
                 <div
                     ref={scrollContainerRef}
-                    className="project-picker-scroll overflow-y-auto py-3"
+                    className="project-picker-scroll overflow-y-auto"
                 >
-                    <div role="listbox" aria-label="Project selection">
+                    <div className="project-picker-list" role="listbox" aria-label="Project selection">
                         {projects.map((p) => (
                             <ProjectRow
                                 key={p}

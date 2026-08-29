@@ -1,8 +1,6 @@
-export {
-	handleBatchDelete,
-	handleBatchDownload,
-	handleBatchUpload,
-} from './sync-batch-handlers';
+export { handleBatchDelete } from './sync-batch/delete';
+export { handleBatchDownload } from './sync-batch/download';
+export { handleBatchUpload } from './sync-batch/upload';
 export {
 	handleDelete,
 	handleDownload,

@@ -19,7 +19,7 @@ export type ProjectColorScheme = 'light' | 'dark';
  * The curated 50-color palette
  * Colors distributed across the spectrum to maximize visual distinction
  */
-const PROJECT_COLORS: ProjectColorDef[] = [
+const PROJECT_COLORS = [
     // ═══════════════════════════════════════════════════════════════
     // REDS & PINKS (8 colors)
     // ═══════════════════════════════════════════════════════════════
@@ -101,7 +101,7 @@ const PROJECT_COLORS: ProjectColorDef[] = [
     { name: 'slate',       light: '#64748b', dark: '#cbd5e1' },  // Cool gray
     { name: 'graphite',    light: '#374151', dark: '#9ca3af' },  // Warm gray
     { name: 'bronze',      light: '#92400e', dark: '#d97706' },  // Metallic warm
-];
+] as const satisfies readonly ProjectColorDef[];
 
 /**
  * Simple hash function to convert string to a number
@@ -123,9 +123,11 @@ function hashString(str: string): number {
  * @returns RGB string (e.g., '220, 38, 38')
  */
 function hexToRgb(hex: string): string {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (!result) return '0, 0, 0';
-    return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
+	const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+	if (!result) return '0, 0, 0';
+	const [, red, green, blue] = result;
+	if (red === undefined || green === undefined || blue === undefined) return '0, 0, 0';
+	return `${parseInt(red, 16)}, ${parseInt(green, 16)}, ${parseInt(blue, 16)}`;
 }
 
 /**
@@ -179,7 +181,7 @@ export function getProjectColor(projectName: string): ProjectColorConfig {
     // Hash the normalized name to get a consistent index
     const hash = hashString(normalized);
     const index = hash % PROJECT_COLORS.length;
-    const color = PROJECT_COLORS[index];
+	const color = PROJECT_COLORS[index] ?? PROJECT_COLORS[0];
 
     // Generate RGB strings for rgba() usage
     const lightRgb = hexToRgb(color.light);

@@ -16,8 +16,8 @@ describe('parseMarkdownLinks', () => {
     it('parses multiple links', () => {
         const links = parseMarkdownLinks('[a](https://a.com) and [b](https://b.com)');
         expect(links).toHaveLength(2);
-        expect(links[0].text).toBe('a');
-        expect(links[1].text).toBe('b');
+		expect(links[0]?.text).toBe('a');
+		expect(links[1]?.text).toBe('b');
     });
 
     it('returns empty array for no links', () => {
@@ -27,13 +27,13 @@ describe('parseMarkdownLinks', () => {
     it('handles empty link text', () => {
         const links = parseMarkdownLinks('[](https://example.com)');
         expect(links).toHaveLength(1);
-        expect(links[0].text).toBe('');
+		expect(links[0]?.text).toBe('');
     });
 
     it('handles empty url', () => {
         const links = parseMarkdownLinks('[text]()');
         expect(links).toHaveLength(1);
-        expect(links[0].url).toBe('');
+		expect(links[0]?.url).toBe('');
     });
 });
 

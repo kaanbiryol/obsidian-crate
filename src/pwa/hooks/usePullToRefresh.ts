@@ -59,7 +59,9 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 			const scrollTarget = findPullScrollTarget(event.target);
 			if (!scrollTarget || scrollTarget.scrollTop > 0) return;
 
-			startY = event.touches[0].clientY;
+			const touch = event.touches.item(0);
+			if (!touch) return;
+			startY = touch.clientY;
 			active = true;
 			pulling = false;
 			currentDistance = 0;
@@ -78,7 +80,9 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 				return;
 			}
 
-			const delta = event.touches[0].clientY - startY;
+			const touch = event.touches.item(0);
+			if (!touch) return;
+			const delta = touch.clientY - startY;
 			if (delta <= 0) {
 				reset();
 				return;

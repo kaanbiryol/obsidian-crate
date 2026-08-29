@@ -62,7 +62,7 @@ export function recurrenceRuleFromPickerState(state: RecurrencePickerState): Rec
 }
 
 export function recurrenceRuleFromPickerDraft(draft: RecurrencePickerDraft): RecurrenceRule {
-	const [rawHour, rawMinute] = draft.time.split(':').map(Number);
+	const [rawHour = 9, rawMinute = 0] = draft.time.split(':').map(Number);
 	const hour = Number.isInteger(rawHour) ? Math.min(23, Math.max(0, rawHour)) : 9;
 	const minute = Number.isInteger(rawMinute) ? Math.min(59, Math.max(0, rawMinute)) : 0;
 	return recurrenceRuleFromPickerState({

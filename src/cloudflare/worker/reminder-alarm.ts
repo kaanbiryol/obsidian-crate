@@ -1,4 +1,4 @@
-import { sendToAllSubscriptions } from './push';
+import { listPushSubscriptionIds, sendToAllSubscriptions } from './push';
 import { parseJsonObject, parseOptionalString, parseNonNegativeInteger } from './utils';
 
 interface ReminderData {
@@ -8,6 +8,8 @@ interface ReminderData {
 	dueDatetime: string;
 	priority?: number;
 }
+
+const PENDING_SUBSCRIPTION_IDS_KEY = 'pendingSubscriptionIds';
 
 export class ReminderAlarm implements DurableObject {
 	constructor(
@@ -70,14 +72,20 @@ export class ReminderAlarm implements DurableObject {
 		if (!reminder) return;
 
 		const db = this.env.DB;
+		let pendingSubscriptionIds = await this.state.storage.get<string[]>(PENDING_SUBSCRIPTION_IDS_KEY);
+		if (!pendingSubscriptionIds) {
+			pendingSubscriptionIds = await listPushSubscriptionIds(db);
+			await this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, pendingSubscriptionIds);
+		}
 		const delivery = await sendToAllSubscriptions(db, {
 			title: reminder.content,
 			body: reminder.project || '',
 			tag: reminder.reminderId,
 			project: reminder.project,
 			reminderId: reminder.reminderId,
-		});
+		}, { subscriptionIds: pendingSubscriptionIds });
 		if (delivery.failed > 0) {
+			await this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, delivery.failedSubscriptionIds);
 			throw new Error(`Push delivery failed for ${delivery.failed} subscription(s)`);
 		}
 

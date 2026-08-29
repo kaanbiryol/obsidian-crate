@@ -21,7 +21,7 @@ interface DatePickerModalProps {
     dueDate: string | null;
     hasTime?: boolean;
     isDark: boolean;
-    onDateTimeChange: (value: string, hasTime: boolean) => void;
+    onDateTimeChange: (value: string | null, hasTime: boolean) => void;
 }
 
 export const DatePickerModal: React.FC<DatePickerModalProps> = ({
@@ -95,6 +95,11 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
         onDateTimeChange(selection.value, selection.hasTime);
     }, [dueDate, hasTime, onDateTimeChange]);
 
+    const handleRemoveSchedule = useCallback(() => {
+        onDateTimeChange(null, false);
+        onClose();
+    }, [onClose, onDateTimeChange]);
+
     return (
         <BaseModal
             isOpen={isOpen}
@@ -105,7 +110,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
             <div className={isDark ? 'dark' : ''}>
                 <PickerHeader
                     onBack={onClose}
-                    title={selectedDateDisplay || 'Select Date'}
+                    title={selectedDateDisplay || 'Select date'}
                     subtitle={currentDate ? selectedTimeDisplay : undefined}
                 />
 
@@ -133,7 +138,13 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                     />
                 </div>
 
-                <PickerDoneButton onClick={onClose} />
+                <PickerDoneButton
+                    onClick={onClose}
+                    removeAction={currentDate ? {
+                        label: 'Remove schedule',
+                        onClick: handleRemoveSchedule,
+                    } : undefined}
+                />
             </div>
         </BaseModal>
     );

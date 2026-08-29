@@ -107,7 +107,7 @@ function findNextWeekday(
 
   const daysUntilNextWeek = 7 - currentDay;
   const additionalWeeks = (weekInterval - 1) * 7;
-  const firstTargetDay = sorted[0];
+	const firstTargetDay = sorted[0] ?? currentDay;
   result = result.add({ days: daysUntilNextWeek + additionalWeeks + firstTargetDay });
   return applyRuleTime(result, rule, fromDate);
 }
@@ -133,7 +133,7 @@ function findFirstMatchingDay(
   }
 
   const daysUntilNextWeek = 7 - currentDay;
-  const firstTargetDay = sorted[0];
+	const firstTargetDay = sorted[0] ?? currentDay;
   result = result.add({ days: daysUntilNextWeek + firstTargetDay });
   return applyRuleTime(result, rule, fromDate);
 }

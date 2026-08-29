@@ -11,14 +11,24 @@ const DAY_NAME_MAP: Record<string, number> = {
   saturday: 6, sat: 6,
 };
 
+function parseWeekdays(text: string): number[] {
+  const matches = text.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/gi) ?? [];
+  const days = matches
+    .map(day => DAY_NAME_MAP[day.toLowerCase()])
+    .filter((day): day is number => day !== undefined);
+  return [...new Set(days)].sort((a, b) => a - b);
+}
+
 function parseTimeString(timeStr: string): { hour: number; minute: number } | null {
   if (!timeStr) return null;
 
   const match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return null;
+	const [, hourText, minuteText] = match;
+	if (hourText === undefined || minuteText === undefined) return null;
 
-  const hour = parseInt(match[1], 10);
-  const minute = parseInt(match[2], 10);
+  const hour = parseInt(hourText, 10);
+  const minute = parseInt(minuteText, 10);
 
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
 
@@ -59,10 +69,12 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
   const weeklyIntervalDaysPattern = /\bevery\s+(\d+)\s+weeks?\s+on\s+((?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)(?:\s*(?:,|and)\s*)?)+)(?:\s+(\d{1,2}:\d{2}))?\b/i;
   const weeklyIntervalDaysMatch = content.match(weeklyIntervalDaysPattern);
   if (weeklyIntervalDaysMatch) {
-    const interval = parseInt(weeklyIntervalDaysMatch[1], 10);
-    const dayMatches = weeklyIntervalDaysMatch[2].match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/gi);
-    if (dayMatches && dayMatches.length > 0) {
-      const daysOfWeek = [...new Set(dayMatches.map(d => DAY_NAME_MAP[d.toLowerCase()]))].sort((a, b) => a - b);
+    const intervalText = weeklyIntervalDaysMatch[1];
+    const daysText = weeklyIntervalDaysMatch[2];
+    if (intervalText && daysText) {
+      const interval = parseInt(intervalText, 10);
+      const daysOfWeek = parseWeekdays(daysText);
+      if (daysOfWeek.length === 0) return null;
       const rule = normalizeRecurrenceRule({
         frequency: 'weekly',
         interval: interval > 1 ? interval : undefined,
@@ -80,8 +92,11 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
   const monthlyIntervalDayPattern = /\bevery\s+(\d+)\s+months?\s+on\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{1,2}:\d{2}))?\b/i;
   const monthlyIntervalDayMatch = content.match(monthlyIntervalDayPattern);
   if (monthlyIntervalDayMatch) {
-    const interval = parseInt(monthlyIntervalDayMatch[1], 10);
-    const dayOfMonth = parseInt(monthlyIntervalDayMatch[2], 10);
+    const intervalText = monthlyIntervalDayMatch[1];
+    const dayText = monthlyIntervalDayMatch[2];
+    if (!intervalText || !dayText) return null;
+    const interval = parseInt(intervalText, 10);
+    const dayOfMonth = parseInt(dayText, 10);
     if (dayOfMonth >= 1 && dayOfMonth <= 31) {
       const rule = normalizeRecurrenceRule({
         frequency: 'monthly',
@@ -99,15 +114,20 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
   // Pattern 1: "every N days/weeks/months" (with interval, optionally with time)
   const intervalMatch = content.match(new RegExp(`\\bevery\\s+(\\d+)\\s+(day|week|month)s?${timePattern}\\b`, 'i'));
   if (intervalMatch) {
-    const interval = parseInt(intervalMatch[1], 10);
-    const unit = intervalMatch[2].toLowerCase();
+    const intervalText = intervalMatch[1];
+    const unitText = intervalMatch[2];
+    if (!intervalText || !unitText) return null;
+    const interval = parseInt(intervalText, 10);
+    const unit = unitText.toLowerCase();
     const frequencyMap: Record<string, RecurrenceFrequency> = {
       day: 'daily',
       week: 'weekly',
       month: 'monthly',
     };
+    const frequency = frequencyMap[unit];
+    if (!frequency) return null;
     const rule = normalizeRecurrenceRule({
-      frequency: frequencyMap[unit],
+      frequency,
       interval: interval > 1 ? interval : undefined,
     })!;
     applyTime(rule, intervalMatch[3]);
@@ -162,10 +182,10 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
   const weekdayPattern = /\bevery\s+((?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)(?:\s*(?:,|and)\s*)?)+)(?:\s+(\d{1,2}:\d{2}))?\b/i;
   const weekdayMatch = content.match(weekdayPattern);
   if (weekdayMatch) {
-    const daysText = weekdayMatch[1].toLowerCase();
-    const dayMatches = daysText.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/gi);
-    if (dayMatches && dayMatches.length > 0) {
-      const daysOfWeek = [...new Set(dayMatches.map(d => DAY_NAME_MAP[d.toLowerCase()]))].sort((a, b) => a - b);
+    const daysText = weekdayMatch[1];
+    if (daysText) {
+      const daysOfWeek = parseWeekdays(daysText);
+      if (daysOfWeek.length === 0) return null;
       const rule = normalizeRecurrenceRule({
         frequency: 'weekly',
         daysOfWeek,

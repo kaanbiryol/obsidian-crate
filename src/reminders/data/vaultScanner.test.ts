@@ -44,8 +44,8 @@ describe('vaultScanner', () => {
     const result = await scanFile(app, file, 'Reminders');
 
     expect(result.reminders).toHaveLength(2);
-    expect(result.reminders[0].content).toBe('Task A');
-    expect(result.reminders[1].completed).toBe(true);
+	expect(result.reminders[0]?.content).toBe('Task A');
+	expect(result.reminders[1]?.completed).toBe(true);
   });
 
   it('scans the vault and collects discovered projects', async () => {
@@ -102,8 +102,8 @@ describe('vaultScanner', () => {
     const result = await scanFile(app, file, 'Reminders');
 
     expect(result.reminders).toHaveLength(1);
-    expect(result.reminders[0].id).toBe('rem-123');
-    expect(result.reminders[0].content).toBe('Task A');
+	expect(result.reminders[0]?.id).toBe('rem-123');
+	expect(result.reminders[0]?.content).toBe('Task A');
   });
 
   it('persists missing reminder IDs before indexing them', async () => {

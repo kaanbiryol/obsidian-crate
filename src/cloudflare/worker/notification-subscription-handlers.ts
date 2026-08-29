@@ -103,10 +103,15 @@ export async function handleListSubscriptions(db: D1Database): Promise<Response>
 }
 
 export async function handleTestPush(db: D1Database): Promise<Response> {
-	const result = await sendToAllSubscriptions(db, {
+	const delivery = await sendToAllSubscriptions(db, {
 		title: 'Crate Test',
 		body: 'If you see this, push notifications are working!',
 		tag: 'crate-test',
 	});
-	return corsResponse(result);
+	return corsResponse({
+		sent: delivery.sent,
+		failed: delivery.failed,
+		pruned: delivery.pruned,
+		errors: delivery.errors,
+	});
 }
