@@ -339,12 +339,18 @@ describe('PWA activation metadata', () => {
 
 	it('hands off from the native launch screen to a themed reminders loader', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
+		const bodyMarkup = html.slice(html.indexOf('<body>'));
 
 		expect(html).toContain('<div id="app"><div class="pwa-bootstrap-shell" role="status"');
 		expect(html).toContain('aria-label="Loading reminders"');
+		expect(html).toContain('<div class="pwa-bootstrap-header" aria-hidden="true">');
+		expect(html).toContain('<div class="pwa-bootstrap-header__copy"><h1>Inbox</h1><div class="pwa-bootstrap-header__meta"></div></div>');
+		expect(html).toContain('<div class="pwa-bootstrap-header__actions"><span></span><span></span></div>');
+		expect(html).toContain('<div class="pwa-bootstrap-content" aria-hidden="true">');
 		expect(html).toContain('<div class="pwa-loading-state is-visible"');
-		expect(html).not.toContain('pwa-skeleton-header');
 		expect(html).toContain('<div class="pwa-bootstrap-tabs" aria-hidden="true">');
+		expect(bodyMarkup.indexOf('pwa-bootstrap-header')).toBeLessThan(bodyMarkup.indexOf('pwa-skeleton-list'));
+		expect(html.match(/class="pwa-skeleton-row"/g)).toHaveLength(5);
 		expect(html).not.toContain('auth-card--loading');
 		expect(html).not.toContain('auth-loading__mark-stage');
 		expect(html).not.toContain('<link rel="preload" as="image" href="/notifications/crate-mark-256.png');

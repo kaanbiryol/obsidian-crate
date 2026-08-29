@@ -9,6 +9,9 @@ import { ShadowDOMButton } from '@/reminders/components/ShadowDOMButton';
 import { ViewHeader } from '@/reminders/components/ViewHeader';
 import type { Reminder } from '@/reminders/types/reminder';
 import {
+	CONTENT_TRANSITION_DURATION,
+	EASE_EXPO_OUT,
+	EASE_STANDARD,
 	PAGE_TRANSITION_DURATION,
 	type TabId,
 } from '@/reminders/ui/layoutConstants';
@@ -173,7 +176,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	}, [currentProject, onReorder]);
 
 	const viewPanels = (
-		<AnimatePresence mode="sync">
+		<AnimatePresence initial={false} mode="sync">
 			<RemindersViewPanels
 				viewMode={viewMode}
 				selectedProject={selectedProject}
@@ -194,9 +197,16 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		</AnimatePresence>
 	);
 
-	const loadingCrossfade = prefersReducedMotion
+	const loadingExitTransition = prefersReducedMotion
 		? { duration: 0 }
-		: { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
+		: { duration: 0.24, ease: EASE_STANDARD };
+	const contentEnterTransition = prefersReducedMotion
+		? { duration: 0 }
+		: {
+			duration: CONTENT_TRANSITION_DURATION,
+			delay: 0.06,
+			ease: EASE_EXPO_OUT,
+		};
 
 	return (
 		<HeroUIProvider>
@@ -227,6 +237,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 								{...currentHeader}
 								large
 								showMeta={isInitialLoadComplete && !loadingContent}
+								reserveMetaSpace={loadingTransition}
 								rightContent={headerRightContent}
 							/>
 						</motion.div>
@@ -245,7 +256,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 									initial={false}
 									animate={{ opacity: 1 }}
 									exit={{ opacity: 0 }}
-									transition={loadingCrossfade}
+									transition={loadingExitTransition}
 								>
 									{loadingContent}
 								</motion.div>
@@ -253,9 +264,9 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 								<motion.div
 									key="initial-content"
 									className="reminders-loading-transition-layer"
-									initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 3 }}
+									initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 6 }}
 									animate={{ opacity: 1, y: 0 }}
-									transition={loadingCrossfade}
+									transition={contentEnterTransition}
 								>
 									{viewPanels}
 								</motion.div>

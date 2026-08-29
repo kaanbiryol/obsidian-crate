@@ -11,6 +11,8 @@ interface ViewHeaderProps {
   large?: boolean;
   /** Hide count metadata while the initial reminder snapshot is loading. */
   showMeta?: boolean;
+  /** Keep the metadata row's height reserved while its values are hidden. */
+  reserveMetaSpace?: boolean;
 }
 
 /**
@@ -25,6 +27,7 @@ export const ViewHeader = memo(function ViewHeader({
   rightContent,
   large = false,
   showMeta = true,
+  reserveMetaSpace = false,
 }: ViewHeaderProps) {
   return (
     <div
@@ -34,8 +37,11 @@ export const ViewHeader = memo(function ViewHeader({
         <h1 className="view-header-title">
           {title}
         </h1>
-        {showMeta && (
-          <div className="view-header-meta">
+        {(showMeta || reserveMetaSpace) && (
+          <div
+            className={`view-header-meta${showMeta ? '' : ' is-reserved'}`}
+            aria-hidden={!showMeta}
+          >
             <span className="view-header-count">
               {count} {count === 1 ? 'reminder' : 'reminders'}
             </span>

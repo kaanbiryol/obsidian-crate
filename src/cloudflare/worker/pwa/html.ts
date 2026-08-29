@@ -8,6 +8,8 @@ import {
 
 export function createPwaHtml(requestUrl?: string): string {
 	const manifestHref = manifestHrefForUrl(requestUrl);
+	const skeletonRow = '<div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div>';
+	const skeletonRows = skeletonRow.repeat(5);
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,7 +45,7 @@ ${PWA_LIGHT_THEME_STYLES}
 	<script src="/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}"></script>
 </head>
 <body>
-	<div id="app"><div class="pwa-bootstrap-shell" role="status" aria-live="polite" aria-label="Loading reminders"><div class="pwa-loading-state is-visible" aria-hidden="true"><div class="pwa-skeleton-list"><div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div><div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div><div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div><div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div><div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div></div></div><div class="pwa-bootstrap-tabs" aria-hidden="true"><span></span><span></span><span></span><span></span></div></div></div>
+	<div id="app"><div class="pwa-bootstrap-shell" role="status" aria-live="polite" aria-label="Loading reminders"><div class="pwa-bootstrap-header" aria-hidden="true"><div class="pwa-bootstrap-header__copy"><h1>Inbox</h1><div class="pwa-bootstrap-header__meta"></div></div><div class="pwa-bootstrap-header__actions"><span></span><span></span></div></div><div class="pwa-bootstrap-content" aria-hidden="true"><div class="pwa-loading-state is-visible"><div class="pwa-skeleton-list">${skeletonRows}</div></div></div><div class="pwa-bootstrap-tabs" aria-hidden="true"><span></span><span></span><span></span><span></span></div></div></div>
 	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
 	</body>
 	</html>`;
