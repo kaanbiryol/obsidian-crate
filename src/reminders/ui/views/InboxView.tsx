@@ -130,7 +130,7 @@ export const InboxView = memo(function InboxView({
               <Button
                 variant="light"
                 onPress={() => setShowCompleted(prev => !prev)}
-                className="w-full justify-between h-10 px-0"
+                className="completed-section-toggle w-full justify-between h-10 px-0"
                 endContent={
                   <motion.span
                     animate={{ rotate: showCompleted ? 180 : 0 }}

@@ -158,7 +158,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
     <ShadowDOMButton
       variant="light"
       onPress={onPress}
-      className="w-full justify-between h-10 px-0"
+      className="completed-section-toggle w-full justify-between h-10 px-0"
       endContent={
         <motion.span
           animate={{ rotate: showCompleted ? 180 : 0 }}

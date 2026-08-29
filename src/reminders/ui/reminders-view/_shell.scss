@@ -328,6 +328,14 @@
     color: var(--text-muted);
 }
 
+// The full-width completed toggle should not retain HeroUI's oversized focus ring.
+.completed-section-toggle:focus,
+.completed-section-toggle:focus-visible,
+.completed-section-toggle[data-focus-visible="true"] {
+    outline: none;
+    box-shadow: none;
+}
+
 // ============================================
 // Project Picker Modal Scrollbar
 // ============================================
