@@ -19,7 +19,10 @@ function layoutOffsetTop(element: HTMLElement): number {
 export function calculateStableScrollAdjustment(
   previous: ReminderScrollAnchor[],
   current: ReminderScrollAnchor[],
+  suspended = false,
 ): number | null {
+  if (suspended) return null;
+
   const currentById = new Map<string, ReminderScrollAnchor[]>();
   for (const anchor of current) {
     const matches = currentById.get(anchor.id) ?? [];
@@ -70,7 +73,7 @@ function captureVisibleAnchors(container: HTMLElement): ReminderScrollAnchor[] {
  * Keeps a visible moving reminder, or the first unchanged fallback, at the
  * same screen position while cards change sections.
  */
-export function useStableReminderScroll(): RefObject<HTMLDivElement | null> {
+export function useStableReminderScroll(suspended = false): RefObject<HTMLDivElement | null> {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousAnchorsRef = useRef<ReminderScrollAnchor[]>([]);
 
@@ -82,6 +85,7 @@ export function useStableReminderScroll(): RefObject<HTMLDivElement | null> {
     const adjustment = calculateStableScrollAdjustment(
       previousAnchorsRef.current,
       currentAnchors,
+      suspended,
     );
 
     if (adjustment !== null && Math.abs(adjustment) > 0.5) {

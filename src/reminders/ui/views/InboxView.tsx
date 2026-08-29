@@ -52,7 +52,8 @@ export const InboxView = memo(function InboxView({
   colorScheme = 'dark',
 }: InboxViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
-  const scrollRef = useStableReminderScroll();
+  const [isReordering, setIsReordering] = useState(false);
+  const scrollRef = useStableReminderScroll(isReordering);
 
   const { active, completed } = useMemo(() => buildInboxViewModel(reminders), [reminders]);
 
@@ -66,6 +67,11 @@ export const InboxView = memo(function InboxView({
   const handleReorderCommit = useCallback((orderedIds: string[]) => {
     onReorder?.(orderedIds);
   }, [onReorder]);
+
+  const handleDragActiveChange = useCallback((active: boolean) => {
+    setIsReordering(active);
+    onReorderDragActiveChange?.(active);
+  }, [onReorderDragActiveChange]);
 
   const hasContent = active.length > 0 || completed.length > 0;
 
@@ -106,7 +112,7 @@ export const InboxView = memo(function InboxView({
             reminders={localOrder}
             onReorder={setLocalOrder}
             onReorderCommit={handleReorderCommit}
-            onDragActiveChange={onReorderDragActiveChange}
+            onDragActiveChange={handleDragActiveChange}
             renderCard={cardRenderer}
             interaction={reorderInteraction}
           />

@@ -43,4 +43,14 @@ describe('calculateStableScrollAdjustment', () => {
 
     expect(adjustment).toBe(84);
   });
+
+  it('does not fight deliberate card reordering while stabilization is suspended', () => {
+    const adjustment = calculateStableScrollAdjustment(
+      [anchor('first', 'active', 18), anchor('second', 'active', 102)],
+      [anchor('second', 'active', 18), anchor('first', 'active', 102)],
+      true,
+    );
+
+    expect(adjustment).toBeNull();
+  });
 });

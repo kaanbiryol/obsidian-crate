@@ -53,7 +53,8 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   colorScheme = 'dark',
 }: ProjectDetailViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
-  const scrollRef = useStableReminderScroll();
+  const [isReordering, setIsReordering] = useState(false);
+  const scrollRef = useStableReminderScroll(isReordering);
 
   const detail = useMemo(() => {
     return buildProjectDetailViewModel(reminders, project, colorScheme);
@@ -76,6 +77,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
 
   const handleDragActiveChange = useCallback((active: boolean) => {
     isDraggingRef.current = active;
+    setIsReordering(active);
     onReorderDragActiveChange?.(active);
   }, [onReorderDragActiveChange]);
 
