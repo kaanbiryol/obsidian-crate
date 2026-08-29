@@ -47,6 +47,7 @@ export function PwaModalSheet({
 	onCloseEnd,
 	children,
 	variant,
+	sheetClassName,
 	detent = 'default',
 	keyboardInset = 0,
 	closeOnBackdrop = true,
@@ -60,6 +61,7 @@ export function PwaModalSheet({
 	onCloseEnd: () => void;
 	children: React.ReactNode;
 	variant: 'reminder' | 'settings';
+	sheetClassName?: string;
 	detent?: SheetDetent;
 	keyboardInset?: number;
 	closeOnBackdrop?: boolean;
@@ -115,7 +117,7 @@ export function PwaModalSheet({
 			unstyled
 			tweenConfig={isOpen ? OPEN_TWEEN : CLOSE_TWEEN}
 			style={isOpen ? { visibility: 'visible' } : undefined}
-			className={`pwa-modal-sheet pwa-modal-sheet--${variant}${keyboardInset > 0 ? ' is-keyboard-open' : ''}${screenTransitionClosing ? ' is-screen-transition-closing' : ''}`}
+			className={`pwa-modal-sheet pwa-modal-sheet--${variant}${sheetClassName ? ` ${sheetClassName}` : ''}${keyboardInset > 0 ? ' is-keyboard-open' : ''}${screenTransitionClosing ? ' is-screen-transition-closing' : ''}`}
 			onKeyDown={onKeyDown}
 		>
 			<Sheet.Backdrop

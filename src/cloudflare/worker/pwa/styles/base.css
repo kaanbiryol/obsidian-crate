@@ -164,7 +164,7 @@ button:disabled{cursor:not-allowed;opacity:.55}
 .toast.is-success::before{background:#65b985;box-shadow:0 0 0 3px rgba(101,185,133,.1)}
 .toast.is-error::before{background:#df7777;box-shadow:0 0 0 3px rgba(223,119,119,.1)}
 .toast.is-info::before{background:#9b75f7;box-shadow:0 0 0 3px rgba(var(--accent-rgb),.1)}
-.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:#0f0f12;border:0;border-radius:0;padding:0;box-shadow:none}
+.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:var(--pwa-sheet-surface);border:0;border-radius:0;padding:0;box-shadow:none}
 .settings-sheet__header{display:flex;min-height:68px;align-items:center;justify-content:space-between;gap:18px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.055)}
 .settings-sheet__header h2{margin:0;color:var(--text);font-size:20px;font-weight:650;line-height:1.2;letter-spacing:-.025em}
 .settings-sheet__close{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:var(--text-faint);transition:transform .16s ease,background .16s ease,color .16s ease}

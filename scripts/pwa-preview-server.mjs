@@ -22,6 +22,9 @@ export function createPwaPreviewServer({ assets, origin }) {
 	let previewLoadingUntil = 0;
 
 	const {
+		APPLE_STARTUP_1179X2556_PNG,
+		APPLE_STARTUP_1206X2622_PNG,
+		APPLE_STARTUP_1290X2796_PNG,
 		APPLE_TOUCH_ICON_180_PNG,
 		CRATE_ICON_192_PNG,
 		CRATE_ICON_512_PNG,
@@ -94,6 +97,21 @@ export function createPwaPreviewServer({ assets, origin }) {
 
 		if (method === 'GET' && path === '/notifications/apple-touch-icon-180.png') {
 			send(res, 200, APPLE_TOUCH_ICON_180_PNG, { 'Content-Type': 'image/png' });
+			return;
+		}
+
+		if (method === 'GET' && path === '/notifications/apple-startup-1179x2556.png') {
+			send(res, 200, APPLE_STARTUP_1179X2556_PNG, { 'Content-Type': 'image/png' });
+			return;
+		}
+
+		if (method === 'GET' && path === '/notifications/apple-startup-1206x2622.png') {
+			send(res, 200, APPLE_STARTUP_1206X2622_PNG, { 'Content-Type': 'image/png' });
+			return;
+		}
+
+		if (method === 'GET' && path === '/notifications/apple-startup-1290x2796.png') {
+			send(res, 200, APPLE_STARTUP_1290X2796_PNG, { 'Content-Type': 'image/png' });
 			return;
 		}
 

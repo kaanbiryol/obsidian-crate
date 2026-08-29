@@ -26,13 +26,18 @@
 @media (max-width: 640px){
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{width:100vw!important;border-right:0;border-left:0}
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{max-height:90dvh!important}
+	.pwa-modal-sheet--reminder.is-editor-screen:not(.is-keyboard-open) .pwa-modal-sheet__container--reminder{height:min(calc(326px + env(safe-area-inset-bottom)),90dvh)!important;max-height:90dvh!important}
+	.pwa-modal-sheet--reminder.is-editor-screen.is-keyboard-open .pwa-modal-sheet__container--reminder{height:min(calc(320px + var(--pwa-keyboard-inset,0px)),90dvh)!important;max-height:90dvh!important}
 	.modal-card.pwa-reminder-editor{padding:0 18px calc(20px + env(safe-area-inset-bottom))}
 	.pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor{padding-bottom:16px}
 	.pwa-editor-header{grid-template-columns:minmax(56px,1fr) minmax(0,1.7fr) minmax(56px,1fr);min-height:68px;margin:0 -18px 16px;padding:0 18px}
 	.pwa-editor-icon-button{width:36px;height:36px;min-width:36px}
-	.pwa-editor-card{flex:0 1 auto;min-height:196px;max-height:300px;padding:14px 16px 16px}
+	.pwa-editor-card{flex:0 1 auto;min-height:148px;max-height:188px;padding:14px 16px 16px}
 	.pwa-editor-title-input{font-size:17px;min-height:42px}
-	.pwa-editor-description-input{flex:1 1 auto;min-height:82px;max-height:140px}
+	.pwa-editor-description-input{flex:1 1 auto;min-height:40px;max-height:68px}
+	.pwa-modal-sheet.is-keyboard-open .pwa-editor-card{flex:0 1 auto;min-height:128px;max-height:188px}
+	.pwa-modal-sheet.is-keyboard-open .pwa-editor-title-input{flex:0 1 auto;min-height:42px;max-height:72px}
+	.pwa-modal-sheet.is-keyboard-open .pwa-editor-description-input{flex:1 1 auto;height:auto;min-height:36px;max-height:68px}
 	.pwa-editor-divider{margin:11px 0 13px}
 	.pwa-editor-chip-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;margin-top:12px;padding:3px;overflow:visible;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(255,255,255,.018)}
 	.pwa-editor-chip-row::-webkit-scrollbar{display:none}

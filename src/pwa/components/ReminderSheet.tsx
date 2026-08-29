@@ -215,6 +215,7 @@ export function ReminderSheet({
 				}}
 				onCloseEnd={handleCloseEnd}
 				variant="reminder"
+				sheetClassName={activeScreen === 'editor' ? 'is-editor-screen' : undefined}
 				keyboardInset={keyboardInset}
 				closeOnBackdrop={!saving && !isClosing && canInteract}
 				screenTransitionClosing={isStageClosing}
@@ -346,7 +347,7 @@ export function ReminderSheet({
 							<textarea
 								ref={descriptionRef}
 								className="pwa-editor-description-input ios-scroll"
-								rows={3}
+								rows={2}
 								maxLength={4096}
 								placeholder="Description"
 								aria-label="Reminder description"
