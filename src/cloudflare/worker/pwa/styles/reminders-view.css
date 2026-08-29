@@ -161,6 +161,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view .reminders-loading-transition-layer{display:flex;grid-area:1/1;min-width:0;min-height:0;height:100%;flex-direction:column;overflow:hidden}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .reminders-view-scroll{padding-top:12px;padding-right:14px;padding-left:14px}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .reorderable-reminder-item{margin-bottom:8px}
+.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) [data-reminder-section="completed"]{margin-bottom:8px}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .premium-reminder-card{margin-bottom:0;border-radius:10px}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .premium-reminder-content{gap:10px;padding:11px 12px;border-radius:10px;background:rgba(255,255,255,.018);border:1px solid rgba(255,255,255,.055);box-shadow:none}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .premium-reminder-card:hover .premium-reminder-content{background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.085)}
