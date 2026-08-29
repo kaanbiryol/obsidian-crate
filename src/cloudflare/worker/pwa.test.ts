@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SERVICE_WORKER_JS, createManifestJson, createPwaHtml, createPwaVersionJson } from './pwa';
+import { OPEN_OBSIDIAN_HTML, SERVICE_WORKER_JS, createManifestJson, createPwaHtml, createPwaVersionJson } from './pwa';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import { PWA_CHROME_COLOR } from './pwa/pwa-params';
 
@@ -172,6 +172,32 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('bottom:calc(0px - var(--pwa-tabbar-safe-area))');
 		expect(html).not.toContain('padding-bottom:max(env(safe-area-inset-bottom),16px)');
 		expect(html).not.toContain('pwa-safe-area-debug');
+	});
+
+	it('provides readable light-theme styles for every PWA surface', () => {
+		const html = createPwaHtml('https://worker.test/notifications');
+
+		expect(html).toContain('--text-muted:#52525b;');
+		expect(html).toContain('--text-faint:#66666f;');
+		expect(html).toContain('--text-error:#b42318;');
+		expect(html).toContain('--text-warning:#92400e;');
+		expect(html).toContain('--text-success:#166534;');
+		expect(html).toContain('--interactive-accent:#6d28d9;');
+		expect(html).toContain('--crate-tab-active-color:var(--pwa-light-accent-text);');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar,.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:var(--pwa-tabbar-surface);');
+		expect(html).toContain('.pwa-modal-sheet{color:var(--text-normal);color-scheme:light}');
+		expect(html).toContain('.pwa-editor-card{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}');
+		expect(html).toContain('.pwa-picker-option,.pwa-project-option,.pwa-project-picker-sheet .pwa-project-list,.pwa-schedule-preset-grid,.pwa-schedule-fields,.pwa-repeat-frequency-grid,.pwa-repeat-control-card,.pwa-repeat-time-card,.pwa-repeat-days,.settings-group{background:var(--pwa-light-surface-soft);');
+		expect(html).toContain('.pwa-schedule-field input,.pwa-repeat-time-card input{color-scheme:light}');
+		expect(html).toContain('.premium-reminder-card.is-completed .premium-reminder-content{opacity:.74}');
+	});
+
+	it('keeps the Obsidian handoff page readable in light mode', () => {
+		expect(OPEN_OBSIDIAN_HTML).toContain('<meta name="color-scheme" content="light dark">');
+		expect(OPEN_OBSIDIAN_HTML).toContain('@media (prefers-color-scheme:light)');
+		expect(OPEN_OBSIDIAN_HTML).toContain('body{background:#f7f7f8;color:#18181b}');
+		expect(OPEN_OBSIDIAN_HTML).toContain('.btn{background:#6d28d9;color:#fff}');
+		expect(OPEN_OBSIDIAN_HTML).toContain('p{color:#52525b}');
 	});
 
 	it('keeps library-backed sheets fixed while their inner fields handle scrolling', () => {

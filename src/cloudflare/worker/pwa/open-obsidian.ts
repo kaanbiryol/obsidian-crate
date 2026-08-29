@@ -3,6 +3,7 @@ export const OPEN_OBSIDIAN_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Opening Obsidian...</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -11,6 +12,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 h1{font-size:1.3rem;margin-bottom:16px;color:#fff}
 .btn{display:inline-block;padding:14px 28px;border:none;border-radius:14px;font-size:1rem;font-weight:600;cursor:pointer;background:#7c3aed;color:#fff;text-decoration:none;margin-top:8px}
 p{color:#a1a1aa;font-size:.9rem;margin-top:16px;line-height:1.5}
+@media (prefers-color-scheme:light){
+body{background:#f7f7f8;color:#18181b}
+.card{background:#fff;border:1px solid rgba(24,24,27,.11);box-shadow:0 18px 48px rgba(24,24,27,.12)}
+h1{color:#18181b}
+.btn{background:#6d28d9;color:#fff}
+p{color:#52525b}
+}
 </style>
 </head>
 <body>
