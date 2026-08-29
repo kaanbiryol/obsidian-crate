@@ -219,7 +219,6 @@ export function ReminderSheet({
 				sheetClassName={activeScreen === 'editor' ? 'is-editor-screen' : undefined}
 				keyboardInset={keyboardInset}
 				closeOnBackdrop={!saving && !isClosing && canInteract}
-				screenTransitionClosing={isStageClosing}
 				onKeyDown={handleDialogKeyDown}
 			>
 				<motion.div
@@ -283,17 +282,16 @@ export function ReminderSheet({
 							<div className="pwa-editor-header__side pwa-editor-header__side--right">
 								{isEditing && draft.deleteConfirm ? (
 									<Button
-										isIconOnly
-										className="pwa-editor-icon-button pwa-editor-icon-button--danger is-active"
+										className="pwa-editor-submit-button pwa-editor-submit-button--danger"
 										type="button"
 										data-action="delete-reminder"
-										aria-label="Confirm delete reminder"
+										aria-label="Delete reminder"
 										isDisabled={saving}
 										preventFocusOnPress
 										onPointerDown={(event) => event.preventDefault()}
 										onClick={() => modal.reminderId && onDelete(modal.reminderId)}
 									>
-										<Trash2 size={20} />
+										Delete
 									</Button>
 								) : (
 									<Button

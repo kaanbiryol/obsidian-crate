@@ -116,6 +116,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.settings-sheet__close{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border:0;border-radius:8px;');
 		expect(html).toContain('.pwa-editor-submit-button{min-width:52px;height:44px;');
 		expect(html).toContain('.pwa-editor-submit-button.is-saving:disabled{color:#bda7ff;');
+		expect(html).toContain('.pwa-editor-submit-button.pwa-editor-submit-button--danger{color:var(--danger)}');
 		expect(html).not.toContain('--interactive-accent:#a78bfa');
 		expect(html).not.toContain('--accent:#9b7cff');
 		expect(html).not.toContain('--accent-strong:#8e7cf4');
@@ -227,6 +228,8 @@ describe('PWA activation metadata', () => {
 
 		expect(html).toContain('.pwa-shadow-root.has-open-sheet .reminders-content,.pwa-shadow-root.has-open-sheet .reminders-view-scroll{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}');
 		expect(html).toContain('.pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.66);backdrop-filter:blur(10px);');
+		expect(html).not.toContain('.pwa-modal-sheet.is-screen-transition-closing .pwa-modal-sheet__backdrop');
+		expect(html).not.toContain('backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:opacity');
 		expect(html).toContain('.pwa-modal-sheet__container--reminder{width:min(1120px,calc(100vw - 36px))!important;height:calc(100% - env(safe-area-inset-top) - 28px)!important;');
 		expect(html).toContain('.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{max-height:90dvh!important}');
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-reminder-sheet-stage{height:calc(100% - var(--pwa-keyboard-inset,0px));flex:0 0 calc(100% - var(--pwa-keyboard-inset,0px))}');
