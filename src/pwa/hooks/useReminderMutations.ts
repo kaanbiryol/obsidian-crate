@@ -13,6 +13,7 @@ type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 
 export function useReminderMutations({
 	apiFetch,
+	beginLocalMutation,
 	closeModal,
 	config,
 	ensureCanMutate,
@@ -27,6 +28,7 @@ export function useReminderMutations({
 	showToast,
 }: {
 	apiFetch: ApiFetch;
+	beginLocalMutation: () => () => void;
 	closeModal: () => void;
 	config: StoredConfig;
 	ensureCanMutate: () => boolean;
@@ -66,6 +68,7 @@ export function useReminderMutations({
 		}
 
 		setSaving(true);
+		const endMutation = beginLocalMutation();
 		const previousReminders = remindersRef.current;
 		const previousProjects = projectsRef.current;
 		const isEdit = currentModal.mode === 'edit' && Boolean(currentModal.reminderId);
@@ -87,22 +90,25 @@ export function useReminderMutations({
 			});
 			if (!response.ok) throw new Error(await response.text());
 			const result = await response.json() as { notificationWarning?: string };
+			endMutation();
 			await loadReminders({ silent: true });
 			closeModal();
 			showToast(result.notificationWarning ? 'info' : 'success', result.notificationWarning
 				? `Saved. Notification sync failed: ${result.notificationWarning}`
 				: 'Reminder saved');
 		} catch (saveError) {
+			endMutation();
 			setReminders(previousReminders);
 			setProjects(previousProjects);
 			setSaving(false);
 			showToast('error', saveError instanceof Error ? saveError.message : String(saveError));
 		}
-	}, [apiFetch, buildMutationBody, closeModal, ensureCanMutate, loadReminders, projectsRef, remindersRef, setProjects, setReminders, setSaving, showToast]);
+	}, [apiFetch, beginLocalMutation, buildMutationBody, closeModal, ensureCanMutate, loadReminders, projectsRef, remindersRef, setProjects, setReminders, setSaving, showToast]);
 
 	const toggleReminderCompleted = useCallback(async (reminderId: string, completed: boolean) => {
 		if (!ensureCanMutate()) return;
-		const previousReminders = remindersRef.current;
+		const endMutation = beginLocalMutation();
+		const previousReminder = remindersRef.current.find((reminder) => reminder.id === reminderId);
 		const nextCompleted = !completed;
 		setReminders((current) => current.map((reminder) => reminder.id === reminderId
 			? { ...reminder, completed: nextCompleted, updatedAt: new Date().toISOString() }
@@ -119,16 +125,23 @@ export function useReminderMutations({
 			});
 			if (!response.ok) throw new Error(await response.text());
 			const result = await response.json() as { notificationWarning?: string };
+			endMutation();
 			await loadReminders({ silent: true });
 			if (result.notificationWarning) showToast('info', `Updated. Notification sync failed: ${result.notificationWarning}`);
 		} catch (toggleError) {
-			setReminders(previousReminders);
+			endMutation();
+			if (previousReminder) {
+				setReminders((current) => current.map((reminder) => reminder.id === reminderId
+					? previousReminder
+					: reminder));
+			}
 			showToast('error', toggleError instanceof Error ? toggleError.message : String(toggleError));
 		}
-	}, [apiFetch, config.allDayNotificationTime, config.folderPath, ensureCanMutate, loadReminders, remindersRef, setReminders, showToast]);
+	}, [apiFetch, beginLocalMutation, config.allDayNotificationTime, config.folderPath, ensureCanMutate, loadReminders, remindersRef, setReminders, showToast]);
 
 	const deleteReminder = useCallback(async (reminderId: string) => {
 		if (!ensureCanMutate()) return;
+		const endMutation = beginLocalMutation();
 		const previousReminders = remindersRef.current;
 		setReminders((current) => current.filter((reminder) => reminder.id !== reminderId));
 		closeModal();
@@ -138,19 +151,22 @@ export function useReminderMutations({
 				body: JSON.stringify({ folderPath: config.folderPath, id: reminderId }),
 			});
 			if (!response.ok) throw new Error(await response.text());
+			endMutation();
 			await loadReminders({ silent: true });
 			showToast('success', 'Reminder deleted');
 		} catch (deleteError) {
+			endMutation();
 			setReminders(previousReminders);
 			showToast('error', deleteError instanceof Error ? deleteError.message : String(deleteError));
 		}
-	}, [apiFetch, closeModal, config.folderPath, ensureCanMutate, loadReminders, remindersRef, setReminders, showToast]);
+	}, [apiFetch, beginLocalMutation, closeModal, config.folderPath, ensureCanMutate, loadReminders, remindersRef, setReminders, showToast]);
 
 	const persistReorder = useCallback(async (project: string, orderedIds: string[]) => {
 		if (!ensureCanMutate()) {
 			setReminders((current) => [...current]);
 			return;
 		}
+		const endMutation = beginLocalMutation();
 		const previousReminders = remindersRef.current;
 		setReminders((current) => reorderProjectReminders(current, project, orderedIds));
 		try {
@@ -159,12 +175,14 @@ export function useReminderMutations({
 				body: JSON.stringify({ folderPath: config.folderPath, project, orderedIds }),
 			});
 			if (!response.ok) throw new Error(await response.text());
+			endMutation();
 			await loadReminders({ silent: true });
 		} catch (reorderError) {
+			endMutation();
 			setReminders(previousReminders);
 			showToast('error', reorderError instanceof Error ? reorderError.message : String(reorderError));
 		}
-	}, [apiFetch, config.folderPath, ensureCanMutate, loadReminders, remindersRef, setReminders, showToast]);
+	}, [apiFetch, beginLocalMutation, config.folderPath, ensureCanMutate, loadReminders, remindersRef, setReminders, showToast]);
 
 	return {
 		saveReminder,

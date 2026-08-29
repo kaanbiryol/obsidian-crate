@@ -95,6 +95,7 @@ function App() {
 		hydratedCacheRef,
 		hydrateCachedSnapshot,
 		loadReminders,
+		beginLocalMutation,
 		resetReminderState,
 		setReminders,
 		setProjects,
@@ -283,6 +284,7 @@ function App() {
 		persistReorder,
 	} = useReminderMutations({
 		apiFetch,
+		beginLocalMutation,
 		closeModal,
 		config,
 		ensureCanMutate,

@@ -506,6 +506,8 @@ describe('markdownWriter', () => {
 
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
+    const onFileWritten = vi.fn(async () => undefined);
+    writer.setOnFileWritten(onFileWritten);
 
     await writer.reorderReminders('Reminders/Work.md', ['r2', 'r1']);
 
@@ -521,6 +523,8 @@ describe('markdownWriter', () => {
     expect(descIndex).toBe(firstIndex + 1);
     expect(doneIndex).toBeGreaterThan(descIndex);
     expect(footerIndex).toBeGreaterThan(doneIndex);
+    expect(onFileWritten).toHaveBeenCalledTimes(1);
+    expect(onFileWritten).toHaveBeenCalledWith(expect.objectContaining({ path: 'Reminders/Work.md' }));
   });
 
   it('removes recurrence when update explicitly clears it', async () => {

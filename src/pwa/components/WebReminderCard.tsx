@@ -29,20 +29,15 @@ export function WebReminderCard({
 
 	useEffect(() => {
 		if (!reminder.completed) return;
-		isCompletingRef.current = false;
 		setCompletionPreview(false);
 	}, [reminder.completed]);
 
 	const toggleComplete = useCallback(() => {
 		if (isCompletingRef.current) return;
-		if (reminder.completed) {
-			void onToggleComplete(reminder.id, true);
-			return;
-		}
-
 		isCompletingRef.current = true;
-		setCompletionPreview(true);
-		void Promise.resolve(onToggleComplete(reminder.id, false))
+		if (!reminder.completed) setCompletionPreview(true);
+		void Promise.resolve()
+			.then(() => onToggleComplete(reminder.id, reminder.completed))
 			.finally(() => {
 				isCompletingRef.current = false;
 				if (mountedRef.current) setCompletionPreview(false);

@@ -6,7 +6,7 @@
  * - Integrates with plugin storage and modal system
  */
 import { Notice } from 'obsidian';
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
 import { useReminderCardInteractions } from '@/reminders/components/useReminderCardInteractions';
 import { createLogger } from '@/reminders/utils/logger';
@@ -43,16 +43,24 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
   colorScheme = 'dark',
 }) => {
   const plugin = PluginContext.use();
+  const isTogglingRef = useRef(false);
 
   /**
    * Handle reminder completion toggle
    * Optimistic updates are handled by ReminderIndex
    */
   const handleToggle = useCallback(async () => {
+    if (isTogglingRef.current) return;
+    isTogglingRef.current = true;
+
     if (onToggleCompleteOverride) {
-      await onToggleCompleteOverride();
-      onUpdate?.();
-      return;
+      try {
+        await onToggleCompleteOverride();
+        onUpdate?.();
+        return;
+      } finally {
+        isTogglingRef.current = false;
+      }
     }
 
     try {
@@ -70,6 +78,8 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
     } catch (error) {
       log.error('Failed to toggle reminder', error);
       new Notice('Failed to update reminder');
+    } finally {
+      isTogglingRef.current = false;
     }
   }, [onToggleCompleteOverride, onUpdate, plugin, reminder.completed, reminder.id]);
 
@@ -87,6 +97,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
   const wrapperRef = useReminderCardInteractions({
     onEdit: handleEdit,
     onToggleComplete: handleToggle,
+    isDisabled: () => isTogglingRef.current,
   });
 
   return (

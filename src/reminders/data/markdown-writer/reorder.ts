@@ -1,6 +1,6 @@
 import { reorderReminderBlocksInContent } from "../../core/markdownReminderFile";
 import type { MarkdownWriterContext } from "./types";
-import { markdownWriterLog } from "./operation-shared";
+import { markdownWriterLog, notifyFileWritten } from "./operation-shared";
 
 export async function reorderRemindersInMarkdown(
   context: MarkdownWriterContext,
@@ -15,5 +15,6 @@ export async function reorderRemindersInMarkdown(
   await context.app.vault.process(file, (fileContent) =>
     reorderReminderBlocksInContent(fileContent, orderedIds)
   );
+  await notifyFileWritten(context, file);
   markdownWriterLog.info(`Reordered reminders in ${filePath}`);
 }
