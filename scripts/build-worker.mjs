@@ -69,7 +69,7 @@ async function buildWorkerBundle(pwaClientJs, pwaAssetVersion) {
 
 async function bundlePwaClient(assetVersion) {
 	const result = await build({
-		entryPoints: [resolve(root, 'src/cloudflare/worker/pwa-client.tsx')],
+		entryPoints: [resolve(root, 'src/pwa/main.tsx')],
 		bundle: true,
 		format: 'esm',
 		platform: 'browser',

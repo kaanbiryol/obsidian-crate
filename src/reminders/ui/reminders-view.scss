@@ -3,6 +3,7 @@
 @use './reminders-view/project-detail';
 @use './reminders-view/reminder-cards';
 @use './reminders-view/layout-modes';
+@use './reminders-view/primary-screen';
 
 .crate-reminders-ui {
 	@include shell.styles;
@@ -10,4 +11,5 @@
 	@include project-detail.styles;
 	@include reminder-cards.styles;
 	@include layout-modes.styles;
+	@include primary-screen.styles;
 }

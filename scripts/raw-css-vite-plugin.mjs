@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
+import { compile } from 'sass';
 
 export function rawCssPlugin() {
 	const cssFiles = new Map();
@@ -31,7 +32,11 @@ export function rawCssPlugin() {
 				return null;
 			}
 
-			return `export default ${JSON.stringify(readFileSync(filePath, 'utf-8'))};`;
+			const contents = filePath.endsWith('.scss')
+				? compile(filePath).css
+				: readFileSync(filePath, 'utf-8');
+
+			return `export default ${JSON.stringify(contents)};`;
 		},
 	};
 }

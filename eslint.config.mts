@@ -64,8 +64,7 @@ export default tseslint.config(
 	},
 	{
 		files: [
-			'src/cloudflare/worker/pwa-client.tsx',
-			'src/cloudflare/worker/pwa-client/**/*.{ts,tsx}',
+			'src/pwa/**/*.{ts,tsx}',
 			'src/cloudflare/worker/setup-client.js',
 		],
 		rules: {

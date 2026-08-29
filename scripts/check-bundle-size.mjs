@@ -11,8 +11,8 @@ const budgetGroups = {
 	},
 	{
 		path: 'dist/styles.css',
-		// Owned selector prefixes add raw bytes without materially affecting transfer size.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '370000', 10),
+		// Owned selector prefixes and shared cross-host UI rules add raw bytes without materially affecting transfer size.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '381000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '45000', 10),
 	}],
 	worker: [{

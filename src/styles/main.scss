@@ -28,6 +28,25 @@
   --crate-success: var(--text-success);
   --crate-on-accent: var(--text-on-accent);
 
+  /* Host-specific appearance tokens consumed by the shared reminders UI. */
+  --crate-primary-header-padding: 14px 16px 10px;
+  --crate-reminder-card-bg: var(--crate-surface-bg);
+  --crate-reminder-card-border: var(--crate-surface-border);
+  --crate-reminder-card-shadow: 0 2px 8px var(--crate-shadow-color);
+  --crate-reminder-card-hover-bg: var(--crate-surface-hover-bg);
+  --crate-reminder-card-hover-border: var(--crate-surface-border-hover);
+  --crate-reminder-card-hover-shadow: var(--shadow-s);
+  --crate-reminder-card-active-bg: var(--crate-surface-active-bg);
+  --crate-reminder-card-active-border: var(--crate-surface-border-hover);
+  --crate-project-card-bg: var(--crate-surface-bg);
+  --crate-project-card-border: var(--crate-surface-border);
+  --crate-project-card-shadow: 0 2px 8px var(--crate-shadow-color);
+  --crate-project-card-hover-bg: var(--crate-surface-hover-bg);
+  --crate-project-card-hover-border: var(--crate-surface-border-hover);
+  --crate-project-accent-hover-shadow: 0 0 16px currentColor;
+  --crate-tab-active-color: var(--interactive-accent);
+  --crate-fab-bg: var(--interactive-accent);
+
   --crate-glass-back-bg: var(--crate-surface-bg);
   --crate-glass-back-border: var(--crate-surface-border);
   --crate-glass-back-hover-bg: var(--crate-surface-hover-bg);

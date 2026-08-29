@@ -3,7 +3,7 @@
 	"entry": [
 		"src/main.ts",
 		"src/cloudflare/worker/index.ts",
-		"src/cloudflare/worker/pwa-client.tsx",
+		"src/pwa/main.tsx",
 		"scripts/*.mjs",
 		"tailwind.theme.js"
 	],

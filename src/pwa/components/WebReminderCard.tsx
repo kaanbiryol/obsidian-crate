@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
+import { useReminderCardInteractions } from '@/reminders/components/useReminderCardInteractions';
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
 
 export function WebReminderCard({
@@ -15,7 +16,6 @@ export function WebReminderCard({
 	onEdit: (id: string) => void;
 	onToggleComplete: (id: string, completed: boolean) => void | Promise<void>;
 }) {
-	const wrapperRef = useRef<HTMLDivElement | null>(null);
 	const mountedRef = useRef(true);
 	const isCompletingRef = useRef(false);
 	const [completionPreview, setCompletionPreview] = useState(false);
@@ -49,48 +49,11 @@ export function WebReminderCard({
 			});
 	}, [onToggleComplete, reminder.completed, reminder.id]);
 
-	useEffect(() => {
-		const wrapper = wrapperRef.current;
-		if (!wrapper) return;
-
-		const handleClick = (event: MouseEvent) => {
-			const target = event.target as HTMLElement;
-			if (isCompletingRef.current) {
-				event.stopPropagation();
-				return;
-			}
-			if (target.closest('.reorder-drag-handle')) {
-				event.stopPropagation();
-				return;
-			}
-
-			if (target.closest('.premium-checkbox') || target.closest('[role="checkbox"]')) {
-				event.stopPropagation();
-				toggleComplete();
-				return;
-			}
-
-			if (target.closest('a[data-markdown-link]')) {
-				event.stopPropagation();
-				return;
-			}
-
-			onEdit(reminder.id);
-		};
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (isCompletingRef.current) return;
-			if (event.target !== wrapper || (event.key !== 'Enter' && event.key !== ' ')) return;
-			event.preventDefault();
-			onEdit(reminder.id);
-		};
-
-		wrapper.addEventListener('click', handleClick, true);
-		wrapper.addEventListener('keydown', handleKeyDown);
-		return () => {
-			wrapper.removeEventListener('click', handleClick, true);
-			wrapper.removeEventListener('keydown', handleKeyDown);
-		};
-	}, [onEdit, reminder.id, toggleComplete]);
+	const wrapperRef = useReminderCardInteractions({
+		onEdit: () => onEdit(reminder.id),
+		onToggleComplete: toggleComplete,
+		isDisabled: () => isCompletingRef.current,
+	});
 
 	return (
 		<div

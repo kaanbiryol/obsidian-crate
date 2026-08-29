@@ -2,45 +2,45 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { RemindersAppShell, type ReminderCardRenderer } from '@/reminders/ui/RemindersAppShell';
-import { PWA_ASSET_VERSION } from './pwa-version';
+import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import {
 	AUTH_TOKEN_KEY,
 	REMINDERS_CACHE_KEY,
 	isStandaloneApp,
 	loadStoredConfig,
-} from './pwa-client/config';
+} from './config';
 import {
 	fetchPwaAssetVersion,
 	makeApiFetch,
 	registerPwaServiceWorker,
 	replaceBrowserUrlWithInstallToken,
-} from './pwa-client/api';
-import { ErrorState, EmptyAuthState } from './pwa-client/components/AuthStates';
-import { PwaHeaderActions, PwaLoadingSkeleton, PwaPullRefreshIndicator, PwaTopNotices } from './pwa-client/components/PwaChrome';
-import { ReminderSheet } from './pwa-client/components/ReminderSheet';
-import { SettingsSheet } from './pwa-client/components/SettingsSheet';
-import { WebReminderCard } from './pwa-client/components/WebReminderCard';
-import { usePushNotifications } from './pwa-client/hooks/usePushNotifications';
-import { usePwaBootstrap } from './pwa-client/hooks/usePwaBootstrap';
-import { usePwaColorScheme } from './pwa-client/hooks/usePwaColorScheme';
-import { usePwaStatus } from './pwa-client/hooks/usePwaStatus';
-import { useLaunchReminderModal } from './pwa-client/hooks/useLaunchReminderModal';
-import { usePwaZoomLock } from './pwa-client/hooks/usePwaZoomLock';
-import { useReminderSync } from './pwa-client/hooks/useReminderSync';
-import { useReminderMutations } from './pwa-client/hooks/useReminderMutations';
-import { useSheetTransition } from './pwa-client/hooks/useSheetTransition';
-import { usePullToRefresh } from './pwa-client/hooks/usePullToRefresh';
-import { useToast } from './pwa-client/hooks/useToast';
+} from './api';
+import { ErrorState, EmptyAuthState } from './components/AuthStates';
+import { PwaHeaderActions, PwaLoadingSkeleton, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
+import { ReminderSheet } from './components/ReminderSheet';
+import { SettingsSheet } from './components/SettingsSheet';
+import { WebReminderCard } from './components/WebReminderCard';
+import { usePushNotifications } from './hooks/usePushNotifications';
+import { usePwaBootstrap } from './hooks/usePwaBootstrap';
+import { usePwaColorScheme } from './hooks/usePwaColorScheme';
+import { usePwaStatus } from './hooks/usePwaStatus';
+import { useLaunchReminderModal } from './hooks/useLaunchReminderModal';
+import { usePwaZoomLock } from './hooks/usePwaZoomLock';
+import { useReminderSync } from './hooks/useReminderSync';
+import { useReminderMutations } from './hooks/useReminderMutations';
+import { useSheetTransition } from './hooks/useSheetTransition';
+import { usePullToRefresh } from './hooks/usePullToRefresh';
+import { useToast } from './hooks/useToast';
 import {
 	buildModalDraft,
 	toSharedReminder,
-} from './pwa-client/reminder-state';
+} from './reminder-state';
 import type {
 	ModalMode,
 	ModalState,
 	StartTab,
 	StoredConfig,
-} from './pwa-client/types';
+} from './types';
 
 function App() {
 	const colorScheme = usePwaColorScheme();
@@ -320,7 +320,10 @@ function App() {
 	}
 
 	return (
-		<div className={`crate-reminders-ui reminders-shadow-root pwa-shadow-root ${colorScheme}${modal || settingsOpen ? ' has-open-sheet' : ''}`}>
+		<div
+			className={`crate-reminders-ui reminders-shadow-root pwa-shadow-root ${colorScheme}${modal || settingsOpen ? ' has-open-sheet' : ''}`}
+			data-ui-host="pwa"
+		>
 			<RemindersAppShell
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}

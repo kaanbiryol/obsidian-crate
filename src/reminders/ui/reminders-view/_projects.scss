@@ -78,7 +78,7 @@
 }
 
 .premium-project-card:hover .premium-project-accent {
-    box-shadow: 0 0 16px currentColor;
+    box-shadow: var(--crate-project-accent-hover-shadow, 0 0 16px currentColor);
 }
 
 .premium-project-info {

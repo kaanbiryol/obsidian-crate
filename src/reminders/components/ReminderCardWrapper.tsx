@@ -6,8 +6,9 @@
  * - Integrates with plugin storage and modal system
  */
 import { Notice } from 'obsidian';
-import React, { useRef, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
+import { useReminderCardInteractions } from '@/reminders/components/useReminderCardInteractions';
 import { createLogger } from '@/reminders/utils/logger';
 
 const log = createLogger('ReminderCardWrapper');
@@ -43,14 +44,11 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
 }) => {
   const plugin = PluginContext.use();
 
-  // Ref for native event listener (React events don't work in Shadow DOM)
-  const wrapperRef = useRef<HTMLDivElement>(null);
-
   /**
    * Handle reminder completion toggle
    * Optimistic updates are handled by ReminderIndex
    */
-  const handleToggle = async () => {
+  const handleToggle = useCallback(async () => {
     if (onToggleCompleteOverride) {
       await onToggleCompleteOverride();
       onUpdate?.();
@@ -73,63 +71,23 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
       log.error('Failed to toggle reminder', error);
       new Notice('Failed to update reminder');
     }
-  };
+  }, [onToggleCompleteOverride, onUpdate, plugin, reminder.completed, reminder.id]);
 
   /**
    * Handle reminder edit
    */
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     if (onEditOverride) {
       onEditOverride();
       return;
     }
     openReminderEditModal(plugin, reminder, onUpdate ?? (() => undefined));
-  };
+  }, [onEditOverride, onUpdate, plugin, reminder]);
 
-  // Native click handler for Shadow DOM compatibility
-  // React's synthetic events don't work properly inside Shadow DOM
-  // Use capture phase to intercept before HeroUI's handlers can stop propagation
-  useEffect(() => {
-    const wrapper = wrapperRef.current;
-    if (!wrapper) return;
-
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-
-      if (target.closest('.reorder-drag-handle')) {
-        e.stopPropagation();
-        return;
-      }
-
-      // Handle checkbox clicks (premium checkbox or legacy HeroUI checkbox)
-      if (target.closest('.premium-checkbox') || target.closest('[data-slot="wrapper"]') || target.closest('input[type="checkbox"]')) {
-        e.stopPropagation();
-        void handleToggle();
-        return;
-      }
-
-      // Allow markdown link clicks to open in browser (don't open edit modal)
-      if (target.closest('a[data-markdown-link]')) {
-        e.stopPropagation();
-        return;
-      }
-
-      // Handle card clicks (edit)
-      handleEdit();
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.target !== wrapper || (event.key !== 'Enter' && event.key !== ' ')) return;
-      event.preventDefault();
-      handleEdit();
-    };
-
-    wrapper.addEventListener('click', handleClick, true);
-    wrapper.addEventListener('keydown', handleKeyDown);
-    return () => {
-      wrapper.removeEventListener('click', handleClick, true);
-      wrapper.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [plugin, reminder, onUpdate, onEditOverride]);
+  const wrapperRef = useReminderCardInteractions({
+    onEdit: handleEdit,
+    onToggleComplete: handleToggle,
+  });
 
   return (
     <div

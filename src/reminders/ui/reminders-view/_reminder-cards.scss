@@ -47,6 +47,38 @@
     .reminder-card__main {
         padding-right: 52px;
     }
+
+    &[data-reorder-interaction="long-press"] {
+        -webkit-touch-callout: none;
+        user-select: none;
+        transform-origin: center;
+        will-change: transform;
+
+        .premium-reminder-content,
+        .reminder-card__main {
+            padding-right: 16px;
+        }
+
+        &.is-long-press-armed {
+            z-index: 45;
+        }
+
+        &.is-reordering {
+            z-index: 50;
+            cursor: grabbing;
+        }
+
+        &.is-long-press-armed,
+        &.is-reordering {
+            .premium-reminder-content,
+            .reminder-card__main {
+                transform: scale(1);
+                background: var(--crate-reminder-card-bg, var(--crate-surface-bg));
+                border-color: var(--crate-reminder-card-border, var(--crate-surface-border));
+                box-shadow: var(--crate-reminder-card-shadow, none);
+            }
+        }
+    }
 }
 
 .reorder-drag-handle {
@@ -113,6 +145,7 @@
     &.is-checked {
         border-color: var(--crate-success);
         background: var(--crate-success);
+        box-shadow: var(--crate-checkbox-checked-shadow, none);
 
         &:hover {
             border-color: var(--crate-success);

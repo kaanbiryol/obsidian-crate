@@ -1,4 +1,4 @@
-import { PWA_ASSET_VERSION } from '../pwa-version';
+import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import {
 	currentQueryParams,
 	detectDeviceName,

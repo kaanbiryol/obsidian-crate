@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@heroui/react';
-import { PWA_ASSET_VERSION } from '../../pwa-version';
+import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { isStandaloneApp } from '../config';
 import type { StoredConfig } from '../types';
 
