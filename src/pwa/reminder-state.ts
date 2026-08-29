@@ -124,6 +124,16 @@ export function formatModalDueSummary(draft: ModalDraft): string {
 	return formatDueDate(draft.dueTime ? `${draft.dueDate}T${draft.dueTime}` : draft.dueDate) ?? 'No date';
 }
 
+export function hasReminderDraftTitle(
+	content: string,
+	projectOptions: string[],
+	defaultProject: string,
+): boolean {
+	return Boolean(
+		deriveReminderDraftContentMetadata(content, projectOptions, defaultProject).cleanContent.trim(),
+	);
+}
+
 function getDraftDueValue(draft: ModalDraft): string | null {
 	if (!draft.dueDate) return null;
 	if (!draft.dueTime) return draft.dueDate;

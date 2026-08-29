@@ -3,7 +3,7 @@
 
 @mixin styles {
 
-.reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse) {
+.reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail) {
     --reminders-fab-size: 44px;
 
     .view-header {
@@ -81,12 +81,9 @@
     }
 
     .premium-checkbox {
-        width: 18px;
-        height: 18px;
-        min-width: 18px;
-        flex-basis: 18px;
-        border-width: 1.5px;
-        margin-top: 1px;
+        --premium-checkbox-size: 18px;
+        --premium-checkbox-offset: -13px;
+        --premium-checkbox-border-width: 1.5px;
     }
 
     .premium-reminder-body {

@@ -99,7 +99,7 @@ if (missingSameNodeSelectors.length > 0) {
 }
 
 const sharedPrimaryScreenSelectors = [
-	'.crate-reminders-ui .reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse)',
+	'.crate-reminders-ui .reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse,.is-project-detail)',
 ];
 const missingSharedPrimaryScreenSelectors = sharedPrimaryScreenSelectors.filter(
 	(selector) => !normalizedGeneratedSelectors.has(selector),

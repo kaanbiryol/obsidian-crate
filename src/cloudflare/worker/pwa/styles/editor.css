@@ -21,13 +21,15 @@
 .pwa-editor-header__side{display:flex;align-items:center;justify-content:flex-start}
 .pwa-editor-header__side--right{justify-content:flex-end}
 .pwa-editor-title{margin:0;text-align:center;font-size:20px;font-weight:650;line-height:1.2;letter-spacing:-.025em;color:var(--text-normal)}
-.pwa-editor-icon-button{width:36px;height:36px;min-width:36px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.025);color:var(--text-faint);padding:0;box-shadow:none}
+.pwa-editor-icon-button{width:44px;height:44px;min-width:44px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.025);color:var(--text-faint);padding:0;box-shadow:none}
 .pwa-editor-icon-button svg{width:18px;height:18px}
 .pwa-editor-icon-button--danger{background:rgba(239,68,68,.065);border-color:rgba(239,68,68,.14);color:#df7777}
 .pwa-editor-icon-button--danger.is-active{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.28)}
-.pwa-editor-icon-button--save{background:#8057e6;border-color:rgba(255,255,255,.1);color:white;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 18px rgba(var(--accent-rgb),.16)}
-.pwa-editor-icon-button--save:disabled{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.08);color:var(--text-faint);box-shadow:none}
-.pwa-editor-icon-button--save.is-saving:disabled{background:#8057e6;border-color:rgba(255,255,255,.1);color:white;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 18px rgba(var(--accent-rgb),.16);cursor:wait;opacity:1}
+.pwa-editor-submit-button{min-width:52px;height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:#bda7ff;box-shadow:none;font-size:15px;font-weight:650;line-height:1}
+.pwa-editor-submit-button:hover{background:rgba(var(--accent-rgb),.08)}
+.pwa-editor-submit-button:active{background:rgba(var(--accent-rgb),.12);transform:scale(.97)}
+.pwa-editor-submit-button:disabled{background:transparent;color:var(--text-faint);box-shadow:none;opacity:.55}
+.pwa-editor-submit-button.is-saving:disabled{color:#bda7ff;cursor:wait;opacity:1}
 .pwa-editor-card{position:relative;display:flex;flex:0 1 auto;min-height:196px;max-height:300px;flex-direction:column;overflow:hidden;overscroll-behavior:none;padding:16px 18px 18px;border-radius:12px;background:rgba(255,255,255,.018);border:1px solid rgba(255,255,255,.06);box-shadow:none}
 .pwa-editor-title-input,.pwa-editor-description-input{display:block;width:100%;padding:0;margin:0;background:transparent;border:none;outline:none;box-shadow:none;color:var(--text-normal);font-family:inherit;resize:none;-webkit-appearance:none}
 .pwa-editor-title-input{flex:0 1 auto;min-height:44px;max-height:108px;font-size:17px;font-weight:580;line-height:1.35;letter-spacing:-.012em;overflow-y:auto;overscroll-behavior-y:contain}

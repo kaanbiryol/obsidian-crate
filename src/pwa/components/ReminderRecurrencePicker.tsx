@@ -89,7 +89,7 @@ export function ReminderRecurrencePicker({
 				</Button>
 				<h3>Repeat</h3>
 				<Button className="pwa-repeat-apply" type="button" onClick={applyRepeat}>
-					Apply
+					Done
 				</Button>
 			</div>
 

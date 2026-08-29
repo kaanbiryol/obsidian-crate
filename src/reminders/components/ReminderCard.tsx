@@ -133,23 +133,28 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                         : reminder.completed
                             ? `Mark ${reminder.content} incomplete`
                             : `Mark ${reminder.content} complete`}
-                    style={{
-                        borderColor: isCheckboxChecked
-                            ? 'var(--text-success)'
-                            : (isImportant
-                                ? 'var(--text-error)'
-                                : 'var(--background-modifier-border-hover, var(--background-modifier-border))'),
-                        backgroundColor: isCheckboxChecked ? 'var(--text-success)' : 'transparent',
-                        boxShadow: isCheckboxChecked
-                            ? '0 0 6px color-mix(in srgb, var(--text-success) 35%, transparent)'
-                            : isImportant
-                                ? '0 0 4px color-mix(in srgb, var(--text-error) 25%, transparent)'
-                                : 'none',
-                    }}
                 >
-                    {isCheckboxChecked && (
-                        <Check size={12} strokeWidth={3} className="premium-checkbox-icon" />
-                    )}
+                    <span
+                        className="premium-checkbox-visual"
+                        style={{
+                            borderColor: isCheckboxChecked
+                                ? 'var(--text-success)'
+                                : (isImportant
+                                    ? 'var(--text-error)'
+                                    : 'var(--background-modifier-border-hover, var(--background-modifier-border))'),
+                            backgroundColor: isCheckboxChecked ? 'var(--text-success)' : 'transparent',
+                            boxShadow: isCheckboxChecked
+                                ? '0 0 6px color-mix(in srgb, var(--text-success) 35%, transparent)'
+                                : isImportant
+                                    ? '0 0 4px color-mix(in srgb, var(--text-error) 25%, transparent)'
+                                    : 'none',
+                        }}
+                        aria-hidden="true"
+                    >
+                        {isCheckboxChecked && (
+                            <Check size={12} strokeWidth={3} className="premium-checkbox-icon" />
+                        )}
+                    </span>
                 </button>
 
                 {/* Main content area */}

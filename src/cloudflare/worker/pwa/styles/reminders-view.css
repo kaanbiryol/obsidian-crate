@@ -66,7 +66,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .reminders-stack,.reorder-list,.completed-list{gap:0}
 .date-group{margin-bottom:20px}
 .date-group__title{margin:0 0 9px;padding-left:3px;font-size:10.5px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.09em}
-.pwa-reminders-view .premium-checkbox.is-completing{animation:pwa-completion-check 360ms cubic-bezier(.16,1,.3,1)}
+.pwa-reminders-view .premium-checkbox.is-completing .premium-checkbox-visual{animation:pwa-completion-check 360ms cubic-bezier(.16,1,.3,1)}
 @keyframes pwa-completion-check{0%{transform:scale(.92)}55%{transform:scale(1.14)}100%{transform:scale(1)}}
 .modal-card,.settings-sheet{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:24px 24px 0 0}
 .composer-surface,.composer-panel{background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.03);border-radius:14px}
@@ -85,7 +85,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view .view-header-meta{opacity:1}
 .pwa-header-actions{display:flex;align-items:flex-start;justify-content:flex-end;gap:7px;min-width:0}
 .pwa-reminders-view button,.pwa-reminder-editor button,.pwa-picker-sheet button,.settings-sheet button{touch-action:manipulation;user-select:none;-webkit-user-select:none}
-.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:40px;height:40px;min-width:40px;border-radius:50%;display:grid;place-items:center;margin-top:0;padding:0;color:var(--text-muted);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.065);box-shadow:inset 0 1px 0 rgba(255,255,255,.018),0 6px 18px rgba(0,0,0,.08);transition:transform 150ms ease,background 170ms ease,border-color 170ms ease,color 170ms ease}
+.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;border-radius:50%;display:grid;place-items:center;margin-top:0;padding:0;color:var(--text-muted);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.065);box-shadow:inset 0 1px 0 rgba(255,255,255,.018),0 6px 18px rgba(0,0,0,.08);transition:transform 150ms ease,background 170ms ease,border-color 170ms ease,color 170ms ease}
 .pwa-header-settings-button svg,.pwa-header-sync-button svg{display:block}
 .pwa-header-settings-button:hover,.pwa-header-settings-button.is-active,.pwa-header-sync-button:hover{color:var(--text-normal);background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.11)}
 .pwa-header-settings-button:active,.pwa-header-sync-button:active{transform:scale(.92)}
@@ -94,10 +94,10 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-header-sync-button.is-cached .pwa-header-sync-button__dot,.pwa-header-sync-button.is-offline .pwa-header-sync-button__dot{background:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.16)}
 .pwa-header-sync-button.is-error .pwa-header-sync-button__dot{background:#ef4444;box-shadow:0 0 0 2px rgba(239,68,68,.16)}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-actions{gap:6px}
-.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-sync-button{width:36px;height:36px;min-width:36px;border-radius:50%;background:rgba(255,255,255,.025);border-color:rgba(255,255,255,.055);box-shadow:none;color:var(--text-faint)}
+.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-sync-button{width:44px;height:44px;min-width:44px;border-radius:50%;background:rgba(255,255,255,.025);border-color:rgba(255,255,255,.055);box-shadow:none;color:var(--text-faint)}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button:hover,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button.is-active,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-sync-button:hover{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.085);color:var(--text-normal)}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button svg,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-sync-button svg{width:17px;height:17px}
-.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-sync-button__dot{top:4px;right:4px;width:6px;height:6px}
+.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-sync-button__dot{top:6px;right:6px;width:6px;height:6px}
 .pwa-reminders-view .reminders-content{flex:1;min-height:0;overflow:hidden;padding-bottom:0;position:relative}
 .pwa-reminders-view .reminders-content.has-loading-transition{display:grid}
 .pwa-reminders-view .reminders-loading-transition-layer{display:flex;grid-area:1/1;min-width:0;min-height:0;height:100%;flex-direction:column;overflow:hidden}

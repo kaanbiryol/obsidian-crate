@@ -6,7 +6,7 @@
 @keyframes pwa-update-slide-in{from{opacity:0;transform:translate3d(0,-10px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @keyframes pwa-toast-in{from{opacity:0;transform:translate3d(-50%,6px,0) scale(.98)}to{opacity:1;transform:translate3d(-50%,0,0) scale(1)}}
 @media (prefers-reduced-motion: reduce){
-	.view-transition,.modal-card,.settings-sheet,.pwa-picker-sheet,.pwa-skeleton-line,.pwa-pull-refresh__glyph svg,.pwa-update-banner,.toast,.premium-checkbox.is-completing,.premium-checkbox-icon{animation:none!important}
+	.view-transition,.modal-card,.settings-sheet,.pwa-picker-sheet,.pwa-skeleton-line,.pwa-pull-refresh__glyph svg,.pwa-update-banner,.toast,.premium-checkbox.is-completing .premium-checkbox-visual,.premium-checkbox-icon{animation:none!important}
 	.pwa-reminders-view .bottom-tab-button,.pwa-reminders-view .bottom-tab-icon,.pwa-reminders-view .bottom-tab-label,.premium-reminder-content,.fab,.pwa-pull-refresh,.pwa-pull-refresh__glyph,.modal-card.pwa-reminder-editor,.pwa-modal-sheet__backdrop{transition:none!important}
 }
 @keyframes sheet-in{from{translate:0 18px;opacity:.92}to{translate:0 0;opacity:1}}
@@ -27,7 +27,7 @@
 	.modal-card.pwa-reminder-editor{padding:0 18px calc(20px + env(safe-area-inset-bottom))}
 	.pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor{padding-bottom:16px}
 	.pwa-editor-header{grid-template-columns:minmax(56px,1fr) minmax(0,1.7fr) minmax(56px,1fr);min-height:68px;margin:0 -18px 16px;padding:0 18px}
-	.pwa-editor-icon-button{width:36px;height:36px;min-width:36px}
+	.pwa-editor-icon-button{width:44px;height:44px;min-width:44px}
 	.pwa-editor-card{flex:0 1 auto;min-height:148px;max-height:188px;padding:14px 16px 16px}
 	.pwa-editor-title-input{font-size:17px;min-height:42px}
 	.pwa-editor-description-input{flex:1 1 auto;min-height:40px;max-height:68px}
@@ -67,7 +67,7 @@
 }
 @media (max-width: 420px){
 	.pwa-reminders-view .view-header{padding:calc(env(safe-area-inset-top) + 17px) 18px 11px!important}
-	.pwa-header-settings-button,.pwa-header-sync-button{width:40px;height:40px;min-width:40px}
+	.pwa-header-settings-button,.pwa-header-sync-button{width:44px;height:44px;min-width:44px}
 	.premium-reminder-title{font-size:15.5px}
 	.premium-reminder-description{font-size:13.25px}
 	.premium-pill{font-size:10.5px}
@@ -75,7 +75,6 @@
 @media (max-width: 392px){
 	:root{--tabbar-h:72px}
 	.premium-reminder-content{padding:12px 13px}
-	.crate-reminders-ui .pwa-reminders-view .premium-checkbox{width:20px;height:20px;min-width:20px;flex-basis:20px;aspect-ratio:1}
 	.fab{right:14px;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) + env(safe-area-inset-bottom));width:48px;height:48px;min-width:48px;border-radius:50%}
 }
 

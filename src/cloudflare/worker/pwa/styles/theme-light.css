@@ -76,7 +76,7 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 #app{background:radial-gradient(circle at 84% -10%,rgba(var(--accent-rgb),.055),transparent 33%),var(--background-primary)}
 .reminders-shadow-root{background:var(--background-primary);color:var(--text-normal)}
 .pwa-reminders-view .bottom-tab-bar,.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:var(--pwa-tabbar-surface);border-color:var(--background-modifier-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
-.crate-reminders-ui .pwa-reminders-view .premium-checkbox{background:transparent;border-color:rgba(24,24,27,.28);color:white}
+.crate-reminders-ui .pwa-reminders-view .premium-checkbox-visual{background:transparent;border-color:rgba(24,24,27,.28);color:white}
 .secondary-button,.pwa-header-settings-button,.pwa-header-sync-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
 .pwa-header-settings-button:hover,.pwa-header-settings-button.is-active,.pwa-header-sync-button:hover{background:var(--pwa-light-surface-hover);border-color:var(--pwa-light-border-strong);color:var(--text-normal)}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-sync-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
@@ -97,7 +97,8 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .pwa-editor-header,.pwa-project-picker-header,.pwa-schedule-header,.pwa-repeat-header,.settings-sheet__header{border-color:var(--pwa-light-border)}
 .pwa-editor-icon-button,.pwa-picker-icon-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
 .pwa-editor-icon-button--danger{background:rgba(180,35,24,.07);border-color:rgba(180,35,24,.18)}
-.pwa-editor-icon-button--save:disabled{background:rgba(24,24,27,.08);border-color:var(--pwa-light-border);color:var(--text-faint);opacity:.72}
+.pwa-editor-submit-button{color:var(--pwa-light-accent-text)}
+.pwa-editor-submit-button:disabled{background:transparent;color:var(--text-faint);opacity:.55}
 .pwa-editor-card{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}
 .pwa-editor-divider{background:var(--pwa-light-border)}
 .pwa-editor-chip-row{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border)}

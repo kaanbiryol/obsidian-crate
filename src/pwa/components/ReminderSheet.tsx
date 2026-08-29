@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { Button } from '@heroui/react';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
-	ArrowUp,
 	Calendar,
-	Check,
 	Flag,
 	Hash,
 	Repeat,
@@ -23,6 +21,7 @@ import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
 	formatModalDueSummary,
+	hasReminderDraftTitle,
 } from '../reminder-state';
 import type { ModalDraft, ModalState } from '../types';
 import { PwaModalSheet } from './PwaModalSheet';
@@ -64,7 +63,9 @@ export function ReminderSheet({
 	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 	const isEditing = modal.mode === 'edit';
 	const title = isEditing ? 'Edit reminder' : 'New reminder';
-	const canSubmit = !saving && !isClosing && Boolean(draft.content.trim());
+	const canSubmit = !saving
+		&& !isClosing
+		&& hasReminderDraftTitle(draft.content, projectOptions, draft.defaultProject);
 	const saveReminder = useCallback(() => {
 		if (!canSubmit) return;
 		onSave(modal);
@@ -296,15 +297,14 @@ export function ReminderSheet({
 									</Button>
 								) : (
 									<Button
-										isIconOnly
-										className={`pwa-editor-icon-button pwa-editor-icon-button--save${saving ? ' is-saving' : ''}`}
+										className={`pwa-editor-submit-button${saving ? ' is-saving' : ''}`}
 										type="submit"
 										data-action="save-reminder"
 										aria-label={saving ? 'Saving reminder' : isEditing ? 'Save reminder' : 'Add reminder'}
 										aria-busy={saving}
 										isDisabled={!canSubmit}
 									>
-										{isEditing ? <Check size={22} /> : <ArrowUp size={22} />}
+										{saving ? 'Saving…' : isEditing ? 'Save' : 'Add'}
 									</Button>
 								)}
 							</div>

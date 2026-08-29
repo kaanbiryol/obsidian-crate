@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { applyReminderDraftContentUpdate } from '@/reminders/core/reminderDraft';
 import type { ReminderDraftContentState } from '@/reminders/core/reminderDraft';
 import { buildInboxViewModel } from '@/reminders/ui/views/viewModels';
-import { applyReminderTextUpdate, reorderProjectReminders, toSharedReminder } from './reminder-state';
+import {
+	applyReminderTextUpdate,
+	hasReminderDraftTitle,
+	reorderProjectReminders,
+	toSharedReminder,
+} from './reminder-state';
 import type { ModalDraft, ReminderRecord } from './types';
 
 function createModalDraft(overrides: Partial<ModalDraft> = {}): ModalDraft {
@@ -39,6 +44,15 @@ function createReminderRecord(id: string, lineNumber: number, overrides: Partial
 }
 
 describe('PWA reminder state', () => {
+	it('requires a human-readable title instead of metadata-only content', () => {
+		const projects = ['Inbox', 'Work'];
+
+		expect(hasReminderDraftTitle('', projects, 'Inbox')).toBe(false);
+		expect(hasReminderDraftTitle('!', projects, 'Inbox')).toBe(false);
+		expect(hasReminderDraftTitle('#Work !', projects, 'Inbox')).toBe(false);
+		expect(hasReminderDraftTitle('Finish report #Work !', projects, 'Inbox')).toBe(true);
+	});
+
 	it('keeps the dropped order when the Inbox view re-sorts optimistic reminders', () => {
 		const reminders = [
 			createReminderRecord('a', 2),
