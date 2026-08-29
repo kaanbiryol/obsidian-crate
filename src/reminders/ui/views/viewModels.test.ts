@@ -36,7 +36,7 @@ describe("reminder view models", () => {
     vi.useRealTimers();
   });
 
-  it("builds inbox active/completed sections with stable file ordering", () => {
+  it("puts the most recently completed inbox reminder first", () => {
     const viewModel = buildInboxViewModel([
       makeReminder({ id: "b", project: "Inbox", lineNumber: 2 }),
       makeReminder({ id: "a", project: "Inbox", lineNumber: 1, completed: true, updatedAt: "2026-01-03T00:00:00.000Z" }),
@@ -45,7 +45,7 @@ describe("reminder view models", () => {
     ]);
 
     expect(viewModel.active.map((reminder) => reminder.id)).toEqual(["b"]);
-    expect(viewModel.completed.map((reminder) => reminder.id)).toEqual(["c", "a"]);
+    expect(viewModel.completed.map((reminder) => reminder.id)).toEqual(["a", "c"]);
   });
 
   it("groups today, overdue, and completed-due-today reminders", () => {

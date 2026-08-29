@@ -83,7 +83,9 @@ export function reorderProjectReminders(reminders: ReminderRecord[], project: st
 		if (reminder.project !== project || reminder.completed) return reminder;
 		const nextReminder = activeProjectReminders[activeIndex];
 		activeIndex += 1;
-		return nextReminder ?? reminder;
+		return nextReminder
+			? { ...nextReminder, lineNumber: reminder.lineNumber }
+			: reminder;
 	});
 }
 

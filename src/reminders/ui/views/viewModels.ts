@@ -57,7 +57,7 @@ export function buildInboxViewModel(reminders: Reminder[]): {
       .sort((left, right) => {
         const leftTime = left.updatedAt ? new Date(left.updatedAt).getTime() : 0;
         const rightTime = right.updatedAt ? new Date(right.updatedAt).getTime() : 0;
-        return leftTime - rightTime;
+        return rightTime - leftTime;
       }),
   };
 }

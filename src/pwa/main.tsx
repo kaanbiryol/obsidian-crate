@@ -43,7 +43,7 @@ import type {
 } from './types';
 
 function App() {
-	const colorScheme = usePwaColorScheme();
+	const { colorScheme, themePreference, setThemePreference } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
 	const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_KEY));
 	const [bootstrapped, setBootstrapped] = useState(false);
@@ -376,11 +376,13 @@ function App() {
 					<SettingsSheet
 						config={config}
 						push={push}
+						themePreference={themePreference}
 						loggingOut={loggingOut}
 						isClosing={settingsTransition.isClosing}
 						onClose={settingsTransition.requestClose}
 						onClosed={settingsTransition.finishClose}
 						onEnablePush={enablePushNotifications}
+						onThemePreferenceChange={setThemePreference}
 						onLogout={() => void logOut()}
 					/>
 				)}

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { applyReminderDraftContentUpdate } from '@/reminders/core/reminderDraft';
 import type { ReminderDraftContentState } from '@/reminders/core/reminderDraft';
-import { applyReminderTextUpdate } from './reminder-state';
-import type { ModalDraft } from './types';
+import { buildInboxViewModel } from '@/reminders/ui/views/viewModels';
+import { applyReminderTextUpdate, reorderProjectReminders, toSharedReminder } from './reminder-state';
+import type { ModalDraft, ReminderRecord } from './types';
 
 function createModalDraft(overrides: Partial<ModalDraft> = {}): ModalDraft {
 	return {
@@ -24,7 +25,35 @@ function applyModalPatch(draft: ModalDraft, patch: Partial<ModalDraft>): ModalDr
 	return { ...draft, ...patch };
 }
 
-describe('PWA reminder draft parity', () => {
+function createReminderRecord(id: string, lineNumber: number, overrides: Partial<ReminderRecord> = {}): ReminderRecord {
+	return {
+		id,
+		content: `Task ${id}`,
+		priority: 4,
+		completed: false,
+		project: 'Inbox',
+		filePath: 'Reminders/Inbox.md',
+		lineNumber,
+		...overrides,
+	};
+}
+
+describe('PWA reminder state', () => {
+	it('keeps the dropped order when the Inbox view re-sorts optimistic reminders', () => {
+		const reminders = [
+			createReminderRecord('a', 2),
+			createReminderRecord('b', 4),
+			createReminderRecord('c', 6),
+			createReminderRecord('done', 8, { completed: true }),
+		];
+
+		const reordered = reorderProjectReminders(reminders, 'Inbox', ['c', 'a', 'b']);
+		const viewModel = buildInboxViewModel(reordered.map(toSharedReminder));
+
+		expect(viewModel.active.map((reminder) => reminder.id)).toEqual(['c', 'a', 'b']);
+		expect(reordered.filter((reminder) => !reminder.completed).map((reminder) => reminder.lineNumber)).toEqual([2, 4, 6]);
+	});
+
 	it('matches shared project and priority updates', () => {
 		const projects = ['Inbox', 'Work'];
 		const initialShared: ReminderDraftContentState = {

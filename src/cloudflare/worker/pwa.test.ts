@@ -106,6 +106,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-picker-icon-button{width:40px;height:40px;min-width:40px;border-radius:50%;');
 		expect(html).toContain('.settings-sheet__close{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border:0;border-radius:8px;');
 		expect(html).toContain('.pwa-editor-icon-button--save{background:#8057e6;');
+		expect(html).toContain('.pwa-editor-icon-button--save.is-saving:disabled{background:#8057e6;');
 		expect(html).not.toContain('--interactive-accent:#a78bfa');
 		expect(html).not.toContain('--accent:#9b7cff');
 		expect(html).not.toContain('--accent-strong:#8e7cf4');
@@ -124,13 +125,15 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('@media (prefers-color-scheme:light){:root{--pwa-launch-bg:#f7f7f8;background:#f7f7f8;color-scheme:light}}');
 		expect(html).toContain('<body>');
 		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
-		expect(html).toContain('<meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)">');
-		expect(html).toContain('<meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)">');
+		expect(html).toContain('<meta id="pwa-theme-color" name="theme-color" content="#0b0b0d">');
+		expect(html).toContain('<style id="pwa-light-theme" media="(prefers-color-scheme: light)">');
+		expect(html).toContain('localStorage.getItem("crate-reminders-theme")');
+		expect(html).toContain("lightTheme.media=preference==='light'?'all':preference==='dark'?'not all':\"(prefers-color-scheme: light)\"");
 		expect(html).toContain('<link rel="icon" type="image/png" sizes="192x192" href="/notifications/crate-icon-192.png?v=');
 		expect(html).toContain('<link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=');
 		expect(html).not.toContain('rel="apple-touch-startup-image"');
 		expect(html).toContain('(prefers-color-scheme: light)');
-		expect(html).toContain('(prefers-color-scheme: dark)');
+		expect(html).toContain("preference==='dark'?'not all'");
 		expect(html).toContain('--pwa-launch-bg:#f7f7f8;');
 		expect(html).toContain('<meta name="format-detection" content="telephone=no,date=no,email=no,address=no">');
 		expect(html).toContain('height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
@@ -190,6 +193,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-picker-option,.pwa-project-option,.pwa-project-picker-sheet .pwa-project-list,.pwa-schedule-preset-grid,.pwa-schedule-fields,.pwa-repeat-frequency-grid,.pwa-repeat-control-card,.pwa-repeat-time-card,.pwa-repeat-days,.settings-group{background:var(--pwa-light-surface-soft);');
 		expect(html).toContain('.pwa-schedule-field input,.pwa-repeat-time-card input{color-scheme:light}');
 		expect(html).toContain('.premium-reminder-card.is-completed .premium-reminder-content{opacity:.74}');
+		expect(html).toContain('.settings-theme-option.is-active{background:var(--pwa-light-surface);color:var(--pwa-light-accent-text);');
 	});
 
 	it('keeps the Obsidian handoff page readable in light mode', () => {

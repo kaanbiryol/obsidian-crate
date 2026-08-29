@@ -251,14 +251,16 @@ export function ReminderSheet({
 								{isEditing ? (
 									<Button
 										isIconOnly
-										className={`pwa-editor-icon-button pwa-editor-icon-button--danger${draft.deleteConfirm ? ' is-active' : ''}`}
+										className={`pwa-editor-icon-button ${draft.deleteConfirm ? 'pwa-editor-icon-button--muted' : 'pwa-editor-icon-button--danger'}`}
 										type="button"
 										data-action="toggle-delete-confirm"
-										aria-label="Delete reminder"
+										aria-label={draft.deleteConfirm ? 'Keep reminder' : 'Delete reminder'}
 										isDisabled={saving}
+										preventFocusOnPress
+										onPointerDown={(event) => event.preventDefault()}
 										onClick={() => patchDraft({ deleteConfirm: !draft.deleteConfirm, activePicker: null })}
 									>
-										<Trash2 size={20} />
+										{draft.deleteConfirm ? <X size={20} /> : <Trash2 size={20} />}
 									</Button>
 								) : (
 									<Button
@@ -273,19 +275,37 @@ export function ReminderSheet({
 									</Button>
 								)}
 							</div>
-							<h2 className="pwa-editor-title">{title}</h2>
+							<h2 className="pwa-editor-title" aria-live="polite">
+								{draft.deleteConfirm ? 'Delete reminder?' : title}
+							</h2>
 							<div className="pwa-editor-header__side pwa-editor-header__side--right">
-								<Button
-									isIconOnly
-									className="pwa-editor-icon-button pwa-editor-icon-button--save"
-									type="submit"
-									data-action="save-reminder"
-									aria-label={isEditing ? 'Save reminder' : 'Add reminder'}
-									isDisabled={!canSubmit}
-									isLoading={saving}
-								>
-									{isEditing ? <Check size={22} /> : <ArrowUp size={22} />}
-								</Button>
+								{isEditing && draft.deleteConfirm ? (
+									<Button
+										isIconOnly
+										className="pwa-editor-icon-button pwa-editor-icon-button--danger is-active"
+										type="button"
+										data-action="delete-reminder"
+										aria-label="Confirm delete reminder"
+										isDisabled={saving}
+										preventFocusOnPress
+										onPointerDown={(event) => event.preventDefault()}
+										onClick={() => modal.reminderId && onDelete(modal.reminderId)}
+									>
+										<Trash2 size={20} />
+									</Button>
+								) : (
+									<Button
+										isIconOnly
+										className={`pwa-editor-icon-button pwa-editor-icon-button--save${saving ? ' is-saving' : ''}`}
+										type="submit"
+										data-action="save-reminder"
+										aria-label={saving ? 'Saving reminder' : isEditing ? 'Save reminder' : 'Add reminder'}
+										aria-busy={saving}
+										isDisabled={!canSubmit}
+									>
+										{isEditing ? <Check size={22} /> : <ArrowUp size={22} />}
+									</Button>
+								)}
 							</div>
 						</div>
 
@@ -395,19 +415,6 @@ export function ReminderSheet({
 								<span className="pwa-editor-chip__mobile-label">Repeat</span>
 							</Button>
 							</div>
-
-							{isEditing && draft.deleteConfirm && (
-								<div className="delete-confirm">
-									<div>
-										<strong>Delete this reminder?</strong>
-										<p>This removes it from the original markdown file and cancels its scheduled notification.</p>
-									</div>
-									<div className="delete-confirm__actions">
-										<Button className="secondary-button" type="button" isDisabled={saving} onClick={() => patchDraft({ deleteConfirm: false })}>Keep it</Button>
-										<Button className="secondary-button is-danger" type="button" data-action="delete-reminder" isDisabled={saving} onClick={() => modal.reminderId && onDelete(modal.reminderId)}>Delete</Button>
-									</div>
-								</div>
-							)}
 						</div>
 							</form>
 						</div>

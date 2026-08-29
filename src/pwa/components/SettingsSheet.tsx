@@ -3,29 +3,37 @@ import { Button } from '@heroui/react';
 import {
 	Check,
 	LogOut,
+	Monitor,
+	Moon,
+	Sun,
 	X,
 } from 'lucide-react';
 import { useDialogFocus } from '../hooks/useDialogFocus';
+import type { PwaThemePreference } from '../theme';
 import type { PushState, StoredConfig } from '../types';
 import { PwaModalSheet } from './PwaModalSheet';
 
 export function SettingsSheet({
 	config,
 	push,
+	themePreference,
 	loggingOut,
 	isClosing,
 	onClose,
 	onClosed,
 	onEnablePush,
+	onThemePreferenceChange,
 	onLogout,
 }: {
 	config: StoredConfig;
 	push: PushState;
+	themePreference: PwaThemePreference;
 	loggingOut: boolean;
 	isClosing: boolean;
 	onClose: () => void;
 	onClosed: () => void;
 	onEnablePush: () => void;
+	onThemePreferenceChange: (preference: PwaThemePreference) => void;
 	onLogout: () => void;
 }) {
 	const upcomingDays = `${config.upcomingDays} ${config.upcomingDays === 1 ? 'day' : 'days'}`;
@@ -54,6 +62,41 @@ export function SettingsSheet({
 					</Button>
 				</div>
 				<div className="settings-panel">
+					<section className="settings-panel__section" aria-labelledby="settings-appearance-title">
+						<h3 id="settings-appearance-title" className="settings-panel__title">Appearance</h3>
+						<div className="settings-group">
+							<div className="settings-row settings-row--theme">
+								<div className="settings-row__copy">
+									<strong>Theme</strong>
+									<span>Choose a theme or follow this device.</span>
+								</div>
+								<div className="settings-theme-picker" role="group" aria-label="Theme">
+									{([
+										{ value: 'system', label: 'System', icon: Monitor },
+										{ value: 'light', label: 'Light', icon: Sun },
+										{ value: 'dark', label: 'Dark', icon: Moon },
+									] satisfies Array<{ value: PwaThemePreference; label: string; icon: typeof Monitor }>).map((option) => {
+										const Icon = option.icon;
+										const active = themePreference === option.value;
+										return (
+											<Button
+												key={option.value}
+												className={`settings-theme-option${active ? ' is-active' : ''}`}
+												type="button"
+												data-theme={option.value}
+												aria-pressed={active}
+												onClick={() => onThemePreferenceChange(option.value)}
+											>
+												<Icon size={15} />
+												<span>{option.label}</span>
+											</Button>
+										);
+									})}
+								</div>
+							</div>
+						</div>
+					</section>
+
 					<section className="settings-panel__section" aria-labelledby="settings-notifications-title">
 						<h3 id="settings-notifications-title" className="settings-panel__title">Notifications</h3>
 						<div className="settings-group">

@@ -91,11 +91,11 @@ export function useReminderMutations({
 			if (!response.ok) throw new Error(await response.text());
 			const result = await response.json() as { notificationWarning?: string };
 			endMutation();
-			await loadReminders({ silent: true });
 			closeModal();
 			showToast(result.notificationWarning ? 'info' : 'success', result.notificationWarning
 				? `Saved. Notification sync failed: ${result.notificationWarning}`
 				: 'Reminder saved');
+			void loadReminders({ silent: true });
 		} catch (saveError) {
 			endMutation();
 			setReminders(previousReminders);
