@@ -69,6 +69,12 @@ export default tseslint.config(
 		],
 		rules: {
 			'no-restricted-globals': 'off',
+			'no-restricted-imports': ['error', {
+				paths: [{
+					name: '@/reminders/ui/plugin/PluginRemindersAppShell',
+					message: 'The PWA owns its application shell; share panels, cards, and view-model logic instead.',
+				}],
+			}],
 			'obsidianmd/platform': 'off',
 			'@typescript-eslint/no-deprecated': 'off',
 			'@typescript-eslint/no-misused-promises': 'off',

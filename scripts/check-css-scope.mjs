@@ -95,3 +95,18 @@ if (missingSameNodeSelectors.length > 0) {
 } else {
 	console.log('Shadow DOM mount selectors target their classes on the same element.');
 }
+
+const pwaOnlySelectors = [
+	'.crate-reminders-ui .reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse)',
+];
+const leakedPwaSelectors = pwaOnlySelectors.filter((selector) => generatedSelectors.has(selector));
+
+if (leakedPwaSelectors.length > 0) {
+	console.error('Found PWA-only screen styles in the plugin stylesheet:');
+	for (const selector of leakedPwaSelectors) {
+		console.error(`- ${selector}`);
+	}
+	process.exitCode = 1;
+} else {
+	console.log('PWA-only screen styles are excluded from the plugin stylesheet.');
+}

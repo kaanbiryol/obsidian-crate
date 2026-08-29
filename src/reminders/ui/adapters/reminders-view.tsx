@@ -10,7 +10,10 @@ import { createShadowReactMount, type ShadowReactMount } from "@/reminders/ui/ad
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { RemindersViewCloseButton } from "@/reminders/ui/RemindersViewCloseButton";
-import { RemindersAppShell, type ReminderCardRenderer } from "@/reminders/ui/RemindersAppShell";
+import {
+    PluginRemindersAppShell,
+    type PluginReminderCardRenderer,
+} from "@/reminders/ui/plugin/PluginRemindersAppShell";
 import "../reminders-view.scss";
 
 export const VIEW_TYPE_REMINDERS = "reminders-view";
@@ -149,7 +152,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
         openReminderCreationModal(plugin, defaultProject, updateReminders);
     }, [plugin, updateReminders]);
 
-    const renderCard = useCallback<ReminderCardRenderer>(({ reminder, index, hideProject }) => (
+    const renderCard = useCallback<PluginReminderCardRenderer>(({ reminder, index, hideProject }) => (
         <ReminderCardWrapper
             key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
             reminder={reminder}
@@ -165,7 +168,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     }, [plugin]);
 
     return (
-        <RemindersAppShell
+        <PluginRemindersAppShell
             reminders={reminders}
             isInitialLoadComplete={isInitialLoadComplete}
             isDarkMode={isDarkMode}

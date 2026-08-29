@@ -1,0 +1,561 @@
+// PWA-owned shell baseline. Keep host changes here instead of in the plugin shell.
+@mixin styles {
+
+// Shadow DOM root container
+// CSS custom properties from Obsidian inherit through shadow boundary
+&.reminders-shadow-root {
+    height: 100%;
+    width: 100%; // Shadow DOM needs explicit width
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: var(--text-normal);
+    font-family: var(--font-interface);
+    font-size: var(--font-ui-medium);
+    // No background for code blocks - they inherit from Obsidian
+    // Modal/fullscreen modes set their own background
+    --reminders-noise: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyB2aWV3Qm94PScwIDAgMTIwIDEyMCc+CjxmaWx0ZXIgaWQ9J24nPgogIDxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjknIG51bU9jdGF2ZXM9JzEnIHN0aXRjaFRpbGVzPSdzdGl0Y2gnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyBmaWx0ZXI9J3VybCgjbiknIG9wYWNpdHk9JzAuMjUnLz4KPC9zdmc+");
+    --reminders-noise-size: 180px 180px;
+
+    // HeroUIProvider adds this wrapper - must participate in flex chain
+    > [data-overlay-container="true"] {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+    }
+}
+
+// Portal container inside shadow DOM for HeroUI components
+&.heroui-portal-container {
+    position: relative;
+    z-index: 1000;
+}
+
+.reminders-view {
+    position: relative; // For FAB absolute positioning in fullscreen mode
+    flex: 1;
+    min-height: 0; // Critical: allows flex child to shrink below content size
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    --reminders-tabbar-height: 80px;
+    --reminders-tabbar-overlay: var(--reminders-tabbar-height);
+    --reminders-tabbar-bottom-offset: 0px;
+    --reminders-bottom-gap: 16px;
+    --reminders-fab-gap: 24px;
+    --reminders-fab-size: 56px;
+    --reminders-safe-area: env(safe-area-inset-bottom);
+
+    // Fix HeroUI component text visibility in Shadow DOM dark mode
+    // HeroUI's foreground color needs to be explicitly set for dark mode
+    &.dark {
+        // Set text color for HeroUI Card content
+        [data-slot="base"] {
+            color: var(--text-normal);
+        }
+
+        // Ensure Chip text is visible
+        [data-slot="content"] {
+            color: inherit;
+        }
+
+        // Fix text-sm and other text utilities
+        .text-sm, .text-base, .font-medium {
+            color: var(--text-normal);
+        }
+    }
+}
+
+.reminders-view-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.view-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 12px 16px 8px;
+    background: transparent;
+    border-bottom: 1px solid var(--background-modifier-border);
+
+    &.is-large {
+        padding: 16px 20px 12px;
+
+        .view-header-title {
+            font-size: 28px;
+        }
+    }
+}
+
+.view-header-copy {
+    flex: 1;
+}
+
+.view-header-title {
+    margin: 0;
+    color: var(--text-normal);
+    font-size: 20px;
+    font-weight: var(--reminder-font-weight-semibold);
+    line-height: 1.2;
+}
+
+.view-header-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    margin-top: 4px;
+}
+
+.view-header-count {
+    color: var(--text-muted);
+    font-size: var(--reminder-font-sm);
+}
+
+.view-header-overdue {
+    padding: 4px 12px;
+    border-radius: 12px;
+    background: var(--reminder-red, var(--text-error));
+    color: var(--text-on-accent);
+    font-size: 14px;
+    font-weight: var(--reminder-font-weight-semibold);
+}
+
+.view-header-actions {
+    flex-shrink: 0;
+}
+
+.bottom-tab-bar {
+    flex-shrink: 0;
+    z-index: 40;
+    background: var(--background-primary);
+
+    &.is-bottom {
+        border-top: 1px solid var(--background-modifier-border);
+    }
+}
+
+.bottom-tab-items {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 8px 12px;
+}
+
+.bottom-tab-button {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 48px;
+    padding: 10px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+
+    &.is-active {
+        color: var(--interactive-accent);
+
+        .bottom-tab-label {
+            font-weight: var(--reminder-font-weight-semibold);
+        }
+    }
+}
+
+.bottom-tab-slider-track {
+    position: absolute;
+    inset: 8px 12px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    pointer-events: none;
+}
+
+.bottom-tab-slider {
+    grid-row: 1;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+}
+
+.bottom-tab-content {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.bottom-tab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 150ms ease;
+}
+
+.bottom-tab-label {
+    color: currentColor;
+    font-size: 13px;
+    font-weight: var(--reminder-font-weight-medium);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    transition: color 150ms ease;
+}
+
+// ============================================
+// Animated Tab Bar (Framer Motion)
+// ============================================
+
+// Base tab bar styles
+.animated-tab-bar {
+    flex-shrink: 0;
+    z-index: 40;
+    background: var(--background-primary);
+}
+
+// Bottom position variant
+.animated-tab-bar-bottom {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+// Content area - wrapper (views manage their own scrolling)
+.reminders-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    // Views handle their own bottom padding via hasFab prop
+    padding-bottom: 0;
+
+    // Hide scrollbar during page transitions to prevent flickering
+    &.is-transitioning {
+        // WebKit: transparent scrollbar thumb
+        &::-webkit-scrollbar-thumb {
+            background: transparent;
+        }
+
+        // Firefox: hide via scrollbar-color
+        scrollbar-color: transparent transparent;
+
+        // Hide inner view scrollbars during transitions (browse/project)
+        .ios-scroll {
+            scrollbar-color: transparent transparent;
+            overflow-y: hidden;
+        }
+
+        .ios-scroll::-webkit-scrollbar {
+            background: transparent;
+        }
+
+        .ios-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .ios-scroll::-webkit-scrollbar-thumb {
+            background: transparent;
+        }
+    }
+}
+
+// Minimal scrollbar - overlay style for all platforms
+.ios-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--background-modifier-border) transparent;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ios-scroll::-webkit-scrollbar {
+    width: 6px;
+    background: transparent;
+}
+
+.ios-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ios-scroll::-webkit-scrollbar-thumb {
+    background: var(--background-modifier-border);
+    border-radius: 3px;
+}
+
+.ios-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--text-faint);
+}
+
+.reminders-view-scroll {
+    padding: 16px;
+    touch-action: pan-y;
+    overflow-anchor: none;
+
+    &.has-fab {
+        padding-bottom: calc(var(--reminders-tabbar-overlay, 0px) + var(--reminders-fab-gap, 24px) + var(--reminders-fab-size, 56px) + var(--reminders-safe-area, env(safe-area-inset-bottom)));
+    }
+
+    &.is-tab-aware {
+        padding-bottom: calc(var(--reminders-tabbar-overlay, 0px) + var(--reminders-bottom-gap, 16px) + var(--reminders-safe-area, env(safe-area-inset-bottom)));
+    }
+}
+
+.upcoming-date-header {
+    margin-bottom: 12px;
+    padding-left: 4px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: var(--reminder-font-weight-semibold);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.reminders-muted-label {
+    color: var(--text-muted);
+}
+
+// The full-width completed toggle should not retain HeroUI's oversized focus ring.
+.completed-section-toggle:focus,
+.completed-section-toggle:focus-visible,
+.completed-section-toggle[data-focus-visible="true"] {
+    outline: none;
+    box-shadow: none;
+}
+
+// ============================================
+// Project Picker Modal Scrollbar
+// ============================================
+
+.project-picker-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--background-modifier-border-hover, var(--background-modifier-border)) transparent;
+
+    &::-webkit-scrollbar {
+        width: 4px;
+        background: transparent;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
+        margin: 8px 0;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: var(--background-modifier-border-hover, var(--background-modifier-border));
+        border-radius: 2px;
+
+        &:hover {
+            background: var(--text-faint);
+        }
+    }
+}
+
+.rich-text-input-editor {
+    min-height: 1.5rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+
+.rich-text-chip {
+    display: inline;
+    margin: 0 1px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: inherit;
+    font-weight: var(--reminder-font-weight-medium, 500);
+    letter-spacing: 0.01em;
+    vertical-align: baseline;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+.rich-text-chip-priority {
+    background: color-mix(in srgb, var(--text-error) 10%, transparent);
+    color: var(--text-error);
+}
+
+.rich-text-chip-date {
+    background: color-mix(in srgb, var(--text-success) 10%, transparent);
+    color: var(--text-success);
+}
+
+.rich-text-chip-project {
+    background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+    color: var(--interactive-accent);
+}
+
+.reminders-empty-state {
+    gap: 4px;
+    padding-right: 28px;
+    padding-left: 28px;
+
+    &.is-compact {
+        padding-right: 20px;
+        padding-left: 20px;
+    }
+}
+
+.reminders-empty-state-icon {
+    --empty-state-color: var(--interactive-accent);
+
+    flex-shrink: 0;
+    width: 88px;
+    height: 88px;
+    margin-bottom: 10px;
+    background: color-mix(in srgb, var(--empty-state-color) 10%, transparent);
+    color: var(--empty-state-color);
+
+    &.tone-secondary {
+        --empty-state-color: var(--color-cyan);
+    }
+
+    &.tone-warning {
+        --empty-state-color: var(--text-warning);
+    }
+}
+
+.reminders-empty-state.is-compact .reminders-empty-state-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 8px;
+}
+
+.reminders-empty-state-title,
+.reminders-empty-state-description {
+    max-width: 320px;
+    margin: 0;
+}
+
+.reminders-empty-state-title {
+    margin-bottom: 4px;
+    color: var(--text-normal);
+    font-size: var(--reminder-font-base, var(--font-ui-medium, 14px));
+    font-weight: var(--reminder-font-weight-semibold, 600);
+    line-height: 1.3;
+}
+
+.reminders-empty-state-description {
+    color: var(--text-muted);
+    font-size: var(--reminder-font-base, var(--font-ui-medium, 14px));
+    line-height: 1.5;
+}
+
+.reminders-empty-state.is-compact {
+    .reminders-empty-state-title,
+    .reminders-empty-state-description {
+        max-width: 240px;
+    }
+
+    .reminders-empty-state-description {
+        font-size: var(--reminder-font-sm, var(--font-ui-small, 13px));
+    }
+}
+
+.reminders-view-close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    z-index: 100;
+    border: 1px solid var(--crate-glass-back-border, var(--background-modifier-border));
+    background: var(--crate-glass-back-bg, var(--background-primary-alt));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: var(--crate-glass-back-shadow, var(--shadow-s));
+    color: var(--text-muted);
+    transition: all 200ms ease-out;
+
+    &:hover {
+        background: var(--crate-glass-back-hover-bg, var(--background-modifier-hover));
+        box-shadow: var(--crate-glass-back-hover-shadow, var(--shadow-s));
+    }
+}
+
+.project-picker-dot {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+
+    .is-dark {
+        display: none;
+    }
+}
+
+.project-picker-dot-glow {
+    opacity: 0.4;
+    filter: blur(2px);
+}
+
+.dark .project-picker-dot,
+&.dark .project-picker-dot {
+    .is-light {
+        display: none;
+    }
+
+    .is-dark {
+        display: initial;
+    }
+
+    .project-picker-dot-glow {
+        opacity: 0.6;
+    }
+}
+
+.project-autocomplete-dropdown {
+    position: absolute;
+    right: 0;
+    left: 0;
+    z-index: 100;
+    max-height: 192px;
+    overflow-y: auto;
+    border: 1px solid var(--background-modifier-border);
+    border-top: 0;
+    border-radius: 0 0 12px 12px;
+    background: var(--background-primary);
+    box-shadow: var(--shadow-s);
+}
+
+.project-autocomplete-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    cursor: pointer;
+
+    &:last-child {
+        border-bottom: 0;
+    }
+
+    &[aria-selected="true"] {
+        background: var(--background-modifier-hover);
+    }
+}
+
+.project-autocomplete-label {
+    overflow: hidden;
+    color: var(--text-normal);
+    font-size: 13px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+}

@@ -1,5 +1,4 @@
-// Shared primary-screen design used by the Obsidian plugin and the PWA.
-// Host styles provide semantic surface tokens; structure and sizing stay here.
+// PWA primary-screen design. Obsidian owns its surrounding chrome and sizing.
 
 @mixin styles {
 

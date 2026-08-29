@@ -3,7 +3,7 @@ import editorStyles from './styles/editor.css?raw-css';
 import remindersViewStyles from './styles/reminders-view.css?raw-css';
 import responsiveStyles from './styles/responsive.css?raw-css';
 import themeStyles from './styles/theme.css?raw-css';
-import sharedRemindersViewStyles from '../../../reminders/ui/reminders-view.scss?raw-css';
+import pwaRemindersViewStyles from '../../../pwa/styles/reminders-view.scss?raw-css';
 
 const LIGHT_THEME_MEDIA_PREFIX = '@media (prefers-color-scheme: light){';
 const lightThemeStart = themeStyles.indexOf(LIGHT_THEME_MEDIA_PREFIX);
@@ -22,7 +22,7 @@ export const PWA_LIGHT_THEME_STYLES = themeStyles.slice(
 
 export const PWA_STYLES = [
 	baseStyles,
-	sharedRemindersViewStyles,
+	pwaRemindersViewStyles,
 	remindersViewStyles,
 	editorStyles,
 	responsiveStyles,

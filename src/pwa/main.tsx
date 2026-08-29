@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { RemindersAppShell, type ReminderCardRenderer } from '@/reminders/ui/RemindersAppShell';
+import {
+	PwaRemindersAppShell,
+	type PwaReminderCardRenderer,
+} from './components/PwaRemindersAppShell';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import {
 	AUTH_TOKEN_KEY,
@@ -300,7 +303,7 @@ function App() {
 	});
 
 	const sharedReminders = useMemo(() => reminders.map(toSharedReminder), [reminders]);
-	const renderSharedCard = useCallback<ReminderCardRenderer>(({ reminder, index, hideProject }) => (
+	const renderSharedCard = useCallback<PwaReminderCardRenderer>(({ reminder, index, hideProject }) => (
 		<WebReminderCard
 			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 			reminder={reminder}
@@ -326,14 +329,12 @@ function App() {
 			className={`crate-reminders-ui reminders-shadow-root pwa-shadow-root ${colorScheme}${modal || settingsOpen ? ' has-open-sheet' : ''}`}
 			data-ui-host="pwa"
 		>
-			<RemindersAppShell
+			<PwaRemindersAppShell
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}
 				projects={projects}
 				isInitialLoadComplete={initialContentReady}
 				isDarkMode={isDarkMode}
-				isFullScreen
-				isModal
 				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}
 				upcomingDays={config.upcomingDays}
@@ -348,7 +349,6 @@ function App() {
 						onToggleSettings={toggleSettings}
 					/>
 				) : undefined}
-				reorderInteraction="long-press"
 				belowHeaderContent={bootstrapped && authToken ? (
 					<>
 						<PwaPullRefreshIndicator pullRefresh={pullRefresh} />
@@ -408,7 +408,7 @@ function App() {
 						{toast.message}
 					</div>
 				)}
-			</RemindersAppShell>
+			</PwaRemindersAppShell>
 		</div>
 	);
 }

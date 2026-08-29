@@ -23,13 +23,13 @@ import {
   type ViewMode,
 } from "@/reminders/ui/remindersViewModel";
 
-export type ReminderCardRenderer = (props: {
+export type PluginReminderCardRenderer = (props: {
   reminder: Reminder;
   index: number;
   hideProject: boolean;
 }) => React.ReactNode;
 
-interface RemindersAppShellProps {
+interface PluginRemindersAppShellProps {
   reminders: Reminder[];
   projects?: string[];
   isInitialLoadComplete: boolean;
@@ -49,14 +49,15 @@ interface RemindersAppShellProps {
   children?: React.ReactNode;
   className?: string;
   suppressFab?: boolean;
-  renderCard: ReminderCardRenderer;
+  renderCard: PluginReminderCardRenderer;
   onAdd: (defaultProject: string) => void;
   onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
   onReorderDragActiveChange?: (active: boolean) => void;
   reorderInteraction?: 'handle' | 'long-press';
 }
 
-export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
+/** Obsidian-owned reminders chrome. Shared reminder content lives below this shell. */
+export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = ({
   reminders,
   projects: providedProjects,
   isInitialLoadComplete,

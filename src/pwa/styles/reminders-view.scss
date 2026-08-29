@@ -1,0 +1,15 @@
+@use './shell';
+@use '../../reminders/ui/shared/styles/projects';
+@use '../../reminders/ui/shared/styles/project-detail';
+@use '../../reminders/ui/shared/styles/reminder-cards';
+@use './layout-modes';
+@use './primary-screen';
+
+.crate-reminders-ui {
+	@include shell.styles;
+	@include projects.styles;
+	@include project-detail.styles;
+	@include reminder-cards.styles;
+	@include layout-modes.styles;
+	@include primary-screen.styles;
+}
