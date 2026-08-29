@@ -5,9 +5,9 @@ import { readFile } from 'node:fs/promises';
 const budgetGroups = {
 	plugin: [{
 		path: 'dist/main.js',
-		// Includes the compressed, integrity-checked Worker used by OAuth deployment.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1400000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '550000', 10),
+		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1825000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '905000', 10),
 	},
 	{
 		path: 'dist/styles.css',
@@ -17,8 +17,9 @@ const budgetGroups = {
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '950000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '260000', 10),
+		// The deployable Worker embeds the complete reminders PWA script.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '1430000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '615000', 10),
 	}],
 };
 

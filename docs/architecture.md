@@ -77,7 +77,7 @@ CratePlugin (src/plugin/CratePlugin.ts)
 1. The plugin creates a cryptographically random OAuth `state` and a fresh PKCE S256 verifier/challenge in memory.
 2. Cloudflare redirects to `https://crate.kaanbiryol.com/oauth/callback/`. The static page immediately clears its query string and opens the `crate-cloudflare-oauth` Obsidian protocol.
 3. The plugin verifies `state` before exchanging the authorization code. The access token is held only in a local stack frame.
-4. The plugin discovers Crate Workers in the selected account. It reuses the saved or selected deployment, or creates new D1 and R2 resources when none exists.
+4. The plugin discovers Crate Workers in the selected account. It reuses the saved or selected deployment, or creates new D1 and R2 resources when none exists. Ordered D1 migrations are applied before the new Worker bundle is uploaded; request cold starts never mutate the schema.
 5. The plugin generates a permanent device secret locally and writes only its hash and device metadata to the deployment's D1 database using the temporary Cloudflare authorization.
 6. The OAuth token is revoked and discarded. Only non-secret resource identifiers remain in plugin settings for reconnects and updates.
 
@@ -93,7 +93,7 @@ Authenticated requests carry a Bearer token in the `Authorization` header. The W
 
 Push-notification device enrollment is intentionally narrower: the plugin mints a short-lived, one-time push enrollment token from the worker and the notification PWA uses that scoped token only for `POST /notifications/subscribe`.
 
-The reminders web app uses a separate short-lived web enrollment token in the `/notifications?token=...` link. The PWA exchanges it once at `POST /notifications/reminders-exchange` for its own per-device bearer token, stored locally by the browser.
+The reminders web app uses a separate short-lived web enrollment token in the `/notifications?token=...` link. The PWA exchanges it once at `POST /notifications/reminders-exchange` for a 90-day, reminder-only bearer token stored locally by the browser. Route authorization prevents that token from reading or mutating the vault sync API, shared settings, device list, or push administration.
 
 ## Secret Storage
 

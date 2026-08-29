@@ -19,6 +19,7 @@ export interface RemoteReminderRecord {
 interface ReminderFileRecord {
 	path: string;
 	content: string;
+	hash: string;
 }
 
 export interface ReminderWorkspace {

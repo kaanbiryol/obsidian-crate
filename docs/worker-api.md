@@ -4,12 +4,12 @@ Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the 
 
 ## Authentication
 
-All non-public API endpoints require an `Authorization: Bearer <token>` header. The Worker validates the token in two steps:
+All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have either `vault` or `reminders` scope, and may have an expiry. The Worker validates the token in two steps:
 
 1. Hash the bearer token with SHA-256 and look up the hash in the `auth_tokens` D1 table
 2. If not found, optionally fall back to timing-safe comparison against a legacy `AUTH_TOKEN` secret binding
 
-New deployments use independent device tokens stored in D1 and do not configure the fallback binding. Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
+New deployments use independent device tokens stored in D1 and do not configure the fallback binding. Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens that cannot call sync, settings, device-management, scheduled-reminder, or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
 ## Endpoints
 
@@ -20,12 +20,12 @@ New deployments use independent device tokens stored in D1 and do not configure 
 | `GET` | `/sync/check?since=<seq>` | Lightweight check: are there changes since this sequence? |
 | `GET` | `/sync/changes?since=<seq>` | Paginated changelog entries (limit 5000 per page) |
 | `GET` | `/sync/manifest` | Full remote manifest (gzip-compressed if accepted) |
-| `PUT` | `/sync/upload?path=<path>` | Upload single file (binary body, streaming to R2) |
+| `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB) |
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
 | `POST` | `/sync/delete` | Delete single file `{ path }` |
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 50 files, 10 MB total) |
-| `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths) |
-| `POST` | `/sync/batch-delete` | Batch delete `{ paths: [...] }` (max 50 paths) |
+| `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
+| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 50 files) |
 | `DELETE` | `/auth/tokens` | Revoke an auth token `{ id }` |
 | `GET` | `/auth/tokens` | List all registered auth tokens |
 | `DELETE` | `/auth/session` | Revoke the current bearer token when disconnecting this device |
@@ -68,9 +68,11 @@ New deployments use independent device tokens stored in D1 and do not configure 
 ### PUT /sync/upload
 
 - Query: `?path=<url-encoded-path>`
-- Headers: `X-File-Hash`, `X-File-Size`, `Content-Type`
-- Body: raw binary (streamed directly to R2, zero memory buffering)
+- Headers: `X-File-Hash`, `X-File-Size`, `X-Crate-Expected-Hash`, `Content-Type`
+- `X-Crate-Expected-Hash` is the 64-character remote hash observed while planning, or `absent` for a new path
+- Body: raw binary, buffered only after declared-size and content-length preflight, with a hard 25 MB cap
 - Response: `{ success, path, hash }`
+- A stale expected hash returns `409` and does not replace the committed object
 
 ### GET /sync/download
 
@@ -88,7 +90,8 @@ New deployments use independent device tokens stored in D1 and do not configure 
       "content": "<base64>",
       "hash": "sha256...",
       "size": 1024,
-      "contentType": "text/markdown"
+      "contentType": "text/markdown",
+      "expectedHash": "sha256..."
     }
   ]
 }
@@ -100,17 +103,19 @@ Response: `{ success, results: [{ path, success, hash?, error? }] }`
 
 ### POST /sync/batch-download
 
-Request: `{ paths: ["notes/file.md", ...] }` (max 50)
+Request: `{ paths: ["notes/file.md", ...] }` (max 50, no duplicates)
 
 Response: `{ files: [{ path, content, hash, size, contentType, error? }] }`
 
-Content is base64-encoded.
+Content is base64-encoded. The Worker rejects a batch before reading R2 if D1 metadata shows that it exceeds 8 MB. The client batches only files smaller than 1 MB, validates the exact response path set, size, and SHA-256 hash, and falls back to individual streaming downloads when a batch is too large or unavailable.
 
 ### POST /sync/delete / batch-delete
 
-Single: `{ path: "notes/file.md" }` -> `{ success, path }`
+Single: `{ path: "notes/file.md", expectedHash: "sha256..." }` -> `{ success, path }`
 
-Batch: `{ paths: [...] }` (max 50) -> `{ success, deleted: [...] }`
+Batch: `{ files: [{ path, expectedHash }, ...] }` (max 50) -> `{ success, deleted: [...] }`
+
+Uploads, deletes, and PWA reminder edits compare the D1 hash they originally read. D1 applies the file-row mutation and changelog append atomically; stale writers receive `409` instead of silently overwriting a newer version.
 
 ### GET /sync/check
 
@@ -365,11 +370,13 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
   device_name TEXT,
   platform TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  last_seen_at TEXT
+  last_seen_at TEXT,
+  scope TEXT NOT NULL DEFAULT 'vault',
+  expires_at INTEGER
 );
 ```
 
-Per-device auth tokens. Token hashes are SHA-256 hex of the bearer token. Used for multi-device support - each device gets its own token that can be independently revoked. Device metadata is updated when a plugin instance comes online, and `last_seen_at` is refreshed periodically while that token is actively used.
+Per-device auth tokens. Token hashes are SHA-256 hex of the bearer token. Vault device tokens have `vault` scope and no default expiry. Reminders PWA tokens have `reminders` scope and expire after 90 days. Device metadata is updated when a plugin instance comes online, and `last_seen_at` is refreshed periodically while that token is actively used.
 
 ### scheduled_reminders
 
@@ -435,11 +442,13 @@ CREATE TABLE IF NOT EXISTS web_enrollment_tokens (
 );
 ```
 
-One-time, short-lived tokens embedded in reminders PWA setup links. `POST /notifications/reminders-exchange` consumes one token and creates a per-device auth token.
+One-time, short-lived tokens embedded in reminders PWA setup links. `POST /notifications/reminders-exchange` consumes one token and creates a scoped, expiring PWA auth token that cannot access vault sync APIs.
 
 ## R2 Key Convention
 
-With D1 enabled, committed file blobs are stored under `__crate__/files/<hash>/<uuid>` and referenced through `files.storage_key`. Legacy rows without `storage_key` still fall back to `files/<vault-path>`. When D1 is unavailable entirely, uploads/downloads continue to use the legacy `files/<vault-path>` layout.
+Committed file blobs are stored under `__crate__/files/<hash>/<uuid>` and referenced through `files.storage_key`. Legacy rows without `storage_key` still fall back to `files/<vault-path>`. D1 is required for every sync transfer; the Worker returns `503` instead of accepting an untracked R2 mutation when the database binding is unavailable.
+
+Versioned migrations are the only production schema writer. The OAuth provisioner applies them before uploading the Worker, and the Wrangler deploy script migrates D1 in `predeploy`, so request cold starts do not execute schema DDL.
 
 ## Path Sanitization
 

@@ -17,7 +17,8 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 	serverVersion: CRATE_SERVER_VERSION,
 	protocol: CRATE_PLUGIN_PROTOCOL,
 	capabilities: Object.freeze([
-		'sync-v1',
+		'sync-v2',
+		'conditional-file-mutations',
 		'settings-v1',
 		'devices-v1',
 		'reminders-v1',

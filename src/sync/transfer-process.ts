@@ -4,7 +4,7 @@ import { createConflictCopy } from "./conflict";
 import { isHiddenPath } from "./file-discovery";
 import { isMarkdownPath } from "./markdown-base-cache";
 import { mergeMarkdownContent } from "./markdown-merge";
-import { downloadAndSaveFile } from "./transfer-download";
+import { downloadAndSaveFile, validateDownloadedContent } from "./transfer-download";
 import { isVaultTFileLike, prepareUploadFromPath } from "./transfer-prepare";
 import type { TransferContext } from "./transfer-types";
 import type { FileDiff, FileEntry, SyncResult } from "../plugin/types";
@@ -20,7 +20,10 @@ export async function processDiff(
 
   switch (diff.action) {
     case "upload": {
-      const uploadFile = await prepareUploadFromPath(context, diff.path, { force: true });
+      const uploadFile = await prepareUploadFromPath(context, diff.path, {
+		force: true,
+		expectedHash: diff.remoteHash ?? null,
+	  });
       if (!uploadFile) {
         break;
       }
@@ -31,10 +34,14 @@ export async function processDiff(
         uploadFile.hash,
         uploadFile.size,
         uploadFile.contentType || "application/octet-stream",
+		uploadFile.expectedHash ?? null,
       );
       if (!uploadResult.success) {
         throw new Error(uploadResult.error || "Upload failed");
       }
+	  if (uploadResult.hash && uploadResult.hash !== uploadFile.hash) {
+		throw new Error(`Hash mismatch after upload (expected ${uploadFile.hash}, got ${uploadResult.hash})`);
+	  }
 
       result.uploaded++;
       result.uploadedPaths.push(uploadFile.path);
@@ -53,7 +60,13 @@ export async function processDiff(
     }
 
     case "download": {
-      await downloadAndSaveFile(context, diff.path, result);
+		if (!diff.remoteHash) throw new Error("Missing remote hash for download");
+      await downloadAndSaveFile(context, {
+		path: diff.path,
+		expectedLocalHash: diff.localHash ?? null,
+		expectedRemoteHash: diff.remoteHash,
+		remoteSize: 0,
+	  }, result);
       const content = await context.vault.adapter.readBinary(diff.path);
       const hash = await computeHash(content);
       localFiles[diff.path] = {
@@ -68,8 +81,15 @@ export async function processDiff(
       const response = await context.api.downloadFile(diff.path);
       const remoteContent = response.content;
       if (remoteContent.byteLength > MAX_FILE_SIZE_BYTES) {
-        throw new Error("Skipped remote file larger than 25MB");
+		throw new Error("Skipped remote file larger than 25MB");
       }
+	  await validateDownloadedContent(
+		diff.path,
+		remoteContent,
+		response.size,
+		response.hash,
+		diff.remoteHash ?? '',
+	  );
 
       const localFile = context.vault.getAbstractFileByPath(diff.path);
       const visibleFile = isVaultTFileLike(localFile) ? localFile : null;
@@ -117,7 +137,8 @@ export async function processDiff(
     }
 
     case "delete": {
-      await context.api.deleteFile(diff.path);
+		if (!diff.remoteHash) throw new Error("Missing remote hash for delete");
+		await context.api.deleteFile(diff.path, diff.remoteHash);
       delete localFiles[diff.path];
       context.localManifest.removeEntry(diff.path);
       result.deleted++;
@@ -170,6 +191,7 @@ async function tryAutoMergeMarkdownConflict(
     mergedHash,
     mergedContent.byteLength,
     "text/markdown",
+	diff.remoteHash ?? null,
   );
   if (!uploadResult.success) {
     throw new Error(uploadResult.error || "Upload failed");

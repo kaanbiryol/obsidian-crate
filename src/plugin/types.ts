@@ -107,6 +107,7 @@ export interface PreparedUpload {
 	size: number;
 	mtime?: number;
 	contentType?: string;
+	expectedHash?: string | null;
 }
 
 export interface UploadResult {
@@ -132,6 +133,12 @@ export interface BatchUploadFile {
 	hash: string;
 	size: number;
 	contentType: string;
+	expectedHash: string | null;
+}
+
+export interface BatchDeleteFile {
+	path: string;
+	expectedHash: string;
 }
 
 export interface BatchUploadResponse {
@@ -155,7 +162,7 @@ export interface BatchDownloadResponse {
 export interface BatchDeleteResponse {
 	success: boolean;
 	deleted: string[];
-	errors?: Array<{ path: string; error: string }>;
+	errors?: Array<{ path: string; error: string; status?: number; currentHash?: string | null }>;
 }
 
 export interface RegisteredDevice {
@@ -254,4 +261,5 @@ export const MAX_DEBOUNCE_WAIT_MS = 30_000;
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
 export const BATCH_MAX_FILES = 50;
 export const BATCH_MAX_BYTES = 10 * 1024 * 1024; // 10MB total decoded content per batch upload
+export const BATCH_DOWNLOAD_MAX_BYTES = 8 * 1024 * 1024;
 export const BATCH_FILE_SIZE_LIMIT = 1 * 1024 * 1024; // 1MB - files >= this fall back to individual uploads

@@ -9,6 +9,7 @@ import {
 	processPendingChanges,
 } from './queue';
 import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
+import { HttpError } from './api';
 
 type QueueState = SyncState;
 type UploadArgs = {
@@ -26,11 +27,20 @@ const TRACKED_PLUGIN_MAIN_PATH = `${CONFIG_DIR}/plugins/foo/main.js`;
 
 function createEventContext() {
 	const pendingPaths = new Set<string>();
+	const pendingRevisions = new Map<string, number>();
+	let revision = 0;
 	const triggerDebouncedSync = vi.fn();
 	const shouldIgnore = vi.fn((path: string) => path.startsWith('.trash/'));
 	return {
-		context: { pendingPaths, shouldIgnore, triggerDebouncedSync },
+		context: {
+			pendingPaths,
+			shouldIgnore,
+			markPending: (path: string) => pendingRevisions.set(path, ++revision),
+			clearPending: (path: string) => pendingRevisions.delete(path),
+			triggerDebouncedSync,
+		},
 		pendingPaths,
+		pendingRevisions,
 		triggerDebouncedSync,
 	};
 }
@@ -51,6 +61,7 @@ function createFlushHarness(overrides: Partial<{
 }> = {}) {
 	const pendingPaths = new Set<string>();
 	const inFlightPaths = new Set<string>();
+	const pendingRevisions = new Map<string, number>();
 	const state: QueueState = {
 		status: overrides.status ?? 'idle',
 		lastSync: null,
@@ -88,6 +99,7 @@ function createFlushHarness(overrides: Partial<{
 	return {
 		state,
 		pendingPaths,
+		pendingRevisions,
 		updateState,
 		updateStateCalls,
 		triggerDebouncedSync,
@@ -102,6 +114,7 @@ function createFlushHarness(overrides: Partial<{
 		context: {
 			pendingPaths,
 			inFlightPaths,
+			pendingRevisions,
 			vault: {} as never,
 			api: {
 				isConfigured: vi.fn(() => overrides.configured ?? true),
@@ -111,6 +124,11 @@ function createFlushHarness(overrides: Partial<{
 				batchDelete,
 			},
 			localManifest: {
+				getEntry: vi.fn(() => ({
+					hash: 'd'.repeat(64),
+					size: 1,
+					modified: '2026-02-15T00:00:00.000Z',
+				})),
 				setEntry,
 				removeEntry,
 				save,
@@ -383,6 +401,32 @@ describe('clearSyncedPendingPaths', () => {
 		expect(clearDebounceTimer).not.toHaveBeenCalled();
 		expect(updateState).not.toHaveBeenCalled();
 	});
+
+	it('keeps a newer event for the same path during sync reconciliation', () => {
+		const pendingPaths = new Set(['notes/a.md']);
+		const pendingRevisions = new Map([['notes/a.md', 2]]);
+		const clearDebounceTimer = vi.fn();
+		const updateState = vi.fn();
+
+		clearSyncedPendingPaths(
+			{ pendingPaths, pendingRevisions, clearDebounceTimer, updateState },
+			createSyncResult({ uploadedPaths: ['notes/a.md'] }),
+			new Map([['notes/a.md', 1]]),
+		);
+
+		expect([...pendingPaths]).toEqual(['notes/a.md']);
+		expect(pendingRevisions.get('notes/a.md')).toBe(2);
+		expect(updateState).not.toHaveBeenCalled();
+	});
+
+	it('coalesces opposite upload and delete events for one path', () => {
+		const eventContext = createEventContext();
+		onFileDelete(eventContext.context, { path: 'notes/a.md' } as never);
+		onFileChange(eventContext.context, { path: 'notes/a.md' } as never);
+
+		expect([...eventContext.pendingPaths]).toEqual(['notes/a.md']);
+		expect([...eventContext.pendingRevisions.keys()]).toEqual(['notes/a.md']);
+	});
 });
 
 describe('processPendingChanges', () => {
@@ -403,7 +447,10 @@ describe('processPendingChanges', () => {
 		await processPendingChanges(harness.context, 4);
 
 		expect(harness.uploadFile).toHaveBeenCalledTimes(1);
-		expect(harness.batchDelete).toHaveBeenCalledWith(['notes/old.md']);
+		expect(harness.batchDelete).toHaveBeenCalledWith(
+			['notes/old.md'],
+			{ 'notes/old.md': 'd'.repeat(64) },
+		);
 		expect(harness.setEntry).toHaveBeenCalledWith(
 			'notes/a.md',
 			expect.objectContaining({ hash: 'abc123', size: 5, modified: '2026-02-15T00:00:00.000Z' }),
@@ -461,6 +508,54 @@ describe('processPendingChanges', () => {
 		expect(harness.state.status).toBe('error');
 		expect(harness.state.lastError).toContain('quota exceeded');
 		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not spin the queue after a permanent version conflict', async () => {
+		const harness = createFlushHarness({
+			prepareUploadFromPath: async path => ({
+				path,
+				content: new TextEncoder().encode('hello').buffer as ArrayBuffer,
+				hash: 'abc123',
+				size: 5,
+				contentType: 'text/plain',
+			}),
+			uploadFile: async () => {
+				throw new HttpError('remote changed', 409);
+			},
+		});
+		harness.pendingPaths.add('notes/a.md');
+		harness.pendingRevisions.set('notes/a.md', 1);
+
+		await processPendingChanges(harness.context, 4);
+
+		expect(harness.state.status).toBe('error');
+		expect(harness.pendingPaths.size).toBe(0);
+		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
+	});
+
+	it('clears completed queue revisions but preserves a newer event for the same path', async () => {
+		const harness = createFlushHarness({
+			prepareUploadFromPath: async path => ({
+				path,
+				content: new TextEncoder().encode('hello').buffer as ArrayBuffer,
+				hash: 'abc123',
+				size: 5,
+				contentType: 'text/plain',
+			}),
+			uploadFile: async ({ path }) => {
+				harness.pendingPaths.add(path);
+				harness.pendingRevisions.set(path, 2);
+				return { success: true, path, hash: 'abc123' };
+			},
+		});
+		harness.pendingPaths.add('notes/a.md');
+		harness.pendingRevisions.set('notes/a.md', 1);
+
+		await processPendingChanges(harness.context, 4);
+
+		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.pendingRevisions.get('notes/a.md')).toBe(2);
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
 	});
 

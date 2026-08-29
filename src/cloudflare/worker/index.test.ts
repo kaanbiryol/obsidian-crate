@@ -355,6 +355,23 @@ describe('worker entrypoint', () => {
 		expect(await response.json()).toEqual({ error: 'Database not available' });
 	});
 
+	it('does not accept untracked file mutations when D1 is unavailable', async () => {
+		const response = await worker.fetch(
+			new Request('https://worker.test/sync/upload?path=notes/a.md', {
+				method: 'PUT',
+				headers: {
+					Authorization: 'Bearer secret-token',
+					'X-Crate-Expected-Hash': 'absent',
+				},
+				body: 'hello',
+			}),
+			createEnv() as never,
+		);
+
+		expect(response.status).toBe(503);
+		expect(await response.json()).toEqual({ error: 'Database not available' });
+	});
+
 	it('accepts push subscription requests with a valid one-time enrollment token', async () => {
 		const tokenHash = await sha256Hex('setup-token');
 		const db = createDb({ [tokenHash]: Date.now() + 60_000 });

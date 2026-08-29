@@ -8,6 +8,7 @@ import { createEmptySyncResult, finalizeSyncResult } from "./sync-result";
 import { createLogger, errorMessage } from "../plugin/logger";
 import type { ChangelogEntry, FileDiff, FileEntry, PreparedUpload, SyncResult } from "../plugin/types";
 import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
+import { validateDownloadedContent, type DownloadRequest } from './transfer-download';
 
 const logger = createLogger("SyncPlanner");
 
@@ -72,7 +73,7 @@ export async function runIncrementalSync(
     const localDeletedPaths = new Set(localDeletes);
     const resurrectPaths = new Set<string>();
     const reclassifiedPaths = new Set<string>();
-    const downloadPaths: string[] = [];
+	const downloadRequests: DownloadRequest[] = [];
     const conflicts: FileDiff[] = [];
 
     for (const [path, entry] of changesByPath) {
@@ -104,6 +105,7 @@ export async function runIncrementalSync(
 
         if (localDeletedPaths.has(path)) {
           const response = await context.api.downloadFile(path);
+		  await validateDownloadedContent(path, response.content, response.size, response.hash, entry.hash);
           const conflictPath = await createConflictCopy(context.vault, path, response.content);
           result.conflicts.push(conflictPath);
           continue;
@@ -111,7 +113,7 @@ export async function runIncrementalSync(
 
         const localFile = context.vault.getAbstractFileByPath(path);
         if (!localFile && !(isHiddenPath(path) && await context.vault.adapter.exists(path))) {
-          downloadPaths.push(path);
+			downloadRequests.push({ path, expectedLocalHash: null, expectedRemoteHash: entry.hash, remoteSize: entry.size });
           continue;
         }
 
@@ -145,7 +147,7 @@ export async function runIncrementalSync(
             });
           }
         } else {
-          downloadPaths.push(path);
+			downloadRequests.push({ path, expectedLocalHash: localHash, expectedRemoteHash: entry.hash, remoteSize: entry.size });
         }
       } catch (error) {
         result.errors.push(`${path}: ${errorMessage(error)}`);
@@ -163,8 +165,8 @@ export async function runIncrementalSync(
     const total = changesByPath.size + localOnlyChanges.length + localOnlyDeletes.length;
     let current = 0;
 
-    if (downloadPaths.length > 0) {
-      await context.parallelDownloadAndSaveFiles(downloadPaths, result);
+    if (downloadRequests.length > 0) {
+	  await context.parallelDownloadAndSaveFiles(downloadRequests, result);
     }
     current += changesByPath.size;
     options.progressCallback?.(current, total);
@@ -192,14 +194,29 @@ export async function runIncrementalSync(
       options.progressCallback?.(current, total);
     }
 
-    await context.uploadPreparedFiles(localOnlyUploads, result, {
+	await context.uploadPreparedFiles(localOnlyUploads, result, {
       concurrency: options.uploadConcurrency,
-      retry: false,
+	  retry: true,
     });
 
     if (localOnlyDeletes.length > 0) {
-      try {
-        const deleteResult = await context.api.batchDelete(localOnlyDeletes);
+		try {
+			const deleteFiles = localOnlyDeletes.flatMap((path) => {
+				const expectedHash = context.localManifest.getEntry(path)?.hash;
+				return expectedHash ? [{ path, expectedHash }] : [];
+			});
+			const missingExpectedPaths = localOnlyDeletes.filter(
+				(path) => !context.localManifest.getEntry(path)?.hash,
+			);
+			for (const path of missingExpectedPaths) {
+				result.errors.push(`${path}: Missing remote version for delete`);
+			}
+			const deleteResult = deleteFiles.length > 0
+				? await context.api.batchDelete(
+					deleteFiles.map((file) => file.path),
+					Object.fromEntries(deleteFiles.map((file) => [file.path, file.expectedHash])),
+				)
+				: { success: true, deleted: [] };
         for (const path of deleteResult.deleted) {
           context.localManifest.removeEntry(path);
           result.deleted++;

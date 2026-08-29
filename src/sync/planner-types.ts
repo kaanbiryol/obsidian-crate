@@ -1,5 +1,6 @@
 import type { TAbstractFile, Vault } from "obsidian";
 import type { ChangelogEntry, CrateSettings, FileDiff, FileEntry, PreparedUpload, SyncResult } from "../plugin/types";
+import type { DownloadRequest } from './transfer-download';
 
 interface PlannerManifest {
   getEntry(path: string): FileEntry | undefined;
@@ -17,12 +18,12 @@ interface PlannerApi {
     hasMore: boolean;
     cursorExpired?: boolean;
   }>;
-  downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number }>;
-  deleteFile(path: string): Promise<{ success: boolean; path: string }>;
-  batchDelete(paths: string[]): Promise<{
+  downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string }>;
+  deleteFile(path: string, expectedHash: string): Promise<{ success: boolean; path: string }>;
+  batchDelete(paths: string[], expectedHashes?: Record<string, string>): Promise<{
     success: boolean;
     deleted: string[];
-    errors?: Array<{ path: string; error: string }>;
+    errors?: Array<{ path: string; error: string; status?: number; currentHash?: string | null }>;
   }>;
 }
 
@@ -44,7 +45,7 @@ export interface IncrementalSyncPlannerContext {
   shouldIgnore(path: string): boolean;
   getLocalChanges(): Promise<{ path: string; hash: string }[]>;
   getLocalDeletes(): Promise<string[]>;
-  parallelDownloadAndSaveFiles(paths: string[], result: SyncResult): Promise<void>;
+  parallelDownloadAndSaveFiles(requests: string[] | DownloadRequest[], result: SyncResult): Promise<void>;
   processDiff(
     diff: FileDiff,
     localFiles: Record<string, FileEntry>,

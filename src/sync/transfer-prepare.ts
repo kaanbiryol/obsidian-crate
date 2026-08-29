@@ -21,7 +21,7 @@ export function isVaultTFileLike(file: unknown): file is TFile {
 export async function prepareUploadFromVaultFile(
   context: TransferContext,
   file: VaultFile,
-  options?: { force?: boolean },
+  options?: { force?: boolean; expectedHash?: string | null },
 ): Promise<PreparedUpload | null> {
   if (file.size > MAX_FILE_SIZE_BYTES) {
     logger.warn("Skipping large file:", file.path);
@@ -43,13 +43,16 @@ export async function prepareUploadFromVaultFile(
     size: file.size,
     mtime: file.mtime,
     contentType: getContentType(file.extension),
+	expectedHash: options && 'expectedHash' in options
+		? options.expectedHash ?? null
+		: context.localManifest.getEntry?.(file.path)?.hash ?? null,
   };
 }
 
 export async function prepareUploadFromPath(
   context: TransferContext,
   path: string,
-  options?: { force?: boolean },
+  options?: { force?: boolean; expectedHash?: string | null },
 ): Promise<PreparedUpload | null> {
   const file = context.vault.getAbstractFileByPath(path);
   if (isVaultTFileLike(file)) {

@@ -125,7 +125,7 @@ Files are split by size at the `BATCH_FILE_SIZE_LIMIT` (1 MB) threshold:
 - **< 1 MB:** batched into JSON payloads with base64-encoded content. Each batch respects `BATCH_MAX_FILES` (50) and `BATCH_MAX_BYTES` (10 MB) limits. Sent via `POST /sync/batch-upload`.
 - **>= 1 MB:** uploaded individually as binary via `PUT /sync/upload` with retry.
 
-Downloads use `POST /sync/batch-download` in chunks of `BATCH_MAX_FILES` (50). If a batch download fails, falls back to individual `GET /sync/download` requests.
+Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable.
 
 Implementation: `transfer.ts:uploadPreparedFiles()`, `transfer.ts:createBatchUploadChunks()`
 
@@ -138,6 +138,7 @@ File events (create, modify, delete, rename) are debounced before syncing:
 3. Rename events emit both a `delete:` for old path and an add for new path
 4. Debounce timer (default 5s) resets with each new event, with a 30s maximum wait
 5. After the quiet period or maximum wait, `processPendingChanges()` flushes the queue
+6. Each event receives a revision so full-sync reconciliation cannot clear a newer edit that arrived while the sync was running; opposite upload/delete events for one path are coalesced
 
 Implementation: `queue.ts`
 

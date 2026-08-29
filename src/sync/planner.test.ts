@@ -195,7 +195,9 @@ describe('runIncrementalSync', () => {
 			save: vi.fn(async () => {}),
 			setEntry: vi.fn(),
 			removeEntry: vi.fn(),
-			getEntry: vi.fn(),
+			getEntry: vi.fn((path: string) => path === 'notes/local-delete.md'
+				? { hash: 'a'.repeat(64), size: 1, modified: '2026-02-15T00:00:00.000Z' }
+				: undefined),
 			getAllPaths: vi.fn(() => []),
 			getManifest: vi.fn(() => ({ version: 1, files: {} })),
 		};
@@ -392,7 +394,7 @@ describe('runIncrementalSync', () => {
 		expect(uploadPreparedFiles).toHaveBeenCalledWith(
 			[prepared],
 			expect.any(Object),
-			expect.objectContaining({ concurrency: 5, retry: false }),
+			expect.objectContaining({ concurrency: 5, retry: true }),
 		);
 		expect(result?.uploaded).toBe(1);
 		expect(harness.settings.lastSeq).toBe(9);
@@ -446,7 +448,9 @@ describe('runIncrementalSync', () => {
 			save: vi.fn(async () => {}),
 			setEntry: vi.fn(),
 			removeEntry: vi.fn(),
-			getEntry: vi.fn(),
+			getEntry: vi.fn((path: string) => path === 'notes/local-delete.md'
+				? { hash: 'a'.repeat(64), size: 1, modified: '2026-02-15T00:00:00.000Z' }
+				: undefined),
 			getAllPaths: vi.fn(() => []),
 			getManifest: vi.fn(() => ({ version: 1, files: {} })),
 		};
@@ -501,8 +505,13 @@ describe('runIncrementalSync', () => {
 
 		const result = await runIncrementalSync(context, { uploadConcurrency: 5 });
 
-		expect(parallelDownloadAndSaveFiles).toHaveBeenCalledWith(['notes/remote.md'], expect.any(Object));
-		expect(batchDelete).toHaveBeenCalledWith(['notes/local-delete.md']);
+		expect(parallelDownloadAndSaveFiles).toHaveBeenCalledWith([
+			{ path: 'notes/remote.md', expectedLocalHash: null, expectedRemoteHash: 'remote-hash', remoteSize: 12 },
+		], expect.any(Object));
+		expect(batchDelete).toHaveBeenCalledWith(
+			['notes/local-delete.md'],
+			{ 'notes/local-delete.md': 'a'.repeat(64) },
+		);
 		expect(localManifest.removeEntry).toHaveBeenCalledWith('notes/local-delete.md');
 		expect(result?.success).toBe(true);
 		expect(result?.downloaded).toBe(1);
@@ -517,7 +526,11 @@ describe('runIncrementalSync', () => {
 			save: vi.fn(async () => {}),
 			setEntry: vi.fn(),
 			removeEntry: vi.fn(),
-			getEntry: vi.fn(),
+			getEntry: vi.fn((path: string) => ({
+				hash: path === 'notes/ok.md' ? 'b'.repeat(64) : 'c'.repeat(64),
+				size: 1,
+				modified: '2026-02-15T00:00:00.000Z',
+			})),
 			getAllPaths: vi.fn(() => []),
 			getManifest: vi.fn(() => ({ version: 1, files: {} })),
 		};

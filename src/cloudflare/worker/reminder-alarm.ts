@@ -71,16 +71,15 @@ export class ReminderAlarm implements DurableObject {
 
 		const db = this.env.DB;
 		if (db) {
-			try {
-				await sendToAllSubscriptions(db, {
-					title: reminder.content,
-					body: reminder.project || '',
-					tag: reminder.reminderId,
-					project: reminder.project,
-					reminderId: reminder.reminderId,
-				});
-			} catch (err) {
-				console.error('ReminderAlarm: push failed', reminder.reminderId, err);
+			const delivery = await sendToAllSubscriptions(db, {
+				title: reminder.content,
+				body: reminder.project || '',
+				tag: reminder.reminderId,
+				project: reminder.project,
+				reminderId: reminder.reminderId,
+			});
+			if (delivery.failed > 0) {
+				throw new Error(`Push delivery failed for ${delivery.failed} subscription(s)`);
 			}
 
 			// Clean up D1 record

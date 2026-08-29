@@ -36,6 +36,7 @@ describe('SyncApiClient', () => {
 		await expect(client.downloadFile('folder/a b#.md')).resolves.toEqual({
 			content: body,
 			contentType: 'text/plain',
+			hash: '',
 			size: 1,
 		});
 

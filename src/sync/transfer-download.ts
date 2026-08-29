@@ -4,26 +4,79 @@ import { computeHash } from "./hasher";
 import { isMarkdownPath } from "./markdown-base-cache";
 import { isAbortError } from "./abort";
 import type { SyncResult } from "../plugin/types";
-import { BATCH_MAX_FILES, MAX_FILE_SIZE_BYTES } from "../plugin/types";
+import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_FILE_SIZE_LIMIT, BATCH_MAX_FILES, MAX_FILE_SIZE_BYTES } from "../plugin/types";
 import { createLogger, errorMessage } from "../plugin/logger";
 import type { TransferContext } from "./transfer-types";
 import { isVaultTFileLike } from "./transfer-prepare";
+import { createConflictCopy } from "./conflict";
 
 const logger = createLogger("SyncTransfer");
 
+export interface DownloadRequest {
+	path: string;
+	expectedLocalHash: string | null;
+	expectedRemoteHash: string;
+	remoteSize: number;
+}
+
+async function preserveLocalChangeIfNeeded(
+	context: TransferContext,
+	request: DownloadRequest,
+	result: SyncResult,
+): Promise<void> {
+	const abstractFile = context.vault.getAbstractFileByPath(request.path);
+	const visibleFile = isVaultTFileLike(abstractFile);
+	const exists = visibleFile || (isHiddenPath(request.path) && await context.vault.adapter.exists(request.path));
+	if (!exists) {
+		if (request.expectedLocalHash !== null) {
+			throw new Error("Local file was deleted during sync; remote download was skipped");
+		}
+		return;
+	}
+
+	const localContent = await context.vault.adapter.readBinary(request.path);
+	const currentHash = await computeHash(localContent);
+	if (request.expectedLocalHash === currentHash) return;
+
+	const conflictPath = await createConflictCopy(context.vault, request.path, localContent);
+	result.conflicts.push(conflictPath);
+}
+
+export async function validateDownloadedContent(
+	path: string,
+	content: ArrayBuffer,
+	declaredSize: number,
+	declaredHash: string,
+	expectedRemoteHash: string,
+): Promise<void> {
+	if (declaredSize !== content.byteLength) {
+		throw new Error(`Download size mismatch (expected ${declaredSize}, got ${content.byteLength})`);
+	}
+	const computedHash = await computeHash(content);
+	if (declaredHash && declaredHash !== computedHash) {
+		throw new Error(`Download hash mismatch for ${path}`);
+	}
+	if (expectedRemoteHash && expectedRemoteHash !== computedHash) {
+		throw new Error(`Downloaded content no longer matches the planned remote version for ${path}`);
+	}
+}
+
 export async function downloadAndSaveFile(
   context: TransferContext,
-  path: string,
-  result: SyncResult,
+	request: DownloadRequest,
+	result: SyncResult,
 ): Promise<void> {
-  const response = await context.api.downloadFile(path);
-  const content = response.content;
+	const { path } = request;
+	const response = await context.api.downloadFile(path);
+	const content = response.content;
   if (content.byteLength > MAX_FILE_SIZE_BYTES) {
     result.errors.push(`${path}: Skipped remote file larger than 25MB`);
-    return;
-  }
+		return;
+	}
+	await validateDownloadedContent(path, content, response.size, response.hash, request.expectedRemoteHash);
+	await preserveLocalChangeIfNeeded(context, request, result);
 
-  await saveDownloadedContent(context, path, content);
+	await saveDownloadedContent(context, path, content);
   result.downloaded++;
   result.downloadedPaths.push(path);
 }
@@ -83,42 +136,84 @@ export async function saveDownloadedContent(
 
 export async function parallelDownloadAndSaveFiles(
   context: TransferContext,
-  paths: string[],
+	requestsOrPaths: Array<DownloadRequest | string>,
   result: SyncResult,
   concurrency: number,
 ): Promise<void> {
-  const batchable: string[] = [];
-  const individual: string[] = [];
+	const requests = requestsOrPaths.map((request): DownloadRequest => typeof request === 'string'
+		? { path: request, expectedLocalHash: null, expectedRemoteHash: '', remoteSize: 0 }
+		: request);
+	const batchable: DownloadRequest[] = [];
+	const individual: DownloadRequest[] = [];
 
-  for (const path of paths) {
-    batchable.push(path);
+	for (const request of requests) {
+		if (request.remoteSize < BATCH_FILE_SIZE_LIMIT) batchable.push(request);
+		else individual.push(request);
   }
 
   if (batchable.length > 0) {
-    const chunks: string[][] = [];
-    for (let index = 0; index < batchable.length; index += BATCH_MAX_FILES) {
-      chunks.push(batchable.slice(index, index + BATCH_MAX_FILES));
-    }
+		const chunks: DownloadRequest[][] = [];
+		let currentChunk: DownloadRequest[] = [];
+		let currentBytes = 0;
+		for (const request of batchable) {
+			if (
+				currentChunk.length >= BATCH_MAX_FILES
+				|| (currentChunk.length > 0 && currentBytes + request.remoteSize > BATCH_DOWNLOAD_MAX_BYTES)
+			) {
+				chunks.push(currentChunk);
+				currentChunk = [];
+				currentBytes = 0;
+			}
+			currentChunk.push(request);
+			currentBytes += request.remoteSize;
+		}
+		if (currentChunk.length > 0) chunks.push(currentChunk);
 
     for (const chunk of chunks) {
       try {
-        const response = await context.api.batchDownload(chunk);
-        for (const file of response.files) {
-          try {
-            if (file.error) {
+			const response = await context.api.batchDownload(chunk.map((request) => request.path));
+			const requestsByPath = new Map(chunk.map((request) => [request.path, request] as const));
+			const responsePaths = response.files.map((file) => file.path);
+			if (
+				new Set(responsePaths).size !== responsePaths.length
+				|| responsePaths.length !== chunk.length
+				|| responsePaths.some((path) => !requestsByPath.has(path))
+			) {
+				throw new Error("Batch download response did not match the requested paths");
+			}
+			const seenPaths = new Set<string>();
+			for (const file of response.files) {
+				try {
+					const downloadRequest = requestsByPath.get(file.path);
+					if (!downloadRequest) throw new Error("Unexpected path in batch response");
+					seenPaths.add(file.path);
+					if (file.error) {
               result.errors.push(`${file.path}: ${file.error}`);
               continue;
             }
 
-            const content = base64ToArrayBuffer(file.content);
-            await saveDownloadedContent(context, file.path, content);
+					const content = base64ToArrayBuffer(file.content);
+					await validateDownloadedContent(
+						file.path,
+						content,
+						file.size,
+						file.hash,
+						downloadRequest.expectedRemoteHash,
+					);
+					await preserveLocalChangeIfNeeded(context, downloadRequest, result);
+					await saveDownloadedContent(context, file.path, content);
             result.downloaded++;
             result.downloadedPaths.push(file.path);
           } catch (error) {
             const downloadError = error instanceof Error ? error.message : "Download failed";
             result.errors.push(`${file.path}: ${downloadError}`);
-          }
-        }
+				}
+			}
+			for (const request of chunk) {
+				if (!seenPaths.has(request.path)) {
+					result.errors.push(`${request.path}: Missing from batch download response`);
+				}
+			}
       } catch (error) {
         if (isAbortError(error)) {
           throw error;
@@ -137,16 +232,16 @@ export async function parallelDownloadAndSaveFiles(
 
 async function downloadFilesIndividually(
   context: TransferContext,
-  paths: string[],
+	requests: DownloadRequest[],
   result: SyncResult,
   concurrency: number,
 ): Promise<void> {
-  const tasks = paths.map((path) => async () => {
-    try {
-      await downloadAndSaveFile(context, path, result);
-    } catch (error) {
-      const downloadError = error instanceof Error ? error.message : "Download failed";
-      result.errors.push(`${path}: ${downloadError}`);
+	const tasks = requests.map((request) => async () => {
+		try {
+			await downloadAndSaveFile(context, request, result);
+		} catch (error) {
+			const downloadError = error instanceof Error ? error.message : "Download failed";
+			result.errors.push(`${request.path}: ${downloadError}`);
     }
   });
 

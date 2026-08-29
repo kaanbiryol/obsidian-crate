@@ -637,7 +637,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 		expect(result.success).toBe(true);
 		expect(result.deleted).toBe(1);
 		expect(harness.api.deleteFile).toHaveBeenCalledTimes(1);
-		expect(harness.api.deleteFile).toHaveBeenCalledWith('notes/remote-only.md');
+		expect(harness.api.deleteFile).toHaveBeenCalledWith('notes/remote-only.md', 'remote-hash');
 		expect(harness.api.deleteFile).not.toHaveBeenCalledWith('.trash/old.md');
 	});
 

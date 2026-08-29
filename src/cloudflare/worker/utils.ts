@@ -18,9 +18,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export async function parseJsonObject(
 	request: Request,
+	maxBytes = 1024 * 1024,
 ): Promise<{ ok: true; value: Record<string, unknown> } | { ok: false; response: Response }> {
+	const contentLength = request.headers.get('Content-Length');
+	if (contentLength) {
+		const declaredBytes = /^\d+$/.test(contentLength) ? Number(contentLength) : Number.NaN;
+		if (!Number.isSafeInteger(declaredBytes) || declaredBytes < 0) {
+			return { ok: false, response: corsResponse({ error: 'Invalid Content-Length header' }, 400) };
+		}
+		if (declaredBytes > maxBytes) {
+			return { ok: false, response: corsResponse({ error: 'JSON body too large' }, 413) };
+		}
+	}
+
 	try {
-		const parsed: unknown = await request.json();
+		const body = await request.text();
+		if (new TextEncoder().encode(body).byteLength > maxBytes) {
+			return { ok: false, response: corsResponse({ error: 'JSON body too large' }, 413) };
+		}
+		const parsed: unknown = JSON.parse(body);
 		if (!isRecord(parsed)) {
 			return { ok: false, response: corsResponse({ error: 'JSON object body required' }, 400) };
 		}
@@ -32,7 +48,7 @@ export async function parseJsonObject(
 
 export function sanitizePath(path: string): string | null {
 	if (typeof path !== 'string') return null;
-	if (!path || path !== path.trim() || path.startsWith('/') || path.endsWith('/') || path.includes('\\')) {
+	if (!path || path.length > 4096 || path !== path.trim() || path.startsWith('/') || path.endsWith('/') || path.includes('\\')) {
 		return null;
 	}
 	if (containsControlCharacters(path)) {

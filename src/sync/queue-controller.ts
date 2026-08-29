@@ -41,6 +41,8 @@ export class SyncQueueController {
 	private maxWaitStart: number | null = null;
 	private pendingPaths: Set<string> = new Set();
 	private inFlightPaths: Set<string> = new Set();
+	private pendingRevisions = new Map<string, number>();
+	private nextRevision = 0;
 
 	constructor(private readonly context: SyncQueueControllerContext) {}
 
@@ -70,14 +72,19 @@ export class SyncQueueController {
 		queueOnFileRename(this.getQueueEventContext(), file, oldPath);
 	}
 
-	clearSyncedPendingPaths(result: SyncResult): void {
-		clearSyncedQueuePaths(this.getQueueReconcileContext(), result);
+	snapshotPendingRevisions(): ReadonlyMap<string, number> {
+		return new Map(this.pendingRevisions);
+	}
+
+	clearSyncedPendingPaths(result: SyncResult, revisionSnapshot?: ReadonlyMap<string, number>): void {
+		clearSyncedQueuePaths(this.getQueueReconcileContext(), result, revisionSnapshot);
 	}
 
 	destroy(): void {
 		this.clearDebounceTimer();
 		this.pendingPaths.clear();
 		this.inFlightPaths.clear();
+		this.pendingRevisions.clear();
 	}
 
 	private async handleRawFileEvent(path: string): Promise<void> {
@@ -106,6 +113,13 @@ export class SyncQueueController {
 		return {
 			pendingPaths: this.pendingPaths,
 			shouldIgnore: (path: string) => this.context.shouldIgnore(path),
+			markPending: (path: string) => {
+				this.nextRevision += 1;
+				this.pendingRevisions.set(path, this.nextRevision);
+			},
+			clearPending: (path: string) => {
+				this.pendingRevisions.delete(path);
+			},
 			triggerDebouncedSync: () => this.debouncedSync(),
 		};
 	}
@@ -131,6 +145,7 @@ export class SyncQueueController {
 		return {
 			pendingPaths: this.pendingPaths,
 			inFlightPaths: this.inFlightPaths,
+			pendingRevisions: this.pendingRevisions,
 			vault: this.context.vault,
 			api: this.context.api,
 			localManifest: this.context.getLocalManifest(),
@@ -150,6 +165,7 @@ export class SyncQueueController {
 	private getQueueReconcileContext(): QueueReconcileContext {
 		return {
 			pendingPaths: this.pendingPaths,
+			pendingRevisions: this.pendingRevisions,
 			clearDebounceTimer: this.clearDebounceTimer.bind(this),
 			updateState: (updates: Partial<SyncState>) => this.context.updateState(updates),
 		};

@@ -23,6 +23,84 @@ async function sha256Hex(data: string): Promise<string> {
 }
 
 describe('worker sync handlers', () => {
+	it('rejects stale uploads without replacing the committed object', async () => {
+		const currentHash = 'a'.repeat(64);
+		const staleHash = 'b'.repeat(64);
+		const managedKey = `__crate__/files/${currentHash}/current`;
+		const { bucket, store } = createMockR2Bucket({ [managedKey]: 'current' });
+		const { db } = createMockD1Database({
+			files: {
+				'notes/test.md': { hash: currentHash, size: 7, storageKey: managedKey },
+			},
+		});
+
+		const response = await handleUpload(
+			new Request('https://worker.test/sync/upload?path=notes/test.md', {
+				method: 'PUT',
+				body: 'stale update',
+				headers: { 'X-Crate-Expected-Hash': staleHash },
+			}),
+			bucket,
+			db,
+		);
+
+		expect(response.status).toBe(409);
+		expect(await responseJson(response)).toEqual(expect.objectContaining({
+			success: false,
+			currentHash,
+		}));
+		expect(new TextDecoder().decode(store.get(managedKey)?.body)).toBe('current');
+		expect(store.size).toBe(1);
+	});
+
+	it('rejects stale deletes without removing the committed file', async () => {
+		const currentHash = 'c'.repeat(64);
+		const managedKey = `__crate__/files/${currentHash}/current`;
+		const { bucket, store } = createMockR2Bucket({ [managedKey]: 'current' });
+		const { db, files } = createMockD1Database({
+			files: {
+				'notes/test.md': { hash: currentHash, size: 7, storageKey: managedKey },
+			},
+		});
+
+		const response = await handleDelete(
+			new Request('https://worker.test/sync/delete', {
+				method: 'POST',
+				body: JSON.stringify({ path: 'notes/test.md', expectedHash: 'd'.repeat(64) }),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket,
+			db,
+		);
+
+		expect(response.status).toBe(409);
+		expect(files.has('notes/test.md')).toBe(true);
+		expect(store.has(managedKey)).toBe(true);
+	});
+
+	it('preflights batch download size before reading R2 objects', async () => {
+		const { bucket } = createMockR2Bucket();
+		const { db } = createMockD1Database({
+			files: {
+				'a.bin': { hash: 'a'.repeat(64), size: 5 * 1024 * 1024, storageKey: 'a' },
+				'b.bin': { hash: 'b'.repeat(64), size: 5 * 1024 * 1024, storageKey: 'b' },
+			},
+		});
+
+		const response = await handleBatchDownload(
+			new Request('https://worker.test/sync/batch-download', {
+				method: 'POST',
+				body: JSON.stringify({ paths: ['a.bin', 'b.bin'] }),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket,
+			db,
+		);
+
+		expect(response.status).toBe(413);
+		expect(bucket.get).not.toHaveBeenCalled();
+	});
+
 	it('rejects traversal-style upload paths', async () => {
 		const { bucket } = createMockR2Bucket();
 
@@ -70,6 +148,7 @@ describe('worker sync handlers', () => {
 				body: 'hello',
 				headers: {
 					'Content-Type': 'text/plain',
+					'X-Crate-Expected-Hash': 'absent',
 				},
 			}),
 			bucket,
@@ -98,6 +177,7 @@ describe('worker sync handlers', () => {
 				body: 'after',
 				headers: {
 					'Content-Type': 'text/plain',
+					'X-Crate-Expected-Hash': 'a'.repeat(64),
 				},
 			}),
 			bucket,
@@ -126,6 +206,7 @@ describe('worker sync handlers', () => {
 				body: 'after',
 				headers: {
 					'Content-Type': 'text/plain',
+					'X-Crate-Expected-Hash': 'absent',
 				},
 			}),
 			bucket,
@@ -167,7 +248,7 @@ describe('worker sync handlers', () => {
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
 				method: 'POST',
-				body: JSON.stringify({ path: 'notes/test.md' }),
+				body: JSON.stringify({ path: 'notes/test.md', expectedHash: 'a'.repeat(64) }),
 				headers: { 'Content-Type': 'application/json' },
 			}),
 			bucket,
@@ -192,14 +273,14 @@ describe('worker sync handlers', () => {
 		});
 		const { db, files } = createMockD1Database({
 			files: {
-				'notes/test.md': null,
+					'notes/test.md': { hash: 'a'.repeat(64), size: 6, storageKey: null },
 			},
 		});
 
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
 				method: 'POST',
-				body: JSON.stringify({ path: 'notes/test.md' }),
+				body: JSON.stringify({ path: 'notes/test.md', expectedHash: 'a'.repeat(64) }),
 				headers: { 'Content-Type': 'application/json' },
 			}),
 			bucket,
@@ -227,7 +308,10 @@ describe('worker sync handlers', () => {
 			new Request('https://worker.test/sync/batch-delete', {
 				method: 'POST',
 				body: JSON.stringify({
-					paths: ['notes/ok.md', 'notes/fail.md'],
+					files: [
+						{ path: 'notes/ok.md', expectedHash: 'a'.repeat(64) },
+						{ path: 'notes/fail.md', expectedHash: 'b'.repeat(64) },
+					],
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),
@@ -264,6 +348,7 @@ describe('worker sync handlers', () => {
 							content: btoa('after'),
 							size: 5,
 							contentType: 'text/plain',
+							expectedHash: 'a'.repeat(64),
 						},
 					],
 				}),
@@ -297,7 +382,7 @@ describe('worker sync handlers', () => {
 			new Request('https://worker.test/sync/batch-delete', {
 				method: 'POST',
 				body: JSON.stringify({
-					paths: ['notes/test.md'],
+					files: [{ path: 'notes/test.md', expectedHash: 'a'.repeat(64) }],
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),

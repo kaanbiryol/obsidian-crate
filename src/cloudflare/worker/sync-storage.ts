@@ -3,10 +3,23 @@ import { FILES_PREFIX } from './utils';
 
 export const MAX_BATCH_FILES = 50;
 export const MAX_BATCH_TOTAL_BYTES = 10 * 1024 * 1024;
+export const MAX_BATCH_DOWNLOAD_BYTES = 8 * 1024 * 1024;
+export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MANAGED_FILES_PREFIX = '__crate__/files/';
 
 export interface FileStorageRow {
+	hash: string;
+	size: number;
 	storageKey: string | null;
+}
+
+export type ExpectedFileHash = string | null;
+
+export function parseExpectedFileHash(value: unknown): ExpectedFileHash | undefined {
+	if (value === null || value === 'absent') return null;
+	if (typeof value !== 'string') return undefined;
+	const normalized = value.trim().toLowerCase();
+	return /^[a-f0-9]{64}$/.test(normalized) ? normalized : undefined;
 }
 
 export function parseDeclaredSize(headerValue: string | null): number | null {
@@ -14,8 +27,11 @@ export function parseDeclaredSize(headerValue: string | null): number | null {
 		return null;
 	}
 
-	const size = Number.parseInt(headerValue, 10);
-	return Number.isInteger(size) && size >= 0 ? size : null;
+	if (!/^\d+$/.test(headerValue)) {
+		return null;
+	}
+	const size = Number(headerValue);
+	return Number.isSafeInteger(size) && size >= 0 ? size : null;
 }
 
 export function formatMutationError(error: unknown): string {
@@ -70,14 +86,16 @@ export function formatMetadataCommitFailure(actionLabel: 'Upload' | 'Delete', me
 }
 
 export async function getStoredFileRow(db: D1Database, path: string): Promise<FileStorageRow | null> {
-	const row = await db.prepare('SELECT storage_key FROM files WHERE path = ?')
+	const row = await db.prepare('SELECT hash, size, storage_key FROM files WHERE path = ?')
 		.bind(path)
-		.first<{ storage_key?: string | null }>();
+		.first<{ hash?: string; size?: number; storage_key?: string | null }>();
 	if (!row) {
 		return null;
 	}
 
 	return {
+		hash: typeof row.hash === 'string' ? row.hash : '',
+		size: typeof row.size === 'number' ? row.size : 0,
 		storageKey: normalizeStorageKey(row.storage_key),
 	};
 }
@@ -89,15 +107,6 @@ export async function loadStoredFileRows(db: D1Database, paths: string[]): Promi
 	}));
 
 	return new Map(rows.filter((entry): entry is readonly [string, FileStorageRow] => entry !== null));
-}
-
-export async function resolveCommittedObjectKey(db: D1Database, path: string): Promise<string | null> {
-	const row = await getStoredFileRow(db, path);
-	if (!row) {
-		return null;
-	}
-
-	return resolveObjectKey(path, row.storageKey);
 }
 
 export async function getChangelogBounds(db: D1Database): Promise<{

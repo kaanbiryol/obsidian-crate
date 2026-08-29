@@ -14,7 +14,7 @@ export async function handleCheckChanges(request: Request, db: D1Database): Prom
 	const since = parseInt(url.searchParams.get('since') || '0', 10);
 	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
 	const { lastSeq, minSeq } = await getChangelogBounds(db);
-	const cursorExpired = since > 0 && (minSeq === null || since < minSeq);
+	const cursorExpired = since > 0 && (minSeq === null || since + 1 < minSeq);
 	return corsResponse({ lastSeq, hasChanges: lastSeq > since, ...(cursorExpired && { cursorExpired: true }) });
 }
 
@@ -28,7 +28,7 @@ export async function handleGetChanges(request: Request, db: D1Database): Promis
 		db.prepare('SELECT seq, path, action, hash, size, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since)
 	);
 	const { lastSeq, minSeq } = await getChangelogBounds(db);
-	const cursorExpired = since > 0 && (minSeq === null || since < minSeq);
+	const cursorExpired = since > 0 && (minSeq === null || since + 1 < minSeq);
 
 	return corsResponse({
 		changes: changeRows,

@@ -9,6 +9,7 @@ import {
 } from './engine-constants';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { FileDiff, FileEntry, SyncResult, SyncState } from '../plugin/types';
+import type { DownloadRequest } from './transfer-download';
 import {
 	completeWorkflowResult,
 	getStartFailureResult,
@@ -39,7 +40,7 @@ export interface SyncWorkflowContext {
 		localFiles: Record<string, FileEntry>,
 		result: SyncResult
 	): Promise<void>;
-	parallelDownloadAndSaveFiles(paths: string[], result: SyncResult): Promise<void>;
+	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult): Promise<void>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	readBinary(path: string): Promise<ArrayBuffer>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
@@ -121,7 +122,12 @@ export async function runSyncWorkflow(
 
 		if (downloadDiffs.length > 0) {
 			await context.parallelDownloadAndSaveFiles(
-				downloadDiffs.map(diff => diff.path),
+				downloadDiffs.map(diff => ({
+					path: diff.path,
+					expectedLocalHash: diff.localHash ?? null,
+					expectedRemoteHash: diff.remoteHash!,
+					remoteSize: remoteManifest.files[diff.path]?.size ?? 0,
+				})),
 				result,
 			);
 			for (const diff of downloadDiffs) {

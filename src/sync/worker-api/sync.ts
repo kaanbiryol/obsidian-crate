@@ -1,6 +1,7 @@
 import { errorMessage } from '../../plugin/logger';
 import type {
 	BatchDeleteResponse,
+	BatchDeleteFile,
 	BatchDownloadResponse,
 	BatchUploadFile,
 	BatchUploadResponse,
@@ -57,7 +58,11 @@ export class SyncWorkerApi {
 	}
 
 	async getManifest(): Promise<FileManifest> {
-		return this.http.requestJson<FileManifest>('/sync/manifest');
+		const manifest = await this.http.requestJson<FileManifest>('/sync/manifest');
+		if (manifest.truncated) {
+			throw new Error('Remote manifest is too large to sync safely');
+		}
+		return manifest;
 	}
 
 	async uploadFile(
@@ -66,6 +71,7 @@ export class SyncWorkerApi {
 		hash: string,
 		size: number,
 		contentType: string,
+		expectedHash: string | null,
 	): Promise<UploadResult> {
 		const encodedPath = encodeURIComponent(path);
 		return this.http.requestJson<UploadResult>(`/sync/upload?path=${encodedPath}`, {
@@ -75,24 +81,30 @@ export class SyncWorkerApi {
 				'Content-Type': contentType,
 				'X-File-Hash': hash,
 				'X-File-Size': String(size),
+				'X-Crate-Expected-Hash': expectedHash === null ? 'absent' : expectedHash,
 			},
 		}, TRANSFER_TIMEOUT_MS);
 	}
 
-	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number }> {
+	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string }> {
 		const encodedPath = encodeURIComponent(path);
 		const { body, headers } = await this.http.requestBinary(`/sync/download?path=${encodedPath}`, {}, TRANSFER_TIMEOUT_MS);
+		const contentLengthHeader = getHeader(headers, 'Content-Length');
+		const contentLength = contentLengthHeader && /^\d+$/.test(contentLengthHeader)
+			? Number(contentLengthHeader)
+			: body.byteLength;
 		return {
 			content: body,
 			contentType: getHeader(headers, 'Content-Type') || 'application/octet-stream',
-			size: body.byteLength,
+			size: Number.isSafeInteger(contentLength) ? contentLength : body.byteLength,
+			hash: getHeader(headers, 'X-File-Hash') || '',
 		};
 	}
 
-	async deleteFile(path: string): Promise<{ success: boolean; path: string }> {
+	async deleteFile(path: string, expectedHash: string): Promise<{ success: boolean; path: string }> {
 		return this.http.requestJson<{ success: boolean; path: string }>('/sync/delete', {
 			method: 'POST',
-			body: JSON.stringify({ path }),
+			body: JSON.stringify({ path, expectedHash }),
 		});
 	}
 
@@ -118,10 +130,20 @@ export class SyncWorkerApi {
 		}, TRANSFER_TIMEOUT_MS);
 	}
 
-	async batchDelete(paths: string[]): Promise<BatchDeleteResponse> {
+	async batchDelete(
+		paths: string[],
+		expectedHashes: Record<string, string> = {},
+	): Promise<BatchDeleteResponse> {
+		const files: BatchDeleteFile[] = paths.map((path) => {
+			const expectedHash = expectedHashes[path];
+			if (!expectedHash) {
+				throw new Error(`Missing expected remote hash for delete: ${path}`);
+			}
+			return { path, expectedHash };
+		});
 		return this.http.requestJson<BatchDeleteResponse>('/sync/batch-delete', {
 			method: 'POST',
-			body: JSON.stringify({ paths }),
+			body: JSON.stringify({ files }),
 		});
 	}
 }

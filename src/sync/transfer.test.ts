@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload, SyncResult } from '../plugin/types';
 import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
+import { computeHash } from './hasher';
 
 const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
@@ -215,7 +216,7 @@ describe('transfer download/process helpers', () => {
 
 		await processDiff(
 			harness.context,
-			{ path: 'notes/a.md', action: 'conflict', localHash: 'l', remoteHash: 'r' },
+			{ path: 'notes/a.md', action: 'conflict', localHash: 'l', remoteHash: await computeHash(remote) },
 			localFiles,
 			result,
 		);
@@ -243,7 +244,7 @@ describe('transfer download/process helpers', () => {
 		harness.api.uploadFile.mockResolvedValue({
 			success: true,
 			path: 'notes/a.md',
-			hash: 'expected-hash',
+			hash: await computeHash(content),
 		});
 
 		const result = emptyResult();
@@ -262,6 +263,7 @@ describe('transfer download/process helpers', () => {
 			expect.any(String),
 			5,
 			'text/markdown',
+			null,
 		);
 		expect(result.uploaded).toBe(1);
 		expect(result.uploadedPaths).toEqual(['notes/a.md']);
@@ -276,7 +278,7 @@ describe('transfer download/process helpers', () => {
 
 		harness.api.batchDownload.mockResolvedValue({
 			files: [
-				{ path: 'good.md', content: b64, hash: 'h1', size: 2, contentType: 'text/plain' },
+				{ path: 'good.md', content: b64, hash: await computeHash(okContent.buffer), size: 2, contentType: 'text/plain' },
 				{ path: 'bad.md', content: '', hash: '', size: 0, contentType: '', error: 'File not found' },
 			],
 		});
@@ -286,6 +288,40 @@ describe('transfer download/process helpers', () => {
 
 		expect(result.downloaded).toBe(1);
 		expect(result.errors).toContain('bad.md: File not found');
+	});
+
+	it('preserves a local edit made after download planning as a conflict copy', async () => {
+		const harness = createTransferHarness();
+		const plannedLocal = new TextEncoder().encode('planned local').buffer as ArrayBuffer;
+		const changedLocal = new TextEncoder().encode('changed during sync').buffer as ArrayBuffer;
+		const remote = new TextEncoder().encode('remote').buffer as ArrayBuffer;
+		const path = 'notes/race.md';
+		harness.vault.getAbstractFileByPath.mockReturnValue({ path, extension: 'md' });
+		harness.adapter.readBinary.mockResolvedValue(changedLocal);
+		harness.api.batchDownload.mockResolvedValue({
+			files: [{
+				path,
+				content: btoa(String.fromCharCode(...new Uint8Array(remote))),
+				hash: await computeHash(remote),
+				size: remote.byteLength,
+				contentType: 'text/markdown',
+			}],
+		});
+
+		const result = emptyResult();
+		await parallelDownloadAndSaveFiles(harness.context, [{
+			path,
+			expectedLocalHash: await computeHash(plannedLocal),
+			expectedRemoteHash: await computeHash(remote),
+			remoteSize: remote.byteLength,
+		}], result, 5);
+
+		expect(conflictMocks.createConflictCopy).toHaveBeenCalledWith(harness.vault, path, changedLocal);
+		expect(result.conflicts).toEqual(['notes/file (conflict).md']);
+		expect(harness.vault.modifyBinary).toHaveBeenCalledWith(
+			{ path, extension: 'md' },
+			remote,
+		);
 	});
 
 	it('falls back to individual downloads when batch fails', async () => {

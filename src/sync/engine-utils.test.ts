@@ -80,4 +80,19 @@ describe('retryWithBackoff', () => {
 		await expect(promise).resolves.toBe('done');
 		expect(callCount).toBe(2);
 	});
+
+	it('does not retry permanent HTTP failures', async () => {
+		const fn = vi.fn(async () => {
+			throw new HttpError('conflict', 409);
+		});
+
+		await expect(retryWithBackoff(fn, {
+			maxRetries: 3,
+			baseDelayMs: 10,
+			isAbortError: () => false,
+			isDestroyed: () => false,
+		})).rejects.toThrow('conflict');
+
+		expect(fn).toHaveBeenCalledTimes(1);
+	});
 });

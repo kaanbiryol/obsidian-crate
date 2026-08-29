@@ -53,12 +53,22 @@ export async function uploadPreparedFiles(
           hash: upload.hash,
           size: upload.size,
           contentType: upload.contentType || "application/octet-stream",
+		  expectedHash: upload.expectedHash ?? null,
         }));
 
         const doBatch = () => context.api.batchUpload(files);
         const response = options.retry
           ? await context.retryWithBackoff(doBatch)
           : await doBatch();
+		const expectedPaths = new Set(chunk.map((upload) => upload.path));
+		const responsePaths = response.results.map((file) => file.path);
+		if (
+			new Set(responsePaths).size !== responsePaths.length
+			|| responsePaths.length !== chunk.length
+			|| responsePaths.some((path) => !expectedPaths.has(path))
+		) {
+			throw new Error("Batch upload response did not match the requested paths");
+		}
 
         for (const fileResult of response.results) {
           const upload = chunk.find((candidate) => candidate.path === fileResult.path);
@@ -118,6 +128,7 @@ async function uploadPreparedFilesIndividually(
         upload.hash,
         upload.size,
         upload.contentType || "application/octet-stream",
+		upload.expectedHash ?? null,
       );
       const uploadResult = options.retry
         ? await context.retryWithBackoff(doUpload)

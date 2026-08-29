@@ -5,15 +5,44 @@ import { handleRemindersRoute } from './routes/reminders';
 import { handleSyncRoute } from './routes/sync';
 import type { RouteMethod } from './routes/shared';
 import type { Env } from './types';
+import type { AuthPrincipal } from './authenticate';
+import { corsResponse } from './cors';
 
 export { handlePublicRoute };
+
+const REMINDERS_SCOPE_ROUTES = new Set([
+	'GET /health',
+	'GET /reminders/list',
+	'POST /reminders/create',
+	'POST /reminders/update',
+	'POST /reminders/set-completed',
+	'DELETE /reminders/delete',
+	'POST /reminders/reorder',
+	'POST /notifications/subscribe',
+	'DELETE /notifications/subscribe',
+	'POST /notifications/reminders-enrollment-token',
+	'DELETE /auth/session',
+]);
+
+export function isAuthenticatedRouteAllowed(
+	principal: AuthPrincipal,
+	path: string,
+	method: RouteMethod,
+): boolean {
+	return principal.scope === 'vault' || REMINDERS_SCOPE_ROUTES.has(`${method} ${path}`);
+}
 
 export async function handleAuthenticatedRoute(
 	request: Request,
 	env: Env,
 	path: string,
 	method: RouteMethod,
+	principal: AuthPrincipal,
 ): Promise<Response | null> {
+	if (!isAuthenticatedRouteAllowed(principal, path, method)) {
+		return corsResponse({ error: 'Token is not authorized for this operation' }, 403);
+	}
+
 	const db = env.DB || null;
 
 	return await handleSyncRoute(request, env, path, method)

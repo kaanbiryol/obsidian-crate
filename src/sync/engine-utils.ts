@@ -3,6 +3,12 @@ import { createLogger } from '../plugin/logger';
 
 const logger = createLogger('SyncEngine');
 
+const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+export function isRetryableSyncError(error: unknown): boolean {
+	return !(error instanceof HttpError) || RETRYABLE_HTTP_STATUSES.has(error.status);
+}
+
 export async function runConcurrentTasks<T>(
 	tasks: Array<() => Promise<T>>,
 	concurrency: number,
@@ -42,12 +48,14 @@ export async function retryWithBackoff<T>(
 			return await fn();
 		} catch (error) {
 			if (options.isAbortError(error) || options.isDestroyed()) throw error;
+			if (!isRetryableSyncError(error)) throw error;
 			if (attempt === options.maxRetries) throw error;
 			let delay: number;
 			if (error instanceof HttpError && error.retryAfter !== null) {
 				delay = error.retryAfter;
 			} else {
-				delay = options.baseDelayMs * Math.pow(2, attempt);
+				const exponentialDelay = options.baseDelayMs * Math.pow(2, attempt);
+				delay = Math.round(exponentialDelay * (0.75 + Math.random() * 0.5));
 			}
 			logger.warn(`Retry ${attempt + 1}/${options.maxRetries} after ${delay}ms`);
 			await new Promise(resolve => setTimeout(resolve, delay));

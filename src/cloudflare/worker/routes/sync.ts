@@ -35,12 +35,24 @@ export async function handleSyncRoute(
 	if (path === '/sync/manifest' && method === 'GET') {
 		return await withDatabase(db, requiredDb => handleGetManifest(request, requiredDb));
 	}
-	if (path === '/sync/upload' && method === 'PUT') return await handleUpload(request, bucket, db);
-	if (path === '/sync/download' && method === 'GET') return await handleDownload(request, bucket, db);
-	if (path === '/sync/delete' && method === 'POST') return await handleDelete(request, bucket, db);
-	if (path === '/sync/batch-upload' && method === 'POST') return await handleBatchUpload(request, bucket, db);
-	if (path === '/sync/batch-download' && method === 'POST') return await handleBatchDownload(request, bucket, db);
-	if (path === '/sync/batch-delete' && method === 'POST') return await handleBatchDelete(request, bucket, db);
+	if (path === '/sync/upload' && method === 'PUT') {
+		return await withDatabase(db, requiredDb => handleUpload(request, bucket, requiredDb));
+	}
+	if (path === '/sync/download' && method === 'GET') {
+		return await withDatabase(db, requiredDb => handleDownload(request, bucket, requiredDb));
+	}
+	if (path === '/sync/delete' && method === 'POST') {
+		return await withDatabase(db, requiredDb => handleDelete(request, bucket, requiredDb));
+	}
+	if (path === '/sync/batch-upload' && method === 'POST') {
+		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb));
+	}
+	if (path === '/sync/batch-download' && method === 'POST') {
+		return await withDatabase(db, requiredDb => handleBatchDownload(request, bucket, requiredDb));
+	}
+	if (path === '/sync/batch-delete' && method === 'POST') {
+		return await withDatabase(db, requiredDb => handleBatchDelete(request, bucket, requiredDb));
+	}
 	if (path === '/settings' && method === 'GET') return await handleGetSettings(bucket);
 	if (path === '/settings' && method === 'PUT') return await handlePutSettings(request, bucket);
 

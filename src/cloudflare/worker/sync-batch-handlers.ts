@@ -1,16 +1,14 @@
 import { sha256HexBytes } from './auth';
 import { corsResponse } from './cors';
-import { maybePruneChangelog } from './db';
+import { commitFileDelete, commitStagedFile } from './sync-mutations';
 import {
 	isSha256Hex,
 	parseJsonObject,
 	parseNonNegativeInteger,
 	parseOptionalString,
-	parseStringArray,
 	sanitizePath,
 } from './utils';
 import {
-	collectCleanupKeys,
 	createManagedObjectKey,
 	deleteBucketObjectsQuietly,
 	ensureSyncMetadata,
@@ -18,9 +16,11 @@ import {
 	formatMutationError,
 	legacyObjectKey,
 	loadStoredFileRows,
-	resolveCommittedObjectKey,
 	MAX_BATCH_FILES,
+	MAX_BATCH_DOWNLOAD_BYTES,
 	MAX_BATCH_TOTAL_BYTES,
+	parseExpectedFileHash,
+	type ExpectedFileHash,
 	type FileStorageRow,
 } from './sync-storage';
 
@@ -30,10 +30,16 @@ interface BatchFile {
 	hash?: string;
 	size?: number;
 	contentType?: string;
+	expectedHash?: unknown;
+}
+
+interface BatchDeleteFile {
+	path?: unknown;
+	expectedHash?: unknown;
 }
 
 export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
-	const parsedBody = await parseJsonObject(request);
+	const parsedBody = await parseJsonObject(request, 15 * 1024 * 1024);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
 	}
@@ -43,10 +49,17 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 	if (files.length > MAX_BATCH_FILES) return corsResponse({ error: `Maximum ${MAX_BATCH_FILES} files per batch` }, 400);
 
 	const results: Array<{ path: string; success: boolean; hash?: string; error?: string }> = [];
-	const dbOps: D1PreparedStatement[] = [];
-	const uploads: Array<{ safePath: string; bytes: ArrayBuffer; hash: string; size: number; contentType: string; objectKey: string }> = [];
-	const committedUploads: Array<{ safePath: string; hash: string; objectKey: string }> = [];
+	const uploads: Array<{
+		safePath: string;
+		bytes: ArrayBuffer;
+		hash: string;
+		size: number;
+		contentType: string;
+		objectKey: string;
+		expectedHash: ExpectedFileHash;
+	}> = [];
 	let totalBytes = 0;
+	const seenPaths = new Set<string>();
 
 	for (const file of files as BatchFile[]) {
 		if (typeof file?.content !== 'string') {
@@ -57,6 +70,17 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 		const safePath = sanitizePath(file.path);
 		if (!safePath) {
 			results.push({ path: file.path, success: false, error: 'Invalid path' });
+			continue;
+		}
+		if (seenPaths.has(safePath)) {
+			results.push({ path: safePath, success: false, error: 'Duplicate path in batch' });
+			continue;
+		}
+		seenPaths.add(safePath);
+
+		const expectedHash = parseExpectedFileHash(file.expectedHash);
+		if (db && expectedHash === undefined) {
+			results.push({ path: safePath, success: false, error: 'Valid expectedHash required' });
 			continue;
 		}
 
@@ -107,6 +131,7 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 				size,
 				contentType: parseOptionalString(file.contentType, 255) || 'application/octet-stream',
 				objectKey: db ? createManagedObjectKey(providedHash || computedHash) : legacyObjectKey(safePath),
+				expectedHash: expectedHash ?? null,
 			});
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : String(err);
@@ -131,56 +156,46 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 		}
 	}
 
+	let metadataFailure = false;
 	await Promise.all(uploads.map(async (file) => {
 		try {
 			await bucket.put(file.objectKey, file.bytes, {
 				httpMetadata: { contentType: file.contentType },
 				customMetadata: { hash: file.hash },
 			});
+			if (db) {
+				const commit = await commitStagedFile(bucket, db, {
+					path: file.safePath,
+					hash: file.hash,
+					size: file.size,
+					objectKey: file.objectKey,
+					expectedHash: file.expectedHash,
+					previousFile: previousFiles.get(file.safePath) ?? null,
+				});
+				if (!commit.committed) {
+					results.push({
+						path: file.safePath,
+						success: false,
+						error: `Remote file changed since it was read${commit.currentHash ? ` (current hash: ${commit.currentHash})` : ''}`,
+					});
+					return;
+				}
+			}
 
 			results.push({ path: file.safePath, success: true, hash: file.hash });
-			committedUploads.push({ safePath: file.safePath, hash: file.hash, objectKey: file.objectKey });
-
-			if (db) {
-				dbOps.push(
-					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(file.safePath, 'put', file.hash, file.size),
-					db.prepare("INSERT OR REPLACE INTO files (path, hash, size, modified, storage_key) VALUES (?, ?, ?, datetime('now'), ?)").bind(file.safePath, file.hash, file.size, file.objectKey),
-				);
-			}
 		} catch (err: unknown) {
-			const message = err instanceof Error ? err.message : String(err);
+			if (db) {
+				metadataFailure = true;
+				await deleteBucketObjectsQuietly(bucket, [file.objectKey]);
+			}
+			const message = db
+				? formatMetadataCommitFailure('Upload', formatMutationError(err))
+				: formatMutationError(err);
 			results.push({ path: file.safePath, success: false, error: message });
 		}
 	}));
 
-	if (db && dbOps.length > 0) {
-		try {
-			await db.batch(dbOps);
-			await maybePruneChangelog(db);
-		} catch (error: unknown) {
-			const metadataMessage = formatMutationError(error);
-			await deleteBucketObjectsQuietly(bucket, committedUploads.map((upload) => upload.objectKey));
-			const failedPaths = new Set(committedUploads.map((upload) => upload.safePath));
-			const finalResults = results
-				.filter((result) => !failedPaths.has(result.path))
-				.concat(committedUploads.map((upload) => {
-					return {
-						path: upload.safePath,
-						success: false as const,
-						error: formatMetadataCommitFailure('Upload', metadataMessage),
-					};
-				}));
-
-			return corsResponse({ success: false, results: finalResults }, 503);
-		}
-
-		await deleteBucketObjectsQuietly(
-			bucket,
-			committedUploads.flatMap((upload) => collectCleanupKeys(upload.safePath, previousFiles.get(upload.safePath) ?? null, upload.objectKey)),
-		);
-	}
-
-	return corsResponse({ success: results.every(r => r.success), results });
+	return corsResponse({ success: results.every(r => r.success), results }, metadataFailure ? 503 : 200);
 }
 
 export async function handleBatchDownload(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
@@ -188,18 +203,35 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket, db
 	if (!parsedBody.ok) {
 		return parsedBody.response;
 	}
-	const paths = parseStringArray(parsedBody.value.paths, MAX_BATCH_FILES, 4096);
-	if (!paths || paths.length === 0) return corsResponse({ error: 'paths array required' }, 400);
+	const rawPaths = parsedBody.value.paths;
+	if (!Array.isArray(rawPaths) || rawPaths.length === 0 || rawPaths.length > MAX_BATCH_FILES) {
+		return corsResponse({ error: `paths array required (maximum ${MAX_BATCH_FILES})` }, 400);
+	}
+	if (!rawPaths.every((path) => typeof path === 'string' && path.length <= 4096)) {
+		return corsResponse({ error: 'Invalid path in batch' }, 400);
+	}
+	const paths = rawPaths as string[];
+	if (new Set(paths).size !== paths.length) {
+		return corsResponse({ error: 'Duplicate paths are not allowed' }, 400);
+	}
 
+	let storedFiles = new Map<string, FileStorageRow>();
 	if (db) {
 		try {
 			await ensureSyncMetadata(db);
+			storedFiles = await loadStoredFileRows(db, paths);
+			const declaredTotal = Array.from(storedFiles.values())
+				.reduce((total, file) => total + file.size, 0);
+			if (declaredTotal > MAX_BATCH_DOWNLOAD_BYTES) {
+				return corsResponse({ error: 'Batch download exceeds 8MB limit; download files individually' }, 413);
+			}
 		} catch {
 			return corsResponse({ error: 'Sync metadata unavailable' }, 503);
 		}
 	}
 
 	const files: Array<{ path: string; content: string; hash: string; size: number; contentType: string; error?: string }> = [];
+	let totalBytes = 0;
 	for (const rawPath of paths) {
 		const safePath = sanitizePath(rawPath);
 		if (!safePath) {
@@ -208,8 +240,11 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket, db
 		}
 
 		try {
+			const storedFile = storedFiles.get(safePath) ?? null;
 			const objectKey = db
-				? await resolveCommittedObjectKey(db, safePath)
+				? storedFile
+					? storedFile.storageKey ?? legacyObjectKey(safePath)
+					: null
 				: legacyObjectKey(safePath);
 			if (!objectKey) {
 				files.push({ path: safePath, content: '', hash: '', size: 0, contentType: '', error: 'File not found' });
@@ -228,6 +263,25 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket, db
 				});
 				continue;
 			}
+			if (storedFile && (
+				(storedFile.size > 0 && obj.size !== storedFile.size)
+				|| (obj.customMetadata?.hash && obj.customMetadata.hash !== storedFile.hash)
+			)) {
+				files.push({
+					path: safePath,
+					content: '',
+					hash: storedFile.hash,
+					size: storedFile.size,
+					contentType: '',
+					error: 'File content failed integrity validation',
+				});
+				continue;
+			}
+
+			totalBytes += obj.size;
+			if (totalBytes > MAX_BATCH_DOWNLOAD_BYTES) {
+				return corsResponse({ error: 'Batch download exceeds 8MB limit; download files individually' }, 413);
+			}
 
 			const arrayBuffer = await obj.arrayBuffer();
 			const bytes = new Uint8Array(arrayBuffer);
@@ -242,7 +296,7 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket, db
 			files.push({
 				path: safePath,
 				content: b64,
-				hash: obj.customMetadata?.hash || '',
+				hash: storedFile?.hash || obj.customMetadata?.hash || '',
 				size: obj.size,
 				contentType: obj.httpMetadata?.contentType || 'application/octet-stream',
 			});
@@ -260,90 +314,92 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 	if (!parsedBody.ok) {
 		return parsedBody.response;
 	}
-	const paths = parseStringArray(parsedBody.value.paths, MAX_BATCH_FILES, 4096);
-	if (!paths || paths.length === 0) return corsResponse({ error: 'paths array required' }, 400);
+	const rawFiles = parsedBody.value.files;
+	if (!Array.isArray(rawFiles) || rawFiles.length === 0 || rawFiles.length > MAX_BATCH_FILES) {
+		return corsResponse({ error: `files array required (maximum ${MAX_BATCH_FILES})` }, 400);
+	}
 
 	const deleted: string[] = [];
-	const errors: Array<{ path: string; error: string }> = [];
-	const dbOps: D1PreparedStatement[] = [];
-	const validPaths: string[] = [];
+	const errors: Array<{ path: string; error: string; status?: number; currentHash?: string | null }> = [];
+	const validFiles: Array<{ path: string; expectedHash: string }> = [];
+	const seenPaths = new Set<string>();
 
-	for (const rawPath of paths) {
+	for (const rawFile of rawFiles as BatchDeleteFile[]) {
+		const rawPath = typeof rawFile?.path === 'string' ? rawFile.path : '';
 		const safePath = sanitizePath(rawPath);
 		if (!safePath) {
 			errors.push({ path: rawPath, error: 'Invalid path' });
 			continue;
 		}
+		if (seenPaths.has(safePath)) {
+			errors.push({ path: safePath, error: 'Duplicate path in batch' });
+			continue;
+		}
+		seenPaths.add(safePath);
+		const expectedHash = parseExpectedFileHash(rawFile.expectedHash);
+		if (expectedHash === undefined || expectedHash === null) {
+			errors.push({ path: safePath, error: 'Valid expectedHash required' });
+			continue;
+		}
 
-		validPaths.push(safePath);
+		validFiles.push({ path: safePath, expectedHash });
 	}
 
 	let previousFiles = new Map<string, FileStorageRow>();
-	if (db && validPaths.length > 0) {
+	if (db && validFiles.length > 0) {
 		try {
 			await ensureSyncMetadata(db);
-			previousFiles = await loadStoredFileRows(db, validPaths);
+			previousFiles = await loadStoredFileRows(db, validFiles.map((file) => file.path));
 		} catch (error: unknown) {
 			return corsResponse({
 				success: false,
 				deleted: [],
-				errors: errors.concat(validPaths.map((path) => ({
-					path,
+				errors: errors.concat(validFiles.map((file) => ({
+					path: file.path,
 					error: formatMetadataCommitFailure('Delete', formatMutationError(error)),
 				}))),
 			}, 503);
 		}
 	}
 
-	for (const safePath of validPaths) {
+	let metadataFailure = false;
+	for (const file of validFiles) {
 		try {
 			if (db) {
-				dbOps.push(
-					db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)').bind(safePath, 'delete', '', 0),
-					db.prepare('DELETE FROM files WHERE path = ?').bind(safePath),
-				);
-				deleted.push(safePath);
+				const commit = await commitFileDelete(bucket, db, {
+					path: file.path,
+					expectedHash: file.expectedHash,
+					previousFile: previousFiles.get(file.path) ?? null,
+				});
+				if (!commit.committed) {
+					errors.push({
+						path: file.path,
+						error: 'Remote file changed since it was read',
+						status: 409,
+						currentHash: commit.currentHash,
+					});
+					continue;
+				}
+				deleted.push(file.path);
 				continue;
 			}
 
-			await bucket.delete(legacyObjectKey(safePath));
-			deleted.push(safePath);
+			await bucket.delete(legacyObjectKey(file.path));
+			deleted.push(file.path);
 		} catch (error: unknown) {
+			if (db) metadataFailure = true;
 			errors.push({
-				path: safePath,
-				error: error instanceof Error ? error.message : String(error),
+				path: file.path,
+				error: db
+					? formatMetadataCommitFailure('Delete', formatMutationError(error))
+					: formatMutationError(error),
 			});
 		}
-	}
-
-	if (db && dbOps.length > 0) {
-		try {
-			await db.batch(dbOps);
-			await maybePruneChangelog(db);
-		} catch (error: unknown) {
-			const metadataMessage = formatMutationError(error);
-			const metadataErrors = deleted.map((path) => {
-				return {
-					path,
-					error: formatMetadataCommitFailure('Delete', metadataMessage),
-				};
-			});
-			return corsResponse({
-				success: false,
-				deleted: [],
-				errors: errors.concat(metadataErrors),
-			}, 503);
-		}
-
-		await deleteBucketObjectsQuietly(
-			bucket,
-			deleted.flatMap((path) => collectCleanupKeys(path, previousFiles.get(path) ?? null)),
-		);
 	}
 
 	return corsResponse({
 		success: errors.length === 0,
 		deleted,
 		...(errors.length > 0 ? { errors } : {}),
-	});
+	}, metadataFailure ? 503 : 200);
 }

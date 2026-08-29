@@ -5,7 +5,7 @@ export {
   prepareUploadFromVaultFile,
 } from "./transfer-prepare";
 export {
-  parallelDownloadAndSaveFiles,
+	parallelDownloadAndSaveFiles,
   saveDownloadedContent,
 } from "./transfer-download";
 export { processDiff } from "./transfer-process";

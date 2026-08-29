@@ -2,6 +2,7 @@ import { corsHeaders, corsResponse } from './cors';
 import { authenticateWorkerRequest } from './authenticate';
 import { handleAuthenticatedRoute, handlePublicRoute } from './router';
 import type { Env } from './types';
+import { FileVersionConflictError } from './storage';
 
 export { ReminderAlarm } from './reminder-alarm';
 export { SetupCoordinator } from './setup-coordinator';
@@ -22,19 +23,31 @@ export default {
 			return publicResponse;
 		}
 
-		const authResponse = await authenticateWorkerRequest(
+		const authResult = await authenticateWorkerRequest(
 			request,
 			db,
 			(env.AUTH_TOKEN ?? '').trim(),
 		);
-		if (authResponse) {
-			return authResponse;
+		if (authResult.response) {
+			return authResult.response;
 		}
 
 		try {
-			return await handleAuthenticatedRoute(request, env, path, method)
+			return await handleAuthenticatedRoute(request, env, path, method, authResult.principal)
 				?? corsResponse({ error: 'Not found' }, 404);
-		} catch {
+		} catch (error) {
+			if (error instanceof FileVersionConflictError) {
+				return corsResponse({
+					error: 'The reminder file changed. Refresh and retry your edit.',
+					path: error.path,
+					currentHash: error.currentHash,
+				}, 409);
+			}
+			console.error('Unhandled worker request error', {
+				method,
+				path,
+				error: error instanceof Error ? error.message : String(error),
+			});
 			return corsResponse({ error: 'Internal server error' }, 500);
 		}
 	},

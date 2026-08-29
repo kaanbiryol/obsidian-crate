@@ -83,16 +83,17 @@ export class SyncApiClient {
 		hash: string,
 		size: number,
 		contentType: string,
+		expectedHash: string | null,
 	): Promise<UploadResult> {
-		return this.syncApi.uploadFile(path, content, hash, size, contentType);
+		return this.syncApi.uploadFile(path, content, hash, size, contentType, expectedHash);
 	}
 
-	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number }> {
+	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string }> {
 		return this.syncApi.downloadFile(path);
 	}
 
-	async deleteFile(path: string): Promise<{ success: boolean; path: string }> {
-		return this.syncApi.deleteFile(path);
+	async deleteFile(path: string, expectedHash: string): Promise<{ success: boolean; path: string }> {
+		return this.syncApi.deleteFile(path, expectedHash);
 	}
 
 	async checkForChanges(since: number): Promise<CheckResponse> {
@@ -111,8 +112,11 @@ export class SyncApiClient {
 		return this.syncApi.batchDownload(paths);
 	}
 
-	async batchDelete(paths: string[]): Promise<BatchDeleteResponse> {
-		return this.syncApi.batchDelete(paths);
+	async batchDelete(
+		paths: string[],
+		expectedHashes?: Record<string, string>,
+	): Promise<BatchDeleteResponse> {
+		return this.syncApi.batchDelete(paths, expectedHashes);
 	}
 
 	async revokeToken(id: string): Promise<{ success: boolean }> {

@@ -109,8 +109,22 @@ export function createMockR2Bucket(initialEntries: Record<string, string> = {}) 
 	return { store, bucket };
 }
 
-export function createMockD1Database(options?: { failBatch?: boolean; files?: Record<string, string | null> }) {
-	const files = new Map<string, string | null>(Object.entries(options?.files ?? {}));
+interface MockFileRecord {
+	hash: string;
+	size: number;
+	storageKey: string | null;
+}
+
+type MockFileInput = string | null | MockFileRecord;
+
+export function createMockD1Database(options?: { failBatch?: boolean; files?: Record<string, MockFileInput> }) {
+	const files = new Map<string, MockFileRecord>(
+		Object.entries(options?.files ?? {}).map(([path, value]) => [path,
+			typeof value === 'object' && value !== null
+				? value
+				: { hash: '', size: 0, storageKey: value },
+		]),
+	);
 
 	function getBoundString(args: unknown[], index: number): string {
 		const value = args[index];
@@ -133,13 +147,18 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 					return {};
 				}),
 				first: vi.fn(async <T = Record<string, unknown>>() => {
-					if (sql.includes('SELECT storage_key FROM files WHERE path = ?')) {
+					if (sql.includes('FROM files WHERE path = ?')) {
 						const path = getBoundString(statement._args, 0);
-						if (!files.has(path)) {
+						const file = files.get(path);
+						if (!file) {
 							return null;
 						}
 
-						return { storage_key: files.get(path) } as T;
+						return {
+							hash: file.hash,
+							size: file.size,
+							storage_key: file.storageKey,
+						} as T;
 					}
 
 					return null;
@@ -153,17 +172,48 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 				throw new Error('D1 unavailable');
 			}
 
+			const results: Array<{ meta: { changes: number } }> = [];
 			for (const statement of statements as MockD1Statement[]) {
-				if (statement._sql.includes("INSERT OR REPLACE INTO files")) {
-					files.set(getBoundString(statement._args, 0), typeof statement._args[3] === 'string' ? statement._args[3] : null);
+				let changes = 0;
+				if (statement._sql.includes('INSERT INTO files (path, hash, size, modified, storage_key)')) {
+					const path = getBoundString(statement._args, 0);
+					if (statement._sql.includes('DO NOTHING') && files.has(path)) {
+						changes = 0;
+					} else {
+						files.set(path, {
+							hash: getBoundString(statement._args, 1),
+							size: Number(statement._args[2]),
+							storageKey: getBoundString(statement._args, 3) || null,
+						});
+						changes = 1;
+					}
+				} else if (statement._sql.startsWith('UPDATE files')) {
+					const path = getBoundString(statement._args, 3);
+					const expectedHash = getBoundString(statement._args, 4);
+					const current = files.get(path);
+					if (current?.hash === expectedHash) {
+						files.set(path, {
+							hash: getBoundString(statement._args, 0),
+							size: Number(statement._args[1]),
+							storageKey: getBoundString(statement._args, 2) || null,
+						});
+						changes = 1;
+					}
+				} else if (statement._sql.includes('DELETE FROM files WHERE')) {
+					const path = getBoundString(statement._args, 0);
+					const current = files.get(path);
+					const expectedHash = statement._args[1];
+					if (current && (expectedHash === undefined || current.hash === expectedHash)) {
+						files.delete(path);
+						changes = 1;
+					}
+				} else if (statement._sql.includes('INSERT INTO changelog')) {
+					changes = 1;
 				}
-
-				if (statement._sql.includes('DELETE FROM files WHERE path = ?')) {
-					files.delete(getBoundString(statement._args, 0));
-				}
+				results.push({ meta: { changes } });
 			}
 
-			return [] as T[];
+			return results as T[];
 		}) as MockD1Database['batch'],
 		exec: vi.fn(async () => ({})),
 	};

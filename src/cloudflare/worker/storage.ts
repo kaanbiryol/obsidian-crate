@@ -1,29 +1,13 @@
 import { sha256HexBytes } from './auth';
-import { initDb, maybePruneChangelog, queryRows } from './db';
-
-const FILES_PREFIX = 'files/';
-const MANAGED_FILES_PREFIX = '__crate__/files/';
-
-interface FileStorageRow {
-	storageKey: string | null;
-}
-
-function legacyObjectKey(path: string): string {
-	return FILES_PREFIX + path;
-}
-
-function createManagedObjectKey(hash: string): string {
-	return `${MANAGED_FILES_PREFIX}${hash}/${crypto.randomUUID()}`;
-}
-
-function normalizeStorageKey(value: unknown): string | null {
-	if (typeof value !== 'string') {
-		return null;
-	}
-
-	const trimmed = value.trim();
-	return trimmed.length > 0 ? trimmed : null;
-}
+import { initDb, queryRows } from './db';
+import { commitFileDelete, commitStagedFile } from './sync-mutations';
+import {
+	createManagedObjectKey,
+	deleteBucketObjectsQuietly,
+	getStoredFileRow,
+	legacyObjectKey,
+	MAX_FILE_BYTES,
+} from './sync-storage';
 
 function resolveObjectKey(path: string, storageKey: string | null): string {
 	return storageKey ?? legacyObjectKey(path);
@@ -33,53 +17,17 @@ function escapeLikePattern(value: string): string {
 	return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
-function collectCleanupKeys(path: string, previousFile: FileStorageRow | null, preserve?: string): string[] {
-	const keys = new Set<string>();
-	const legacyKey = legacyObjectKey(path);
-	if (legacyKey !== preserve) {
-		keys.add(legacyKey);
-	}
-
-	if (previousFile) {
-		const previousKey = resolveObjectKey(path, previousFile.storageKey);
-		if (previousKey !== preserve) {
-			keys.add(previousKey);
-		}
-	}
-
-	return Array.from(keys);
-}
-
-async function deleteBucketObjectsQuietly(bucket: R2Bucket, keys: string[]): Promise<void> {
-	const uniqueKeys = Array.from(new Set(keys.filter((key) => key.length > 0)));
-	await Promise.allSettled(uniqueKeys.map((key) => bucket.delete(key)));
-}
-
-async function getStoredFileRow(db: D1Database, path: string): Promise<FileStorageRow | null> {
-	const row = await db.prepare('SELECT storage_key FROM files WHERE path = ?')
-		.bind(path)
-		.first<{ storage_key?: string | null }>();
-	if (!row) {
-		return null;
-	}
-
-	return {
-		storageKey: normalizeStorageKey(row.storage_key),
-	};
-}
-
-async function resolveCommittedObjectKey(db: D1Database, path: string): Promise<string | null> {
-	const row = await getStoredFileRow(db, path);
-	if (!row) {
-		return null;
-	}
-
-	return resolveObjectKey(path, row.storageKey);
-}
-
 export interface StoredTextFile {
 	path: string;
 	content: string;
+	hash: string;
+}
+
+export class FileVersionConflictError extends Error {
+	constructor(readonly path: string, readonly currentHash: string | null) {
+		super(`Remote file changed while editing: ${path}`);
+		this.name = 'FileVersionConflictError';
+	}
 }
 
 export async function listStoredMarkdownFilesByPrefix(
@@ -88,51 +36,62 @@ export async function listStoredMarkdownFilesByPrefix(
 	pathPrefix: string,
 ): Promise<StoredTextFile[]> {
 	await initDb(db);
-	const rows = await queryRows<{ path: string }>(
+	const rows = await queryRows<{ path: string; hash: string; size: number; storage_key?: string | null }>(
 		db.prepare(
-			"SELECT path FROM files WHERE path LIKE ? ESCAPE '\\' AND lower(path) LIKE '%.md' ORDER BY path ASC",
+			"SELECT path, hash, size, storage_key FROM files WHERE path LIKE ? ESCAPE '\\' AND lower(path) LIKE '%.md' ORDER BY path ASC",
 		).bind(`${escapeLikePattern(pathPrefix)}/%`),
 	);
 
 	const decoder = new TextDecoder();
-	const files = await Promise.all(rows.map(async (row) => {
-		const objectKey = await resolveCommittedObjectKey(db, row.path);
-		if (!objectKey) {
-			return null;
-		}
+	const files: Array<StoredTextFile | null> = [];
+	for (let index = 0; index < rows.length; index += 8) {
+		const chunk = rows.slice(index, index + 8);
+		files.push(...await Promise.all(chunk.map(async (row) => {
+			if (row.size > MAX_FILE_BYTES) return null;
+			const objectKey = resolveObjectKey(row.path, row.storage_key ?? null);
+			const object = await bucket.get(objectKey);
+			if (!object || (row.size > 0 && object.size !== row.size)) return null;
 
-		const object = await bucket.get(objectKey);
-		if (!object) {
-			return null;
-		}
-
-		const content = decoder.decode(await object.arrayBuffer());
-		return {
-			path: row.path,
-			content,
-		} satisfies StoredTextFile;
-	}));
+			const bytes = await object.arrayBuffer();
+			if (await sha256HexBytes(bytes) !== row.hash) return null;
+			const content = decoder.decode(bytes);
+			return {
+				path: row.path,
+				content,
+				hash: row.hash,
+			} satisfies StoredTextFile;
+		})));
+	}
 
 	return files.filter((file): file is StoredTextFile => file !== null);
 }
 
-export async function readCommittedMarkdownFile(
+export async function readCommittedMarkdownFileVersion(
 	bucket: R2Bucket,
 	db: D1Database,
 	path: string,
-): Promise<string | null> {
+): Promise<{ content: string; hash: string } | null> {
 	await initDb(db);
-	const objectKey = await resolveCommittedObjectKey(db, path);
-	if (!objectKey) {
+	const file = await getStoredFileRow(db, path);
+	if (!file) {
 		return null;
 	}
 
+	const objectKey = resolveObjectKey(path, file.storageKey);
 	const object = await bucket.get(objectKey);
-	if (!object) {
+	if (!object || (file.size > 0 && object.size !== file.size)) {
 		return null;
 	}
 
-	return new TextDecoder().decode(await object.arrayBuffer());
+	const bytes = await object.arrayBuffer();
+	if (await sha256HexBytes(bytes) !== file.hash) {
+		return null;
+	}
+
+	return {
+		content: new TextDecoder().decode(bytes),
+		hash: file.hash,
+	};
 }
 
 export async function writeCommittedMarkdownFile(
@@ -140,12 +99,16 @@ export async function writeCommittedMarkdownFile(
 	db: D1Database,
 	path: string,
 	content: string,
+	expectedHash: string | null,
 ): Promise<{ hash: string; size: number }> {
 	await initDb(db);
 	const previousFile = await getStoredFileRow(db, path);
 	const bytes = new TextEncoder().encode(content);
 	const hash = await sha256HexBytes(bytes.buffer);
 	const size = bytes.byteLength;
+	if (size > MAX_FILE_BYTES) {
+		throw new Error('Reminder file exceeds 25MB limit');
+	}
 	const objectKey = createManagedObjectKey(hash);
 
 	await bucket.put(objectKey, bytes, {
@@ -154,18 +117,41 @@ export async function writeCommittedMarkdownFile(
 	});
 
 	try {
-		await db.batch([
-			db.prepare('INSERT INTO changelog (path, action, hash, size) VALUES (?, ?, ?, ?)')
-				.bind(path, 'put', hash, size),
-			db.prepare("INSERT OR REPLACE INTO files (path, hash, size, modified, storage_key) VALUES (?, ?, ?, datetime('now'), ?)")
-				.bind(path, hash, size, objectKey),
-		]);
-		await maybePruneChangelog(db);
+		const commit = await commitStagedFile(bucket, db, {
+			path,
+			hash,
+			size,
+			objectKey,
+			expectedHash,
+			previousFile,
+		});
+		if (!commit.committed) {
+			throw new FileVersionConflictError(path, commit.currentHash);
+		}
 	} catch (error) {
-		await deleteBucketObjectsQuietly(bucket, [objectKey]);
+		if (!(error instanceof FileVersionConflictError)) {
+			await deleteBucketObjectsQuietly(bucket, [objectKey]);
+		}
 		throw error;
 	}
 
-	await deleteBucketObjectsQuietly(bucket, collectCleanupKeys(path, previousFile, objectKey));
 	return { hash, size };
+}
+
+export async function deleteCommittedMarkdownFile(
+	bucket: R2Bucket,
+	db: D1Database,
+	path: string,
+	expectedHash: string,
+): Promise<void> {
+	await initDb(db);
+	const previousFile = await getStoredFileRow(db, path);
+	const commit = await commitFileDelete(bucket, db, {
+		path,
+		expectedHash,
+		previousFile,
+	});
+	if (!commit.committed) {
+		throw new FileVersionConflictError(path, commit.currentHash);
+	}
 }

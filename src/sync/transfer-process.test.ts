@@ -89,7 +89,7 @@ describe('processDiff conflict handling', () => {
 
 		await processDiff(
 			harness.context,
-			{ path, action: 'conflict', localHash: 'l', remoteHash: 'r' },
+			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)) },
 			localFiles,
 			result,
 		);
@@ -150,7 +150,7 @@ describe('processDiff conflict handling', () => {
 
 		await processDiff(
 			harness.context,
-			{ path, action: 'conflict', localHash: 'l', remoteHash: 'r' },
+			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)) },
 			localFiles,
 			result,
 		);
@@ -199,7 +199,7 @@ describe('processDiff conflict handling', () => {
 
 		await processDiff(
 			harness.context,
-			{ path, action: 'conflict', localHash: 'l', remoteHash: 'r' },
+			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)) },
 			localFiles,
 			result,
 		);

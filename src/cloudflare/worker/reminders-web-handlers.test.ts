@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { sha256HexBytes } from './auth';
 import {
 	handleCreateReminder,
 	handleDeleteReminder,
@@ -63,8 +64,15 @@ function createBucket(
 	};
 }
 
-function createDb(options?: { files?: Record<string, string | null>; committedPaths?: string[] }) {
+function createDb(options?: {
+	files?: Record<string, string | null>;
+	fileSizes?: Record<string, number>;
+	fileHashes?: Record<string, string>;
+	committedPaths?: string[];
+}) {
 	const files = new Map<string, string | null>(Object.entries(options?.files ?? {}));
+	const hashes = new Map<string, string>(Object.entries(options?.fileHashes ?? {}));
+	const sizes = new Map<string, number>(Object.entries(options?.fileSizes ?? {}));
 	const scheduled = new Map<string, { content: string; project: string | null; dueDatetime: string }>();
 
 	function getBoundString(args: unknown[], index: number): string {
@@ -101,12 +109,16 @@ function createDb(options?: { files?: Record<string, string | null>; committedPa
 					return {};
 				}),
 				first: vi.fn(async () => {
-					if (sql.includes('SELECT storage_key FROM files WHERE path = ?')) {
+					if (sql.includes('FROM files WHERE path = ?')) {
 						const path = getBoundString(statement._args, 0);
 						if (!files.has(path)) {
 							return null;
 						}
-						return { storage_key: files.get(path) };
+						return {
+							hash: hashes.get(path) ?? '',
+							size: sizes.get(path) ?? 0,
+							storage_key: files.get(path),
+						};
 					}
 
 					return null;
@@ -118,13 +130,18 @@ function createDb(options?: { files?: Record<string, string | null>; committedPa
 					if (sql.includes('PRAGMA table_info(auth_tokens)')) {
 						return { results: [{ name: 'id' }, { name: 'token_hash' }, { name: 'device_id' }, { name: 'device_name' }, { name: 'platform' }, { name: 'last_seen_at' }] };
 					}
-					if (sql.includes('SELECT path FROM files WHERE path LIKE')) {
+					if (sql.includes('FROM files WHERE path LIKE')) {
 						const prefix = getBoundString(statement._args, 0).slice(0, -1);
 						return {
 							results: Array.from(files.keys())
 								.filter((path) => path.startsWith(prefix) && path.toLowerCase().endsWith('.md'))
 								.sort()
-								.map((path) => ({ path })),
+								.map((path) => ({
+									path,
+									hash: hashes.get(path) ?? '',
+									size: sizes.get(path) ?? 0,
+									storage_key: files.get(path),
+								})),
 						};
 					}
 					return { results: [] };
@@ -133,18 +150,43 @@ function createDb(options?: { files?: Record<string, string | null>; committedPa
 			return statement;
 		}),
 		batch: vi.fn(async (statements: Array<{ _sql: string; _args: unknown[] }>) => {
+			const results: Array<{ meta: { changes: number } }> = [];
 			for (const statement of statements) {
-				if (statement._sql.includes('INSERT OR REPLACE INTO files')) {
+				let changes = 0;
+				if (statement._sql.includes('INSERT INTO files (path, hash, size, modified, storage_key)')) {
 					const path = getBoundString(statement._args, 0);
-					const storageKey = typeof statement._args[3] === 'string' ? statement._args[3] : null;
-					files.set(path, storageKey);
-					options?.committedPaths?.push(path);
+					if (!statement._sql.includes('DO NOTHING') || !files.has(path)) {
+						files.set(path, typeof statement._args[3] === 'string' ? statement._args[3] : null);
+						hashes.set(path, getBoundString(statement._args, 1));
+						sizes.set(path, Number(statement._args[2]));
+						options?.committedPaths?.push(path);
+						changes = 1;
+					}
+				} else if (statement._sql.startsWith('UPDATE files')) {
+					const path = getBoundString(statement._args, 3);
+					if (hashes.get(path) === getBoundString(statement._args, 4)) {
+						files.set(path, getBoundString(statement._args, 2) || null);
+						hashes.set(path, getBoundString(statement._args, 0));
+						sizes.set(path, Number(statement._args[1]));
+						options?.committedPaths?.push(path);
+						changes = 1;
+					}
 				}
-				if (statement._sql.includes('DELETE FROM files WHERE path = ?')) {
-					files.delete(getBoundString(statement._args, 0));
+				if (statement._sql.includes('DELETE FROM files WHERE')) {
+					const path = getBoundString(statement._args, 0);
+					const expectedHash = statement._args[1];
+					if (files.has(path) && (expectedHash === undefined || hashes.get(path) === expectedHash)) {
+						files.delete(path);
+						hashes.delete(path);
+						sizes.delete(path);
+						changes = 1;
+					}
+				} else if (statement._sql.includes('INSERT INTO changelog')) {
+					changes = 1;
 				}
+				results.push({ meta: { changes } });
 			}
-			return [];
+			return results;
 		}),
 		exec: vi.fn(async () => ({})),
 	};
@@ -152,14 +194,24 @@ function createDb(options?: { files?: Record<string, string | null>; committedPa
 	return { db, files, scheduled };
 }
 
-function createEnv(input: {
+async function createEnv(input: {
 	bucketEntries: Record<string, string>;
 	files: Record<string, string | null>;
 	failPutWhen?: (key: string, content: string) => boolean;
 }) {
 	const committedPaths: string[] = [];
 	const { bucket, store } = createBucket(input.bucketEntries, { failPutWhen: input.failPutWhen });
-	const { db, files, scheduled } = createDb({ files: input.files, committedPaths });
+	const fileSizes = Object.fromEntries(Object.entries(input.files).map(([path, storageKey]) => {
+		const objectKey = storageKey ?? `files/${path}`;
+		return [path, store.get(objectKey)?.body.byteLength ?? 0];
+	}));
+	const hashEntries = await Promise.all(Object.entries(input.files).map(async ([path, storageKey]) => {
+		const objectKey = storageKey ?? `files/${path}`;
+		const body = store.get(objectKey)?.body;
+		return [path, body ? await sha256HexBytes(body) : ''] as const;
+	}));
+	const fileHashes: Record<string, string> = Object.fromEntries(hashEntries);
+	const { db, files, scheduled } = createDb({ files: input.files, fileSizes, fileHashes, committedPaths });
 
 	return {
 		env: {
@@ -201,7 +253,7 @@ function createEnv(input: {
 
 describe('reminders web handlers', () => {
 	it('lists reminders from markdown files in the configured folder', async () => {
-		const workspace = createEnv({
+		const workspace = await createEnv({
 			bucketEntries: {
 				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] First task <!-- crate-id:r1 -->\n- [x] Done task <!-- crate-id:r2 -->\n',
 			},
@@ -222,7 +274,7 @@ describe('reminders web handlers', () => {
 	});
 
 	it('creates and deletes reminders against the source markdown files', async () => {
-		const workspace = createEnv({
+		const workspace = await createEnv({
 			bucketEntries: {
 				'files/Reminders/Inbox.md': '# Inbox\n\n',
 			},
@@ -275,7 +327,7 @@ describe('reminders web handlers', () => {
 	});
 
 	it('rejects unsafe project paths and invalid all-day notification times', async () => {
-		const workspace = createEnv({
+		const workspace = await createEnv({
 			bucketEntries: {
 				'files/Reminders/Inbox.md': '# Inbox\n\n',
 			},
@@ -319,7 +371,7 @@ describe('reminders web handlers', () => {
 	});
 
 	it('persists recurrence from create and update payloads', async () => {
-		const workspace = createEnv({
+		const workspace = await createEnv({
 			bucketEntries: {
 				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] Existing task <!-- crate-id:r-existing -->\n',
 			},
@@ -381,7 +433,7 @@ describe('reminders web handlers', () => {
 	});
 
 	it('moves completed reminders by writing the destination before removing the source', async () => {
-		const workspace = createEnv({
+		const workspace = await createEnv({
 			bucketEntries: {
 				'files/Reminders/Inbox.md': '# Inbox\n\n- [x] Done task Jan 1, 2026 <!-- crate-id:r-done -->\n',
 			},
@@ -413,7 +465,7 @@ describe('reminders web handlers', () => {
 	});
 
 	it('keeps the source reminder when the destination move write fails', async () => {
-		const workspace = createEnv({
+		const workspace = await createEnv({
 			bucketEntries: {
 				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] Keep task Jan 1, 2026 <!-- crate-id:r-keep -->\n',
 			},
@@ -442,7 +494,7 @@ describe('reminders web handlers', () => {
 	});
 
 	it('reorders active reminders while leaving completed reminders at the bottom', async () => {
-		const workspace = createEnv({
+		const workspace = await createEnv({
 			bucketEntries: {
 				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] First <!-- crate-id:r1 -->\n- [ ] Second <!-- crate-id:r2 -->\n- [x] Done <!-- crate-id:r3 -->\n',
 			},

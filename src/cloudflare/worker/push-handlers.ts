@@ -197,6 +197,8 @@ function createBearerToken(): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+const REMINDERS_AUTH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
 export async function handleCreateRemindersEnrollmentToken(db: D1Database): Promise<Response> {
 	await initDb(db);
 	const { token, expiresAt } = await issueWebEnrollmentToken(db);
@@ -228,13 +230,14 @@ export async function handleExchangeRemindersEnrollmentToken(request: Request, d
 	const tokenHash = await sha256Hex(authToken);
 	const id = crypto.randomUUID();
 
+	const expiresAt = Date.now() + REMINDERS_AUTH_TOKEN_TTL_MS;
 	await db.prepare(`INSERT INTO auth_tokens
-		(id, token_hash, device_id, device_name, platform, last_seen_at)
-		VALUES (?, ?, ?, ?, ?, datetime('now'))`)
-		.bind(id, tokenHash, null, deviceName, 'pwa')
+		(id, token_hash, device_id, device_name, platform, last_seen_at, scope, expires_at)
+		VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?)`)
+		.bind(id, tokenHash, null, deviceName, 'pwa', 'reminders', expiresAt)
 		.run();
 
-	return corsResponse({ authToken });
+	return corsResponse({ authToken, expiresAt: new Date(expiresAt).toISOString() });
 }
 
 export async function handleSubscribe(request: Request, db: D1Database): Promise<Response> {

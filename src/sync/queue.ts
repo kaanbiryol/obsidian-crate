@@ -3,9 +3,11 @@ import { TFolder } from 'obsidian';
 import { createLogger, errorMessage } from '../plugin/logger';
 import { isMarkdownPath } from './markdown-base-cache';
 import { isAbortError } from './abort';
+import { isRetryableSyncError } from './engine-utils';
 import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
 
 const logger = createLogger('SyncQueue');
+const RETRYABLE_DELETE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 interface QueueApi {
 	isConfigured(): boolean;
@@ -15,12 +17,13 @@ interface QueueApi {
 		hash: string,
 		size: number,
 		contentType: string,
+		expectedHash: string | null,
 	): Promise<{ success: boolean; path: string; hash?: string; error?: string }>;
-	deleteFile(path: string): Promise<{ success: boolean; path: string }>;
-	batchDelete(paths: string[]): Promise<{
+	deleteFile(path: string, expectedHash: string): Promise<{ success: boolean; path: string }>;
+	batchDelete(paths: string[], expectedHashes?: Record<string, string>): Promise<{
 		success: boolean;
 		deleted: string[];
-		errors?: Array<{ path: string; error: string }>;
+		errors?: Array<{ path: string; error: string; status?: number }>;
 	}>;
 }
 
@@ -49,6 +52,8 @@ export interface QueueDebounceContext {
 export interface QueueEventContext {
 	pendingPaths: Set<string>;
 	shouldIgnore(path: string): boolean;
+	markPending?(path: string): void;
+	clearPending?(path: string): void;
 	triggerDebouncedSync(): void;
 }
 
@@ -62,6 +67,7 @@ interface RawPathChangeOptions {
 export interface QueueFlushContext {
 	pendingPaths: Set<string>;
 	inFlightPaths: Set<string>;
+	pendingRevisions?: Map<string, number>;
 	vault: Vault;
 	api: QueueApi;
 	localManifest: QueueManifest;
@@ -77,8 +83,19 @@ export interface QueueFlushContext {
 
 export interface QueueReconcileContext {
 	pendingPaths: Set<string>;
+	pendingRevisions?: Map<string, number>;
 	clearDebounceTimer(): void;
 	updateState(updates: Partial<SyncState>): void;
+}
+
+function addPendingPath(context: QueueEventContext, path: string): void {
+	const oppositePath = path.startsWith('delete:')
+		? path.substring(7)
+		: `delete:${path}`;
+	context.pendingPaths.delete(oppositePath);
+	context.clearPending?.(oppositePath);
+	context.pendingPaths.add(path);
+	context.markPending?.(path);
 }
 
 export function onRawPathChange(
@@ -93,25 +110,25 @@ export function onRawPathChange(
 
 	if (kind === 'missing') {
 		if (!options.wasTracked) return;
-		context.pendingPaths.add(`delete:${path}`);
+		addPendingPath(context, `delete:${path}`);
 		context.triggerDebouncedSync();
 		return;
 	}
 
-	context.pendingPaths.add(path);
+	addPendingPath(context, path);
 	context.triggerDebouncedSync();
 }
 
 export function onFileChange(context: QueueEventContext, file: TAbstractFile): void {
 	if (!(file instanceof TFolder) && !context.shouldIgnore(file.path)) {
-		context.pendingPaths.add(file.path);
+		addPendingPath(context, file.path);
 		context.triggerDebouncedSync();
 	}
 }
 
 export function onFileDelete(context: QueueEventContext, file: TAbstractFile): void {
 	if (!context.shouldIgnore(file.path)) {
-		context.pendingPaths.add(`delete:${file.path}`);
+		addPendingPath(context, `delete:${file.path}`);
 		context.triggerDebouncedSync();
 	}
 }
@@ -128,10 +145,10 @@ export function onFileRename(
 	if (oldIgnored && newIgnored) return;
 
 	if (!oldIgnored) {
-		context.pendingPaths.add(`delete:${oldPath}`);
+		addPendingPath(context, `delete:${oldPath}`);
 	}
 	if (!newIgnored) {
-		context.pendingPaths.add(file.path);
+		addPendingPath(context, file.path);
 	}
 	context.triggerDebouncedSync();
 }
@@ -197,6 +214,20 @@ export async function processPendingChanges(
 	}
 
 	const paths = Array.from(context.pendingPaths);
+	const pendingRevisions = context.pendingRevisions;
+	const revisionSnapshot = new Map(paths.map((path) => [path, pendingRevisions?.get(path)] as const));
+	const completedQueueKeys = new Set<string>();
+	const clearCompletedRevisions = () => {
+		for (const path of completedQueueKeys) {
+			const startingRevision = revisionSnapshot.get(path);
+			if (
+				!context.pendingPaths.has(path)
+				&& pendingRevisions?.get(path) === startingRevision
+			) {
+				pendingRevisions?.delete(path);
+			}
+		}
+	};
 	for (const path of paths) {
 		context.pendingPaths.delete(path);
 		context.inFlightPaths.add(path);
@@ -207,11 +238,17 @@ export async function processPendingChanges(
 
 	try {
 		const uploads: PreparedUpload[] = [];
-		const deletes: string[] = [];
+		const deletes: Array<{ path: string; expectedHash: string }> = [];
 
 		for (const path of paths) {
 			if (path.startsWith('delete:')) {
-				deletes.push(path.substring(7));
+				const deletedPath = path.substring(7);
+				const expectedHash = context.localManifest.getEntry?.(deletedPath)?.hash;
+				if (!expectedHash) {
+					// The path was created and removed before it ever reached the remote.
+					continue;
+				}
+				deletes.push({ path: deletedPath, expectedHash });
 				continue;
 			}
 
@@ -229,13 +266,13 @@ export async function processPendingChanges(
 					upload.hash,
 					upload.size,
 					upload.contentType || 'application/octet-stream',
+					upload.expectedHash ?? null,
 				);
 				if (!result.success) {
 					throw new Error(result.error || `Upload failed: ${upload.path}`);
 				}
 				if (result.hash && result.hash !== upload.hash) {
-					logger.warn(`Hash mismatch after upload for ${upload.path}`);
-					return;
+					throw new Error(`Hash mismatch after upload for ${upload.path}`);
 				}
 				context.localManifest.setEntry(upload.path, {
 					hash: upload.hash,
@@ -245,27 +282,35 @@ export async function processPendingChanges(
 				if (isMarkdownPath(upload.path)) {
 					await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
 				}
+				completedQueueKeys.add(upload.path);
 			});
 			await context.runConcurrent(uploadTasks, uploadConcurrency);
 		}
 
 		if (deletes.length > 0) {
-			const deleteResult = await context.api.batchDelete(deletes);
+			const deleteResult = await context.api.batchDelete(
+				deletes.map((file) => file.path),
+				Object.fromEntries(deletes.map((file) => [file.path, file.expectedHash])),
+			);
 			for (const path of deleteResult.deleted) {
 				context.localManifest.removeEntry(path);
+				completedQueueKeys.add(`delete:${path}`);
 			}
 			if (!deleteResult.success) {
 				const deletedSet = new Set(deleteResult.deleted);
-				const failedDeletes = deleteResult.errors
+				const failedDeletes: Array<{ path: string; error: string; status?: number }> = deleteResult.errors
 					&& deleteResult.errors.length > 0
 					? deleteResult.errors
 					: deletes
-						.filter((path) => !deletedSet.has(path))
-						.map((path) => ({ path, error: 'Batch delete failed' }));
+						.filter((file) => !deletedSet.has(file.path))
+						.map((file) => ({ path: file.path, error: 'Batch delete failed' }));
 				for (const failedDelete of failedDeletes) {
-					context.pendingPaths.add(`delete:${failedDelete.path}`);
+					if (failedDelete.status === undefined || RETRYABLE_DELETE_STATUSES.has(failedDelete.status)) {
+						context.pendingPaths.add(`delete:${failedDelete.path}`);
+					}
 				}
 				await context.localManifest.save();
+				clearCompletedRevisions();
 				context.updateState({
 					status: 'error',
 					lastError: failedDeletes.map((failure) => `${failure.path}: ${failure.error}`).join('; '),
@@ -276,6 +321,7 @@ export async function processPendingChanges(
 		}
 
 		await context.localManifest.save();
+		clearCompletedRevisions();
 		context.inFlightPaths.clear();
 
 		const didWork = uploads.length > 0 || deletes.length > 0;
@@ -288,8 +334,10 @@ export async function processPendingChanges(
 		if (isAbortError(error)) {
 			logger.info('Queue processing aborted');
 		} else {
-			for (const path of paths) {
-				context.pendingPaths.add(path);
+			if (isRetryableSyncError(error)) {
+				for (const path of paths) {
+					context.pendingPaths.add(path);
+				}
 			}
 			context.inFlightPaths.clear();
 			const errMsg = errorMessage(error);
@@ -310,6 +358,7 @@ export async function processPendingChanges(
 export function clearSyncedPendingPaths(
 	context: QueueReconcileContext,
 	result: SyncResult,
+	revisionSnapshot?: ReadonlyMap<string, number>,
 ): void {
 	if (!result.success || context.pendingPaths.size === 0) {
 		return;
@@ -317,18 +366,23 @@ export function clearSyncedPendingPaths(
 
 	const previousPendingCount = context.pendingPaths.size;
 
-	for (const path of result.uploadedPaths) {
-		context.pendingPaths.delete(path);
-	}
-	for (const path of result.downloadedPaths) {
-		context.pendingPaths.delete(path);
-	}
-	for (const path of result.mergedPaths ?? []) {
-		context.pendingPaths.delete(path);
-	}
-	for (const path of result.deletedPaths) {
-		context.pendingPaths.delete(`delete:${path}`);
-	}
+	const clearIfUnchanged = (key: string) => {
+		if (revisionSnapshot && context.pendingRevisions) {
+			const startRevision = revisionSnapshot.get(key);
+			const currentRevision = context.pendingRevisions.get(key);
+			if (
+				(startRevision === undefined && currentRevision !== undefined)
+				|| (startRevision !== undefined && currentRevision !== startRevision)
+			) return;
+		}
+		context.pendingPaths.delete(key);
+		context.pendingRevisions?.delete(key);
+	};
+
+	for (const path of result.uploadedPaths) clearIfUnchanged(path);
+	for (const path of result.downloadedPaths) clearIfUnchanged(path);
+	for (const path of result.mergedPaths ?? []) clearIfUnchanged(path);
+	for (const path of result.deletedPaths) clearIfUnchanged(`delete:${path}`);
 
 	if (context.pendingPaths.size === previousPendingCount) {
 		return;

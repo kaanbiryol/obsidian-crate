@@ -7,6 +7,7 @@ import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { MarkdownBaseCache } from './markdown-base-cache';
 import type { VaultFile } from './file-discovery';
+import type { DownloadRequest } from './transfer-download';
 import { SyncQueueController } from './queue-controller';
 import { isAbortError as isSyncAbortError } from './abort';
 import {
@@ -293,8 +294,8 @@ export class SyncEngine {
 			shouldIgnore: this.shouldIgnore.bind(this),
 			getLocalChanges: () => this.getLocalChanges(),
 			getLocalDeletes: () => this.getLocalDeletes(),
-			parallelDownloadAndSaveFiles: (paths: string[], result: SyncResult) =>
-				this.parallelDownloadAndSaveFiles(paths, result),
+			parallelDownloadAndSaveFiles: (requests: string[] | DownloadRequest[], result: SyncResult) =>
+				this.parallelDownloadAndSaveFiles(requests, result),
 			processDiff: (
 				diff: FileDiff,
 				localFiles: Record<string, FileEntry>,
@@ -405,8 +406,8 @@ export class SyncEngine {
 			prepareUploadsFromVaultFiles: this.prepareUploadsFromVaultFiles.bind(this),
 			uploadPreparedFiles: this.uploadPreparedFiles.bind(this),
 			throwIfDestroyed: this.throwIfDestroyed.bind(this),
-			deleteRemoteFile: async (path: string) => {
-				await this.api.deleteFile(path);
+			deleteRemoteFile: async (path: string, expectedHash: string) => {
+				await this.api.deleteFile(path, expectedHash);
 			},
 			removeLocalManifestEntry: (path: string) => {
 				this.localManifest.removeEntry(path);
@@ -433,18 +434,19 @@ export class SyncEngine {
 		return planLocalChanges(this.getLocalDiffPlannerContext(), PREPARE_CONCURRENCY);
 	}
 
-	private async parallelDownloadAndSaveFiles(paths: string[], result: SyncResult): Promise<void> {
+	private async parallelDownloadAndSaveFiles(requests: string[] | DownloadRequest[], result: SyncResult): Promise<void> {
 		await transferParallelDownloadAndSaveFiles(
 			this.getTransferContext(),
-			paths,
+			requests,
 			result,
 			DOWNLOAD_CONCURRENCY,
 		);
 	}
 
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
+		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 		const result = await runSyncWorkflow(this.getSyncWorkflowContext(), progressCallback);
-		this.queueController.clearSyncedPendingPaths(result);
+		this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 		if (result.success) {
 			this.pruneMarkdownBaseCacheInBackground();
 		}
@@ -484,8 +486,9 @@ export class SyncEngine {
 	}
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
+		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 		const result = await runInitialSyncWorkflow(this.getInitialSyncWorkflowContext(), progressCallback);
-		this.queueController.clearSyncedPendingPaths(result);
+		this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 		if (result.success) {
 			this.pruneMarkdownBaseCacheInBackground();
 		}
@@ -493,8 +496,9 @@ export class SyncEngine {
 	}
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
+		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 		const result = await runForceFullSyncWorkflow(this.getForceSyncWorkflowContext(), progressCallback);
-		this.queueController.clearSyncedPendingPaths(result);
+		this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 		if (result.success) {
 			this.pruneMarkdownBaseCacheInBackground();
 		}

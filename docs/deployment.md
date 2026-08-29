@@ -96,7 +96,7 @@ Official references:
 4. In Cloudflare, select exactly one account, review the four permissions, and authorize Crate.
 5. Cloudflare returns to the static callback page. It removes the OAuth query from the browser URL immediately and opens `obsidian://crate-cloudflare-oauth`.
 6. Crate verifies the random OAuth state before exchanging the code with its in-memory PKCE verifier.
-7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, workers.dev endpoint, and versioned D1 migrations when none exists.
+7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, workers.dev endpoint, and versioned D1 migrations when none exists. Migrations finish before the Worker bundle is uploaded, keeping schema work out of request cold starts.
 8. Crate registers this device's hashed credential through the Cloudflare D1 API, then revokes and discards the access token.
 9. In Crate, run **Initial sync → Upload all** when ready.
 

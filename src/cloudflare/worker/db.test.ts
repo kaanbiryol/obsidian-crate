@@ -19,15 +19,12 @@ function createDb() {
 }
 
 describe('initDb', () => {
-	it('initializes each database instance independently', async () => {
-		const first = createDb();
-		const second = createDb();
+	it('does not execute runtime schema DDL', async () => {
+		const database = createDb();
 
-	await initDb(first.db as never);
-	await initDb(first.db as never);
-	await initDb(second.db as never);
+		await initDb(database.db as never);
 
-		expect(first.db.prepare).toHaveBeenCalledTimes(15);
-		expect(second.db.prepare).toHaveBeenCalledTimes(15);
+		expect(database.db.prepare).not.toHaveBeenCalled();
+		expect(database.run).not.toHaveBeenCalled();
 	});
 });

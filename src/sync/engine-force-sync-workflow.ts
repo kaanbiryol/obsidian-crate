@@ -36,7 +36,7 @@ export interface ForceSyncWorkflowContext {
 		options: { concurrency: number; retry: boolean; batchConcurrency?: number }
 	): Promise<void>;
 	throwIfDestroyed(): void;
-	deleteRemoteFile(path: string): Promise<void>;
+	deleteRemoteFile(path: string, expectedHash: string): Promise<void>;
 	removeLocalManifestEntry(path: string): void;
 	saveLocalManifest(): Promise<void>;
 	setLastSync(value: string): void;
@@ -72,6 +72,9 @@ export async function runForceFullSyncWorkflow(
 			current = completed;
 			progressCallback?.(current, total);
 		});
+		for (const upload of prepared) {
+			upload.expectedHash = remoteManifest.files[upload.path]?.hash ?? null;
+		}
 
 		context.throwIfDestroyed();
 
@@ -84,7 +87,9 @@ export async function runForceFullSyncWorkflow(
 
 		for (const path of remoteOnlyPaths) {
 			try {
-				await context.deleteRemoteFile(path);
+				const expectedHash = remoteManifest.files[path]?.hash;
+				if (!expectedHash) throw new Error('Missing remote version for delete');
+				await context.deleteRemoteFile(path, expectedHash);
 				context.removeLocalManifestEntry(path);
 				result.deleted++;
 				result.deletedPaths.push(path);
