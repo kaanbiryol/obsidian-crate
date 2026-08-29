@@ -13,9 +13,10 @@ export function createPwaHtml(requestUrl?: string): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="dark">
 <style>
-:root{--pwa-launch-bg:${PWA_CHROME_COLOR};background:${PWA_CHROME_COLOR};color-scheme:dark}
+:root{--pwa-launch-bg:${PWA_CHROME_COLOR};color-scheme:dark}
+html,body,#app{background-color:${PWA_CHROME_COLOR};color-scheme:dark}
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crate">
@@ -39,10 +40,10 @@ ${PWA_STYLES}
 <style id="${PWA_LIGHT_THEME_STYLE_ID}" media="not all">
 ${PWA_LIGHT_THEME_STYLES}
 </style>
+	<script src="/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}"></script>
 </head>
 <body>
 	<div id="app"><div class="pwa-bootstrap-shell" role="status" aria-live="polite" aria-label="Loading reminders"><div class="pwa-loading-state is-visible" aria-hidden="true"><div class="pwa-skeleton-list"><div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div><div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div><div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div><div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div><div class="pwa-skeleton-row"><div class="pwa-skeleton-check"></div><div class="pwa-skeleton-body"><div class="pwa-skeleton-line"></div><div class="pwa-skeleton-line is-short"></div></div></div></div></div><div class="pwa-bootstrap-tabs" aria-hidden="true"><span></span><span></span><span></span><span></span></div></div></div>
-	<script src="/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}"></script>
 	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
 	</body>
 	</html>`;

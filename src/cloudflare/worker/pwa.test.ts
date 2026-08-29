@@ -130,8 +130,9 @@ describe('PWA activation metadata', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('<html lang="en">');
-		expect(html).toContain('<meta name="color-scheme" content="light dark">');
-		expect(html).toContain(':root{--pwa-launch-bg:#0b0b0d;background:#0b0b0d;color-scheme:dark}');
+		expect(html).toContain('<meta name="color-scheme" content="dark">');
+		expect(html).toContain(':root{--pwa-launch-bg:#0b0b0d;color-scheme:dark}');
+		expect(html).toContain('html,body,#app{background-color:#0b0b0d;color-scheme:dark}');
 		expect(html).not.toContain('@media (prefers-color-scheme:light){:root{--pwa-launch-bg:#f7f7f8;');
 		expect(html).toContain('<body>');
 		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
@@ -149,7 +150,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"');
 		expect(PWA_THEME_BOOTSTRAP_JS).toContain('(prefers-color-scheme: light)');
 		expect(PWA_THEME_BOOTSTRAP_JS).toContain("preference==='dark'?'not all'");
-		expect(html.indexOf('<div id="app"><div class="pwa-bootstrap-shell"')).toBeLessThan(html.indexOf('/notifications/theme-bootstrap.js'));
+		expect(html.indexOf('/notifications/theme-bootstrap.js')).toBeLessThan(html.indexOf('<body>'));
+		expect(html.indexOf('/notifications/theme-bootstrap.js')).toBeLessThan(html.indexOf('<div id="app"><div class="pwa-bootstrap-shell"'));
 		expect(html).toContain('--pwa-launch-bg:#f7f7f8;');
 		expect(html).toContain('<meta name="format-detection" content="telephone=no,date=no,email=no,address=no">');
 		expect(html).toContain('height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
