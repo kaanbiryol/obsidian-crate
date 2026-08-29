@@ -239,6 +239,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
               <ViewHeader
                 {...currentHeader}
                 large={isFullScreen}
+                showMeta={isInitialLoadComplete && !loadingContent}
                 rightContent={headerRightContent}
               />
             </motion.div>

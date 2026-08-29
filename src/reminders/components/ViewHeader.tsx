@@ -9,6 +9,8 @@ interface ViewHeaderProps {
   rightContent?: React.ReactNode;
   /** Use large title style (for fullscreen views) */
   large?: boolean;
+  /** Hide count metadata while the initial reminder snapshot is loading. */
+  showMeta?: boolean;
 }
 
 /**
@@ -21,7 +23,8 @@ export const ViewHeader = memo(function ViewHeader({
   overdueCount = 0,
   className = '',
   rightContent,
-  large = false
+  large = false,
+  showMeta = true,
 }: ViewHeaderProps) {
   return (
     <div
@@ -31,17 +34,19 @@ export const ViewHeader = memo(function ViewHeader({
         <h1 className="view-header-title">
           {title}
         </h1>
-        <div className="view-header-meta">
-          <span className="view-header-count">
-            {count} {count === 1 ? 'reminder' : 'reminders'}
-          </span>
-
-          {overdueCount > 0 && (
-            <span className="view-header-overdue">
-              {overdueCount} overdue
+        {showMeta && (
+          <div className="view-header-meta">
+            <span className="view-header-count">
+              {count} {count === 1 ? 'reminder' : 'reminders'}
             </span>
-          )}
-        </div>
+
+            {overdueCount > 0 && (
+              <span className="view-header-overdue">
+                {overdueCount} overdue
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {rightContent && (

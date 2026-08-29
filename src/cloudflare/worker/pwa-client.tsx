@@ -21,7 +21,6 @@ import { ReminderSheet } from './pwa-client/components/ReminderSheet';
 import { SettingsSheet } from './pwa-client/components/SettingsSheet';
 import { WebReminderCard } from './pwa-client/components/WebReminderCard';
 import { usePushNotifications } from './pwa-client/hooks/usePushNotifications';
-import { useInitialLoadingTransition } from './pwa-client/hooks/useInitialLoadingTransition';
 import { usePwaBootstrap } from './pwa-client/hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './pwa-client/hooks/usePwaColorScheme';
 import { usePwaStatus } from './pwa-client/hooks/usePwaStatus';
@@ -103,7 +102,6 @@ function App() {
 		setError,
 	} = reminderSync;
 	const initialContentReady = bootstrapped && (!authToken || !loading);
-	const initialLoadingTransition = useInitialLoadingTransition(initialContentReady);
 	const clearLocalSession = useCallback((showMessage: boolean) => {
 		localStorage.removeItem(AUTH_TOKEN_KEY);
 		localStorage.removeItem(REMINDERS_CACHE_KEY);
@@ -311,7 +309,7 @@ function App() {
 		/>
 	), [openModal, toggleReminderCompleted]);
 
-	if (bootstrapped && !authToken && !initialLoadingTransition.showLoadingContent) {
+	if (bootstrapped && !authToken && initialContentReady) {
 		return (
 			<div>
 				{error
@@ -335,7 +333,7 @@ function App() {
 				initialProject={selectedProject ?? undefined}
 				upcomingDays={config.upcomingDays}
 				className="app-shell pwa-reminders-view"
-				headerRightContent={bootstrapped && authToken ? (
+				headerRightContent={authToken ? (
 					<PwaHeaderActions
 						settingsOpen={settingsOpen}
 						statusText={statusText}
@@ -359,11 +357,11 @@ function App() {
 						/>
 					</>
 				) : undefined}
-				loadingContent={initialLoadingTransition.showLoadingContent
-					? <PwaLoadingSkeleton isVisible={initialLoadingTransition.isSkeletonVisible} />
+				loadingContent={!initialContentReady
+					? <PwaLoadingSkeleton />
 					: undefined}
 				loadingTransition
-				suppressFab={!bootstrapped || !authToken || initialLoadingTransition.showLoadingContent || Boolean(modal) || settingsOpen || readOnly}
+				suppressFab={!bootstrapped || !authToken || !initialContentReady || Boolean(modal) || settingsOpen || readOnly}
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
 				onReorder={persistReorder}

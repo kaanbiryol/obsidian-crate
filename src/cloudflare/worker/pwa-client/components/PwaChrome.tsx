@@ -168,18 +168,14 @@ export function PwaPullRefreshIndicator({ pullRefresh }: { pullRefresh: PullRefr
 	);
 }
 
-export function PwaLoadingSkeleton({ isVisible = true }: { isVisible?: boolean }) {
+export function PwaLoadingSkeleton() {
 	return (
 		<div
-			className={`pwa-loading-state ${isVisible ? 'is-visible' : 'is-pending'}`}
+			className="pwa-loading-state is-visible"
 			role="status"
 			aria-live="polite"
 			aria-label="Loading reminders"
 		>
-			<div className="pwa-skeleton-header">
-				<div className="pwa-skeleton-line is-title" />
-				<div className="pwa-skeleton-line is-meta" />
-			</div>
 			<div className="pwa-skeleton-list">
 				{[0, 1, 2, 3, 4].map((item) => (
 					<div className="pwa-skeleton-row" key={item}>

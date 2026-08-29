@@ -5,13 +5,10 @@
 @keyframes tab-active-pop{0%{transform:scale(.96)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
 @keyframes pwa-spin{to{transform:rotate(360deg)}}
 @keyframes pwa-skeleton-shimmer{0%{background-position:120% 0}100%{background-position:-120% 0}}
-@keyframes pwa-loading-delayed-reveal{from{opacity:0}to{opacity:1}}
 @keyframes pwa-update-slide-in{from{opacity:0;transform:translate3d(0,-10px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @keyframes pwa-toast-in{from{opacity:0;transform:translate3d(-50%,6px,0) scale(.98)}to{opacity:1;transform:translate3d(-50%,0,0) scale(1)}}
 @media (prefers-reduced-motion: reduce){
 	.view-transition,.app-header__body,.tab-button.is-active,.modal-card,.settings-sheet,.pwa-picker-sheet,.pwa-skeleton-line,.pwa-pull-refresh__glyph svg,.pwa-update-banner,.toast,.premium-checkbox.is-completing,.premium-checkbox-icon{animation:none!important}
-	.pwa-bootstrap-shell .pwa-loading-state.is-pending{animation:none!important;opacity:1}
-	.pwa-loading-state{transition:none!important}
 	.tab-button,.tab-button__icon,.pwa-reminders-view .bottom-tab-button,.pwa-reminders-view .bottom-tab-icon,.pwa-reminders-view .bottom-tab-label,.premium-reminder-content,.fab,.pwa-pull-refresh,.pwa-pull-refresh__glyph,.modal-card.pwa-reminder-editor,.pwa-modal-sheet__backdrop{transition:none!important}
 }
 @keyframes sheet-in{from{translate:0 18px;opacity:.92}to{translate:0 0;opacity:1}}

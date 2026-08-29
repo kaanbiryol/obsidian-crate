@@ -259,9 +259,9 @@ describe('PWA activation metadata', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('<div id="app"><div class="pwa-bootstrap-shell" role="status"');
-		expect(html).toContain('window.__CRATE_PWA_LOADING_STARTED_AT__=performance.now()');
 		expect(html).toContain('aria-label="Loading reminders"');
-		expect(html).toContain('<div class="pwa-loading-state is-pending"');
+		expect(html).toContain('<div class="pwa-loading-state is-visible"');
+		expect(html).not.toContain('pwa-skeleton-header');
 		expect(html).toContain('<div class="pwa-bootstrap-tabs" aria-hidden="true">');
 		expect(html).not.toContain('auth-card--loading');
 		expect(html).not.toContain('auth-loading__mark-stage');
