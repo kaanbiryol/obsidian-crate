@@ -17,6 +17,7 @@ import {
   createCloudflareDeploymentService,
   handleCloudflareOAuthProtocol,
 } from "../cloudflare/plugin-integration";
+import { showCloudflareServerUpdateNotice } from "../cloudflare/update-notice";
 
 const logger = createLogger("Plugin");
 
@@ -31,6 +32,7 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
   plugin.registerSettingsTab(new CrateSettingTab(plugin.app, plugin));
   registerVaultSyncEventHandlers(plugin);
   await initializePluginSync(plugin);
+  showCloudflareServerUpdateNotice(plugin);
   registerPluginCommands(plugin);
   registerPluginProtocols(plugin);
   await initializePluginReminders(plugin);

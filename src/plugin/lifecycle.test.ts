@@ -16,6 +16,7 @@ const registerVaultSyncEventHandlers = vi.fn();
 const ensurePluginDeviceId = vi.fn();
 const openFullScreenReminderModal = vi.fn();
 const handleCloudflareOAuthProtocol = vi.fn();
+const showCloudflareServerUpdateNotice = vi.fn();
 const cloudflareDeploymentDestroy = vi.fn();
 const createCloudflareDeploymentService = vi.fn(() => ({
 	destroy: cloudflareDeploymentDestroy,
@@ -91,6 +92,7 @@ async function loadLifecycleModule() {
 		createCloudflareDeploymentService,
 		handleCloudflareOAuthProtocol,
 	}));
+	vi.doMock('../cloudflare/update-notice', () => ({ showCloudflareServerUpdateNotice }));
 
 	return import('./lifecycle');
 }
@@ -123,6 +125,7 @@ beforeEach(() => {
 	ensurePluginDeviceId.mockReset();
 	openFullScreenReminderModal.mockReset();
 	handleCloudflareOAuthProtocol.mockReset();
+	showCloudflareServerUpdateNotice.mockReset();
 	cloudflareDeploymentDestroy.mockReset();
 	createCloudflareDeploymentService.mockClear();
 	secretStorageHas.mockReset().mockReturnValue(false);
@@ -144,6 +147,7 @@ afterEach(() => {
 	vi.doUnmock('../sync/plugin-integration');
 	vi.doUnmock('./deviceId');
 	vi.doUnmock('../cloudflare/plugin-integration');
+	vi.doUnmock('../cloudflare/update-notice');
 });
 
 describe('bootstrapPlugin', () => {
@@ -169,6 +173,7 @@ describe('bootstrapPlugin', () => {
 		expect(registerSyncCommands).toHaveBeenCalledWith(plugin);
 		expect(initializeReminders).toHaveBeenCalledWith(plugin);
 		expect(createCloudflareDeploymentService).toHaveBeenCalledWith(plugin);
+		expect(showCloudflareServerUpdateNotice).toHaveBeenCalledWith(plugin);
 		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(2);
 
 		const remindersHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
@@ -259,6 +264,7 @@ describe('bootstrapPlugin', () => {
 		expect(registerVaultSyncEventHandlers).not.toHaveBeenCalled();
 		expect(registerSyncCommands).not.toHaveBeenCalled();
 		expect(initializeReminders).not.toHaveBeenCalled();
+		expect(showCloudflareServerUpdateNotice).not.toHaveBeenCalled();
 		expect(noticeMessages).toContain('Crate failed to initialize: Error: settings unavailable');
 	});
 });

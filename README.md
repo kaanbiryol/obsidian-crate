@@ -117,7 +117,7 @@ To connect another computer or mobile device, install Crate there and select **C
 
 **Disconnect this device** removes the local sync credential while retaining the non-secret deployment identity. Signing in to Cloudflare again reconnects the same server.
 
-For the one-time GitHub Pages and OAuth-client configuration, updates, and recovery instructions, see [Deploying and operating the server](docs/deployment.md). When the installed Crate build contains newer Worker, web app, or migration artifacts, **Authorize update** appears and reuses the resource IDs saved by the initial OAuth deployment.
+For the one-time GitHub Pages and OAuth-client configuration, updates, and recovery instructions, see [Deploying and operating the server](docs/deployment.md). When the installed Crate build contains newer Worker, web app, or migration artifacts, Obsidian shows a server-update notice and **Authorize update** appears in Crate settings. Updating reuses the resource IDs saved by the initial OAuth deployment.
 
 ## Sync Scope and Limits
 
