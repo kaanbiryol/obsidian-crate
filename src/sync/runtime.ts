@@ -214,12 +214,14 @@ export class SyncRuntime {
 		this.syncEngine?.updateSettings(this.settings);
 	}
 
-	async pushSharedSettings(): Promise<void> {
-		if (!this.apiClient) return;
+	async pushSharedSettingsBestEffort(): Promise<boolean> {
+		if (!this.apiClient) return false;
 		try {
 			await this.apiClient.putSharedSettings(buildSharedSettings(this.settings));
+			return true;
 		} catch (error) {
 			logger.error('Failed to push shared settings:', error);
+			return false;
 		}
 	}
 

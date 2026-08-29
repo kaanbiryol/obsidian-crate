@@ -1,6 +1,6 @@
 import { corsHeaders, corsResponse } from './cors';
 import { sha256Hex } from './auth';
-import { initDb, queryRows } from './db';
+import { queryRows } from './db';
 import { getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
 import { issuePushEnrollmentToken, purgeExpiredPushEnrollmentTokens } from './push-enrollment';
 import { consumeWebEnrollmentToken, issueWebEnrollmentToken } from './web-enrollment';
@@ -197,7 +197,6 @@ export async function handleVapidPublicKey(db: D1Database): Promise<Response> {
 }
 
 export async function handleCreateEnrollmentToken(db: D1Database): Promise<Response> {
-	await initDb(db);
 	const { token, expiresAt } = await issuePushEnrollmentToken(db);
 	return corsResponse({
 		token,
@@ -214,7 +213,6 @@ function createBearerToken(): string {
 const REMINDERS_AUTH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 export async function handleCreateRemindersEnrollmentToken(db: D1Database): Promise<Response> {
-	await initDb(db);
 	const { token, expiresAt } = await issueWebEnrollmentToken(db);
 	return corsResponse({
 		token,
@@ -223,7 +221,6 @@ export async function handleCreateRemindersEnrollmentToken(db: D1Database): Prom
 }
 
 export async function handleExchangeRemindersEnrollmentToken(request: Request, db: D1Database): Promise<Response> {
-	await initDb(db);
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -255,7 +252,6 @@ export async function handleExchangeRemindersEnrollmentToken(request: Request, d
 }
 
 export async function handleSubscribe(request: Request, db: D1Database): Promise<Response> {
-	await initDb(db);
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -314,7 +310,6 @@ export async function handleSubscribe(request: Request, db: D1Database): Promise
 }
 
 export async function handleUnsubscribe(request: Request, db: D1Database): Promise<Response> {
-	await initDb(db);
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -335,7 +330,6 @@ export async function handleUnsubscribe(request: Request, db: D1Database): Promi
 }
 
 export async function handleListSubscriptions(db: D1Database): Promise<Response> {
-	await initDb(db);
 	const rows = await queryRows(
 		db.prepare('SELECT id, device_name, created_at FROM push_subscriptions ORDER BY created_at DESC')
 	);

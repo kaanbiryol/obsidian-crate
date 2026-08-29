@@ -1,5 +1,5 @@
 import { sha256HexBytes } from './auth';
-import { initDb, queryRows } from './db';
+import { queryRows } from './db';
 import { commitFileDelete, commitStagedFile } from './sync-mutations';
 import {
 	createManagedObjectKey,
@@ -31,7 +31,6 @@ export async function listStoredMarkdownFilesByPrefix(
 	db: D1Database,
 	pathPrefix: string,
 ): Promise<StoredTextFile[]> {
-	await initDb(db);
 	const rows = await queryRows<{ path: string; hash: string; size: number; storage_key?: string | null }>(
 		db.prepare(
 			"SELECT path, hash, size, storage_key FROM files WHERE path LIKE ? ESCAPE '\\' AND lower(path) LIKE '%.md' ORDER BY path ASC",
@@ -67,7 +66,6 @@ export async function readCommittedMarkdownFileVersion(
 	db: D1Database,
 	path: string,
 ): Promise<{ content: string; hash: string } | null> {
-	await initDb(db);
 	const file = await getStoredFileRow(db, path);
 	if (!file) {
 		return null;
@@ -97,7 +95,6 @@ export async function writeCommittedMarkdownFile(
 	content: string,
 	expectedHash: string | null,
 ): Promise<{ hash: string; size: number }> {
-	await initDb(db);
 	const previousFile = await getStoredFileRow(db, path);
 	const bytes = new TextEncoder().encode(content);
 	const hash = await sha256HexBytes(bytes.buffer);
@@ -140,7 +137,6 @@ export async function deleteCommittedMarkdownFile(
 	path: string,
 	expectedHash: string,
 ): Promise<void> {
-	await initDb(db);
 	const previousFile = await getStoredFileRow(db, path);
 	const commit = await commitFileDelete(bucket, db, {
 		path,

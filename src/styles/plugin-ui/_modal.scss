@@ -1,0 +1,69 @@
+@mixin styles {
+.base-modal-container {
+  position: fixed;
+}
+
+.base-modal-surface {
+  border: 1px solid var(--crate-surface-border);
+  background: var(--background-primary);
+  box-shadow: var(--shadow-l);
+  color: var(--text-normal);
+  will-change: transform, opacity;
+
+  &.is-centered {
+    padding-bottom: 16px;
+  }
+
+  &.is-bottom-sheet {
+    padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  }
+}
+
+.base-modal-drag-region {
+  touch-action: none;
+}
+
+.base-modal-drag-handle {
+  width: 40px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--crate-surface-border);
+}
+
+.modal-backdrop {
+  background: var(--background-modifier-cover);
+  pointer-events: none;
+  will-change: opacity;
+
+  &.is-interactive {
+    pointer-events: auto;
+  }
+}
+
+.delete-confirmation-close {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+}
+
+.delete-confirmation-cancel {
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+
+  &:hover {
+    background: var(--interactive-hover);
+  }
+}
+
+.delete-confirmation-confirm {
+  background: var(--text-error);
+  color: var(--text-on-accent);
+}
+}

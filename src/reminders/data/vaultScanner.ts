@@ -44,8 +44,8 @@ export interface ReminderIdNormalizationResult {
 
 /**
  * Add stable IDs while the file is already being read for indexing. This keeps
- * manually-authored checkboxes discoverable without a second vault-wide
- * migration pass.
+ * manually-authored checkboxes discoverable without a separate vault-wide
+ * rewrite.
  */
 export function normalizeReminderIds(content: string): ReminderIdNormalizationResult {
   const lines = content.split("\n");
@@ -80,29 +80,9 @@ export function isInRemindersFolder(filePath: string, remindersFolderPath: strin
 
 function collectMarkdownFilesInFolder(app: App, remindersFolderPath: string): TFile[] {
   const normalizedFolderPath = remindersFolderPath.replace(/^\/|\/$/g, '');
-  let rootEntry: TAbstractFile | null = null;
-
-  if (!normalizedFolderPath) {
-    const vaultWithRoot = app.vault as unknown as { getRoot?: () => TFolder };
-    rootEntry = vaultWithRoot.getRoot ? vaultWithRoot.getRoot() : null;
-    if (!rootEntry) {
-      return app.vault.getMarkdownFiles();
-    }
-  } else {
-    const vault = app.vault as unknown as {
-      getAbstractFileByPath?: (path: string) => TAbstractFile | null;
-      getMarkdownFiles?: () => TFile[];
-    };
-    if (typeof vault.getAbstractFileByPath === 'function') {
-      rootEntry = vault.getAbstractFileByPath(normalizedFolderPath);
-    } else if (typeof vault.getMarkdownFiles === 'function') {
-      return vault
-        .getMarkdownFiles()
-        .filter((file) => isInRemindersFolder(file.path, remindersFolderPath));
-    } else {
-      rootEntry = null;
-    }
-  }
+  const rootEntry = normalizedFolderPath
+    ? app.vault.getAbstractFileByPath(normalizedFolderPath)
+    : app.vault.getRoot();
 
   if (!rootEntry) {
     log.warn(` Reminders folder not found: ${remindersFolderPath}`);

@@ -4,6 +4,7 @@ import {
 	normalizeRemindersFolderPath,
 	type AutoOpenSetting,
 	type DueDateDefaultSetting,
+	type RemindersSettings,
 } from '../../reminders/settings';
 import type { TabId } from '../../reminders/ui/layoutConstants';
 import { errorMessage } from '../../plugin/logger';
@@ -16,8 +17,16 @@ export interface RemindersSectionContext {
 }
 
 export function renderRemindersSection(context: RemindersSectionContext): void {
-	const { containerEl, plugin } = context;
+	const { containerEl, plugin, rerender } = context;
 	const settings = plugin.remindersSettings;
+	const persistSettings = async (update: Partial<RemindersSettings>): Promise<void> => {
+		try {
+			await plugin.writeRemindersSettings(update);
+		} catch (error) {
+			new Notice(`Failed to save reminders settings: ${errorMessage(error)}`);
+			rerender();
+		}
+	};
 
 	createSettingsSectionHeading(containerEl, 'Reminders');
 
@@ -69,7 +78,7 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 			dropdown.addOption('tomorrow', 'Tomorrow');
 			dropdown.setValue(settings.taskCreationDefaultDueDate)
 				.onChange(async (value) => {
-					await plugin.writeRemindersSettings({
+					await persistSettings({
 						taskCreationDefaultDueDate: value as DueDateDefaultSetting,
 					});
 				});
@@ -83,7 +92,7 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 			dropdown.addOption('fullscreen', 'Full screen');
 			dropdown.setValue(settings.autoOpenView)
 				.onChange(async (value) => {
-					await plugin.writeRemindersSettings({
+					await persistSettings({
 						autoOpenView: value as AutoOpenSetting,
 					});
 				});
@@ -98,7 +107,7 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 			dropdown.addOption('browse', 'Browse');
 			dropdown.setValue(settings.sidebarDefaultTab)
 				.onChange(async (value) => {
-					await plugin.writeRemindersSettings({
+					await persistSettings({
 						sidebarDefaultTab: value as TabId,
 					});
 				});
@@ -113,7 +122,7 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 			dropdown.addOption('browse', 'Browse');
 			dropdown.setValue(settings.fullscreenDefaultTab)
 				.onChange(async (value) => {
-					await plugin.writeRemindersSettings({
+					await persistSettings({
 						fullscreenDefaultTab: value as TabId,
 					});
 				});
@@ -127,7 +136,7 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 				.onChange(async (value) => {
 					const num = parseInt(value, 10);
 					if (!isNaN(num) && num > 0) {
-						await plugin.writeRemindersSettings({ upcomingDaysDefault: num });
+						await persistSettings({ upcomingDaysDefault: num });
 					}
 				});
 		});
@@ -138,7 +147,7 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 		.addToggle(toggle => {
 			toggle.setValue(settings.debugLogging)
 				.onChange(async (value) => {
-					await plugin.writeRemindersSettings({ debugLogging: value });
+					await persistSettings({ debugLogging: value });
 				});
 		});
 }

@@ -1,5 +1,5 @@
 import { corsResponse } from './cors';
-import { initDb, queryRows } from './db';
+import { queryRows } from './db';
 import type { Env } from './types';
 import { parseJsonObject, parseNonNegativeInteger, parseOptionalString } from './utils';
 
@@ -32,7 +32,6 @@ export async function scheduleScheduledReminder(
 	}
 
 	const db = env.DB;
-	await initDb(db);
 
 	const id = env.REMINDER_ALARMS.idFromName(reminderId);
 	const stub = env.REMINDER_ALARMS.get(id);
@@ -58,7 +57,6 @@ export async function scheduleScheduledReminder(
 
 export async function cancelScheduledReminder(env: Env, reminderId: string): Promise<void> {
 	const db = env.DB;
-	await initDb(db);
 
 	const id = env.REMINDER_ALARMS.idFromName(reminderId);
 	const stub = env.REMINDER_ALARMS.get(id);
@@ -144,7 +142,6 @@ export async function handleCancelReminder(request: Request, env: Env): Promise<
 }
 
 export async function handleListScheduled(db: D1Database): Promise<Response> {
-	await initDb(db);
 	const rows = await queryRows(
 		db.prepare('SELECT reminder_id, content, project, due_datetime, created_at FROM scheduled_reminders ORDER BY due_datetime ASC')
 	);

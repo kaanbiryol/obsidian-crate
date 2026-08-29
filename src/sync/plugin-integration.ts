@@ -161,6 +161,6 @@ export async function configureCloudflareAuthorizedDevice(
 		authToken,
 	});
 
-	plugin.syncRuntime.pushSharedSettings().catch(() => {});
+	void plugin.syncRuntime.pushSharedSettingsBestEffort();
 	return await plugin.syncRuntime.testConnection();
 }

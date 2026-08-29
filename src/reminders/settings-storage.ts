@@ -53,14 +53,10 @@ async function loadRemindersSettingsData(plugin: CratePlugin): Promise<Partial<R
 }
 
 async function saveRemindersSettingsData(plugin: CratePlugin, settings: RemindersSettings): Promise<void> {
-	try {
-		const adapter = plugin.app.vault.adapter;
-		await ensurePluginDataDir(plugin);
-		const settingsPath = getPluginDataPath(plugin, 'reminders-settings.json');
-		await adapter.write(settingsPath, JSON.stringify(settings, null, 2));
-	} catch (error) {
-		remindersLogger.error('Failed to save reminders settings:', error);
-	}
+	const adapter = plugin.app.vault.adapter;
+	await ensurePluginDataDir(plugin);
+	const settingsPath = getPluginDataPath(plugin, 'reminders-settings.json');
+	await adapter.write(settingsPath, JSON.stringify(settings, null, 2));
 }
 
 export async function loadRemindersSettings(plugin: CratePlugin): Promise<void> {
@@ -68,19 +64,12 @@ export async function loadRemindersSettings(plugin: CratePlugin): Promise<void> 
 	let shouldPersistNormalizedSettings = settingsData === null;
 
 	if (settingsData) {
-		const loaded: Record<string, unknown> = { ...settingsData };
-		if ('autoOpenSidebarOnMobile' in loaded) {
-			if (loaded.autoOpenSidebarOnMobile === true) {
-				loaded.autoOpenView = 'sidebar';
-			}
-			delete loaded.autoOpenSidebarOnMobile;
-		}
-
-		delete loaded.syncMethod;
 		const normalizedSettings = normalizeRemindersSettings({
-			...loaded,
+			...settingsData,
 			remindersFolderPath: normalizeRemindersFolderPath(
-				typeof loaded.remindersFolderPath === 'string' ? loaded.remindersFolderPath : undefined,
+				typeof settingsData.remindersFolderPath === 'string'
+					? settingsData.remindersFolderPath
+					: undefined,
 			),
 		} satisfies Partial<RemindersSettings>);
 		shouldPersistNormalizedSettings = JSON.stringify(settingsData) !== JSON.stringify(normalizedSettings);
@@ -91,7 +80,11 @@ export async function loadRemindersSettings(plugin: CratePlugin): Promise<void> 
 	plugin.remindersSettings = useRemindersSettingsStore.getState();
 	configureLogger({ prefix: 'Crate', enabled: plugin.remindersSettings.debugLogging });
 	if (shouldPersistNormalizedSettings) {
-		await saveRemindersSettingsData(plugin, plugin.remindersSettings);
+		try {
+			await saveRemindersSettingsData(plugin, plugin.remindersSettings);
+		} catch (error) {
+			remindersLogger.error('Failed to save normalized reminders settings:', error);
+		}
 	}
 }
 
@@ -103,14 +96,12 @@ export async function writeRemindersSettings(
 	if (Object.prototype.hasOwnProperty.call(normalizedUpdate, 'remindersFolderPath')) {
 		normalizedUpdate.remindersFolderPath = normalizeRemindersFolderPath(normalizedUpdate.remindersFolderPath);
 	}
-	useRemindersSettingsStore.setState(
-		normalizeRemindersSettings({
-			...useRemindersSettingsStore.getState(),
-			...normalizedUpdate,
-		}),
-		true,
-	);
-	plugin.remindersSettings = useRemindersSettingsStore.getState();
+	const nextSettings = normalizeRemindersSettings({
+		...useRemindersSettingsStore.getState(),
+		...normalizedUpdate,
+	});
+	await saveRemindersSettingsData(plugin, nextSettings);
+	useRemindersSettingsStore.setState(nextSettings, true);
+	plugin.remindersSettings = nextSettings;
 	configureLogger({ prefix: 'Crate', enabled: plugin.remindersSettings.debugLogging });
-	await saveRemindersSettingsData(plugin, plugin.remindersSettings);
 }

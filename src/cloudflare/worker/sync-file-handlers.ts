@@ -5,7 +5,6 @@ import { commitFileDelete, commitStagedFile } from './sync-mutations';
 import {
 	createManagedObjectKey,
 	deleteBucketObjectsQuietly,
-	ensureSyncMetadata,
 	formatMetadataCommitFailure,
 	formatMutationError,
 	getStoredFileRow,
@@ -68,7 +67,6 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 		const size = declaredSize ?? computedSize;
 		let previousFile: FileStorageRow | null = null;
 		try {
-			await ensureSyncMetadata(db);
 			previousFile = await getStoredFileRow(db, safePath);
 		} catch (error: unknown) {
 			return corsResponse({
@@ -127,7 +125,6 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 
 	let storedFile: FileStorageRow | null = null;
 	try {
-		await ensureSyncMetadata(db);
 		storedFile = await getStoredFileRow(db, path);
 	} catch {
 		return corsResponse({ error: 'Sync metadata unavailable' }, 503);
@@ -179,7 +176,6 @@ export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Dat
 
 	let previousFile: FileStorageRow | null = null;
 	try {
-		await ensureSyncMetadata(db);
 		previousFile = await getStoredFileRow(db, safePath);
 		const commit = await commitFileDelete(bucket, db, {
 			path: safePath,

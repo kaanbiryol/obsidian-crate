@@ -1,0 +1,91 @@
+/* Settings tab - sync progress bar */
+.crate-sync-progress {
+	margin-top: 8px;
+}
+
+.crate-sync-progress-label {
+	font-size: 12px;
+	color: var(--text-muted);
+	margin-bottom: 4px;
+}
+
+.crate-sync-progress-bar {
+	width: 100%;
+	height: 6px;
+	background: var(--background-modifier-border);
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.crate-sync-progress-fill {
+	height: 100%;
+	background: var(--interactive-accent);
+	border-radius: 3px;
+	transition: width 0.2s ease;
+}
+
+/* Settings tab - setup and diagnostics */
+.crate-action-progress {
+	margin: 6px 0 12px;
+	padding: 8px 10px;
+	border-left: 3px solid var(--interactive-accent);
+	background: var(--background-secondary);
+	border-radius: 4px;
+	color: var(--text-normal);
+	font-size: 13px;
+	animation: crate-fade-in 0.2s ease;
+}
+
+@keyframes crate-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+/* QR code modal */
+.crate-qr-modal {
+	max-width: 360px;
+}
+
+.crate-qr-modal .modal-content h2 {
+	margin: 0 0 4px;
+}
+
+.crate-qr-desc {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin: 0 0 16px;
+}
+
+.crate-qr-wrapper {
+	display: flex;
+	justify-content: center;
+}
+
+.crate-qr-wrapper svg {
+	width: 280px;
+	height: 280px;
+	border-radius: 8px;
+}
+
+.crate-diagnostics {
+	margin: 8px 0 16px;
+	padding: 8px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+}
+
+.crate-diagnostic-row p {
+	margin: 0 0 4px;
+}
+
+.crate-diagnostic-pass {
+	color: var(--text-success);
+}
+
+.crate-diagnostic-warn {
+	color: var(--text-warning);
+}
+
+.crate-diagnostic-fail {
+	color: var(--text-error);
+}

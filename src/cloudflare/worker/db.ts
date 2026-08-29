@@ -1,11 +1,3 @@
-/**
- * Kept as an awaitable boundary for callers, but intentionally performs no DDL.
- * The provisioner applies versioned migrations before uploading a Worker.
- */
-export function initDb(_db: D1Database): Promise<void> {
-	return Promise.resolve();
-}
-
 const CHANGELOG_RETENTION_DAYS = 30;
 
 export async function maybePruneChangelog(db: D1Database): Promise<void> {

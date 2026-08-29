@@ -57,7 +57,12 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 				}
 			};
 
-			text.inputEl.addEventListener('blur', () => void commit());
+			text.inputEl.addEventListener('blur', () => {
+				void commit().catch((error: unknown) => {
+					new Notice(`Failed to save notification time: ${errorMessage(error)}`);
+					text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
+				});
+			});
 			text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
 				if (e.key === 'Enter') {
 					e.preventDefault();

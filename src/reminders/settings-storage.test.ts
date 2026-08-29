@@ -5,15 +5,18 @@ import {
 	type RemindersSettings,
 	useRemindersSettingsStore,
 } from './settings';
-import { loadRemindersSettings } from './settings-storage';
+import { loadRemindersSettings, writeRemindersSettings } from './settings-storage';
 
-function createPlugin(settings: Record<string, unknown> | null): {
+function createPlugin(
+	settings: Record<string, unknown> | null,
+	writeImplementation: () => Promise<void> = async () => undefined,
+): {
 	plugin: CratePlugin;
 	write: ReturnType<typeof vi.fn>;
 } {
 	const configDir = 'vault-config';
 	const settingsPath = `${configDir}/plugins/crate/reminders-settings.json`;
-	const write = vi.fn(async () => undefined);
+	const write = vi.fn(writeImplementation);
 	const adapter = {
 		exists: vi.fn(async (path: string) => path === settingsPath ? settings !== null : true),
 		read: vi.fn(async () => JSON.stringify(settings)),
@@ -56,20 +59,21 @@ describe('loadRemindersSettings', () => {
 		expect(write).not.toHaveBeenCalled();
 	});
 
-	it('persists legacy settings once after normalization', async () => {
+	it('persists noncanonical settings once after normalization', async () => {
 		const { plugin, write } = createPlugin({
 			...canonicalSettings(),
-			autoOpenSidebarOnMobile: true,
-			syncMethod: 'legacy',
+			upcomingDaysDefault: -1,
+			unknownSetting: true,
 		});
 
 		await loadRemindersSettings(plugin);
 
-		expect(plugin.remindersSettings.autoOpenView).toBe('sidebar');
+		expect(plugin.remindersSettings.upcomingDaysDefault).toBe(
+			DEFAULT_REMINDERS_SETTINGS.upcomingDaysDefault,
+		);
 		expect(write).toHaveBeenCalledOnce();
 		const persisted = JSON.parse(String(write.mock.calls[0]?.[1])) as Record<string, unknown>;
-		expect(persisted).not.toHaveProperty('autoOpenSidebarOnMobile');
-		expect(persisted).not.toHaveProperty('syncMethod');
+		expect(persisted).not.toHaveProperty('unknownSetting');
 	});
 
 	it('creates the settings file when it does not exist', async () => {
@@ -78,5 +82,21 @@ describe('loadRemindersSettings', () => {
 		await loadRemindersSettings(plugin);
 
 		expect(write).toHaveBeenCalledOnce();
+	});
+
+	it('leaves runtime settings unchanged when persistence fails', async () => {
+		const initialSettings = canonicalSettings();
+		useRemindersSettingsStore.setState(initialSettings, true);
+		const { plugin } = createPlugin(initialSettings, async () => {
+			throw new Error('vault is read-only');
+		});
+		plugin.remindersSettings = initialSettings;
+
+		await expect(writeRemindersSettings(plugin, {
+			upcomingDaysDefault: 14,
+		})).rejects.toThrow('vault is read-only');
+
+		expect(plugin.remindersSettings).toEqual(initialSettings);
+		expect(useRemindersSettingsStore.getState()).toEqual(initialSettings);
 	});
 });

@@ -2,10 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { sha256Hex } from './auth';
 import { authenticateWorkerRequest } from './authenticate';
 
-vi.mock('./db', () => ({
-	initDb: vi.fn(async () => {}),
-}));
-
 function createDb(tokenHash: string, row: { id: string; scope: string } | null) {
 	return {
 		prepare: vi.fn((sql: string) => {

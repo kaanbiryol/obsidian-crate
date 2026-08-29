@@ -1,0 +1,64 @@
+/**
+ * Crate - Styles
+ */
+
+/* Status bar */
+.crate-status-bar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	cursor: pointer;
+}
+
+.crate-reminders-view-container {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.crate-status-icon {
+	font-size: 12px;
+	display: flex;
+	align-items: center;
+}
+
+.crate-status-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.crate-status-text {
+	font-size: 11px;
+	opacity: 0.8;
+}
+
+/* Syncing animation */
+.crate-status-bar[data-status="syncing"] .crate-status-icon svg {
+	animation: crate-spin 1s linear infinite;
+	color: var(--text-warning);
+}
+
+@keyframes crate-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Conflict state */
+.crate-status-bar.crate-has-conflicts .crate-status-icon {
+	color: var(--text-warning);
+}
+
+/* Error state */
+.crate-status-bar[data-status="error"] .crate-status-icon {
+	color: var(--text-error);
+}
+
+.crate-status-bar[data-status="syncing"] .crate-status-text {
+	color: var(--text-warning);
+	opacity: 1;
+}

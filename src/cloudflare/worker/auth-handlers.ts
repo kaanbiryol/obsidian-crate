@@ -1,10 +1,9 @@
 import { corsResponse } from './cors';
 import { sha256Hex } from './auth';
-import { initDb, queryRows } from './db';
+import { queryRows } from './db';
 import { parseJsonObject, parseOptionalString } from './utils';
 
 export async function handleRevokeToken(request: Request, db: D1Database): Promise<Response> {
-	await initDb(db);
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -19,7 +18,6 @@ export async function handleRevokeToken(request: Request, db: D1Database): Promi
 }
 
 export async function handleRevokeCurrentToken(request: Request, db: D1Database): Promise<Response> {
-	await initDb(db);
 	const authHeader = request.headers.get('Authorization') || '';
 	const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
 	if (!token) {
@@ -32,7 +30,6 @@ export async function handleRevokeCurrentToken(request: Request, db: D1Database)
 }
 
 export async function handleListTokens(request: Request, db: D1Database): Promise<Response> {
-	await initDb(db);
 	const authHeader = request.headers.get('Authorization') || '';
 	const currentToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
 	const currentTokenHash = currentToken

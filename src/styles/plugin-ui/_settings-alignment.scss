@@ -1,0 +1,21 @@
+@mixin styles {
+  /* Settings tab alignment fix */
+  .crate-settings .setting-item {
+    display: flex;
+    align-items: center;
+  }
+
+  .crate-settings .setting-item-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .crate-settings .setting-item-control {
+    flex-shrink: 0;
+  }
+
+  .crate-settings .setting-item-name {
+    padding-left: 0;
+    margin-left: 0;
+  }
+}

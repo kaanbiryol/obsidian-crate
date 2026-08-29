@@ -46,6 +46,7 @@ export interface Logger {
 }
 
 function shouldLog(level: LogLevel): boolean {
+  if (level === 'warn' || level === 'error') return true;
   if (!globalConfig.enabled) return false;
   const minPriority = LOG_LEVEL_PRIORITY[globalConfig.minLevel || 'debug'];
   return LOG_LEVEL_PRIORITY[level] >= minPriority;

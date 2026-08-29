@@ -1,5 +1,4 @@
 import { corsResponse } from './cors';
-import { initDb } from './db';
 import { sha256Hex } from './auth';
 
 type AuthScope = 'vault' | 'reminders';
@@ -28,7 +27,6 @@ export async function authenticateWorkerRequest(
 	}
 
 	try {
-		await initDb(db);
 		const tokenHash = await sha256Hex(token);
 		const row = await db.prepare(`SELECT id, scope FROM auth_tokens
 			WHERE token_hash = ? AND (expires_at IS NULL OR expires_at > ?)`)

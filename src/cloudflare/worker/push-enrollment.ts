@@ -1,5 +1,4 @@
 import { sha256Hex } from './auth';
-import { initDb } from './db';
 
 const ENROLLMENT_TOKEN_TTL_MS = 10 * 60 * 1000;
 
@@ -22,7 +21,6 @@ export async function purgeExpiredPushEnrollmentTokens(db: D1Database): Promise<
 export async function issuePushEnrollmentToken(
 	db: D1Database,
 ): Promise<{ token: string; expiresAt: number }> {
-	await initDb(db);
 	await purgeExpiredPushEnrollmentTokens(db);
 
 	const token = createEnrollmentToken();
@@ -40,7 +38,6 @@ export async function consumePushEnrollmentToken(
 	db: D1Database,
 	token: string,
 ): Promise<boolean> {
-	await initDb(db);
 	await purgeExpiredPushEnrollmentTokens(db);
 
 	const trimmedToken = token.trim();

@@ -1,0 +1,150 @@
+@use '../colors';
+
+@mixin styles {
+@tailwind utilities;
+
+  // Let Obsidian own the surrounding surface instead of HeroUI's theme background.
+  background-color: transparent;
+
+  &,
+  &::before,
+  &::after,
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  :where(button, input, textarea, select) {
+    color: inherit;
+    font: inherit;
+  }
+
+  :where(button) {
+    margin: 0;
+    border: 0;
+    appearance: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  @each $name, $color in colors.$reminder-colors {
+    --reminder-#{$name}: #{$color};
+  }
+
+  /* Plugin chrome follows the active Obsidian theme. */
+  --crate-surface-bg: var(--background-primary-alt, var(--background-primary));
+  --crate-surface-hover-bg: var(--background-modifier-hover);
+  --crate-surface-active-bg: var(--background-modifier-active-hover, var(--background-modifier-hover));
+  --crate-surface-border: var(--background-modifier-border);
+  --crate-surface-border-hover: var(--background-modifier-border-hover, var(--background-modifier-border));
+  --crate-shadow-color: var(--background-modifier-box-shadow);
+  --crate-accent: var(--interactive-accent);
+  --crate-accent-hover: var(--interactive-accent-hover);
+  --crate-danger: var(--text-error);
+  --crate-warning: var(--text-warning);
+  --crate-success: var(--text-success);
+  --crate-on-accent: var(--text-on-accent);
+
+  --crate-glass-back-bg: var(--crate-surface-bg);
+  --crate-glass-back-border: var(--crate-surface-border);
+  --crate-glass-back-hover-bg: var(--crate-surface-hover-bg);
+  --crate-glass-back-shadow: 0 2px 8px var(--crate-shadow-color);
+  --crate-glass-back-hover-shadow: var(--shadow-s);
+  --crate-glass-surface-bg: var(--crate-surface-bg);
+  --crate-glass-surface-border: var(--crate-surface-border);
+  --crate-glass-surface-hover-bg: var(--crate-surface-hover-bg);
+  --crate-glass-surface-hover-border: var(--crate-surface-border-hover);
+  --crate-glass-text-secondary: var(--text-muted);
+  --crate-glass-text-tertiary: var(--text-faint);
+  --crate-picker-icon-color: var(--text-muted);
+
+  /* Reminder semantics also inherit the theme instead of HeroUI's palette. */
+  --reminder-p1-border: var(--crate-danger);
+  --reminder-p1-border-hover: color-mix(in srgb, var(--crate-danger) 50%, transparent);
+  --reminder-p1-background: color-mix(in srgb, var(--crate-danger) 10%, transparent);
+  --reminder-p2-border: var(--crate-warning);
+  --reminder-p2-border-hover: color-mix(in srgb, var(--crate-warning) 50%, transparent);
+  --reminder-p2-background: color-mix(in srgb, var(--crate-warning) 10%, transparent);
+  --reminder-p3-border: var(--crate-accent);
+  --reminder-p3-border-hover: color-mix(in srgb, var(--crate-accent) 50%, transparent);
+  --reminder-p3-background: color-mix(in srgb, var(--crate-accent) 10%, transparent);
+  --reminder-p4-border: var(--crate-surface-border);
+  --reminder-p4-border-hover: var(--crate-surface-border-hover);
+  --reminder-p4-background: unset;
+  --reminder-red: var(--crate-danger);
+  --reminder-task-separator-color: var(--crate-surface-border);
+  --color-p1-bg: color-mix(in srgb, var(--crate-danger) 10%, transparent);
+  --color-p1-border: var(--crate-danger);
+  --color-p2-bg: color-mix(in srgb, var(--crate-warning) 10%, transparent);
+  --color-p2-border: var(--crate-warning);
+  --color-p3-bg: color-mix(in srgb, var(--crate-accent) 10%, transparent);
+  --color-p3-border: var(--crate-accent);
+  --color-p4-bg: var(--crate-surface-bg);
+  --color-p4-border: var(--crate-surface-border);
+  --color-primary: var(--crate-accent);
+  --color-primary-hover: var(--crate-accent-hover);
+  --color-reminder-red: var(--crate-danger);
+
+  /*
+   * Typography variables - semantic abstraction layer
+   * Maps to Obsidian's CSS variables for consistent theming
+   */
+  /* Font sizes - mapped to Obsidian variables */
+  --reminder-font-base: var(--font-text-size);
+  --reminder-font-sm: var(--font-small);
+  --reminder-font-xs: var(--font-smaller);
+  --reminder-font-xxs: var(--font-smallest);
+
+  /* Font families */
+  --reminder-font-ui: var(--font-interface);
+  --reminder-font-text: var(--font-text);
+
+  /* Font weights */
+  --reminder-font-weight-normal: 400;
+  --reminder-font-weight-medium: 500;
+  --reminder-font-weight-semibold: var(--font-semibold);
+
+  /* Line heights */
+  --reminder-line-height-tight: 1.2;
+  --reminder-line-height-normal: 1.4;
+  --reminder-line-height-relaxed: 1.6;
+
+  /*
+   * Plugin theme mapping to shared Tailwind theme
+   * HeroUI generates CSS variables like --heroui-danger, --heroui-warning, etc.
+   * We map Obsidian's theme classes to reference these shared theme values
+   */
+
+&.theme-dark,
+&.dark,
+.theme-dark,
+.dark {
+  /* HeroUI semantic content colors - map to Obsidian theme */
+  --heroui-content1: var(--background-primary);
+  --heroui-content2: var(--background-secondary);
+  --heroui-content3: var(--background-modifier-hover);
+  --heroui-content4: var(--background-modifier-border);
+  --heroui-default-100: var(--background-secondary);
+  --heroui-default-200: var(--background-modifier-border);
+
+  /* HeroUI text color - ensure text is visible in dark mode */
+  --heroui-foreground: var(--text-normal);
+  color: var(--text-normal);
+
+}
+
+&.theme-light,
+&.light,
+.theme-light,
+.light {
+  /* HeroUI semantic content colors - map to Obsidian theme */
+  --heroui-content1: var(--background-primary);
+  --heroui-content2: var(--background-secondary);
+  --heroui-content3: var(--background-modifier-hover);
+  --heroui-content4: var(--background-modifier-border);
+  --heroui-default-100: var(--background-secondary);
+  --heroui-default-200: var(--background-modifier-border);
+
+}
+}

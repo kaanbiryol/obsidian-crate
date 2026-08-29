@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault } from '@/reminders/data/vaultScanner';
-import { TFile, type App } from 'obsidian';
+import { TFile, TFolder, type App } from 'obsidian';
 
 function makeMockFile(path: string): TFile {
   const file = new TFile();
@@ -63,7 +63,10 @@ describe('vaultScanner', () => {
 
     const app = {
       vault: {
-        getMarkdownFiles: vi.fn().mockReturnValue(files),
+        getAbstractFileByPath: vi.fn().mockReturnValue(Object.assign(new TFolder(), {
+          path: 'Reminders',
+          children: files.slice(0, 2),
+        })),
         cachedRead: vi.fn((file: TFile) => Promise.resolve(contentByPath[file.path] || '')),
       },
     } as unknown as App;
@@ -75,29 +78,17 @@ describe('vaultScanner', () => {
     expect(result.discoveredProjects).toEqual(['Empty', 'Work']);
   });
 
-  it('falls back to getMarkdownFiles when getAbstractFileByPath is unavailable', async () => {
-    const files = [
-      makeMockFile('Reminders/Work.md'),
-      makeMockFile('Notes/Other.md'),
-    ];
-
-    const contentByPath: Record<string, string> = {
-      'Reminders/Work.md': '- [ ] Task A <!-- crate-id:rem-1 -->',
-      'Notes/Other.md': '- [ ] Not included',
-    };
-
+  it('returns an empty result when the reminders folder does not exist', async () => {
     const app = {
       vault: {
-        getMarkdownFiles: vi.fn().mockReturnValue(files),
-        cachedRead: vi.fn((file: TFile) => Promise.resolve(contentByPath[file.path] || '')),
+        getAbstractFileByPath: vi.fn().mockReturnValue(null),
       },
     } as unknown as App;
 
     const result = await scanVault(app, 'Reminders');
 
-    expect(result.filesScanned).toBe(1);
-    expect(result.reminders).toHaveLength(1);
-    expect(result.reminders[0].id).toBeTruthy();
+    expect(result.filesScanned).toBe(0);
+    expect(result.reminders).toHaveLength(0);
   });
 
   it('preserves persisted reminder IDs from markdown metadata', async () => {

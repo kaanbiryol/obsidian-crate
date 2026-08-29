@@ -1,4 +1,4 @@
-import { initDb, queryRows } from './db';
+import { queryRows } from './db';
 import { FILES_PREFIX } from './utils';
 
 export const MAX_BATCH_FILES = 50;
@@ -127,8 +127,4 @@ export async function getChangelogBounds(db: D1Database): Promise<{
 		lastSeq: maxRows[0]?.lastSeq || 0,
 		minSeq: minRows[0]?.minSeq ?? null,
 	};
-}
-
-export async function ensureSyncMetadata(db: D1Database): Promise<void> {
-	await initDb(db);
 }

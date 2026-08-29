@@ -2,7 +2,7 @@ import {
 	generateVapidKeys, serializeVapidKeys, deserializeVapidKeys,
 	sendPushNotification,
 } from 'web-push-browser';
-import { initDb, queryRows } from './db';
+import { queryRows } from './db';
 
 interface SerializedVapidKeys {
 	publicKey: string;
@@ -65,7 +65,6 @@ export function createDeclarativePushPayload(payload: PushNotificationPayload): 
 }
 
 export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVapidKeys> {
-	await initDb(db);
 	const rows = await queryRows<{ public_key: string; private_key: string }>(
 		db.prepare('SELECT public_key, private_key FROM vapid_keys WHERE id = 1')
 	);
@@ -88,7 +87,6 @@ export async function sendToAllSubscriptions(
 	db: D1Database,
 	payload: PushNotificationPayload,
 ): Promise<{ sent: number; failed: number; pruned: number; errors: string[] }> {
-	await initDb(db);
 
 	const serializedKeys = await getOrCreateVapidKeys(db);
 	const keys = await deserializeVapidKeys(serializedKeys);

@@ -539,7 +539,7 @@ describe('SyncRuntime operation wrappers', () => {
 			testConnection: vi.fn(async () => ({ success: true })),
 		});
 
-		await runtime.pushSharedSettings();
+		await expect(runtime.pushSharedSettingsBestEffort()).resolves.toBe(true);
 
 		expect(putSharedSettings).toHaveBeenCalledWith({
 			ignorePatterns: ['*.tmp'],
@@ -549,6 +549,26 @@ describe('SyncRuntime operation wrappers', () => {
 			showStatusBar: true,
 			pushEnabled: true,
 		});
+	});
+
+	it('reports shared settings push failures without rejecting', async () => {
+		const { runtime } = createRuntimeHarness();
+		const pushError = new Error('server unavailable');
+		setApiClient(runtime, {
+			putSharedSettings: vi.fn(async () => {
+				throw pushError;
+			}),
+			testConnection: vi.fn(async () => ({ success: true })),
+		});
+		const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		await expect(runtime.pushSharedSettingsBestEffort()).resolves.toBe(false);
+
+		expect(logError).toHaveBeenCalledWith(
+			'[Crate] [SyncRuntime]',
+			'Failed to push shared settings:',
+			pushError,
+		);
 	});
 
 	it('delegates connection tests to the API client when configured', async () => {

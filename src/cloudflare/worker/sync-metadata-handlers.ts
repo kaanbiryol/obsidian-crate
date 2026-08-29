@@ -2,14 +2,13 @@ import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
 import { corsResponse } from './cors';
 import { queryRows } from './db';
 import { parseJsonObject } from './utils';
-import { ensureSyncMetadata, getChangelogBounds } from './sync-storage';
+import { getChangelogBounds } from './sync-storage';
 
 export async function handleHealth(): Promise<Response> {
 	return corsResponse({ status: 'ok', timestamp: new Date().toISOString() });
 }
 
 export async function handleCheckChanges(request: Request, db: D1Database): Promise<Response> {
-	await ensureSyncMetadata(db);
 	const url = new URL(request.url);
 	const since = parseInt(url.searchParams.get('since') || '0', 10);
 	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
@@ -23,7 +22,6 @@ export async function handleGetChanges(request: Request, db: D1Database): Promis
 	const since = parseInt(url.searchParams.get('since') || '0', 10);
 	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
 
-	await ensureSyncMetadata(db);
 	const changeRows = await queryRows(
 		db.prepare('SELECT seq, path, action, hash, size, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since)
 	);
@@ -39,8 +37,6 @@ export async function handleGetChanges(request: Request, db: D1Database): Promis
 }
 
 export async function handleGetManifest(request: Request, db: D1Database): Promise<Response> {
-	await ensureSyncMetadata(db);
-
 	const MAX_MANIFEST_FILES = 200000;
 	const filesRows = await queryRows<{ path: string; hash: string; size: number; modified: string }>(
 		db.prepare('SELECT path, hash, size, modified FROM files LIMIT 200001')

@@ -1,9 +1,10 @@
 import type { MarkdownPostProcessorContext, MarkdownSectionInformation } from "obsidian";
-import { MarkdownRenderChild, Platform } from "obsidian";
+import { MarkdownRenderChild, Notice, Platform } from "obsidian";
 import type React from "react";
 import type { Root } from "react-dom/client";
 
 import type CratePlugin from "@/main";
+import { errorMessage } from "@/plugin/logger";
 import {
   createShadowReactRoot,
   createShadowRootMount,
@@ -118,6 +119,8 @@ export class ReminderQueryInjector {
 
       void this.plugin.writeRemindersSettings({
         queryViewPreferences: nextPreferences,
+      }).catch((error: unknown) => {
+        new Notice(`Failed to save reminder view preference: ${errorMessage(error)}`);
       });
     };
   }

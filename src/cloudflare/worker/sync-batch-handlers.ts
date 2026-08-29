@@ -11,7 +11,6 @@ import {
 import {
 	createManagedObjectKey,
 	deleteBucketObjectsQuietly,
-	ensureSyncMetadata,
 	formatMetadataCommitFailure,
 	formatMutationError,
 	loadStoredFileRows,
@@ -143,7 +142,6 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 	let previousFiles = new Map<string, FileStorageRow>();
 	if (uploads.length > 0) {
 		try {
-			await ensureSyncMetadata(db);
 			previousFiles = await loadStoredFileRows(db, uploads.map((file) => file.safePath));
 		} catch (error: unknown) {
 			return corsResponse({
@@ -212,7 +210,6 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket, db
 
 	let storedFiles = new Map<string, FileStorageRow>();
 	try {
-		await ensureSyncMetadata(db);
 		storedFiles = await loadStoredFileRows(db, paths);
 		const declaredTotal = Array.from(storedFiles.values())
 			.reduce((total, file) => total + file.size, 0);
@@ -336,7 +333,6 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 	let previousFiles = new Map<string, FileStorageRow>();
 	if (validFiles.length > 0) {
 		try {
-			await ensureSyncMetadata(db);
 			previousFiles = await loadStoredFileRows(db, validFiles.map((file) => file.path));
 		} catch (error: unknown) {
 			return corsResponse({
