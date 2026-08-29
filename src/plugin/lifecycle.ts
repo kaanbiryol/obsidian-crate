@@ -74,8 +74,9 @@ async function restoreManagedWorkerConnection(plugin: CratePlugin): Promise<void
     return;
   }
 
-  plugin.settings.workerUrl = `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`;
-  await plugin.saveSettings();
+  await plugin.writeSettings({
+    workerUrl: `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`,
+  });
 }
 
 async function initializePluginSync(plugin: CratePlugin): Promise<void> {

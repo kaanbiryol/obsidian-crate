@@ -271,13 +271,11 @@ describe('reminderRepository.update and today view', () => {
 		const completed = await repository.complete('r1');
 		expect(spies.toggleComplete).toHaveBeenNthCalledWith(1, indexedReminder);
 		expect(completed?.completed).toBe(true);
-		expect(completed?.completedAt).toEqual(expect.any(String));
 
 		indexedReminder = { ...indexedReminder, completed: true };
 		const uncompleted = await repository.uncomplete('r1');
 		expect(spies.toggleComplete).toHaveBeenNthCalledWith(2, indexedReminder);
 		expect(uncompleted?.completed).toBe(false);
-		expect(uncompleted?.completedAt).toBeUndefined();
 
 		await repository.reorder('Work', ['r1', 'done']);
 		expect(spies.reorderReminders).toHaveBeenCalledWith('Reminders/Work.md', ['r1', 'done']);

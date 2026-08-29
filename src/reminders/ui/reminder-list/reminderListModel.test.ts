@@ -16,10 +16,7 @@ function makeReminder(overrides: Partial<Reminder>): Reminder {
     dueDate: overrides.dueDate,
     dueDatetime: overrides.dueDatetime,
     recurrence: overrides.recurrence,
-    createdAt: overrides.createdAt || "2026-01-01T00:00:00.000Z",
-    updatedAt: overrides.updatedAt || "2026-01-01T00:00:00.000Z",
     description: overrides.description,
-    completedAt: overrides.completedAt,
     fileLink: overrides.fileLink,
     lineNumber: overrides.lineNumber,
   };

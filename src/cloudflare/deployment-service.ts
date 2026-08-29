@@ -24,7 +24,7 @@ const OAUTH_SESSION_MAX_AGE_MS = 10 * 60 * 1000;
 
 interface DeploymentSettingsOwner {
 	settings: CrateSettings;
-	saveSettings(): Promise<void>;
+	writeSettings(update: Partial<CrateSettings>): Promise<void>;
 }
 
 interface PendingOAuthSession {
@@ -99,7 +99,9 @@ export class CloudflareDeploymentService {
 
 	async startDeployment(): Promise<void> {
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
-		const metadata = existingMetadata ?? createCloudflareDeploymentMetadata();
+		const metadata = existingMetadata
+			? { ...existingMetadata }
+			: createCloudflareDeploymentMetadata();
 
 		const { verifier, challenge } = await createPkcePair();
 		const state = randomBase64Url(32);
@@ -201,7 +203,8 @@ export class CloudflareDeploymentService {
 	}
 
 	private async persistMetadata(metadata: CloudflareDeploymentMetadata): Promise<void> {
-		this.options.settingsOwner.settings.cloudflareDeployment = metadata;
-		await this.options.settingsOwner.saveSettings();
+		await this.options.settingsOwner.writeSettings({
+			cloudflareDeployment: { ...metadata },
+		});
 	}
 }

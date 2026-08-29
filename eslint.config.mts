@@ -57,7 +57,10 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['src/cloudflare/callback-page.test.ts'],
+		files: [
+			'src/cloudflare/callback-page.test.ts',
+			'src/cloudflare/worker/pwa.test.ts',
+		],
 		rules: {
 			'import/no-nodejs-modules': 'off',
 		},

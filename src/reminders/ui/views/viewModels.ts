@@ -52,13 +52,7 @@ export function buildInboxViewModel(reminders: Reminder[]): {
 
   return {
     active: sorted.filter((reminder) => !reminder.completed),
-    completed: sorted
-      .filter((reminder) => reminder.completed)
-      .sort((left, right) => {
-        const leftTime = left.updatedAt ? new Date(left.updatedAt).getTime() : 0;
-        const rightTime = right.updatedAt ? new Date(right.updatedAt).getTime() : 0;
-        return rightTime - leftTime;
-      }),
+    completed: sorted.filter((reminder) => reminder.completed),
   };
 }
 

@@ -170,8 +170,6 @@ export async function updateReminderInMarkdown(
         completed: reminder.completed,
         project: newProject,
         recurrence: newRecurrence,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
         contentHash: movedReminder.contentHash,
       };
       triggerReminderChange(context, updatedReminder, "update");
@@ -248,8 +246,6 @@ export async function updateReminderInMarkdown(
       completed: reminder.completed,
       project: newProject || "Inbox",
       recurrence: newRecurrence,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
       contentHash,
     };
     triggerReminderChange(context, updatedReminder, "update");

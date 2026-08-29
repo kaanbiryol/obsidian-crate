@@ -1,8 +1,6 @@
 import type { App, TFile } from "obsidian";
-import type { Reminder } from "@/reminders/types/reminder";
 import { createLogger } from "@/reminders/utils/logger";
-import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
-import type { IndexedReminder, ReminderIndex } from "../reminder-index";
+import type { ReminderIndex } from "../reminder-index";
 import { getInitialProjectFileContent } from "../../core/markdownReminderFile";
 import {
   getReminderProjectFilePath,
@@ -70,20 +68,4 @@ export async function getOrCreateProjectFile(
   }
 
   return file;
-}
-
-export function toReminder(indexed: IndexedReminder): Reminder {
-  return {
-    id: indexed.id,
-    content: indexed.content,
-    description: indexed.description,
-    dueDate: indexed.dueDate,
-    dueDatetime: indexed.dueDatetime,
-    priority: indexed.priority,
-    completed: indexed.completed,
-    project: indexed.project || "Inbox",
-    recurrence: normalizeRecurrenceRule(indexed.recurrence),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
 }

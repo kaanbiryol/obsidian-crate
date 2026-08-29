@@ -24,8 +24,6 @@ export function toReminderPayload(reminder: RemoteReminderRecord): Record<string
 		recurrence: reminder.recurrence,
 		filePath: reminder.filePath,
 		lineNumber: reminder.lineNumber,
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
 		projectColor: getProjectColor(reminder.project),
 	};
 }

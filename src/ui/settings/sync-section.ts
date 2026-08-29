@@ -1,7 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
-import { configureSyncLogger } from '../../plugin/logger';
-import type { SyncState } from '../../plugin/types';
+import { configureSyncLogger, errorMessage } from '../../plugin/logger';
+import type { CrateSettings, SyncState } from '../../plugin/types';
 import { createFileSyncProgress, hideFileSyncProgress, runButtonTask, showFileSyncProgress, updateFileSyncProgress } from './action-helpers';
 import { createSettingsSectionHeading } from './section-helpers';
 
@@ -14,6 +14,16 @@ export interface SyncSectionContext {
 export function renderSyncSection(context: SyncSectionContext): () => void {
 	const { containerEl, plugin, rerender } = context;
 	const isSyncing = plugin.syncRuntime.getState().status === 'syncing';
+	const persistSettings = async (update: Partial<CrateSettings>): Promise<boolean> => {
+		try {
+			await plugin.writeSettings(update);
+			return true;
+		} catch (error) {
+			new Notice(`Failed to save sync settings: ${errorMessage(error)}`);
+			rerender();
+			return false;
+		}
+	};
 
 	createSettingsSectionHeading(containerEl, 'Sync');
 
@@ -98,8 +108,7 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.syncOnStartup)
 			.onChange(async (value) => {
-				plugin.settings.syncOnStartup = value;
-				await plugin.saveSettings();
+				await persistSettings({ syncOnStartup: value });
 			}));
 
 	new Setting(containerEl)
@@ -108,8 +117,7 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.syncOnResume)
 			.onChange(async (value) => {
-				plugin.settings.syncOnResume = value;
-				await plugin.saveSettings();
+				await persistSettings({ syncOnResume: value });
 			}));
 
 	new Setting(containerEl)
@@ -120,9 +128,9 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 			.onChange(async (value) => {
 				const interval = parseInt(value, 10);
 				if (!isNaN(interval) && interval >= 0) {
-					plugin.settings.syncInterval = interval;
-					await plugin.saveSettings();
-					plugin.syncRuntime.updateSyncSettings();
+					if (await persistSettings({ syncInterval: interval })) {
+						plugin.syncRuntime.updateSyncSettings();
+					}
 				}
 			}));
 
@@ -133,12 +141,13 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 			text
 				.setValue(plugin.settings.ignorePatterns.join('\n'))
 				.onChange(async (value) => {
-					plugin.settings.ignorePatterns = value
+					const ignorePatterns = value
 						.split('\n')
 						.map(p => p.trim())
 						.filter(p => p.length > 0);
-					await plugin.saveSettings();
-					plugin.syncRuntime.updateSyncSettings();
+					if (await persistSettings({ ignorePatterns })) {
+						plugin.syncRuntime.updateSyncSettings();
+					}
 				});
 			text.inputEl.rows = 6;
 			text.inputEl.cols = 40;
@@ -150,9 +159,9 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.showStatusBar)
 			.onChange(async (value) => {
-				plugin.settings.showStatusBar = value;
-				await plugin.saveSettings();
-				plugin.syncRuntime.updateStatusBar(value);
+				if (await persistSettings({ showStatusBar: value })) {
+					plugin.syncRuntime.updateStatusBar(value);
+				}
 			}));
 
 	new Setting(containerEl)
@@ -163,8 +172,7 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 			.onChange(async (value) => {
 				const delay = parseInt(value, 10);
 				if (!isNaN(delay) && delay >= 0) {
-					plugin.settings.debounceDelay = delay;
-					await plugin.saveSettings();
+					await persistSettings({ debounceDelay: delay });
 				}
 			}));
 
@@ -174,9 +182,9 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.syncDebugLogging)
 			.onChange(async (value) => {
-				plugin.settings.syncDebugLogging = value;
-				await plugin.saveSettings();
-				configureSyncLogger({ enabled: value });
+				if (await persistSettings({ syncDebugLogging: value })) {
+					configureSyncLogger({ enabled: value });
+				}
 			}));
 
 	return cleanup;

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { OPEN_OBSIDIAN_HTML, SERVICE_WORKER_JS, createManifestJson, createPwaHtml, createPwaVersionJson } from './pwa';
+import { Script } from 'node:vm';
+import {
+	OPEN_OBSIDIAN_HTML,
+	OPEN_OBSIDIAN_JS,
+	PWA_THEME_BOOTSTRAP_JS,
+	SERVICE_WORKER_JS,
+	createManifestJson,
+	createPwaHtml,
+	createPwaVersionJson,
+} from './pwa';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import { PWA_CHROME_COLOR } from './pwa/pwa-params';
 
@@ -127,17 +136,19 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
 		expect(html).toContain('<meta id="pwa-theme-color" name="theme-color" content="#0b0b0d">');
 		expect(html).toContain('<style id="pwa-light-theme" media="not all">');
-		expect(html).toContain('localStorage.getItem("crate-reminders-theme")');
-		expect(html).toContain("lightTheme.media=preference==='light'?'all':preference==='dark'?'not all':\"(prefers-color-scheme: light)\"");
+		expect(html).toContain('<script src="/notifications/theme-bootstrap.js?v=');
+		expect(html).not.toContain('<script>');
+		expect(PWA_THEME_BOOTSTRAP_JS).toContain('localStorage.getItem("crate-reminders-theme")');
+		expect(PWA_THEME_BOOTSTRAP_JS).toContain("lightTheme.media=preference==='light'?'all':preference==='dark'?'not all':\"(prefers-color-scheme: light)\"");
 		expect(html).toContain('<link rel="icon" type="image/png" sizes="192x192" href="/notifications/crate-icon-192.png?v=');
 		expect(html).toContain('<link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=');
 		expect(html).toContain('<link rel="apple-touch-startup-image" href="/notifications/apple-startup-1206x2622.png?v=');
 		expect(html).toContain('media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"');
 		expect(html).toContain('media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"');
 		expect(html).toContain('media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"');
-		expect(html).toContain('(prefers-color-scheme: light)');
-		expect(html).toContain("preference==='dark'?'not all'");
-		expect(html.indexOf('<div id="app"><div class="pwa-bootstrap-shell"')).toBeLessThan(html.indexOf('localStorage.getItem("crate-reminders-theme")'));
+		expect(PWA_THEME_BOOTSTRAP_JS).toContain('(prefers-color-scheme: light)');
+		expect(PWA_THEME_BOOTSTRAP_JS).toContain("preference==='dark'?'not all'");
+		expect(html.indexOf('<div id="app"><div class="pwa-bootstrap-shell"')).toBeLessThan(html.indexOf('/notifications/theme-bootstrap.js'));
 		expect(html).toContain('--pwa-launch-bg:#f7f7f8;');
 		expect(html).toContain('<meta name="format-detection" content="telephone=no,date=no,email=no,address=no">');
 		expect(html).toContain('height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
@@ -206,6 +217,9 @@ describe('PWA activation metadata', () => {
 		expect(OPEN_OBSIDIAN_HTML).toContain('body{background:#f7f7f8;color:#18181b}');
 		expect(OPEN_OBSIDIAN_HTML).toContain('.btn{background:#6d28d9;color:#fff}');
 		expect(OPEN_OBSIDIAN_HTML).toContain('p{color:#52525b}');
+		expect(OPEN_OBSIDIAN_HTML).toContain('<script src="/notifications/open-obsidian.js?v=');
+		expect(OPEN_OBSIDIAN_HTML).not.toContain('<script>');
+		expect(OPEN_OBSIDIAN_JS).toContain("var project = params.get('project')");
 	});
 
 	it('keeps library-backed sheets fixed while their inner fields handle scrolling', () => {
@@ -277,12 +291,15 @@ describe('PWA activation metadata', () => {
 	});
 
 	it('ships an offline-capable installed app shell service worker', () => {
+		expect(() => new Script(SERVICE_WORKER_JS)).not.toThrow();
+		expect(SERVICE_WORKER_JS.endsWith('`')).toBe(false);
 		expect(SERVICE_WORKER_JS).toContain("const PWA_SHELL_CACHE = 'crate-reminders-shell-");
 		expect(SERVICE_WORKER_JS).toContain("const PWA_SHELL_URL = '/notifications'");
 		expect(SERVICE_WORKER_JS).toContain("cache.addAll(PWA_PRECACHE_URLS)");
 		expect(SERVICE_WORKER_JS).toContain("event.request.mode === 'navigate' || url.pathname === PWA_SHELL_URL");
 		expect(SERVICE_WORKER_JS).toContain("return caches.match(PWA_SHELL_URL).then(function(cached)");
 		expect(SERVICE_WORKER_JS).toContain("url.pathname === '/notifications/app.js'");
+		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/theme-bootstrap.js'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/icon.svg'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-icon-192.png'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-icon-512.png'");
@@ -291,6 +308,12 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-startup-1179x2556.png'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-startup-1206x2622.png'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-startup-1290x2796.png'");
+	});
+
+	it('ships parseable external scripts under the strict PWA CSP', () => {
+		expect(() => new Script(PWA_THEME_BOOTSTRAP_JS)).not.toThrow();
+		expect(() => new Script(OPEN_OBSIDIAN_JS)).not.toThrow();
+		expect(OPEN_OBSIDIAN_HTML.endsWith('`')).toBe(false);
 	});
 
 	it('deep links notification clicks to the reminder and project', () => {

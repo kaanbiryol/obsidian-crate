@@ -189,6 +189,12 @@ export function createReminderIndex(app: App, remindersFolderPath: string): Remi
       log.info(` Rescanning file: ${filePath}`);
       fileRescanTimestamps.set(filePath, now);
 
+      const result = await scanFile(app, file, remindersFolderPath);
+      if (result.error) {
+        log.error(` Keeping the previous reminder index for ${filePath}: ${result.error}`);
+        return;
+      }
+
       discoveredProjects.add(getProjectFromPath(filePath, remindersFolderPath));
 
       const persistedReminders = lookupStore.getByFile(filePath);
@@ -197,7 +203,6 @@ export function createReminderIndex(app: App, remindersFolderPath: string): Remi
       lookupStore.removeFile(filePath);
       reminders = reminders.filter((reminder) => reminder.filePath !== filePath);
 
-      const result = await scanFile(app, file, remindersFolderPath);
       reminders.push(...result.reminders);
       lookupStore.addReminders(result.reminders);
       notifyListeners();

@@ -297,6 +297,33 @@ describe('worker entrypoint', () => {
 		expect(response.headers.get('Service-Worker-Allowed')).toBe('/notifications');
 	});
 
+	it('serves PWA scripts from same-origin assets under a strict CSP', async () => {
+		const pageResponse = await worker.fetch(
+			new Request('https://worker.test/notifications'),
+			createEnv() as never,
+		);
+		const handoffResponse = await worker.fetch(
+			new Request('https://worker.test/notifications/open-obsidian?project=Work'),
+			createEnv() as never,
+		);
+		const themeScriptResponse = await worker.fetch(
+			new Request(`https://worker.test/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}`),
+			createEnv() as never,
+		);
+		const handoffScriptResponse = await worker.fetch(
+			new Request(`https://worker.test/notifications/open-obsidian.js?v=${PWA_ASSET_VERSION}`),
+			createEnv() as never,
+		);
+
+		expect(pageResponse.headers.get('Content-Security-Policy')).toContain("script-src 'self';");
+		expect(pageResponse.headers.get('Content-Security-Policy')).not.toContain("script-src 'self' 'unsafe-inline'");
+		expect(handoffResponse.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
+		expect(await pageResponse.text()).not.toContain('<script>');
+		expect(await handoffResponse.text()).not.toContain('<script>');
+		expect(themeScriptResponse.headers.get('Content-Type')).toBe('application/javascript; charset=utf-8');
+		expect(handoffScriptResponse.headers.get('Content-Type')).toBe('application/javascript; charset=utf-8');
+	});
+
 	it('uses immutable caching for versioned PWA app assets only', async () => {
 		const versionedAppResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/app.js?v=${PWA_ASSET_VERSION}`),
@@ -304,6 +331,10 @@ describe('worker entrypoint', () => {
 		);
 		const unversionedAppResponse = await worker.fetch(
 			new Request('https://worker.test/notifications/app.js'),
+			createEnv() as never,
+		);
+		const versionedThemeResponse = await worker.fetch(
+			new Request(`https://worker.test/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}`),
 			createEnv() as never,
 		);
 		const versionedIconResponse = await worker.fetch(
@@ -325,6 +356,7 @@ describe('worker entrypoint', () => {
 
 		expect(versionedAppResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(unversionedAppResponse.headers.get('Cache-Control')).toBe('no-store');
+		expect(versionedThemeResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedCrateIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedCrateIconResponse.headers.get('Content-Type')).toBe('image/png');

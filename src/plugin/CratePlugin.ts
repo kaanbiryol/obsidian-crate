@@ -58,8 +58,17 @@ export default class CratePlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		const normalizedSettings = normalizeCrateSettings(this.settings, this.app.vault.configDir);
+		await this.saveData(buildPersistedCrateSettings(normalizedSettings));
 		Object.assign(this.settings, normalizedSettings);
-		await this.saveData(buildPersistedCrateSettings(this.settings));
+	}
+
+	async writeSettings(update: Partial<CrateSettings>): Promise<void> {
+		const nextSettings = normalizeCrateSettings(
+			{ ...this.settings, ...update },
+			this.app.vault.configDir,
+		);
+		await this.saveData(buildPersistedCrateSettings(nextSettings));
+		Object.assign(this.settings, nextSettings);
 	}
 
 	async loadRemindersSettings(): Promise<void> {

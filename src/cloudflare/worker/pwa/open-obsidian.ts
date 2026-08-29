@@ -1,3 +1,13 @@
+import { PWA_ASSET_VERSION } from '../pwa-version';
+
+export const OPEN_OBSIDIAN_JS = `(()=>{
+var params = new URLSearchParams(location.search);
+var project = params.get('project');
+var uri = project ? 'obsidian://crate-reminders?project=' + encodeURIComponent(project) : 'obsidian://crate-reminders';
+document.getElementById('open-link').href = uri;
+window.location.href = uri;
+})();`;
+
 export const OPEN_OBSIDIAN_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27,12 +37,6 @@ p{color:#52525b}
 <a id="open-link" href="obsidian://open" class="btn">Open Obsidian</a>
 <p>If Obsidian didn't open automatically, tap the button above.</p>
 </div>
-<script>
-var params = new URLSearchParams(location.search);
-var project = params.get('project');
-var uri = project ? 'obsidian://crate-reminders?project=' + encodeURIComponent(project) : 'obsidian://crate-reminders';
-document.getElementById('open-link').href = uri;
-window.location.href = uri;
-</script>
+<script src="/notifications/open-obsidian.js?v=${PWA_ASSET_VERSION}"></script>
 </body>
-</html>\``;
+</html>`;

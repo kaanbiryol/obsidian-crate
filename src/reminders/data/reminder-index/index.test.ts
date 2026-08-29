@@ -16,6 +16,7 @@ type ScanFileResult = {
   filePath: string;
   reminders: IndexedReminder[];
   lineCount: number;
+  error?: string;
 };
 
 function makeMockFile(path: string): TFile {
@@ -313,5 +314,35 @@ describe('reminderIndex', () => {
     expect(index.getAll().map((reminder) => reminder.id)).toEqual(['r1']);
     expect(index.getById('r1')?.content).toBe('Persisted task');
     expect(index.getById('r2')).toBeUndefined();
+  });
+
+  it('preserves the last-known-good index when a file rescan fails', async () => {
+    vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+      reminders: [
+        makeReminder({ id: 'r1', content: 'Persisted task', filePath: 'Reminders/Work.md', project: 'Work' }),
+      ],
+      filesScanned: 1,
+      totalLines: 1,
+      scanDurationMs: 5,
+      discoveredProjects: ['Work'],
+    });
+    vi.mocked(vaultScanner.isInRemindersFolder).mockReturnValue(true);
+    vi.mocked(vaultScanner.scanFile).mockResolvedValue({
+      filePath: 'Reminders/Work.md',
+      reminders: [],
+      lineCount: 0,
+      error: 'read failed',
+    });
+
+    const index = createReminderIndex(app, 'Reminders');
+    const listener = vi.fn();
+    index.onIndexChange(listener);
+    await index.load();
+    listener.mockClear();
+
+    await index.rescanFile(makeMockFile('Reminders/Work.md'), true);
+
+    expect(index.getById('r1')?.content).toBe('Persisted task');
+    expect(listener).not.toHaveBeenCalled();
   });
 });

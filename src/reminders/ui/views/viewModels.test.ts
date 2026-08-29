@@ -22,10 +22,7 @@ function makeReminder(overrides: Partial<Reminder>): Reminder {
     dueDate: overrides.dueDate,
     dueDatetime: overrides.dueDatetime,
     recurrence: overrides.recurrence,
-    createdAt: overrides.createdAt || "2026-01-01T00:00:00.000Z",
-    updatedAt: overrides.updatedAt || "2026-01-01T00:00:00.000Z",
     description: overrides.description,
-    completedAt: overrides.completedAt,
     fileLink: overrides.fileLink,
     lineNumber: overrides.lineNumber,
   };
@@ -36,11 +33,11 @@ describe("reminder view models", () => {
     vi.useRealTimers();
   });
 
-  it("puts the most recently completed inbox reminder first", () => {
+  it("keeps completed inbox reminders in file order", () => {
     const viewModel = buildInboxViewModel([
       makeReminder({ id: "b", project: "Inbox", lineNumber: 2 }),
-      makeReminder({ id: "a", project: "Inbox", lineNumber: 1, completed: true, updatedAt: "2026-01-03T00:00:00.000Z" }),
-      makeReminder({ id: "c", project: "Inbox", lineNumber: 3, completed: true, updatedAt: "2026-01-02T00:00:00.000Z" }),
+      makeReminder({ id: "c", project: "Inbox", lineNumber: 3, completed: true }),
+      makeReminder({ id: "a", project: "Inbox", lineNumber: 1, completed: true }),
       makeReminder({ id: "other", project: "Work" }),
     ]);
 

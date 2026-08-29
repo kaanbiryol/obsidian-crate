@@ -24,9 +24,13 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 		.addToggle(toggle => {
 			toggle.setValue(plugin.settings.pushEnabled)
 				.onChange(async (value) => {
-					plugin.settings.pushEnabled = value;
-					await plugin.saveSettings();
-					context.rerender();
+					try {
+						await plugin.writeSettings({ pushEnabled: value });
+						context.rerender();
+					} catch (error) {
+						new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
+						toggle.setValue(plugin.settings.pushEnabled);
+					}
 				});
 		});
 

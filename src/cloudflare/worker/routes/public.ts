@@ -12,7 +12,9 @@ import {
 	handleManifest,
 	handleNotificationsPage,
 	handleOpenObsidian,
+	handleOpenObsidianScript,
 	handlePwaApp,
+	handlePwaThemeBootstrap,
 	handlePwaVersion,
 	handleServiceWorker,
 	handleSubscribe,
@@ -34,6 +36,7 @@ export async function handlePublicRoute(
 	if (path === '/' && method === 'GET') return handleServerInfo();
 	if (path === '/notifications' && method === 'GET') return handleNotificationsPage(request);
 	if (path === '/notifications/app.js' && method === 'GET') return handlePwaApp(request);
+	if (path === '/notifications/theme-bootstrap.js' && method === 'GET') return handlePwaThemeBootstrap(request);
 	if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
 	if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest(request);
 	if (path === '/notifications/version.json' && method === 'GET') return handlePwaVersion();
@@ -46,6 +49,7 @@ export async function handlePublicRoute(
 	if (path === '/notifications/apple-startup-1206x2622.png' && method === 'GET') return handleAppleStartup1206x2622(request);
 	if (path === '/notifications/apple-startup-1290x2796.png' && method === 'GET') return handleAppleStartup1290x2796(request);
 	if (path === '/notifications/open-obsidian' && method === 'GET') return handleOpenObsidian();
+	if (path === '/notifications/open-obsidian.js' && method === 'GET') return handleOpenObsidianScript(request);
 	if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);
 	if (path === '/notifications/reminders-exchange' && method === 'POST') {
 		return await withDatabase(db, requiredDb => handleExchangeRemindersEnrollmentToken(request, requiredDb));

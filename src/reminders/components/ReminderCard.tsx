@@ -54,8 +54,6 @@ interface ReminderData {
     dueDate?: string;
     priority?: number;
     project?: string;
-    updated_at?: string;
-    updatedAt?: string;
     recurrence?: RecurrenceRule;
 }
 

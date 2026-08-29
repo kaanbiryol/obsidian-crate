@@ -30,6 +30,9 @@ export function createPwaPreviewServer({ assets, origin }) {
 		CRATE_ICON_512_PNG,
 		CRATE_MARK_256_PNG,
 		PWA_APP_JS,
+		PWA_THEME_BOOTSTRAP_JS,
+		OPEN_OBSIDIAN_HTML,
+		OPEN_OBSIDIAN_JS,
 		SERVICE_WORKER_JS,
 		ICON_SVG,
 		createManifestJson,
@@ -69,10 +72,25 @@ export function createPwaPreviewServer({ assets, origin }) {
 			return;
 		}
 
+		if (method === 'GET' && path === '/notifications/theme-bootstrap.js') {
+			sendText(res, 200, PWA_THEME_BOOTSTRAP_JS, 'application/javascript; charset=utf-8');
+			return;
+		}
+
 		if (method === 'GET' && path === '/notifications/sw.js') {
 			sendText(res, 200, SERVICE_WORKER_JS, 'application/javascript; charset=utf-8', {
 				'Service-Worker-Allowed': '/notifications',
 			});
+			return;
+		}
+
+		if (method === 'GET' && path === '/notifications/open-obsidian') {
+			sendText(res, 200, OPEN_OBSIDIAN_HTML, 'text/html; charset=utf-8');
+			return;
+		}
+
+		if (method === 'GET' && path === '/notifications/open-obsidian.js') {
+			sendText(res, 200, OPEN_OBSIDIAN_JS, 'application/javascript; charset=utf-8');
 			return;
 		}
 

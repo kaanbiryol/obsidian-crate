@@ -14,8 +14,6 @@ function makeReminder(overrides: Partial<Reminder> = {}): Reminder {
 		priority: 4,
 		completed: false,
 		project: 'Inbox',
-		createdAt: '2026-01-01T00:00:00.000Z',
-		updatedAt: '2026-01-01T00:00:00.000Z',
 		...overrides,
 	};
 }

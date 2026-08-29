@@ -1,4 +1,5 @@
 import net from 'node:net';
+import { Script } from 'node:vm';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 
@@ -35,6 +36,8 @@ try {
 	const pageHtml = await pageResponse.text();
 	if (!pageHtml.includes('<div id="app"><div class="pwa-bootstrap-shell"')) throw new Error('PWA page is missing the themed loading shell');
 	if (!pageHtml.includes('/notifications/app.js?v=')) throw new Error('PWA page is missing the versioned app script');
+	if (!pageHtml.includes('/notifications/theme-bootstrap.js?v=')) throw new Error('PWA page is missing the theme bootstrap script');
+	if (pageHtml.includes('<script>')) throw new Error('PWA page contains an inline script');
 	if (!pageHtml.includes('/notifications/apple-startup-1206x2622.png?v=')) throw new Error('PWA page is missing the iPhone startup image');
 
 	const manifestResponse = await fetchOk(`${origin}/notifications/manifest.json?token=preview-install-token&folder=Reminders&upcomingDays=7`);
@@ -47,12 +50,23 @@ try {
 	const appJs = await appResponse.text();
 	if (appJs.length < 100_000) throw new Error(`PWA app bundle is unexpectedly small: ${appJs.length} bytes`);
 
+	const themeResponse = await fetchOk(`${origin}/notifications/theme-bootstrap.js?v=smoke`);
+	new Script(await themeResponse.text());
+
 	const serviceWorkerResponse = await fetchOk(`${origin}/notifications/sw.js`);
 	if (serviceWorkerResponse.headers.get('service-worker-allowed') !== '/notifications') {
 		throw new Error('Service worker scope header is missing');
 	}
 	const serviceWorkerJs = await serviceWorkerResponse.text();
 	if (!serviceWorkerJs.includes('crate-reminders-shell-')) throw new Error('Service worker shell cache name is missing');
+	new Script(serviceWorkerJs);
+
+	const handoffResponse = await fetchOk(`${origin}/notifications/open-obsidian?project=Work`);
+	const handoffHtml = await handoffResponse.text();
+	if (!handoffHtml.includes('/notifications/open-obsidian.js?v=')) throw new Error('Obsidian handoff page is missing its external script');
+	if (handoffHtml.includes('<script>')) throw new Error('Obsidian handoff page contains an inline script');
+	const handoffScriptResponse = await fetchOk(`${origin}/notifications/open-obsidian.js?v=smoke`);
+	new Script(await handoffScriptResponse.text());
 
 	for (const [path, minimumBytes] of [
 		['/notifications/crate-mark-256.png?v=smoke', 5_000],

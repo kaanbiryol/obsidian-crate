@@ -7,24 +7,7 @@ import {
   parseReminderDateValue,
 } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
-
-/** Convert the indexed Markdown representation into the UI-facing reminder model. */
-export function toReminder(indexed: IndexedReminder): Reminder {
-  return {
-    id: indexed.id,
-    content: indexed.content,
-    description: indexed.description,
-    dueDate: indexed.dueDate,
-    dueDatetime: indexed.dueDatetime,
-    priority: indexed.priority,
-    completed: indexed.completed,
-    project: indexed.project || "Inbox",
-    recurrence: normalizeRecurrenceRule(indexed.recurrence),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    lineNumber: indexed.lineNumber,
-  };
-}
+import { toReminder } from "../toReminder";
 
 export function getTodayReminderIds(
   activeToday: IndexedReminder[],
@@ -101,8 +84,6 @@ export function buildCreatedReminderFallback(params: {
     completed: false,
     project: params.project,
     recurrence: params.recurrence,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   };
 }
 

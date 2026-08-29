@@ -18,8 +18,6 @@ export interface ReminderRecord {
 	recurrence?: RecurrenceRule;
 	filePath: string;
 	lineNumber?: number;
-	createdAt?: string;
-	updatedAt?: string;
 }
 
 export interface StoredConfig {

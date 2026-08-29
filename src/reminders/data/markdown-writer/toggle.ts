@@ -118,14 +118,11 @@ export async function toggleReminderCompletionInMarkdown(
       id: reminder.id,
       content: reminder.content,
       completed: newCompleted,
-      completedAt: newCompleted ? new Date().toISOString() : undefined,
       priority: reminder.priority,
       project: reminder.project || "Inbox",
       dueDate: newDueDate,
       dueDatetime: newDueDatetime,
       recurrence,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
       contentHash,
     };
     triggerReminderChange(context, updatedReminder, "update", changeContext);

@@ -1,5 +1,6 @@
 import type { ReminderRepositoryContext } from "./types";
-import { getTodayReminderIds, toReminder } from "./shared";
+import { getTodayReminderIds } from "./shared";
+import { toReminder } from "../toReminder";
 
 export function createReminderRepositoryQueries({ index }: ReminderRepositoryContext) {
   return {

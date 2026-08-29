@@ -31,10 +31,11 @@ export interface ScanResult {
   discoveredProjects: string[]; // All projects from file paths, including empty ones
 }
 
-interface FileScanResult {
+export interface FileScanResult {
   filePath: string;
   reminders: IndexedReminder[];
   lineCount: number;
+  error?: string;
 }
 
 export interface ReminderIdNormalizationResult {
@@ -146,6 +147,7 @@ export async function scanFile(
       filePath,
       reminders: [],
       lineCount: 0,
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }
@@ -186,6 +188,7 @@ export async function scanVault(
     );
 
     for (const result of results) {
+      if (result.error) continue;
       allReminders.push(...result.reminders);
       totalLines += result.lineCount;
     }

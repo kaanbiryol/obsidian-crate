@@ -16,6 +16,8 @@ import {
 	SERVICE_WORKER_JS,
 	ICON_SVG,
 	OPEN_OBSIDIAN_HTML,
+	OPEN_OBSIDIAN_JS,
+	PWA_THEME_BOOTSTRAP_JS,
 	createManifestJson,
 	createPwaHtml,
 	createPwaVersionJson,
@@ -105,13 +107,21 @@ export function handleServiceWorker(): Response {
 }
 
 export function handlePwaApp(request: Request): Response {
-	return new Response(PWA_APP_JS, {
+	return javascriptAssetResponse(request, PWA_APP_JS);
+}
+
+function javascriptAssetResponse(request: Request, source: string): Response {
+	return new Response(source, {
 		headers: {
 			'Content-Type': 'application/javascript; charset=utf-8',
 			...versionedAssetHeaders(request),
 			...corsHeaders(),
 		},
 	});
+}
+
+export function handlePwaThemeBootstrap(request: Request): Response {
+	return javascriptAssetResponse(request, PWA_THEME_BOOTSTRAP_JS);
 }
 
 export function handleManifest(request: Request): Response {
@@ -141,6 +151,10 @@ export function handleOpenObsidian(): Response {
 			...htmlSecurityHeaders(),
 		},
 	});
+}
+
+export function handleOpenObsidianScript(request: Request): Response {
+	return javascriptAssetResponse(request, OPEN_OBSIDIAN_JS);
 }
 
 export function handleIcon(request: Request): Response {

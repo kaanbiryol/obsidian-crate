@@ -70,8 +70,11 @@ function App() {
 	usePwaZoomLock();
 
 	useEffect(() => {
-		void registerPwaServiceWorker().catch(() => undefined);
-	}, []);
+		void registerPwaServiceWorker().catch((error: unknown) => {
+			const message = error instanceof Error ? error.message : String(error);
+			showToast('error', `Offline support could not start: ${message}`);
+		});
+	}, [showToast]);
 
 	const apiFetch = useMemo(
 		() => makeApiFetch(authToken, () => handleUnauthorizedRef.current()),

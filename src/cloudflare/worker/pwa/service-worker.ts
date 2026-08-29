@@ -6,6 +6,7 @@ const PWA_SHELL_URL = '/notifications';
 const PWA_PRECACHE_URLS = [
 	PWA_SHELL_URL,
 	'/notifications/app.js?v=${PWA_ASSET_VERSION}',
+	'/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}',
 	'/notifications/crate-icon-192.png?v=${PWA_ASSET_VERSION}',
 	'/notifications/crate-icon-512.png?v=${PWA_ASSET_VERSION}',
 	'/notifications/crate-mark-256.png?v=${PWA_ASSET_VERSION}',
@@ -73,6 +74,7 @@ self.addEventListener('fetch', function(event) {
 
 	if (
 		url.pathname === '/notifications/app.js'
+		|| url.pathname === '/notifications/theme-bootstrap.js'
 		|| url.pathname === '/notifications/icon.svg'
 		|| url.pathname === '/notifications/crate-icon-192.png'
 		|| url.pathname === '/notifications/crate-icon-512.png'
@@ -155,4 +157,4 @@ self.addEventListener('notificationclick', function(event) {
 self.addEventListener('pushsubscriptionchange', function() {
 	// Re-subscription is handled by the app the next time it opens.
 });
-\``;
+`;

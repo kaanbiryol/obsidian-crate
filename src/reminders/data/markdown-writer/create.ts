@@ -89,8 +89,6 @@ export async function createReminderInMarkdown(
       completed: false,
       project: normalizedProject,
       recurrence: normalizedRecurrence,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
       contentHash,
     };
     triggerReminderChange(context, reminder, "create");

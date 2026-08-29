@@ -52,4 +52,36 @@ describe('CratePlugin settings persistence', () => {
 			workerUrl: 'https://crate.example.workers.dev',
 		}));
 	});
+
+	it('applies proposed settings only after persistence succeeds', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const saveData = vi.fn(async () => {});
+		const settings = normalizeCrateSettings({}, 'vault-config');
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			saveData,
+			settings,
+		});
+
+		await plugin.writeSettings({ syncInterval: 120 });
+
+		expect(plugin.settings).toBe(settings);
+		expect(plugin.settings.syncInterval).toBe(120);
+		expect(saveData).toHaveBeenCalledWith(expect.objectContaining({ syncInterval: 120 }));
+	});
+
+	it('keeps runtime settings unchanged when a proposed write fails', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const settings = normalizeCrateSettings({}, 'vault-config');
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			saveData: vi.fn().mockRejectedValue(new Error('disk full')),
+			settings,
+		});
+
+		await expect(plugin.writeSettings({ syncInterval: 120 })).rejects.toThrow('disk full');
+
+		expect(plugin.settings).toBe(settings);
+		expect(plugin.settings.syncInterval).toBe(300);
+	});
 });

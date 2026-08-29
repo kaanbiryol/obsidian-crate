@@ -1,8 +1,9 @@
 import { createReminderId } from "../../core/reminderIdentity";
-import { buildCreatedReminderFallback, buildCreateReminderArgs, buildReminderUpdate, toReminder } from "./shared";
+import { buildCreatedReminderFallback, buildCreateReminderArgs, buildReminderUpdate } from "./shared";
 import type { ReminderRepositoryContext } from "./types";
 import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
 import { getReminderProjectFilePath } from "@/reminders/core/reminderProjectPath";
+import { toReminder } from "../toReminder";
 
 export function createReminderRepositoryMutations({ index, writer }: ReminderRepositoryContext) {
   return {
@@ -51,7 +52,6 @@ export function createReminderRepositoryMutations({ index, writer }: ReminderRep
         ...params,
         ...(update.hasRecurrenceUpdate ? { recurrence: update.recurrenceUpdate } : {}),
         ...update.storedDates,
-        updatedAt: new Date().toISOString(),
       };
 
       if (updated.recurrence === null) {
@@ -80,7 +80,6 @@ export function createReminderRepositoryMutations({ index, writer }: ReminderRep
       return {
         ...toReminder(indexed),
         completed: true,
-        completedAt: new Date().toISOString(),
       };
     },
 
@@ -95,7 +94,6 @@ export function createReminderRepositoryMutations({ index, writer }: ReminderRep
       return {
         ...toReminder(indexed),
         completed: false,
-        completedAt: undefined,
       };
     },
 

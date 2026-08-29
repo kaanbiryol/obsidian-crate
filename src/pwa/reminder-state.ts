@@ -11,7 +11,6 @@ import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import type { ModalDraft, ReminderMutationBody, ReminderRecord } from './types';
 
 export function toSharedReminder(reminder: ReminderRecord): SharedReminder {
-	const timestamp = reminder.updatedAt ?? reminder.createdAt ?? new Date(0).toISOString();
 	return {
 		id: reminder.id,
 		content: reminder.content,
@@ -24,14 +23,11 @@ export function toSharedReminder(reminder: ReminderRecord): SharedReminder {
 		recurrence: reminder.recurrence,
 		fileLink: reminder.filePath,
 		lineNumber: reminder.lineNumber,
-		createdAt: reminder.createdAt ?? timestamp,
-		updatedAt: timestamp,
 	};
 }
 
 export function buildOptimisticReminder(body: ReminderMutationBody, id: string): ReminderRecord {
 	const project = body.project.trim() || 'Inbox';
-	const timestamp = new Date().toISOString();
 	return {
 		id,
 		content: body.content,
@@ -43,8 +39,6 @@ export function buildOptimisticReminder(body: ReminderMutationBody, id: string):
 		project,
 		recurrence: normalizeRecurrenceRule(body.recurrence ?? undefined),
 		filePath: getReminderProjectFilePath(body.folderPath, project),
-		createdAt: timestamp,
-		updatedAt: timestamp,
 	};
 }
 
@@ -64,7 +58,6 @@ export function applyOptimisticReminderUpdate(reminder: ReminderRecord, body: Re
 		filePath: project === reminder.project
 			? reminder.filePath
 			: getReminderProjectFilePath(body.folderPath, project),
-		updatedAt: new Date().toISOString(),
 	};
 }
 

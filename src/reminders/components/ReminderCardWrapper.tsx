@@ -112,8 +112,6 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
           dueDate: reminder.dueDate,
           priority: reminder.priority,
           project: reminder.project,
-          updated_at: reminder.updatedAt,
-          updatedAt: reminder.updatedAt,
           recurrence: reminder.recurrence,
         }}
         animationConfig={{ enabled: false }}

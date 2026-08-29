@@ -55,8 +55,6 @@ function makeProps(overrides: Record<string, unknown> = {}) {
 			content: 'Task',
 			priority: 4,
 			completed: false,
-			createdAt: '2026-01-01T00:00:00.000Z',
-			updatedAt: '2026-01-01T00:00:00.000Z',
 		}],
 		projects: ['Inbox', 'Work'],
 		showFab: true,

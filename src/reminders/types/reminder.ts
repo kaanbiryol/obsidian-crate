@@ -25,9 +25,6 @@ export interface Reminder {
   completed: boolean;
   project?: string; // Project tag for organizing reminders (defaults to "Inbox")
   fileLink?: string; // Link to the markdown file where this reminder was created
-  createdAt: string; // ISO datetime string
-  updatedAt: string; // ISO datetime string
-  completedAt?: string; // ISO datetime string when completed
   recurrence?: RecurrenceRule; // Optional recurrence rule for recurring reminders
   lineNumber?: number; // Line position in source markdown file (for manual ordering)
 }
@@ -51,7 +48,6 @@ export interface UpdateReminderParams {
   dueDatetime?: string;
   priority?: Priority;
   completed?: boolean;
-  completedAt?: string;
   project?: string; // Project tag
   recurrence?: RecurrenceRule | null; // Optional recurrence rule (null to remove)
 }

@@ -59,7 +59,8 @@ function createHarness() {
 	const persisted: string[] = [];
 	const settingsOwner = {
 		settings,
-		saveSettings: vi.fn(async () => {
+		writeSettings: vi.fn(async (update: Partial<CrateSettings>) => {
+			Object.assign(settingsOwner.settings, update);
 			persisted.push(JSON.stringify(settingsOwner.settings));
 		}),
 	};
@@ -160,6 +161,35 @@ describe('CloudflareDeploymentService', () => {
 		expect(persistedSettings).not.toContain('sensitive-authorization-code');
 		expect(persistedSettings).not.toContain('temporary-access-token');
 		expect(persistedSettings).not.toContain(verifier);
+	});
+
+	it('does not mutate saved deployment metadata when persistence fails', async () => {
+		const harness = createHarness();
+		harness.settings.cloudflareDeployment = {
+			deploymentId: '0123456789abcdef',
+			accountId: null,
+			accountName: null,
+			workerName: 'crate-0123456789abcdef',
+			d1DatabaseName: 'crate-0123456789abcdef',
+			d1DatabaseId: null,
+			r2BucketName: 'crate-0123456789abcdef',
+			workersSubdomain: null,
+			lastDeployedVersion: null,
+			lastDeployedFingerprint: null,
+		};
+		harness.settingsOwner.writeSettings.mockRejectedValueOnce(new Error('disk full'));
+		await harness.service.startDeployment();
+		const state = new URL(harness.opened[0]).searchParams.get('state');
+		if (!state) throw new Error('Missing OAuth state');
+
+		await expect(harness.service.handleCallback({ code: 'code', state }))
+			.rejects.toThrow('disk full');
+
+		expect(harness.settings.cloudflareDeployment).toEqual(expect.objectContaining({
+			accountId: null,
+			accountName: null,
+			lastDeployedVersion: null,
+		}));
 	});
 
 	it('discovers an existing Crate deployment and registers this device through Cloudflare', async () => {

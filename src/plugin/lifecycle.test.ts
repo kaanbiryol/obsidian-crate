@@ -225,10 +225,14 @@ describe('bootstrapPlugin', () => {
 			},
 		};
 		const saveSettings = vi.fn(async () => {});
+		const writeSettings = vi.fn(async (update: Partial<typeof settings>) => {
+			Object.assign(settings, update);
+		});
 		const plugin = createPlugin({
 			settings,
 			loadSettings: vi.fn(async () => {}),
 			saveSettings,
+			writeSettings,
 		});
 		secretStorageHas.mockReturnValue(true);
 		initializeSyncManagers.mockImplementation((target) => {
@@ -243,7 +247,10 @@ describe('bootstrapPlugin', () => {
 		expect(settings.workerUrl).toBe(
 			'https://crate-0123456789abcdef.example-account.workers.dev',
 		);
-		expect(saveSettings).toHaveBeenCalledTimes(1);
+		expect(writeSettings).toHaveBeenCalledWith({
+			workerUrl: 'https://crate-0123456789abcdef.example-account.workers.dev',
+		});
+		expect(saveSettings).not.toHaveBeenCalled();
 	});
 
 	it('stops bootstrapping when core initialization fails', async () => {

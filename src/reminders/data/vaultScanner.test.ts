@@ -106,16 +106,38 @@ describe('vaultScanner', () => {
     expect(result.reminders[0].content).toBe('Task A');
   });
 
-  it('ignores reminder lines that do not have persisted IDs yet', async () => {
+  it('persists missing reminder IDs before indexing them', async () => {
+    const modify = vi.fn().mockResolvedValue(undefined);
     const app = {
       vault: {
         cachedRead: vi.fn().mockResolvedValue('- [ ] Task A\n- [ ] Task A'),
+        modify,
       },
     } as unknown as App;
 
     const file = makeMockFile('Reminders/Work.md');
     const result = await scanFile(app, file, 'Reminders');
 
-    expect(result.reminders).toHaveLength(0);
+    expect(result.error).toBeUndefined();
+    expect(result.reminders).toHaveLength(2);
+    expect(result.reminders[0]?.id).not.toBe(result.reminders[1]?.id);
+    expect(modify).toHaveBeenCalledOnce();
+  });
+
+  it('reports file read failures explicitly', async () => {
+    const app = {
+      vault: {
+        cachedRead: vi.fn().mockRejectedValue(new Error('read failed')),
+      },
+    } as unknown as App;
+
+    const result = await scanFile(app, makeMockFile('Reminders/Work.md'), 'Reminders');
+
+    expect(result).toMatchObject({
+      filePath: 'Reminders/Work.md',
+      reminders: [],
+      lineCount: 0,
+      error: 'read failed',
+    });
   });
 });
