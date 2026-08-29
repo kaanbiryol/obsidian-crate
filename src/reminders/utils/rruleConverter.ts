@@ -25,8 +25,10 @@ export function formatRecurrence(rule: RecurrenceRule): string {
   const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const interval = rule.interval || 1;
-  const hasTime = rule.hour !== undefined && rule.minute !== undefined;
-  const timeStr = hasTime ? ` at ${formatTime(rule.hour!, rule.minute!)}` : '';
+  const { hour, minute } = rule;
+  const timeStr = hour !== undefined && minute !== undefined
+    ? ` at ${formatTime(hour, minute)}`
+    : '';
 
   if (rule.frequency === 'daily') {
     if (interval === 1) {
@@ -90,8 +92,10 @@ function formatTime24(hour: number, minute: number): string {
 export function recurrenceToText(rule: RecurrenceRule): string {
   const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const interval = rule.interval || 1;
-  const hasTime = rule.hour !== undefined && rule.minute !== undefined;
-  const timeStr = hasTime ? ` ${formatTime24(rule.hour!, rule.minute!)}` : '';
+  const { hour, minute } = rule;
+  const timeStr = hour !== undefined && minute !== undefined
+    ? ` ${formatTime24(hour, minute)}`
+    : '';
 
   if (rule.frequency === 'daily') {
     if (interval === 1) {

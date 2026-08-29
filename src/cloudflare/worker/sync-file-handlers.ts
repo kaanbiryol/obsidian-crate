@@ -45,6 +45,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 	if (!request.headers.has('X-Crate-Expected-Hash') || expectedHash === undefined) {
 		return corsResponse({ error: 'Valid X-Crate-Expected-Hash header required' }, 400);
 	}
+	const expectedRemoteHash = expectedHash;
 
 	const contentType = request.headers.get('Content-Type') || 'application/octet-stream';
 
@@ -88,7 +89,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 				hash,
 				size,
 				objectKey,
-				expectedHash: expectedHash!,
+				expectedHash: expectedRemoteHash,
 				previousFile,
 			});
 			if (!commit.committed) {

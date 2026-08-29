@@ -1,5 +1,4 @@
 import type { TAbstractFile } from 'obsidian';
-import { createLogger, errorMessage } from '../plugin/logger';
 import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
 import {
 	clearSyncedPendingPaths as clearSyncedQueuePaths,
@@ -7,19 +6,16 @@ import {
 	onFileChange as queueOnFileChange,
 	onFileDelete as queueOnFileDelete,
 	onFileRename as queueOnFileRename,
-	onRawPathChange as queueOnRawPathChange,
-	processPendingChanges as flushPendingQueueChanges,
 	type QueueDebounceContext,
 	type QueueEventContext,
-	type QueueFlushContext,
 	type QueueReconcileContext,
-	type RawPathKind,
 } from './queue';
-
-const logger = createLogger('SyncQueue');
+import {
+	processPendingChanges as flushPendingQueueChanges,
+	type QueueFlushContext,
+} from './queue-flush';
 
 export interface SyncQueueControllerContext {
-	vault: QueueFlushContext['vault'];
 	api: QueueFlushContext['api'];
 	getLocalManifest(): QueueFlushContext['localManifest'];
 	markdownBaseCache?: QueueFlushContext['markdownBaseCache'];
@@ -31,7 +27,6 @@ export interface SyncQueueControllerContext {
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	getDebounceDelayMs(): number;
-	hasLocalManifestFile(path: string): boolean;
 	uploadConcurrency: number;
 	maxDebounceWaitMs: number;
 }
@@ -54,10 +49,6 @@ export class SyncQueueController {
 
 	getPendingPathCount(): number {
 		return this.pendingPaths.size;
-	}
-
-	onRawFileEvent(path: string): void {
-		void this.handleRawFileEvent(path);
 	}
 
 	onFileChange(file: TAbstractFile): void {
@@ -85,28 +76,6 @@ export class SyncQueueController {
 		this.pendingPaths.clear();
 		this.inFlightPaths.clear();
 		this.pendingRevisions.clear();
-	}
-
-	private async handleRawFileEvent(path: string): Promise<void> {
-		if (this.context.isDestroyed()) return;
-		const kind = await this.getRawPathKind(path);
-		const wasTracked = kind === 'missing' ? this.context.hasLocalManifestFile(path) : false;
-		queueOnRawPathChange(this.getQueueEventContext(), path, { kind, wasTracked });
-	}
-
-	private async getRawPathKind(path: string): Promise<RawPathKind> {
-		try {
-			const stat = await this.context.vault.adapter.stat(path);
-			if (stat?.type === 'file') return 'file';
-			if (stat?.type === 'folder') return 'folder';
-			return 'missing';
-		} catch (error) {
-			logger.warn(
-				`Raw event stat failed for ${path}:`,
-				errorMessage(error),
-			);
-			return 'missing';
-		}
 	}
 
 	private getQueueEventContext(): QueueEventContext {
@@ -146,7 +115,6 @@ export class SyncQueueController {
 			pendingPaths: this.pendingPaths,
 			inFlightPaths: this.inFlightPaths,
 			pendingRevisions: this.pendingRevisions,
-			vault: this.context.vault,
 			api: this.context.api,
 			localManifest: this.context.getLocalManifest(),
 			updateState: (updates: Partial<SyncState>) => this.context.updateState(updates),

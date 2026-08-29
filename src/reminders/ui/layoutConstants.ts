@@ -1,3 +1,5 @@
+import type { Easing } from 'framer-motion';
+
 /**
  * Layout spacing constants for consistent UI measurements
  * These values are shared across the plugin UI for visual consistency
@@ -8,10 +10,10 @@
 // ============================================
 
 // Unified easing curve (expo-out: fast start, gentle settle)
-export const EASE_EXPO_OUT = [0.16, 1, 0.3, 1] as const;
+export const EASE_EXPO_OUT: Easing = [0.16, 1, 0.3, 1];
 
 // Material Design standard easing (used for exits)
-export const EASE_STANDARD = [0.4, 0, 0.2, 1] as const;
+export const EASE_STANDARD: Easing = [0.4, 0, 0.2, 1];
 
 // Unified duration for content transitions
 export const CONTENT_TRANSITION_DURATION = 0.35;

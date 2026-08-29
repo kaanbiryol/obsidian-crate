@@ -151,11 +151,6 @@ export class SyncRuntime {
 		this.statusBar = null;
 	}
 
-	onRawFileEvent(path: string): void {
-		if (!this.acceptingEvents) return;
-		this.syncEngine?.onRawFileEvent(path);
-	}
-
 	onFileChange(file: TAbstractFile): void {
 		if (!this.acceptingEvents) return;
 		this.syncEngine?.onFileChange(file);

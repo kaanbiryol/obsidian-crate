@@ -139,9 +139,13 @@ export class CloudflareApiClient {
 			status?: string;
 			account?: { id?: string; name?: string };
 		}>>('/memberships?status=accepted&per_page=50');
-		return result
-			.filter(item => item.status === 'accepted' && item.account?.id && item.account.name)
-			.map(item => ({ id: item.account!.id!, name: item.account!.name! }));
+		return result.flatMap(item => {
+			const account = item.account;
+			if (item.status !== 'accepted' || !account?.id || !account.name) {
+				return [];
+			}
+			return [{ id: account.id, name: account.name }];
+		});
 	}
 
 	async listWorkers(accountId: string): Promise<CloudflareWorkerScript[]> {

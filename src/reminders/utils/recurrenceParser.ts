@@ -79,7 +79,7 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
         frequency: 'weekly',
         interval: interval > 1 ? interval : undefined,
         daysOfWeek,
-      })!;
+      });
       applyTime(rule, weeklyIntervalDaysMatch[3]);
       return {
         matched: weeklyIntervalDaysMatch[0],
@@ -102,7 +102,7 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
         frequency: 'monthly',
         interval: interval > 1 ? interval : undefined,
         dayOfMonth,
-      })!;
+      });
       applyTime(rule, monthlyIntervalDayMatch[3]);
       return {
         matched: monthlyIntervalDayMatch[0],
@@ -129,7 +129,7 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
     const rule = normalizeRecurrenceRule({
       frequency,
       interval: interval > 1 ? interval : undefined,
-    })!;
+    });
     applyTime(rule, intervalMatch[3]);
     return {
       matched: intervalMatch[0],
@@ -140,7 +140,7 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
   // Pattern 2: "every day" or "daily" (optionally with time)
   const dailyMatch = content.match(new RegExp(`\\b(?:every\\s*day|daily)${timePattern}\\b`, 'i'));
   if (dailyMatch) {
-    const rule = normalizeRecurrenceRule({ frequency: 'daily' })!;
+    const rule = normalizeRecurrenceRule({ frequency: 'daily' });
     applyTime(rule, dailyMatch[1]);
     return {
       matched: dailyMatch[0],
@@ -151,7 +151,7 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
   // Pattern 3: "every week" or "weekly" (optionally with time)
   const weeklyMatch = content.match(new RegExp(`\\b(?:every\\s*week|weekly)${timePattern}\\b`, 'i'));
   if (weeklyMatch) {
-    const rule = normalizeRecurrenceRule({ frequency: 'weekly' })!;
+    const rule = normalizeRecurrenceRule({ frequency: 'weekly' });
     applyTime(rule, weeklyMatch[1]);
     return {
       matched: weeklyMatch[0],
@@ -162,7 +162,7 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
   // Pattern 4: "every month" or "monthly" (optionally with day and/or time)
   const monthlyMatch = content.match(new RegExp(`\\b(?:every\\s*month|monthly)(?:\\s+on\\s+(?:the\\s+)?(\\d{1,2})(?:st|nd|rd|th)?)?${timePattern}\\b`, 'i'));
   if (monthlyMatch) {
-    const rule = normalizeRecurrenceRule({ frequency: 'monthly' })!;
+    const rule = normalizeRecurrenceRule({ frequency: 'monthly' });
     if (monthlyMatch[1]) {
       const dayOfMonth = parseInt(monthlyMatch[1], 10);
       if (dayOfMonth >= 1 && dayOfMonth <= 31) {
@@ -189,7 +189,7 @@ export function parseRecurrenceFromContent(content: string): { matched: string; 
       const rule = normalizeRecurrenceRule({
         frequency: 'weekly',
         daysOfWeek,
-      })!;
+      });
       applyTime(rule, weekdayMatch[2]);
       return {
         matched: weekdayMatch[0],

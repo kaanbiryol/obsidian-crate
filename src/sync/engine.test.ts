@@ -7,8 +7,6 @@ import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
-const CONFIG_PLUGINS_DIR = `${CONFIG_DIR}/plugins`;
-const TRACKED_PLUGIN_MAIN_PATH = `${CONFIG_DIR}/plugins/foo/main.js`;
 
 type ManifestEntry = {
 	hash: string;
@@ -161,11 +159,6 @@ function createNamedAbortError(message = 'Sync request aborted'): Error {
 	return error;
 }
 
-async function flushMicrotasks(): Promise<void> {
-	await Promise.resolve();
-	await Promise.resolve();
-}
-
 function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness {
 	const settings = { ...createSettings(), ...settingsOverrides };
 
@@ -281,43 +274,6 @@ describe('SyncEngine event queue behavior', () => {
 		expect(pendingPaths.has('delete:.trash/note.md')).toBe(false);
 		expect(pendingPaths.has('notes/note.md')).toBe(true);
 		expect(debouncedSync).toHaveBeenCalledTimes(1);
-	});
-
-	it('ignores raw folder events', async () => {
-		const debouncedSync = spyOnDebouncedSync(harness.engine);
-		harness.vault.adapter.stat.mockResolvedValueOnce({ type: 'folder', size: 0, mtime: 1700000000000 });
-
-		harness.engine.onRawFileEvent(CONFIG_PLUGINS_DIR);
-		await flushMicrotasks();
-
-		const pendingPaths = getPendingPaths(harness.engine);
-		expect(pendingPaths.size).toBe(0);
-		expect(debouncedSync).not.toHaveBeenCalled();
-	});
-
-	it('queues delete marker for missing tracked raw paths', async () => {
-		const debouncedSync = spyOnDebouncedSync(harness.engine);
-		harness.vault.adapter.stat.mockResolvedValueOnce(null);
-		harness.localManifest.hasFile.mockReturnValueOnce(true);
-
-		harness.engine.onRawFileEvent(TRACKED_PLUGIN_MAIN_PATH);
-		await flushMicrotasks();
-
-		const pendingPaths = getPendingPaths(harness.engine);
-		expect(pendingPaths.has(`delete:${TRACKED_PLUGIN_MAIN_PATH}`)).toBe(true);
-		expect(debouncedSync).toHaveBeenCalledTimes(1);
-	});
-
-	it('skips raw events for nested files ignored by slashless filename patterns', async () => {
-		const dsHarness = createHarness({ ignorePatterns: ['.DS_Store'] });
-		const debouncedSync = spyOnDebouncedSync(dsHarness.engine);
-		dsHarness.vault.adapter.stat.mockResolvedValueOnce({ type: 'file', size: 1, mtime: 1700000000000 });
-
-		dsHarness.engine.onRawFileEvent('notes/.DS_Store');
-		await flushMicrotasks();
-
-		expect(getPendingPaths(dsHarness.engine).size).toBe(0);
-		expect(debouncedSync).not.toHaveBeenCalled();
 	});
 
 	it('emits idle state after flush with no pending paths left', async () => {

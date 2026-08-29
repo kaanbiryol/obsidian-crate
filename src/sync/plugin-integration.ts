@@ -2,7 +2,6 @@ import { Notice, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../main';
 import { type ForegroundSyncReason, SyncRuntime } from './runtime';
 import { notifyConflicts } from './conflict';
-import { isHiddenPath } from './file-discovery';
 import { ActivityModal } from '../ui/activity-modal';
 import { openConfirmationModal } from '../ui/confirmation-modal';
 import { applySharedSettings } from './shared-settings';
@@ -110,18 +109,6 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 		plugin.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
 			plugin.syncRuntime.onFileRename(file, oldPath);
 		}),
-	);
-
-	type RawOn = (name: 'raw', callback: (path: string) => void) => import('obsidian').EventRef;
-	plugin.registerEvent(
-		(plugin.app.vault.on as unknown as RawOn)(
-			'raw',
-			(path: string) => {
-				if (isHiddenPath(path)) {
-					plugin.syncRuntime.onRawFileEvent(path);
-				}
-			},
-		),
 	);
 
 	const triggerForegroundSync = (reason: ForegroundSyncReason): void => {

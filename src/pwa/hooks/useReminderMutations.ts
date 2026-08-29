@@ -7,9 +7,7 @@ import {
 	reorderProjectReminders,
 } from '../reminder-state';
 import { buildReminderMutationBody } from '../reminder-mutation';
-import type { ModalState, ReminderRecord, StoredConfig, ToastKind } from '../types';
-
-type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
+import type { ApiFetch, LoadReminders, ModalState, ReminderRecord, ShowToast, StoredConfig } from '../types';
 
 export function useReminderMutations({
 	apiFetch,
@@ -32,7 +30,7 @@ export function useReminderMutations({
 	closeModal: () => void;
 	config: StoredConfig;
 	ensureCanMutate: () => boolean;
-	loadReminders: (options?: { silent?: boolean }) => Promise<void>;
+	loadReminders: LoadReminders;
 	projects: string[];
 	projectsRef: MutableRefObject<string[]>;
 	remindersRef: MutableRefObject<ReminderRecord[]>;
@@ -40,7 +38,7 @@ export function useReminderMutations({
 	setProjects: Dispatch<SetStateAction<string[]>>;
 	setReminders: Dispatch<SetStateAction<ReminderRecord[]>>;
 	setSaving: Dispatch<SetStateAction<boolean>>;
-	showToast: (kind: ToastKind, message: string) => void;
+	showToast: ShowToast;
 }): {
 	saveReminder: (currentModal: ModalState) => Promise<void>;
 	toggleReminderCompleted: (reminderId: string, completed: boolean) => Promise<void>;

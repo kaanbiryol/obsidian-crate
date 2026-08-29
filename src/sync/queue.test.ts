@@ -5,9 +5,8 @@ import {
 	onFileChange,
 	onFileDelete,
 	onFileRename,
-	onRawPathChange,
-	processPendingChanges,
 } from './queue';
+import { processPendingChanges } from './queue-flush';
 import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
 import { HttpError } from './api';
 
@@ -19,11 +18,6 @@ type UploadArgs = {
 	size: number;
 	contentType: string;
 };
-
-const CONFIG_DIR = '.vault-config';
-const CONFIG_PLUGIN_MAIN_PATH = `${CONFIG_DIR}/plugins/some-plugin/main.js`;
-const CONFIG_PLUGINS_DIR = `${CONFIG_DIR}/plugins`;
-const TRACKED_PLUGIN_MAIN_PATH = `${CONFIG_DIR}/plugins/foo/main.js`;
 
 function createEventContext() {
 	const pendingPaths = new Set<string>();
@@ -115,7 +109,6 @@ function createFlushHarness(overrides: Partial<{
 			pendingPaths,
 			inFlightPaths,
 			pendingRevisions,
-			vault: {} as never,
 			api: {
 				isConfigured: vi.fn(() => overrides.configured ?? true),
 				uploadFile: (path: string, content: ArrayBuffer, hash: string, size: number, contentType: string) =>
@@ -196,53 +189,6 @@ describe('queue event handlers', () => {
 		expect(pendingPaths.has('notes/b.md')).toBe(true);
 		expect(pendingPaths.has('.trash/b.md')).toBe(false);
 		expect(triggerDebouncedSync).toHaveBeenCalledTimes(2);
-	});
-});
-
-describe('onRawPathChange', () => {
-	it('enqueues non-ignored paths and triggers debounced sync', () => {
-		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
-
-		onRawPathChange(context, CONFIG_PLUGIN_MAIN_PATH);
-
-		expect(pendingPaths.has(CONFIG_PLUGIN_MAIN_PATH)).toBe(true);
-		expect(triggerDebouncedSync).toHaveBeenCalledTimes(1);
-	});
-
-	it('skips ignored paths', () => {
-		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
-
-		onRawPathChange(context, '.trash/deleted.md');
-
-		expect(pendingPaths.size).toBe(0);
-		expect(triggerDebouncedSync).not.toHaveBeenCalled();
-	});
-
-	it('ignores raw folder paths', () => {
-		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
-
-		onRawPathChange(context, CONFIG_PLUGINS_DIR, { kind: 'folder' });
-
-		expect(pendingPaths.size).toBe(0);
-		expect(triggerDebouncedSync).not.toHaveBeenCalled();
-	});
-
-	it('queues delete marker for missing tracked paths', () => {
-		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
-
-		onRawPathChange(context, TRACKED_PLUGIN_MAIN_PATH, { kind: 'missing', wasTracked: true });
-
-		expect(pendingPaths.has(`delete:${TRACKED_PLUGIN_MAIN_PATH}`)).toBe(true);
-		expect(triggerDebouncedSync).toHaveBeenCalledTimes(1);
-	});
-
-	it('ignores missing untracked paths', () => {
-		const { context, pendingPaths, triggerDebouncedSync } = createEventContext();
-
-		onRawPathChange(context, TRACKED_PLUGIN_MAIN_PATH, { kind: 'missing', wasTracked: false });
-
-		expect(pendingPaths.size).toBe(0);
-		expect(triggerDebouncedSync).not.toHaveBeenCalled();
 	});
 });
 

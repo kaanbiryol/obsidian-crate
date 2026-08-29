@@ -121,13 +121,21 @@ export async function runSyncWorkflow(
 		context.throwIfDestroyed();
 
 		if (downloadDiffs.length > 0) {
-			await context.parallelDownloadAndSaveFiles(
-				downloadDiffs.map(diff => ({
+			const downloadRequests: DownloadRequest[] = [];
+			for (const diff of downloadDiffs) {
+				if (!diff.remoteHash) {
+					result.errors.push(`${diff.path}: remote hash missing from download plan`);
+					continue;
+				}
+				downloadRequests.push({
 					path: diff.path,
 					expectedLocalHash: diff.localHash ?? null,
-					expectedRemoteHash: diff.remoteHash!,
+					expectedRemoteHash: diff.remoteHash,
 					remoteSize: remoteManifest.files[diff.path]?.size ?? 0,
-				})),
+				});
+			}
+			await context.parallelDownloadAndSaveFiles(
+				downloadRequests,
 				result,
 			);
 			for (const diff of downloadDiffs) {

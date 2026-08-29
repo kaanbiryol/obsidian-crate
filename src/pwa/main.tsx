@@ -5,18 +5,13 @@ import {
 	PwaRemindersAppShell,
 	type PwaReminderCardRenderer,
 } from './components/PwaRemindersAppShell';
-import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import {
 	AUTH_TOKEN_KEY,
-	REMINDERS_CACHE_KEY,
-	isStandaloneApp,
 	loadStoredConfig,
 } from './config';
 import {
-	fetchPwaAssetVersion,
 	makeApiFetch,
 	registerPwaServiceWorker,
-	replaceBrowserUrlWithInstallToken,
 } from './api';
 import { ErrorState, EmptyAuthState } from './components/AuthStates';
 import { PwaHeaderActions, PwaLoadingSkeleton, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
@@ -26,6 +21,8 @@ import { WebReminderCard } from './components/WebReminderCard';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
+import { usePwaRefreshLifecycle } from './hooks/usePwaRefreshLifecycle';
+import { usePwaSessionLifecycle } from './hooks/usePwaSessionLifecycle';
 import { usePwaStatus } from './hooks/usePwaStatus';
 import { useLaunchReminderModal } from './hooks/useLaunchReminderModal';
 import { usePwaZoomLock } from './hooks/usePwaZoomLock';
@@ -56,8 +53,6 @@ function App() {
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [launchReminderId, setLaunchReminderId] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
-	const [loggingOut, setLoggingOut] = useState(false);
-	const [updateAvailable, setUpdateAvailable] = useState(false);
 	const [modal, setModal] = useState<ModalState | null>(null);
 	const [reorderDragging, setReorderDragging] = useState(false);
 	const { toast, showToast } = useToast();
@@ -109,39 +104,19 @@ function App() {
 		setError,
 	} = reminderSync;
 	const initialContentReady = bootstrapped && (!authToken || !loading);
-	const clearLocalSession = useCallback((showMessage: boolean) => {
-		localStorage.removeItem(AUTH_TOKEN_KEY);
-		localStorage.removeItem(REMINDERS_CACHE_KEY);
-		setAuthToken(null);
-		resetReminderState();
-		settingsTransition.cancelClose();
-		modalTransition.cancelClose();
-		setSettingsOpen(false);
-		setModal(null);
-		if (showMessage) {
-			setError(null);
-			showToast('info', 'Logged out');
-		}
-	}, [modalTransition.cancelClose, resetReminderState, setError, settingsTransition.cancelClose, showToast]);
-
-	useEffect(() => {
-		handleUnauthorizedRef.current = () => clearLocalSession(false);
-	}, [clearLocalSession]);
-
-	const logOut = useCallback(async () => {
-		if (loggingOut) return;
-		setLoggingOut(true);
-		try {
-			await disablePushNotifications();
-			const response = await apiFetch('/auth/session', { method: 'DELETE' });
-			if (!response.ok) throw new Error(await response.text());
-			clearLocalSession(true);
-		} catch (logoutError) {
-			showToast('error', logoutError instanceof Error ? logoutError.message : String(logoutError));
-		} finally {
-			setLoggingOut(false);
-		}
-	}, [apiFetch, clearLocalSession, disablePushNotifications, loggingOut, showToast]);
+	const { loggingOut, logOut } = usePwaSessionLifecycle({
+		apiFetch,
+		cancelModalClose: modalTransition.cancelClose,
+		cancelSettingsClose: settingsTransition.cancelClose,
+		disablePushNotifications,
+		handleUnauthorizedRef,
+		resetReminderState,
+		setAuthToken,
+		setError,
+		setModal,
+		setSettingsOpen,
+		showToast,
+	});
 
 	usePwaBootstrap({
 		authToken,
@@ -157,57 +132,15 @@ function App() {
 		setStartTab,
 	});
 
-	const refreshInstallActivationUrl = useCallback(async () => {
-		if (!authToken || isStandaloneApp()) return;
-		const response = await apiFetch('/notifications/reminders-enrollment-token', { method: 'POST' });
-		if (!response.ok) throw new Error(await response.text());
-		const result = await response.json() as { token?: string };
-		if (!result.token) throw new Error('Missing install token');
-		replaceBrowserUrlWithInstallToken(result.token, config);
-	}, [apiFetch, authToken, config]);
-
-	useEffect(() => {
-		if (!bootstrapped || !authToken) return;
-		void refreshInstallActivationUrl().catch(() => undefined);
-		void Promise.all([
-			loadReminders({ silent: hydratedCacheRef.current }),
-			refreshPushState().catch(() => undefined),
-		]);
-	}, [authToken, bootstrapped, loadReminders, refreshInstallActivationUrl, refreshPushState]);
-
-	const checkForUpdate = useCallback(async () => {
-		try {
-			const assetVersion = await fetchPwaAssetVersion();
-			if (assetVersion && assetVersion !== PWA_ASSET_VERSION) {
-				setUpdateAvailable(true);
-			}
-		} catch {
-			// Version checks are opportunistic and should not disrupt reminder use.
-		}
-	}, []);
-
-	useEffect(() => {
-		void checkForUpdate();
-	}, [checkForUpdate]);
-
-	useEffect(() => {
-		const resume = () => {
-			void checkForUpdate();
-			if (!bootstrapped || !authToken) return;
-			void loadReminders({ silent: true });
-			void refreshPushState().catch(() => undefined);
-		};
-		const handleVisibilityChange = () => {
-			if (document.visibilityState === 'visible') resume();
-		};
-
-		window.addEventListener('pageshow', resume);
-		document.addEventListener('visibilitychange', handleVisibilityChange);
-		return () => {
-			window.removeEventListener('pageshow', resume);
-			document.removeEventListener('visibilitychange', handleVisibilityChange);
-		};
-	}, [authToken, bootstrapped, checkForUpdate, loadReminders, refreshPushState]);
+	const updateAvailable = usePwaRefreshLifecycle({
+		apiFetch,
+		authToken,
+		bootstrapped,
+		config,
+		hydratedCacheRef,
+		loadReminders,
+		refreshPushState,
+	});
 
 	const {
 		readOnlyMessage,

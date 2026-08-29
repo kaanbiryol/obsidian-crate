@@ -1,12 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { sha256HexBytes } from './auth';
-import {
-	handleCreateReminder,
-	handleDeleteReminder,
-	handleListReminders,
-	handleReorderReminders,
-	handleUpdateReminder,
-} from './reminders-web-handlers';
+import { handleCreateReminder } from './reminders-web/routes/create';
+import { handleDeleteReminder } from './reminders-web/routes/delete';
+import { handleListReminders } from './reminders-web/routes/list';
+import { handleReorderReminders } from './reminders-web/routes/reorder';
+import { handleUpdateReminder } from './reminders-web/routes/update';
 
 type StoredObject = {
 	body: ArrayBuffer;

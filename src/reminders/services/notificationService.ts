@@ -88,21 +88,21 @@ export class ReminderNotificationService {
 	async onReminderCreated(reminder: SchedulableReminder): Promise<void> {
 		if (!this.isAvailable()) return;
 		const effectiveDatetime = this.resolveNotificationDatetime(reminder);
-		if (reminder.completed || !this.getSchedulableDueDate(effectiveDatetime)) return;
+		if (!effectiveDatetime || reminder.completed || !this.getSchedulableDueDate(effectiveDatetime)) return;
 
-		await this.schedule(reminder, effectiveDatetime!);
+		await this.schedule(reminder, effectiveDatetime);
 	}
 
 	async onReminderUpdated(reminder: SchedulableReminder): Promise<void> {
 		if (!this.isAvailable()) return;
 		const effectiveDatetime = this.resolveNotificationDatetime(reminder);
 
-		if (reminder.completed || !this.getSchedulableDueDate(effectiveDatetime)) {
+		if (!effectiveDatetime || reminder.completed || !this.getSchedulableDueDate(effectiveDatetime)) {
 			await this.cancel(reminder.id);
 			return;
 		}
 
-		await this.schedule(reminder, effectiveDatetime!);
+		await this.schedule(reminder, effectiveDatetime);
 	}
 
 	async onReminderDeleted(reminderId: string): Promise<void> {
@@ -137,7 +137,8 @@ export class ReminderNotificationService {
 	async reconcile(reminders: SchedulableReminder[]): Promise<void> {
 		if (!this.isAvailable()) return;
 
-		const api = this.getApiClient()!;
+		const api = this.getApiClient();
+		if (!api) return;
 		try {
 			const { scheduled } = await api.getScheduledReminders();
 			const scheduledById = new Map(scheduled.map((entry) => [entry.reminder_id, entry] as const));
@@ -146,8 +147,8 @@ export class ReminderNotificationService {
 			const shouldBeScheduled = reminders.filter(r => {
 				if (r.completed) return false;
 				const effectiveDatetime = this.resolveNotificationDatetime(r);
-				if (!this.getSchedulableDueDate(effectiveDatetime)) return false;
-				resolvedDatetimes.set(r.id, effectiveDatetime!);
+				if (!effectiveDatetime || !this.getSchedulableDueDate(effectiveDatetime)) return false;
+				resolvedDatetimes.set(r.id, effectiveDatetime);
 				return true;
 			});
 			const shouldBeScheduledIds = new Set(shouldBeScheduled.map(r => r.id));
@@ -161,7 +162,8 @@ export class ReminderNotificationService {
 
 			for (const r of shouldBeScheduled) {
 				const existing = scheduledById.get(r.id);
-				const effectiveDatetime = resolvedDatetimes.get(r.id)!;
+				const effectiveDatetime = resolvedDatetimes.get(r.id);
+				if (!effectiveDatetime) continue;
 				if (!existing || this.shouldReschedule(existing, r, effectiveDatetime)) {
 					operations.push(this.schedule(r, effectiveDatetime));
 				}

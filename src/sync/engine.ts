@@ -42,6 +42,7 @@ import {
 	UPLOAD_CONCURRENCY,
 } from './engine-constants';
 import { shouldIgnoreSyncPath } from './engine-ignore';
+import { hasHiddenFileChanges } from './hidden-file-changes';
 import { retryWithBackoff, runConcurrentTasks } from './engine-utils';
 import {
 	runForceFullSyncWorkflow,
@@ -98,7 +99,6 @@ export class SyncEngine {
 			conflictCount: 0,
 		};
 		this.queueController = new SyncQueueController({
-			vault: this.vault,
 			api: this.api,
 			getLocalManifest: () => this.localManifest,
 			markdownBaseCache: this.markdownBaseCache,
@@ -110,7 +110,6 @@ export class SyncEngine {
 			runConcurrent: this.runConcurrent.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
 			getDebounceDelayMs: () => (this.settings.debounceDelay ?? 5) * 1000,
-			hasLocalManifestFile: (path: string) => this.localManifest.hasFile(path),
 			uploadConcurrency: UPLOAD_CONCURRENCY,
 			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
 		});
@@ -230,10 +229,6 @@ export class SyncEngine {
 		};
 	}
 
-	onRawFileEvent(path: string): void {
-		this.queueController.onRawFileEvent(path);
-	}
-
 	onFileChange(file: TAbstractFile): void {
 		this.queueController.onFileChange(file);
 	}
@@ -335,6 +330,11 @@ export class SyncEngine {
 			setLastCheckAttempt: (value: number) => {
 				this.lastCheckAttempt = value;
 			},
+			hasHiddenFileChanges: () => hasHiddenFileChanges(
+				this.vault,
+				this.localManifest,
+				this.shouldIgnore.bind(this),
+			),
 			checkForChanges: (lastSeq: number) => this.api.checkForChanges(lastSeq),
 			sync: () => this.sync(),
 		};

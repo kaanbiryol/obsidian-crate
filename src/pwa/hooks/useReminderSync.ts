@@ -5,9 +5,7 @@ import {
 	saveCachedReminderSnapshot,
 } from '../config';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
-import type { CachedReminderSnapshot, DataMode, ReminderRecord, StoredConfig } from '../types';
-
-type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
+import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, StoredConfig } from '../types';
 
 export interface ReminderSyncState {
 	reminders: ReminderRecord[];
@@ -22,7 +20,7 @@ export interface ReminderSyncState {
 	projectsRef: MutableRefObject<string[]>;
 	hydratedCacheRef: MutableRefObject<boolean>;
 	hydrateCachedSnapshot: (snapshot: CachedReminderSnapshot) => void;
-	loadReminders: (options?: { silent?: boolean }) => Promise<void>;
+	loadReminders: LoadReminders;
 	beginLocalMutation: () => () => void;
 	resetReminderState: () => void;
 	setReminders: Dispatch<SetStateAction<ReminderRecord[]>>;

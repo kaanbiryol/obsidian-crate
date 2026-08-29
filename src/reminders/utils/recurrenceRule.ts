@@ -5,6 +5,11 @@ export function getRecurrenceTimeZone(rule: RecurrenceRule | undefined): string 
   return rule?.timezone || getLocalTimeZone();
 }
 
+export function normalizeRecurrenceRule(rule: RecurrenceRule): RecurrenceRule;
+export function normalizeRecurrenceRule(rule: null | undefined): undefined;
+export function normalizeRecurrenceRule(
+  rule: RecurrenceRule | null | undefined,
+): RecurrenceRule | undefined;
 export function normalizeRecurrenceRule(
   rule: RecurrenceRule | null | undefined,
 ): RecurrenceRule | undefined {

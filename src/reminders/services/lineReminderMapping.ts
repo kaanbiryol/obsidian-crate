@@ -75,12 +75,11 @@ export class LineReminderMappingService {
     reminderId: string,
     content: string
   ): void {
-    // Ensure file mapping exists
-    if (!this.mappings.has(filePath)) {
-      this.mappings.set(filePath, {});
+    let fileMapping = this.mappings.get(filePath);
+    if (!fileMapping) {
+      fileMapping = {};
+      this.mappings.set(filePath, fileMapping);
     }
-
-    const fileMapping = this.mappings.get(filePath)!;
 
     // Remove old mapping if this reminder was previously at a different line
     const oldLocation = this.reverseMap.get(reminderId);
@@ -220,10 +219,12 @@ export class LineReminderMappingService {
     const linesByReminderId = new Map<string, { lineNumber: number; content: string }>();
     for (const line of checkboxLines) {
       const hash = generateContentHash(line.content);
-      if (!linesByHash.has(hash)) {
-        linesByHash.set(hash, []);
+      const matchingLines = linesByHash.get(hash);
+      if (matchingLines) {
+        matchingLines.push(line);
+      } else {
+        linesByHash.set(hash, [line]);
       }
-      linesByHash.get(hash)!.push(line);
       if (line.reminderId && !linesByReminderId.has(line.reminderId)) {
         linesByReminderId.set(line.reminderId, line);
       }

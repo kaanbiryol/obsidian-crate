@@ -1,16 +1,14 @@
 import { useCallback, useState } from 'react';
 import { detectDeviceName, isIosOrIpados, isStandaloneApp } from '../config';
 import { getPwaPushManager, urlBase64ToUint8Array } from '../api';
-import type { PushState, ToastKind } from '../types';
-
-type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
+import type { ApiFetch, PushState, ShowToast } from '../types';
 
 export function usePushNotifications({
 	apiFetch,
 	showToast,
 }: {
 	apiFetch: ApiFetch;
-	showToast: (kind: ToastKind, message: string) => void;
+	showToast: ShowToast;
 }): {
 	push: PushState;
 	refreshPushState: () => Promise<void>;

@@ -1,5 +1,5 @@
 import React from "react";
-import { motion, type Easing } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   BrowseView,
   InboxView,
@@ -55,14 +55,13 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
   colorScheme,
   reorderInteraction = 'handle',
 }) => {
-  const easeExpoOut = EASE_EXPO_OUT as unknown as Easing;
   const pageTransition = {
     initial: { opacity: 0 },
     animate: { opacity: 1 },
     exit: { opacity: 0 },
     transition: {
       duration: PAGE_TRANSITION_DURATION,
-      ease: easeExpoOut,
+      ease: EASE_EXPO_OUT,
     },
   };
 

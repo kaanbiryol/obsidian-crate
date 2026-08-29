@@ -1,11 +1,7 @@
 import React from 'react';
-import { motion, type Easing } from 'framer-motion';
+import { motion } from 'framer-motion';
 import type { AnimationConfig } from '../types/componentAdapter';
 import { EASE_EXPO_OUT, EASE_STANDARD, CONTENT_TRANSITION_DURATION } from '../ui/layoutConstants';
-
-// Cast easing arrays to framer-motion compatible type
-const easeExpoOut = EASE_EXPO_OUT as unknown as Easing;
-const easeStandard = EASE_STANDARD as unknown as Easing;
 
 interface EmptyStateProps {
     icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -33,11 +29,11 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         hidden: { opacity: 0 },
         visible: {
             opacity: 1,
-            transition: { duration, ease: easeExpoOut }
+            transition: { duration, ease: EASE_EXPO_OUT }
         },
         exit: {
             opacity: 0,
-            transition: { duration: 0.2, ease: easeStandard }
+            transition: { duration: 0.2, ease: EASE_STANDARD }
         }
     };
 
@@ -54,7 +50,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
     const iconMotionProps = animationConfig.enabled ? {
         initial: { opacity: 0 },
-        animate: { opacity: 1, transition: { duration, delay: 0.05, ease: easeExpoOut } }
+        animate: { opacity: 1, transition: { duration, delay: 0.05, ease: EASE_EXPO_OUT } }
     } : {};
 
     const iconInnerSize = compact ? 26 : 40;

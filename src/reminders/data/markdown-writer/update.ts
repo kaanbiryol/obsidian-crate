@@ -1,22 +1,16 @@
 import type { Reminder } from "@/reminders/types/reminder";
 import { generateContentHash } from "@/reminders/utils/checkboxParser";
-import { rebuildCheckboxLine } from "@/reminders/utils/checkboxParser";
-import { calculateFirstOccurrence } from "@/reminders/utils/recurrenceCalculator";
-import {
-  buildStoredReminderDates,
-  inferHasTimeFromDate,
-  parseStoredReminderDate,
-  reminderHasTime,
-} from "@/reminders/utils/reminderDate";
-import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { IndexedReminder } from "../reminder-index";
 import { findReminderLineNumber } from "./helpers";
 import {
   appendReminderBlockToContent,
-  buildDescriptionBlock,
   deleteReminderBlockFromContent,
-  replaceReminderBlockInContent,
 } from "../../core/markdownReminderFile";
+import {
+  buildCreatedReminderBlock,
+  buildUpdatedReminderBlock,
+  replaceUpdatedReminderBlock,
+} from "../../core/markdownReminderMutation";
 import { normalizeReminderProjectPath } from "../../core/reminderProjectPath";
 import type {
   MarkdownWriterContext,
@@ -62,29 +56,20 @@ export async function updateReminderInMarkdown(
     throw new Error(`Invalid reminder project: ${requestedProject}`);
   }
   const oldProject = reminder.project || "Inbox";
-  const newRecurrence = Object.prototype.hasOwnProperty.call(updates, "recurrence")
-    ? normalizeRecurrenceRule(updates.recurrence ?? undefined)
-    : normalizeRecurrenceRule(reminder.recurrence);
-  const currentDueDate = parseStoredReminderDate(reminder);
-  const currentHasTime = reminderHasTime(reminder);
-  const newHasTime = Object.prototype.hasOwnProperty.call(updates, "hasTime")
-    ? updates.hasTime
-    : ("dueDate" in updates ? inferHasTimeFromDate(updates.dueDate) : currentHasTime);
+  const mutation = buildUpdatedReminderBlock(reminder, updates);
 
   if (newProject && newProject !== oldProject) {
     markdownWriterLog.info(`Moving reminder from ${oldProject} to ${newProject}`);
-    const newContent = updates.content ?? reminder.content;
-    const newDueDate = "dueDate" in updates ? updates.dueDate : currentDueDate;
-    const newPriority = updates.priority ?? reminder.priority;
-    const movedDescription = "description" in updates
-      ? updates.description
-      : reminder.description;
-    const normalizedDescription = movedDescription?.trim() || undefined;
-    const effectiveDueDate = newRecurrence && !newDueDate
-      ? calculateFirstOccurrence(newRecurrence)
-      : newDueDate;
-    const resolvedHasTime = newHasTime ?? inferHasTimeFromDate(effectiveDueDate);
-    const storedDates = buildStoredReminderDates(effectiveDueDate, resolvedHasTime);
+    const movedMutation = buildCreatedReminderBlock({
+      content: mutation.content,
+      description: mutation.description,
+      dueDate: mutation.dueDate,
+      priority: mutation.priority,
+      recurrence: mutation.recurrence,
+      hasTime: mutation.hasTime,
+      completed: reminder.completed,
+      reminderId: reminder.id,
+    });
 
     const oldFile = await context.getFile(reminder.filePath);
     if (!oldFile) {
@@ -92,31 +77,20 @@ export async function updateReminderInMarkdown(
     }
 
     const newFile = await context.getOrCreateProjectFile(newProject);
-    const newLine = rebuildCheckboxLine(
-      "",
-      reminder.completed,
-      newContent,
-      effectiveDueDate,
-      newPriority,
-      undefined,
-      newRecurrence,
-      resolvedHasTime,
-      reminder.id,
-    );
     const movedReminder: IndexedReminder = {
       ...reminder,
-      content: newContent,
-      description: normalizedDescription,
-      dueDate: storedDates.dueDate,
-      dueDatetime: storedDates.dueDatetime,
-      priority: newPriority,
+      content: movedMutation.content,
+      description: movedMutation.description,
+      dueDate: movedMutation.dueDateKey,
+      dueDatetime: movedMutation.dueDatetime,
+      priority: movedMutation.priority,
       completed: reminder.completed,
       project: newProject,
-      recurrence: newRecurrence,
+      recurrence: movedMutation.recurrence,
       filePath: newFile.path,
       lineNumber: -1,
-      rawLine: newLine,
-      contentHash: generateContentHash(newContent),
+      rawLine: movedMutation.checkboxLine,
+      contentHash: generateContentHash(movedMutation.content),
     };
 
     context.index.applyOptimisticUpdate(reminder.id, movedReminder);
@@ -127,7 +101,11 @@ export async function updateReminderInMarkdown(
         if (findReminderLineNumber(fileContent.split("\n"), movedReminder) !== -1) {
           throw new Error(`Reminder ${reminder.id} already exists in ${newFile.path}`);
         }
-        return appendReminderBlockToContent(fileContent, newLine, normalizedDescription);
+        return appendReminderBlockToContent(
+          fileContent,
+          movedMutation.checkboxLine,
+          movedMutation.description,
+        );
       });
       destinationWritten = true;
 
@@ -162,14 +140,14 @@ export async function updateReminderInMarkdown(
 
       const updatedReminder: Reminder & { contentHash: string } = {
         id: reminder.id,
-        content: newContent,
-        description: normalizedDescription,
-        dueDate: storedDates.dueDate,
-        dueDatetime: storedDates.dueDatetime,
-        priority: newPriority,
+        content: movedMutation.content,
+        description: movedMutation.description,
+        dueDate: movedMutation.dueDateKey,
+        dueDatetime: movedMutation.dueDatetime,
+        priority: movedMutation.priority,
         completed: reminder.completed,
         project: newProject,
-        recurrence: newRecurrence,
+        recurrence: movedMutation.recurrence,
         contentHash: movedReminder.contentHash,
       };
       triggerReminderChange(context, updatedReminder, "update");
@@ -185,67 +163,35 @@ export async function updateReminderInMarkdown(
     throw new Error(`File not found: ${reminder.filePath}`);
   }
 
-  const newContent = updates.content ?? reminder.content;
-  const newDueDate = "dueDate" in updates ? updates.dueDate : currentDueDate;
-  const newPriority = updates.priority ?? reminder.priority;
-  const storedDates = buildStoredReminderDates(newDueDate, newHasTime);
-  const newDescription = "description" in updates
-    ? (updates.description?.trim() || undefined)
-    : reminder.description;
-  const newDescLines = buildDescriptionBlock(newDescription);
-
   context.index.applyOptimisticUpdate(reminder.id, {
-    content: newContent,
-    description: newDescription,
-    dueDate: storedDates.dueDate,
-    dueDatetime: storedDates.dueDatetime,
-    priority: newPriority,
-    recurrence: newRecurrence,
+    content: mutation.content,
+    description: mutation.description,
+    dueDate: mutation.dueDateKey,
+    dueDatetime: mutation.dueDatetime,
+    priority: mutation.priority,
+    recurrence: mutation.recurrence,
   });
-
-	const indentMatch = reminder.rawLine.match(/^(\s*)/);
-	const indentation = indentMatch?.[1] ?? "";
-  const newLine = rebuildCheckboxLine(
-    indentation,
-    reminder.completed,
-    newContent,
-    newDueDate,
-    newPriority,
-    undefined,
-    newRecurrence,
-    newHasTime,
-    reminder.id,
-  );
 
   try {
     let replacementLineNumber = -1;
     await context.app.vault.process(file, (fileContent) => {
-      const replacement = replaceReminderBlockInContent(
-        fileContent,
-        reminder,
-        [newLine, ...newDescLines],
-      );
-      if (!replacement.found) {
-        throw new Error(
-          `Cannot safely locate reminder line in ${reminder.filePath}. The file may have been modified.`,
-        );
-      }
+      const replacement = replaceUpdatedReminderBlock(fileContent, reminder, mutation);
       replacementLineNumber = replacement.lineNumber;
       return replacement.content;
     });
     markdownWriterLog.info(`Updated reminder in ${reminder.filePath} at line ${replacementLineNumber}`);
     await notifyFileWritten(context, file);
 
-    const contentHash = generateContentHash(newContent);
+    const contentHash = generateContentHash(mutation.content);
     const updatedReminder: Reminder & { contentHash: string } = {
       id: reminder.id,
-      content: newContent,
-      dueDate: storedDates.dueDate,
-      dueDatetime: storedDates.dueDatetime,
-      priority: newPriority,
+      content: mutation.content,
+      dueDate: mutation.dueDateKey,
+      dueDatetime: mutation.dueDatetime,
+      priority: mutation.priority,
       completed: reminder.completed,
       project: newProject || "Inbox",
-      recurrence: newRecurrence,
+      recurrence: mutation.recurrence,
       contentHash,
     };
     triggerReminderChange(context, updatedReminder, "update");
