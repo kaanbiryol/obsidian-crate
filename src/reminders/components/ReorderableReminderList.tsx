@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Reorder, useDragControls } from 'framer-motion';
+import { motion, Reorder, useDragControls } from 'framer-motion';
 import { GripVertical } from 'lucide-react';
 import type { Reminder } from '../types/reminder';
+import { REMINDER_LIST_LAYOUT_TRANSITION } from '../ui/layoutConstants';
 
 interface ReorderableReminderListProps {
   reminders: Reminder[];
@@ -115,8 +116,8 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
       onPointerUp={cancelLongPress}
       onPointerCancel={cancelLongPress}
       onContextMenu={interaction === 'long-press' ? (event) => event.preventDefault() : undefined}
-      layoutId={`reminder-card-${reminder.id}`}
       layout="position"
+      layoutDependency={index}
       data-reminder-scroll-anchor="true"
       data-reminder-id={reminder.id}
       data-reminder-section="active"
@@ -127,14 +128,22 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
       whileDrag={usesLongPress ? { zIndex: 50 } : { scale: 1.02, zIndex: 50 }}
       transition={usesLongPress
         ? {
-            layout: { type: 'spring', stiffness: 350, damping: 35 },
+            layout: REMINDER_LIST_LAYOUT_TRANSITION,
             scale: { type: 'spring', stiffness: 420, damping: 31, mass: 0.68 },
           }
         : {
-            layout: { type: 'spring', stiffness: 350, damping: 35 },
+            layout: REMINDER_LIST_LAYOUT_TRANSITION,
           }}
     >
-      {renderCard(reminder, index)}
+      <motion.div
+        layoutId={`reminder-card-${reminder.id}`}
+        layoutCrossfade={false}
+        layout="position"
+        layoutDependency={reminder.id}
+        transition={{ layout: REMINDER_LIST_LAYOUT_TRANSITION }}
+      >
+        {renderCard(reminder, index)}
+      </motion.div>
       {interaction === 'handle' && (
         <button
           className="reorder-drag-handle"

@@ -32,6 +32,18 @@ export const SPRING_CONFIG_BOUNCY = {
   mass: 0.8
 } as const;
 
+// Non-bouncy movement for cards changing position within or between lists.
+// Keeping one transition for both sides of a shared-layout handoff prevents the
+// source card and its displaced neighbors from settling at different speeds.
+export const REMINDER_LIST_LAYOUT_TRANSITION = {
+  type: 'spring' as const,
+  stiffness: 500,
+  damping: 44,
+  mass: 0.8,
+  restDelta: 0.5,
+  restSpeed: 10,
+} as const;
+
 // Default card enter/exit animation
 export const CARD_ANIMATION = {
   initial: { opacity: 0, y: 8 },

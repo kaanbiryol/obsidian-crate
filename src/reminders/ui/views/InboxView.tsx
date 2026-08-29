@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect, memo } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { Inbox, ChevronDown } from 'lucide-react';
 import { Button, Divider } from '@heroui/react';
@@ -9,7 +9,10 @@ import { ReminderCard } from '../../components/ReminderCard';
 import { ReorderableReminderList } from '../../components/ReorderableReminderList';
 import { EmptyState } from '../../components/EmptyState';
 import { buildInboxViewModel } from './viewModels';
-import { SPRING_CONFIG_BOUNCY } from '../layoutConstants';
+import {
+  REMINDER_LIST_LAYOUT_TRANSITION,
+  SPRING_CONFIG_BOUNCY,
+} from '../layoutConstants';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 
@@ -56,13 +59,25 @@ export const InboxView = memo(function InboxView({
   const scrollRef = useStableReminderScroll(isReordering);
 
   const { active, completed } = useMemo(() => buildInboxViewModel(reminders), [reminders]);
+  const previousCompletedCountRef = useRef(completed.length);
+  const shouldAnimateCompletedReveal = previousCompletedCountRef.current > 0;
+
+  useEffect(() => {
+    previousCompletedCountRef.current = completed.length;
+  }, [completed.length]);
 
   // Local state for optimistic reorder (visual only during drag)
   const [localOrder, setLocalOrder] = useState<Reminder[]>(active);
 
   useEffect(() => {
-    setLocalOrder(active);
-  }, [active]);
+    if (!isReordering) setLocalOrder(active);
+  }, [active, isReordering]);
+
+  // Outside a drag, render the latest view-model order immediately. Waiting for
+  // the synchronization effect adds an intermediate frame where a reminder has
+  // left Completed but has not entered the active list yet, which breaks the
+  // shared-layout measurement and makes neighboring cards jump.
+  const displayedOrder = isReordering ? localOrder : active;
 
   const handleReorderCommit = useCallback((orderedIds: string[]) => {
     onReorder?.(orderedIds);
@@ -109,7 +124,7 @@ export const InboxView = memo(function InboxView({
       >
         <LayoutGroup id="inbox-reminder-sections">
           <ReorderableReminderList
-            reminders={localOrder}
+            reminders={displayedOrder}
             onReorder={setLocalOrder}
             onReorderCommit={handleReorderCommit}
             onDragActiveChange={handleDragActiveChange}
@@ -158,52 +173,56 @@ export const InboxView = memo(function InboxView({
             <AnimatePresence mode="popLayout" initial={false}>
               {showCompleted && (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
+                  initial={animationConfig.enabled && shouldAnimateCompletedReveal
+                    ? { opacity: 0, height: 0, overflow: 'hidden' }
+                    : false}
                   animate={{
                     opacity: 1,
                     height: 'auto',
                     transition: {
                       height: { type: 'spring', ...SPRING_CONFIG_BOUNCY },
                       opacity: { duration: 0.2, delay: 0.05 }
-                    }
+                    },
+                    transitionEnd: { overflow: 'visible' }
                   }}
                   exit={{
                     opacity: 0,
                     height: 0,
+                    overflow: 'hidden',
                     transition: {
                       height: { duration: 0.2 },
                       opacity: { duration: 0.15 }
                     }
                   }}
-                  className="mt-3 overflow-hidden"
+                  className="mt-3"
                 >
                   <AnimatePresence mode="popLayout" initial={false}>
                     {completed.map((reminder, index) => (
                       <motion.div
                         key={reminder.id}
-                        layoutId={`reminder-card-${reminder.id}`}
-                        layout="position"
-                        initial={animationConfig.enabled ? { opacity: 0, y: 6 } : false}
-                        animate={animationConfig.enabled ? {
-                          opacity: 1,
-                          y: 0,
-                          transition: {
-                            duration: 0.4,
-                            delay: index * 0.03,
-                            ease: [0.4, 0, 0.2, 1] as const
-                          }
-                        } : { opacity: 1 }}
+                        initial={false}
+                        animate={{ opacity: 1 }}
                         exit={animationConfig.enabled ? {
                           opacity: 0,
-                          x: 20,
-                          transition: { duration: 0.25, ease: [0.4, 0, 1, 1] as const }
+                          transition: { duration: 0.14, ease: 'easeOut' }
                         } : undefined}
+                        transition={{
+                          opacity: { duration: 0.14, ease: 'easeOut' },
+                        }}
                         className="mb-2"
                         data-reminder-scroll-anchor="true"
                         data-reminder-id={reminder.id}
                         data-reminder-section="completed"
                       >
-                        {cardRenderer(reminder, index)}
+                        <motion.div
+                          layoutId={`reminder-card-${reminder.id}`}
+                          layoutCrossfade={false}
+                          layout="position"
+                          layoutDependency={reminder.id}
+                          transition={{ layout: REMINDER_LIST_LAYOUT_TRANSITION }}
+                        >
+                          {cardRenderer(reminder, index)}
+                        </motion.div>
                       </motion.div>
                     ))}
                   </AnimatePresence>
