@@ -301,6 +301,8 @@ export function ReminderSheet({
 										aria-label={saving ? 'Saving reminder' : isEditing ? 'Save reminder' : 'Add reminder'}
 										aria-busy={saving}
 										isDisabled={!canSubmit}
+										preventFocusOnPress
+										onPointerDown={(event) => event.preventDefault()}
 									>
 										{saving ? 'Saving…' : isEditing ? 'Save' : 'Add'}
 									</Button>
