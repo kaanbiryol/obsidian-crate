@@ -25,6 +25,8 @@ export class ActivityModal extends Modal {
 	private readonly deps: ActivityModalDeps;
 	private tabIndicator!: HTMLDivElement;
 	private subtitleEl!: HTMLSpanElement;
+	private errorNoticeEl!: HTMLDivElement;
+	private errorMessageEl!: HTMLSpanElement;
 	private syncBtn!: HTMLButtonElement;
 	private syncBtnIcon!: HTMLSpanElement;
 	private pendingCount!: HTMLSpanElement;
@@ -60,6 +62,17 @@ export class ActivityModal extends Modal {
 			void this.deps.sync();
 		});
 		this.updateSyncBtn();
+
+		this.errorNoticeEl = contentEl.createDiv({
+			cls: 'crate-sync-error-notice',
+			attr: { role: 'status', 'aria-live': 'polite' },
+		});
+		const errorIconEl = this.errorNoticeEl.createDiv({ cls: 'crate-sync-error-icon' });
+		setIcon(errorIconEl, 'alert-triangle');
+		const errorCopyEl = this.errorNoticeEl.createDiv({ cls: 'crate-sync-error-copy' });
+		errorCopyEl.createSpan({ text: 'Sync error', cls: 'crate-sync-error-title' });
+		this.errorMessageEl = errorCopyEl.createSpan({ cls: 'crate-sync-error-message' });
+		this.updateSyncErrorNotice();
 
 		// Tab bar
 		const tabBar = contentEl.createDiv({ cls: 'crate-activity-tab-bar' });
@@ -156,8 +169,20 @@ export class ActivityModal extends Modal {
 		if (textEl) textEl.textContent = syncing ? 'Syncing...' : 'Sync now';
 	}
 
+	private updateSyncErrorNotice(): void {
+		const state = this.deps.getState();
+		if (state.status !== 'error') {
+			this.errorNoticeEl.hide();
+			return;
+		}
+
+		this.errorMessageEl.setText(state.lastError || 'An error occurred during sync.');
+		this.errorNoticeEl.show();
+	}
+
 	private refresh(): void {
 		this.updateSyncBtn();
+		this.updateSyncErrorNotice();
 		this.subtitleEl.setText(this.formatLastSync());
 		this.updateTabCounts();
 		this.pendingPanel.empty();

@@ -337,6 +337,50 @@
 	font-variant-numeric: tabular-nums;
 }
 
+.crate-sync-error-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	margin: -2px 0 16px;
+	padding: 10px 12px;
+	border: 1px solid color-mix(in srgb, var(--text-error) 25%, transparent);
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--text-error) 8%, transparent);
+}
+
+.crate-sync-error-icon {
+	display: flex;
+	flex: 0 0 auto;
+	margin-top: 1px;
+	color: var(--text-error);
+
+	svg {
+		width: 16px;
+		height: 16px;
+	}
+}
+
+.crate-sync-error-copy {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.crate-sync-error-title {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text-error);
+}
+
+.crate-sync-error-message {
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--text-muted);
+	overflow-wrap: anywhere;
+	user-select: text;
+}
+
 /* Sync button */
 .crate-sync-now-btn {
 	display: inline-flex;

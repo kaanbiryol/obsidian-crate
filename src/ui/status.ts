@@ -95,14 +95,19 @@ export class StatusBarManager {
 		}
 
 		this.statusBarEl.toggleClass('crate-has-conflicts', state.conflictCount > 0);
-		this.statusBarEl.setAttribute('aria-label', tooltip);
-		this.statusBarEl.setAttribute('data-tooltip-position', 'top');
+		if (tooltip) {
+			this.statusBarEl.setAttribute('aria-label', tooltip);
+			this.statusBarEl.setAttribute('data-tooltip-position', 'top');
+		} else {
+			this.statusBarEl.removeAttribute('aria-label');
+			this.statusBarEl.removeAttribute('data-tooltip-position');
+		}
 	}
 
 	/**
 	 * Get display information for state
 	 */
-	private getDisplayInfo(state: SyncState): { icon: string | null; text: string; tooltip: string } {
+	private getDisplayInfo(state: SyncState): { icon: string | null; text: string; tooltip: string | null } {
 		switch (state.status) {
 			case 'syncing':
 				return {
@@ -117,7 +122,7 @@ export class StatusBarManager {
 				return {
 					icon: '⚠',
 					text: 'Sync error',
-					tooltip: state.lastError || 'An error occurred during sync',
+					tooltip: null,
 				};
 
 			case 'offline':
