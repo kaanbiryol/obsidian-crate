@@ -329,11 +329,11 @@
     color: var(--text-muted);
 }
 
-// The full-width completed toggle should not retain HeroUI's oversized focus ring.
-.completed-section-toggle:focus,
-.completed-section-toggle:focus-visible,
-.completed-section-toggle[data-focus-visible="true"] {
-    outline: none;
+// Keep the shared disclosure button independent of document-level button resets.
+.completed-section-toggle {
+    appearance: none;
+    border: 0;
+    background: transparent;
     box-shadow: none;
 }
 
