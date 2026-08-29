@@ -5,13 +5,9 @@ import {
 	createManagedObjectKey,
 	deleteBucketObjectsQuietly,
 	getStoredFileRow,
-	legacyObjectKey,
 	MAX_FILE_BYTES,
+	resolveStoredObjectKey,
 } from './sync-storage';
-
-function resolveObjectKey(path: string, storageKey: string | null): string {
-	return storageKey ?? legacyObjectKey(path);
-}
 
 function escapeLikePattern(value: string): string {
 	return value.replace(/[\\%_]/g, (character) => `\\${character}`);
@@ -48,7 +44,7 @@ export async function listStoredMarkdownFilesByPrefix(
 		const chunk = rows.slice(index, index + 8);
 		files.push(...await Promise.all(chunk.map(async (row) => {
 			if (row.size > MAX_FILE_BYTES) return null;
-			const objectKey = resolveObjectKey(row.path, row.storage_key ?? null);
+			const objectKey = resolveStoredObjectKey(row.path, row.storage_key ?? null);
 			const object = await bucket.get(objectKey);
 			if (!object || (row.size > 0 && object.size !== row.size)) return null;
 
@@ -77,7 +73,7 @@ export async function readCommittedMarkdownFileVersion(
 		return null;
 	}
 
-	const objectKey = resolveObjectKey(path, file.storageKey);
+	const objectKey = resolveStoredObjectKey(path, file.storageKey);
 	const object = await bucket.get(objectKey);
 	if (!object || (file.size > 0 && object.size !== file.size)) {
 		return null;

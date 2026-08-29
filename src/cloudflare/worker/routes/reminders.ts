@@ -21,7 +21,7 @@ export async function handleRemindersRoute(
 	path: string,
 	method: RouteMethod,
 ): Promise<Response | null> {
-	const db = env.DB || null;
+	const db = env.DB;
 
 	if (path === '/reminders/list' && method === 'GET') {
 		return await withDatabase(db, () => handleListReminders(request, env));

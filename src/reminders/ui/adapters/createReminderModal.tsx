@@ -46,7 +46,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
   const keyboardHeight = useKeyboardHeight(isMobile);
 
   // Get projects and active reminders from index (sync, fast)
-  const projects = plugin.storage.getProjects() || [];
+  const projects = plugin.reminderRepository.getProjects();
   const projectsList = ['Inbox', ...projects.filter((p: string) => p !== 'Inbox')];
 
   // Calculate default due date
@@ -60,19 +60,18 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     const parsedDueDate = parseReminderDateValue(dueDate, hasTime);
 
     try {
-      // Always use markdown writer (markdown-first is always enabled)
-      await plugin.markdownWriter.createReminder(
+      await plugin.reminderRepository.create({
+        content: content.trim(),
         project,
-        content.trim(),
-        parsedDueDate,
-        priority as 1 | 4,
+        priority: priority as 1 | 4,
         recurrence,
-        hasTime,
-        undefined,
         description,
-      );
-
-      // VaultWatcher will handle rescanning after file modify event
+        ...(hasTime && parsedDueDate
+          ? { dueDatetime: parsedDueDate.toISOString() }
+          : dueDate
+            ? { dueDate }
+            : {}),
+      });
 
       new Notice("Reminder created!");
       if (onSave) onSave(null); // Trigger refresh
@@ -85,46 +84,21 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
   const handleSave = async (updatedReminder: Reminder) => {
     try {
-      // Parse due date for markdown writer
-      const parsedDueDate = updatedReminder.dueDatetime
-        ? parseReminderDateValue(updatedReminder.dueDatetime, true)
-        : parseReminderDateValue(updatedReminder.dueDate, false);
-
-      // Use markdown writer directly (markdown-first is always enabled)
-      const indexed = plugin.reminderIndex?.getById(updatedReminder.id);
-      if (indexed) {
-        await plugin.markdownWriter.updateReminder(indexed, {
-          content: updatedReminder.content,
-          description: updatedReminder.description,
-          dueDate: parsedDueDate,
-          priority: updatedReminder.priority,
-          project: updatedReminder.project,
-          recurrence: updatedReminder.recurrence,
-          hasTime: !!updatedReminder.dueDatetime,
-        });
-
-        // VaultWatcher will handle rescanning after file modify event
-
-        new Notice("Reminder updated!");
-        if (onSave) onSave(null); // Trigger refresh
-      } else {
-        // Fallback to storage compatibility layer
-        await plugin.storage.update(updatedReminder.id, {
-          content: updatedReminder.content,
-          description: updatedReminder.description,
-          priority: updatedReminder.priority,
-          project: updatedReminder.project,
-          dueDate: updatedReminder.dueDate,
-          dueDatetime: updatedReminder.dueDatetime,
-          recurrence: updatedReminder.recurrence ?? null,
-        });
-        new Notice("Reminder updated!");
-
-        if (onSave) {
-          const saved = await plugin.storage.getByIdAsync(updatedReminder.id);
-          onSave(saved || updatedReminder);
-        }
+      const saved = await plugin.reminderRepository.update(updatedReminder.id, {
+        content: updatedReminder.content,
+        description: updatedReminder.description,
+        priority: updatedReminder.priority,
+        project: updatedReminder.project,
+        dueDate: updatedReminder.dueDate,
+        dueDatetime: updatedReminder.dueDatetime,
+        recurrence: updatedReminder.recurrence ?? null,
+      });
+      if (!saved) {
+        throw new Error(`Reminder not found: ${updatedReminder.id}`);
       }
+
+      new Notice("Reminder updated!");
+      onSave?.(saved);
     } catch (err) {
       new Notice("Failed to update reminder");
       log.error("Failed to update reminder", err);
@@ -136,32 +110,15 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     log.info(" Deleting reminder:", reminderToDelete?.id);
 
     try {
-      // Use markdown writer directly (markdown-first is always enabled)
-      const indexed = plugin.reminderIndex?.getById(reminderToDelete.id);
-      if (indexed) {
-        await plugin.markdownWriter.deleteReminder(indexed);
-
-        // VaultWatcher will handle rescanning after file modify event
-
-        new Notice("Reminder deleted");
-        if (onDelete) onDelete(reminderToDelete);
-      } else {
-        // Fallback to storage compatibility layer
-        const deleteResult = await plugin.storage.delete(reminderToDelete.id);
-        log.info(" storage.delete result:", deleteResult);
-
-        if (deleteResult) {
-          new Notice("Reminder deleted");
-        } else {
-          new Notice("Reminder not found in storage");
-          log.warn(" Reminder not found:", reminderToDelete.id);
-        }
-
-        if (onDelete) {
-          log.info(" Calling onDelete callback");
-          onDelete(reminderToDelete);
-        }
+      const deleted = await plugin.reminderRepository.delete(reminderToDelete.id);
+      if (!deleted) {
+        new Notice("Reminder not found");
+        log.warn(" Reminder not found:", reminderToDelete.id);
+        return;
       }
+
+      new Notice("Reminder deleted");
+      onDelete?.(reminderToDelete);
     } catch (err) {
       new Notice("Failed to delete reminder");
       log.error("Failed to delete reminder", err);

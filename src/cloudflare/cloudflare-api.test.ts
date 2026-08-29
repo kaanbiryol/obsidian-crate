@@ -5,7 +5,7 @@ import type { HttpTransport } from './http';
 const artifacts = {
 	version: '0.1.0',
 	fingerprint: 'f'.repeat(64),
-	workerBundle: 'export class ReminderAlarm {}\nexport class SetupCoordinator {}',
+	workerBundle: 'export class ReminderAlarm {}',
 	workerBundleSha256: 'worker-hash',
 	d1Migrations: [],
 };
@@ -23,7 +23,8 @@ describe('CloudflareApiClient', () => {
 		expect(body).toContain('"type":"d1","name":"DB"');
 		expect(body).toContain('"type":"r2_bucket","name":"BUCKET"');
 		expect(body).toContain('"name":"REMINDER_ALARMS","class_name":"ReminderAlarm"');
-		expect(body).toContain('"name":"SETUP","class_name":"SetupCoordinator"');
+		expect(body).not.toContain('"name":"SETUP"');
+		expect(body).toContain('"SetupCoordinator":{"type":"durable-object","state":"deleted"}');
 		expect(body).toContain('"storage":"sqlite","state":"created"');
 		expect(body).toContain('"workers/tag":"crate"');
 		expect(body).toContain(`"workers/message":"Crate 0.1.0 ${'f'.repeat(64)}"`);

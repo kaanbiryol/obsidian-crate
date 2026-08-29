@@ -191,8 +191,7 @@ export function handleCrateMark256(request: Request): Response {
 	return pngAssetResponse(request, CRATE_MARK_256_PNG);
 }
 
-export async function handleVapidPublicKey(db: D1Database | null): Promise<Response> {
-	if (!db) return corsResponse({ error: 'Database not available' }, 404);
+export async function handleVapidPublicKey(db: D1Database): Promise<Response> {
 	const keys = await getOrCreateVapidKeys(db);
 	return corsResponse({ publicKey: keys.publicKey });
 }

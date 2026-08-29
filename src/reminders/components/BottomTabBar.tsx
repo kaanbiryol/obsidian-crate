@@ -1,7 +1,8 @@
-import React, { memo, useRef, useEffect } from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Inbox, Calendar, CalendarRange, FolderOpen } from 'lucide-react';
 import { TABS, SPRING_CONFIG, type TabId } from '../ui/layoutConstants';
+import { ShadowDOMNativeButton } from './ShadowDOMButton';
 
 // Icon component map
 const IconMap = {
@@ -19,7 +20,7 @@ interface TabButtonProps {
 
 /**
  * Individual tab button component
- * Uses native button with capture-phase click for Shadow DOM compatibility
+ * Uses the shared capture-phase click bridge for Shadow DOM compatibility.
  */
 const TabButton = memo(function TabButton({
   tab,
@@ -27,25 +28,10 @@ const TabButton = memo(function TabButton({
   onTabChange,
 }: TabButtonProps) {
   const Icon = IconMap[tab.iconName];
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  // Use capture-phase click handler for Shadow DOM
-  useEffect(() => {
-    const button = buttonRef.current;
-    if (!button) return;
-
-    const handleClick = (e: MouseEvent) => {
-      e.stopPropagation();
-      onTabChange(tab.id);
-    };
-
-    button.addEventListener('click', handleClick, true);
-    return () => button.removeEventListener('click', handleClick, true);
-  }, [onTabChange, tab.id]);
 
   return (
-    <button
-      ref={buttonRef}
+    <ShadowDOMNativeButton
+      onClick={() => onTabChange(tab.id)}
       className={`bottom-tab-button${isActive ? ' is-active' : ''}`}
       data-action="switch-tab"
       data-tab={tab.id === 'browse' ? 'projects' : tab.id}
@@ -61,7 +47,7 @@ const TabButton = memo(function TabButton({
           {tab.label}
         </span>
       </div>
-    </button>
+    </ShadowDOMNativeButton>
   );
 });
 

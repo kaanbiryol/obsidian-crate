@@ -1,4 +1,5 @@
-// PWA primary-screen design. Obsidian owns its surrounding chrome and sizing.
+// Shared primary-screen density and hierarchy.
+// Each host supplies its own theme-aware surface, accent, and semantic colors.
 
 @mixin styles {
 

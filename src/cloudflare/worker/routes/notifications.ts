@@ -11,7 +11,7 @@ import { withDatabase } from './shared';
 
 export async function handleNotificationsRoute(
 	request: Request,
-	db: D1Database | null,
+	db: D1Database,
 	path: string,
 	method: RouteMethod,
 ): Promise<Response | null> {

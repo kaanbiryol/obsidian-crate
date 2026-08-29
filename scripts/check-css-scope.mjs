@@ -54,6 +54,7 @@ function isInsideKeyframes(rule) {
 const stylesheet = postcss.parse(await readFile(STYLES_PATH, 'utf8'), { from: STYLES_PATH });
 const unownedSelectors = new Set();
 const generatedSelectors = new Set();
+const normalizedGeneratedSelectors = new Set();
 
 stylesheet.walkRules((rule) => {
 	if (isInsideKeyframes(rule)) {
@@ -62,6 +63,7 @@ stylesheet.walkRules((rule) => {
 
 	for (const selector of splitSelectorList(rule.selector)) {
 		generatedSelectors.add(selector);
+		normalizedGeneratedSelectors.add(selector.replace(/,\s+/g, ','));
 		if (!selector.includes(OWNED_SELECTOR_FRAGMENT)) {
 			unownedSelectors.add(selector);
 		}
@@ -96,17 +98,19 @@ if (missingSameNodeSelectors.length > 0) {
 	console.log('Shadow DOM mount selectors target their classes on the same element.');
 }
 
-const pwaOnlySelectors = [
-	'.crate-reminders-ui .reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse)',
+const sharedPrimaryScreenSelectors = [
+	'.crate-reminders-ui .reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse)',
 ];
-const leakedPwaSelectors = pwaOnlySelectors.filter((selector) => generatedSelectors.has(selector));
+const missingSharedPrimaryScreenSelectors = sharedPrimaryScreenSelectors.filter(
+	(selector) => !normalizedGeneratedSelectors.has(selector),
+);
 
-if (leakedPwaSelectors.length > 0) {
-	console.error('Found PWA-only screen styles in the plugin stylesheet:');
-	for (const selector of leakedPwaSelectors) {
+if (missingSharedPrimaryScreenSelectors.length > 0) {
+	console.error('Missing shared primary-screen styles from the plugin stylesheet:');
+	for (const selector of missingSharedPrimaryScreenSelectors) {
 		console.error(`- ${selector}`);
 	}
 	process.exitCode = 1;
 } else {
-	console.log('PWA-only screen styles are excluded from the plugin stylesheet.');
+	console.log('Shared primary-screen styles are included in the plugin stylesheet.');
 }

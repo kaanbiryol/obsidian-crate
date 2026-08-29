@@ -49,9 +49,6 @@
 | `BUCKET` | R2 Bucket | File storage |
 | `DB` | D1 Database | Changelog + file manifest |
 | `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
-| `SETUP` | Durable Object Namespace | Retained compatibility binding; legacy device enrollment is closed |
-
-An optional legacy `AUTH_TOKEN` binding is still accepted as an authentication fallback, but new deployments use only per-device D1 tokens.
 
 ## Component Ownership
 
@@ -64,7 +61,7 @@ CratePlugin (src/plugin/CratePlugin.ts)
         │     uses: planner, transfer, queue, file-discovery, manifest
         ├── SyncApiClient (sync/api.ts) - HTTP calls to worker
         └── StatusBarManager (ui/status.ts) - status bar rendering
-  ├── Reminder runtime (reminders/runtime.ts) - index/writer/storage/watcher setup
+  ├── Reminder runtime (reminders/runtime.ts) - index/writer/repository/watcher setup
   ├── Reminder registrations (reminders/register-integrations.ts) - commands, code blocks, views
   ├── ReminderIndex (reminders/data/reminder-index/) - in-memory reminder index
   └── MarkdownWriter (reminders/data/markdown-writer/) - markdown CRUD for reminder lines
@@ -85,11 +82,11 @@ CratePlugin (src/plugin/CratePlugin.ts)
 
 Cloudflare account authorization is the sole authority for adding a vault-sync device. A fresh device signs in through OAuth, discovers matching `crate-<deployment-id>` Workers and their D1/R2 bindings, and chooses a server only when the account contains more than one. Crate then inserts or rotates that device's hashed bearer token directly through the Cloudflare D1 API.
 
-Disconnecting locally preserves non-secret deployment metadata so reconnecting the same vault converges on the same Worker. The legacy `SETUP` Durable Object export remains only so existing deployments can update without a destructive Durable Object migration; its fetch handler always returns `410 Gone`.
+Disconnecting locally preserves non-secret deployment metadata so reconnecting the same vault converges on the same Worker.
 
 ### Worker Authentication
 
-Authenticated requests carry a Bearer token in the `Authorization` header. The Worker hashes the bearer token and checks the `auth_tokens` D1 table. If no D1 token matches, it can fall back to a timing-safe comparison against an optional legacy `AUTH_TOKEN` secret binding.
+Authenticated requests carry a Bearer token in the `Authorization` header. The Worker hashes the bearer token and checks the `auth_tokens` D1 table. Missing or expired tokens are rejected, and D1 failures return `503` without falling back to a second credential system.
 
 Push-notification device enrollment is intentionally narrower: the plugin mints a short-lived, one-time push enrollment token from the worker and the notification PWA uses that scoped token only for `POST /notifications/subscribe`.
 

@@ -9,14 +9,15 @@ import {
 	formatMetadataCommitFailure,
 	formatMutationError,
 	getStoredFileRow,
-	legacyObjectKey,
 	MAX_FILE_BYTES,
 	parseExpectedFileHash,
 	parseDeclaredSize,
+	resolveStoredObjectKey,
+	storedObjectMatchesMetadata,
 	type FileStorageRow,
 } from './sync-storage';
 
-export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
+export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const url = new URL(request.url);
 	const rawPath = url.searchParams.get('path');
 	if (!rawPath) return corsResponse({ error: 'Path query parameter required' }, 400);
@@ -42,7 +43,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 	}
 
 	const expectedHash = parseExpectedFileHash(request.headers.get('X-Crate-Expected-Hash'));
-	if (db && (!request.headers.has('X-Crate-Expected-Hash') || expectedHash === undefined)) {
+	if (!request.headers.has('X-Crate-Expected-Hash') || expectedHash === undefined) {
 		return corsResponse({ error: 'Valid X-Crate-Expected-Hash header required' }, 400);
 	}
 
@@ -66,51 +67,47 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 		const hash = hashHeader || computedHash;
 		const size = declaredSize ?? computedSize;
 		let previousFile: FileStorageRow | null = null;
-		if (db) {
-			try {
-				await ensureSyncMetadata(db);
-				previousFile = await getStoredFileRow(db, safePath);
-			} catch (error: unknown) {
-				return corsResponse({
-					success: false,
-					path: safePath,
-					error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
-				}, 503);
-			}
+		try {
+			await ensureSyncMetadata(db);
+			previousFile = await getStoredFileRow(db, safePath);
+		} catch (error: unknown) {
+			return corsResponse({
+				success: false,
+				path: safePath,
+				error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
+			}, 503);
 		}
 
-		const objectKey = db ? createManagedObjectKey(hash) : legacyObjectKey(safePath);
+		const objectKey = createManagedObjectKey(hash);
 		await bucket.put(objectKey, body, {
 			httpMetadata: { contentType },
 			customMetadata: { hash },
 		});
 
-		if (db) {
-			try {
-				const commit = await commitStagedFile(bucket, db, {
-					path: safePath,
-					hash,
-					size,
-					objectKey,
-					expectedHash: expectedHash!,
-					previousFile,
-				});
-				if (!commit.committed) {
-					return corsResponse({
-						success: false,
-						path: safePath,
-						error: 'Remote file changed since it was read',
-						currentHash: commit.currentHash,
-					}, 409);
-				}
-			} catch (error: unknown) {
-				await deleteBucketObjectsQuietly(bucket, [objectKey]);
+		try {
+			const commit = await commitStagedFile(bucket, db, {
+				path: safePath,
+				hash,
+				size,
+				objectKey,
+				expectedHash: expectedHash!,
+				previousFile,
+			});
+			if (!commit.committed) {
 				return corsResponse({
 					success: false,
 					path: safePath,
-					error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
-				}, 503);
+					error: 'Remote file changed since it was read',
+					currentHash: commit.currentHash,
+				}, 409);
 			}
+		} catch (error: unknown) {
+			await deleteBucketObjectsQuietly(bucket, [objectKey]);
+			return corsResponse({
+				success: false,
+				path: safePath,
+				error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
+			}, 503);
 		}
 
 		return corsResponse({ success: true, path: safePath, hash });
@@ -120,7 +117,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 	}
 }
 
-export async function handleDownload(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
+export async function handleDownload(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const url = new URL(request.url);
 	const rawPath = url.searchParams.get('path');
 	if (!rawPath) return corsResponse({ error: 'Path query parameter required' }, 400);
@@ -128,22 +125,15 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 	const path = sanitizePath(rawPath);
 	if (!path) return corsResponse({ error: 'Invalid path' }, 400);
 
-	let objectKey: string | null;
 	let storedFile: FileStorageRow | null = null;
-	if (db) {
-		try {
-			await ensureSyncMetadata(db);
-			storedFile = await getStoredFileRow(db, path);
-			objectKey = storedFile
-				? storedFile.storageKey ?? legacyObjectKey(path)
-				: null;
-		} catch {
-			return corsResponse({ error: 'Sync metadata unavailable' }, 503);
-		}
-	} else {
-		objectKey = legacyObjectKey(path);
+	try {
+		await ensureSyncMetadata(db);
+		storedFile = await getStoredFileRow(db, path);
+	} catch {
+		return corsResponse({ error: 'Sync metadata unavailable' }, 503);
 	}
 
+	const objectKey = storedFile ? resolveStoredObjectKey(path, storedFile.storageKey) : null;
 	if (!objectKey) return corsResponse({ error: 'File not found' }, 404);
 	if (storedFile && storedFile.size > MAX_FILE_BYTES) {
 		return corsResponse({ error: 'File exceeds 25MB download limit' }, 413);
@@ -151,12 +141,9 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 
 	const obj = await bucket.get(objectKey);
 	if (!obj) {
-		return corsResponse({ error: db ? 'File content unavailable' : 'File not found' }, db ? 503 : 404);
+		return corsResponse({ error: 'File content unavailable' }, 503);
 	}
-	if (storedFile && (
-		(storedFile.size > 0 && obj.size !== storedFile.size)
-		|| (obj.customMetadata?.hash && obj.customMetadata.hash !== storedFile.hash)
-	)) {
+	if (storedFile && !storedObjectMatchesMetadata(obj, storedFile)) {
 		return corsResponse({ error: 'File content failed integrity validation' }, 503);
 	}
 	if (obj.size > MAX_FILE_BYTES) {
@@ -174,7 +161,7 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 	});
 }
 
-export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
+export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -186,37 +173,33 @@ export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Dat
 	const safePath = sanitizePath(rawPath);
 	if (!safePath) return corsResponse({ error: 'Invalid path' }, 400);
 	const expectedHash = parseExpectedFileHash(parsedBody.value.expectedHash);
-	if (db && (expectedHash === undefined || expectedHash === null)) {
+	if (expectedHash === undefined || expectedHash === null) {
 		return corsResponse({ error: 'Valid expectedHash required' }, 400);
 	}
 
 	let previousFile: FileStorageRow | null = null;
-	if (db) {
-		try {
-			await ensureSyncMetadata(db);
-			previousFile = await getStoredFileRow(db, safePath);
-			const commit = await commitFileDelete(bucket, db, {
-				path: safePath,
-				expectedHash: expectedHash!,
-				previousFile,
-			});
-			if (!commit.committed) {
-				return corsResponse({
-					success: false,
-					path: safePath,
-					error: 'Remote file changed since it was read',
-					currentHash: commit.currentHash,
-				}, 409);
-			}
-		} catch (error: unknown) {
+	try {
+		await ensureSyncMetadata(db);
+		previousFile = await getStoredFileRow(db, safePath);
+		const commit = await commitFileDelete(bucket, db, {
+			path: safePath,
+			expectedHash,
+			previousFile,
+		});
+		if (!commit.committed) {
 			return corsResponse({
 				success: false,
 				path: safePath,
-				error: formatMetadataCommitFailure('Delete', formatMutationError(error)),
-			}, 503);
+				error: 'Remote file changed since it was read',
+				currentHash: commit.currentHash,
+			}, 409);
 		}
-	} else {
-		await bucket.delete(legacyObjectKey(safePath));
+	} catch (error: unknown) {
+		return corsResponse({
+			success: false,
+			path: safePath,
+			error: formatMetadataCommitFailure('Delete', formatMutationError(error)),
+		}, 503);
 	}
 
 	return corsResponse({ success: true, path: safePath });

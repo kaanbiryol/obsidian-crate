@@ -11,7 +11,6 @@ import { ReorderableReminderList } from "@/reminders/components/ReorderableRemin
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
 import { openReminderCreationModal } from "@/reminders/ui/adapters/modals";
-import { formatLocalDateKey } from "@/reminders/utils/reminderDate";
 import {
   buildRemindersListPresentation,
   formatDateHeader,
@@ -41,7 +40,6 @@ export const RemindersList: React.FC<Props> = ({
 
   // Subscribe to index changes for automatic refresh
   const { refreshToken, triggerRefresh } = useIndexRefresh();
-  const todayPrefix = formatLocalDateKey(new Date());
 
   // State for reminders (needed because getAll is async when showCompleted is true)
   const [rawReminders, setRawReminders] = useState<Reminder[]>([]);
@@ -50,18 +48,16 @@ export const RemindersList: React.FC<Props> = ({
   useEffect(() => {
     const loadReminders = async () => {
       const loaded = await loadRemindersListData({
-        reminderIndex: plugin.reminderIndex,
-        storage: plugin.storage,
+        repository: plugin.reminderRepository,
         showToday,
         showUpcoming,
         showCompleted: showCompletedState,
         effectiveDays,
-        todayPrefix,
       });
       setRawReminders(loaded);
     };
     void loadReminders();
-  }, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken, todayPrefix]);
+  }, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken]);
 
   const presentation = useMemo(() => buildRemindersListPresentation({
     rawReminders,
@@ -84,7 +80,7 @@ export const RemindersList: React.FC<Props> = ({
   }, [presentation.activeReminders]);
 
   const handleReorderCommit = useCallback((orderedIds: string[]) => {
-    void plugin.storage.reorder(presentation.effectiveProject, orderedIds);
+    void plugin.reminderRepository.reorder(presentation.effectiveProject, orderedIds);
   }, [plugin, presentation.effectiveProject]);
 
   const renderCard = useCallback((reminder: Reminder, _index: number) => (

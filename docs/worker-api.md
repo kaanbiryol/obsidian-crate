@@ -4,12 +4,9 @@ Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the 
 
 ## Authentication
 
-All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have either `vault` or `reminders` scope, and may have an expiry. The Worker validates the token in two steps:
+All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have either `vault` or `reminders` scope, and may have an expiry. The Worker hashes the bearer token with SHA-256 and looks up the hash in the `auth_tokens` D1 table. Authentication fails closed with `503` when D1 is unavailable.
 
-1. Hash the bearer token with SHA-256 and look up the hash in the `auth_tokens` D1 table
-2. If not found, optionally fall back to timing-safe comparison against a legacy `AUTH_TOKEN` secret binding
-
-New deployments use independent device tokens stored in D1 and do not configure the fallback binding. Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens that cannot call sync, settings, device-management, scheduled-reminder, or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
+Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens that cannot call sync, settings, device-management, scheduled-reminder, or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
 ## Endpoints
 

@@ -173,7 +173,6 @@ describe('CloudflareDeploymentService', () => {
 				{ type: 'd1', name: 'DB', id: 'existing-database-id' },
 				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-fedcba9876543210' },
 				{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },
-				{ type: 'durable_object_namespace', name: 'SETUP', class_name: 'SetupCoordinator' },
 			],
 		});
 		const harness = createHarness();

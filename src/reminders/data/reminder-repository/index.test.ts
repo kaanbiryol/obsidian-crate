@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ReminderIndex, IndexedReminder } from '../reminder-index';
 import type { MarkdownWriter } from '../markdown-writer';
-import { createStorageCompat } from '.';
+import { createReminderRepository } from '.';
 import { timezone as getLocalTimeZone } from '../../utils/time';
 
 function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
@@ -67,7 +67,7 @@ function createWriter(): {
 	};
 }
 
-describe('storageCompat.create', () => {
+describe('reminderRepository.create', () => {
 	it('returns the persisted reminder id when the index already reflects the create', async () => {
 		const filePath = 'Reminders/Work.md';
 		let persistedId: string | undefined;
@@ -88,9 +88,9 @@ describe('storageCompat.create', () => {
 			},
 		});
 		const { writer, spies } = createWriter();
-		const storage = createStorageCompat(index, writer);
+		const repository = createReminderRepository(index, writer);
 
-		const created = await storage.create({
+		const created = await repository.create({
 			content: 'Task A',
 			project: 'Work',
 			priority: 1,
@@ -113,10 +113,10 @@ describe('storageCompat.create', () => {
 	it('passes recurrence through on create', async () => {
 		const index = createIndex();
 		const { writer, spies } = createWriter();
-		const storage = createStorageCompat(index, writer);
+		const repository = createReminderRepository(index, writer);
 
 		const recurrence = { frequency: 'daily' as const };
-		const created = await storage.create({
+		const created = await repository.create({
 			content: 'Task recur',
 			project: 'Work',
 			priority: 1,
@@ -138,9 +138,9 @@ describe('storageCompat.create', () => {
 	it('passes date-only reminders through with hasTime false', async () => {
 		const index = createIndex();
 		const { writer, spies } = createWriter();
-		const storage = createStorageCompat(index, writer);
+		const repository = createReminderRepository(index, writer);
 
-		await storage.create({
+		await repository.create({
 			content: 'Task dated',
 			project: 'Work',
 			priority: 4,
@@ -157,9 +157,9 @@ describe('storageCompat.create', () => {
 	it('returns the generated reminder id when optimistic state is unavailable', async () => {
 		const index = createIndex();
 		const { writer, spies } = createWriter();
-		const storage = createStorageCompat(index, writer);
+		const repository = createReminderRepository(index, writer);
 
-		const created = await storage.create({
+		const created = await repository.create({
 			content: 'Task B',
 			project: 'Inbox',
 			priority: 4,
@@ -172,7 +172,7 @@ describe('storageCompat.create', () => {
 	});
 });
 
-describe('storageCompat.update and today view', () => {
+describe('reminderRepository.update and today view', () => {
 	it('passes recurrence removal through to the writer', async () => {
 		const indexedReminder: IndexedReminder = {
 			id: 'r1',
@@ -191,9 +191,9 @@ describe('storageCompat.update and today view', () => {
 			getById: (id: string) => id === 'r1' ? indexedReminder : undefined,
 		});
 		const { writer, spies } = createWriter();
-		const storage = createStorageCompat(index, writer);
+		const repository = createReminderRepository(index, writer);
 
-		await storage.update('r1', { recurrence: null });
+		await repository.update('r1', { recurrence: null });
 
 		expect(spies.updateReminder).toHaveBeenCalledWith(
 			indexedReminder,
@@ -238,9 +238,9 @@ describe('storageCompat.update and today view', () => {
 			}],
 		});
 		const { writer } = createWriter();
-		const storage = createStorageCompat(index, writer);
+		const repository = createReminderRepository(index, writer);
 
-		expect(storage.getTodayReminders(true).map(reminder => reminder.id)).toEqual(['active', 'completed']);
+		expect(repository.getTodayReminders(true).map(reminder => reminder.id)).toEqual(['active', 'completed']);
 
 		vi.useRealTimers();
 	});
@@ -263,26 +263,26 @@ describe('storageCompat.update and today view', () => {
 			getCompleted: () => [{ ...indexedReminder, id: 'done', completed: true }],
 		});
 		const { writer, spies } = createWriter();
-		const storage = createStorageCompat(index, writer);
+		const repository = createReminderRepository(index, writer);
 
-		expect(await storage.delete('r1')).toBe(true);
+		expect(await repository.delete('r1')).toBe(true);
 		expect(spies.deleteReminder).toHaveBeenCalledWith(indexedReminder);
 
-		const completed = await storage.complete('r1');
+		const completed = await repository.complete('r1');
 		expect(spies.toggleComplete).toHaveBeenNthCalledWith(1, indexedReminder);
 		expect(completed?.completed).toBe(true);
 		expect(completed?.completedAt).toEqual(expect.any(String));
 
 		indexedReminder = { ...indexedReminder, completed: true };
-		const uncompleted = await storage.uncomplete('r1');
+		const uncompleted = await repository.uncomplete('r1');
 		expect(spies.toggleComplete).toHaveBeenNthCalledWith(2, indexedReminder);
 		expect(uncompleted?.completed).toBe(false);
 		expect(uncompleted?.completedAt).toBeUndefined();
 
-		await storage.reorder('Work', ['r1', 'done']);
+		await repository.reorder('Work', ['r1', 'done']);
 		expect(spies.reorderReminders).toHaveBeenCalledWith('Reminders/Work.md', ['r1', 'done']);
 
-		expect(storage.getStats()).toEqual({
+		expect(repository.getStats()).toEqual({
 			activeCount: 1,
 			completedCount: 1,
 			totalCount: 2,
@@ -305,14 +305,14 @@ describe('storageCompat.update and today view', () => {
 			getById: (id: string) => id === 'r1' ? indexedReminder : undefined,
 		});
 		const { writer, spies } = createWriter();
-		const storage = createStorageCompat(index, writer);
+		const repository = createReminderRepository(index, writer);
 
-		const completed = await storage.complete('r1');
+		const completed = await repository.complete('r1');
 		expect(completed?.completed).toBe(true);
 		expect(spies.toggleComplete).not.toHaveBeenCalled();
 
 		indexedReminder = { ...indexedReminder, completed: false, rawLine: '- [ ] Task A' };
-		const uncompleted = await storage.uncomplete('r1');
+		const uncompleted = await repository.uncomplete('r1');
 
 		expect(uncompleted?.completed).toBe(false);
 		expect(spies.toggleComplete).not.toHaveBeenCalled();

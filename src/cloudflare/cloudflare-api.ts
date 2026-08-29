@@ -107,14 +107,13 @@ export function buildWorkerMultipartBody(input: {
 			'workers/tag': 'crate',
 		},
 		bindings: [
-			{ type: 'd1', name: 'DB', id: input.d1DatabaseId },
-			{ type: 'r2_bucket', name: 'BUCKET', bucket_name: input.r2BucketName },
-			{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },
-			{ type: 'durable_object_namespace', name: 'SETUP', class_name: 'SetupCoordinator' },
-		],
+				{ type: 'd1', name: 'DB', id: input.d1DatabaseId },
+				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: input.r2BucketName },
+				{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },
+			],
 		exports: {
 			ReminderAlarm: { type: 'durable-object', storage: 'sqlite', state: 'created' },
-			SetupCoordinator: { type: 'durable-object', storage: 'sqlite', state: 'created' },
+			SetupCoordinator: { type: 'durable-object', state: 'deleted' },
 		},
 	};
 	const parts = [

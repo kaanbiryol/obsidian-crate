@@ -2,8 +2,8 @@
 @use '../../reminders/ui/shared/styles/projects';
 @use '../../reminders/ui/shared/styles/project-detail';
 @use '../../reminders/ui/shared/styles/reminder-cards';
+@use '../../reminders/ui/shared/styles/primary-screen';
 @use './layout-modes';
-@use './primary-screen';
 
 .crate-reminders-ui {
 	@include shell.styles;

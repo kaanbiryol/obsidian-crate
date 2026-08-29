@@ -329,14 +329,6 @@
     color: var(--text-muted);
 }
 
-// Keep the shared disclosure button independent of document-level button resets.
-.completed-section-toggle {
-    appearance: none;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
 // ============================================
 // Project Picker Modal Scrollbar
 // ============================================

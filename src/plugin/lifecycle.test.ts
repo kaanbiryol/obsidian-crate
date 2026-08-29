@@ -10,6 +10,7 @@ type SyncRuntimeTarget = {
 };
 
 const initializeReminders = vi.fn();
+const reconcileReminderNotifications = vi.fn();
 const initializeSyncManagers = vi.fn<(target: SyncRuntimeTarget) => void>();
 const registerSyncCommands = vi.fn();
 const registerVaultSyncEventHandlers = vi.fn();
@@ -79,6 +80,7 @@ async function loadLifecycleModule() {
 	}));
 	vi.doMock('../reminders/plugin-integration', () => ({
 		initializeReminders,
+		reconcileReminderNotifications,
 	}));
 	vi.doMock('../sync/plugin-integration', () => ({
 		initializeSyncManagers,
@@ -119,6 +121,7 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
 	noticeMessages.length = 0;
 	initializeReminders.mockReset();
+	reconcileReminderNotifications.mockReset();
 	initializeSyncManagers.mockReset();
 	registerSyncCommands.mockReset();
 	registerVaultSyncEventHandlers.mockReset();
@@ -172,6 +175,7 @@ describe('bootstrapPlugin', () => {
 		expect(syncInitialize).toHaveBeenCalledTimes(1);
 		expect(registerSyncCommands).toHaveBeenCalledWith(plugin);
 		expect(initializeReminders).toHaveBeenCalledWith(plugin);
+		expect(reconcileReminderNotifications).toHaveBeenCalledWith(plugin);
 		expect(createCloudflareDeploymentService).toHaveBeenCalledWith(plugin);
 		expect(showCloudflareServerUpdateNotice).toHaveBeenCalledWith(plugin);
 		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(2);

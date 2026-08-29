@@ -217,7 +217,6 @@ async function createEnv(input: {
 		env: {
 			BUCKET: bucket,
 			DB: db,
-			AUTH_TOKEN: 'secret-token',
 			REMINDER_ALARMS: {
 				idFromName: vi.fn((name: string) => name),
 				get: vi.fn((name: string) => ({

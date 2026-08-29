@@ -1,9 +1,8 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from '../main';
 import { createReminderIndex } from './data/reminder-index';
-import { migrateReminderIds } from './data/reminderIdMigration';
 import { createMarkdownWriter } from './data/markdown-writer';
-import { createStorageCompat } from './data/storage-compat';
+import { createReminderRepository } from './data/reminder-repository';
 import { ReminderNotificationService } from './services/notificationService';
 import { VaultWatcher } from './services/vaultWatcher';
 import { createLogger } from './utils/logger';
@@ -39,25 +38,11 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	plugin.reminderIndex = createReminderIndex(plugin.app, folderPath);
 	await plugin.reminderIndex.load();
 	plugin.markdownWriter = createMarkdownWriter(plugin.app, plugin.reminderIndex);
-	plugin.storage = createStorageCompat(plugin.reminderIndex, plugin.markdownWriter);
+	plugin.reminderRepository = createReminderRepository(plugin.reminderIndex, plugin.markdownWriter);
 	configureReminderWriterCallbacks(plugin);
-	await reconcileReminderNotifications(plugin);
 
 	plugin.remindersVaultWatcher = new VaultWatcher(plugin, plugin.reminderIndex);
 	plugin.remindersVaultWatcher.register();
-
-	const migrate = async () => {
-		const result = await migrateReminderIds(plugin.app, folderPath);
-		if (result.remindersUpdated > 0) {
-			await plugin.reminderIndex.load();
-		}
-	};
-
-	if (plugin.app.workspace.layoutReady) {
-		await migrate();
-	} else {
-		plugin.app.workspace.onLayoutReady(() => void migrate());
-	}
 }
 
 export async function reconcileReminderNotifications(plugin: CratePlugin): Promise<void> {

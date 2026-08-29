@@ -3,7 +3,7 @@
  *
  * Adapts the shared ReminderCard component to the plugin's API with platform-specific behavior:
  * - animations disabled (parent handles animations via Framer Motion)
- * - Integrates with plugin storage and modal system
+ * - Integrates with the reminder repository and modal system
  */
 import { Notice } from 'obsidian';
 import React, { useCallback, useRef } from 'react';
@@ -64,16 +64,10 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
     }
 
     try {
-      const indexed = plugin.reminderIndex?.getById(reminder.id);
-      if (indexed) {
-        await plugin.markdownWriter.toggleComplete(indexed);
+      if (reminder.completed) {
+        await plugin.reminderRepository.uncomplete(reminder.id);
       } else {
-        // Fallback to storage compatibility layer
-        if (reminder.completed) {
-          await plugin.storage.uncomplete(reminder.id);
-        } else {
-          await plugin.storage.complete(reminder.id);
-        }
+        await plugin.reminderRepository.complete(reminder.id);
       }
     } catch (error) {
       log.error('Failed to toggle reminder', error);

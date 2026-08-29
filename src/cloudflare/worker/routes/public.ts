@@ -29,7 +29,7 @@ export async function handlePublicRoute(
 	path: string,
 	method: RouteMethod,
 ): Promise<Response | null> {
-	const db = env.DB || null;
+	const db = env.DB;
 	if (path === '/.well-known/crate' && method === 'GET') return handleServerInfo();
 	if (path === '/' && method === 'GET') return handleServerInfo();
 	if (path === '/notifications' && method === 'GET') return handleNotificationsPage(request);

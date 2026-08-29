@@ -10,6 +10,28 @@
   // Let Obsidian own the surrounding surface instead of HeroUI's theme background.
   background-color: transparent;
 
+  &,
+  &::before,
+  &::after,
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  :where(button, input, textarea, select) {
+    color: inherit;
+    font: inherit;
+  }
+
+  :where(button) {
+    margin: 0;
+    border: 0;
+    appearance: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
   @each $name, $color in colors.$reminder-colors {
     --reminder-#{$name}: #{$color};
   }

@@ -13,7 +13,6 @@ import {
 	type PwaThemePreference,
 } from '../theme';
 
-export { preferredPwaColorScheme } from '../theme';
 export type { PwaColorScheme, PwaThemePreference } from '../theme';
 
 function applyPwaColorScheme(preference: PwaThemePreference, colorScheme: PwaColorScheme): void {

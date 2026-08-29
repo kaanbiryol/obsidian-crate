@@ -136,9 +136,9 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     // Subscribe to index changes for automatic refresh (replaces 5-second polling)
     const { refreshToken, triggerRefresh } = useIndexRefresh();
 
-    // Get all reminders from storage
+    // Get all reminders from the repository.
     const updateReminders = useCallback(() => {
-        const allReminders = plugin.storage.getAll();
+        const allReminders = plugin.reminderRepository.getAll();
         setReminders(allReminders);
         setIsInitialLoadComplete(true);
     }, [plugin]);
@@ -164,7 +164,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     ), [isDarkMode, triggerRefresh]);
 
     const handleReorder = useCallback(async (project: string, orderedIds: string[]) => {
-        await plugin.storage.reorder(project, orderedIds);
+        await plugin.reminderRepository.reorder(project, orderedIds);
     }, [plugin]);
 
     return (

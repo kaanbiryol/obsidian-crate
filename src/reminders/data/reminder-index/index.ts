@@ -7,7 +7,7 @@
  */
 
 import type { App, TFile } from "obsidian";
-import type { Priority, RecurrenceRule, Reminder } from "@/reminders/types/reminder";
+import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
 import { createLogger } from "@/reminders/utils/logger";
 import { isReminderOverdue, isReminderToday, isReminderWithinDays } from "./dates";
 import { createReminderLookupStore } from "./lookup-store";
@@ -255,25 +255,5 @@ export function createReminderIndex(app: App, remindersFolderPath: string): Remi
       optimisticState.clear(id);
       notifyListeners();
     },
-  };
-}
-
-export function indexedToReminder(indexed: IndexedReminder): Reminder {
-  const now = new Date().toISOString();
-  return {
-    id: indexed.id,
-    content: indexed.content,
-    description: indexed.description,
-    dueDate: indexed.dueDate,
-    dueDatetime: indexed.dueDatetime,
-    priority: indexed.priority,
-    completed: indexed.completed,
-    project: indexed.project,
-    fileLink: indexed.filePath,
-    recurrence: indexed.recurrence,
-    lineNumber: indexed.lineNumber,
-    createdAt: now,
-    updatedAt: now,
-    completedAt: indexed.completed ? now : undefined,
   };
 }

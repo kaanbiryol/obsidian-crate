@@ -37,7 +37,7 @@ type MockPlugin = {
 	addCommand: ReturnType<typeof vi.fn>;
 	reminderIndex?: unknown;
 	markdownWriter?: unknown;
-	storage?: unknown;
+	reminderRepository?: unknown;
 	remindersVaultWatcher?: {
 		register?: ReturnType<typeof vi.fn>;
 		unregister: ReturnType<typeof vi.fn>;
@@ -51,8 +51,7 @@ const reminderIndexGetAll = vi.fn(() => [{ id: 'r1' }]);
 const reminderIndexRescanFile = vi.fn(async () => {});
 const reminderIndexFactory = vi.fn();
 const createMarkdownWriter = vi.fn();
-const createStorageCompat = vi.fn();
-const migrateReminderIds = vi.fn();
+const createReminderRepository = vi.fn();
 const reminderQueryOnNewBlock = vi.fn();
 const reminderQueryOnTodayBlock = vi.fn();
 const reminderQueryOnUpcomingBlock = vi.fn();
@@ -89,14 +88,11 @@ async function loadPluginIntegrationModule() {
 	vi.doMock('./data/reminder-index', () => ({
 		createReminderIndex: reminderIndexFactory,
 	}));
-	vi.doMock('./data/reminderIdMigration', () => ({
-		migrateReminderIds,
-	}));
 	vi.doMock('./data/markdown-writer', () => ({
 		createMarkdownWriter,
 	}));
-	vi.doMock('./data/storage-compat', () => ({
-		createStorageCompat,
+	vi.doMock('./data/reminder-repository', () => ({
+		createReminderRepository,
 	}));
 	vi.doMock('./query/injector', () => ({
 		ReminderQueryInjector: class ReminderQueryInjector {
@@ -189,8 +185,7 @@ beforeEach(() => {
 	reminderIndexRescanFile.mockReset();
 	reminderIndexFactory.mockReset();
 	createMarkdownWriter.mockReset();
-	createStorageCompat.mockReset();
-	migrateReminderIds.mockReset();
+	createReminderRepository.mockReset();
 	reminderQueryOnNewBlock.mockReset();
 	reminderQueryOnTodayBlock.mockReset();
 	reminderQueryOnUpcomingBlock.mockReset();
@@ -220,10 +215,9 @@ beforeEach(() => {
 		rescanFile: reminderIndexRescanFile,
 	}));
 	createMarkdownWriter.mockImplementation(() => latestWriter);
-	createStorageCompat.mockReturnValue({
+	createReminderRepository.mockReturnValue({
 		getProjects: vi.fn(() => ['Inbox', 'Work']),
 	});
-	migrateReminderIds.mockResolvedValue({ remindersUpdated: 0 });
 	createRemindersBlockExtension.mockReturnValue('extension');
 	loadRemindersSettings.mockImplementation(async (plugin) => {
 		plugin.remindersSettings = {
@@ -239,9 +233,8 @@ afterEach(() => {
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
 	vi.doUnmock('./data/reminder-index');
-	vi.doUnmock('./data/reminderIdMigration');
 	vi.doUnmock('./data/markdown-writer');
-	vi.doUnmock('./data/storage-compat');
+	vi.doUnmock('./data/reminder-repository');
 	vi.doUnmock('./query/injector');
 	vi.doUnmock('./query/remindersBlockLivePreview');
 	vi.doUnmock('./commands');
@@ -264,8 +257,8 @@ describe('initializeReminders', () => {
 		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders');
 		expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
 		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex);
-		expect(createStorageCompat).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
-		expect(notificationReconcile).toHaveBeenCalledWith([{ id: 'r1' }]);
+		expect(createReminderRepository).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
+		expect(notificationReconcile).not.toHaveBeenCalled();
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
 		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(4);
 		expect(plugin.registerEditorExtension).toHaveBeenCalledWith('extension');
@@ -325,6 +318,7 @@ describe('reinitializeReminders', () => {
 
 		expect(oldWatcher.unregister).toHaveBeenCalledTimes(1);
 		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders/Work');
+		expect(notificationReconcile).toHaveBeenCalledWith([{ id: 'r1' }]);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
 	});
 });

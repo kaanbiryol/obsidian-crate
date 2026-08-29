@@ -13,7 +13,7 @@ export async function handleAuthRoute(
 	path: string,
 	method: RouteMethod,
 ): Promise<Response | null> {
-	const db = env.DB || null;
+	const db = env.DB;
 	if (path === '/auth/tokens' && method === 'DELETE') {
 		return await withDatabase(db, requiredDb => handleRevokeToken(request, requiredDb));
 	}

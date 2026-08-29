@@ -2,7 +2,7 @@ import type { MarkdownWriter } from "../markdown-writer";
 import type { ReminderIndex } from "../reminder-index";
 import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
 
-export interface StorageCompat {
+export interface ReminderRepository {
   getAll(): Reminder[];
   getActive(): Reminder[];
   getCompleted(): Reminder[];
@@ -26,7 +26,7 @@ export interface StorageCompat {
   getStats(): { activeCount: number; completedCount: number; totalCount: number };
 }
 
-export interface StorageCompatContext {
+export interface ReminderRepositoryContext {
   index: ReminderIndex;
   writer: MarkdownWriter;
 }

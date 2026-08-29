@@ -14,12 +14,13 @@ import {
 	ensureSyncMetadata,
 	formatMetadataCommitFailure,
 	formatMutationError,
-	legacyObjectKey,
 	loadStoredFileRows,
 	MAX_BATCH_FILES,
 	MAX_BATCH_DOWNLOAD_BYTES,
 	MAX_BATCH_TOTAL_BYTES,
 	parseExpectedFileHash,
+	resolveStoredObjectKey,
+	storedObjectMatchesMetadata,
 	type ExpectedFileHash,
 	type FileStorageRow,
 } from './sync-storage';
@@ -38,7 +39,7 @@ interface BatchDeleteFile {
 	expectedHash?: unknown;
 }
 
-export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
+export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const parsedBody = await parseJsonObject(request, 15 * 1024 * 1024);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -79,7 +80,7 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 		seenPaths.add(safePath);
 
 		const expectedHash = parseExpectedFileHash(file.expectedHash);
-		if (db && expectedHash === undefined) {
+		if (expectedHash === undefined) {
 			results.push({ path: safePath, success: false, error: 'Valid expectedHash required' });
 			continue;
 		}
@@ -130,7 +131,7 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 				hash: providedHash || computedHash,
 				size,
 				contentType: parseOptionalString(file.contentType, 255) || 'application/octet-stream',
-				objectKey: db ? createManagedObjectKey(providedHash || computedHash) : legacyObjectKey(safePath),
+				objectKey: createManagedObjectKey(providedHash || computedHash),
 				expectedHash: expectedHash ?? null,
 			});
 		} catch (err: unknown) {
@@ -140,7 +141,7 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 	}
 
 	let previousFiles = new Map<string, FileStorageRow>();
-	if (db && uploads.length > 0) {
+	if (uploads.length > 0) {
 		try {
 			await ensureSyncMetadata(db);
 			previousFiles = await loadStoredFileRows(db, uploads.map((file) => file.safePath));
@@ -163,34 +164,28 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 				httpMetadata: { contentType: file.contentType },
 				customMetadata: { hash: file.hash },
 			});
-			if (db) {
-				const commit = await commitStagedFile(bucket, db, {
+			const commit = await commitStagedFile(bucket, db, {
+				path: file.safePath,
+				hash: file.hash,
+				size: file.size,
+				objectKey: file.objectKey,
+				expectedHash: file.expectedHash,
+				previousFile: previousFiles.get(file.safePath) ?? null,
+			});
+			if (!commit.committed) {
+				results.push({
 					path: file.safePath,
-					hash: file.hash,
-					size: file.size,
-					objectKey: file.objectKey,
-					expectedHash: file.expectedHash,
-					previousFile: previousFiles.get(file.safePath) ?? null,
+					success: false,
+					error: `Remote file changed since it was read${commit.currentHash ? ` (current hash: ${commit.currentHash})` : ''}`,
 				});
-				if (!commit.committed) {
-					results.push({
-						path: file.safePath,
-						success: false,
-						error: `Remote file changed since it was read${commit.currentHash ? ` (current hash: ${commit.currentHash})` : ''}`,
-					});
-					return;
-				}
+				return;
 			}
 
 			results.push({ path: file.safePath, success: true, hash: file.hash });
 		} catch (err: unknown) {
-			if (db) {
-				metadataFailure = true;
-				await deleteBucketObjectsQuietly(bucket, [file.objectKey]);
-			}
-			const message = db
-				? formatMetadataCommitFailure('Upload', formatMutationError(err))
-				: formatMutationError(err);
+			metadataFailure = true;
+			await deleteBucketObjectsQuietly(bucket, [file.objectKey]);
+			const message = formatMetadataCommitFailure('Upload', formatMutationError(err));
 			results.push({ path: file.safePath, success: false, error: message });
 		}
 	}));
@@ -198,7 +193,7 @@ export async function handleBatchUpload(request: Request, bucket: R2Bucket, db: 
 	return corsResponse({ success: results.every(r => r.success), results }, metadataFailure ? 503 : 200);
 }
 
-export async function handleBatchDownload(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
+export async function handleBatchDownload(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -216,18 +211,16 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket, db
 	}
 
 	let storedFiles = new Map<string, FileStorageRow>();
-	if (db) {
-		try {
-			await ensureSyncMetadata(db);
-			storedFiles = await loadStoredFileRows(db, paths);
-			const declaredTotal = Array.from(storedFiles.values())
-				.reduce((total, file) => total + file.size, 0);
-			if (declaredTotal > MAX_BATCH_DOWNLOAD_BYTES) {
-				return corsResponse({ error: 'Batch download exceeds 8MB limit; download files individually' }, 413);
-			}
-		} catch {
-			return corsResponse({ error: 'Sync metadata unavailable' }, 503);
+	try {
+		await ensureSyncMetadata(db);
+		storedFiles = await loadStoredFileRows(db, paths);
+		const declaredTotal = Array.from(storedFiles.values())
+			.reduce((total, file) => total + file.size, 0);
+		if (declaredTotal > MAX_BATCH_DOWNLOAD_BYTES) {
+			return corsResponse({ error: 'Batch download exceeds 8MB limit; download files individually' }, 413);
 		}
+	} catch {
+		return corsResponse({ error: 'Sync metadata unavailable' }, 503);
 	}
 
 	const files: Array<{ path: string; content: string; hash: string; size: number; contentType: string; error?: string }> = [];
@@ -241,11 +234,9 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket, db
 
 		try {
 			const storedFile = storedFiles.get(safePath) ?? null;
-			const objectKey = db
-				? storedFile
-					? storedFile.storageKey ?? legacyObjectKey(safePath)
-					: null
-				: legacyObjectKey(safePath);
+			const objectKey = storedFile
+				? resolveStoredObjectKey(safePath, storedFile.storageKey)
+				: null;
 			if (!objectKey) {
 				files.push({ path: safePath, content: '', hash: '', size: 0, contentType: '', error: 'File not found' });
 				continue;
@@ -259,14 +250,11 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket, db
 					hash: '',
 					size: 0,
 					contentType: '',
-					error: db ? 'File content unavailable' : 'File not found',
+					error: 'File content unavailable',
 				});
 				continue;
 			}
-			if (storedFile && (
-				(storedFile.size > 0 && obj.size !== storedFile.size)
-				|| (obj.customMetadata?.hash && obj.customMetadata.hash !== storedFile.hash)
-			)) {
+			if (storedFile && !storedObjectMatchesMetadata(obj, storedFile)) {
 				files.push({
 					path: safePath,
 					content: '',
@@ -309,7 +297,7 @@ export async function handleBatchDownload(request: Request, bucket: R2Bucket, db
 	return corsResponse({ files });
 }
 
-export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: D1Database | null): Promise<Response> {
+export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -346,7 +334,7 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 	}
 
 	let previousFiles = new Map<string, FileStorageRow>();
-	if (db && validFiles.length > 0) {
+	if (validFiles.length > 0) {
 		try {
 			await ensureSyncMetadata(db);
 			previousFiles = await loadStoredFileRows(db, validFiles.map((file) => file.path));
@@ -365,34 +353,26 @@ export async function handleBatchDelete(request: Request, bucket: R2Bucket, db: 
 	let metadataFailure = false;
 	for (const file of validFiles) {
 		try {
-			if (db) {
-				const commit = await commitFileDelete(bucket, db, {
+			const commit = await commitFileDelete(bucket, db, {
+				path: file.path,
+				expectedHash: file.expectedHash,
+				previousFile: previousFiles.get(file.path) ?? null,
+			});
+			if (!commit.committed) {
+				errors.push({
 					path: file.path,
-					expectedHash: file.expectedHash,
-					previousFile: previousFiles.get(file.path) ?? null,
+					error: 'Remote file changed since it was read',
+					status: 409,
+					currentHash: commit.currentHash,
 				});
-				if (!commit.committed) {
-					errors.push({
-						path: file.path,
-						error: 'Remote file changed since it was read',
-						status: 409,
-						currentHash: commit.currentHash,
-					});
-					continue;
-				}
-				deleted.push(file.path);
 				continue;
 			}
-
-			await bucket.delete(legacyObjectKey(file.path));
 			deleted.push(file.path);
 		} catch (error: unknown) {
-			if (db) metadataFailure = true;
+			metadataFailure = true;
 			errors.push({
 				path: file.path,
-				error: db
-					? formatMetadataCommitFailure('Delete', formatMutationError(error))
-					: formatMutationError(error),
+				error: formatMetadataCommitFailure('Delete', formatMutationError(error)),
 			});
 		}
 	}

@@ -1,7 +1,5 @@
 export interface Env {
 	BUCKET: R2Bucket;
-	DB: D1Database | null;
-	AUTH_TOKEN: string;
+	DB: D1Database;
 	REMINDER_ALARMS: DurableObjectNamespace;
-	SETUP: DurableObjectNamespace;
 }

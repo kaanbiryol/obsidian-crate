@@ -32,10 +32,6 @@ export async function scheduleScheduledReminder(
 	}
 
 	const db = env.DB;
-	if (!db) {
-		throw new Error('Database not available');
-	}
-
 	await initDb(db);
 
 	const id = env.REMINDER_ALARMS.idFromName(reminderId);
@@ -62,10 +58,6 @@ export async function scheduleScheduledReminder(
 
 export async function cancelScheduledReminder(env: Env, reminderId: string): Promise<void> {
 	const db = env.DB;
-	if (!db) {
-		throw new Error('Database not available');
-	}
-
 	await initDb(db);
 
 	const id = env.REMINDER_ALARMS.idFromName(reminderId);

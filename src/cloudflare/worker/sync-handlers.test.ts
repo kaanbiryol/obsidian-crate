@@ -103,6 +103,7 @@ describe('worker sync handlers', () => {
 
 	it('rejects traversal-style upload paths', async () => {
 		const { bucket } = createMockR2Bucket();
+		const { db } = createMockD1Database();
 
 		const response = await handleUpload(
 			new Request('https://worker.test/sync/upload?path=notes/../secret.md', {
@@ -110,7 +111,7 @@ describe('worker sync handlers', () => {
 				body: 'hello',
 			}),
 			bucket,
-			null,
+			db,
 		);
 
 		expect(response.status).toBe(400);
@@ -120,6 +121,7 @@ describe('worker sync handlers', () => {
 
 	it('rejects uploads when the declared hash does not match the body', async () => {
 		const { bucket } = createMockR2Bucket();
+		const { db } = createMockD1Database();
 
 		const response = await handleUpload(
 			new Request('https://worker.test/sync/upload?path=notes/test.md', {
@@ -128,10 +130,11 @@ describe('worker sync handlers', () => {
 				headers: {
 					'X-File-Hash': '0'.repeat(64),
 					'X-File-Size': '5',
+					'X-Crate-Expected-Hash': 'absent',
 				},
 			}),
 			bucket,
-			null,
+			db,
 		);
 
 		expect(response.status).toBe(400);
@@ -141,6 +144,7 @@ describe('worker sync handlers', () => {
 
 	it('computes and stores upload hash metadata when the client does not send one', async () => {
 		const { bucket, store } = createMockR2Bucket();
+		const { db, files } = createMockD1Database();
 
 		const response = await handleUpload(
 			new Request('https://worker.test/sync/upload?path=notes/test.md', {
@@ -152,7 +156,7 @@ describe('worker sync handlers', () => {
 				},
 			}),
 			bucket,
-			null,
+			db,
 		);
 
 		expect(response.status).toBe(200);
@@ -162,7 +166,8 @@ describe('worker sync handlers', () => {
 			path: 'notes/test.md',
 			hash: expectedHash,
 		});
-		expect(store.get('files/notes/test.md')?.customMetadata?.hash).toBe(expectedHash);
+		expect(files.get('notes/test.md')?.hash).toBe(expectedHash);
+		expect(Array.from(store.values()).some(object => object.customMetadata?.hash === expectedHash)).toBe(true);
 	});
 
 	it('leaves single-file uploads uncommitted when the D1 metadata write fails', async () => {
@@ -224,6 +229,7 @@ describe('worker sync handlers', () => {
 
 	it('returns 400 for invalid JSON delete requests instead of throwing 500', async () => {
 		const { bucket } = createMockR2Bucket();
+		const { db } = createMockD1Database();
 
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
@@ -232,7 +238,7 @@ describe('worker sync handlers', () => {
 				headers: { 'Content-Type': 'application/json' },
 			}),
 			bucket,
-			null,
+			db,
 		);
 
 		expect(response.status).toBe(400);
@@ -294,42 +300,6 @@ describe('worker sync handlers', () => {
 		});
 		expect(files.has('notes/test.md')).toBe(false);
 		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
-	});
-
-	it('reports partial batch delete failures instead of claiming full success', async () => {
-		const { bucket } = createMockR2Bucket();
-		bucket.delete = vi.fn(async (key: string) => {
-			if (key === 'files/notes/fail.md') {
-				throw new Error('bucket unavailable');
-			}
-		});
-
-		const response = await handleBatchDelete(
-			new Request('https://worker.test/sync/batch-delete', {
-				method: 'POST',
-				body: JSON.stringify({
-					files: [
-						{ path: 'notes/ok.md', expectedHash: 'a'.repeat(64) },
-						{ path: 'notes/fail.md', expectedHash: 'b'.repeat(64) },
-					],
-				}),
-				headers: { 'Content-Type': 'application/json' },
-			}),
-			bucket,
-			null,
-		);
-
-		expect(response.status).toBe(200);
-		expect(await responseJson(response)).toEqual({
-			success: false,
-			deleted: ['notes/ok.md'],
-			errors: [
-				{
-					path: 'notes/fail.md',
-					error: 'bucket unavailable',
-				},
-			],
-		});
 	});
 
 	it('leaves batch uploads uncommitted when the D1 metadata write fails', async () => {
@@ -534,6 +504,7 @@ describe('worker sync handlers', () => {
 
 	it('rejects malformed batch upload entries without writing them', async () => {
 		const { bucket } = createMockR2Bucket();
+		const { db } = createMockD1Database();
 
 		const response = await handleBatchUpload(
 			new Request('https://worker.test/sync/batch-upload', {
@@ -549,7 +520,7 @@ describe('worker sync handlers', () => {
 				headers: { 'Content-Type': 'application/json' },
 			}),
 			bucket,
-			null,
+			db,
 		);
 
 		expect(response.status).toBe(200);

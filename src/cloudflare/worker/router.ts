@@ -43,7 +43,7 @@ export async function handleAuthenticatedRoute(
 		return corsResponse({ error: 'Token is not authorized for this operation' }, 403);
 	}
 
-	const db = env.DB || null;
+	const db = env.DB;
 
 	return await handleSyncRoute(request, env, path, method)
 		?? await handleAuthRoute(request, env, path, method)

@@ -65,9 +65,10 @@ async function saveRemindersSettingsData(plugin: CratePlugin, settings: Reminder
 
 export async function loadRemindersSettings(plugin: CratePlugin): Promise<void> {
 	const settingsData = await loadRemindersSettingsData(plugin);
+	let shouldPersistNormalizedSettings = settingsData === null;
 
 	if (settingsData) {
-		const loaded = settingsData as Record<string, unknown>;
+		const loaded: Record<string, unknown> = { ...settingsData };
 		if ('autoOpenSidebarOnMobile' in loaded) {
 			if (loaded.autoOpenSidebarOnMobile === true) {
 				loaded.autoOpenView = 'sidebar';
@@ -77,18 +78,21 @@ export async function loadRemindersSettings(plugin: CratePlugin): Promise<void> 
 
 		delete loaded.syncMethod;
 		const normalizedSettings = normalizeRemindersSettings({
-			...settingsData,
+			...loaded,
 			remindersFolderPath: normalizeRemindersFolderPath(
 				typeof loaded.remindersFolderPath === 'string' ? loaded.remindersFolderPath : undefined,
 			),
 		} satisfies Partial<RemindersSettings>);
+		shouldPersistNormalizedSettings = JSON.stringify(settingsData) !== JSON.stringify(normalizedSettings);
 
 		useRemindersSettingsStore.setState(normalizedSettings, true);
 	}
 
 	plugin.remindersSettings = useRemindersSettingsStore.getState();
 	configureLogger({ prefix: 'Crate', enabled: plugin.remindersSettings.debugLogging });
-	await saveRemindersSettingsData(plugin, plugin.remindersSettings);
+	if (shouldPersistNormalizedSettings) {
+		await saveRemindersSettingsData(plugin, plugin.remindersSettings);
+	}
 }
 
 export async function writeRemindersSettings(

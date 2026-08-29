@@ -22,7 +22,7 @@ export async function handleSyncRoute(
 	path: string,
 	method: RouteMethod,
 ): Promise<Response | null> {
-	const db = env.DB || null;
+	const db = env.DB;
 	const bucket = env.BUCKET;
 
 	if (path === '/health' && method === 'GET') return await handleHealth();

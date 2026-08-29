@@ -194,7 +194,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar,.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:var(--pwa-tabbar-surface);');
 		expect(html).toContain('.pwa-modal-sheet{color:var(--text-normal);color-scheme:light}');
 		expect(html).toContain('.pwa-editor-card{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}');
-		expect(html).toContain('.pwa-picker-option,.pwa-project-option,.pwa-project-picker-sheet .pwa-project-list,.pwa-schedule-preset-grid,.pwa-schedule-fields,.pwa-repeat-frequency-grid,.pwa-repeat-control-card,.pwa-repeat-time-card,.pwa-repeat-days,.settings-group{background:var(--pwa-light-surface-soft);');
+		expect(html).toContain('.pwa-project-option,.pwa-project-picker-sheet .pwa-project-list,.pwa-schedule-preset-grid,.pwa-schedule-fields,.pwa-repeat-frequency-grid,.pwa-repeat-control-card,.pwa-repeat-time-card,.pwa-repeat-days,.settings-group{background:var(--pwa-light-surface-soft);');
 		expect(html).toContain('.pwa-schedule-field input,.pwa-repeat-time-card input{color-scheme:light}');
 		expect(html).toContain('.premium-reminder-card.is-completed .premium-reminder-content{opacity:.74}');
 		expect(html).toContain('.settings-theme-option.is-active{background:var(--pwa-light-surface);color:var(--pwa-light-accent-text);');
@@ -238,6 +238,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-card{flex:1 1 auto;min-height:0;max-height:none;padding:14px 16px 16px}');
 		expect(html).toContain('.pwa-editor-title-input{flex:0 1 auto;min-height:44px;max-height:108px;');
 		expect(html).toContain('.pwa-editor-description-input{flex:1 1 auto;height:auto;min-height:82px;max-height:140px;');
+		expect(html).toContain('font-size:13.5px;font-weight:450;line-height:20px;color:var(--text-muted);');
+		expect(html).not.toContain('font-size:13.5px;font-weight:450;line-height:1.5;color:var(--text-muted);');
 		expect(html).toContain('.pwa-editor-description-input{flex:1 1 auto;min-height:40px;max-height:68px}');
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-title-input{flex:.9 1 0;min-height:42px;max-height:96px}');
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-description-input{flex:1.1 1 0;height:auto;min-height:42px;max-height:none}');

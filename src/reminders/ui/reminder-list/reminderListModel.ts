@@ -5,19 +5,15 @@ import {
   sortRemindersByFileOrder,
 } from "@/reminders/utils/reminderSort";
 import { formatDateHeader, isReminderOverdue } from "@/reminders/utils/dateFormatting";
-import { indexedToReminder, type IndexedReminder, type ReminderIndex } from "@/reminders/data/reminder-index";
-import type { StorageCompat } from "@/reminders/data/storage-compat";
+import type { ReminderRepository } from "@/reminders/data/reminder-repository";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
-import { formatLocalDateKey } from "@/reminders/utils/reminderDate";
 
 export interface RemindersListLoadOptions {
-  reminderIndex?: ReminderIndex;
-  storage: StorageCompat;
+  repository: ReminderRepository;
   showToday?: boolean;
   showUpcoming?: boolean;
   showCompleted: boolean;
   effectiveDays: number;
-  todayPrefix: string;
 }
 
 export interface RemindersListPresentationOptions {
@@ -42,38 +38,23 @@ export interface RemindersListPresentation {
 
 export async function loadRemindersListData(options: RemindersListLoadOptions): Promise<Reminder[]> {
   const {
-    reminderIndex,
-    storage,
+    repository,
     showToday = false,
     showUpcoming = false,
     showCompleted,
     effectiveDays,
-    todayPrefix,
   } = options;
 
-  if (reminderIndex?.isLoaded) {
-    if (showToday) {
-      return getTodayIndexReminders(reminderIndex, showCompleted, todayPrefix).map(indexedToReminder);
-    }
-
-    if (showUpcoming) {
-      const source = showCompleted ? reminderIndex.getAll() : reminderIndex.getActive();
-      return getUpcomingReminders(source.map(indexedToReminder), effectiveDays);
-    }
-
-    return (showCompleted ? reminderIndex.getAll() : reminderIndex.getActive()).map(indexedToReminder);
-  }
-
   if (showToday) {
-    return storage.getTodayReminders(showCompleted);
+    return repository.getTodayReminders(showCompleted);
   }
 
   if (showUpcoming) {
-    const allReminders = showCompleted ? storage.getAll() : storage.getActive();
+    const allReminders = showCompleted ? repository.getAll() : repository.getActive();
     return getUpcomingReminders(allReminders, effectiveDays);
   }
 
-  return showCompleted ? storage.getAll() : storage.getActive();
+  return showCompleted ? repository.getAll() : repository.getActive();
 }
 
 export function buildRemindersListPresentation(
@@ -111,33 +92,6 @@ export function buildRemindersListPresentation(
     emptyMessage: buildEmptyMessage({ showToday, showUpcoming, effectiveDays, projectFilter }),
     dateGroups: showUpcoming ? groupRemindersByDate(reminders) : null,
   };
-}
-
-function getTodayIndexReminders(
-  reminderIndex: ReminderIndex,
-  showCompleted: boolean,
-  todayPrefix: string,
-): IndexedReminder[] {
-  const todayReminders = reminderIndex.getToday();
-  const overdueReminders = reminderIndex.getOverdue();
-  const todayAndOverdueMap = new Map<string, IndexedReminder>();
-
-  for (const reminder of [...todayReminders, ...overdueReminders]) {
-    todayAndOverdueMap.set(reminder.id, reminder);
-  }
-
-  let indexed = Array.from(todayAndOverdueMap.values());
-  if (showCompleted) {
-    const completedToday = reminderIndex.getCompleted().filter((reminder) => {
-      if (reminder.dueDatetime) {
-        return formatLocalDateKey(new Date(reminder.dueDatetime)) === todayPrefix;
-      }
-      return reminder.dueDate === todayPrefix;
-    });
-    indexed = [...indexed, ...completedToday];
-  }
-
-  return indexed;
 }
 
 function buildEmptyMessage(options: {

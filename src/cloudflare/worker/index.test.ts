@@ -116,7 +116,9 @@ function createDb(initialTokens: Record<string, number>, options?: { failSubscri
 					statement._args = args;
 					return statement;
 				}),
-				first: vi.fn(async () => null),
+				first: vi.fn(async () => sql.includes('SELECT id, scope FROM auth_tokens')
+					? { id: 'vault-token', scope: 'vault' }
+					: null),
 				run: vi.fn(async () => applyMutation({ tokens, subscriptions }, sql, statement._args)),
 				all: vi.fn(async () => ({ results: [] })),
 			};
@@ -166,13 +168,8 @@ function createEnv(overrides?: Partial<Env>): Env {
 function createEnvDefaults(): Env {
 	return {
 		BUCKET: {} as R2Bucket,
-		DB: null,
-		AUTH_TOKEN: 'secret-token',
+		DB: createDb({}).db as unknown as D1Database,
 		REMINDER_ALARMS: {
-			idFromName: vi.fn(),
-			get: vi.fn(),
-		} as unknown as DurableObjectNamespace,
-		SETUP: {
 			idFromName: vi.fn(),
 			get: vi.fn(),
 		} as unknown as DurableObjectNamespace,
@@ -200,7 +197,7 @@ describe('worker entrypoint', () => {
 	it('serves server metadata at the root without a public claim page', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/'),
-			createEnv({ AUTH_TOKEN: '' }) as never,
+			createEnv() as never,
 		);
 
 		expect(response.status).toBe(200);
@@ -272,7 +269,7 @@ describe('worker entrypoint', () => {
 	it('publishes unauthenticated server compatibility metadata', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/.well-known/crate'),
-			createEnv({ AUTH_TOKEN: '' }) as never,
+			createEnv() as never,
 		);
 
 		expect(response.status).toBe(200);
@@ -338,28 +335,28 @@ describe('worker entrypoint', () => {
 		expect((await versionedStartupImageResponse.arrayBuffer()).byteLength).toBeGreaterThan(0);
 	});
 
-	it('rejects blank bearer tokens when no fallback auth token is configured', async () => {
+	it('rejects blank bearer tokens', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/health', {
 				headers: { Authorization: 'Bearer ' },
 			}),
-			createEnv({ AUTH_TOKEN: '' }) as never,
+			createEnv() as never,
 		);
 
 		expect(response.status).toBe(401);
 		expect(await response.json()).toEqual({ error: 'Unauthorized' });
 	});
 
-	it('returns a controlled 503 when a DB-backed sync route is requested without D1', async () => {
+	it('returns a controlled 503 when authentication cannot reach D1', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/sync/manifest', {
 				headers: { Authorization: 'Bearer secret-token' },
 			}),
-			createEnv() as never,
+			createEnv({ DB: null as never }) as never,
 		);
 
 		expect(response.status).toBe(503);
-		expect(await response.json()).toEqual({ error: 'Database not available' });
+		expect(await response.json()).toEqual({ error: 'Authentication service unavailable' });
 	});
 
 	it('does not accept untracked file mutations when D1 is unavailable', async () => {
@@ -372,11 +369,11 @@ describe('worker entrypoint', () => {
 				},
 				body: 'hello',
 			}),
-			createEnv() as never,
+			createEnv({ DB: null as never }) as never,
 		);
 
 		expect(response.status).toBe(503);
-		expect(await response.json()).toEqual({ error: 'Database not available' });
+		expect(await response.json()).toEqual({ error: 'Authentication service unavailable' });
 	});
 
 	it('accepts push subscription requests with a valid one-time enrollment token', async () => {

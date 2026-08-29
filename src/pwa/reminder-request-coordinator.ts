@@ -1,4 +1,4 @@
-export interface ReminderReadToken {
+interface ReminderReadToken {
 	requestId: number;
 	mutationRevision: number;
 }

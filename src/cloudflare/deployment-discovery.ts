@@ -55,7 +55,6 @@ function toDeployment(
 	const d1Binding = findBinding(settings, 'd1', 'DB');
 	const r2Binding = findBinding(settings, 'r2_bucket', 'BUCKET');
 	const reminderBinding = findBinding(settings, 'durable_object_namespace', 'REMINDER_ALARMS');
-	const setupBinding = findBinding(settings, 'durable_object_namespace', 'SETUP');
 	const message = settings.annotations?.['workers/message']?.trim() ?? '';
 	const tag = settings.annotations?.['workers/tag']?.trim() ?? '';
 	const deployed = deployedArtifact(settings);
@@ -63,7 +62,6 @@ function toDeployment(
 		!d1Binding?.id
 		|| !r2Binding?.bucket_name
 		|| reminderBinding?.class_name !== 'ReminderAlarm'
-		|| setupBinding?.class_name !== 'SetupCoordinator'
 		|| (!message.startsWith('Crate ') && tag !== 'crate')
 	) return null;
 

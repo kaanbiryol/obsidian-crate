@@ -14,6 +14,8 @@ import {
   getProjectFromPath as deriveProjectFromPath,
   scanReminderMarkdownContent,
 } from "@/reminders/core/markdownScan";
+import { createReminderId, setReminderIdMarker } from "@/reminders/core/reminderIdentity";
+import { parseCheckboxLine } from "@/reminders/utils/checkboxParser";
 import { createLogger } from "@/reminders/utils/logger";
 import type { IndexedReminder } from "./reminder-index";
 
@@ -33,6 +35,37 @@ interface FileScanResult {
   filePath: string;
   reminders: IndexedReminder[];
   lineCount: number;
+}
+
+export interface ReminderIdNormalizationResult {
+  content: string;
+  remindersUpdated: number;
+}
+
+/**
+ * Add stable IDs while the file is already being read for indexing. This keeps
+ * manually-authored checkboxes discoverable without a second vault-wide
+ * migration pass.
+ */
+export function normalizeReminderIds(content: string): ReminderIdNormalizationResult {
+  const lines = content.split("\n");
+  let remindersUpdated = 0;
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const parsed = parseCheckboxLine(line);
+    if (!parsed || !parsed.parsed.cleanContent.trim() || parsed.reminderId) {
+      continue;
+    }
+
+    lines[index] = setReminderIdMarker(line, createReminderId());
+    remindersUpdated++;
+  }
+
+  return {
+    content: remindersUpdated > 0 ? lines.join("\n") : content,
+    remindersUpdated,
+  };
 }
 
 /**
@@ -114,8 +147,13 @@ export async function scanFile(
   const filePath = file.path;
 
   try {
-    const content = await app.vault.cachedRead(file);
-    const result = scanReminderMarkdownContent(filePath, content, remindersFolderPath);
+    const originalContent = await app.vault.cachedRead(file);
+    const normalized = normalizeReminderIds(originalContent);
+    if (normalized.remindersUpdated > 0) {
+      await app.vault.modify(file, normalized.content);
+      log.info(` Added ${normalized.remindersUpdated} reminder identifiers to ${filePath}`);
+    }
+    const result = scanReminderMarkdownContent(filePath, normalized.content, remindersFolderPath);
 
     return {
       filePath,

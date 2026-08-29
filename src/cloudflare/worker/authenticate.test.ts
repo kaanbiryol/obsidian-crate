@@ -36,7 +36,6 @@ describe('worker authentication principals', () => {
 				headers: { Authorization: `Bearer ${token}` },
 			}),
 			db as never,
-			'',
 		);
 
 		expect(result).toEqual({ principal: { tokenId: 'pwa-id', scope: 'reminders' } });
@@ -52,21 +51,21 @@ describe('worker authentication principals', () => {
 				headers: { Authorization: `Bearer ${token}` },
 			}),
 			db as never,
-			'',
 		);
 
 		expect(result.response?.status).toBe(401);
 	});
 
-	it('treats the legacy binding token as a vault principal', async () => {
+	it('returns 503 instead of falling back when D1 authentication fails', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 		const result = await authenticateWorkerRequest(
 			new Request('https://worker.test/health', {
-				headers: { Authorization: 'Bearer legacy-token' },
+				headers: { Authorization: 'Bearer device-token' },
 			}),
-			null,
-			'legacy-token',
+			{ prepare: vi.fn(() => { throw new Error('D1 unavailable'); }) } as never,
 		);
 
-		expect(result).toEqual({ principal: { tokenId: null, scope: 'vault' } });
+		expect(result.response?.status).toBe(503);
+		consoleError.mockRestore();
 	});
 });

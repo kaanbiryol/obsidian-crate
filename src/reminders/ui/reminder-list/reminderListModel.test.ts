@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
-import type { ReminderIndex, IndexedReminder } from "@/reminders/data/reminder-index";
-import type { StorageCompat } from "@/reminders/data/storage-compat";
+import type { ReminderRepository } from "@/reminders/data/reminder-repository";
 import {
   buildRemindersListPresentation,
   loadRemindersListData,
@@ -26,25 +25,7 @@ function makeReminder(overrides: Partial<Reminder>): Reminder {
   };
 }
 
-function makeIndexedReminder(overrides: Partial<IndexedReminder>): IndexedReminder {
-  return {
-    id: overrides.id || "r1",
-    content: overrides.content || "Task",
-    priority: overrides.priority ?? 4,
-    completed: overrides.completed ?? false,
-    project: overrides.project,
-    dueDate: overrides.dueDate,
-    dueDatetime: overrides.dueDatetime,
-    recurrence: overrides.recurrence,
-    description: overrides.description,
-    filePath: overrides.filePath || "Reminders/Inbox.md",
-    lineNumber: overrides.lineNumber ?? 1,
-    rawLine: overrides.rawLine || "- [ ] Task",
-    contentHash: overrides.contentHash || "hash",
-  };
-}
-
-function createStorage(overrides: Partial<StorageCompat> = {}): StorageCompat {
+function createRepository(overrides: Partial<ReminderRepository> = {}): ReminderRepository {
   return {
     getAll: () => [],
     getActive: () => [],
@@ -69,73 +50,41 @@ function createStorage(overrides: Partial<StorageCompat> = {}): StorageCompat {
   };
 }
 
-function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
-  return {
-    isLoaded: true,
-    remindersFolderPath: "Reminders",
-    getAll: () => [],
-    getActive: () => [],
-    getCompleted: () => [],
-    getToday: () => [],
-    getUpcoming: () => [],
-    getOverdue: () => [],
-    getByProject: () => [],
-    getByFile: () => [],
-    getById: () => undefined,
-    getProjects: () => [],
-    load: async () => ({ reminders: [], filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [] }),
-    rescanFile: async () => {},
-    removeFile: () => {},
-    renameFile: () => {},
-    isReminderFile: () => true,
-    onIndexChange: () => () => {},
-    applyOptimisticCreate: () => {},
-    applyOptimisticUpdate: () => {},
-    applyOptimisticDelete: () => {},
-    clearOptimistic: () => {},
-    ...overrides,
-  };
-}
-
 describe("loadRemindersListData", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("combines today, overdue, and completed-today reminders from the index", async () => {
+  it("loads today reminders through the repository", async () => {
+    const todayReminders = [
+      makeReminder({ id: "today", dueDate: "2026-01-10" }),
+      makeReminder({ id: "overdue", dueDate: "2026-01-08" }),
+      makeReminder({ id: "completed-today", completed: true, dueDate: "2026-01-10" }),
+    ];
     const loaded = await loadRemindersListData({
-      reminderIndex: createIndex({
-        getToday: () => [makeIndexedReminder({ id: "today", dueDate: "2026-01-10" })],
-        getOverdue: () => [makeIndexedReminder({ id: "overdue", dueDate: "2026-01-08" })],
-        getCompleted: () => [
-          makeIndexedReminder({ id: "completed-today", completed: true, dueDate: "2026-01-10" }),
-          makeIndexedReminder({ id: "completed-old", completed: true, dueDate: "2026-01-01" }),
-        ],
+      repository: createRepository({
+        getTodayReminders: () => todayReminders,
       }),
-      storage: createStorage(),
       showToday: true,
       showCompleted: true,
       effectiveDays: 7,
-      todayPrefix: "2026-01-10",
     });
 
     expect(loaded.map((reminder) => reminder.id)).toEqual(["today", "overdue", "completed-today"]);
   });
 
-  it("falls back to storage for upcoming reminders when the index is unavailable", async () => {
+  it("loads upcoming reminders through the repository", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
 
     const upcomingReminder = makeReminder({ id: "upcoming", dueDate: "2026-01-12" });
     const loaded = await loadRemindersListData({
-      reminderIndex: createIndex({ isLoaded: false }),
-      storage: createStorage({
+      repository: createRepository({
         getActive: () => [upcomingReminder],
       }),
       showUpcoming: true,
       showCompleted: false,
       effectiveDays: 7,
-      todayPrefix: "2026-01-10",
     });
 
     expect(loaded).toEqual([upcomingReminder]);

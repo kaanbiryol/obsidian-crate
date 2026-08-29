@@ -2,7 +2,7 @@ import { parseStoredReminderDate, reminderHasTime } from '@/reminders/utils/remi
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import type { UpdateReminderParams } from '@/reminders/types/plugin-reminder';
 import { createReminderId } from '@/reminders/core/reminderIdentity';
-import { buildCreateReminderArgs, buildReminderUpdate } from '@/reminders/data/storage-compat/shared';
+import { buildCreateReminderArgs, buildReminderUpdate } from '@/reminders/data/reminder-repository/shared';
 import { corsResponse } from './cors';
 import {
 	deleteCommittedMarkdownFile,
@@ -83,7 +83,7 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 	});
 	const reminderId = createArgs.reminderId || createReminderId();
 	const filePath = getProjectFilePath(workspaceResult.folderPath, project);
-	const existingFile = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB!, filePath);
+	const existingFile = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, filePath);
 	const existingContent = existingFile?.content ?? getInitialProjectFileContent(project);
 	const nextContent = createReminderInFileContent(existingContent, {
 		content,
@@ -94,7 +94,7 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 		hasTime: createArgs.hasTime,
 		reminderId,
 	});
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB!, filePath, nextContent, existingFile?.hash ?? null);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, existingFile?.hash ?? null);
 
 	const workspace = await loadReminderWorkspace(env, workspaceResult.folderPath);
 	const reminder = findReminderById(workspace, reminderId);
@@ -176,7 +176,7 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		}
 
 		const newFilePath = getProjectFilePath(workspaceResult.folderPath, nextProject);
-		const newFile = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB!, newFilePath);
+		const newFile = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, newFilePath);
 		const newFileContent = newFile?.content ?? getInitialProjectFileContent(nextProject);
 		const movedContent = createReminderInFileContent(newFileContent, {
 			content: update.updates.content ?? reminder.content,
@@ -196,7 +196,7 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		});
 		const newWrite = await writeCommittedMarkdownFile(
 			env.BUCKET,
-			env.DB!,
+				env.DB,
 			newFilePath,
 			movedContent,
 			newFile?.hash ?? null,
@@ -204,19 +204,19 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 
 		try {
 			const oldContent = deleteReminderFromFileContent(oldFile.content, reminder);
-			await writeCommittedMarkdownFile(env.BUCKET, env.DB!, reminder.filePath, oldContent, oldFile.hash);
+			await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, oldContent, oldFile.hash);
 		} catch (error) {
 			try {
 				if (newFile) {
 					await writeCommittedMarkdownFile(
 						env.BUCKET,
-						env.DB!,
+						env.DB,
 						newFilePath,
 						newFile.content,
 						newWrite.hash,
 					);
 				} else {
-					await deleteCommittedMarkdownFile(env.BUCKET, env.DB!, newFilePath, newWrite.hash);
+					await deleteCommittedMarkdownFile(env.BUCKET, env.DB, newFilePath, newWrite.hash);
 				}
 			} catch {
 				// A newer edit won the race; never overwrite it during compensation.
@@ -230,7 +230,7 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		}
 
 		const nextContent = updateReminderInFileContent(file.content, reminder, update);
-		await writeCommittedMarkdownFile(env.BUCKET, env.DB!, reminder.filePath, nextContent, file.hash);
+		await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash);
 	}
 
 	const nextWorkspace = await loadReminderWorkspace(env, workspaceResult.folderPath);
@@ -272,7 +272,7 @@ export async function handleSetReminderCompleted(request: Request, env: Env): Pr
 	}
 
 	const nextContent = setReminderCompletedInFileContent(file.content, reminder, parsedBody.value.completed);
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB!, reminder.filePath, nextContent, file.hash);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash);
 
 	const nextWorkspace = await loadReminderWorkspace(env, workspaceResult.folderPath);
 	const updatedReminder = findReminderById(nextWorkspace, id);
@@ -313,7 +313,7 @@ export async function handleDeleteReminder(request: Request, env: Env): Promise<
 	}
 
 	const nextContent = deleteReminderFromFileContent(file.content, reminder);
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB!, reminder.filePath, nextContent, file.hash);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash);
 	const notificationWarning = await cancelReminderNotification(env, id);
 	return corsResponse({
 		success: true,
@@ -335,12 +335,12 @@ export async function handleReorderReminders(request: Request, env: Env): Promis
 	}
 
 	const filePath = getProjectFilePath(folderPath, project);
-	const file = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB!, filePath);
+	const file = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, filePath);
 	if (!file) {
 		return corsResponse({ error: 'Project file not found' }, 404);
 	}
 
 	const nextContent = reorderReminderBlocksInFileContent(file.content, orderedIds);
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB!, filePath, nextContent, file.hash);
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, file.hash);
 	return corsResponse({ success: true });
 }

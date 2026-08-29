@@ -38,7 +38,7 @@ export function formatMutationError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
-export function legacyObjectKey(path: string): string {
+function legacyObjectKey(path: string): string {
 	return FILES_PREFIX + path;
 }
 
@@ -55,7 +55,7 @@ function normalizeStorageKey(value: unknown): string | null {
 	return trimmed.length > 0 ? trimmed : null;
 }
 
-function resolveObjectKey(path: string, storageKey: string | null): string {
+export function resolveStoredObjectKey(path: string, storageKey: string | null): string {
 	return storageKey ?? legacyObjectKey(path);
 }
 
@@ -67,7 +67,7 @@ export function collectCleanupKeys(path: string, previousFile: FileStorageRow | 
 	}
 
 	if (previousFile) {
-		const previousKey = resolveObjectKey(path, previousFile.storageKey);
+		const previousKey = resolveStoredObjectKey(path, previousFile.storageKey);
 		if (previousKey !== preserve) {
 			keys.add(previousKey);
 		}
@@ -79,6 +79,14 @@ export function collectCleanupKeys(path: string, previousFile: FileStorageRow | 
 export async function deleteBucketObjectsQuietly(bucket: R2Bucket, keys: string[]): Promise<void> {
 	const uniqueKeys = Array.from(new Set(keys.filter((key) => key.length > 0)));
 	await Promise.allSettled(uniqueKeys.map((key) => bucket.delete(key)));
+}
+
+export function storedObjectMatchesMetadata(
+	object: { size: number; customMetadata?: Record<string, string> },
+	storedFile: FileStorageRow,
+): boolean {
+	return (storedFile.size <= 0 || object.size === storedFile.size)
+		&& (!object.customMetadata?.hash || object.customMetadata.hash === storedFile.hash);
 }
 
 export function formatMetadataCommitFailure(actionLabel: 'Upload' | 'Delete', metadataMessage: string): string {

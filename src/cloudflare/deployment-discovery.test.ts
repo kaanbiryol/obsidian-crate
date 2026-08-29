@@ -14,7 +14,6 @@ describe('discoverCloudflareDeployments', () => {
 					{ type: 'd1', name: 'DB', id: 'database-id' },
 					{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-0123456789abcdef' },
 					{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },
-					{ type: 'durable_object_namespace', name: 'SETUP', class_name: 'SetupCoordinator' },
 				],
 			})),
 		};

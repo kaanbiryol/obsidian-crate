@@ -23,10 +23,6 @@
 			{
 				"name": "REMINDER_ALARMS",
 				"class_name": "ReminderAlarm"
-			},
-			{
-				"name": "SETUP",
-				"class_name": "SetupCoordinator"
 			}
 		]
 	},
@@ -38,6 +34,10 @@
 		{
 			"tag": "v2",
 			"new_sqlite_classes": ["SetupCoordinator"]
+		},
+		{
+			"tag": "v3",
+			"deleted_classes": ["SetupCoordinator"]
 		}
 	]
 }

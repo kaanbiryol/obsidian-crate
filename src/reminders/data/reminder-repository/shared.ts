@@ -8,6 +8,7 @@ import {
 } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 
+/** Convert the indexed Markdown representation into the UI-facing reminder model. */
 export function toReminder(indexed: IndexedReminder): Reminder {
   return {
     id: indexed.id,

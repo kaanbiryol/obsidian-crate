@@ -3,7 +3,7 @@ import { SecretStorageService } from "./secret-storage";
 import { createLogger, errorMessage } from "./logger";
 import { CrateSettingTab } from "../ui/settings-tab";
 import { openFullScreenReminderModal } from "../reminders/ui/adapters/modals";
-import { initializeReminders } from "../reminders/plugin-integration";
+import { initializeReminders, reconcileReminderNotifications } from "../reminders/plugin-integration";
 import {
   initializeSyncManagers,
   registerSyncCommands,
@@ -31,11 +31,12 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
 
   plugin.registerSettingsTab(new CrateSettingTab(plugin.app, plugin));
   registerVaultSyncEventHandlers(plugin);
+  await initializePluginReminders(plugin);
   await initializePluginSync(plugin);
+  await reconcileReminderNotifications(plugin);
   showCloudflareServerUpdateNotice(plugin);
   registerPluginCommands(plugin);
   registerPluginProtocols(plugin);
-  await initializePluginReminders(plugin);
 }
 
 export function shutdownPlugin(plugin: CratePlugin): void {

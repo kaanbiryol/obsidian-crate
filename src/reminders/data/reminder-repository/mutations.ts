@@ -1,10 +1,10 @@
 import { createReminderId } from "../../core/reminderIdentity";
 import { buildCreatedReminderFallback, buildCreateReminderArgs, buildReminderUpdate, toReminder } from "./shared";
-import type { StorageCompatContext } from "./types";
+import type { ReminderRepositoryContext } from "./types";
 import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
 import { getReminderProjectFilePath } from "@/reminders/core/reminderProjectPath";
 
-export function createStorageCompatMutations({ index, writer }: StorageCompatContext) {
+export function createReminderRepositoryMutations({ index, writer }: ReminderRepositoryContext) {
   return {
     async create(params: CreateReminderParams) {
       const createArgs = buildCreateReminderArgs(params);

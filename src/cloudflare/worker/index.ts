@@ -5,7 +5,6 @@ import type { Env } from './types';
 import { FileVersionConflictError } from './storage';
 
 export { ReminderAlarm } from './reminder-alarm';
-export { SetupCoordinator } from './setup-coordinator';
 
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
@@ -16,18 +15,14 @@ export default {
 		const url = new URL(request.url);
 		const path = url.pathname;
 		const method = request.method;
-		const db = env.DB || null;
+		const db = env.DB;
 
 		const publicResponse = await handlePublicRoute(request, env, path, method);
 		if (publicResponse) {
 			return publicResponse;
 		}
 
-		const authResult = await authenticateWorkerRequest(
-			request,
-			db,
-			(env.AUTH_TOKEN ?? '').trim(),
-		);
+		const authResult = await authenticateWorkerRequest(request, db);
 		if (authResult.response) {
 			return authResult.response;
 		}

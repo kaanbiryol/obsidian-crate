@@ -328,14 +328,6 @@
     color: var(--text-muted);
 }
 
-// HeroUI relies on a document-level button reset, which does not cross the plugin's Shadow DOM.
-.completed-section-toggle {
-    appearance: none;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
 // ============================================
 // Project Picker Modal Scrollbar
 // ============================================

@@ -1,7 +1,7 @@
-import type { StorageCompatContext } from "./types";
+import type { ReminderRepositoryContext } from "./types";
 import { getTodayReminderIds, toReminder } from "./shared";
 
-export function createStorageCompatQueries({ index }: StorageCompatContext) {
+export function createReminderRepositoryQueries({ index }: ReminderRepositoryContext) {
   return {
     getAll() {
       return index.getAll().map(toReminder);

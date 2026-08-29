@@ -12,7 +12,7 @@ interface ReminderData {
 export class ReminderAlarm implements DurableObject {
 	constructor(
 		private state: DurableObjectState,
-		private env: { DB: D1Database | null },
+		private env: { DB: D1Database },
 	) {}
 
 	async fetch(request: Request): Promise<Response> {
@@ -70,24 +70,22 @@ export class ReminderAlarm implements DurableObject {
 		if (!reminder) return;
 
 		const db = this.env.DB;
-		if (db) {
-			const delivery = await sendToAllSubscriptions(db, {
-				title: reminder.content,
-				body: reminder.project || '',
-				tag: reminder.reminderId,
-				project: reminder.project,
-				reminderId: reminder.reminderId,
-			});
-			if (delivery.failed > 0) {
-				throw new Error(`Push delivery failed for ${delivery.failed} subscription(s)`);
-			}
-
-			// Clean up D1 record
-			try {
-				await db.prepare('DELETE FROM scheduled_reminders WHERE reminder_id = ?')
-					.bind(reminder.reminderId).run();
-			} catch { /* non-fatal */ }
+		const delivery = await sendToAllSubscriptions(db, {
+			title: reminder.content,
+			body: reminder.project || '',
+			tag: reminder.reminderId,
+			project: reminder.project,
+			reminderId: reminder.reminderId,
+		});
+		if (delivery.failed > 0) {
+			throw new Error(`Push delivery failed for ${delivery.failed} subscription(s)`);
 		}
+
+		// Clean up D1 record
+		try {
+			await db.prepare('DELETE FROM scheduled_reminders WHERE reminder_id = ?')
+				.bind(reminder.reminderId).run();
+		} catch { /* non-fatal */ }
 
 		// Clean up DO storage
 		await this.state.storage.deleteAll();

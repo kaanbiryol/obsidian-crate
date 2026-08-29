@@ -6,7 +6,7 @@ import { Plugin } from 'obsidian';
 import { type CloudflareDeploymentService } from '../cloudflare/deployment-service';
 import { type ReminderIndex } from '../reminders/data/reminder-index';
 import { type MarkdownWriter } from '../reminders/data/markdown-writer';
-import { type StorageCompat } from '../reminders/data/storage-compat';
+import { type ReminderRepository } from '../reminders/data/reminder-repository';
 import { reinitializeReminders } from '../reminders/plugin-integration';
 import {
 	type RemindersSettings,
@@ -37,7 +37,7 @@ export default class CratePlugin extends Plugin {
 	// Reminders
 	reminderIndex!: ReminderIndex;
 	markdownWriter!: MarkdownWriter;
-	storage!: StorageCompat;
+	reminderRepository!: ReminderRepository;
 	remindersSettings: RemindersSettings = useRemindersSettingsStore.getState();
 	remindersVaultWatcher?: VaultWatcher;
 

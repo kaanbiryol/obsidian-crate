@@ -7,7 +7,7 @@ import {
 } from '@/reminders/utils/reminderDate';
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
-import type { buildReminderUpdate } from '@/reminders/data/storage-compat/shared';
+import type { buildReminderUpdate } from '@/reminders/data/reminder-repository/shared';
 import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
 import { setReminderIdMarker } from '@/reminders/core/reminderIdentity';
 import {
