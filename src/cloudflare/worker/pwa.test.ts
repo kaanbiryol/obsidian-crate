@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SERVICE_WORKER_JS, createManifestJson, createPwaHtml, createPwaVersionJson } from './pwa';
 import { PWA_ASSET_VERSION } from './pwa-version';
+import { PWA_CHROME_COLOR } from './pwa/pwa-params';
 
 describe('PWA activation metadata', () => {
 	it('uses the plain notifications route when no activation params are present', () => {
@@ -9,16 +10,18 @@ describe('PWA activation metadata', () => {
 		expect(manifest.start_url).toBe('/notifications');
 	});
 
-	it('requests standalone install chrome without fullscreen overrides', () => {
+	it('keeps the generated splash on the app background', () => {
 		const manifest = JSON.parse(createManifestJson('https://worker.test/notifications/manifest.json?v=asset')) as {
+			background_color: string;
 			display: string;
 			display_override: string[];
+			theme_color: string;
 		};
 
 		expect(manifest.display).toBe('standalone');
 		expect(manifest.display_override).toEqual(['standalone', 'minimal-ui']);
-		expect(manifest).not.toHaveProperty('background_color');
-		expect(manifest).not.toHaveProperty('theme_color');
+		expect(manifest.background_color).toBe(PWA_CHROME_COLOR);
+		expect(manifest.theme_color).toBe(PWA_CHROME_COLOR);
 	});
 
 	it('carries activation params into the manifest start URL', () => {
