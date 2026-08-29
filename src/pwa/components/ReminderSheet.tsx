@@ -15,7 +15,10 @@ import { useProjectAutocomplete } from '@/reminders/ui/reminder-modal/useProject
 import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
 import { useDialogFocus } from '../hooks/useDialogFocus';
-import { useReminderSheetNavigation } from '../hooks/useReminderSheetNavigation';
+import {
+	getReminderSheetClosedOffset,
+	useReminderSheetNavigation,
+} from '../hooks/useReminderSheetNavigation';
 import { shouldSaveFromKeyboardDone } from '../keyboard-done-save';
 import {
 	applyReminderTextUpdate,
@@ -53,6 +56,9 @@ export function ReminderSheet({
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 	const editorCardRef = useRef<HTMLDivElement | null>(null);
 	const keyboardDoneTimerRef = useRef<number | null>(null);
+	const pickerTransitionClosedOffsetRef = useRef('100%');
+	const pickerTransitionKeyboardInsetRef = useRef(0);
+	const reminderStageRef = useRef<HTMLDivElement | null>(null);
 	const titleFocusFrameRef = useRef<number | null>(null);
 	const lastFocusedEditorFieldRef = useRef<'title' | 'description' | null>(null);
 	const lastPagePointerAtRef = useRef(Number.NEGATIVE_INFINITY);
@@ -71,13 +77,18 @@ export function ReminderSheet({
 		onSave(modal);
 	}, [canSubmit, modal, onSave]);
 	const dismissEditorKeyboard = useCallback(() => {
+		pickerTransitionClosedOffsetRef.current = getReminderSheetClosedOffset(
+			reminderStageRef.current?.getBoundingClientRect().height ?? 0,
+			keyboardInset,
+		);
+		pickerTransitionKeyboardInsetRef.current = keyboardInset;
 		suppressKeyboardDoneSaveRef.current = true;
 		richTextInputRef.current?.getElement()?.blur();
 		descriptionRef.current?.blur();
 		window.setTimeout(() => {
 			suppressKeyboardDoneSaveRef.current = false;
 		}, 0);
-	}, []);
+	}, [keyboardInset]);
 	const patchDraft = useCallback((patch: Partial<ModalDraft>) => {
 		onChange((current) => current ? ({ ...current, draft: { ...current.draft, ...patch } }) : current);
 	}, [onChange]);
@@ -116,6 +127,18 @@ export function ReminderSheet({
 	}, [activeScreen, canInteract, draft.content, projectOptions.join('\u0000')]);
 
 	const editorInteractive = activeScreen === 'editor' || isReturningToEditor;
+	const pickerTransitionKeyboardInset = isStageClosing
+		? pickerTransitionKeyboardInsetRef.current
+		: 0;
+	const renderedKeyboardInset = pickerTransitionKeyboardInset || keyboardInset;
+	const stageClosedOffset = isStageClosing
+		? pickerTransitionClosedOffsetRef.current
+		: '100%';
+	const handleReminderStageAnimationComplete = useCallback(() => {
+		pickerTransitionClosedOffsetRef.current = '100%';
+		pickerTransitionKeyboardInsetRef.current = 0;
+		handleStageAnimationComplete();
+	}, [handleStageAnimationComplete]);
 
 	useEffect(() => {
 		const recordPagePointer = () => {
@@ -217,20 +240,21 @@ export function ReminderSheet({
 				onCloseEnd={handleCloseEnd}
 				variant="reminder"
 				sheetClassName={activeScreen === 'editor' ? 'is-editor-screen' : undefined}
-				keyboardInset={keyboardInset}
+				keyboardInset={renderedKeyboardInset}
 				closeOnBackdrop={!saving && !isClosing && canInteract}
 				onKeyDown={handleDialogKeyDown}
 			>
 				<motion.div
+					ref={reminderStageRef}
 					className="pwa-reminder-sheet-stage"
 					initial={false}
-					animate={{ y: isStageClosing ? '100%' : '0%' }}
+					animate={{ y: isStageClosing ? stageClosedOffset : '0%' }}
 					transition={prefersReducedMotion
 						? { duration: 0 }
 						: isStageClosing
 							? { duration: 0.26, ease: [0.4, 0, 1, 1] }
 							: { duration: 0.36, ease: [0.32, 0.72, 0, 1] }}
-					onAnimationComplete={handleStageAnimationComplete}
+					onAnimationComplete={handleReminderStageAnimationComplete}
 				>
 						<div
 							ref={activeScreen === 'editor' ? setDialogRef : undefined}

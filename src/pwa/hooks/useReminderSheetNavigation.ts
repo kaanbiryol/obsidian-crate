@@ -67,6 +67,11 @@ export function getImmediateEditorTransitionPatch(
 	return { ...patch, activePicker, deleteConfirm: false };
 }
 
+export function getReminderSheetClosedOffset(stageHeight: number, keyboardInset: number): string {
+	const closeDistance = Math.ceil(stageHeight + keyboardInset);
+	return closeDistance > 0 ? `${closeDistance}px` : '100%';
+}
+
 export function useReminderSheetNavigation({
 	mode,
 	reminderId,

@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
 	getImmediateEditorTransitionPatch,
+	getReminderSheetClosedOffset,
 	getReminderSheetTransitionPatch,
 	INITIAL_REMINDER_SHEET_NAVIGATION_STATE,
 	reduceReminderSheetNavigation,
 } from './useReminderSheetNavigation';
 
 describe('reminder sheet navigation', () => {
+	it('moves a keyboard-sized editor fully off screen during picker transitions', () => {
+		expect(getReminderSheetClosedOffset(320, 334)).toBe('654px');
+		expect(getReminderSheetClosedOffset(320.25, 0)).toBe('321px');
+		expect(getReminderSheetClosedOffset(0, 0)).toBe('100%');
+	});
+
 	it('closes the editor before activating a picker', () => {
 		const requested = reduceReminderSheetNavigation(
 			INITIAL_REMINDER_SHEET_NAVIGATION_STATE,
