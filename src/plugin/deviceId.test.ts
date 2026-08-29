@@ -3,7 +3,6 @@ import { ensurePluginDeviceId, setPluginDeviceId } from './deviceId';
 import { SECRET_KEYS } from './types';
 
 function createPlugin(options?: {
-	settingsDeviceId?: string;
 	secrets?: Record<string, string | null>;
 }): {
 	settings: { deviceId: string };
@@ -11,9 +10,7 @@ function createPlugin(options?: {
 		get: ReturnType<typeof vi.fn>;
 		set: ReturnType<typeof vi.fn>;
 		delete: ReturnType<typeof vi.fn>;
-		has: ReturnType<typeof vi.fn>;
 	};
-	saveSettings: ReturnType<typeof vi.fn>;
 } {
 	const secrets = new Map<string, string>();
 	for (const [key, value] of Object.entries(options?.secrets ?? {})) {
@@ -24,7 +21,7 @@ function createPlugin(options?: {
 
 	return {
 		settings: {
-			deviceId: options?.settingsDeviceId ?? '',
+			deviceId: '',
 		},
 		secretStorage: {
 			get: vi.fn((key: string) => secrets.get(key) ?? null),
@@ -38,9 +35,7 @@ function createPlugin(options?: {
 			delete: vi.fn((key: string) => {
 				secrets.delete(key);
 			}),
-			has: vi.fn((key: string) => secrets.has(key)),
 		},
-		saveSettings: vi.fn(async () => {}),
 	};
 }
 
@@ -49,73 +44,52 @@ beforeEach(() => {
 });
 
 describe('ensurePluginDeviceId', () => {
-	it('hydrates the runtime deviceId from local secret storage without re-saving settings', async () => {
+	it('hydrates the runtime deviceId from local secret storage', () => {
 		const plugin = createPlugin({
 			secrets: {
 				[SECRET_KEYS.DEVICE_ID]: 'device-local',
 			},
 		});
 
-		await ensurePluginDeviceId(plugin as never);
+		ensurePluginDeviceId(plugin as never);
 
 		expect(plugin.settings.deviceId).toBe('device-local');
-		expect(plugin.saveSettings).not.toHaveBeenCalled();
 	});
 
-	it('migrates a configured legacy deviceId into local secret storage when auth is already present', async () => {
-		const plugin = createPlugin({
-			settingsDeviceId: 'device-legacy',
-			secrets: {
-				[SECRET_KEYS.AUTH_TOKEN]: 'auth-token',
-			},
-		});
-
-		await ensurePluginDeviceId(plugin as never);
-
-		expect(plugin.secretStorage.set).toHaveBeenCalledWith(SECRET_KEYS.DEVICE_ID, 'device-legacy');
-		expect(plugin.settings.deviceId).toBe('device-legacy');
-		expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
-	});
-
-	it('generates a fresh local deviceId when copied settings exist without local auth state', async () => {
+	it('generates and securely stores a fresh local deviceId when none exists', () => {
 		vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(((array: Uint8Array) => {
 			array.set([0, 1, 2, 3, 4, 5, 6, 7]);
 			return array;
 		}) as typeof crypto.getRandomValues);
-		const plugin = createPlugin({
-			settingsDeviceId: 'device-zmhf',
-		});
+		const plugin = createPlugin();
 
-		await ensurePluginDeviceId(plugin as never);
+		ensurePluginDeviceId(plugin as never);
 
 		expect(plugin.settings.deviceId).toBe('device-abcdefgh');
 		expect(plugin.secretStorage.set).toHaveBeenCalledWith(SECRET_KEYS.DEVICE_ID, 'device-abcdefgh');
-		expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
 	});
 });
 
 describe('setPluginDeviceId', () => {
-	it('writes the edited deviceId into local secret storage', async () => {
+	it('writes the edited deviceId into local secret storage', () => {
 		const plugin = createPlugin();
 
-		await setPluginDeviceId(plugin as never, '  device-manual  ');
+		setPluginDeviceId(plugin as never, '  device-manual  ');
 
 		expect(plugin.secretStorage.set).toHaveBeenCalledWith(SECRET_KEYS.DEVICE_ID, 'device-manual');
 		expect(plugin.settings.deviceId).toBe('device-manual');
-		expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
 	});
 
-	it('removes the local secret when the deviceId field is cleared', async () => {
+	it('removes the local secret when the deviceId field is cleared', () => {
 		const plugin = createPlugin({
 			secrets: {
 				[SECRET_KEYS.DEVICE_ID]: 'device-existing',
 			},
 		});
 
-		await setPluginDeviceId(plugin as never, '   ');
+		setPluginDeviceId(plugin as never, '   ');
 
 		expect(plugin.secretStorage.delete).toHaveBeenCalledWith(SECRET_KEYS.DEVICE_ID);
 		expect(plugin.settings.deviceId).toBe('');
-		expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
 	});
 });

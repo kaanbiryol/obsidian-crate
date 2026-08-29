@@ -9,7 +9,6 @@ import {
   registerSyncCommands,
   registerVaultSyncEventHandlers,
 } from "../sync/plugin-integration";
-import { SyncApiClient } from "../sync/api";
 import { ensurePluginDeviceId } from "./deviceId";
 import { SECRET_KEYS } from "./types";
 import type CratePlugin from "./CratePlugin";
@@ -53,10 +52,9 @@ async function initializePluginCore(plugin: CratePlugin): Promise<boolean> {
     );
     await plugin.loadSettings();
     await restoreManagedWorkerConnection(plugin);
-    await migrateLegacyAuthToken(plugin);
     plugin.cloudflareDeploymentService = createCloudflareDeploymentService(plugin);
     initializeSyncManagers(plugin);
-    await ensurePluginDeviceId(plugin);
+    ensurePluginDeviceId(plugin);
     return true;
   } catch (error) {
     const message = errorMessage(error);
@@ -78,27 +76,6 @@ async function restoreManagedWorkerConnection(plugin: CratePlugin): Promise<void
 
   plugin.settings.workerUrl = `https://${deployment.workerName}.${deployment.workersSubdomain}.workers.dev`;
   await plugin.saveSettings();
-}
-
-async function migrateLegacyAuthToken(plugin: CratePlugin): Promise<void> {
-  const workerUrl = plugin.settings?.workerUrl;
-  if (!workerUrl || plugin.secretStorage.has(SECRET_KEYS.AUTH_TOKEN)) {
-    return;
-  }
-
-  const legacyToken = plugin.secretStorage.getLegacy(SECRET_KEYS.AUTH_TOKEN);
-  if (!legacyToken) {
-    return;
-  }
-
-  try {
-    const connection = await new SyncApiClient(workerUrl, legacyToken).testConnection();
-    if (connection.success) {
-      plugin.secretStorage.set(SECRET_KEYS.AUTH_TOKEN, legacyToken);
-    }
-  } catch {
-    // Leave the vault disconnected so Cloudflare authorization can repair it.
-  }
 }
 
 async function initializePluginSync(plugin: CratePlugin): Promise<void> {

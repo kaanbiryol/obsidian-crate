@@ -46,8 +46,8 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 		.setDesc('Unique identifier for this device. Stored locally and not shared through vault sync.')
 		.addText(text => text
 			.setValue(plugin.settings.deviceId)
-			.onChange(async (value) => {
-				await setPluginDeviceId(plugin, value);
+			.onChange((value) => {
+				setPluginDeviceId(plugin, value);
 			}));
 
 	const initialSyncSetting = new Setting(containerEl)

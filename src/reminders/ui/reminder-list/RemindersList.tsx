@@ -11,6 +11,7 @@ import { ReorderableReminderList } from "@/reminders/components/ReorderableRemin
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
 import { openReminderCreationModal } from "@/reminders/ui/adapters/modals";
+import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import {
   buildRemindersListPresentation,
   formatDateHeader,
@@ -80,8 +81,11 @@ export const RemindersList: React.FC<Props> = ({
   }, [presentation.activeReminders]);
 
   const handleReorderCommit = useCallback((orderedIds: string[]) => {
-    void plugin.reminderRepository.reorder(presentation.effectiveProject, orderedIds);
-  }, [plugin, presentation.effectiveProject]);
+    void persistReminderOrder(plugin.reminderRepository, presentation.effectiveProject, orderedIds, () => {
+      setLocalOrder(presentation.activeReminders);
+      triggerRefresh();
+    });
+  }, [plugin, presentation.activeReminders, presentation.effectiveProject, triggerRefresh]);
 
   const renderCard = useCallback((reminder: Reminder, _index: number) => (
     <ReminderCardWrapper

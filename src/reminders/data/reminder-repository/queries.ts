@@ -11,10 +11,6 @@ export function createReminderRepositoryQueries({ index }: ReminderRepositoryCon
       return index.getActive().map(toReminder);
     },
 
-    getCompleted() {
-      return index.getCompleted().map(toReminder);
-    },
-
     getTodayReminders(includeCompleted = false) {
       return getTodayReminderIds(
         index.getToday(),
@@ -22,32 +18,6 @@ export function createReminderRepositoryQueries({ index }: ReminderRepositoryCon
         index.getCompleted(),
         includeCompleted,
       );
-    },
-
-    getUpcoming(days = 7) {
-      return index.getUpcoming(days).map(toReminder);
-    },
-
-    getOverdue() {
-      return index.getOverdue().map(toReminder);
-    },
-
-    getByProject(project: string) {
-      return index.getByProject(project).map(toReminder);
-    },
-
-    getByFile(filePath: string) {
-      return index.getByFile(filePath).map(toReminder);
-    },
-
-    getById(id: string) {
-      const indexed = index.getById(id);
-      return indexed ? toReminder(indexed) : undefined;
-    },
-
-    async getByIdAsync(id: string) {
-      const indexed = index.getById(id);
-      return indexed ? toReminder(indexed) : undefined;
     },
 
     getProjects() {

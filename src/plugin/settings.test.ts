@@ -72,7 +72,7 @@ describe('normalizeCrateSettings', () => {
 		expect(settings.workerUrl).toBe('');
 		expect(settings.lastSync).toBe('2026-01-01T00:00:00.000Z');
 		expect(settings.lastSeq).toBe(DEFAULT_SETTINGS.lastSeq);
-		expect(settings.deviceId).toBe('device-1');
+		expect(settings.deviceId).toBe(DEFAULT_SETTINGS.deviceId);
 		expect(settings.ignorePatterns).toEqual(['.git/', 'vault-config/workspace*']);
 		expect(settings.syncOnStartup).toBe(DEFAULT_SETTINGS.syncOnStartup);
 		expect(settings.syncOnResume).toBe(DEFAULT_SETTINGS.syncOnResume);

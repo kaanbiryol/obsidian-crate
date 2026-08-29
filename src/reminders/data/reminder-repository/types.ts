@@ -5,14 +5,7 @@ import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/rem
 export interface ReminderRepository {
   getAll(): Reminder[];
   getActive(): Reminder[];
-  getCompleted(): Reminder[];
   getTodayReminders(includeCompleted?: boolean): Reminder[];
-  getUpcoming(days?: number): Reminder[];
-  getOverdue(): Reminder[];
-  getByProject(project: string): Reminder[];
-  getByFile(filePath: string): Reminder[];
-  getById(id: string): Reminder | undefined;
-  getByIdAsync(id: string): Promise<Reminder | undefined>;
   getProjects(): string[];
 
   create(params: CreateReminderParams): Promise<Reminder>;
@@ -22,7 +15,6 @@ export interface ReminderRepository {
   uncomplete(id: string): Promise<Reminder | undefined>;
   reorder(project: string, orderedIds: string[]): Promise<void>;
 
-  forceSave(): Promise<void>;
   getStats(): { activeCount: number; completedCount: number; totalCount: number };
 }
 

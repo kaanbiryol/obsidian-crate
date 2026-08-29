@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeReminderIds } from '@/reminders/data/vaultScanner';
 
-describe('normalizeReminderIds', () => {
+describe('reminder ID normalization', () => {
   it('adds fresh reminder identifiers to plain markdown reminder lines', async () => {
     const result = normalizeReminderIds('- [ ] Task A\n- [ ] Task A\n');
 

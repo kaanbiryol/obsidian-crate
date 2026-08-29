@@ -176,7 +176,7 @@ export function normalizeCrateSettings(
 		cloudflareDeployment: normalizeCloudflareDeployment(value?.cloudflareDeployment),
 		lastSync: normalizeNullableString(value?.lastSync),
 		lastSeq: normalizeNonNegativeInteger(value?.lastSeq, DEFAULT_SETTINGS.lastSeq),
-		deviceId: normalizeString(value?.deviceId),
+		deviceId: DEFAULT_SETTINGS.deviceId,
 		ignorePatterns: ensureConfigDirWorkspaceIgnorePattern(
 			normalizeStringArray(value?.ignorePatterns, DEFAULT_SETTINGS.ignorePatterns),
 			configDir,

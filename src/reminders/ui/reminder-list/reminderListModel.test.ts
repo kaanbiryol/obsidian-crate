@@ -29,14 +29,7 @@ function createRepository(overrides: Partial<ReminderRepository> = {}): Reminder
   return {
     getAll: () => [],
     getActive: () => [],
-    getCompleted: () => [],
     getTodayReminders: () => [],
-    getUpcoming: () => [],
-    getOverdue: () => [],
-    getByProject: () => [],
-    getByFile: () => [],
-    getById: () => undefined,
-    getByIdAsync: async () => undefined,
     getProjects: () => [],
     create: async () => makeReminder({}),
     update: async () => undefined,
@@ -44,7 +37,6 @@ function createRepository(overrides: Partial<ReminderRepository> = {}): Reminder
     complete: async () => undefined,
     uncomplete: async () => undefined,
     reorder: async () => {},
-    forceSave: async () => {},
     getStats: () => ({ activeCount: 0, completedCount: 0, totalCount: 0 }),
     ...overrides,
   };

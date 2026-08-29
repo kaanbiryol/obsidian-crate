@@ -51,11 +51,6 @@ export class SecretStorageService {
 		return !!this.get(key);
 	}
 
-	getLegacy(key: SecretKey): string | null {
-		const value = this.secretStorage.getSecret(key);
-		return value || null;
-	}
-
 	private storageId(key: SecretKey): string {
 		if (key !== SECRET_KEYS.AUTH_TOKEN) {
 			return key;

@@ -23,8 +23,6 @@ const createCloudflareDeploymentService = vi.fn(() => ({
 	destroy: cloudflareDeploymentDestroy,
 }));
 const secretStorageHas = vi.fn(() => false);
-const secretStorageGetLegacy = vi.fn(() => null);
-const secretStorageSet = vi.fn();
 
 class FakeDocumentFragment {
 	readonly spans: string[] = [];
@@ -59,8 +57,6 @@ async function loadLifecycleModule() {
 		SecretStorageService: class SecretStorageService {
 			constructor(public readonly app: unknown) {}
 			has = secretStorageHas;
-			getLegacy = secretStorageGetLegacy;
-			set = secretStorageSet;
 		},
 	}));
 	vi.doMock('./logger', () => ({
@@ -132,8 +128,6 @@ beforeEach(() => {
 	cloudflareDeploymentDestroy.mockReset();
 	createCloudflareDeploymentService.mockClear();
 	secretStorageHas.mockReset().mockReturnValue(false);
-	secretStorageGetLegacy.mockReset().mockReturnValue(null);
-	secretStorageSet.mockReset();
 	vi.stubGlobal('DocumentFragment', FakeDocumentFragment as unknown as typeof DocumentFragment);
 });
 

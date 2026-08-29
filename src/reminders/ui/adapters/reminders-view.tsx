@@ -14,6 +14,7 @@ import {
     PluginRemindersAppShell,
     type PluginReminderCardRenderer,
 } from "@/reminders/ui/plugin/PluginRemindersAppShell";
+import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import "../reminders-view.scss";
 
 export const VIEW_TYPE_REMINDERS = "reminders-view";
@@ -163,9 +164,14 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
         />
     ), [isDarkMode, triggerRefresh]);
 
-    const handleReorder = useCallback(async (project: string, orderedIds: string[]) => {
-        await plugin.reminderRepository.reorder(project, orderedIds);
-    }, [plugin]);
+    const handleReorder = useCallback((project: string, orderedIds: string[]) => {
+        void persistReminderOrder(
+            plugin.reminderRepository,
+            project,
+            orderedIds,
+            updateReminders,
+        );
+    }, [plugin, updateReminders]);
 
     return (
         <PluginRemindersAppShell

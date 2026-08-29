@@ -53,12 +53,4 @@ describe('SecretStorageService', () => {
 
 		expect(secrets.get(SECRET_KEYS.DEVICE_ID)).toBe('device-id');
 	});
-
-	it('keeps legacy credentials available for validated migration', () => {
-		const { service, secrets } = createSecretStorage(() => 'deployment-a');
-		secrets.set(SECRET_KEYS.AUTH_TOKEN, 'legacy-token');
-
-		expect(service.get(SECRET_KEYS.AUTH_TOKEN)).toBeNull();
-		expect(service.getLegacy(SECRET_KEYS.AUTH_TOKEN)).toBe('legacy-token');
-	});
 });

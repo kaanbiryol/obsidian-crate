@@ -103,9 +103,5 @@ export function createReminderRepositoryMutations({ index, writer }: ReminderRep
       const filePath = getReminderProjectFilePath(index.remindersFolderPath, project);
       await writer.reorderReminders(filePath, orderedIds);
     },
-
-    async forceSave() {
-      return undefined;
-    },
   };
 }
