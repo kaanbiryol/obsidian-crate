@@ -1,4 +1,4 @@
-import { maybePruneChangelog } from './db';
+import { changedRows, maybePruneChangelog } from './db';
 import {
 	collectCleanupKeys,
 	deleteBucketObjectsQuietly,
@@ -6,16 +6,6 @@ import {
 	type ExpectedFileHash,
 	type FileStorageRow,
 } from './sync-storage';
-
-interface D1MutationResult {
-	meta?: { changes?: number };
-}
-
-function changedRows(result: unknown): number {
-	if (!result || typeof result !== 'object') return 0;
-	const changes = (result as D1MutationResult).meta?.changes;
-	return typeof changes === 'number' ? changes : 0;
-}
 
 function uploadMutation(
 	db: D1Database,

@@ -1,5 +1,17 @@
 const CHANGELOG_RETENTION_DAYS = 30;
 
+interface D1MutationResult {
+	meta?: {
+		changes?: number;
+	};
+}
+
+export function changedRows(result: unknown): number {
+	if (!result || typeof result !== 'object') return 0;
+	const changes = (result as D1MutationResult).meta?.changes;
+	return typeof changes === 'number' ? changes : 0;
+}
+
 export async function maybePruneChangelog(db: D1Database): Promise<void> {
 	if (Math.random() > 0.05) return;
 	try {

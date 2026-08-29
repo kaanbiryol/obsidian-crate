@@ -31,7 +31,6 @@ function createPlugin(
 			},
 		},
 		manifest: { id: 'crate' },
-		remindersSettings: null,
 	} as unknown as CratePlugin;
 
 	return { plugin, write };
@@ -55,7 +54,7 @@ describe('loadRemindersSettings', () => {
 
 		await loadRemindersSettings(plugin);
 
-		expect(plugin.remindersSettings).toEqual(settings);
+		expect(useRemindersSettingsStore.getState()).toEqual(settings);
 		expect(write).not.toHaveBeenCalled();
 	});
 
@@ -68,7 +67,7 @@ describe('loadRemindersSettings', () => {
 
 		await loadRemindersSettings(plugin);
 
-		expect(plugin.remindersSettings.upcomingDaysDefault).toBe(
+		expect(useRemindersSettingsStore.getState().upcomingDaysDefault).toBe(
 			DEFAULT_REMINDERS_SETTINGS.upcomingDaysDefault,
 		);
 		expect(write).toHaveBeenCalledOnce();
@@ -90,13 +89,10 @@ describe('loadRemindersSettings', () => {
 		const { plugin } = createPlugin(initialSettings, async () => {
 			throw new Error('vault is read-only');
 		});
-		plugin.remindersSettings = initialSettings;
-
 		await expect(writeRemindersSettings(plugin, {
 			upcomingDaysDefault: 14,
 		})).rejects.toThrow('vault is read-only');
 
-		expect(plugin.remindersSettings).toEqual(initialSettings);
 		expect(useRemindersSettingsStore.getState()).toEqual(initialSettings);
 	});
 });

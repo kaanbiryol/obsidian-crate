@@ -38,8 +38,11 @@ export default class CratePlugin extends Plugin {
 	reminderIndex!: ReminderIndex;
 	markdownWriter!: MarkdownWriter;
 	reminderRepository!: ReminderRepository;
-	remindersSettings: RemindersSettings = useRemindersSettingsStore.getState();
 	remindersVaultWatcher?: VaultWatcher;
+
+	get remindersSettings(): RemindersSettings {
+		return useRemindersSettingsStore.getState();
+	}
 
 	async onload(): Promise<void> {
 		await bootstrapPlugin(this);

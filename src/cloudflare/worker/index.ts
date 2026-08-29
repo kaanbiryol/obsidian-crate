@@ -17,17 +17,17 @@ export default {
 		const method = request.method;
 		const db = env.DB;
 
-		const publicResponse = await handlePublicRoute(request, env, path, method);
-		if (publicResponse) {
-			return publicResponse;
-		}
-
-		const authResult = await authenticateWorkerRequest(request, db);
-		if (authResult.response) {
-			return authResult.response;
-		}
-
 		try {
+			const publicResponse = await handlePublicRoute(request, env, path, method);
+			if (publicResponse) {
+				return publicResponse;
+			}
+
+			const authResult = await authenticateWorkerRequest(request, db);
+			if (authResult.response) {
+				return authResult.response;
+			}
+
 			return await handleAuthenticatedRoute(request, env, path, method, authResult.principal)
 				?? corsResponse({ error: 'Not found' }, 404);
 		} catch (error) {

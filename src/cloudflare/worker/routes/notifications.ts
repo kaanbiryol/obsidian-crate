@@ -1,11 +1,13 @@
 import {
 	handleCreateEnrollmentToken,
 	handleCreateRemindersEnrollmentToken,
+} from '../notification-enrollment-handlers';
+import {
 	handleListSubscriptions,
 	handleSubscribe,
 	handleTestPush,
 	handleUnsubscribe,
-} from '../push-handlers';
+} from '../notification-subscription-handlers';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';
 

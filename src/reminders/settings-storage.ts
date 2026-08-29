@@ -77,11 +77,11 @@ export async function loadRemindersSettings(plugin: CratePlugin): Promise<void> 
 		useRemindersSettingsStore.setState(normalizedSettings, true);
 	}
 
-	plugin.remindersSettings = useRemindersSettingsStore.getState();
-	configureLogger({ prefix: 'Crate', enabled: plugin.remindersSettings.debugLogging });
+	const currentSettings = useRemindersSettingsStore.getState();
+	configureLogger({ prefix: 'Crate', enabled: currentSettings.debugLogging });
 	if (shouldPersistNormalizedSettings) {
 		try {
-			await saveRemindersSettingsData(plugin, plugin.remindersSettings);
+			await saveRemindersSettingsData(plugin, currentSettings);
 		} catch (error) {
 			remindersLogger.error('Failed to save normalized reminders settings:', error);
 		}
@@ -102,6 +102,5 @@ export async function writeRemindersSettings(
 	});
 	await saveRemindersSettingsData(plugin, nextSettings);
 	useRemindersSettingsStore.setState(nextSettings, true);
-	plugin.remindersSettings = nextSettings;
-	configureLogger({ prefix: 'Crate', enabled: plugin.remindersSettings.debugLogging });
+	configureLogger({ prefix: 'Crate', enabled: nextSettings.debugLogging });
 }

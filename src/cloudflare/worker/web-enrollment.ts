@@ -1,12 +1,6 @@
-import { sha256Hex } from './auth';
+import { createRandomHexToken, sha256Hex } from './auth';
 
 const WEB_ENROLLMENT_TOKEN_TTL_MS = 10 * 60 * 1000;
-
-function createEnrollmentToken(): string {
-	const bytes = new Uint8Array(32);
-	crypto.getRandomValues(bytes);
-	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
 
 async function purgeExpiredWebEnrollmentTokens(db: D1Database): Promise<void> {
 	try {
@@ -23,7 +17,7 @@ export async function issueWebEnrollmentToken(
 ): Promise<{ token: string; expiresAt: number }> {
 	await purgeExpiredWebEnrollmentTokens(db);
 
-	const token = createEnrollmentToken();
+	const token = createRandomHexToken();
 	const tokenHash = await sha256Hex(token);
 	const expiresAt = Date.now() + WEB_ENROLLMENT_TOKEN_TTL_MS;
 

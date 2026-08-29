@@ -333,6 +333,10 @@ describe('worker entrypoint', () => {
 			new Request('https://worker.test/notifications/app.js'),
 			createEnv() as never,
 		);
+		const staleVersionAppResponse = await worker.fetch(
+			new Request('https://worker.test/notifications/app.js?v=stale'),
+			createEnv() as never,
+		);
 		const versionedThemeResponse = await worker.fetch(
 			new Request(`https://worker.test/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}`),
 			createEnv() as never,
@@ -356,6 +360,7 @@ describe('worker entrypoint', () => {
 
 		expect(versionedAppResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(unversionedAppResponse.headers.get('Cache-Control')).toBe('no-store');
+		expect(staleVersionAppResponse.headers.get('Cache-Control')).toBe('no-store');
 		expect(versionedThemeResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedCrateIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
@@ -389,6 +394,22 @@ describe('worker entrypoint', () => {
 
 		expect(response.status).toBe(503);
 		expect(await response.json()).toEqual({ error: 'Authentication service unavailable' });
+	});
+
+	it('returns a controlled 500 when a public route throws', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		try {
+			const response = await worker.fetch(
+				new Request('https://worker.test/notifications/vapid-public-key'),
+				createEnv({ DB: null as never }) as never,
+			);
+
+			expect(response.status).toBe(500);
+			expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+			expect(await response.json()).toEqual({ error: 'Internal server error' });
+		} finally {
+			consoleError.mockRestore();
+		}
 	});
 
 	it('does not accept untracked file mutations when D1 is unavailable', async () => {

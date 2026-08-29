@@ -1,6 +1,9 @@
-import { corsResponse } from '../cors';
 import {
 	handleExchangeRemindersEnrollmentToken,
+	handleVapidPublicKey,
+} from '../notification-enrollment-handlers';
+import { handleSubscribe } from '../notification-subscription-handlers';
+import {
 	handleAppleStartup1179x2556,
 	handleAppleStartup1206x2622,
 	handleAppleStartup1290x2796,
@@ -17,9 +20,7 @@ import {
 	handlePwaThemeBootstrap,
 	handlePwaVersion,
 	handleServiceWorker,
-	handleSubscribe,
-	handleVapidPublicKey,
-} from '../push-handlers';
+} from '../pwa/asset-handlers';
 import { handleServerInfo } from '../server-info';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
@@ -60,11 +61,7 @@ export async function handlePublicRoute(
 		&& method === 'POST'
 		&& request.headers.get('X-Crate-Enrollment-Token')?.trim()
 	) {
-		try {
-			return await withDatabase(db, requiredDb => handleSubscribe(request, requiredDb));
-		} catch {
-			return corsResponse({ error: 'Internal server error' }, 500);
-		}
+		return await withDatabase(db, requiredDb => handleSubscribe(request, requiredDb));
 	}
 
 	return null;

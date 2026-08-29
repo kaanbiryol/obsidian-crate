@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sha256Hex } from './auth';
-import { consumePushEnrollmentToken, issuePushEnrollmentToken } from './push-enrollment';
+import { issuePushEnrollmentToken, purgeExpiredPushEnrollmentTokens } from './push-enrollment';
 
 function createDb(initialTokens?: Record<string, number>) {
 	const tokens = new Map<string, number>(Object.entries(initialTokens ?? {}));
@@ -30,13 +29,7 @@ function createDb(initialTokens?: Record<string, number>) {
 					}
 					return {};
 				}),
-				first: vi.fn(async () => {
-					if (sql.includes('SELECT expires_at FROM push_enrollment_tokens WHERE token_hash = ?')) {
-						const expiresAt = tokens.get(String(boundArgs[0]));
-						return expiresAt === undefined ? null : { expires_at: expiresAt };
-					}
-					return null;
-				}),
+				first: vi.fn(async () => null),
 				all: vi.fn(async () => ({ results: [] })),
 			};
 			return statement;
@@ -49,26 +42,28 @@ function createDb(initialTokens?: Record<string, number>) {
 }
 
 describe('push enrollment tokens', () => {
-	it('issues one-time tokens that can be consumed exactly once', async () => {
+	it('issues a cryptographically random token and stores only its hash', async () => {
 		const { db, tokens } = createDb();
 
 		const issued = await issuePushEnrollmentToken(db as never);
 
 		expect(issued.token).toHaveLength(64);
 		expect(tokens.size).toBe(1);
-		await expect(consumePushEnrollmentToken(db as never, issued.token)).resolves.toBe(true);
-		await expect(consumePushEnrollmentToken(db as never, issued.token)).resolves.toBe(false);
-		expect(tokens.size).toBe(0);
+		expect(tokens.has(issued.token)).toBe(false);
+		expect(issued.expiresAt).toBeGreaterThan(Date.now());
 	});
 
-	it('rejects expired tokens and purges them', async () => {
-		const expiredToken = 'expired-token';
-		const expiredHash = await sha256Hex(expiredToken);
+	it('purges expired tokens without removing live tokens', async () => {
+		const liveHash = 'live-hash';
+		const expiredHash = 'expired-hash';
 		const { db, tokens } = createDb({
 			[expiredHash]: Date.now() - 1000,
+			[liveHash]: Date.now() + 1000,
 		});
 
-		await expect(consumePushEnrollmentToken(db as never, expiredToken)).resolves.toBe(false);
-		expect(tokens.size).toBe(0);
+		await purgeExpiredPushEnrollmentTokens(db as never);
+
+		expect(tokens.has(expiredHash)).toBe(false);
+		expect(tokens.has(liveHash)).toBe(true);
 	});
 });

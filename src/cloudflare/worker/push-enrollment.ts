@@ -1,12 +1,6 @@
-import { sha256Hex } from './auth';
+import { createRandomHexToken, sha256Hex } from './auth';
 
 const ENROLLMENT_TOKEN_TTL_MS = 10 * 60 * 1000;
-
-function createEnrollmentToken(): string {
-	const bytes = new Uint8Array(32);
-	crypto.getRandomValues(bytes);
-	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
 
 export async function purgeExpiredPushEnrollmentTokens(db: D1Database): Promise<void> {
 	try {
@@ -23,7 +17,7 @@ export async function issuePushEnrollmentToken(
 ): Promise<{ token: string; expiresAt: number }> {
 	await purgeExpiredPushEnrollmentTokens(db);
 
-	const token = createEnrollmentToken();
+	const token = createRandomHexToken();
 	const tokenHash = await sha256Hex(token);
 	const expiresAt = Date.now() + ENROLLMENT_TOKEN_TTL_MS;
 
@@ -32,31 +26,4 @@ export async function issuePushEnrollmentToken(
 		.run();
 
 	return { token, expiresAt };
-}
-
-export async function consumePushEnrollmentToken(
-	db: D1Database,
-	token: string,
-): Promise<boolean> {
-	await purgeExpiredPushEnrollmentTokens(db);
-
-	const trimmedToken = token.trim();
-	if (!trimmedToken) {
-		return false;
-	}
-
-	const tokenHash = await sha256Hex(trimmedToken);
-	const row = await db.prepare('SELECT expires_at FROM push_enrollment_tokens WHERE token_hash = ?')
-		.bind(tokenHash)
-		.first<{ expires_at: number }>();
-
-	if (!row) {
-		return false;
-	}
-
-	await db.prepare('DELETE FROM push_enrollment_tokens WHERE token_hash = ?')
-		.bind(tokenHash)
-		.run();
-
-	return Number.isFinite(row.expires_at) && row.expires_at > Date.now();
 }
