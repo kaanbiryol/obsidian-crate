@@ -349,6 +349,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('<div class="pwa-bootstrap-content" aria-hidden="true">');
 		expect(html).toContain('<div class="pwa-loading-state is-visible"');
 		expect(html).toContain('<div class="pwa-bootstrap-tabs" aria-hidden="true">');
+		expect(html).toContain('--pwa-bootstrap-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px))');
+		expect(html).not.toContain('--pwa-bootstrap-safe-area-fallback');
 		expect(bodyMarkup.indexOf('pwa-bootstrap-header')).toBeLessThan(bodyMarkup.indexOf('pwa-skeleton-list'));
 		expect(html.match(/class="pwa-skeleton-row"/g)).toHaveLength(5);
 		expect(html).not.toContain('auth-card--loading');
