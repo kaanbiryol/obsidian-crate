@@ -83,6 +83,7 @@ export function PwaTopNotices({
 	const transition = prefersReducedMotion
 		? { duration: 0 }
 		: { duration: 0.16, ease: [0.32, 0, 0.67, 0] as const };
+	const collapsedNotice = { opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0 };
 
 	return (
 		<AnimatePresence initial={false}>
@@ -90,9 +91,9 @@ export function PwaTopNotices({
 				<motion.div
 					key="pwa-top-notices"
 					className="pwa-top-notices"
-					initial={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0 }}
+					initial={showNotificationPrompt ? false : collapsedNotice}
 					animate={{ opacity: 1, height: 'auto', paddingTop: 12, paddingBottom: 4 }}
-					exit={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0 }}
+					exit={collapsedNotice}
 					transition={transition}
 					style={{ overflow: 'hidden' }}
 				>
@@ -110,7 +111,7 @@ export function PwaTopNotices({
 							<motion.div
 								key="notification-prompt"
 								className="pwa-notification-prompt"
-								initial={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0 }}
+								initial={false}
 								animate={{ opacity: 1, height: 'auto', paddingTop: 10, paddingBottom: 10 }}
 								exit={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0 }}
 								transition={transition}
@@ -167,9 +168,14 @@ export function PwaPullRefreshIndicator({ pullRefresh }: { pullRefresh: PullRefr
 	);
 }
 
-export function PwaLoadingSkeleton() {
+export function PwaLoadingSkeleton({ isVisible = true }: { isVisible?: boolean }) {
 	return (
-		<div className="pwa-loading-state" aria-label="Loading reminders">
+		<div
+			className={`pwa-loading-state ${isVisible ? 'is-visible' : 'is-pending'}`}
+			role="status"
+			aria-live="polite"
+			aria-label="Loading reminders"
+		>
 			<div className="pwa-skeleton-header">
 				<div className="pwa-skeleton-line is-title" />
 				<div className="pwa-skeleton-line is-meta" />

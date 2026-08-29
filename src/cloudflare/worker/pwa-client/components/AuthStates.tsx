@@ -29,21 +29,6 @@ export function EmptyAuthState({ config }: { config: StoredConfig }) {
 	);
 }
 
-export function LoadingAuthState({ isExiting = false }: { isExiting?: boolean }) {
-	return (
-		<div
-			className={`auth-card auth-card--loading${isExiting ? ' is-exiting' : ''}`}
-			role="status"
-			aria-live="polite"
-			aria-label="Loading reminders"
-		>
-			<div className="auth-loading__mark-stage" aria-hidden="true">
-				<img src={brandMarkSrc} alt="" />
-			</div>
-		</div>
-	);
-}
-
 export function ErrorState({ error, config, onRetry }: { error: string; config: StoredConfig; onRetry: () => void }) {
 	const standalone = isStandaloneApp();
 	return (

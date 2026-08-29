@@ -13,14 +13,12 @@ describe('PWA activation metadata', () => {
 		const manifest = JSON.parse(createManifestJson('https://worker.test/notifications/manifest.json?v=asset')) as {
 			display: string;
 			display_override: string[];
-			background_color: string;
-			theme_color: string;
 		};
 
 		expect(manifest.display).toBe('standalone');
 		expect(manifest.display_override).toEqual(['standalone', 'minimal-ui']);
-		expect(manifest.background_color).toBe('#0b0b0d');
-		expect(manifest.theme_color).toBe('#0b0b0d');
+		expect(manifest).not.toHaveProperty('background_color');
+		expect(manifest).not.toHaveProperty('theme_color');
 	});
 
 	it('carries activation params into the manifest start URL', () => {
@@ -115,12 +113,20 @@ describe('PWA activation metadata', () => {
 	it('keeps standalone safe areas outside visible navigation chrome', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
+		expect(html).toContain('<html lang="en">');
+		expect(html).toContain('<meta name="color-scheme" content="light dark">');
+		expect(html).toContain(':root{--pwa-launch-bg:#0b0b0d;background:#0b0b0d;color-scheme:dark}');
+		expect(html).toContain('@media (prefers-color-scheme:light){:root{--pwa-launch-bg:#f7f7f8;background:#f7f7f8;color-scheme:light}}');
+		expect(html).toContain('<body>');
 		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
-		expect(html).toContain('<meta name="theme-color" content="#0b0b0d">');
+		expect(html).toContain('<meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)">');
+		expect(html).toContain('<meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)">');
 		expect(html).toContain('<link rel="icon" type="image/png" sizes="192x192" href="/notifications/crate-icon-192.png?v=');
 		expect(html).toContain('<link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=');
-		expect(html).toContain('<link rel="apple-touch-startup-image" href="/notifications/apple-startup-1179x2556.png?v=');
-		expect(html).toContain('<link rel="apple-touch-startup-image" href="/notifications/apple-startup-1290x2796.png?v=');
+		expect(html).not.toContain('rel="apple-touch-startup-image"');
+		expect(html).toContain('(prefers-color-scheme: light)');
+		expect(html).toContain('(prefers-color-scheme: dark)');
+		expect(html).toContain('--pwa-launch-bg:#f7f7f8;');
 		expect(html).toContain('<meta name="format-detection" content="telephone=no,date=no,email=no,address=no">');
 		expect(html).toContain('height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
 		expect(html).toContain('body{min-height:100%;min-height:100dvh;overflow:hidden;touch-action:manipulation}');
@@ -230,8 +236,7 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-icon-512.png'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-mark-256.png'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-touch-icon-180.png'");
-		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-startup-1179x2556.png'");
-		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-startup-1290x2796.png'");
+		expect(SERVICE_WORKER_JS).not.toContain('apple-startup-');
 	});
 
 	it('deep links notification clicks to the reminder and project', () => {
@@ -250,16 +255,17 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("navigate: notification.navigate || ''");
 	});
 
-	it('continues the native launch screen with a logo-only startup state', () => {
+	it('hands off from the native launch screen to a themed reminders loader', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('<link rel="preload" as="image" href="/notifications/crate-mark-256.png?v=');
-		expect(html).toContain('<div id="app"><div class="auth-card auth-card--loading" role="status"');
-		expect(html).toContain('max-width:none;align-items:center;padding:0;text-align:center;background:#000;box-shadow:none');
-		expect(html).toContain('.auth-loading__mark-stage{display:grid;width:min(32.5vw,140px);aspect-ratio:1;place-items:center;transform:translateY(-3.15dvh)}');
-		expect(html).toContain('.auth-loading__mark-stage img{width:100%;height:100%;object-fit:contain}');
-		expect(html).not.toContain('auth-loading__progress');
-		expect(html).not.toContain('>Loading reminders</h1>');
+		expect(html).toContain('<div id="app"><div class="pwa-bootstrap-shell" role="status"');
+		expect(html).toContain('window.__CRATE_PWA_LOADING_STARTED_AT__=performance.now()');
+		expect(html).toContain('aria-label="Loading reminders"');
+		expect(html).toContain('<div class="pwa-loading-state is-pending"');
+		expect(html).toContain('<div class="pwa-bootstrap-tabs" aria-hidden="true">');
+		expect(html).not.toContain('auth-card--loading');
+		expect(html).not.toContain('auth-loading__mark-stage');
+		expect(html).not.toContain('<link rel="preload" as="image" href="/notifications/crate-mark-256.png');
 	});
 
 });

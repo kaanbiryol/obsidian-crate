@@ -33,7 +33,7 @@ const { server, origin } = await listenPwaPreviewServer({ port, assets });
 try {
 	const pageResponse = await fetchOk(`${origin}/notifications?token=preview-install-token&folder=Reminders&upcomingDays=7`);
 	const pageHtml = await pageResponse.text();
-	if (!pageHtml.includes('<div id="app">')) throw new Error('PWA page is missing the app root');
+	if (!pageHtml.includes('<div id="app"><div class="pwa-bootstrap-shell"')) throw new Error('PWA page is missing the themed loading shell');
 	if (!pageHtml.includes('/notifications/app.js?v=')) throw new Error('PWA page is missing the versioned app script');
 
 	const manifestResponse = await fetchOk(`${origin}/notifications/manifest.json?token=preview-install-token&folder=Reminders&upcomingDays=7`);
@@ -58,8 +58,6 @@ try {
 		['/notifications/crate-icon-192.png?v=smoke', 5_000],
 		['/notifications/crate-icon-512.png?v=smoke', 20_000],
 		['/notifications/apple-touch-icon-180.png?v=smoke', 5_000],
-		['/notifications/apple-startup-1179x2556.png?v=smoke', 20_000],
-		['/notifications/apple-startup-1290x2796.png?v=smoke', 20_000],
 	]) {
 		const imageResponse = await fetchOk(`${origin}${path}`);
 		if (imageResponse.headers.get('Content-Type') !== 'image/png') {

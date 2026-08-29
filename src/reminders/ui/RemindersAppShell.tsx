@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { HeroUIProvider } from "@heroui/react";
 
@@ -42,6 +42,7 @@ interface RemindersAppShellProps {
   hideTabBar?: boolean;
   upcomingDays: number;
   loadingContent?: React.ReactNode;
+  loadingTransition?: boolean;
   headerRightContent?: React.ReactNode;
   belowHeaderContent?: React.ReactNode;
   topOverlay?: React.ReactNode;
@@ -68,6 +69,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
   hideTabBar = false,
   upcomingDays,
   loadingContent,
+  loadingTransition = false,
   headerRightContent,
   belowHeaderContent,
   topOverlay,
@@ -84,6 +86,7 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
   const [isTransitioning, setIsTransitioning] = useState(false);
   const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     return () => {
@@ -179,6 +182,32 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
     void onReorder(currentProject, orderedIds);
   }, [currentProject, onReorder]);
 
+  const viewPanels = (
+    <AnimatePresence mode="sync">
+      <RemindersViewPanels
+        viewMode={viewMode}
+        selectedProject={selectedProject}
+        isInitialLoadComplete={isInitialLoadComplete}
+        reminders={reminders}
+        projects={projects}
+        showFab={showFab}
+        upcomingDays={upcomingDays}
+        renderCard={panelCardRenderer}
+        renderToggleButton={renderToggleButton}
+        onProjectSelect={handleProjectSelect}
+        onBackToProjects={handleBackToProjects}
+        onReorder={handleReorder}
+        onReorderDragActiveChange={onReorderDragActiveChange}
+        colorScheme={isDarkMode ? "dark" : "light"}
+        reorderInteraction={reorderInteraction}
+      />
+    </AnimatePresence>
+  );
+
+  const loadingCrossfade = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
+
   return (
     <HeroUIProvider>
       <div
@@ -218,30 +247,33 @@ export const RemindersAppShell: React.FC<RemindersAppShellProps> = ({
 
         {belowHeaderContent}
 
-        <div className={`reminders-content${isTransitioning ? " is-transitioning" : ""}`}>
-          {loadingContent ? (
-            loadingContent
-          ) : (
-            <AnimatePresence mode="sync">
-              <RemindersViewPanels
-                viewMode={viewMode}
-                selectedProject={selectedProject}
-                isInitialLoadComplete={isInitialLoadComplete}
-                reminders={reminders}
-                projects={projects}
-                showFab={showFab}
-                upcomingDays={upcomingDays}
-                renderCard={panelCardRenderer}
-                renderToggleButton={renderToggleButton}
-                onProjectSelect={handleProjectSelect}
-                onBackToProjects={handleBackToProjects}
-                onReorder={handleReorder}
-                onReorderDragActiveChange={onReorderDragActiveChange}
-                colorScheme={isDarkMode ? "dark" : "light"}
-                reorderInteraction={reorderInteraction}
-              />
+        <div className={`reminders-content${isTransitioning ? " is-transitioning" : ""}${loadingTransition ? " has-loading-transition" : ""}`}>
+          {loadingTransition ? (
+            <AnimatePresence initial={false} mode="sync">
+              {loadingContent ? (
+                <motion.div
+                  key="initial-loading"
+                  className="reminders-loading-transition-layer"
+                  initial={false}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={loadingCrossfade}
+                >
+                  {loadingContent}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="initial-content"
+                  className="reminders-loading-transition-layer"
+                  initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={loadingCrossfade}
+                >
+                  {viewPanels}
+                </motion.div>
+              )}
             </AnimatePresence>
-          )}
+          ) : loadingContent ? loadingContent : viewPanels}
         </div>
 
         {!hideTabBar && (

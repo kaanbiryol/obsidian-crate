@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { hydrateRoot } from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { RemindersAppShell, type ReminderCardRenderer } from '@/reminders/ui/RemindersAppShell';
 import { PWA_ASSET_VERSION } from './pwa-version';
@@ -15,14 +15,15 @@ import {
 	registerPwaServiceWorker,
 	replaceBrowserUrlWithInstallToken,
 } from './pwa-client/api';
-import { ErrorState, EmptyAuthState, LoadingAuthState } from './pwa-client/components/AuthStates';
+import { ErrorState, EmptyAuthState } from './pwa-client/components/AuthStates';
 import { PwaHeaderActions, PwaLoadingSkeleton, PwaPullRefreshIndicator, PwaTopNotices } from './pwa-client/components/PwaChrome';
 import { ReminderSheet } from './pwa-client/components/ReminderSheet';
 import { SettingsSheet } from './pwa-client/components/SettingsSheet';
 import { WebReminderCard } from './pwa-client/components/WebReminderCard';
 import { usePushNotifications } from './pwa-client/hooks/usePushNotifications';
-import { useInitialLoadingGate } from './pwa-client/hooks/useInitialLoadingGate';
+import { useInitialLoadingTransition } from './pwa-client/hooks/useInitialLoadingTransition';
 import { usePwaBootstrap } from './pwa-client/hooks/usePwaBootstrap';
+import { usePwaColorScheme } from './pwa-client/hooks/usePwaColorScheme';
 import { usePwaStatus } from './pwa-client/hooks/usePwaStatus';
 import { useLaunchReminderModal } from './pwa-client/hooks/useLaunchReminderModal';
 import { usePwaZoomLock } from './pwa-client/hooks/usePwaZoomLock';
@@ -43,6 +44,8 @@ import type {
 } from './pwa-client/types';
 
 function App() {
+	const colorScheme = usePwaColorScheme();
+	const isDarkMode = colorScheme === 'dark';
 	const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_KEY));
 	const [bootstrapped, setBootstrapped] = useState(false);
 	const [config, setConfig] = useState<StoredConfig>(() => loadStoredConfig());
@@ -100,8 +103,7 @@ function App() {
 		setError,
 	} = reminderSync;
 	const initialContentReady = bootstrapped && (!authToken || !loading);
-	const initialLoading = useInitialLoadingGate(initialContentReady);
-
+	const initialLoadingTransition = useInitialLoadingTransition(initialContentReady);
 	const clearLocalSession = useCallback((showMessage: boolean) => {
 		localStorage.removeItem(AUTH_TOKEN_KEY);
 		localStorage.removeItem(REMINDERS_CACHE_KEY);
@@ -309,39 +311,31 @@ function App() {
 		/>
 	), [openModal, toggleReminderCompleted]);
 
-	if (!initialLoading.canReveal) {
-		return <LoadingAuthState />;
-	}
-
-	if (!authToken) {
+	if (bootstrapped && !authToken && !initialLoadingTransition.showLoadingContent) {
 		return (
-			<>
-				<div className="pwa-initial-content">
-					{error
-						? <ErrorState error={error} config={config} onRetry={() => window.location.reload()} />
-						: <EmptyAuthState config={config} />}
-				</div>
-				{initialLoading.isLoadingVisible && <LoadingAuthState isExiting />}
-			</>
+			<div>
+				{error
+					? <ErrorState error={error} config={config} onRetry={() => window.location.reload()} />
+					: <EmptyAuthState config={config} />}
+			</div>
 		);
 	}
 
 	return (
-		<>
-			<div className={`crate-reminders-ui reminders-shadow-root pwa-shadow-root pwa-initial-content dark${modal || settingsOpen ? ' has-open-sheet' : ''}`}>
-				<RemindersAppShell
+		<div className={`crate-reminders-ui reminders-shadow-root pwa-shadow-root ${colorScheme}${modal || settingsOpen ? ' has-open-sheet' : ''}`}>
+			<RemindersAppShell
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}
 				projects={projects}
-				isInitialLoadComplete={!loading}
-				isDarkMode
+				isInitialLoadComplete={initialContentReady}
+				isDarkMode={isDarkMode}
 				isFullScreen
 				isModal
 				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}
 				upcomingDays={config.upcomingDays}
 				className="app-shell pwa-reminders-view"
-				headerRightContent={(
+				headerRightContent={bootstrapped && authToken ? (
 					<PwaHeaderActions
 						settingsOpen={settingsOpen}
 						statusText={statusText}
@@ -350,9 +344,9 @@ function App() {
 						onRefresh={() => void loadReminders({ silent: true })}
 						onToggleSettings={toggleSettings}
 					/>
-				)}
+				) : undefined}
 				reorderInteraction="long-press"
-				belowHeaderContent={
+				belowHeaderContent={bootstrapped && authToken ? (
 					<>
 						<PwaPullRefreshIndicator pullRefresh={pullRefresh} />
 						<PwaTopNotices
@@ -364,9 +358,12 @@ function App() {
 							onEnableNotifications={enablePushNotifications}
 						/>
 					</>
-				}
-				loadingContent={loading ? <PwaLoadingSkeleton /> : undefined}
-				suppressFab={Boolean(modal) || settingsOpen || readOnly}
+				) : undefined}
+				loadingContent={initialLoadingTransition.showLoadingContent
+					? <PwaLoadingSkeleton isVisible={initialLoadingTransition.isSkeletonVisible} />
+					: undefined}
+				loadingTransition
+				suppressFab={!bootstrapped || !authToken || initialLoadingTransition.showLoadingContent || Boolean(modal) || settingsOpen || readOnly}
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
 				onReorder={persistReorder}
@@ -406,13 +403,11 @@ function App() {
 						{toast.message}
 					</div>
 				)}
-				</RemindersAppShell>
-			</div>
-			{initialLoading.isLoadingVisible && <LoadingAuthState isExiting />}
-		</>
+			</RemindersAppShell>
+		</div>
 	);
 }
 
 const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app root');
-hydrateRoot(root, <App />);
+createRoot(root).render(<App />);
