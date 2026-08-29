@@ -4,6 +4,7 @@ import type CratePlugin from "@/main";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
+import { useObsidianStatusBarInset } from "@/reminders/ui/hooks/useObsidianStatusBarInset";
 import type { TabId } from "@/reminders/ui/layoutConstants";
 import { openReminderCreationModal } from "@/reminders/ui/adapters/modals";
 import { createShadowReactMount, type ShadowReactMount } from "@/reminders/ui/adapters/shadowReactMount";
@@ -115,6 +116,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     const isDarkMode = useObsidianDarkMode();
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
+    useObsidianStatusBarInset(shadowRoot, !onClose);
 
     // Create portal container ref inside shadow DOM for HeroUI popovers/modals
     const portalContainerRef = useRef<HTMLDivElement | null>(null);

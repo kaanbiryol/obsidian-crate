@@ -42,11 +42,14 @@
     overflow: hidden;
     --reminders-tabbar-height: 80px;
     --reminders-tabbar-overlay: var(--reminders-tabbar-height);
-    --reminders-tabbar-bottom-offset: 0px;
+    --reminders-tabbar-bottom-offset: var(--reminders-host-bottom-inset, 0px);
     --reminders-bottom-gap: 16px;
     --reminders-fab-gap: 24px;
     --reminders-fab-size: 56px;
-    --reminders-safe-area: env(safe-area-inset-bottom);
+    --reminders-safe-area: max(
+        var(--safe-area-inset-bottom, env(safe-area-inset-bottom)),
+        var(--reminders-host-bottom-inset, 0px)
+    );
 
     // Fix HeroUI component text visibility in Shadow DOM dark mode
     // HeroUI's foreground color needs to be explicitly set for dark mode
@@ -148,7 +151,7 @@
     width: 100%;
     max-width: 42rem;
     margin: 0 auto;
-    padding: 8px 12px;
+    padding: 8px 0;
 }
 
 .bottom-tab-button {
@@ -231,7 +234,7 @@
 // Bottom position variant
 .animated-tab-bar-bottom {
     position: fixed;
-    bottom: 0;
+    bottom: var(--reminders-host-bottom-inset, 0px);
     left: 0;
     right: 0;
     border-top: 1px solid var(--background-modifier-border);

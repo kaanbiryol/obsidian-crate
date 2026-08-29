@@ -47,7 +47,10 @@
     &.is-fullscreen {
         --reminders-tabbar-overlay: 0px;
         --reminders-safe-area: 0px;
-        --reminders-tabbar-bottom-offset: max(8px, calc(env(safe-area-inset-bottom) - 16px));
+        --reminders-tabbar-bottom-offset: max(
+            8px,
+            calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom)) - 16px)
+        );
         --reminders-fab-gap: 36px;
 
         .animated-tab-bar-bottom {
@@ -78,10 +81,11 @@
     background: var(--background-primary);
     --reminders-tabbar-overlay: 0px;
     --reminders-safe-area: 0px;
-    // Add margin to sit above Obsidian's native bottom nav bar (~50px)
-    // Plus safe area for home indicator
-    // Reduced from 50px to 40px to position tab bar slightly lower on iOS
-    --reminders-tabbar-bottom-offset: calc(40px + env(safe-area-inset-bottom));
+    // Obsidian owns the mobile navbar and includes its safe-area padding in this height.
+    --reminders-tabbar-bottom-offset: var(
+        --navbar-height,
+        calc(40px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)))
+    );
 
     // Content doesn't need bottom padding for tab bar
     // since tab bar is now in flex flow
