@@ -34,16 +34,19 @@ const { server, origin } = await listenPwaPreviewServer({ port, assets });
 try {
 	const pageResponse = await fetchOk(`${origin}/notifications?token=preview-install-token&folder=Reminders&upcomingDays=7`);
 	const pageHtml = await pageResponse.text();
-	if (!pageHtml.includes('<div id="app"><div class="pwa-bootstrap-shell"')) throw new Error('PWA page is missing the themed loading shell');
+	if (!pageHtml.includes('<div id="app"><div class="pwa-launch-splash"')) throw new Error('PWA page is missing the launch splash');
 	if (!pageHtml.includes('/notifications/app.js?v=')) throw new Error('PWA page is missing the versioned app script');
 	if (!pageHtml.includes('/notifications/theme-bootstrap.js?v=')) throw new Error('PWA page is missing the theme bootstrap script');
 	if (pageHtml.includes('<script>')) throw new Error('PWA page contains an inline script');
-	if (!pageHtml.includes('/notifications/apple-startup-1206x2622.png?v=')) throw new Error('PWA page is missing the iPhone startup image');
+	if (pageHtml.includes('apple-touch-startup-image')) throw new Error('PWA page still includes device-specific startup images');
 
 	const manifestResponse = await fetchOk(`${origin}/notifications/manifest.json?token=preview-install-token&folder=Reminders&upcomingDays=7`);
 	const manifest = await manifestResponse.json();
 	if (manifest.start_url !== '/notifications?token=preview-install-token&folder=Reminders&upcomingDays=7') {
 		throw new Error(`Unexpected manifest start_url: ${manifest.start_url}`);
+	}
+	if (manifest.background_color !== '#f7f7f8' || manifest.color_scheme_dark?.background_color !== '#0b0b0d') {
+		throw new Error('PWA manifest is missing light and dark launch colors');
 	}
 
 	const appResponse = await fetchOk(`${origin}/notifications/app.js?v=smoke`);
@@ -73,9 +76,6 @@ try {
 		['/notifications/crate-icon-192.png?v=smoke', 5_000],
 		['/notifications/crate-icon-512.png?v=smoke', 20_000],
 		['/notifications/apple-touch-icon-180.png?v=smoke', 5_000],
-		['/notifications/apple-startup-1179x2556.png?v=smoke', 1_000],
-		['/notifications/apple-startup-1206x2622.png?v=smoke', 1_000],
-		['/notifications/apple-startup-1290x2796.png?v=smoke', 1_000],
 	]) {
 		const imageResponse = await fetchOk(`${origin}${path}`);
 		if (imageResponse.headers.get('Content-Type') !== 'image/png') {

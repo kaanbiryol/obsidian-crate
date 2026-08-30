@@ -27,6 +27,7 @@ function applyPwaColorScheme(preference: PwaThemePreference, colorScheme: PwaCol
 	if (lightTheme) lightTheme.media = lightThemeMediaForPreference(preference);
 
 	const themeColor = document.getElementById(PWA_THEME_COLOR_META_ID);
+	themeColor?.setAttribute('media', 'all');
 	themeColor?.setAttribute('content', isLight ? PWA_LIGHT_CHROME_COLOR : PWA_CHROME_COLOR);
 }
 

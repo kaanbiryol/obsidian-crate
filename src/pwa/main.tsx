@@ -14,7 +14,7 @@ import {
 	registerPwaServiceWorker,
 } from './api';
 import { ErrorState, EmptyAuthState } from './components/AuthStates';
-import { PwaHeaderActions, PwaLoadingSkeleton, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
+import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
 import { ReminderSheet } from './components/ReminderSheet';
 import { SettingsSheet } from './components/SettingsSheet';
 import { WebReminderCard } from './components/WebReminderCard';
@@ -257,7 +257,11 @@ function App() {
 		/>
 	), [openModal, toggleReminderCompleted]);
 
-	if (bootstrapped && !authToken && initialContentReady) {
+	if (!initialContentReady) {
+		return <PwaLaunchSplash />;
+	}
+
+	if (bootstrapped && !authToken) {
 		return (
 			<div>
 				{error
@@ -276,7 +280,6 @@ function App() {
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}
 				projects={projects}
-				isInitialLoadComplete={initialContentReady}
 				isDarkMode={isDarkMode}
 				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}
@@ -305,11 +308,7 @@ function App() {
 						/>
 					</>
 				) : undefined}
-				loadingContent={!initialContentReady
-					? <PwaLoadingSkeleton />
-					: undefined}
-				loadingTransition
-				suppressFab={!bootstrapped || !authToken || !initialContentReady || Boolean(modal) || settingsOpen || readOnly}
+				suppressFab={Boolean(modal) || settingsOpen || readOnly}
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
 				onReorder={persistReorder}

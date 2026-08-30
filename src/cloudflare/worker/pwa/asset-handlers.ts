@@ -1,8 +1,5 @@
 import { corsHeaders } from '../cors';
 import {
-	APPLE_STARTUP_1179X2556_PNG,
-	APPLE_STARTUP_1206X2622_PNG,
-	APPLE_STARTUP_1290X2796_PNG,
 	APPLE_TOUCH_ICON_180_PNG,
 	CRATE_ICON_192_PNG,
 	CRATE_ICON_512_PNG,
@@ -153,18 +150,6 @@ function pngAssetResponse(request: Request, asset: Uint8Array): Response {
 
 export function handleAppleTouchIcon(request: Request): Response {
 	return pngAssetResponse(request, APPLE_TOUCH_ICON_180_PNG);
-}
-
-export function handleAppleStartup1179x2556(request: Request): Response {
-	return pngAssetResponse(request, APPLE_STARTUP_1179X2556_PNG);
-}
-
-export function handleAppleStartup1206x2622(request: Request): Response {
-	return pngAssetResponse(request, APPLE_STARTUP_1206X2622_PNG);
-}
-
-export function handleAppleStartup1290x2796(request: Request): Response {
-	return pngAssetResponse(request, APPLE_STARTUP_1290X2796_PNG);
 }
 
 export function handleCrateIcon192(request: Request): Response {

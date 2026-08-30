@@ -4,9 +4,6 @@ import { PWA_ASSET_VERSION } from './pwa-version';
 export { createPwaHtml } from './pwa/html';
 export { ICON_SVG } from './pwa/icons';
 export {
-	APPLE_STARTUP_1179X2556_PNG,
-	APPLE_STARTUP_1206X2622_PNG,
-	APPLE_STARTUP_1290X2796_PNG,
 	APPLE_TOUCH_ICON_180_PNG,
 	CRATE_ICON_192_PNG,
 	CRATE_ICON_512_PNG,

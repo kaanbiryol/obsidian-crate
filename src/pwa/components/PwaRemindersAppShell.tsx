@@ -31,13 +31,10 @@ export type PwaReminderCardRenderer = (props: {
 interface PwaRemindersAppShellProps {
 	reminders: Reminder[];
 	projects: string[];
-	isInitialLoadComplete: boolean;
 	isDarkMode: boolean;
 	initialTab: TabId;
 	initialProject?: string;
 	upcomingDays: number;
-	loadingContent?: React.ReactNode;
-	loadingTransition?: boolean;
 	headerRightContent?: React.ReactNode;
 	belowHeaderContent?: React.ReactNode;
 	children?: React.ReactNode;
@@ -59,13 +56,10 @@ interface PwaRemindersAppShellProps {
 export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	reminders,
 	projects,
-	isInitialLoadComplete,
 	isDarkMode,
 	initialTab,
 	initialProject,
 	upcomingDays,
-	loadingContent,
-	loadingTransition = false,
 	headerRightContent,
 	belowHeaderContent,
 	children,
@@ -176,7 +170,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 			<RemindersViewPanels
 				viewMode={viewMode}
 				selectedProject={selectedProject}
-				isInitialLoadComplete={isInitialLoadComplete}
+				isInitialLoadComplete
 				reminders={reminders}
 				projects={projects}
 				showFab={showFab}
@@ -205,48 +199,36 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					className,
 				].filter(Boolean).join(' ')}
 			>
-				<AnimatePresence initial={false}>
-					{!(viewMode === 'browse' && selectedProject) && (
-						<motion.div
-							key="view-header"
-							initial={{ opacity: 0, height: 0 }}
-							animate={{ opacity: 1, height: 'auto' }}
-							exit={{ opacity: 0, height: 0 }}
-							transition={{
-								height: { duration: PAGE_TRANSITION_DURATION, ease: 'easeOut' },
-								opacity: { duration: 0.18, ease: 'easeOut' },
-							}}
-							className="overflow-hidden"
-						>
-							<ViewHeader
-								{...currentHeader}
-								large
-								showMeta={isInitialLoadComplete && !loadingContent}
-								reserveMetaSpace={loadingTransition}
-								rightContent={headerRightContent}
-							/>
-						</motion.div>
-					)}
-				</AnimatePresence>
+				{!(viewMode === 'browse' && selectedProject) && (
+					<div className="overflow-hidden">
+						<ViewHeader
+							{...currentHeader}
+							large
+							showMeta
+							rightContent={headerRightContent}
+						/>
+					</div>
+				)}
 
-				{!loadingContent && belowHeaderContent && (
+				{belowHeaderContent && (
 					<div className="pwa-below-header-content">
 						{belowHeaderContent}
 					</div>
 				)}
 
 				<div className={`reminders-content${isTransitioning ? ' is-transitioning' : ''}`}>
-					{loadingContent ?? viewPanels}
+					{viewPanels}
 				</div>
 
 				<BottomTabBar
 					activeTab={viewMode}
 					onTabChange={handleViewModeChange}
 					className="animated-tab-bar animated-tab-bar-bottom"
+					animateActiveIndicator={false}
 				/>
 
 				<AnimatePresence>
-					{showFab && !loadingContent && !suppressFab && (
+					{showFab && !suppressFab && (
 						<FloatingActionButton
 							onClick={handleAdd}
 							className="fab"

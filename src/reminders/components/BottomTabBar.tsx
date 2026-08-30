@@ -56,6 +56,7 @@ interface BottomTabBarProps {
   onTabChange: (tab: TabId) => void;
   position?: 'top' | 'bottom';
   className?: string;
+  animateActiveIndicator?: boolean;
 }
 
 /**
@@ -66,6 +67,7 @@ export const BottomTabBar = memo(function BottomTabBar({
   onTabChange,
   position = 'bottom',
   className = '',
+  animateActiveIndicator = true,
 }: BottomTabBarProps) {
   const activeIndex = Math.max(0, TABS.findIndex((tab) => tab.id === activeTab));
 
@@ -75,13 +77,20 @@ export const BottomTabBar = memo(function BottomTabBar({
     >
       <div className="bottom-tab-items">
         <div className="bottom-tab-slider-track" aria-hidden="true">
-          <motion.div
-            layout
-            initial={false}
-            className="bottom-tab-slider"
-            style={{ gridColumn: activeIndex + 1 }}
-            transition={{ type: 'spring', ...SPRING_CONFIG }}
-          />
+          {animateActiveIndicator ? (
+            <motion.div
+              layout
+              initial={false}
+              className="bottom-tab-slider"
+              style={{ gridColumn: activeIndex + 1 }}
+              transition={{ type: 'spring', ...SPRING_CONFIG }}
+            />
+          ) : (
+            <div
+              className="bottom-tab-slider"
+              style={{ gridColumn: activeIndex + 1 }}
+            />
+          )}
         </div>
         {TABS.map((tab) => (
           <TabButton

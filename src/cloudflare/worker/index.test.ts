@@ -355,10 +355,6 @@ describe('worker entrypoint', () => {
 			new Request(`https://worker.test/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}`),
 			createEnv() as never,
 		);
-		const versionedStartupImageResponse = await worker.fetch(
-			new Request(`https://worker.test/notifications/apple-startup-1206x2622.png?v=${PWA_ASSET_VERSION}`),
-			createEnv() as never,
-		);
 
 		expect(versionedAppResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(unversionedAppResponse.headers.get('Cache-Control')).toBe('no-store');
@@ -369,9 +365,6 @@ describe('worker entrypoint', () => {
 		expect(versionedCrateIconResponse.headers.get('Content-Type')).toBe('image/png');
 		expect(versionedTouchIconResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 		expect(versionedTouchIconResponse.headers.get('Content-Type')).toBe('image/png');
-		expect(versionedStartupImageResponse.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
-		expect(versionedStartupImageResponse.headers.get('Content-Type')).toBe('image/png');
-		expect((await versionedStartupImageResponse.arrayBuffer()).byteLength).toBeGreaterThan(0);
 	});
 
 	it('rejects blank bearer tokens', async () => {

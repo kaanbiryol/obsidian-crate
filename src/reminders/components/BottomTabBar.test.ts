@@ -24,4 +24,16 @@ describe('BottomTabBar', () => {
         expect(markup.match(/bottom-tab-slider"/g)).toHaveLength(1);
         expect(markup).toContain('grid-column:2');
     });
+
+    it('can render a static active indicator', () => {
+        const markup = renderToStaticMarkup(React.createElement(BottomTabBar, {
+            activeTab: 'upcoming',
+            onTabChange: vi.fn(),
+            animateActiveIndicator: false,
+        }));
+
+        expect(markup.match(/bottom-tab-slider"/g)).toHaveLength(1);
+        expect(markup).toContain('grid-column:3');
+        expect(markup).not.toContain('data-framer');
+    });
 });

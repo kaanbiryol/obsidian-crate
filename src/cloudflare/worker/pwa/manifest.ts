@@ -1,5 +1,5 @@
 import { PWA_ASSET_VERSION } from '../pwa-version';
-import { PWA_CHROME_COLOR, pwaStartSearchFromUrl } from './pwa-params';
+import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR, pwaStartSearchFromUrl } from './pwa-params';
 
 export function createManifestJson(requestUrl?: string): string {
 	return JSON.stringify({
@@ -12,8 +12,12 @@ export function createManifestJson(requestUrl?: string): string {
 		display: 'standalone',
 		display_override: ['standalone', 'minimal-ui'],
 		orientation: 'portrait',
-		background_color: PWA_CHROME_COLOR,
-		theme_color: PWA_CHROME_COLOR,
+		background_color: PWA_LIGHT_CHROME_COLOR,
+		theme_color: PWA_LIGHT_CHROME_COLOR,
+		color_scheme_dark: {
+			background_color: PWA_CHROME_COLOR,
+			theme_color: PWA_CHROME_COLOR,
+		},
 		categories: ['productivity', 'utilities'],
 		launch_handler: {
 			client_mode: 'navigate-existing',

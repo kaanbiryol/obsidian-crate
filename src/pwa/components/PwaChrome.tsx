@@ -141,25 +141,12 @@ export function PwaPullRefreshIndicator({ pullRefresh }: { pullRefresh: PullRefr
 	);
 }
 
-export function PwaLoadingSkeleton() {
+export function PwaLaunchSplash() {
 	return (
 		<div
-			className="pwa-loading-state is-visible"
+			className="pwa-launch-splash"
 			role="status"
-			aria-live="polite"
-			aria-label="Loading reminders"
-		>
-			<div className="pwa-skeleton-list">
-				{[0, 1, 2, 3, 4].map((item) => (
-					<div className="pwa-skeleton-row" key={item}>
-						<div className="pwa-skeleton-check" />
-						<div className="pwa-skeleton-body">
-							<div className="pwa-skeleton-line" />
-							<div className="pwa-skeleton-line is-short" />
-						</div>
-					</div>
-				))}
-			</div>
-		</div>
+			aria-label="Loading Crate"
+		/>
 	);
 }
