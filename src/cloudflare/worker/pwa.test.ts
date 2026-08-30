@@ -79,9 +79,10 @@ describe('PWA activation metadata', () => {
 	});
 
 	it('links the page to an activation-aware manifest', () => {
-		const html = createPwaHtml('https://worker.test/notifications?token=install-token&folder=Reminders&upcomingDays=7');
+		const html = createPwaHtml('https://worker.test/notifications?token=install-token&browserToken=browser-token&folder=Reminders&upcomingDays=7');
 
 		expect(html).toContain('<link rel="manifest" href="/notifications/manifest.json?token=install-token&folder=Reminders&upcomingDays=7&v=');
+		expect(html).not.toContain('browserToken=browser-token');
 	});
 
 	it('locks the PWA shell to the native app scale', () => {

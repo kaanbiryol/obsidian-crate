@@ -125,9 +125,10 @@ async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
 		throw new Error('Sync API is unavailable');
 	}
 
-	const { token } = await apiClient.createRemindersEnrollmentToken();
+	const { token, browserToken } = await apiClient.createRemindersEnrollmentToken();
 	const subscribeUrl = new URL('notifications', `${apiClient.getWorkerUrl()}/`);
 	subscribeUrl.searchParams.set('token', token);
+	if (browserToken) subscribeUrl.searchParams.set('browserToken', browserToken);
 	subscribeUrl.searchParams.set('folder', plugin.remindersSettings.remindersFolderPath);
 	subscribeUrl.searchParams.set('upcomingDays', String(plugin.remindersSettings.upcomingDaysDefault ?? 7));
 	if (plugin.remindersSettings.allDayNotificationTime) {

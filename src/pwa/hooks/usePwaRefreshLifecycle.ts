@@ -28,9 +28,9 @@ export function usePwaRefreshLifecycle({
 		if (!authToken || isStandaloneApp()) return;
 		const response = await apiFetch('/notifications/reminders-enrollment-token', { method: 'POST' });
 		if (!response.ok) throw new Error(await response.text());
-		const result = await response.json() as { token?: string };
+		const result = await response.json() as { token?: string; browserToken?: string };
 		if (!result.token) throw new Error('Missing install token');
-		replaceBrowserUrlWithInstallToken(result.token, config);
+		replaceBrowserUrlWithInstallToken(result.token, config, result.browserToken);
 	}, [apiFetch, authToken, config]);
 
 	useEffect(() => {

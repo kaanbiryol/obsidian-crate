@@ -34,12 +34,13 @@ export async function validateStoredAuthToken(authToken: string): Promise<boolea
 	}
 }
 
-function installActivationParams(token: string, config: StoredConfig): URLSearchParams {
+function installActivationParams(token: string, config: StoredConfig, browserToken?: string): URLSearchParams {
 	const params = currentQueryParams();
 	const project = params.get('project');
 	const tab = parseStartTab(params.get('tab'));
 	const nextParams = new URLSearchParams();
 	nextParams.set('token', token);
+	if (browserToken) nextParams.set('browserToken', browserToken);
 	nextParams.set('folder', config.folderPath);
 	nextParams.set('upcomingDays', String(config.upcomingDays));
 	if (config.allDayNotificationTime) nextParams.set('allDayTime', config.allDayNotificationTime);
@@ -57,8 +58,12 @@ function updateManifestWithInstallToken(token: string, config: StoredConfig): vo
 	}
 }
 
-export function replaceBrowserUrlWithInstallToken(token: string, config: StoredConfig): void {
-	const params = installActivationParams(token, config);
+export function replaceBrowserUrlWithInstallToken(
+	token: string,
+	config: StoredConfig,
+	browserToken?: string,
+): void {
+	const params = installActivationParams(token, config, browserToken);
 
 	const query = params.toString();
 	history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);

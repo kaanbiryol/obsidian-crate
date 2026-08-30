@@ -184,7 +184,7 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 
 		expect(lastQrCodeData).toBe(
-			'https://active-worker.example.com/notifications?token=enroll-token&folder=Reminders&upcomingDays=7&allDayTime=09%3A00',
+			'https://active-worker.example.com/notifications?token=install-token&browserToken=browser-token&folder=Reminders&upcomingDays=7&allDayTime=09%3A00',
 		);
 	});
 });
@@ -207,7 +207,8 @@ function createPlugin(apiClient: Record<string, unknown>): never {
 			getApiClient: () => ({
 				getWorkerUrl: vi.fn(() => 'https://worker.example.com'),
 				createRemindersEnrollmentToken: vi.fn(async () => ({
-					token: 'enroll-token',
+					token: 'install-token',
+					browserToken: 'browser-token',
 					expiresAt: '2026-06-13T12:00:00.000Z',
 				})),
 				...apiClient,

@@ -159,7 +159,7 @@ export class SyncApiClient {
 		return this.notificationsApi.createPushEnrollmentToken();
 	}
 
-	async createRemindersEnrollmentToken(): Promise<{ token: string; expiresAt: string }> {
+	async createRemindersEnrollmentToken(): Promise<{ token: string; browserToken?: string; expiresAt: string }> {
 		return this.notificationsApi.createRemindersEnrollmentToken();
 	}
 

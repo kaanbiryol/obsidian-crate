@@ -258,8 +258,10 @@ describe('worker entrypoint', () => {
 		);
 
 		expect(response.status).toBe(200);
-		const result = await response.json() as { token: string; expiresAt: string };
+		const result = await response.json() as { token: string; browserToken: string; expiresAt: string };
 		expect(result.token).toHaveLength(64);
+		expect(result.browserToken).toHaveLength(64);
+		expect(result.browserToken).not.toBe(result.token);
 		expect(Number.isNaN(Date.parse(result.expiresAt))).toBe(false);
 		expect(db.db.prepare).toHaveBeenCalledWith(
 			'INSERT INTO web_enrollment_tokens (token_hash, expires_at) VALUES (?, ?)',

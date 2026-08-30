@@ -38,7 +38,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `DELETE` | `/reminders/cancel` | Cancel a DO alarm |
 | `GET` | `/reminders/scheduled` | List scheduled reminders from D1 |
 | `POST` | `/notifications/enrollment-token` | Create a one-time push subscription token |
-| `POST` | `/notifications/reminders-enrollment-token` | Create a one-time reminders web app token |
+| `POST` | `/notifications/reminders-enrollment-token` | Create one-time browser and install tokens for a reminders web app link |
 | `POST` | `/notifications/subscribe` | Save a push subscription |
 | `DELETE` | `/notifications/subscribe` | Remove a push subscription |
 | `GET` | `/notifications/subscriptions` | List push subscriptions |
@@ -286,9 +286,9 @@ Response: `{ token, expiresAt }`
 
 ### POST /notifications/reminders-enrollment-token
 
-Authenticated. Creates a short-lived, one-time token used in `/notifications?token=...` reminders app links.
+Authenticated. Creates separate short-lived, one-time tokens for previewing a reminders app link in the browser and activating the installed app. Keeping the install token unused by the browser prevents iOS from launching a Home Screen app with an already-consumed credential.
 
-Response: `{ token, expiresAt }`
+Response: `{ token, browserToken, expiresAt }`, where `token` is reserved for the installed app.
 
 ### POST /notifications/subscribe
 
@@ -439,7 +439,7 @@ CREATE TABLE IF NOT EXISTS web_enrollment_tokens (
 );
 ```
 
-One-time, short-lived tokens embedded in reminders PWA setup links. `POST /notifications/reminders-exchange` consumes one token and creates a scoped, expiring PWA auth token that cannot access vault sync APIs.
+One-time, short-lived tokens embedded in reminders PWA setup links. Each link contains separate browser and install tokens. `POST /notifications/reminders-exchange` consumes one token and creates a scoped, expiring PWA auth token that cannot access vault sync APIs.
 
 ## R2 Key Convention
 

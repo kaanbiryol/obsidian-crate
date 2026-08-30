@@ -21,10 +21,12 @@ export async function handleCreateEnrollmentToken(db: D1Database): Promise<Respo
 }
 
 export async function handleCreateRemindersEnrollmentToken(db: D1Database): Promise<Response> {
-	const { token, expiresAt } = await issueWebEnrollmentToken(db);
+	const installEnrollment = await issueWebEnrollmentToken(db);
+	const browserEnrollment = await issueWebEnrollmentToken(db);
 	return corsResponse({
-		token,
-		expiresAt: new Date(expiresAt).toISOString(),
+		token: installEnrollment.token,
+		browserToken: browserEnrollment.token,
+		expiresAt: new Date(Math.min(installEnrollment.expiresAt, browserEnrollment.expiresAt)).toISOString(),
 	});
 }
 

@@ -114,6 +114,17 @@ export function formatLastUpdated(timestamp: number | null, now: number): string
 	return `Last updated ${elapsedDays}d ago`;
 }
 
+export function enrollmentTokenFromParams(
+	params: URLSearchParams,
+	standalone = isStandaloneApp(),
+): string | null {
+	const installToken = params.get('token')?.trim() || null;
+	const browserToken = params.get('browserToken')?.trim() || null;
+	return standalone
+		? installToken
+		: browserToken ?? installToken;
+}
+
 export function applyConfigFromUrl(config: StoredConfig): {
 	config: StoredConfig;
 	token: string | null;
@@ -142,7 +153,7 @@ export function applyConfigFromUrl(config: StoredConfig): {
 	saveConfig(nextConfig);
 	return {
 		config: nextConfig,
-		token: params.get('token'),
+		token: enrollmentTokenFromParams(params),
 		project: params.get('project'),
 		tab: parseStartTab(params.get('tab')),
 		reminderId: reminderId || null,

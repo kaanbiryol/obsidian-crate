@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectDeviceName, isIosOrIpados } from './config';
+import { detectDeviceName, enrollmentTokenFromParams, isIosOrIpados } from './config';
 
 function device(userAgent: string, maxTouchPoints = 0): Pick<Navigator, 'maxTouchPoints' | 'userAgent'> {
 	return { userAgent, maxTouchPoints };
@@ -21,5 +21,27 @@ describe('PWA device detection', () => {
 		const mac = device('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15');
 		expect(isIosOrIpados(mac)).toBe(false);
 		expect(detectDeviceName(mac)).toBe('Mac');
+	});
+});
+
+describe('PWA enrollment token selection', () => {
+	it('reserves the install token when Safari opens a two-token app link', () => {
+		const params = new URLSearchParams('token=install-token&browserToken=browser-token');
+
+		expect(enrollmentTokenFromParams(params, false)).toBe('browser-token');
+		expect(enrollmentTokenFromParams(params, true)).toBe('install-token');
+	});
+
+	it('keeps older single-token app links compatible', () => {
+		const params = new URLSearchParams('token=legacy-token');
+
+		expect(enrollmentTokenFromParams(params, false)).toBe('legacy-token');
+		expect(enrollmentTokenFromParams(params, true)).toBe('legacy-token');
+	});
+
+	it('ignores a blank browser token and falls back to the install token in a browser', () => {
+		const params = new URLSearchParams('token=install-token&browserToken=%20');
+
+		expect(enrollmentTokenFromParams(params, false)).toBe('install-token');
 	});
 });
