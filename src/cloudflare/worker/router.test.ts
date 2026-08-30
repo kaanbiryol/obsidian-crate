@@ -25,5 +25,6 @@ describe('authenticated route scopes', () => {
 		expect(isAuthenticatedRouteAllowed(principal, '/settings', 'GET')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/auth/tokens', 'GET')).toBe(false);
 		expect(isAuthenticatedRouteAllowed(principal, '/notifications/test', 'POST')).toBe(false);
+		expect(isAuthenticatedRouteAllowed(principal, '/notifications/reminders-enrollment-token', 'POST')).toBe(false);
 	});
 });

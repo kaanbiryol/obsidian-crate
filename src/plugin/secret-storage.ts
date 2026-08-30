@@ -1,5 +1,5 @@
 /**
- * Wrapper around Obsidian's SecretStorage API (v1.13.0+)
+ * Wrapper around Obsidian's SecretStorage API (v1.11.4+)
  *
  * app.secretStorage provides cross-platform secure credential storage
  * using the OS keychain on desktop. The API is synchronous.
@@ -9,20 +9,8 @@
 import type { App } from 'obsidian';
 import { SECRET_KEYS, type SecretKey } from './types';
 
-interface SecretStorage {
-	getSecret(id: string): string | null;
-	setSecret(id: string, secret: string): void;
-	listSecrets(): string[];
-}
-
-declare module 'obsidian' {
-	interface App {
-		secretStorage: SecretStorage;
-	}
-}
-
 export class SecretStorageService {
-	private secretStorage: SecretStorage;
+	private secretStorage: App['secretStorage'];
 
 	constructor(
 		app: App,

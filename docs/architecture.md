@@ -74,7 +74,7 @@ CratePlugin (src/plugin/CratePlugin.ts)
 1. The plugin creates a cryptographically random OAuth `state` and a fresh PKCE S256 verifier/challenge in memory.
 2. Cloudflare redirects to `https://crate.kaanbiryol.com/oauth/callback/`. The static page immediately clears its query string and opens the `crate-cloudflare-oauth` Obsidian protocol.
 3. The plugin verifies `state` before exchanging the authorization code. The access token is held only in a local stack frame.
-4. The plugin discovers Crate Workers in the selected account. It reuses the saved or selected deployment, or creates new D1 and R2 resources when none exists. The idempotent initial D1 schema is applied before the new Worker bundle is uploaded; request cold starts never mutate the schema.
+4. The plugin discovers Crate Workers in the selected account. It reuses the saved or selected deployment, or creates new D1 and R2 resources when none exists. The complete D1 schema and any unapplied ordered upgrades are applied before the new Worker bundle is uploaded; request cold starts never mutate the schema.
 5. The plugin generates a permanent device secret locally and writes only its hash and device metadata to the deployment's D1 database using the temporary Cloudflare authorization.
 6. The OAuth token is revoked and discarded. Only non-secret resource identifiers remain in plugin settings for reconnects and updates.
 
@@ -90,7 +90,7 @@ Authenticated requests carry a Bearer token in the `Authorization` header. The W
 
 Push-notification device enrollment is intentionally narrower: the plugin mints a short-lived, one-time push enrollment token from the worker and the notification PWA uses that scoped token only for `POST /notifications/subscribe`.
 
-The reminders web app uses a separate short-lived web enrollment token in the `/notifications?token=...` link. The PWA exchanges it once at `POST /notifications/reminders-exchange` for a 90-day, reminder-only bearer token stored locally by the browser. Route authorization prevents that token from reading or mutating the vault sync API, shared settings, device list, or push administration.
+The reminders web app uses a separate short-lived web enrollment token in the `/notifications?token=...` link. The PWA exchanges it once at `POST /notifications/reminders-exchange` for a 90-day, reminder-only bearer token stored locally by the browser. Route authorization prevents that token from reading or mutating the vault sync API, shared settings, device list, push administration, or enrollment-token API, so it cannot renew itself. Open a fresh link from the plugin after the session expires.
 
 ## Secret Storage
 
@@ -103,7 +103,7 @@ The plugin stores two local values through `SecretStorageService`:
 
 **Convention:** Obsidian's `secretStorage` has no delete method. The plugin writes empty string to "delete" and treats empty strings as null on read.
 
-**Type augmentation:** Obsidian's types package doesn't include `secretStorage`. The module augmentation (`declare module 'obsidian'`) lives in `src/plugin/secret-storage.ts`.
+The service uses Obsidian's official `App.secretStorage` type and scopes the sync bearer token by Worker URL so credentials cannot leak between deployments.
 
 ## Worker and PWA build
 
@@ -111,7 +111,7 @@ The browser-facing PWA source lives in `src/pwa/`, while its Worker-served HTML,
 
 The Obsidian plugin and PWA own separate application shells so viewport, navigation, safe-area, and modal behavior can follow each host. They share reminder panels, cards, and view-model logic rather than sharing host chrome.
 
-The Worker remains an independently deployable build product, but the production plugin also includes a gzip-compressed copy of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime.
+The Worker remains an independently deployable build product, but the production plugin also includes a gzip-compressed copy of `.generated/cloudflare/worker.mjs`, `src/cloudflare/schema.sql`, and ordered SQL files from `src/cloudflare/migrations/`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. New databases record the `0001_initial.sql` baseline in Cloudflare's standard `d1_migrations` table, and later files are applied once in filename order.
 
 `npm run release:check` enforces Worker and combined-plugin size budgets and checks that the OAuth entry point remains present.
 

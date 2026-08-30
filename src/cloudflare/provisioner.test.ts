@@ -25,6 +25,7 @@ const artifacts = {
 	workerBundleSha256: 'worker-hash',
 	d1Schema: 'CREATE TABLE IF NOT EXISTS example (id TEXT);',
 	d1SchemaSha256: 'schema-hash',
+	d1Migrations: [],
 };
 
 function createApi() {
@@ -34,7 +35,7 @@ function createApi() {
 		createD1Database: vi.fn(),
 		getR2Bucket: vi.fn(async () => ({ name: 'crate-0123456789abcdef' })),
 		createR2Bucket: vi.fn(),
-		queryD1: vi.fn(async () => []),
+		queryD1: vi.fn(async (): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => []),
 		uploadWorker: vi.fn(async () => {}),
 		updateWorkerSchedules: vi.fn(async () => {}),
 		getWorkersSubdomain: vi.fn(async () => 'personal-crate'),
@@ -60,7 +61,7 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.createD1Database).not.toHaveBeenCalled();
 		expect(api.createR2Bucket).not.toHaveBeenCalled();
 		expect(api.createWorkersSubdomain).not.toHaveBeenCalled();
-		expect(api.queryD1).toHaveBeenCalledOnce();
+		expect(api.queryD1).toHaveBeenCalledTimes(2);
 		expect(api.queryD1).toHaveBeenCalledWith(
 			metadata.accountId,
 			metadata.d1DatabaseId,
@@ -80,6 +81,34 @@ describe('provisionCloudflareDeployment', () => {
 		expect(metadata.lastDeployedVersion).toBe('0.1.0');
 		expect(metadata.lastDeployedFingerprint).toBe('f'.repeat(64));
 		expect(workerUrl).toBe('https://crate-0123456789abcdef.personal-crate.workers.dev');
+	});
+
+	it('applies only pending D1 migrations before uploading the Worker', async () => {
+		const api = createApi();
+		api.queryD1
+			.mockResolvedValueOnce([])
+			.mockResolvedValueOnce([{ results: [{ name: '0001_initial.sql' }] }])
+			.mockResolvedValueOnce([]);
+		const metadata = createMetadata();
+		const migrations = [
+			{ name: '0002_add_example.sql', sql: 'ALTER TABLE example ADD COLUMN title TEXT;', sha256: 'hash' },
+		];
+
+		await provisionCloudflareDeployment({
+			api: api as never,
+			accountId: metadata.accountId!,
+			metadata,
+			artifacts: { ...artifacts, d1Migrations: migrations },
+			onMetadataChanged: vi.fn(async () => {}),
+		});
+
+		expect(api.queryD1).toHaveBeenNthCalledWith(
+			3,
+			metadata.accountId,
+			metadata.d1DatabaseId,
+			"ALTER TABLE example ADD COLUMN title TEXT;\nINSERT INTO d1_migrations (name) VALUES ('0002_add_example.sql');",
+		);
+		expect(api.uploadWorker).toHaveBeenCalledOnce();
 	});
 
 	it('explains how to activate R2 when the account is not entitled', async () => {

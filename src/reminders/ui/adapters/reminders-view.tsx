@@ -1,5 +1,5 @@
 import { ItemView, Platform, WorkspaceLeaf } from "obsidian";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import type CratePlugin from "@/main";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
@@ -65,13 +65,6 @@ export class RemindersView extends ItemView {
         container.empty();
         container.addClass("crate-reminders-view-container");
 
-        // CRITICAL: Force height chain to work
-        // Obsidian's container is a flex child, so height: 100% will resolve
-        container.setCssProps({
-            height: "100%",
-            overflow: "hidden",
-        });
-
         const shadowMount = await createShadowReactMount(this.plugin, container, {
             isActive: () => this.isOpen,
         });
@@ -117,24 +110,6 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
     useObsidianStatusBarInset(shadowRoot, !onClose);
-
-    // Create portal container ref inside shadow DOM for HeroUI popovers/modals
-    const portalContainerRef = useRef<HTMLDivElement | null>(null);
-    useEffect(() => {
-        // Create portal container inside shadow root if it doesn't exist
-        let portalContainer = shadowRoot.querySelector(".heroui-portal-container") as HTMLDivElement;
-        if (!portalContainer) {
-            portalContainer = document.createElement("div");
-            portalContainer.className = "crate-reminders-ui heroui-portal-container";
-            shadowRoot.appendChild(portalContainer);
-        }
-        portalContainer.classList.add("crate-reminders-ui");
-        portalContainerRef.current = portalContainer;
-
-        // Update dark mode class on portal container
-        portalContainer.classList.toggle("dark", isDarkMode);
-        portalContainer.classList.toggle("light", !isDarkMode);
-    }, [shadowRoot, isDarkMode]);
 
     // Subscribe to index changes for automatic refresh (replaces 5-second polling)
     const { refreshToken, triggerRefresh } = useIndexRefresh();

@@ -82,7 +82,6 @@ if (unownedSelectors.size > 0) {
 
 const requiredSameNodeSelectors = [
 	'.crate-reminders-ui.reminders-shadow-root',
-	'.crate-reminders-ui.heroui-portal-container',
 ];
 const missingSameNodeSelectors = requiredSameNodeSelectors.filter(
 	(selector) => !generatedSelectors.has(selector),

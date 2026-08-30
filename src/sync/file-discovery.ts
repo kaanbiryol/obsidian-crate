@@ -132,34 +132,38 @@ async function walkHiddenFolder(
 	seen: Set<string>,
 	result: VaultFile[],
 ): Promise<void> {
-	const listing = await safeList(vault, folderPath);
+	const pendingFolders = [folderPath];
+	const visitedFolders = new Set<string>();
+	while (pendingFolders.length > 0) {
+		const currentFolder = pendingFolders.pop();
+		if (!currentFolder || visitedFolders.has(currentFolder)) continue;
+		visitedFolders.add(currentFolder);
+		const listing = await safeList(vault, currentFolder);
 
-	for (const filePath of listing.files) {
-		if (seen.has(filePath) || shouldIgnore(filePath)) continue;
+		for (const filePath of listing.files) {
+			if (seen.has(filePath) || shouldIgnore(filePath)) continue;
 
-		const stat = await safeStat(vault, filePath);
-		if (!stat || stat.type !== 'file') continue;
+			const stat = await safeStat(vault, filePath);
+			if (!stat || stat.type !== 'file') continue;
 
-		seen.add(filePath);
-		result.push({
-			path: filePath,
-			size: stat.size,
-			mtime: stat.mtime,
-			extension: getExtensionFromPath(filePath),
-		});
-	}
+			seen.add(filePath);
+			result.push({
+				path: filePath,
+				size: stat.size,
+				mtime: stat.mtime,
+				extension: getExtensionFromPath(filePath),
+			});
+		}
 
-	for (const subfolder of listing.folders) {
-		if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
-		await walkHiddenFolder(vault, subfolder, shouldIgnore, seen, result);
+		for (const subfolder of listing.folders) {
+			if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
+			pendingFolders.push(subfolder);
+		}
 	}
 }
 
-const MAX_NESTED_WALK_DEPTH = 5;
-
 /**
  * Walk non-hidden folders and recurse into hidden descendants only.
- * Depth-limited to avoid excessive recursion into deep visible folder trees.
  */
 async function walkForNestedHiddenFolders(
 	vault: Vault,
@@ -167,19 +171,23 @@ async function walkForNestedHiddenFolders(
 	shouldIgnore: (path: string) => boolean,
 	seen: Set<string>,
 	result: VaultFile[],
-	depth = 0,
 ): Promise<void> {
-	if (depth >= MAX_NESTED_WALK_DEPTH) return;
+	const pendingFolders = [folderPath];
+	const visitedFolders = new Set<string>();
+	while (pendingFolders.length > 0) {
+		const currentFolder = pendingFolders.pop();
+		if (!currentFolder || visitedFolders.has(currentFolder)) continue;
+		visitedFolders.add(currentFolder);
+		const listing = await safeList(vault, currentFolder);
 
-	const listing = await safeList(vault, folderPath);
-
-	for (const subfolder of listing.folders) {
-		if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
-		const name = subfolder.split('/').pop() ?? '';
-		if (name.startsWith('.')) {
-			await walkHiddenFolder(vault, subfolder, shouldIgnore, seen, result);
-		} else {
-			await walkForNestedHiddenFolders(vault, subfolder, shouldIgnore, seen, result, depth + 1);
+		for (const subfolder of listing.folders) {
+			if (shouldIgnore(subfolder) || shouldIgnore(subfolder + '/')) continue;
+			const name = subfolder.split('/').pop() ?? '';
+			if (name.startsWith('.')) {
+				await walkHiddenFolder(vault, subfolder, shouldIgnore, seen, result);
+			} else {
+				pendingFolders.push(subfolder);
+			}
 		}
 	}
 }

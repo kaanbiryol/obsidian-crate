@@ -50,6 +50,27 @@ async function initializeD1Schema(input: {
 		input.databaseId,
 		input.artifacts.d1Schema,
 	);
+
+	const appliedResults = await input.api.queryD1(
+		input.accountId,
+		input.databaseId,
+		'SELECT name FROM d1_migrations ORDER BY id;',
+	);
+	const appliedNames = new Set(
+		appliedResults
+			.flatMap(result => result.results ?? [])
+			.map(row => row.name)
+			.filter((name): name is string => typeof name === 'string'),
+	);
+
+	for (const migration of input.artifacts.d1Migrations) {
+		if (appliedNames.has(migration.name)) continue;
+		await input.api.queryD1(
+			input.accountId,
+			input.databaseId,
+			`${migration.sql.trim()}\nINSERT INTO d1_migrations (name) VALUES ('${migration.name}');`,
+		);
+	}
 }
 
 async function ensureWorkersSubdomain(

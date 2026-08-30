@@ -1,47 +1,126 @@
-import React, { forwardRef } from "react";
-import { Button } from "@heroui/react";
-import { motion } from "framer-motion";
+import React, { forwardRef } from 'react';
+import { motion } from 'framer-motion';
 import { useShadowDomClickBridge } from './shadowDomClickBridge';
 
-type HeroButtonProps = Omit<React.ComponentProps<typeof Button>, "children" | "onPress"> & {
-  onPress: () => void;
-  children: React.ReactNode;
-};
+interface ButtonBehaviorProps {
+	onPress: () => void;
+	children: React.ReactNode;
+	variant?: 'solid' | 'bordered' | 'light' | 'flat' | 'faded' | 'shadow' | 'ghost';
+	color?: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
+	size?: 'sm' | 'md' | 'lg';
+	radius?: 'none' | 'sm' | 'md' | 'lg' | 'full';
+	isIconOnly?: boolean;
+	isDisabled?: boolean;
+	isLoading?: boolean;
+	disableAnimation?: boolean;
+	startContent?: React.ReactNode;
+	endContent?: React.ReactNode;
+}
 
-/**
- * HeroUI Button wrapper that works inside Shadow DOM
- * Uses native click handler via capture phase since HeroUI's onPress doesn't work in Shadow DOM
- */
-export const ShadowDOMButton = forwardRef<HTMLButtonElement, HeroButtonProps>(({ onPress, children, type = "button", ...props }, ref) => {
-  const combinedRef = useShadowDomClickBridge(onPress, ref);
+type NativeButtonProps = Omit<
+	React.ButtonHTMLAttributes<HTMLButtonElement>,
+	'children' | 'color' | 'disabled' | 'onClick' | 'size'
+> & ButtonBehaviorProps;
 
-  return (
-    <Button ref={combinedRef} type={type} {...props}>
-      {children}
-    </Button>
-  );
+type MotionButtonProps = Omit<
+	React.ComponentProps<typeof motion.button>,
+	'children' | 'color' | 'disabled' | 'onClick'
+> & ButtonBehaviorProps;
+
+function buttonClassName(className: string | undefined): string {
+	return ['shadow-dom-button', className].filter(Boolean).join(' ');
+}
+
+function buttonContent({
+	children,
+	isLoading,
+	startContent,
+	endContent,
+}: Pick<ButtonBehaviorProps, 'children' | 'isLoading' | 'startContent' | 'endContent'>): React.ReactNode {
+	return (
+		<>
+			{isLoading ? <span className="shadow-dom-button__spinner" aria-hidden="true" /> : startContent}
+			{children}
+			{endContent}
+		</>
+	);
+}
+
+function semanticAttributes(props: ButtonBehaviorProps) {
+	return {
+		'aria-busy': props.isLoading || undefined,
+		'data-color': props.color,
+		'data-icon-only': props.isIconOnly || undefined,
+		'data-radius': props.radius,
+		'data-size': props.size,
+		'data-variant': props.variant,
+	};
+}
+
+export const ShadowDOMButton = forwardRef<HTMLButtonElement, NativeButtonProps>(function ShadowDOMButton({
+	onPress,
+	children,
+	type = 'button',
+	className,
+	isDisabled,
+	isLoading,
+	disableAnimation: _disableAnimation,
+	startContent,
+	endContent,
+	variant,
+	color,
+	size,
+	radius,
+	isIconOnly,
+	...props
+}, ref) {
+	const combinedRef = useShadowDomClickBridge(onPress, ref);
+	const behavior = { onPress, children, isDisabled, isLoading, startContent, endContent, variant, color, size, radius, isIconOnly };
+
+	return (
+		<button
+			ref={combinedRef}
+			type={type}
+			className={buttonClassName(className)}
+			disabled={isDisabled || isLoading}
+			{...semanticAttributes(behavior)}
+			{...props}
+		>
+			{buttonContent(behavior)}
+		</button>
+	);
 });
 
-ShadowDOMButton.displayName = 'ShadowDOMButton';
+export const ShadowDOMMotionButton = forwardRef<HTMLButtonElement, MotionButtonProps>(function ShadowDOMMotionButton({
+	onPress,
+	children,
+	type = 'button',
+	className,
+	isDisabled,
+	isLoading,
+	disableAnimation: _disableAnimation,
+	startContent,
+	endContent,
+	variant,
+	color,
+	size,
+	radius,
+	isIconOnly,
+	...props
+}, ref) {
+	const combinedRef = useShadowDomClickBridge(onPress, ref);
+	const behavior = { onPress, children, isDisabled, isLoading, startContent, endContent, variant, color, size, radius, isIconOnly };
 
-/**
- * Motion-enabled Button wrapper that works inside Shadow DOM
- * Combines framer-motion animations with capture-phase click handling
- */
-const MotionButton = motion.create(Button);
-type MotionHeroButtonProps = Omit<React.ComponentProps<typeof MotionButton>, "children" | "onPress" | "ref"> & {
-  onPress: () => void;
-  children: React.ReactNode;
-};
-
-export const ShadowDOMMotionButton = forwardRef<HTMLButtonElement, MotionHeroButtonProps>(({ onPress, children, type = "button", ...props }, ref) => {
-  const combinedRef = useShadowDomClickBridge(onPress, ref);
-
-  return (
-    <MotionButton ref={combinedRef} type={type} {...props}>
-      {children}
-    </MotionButton>
-  );
+	return (
+		<motion.button
+			ref={combinedRef}
+			type={type}
+			className={buttonClassName(typeof className === 'string' ? className : undefined)}
+			disabled={isDisabled || isLoading}
+			{...semanticAttributes(behavior)}
+			{...props}
+		>
+			{buttonContent(behavior)}
+		</motion.button>
+	);
 });
-
-ShadowDOMMotionButton.displayName = 'ShadowDOMMotionButton';

@@ -137,6 +137,40 @@ describe('getAllVaultFiles', () => {
 		expect(files.map(f => f.path)).toContain('notes/.config/local.json');
 	});
 
+	it('discovers hidden folders below deeply nested visible paths', async () => {
+		const visibleFolders = [
+			'one',
+			'one/two',
+			'one/two/three',
+			'one/two/three/four',
+			'one/two/three/four/five',
+			'one/two/three/four/five/six',
+		];
+		const hiddenFolder = `${visibleFolders.at(-1)}/.config`;
+		const hiddenFile = `${hiddenFolder}/settings.json`;
+		const list = vi.fn(async (folderPath: string) => {
+			if (folderPath === '') return { files: [], folders: [visibleFolders[0]!] };
+			const visibleIndex = visibleFolders.indexOf(folderPath);
+			if (visibleIndex >= 0 && visibleIndex < visibleFolders.length - 1) {
+				return { files: [], folders: [visibleFolders[visibleIndex + 1]!] };
+			}
+			if (folderPath === visibleFolders.at(-1)) return { files: [], folders: [hiddenFolder] };
+			if (folderPath === hiddenFolder) return { files: [hiddenFile], folders: [] };
+			return { files: [], folders: [] };
+		});
+		const vault = {
+			getFiles: vi.fn(() => []),
+			adapter: {
+				list,
+				stat: vi.fn(async () => ({ type: 'file', size: 42, mtime: 123 })),
+			},
+		} as unknown as Vault;
+
+		const files = await getAllVaultFiles(vault, () => false);
+
+		expect(files.map(file => file.path)).toContain(hiddenFile);
+	});
+
 	it('keeps indexed files when adapter listing the root fails', async () => {
 		const indexedFiles = [
 			{

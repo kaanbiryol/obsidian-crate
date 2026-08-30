@@ -114,34 +114,10 @@ export async function handleCloudflareOAuthProtocol(
 		return;
 	}
 
-	progress.setWorking(
-		'Syncing your vault',
-		'Your server is connected. Running the first sync now.',
+	progress.succeed(
+		'Crate is connected',
+		'No vault files were transferred. Use Initial sync to seed a new server, or Sync now to join an existing one.',
 	);
-	try {
-		const syncResult = await plugin.syncRuntime.sync();
-		plugin.refreshSettingsTab();
-		if (!syncResult.success) {
-			progress.fail(
-				'Crate is connected with a sync warning',
-				`The first sync failed: ${syncResult.errors[0] ?? 'Unknown sync error'}`,
-				['Your device is connected. Select “Sync now” to try again.'],
-			);
-			return;
-		}
-
-		progress.succeed(
-			'Crate is ready',
-			'Your vault is synced and this device is ready to use.',
-		);
-	} catch (error) {
-		plugin.refreshSettingsTab();
-		progress.fail(
-			'Crate is connected with a sync warning',
-			`The first sync failed: ${deploymentErrorMessage(error)}`,
-			['Your device is connected. Select “Sync now” to try again.'],
-		);
-	}
 }
 
 function deploymentErrorMessage(error: unknown): string {

@@ -103,8 +103,8 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
 
 1. **Pass 1:** `vault.getFiles()` - standard Obsidian API (excludes hidden files)
 2. **Pass 2:** Walk dot-prefixed folders via `vault.adapter.list()` + `vault.adapter.stat()`
-   - Hidden root folders (e.g. `.obsidian/`) are walked recursively (unlimited depth)
-   - Non-hidden folders are walked up to depth 5 (`MAX_NESTED_WALK_DEPTH`) looking for nested hidden subfolders
+   - Hidden root folders (e.g. `.obsidian/`) are walked recursively
+   - Non-hidden folders are walked iteratively at any depth while looking for nested hidden subfolders
 3. **Deduplication:** via Set to avoid processing the same file twice
 4. **Early filtering:** ignore patterns applied during discovery, before hashing
 

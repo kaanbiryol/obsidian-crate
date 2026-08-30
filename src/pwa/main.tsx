@@ -136,10 +136,8 @@ function App() {
 	});
 
 	const updateAvailable = usePwaRefreshLifecycle({
-		apiFetch,
 		authToken,
 		bootstrapped,
-		config,
 		hydratedCacheRef,
 		loadReminders,
 		refreshPushState,

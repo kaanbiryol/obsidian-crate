@@ -1,5 +1,7 @@
 import { Modal, setIcon, type App } from 'obsidian';
-import type { CrateSettings, SyncHistoryEntry, SyncState } from '../plugin/types';
+import type { CrateSettings, SyncState } from '../plugin/types';
+import { renderHistoryPanel } from './activity/history';
+import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
 
 export interface ActivityModalDeps {
 	getPendingPaths(): string[];
@@ -9,16 +11,6 @@ export interface ActivityModalDeps {
 	addStateChangeListener(listener: (state: SyncState) => void): void;
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
 }
-
-type FileCardType = 'upload' | 'download' | 'merge' | 'delete' | 'conflict';
-
-const FILE_CARD_ICONS: Record<FileCardType, string> = {
-	upload: 'upload',
-	download: 'download',
-	merge: 'git-merge',
-	delete: 'trash-2',
-	conflict: 'alert-triangle',
-};
 
 export class ActivityModal extends Modal {
 	private readonly settings: CrateSettings;
@@ -103,9 +95,9 @@ export class ActivityModal extends Modal {
 		this.allTabs = [pendingTab, conflictsTab, historyTab];
 		this.allPanels = [this.pendingPanel, this.conflictsPanel, historyPanel];
 
-		this.renderPending();
-		this.renderConflicts();
-		this.renderHistory(historyPanel);
+		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths());
+		renderConflictsPanel(this.conflictsPanel, this.deps.getConflictFiles());
+		renderHistoryPanel(historyPanel, this.settings.syncHistory ?? []);
 
 		for (let i = 0; i < this.allTabs.length; i++) {
 			const tab = this.allTabs[i];
@@ -186,74 +178,10 @@ export class ActivityModal extends Modal {
 		this.subtitleEl.setText(this.formatLastSync());
 		this.updateTabCounts();
 		this.pendingPanel.empty();
-		this.renderPending();
+		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths());
 		this.conflictsPanel.empty();
-		this.renderConflicts();
+		renderConflictsPanel(this.conflictsPanel, this.deps.getConflictFiles());
 		requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
-	}
-
-	private renderPending(): void {
-		const paths = this.deps.getPendingPaths();
-		if (paths.length === 0) {
-			renderEmptyState(this.pendingPanel, 'check-circle', 'All synced', 'Your vault is up to date.');
-			return;
-		}
-
-		const uploads: string[] = [];
-		const deletes: string[] = [];
-		for (const raw of paths) {
-			if (raw.startsWith('delete:')) {
-				deletes.push(raw.substring(7));
-			} else {
-				uploads.push(raw);
-			}
-		}
-
-		const list = this.pendingPanel.createDiv({ cls: 'crate-activity-list' });
-		for (const filePath of uploads) renderFileMicroCard(list, filePath, 'upload');
-		for (const filePath of deletes) renderFileMicroCard(list, filePath, 'delete');
-	}
-
-	private renderConflicts(): void {
-		const paths = this.deps.getConflictFiles();
-		if (paths.length === 0) {
-			renderEmptyState(this.conflictsPanel, 'shield-check', 'No conflicts', 'Everything looks good.');
-			return;
-		}
-
-		const list = this.conflictsPanel.createDiv({ cls: 'crate-activity-list' });
-		for (const filePath of paths) renderFileMicroCard(list, filePath, 'conflict');
-	}
-
-	private renderHistory(container: HTMLElement): void {
-		const history = this.settings.syncHistory ?? [];
-
-		if (history.length === 0) {
-			renderEmptyState(container, 'clock', 'No activity yet', 'Sync history will appear here.');
-			return;
-		}
-
-		const timeline = container.createDiv({ cls: 'crate-activity-timeline' });
-
-		for (const entry of history) {
-			const entryEl = timeline.createDiv({ cls: 'crate-history-entry' });
-
-			// Timeline dot
-			const dot = entryEl.createDiv({ cls: 'crate-history-dot' });
-			if (!entry.success) dot.addClass('is-error');
-
-			const hasPaths = hasFilePaths(entry);
-
-			if (hasPaths) {
-				const details = entryEl.createEl('details', { cls: 'crate-history-details' });
-				const summary = details.createEl('summary', { cls: 'crate-history-card' });
-				renderHistoryHeader(summary, entry, true);
-				renderHistoryFiles(details, entry);
-			} else {
-				const card = entryEl.createDiv({ cls: 'crate-history-card' });
-				renderHistoryHeader(card, entry, false);
-			}
-		}
 	}
 
 	private formatLastSync(): string {
@@ -272,117 +200,4 @@ export class ActivityModal extends Modal {
 		this.deps.removeStateChangeListener(this.onStateChange);
 		this.contentEl.empty();
 	}
-}
-
-function renderFileMicroCard(container: HTMLElement, filePath: string, type: FileCardType): void {
-	const card = container.createDiv({
-		cls: `crate-activity-file-card${type === 'conflict' ? ' crate-file-card-conflict' : ''}`,
-	});
-
-	card.createDiv({ cls: `crate-file-accent crate-file-accent-${type}` });
-
-	const iconEl = card.createDiv({ cls: 'crate-file-icon' });
-	setIcon(iconEl, FILE_CARD_ICONS[type]);
-
-	const info = card.createDiv({ cls: 'crate-file-info' });
-	const parts = filePath.split('/');
-	const fileName = parts.pop() ?? filePath;
-	const dirPath = parts.join('/');
-
-	info.createSpan({ text: fileName, cls: 'crate-file-name', attr: { title: filePath } });
-	if (dirPath) {
-		info.createSpan({ text: dirPath, cls: 'crate-file-path' });
-	}
-}
-
-function renderEmptyState(container: HTMLElement, icon: string, title: string, desc: string): void {
-	const wrapper = container.createDiv({ cls: 'crate-activity-empty-state' });
-	const iconEl = wrapper.createDiv({ cls: 'crate-empty-icon' });
-	setIcon(iconEl, icon);
-	const textEl = wrapper.createDiv({ cls: 'crate-empty-text' });
-	textEl.createSpan({ text: title, cls: 'crate-empty-title' });
-	textEl.createSpan({ text: desc, cls: 'crate-empty-desc' });
-}
-
-function renderHistoryHeader(el: HTMLElement, entry: SyncHistoryEntry, expandable: boolean): void {
-	const header = el.createDiv({ cls: 'crate-history-header' });
-	const meta = header.createDiv({ cls: 'crate-history-meta' });
-
-	meta.createSpan({ text: entry.type, cls: 'crate-history-type' });
-	meta.createSpan({ text: formatTimestamp(entry.timestamp), cls: 'crate-history-time' });
-
-	const summaryText = formatSummary(entry);
-	header.createSpan({
-		text: summaryText,
-		cls: `crate-history-summary${entry.success ? '' : ' crate-history-summary-error'}`,
-	});
-
-	if (expandable) {
-		const chevron = header.createDiv({ cls: 'crate-history-chevron' });
-		setIcon(chevron, 'chevron-right');
-	}
-}
-
-function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry): void {
-	const filesEl = container.createDiv({ cls: 'crate-history-files' });
-
-	const groups: Array<{ paths: string[]; type: FileCardType }> = [
-		{ paths: entry.uploadedPaths ?? [], type: 'upload' },
-		{ paths: entry.downloadedPaths ?? [], type: 'download' },
-		{ paths: entry.mergedPaths ?? [], type: 'merge' },
-		{ paths: entry.deletedPaths ?? [], type: 'delete' },
-	];
-
-	for (const group of groups) {
-		for (const filePath of group.paths) {
-			renderFileMicroCard(filesEl, filePath, group.type);
-		}
-	}
-}
-
-function hasFilePaths(entry: SyncHistoryEntry): boolean {
-	return (entry.uploadedPaths?.length ?? 0) > 0
-		|| (entry.downloadedPaths?.length ?? 0) > 0
-		|| (entry.mergedPaths?.length ?? 0) > 0
-		|| (entry.deletedPaths?.length ?? 0) > 0;
-}
-
-function formatTimestamp(iso: string): string {
-	const d = new Date(iso);
-	const month = d.toLocaleString(undefined, { month: 'short' });
-	const day = d.getDate();
-	const hours = String(d.getHours()).padStart(2, '0');
-	const minutes = String(d.getMinutes()).padStart(2, '0');
-	return `${month} ${day}, ${hours}:${minutes}`;
-}
-
-function formatSummary(entry: SyncHistoryEntry): string {
-	if (!entry.success) {
-		const parts = [`failed (${entry.errorCount} error${entry.errorCount !== 1 ? 's' : ''})`];
-		if (entry.merged > 0) {
-			parts.push(`${entry.merged} merged`);
-		}
-		if (entry.conflictCount > 0) {
-			parts.push(`${entry.conflictCount} conflict${entry.conflictCount !== 1 ? 's' : ''}`);
-		}
-		return parts.join(', ');
-	}
-
-	if (
-		entry.uploaded === 0
-		&& entry.downloaded === 0
-		&& entry.merged === 0
-		&& entry.deleted === 0
-		&& entry.conflictCount === 0
-	) {
-		return 'no changes';
-	}
-
-	const parts: string[] = [];
-	if (entry.uploaded > 0) parts.push(`${entry.uploaded} up`);
-	if (entry.downloaded > 0) parts.push(`${entry.downloaded} down`);
-	if (entry.merged > 0) parts.push(`${entry.merged} merged`);
-	if (entry.deleted > 0) parts.push(`${entry.deleted} del`);
-	if (entry.conflictCount > 0) parts.push(`${entry.conflictCount} conflict${entry.conflictCount !== 1 ? 's' : ''}`);
-	return parts.join(', ');
 }

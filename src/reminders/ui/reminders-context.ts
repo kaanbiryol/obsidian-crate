@@ -24,9 +24,7 @@ export const PluginContext = makeContext<CratePlugin>();
 
 type ModalInfo = {
   close: () => void;
-  popoverContainerEl: HTMLElement;
   isMobile: boolean;
 };
 
 export const ModalContext = makeContext<ModalInfo>();
-

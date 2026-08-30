@@ -36,7 +36,7 @@ In the Cloudflare dashboard, select the account that will own the OAuth client, 
 | Token authentication method | `none` |
 | Redirect URL | `https://crate.kaanbiryol.com/oauth/callback/` |
 | Client URL | `https://kaanbiryol.com` |
-| Logo URL | `https://crate.kaanbiryol.com/assets/logo.svg` |
+| Logo URL | `https://crate.kaanbiryol.com/assets/logo.png` |
 | Privacy policy URL | `https://crate.kaanbiryol.com/privacy/` |
 | Terms URL | Leave empty |
 | Allowed CORS origins | Leave empty |
@@ -96,9 +96,9 @@ Official references:
 4. In Cloudflare, select exactly one account, review the four permissions, and authorize Crate.
 5. Cloudflare returns to the static callback page. It removes the OAuth query from the browser URL immediately and opens `obsidian://crate-cloudflare-oauth`.
 6. Crate verifies the random OAuth state before exchanging the code with its in-memory PKCE verifier.
-7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, and workers.dev endpoint when none exists. The idempotent initial D1 schema is applied before the Worker bundle is uploaded, keeping schema work out of request cold starts.
+7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, and workers.dev endpoint when none exists. The complete D1 schema and any unapplied, hash-verified upgrades are applied before the Worker bundle is uploaded, keeping schema work out of request cold starts.
 8. Crate registers this device's hashed credential through the Cloudflare D1 API, then revokes and discards the access token.
-9. In Crate, run **Initial sync → Upload all** when ready.
+9. Connection does not transfer vault files. For a new server, run **Initial sync → Upload all** when ready. When joining an existing server, run **Sync now** instead.
 
 If the Cloudflare API returns R2 error `10042`, Crate tells the user to activate the R2 subscription and try again. Resource names and Cloudflare IDs are saved without credentials, so retries converge on the same deployment. When the installed plugin contains different Worker, web app, or schema artifacts, **Authorize update** appears and reuses those same Worker, D1, R2, and Durable Object resources. It is hidden when the server already has the exact embedded artifact or was deployed by a newer plugin version.
 

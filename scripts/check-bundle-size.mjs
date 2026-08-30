@@ -6,14 +6,14 @@ const budgetGroups = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1825000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '905000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1450000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '820000', 10),
 	},
 	{
 		path: 'dist/styles.css',
 		// Owned selector prefixes and shared cross-host UI rules add raw bytes without materially affecting transfer size.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '382000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '45000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '125000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '20000', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',

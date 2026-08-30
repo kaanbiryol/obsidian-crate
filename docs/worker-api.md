@@ -38,7 +38,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `DELETE` | `/reminders/cancel` | Cancel a DO alarm |
 | `GET` | `/reminders/scheduled` | List scheduled reminders from D1 |
 | `POST` | `/notifications/enrollment-token` | Create a one-time push subscription token |
-| `POST` | `/notifications/reminders-enrollment-token` | Create one-time browser and install tokens for a reminders web app link |
+| `POST` | `/notifications/reminders-enrollment-token` | Create one-time browser and install tokens for a reminders web app link (vault tokens only) |
 | `POST` | `/notifications/subscribe` | Save a push subscription |
 | `DELETE` | `/notifications/subscribe` | Remove a push subscription |
 | `GET` | `/notifications/subscriptions` | List push subscriptions |
@@ -288,7 +288,7 @@ Response: `{ token, expiresAt }`
 
 ### POST /notifications/reminders-enrollment-token
 
-Authenticated. Creates separate short-lived, one-time tokens for previewing a reminders app link in the browser and activating the installed app. Keeping the install token unused by the browser prevents iOS from launching a Home Screen app with an already-consumed credential.
+Vault-token authenticated. Creates separate short-lived, one-time tokens for previewing a reminders app link in the browser and activating the installed app. Reminders web app tokens cannot mint replacement sessions. Keeping the install token unused by the browser prevents iOS from launching a Home Screen app with an already-consumed credential.
 
 Response: `{ token, browserToken, expiresAt }`, where `token` is reserved for the installed app.
 
@@ -328,7 +328,19 @@ Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarat
 
 ## D1 Database Schema
 
-Ten tables, initialized from `src/cloudflare/schema.sql` before the Worker is uploaded:
+Eleven tables, initialized from `src/cloudflare/schema.sql` before the Worker is uploaded. Future upgrades are recorded in `d1_migrations` and applied before the new Worker bundle:
+
+### d1_migrations
+
+```sql
+CREATE TABLE IF NOT EXISTS d1_migrations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+```
+
+Tracks the initial schema baseline and each later ordered SQL upgrade.
 
 ### changelog
 

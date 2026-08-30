@@ -1,274 +1,73 @@
 @mixin styles {
-/* Fix HeroUI Popover positioning and visibility in Obsidian modals */
-/* Target popovers specifically using HeroUI's data attributes */
-[data-slot="base"][data-open="true"] {
-  z-index: 10000;
-  position: fixed;
-}
+  .date-calendar-grid {
+    width: 100%;
+    max-width: 320px;
+    border-collapse: collapse;
+    table-layout: fixed;
+    color: var(--text-normal);
 
-/* Ensure popover trigger is clickable */
-[data-slot="trigger"] {
-  cursor: pointer;
-}
+    th {
+      height: 32px;
+      color: var(--text-faint);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
 
-/* Make sure popover content appears above modal */
-.heroui-popover,
-[role="dialog"][data-slot="base"],
-[aria-modal="true"][data-slot="base"] {
-  z-index: 10000;
-  position: fixed;
-}
+    td {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      text-align: center;
+    }
 
-/* Ensure HeroUI overlays and backdrops don't block interactions */
-[data-slot="backdrop"] {
-  z-index: 9998;
-}
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text-normal);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
 
-/* Make sure popover content container is properly positioned */
-[data-slot="content"][role="dialog"],
-.heroui-popover-content {
-  position: relative;
-  z-index: 10001;
-}
+      &:hover {
+        background: var(--background-modifier-hover);
+      }
 
-/* Scale up delete and close buttons in modal header */
-/* Target all buttons in the header row */
-.flex.justify-between.items-center button {
-  min-width: 2.5rem;
-  min-height: 2.5rem;
-  width: 2.5rem;
-  height: 2.5rem;
-  padding: 0.5rem;
-}
+      &:active {
+        transform: scale(0.95);
+      }
 
-/* Target icons inside header buttons */
-.flex.justify-between.items-center button svg {
-  width: 1.25rem;
-  height: 1.25rem;
-  min-width: 1.25rem;
-  min-height: 1.25rem;
-}
+      &:focus-visible {
+        outline: 2px solid var(--interactive-accent);
+        outline-offset: 2px;
+      }
 
-/* Also target the wrapper divs to ensure they don't constrain button size */
-.flex.justify-between.items-center .w-10 {
-  width: auto;
-  min-width: 2.5rem;
-}
+      &[data-selected] {
+        background: var(--interactive-accent);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--interactive-accent) 50%, transparent);
+        color: var(--text-on-accent);
+        font-weight: 600;
+      }
 
-/* React Day Picker styling to match theme */
-.rdp {
-  --rdp-accent-color: var(--interactive-accent);
-  --rdp-accent-background-color: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
-  --rdp-day-height: 36px;
-  --rdp-day-width: 36px;
-  --rdp-selected-font: inherit;
+      &[data-today]:not([data-selected]) {
+        box-shadow: 0 0 8px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+        color: var(--interactive-accent);
+        font-weight: 700;
+      }
 
-  margin: 0;
-  font-family: inherit;
-}
-
-/* Fixed height for calendar weeks grid to prevent layout shift when changing months */
-/* 6 rows × 36px = 216px ensures space for max rows */
-.rdp-weeks {
-  min-height: 216px;
-}
-
-.rdp-root {
-  --rdp-accent-color: var(--interactive-accent);
-  --rdp-accent-background-color: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
-}
-
-.rdp-month_caption {
-  font-weight: var(--reminder-font-weight-semibold);
-  font-size: var(--reminder-font-sm);
-  padding: 0.5rem 0;
-}
-
-.rdp-nav {
-  gap: 0.25rem;
-}
-
-.rdp-button_previous,
-.rdp-button_next {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.15s;
-  color: var(--text-muted);
-}
-
-.rdp-button_previous:hover,
-.rdp-button_next:hover {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-/* Custom chevron SVGs inside nav buttons */
-.rdp-button_previous svg,
-.rdp-button_next svg {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
-}
-
-.rdp-weekday {
-  font-size: var(--reminder-font-xs);
-  font-weight: var(--reminder-font-weight-medium);
-  opacity: 0.6;
-  width: 36px;
-  height: 28px;
-}
-
-.rdp-day {
-  width: 36px;
-  height: 36px;
-}
-
-.rdp-day_button {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  font-size: var(--reminder-font-sm);
-  font-weight: var(--reminder-font-weight-normal);
-  transition: all 0.15s;
-}
-
-.rdp-day_button:hover:not(.rdp-selected):not(.rdp-disabled) {
-  background-color: var(--background-modifier-hover);
-}
-
-.rdp-selected .rdp-day_button {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-  font-weight: var(--reminder-font-weight-medium);
-}
-
-.rdp-today:not(.rdp-selected) .rdp-day_button {
-  font-weight: var(--reminder-font-weight-semibold);
-  color: var(--interactive-accent);
-}
-
-.rdp-outside .rdp-day_button {
-  opacity: 0.4;
-}
-
-.rdp-disabled .rdp-day_button {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.rdp {
-  color: var(--text-normal);
-}
-
-.rdp-button_previous svg,
-.rdp-button_next svg {
-  stroke: currentColor;
-}
-
-/* HeroUI Calendar styling for Obsidian theme */
-/* Base calendar styling */
-[data-slot="grid"] {
-  width: 100%;
-}
-
-[data-slot="cell"] {
-  width: 36px;
-  height: 36px;
-}
-
-[data-slot="cell"] button {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  font-size: var(--reminder-font-sm);
-  font-weight: var(--reminder-font-weight-normal);
-  transition: all 0.15s;
-}
-
-/* Calendar header styling */
-[data-slot="header"] {
-  padding: 0.5rem 0;
-}
-
-[data-slot="title"] {
-  font-weight: var(--reminder-font-weight-semibold);
-  font-size: var(--reminder-font-sm);
-}
-
-/* Navigation buttons */
-[data-slot="prev-button"],
-[data-slot="next-button"] {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.15s;
-}
-
-/* Weekday header styling */
-[data-slot="grid-header-cell"] {
-  font-size: var(--reminder-font-xs);
-  font-weight: var(--reminder-font-weight-medium);
-  opacity: 0.6;
-  width: 36px;
-  height: 28px;
-}
-
-[data-slot="cell"] button {
-  color: var(--text-normal);
-}
-
-[data-slot="cell"] button:hover:not([data-selected]):not([data-disabled]) {
-  background-color: var(--background-modifier-hover);
-}
-
-[data-slot="cell"] button[data-selected] {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-  font-weight: var(--reminder-font-weight-medium);
-}
-
-[data-slot="cell"] button[data-today]:not([data-selected]) {
-  font-weight: var(--reminder-font-weight-semibold);
-  color: var(--interactive-accent);
-}
-
-[data-slot="cell"] button[data-outside-month] {
-  opacity: 0.4;
-}
-
-[data-slot="cell"] button[data-disabled] {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-[data-slot="prev-button"],
-[data-slot="next-button"] {
-  color: var(--text-muted);
-}
-
-[data-slot="prev-button"]:hover,
-[data-slot="next-button"]:hover {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-[data-slot="title"] {
-  color: var(--text-normal);
-}
-
-[data-slot="grid-header-cell"] {
-  color: var(--text-muted);
-}
-
-[data-slot="input-wrapper"] {
-  background-color: var(--background-modifier-form-field);
-}
+      &[data-outside-month] {
+        color: var(--text-faint);
+        opacity: 0.35;
+      }
+    }
+  }
 }

@@ -41,7 +41,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
 - OAuth state and PKCE material exist only in memory during one deployment; authorization codes and OAuth access tokens are never stored or logged.
-- The Worker module and initial D1 schema are versioned build-time artifacts inside the plugin. Crate does not fetch deployment code at runtime.
+- The Worker module, complete D1 schema, and ordered schema upgrades are versioned build-time artifacts inside the plugin. Crate does not fetch deployment code at runtime.
 - Vault devices can be authorized only through the Cloudflare account that owns the server.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - Remote code is not fetched or evaluated at runtime.
@@ -107,11 +107,11 @@ After installing the plugin, open the Crate settings tab in Obsidian:
 
 1. Select **Connect with Cloudflare**. Your browser opens Cloudflare OAuth.
 2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
-3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate reuses an existing Crate server in that account or provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and initial schema.
+3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate reuses an existing Crate server in that account or provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and schema.
 4. Crate registers this device through the Cloudflare-authorized D1 API, revokes the temporary OAuth token, and connects automatically.
-5. Run **Initial sync → Upload all** when you are ready to seed the remote vault.
+5. No vault files are transferred during connection. For a new server, run **Initial sync → Upload all** when you are ready to seed it. When joining an existing server, run **Sync now** instead.
 
-The OAuth deployment uses the build-time Worker and initial schema included in the installed plugin. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered in D1.
+The OAuth deployment uses the build-time Worker, complete schema, and ordered schema upgrades included in the installed plugin. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered in D1.
 
 To connect another computer or mobile device, install Crate there and select **Connect with Cloudflare**. Access to the Cloudflare account is the source of truth for vault membership. If the account contains more than one Crate server, Obsidian asks which one belongs to the vault.
 
@@ -195,13 +195,13 @@ Run a production build:
 npm run build
 ```
 
-Run the complete first-release gate, including plugin and Worker size budgets plus artifact separation checks:
+Run the complete first-release gate, including lint, types, dead-code analysis, unit and Worker-runtime tests, the PWA smoke test, size budgets, and release-artifact checks:
 
 ```bash
 npm run release:check
 ```
 
-Generated files under `.generated/`, `dist/`, and root-level release artifacts such as `main.js` are intentionally not tracked. Release assets should be built and attached separately.
+Generated files under `.generated/`, `dist/`, and root-level release artifacts such as `main.js` are intentionally not tracked. Pushing a tag that exactly matches the `x.y.z` version in `manifest.json` runs the release gate and creates a GitHub release with `main.js`, `manifest.json`, and `styles.css` as individual assets.
 
 ## Documentation
 

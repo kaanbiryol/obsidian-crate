@@ -1,10 +1,23 @@
-import { Calendar } from '@heroui/react';
-import { CalendarDate, parseDate } from '@internationalized/date';
+import { CalendarDate } from '@internationalized/date';
 import { format } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
-import { formatLocalDateKey } from '../../utils/reminderDate';
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+function calendarGrid(displayMonth: CalendarDate): Date[] {
+	const firstWeekday = new Date(displayMonth.year, displayMonth.month - 1, 1).getDay();
+	return Array.from({ length: 42 }, (_, index) => (
+		new Date(displayMonth.year, displayMonth.month - 1, index - firstWeekday + 1)
+	));
+}
+
+function isSameLocalDay(left: Date, right: Date): boolean {
+	return left.getFullYear() === right.getFullYear()
+		&& left.getMonth() === right.getMonth()
+		&& left.getDate() === right.getDate();
+}
 
 const calendarVariants = {
 	enter: (direction: number) => ({
@@ -48,11 +61,15 @@ export function DateCalendarPanel({
 	onNextMonth,
 	onDateChange,
 }: DateCalendarPanelProps) {
+	const days = calendarGrid(displayMonth);
+	const today = new Date();
+
 	return (
 		<div className="px-4 pt-2">
 			<div className="flex items-center justify-center gap-4 mb-3">
 				<ShadowDOMNativeButton
 					onClick={onPrevMonth}
+					aria-label="Previous month"
 					className="date-calendar-navigation-button flex items-center justify-center w-9 h-9 rounded-xl active:scale-95"
 				>
 					<ChevronLeft
@@ -67,6 +84,7 @@ export function DateCalendarPanel({
 
 				<ShadowDOMNativeButton
 					onClick={onNextMonth}
+					aria-label="Next month"
 					className="date-calendar-navigation-button flex items-center justify-center w-9 h-9 rounded-xl active:scale-95"
 				>
 					<ChevronRight
@@ -87,42 +105,45 @@ export function DateCalendarPanel({
 						exit={animationsEnabled ? "exit" : undefined}
 						className="flex justify-center"
 					>
-						<Calendar
-							aria-label="Date picker"
-							showShadow={false}
-							value={currentDate ? parseDate(formatLocalDateKey(currentDate)) : undefined}
-							defaultFocusedValue={displayMonth}
-							focusedValue={displayMonth}
-							onChange={(date) => {
-								if (date) {
-									onDateChange(date);
-								}
-							}}
-							classNames={{
-								base: '!bg-transparent !shadow-none !border-none w-full max-w-[320px]',
-								content: '!bg-transparent !shadow-none !border-none w-full',
-								headerWrapper: 'hidden',
-								gridWrapper: 'pb-0 w-full !border-none',
-								grid: 'gap-0 w-full !border-none',
-								gridBody: '!border-none',
-								gridHeader: 'pb-2 !border-none',
-								gridHeaderRow: '!border-none',
-								gridHeaderCell: 'w-10 h-8 text-[11px] font-semibold text-[var(--text-faint)] uppercase tracking-wider !border-none',
-								cell: 'w-10 h-10 flex items-center justify-center !border-none',
-								cellButton: [
-									'w-8 h-8 text-[13px] font-medium rounded-full',
-									'transition-transform duration-150',
-									'!border-none !outline-none',
-									'data-[selected=true]:bg-[var(--interactive-accent)]',
-									'data-[selected=true]:text-[var(--text-on-accent)] data-[selected=true]:font-semibold',
-									'data-[selected=true]:shadow-[0_0_12px_color-mix(in_srgb,var(--interactive-accent)_50%,transparent)]',
-									'data-[today=true]:font-bold data-[today=true]:text-[var(--interactive-accent)]',
-									'data-[today=true]:shadow-[0_0_8px_var(--interactive-accent)/0.3]',
-									'data-[outside-month=true]:text-[var(--text-faint)] data-[outside-month=true]:opacity-25',
-									'hover:bg-[var(--background-modifier-hover)] active:scale-95',
-								].join(' '),
-							}}
-						/>
+						<table className="date-calendar-grid" aria-label="Date picker">
+							<thead>
+								<tr>
+									{WEEKDAYS.map(weekday => <th key={weekday} scope="col">{weekday}</th>)}
+								</tr>
+							</thead>
+							<tbody>
+								{Array.from({ length: 6 }, (_, weekIndex) => (
+									<tr key={weekIndex}>
+										{days.slice(weekIndex * 7, weekIndex * 7 + 7).map(date => {
+											const selected = currentDate ? isSameLocalDay(date, currentDate) : false;
+											const isToday = isSameLocalDay(date, today);
+											const outsideMonth = date.getMonth() !== displayMonth.month - 1;
+											const key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+											return (
+												<td key={key}>
+													<button
+														type="button"
+														aria-label={format(date, 'MMMM d, yyyy')}
+														aria-current={isToday ? 'date' : undefined}
+														aria-pressed={selected}
+														data-outside-month={outsideMonth || undefined}
+														data-selected={selected || undefined}
+														data-today={isToday || undefined}
+														onClick={() => onDateChange(new CalendarDate(
+															date.getFullYear(),
+															date.getMonth() + 1,
+															date.getDate(),
+														))}
+													>
+														{date.getDate()}
+													</button>
+												</td>
+											);
+										})}
+									</tr>
+								))}
+							</tbody>
+						</table>
 					</motion.div>
 				</AnimatePresence>
 			</div>

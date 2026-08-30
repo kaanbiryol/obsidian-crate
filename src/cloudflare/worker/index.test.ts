@@ -10,7 +10,10 @@ interface SubscriptionRecord {
 	endpoint: string;
 }
 
-function createDb(initialTokens: Record<string, number>, options?: { failSubscriptionInsert?: boolean }) {
+function createDb(
+	initialTokens: Record<string, number>,
+	options?: { failSubscriptionInsert?: boolean; authenticatedScope?: 'vault' | 'reminders' },
+) {
 	let tokens = new Map<string, number>(Object.entries(initialTokens));
 	let subscriptions = new Map<string, SubscriptionRecord>();
 	let failSubscriptionInsert = options?.failSubscriptionInsert ?? false;
@@ -117,7 +120,7 @@ function createDb(initialTokens: Record<string, number>, options?: { failSubscri
 					return statement;
 				}),
 				first: vi.fn(async () => sql.includes('SELECT id, scope FROM auth_tokens')
-					? { id: 'vault-token', scope: 'vault' }
+					? { id: 'authenticated-token', scope: options?.authenticatedScope ?? 'vault' }
 					: null),
 				run: vi.fn(async () => applyMutation({ tokens, subscriptions }, sql, statement._args)),
 				all: vi.fn(async () => ({ results: [] })),
@@ -264,6 +267,23 @@ describe('worker entrypoint', () => {
 		expect(result.browserToken).not.toBe(result.token);
 		expect(Number.isNaN(Date.parse(result.expiresAt))).toBe(false);
 		expect(db.db.prepare).toHaveBeenCalledWith(
+			'INSERT INTO web_enrollment_tokens (token_hash, expires_at) VALUES (?, ?)',
+		);
+	});
+
+	it('prevents a reminders session from minting a replacement session', async () => {
+		const db = createDb({}, { authenticatedScope: 'reminders' });
+		const response = await worker.fetch(
+			new Request('https://worker.test/notifications/reminders-enrollment-token', {
+				method: 'POST',
+				headers: { Authorization: 'Bearer reminders-token' },
+			}),
+			createEnv({ DB: db.db as unknown as D1Database }) as never,
+		);
+
+		expect(response.status).toBe(403);
+		expect(await response.json()).toEqual({ error: 'Token is not authorized for this operation' });
+		expect(db.db.prepare).not.toHaveBeenCalledWith(
 			'INSERT INTO web_enrollment_tokens (token_hash, expires_at) VALUES (?, ?)',
 		);
 	});

@@ -16,7 +16,7 @@ function normalizeTimeString(value: unknown): string | null {
 	return match ? `${match[1]}:${match[2]}` : null;
 }
 
-export function parseStartTab(value: unknown): StartTab | null {
+function parseStartTab(value: unknown): StartTab | null {
 	return value === 'inbox' || value === 'today' || value === 'upcoming' || value === 'browse'
 		? value
 		: null;
@@ -45,7 +45,7 @@ function saveConfig(config: StoredConfig): void {
 	localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
 }
 
-export function currentQueryParams(): URLSearchParams {
+function currentQueryParams(): URLSearchParams {
 	return new URLSearchParams(window.location.search);
 }
 

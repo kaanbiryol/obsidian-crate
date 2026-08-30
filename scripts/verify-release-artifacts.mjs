@@ -32,6 +32,10 @@ const [packageJson, manifest, versions, wrangler, pluginBundle, styles, workerBu
 ]);
 
 assert(packageJson.version === manifest.version, 'package.json and manifest.json versions must match');
+assert(
+	/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(manifest.version),
+	'manifest.json version must use x.y.z semantic versioning',
+);
 assert(versions[manifest.version] === manifest.minAppVersion, 'versions.json must map the release to manifest.minAppVersion');
 assert(typeof manifest.id === 'string' && manifest.id.length > 0, 'manifest.id is required');
 assert(typeof manifest.name === 'string' && manifest.name.length > 0, 'manifest.name is required');
@@ -50,6 +54,10 @@ for (const forbiddenMarker of [
 assert(
 	pluginBundle.includes('CREATE TABLE IF NOT EXISTS auth_tokens'),
 	'Plugin bundle is missing the initial D1 schema artifact',
+);
+assert(
+	pluginBundle.includes('CREATE TABLE IF NOT EXISTS d1_migrations'),
+	'Plugin bundle is missing the D1 schema-version baseline',
 );
 assert(pluginBundle.includes('https://dash.cloudflare.com/oauth2/auth'), 'Plugin bundle is missing the Cloudflare OAuth entry point');
 assert(

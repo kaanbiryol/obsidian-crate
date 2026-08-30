@@ -122,17 +122,25 @@ export default class CratePlugin extends Plugin {
 		this.addSettingTab(settingTab);
 	}
 
-	openSettingsTab(): void {
+	openSettingsTab(): boolean {
 		type AppWithSettings = CratePlugin['app'] & {
-			setting: {
-				open: () => void;
-				openTabById: (id: string) => void;
+			setting?: {
+				open?: () => void;
+				openTabById?: (id: string) => void;
 			};
 		};
 
 		const settings = (this.app as AppWithSettings).setting;
+		if (
+			!settings
+			|| typeof settings.open !== 'function'
+			|| typeof settings.openTabById !== 'function'
+		) {
+			return false;
+		}
 		settings.open();
 		settings.openTabById(this.manifest.id);
+		return true;
 	}
 
 	refreshSettingsTab(): void {

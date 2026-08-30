@@ -16,7 +16,6 @@ export default tseslint.config(
 						'manifest.json',
 						'postcss.config.js',
 						'tailwind.config.js',
-						'tailwind.theme.js',
 						'vite.config.mts',
 						'vitest.cloudflare.config.ts',
 						'vitest.config.ts',

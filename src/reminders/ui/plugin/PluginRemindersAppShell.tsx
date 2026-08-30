@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
-import { HeroUIProvider } from "@heroui/react";
 
 import { BottomTabBar } from "@/reminders/components/BottomTabBar";
 import { FloatingActionButton } from "@/reminders/components/FloatingActionButton";
@@ -210,8 +209,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
     : { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
 
   return (
-    <HeroUIProvider>
-      <div
+    <div
         className={[
           "reminders-view",
           isDarkMode ? "dark" : "light",
@@ -297,7 +295,6 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
         </AnimatePresence>
 
         {children}
-      </div>
-    </HeroUIProvider>
+    </div>
   );
 };

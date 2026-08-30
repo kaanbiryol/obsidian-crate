@@ -71,7 +71,7 @@ afterEach(() => {
 });
 
 describe('handleCloudflareOAuthProtocol', () => {
-	it('opens settings for visible progress and refreshes them after connecting', async () => {
+	it('connects the device without transferring vault files', async () => {
 		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
 		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
 		const plugin = createPlugin();
@@ -90,17 +90,13 @@ describe('handleCloudflareOAuthProtocol', () => {
 			'https://crate.example.workers.dev',
 			'device-token',
 		);
-		expect(plugin.refreshSettingsTab).toHaveBeenCalledTimes(2);
-		expect(plugin.refreshSettingsTab.mock.invocationCallOrder.at(-1))
+		expect(plugin.refreshSettingsTab).toHaveBeenCalledTimes(1);
+		expect(plugin.refreshSettingsTab.mock.invocationCallOrder[0])
 			.toBeLessThan(progress.succeed.mock.invocationCallOrder[0] ?? 0);
-		expect(plugin.syncRuntime.sync).toHaveBeenCalledTimes(1);
-		expect(progress.setWorking).toHaveBeenLastCalledWith(
-			'Syncing your vault',
-			'Your server is connected. Running the first sync now.',
-		);
+		expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
 		expect(progress.succeed).toHaveBeenCalledWith(
-			'Crate is ready',
-			'Your vault is synced and this device is ready to use.',
+			'Crate is connected',
+			'No vault files were transferred. Use Initial sync to seed a new server, or Sync now to join an existing one.',
 		);
 	});
 
@@ -143,26 +139,4 @@ describe('handleCloudflareOAuthProtocol', () => {
 		);
 	});
 
-	it('keeps the device connected and shows a retryable warning when the first sync fails', async () => {
-		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
-		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
-		const plugin = createPlugin();
-		plugin.syncRuntime.sync.mockResolvedValue({
-			success: false,
-			errors: ['Remote manifest unavailable'],
-		});
-
-		await handleCloudflareOAuthProtocol(plugin as never, {
-			code: 'authorization-code',
-			state: 'oauth-state',
-		});
-
-		expect(plugin.syncRuntime.sync).toHaveBeenCalledTimes(1);
-		expect(progress.succeed).not.toHaveBeenCalled();
-		expect(progress.fail).toHaveBeenCalledWith(
-			'Crate is connected with a sync warning',
-			'The first sync failed: Remote manifest unavailable',
-			['Your device is connected. Select “Sync now” to try again.'],
-		);
-	});
 });

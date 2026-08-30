@@ -9,6 +9,7 @@ const artifacts = {
 	workerBundleSha256: 'worker-hash',
 	d1Schema: 'CREATE TABLE IF NOT EXISTS example (id TEXT);',
 	d1SchemaSha256: 'schema-hash',
+	d1Migrations: [],
 };
 
 describe('CloudflareApiClient', () => {

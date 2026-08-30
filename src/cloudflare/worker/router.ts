@@ -20,7 +20,6 @@ const REMINDERS_SCOPE_ROUTES = new Set([
 	'POST /reminders/reorder',
 	'POST /notifications/subscribe',
 	'DELETE /notifications/subscribe',
-	'POST /notifications/reminders-enrollment-token',
 	'DELETE /auth/session',
 ]);
 

@@ -179,4 +179,28 @@ describe('CratePlugin settings persistence', () => {
 		expect(lastPersisted.syncInterval).toBe(120);
 		expect(lastPersisted.reminders?.upcomingDaysDefault).toBe(14);
 	});
+
+	it('opens its settings tab when the host exposes the settings controller', () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const open = vi.fn();
+		const openTabById = vi.fn();
+		Object.assign(plugin, {
+			app: { setting: { open, openTabById } },
+			manifest: { id: 'crate' },
+		});
+
+		expect(plugin.openSettingsTab()).toBe(true);
+		expect(open).toHaveBeenCalledTimes(1);
+		expect(openTabById).toHaveBeenCalledWith('crate');
+	});
+
+	it('continues safely when the host does not expose settings navigation', () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		Object.assign(plugin, {
+			app: {},
+			manifest: { id: 'crate' },
+		});
+
+		expect(plugin.openSettingsTab()).toBe(false);
+	});
 });

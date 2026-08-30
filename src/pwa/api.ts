@@ -1,10 +1,7 @@
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import {
-	currentQueryParams,
 	detectDeviceName,
-	parseStartTab,
 } from './config';
-import type { StoredConfig } from './types';
 
 export async function exchangeEnrollmentToken(token: string): Promise<string> {
 	const response = await fetch('/notifications/reminders-exchange', {
@@ -21,42 +18,6 @@ export async function exchangeEnrollmentToken(token: string): Promise<string> {
 	const result = await response.json() as { authToken?: string };
 	if (!result.authToken) throw new Error('Missing auth token');
 	return result.authToken;
-}
-
-function installActivationParams(token: string, config: StoredConfig, browserToken?: string): URLSearchParams {
-	const params = currentQueryParams();
-	const project = params.get('project');
-	const tab = parseStartTab(params.get('tab'));
-	const nextParams = new URLSearchParams();
-	nextParams.set('token', token);
-	if (browserToken) nextParams.set('browserToken', browserToken);
-	nextParams.set('folder', config.folderPath);
-	nextParams.set('upcomingDays', String(config.upcomingDays));
-	if (config.allDayNotificationTime) nextParams.set('allDayTime', config.allDayNotificationTime);
-	if (project) nextParams.set('project', project);
-	if (tab) nextParams.set('tab', tab);
-	return nextParams;
-}
-
-function updateManifestWithInstallToken(token: string, config: StoredConfig): void {
-	const params = installActivationParams(token, config);
-	params.set('v', PWA_ASSET_VERSION);
-	const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-	if (manifest) {
-		manifest.href = `/notifications/manifest.json?${params.toString()}`;
-	}
-}
-
-export function replaceBrowserUrlWithInstallToken(
-	token: string,
-	config: StoredConfig,
-	browserToken?: string,
-): void {
-	const params = installActivationParams(token, config, browserToken);
-
-	const query = params.toString();
-	history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
-	updateManifestWithInstallToken(token, config);
 }
 
 export function makeApiFetch(authToken: string | null, onUnauthorized: () => void) {

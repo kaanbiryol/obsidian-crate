@@ -1,4 +1,3 @@
-import { HeroUIProvider } from "@heroui/react";
 import { Modal, Platform } from "obsidian";
 import type { ReactElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
@@ -26,48 +25,30 @@ abstract class BaseReminderModal extends Modal {
     const { contentEl } = this;
     const isMobile = Platform.isMobile;
 
-    this.modalEl.setCssProps({
-      all: "unset",
-      position: "fixed",
-      inset: "0",
-      display: "flex",
-      "align-items": isMobile ? "flex-end" : "center",
-      "justify-content": "center",
-      "pointer-events": "none",
-      "z-index": "9999",
-    });
+    this.modalEl.addClass("crate-reminder-editor-modal");
+    this.modalEl.toggleClass("is-mobile", isMobile);
     hideNativeModalCloseButton(this.modalEl);
 
-    contentEl.setCssProps({
-      all: "unset",
-      "pointer-events": "auto",
-      display: "block",
-      position: "relative",
-      "z-index": "10000",
-    });
-    contentEl.addClass("crate-reminders-ui");
+    contentEl.addClasses(["crate-reminder-editor-modal__content", "crate-reminders-ui"]);
 
     const isDarkMode = document.body.classList.contains("theme-dark");
     const close = () => this.close();
-    const popoverContainerEl = document.body;
 
     this.root = createRoot(contentEl);
     this.root.render(
       <PluginContext.Provider value={this.plugin}>
-        <HeroUIProvider disableRipple>
-          <div className={isDarkMode ? "dark" : "light"}>
-            <ModalContext.Provider value={{ close, popoverContainerEl, isMobile }}>
-              {this.renderContent()}
-            </ModalContext.Provider>
-          </div>
-        </HeroUIProvider>
+        <div className={isDarkMode ? "dark" : "light"}>
+          <ModalContext.Provider value={{ close, isMobile }}>
+            {this.renderContent()}
+          </ModalContext.Provider>
+        </div>
       </PluginContext.Provider>,
     );
   }
 
   onClose(): void {
     this.root?.unmount();
-    this.contentEl.removeClass("crate-reminders-ui");
+    this.contentEl.removeClasses(["crate-reminder-editor-modal__content", "crate-reminders-ui"]);
   }
 }
 

@@ -21,25 +21,10 @@ class FullScreenReminderModal extends Modal {
     this.isOpen = true;
     const { contentEl } = this;
 
-    this.modalEl.setCssProps({
-      all: "unset",
-      position: "fixed",
-      inset: "0",
-      "z-index": "9999",
-      display: "flex",
-      "flex-direction": "column",
-      background: "var(--background-primary)",
-    });
+    this.modalEl.addClass("crate-reminders-fullscreen-modal");
     hideNativeModalCloseButton(this.modalEl);
 
-    contentEl.setCssProps({
-      all: "unset",
-      flex: "1",
-      display: "flex",
-      "flex-direction": "column",
-      overflow: "hidden",
-      height: "100%",
-    });
+    contentEl.addClass("crate-reminders-fullscreen-modal__content");
 
     const shadowMount = await createShadowReactMount(this.plugin, contentEl, {
       isActive: () => this.isOpen,
@@ -87,31 +72,10 @@ class CompactReminderModal extends Modal {
     this.isOpen = true;
     const { contentEl } = this;
 
-    this.modalEl.setCssProps({
-      all: "unset",
-      position: "fixed",
-      inset: "0",
-      "z-index": "9999",
-      display: "flex",
-      "align-items": "center",
-      "justify-content": "center",
-      background: "var(--background-modifier-cover)",
-    });
+    this.modalEl.addClass("crate-reminders-compact-modal");
     hideNativeModalCloseButton(this.modalEl);
 
-    contentEl.setCssProps({
-      all: "unset",
-      display: "flex",
-      "flex-direction": "column",
-      overflow: "hidden",
-      width: "90vw",
-      height: "85vh",
-      "max-width": "500px",
-      "max-height": "700px",
-      "border-radius": "12px",
-      background: "var(--background-primary)",
-      "box-shadow": "0 25px 50px -12px var(--background-modifier-box-shadow)",
-    });
+    contentEl.addClass("crate-reminders-compact-modal__content");
 
     const shadowMount = await createShadowReactMount(this.plugin, contentEl, {
       isActive: () => this.isOpen,

@@ -16,20 +16,6 @@
     --reminders-noise: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyB2aWV3Qm94PScwIDAgMTIwIDEyMCc+CjxmaWx0ZXIgaWQ9J24nPgogIDxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjknIG51bU9jdGF2ZXM9JzEnIHN0aXRjaFRpbGVzPSdzdGl0Y2gnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyBmaWx0ZXI9J3VybCgjbiknIG9wYWNpdHk9JzAuMjUnLz4KPC9zdmc+");
     --reminders-noise-size: 180px 180px;
 
-    // HeroUIProvider adds this wrapper - must participate in flex chain
-    > [data-overlay-container="true"] {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        min-height: 0;
-        width: 100%;
-    }
-}
-
-// Portal container inside shadow DOM for HeroUI components
-&.heroui-portal-container {
-    position: relative;
-    z-index: 1000;
 }
 
 .reminders-view {
@@ -51,24 +37,6 @@
         var(--reminders-host-bottom-inset, 0px)
     );
 
-    // Fix HeroUI component text visibility in Shadow DOM dark mode
-    // HeroUI's foreground color needs to be explicitly set for dark mode
-    &.dark {
-        // Set text color for HeroUI Card content
-        [data-slot="base"] {
-            color: var(--text-normal);
-        }
-
-        // Ensure Chip text is visible
-        [data-slot="content"] {
-            color: inherit;
-        }
-
-        // Fix text-sm and other text utilities
-        .text-sm, .text-base, .font-medium {
-            color: var(--text-normal);
-        }
-    }
 }
 
 .reminders-view-panel {

@@ -2,6 +2,7 @@ import type { ApiFetch } from './types';
 
 const MAX_REMINDER_INDEX_WARMUP_REQUESTS = 100;
 const MAX_REMINDER_INDEX_RETRY_DELAY_MS = 5_000;
+const MAX_REMINDER_INDEX_TOTAL_WAIT_MS = 15_000;
 
 function retryDelayMs(response: Response): number {
 	const retryAfter = response.headers.get('Retry-After');
@@ -20,13 +21,16 @@ export async function fetchReadyReminderList(
 	path: string,
 	headers: Headers,
 ): Promise<Response> {
+	let totalWaitMs = 0;
 	for (let attempt = 0; attempt < MAX_REMINDER_INDEX_WARMUP_REQUESTS; attempt += 1) {
 		const response = await apiFetch(path, { headers });
 		if (response.status !== 202) return response;
 		const waitMs = retryDelayMs(response);
 		if (waitMs > 0) {
+			if (totalWaitMs + waitMs > MAX_REMINDER_INDEX_TOTAL_WAIT_MS) break;
 			await delay(waitMs);
+			totalWaitMs += waitMs;
 		}
 	}
-	throw new Error('Reminder index is taking too long to prepare');
+	throw new Error('Reminder index is still preparing. Try again in a moment.');
 }
