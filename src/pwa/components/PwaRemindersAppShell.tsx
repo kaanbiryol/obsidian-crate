@@ -1,5 +1,5 @@
 import { HeroUIProvider } from '@heroui/react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -9,9 +9,6 @@ import { ShadowDOMButton } from '@/reminders/components/ShadowDOMButton';
 import { ViewHeader } from '@/reminders/components/ViewHeader';
 import type { Reminder } from '@/reminders/types/reminder';
 import {
-	CONTENT_TRANSITION_DURATION,
-	EASE_EXPO_OUT,
-	EASE_STANDARD,
 	PAGE_TRANSITION_DURATION,
 	type TabId,
 } from '@/reminders/ui/layoutConstants';
@@ -83,7 +80,6 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	const [isTransitioning, setIsTransitioning] = useState(false);
 	const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
-	const prefersReducedMotion = useReducedMotion();
 
 	useEffect(() => {
 		return () => {
@@ -197,17 +193,6 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		</AnimatePresence>
 	);
 
-	const loadingExitTransition = prefersReducedMotion
-		? { duration: 0 }
-		: { duration: 0.24, ease: EASE_STANDARD };
-	const contentEnterTransition = prefersReducedMotion
-		? { duration: 0 }
-		: {
-			duration: CONTENT_TRANSITION_DURATION,
-			delay: 0.06,
-			ease: EASE_EXPO_OUT,
-		};
-
 	return (
 		<HeroUIProvider>
 			<div
@@ -244,35 +229,14 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					)}
 				</AnimatePresence>
 
-				{belowHeaderContent}
+				{!loadingContent && belowHeaderContent && (
+					<div className="pwa-below-header-content">
+						{belowHeaderContent}
+					</div>
+				)}
 
-				<div className={`reminders-content${isTransitioning ? ' is-transitioning' : ''}${loadingTransition ? ' has-loading-transition' : ''}`}>
-					{loadingTransition ? (
-						<AnimatePresence initial={false} mode="sync">
-							{loadingContent ? (
-								<motion.div
-									key="initial-loading"
-									className="reminders-loading-transition-layer"
-									initial={false}
-									animate={{ opacity: 1 }}
-									exit={{ opacity: 0 }}
-									transition={loadingExitTransition}
-								>
-									{loadingContent}
-								</motion.div>
-							) : (
-								<motion.div
-									key="initial-content"
-									className="reminders-loading-transition-layer"
-									initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 6 }}
-									animate={{ opacity: 1, y: 0 }}
-									transition={contentEnterTransition}
-								>
-									{viewPanels}
-								</motion.div>
-							)}
-						</AnimatePresence>
-					) : loadingContent ? loadingContent : viewPanels}
+				<div className={`reminders-content${isTransitioning ? ' is-transitioning' : ''}`}>
+					{loadingContent ?? viewPanels}
 				</div>
 
 				<BottomTabBar
@@ -286,6 +250,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 						<FloatingActionButton
 							onClick={handleAdd}
 							className="fab"
+							animateOnMount={false}
 							data-action="open-create-modal"
 						/>
 					)}

@@ -31,6 +31,7 @@ import { useReminderMutations } from './hooks/useReminderMutations';
 import { useSheetTransition } from './hooks/useSheetTransition';
 import { usePullToRefresh } from './hooks/usePullToRefresh';
 import { useToast } from './hooks/useToast';
+import { isInitialPwaContentReady } from './initial-content-readiness';
 import {
 	buildModalDraft,
 	toSharedReminder,
@@ -78,6 +79,7 @@ function App() {
 	const reminderSync = useReminderSync({ apiFetch, authToken, bootstrapped, config, setSelectedProject });
 	const {
 		push,
+		pushStateReady,
 		refreshPushState,
 		enablePushNotifications,
 		disablePushNotifications,
@@ -103,7 +105,12 @@ function App() {
 		setLoading,
 		setError,
 	} = reminderSync;
-	const initialContentReady = bootstrapped && (!authToken || !loading);
+	const initialContentReady = isInitialPwaContentReady({
+		authToken,
+		bootstrapped,
+		loading,
+		pushStateReady,
+	});
 	const { loggingOut, logOut } = usePwaSessionLifecycle({
 		apiFetch,
 		cancelModalClose: modalTransition.cancelClose,

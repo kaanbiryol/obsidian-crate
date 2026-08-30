@@ -1,6 +1,5 @@
 import React from 'react';
 import { Button } from '@heroui/react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
 	ArrowDown,
 	Bell,
@@ -79,60 +78,34 @@ export function PwaTopNotices({
 }) {
 	const showStatusLine = Boolean(statusText && statusKind !== 'live');
 	const showNotices = showStatusLine || updateAvailable || showNotificationPrompt;
-	const prefersReducedMotion = useReducedMotion();
-	const transition = prefersReducedMotion
-		? { duration: 0 }
-		: { duration: 0.16, ease: [0.32, 0, 0.67, 0] as const };
-	const collapsedNotice = { opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0 };
+	if (!showNotices) return null;
 
 	return (
-		<AnimatePresence initial={false}>
-			{showNotices && (
-				<motion.div
-					key="pwa-top-notices"
-					className="pwa-top-notices"
-					initial={showNotificationPrompt ? false : collapsedNotice}
-					animate={{ opacity: 1, height: 'auto', paddingTop: 12, paddingBottom: 4 }}
-					exit={collapsedNotice}
-					transition={transition}
-					style={{ overflow: 'hidden' }}
-				>
-					{updateAvailable && (
-						<div className="pwa-update-banner" role="status">
-							<span className="pwa-update-banner__text">Update available</span>
-							<button className="pwa-update-button" type="button" onClick={onReload} aria-label="Update to the latest version">
-								Update
-							</button>
-						</div>
-					)}
-					{showStatusLine && <div className={`pwa-status-line is-${statusKind}`} role="status">{statusText}</div>}
-					<AnimatePresence initial={false}>
-						{showNotificationPrompt && (
-							<motion.div
-								key="notification-prompt"
-								className="pwa-notification-prompt"
-								initial={false}
-								animate={{ opacity: 1, height: 'auto', paddingTop: 10, paddingBottom: 10 }}
-								exit={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0 }}
-								transition={transition}
-								style={{ overflow: 'hidden' }}
-							>
-								<div className="pwa-notification-prompt__icon">
-									<Bell size={16} />
-								</div>
-								<div className="pwa-notification-prompt__copy">
-									<strong>Enable notifications</strong>
-									<span>Get reminder alerts from this Home Screen app.</span>
-								</div>
-								<Button className="pwa-inline-button" type="button" onClick={onEnableNotifications}>
-									Enable
-								</Button>
-							</motion.div>
-						)}
-					</AnimatePresence>
-				</motion.div>
+		<div className="pwa-top-notices">
+			{updateAvailable && (
+				<div className="pwa-update-banner" role="status">
+					<span className="pwa-update-banner__text">Update available</span>
+					<button className="pwa-update-button" type="button" onClick={onReload} aria-label="Update to the latest version">
+						Update
+					</button>
+				</div>
 			)}
-		</AnimatePresence>
+			{showStatusLine && <div className={`pwa-status-line is-${statusKind}`} role="status">{statusText}</div>}
+			{showNotificationPrompt && (
+				<div className="pwa-notification-prompt">
+					<div className="pwa-notification-prompt__icon">
+						<Bell size={16} />
+					</div>
+					<div className="pwa-notification-prompt__copy">
+						<strong>Enable notifications</strong>
+						<span>Get reminder alerts from this Home Screen app.</span>
+					</div>
+					<Button className="pwa-inline-button" type="button" onClick={onEnableNotifications}>
+						Enable
+					</Button>
+				</div>
+			)}
+		</div>
 	);
 }
 

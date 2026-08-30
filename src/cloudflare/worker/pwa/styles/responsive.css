@@ -2,7 +2,6 @@
 @keyframes view-slide-forward{from{opacity:0;transform:translate3d(22px,0,0) scale(.992);filter:blur(1px)}to{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}}
 @keyframes view-slide-backward{from{opacity:0;transform:translate3d(-22px,0,0) scale(.992);filter:blur(1px)}to{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}}
 @keyframes pwa-spin{to{transform:rotate(360deg)}}
-@keyframes pwa-skeleton-shimmer{0%{background-position:120% 0}100%{background-position:-120% 0}}
 @keyframes pwa-update-slide-in{from{opacity:0;transform:translate3d(0,-10px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @keyframes pwa-toast-in{from{opacity:0;transform:translate3d(-50%,6px,0) scale(.98)}to{opacity:1;transform:translate3d(-50%,0,0) scale(1)}}
 @media (prefers-reduced-motion: reduce){
