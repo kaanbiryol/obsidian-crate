@@ -186,7 +186,9 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;');
 		expect(html).toContain('.pwa-reminders-view .ios-scroll{scrollbar-width:none;overscroll-behavior-y:contain}');
 		expect(html).toContain('position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none');
-		expect(html).toContain('.pwa-reminders-view .premium-back-button{margin-top:calc(env(safe-area-inset-top) + 12px)}');
+		expect(html).toContain('--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px))');
+		expect(html).toContain('.pwa-reminders-view .view-header{max-width:100vw;overflow:hidden;padding:calc(var(--pwa-safe-area-top) + 17px)');
+		expect(html).toContain('.pwa-reminders-view .premium-back-button{margin-top:calc(var(--pwa-safe-area-top) + 12px)}');
 		expect(html).not.toContain('@supports (-webkit-touch-callout: none)');
 		expect(html).not.toContain('bottom:calc(0px - env(safe-area-inset-bottom))');
 		expect(html).not.toContain('bottom:calc(var(--pwa-tabbar-safe-area) * -1)');
@@ -349,7 +351,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('<div class="pwa-bootstrap-content" aria-hidden="true">');
 		expect(html).toContain('<div class="pwa-loading-state is-visible"');
 		expect(html).toContain('<div class="pwa-bootstrap-tabs" aria-hidden="true">');
-		expect(html).toContain('--pwa-bootstrap-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px))');
+		expect(html).toContain('.pwa-bootstrap-header{min-height:80px;display:flex;flex-shrink:0;align-items:flex-start;justify-content:space-between;gap:10px;padding:calc(var(--pwa-safe-area-top) + 17px)');
 		expect(html).not.toContain('--pwa-bootstrap-safe-area-fallback');
 		expect(bodyMarkup.indexOf('pwa-bootstrap-header')).toBeLessThan(bodyMarkup.indexOf('pwa-skeleton-list'));
 		expect(html.match(/class="pwa-skeleton-row"/g)).toHaveLength(5);

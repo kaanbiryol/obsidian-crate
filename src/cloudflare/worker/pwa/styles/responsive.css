@@ -66,7 +66,7 @@
 	.fab{width:46px;height:46px;min-width:46px;right:10px;bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px)}
 }
 @media (max-width: 420px){
-	.pwa-reminders-view .view-header{padding:calc(env(safe-area-inset-top) + 17px) 18px 11px!important}
+	.pwa-reminders-view .view-header{padding:calc(var(--pwa-safe-area-top) + 17px) 18px 11px!important}
 	.pwa-header-settings-button,.pwa-header-sync-button{width:44px;height:44px;min-width:44px}
 	.premium-reminder-title{font-size:15.5px}
 	.premium-reminder-description{font-size:13.25px}
