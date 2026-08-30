@@ -5,9 +5,8 @@ import { buildInboxViewModel } from '@/reminders/ui/views/viewModels';
 import {
 	applyReminderTextUpdate,
 	hasReminderDraftTitle,
-	reorderProjectReminders,
-	toSharedReminder,
 } from './reminder-state';
+import { reorderProjectReminders, toSharedReminder } from './reminder-list-state';
 import type { ModalDraft, ReminderRecord } from './types';
 
 function createModalDraft(overrides: Partial<ModalDraft> = {}): ModalDraft {

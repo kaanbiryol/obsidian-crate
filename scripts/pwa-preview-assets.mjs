@@ -13,6 +13,8 @@ async function readGeneratedPwaClient() {
 		|| typeof payload.version !== 'string'
 		|| typeof payload.script !== 'string'
 		|| payload.script.length === 0
+		|| !payload.assets
+		|| typeof payload.assets !== 'object'
 	) {
 		throw new Error(`Invalid generated PWA client bundle: ${generatedPath}`);
 	}
@@ -41,7 +43,7 @@ export async function buildPwaPreviewAssets() {
 		write: false,
 		define: {
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(pwaClient.version),
-			__CRATE_PWA_CLIENT_JS__: JSON.stringify(pwaClient.script),
+			__CRATE_PWA_CLIENT_ASSETS__: JSON.stringify(pwaClient.assets),
 		},
 		loader: { '.png': 'binary' },
 		plugins: [rawTextPlugin()],

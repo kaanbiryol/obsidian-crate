@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { Inbox, ChevronDown } from 'lucide-react';
-import { Button, Divider } from '@heroui/react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
@@ -140,7 +139,7 @@ export const InboxView = memo(function InboxView({
               data-reminder-id="completed-section"
               data-reminder-section="section"
             >
-            <Divider className="mb-3" />
+            <div className="mb-3 premium-divider" role="separator" />
             {renderToggleButton ? (
               renderToggleButton({
                 onPress: () => setShowCompleted(prev => !prev),
@@ -148,26 +147,26 @@ export const InboxView = memo(function InboxView({
                 count: completed.length
               })
             ) : (
-              <Button
-                variant="light"
-                onPress={() => setShowCompleted(prev => !prev)}
-                className="completed-section-toggle w-full justify-between h-10 px-0"
-                endContent={
-                  <motion.span
+              <button
+				type="button"
+				onClick={() => setShowCompleted(prev => !prev)}
+				className="completed-section-toggle w-full justify-between h-10 px-0"
+			  >
+				<span
+				  className="text-sm font-semibold reminders-muted-label"
+				>
+				  Completed ({completed.length})
+				</span>
+				{
+				  <motion.span
                     animate={{ rotate: showCompleted ? 180 : 0 }}
                     transition={{ duration: 0.2, ease: 'easeOut' }}
                     className="inline-flex"
                   >
                     <ChevronDown size={18} />
-                  </motion.span>
-                }
-              >
-                <span
-                  className="text-sm font-semibold reminders-muted-label"
-                >
-                  Completed ({completed.length})
-                </span>
-              </Button>
+				  </motion.span>
+				}
+			  </button>
             )}
 
             <AnimatePresence mode="popLayout" initial={false}>
@@ -209,7 +208,7 @@ export const InboxView = memo(function InboxView({
                         transition={{
                           opacity: { duration: 0.14, ease: 'easeOut' },
                         }}
-                        className="mb-2"
+						className="mb-2 reminder-render-item"
                         data-reminder-scroll-anchor="true"
                         data-reminder-id={reminder.id}
                         data-reminder-section="completed"

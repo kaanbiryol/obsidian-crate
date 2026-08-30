@@ -3,7 +3,7 @@ import { LayoutGroup } from 'framer-motion';
 import { ChevronLeft, FolderOpen } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import type { Reminder } from '../../types/reminder';
 import { ReminderCard } from '../../components/ReminderCard';
 import { ReorderableReminderList } from '../../components/ReorderableReminderList';

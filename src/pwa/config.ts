@@ -1,8 +1,7 @@
-import type { CachedReminderSnapshot, ReminderRecord, StartTab, StoredConfig } from './types';
+import type { StartTab, StoredConfig } from './types';
 
 export const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
 const CONFIG_KEY = 'crate-reminders-config';
-export const REMINDERS_CACHE_KEY = 'crate-reminders-cache-v1';
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const defaultConfig: StoredConfig = {
@@ -44,35 +43,6 @@ export function loadStoredConfig(): StoredConfig {
 
 function saveConfig(config: StoredConfig): void {
 	localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-}
-
-export function loadCachedReminderSnapshot(folderPath: string): CachedReminderSnapshot | null {
-	try {
-		const raw = localStorage.getItem(REMINDERS_CACHE_KEY);
-		if (!raw) return null;
-		const parsed = JSON.parse(raw) as Partial<CachedReminderSnapshot>;
-		if (parsed.folderPath !== folderPath) return null;
-		if (!Array.isArray(parsed.reminders) || !Array.isArray(parsed.projects) || typeof parsed.savedAt !== 'number') {
-			return null;
-		}
-		return {
-			folderPath,
-			reminders: parsed.reminders,
-			projects: parsed.projects.filter((project): project is string => typeof project === 'string'),
-			savedAt: parsed.savedAt,
-		};
-	} catch {
-		return null;
-	}
-}
-
-export function saveCachedReminderSnapshot(folderPath: string, reminders: ReminderRecord[], projects: string[], savedAt = Date.now()): void {
-	try {
-		const snapshot: CachedReminderSnapshot = { folderPath, reminders, projects, savedAt };
-		localStorage.setItem(REMINDERS_CACHE_KEY, JSON.stringify(snapshot));
-	} catch {
-		// Best-effort cache for offline display; storage can be unavailable in private contexts.
-	}
 }
 
 export function currentQueryParams(): URLSearchParams {

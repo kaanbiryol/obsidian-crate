@@ -1,12 +1,13 @@
 import React from 'react';
-import { Button } from '@heroui/react';
+import { PwaButton as Button } from './PwaButton';
 import {
 	ArrowDown,
 	Bell,
 	RefreshCw,
 	Settings,
 } from 'lucide-react';
-import type { DataMode, PullRefreshState } from '../types';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import type { DataMode } from '../types';
 
 function PwaSettingsButton({
 	settingsOpen,
@@ -109,7 +110,14 @@ export function PwaTopNotices({
 	);
 }
 
-export function PwaPullRefreshIndicator({ pullRefresh }: { pullRefresh: PullRefreshState }) {
+export function PwaPullRefreshIndicator({
+	enabled,
+	onRefresh,
+}: {
+	enabled: boolean;
+	onRefresh: () => Promise<void>;
+}) {
+	const pullRefresh = usePullToRefresh(enabled, onRefresh);
 	const visible = pullRefresh.distance > 0 || pullRefresh.refreshing;
 	const height = visible ? Math.min(56, Math.max(0, pullRefresh.distance)) : 0;
 	const label = pullRefresh.refreshing

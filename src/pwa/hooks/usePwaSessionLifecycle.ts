@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import { AUTH_TOKEN_KEY, REMINDERS_CACHE_KEY } from '../config';
+import { AUTH_TOKEN_KEY } from '../config';
+import { clearCachedReminderSnapshots } from '../reminder-cache';
 import type { ApiFetch, ModalState, ShowToast } from '../types';
 
 export function usePwaSessionLifecycle({
@@ -35,7 +36,7 @@ export function usePwaSessionLifecycle({
 
 	const clearLocalSession = useCallback((showMessage: boolean) => {
 		localStorage.removeItem(AUTH_TOKEN_KEY);
-		localStorage.removeItem(REMINDERS_CACHE_KEY);
+		void clearCachedReminderSnapshots();
 		setAuthToken(null);
 		resetReminderState();
 		cancelSettingsClose();

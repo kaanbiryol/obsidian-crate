@@ -268,6 +268,78 @@ describe('reminders web handlers', () => {
 		const result = await response.json() as { reminders: Array<{ id: string }>; projects: string[] };
 		expect(result.reminders.map((reminder) => reminder.id)).toEqual(['r1', 'r2']);
 		expect(result.projects).toEqual(['Inbox']);
+		expect(result.reminders[0]).not.toHaveProperty('projectColor');
+	});
+
+	it('returns 304 from file metadata without reading markdown objects again', async () => {
+		const workspace = await createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] First task <!-- crate-id:r1 -->\n',
+				'files/Reminders/Work.md': '# Work\n\n- [ ] Second task <!-- crate-id:r2 -->\n',
+			},
+			files: {
+				'Reminders/Inbox.md': null,
+				'Reminders/Work.md': null,
+			},
+		});
+		const bucketGet = workspace.env.BUCKET.get as ReturnType<typeof vi.fn>;
+		const firstResponse = await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+		const etag = firstResponse.headers.get('ETag');
+		expect(etag).toMatch(/^"[a-f0-9]{64}"$/);
+		expect(bucketGet).toHaveBeenCalledTimes(2);
+
+		const secondResponse = await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders', {
+				headers: { 'If-None-Match': etag ?? '' },
+			}),
+			workspace.env as never,
+		);
+
+		expect(secondResponse.status).toBe(304);
+		expect(bucketGet).toHaveBeenCalledTimes(2);
+	});
+
+	it('updates a known source file without scanning unrelated project files', async () => {
+		const workspace = await createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] Existing task <!-- crate-id:r-existing -->\n',
+				'files/Reminders/Work.md': '# Work\n\n- [ ] Work task <!-- crate-id:r-work -->\n',
+				'files/Reminders/Home.md': '# Home\n\n- [ ] Home task <!-- crate-id:r-home -->\n',
+			},
+			files: {
+				'Reminders/Inbox.md': null,
+				'Reminders/Work.md': null,
+				'Reminders/Home.md': null,
+			},
+		});
+		const bucketGet = workspace.env.BUCKET.get as ReturnType<typeof vi.fn>;
+
+		const response = await handleUpdateReminder(
+			new Request('https://worker.test/reminders/update', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					id: 'r-existing',
+					filePath: 'Reminders/Inbox.md',
+					content: 'Updated task',
+				}),
+			}),
+			workspace.env as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(bucketGet).toHaveBeenCalledTimes(1);
+		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('Updated task');
+		const result = await response.json() as { reminder?: { id: string; content: string; filePath: string } };
+		expect(result.reminder).toMatchObject({
+			id: 'r-existing',
+			content: 'Updated task',
+			filePath: 'Reminders/Inbox.md',
+		});
 	});
 
 	it('creates and deletes reminders against the source markdown files', async () => {

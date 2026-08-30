@@ -11,13 +11,11 @@ export function usePushNotifications({
 	showToast: ShowToast;
 }): {
 	push: PushState;
-	pushStateReady: boolean;
 	refreshPushState: () => Promise<void>;
 	enablePushNotifications: () => Promise<void>;
 	disablePushNotifications: () => Promise<void>;
 } {
 	const [push, setPush] = useState<PushState>({ supported: false, subscribed: false, status: null });
-	const [pushStateReady, setPushStateReady] = useState(false);
 
 	const refreshPushState = useCallback(async () => {
 		try {
@@ -45,8 +43,6 @@ export function usePushNotifications({
 		} catch (pushError) {
 			const message = pushError instanceof Error ? pushError.message : String(pushError);
 			setPush({ supported: false, subscribed: false, status: `Notification setup failed: ${message}` });
-		} finally {
-			setPushStateReady(true);
 		}
 	}, []);
 
@@ -94,5 +90,5 @@ export function usePushNotifications({
 		setPush({ supported: true, subscribed: false, status: null });
 	}, [apiFetch]);
 
-	return { push, pushStateReady, refreshPushState, enablePushNotifications, disablePushNotifications };
+	return { push, refreshPushState, enablePushNotifications, disablePushNotifications };
 }

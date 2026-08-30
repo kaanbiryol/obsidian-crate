@@ -3,10 +3,10 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import {
 	AUTH_TOKEN_KEY,
 	applyConfigFromUrl,
-	loadCachedReminderSnapshot,
 	loadStoredConfig,
 } from '../config';
-import { exchangeEnrollmentToken, validateStoredAuthToken } from '../api';
+import { exchangeEnrollmentToken } from '../api';
+import { loadCachedReminderSnapshot } from '../reminder-cache';
 import type { CachedReminderSnapshot, StartTab, StoredConfig } from '../types';
 
 export function usePwaBootstrap({
@@ -55,15 +55,6 @@ export function usePwaBootstrap({
 				}
 
 				let nextToken = initialAuthTokenRef.current;
-				if (nextToken && applied.token) {
-					const storedTokenValid = await validateStoredAuthToken(nextToken);
-					if (cancelled) return;
-					if (!storedTokenValid) {
-						localStorage.removeItem(AUTH_TOKEN_KEY);
-						nextToken = null;
-					}
-				}
-
 				if (!nextToken && applied.token) {
 					nextToken = await exchangeEnrollmentToken(applied.token);
 					localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
@@ -76,7 +67,7 @@ export function usePwaBootstrap({
 					return;
 				}
 
-				const cached = loadCachedReminderSnapshot(applied.config.folderPath);
+				const cached = await loadCachedReminderSnapshot(applied.config.folderPath);
 				hydratedCacheRef.current = Boolean(cached);
 				if (cached) {
 					hydrateCachedSnapshot(cached);

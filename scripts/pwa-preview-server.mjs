@@ -27,6 +27,7 @@ export function createPwaPreviewServer({ assets, origin }) {
 		CRATE_ICON_512_PNG,
 		CRATE_MARK_256_PNG,
 		PWA_APP_JS,
+		PWA_CLIENT_ASSETS,
 		PWA_THEME_BOOTSTRAP_JS,
 		OPEN_OBSIDIAN_HTML,
 		OPEN_OBSIDIAN_JS,
@@ -66,6 +67,17 @@ export function createPwaPreviewServer({ assets, origin }) {
 
 		if (method === 'GET' && path === '/notifications/app.js') {
 			sendText(res, 200, PWA_APP_JS, 'application/javascript; charset=utf-8');
+			return;
+		}
+
+		if (method === 'GET' && path.startsWith('/notifications/assets/')) {
+			const fileName = path.slice('/notifications/assets/'.length);
+			const source = PWA_CLIENT_ASSETS[fileName];
+			if (typeof source === 'string') {
+				sendText(res, 200, source, 'application/javascript; charset=utf-8');
+			} else {
+				sendJson(res, 404, { error: 'Not found' });
+			}
 			return;
 		}
 
@@ -194,7 +206,7 @@ export function createPwaPreviewServer({ assets, origin }) {
 				const body = await readJson(req);
 				const reminder = parseMutationReminder(body);
 				state.reminders.push(reminder);
-				sendJson(res, 200, reminder);
+				sendJson(res, 200, { success: true, reminder });
 				return;
 			}
 
@@ -213,7 +225,7 @@ export function createPwaPreviewServer({ assets, origin }) {
 					completed: current.completed,
 				}));
 
-				sendJson(res, 200, current);
+				sendJson(res, 200, { success: true, reminder: current });
 				return;
 			}
 
@@ -226,7 +238,7 @@ export function createPwaPreviewServer({ assets, origin }) {
 				}
 
 				current.completed = Boolean(body.completed);
-				sendJson(res, 200, current);
+				sendJson(res, 200, { success: true, reminder: current });
 				return;
 			}
 

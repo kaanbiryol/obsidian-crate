@@ -16,7 +16,7 @@ import {
 	parseRecurrenceMutationValue,
 	parseReminderMutationWorkspace,
 } from '../requests';
-import { findReminderById, loadReminderWorkspace } from '../workspace';
+import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
 
 export async function handleCreateReminder(request: Request, env: Env): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -70,10 +70,14 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 	});
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, existingFile?.hash ?? null);
 
-	const workspace = await loadReminderWorkspace(env, workspaceResult.folderPath);
-	const reminder = findReminderById(workspace, reminderId);
+	const reminder = scanReminderMarkdownFile(filePath, nextContent, workspaceResult.folderPath)
+		.find(candidate => candidate.id === reminderId);
 	const notificationWarning = reminder
 		? await syncReminderNotification(env, reminder, workspaceResult.allDayNotificationTime)
 		: undefined;
-	return corsResponse({ success: true, notificationWarning });
+	return corsResponse({
+		success: true,
+		reminder: reminder ? toReminderPayload(reminder) : undefined,
+		notificationWarning,
+	});
 }

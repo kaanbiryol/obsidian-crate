@@ -316,8 +316,13 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("cache.addAll(PWA_PRECACHE_URLS)");
 		expect(SERVICE_WORKER_JS).not.toContain('apple-startup');
 		expect(SERVICE_WORKER_JS).toContain("event.request.mode === 'navigate' || url.pathname === PWA_SHELL_URL");
-		expect(SERVICE_WORKER_JS).toContain("return caches.match(PWA_SHELL_URL).then(function(cached)");
+		expect(SERVICE_WORKER_JS).toContain("return cache.match(PWA_SHELL_URL)");
+		expect(SERVICE_WORKER_JS).toContain('previousShellCaches.slice(0, -1)');
+		expect(SERVICE_WORKER_JS.indexOf("cache.match(PWA_SHELL_URL)")).toBeLessThan(
+			SERVICE_WORKER_JS.indexOf('return fetch(event.request)'),
+		);
 		expect(SERVICE_WORKER_JS).toContain("url.pathname === '/notifications/app.js'");
+		expect(SERVICE_WORKER_JS).toContain("|| url.pathname.indexOf('/notifications/assets/') === 0");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/theme-bootstrap.js'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/icon.svg'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-icon-192.png'");

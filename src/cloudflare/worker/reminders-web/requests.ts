@@ -21,6 +21,17 @@ export function parseProjectPath(value: unknown): string | null {
 	return parsed ? normalizeReminderProjectPath(parsed) : null;
 }
 
+export function parseReminderSourceFilePath(value: unknown, folderPath: string): string | null {
+	const parsed = parseOptionalString(value, 512);
+	if (!parsed) return null;
+	const sanitized = sanitizePath(parsed);
+	return sanitized
+		&& sanitized.startsWith(`${folderPath}/`)
+		&& sanitized.toLowerCase().endsWith('.md')
+		? sanitized
+		: null;
+}
+
 export function hasNonEmptyStringValue(value: unknown): boolean {
 	return typeof value === 'string' && value.trim().length > 0;
 }

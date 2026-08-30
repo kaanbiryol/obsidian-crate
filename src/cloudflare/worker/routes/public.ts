@@ -14,6 +14,7 @@ import {
 	handleOpenObsidian,
 	handleOpenObsidianScript,
 	handlePwaApp,
+	handlePwaClientAsset,
 	handlePwaThemeBootstrap,
 	handlePwaVersion,
 	handleServiceWorker,
@@ -34,6 +35,9 @@ export async function handlePublicRoute(
 	if (path === '/' && method === 'GET') return handleServerInfo();
 	if (path === '/notifications' && method === 'GET') return handleNotificationsPage(request);
 	if (path === '/notifications/app.js' && method === 'GET') return handlePwaApp(request);
+	if (path.startsWith('/notifications/assets/') && method === 'GET') {
+		return handlePwaClientAsset(request, path.slice('/notifications/assets/'.length));
+	}
 	if (path === '/notifications/theme-bootstrap.js' && method === 'GET') return handlePwaThemeBootstrap(request);
 	if (path === '/notifications/sw.js' && method === 'GET') return handleServiceWorker();
 	if (path === '/notifications/manifest.json' && method === 'GET') return handleManifest(request);

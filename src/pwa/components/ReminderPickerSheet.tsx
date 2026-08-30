@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from '@heroui/react';
+import { PwaButton as Button } from './PwaButton';
 import { Check, X } from 'lucide-react';
 import { getProjectColor } from '@/reminders/utils/projectColors';
 import {

@@ -3,7 +3,7 @@ import { CalendarDate, parseDate } from '@internationalized/date';
 import { format } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { formatLocalDateKey } from '../../utils/reminderDate';
 
 const calendarVariants = {

@@ -1,6 +1,6 @@
 import React from "react";
 import { X } from "lucide-react";
-import { ShadowDOMNativeButton } from "@/reminders/components/ShadowDOMButton";
+import { ShadowDOMNativeButton } from "@/reminders/components/ShadowDOMNativeButton";
 
 interface RemindersViewCloseButtonProps {
   onClose: () => void;

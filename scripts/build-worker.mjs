@@ -1,7 +1,7 @@
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { resolve, dirname, relative } from 'node:path';
+import { basename, resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rawTextPlugin } from './raw-text-plugin.mjs';
 
@@ -19,8 +19,12 @@ function listFiles(directory) {
 	});
 }
 
-function createPwaAssetVersion(clientTemplate) {
-	const hash = createHash('sha256').update(clientTemplate);
+function createPwaAssetVersion(clientAssets) {
+	const hash = createHash('sha256');
+	for (const [name, source] of Object.entries(clientAssets).sort(([left], [right]) => left.localeCompare(right))) {
+		hash.update(name);
+		hash.update(source);
+	}
 	const pwaSourceRoot = resolve(root, 'src/cloudflare/worker/pwa');
 
 	for (const path of listFiles(pwaSourceRoot).sort()) {
@@ -40,7 +44,7 @@ function writeGeneratedJson(fileName, payload) {
 	);
 }
 
-async function buildWorkerBundle(pwaClientJs, pwaAssetVersion) {
+async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion) {
 	const result = await build({
 		entryPoints: [resolve(root, 'src/cloudflare/worker/index.ts')],
 		bundle: true,
@@ -56,7 +60,7 @@ async function buildWorkerBundle(pwaClientJs, pwaAssetVersion) {
 		define: {
 			__CRATE_SERVER_VERSION__: JSON.stringify(serverVersion),
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(pwaAssetVersion),
-			__CRATE_PWA_CLIENT_JS__: JSON.stringify(pwaClientJs),
+			__CRATE_PWA_CLIENT_ASSETS__: JSON.stringify(pwaClientAssets),
 		},
 		plugins: [rawTextPlugin()],
 	});
@@ -71,10 +75,15 @@ async function bundlePwaClient(assetVersion) {
 	const result = await build({
 		entryPoints: [resolve(root, 'src/pwa/main.tsx')],
 		bundle: true,
+		splitting: true,
 		format: 'esm',
 		platform: 'browser',
 		target: 'es2020',
 		write: false,
+		outdir: 'pwa-client',
+		entryNames: 'app',
+		chunkNames: 'chunk-[hash]',
+		publicPath: '/notifications/assets',
 		minify: true,
 		define: {
 			'process.env.NODE_ENV': JSON.stringify('production'),
@@ -88,20 +97,23 @@ async function bundlePwaClient(assetVersion) {
 		mainFields: ['browser', 'module', 'main'],
 		conditions: ['browser', 'import'],
 	});
-	return result.outputFiles[0].text;
+	return Object.fromEntries(result.outputFiles.map(output => [basename(output.path), output.text]));
 }
 
 async function buildPwaClientBundle() {
 	const versionTemplate = await bundlePwaClient(PWA_VERSION_PLACEHOLDER);
 	const version = createPwaAssetVersion(versionTemplate);
-	const code = await bundlePwaClient(version);
+	const assets = await bundlePwaClient(version);
+	const script = assets['app.js'];
+	if (!script) throw new Error('PWA client build did not emit app.js');
 	writeGeneratedJson('pwa-client.json', {
 		version,
-		script: code,
+		script,
+		assets,
 	});
 	console.log('PWA client bundle written to .generated/cloudflare/pwa-client.json');
-	return { code, version };
+	return { assets, version };
 }
 
 const pwaClient = await buildPwaClientBundle();
-await buildWorkerBundle(pwaClient.code, pwaClient.version);
+await buildWorkerBundle(pwaClient.assets, pwaClient.version);

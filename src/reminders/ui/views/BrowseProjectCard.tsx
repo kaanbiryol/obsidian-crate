@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import { ChevronRight, Circle, CheckCircle2, Sparkles } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
-import { ShadowDOMNativeMotionButton } from '../../components/ShadowDOMButton';
+import { ShadowDOMNativeMotionButton } from '../../components/ShadowDOMNativeMotionButton';
 import type { BrowseProjectCardViewModel } from './viewModels';
 
 const MiniProgressBar = memo(function MiniProgressBar({

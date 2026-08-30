@@ -1,11 +1,10 @@
-import { HeroUIProvider } from '@heroui/react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BottomTabBar } from '@/reminders/components/BottomTabBar';
 import { FloatingActionButton } from '@/reminders/components/FloatingActionButton';
-import { ShadowDOMButton } from '@/reminders/components/ShadowDOMButton';
+import { ShadowDOMNativeButton } from '@/reminders/components/ShadowDOMNativeButton';
 import { ViewHeader } from '@/reminders/components/ViewHeader';
 import type { Reminder } from '@/reminders/types/reminder';
 import {
@@ -138,11 +137,14 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		showCompleted: boolean;
 		count: number;
 	}) => (
-		<ShadowDOMButton
-			variant="light"
-			onPress={onPress}
+		<ShadowDOMNativeButton
+			onClick={onPress}
 			className="completed-section-toggle w-full justify-between h-10 px-0"
-			endContent={
+		>
+			<span className="text-sm font-semibold reminders-muted-label">
+				Completed ({count})
+			</span>
+			{
 				<motion.span
 					animate={{ rotate: showCompleted ? 180 : 0 }}
 					transition={{ duration: 0.2, ease: 'easeOut' }}
@@ -151,11 +153,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					<ChevronDown size={18} />
 				</motion.span>
 			}
-		>
-			<span className="text-sm font-semibold reminders-muted-label">
-				Completed ({count})
-			</span>
-		</ShadowDOMButton>
+		</ShadowDOMNativeButton>
 	), []);
 
 	const currentProject = getReorderProject(viewMode, selectedProject);
@@ -188,8 +186,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	);
 
 	return (
-		<HeroUIProvider>
-			<div
+		<div
 				className={[
 					'reminders-view',
 					isDarkMode ? 'dark' : 'light',
@@ -239,7 +236,6 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 				</AnimatePresence>
 
 				{children}
-			</div>
-		</HeroUIProvider>
+		</div>
 	);
 };

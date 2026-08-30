@@ -5,7 +5,7 @@ import React, {
 	useImperativeHandle,
 	useRef,
 } from 'react';
-import { Button } from '@heroui/react';
+import { PwaButton as Button } from './PwaButton';
 import { Calendar, Flag, Hash, Repeat, Trash2, X } from 'lucide-react';
 import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/RichTextInput';
 import { ProjectAutocompleteDropdown } from '@/reminders/ui/reminder-modal/ProjectAutocompleteDropdown';

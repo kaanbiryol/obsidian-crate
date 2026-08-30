@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronLeft } from 'lucide-react';
 
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 
 interface PickerHeaderProps {
     onBack: () => void;

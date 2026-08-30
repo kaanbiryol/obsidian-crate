@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { buildModalDraft } from '../reminder-state';
+import { buildModalDraft } from '../reminder-modal-draft';
 import type {
 	DataMode,
 	ModalState,

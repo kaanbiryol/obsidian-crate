@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import {
@@ -15,8 +15,6 @@ import {
 } from './api';
 import { ErrorState, EmptyAuthState } from './components/AuthStates';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
-import { ReminderSheet } from './components/ReminderSheet';
-import { SettingsSheet } from './components/SettingsSheet';
 import { WebReminderCard } from './components/WebReminderCard';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
@@ -28,19 +26,21 @@ import { useLaunchReminderModal } from './hooks/useLaunchReminderModal';
 import { useReminderSync } from './hooks/useReminderSync';
 import { useReminderMutations } from './hooks/useReminderMutations';
 import { useSheetTransition } from './hooks/useSheetTransition';
-import { usePullToRefresh } from './hooks/usePullToRefresh';
 import { useToast } from './hooks/useToast';
 import { isInitialPwaContentReady } from './initial-content-readiness';
-import {
-	buildModalDraft,
-	toSharedReminder,
-} from './reminder-state';
+import { toSharedReminder } from './reminder-list-state';
+import { buildModalDraft } from './reminder-modal-draft';
 import type {
 	ModalMode,
 	ModalState,
 	StartTab,
 	StoredConfig,
 } from './types';
+
+const ReminderSheet = lazy(() => import('./components/ReminderSheet')
+	.then(module => ({ default: module.ReminderSheet })));
+const SettingsSheet = lazy(() => import('./components/SettingsSheet')
+	.then(module => ({ default: module.SettingsSheet })));
 
 function App() {
 	const { colorScheme, themePreference, setThemePreference } = usePwaColorScheme();
@@ -76,7 +76,6 @@ function App() {
 	const reminderSync = useReminderSync({ apiFetch, authToken, bootstrapped, config, setSelectedProject });
 	const {
 		push,
-		pushStateReady,
 		refreshPushState,
 		enablePushNotifications,
 		disablePushNotifications,
@@ -96,6 +95,7 @@ function App() {
 		hydrateCachedSnapshot,
 		loadReminders,
 		beginLocalMutation,
+		commitReminderState,
 		resetReminderState,
 		setReminders,
 		setProjects,
@@ -106,7 +106,6 @@ function App() {
 		authToken,
 		bootstrapped,
 		loading,
-		pushStateReady,
 	});
 	const { loggingOut, logOut } = usePwaSessionLifecycle({
 		apiFetch,
@@ -169,10 +168,7 @@ function App() {
 		return false;
 	}, [readOnlyMessage, showToast]);
 
-	const pullRefresh = usePullToRefresh(
-		Boolean(authToken && bootstrapped && !loading && !modal && !settingsOpen && !reorderDragging),
-		useCallback(() => loadReminders({ silent: true }), [loadReminders]),
-	);
+	const handlePullRefresh = useCallback(() => loadReminders({ silent: true }), [loadReminders]);
 
 	useLaunchReminderModal({
 		authToken,
@@ -228,10 +224,10 @@ function App() {
 	} = useReminderMutations({
 		apiFetch,
 		beginLocalMutation,
+		commitReminderState,
 		closeModal,
 		config,
 		ensureCanMutate,
-		loadReminders,
 		projects,
 		projectsRef,
 		remindersRef,
@@ -294,7 +290,10 @@ function App() {
 				) : undefined}
 				belowHeaderContent={bootstrapped && authToken ? (
 					<>
-						<PwaPullRefreshIndicator pullRefresh={pullRefresh} />
+						<PwaPullRefreshIndicator
+							enabled={Boolean(!loading && !modal && !settingsOpen && !reorderDragging)}
+							onRefresh={handlePullRefresh}
+						/>
 						<PwaTopNotices
 							statusText={statusText}
 							statusKind={statusKind}
@@ -312,7 +311,7 @@ function App() {
 				onReorderDragActiveChange={setReorderDragging}
 			>
 				{settingsOpen && (
-					<SettingsSheet
+					<Suspense fallback={null}><SettingsSheet
 						config={config}
 						push={push}
 						themePreference={themePreference}
@@ -323,10 +322,10 @@ function App() {
 						onEnablePush={enablePushNotifications}
 						onThemePreferenceChange={setThemePreference}
 						onLogout={() => void logOut()}
-					/>
+					/></Suspense>
 				)}
 				{modal && (
-					<ReminderSheet
+					<Suspense fallback={null}><ReminderSheet
 						modal={modal}
 						projects={projects}
 						saving={saving}
@@ -336,7 +335,7 @@ function App() {
 						onClosed={modalTransition.finishClose}
 						onSave={saveReminder}
 						onDelete={deleteReminder}
-					/>
+					/></Suspense>
 				)}
 				{toast && (
 					<div

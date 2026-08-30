@@ -23,8 +23,10 @@ import {
 	parseProjectPath,
 	parseRecurrenceMutationValue,
 	parseReminderMutationWorkspace,
+	parseReminderSourceFilePath,
 } from '../requests';
-import { findReminderById, loadReminderWorkspace } from '../workspace';
+import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
+import { loadReminderSource } from '../workspace';
 
 function parseUpdateParams(body: Record<string, unknown>): UpdateReminderParams | Response {
 	const updateParams: UpdateReminderParams = {};
@@ -81,11 +83,15 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		return corsResponse({ error: 'id required' }, 400);
 	}
 
-	const workspace = await loadReminderWorkspace(env, workspaceResult.folderPath);
-	const reminder = findReminderById(workspace, id);
-	if (!reminder) {
+	const sourceFilePath = parseReminderSourceFilePath(parsedBody.value.filePath, workspaceResult.folderPath);
+	if (parsedBody.value.filePath !== undefined && !sourceFilePath) {
+		return corsResponse({ error: 'Invalid filePath' }, 400);
+	}
+	const source = await loadReminderSource(env, workspaceResult.folderPath, id, sourceFilePath ?? undefined);
+	if (!source) {
 		return corsResponse({ error: 'Reminder not found' }, 404);
 	}
+	const { file: oldFile, reminder } = source;
 
 	const updateParams = parseUpdateParams(parsedBody.value);
 	if (updateParams instanceof Response) {
@@ -94,12 +100,8 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 	const update = buildReminderUpdate(updateParams);
 
 	const nextProject = update.updates.project ?? reminder.project;
+	let updatedReminder;
 	if (nextProject !== reminder.project) {
-		const oldFile = workspace.files.get(reminder.filePath);
-		if (!oldFile) {
-			return corsResponse({ error: 'Reminder source file not found' }, 409);
-		}
-
 		const newFilePath = getProjectFilePath(workspaceResult.folderPath, nextProject);
 		const newFile = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, newFilePath);
 		const newFileContent = newFile?.content ?? getInitialProjectFileContent(nextProject);
@@ -148,20 +150,21 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 			}
 			throw error;
 		}
+		updatedReminder = scanReminderMarkdownFile(newFilePath, movedContent, workspaceResult.folderPath)
+			.find(candidate => candidate.id === id);
 	} else {
-		const file = workspace.files.get(reminder.filePath);
-		if (!file) {
-			return corsResponse({ error: 'Reminder source file not found' }, 409);
-		}
-
-		const nextContent = updateReminderInFileContent(file.content, reminder, update);
-		await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash);
+		const nextContent = updateReminderInFileContent(oldFile.content, reminder, update);
+		await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, oldFile.hash);
+		updatedReminder = scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath)
+			.find(candidate => candidate.id === id);
 	}
 
-	const nextWorkspace = await loadReminderWorkspace(env, workspaceResult.folderPath);
-	const updatedReminder = findReminderById(nextWorkspace, id);
 	const notificationWarning = updatedReminder
 		? await syncReminderNotification(env, updatedReminder, workspaceResult.allDayNotificationTime)
 		: await cancelReminderNotification(env, id);
-	return corsResponse({ success: true, notificationWarning });
+	return corsResponse({
+		success: true,
+		reminder: updatedReminder ? toReminderPayload(updatedReminder) : undefined,
+		notificationWarning,
+	});
 }

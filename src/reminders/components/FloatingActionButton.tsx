@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { Plus } from 'lucide-react';
-import { ShadowDOMNativeMotionButton } from './ShadowDOMButton';
+import { ShadowDOMNativeMotionButton } from './ShadowDOMNativeMotionButton';
 
 interface FloatingActionButtonProps {
   onClick: () => void;

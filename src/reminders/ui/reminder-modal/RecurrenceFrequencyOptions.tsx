@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import type { RecurrenceRule } from '../../types';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import {
 	RECURRENCE_DAY_LABELS,
 	getOrdinalSuffix,

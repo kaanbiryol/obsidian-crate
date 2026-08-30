@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { RecurrenceRule } from '../../types';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import {
 	RECURRENCE_FREQUENCIES,
 	RECURRENCE_FREQUENCY_LABELS,

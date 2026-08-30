@@ -1,7 +1,6 @@
 import React, { useMemo, memo } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { CalendarRange } from 'lucide-react';
-import { Divider } from '@heroui/react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
@@ -44,6 +43,7 @@ export const UpcomingView = memo(function UpcomingView({
   const { upcomingReminders, dateGroups } = useMemo(() => {
     return buildUpcomingViewModel(reminders, days);
   }, [reminders, days]);
+	const enableListAnimations = animationConfig.enabled && upcomingReminders.length <= 80;
 
   // Default card renderer
   const defaultRenderCard = (reminder: Reminder, index: number) => (
@@ -81,7 +81,7 @@ export const UpcomingView = memo(function UpcomingView({
         <div className="space-y-6">
           {dateGroups.map((group, groupIndex) => (
             <div key={group.date.toISOString()}>
-              {groupIndex > 0 && <Divider className="my-4" />}
+              {groupIndex > 0 && <div className="my-4 premium-divider" role="separator" />}
               <h2
                 className="upcoming-date-header"
               >
@@ -92,12 +92,12 @@ export const UpcomingView = memo(function UpcomingView({
                   {group.reminders.map((reminder, index) => (
                     <motion.div
                       key={reminder.id}
-                      layout="position"
+					  layout={enableListAnimations ? 'position' : false}
                       custom={index}
-                      initial={animationConfig.enabled ? STAGGERED_CARD_ANIMATION.initial : false}
-                      animate={animationConfig.enabled ? STAGGERED_CARD_ANIMATION.animate(index) : { opacity: 1 }}
-                      exit={animationConfig.enabled ? STAGGERED_CARD_ANIMATION.exit : undefined}
-                      className="mb-2"
+					  initial={enableListAnimations ? STAGGERED_CARD_ANIMATION.initial : false}
+					  animate={enableListAnimations ? STAGGERED_CARD_ANIMATION.animate(index) : { opacity: 1 }}
+					  exit={enableListAnimations ? STAGGERED_CARD_ANIMATION.exit : undefined}
+					  className="mb-2 reminder-render-item"
                       data-reminder-scroll-anchor="true"
                       data-reminder-id={reminder.id}
                       data-reminder-section="active"

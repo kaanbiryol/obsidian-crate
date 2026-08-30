@@ -39,6 +39,7 @@ export const TodayView = memo(function TodayView({
   const [showCompleted, setShowCompleted] = useState(false);
   const scrollRef = useStableReminderScroll();
   const { active, completed } = useMemo(() => buildTodayViewModel(reminders), [reminders]);
+	const enableListAnimations = animationConfig.enabled && active.length <= 80;
   const hasContent = active.length > 0 || completed.length > 0;
 
   // Default card renderer
@@ -82,11 +83,11 @@ export const TodayView = memo(function TodayView({
               <motion.div
                 key={reminder.id}
                 layoutId={`reminder-card-${reminder.id}`}
-                layout="position"
-                initial={animationConfig.enabled ? CARD_ANIMATION.initial : false}
-                animate={animationConfig.enabled ? CARD_ANIMATION.animate : { opacity: 1 }}
-                exit={animationConfig.enabled ? CARD_ANIMATION.exit : undefined}
-                className="mb-2"
+				layout={enableListAnimations ? 'position' : false}
+				initial={enableListAnimations ? CARD_ANIMATION.initial : false}
+				animate={enableListAnimations ? CARD_ANIMATION.animate : { opacity: 1 }}
+				exit={enableListAnimations ? CARD_ANIMATION.exit : undefined}
+				className="mb-2 reminder-render-item"
                 data-reminder-scroll-anchor="true"
                 data-reminder-id={reminder.id}
                 data-reminder-section="active"

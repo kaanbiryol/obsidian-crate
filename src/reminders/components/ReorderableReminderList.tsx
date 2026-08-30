@@ -20,13 +20,16 @@ interface ReorderableItemProps {
   onDragStart: () => void;
   onDragEnd: () => void;
   interaction: 'handle' | 'long-press';
+	enableLayoutAnimations: boolean;
 }
 
 const LONG_PRESS_DELAY_MS = 380;
 const LONG_PRESS_MOVE_TOLERANCE = 9;
 const LONG_PRESS_INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, [contenteditable="true"], [role="checkbox"]';
 
-function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction }: ReorderableItemProps) {
+const LARGE_LIST_ANIMATION_LIMIT = 80;
+
+function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction, enableLayoutAnimations }: ReorderableItemProps) {
   const didDragRef = useRef(false);
   const dragControls = useDragControls();
   const longPressTimerRef = useRef<number | null>(null);
@@ -116,7 +119,7 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
       onPointerUp={cancelLongPress}
       onPointerCancel={cancelLongPress}
       onContextMenu={interaction === 'long-press' ? (event) => event.preventDefault() : undefined}
-      layout="position"
+	  layout={enableLayoutAnimations ? 'position' : undefined}
       layoutDependency={index}
       data-reminder-scroll-anchor="true"
       data-reminder-id={reminder.id}
@@ -138,7 +141,7 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
       <motion.div
         layoutId={`reminder-card-${reminder.id}`}
         layoutCrossfade={false}
-        layout="position"
+		layout={enableLayoutAnimations ? 'position' : false}
         layoutDependency={reminder.id}
         transition={{ layout: REMINDER_LIST_LAYOUT_TRANSITION }}
       >
@@ -170,6 +173,7 @@ export function ReorderableReminderList({
   renderCard,
   interaction = 'handle',
 }: ReorderableReminderListProps) {
+	const enableLayoutAnimations = reminders.length <= LARGE_LIST_ANIMATION_LIMIT;
   const latestOrderRef = useRef(reminders);
   latestOrderRef.current = reminders;
   const orderBeforeDragRef = useRef<string[]>([]);
@@ -206,6 +210,7 @@ export function ReorderableReminderList({
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           interaction={interaction}
+		  enableLayoutAnimations={enableLayoutAnimations}
         />
       ))}
     </Reorder.Group>

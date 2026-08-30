@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 
 import type { Reminder } from '../../types/reminder';
-import { ShadowDOMButton } from '../../components/ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { CARD_ANIMATION } from '../layoutConstants';
 
 export const ProjectCompletedSection = memo(function ProjectCompletedSection({
@@ -29,24 +29,23 @@ export const ProjectCompletedSection = memo(function ProjectCompletedSection({
       data-reminder-section="section"
     >
       <div className="premium-divider" />
-      <ShadowDOMButton
-        variant="light"
-        onPress={onToggle}
-        className="completed-section-toggle w-full justify-between h-10 px-0"
-        endContent={
-          <motion.span
+      <ShadowDOMNativeButton
+		onClick={onToggle}
+		className="completed-section-toggle w-full justify-between h-10 px-0"
+	  >
+		<span className="text-sm font-semibold reminders-muted-label">
+		  Completed ({reminders.length})
+		</span>
+		{
+		  <motion.span
             animate={{ rotate: showCompleted ? 180 : 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="inline-flex"
           >
             <ChevronDown size={18} />
-          </motion.span>
-        }
-      >
-        <span className="text-sm font-semibold reminders-muted-label">
-          Completed ({reminders.length})
-        </span>
-      </ShadowDOMButton>
+		  </motion.span>
+		}
+	  </ShadowDOMNativeButton>
 
       <AnimatePresence mode="popLayout" initial={false}>
         {showCompleted && (
@@ -79,7 +78,7 @@ export const ProjectCompletedSection = memo(function ProjectCompletedSection({
                   initial={false}
                   animate={{ opacity: 1 }}
                   exit={{ ...CARD_ANIMATION.exit, x: 20 }}
-                  className="premium-reminder-card-wrapper"
+				  className="premium-reminder-card-wrapper reminder-render-item"
                   data-reminder-scroll-anchor="true"
                   data-reminder-id={reminder.id}
                   data-reminder-section="completed"

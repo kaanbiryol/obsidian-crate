@@ -1,116 +1,12 @@
 import {
 	applyReminderDraftContentUpdate,
-	buildInitialReminderContent,
 	deriveReminderDraftContentMetadata,
 } from '@/reminders/core/reminderDraft';
-import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
-import type { Priority, Reminder as SharedReminder, RecurrenceRule } from '@/reminders/types/reminder';
+import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
 import { formatDueDate } from '@/reminders/utils/dateFormatting';
 import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/utils/reminderDate';
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
-import type { ModalDraft, ReminderMutationBody, ReminderRecord } from './types';
-
-export function toSharedReminder(reminder: ReminderRecord): SharedReminder {
-	return {
-		id: reminder.id,
-		content: reminder.content,
-		description: reminder.description,
-		dueDate: reminder.dueDate,
-		dueDatetime: reminder.dueDatetime,
-		priority: reminder.priority,
-		completed: reminder.completed,
-		project: reminder.project || 'Inbox',
-		recurrence: reminder.recurrence,
-		fileLink: reminder.filePath,
-		lineNumber: reminder.lineNumber,
-	};
-}
-
-export function buildOptimisticReminder(body: ReminderMutationBody, id: string): ReminderRecord {
-	const project = body.project.trim() || 'Inbox';
-	return {
-		id,
-		content: body.content,
-		description: body.description?.trim() || undefined,
-		dueDate: body.dueDate || undefined,
-		dueDatetime: body.dueDatetime || undefined,
-		priority: body.priority,
-		completed: false,
-		project,
-		recurrence: normalizeRecurrenceRule(body.recurrence ?? undefined),
-		filePath: getReminderProjectFilePath(body.folderPath, project),
-	};
-}
-
-export function applyOptimisticReminderUpdate(reminder: ReminderRecord, body: ReminderMutationBody): ReminderRecord {
-	const project = body.project.trim() || reminder.project || 'Inbox';
-	return {
-		...reminder,
-		content: body.content,
-		description: body.description?.trim() || undefined,
-		dueDate: body.dueDate || undefined,
-		dueDatetime: body.dueDatetime || undefined,
-		priority: body.priority,
-		project,
-		recurrence: Object.prototype.hasOwnProperty.call(body, 'recurrence')
-			? normalizeRecurrenceRule(body.recurrence ?? undefined)
-			: reminder.recurrence,
-		filePath: project === reminder.project
-			? reminder.filePath
-			: getReminderProjectFilePath(body.folderPath, project),
-	};
-}
-
-export function reorderProjectReminders(reminders: ReminderRecord[], project: string, orderedIds: string[]): ReminderRecord[] {
-	const order = new Map(orderedIds.map((id, index) => [id, index]));
-	const activeProjectReminders = reminders
-		.filter((reminder) => reminder.project === project && !reminder.completed)
-		.sort((a, b) => {
-			const aIndex = order.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-			const bIndex = order.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-			return aIndex - bIndex;
-		});
-
-	let activeIndex = 0;
-	return reminders.map((reminder) => {
-		if (reminder.project !== project || reminder.completed) return reminder;
-		const nextReminder = activeProjectReminders[activeIndex];
-		activeIndex += 1;
-		return nextReminder
-			? { ...nextReminder, lineNumber: reminder.lineNumber }
-			: reminder;
-	});
-}
-
-export function mergeProject(projects: string[], project: string): string[] {
-	const normalized = project.trim() || 'Inbox';
-	return projects.includes(normalized) ? projects : [...projects, normalized].sort((a, b) => a.localeCompare(b));
-}
-
-export function buildModalDraft(reminder: ReminderRecord | null, selectedProject: string | null): ModalDraft {
-	const parsedDate = reminder?.dueDatetime
-		? new Date(reminder.dueDatetime)
-		: reminder?.dueDate
-			? parseReminderDateValue(reminder.dueDate, false) ?? null
-			: null;
-	const defaultProject = selectedProject ?? 'Inbox';
-	const sharedReminder = reminder ? toSharedReminder(reminder) : undefined;
-
-	return {
-		content: buildInitialReminderContent(sharedReminder, defaultProject),
-		description: reminder?.description ?? '',
-		project: reminder?.project ?? defaultProject,
-		defaultProject,
-		priority: reminder?.priority ?? 4,
-		dueDate: parsedDate && !reminder?.recurrence ? formatLocalDateKey(parsedDate) : '',
-		dueTime: reminder?.dueDatetime && !reminder?.recurrence
-			? `${String(parsedDate?.getHours() ?? 0).padStart(2, '0')}:${String(parsedDate?.getMinutes() ?? 0).padStart(2, '0')}`
-			: '',
-		recurrence: reminder?.recurrence,
-		activePicker: null,
-		deleteConfirm: false,
-	};
-}
+import type { ModalDraft } from './types';
 
 export function formatModalDueSummary(draft: ModalDraft): string {
 	if (!draft.dueDate) return 'No date';

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button } from '@heroui/react';
+import { PwaButton as Button } from './PwaButton';
 import {
 	Minus,
 	Plus,

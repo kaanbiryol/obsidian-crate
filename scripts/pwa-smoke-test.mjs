@@ -51,7 +51,12 @@ try {
 
 	const appResponse = await fetchOk(`${origin}/notifications/app.js?v=smoke`);
 	const appJs = await appResponse.text();
-	if (appJs.length < 100_000) throw new Error(`PWA app bundle is unexpectedly small: ${appJs.length} bytes`);
+	if (appJs.length < 40_000 || appJs.length > 80_000) throw new Error(`PWA app entry is outside its expected range: ${appJs.length} bytes`);
+	for (const [fileName, source] of Object.entries(assets.PWA_CLIENT_ASSETS)) {
+		if (fileName === 'app.js') continue;
+		const chunkResponse = await fetchOk(`${origin}/notifications/assets/${fileName}`);
+		if ((await chunkResponse.text()) !== source) throw new Error(`PWA chunk response did not match ${fileName}`);
+	}
 
 	const themeResponse = await fetchOk(`${origin}/notifications/theme-bootstrap.js?v=smoke`);
 	new Script(await themeResponse.text());

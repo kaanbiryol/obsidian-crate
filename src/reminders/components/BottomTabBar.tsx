@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Inbox, Calendar, CalendarRange, FolderOpen } from 'lucide-react';
 import { TABS, SPRING_CONFIG, type TabId } from '../ui/layoutConstants';
-import { ShadowDOMNativeButton } from './ShadowDOMButton';
+import { ShadowDOMNativeButton } from './ShadowDOMNativeButton';
 
 // Icon component map
 const IconMap = {

@@ -1,4 +1,4 @@
-import { PWA_CLIENT_JS } from './pwa-client-bundle';
+import { PWA_CLIENT_ASSETS, PWA_CLIENT_JS } from './pwa-client-bundle';
 import { PWA_ASSET_VERSION } from './pwa-version';
 
 export { createPwaHtml } from './pwa/html';
@@ -15,6 +15,7 @@ export { SERVICE_WORKER_JS } from './pwa/service-worker';
 export { PWA_THEME_BOOTSTRAP_JS } from './pwa/theme-bootstrap';
 
 export const PWA_APP_JS = PWA_CLIENT_JS;
+export { PWA_CLIENT_ASSETS };
 
 export function createPwaVersionJson(): string {
 	return JSON.stringify({ assetVersion: PWA_ASSET_VERSION });

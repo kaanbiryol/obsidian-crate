@@ -61,7 +61,7 @@ export function usePwaRefreshLifecycle({
 		const resume = () => {
 			void checkForUpdate();
 			if (!bootstrapped || !authToken) return;
-			void loadReminders({ silent: true });
+			void loadReminders({ silent: true, maxAgeMs: 30_000 });
 			void refreshPushState().catch(() => undefined);
 		};
 		const handleVisibilityChange = () => {

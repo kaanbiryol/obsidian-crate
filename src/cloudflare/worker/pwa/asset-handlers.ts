@@ -8,6 +8,7 @@ import {
 	OPEN_OBSIDIAN_HTML,
 	OPEN_OBSIDIAN_JS,
 	PWA_APP_JS,
+	PWA_CLIENT_ASSETS,
 	PWA_THEME_BOOTSTRAP_JS,
 	SERVICE_WORKER_JS,
 	createManifestJson,
@@ -46,9 +47,11 @@ function staticAssetHeaders(): Record<string, string> {
 }
 
 function versionedAssetHeaders(request: Request): Record<string, string> {
-	const version = new URL(request.url).searchParams.get('v')?.trim();
+	const url = new URL(request.url);
+	const version = url.searchParams.get('v')?.trim();
+	const isContentHashedChunk = /^\/notifications\/assets\/chunk-[a-z0-9-]+\.js$/i.test(url.pathname);
 	return {
-		'Cache-Control': version === PWA_ASSET_VERSION
+		'Cache-Control': version === PWA_ASSET_VERSION || isContentHashedChunk
 			? 'public, max-age=31536000, immutable'
 			: 'no-store',
 		'Referrer-Policy': 'no-referrer',
@@ -89,6 +92,13 @@ function javascriptAssetResponse(request: Request, source: string): Response {
 
 export function handlePwaApp(request: Request): Response {
 	return javascriptAssetResponse(request, PWA_APP_JS);
+}
+
+export function handlePwaClientAsset(request: Request, fileName: string): Response {
+	const source = PWA_CLIENT_ASSETS[fileName];
+	return source === undefined
+		? new Response('Not found', { status: 404, headers: staticAssetHeaders() })
+		: javascriptAssetResponse(request, source);
 }
 
 export function handlePwaThemeBootstrap(request: Request): Response {

@@ -19,6 +19,13 @@ export interface StoredTextFile {
 	hash: string;
 }
 
+export interface StoredMarkdownFileMetadata {
+	path: string;
+	hash: string;
+	size: number;
+	storageKey: string | null;
+}
+
 export class FileVersionConflictError extends Error {
 	constructor(readonly path: string, readonly currentHash: string | null) {
 		super(`Remote file changed while editing: ${path}`);
@@ -26,24 +33,34 @@ export class FileVersionConflictError extends Error {
 	}
 }
 
-export async function listStoredMarkdownFilesByPrefix(
-	bucket: R2Bucket,
+export async function listStoredMarkdownFileMetadataByPrefix(
 	db: D1Database,
 	pathPrefix: string,
-): Promise<StoredTextFile[]> {
+): Promise<StoredMarkdownFileMetadata[]> {
 	const rows = await queryRows<{ path: string; hash: string; size: number; storage_key?: string | null }>(
 		db.prepare(
 			"SELECT path, hash, size, storage_key FROM files WHERE path LIKE ? ESCAPE '\\' AND lower(path) LIKE '%.md' ORDER BY path ASC",
 		).bind(`${escapeLikePattern(pathPrefix)}/%`),
 	);
+	return rows.map((row) => ({
+		path: row.path,
+		hash: row.hash,
+		size: row.size,
+		storageKey: row.storage_key ?? null,
+	}));
+}
 
+export async function readStoredMarkdownFiles(
+	bucket: R2Bucket,
+	rows: StoredMarkdownFileMetadata[],
+): Promise<StoredTextFile[]> {
 	const decoder = new TextDecoder();
 	const files: Array<StoredTextFile | null> = [];
 	for (let index = 0; index < rows.length; index += 8) {
 		const chunk = rows.slice(index, index + 8);
 		files.push(...await Promise.all(chunk.map(async (row) => {
 			if (row.size > MAX_FILE_BYTES) return null;
-			const objectKey = resolveStoredObjectKey(row.path, row.storage_key ?? null);
+			const objectKey = resolveStoredObjectKey(row.path, row.storageKey);
 			const object = await bucket.get(objectKey);
 			if (!object || (row.size > 0 && object.size !== row.size)) return null;
 
@@ -59,6 +76,15 @@ export async function listStoredMarkdownFilesByPrefix(
 	}
 
 	return files.filter((file): file is StoredTextFile => file !== null);
+}
+
+export async function listStoredMarkdownFilesByPrefix(
+	bucket: R2Bucket,
+	db: D1Database,
+	pathPrefix: string,
+): Promise<StoredTextFile[]> {
+	const rows = await listStoredMarkdownFileMetadataByPrefix(db, pathPrefix);
+	return readStoredMarkdownFiles(bucket, rows);
 }
 
 export async function readCommittedMarkdownFileVersion(

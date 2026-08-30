@@ -23,17 +23,6 @@ export async function exchangeEnrollmentToken(token: string): Promise<string> {
 	return result.authToken;
 }
 
-export async function validateStoredAuthToken(authToken: string): Promise<boolean> {
-	try {
-		const response = await fetch('/health', {
-			headers: { Authorization: `Bearer ${authToken}` },
-		});
-		return response.status !== 401 && response.status !== 403;
-	} catch {
-		return true;
-	}
-}
-
 function installActivationParams(token: string, config: StoredConfig, browserToken?: string): URLSearchParams {
 	const params = currentQueryParams();
 	const project = params.get('project');

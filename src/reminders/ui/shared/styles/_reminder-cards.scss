@@ -81,6 +81,12 @@
     }
 }
 
+.pwa-shadow-root .reminder-render-item,
+.pwa-shadow-root .reorderable-reminder-item:not(.is-reordering):not(.is-long-press-armed) {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto 88px;
+}
+
 .reorder-drag-handle {
     position: absolute;
     top: 50%;

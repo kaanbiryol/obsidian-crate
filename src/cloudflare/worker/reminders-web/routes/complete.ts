@@ -4,8 +4,9 @@ import type { Env } from '../../types';
 import { parseJsonObject, parseOptionalString } from '../../utils';
 import { setReminderCompletedInFileContent } from '../file-content';
 import { cancelReminderNotification, syncReminderNotification } from '../notifications';
-import { parseReminderMutationWorkspace } from '../requests';
-import { findReminderById, loadReminderWorkspace } from '../workspace';
+import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
+import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
+import { loadReminderSource } from '../workspace';
 
 export async function handleSetReminderCompleted(request: Request, env: Env): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -19,20 +20,25 @@ export async function handleSetReminderCompleted(request: Request, env: Env): Pr
 		return corsResponse({ error: 'id and completed required' }, 400);
 	}
 
-	const workspace = await loadReminderWorkspace(env, workspaceResult.folderPath);
-	const reminder = findReminderById(workspace, id);
-	if (!reminder) return corsResponse({ error: 'Reminder not found' }, 404);
-
-	const file = workspace.files.get(reminder.filePath);
-	if (!file) return corsResponse({ error: 'Reminder source file not found' }, 409);
+	const sourceFilePath = parseReminderSourceFilePath(parsedBody.value.filePath, workspaceResult.folderPath);
+	if (parsedBody.value.filePath !== undefined && !sourceFilePath) {
+		return corsResponse({ error: 'Invalid filePath' }, 400);
+	}
+	const source = await loadReminderSource(env, workspaceResult.folderPath, id, sourceFilePath ?? undefined);
+	if (!source) return corsResponse({ error: 'Reminder not found' }, 404);
+	const { file, reminder } = source;
 
 	const nextContent = setReminderCompletedInFileContent(file.content, reminder, parsedBody.value.completed);
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash);
 
-	const nextWorkspace = await loadReminderWorkspace(env, workspaceResult.folderPath);
-	const updatedReminder = findReminderById(nextWorkspace, id);
+	const updatedReminder = scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath)
+		.find(candidate => candidate.id === id);
 	const notificationWarning = updatedReminder
 		? await syncReminderNotification(env, updatedReminder, workspaceResult.allDayNotificationTime)
 		: await cancelReminderNotification(env, id);
-	return corsResponse({ success: true, notificationWarning });
+	return corsResponse({
+		success: true,
+		reminder: updatedReminder ? toReminderPayload(updatedReminder) : undefined,
+		notificationWarning,
+	});
 }

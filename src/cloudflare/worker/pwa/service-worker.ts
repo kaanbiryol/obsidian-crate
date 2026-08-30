@@ -1,4 +1,9 @@
 import { PWA_ASSET_VERSION } from '../pwa-version';
+import { PWA_CLIENT_ASSETS } from '../pwa-client-bundle';
+
+const pwaClientChunkUrls = Object.keys(PWA_CLIENT_ASSETS)
+	.filter(fileName => fileName !== 'app.js')
+	.map(fileName => `/notifications/assets/${fileName}`);
 
 export const SERVICE_WORKER_JS = `
 const PWA_SHELL_CACHE = 'crate-reminders-shell-${PWA_ASSET_VERSION}';
@@ -11,6 +16,7 @@ const PWA_PRECACHE_URLS = [
 	'/notifications/crate-icon-512.png?v=${PWA_ASSET_VERSION}',
 	'/notifications/crate-mark-256.png?v=${PWA_ASSET_VERSION}',
 	'/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}',
+	${pwaClientChunkUrls.map(url => `'${url}',`).join('\n\t')}
 ];
 
 self.addEventListener('install', function(event) {
@@ -29,10 +35,10 @@ self.addEventListener('activate', function(event) {
 	event.waitUntil(
 		caches.keys()
 			.then(function(cacheNames) {
-				return Promise.all(cacheNames.map(function(cacheName) {
-					if (cacheName === PWA_SHELL_CACHE || cacheName.indexOf('crate-reminders-shell-') !== 0) {
-						return undefined;
-					}
+				var previousShellCaches = cacheNames.filter(function(cacheName) {
+					return cacheName !== PWA_SHELL_CACHE && cacheName.indexOf('crate-reminders-shell-') === 0;
+				});
+				return Promise.all(previousShellCaches.slice(0, -1).map(function(cacheName) {
 					return caches.delete(cacheName);
 				}));
 			})
@@ -50,8 +56,11 @@ self.addEventListener('fetch', function(event) {
 
 	if (event.request.mode === 'navigate' || url.pathname === PWA_SHELL_URL) {
 		event.respondWith(
-			fetch(event.request)
-				.then(function(response) {
+			caches.open(PWA_SHELL_CACHE).then(function(cache) {
+				return cache.match(PWA_SHELL_URL);
+			}).then(function(cached) {
+				if (cached) return cached;
+				return fetch(event.request).then(function(response) {
 					if (response.ok && !url.search) {
 						var cachedResponse = response.clone();
 						event.waitUntil(caches.open(PWA_SHELL_CACHE).then(function(cache) {
@@ -59,18 +68,17 @@ self.addEventListener('fetch', function(event) {
 						}));
 					}
 					return response;
-				})
-				.catch(function() {
-					return caches.match(PWA_SHELL_URL).then(function(cached) {
-						return cached || Response.error();
-					});
-				})
+				});
+			}).catch(function() {
+				return Response.error();
+			})
 		);
 		return;
 	}
 
 	if (
 		url.pathname === '/notifications/app.js'
+		|| url.pathname.indexOf('/notifications/assets/') === 0
 		|| url.pathname === '/notifications/theme-bootstrap.js'
 		|| url.pathname === '/notifications/icon.svg'
 		|| url.pathname === '/notifications/crate-icon-192.png'

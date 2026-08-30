@@ -6,7 +6,7 @@ export type ToastKind = 'success' | 'error' | 'info';
 export type StartTab = 'inbox' | 'today' | 'upcoming' | 'browse';
 export type DataMode = 'live' | 'cached' | 'error';
 export type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
-export type LoadReminders = (options?: { silent?: boolean }) => Promise<void>;
+export type LoadReminders = (options?: { silent?: boolean; maxAgeMs?: number }) => Promise<void>;
 export type ShowToast = (kind: ToastKind, message: string) => void;
 
 export interface ReminderRecord {
@@ -64,6 +64,7 @@ export interface CachedReminderSnapshot {
 	reminders: ReminderRecord[];
 	projects: string[];
 	savedAt: number;
+	etag?: string;
 }
 
 export interface ReminderMutationBody {

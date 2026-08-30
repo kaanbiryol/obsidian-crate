@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { BaseModal } from '../../components/BaseModal';
 import { AnimationConfig } from '../animations';
 import { getProjectColor } from '../../utils/projectColors';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { getPickerModalProps } from '../glassStyles';
 import { PickerHeader } from './PickerHeader';
 

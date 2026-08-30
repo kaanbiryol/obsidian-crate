@@ -4,12 +4,6 @@ import type { PullRefreshState } from '../types';
 const PULL_REFRESH_THRESHOLD = 70;
 const PULL_REFRESH_MAX_DISTANCE = 120;
 const PULL_REFRESH_SNAP_DISTANCE = 58;
-const ACTIVE_REORDER_SELECTOR = '.reorderable-reminder-item.is-long-press-armed, .reorderable-reminder-item.is-reordering';
-
-function isReorderGestureActive(): boolean {
-	return Boolean(document.querySelector(ACTIVE_REORDER_SELECTOR));
-}
-
 function findPullScrollTarget(target: EventTarget | null): HTMLElement | null {
 	if (!(target instanceof Element)) return null;
 	const targetScroll = target.closest<HTMLElement>('.pwa-reminders-view .ios-scroll');
@@ -41,8 +35,18 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 		let pulling = false;
 		let currentDistance = 0;
 		let animationFrame: number | null = null;
+		let scrollTarget: HTMLElement | null = null;
+		let settleTimeout: number | null = null;
 
-		const reset = () => {
+		const detachGestureListeners = () => {
+			if (!scrollTarget) return;
+			scrollTarget.removeEventListener('touchmove', handleTouchMove);
+			scrollTarget.removeEventListener('touchend', handleTouchEnd);
+			scrollTarget.removeEventListener('touchcancel', reset);
+			scrollTarget = null;
+		};
+
+		function reset() {
 			active = false;
 			pulling = false;
 			currentDistance = 0;
@@ -50,14 +54,15 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 				window.cancelAnimationFrame(animationFrame);
 				animationFrame = null;
 			}
+			detachGestureListeners();
 			setState({ distance: 0, progress: 0, ready: false, refreshing: false });
-		};
+		}
 
-		const handleTouchStart = (event: TouchEvent) => {
+		function handleTouchStart(event: TouchEvent) {
 			if (event.touches.length !== 1) return;
 			if ((event.target as Element | null)?.closest('.react-modal-sheet-root')) return;
-			const scrollTarget = findPullScrollTarget(event.target);
-			if (!scrollTarget || scrollTarget.scrollTop > 0) return;
+			const nextScrollTarget = findPullScrollTarget(event.target);
+			if (!nextScrollTarget || nextScrollTarget.scrollTop > 0) return;
 
 			const touch = event.touches.item(0);
 			if (!touch) return;
@@ -65,16 +70,14 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 			active = true;
 			pulling = false;
 			currentDistance = 0;
-		};
+			scrollTarget = nextScrollTarget;
+			scrollTarget.addEventListener('touchmove', handleTouchMove, { passive: false });
+			scrollTarget.addEventListener('touchend', handleTouchEnd);
+			scrollTarget.addEventListener('touchcancel', reset);
+		}
 
-		const handleTouchMove = (event: TouchEvent) => {
+		function handleTouchMove(event: TouchEvent) {
 			if (!active || event.touches.length !== 1) return;
-			if (isReorderGestureActive()) {
-				event.preventDefault();
-				reset();
-				return;
-			}
-			const scrollTarget = findPullScrollTarget(event.target);
 			if (!scrollTarget || scrollTarget.scrollTop > 0) {
 				reset();
 				return;
@@ -102,13 +105,9 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 				});
 				animationFrame = null;
 			});
-		};
+		}
 
-		const handleTouchEnd = () => {
-			if (isReorderGestureActive()) {
-				reset();
-				return;
-			}
+		function handleTouchEnd() {
 			if (animationFrame !== null) {
 				window.cancelAnimationFrame(animationFrame);
 				animationFrame = null;
@@ -127,24 +126,21 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 			active = false;
 			pulling = false;
 			currentDistance = 0;
+			detachGestureListeners();
 			setState({ distance: PULL_REFRESH_SNAP_DISTANCE, progress: 1, ready: true, refreshing: true });
 			void refreshRef.current().finally(() => {
-				window.setTimeout(() => {
+				settleTimeout = window.setTimeout(() => {
 					setState({ distance: 0, progress: 0, ready: false, refreshing: false });
 				}, 360);
 			});
-		};
+		}
 
 		document.addEventListener('touchstart', handleTouchStart, { passive: true });
-		document.addEventListener('touchmove', handleTouchMove, { passive: false });
-		document.addEventListener('touchend', handleTouchEnd);
-		document.addEventListener('touchcancel', reset);
 		return () => {
 			document.removeEventListener('touchstart', handleTouchStart);
-			document.removeEventListener('touchmove', handleTouchMove);
-			document.removeEventListener('touchend', handleTouchEnd);
-			document.removeEventListener('touchcancel', reset);
+			detachGestureListeners();
 			if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+			if (settleTimeout !== null) window.clearTimeout(settleTimeout);
 		};
 	}, [enabled]);
 

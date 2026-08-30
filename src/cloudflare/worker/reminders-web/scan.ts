@@ -2,7 +2,6 @@ import {
 	getProjectFromPath,
 	scanReminderMarkdownContent,
 } from '@/reminders/core/markdownScan';
-import { getProjectColor } from '@/reminders/utils/projectColors';
 import type { RemoteReminderRecord } from './types';
 
 export { getProjectFromPath };
@@ -24,6 +23,5 @@ export function toReminderPayload(reminder: RemoteReminderRecord): Record<string
 		recurrence: reminder.recurrence,
 		filePath: reminder.filePath,
 		lineNumber: reminder.lineNumber,
-		projectColor: getProjectColor(reminder.project),
 	};
 }

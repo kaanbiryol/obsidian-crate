@@ -1,5 +1,5 @@
 import { addDays, isSameDay, nextMonday } from 'date-fns';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 
 interface QuickDateOption {
 	label: string;
