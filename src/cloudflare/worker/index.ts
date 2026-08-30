@@ -3,6 +3,7 @@ import { authenticateWorkerRequest } from './authenticate';
 import { handleAuthenticatedRoute, handlePublicRoute } from './router';
 import type { Env } from './types';
 import { FileVersionConflictError } from './storage';
+import { runScheduledMaintenance } from './maintenance';
 
 export { ReminderAlarm } from './reminder-alarm';
 
@@ -45,5 +46,8 @@ export default {
 			});
 			return corsResponse({ error: 'Internal server error' }, 500);
 		}
+	},
+	async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+		await runScheduledMaintenance(env);
 	},
 };

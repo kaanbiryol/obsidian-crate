@@ -14,7 +14,7 @@ import {
 	formatMetadataCommitFailure,
 	formatMutationError,
 	loadStoredFileRows,
-	MAX_BATCH_FILES,
+	MAX_BATCH_UPLOAD_FILES,
 	MAX_BATCH_TOTAL_BYTES,
 	parseExpectedFileHash,
 	type ExpectedFileHash,
@@ -36,8 +36,8 @@ export async function handleBatchUpload(
 	if (!Array.isArray(files) || files.length === 0) {
 		return corsResponse({ error: 'files array required' }, 400);
 	}
-	if (files.length > MAX_BATCH_FILES) {
-		return corsResponse({ error: `Maximum ${MAX_BATCH_FILES} files per batch` }, 400);
+	if (files.length > MAX_BATCH_UPLOAD_FILES) {
+		return corsResponse({ error: `Maximum ${MAX_BATCH_UPLOAD_FILES} files per batch` }, 400);
 	}
 
 	const results: Array<{ path: string; success: boolean; hash?: string; error?: string }> = [];

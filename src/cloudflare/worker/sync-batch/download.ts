@@ -3,7 +3,7 @@ import { parseJsonObject, sanitizePath } from '../utils';
 import {
 	loadStoredFileRows,
 	MAX_BATCH_DOWNLOAD_BYTES,
-	MAX_BATCH_FILES,
+	MAX_BATCH_DOWNLOAD_FILES,
 	storedObjectMatchesMetadata,
 	type FileStorageRow,
 } from '../sync-storage';
@@ -18,8 +18,8 @@ export async function handleBatchDownload(
 		return parsedBody.response;
 	}
 	const rawPaths = parsedBody.value.paths;
-	if (!Array.isArray(rawPaths) || rawPaths.length === 0 || rawPaths.length > MAX_BATCH_FILES) {
-		return corsResponse({ error: `paths array required (maximum ${MAX_BATCH_FILES})` }, 400);
+	if (!Array.isArray(rawPaths) || rawPaths.length === 0 || rawPaths.length > MAX_BATCH_DOWNLOAD_FILES) {
+		return corsResponse({ error: `paths array required (maximum ${MAX_BATCH_DOWNLOAD_FILES})` }, 400);
 	}
 	if (!rawPaths.every((path) => typeof path === 'string' && path.length <= 4096)) {
 		return corsResponse({ error: 'Invalid path in batch' }, 400);

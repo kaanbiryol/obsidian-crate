@@ -1,7 +1,8 @@
-import { changedRows, maybePruneChangelog } from './db';
+import { changedRows } from './db';
 import {
 	collectCleanupKeys,
 	deleteBucketObjectsOrQueue,
+	deleteQueuedBucketObjects,
 	getStoredFileRow,
 	type ExpectedFileHash,
 	type FileStorageRow,
@@ -77,8 +78,7 @@ export async function commitStagedFile(
 		return { committed: false, currentHash: current?.hash ?? null };
 	}
 
-	await maybePruneChangelog(db);
-	await deleteBucketObjectsOrQueue(
+	await deleteQueuedBucketObjects(
 		bucket,
 		db,
 		cleanupKeys,
@@ -121,7 +121,6 @@ export async function commitFileDelete(
 		return { committed: false, currentHash: current.hash };
 	}
 
-	await maybePruneChangelog(db);
-	await deleteBucketObjectsOrQueue(bucket, db, cleanupKeys);
+	await deleteQueuedBucketObjects(bucket, db, cleanupKeys);
 	return { committed: true, currentHash: null };
 }

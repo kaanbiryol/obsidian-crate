@@ -1,12 +1,15 @@
 import { queryRows } from './db';
-
-export const MAX_BATCH_FILES = 50;
-export const MAX_BATCH_TOTAL_BYTES = 10 * 1024 * 1024;
-export const MAX_BATCH_DOWNLOAD_BYTES = 8 * 1024 * 1024;
-export const MAX_FILE_BYTES = 25 * 1024 * 1024;
+export {
+	BATCH_DELETE_MAX_FILES as MAX_BATCH_DELETE_FILES,
+	BATCH_DOWNLOAD_MAX_BYTES as MAX_BATCH_DOWNLOAD_BYTES,
+	BATCH_DOWNLOAD_MAX_FILES as MAX_BATCH_DOWNLOAD_FILES,
+	BATCH_UPLOAD_MAX_BYTES as MAX_BATCH_TOTAL_BYTES,
+	BATCH_UPLOAD_MAX_FILES as MAX_BATCH_UPLOAD_FILES,
+	MAX_FILE_SIZE_BYTES as MAX_FILE_BYTES,
+} from '../../protocol/sync-limits';
 const MANAGED_FILES_PREFIX = '__crate__/files/';
 const CLEANUP_BATCH_LIMIT = 25;
-const CLEANUP_DRAIN_PROBABILITY = 0.05;
+const MAX_D1_BOUND_PARAMETERS = 100;
 
 export interface FileStorageRow {
 	hash: string;
@@ -68,9 +71,13 @@ async function queueObjectCleanup(db: D1Database, keys: string[]): Promise<void>
 	if (keys.length === 0) return;
 
 	try {
-		await db.batch(keys.map((key) => db.prepare(
-			'INSERT OR IGNORE INTO object_cleanup_queue (storage_key) VALUES (?)',
-		).bind(key)));
+		for (let index = 0; index < keys.length; index += MAX_D1_BOUND_PARAMETERS) {
+			const chunk = keys.slice(index, index + MAX_D1_BOUND_PARAMETERS);
+			const placeholders = chunk.map(() => '(?)').join(', ');
+			await db.prepare(
+				`INSERT OR IGNORE INTO object_cleanup_queue (storage_key) VALUES ${placeholders}`,
+			).bind(...chunk).run();
+		}
 	} catch {
 		// Cleanup must never turn an already-committed file mutation into a failure.
 	}
@@ -80,11 +87,31 @@ async function removeQueuedObjectCleanup(db: D1Database, keys: string[]): Promis
 	if (keys.length === 0) return;
 
 	try {
-		await db.batch(keys.map((key) => db.prepare(
-			'DELETE FROM object_cleanup_queue WHERE storage_key = ?',
-		).bind(key)));
+		for (let index = 0; index < keys.length; index += MAX_D1_BOUND_PARAMETERS) {
+			const chunk = keys.slice(index, index + MAX_D1_BOUND_PARAMETERS);
+			const placeholders = chunk.map(() => '?').join(', ');
+			await db.prepare(
+				`DELETE FROM object_cleanup_queue WHERE storage_key IN (${placeholders})`,
+			).bind(...chunk).run();
+		}
 	} catch {
 		// A later drain will repeat the idempotent R2 deletion and clear the row.
+	}
+}
+
+export async function deleteQueuedBucketObjects(
+	bucket: R2Bucket,
+	db: D1Database,
+	keys: string[],
+): Promise<void> {
+	const uniqueKeys = Array.from(new Set(keys.filter((key) => key.length > 0)));
+	if (uniqueKeys.length === 0) return;
+
+	try {
+		await bucket.delete(uniqueKeys.length === 1 ? uniqueKeys[0]! : uniqueKeys);
+		await removeQueuedObjectCleanup(db, uniqueKeys);
+	} catch {
+		// The keys remain queued for the scheduled maintenance pass.
 	}
 }
 
@@ -94,22 +121,10 @@ export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database):
 			db.prepare('SELECT storage_key FROM object_cleanup_queue ORDER BY created_at LIMIT ?')
 				.bind(CLEANUP_BATCH_LIMIT),
 		);
-		const outcomes = await Promise.all(rows.map(async ({ storage_key: key }) => {
-			try {
-				await bucket.delete(key);
-				return key;
-			} catch {
-				return null;
-			}
-		}));
-		const deletedKeys = outcomes.filter((key): key is string => key !== null);
-		if (deletedKeys.length > 0) {
-			await db.batch(deletedKeys.map((key) => db.prepare(
-				'DELETE FROM object_cleanup_queue WHERE storage_key = ?',
-			).bind(key)));
-		}
+		const keys = rows.map(({ storage_key }) => storage_key).filter((key) => key.length > 0);
+		await deleteQueuedBucketObjects(bucket, db, keys);
 	} catch {
-		// The queue is best effort and will be retried by a later mutation.
+		// The scheduled handler will retry on its next invocation.
 	}
 }
 
@@ -120,18 +135,7 @@ export async function deleteBucketObjectsOrQueue(
 ): Promise<void> {
 	const uniqueKeys = Array.from(new Set(keys.filter((key) => key.length > 0)));
 	await queueObjectCleanup(db, uniqueKeys);
-	const outcomes = await Promise.all(uniqueKeys.map(async (key) => {
-		try {
-			await bucket.delete(key);
-			return key;
-		} catch {
-			return null;
-		}
-	}));
-	await removeQueuedObjectCleanup(db, outcomes.filter((key): key is string => key !== null));
-	if (Math.random() < CLEANUP_DRAIN_PROBABILITY) {
-		await drainObjectCleanupQueue(bucket, db);
-	}
+	await deleteQueuedBucketObjects(bucket, db, uniqueKeys);
 }
 
 export function storedObjectMatchesMetadata(
@@ -163,12 +167,34 @@ export async function getStoredFileRow(db: D1Database, path: string): Promise<Fi
 }
 
 export async function loadStoredFileRows(db: D1Database, paths: string[]): Promise<Map<string, FileStorageRow>> {
-	const rows = await Promise.all(paths.map(async (path) => {
-		const row = await getStoredFileRow(db, path);
-		return row ? [path, row] as const : null;
-	}));
+	if (paths.length === 0) return new Map();
+	if (paths.length > MAX_D1_BOUND_PARAMETERS) {
+		throw new Error(`Cannot load more than ${MAX_D1_BOUND_PARAMETERS} file rows at once`);
+	}
 
-	return new Map(rows.filter((entry): entry is readonly [string, FileStorageRow] => entry !== null));
+	const placeholders = paths.map(() => '?').join(', ');
+	const rows = await queryRows<{
+		path?: string;
+		hash?: string;
+		size?: number;
+		storage_key?: string;
+	}>(db.prepare(
+		`SELECT path, hash, size, storage_key FROM files WHERE path IN (${placeholders})`,
+	).bind(...paths));
+
+	const entries: Array<readonly [string, FileStorageRow]> = [];
+	for (const row of rows) {
+		const path = typeof row.path === 'string' ? row.path : null;
+		const storageKey = normalizeStorageKey(row.storage_key);
+		if (!path || !storageKey) continue;
+		entries.push([path, {
+			hash: typeof row.hash === 'string' ? row.hash : '',
+			size: typeof row.size === 'number' ? row.size : 0,
+			storageKey,
+		}]);
+	}
+
+	return new Map(entries);
 }
 
 export async function getChangelogBounds(db: D1Database): Promise<{

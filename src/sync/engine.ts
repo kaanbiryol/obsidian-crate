@@ -105,6 +105,7 @@ export class SyncEngine {
 			getDebounceDelayMs: () => (this.settings.debounceDelay ?? 5) * 1000,
 			uploadConcurrency: UPLOAD_CONCURRENCY,
 			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
+			reconcile: () => this.reconcileFromQueue(),
 		});
 	}
 
@@ -442,6 +443,18 @@ export class SyncEngine {
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 		const result = await runSyncWorkflow(this.getSyncWorkflowContext(), progressCallback);
+		this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+		if (result.success) {
+			this.pruneMarkdownBaseCacheInBackground();
+		}
+		return result;
+	}
+
+	private async reconcileFromQueue(): Promise<SyncResult> {
+		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
+		const workflowContext = this.getSyncWorkflowContext();
+		workflowContext.incrementalSync = async () => null;
+		const result = await runSyncWorkflow(workflowContext);
 		this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 		if (result.success) {
 			this.pruneMarkdownBaseCacheInBackground();

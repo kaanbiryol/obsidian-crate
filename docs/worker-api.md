@@ -20,9 +20,9 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB) |
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
 | `POST` | `/sync/delete` | Delete single file `{ path }` |
-| `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 50 files, 10 MB total) |
+| `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 6 files, 10 MB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
-| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 50 files) |
+| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 6 files) |
 | `DELETE` | `/auth/tokens` | Revoke an auth token `{ id }` |
 | `GET` | `/auth/tokens` | List all registered auth tokens |
 | `DELETE` | `/auth/session` | Revoke the current bearer token when disconnecting this device |
@@ -94,7 +94,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 }
 ```
 
-Worker validates: max 50 files, total decoded content <= 10 MB.
+Worker validates: max 6 files, total decoded content <= 10 MB. Mutation batches are deliberately smaller than download batches to stay within Workers Free D1 query limits even on stale-write cleanup paths.
 
 Response: `{ success, results: [{ path, success, hash?, error? }] }`
 
@@ -110,7 +110,7 @@ Content is base64-encoded. The Worker rejects a batch before reading R2 if D1 me
 
 Single: `{ path: "notes/file.md", expectedHash: "sha256..." }` -> `{ success, path }`
 
-Batch: `{ files: [{ path, expectedHash }, ...] }` (max 50) -> `{ success, deleted: [...] }`
+Batch: `{ files: [{ path, expectedHash }, ...] }` (max 6) -> `{ success, deleted: [...] }`
 
 Uploads, deletes, and PWA reminder edits compare the D1 hash they originally read. D1 applies the file-row mutation and changelog append atomically; stale writers receive `409` instead of silently overwriting a newer version.
 
@@ -456,7 +456,7 @@ Retry queue for R2 objects whose best-effort deletion failed after their D1 meta
 
 Committed file blobs are stored under `__crate__/files/<hash>/<uuid>` and referenced through the required `files.storage_key`. D1 is required for every sync transfer; the Worker returns `503` instead of accepting an untracked R2 mutation when the database binding is unavailable.
 
-Failed best-effort R2 deletions are recorded in `object_cleanup_queue` and retried during later mutations. The OAuth provisioner applies the initial schema before uploading the Worker, and the Wrangler deploy script runs `db:init:remote` in `predeploy`, so request cold starts do not execute schema DDL.
+Failed R2 deletions are recorded in `object_cleanup_queue` and retried by the Worker's 15-minute maintenance Cron Trigger. The OAuth provisioner applies the initial schema and configures that trigger before enabling the Worker; the Wrangler deploy path declares the same trigger and runs `db:init:remote` in `predeploy`, so request cold starts do not execute schema DDL.
 
 ## Path Sanitization
 
@@ -464,7 +464,7 @@ Failed best-effort R2 deletions are recorded in `object_cleanup_queue` and retri
 
 ## Changelog Pruning
 
-5% random chance after each write operation. Deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Non-fatal - errors are silently caught.
+The 15-minute maintenance Cron Trigger deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Failures are non-fatal and retried on the next scheduled run.
 
 When a client's `since` cursor points to pruned entries, the `cursorExpired` flag is returned so the plugin falls back to full sync.
 

@@ -39,6 +39,12 @@ export interface QueueDeleteFailure {
 	status?: number;
 }
 
+export interface QueueUploadFailure {
+	path: string;
+	error: string;
+	status?: number;
+}
+
 export interface QueueOperations {
 	uploads: PreparedUpload[];
 	deletes: QueueDeleteCandidate[];
@@ -58,4 +64,5 @@ export interface QueueFlushContext {
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	triggerDebouncedSync(): void;
+	requestReconciliation(): void;
 }

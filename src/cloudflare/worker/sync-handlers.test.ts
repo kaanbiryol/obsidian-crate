@@ -23,6 +23,102 @@ async function sha256Hex(data: string): Promise<string> {
 }
 
 describe('worker sync handlers', () => {
+	it('loads metadata for a maximum download batch with one D1 query', async () => {
+		const paths = Array.from({ length: 50 }, (_, index) => `notes/${index}.md`);
+		const { bucket } = createMockR2Bucket();
+		const { db } = createMockD1Database({
+			files: Object.fromEntries(paths.map((path, index) => [path, {
+				hash: String(index).padStart(64, '0'),
+				size: 1,
+				storageKey: `object-${index}`,
+			}])),
+		});
+
+		const response = await handleBatchDownload(
+			new Request('https://worker.test/sync/batch-download', {
+				method: 'POST',
+				body: JSON.stringify({ paths }),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket,
+			db,
+		);
+
+		expect(response.status).toBe(200);
+		const metadataQueries = db.prepare.mock.calls.filter(([sql]) =>
+			typeof sql === 'string' && sql.includes('FROM files WHERE path IN'));
+		expect(metadataQueries).toHaveLength(1);
+		expect(metadataQueries[0]?.[0]).toContain(Array.from({ length: 50 }, () => '?').join(', '));
+	});
+
+	it('rejects mutation batches above the Free-plan-safe limit', async () => {
+		const files = Array.from({ length: 7 }, (_, index) => ({
+			path: `notes/${index}.md`,
+			content: btoa('x'),
+			expectedHash: null,
+		}));
+		const { bucket } = createMockR2Bucket();
+		const { db } = createMockD1Database();
+
+		const uploadResponse = await handleBatchUpload(
+			new Request('https://worker.test/sync/batch-upload', {
+				method: 'POST',
+				body: JSON.stringify({ files }),
+			}),
+			bucket,
+			db,
+		);
+		const deleteResponse = await handleBatchDelete(
+			new Request('https://worker.test/sync/batch-delete', {
+				method: 'POST',
+				body: JSON.stringify({
+					files: files.map((file) => ({ path: file.path, expectedHash: 'a'.repeat(64) })),
+				}),
+			}),
+			bucket,
+			db,
+		);
+
+		expect(uploadResponse.status).toBe(400);
+		expect(deleteResponse.status).toBe(400);
+		expect(bucket.put).not.toHaveBeenCalled();
+	});
+
+	it('keeps a worst-case stale upload batch within the Free-plan D1 query budget', async () => {
+		const currentHash = 'a'.repeat(64);
+		const staleHash = 'b'.repeat(64);
+		const paths = Array.from({ length: 6 }, (_, index) => `notes/${index}.md`);
+		const { bucket } = createMockR2Bucket();
+		const { db } = createMockD1Database({
+			files: Object.fromEntries(paths.map((path, index) => [path, {
+				hash: currentHash,
+				size: 1,
+				storageKey: `current-${index}`,
+			}])),
+		});
+
+		const response = await handleBatchUpload(
+			new Request('https://worker.test/sync/batch-upload', {
+				method: 'POST',
+				body: JSON.stringify({
+					files: paths.map((path) => ({
+						path,
+						content: btoa('x'),
+						expectedHash: staleHash,
+					})),
+				}),
+			}),
+			bucket,
+			db,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await responseJson(response)).toEqual(expect.objectContaining({ success: false }));
+		// Reserve two of the 50 available queries for request authentication.
+		expect(db.prepare.mock.calls.length).toBeGreaterThan(0);
+		expect(db.prepare.mock.calls.length).toBeLessThanOrEqual(48);
+	});
+
 	it('rejects stale uploads without replacing the committed object', async () => {
 		const currentHash = 'a'.repeat(64);
 		const staleHash = 'b'.repeat(64);

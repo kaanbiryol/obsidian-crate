@@ -66,3 +66,9 @@ interface DurableObject {
 	fetch(request: Request): Promise<Response>;
 	alarm?(): Promise<void>;
 }
+
+interface ScheduledController {
+	readonly cron: string;
+	readonly scheduledTime: number;
+	noRetry(): void;
+}

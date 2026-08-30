@@ -69,6 +69,7 @@ function createFlushHarness(overrides: Partial<{
 		Object.assign(state, updates);
 	});
 	const triggerDebouncedSync = vi.fn();
+	const requestReconciliation = vi.fn();
 	const prepareUploadFromPath = vi.fn(
 		overrides.prepareUploadFromPath ??
 			(async () => null),
@@ -97,6 +98,7 @@ function createFlushHarness(overrides: Partial<{
 		updateState,
 		updateStateCalls,
 		triggerDebouncedSync,
+		requestReconciliation,
 		prepareUploadFromPath,
 		uploadFile,
 		deleteFile,
@@ -133,6 +135,7 @@ function createFlushHarness(overrides: Partial<{
 			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 			getModifiedIso,
 			triggerDebouncedSync,
+			requestReconciliation,
 		},
 	};
 }
@@ -457,7 +460,7 @@ describe('processPendingChanges', () => {
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not spin the queue after a permanent version conflict', async () => {
+	it('runs full reconciliation after a permanent version conflict', async () => {
 		const harness = createFlushHarness({
 			prepareUploadFromPath: async path => ({
 				path,
@@ -476,8 +479,23 @@ describe('processPendingChanges', () => {
 		await processPendingChanges(harness.context, 4);
 
 		expect(harness.state.status).toBe('error');
-		expect(harness.pendingPaths.size).toBe(0);
+		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
+		expect(harness.requestReconciliation).toHaveBeenCalledTimes(1);
+	});
+
+	it('chunks mass deletes to the shared server limit', async () => {
+		const harness = createFlushHarness();
+		for (let index = 0; index < 14; index++) {
+			harness.pendingPaths.add(`delete:notes/${index}.md`);
+		}
+
+		await processPendingChanges(harness.context, 4);
+
+		expect(harness.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([6, 6, 2]);
+		expect(harness.removeEntry).toHaveBeenCalledTimes(14);
+		expect(harness.pendingPaths.size).toBe(0);
+		expect(harness.requestReconciliation).not.toHaveBeenCalled();
 	});
 
 	it('clears completed queue revisions but preserves a newer event for the same path', async () => {

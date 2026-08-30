@@ -36,6 +36,7 @@ function createApi() {
 		createR2Bucket: vi.fn(),
 		queryD1: vi.fn(async () => []),
 		uploadWorker: vi.fn(async () => {}),
+		updateWorkerSchedules: vi.fn(async () => {}),
 		getWorkersSubdomain: vi.fn(async () => 'personal-crate'),
 		createWorkersSubdomain: vi.fn(),
 		enableWorkerSubdomain: vi.fn(async () => {}),
@@ -71,6 +72,11 @@ describe('provisionCloudflareDeployment', () => {
 			r2BucketName: metadata.r2BucketName,
 		}));
 		expect(api.enableWorkerSubdomain).toHaveBeenCalledTimes(1);
+		expect(api.updateWorkerSchedules).toHaveBeenCalledWith(
+			metadata.accountId,
+			metadata.workerName,
+			['*/15 * * * *'],
+		);
 		expect(metadata.lastDeployedVersion).toBe('0.1.0');
 		expect(metadata.lastDeployedFingerprint).toBe('f'.repeat(64));
 		expect(workerUrl).toBe('https://crate-0123456789abcdef.personal-crate.workers.dev');

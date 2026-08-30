@@ -12,8 +12,7 @@ export function changedRows(result: unknown): number {
 	return typeof changes === 'number' ? changes : 0;
 }
 
-export async function maybePruneChangelog(db: D1Database): Promise<void> {
-	if (Math.random() > 0.05) return;
+export async function pruneChangelog(db: D1Database): Promise<void> {
 	try {
 		await db.prepare(
 			"DELETE FROM changelog WHERE created_at < datetime('now', '-' || ? || ' days')"

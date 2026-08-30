@@ -459,7 +459,7 @@ describe('transfer upload helpers', () => {
 		});
 
 		// Create 3 batches of small files (3 files, each in its own batch of 1 via count limit)
-		const prepared: PreparedUpload[] = Array.from({ length: 150 }, (_, i) => ({
+		const prepared: PreparedUpload[] = Array.from({ length: 18 }, (_, i) => ({
 			path: `file-${i}.md`,
 			content: new TextEncoder().encode('x').buffer as ArrayBuffer,
 			hash: `hash-${i}`,
@@ -474,7 +474,7 @@ describe('transfer upload helpers', () => {
 			batchConcurrency: 3,
 		});
 
-		expect(harness.api.batchUpload).toHaveBeenCalledTimes(3); // 150 files / 50 per batch = 3 batches
+		expect(harness.api.batchUpload).toHaveBeenCalledTimes(3); // 18 files / 6 per batch = 3 batches
 		expect(maxConcurrentCalls).toBeGreaterThan(1);
 	});
 
@@ -522,7 +522,7 @@ describe('transfer upload helpers', () => {
 
 describe('batch upload chunking', () => {
 	it('respects file count limit', () => {
-		const prepared: PreparedUpload[] = Array.from({ length: 120 }, (_, i) => ({
+		const prepared: PreparedUpload[] = Array.from({ length: 14 }, (_, i) => ({
 			path: `file-${i}.md`,
 			content: new ArrayBuffer(100),
 			hash: `hash-${i}`,
@@ -533,9 +533,9 @@ describe('batch upload chunking', () => {
 		const chunks = createBatchUploadChunks(prepared);
 
 		expect(chunks).toHaveLength(3);
-		expect(chunks[0]).toHaveLength(50);
-		expect(chunks[1]).toHaveLength(50);
-		expect(chunks[2]).toHaveLength(20);
+		expect(chunks[0]).toHaveLength(6);
+		expect(chunks[1]).toHaveLength(6);
+		expect(chunks[2]).toHaveLength(2);
 	});
 
 	it('respects byte size limit', () => {

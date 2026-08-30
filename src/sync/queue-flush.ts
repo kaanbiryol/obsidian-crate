@@ -8,6 +8,11 @@ import { prepareQueueOperations, uploadPendingFiles } from './queue-upload';
 export type { QueueFlushContext } from './queue-flush-types';
 
 const logger = createLogger('SyncQueue');
+const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+function requiresReconciliation(status: number | undefined): boolean {
+	return status !== undefined && !RETRYABLE_HTTP_STATUSES.has(status);
+}
 
 function clearCompletedRevisions(
 	context: QueueFlushContext,
@@ -50,6 +55,7 @@ export async function processPendingChanges(
 		paths.map(path => [path, context.pendingRevisions?.get(path)] as const),
 	);
 	const completedQueueKeys = new Set<string>();
+	let reconciliationRequested = false;
 	for (const path of paths) {
 		context.pendingPaths.delete(path);
 		context.inFlightPaths.add(path);
@@ -60,26 +66,34 @@ export async function processPendingChanges(
 
 	try {
 		const { uploads, deletes } = await prepareQueueOperations(context, paths);
+		const failures: Array<{ path: string; error: string; status?: number }> = [];
 		if (uploads.length > 0) {
-			await uploadPendingFiles(context, uploads, completedQueueKeys, uploadConcurrency);
+			const uploadFailures = await uploadPendingFiles(context, uploads, completedQueueKeys, uploadConcurrency);
+			for (const failure of uploadFailures) {
+				context.pendingPaths.add(failure.path);
+				reconciliationRequested ||= requiresReconciliation(failure.status);
+			}
+			failures.push(...uploadFailures);
 		}
 
 		if (deletes.length > 0) {
-			const failures = await deletePendingFiles(context, deletes, completedQueueKeys);
-			if (failures.length > 0) {
-				await context.localManifest.save();
-				clearCompletedRevisions(context, completedQueueKeys, revisionSnapshot);
-				context.updateState({
-					status: 'error',
-					lastError: failures.map(failure => `${failure.path}: ${failure.error}`).join('; '),
-					pendingChanges: context.pendingPaths.size,
-				});
-				return;
-			}
+			const deleteResult = await deletePendingFiles(context, deletes, completedQueueKeys);
+			failures.push(...deleteResult.failures);
+			reconciliationRequested ||= deleteResult.requiresReconciliation;
 		}
 
 		await context.localManifest.save();
 		clearCompletedRevisions(context, completedQueueKeys, revisionSnapshot);
+		if (failures.length > 0) {
+			context.updateState({
+				status: 'error',
+				lastError: failures.map(failure => `${failure.path}: ${failure.error}`).join('; '),
+				pendingChanges: context.pendingPaths.size,
+			});
+			if (reconciliationRequested) context.requestReconciliation();
+			return;
+		}
+
 		context.inFlightPaths.clear();
 		const didWork = uploads.length > 0 || deletes.length > 0;
 		context.updateState({
@@ -91,20 +105,21 @@ export async function processPendingChanges(
 		if (isAbortError(error)) {
 			logger.info('Queue processing aborted');
 		} else {
-			if (isRetryableSyncError(error)) {
-				for (const path of paths) {
-					context.pendingPaths.add(path);
-				}
+			const retryable = isRetryableSyncError(error);
+			for (const path of paths) {
+				if (!completedQueueKeys.has(path)) context.pendingPaths.add(path);
 			}
+			reconciliationRequested = !retryable;
 			context.updateState({
 				status: 'error',
 				lastError: errorMessage(error),
 				pendingChanges: context.pendingPaths.size,
 			});
+			if (reconciliationRequested) context.requestReconciliation();
 		}
 	} finally {
 		context.inFlightPaths.clear();
-		if (!context.isDestroyed() && context.pendingPaths.size > 0) {
+		if (!context.isDestroyed() && context.pendingPaths.size > 0 && !reconciliationRequested) {
 			context.triggerDebouncedSync();
 		}
 	}

@@ -5,7 +5,7 @@ import {
 	formatMetadataCommitFailure,
 	formatMutationError,
 	loadStoredFileRows,
-	MAX_BATCH_FILES,
+	MAX_BATCH_DELETE_FILES,
 	parseExpectedFileHash,
 	type FileStorageRow,
 } from '../sync-storage';
@@ -21,8 +21,8 @@ export async function handleBatchDelete(
 		return parsedBody.response;
 	}
 	const rawFiles = parsedBody.value.files;
-	if (!Array.isArray(rawFiles) || rawFiles.length === 0 || rawFiles.length > MAX_BATCH_FILES) {
-		return corsResponse({ error: `files array required (maximum ${MAX_BATCH_FILES})` }, 400);
+	if (!Array.isArray(rawFiles) || rawFiles.length === 0 || rawFiles.length > MAX_BATCH_DELETE_FILES) {
+		return corsResponse({ error: `files array required (maximum ${MAX_BATCH_DELETE_FILES})` }, 400);
 	}
 
 	const deleted: string[] = [];

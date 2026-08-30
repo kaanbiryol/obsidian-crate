@@ -511,6 +511,26 @@ describe('runIncrementalSync', () => {
 		expect(result?.deletedPaths).toContain(path);
 	});
 
+	it('chunks more than one server batch of local deletes', async () => {
+		const paths = Array.from({ length: 14 }, (_, index) => `notes/delete-${index}.md`);
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 10 },
+			lastSeq: 11,
+			localDeletes: paths,
+		});
+		harness.localManifest.getEntry.mockReturnValue({
+			hash: 'a'.repeat(64),
+			size: 1,
+			modified: '2026-02-06T10:00:00.000Z',
+		});
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(harness.api.batchDelete.mock.calls.map(([chunk]) => chunk.length)).toEqual([6, 6, 2]);
+		expect(result?.deletedPaths).toEqual(paths);
+		expect(result?.success).toBe(true);
+	});
+
 	it('applies remote downloads and local deletes during incremental planning', async () => {
 		const settings = createSettings({ lastSeq: 7 });
 		const localManifest = {

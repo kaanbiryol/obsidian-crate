@@ -259,8 +259,11 @@ export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
 export const MAX_SYNC_HISTORY = 20;
 export const MAX_SYNC_HISTORY_PATHS = 50;
 export const MAX_DEBOUNCE_WAIT_MS = 30_000;
-export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
-export const BATCH_MAX_FILES = 50;
-export const BATCH_MAX_BYTES = 10 * 1024 * 1024; // 10MB total decoded content per batch upload
-export const BATCH_DOWNLOAD_MAX_BYTES = 8 * 1024 * 1024;
-export const BATCH_FILE_SIZE_LIMIT = 1 * 1024 * 1024; // 1MB - files >= this fall back to individual uploads
+export {
+	BATCH_DOWNLOAD_MAX_BYTES,
+	BATCH_DOWNLOAD_MAX_FILES,
+	BATCH_FILE_SIZE_LIMIT,
+	BATCH_UPLOAD_MAX_BYTES as BATCH_MAX_BYTES,
+	BATCH_UPLOAD_MAX_FILES as BATCH_MAX_FILES,
+	MAX_FILE_SIZE_BYTES,
+} from '../protocol/sync-limits';

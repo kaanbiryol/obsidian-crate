@@ -8,6 +8,7 @@ import { createLogger, errorMessage } from "../plugin/logger";
 import type { ChangelogEntry, FileDiff, FileEntry, PreparedUpload, SyncResult } from "../plugin/types";
 import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
 import type { DownloadRequest } from './transfer-download';
+import { deleteFilesInBatches } from './delete-batches';
 
 const logger = createLogger("SyncPlanner");
 
@@ -235,11 +236,8 @@ export async function runIncrementalSync(
 				result.errors.push(`${path}: Missing remote version for delete`);
 			}
 			const deleteResult = deleteFiles.length > 0
-				? await context.api.batchDelete(
-					deleteFiles.map((file) => file.path),
-					Object.fromEntries(deleteFiles.map((file) => [file.path, file.expectedHash])),
-				)
-				: { success: true, deleted: [] };
+				? await deleteFilesInBatches(context.api, deleteFiles)
+				: { success: true, deleted: [], errors: [] };
         for (const path of deleteResult.deleted) {
           context.localManifest.removeEntry(path);
           result.deleted++;

@@ -117,7 +117,9 @@ The active Obsidian configuration folder's entire `plugins/` tree is always excl
 | `debounceDelay` default | 5 seconds | `types.ts` |
 | `MAX_DEBOUNCE_WAIT_MS` | 30,000 ms | `types.ts` |
 | `MAX_FILE_SIZE_BYTES` | 25 MB | `types.ts` |
-| `BATCH_MAX_FILES` | 50 | `types.ts` |
+| `BATCH_UPLOAD_MAX_FILES` | 6 | `protocol/sync-limits.ts` |
+| `BATCH_DELETE_MAX_FILES` | 6 | `protocol/sync-limits.ts` |
+| `BATCH_DOWNLOAD_MAX_FILES` | 50 | `protocol/sync-limits.ts` |
 | `BATCH_MAX_BYTES` | 10 MB | `types.ts` |
 | `BATCH_FILE_SIZE_LIMIT` | 1 MB | `types.ts` |
 | `UPLOAD_CONCURRENCY` | 10 | `engine.ts` |
@@ -133,10 +135,10 @@ The active Obsidian configuration folder's entire `plugins/` tree is always excl
 
 Files are split by size at the `BATCH_FILE_SIZE_LIMIT` (1 MB) threshold:
 
-- **< 1 MB:** batched into JSON payloads with base64-encoded content. Each batch respects `BATCH_MAX_FILES` (50) and `BATCH_MAX_BYTES` (10 MB) limits. Sent via `POST /sync/batch-upload`.
+- **< 1 MB:** batched into JSON payloads with base64-encoded content. Each batch respects `BATCH_UPLOAD_MAX_FILES` (6) and `BATCH_MAX_BYTES` (10 MB) limits. Sent via `POST /sync/batch-upload`. The smaller mutation limit keeps worst-case conditional-write cleanup below Workers Free D1 query limits.
 - **>= 1 MB:** uploaded individually as binary via `PUT /sync/upload` with retry.
 
-Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable.
+Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable. Conditional deletes are chunked into six-file requests and their partial results are aggregated.
 
 Implementation: `transfer.ts:uploadPreparedFiles()`, `transfer.ts:createBatchUploadChunks()`
 
@@ -179,5 +181,5 @@ Implementation: `manifest.ts:LocalManifest`
 - **Retry:** failed uploads retry up to 3 times with exponential backoff (1s base delay)
 - **Incremental-to-full fallback:** if incremental sync returns `null` (error/cursor expiry), engine runs full sync
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file
-- **Queue retry:** on flush failure, paths are re-added to `pendingPaths` and debounce timer restarts
+- **Queue retry:** retryable flush failures are re-added to `pendingPaths`; version and validation conflicts request a full three-way reconciliation instead of spinning or dropping the path
 - **Large files:** files > 25 MB are skipped with error message, not crashed

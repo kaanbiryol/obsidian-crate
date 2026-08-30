@@ -227,6 +227,17 @@ export class CloudflareApiClient {
 		});
 	}
 
+	async updateWorkerSchedules(accountId: string, workerName: string, crons: string[]): Promise<void> {
+		await this.request(
+			`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/schedules`,
+			{
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(crons.map((cron) => ({ cron }))),
+			},
+		);
+	}
+
 	async getWorkersSubdomain(accountId: string): Promise<string | null> {
 		try {
 			const result = await this.request<{ subdomain?: string }>(`/accounts/${accountId}/workers/subdomain`);

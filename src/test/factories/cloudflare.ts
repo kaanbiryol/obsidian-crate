@@ -163,7 +163,22 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 
 					return null;
 				}) as MockD1Statement['first'],
-				all: vi.fn(async <T = Record<string, unknown>>() => ({ results: [] as T[] })) as MockD1Statement['all'],
+				all: vi.fn(async <T = Record<string, unknown>>() => {
+					if (sql.includes('FROM files WHERE path IN')) {
+						const results = statement._args.flatMap((value) => {
+							if (typeof value !== 'string') return [];
+							const file = files.get(value);
+							return file ? [{
+								path: value,
+								hash: file.hash,
+								size: file.size,
+								storage_key: file.storageKey,
+							}] : [];
+						});
+						return { results: results as T[] };
+					}
+					return { results: [] as T[] };
+				}) as MockD1Statement['all'],
 			};
 			return statement;
 		}),

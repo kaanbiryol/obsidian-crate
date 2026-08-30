@@ -2,6 +2,7 @@ import type { CloudflareDeploymentMetadata } from '../plugin/types';
 import { CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import { randomHex } from './pkce';
+import { CLOUDFLARE_MAINTENANCE_CRON } from './maintenance-schedule';
 
 async function ensureD1Database(
 	api: CloudflareApiClient,
@@ -103,6 +104,11 @@ export async function provisionCloudflareDeployment(input: {
 		d1DatabaseId: databaseId,
 		r2BucketName: input.metadata.r2BucketName,
 	});
+	await input.api.updateWorkerSchedules(
+		input.accountId,
+		input.metadata.workerName,
+		[CLOUDFLARE_MAINTENANCE_CRON],
+	);
 
 	const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata);
 	if (input.metadata.workersSubdomain !== workersSubdomain) {

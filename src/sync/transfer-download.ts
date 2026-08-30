@@ -4,7 +4,12 @@ import { computeHash } from "./hasher";
 import { isMarkdownPath } from "./markdown-base-cache";
 import { isAbortError } from "./abort";
 import type { SyncResult } from "../plugin/types";
-import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_FILE_SIZE_LIMIT, BATCH_MAX_FILES, MAX_FILE_SIZE_BYTES } from "../plugin/types";
+import {
+	BATCH_DOWNLOAD_MAX_BYTES,
+	BATCH_DOWNLOAD_MAX_FILES,
+	BATCH_FILE_SIZE_LIMIT,
+	MAX_FILE_SIZE_BYTES,
+} from "../plugin/types";
 import { createLogger, errorMessage } from "../plugin/logger";
 import type { TransferContext } from "./transfer-types";
 import { isVaultTFileLike } from "./transfer-prepare";
@@ -157,7 +162,7 @@ export async function parallelDownloadAndSaveFiles(
 		let currentBytes = 0;
 		for (const request of batchable) {
 			if (
-				currentChunk.length >= BATCH_MAX_FILES
+				currentChunk.length >= BATCH_DOWNLOAD_MAX_FILES
 				|| (currentChunk.length > 0 && currentBytes + request.remoteSize > BATCH_DOWNLOAD_MAX_BYTES)
 			) {
 				chunks.push(currentChunk);
