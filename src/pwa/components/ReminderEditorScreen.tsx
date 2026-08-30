@@ -66,7 +66,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	const canSubmit = !saving
 		&& !isClosing
 		&& hasReminderDraftTitle(draft.content, projectOptions, draft.defaultProject);
-	const saveReminder = useCallback(() => {
+	const performSave = useCallback(() => {
 		if (!canSubmit) return;
 		onSave(modal);
 	}, [canSubmit, modal, onSave]);
@@ -80,8 +80,16 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 		contentRef,
 		descriptionRef,
 		richTextInputRef,
-		onSave: saveReminder,
+		onSave: performSave,
 	});
+	const saveReminder = useCallback(() => {
+		dismissEditorKeyboard();
+		performSave();
+	}, [dismissEditorKeyboard, performSave]);
+	const closeReminder = useCallback(() => {
+		dismissEditorKeyboard();
+		onClose();
+	}, [dismissEditorKeyboard, onClose]);
 
 	useImperativeHandle(ref, () => ({
 		dismissKeyboard: dismissEditorKeyboard,
@@ -160,7 +168,9 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 								type="button"
 								aria-label="Close modal"
 								isDisabled={saving}
-								onClick={onClose}
+								preventFocusOnPress
+								onPointerDown={(event) => event.preventDefault()}
+								onClick={closeReminder}
 							>
 								<X size={20} />
 							</Button>
