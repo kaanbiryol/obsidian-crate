@@ -45,11 +45,29 @@ async function initializeD1Schema(input: {
 	databaseId: string;
 	artifacts: CloudflareDeploymentArtifacts;
 }): Promise<void> {
-	await input.api.queryD1(
+	const migrationTableResult = await input.api.queryD1(
 		input.accountId,
 		input.databaseId,
-		input.artifacts.d1Schema,
+		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'd1_migrations';",
 	);
+	const migrationTableExists = migrationTableResult
+		.flatMap(result => result.results ?? [])
+		.some(row => row.name === 'd1_migrations');
+
+	if (!migrationTableExists) {
+		await input.api.queryD1(
+			input.accountId,
+			input.databaseId,
+			input.artifacts.d1Schema,
+		);
+		if (input.artifacts.d1Migrations.length > 0) {
+			const markerSql = input.artifacts.d1Migrations
+				.map(migration => `INSERT OR IGNORE INTO d1_migrations (name) VALUES ('${migration.name.split("'").join("''")}');`)
+				.join('\n');
+			await input.api.queryD1(input.accountId, input.databaseId, markerSql);
+		}
+		return;
+	}
 
 	const appliedResults = await input.api.queryD1(
 		input.accountId,
@@ -71,6 +89,14 @@ async function initializeD1Schema(input: {
 			`${migration.sql.trim()}\nINSERT INTO d1_migrations (name) VALUES ('${migration.name}');`,
 		);
 	}
+
+	// Reapply the idempotent complete schema only after pending ALTER migrations.
+	// This creates newly introduced indexes without referencing columns too early.
+	await input.api.queryD1(
+		input.accountId,
+		input.databaseId,
+		input.artifacts.d1Schema,
+	);
 }
 
 async function ensureWorkersSubdomain(

@@ -1,4 +1,6 @@
 import { corsResponse } from './cors';
+import { getPortablePathIssue } from '../../protocol/portable-path';
+import { readLimitedRequestBody } from './body-reader';
 
 const SHA256_HEX_REGEX = /^[a-f0-9]{64}$/i;
 
@@ -20,22 +22,10 @@ export async function parseJsonObject(
 	request: Request,
 	maxBytes = 1024 * 1024,
 ): Promise<{ ok: true; value: Record<string, unknown> } | { ok: false; response: Response }> {
-	const contentLength = request.headers.get('Content-Length');
-	if (contentLength) {
-		const declaredBytes = /^\d+$/.test(contentLength) ? Number(contentLength) : Number.NaN;
-		if (!Number.isSafeInteger(declaredBytes) || declaredBytes < 0) {
-			return { ok: false, response: corsResponse({ error: 'Invalid Content-Length header' }, 400) };
-		}
-		if (declaredBytes > maxBytes) {
-			return { ok: false, response: corsResponse({ error: 'JSON body too large' }, 413) };
-		}
-	}
-
 	try {
-		const body = await request.text();
-		if (new TextEncoder().encode(body).byteLength > maxBytes) {
-			return { ok: false, response: corsResponse({ error: 'JSON body too large' }, 413) };
-		}
+		const bodyResult = await readLimitedRequestBody(request, maxBytes, 'JSON body too large');
+		if (!bodyResult.ok) return bodyResult;
+		const body = new TextDecoder().decode(bodyResult.bytes);
 		const parsed: unknown = JSON.parse(body);
 		if (!isRecord(parsed)) {
 			return { ok: false, response: corsResponse({ error: 'JSON object body required' }, 400) };
@@ -59,6 +49,7 @@ export function sanitizePath(path: string): string | null {
 	if (segments.length === 0 || segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
 		return null;
 	}
+	if (getPortablePathIssue(path)) return null;
 
 	return segments.join('/');
 }

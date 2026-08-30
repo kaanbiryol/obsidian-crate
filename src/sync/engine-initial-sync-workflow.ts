@@ -6,7 +6,6 @@ import {
 } from './sync-result';
 import {
 	BATCH_UPLOAD_CONCURRENCY,
-	INITIAL_SYNC_PIPELINE_CHUNK_FILES,
 	UPLOAD_CONCURRENCY,
 } from './engine-constants';
 import { createLogger } from '../plugin/logger';
@@ -36,7 +35,7 @@ export interface InitialSyncWorkflowContext {
 		result: SyncResult,
 		options: { concurrency: number; retry: boolean; batchConcurrency?: number }
 	): Promise<void>;
-	createVaultFileChunks(files: VaultFile[], chunkSize: number): VaultFile[][];
+	createVaultFileChunks(files: VaultFile[]): VaultFile[][];
 	saveLocalManifest(): Promise<void>;
 	throwIfDestroyed(): void;
 	setLastSync(value: string): void;
@@ -59,23 +58,16 @@ export async function runInitialSyncWorkflow(
 		let preparedCount = 0;
 		let uploadCandidates = 0;
 
-		const chunks = context.createVaultFileChunks(files, INITIAL_SYNC_PIPELINE_CHUNK_FILES);
+		const chunks = context.createVaultFileChunks(files);
 		const prepareChunk = (chunk: VaultFile[]) => context.prepareUploadsFromVaultFiles(chunk, () => {
 			preparedCount++;
 			progressCallback?.(preparedCount, total);
 		});
 
-		let chunkIndex = 0;
-		const firstChunk = chunks[0];
-		let currentPrepare = firstChunk ? prepareChunk(firstChunk) : null;
-		while (currentPrepare) {
-			const preparedChunk = await currentPrepare;
+		for (const chunk of chunks) {
+			const preparedChunk = await prepareChunk(chunk);
 			context.throwIfDestroyed();
 			uploadCandidates += preparedChunk.length;
-
-			chunkIndex++;
-			const nextChunk = chunks[chunkIndex];
-			const nextPrepare = nextChunk ? prepareChunk(nextChunk) : null;
 
 			if (preparedChunk.length > 0) {
 				await context.uploadPreparedFiles(preparedChunk, result, {
@@ -84,8 +76,6 @@ export async function runInitialSyncWorkflow(
 					batchConcurrency: BATCH_UPLOAD_CONCURRENCY,
 				});
 			}
-
-			currentPrepare = nextPrepare;
 		}
 
 		logger.info(

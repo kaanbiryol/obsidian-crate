@@ -28,10 +28,38 @@ export async function prepareUploadFromVaultFile(
     return null;
   }
 
-  const content = await context.vault.adapter.readBinary(file.path);
+  let source = file;
+  let content = await context.vault.adapter.readBinary(file.path);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (content.byteLength > MAX_FILE_SIZE_BYTES) {
+      logger.warn("Skipping large file:", file.path);
+      return null;
+    }
+
+    const stat = await context.vault.adapter.stat(file.path);
+    if (!stat || stat.type !== "file") {
+      throw new Error(`File disappeared while preparing upload: ${file.path}`);
+    }
+    if (stat.size === content.byteLength && stat.mtime === source.mtime) {
+      source = { ...source, size: content.byteLength, mtime: stat.mtime };
+      break;
+    }
+    if (attempt === 1) {
+      throw new Error(`File changed repeatedly while preparing upload: ${file.path}`);
+    }
+
+    source = { ...source, size: stat.size, mtime: stat.mtime };
+    content = await context.vault.adapter.readBinary(file.path);
+  }
+
   const hash = await computeHash(content);
 
   if (!options?.force && context.localManifest.hashMatches(file.path, hash)) {
+    context.localManifest.setEntry(file.path, {
+      hash,
+      size: content.byteLength,
+      modified: new Date(source.mtime).toISOString(),
+    });
     logger.debug("Skipping unchanged file:", file.path);
     return null;
   }
@@ -40,8 +68,8 @@ export async function prepareUploadFromVaultFile(
     path: file.path,
     content,
     hash,
-    size: file.size,
-    mtime: file.mtime,
+    size: content.byteLength,
+    mtime: source.mtime,
     contentType: getContentType(file.extension),
 	expectedHash: options && 'expectedHash' in options
 		? options.expectedHash ?? null

@@ -1,10 +1,11 @@
 import { changedRows } from './db';
+import { portablePathKey } from '../../protocol/portable-path';
 import { stageMarkdownFile, type StagedMarkdownFile } from './markdown-file-staging';
 import { FileVersionConflictError } from './storage';
 import {
 	collectCleanupKeys,
 	deleteBucketObjectsOrQueue,
-	deleteQueuedBucketObjects,
+	FILE_VERSION_RETENTION_MS,
 	getStoredFileRow,
 } from './sync-storage';
 
@@ -15,13 +16,14 @@ function destinationMutation(
 ): D1PreparedStatement {
 	if (destination.expectedHash === null) {
 		return db.prepare(`/* atomic-destination-insert */
-			INSERT INTO files (path, hash, size, modified, storage_key)
-			SELECT ?, ?, ?, datetime('now'), ?
+			INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
+			SELECT ?, ?, ?, ?, datetime('now'), ?
 			WHERE NOT EXISTS (SELECT 1 FROM files WHERE path = ?)
 			AND EXISTS (SELECT 1 FROM files WHERE path = ? AND hash = ?)
 			ON CONFLICT(path) DO NOTHING`)
 			.bind(
 				destination.path,
+				portablePathKey(destination.path),
 				destination.hash,
 				destination.size,
 				destination.objectKey,
@@ -32,10 +34,11 @@ function destinationMutation(
 	}
 
 	return db.prepare(`/* atomic-destination-update */
-		UPDATE files SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?
+		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
 		WHERE path = ? AND hash = ?
 		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND hash = ?)`)
 		.bind(
+			portablePathKey(destination.path),
 			destination.hash,
 			destination.size,
 			destination.objectKey,
@@ -52,10 +55,11 @@ function sourceMutation(
 	destination: StagedMarkdownFile,
 ): D1PreparedStatement {
 	return db.prepare(`/* atomic-source-update */
-		UPDATE files SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?
+		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
 		WHERE path = ? AND hash = ?
 		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
 		.bind(
+			portablePathKey(source.path),
 			source.hash,
 			source.size,
 			source.objectKey,
@@ -73,18 +77,23 @@ function changelogStatement(db: D1Database, staged: StagedMarkdownFile): D1Prepa
 		.bind(staged.path, staged.hash, staged.size, staged.path, staged.objectKey);
 }
 
-function cleanupStatement(
+function retainVersionStatement(
 	db: D1Database,
-	storageKey: string,
+	previous: { path: string; hash: string; size: number; storageKey: string },
 	source: StagedMarkdownFile,
 	destination: StagedMarkdownFile,
 ): D1PreparedStatement {
-	return db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key)
-		SELECT ?
+	return db.prepare(`INSERT OR IGNORE INTO file_versions
+		(storage_key, path, hash, size, reason, expires_at)
+		SELECT ?, ?, ?, ?, 'replaced', ?
 		WHERE EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)
 		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
 		.bind(
-			storageKey,
+			previous.storageKey,
+			previous.path,
+			previous.hash,
+			previous.size,
+			Date.now() + FILE_VERSION_RETENTION_MS,
 			source.path,
 			source.objectKey,
 			destination.path,
@@ -131,9 +140,13 @@ export async function writeCommittedMarkdownFilePair(
 	}
 
 	const [destination, source] = stagedFiles as [StagedMarkdownFile, StagedMarkdownFile];
-	const cleanupKeys = [
-		...collectCleanupKeys(previousSource, source.objectKey),
-		...collectCleanupKeys(previousDestination, destination.objectKey),
+	const previousVersions = [
+		...(previousSource && collectCleanupKeys(previousSource, source.objectKey).length > 0
+			? [{ path: source.path, ...previousSource }]
+			: []),
+		...(previousDestination && collectCleanupKeys(previousDestination, destination.objectKey).length > 0
+			? [{ path: destination.path, ...previousDestination }]
+			: []),
 	];
 
 	let results: unknown[];
@@ -143,7 +156,7 @@ export async function writeCommittedMarkdownFilePair(
 			sourceMutation(db, source, destination),
 			changelogStatement(db, destination),
 			changelogStatement(db, source),
-			...cleanupKeys.map(key => cleanupStatement(db, key, source, destination)),
+			...previousVersions.map(previous => retainVersionStatement(db, previous, source, destination)),
 		]);
 	} catch (error) {
 		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => file.objectKey));
@@ -167,7 +180,6 @@ export async function writeCommittedMarkdownFilePair(
 		throw new FileVersionConflictError(destination.path, currentDestination?.hash ?? null);
 	}
 
-	await deleteQueuedBucketObjects(bucket, db, cleanupKeys);
 	return {
 		source: { hash: source.hash, size: source.size },
 		destination: { hash: destination.hash, size: destination.size },

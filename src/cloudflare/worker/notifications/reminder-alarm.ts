@@ -30,6 +30,9 @@ const DELIVERY_COMPLETE_KEY = 'deliveryComplete';
 const RETRY_ATTEMPT_KEY = 'retryAttempt';
 const RETRY_BASE_DELAY_MS = 60_000;
 const RETRY_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
+const MAX_DELIVERY_RETRY_ATTEMPTS = 10;
+const MAX_DELIVERY_RETRY_AGE_MS = 24 * 60 * 60 * 1000;
+const DELIVERY_FAILURE_KEY = 'deliveryFailure';
 
 function retryDelayMs(attempt: number): number {
 	return Math.min(RETRY_BASE_DELAY_MS * (2 ** Math.min(attempt, 8)), RETRY_MAX_DELAY_MS);
@@ -181,12 +184,27 @@ export class ReminderAlarm implements DurableObject {
 		if (current?.scheduleToken !== reminder.scheduleToken) return;
 
 		const attempt = await this.state.storage.get<number>(RETRY_ATTEMPT_KEY) ?? 0;
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		const dueTime = new Date(reminder.dueDatetime).getTime();
+		if (
+			attempt >= MAX_DELIVERY_RETRY_ATTEMPTS
+			|| (Number.isFinite(dueTime) && Date.now() - dueTime >= MAX_DELIVERY_RETRY_AGE_MS)
+		) {
+			await this.state.storage.put(DELIVERY_FAILURE_KEY, {
+				attempts: attempt,
+				failedAt: new Date().toISOString(),
+				error: errorMessage.slice(0, 1024),
+			});
+			await this.state.storage.deleteAlarm();
+			console.error(`Reminder alarm ${reminder.reminderId} exhausted delivery retries:`, errorMessage);
+			return;
+		}
 		const delay = retryDelayMs(attempt);
 		await this.state.storage.put(RETRY_ATTEMPT_KEY, attempt + 1);
 		await this.state.storage.setAlarm(Date.now() + delay);
 		console.error(
 			`Reminder alarm ${reminder.reminderId} failed; retrying in ${delay}ms:`,
-			error instanceof Error ? error.message : String(error),
+			errorMessage,
 		);
 	}
 

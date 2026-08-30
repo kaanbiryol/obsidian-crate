@@ -34,8 +34,9 @@ export async function listStoredMarkdownFileMetadataByPrefix(
 ): Promise<StoredMarkdownFileMetadata[]> {
 	const rows = await queryRows<{ path: string; hash: string; size: number; storage_key: string }>(
 		db.prepare(
-			"SELECT path, hash, size, storage_key FROM files WHERE instr(path, ? || '/') = 1 AND lower(path) LIKE '%.md' ORDER BY path ASC",
-		).bind(pathPrefix),
+			`SELECT path, hash, size, storage_key FROM files
+			WHERE path >= ? AND path < ? AND lower(path) LIKE '%.md' ORDER BY path ASC`,
+		).bind(`${pathPrefix}/`, `${pathPrefix}0`),
 	);
 	return rows.map((row) => ({
 		path: row.path,

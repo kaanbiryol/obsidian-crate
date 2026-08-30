@@ -12,6 +12,8 @@ import {
 	handlePutSettings,
 	handleUpload,
 } from '../sync';
+import { handleListFileVersions, handleRestoreFileVersion } from '../file-version-handlers';
+import { handleDiagnostics } from '../maintenance/diagnostics';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';
@@ -26,6 +28,9 @@ export async function handleSyncRoute(
 	const bucket = env.BUCKET;
 
 	if (path === '/health' && method === 'GET') return await handleHealth();
+	if (path === '/diagnostics' && method === 'GET') {
+		return await withDatabase(db, requiredDb => handleDiagnostics(requiredDb));
+	}
 	if (path === '/sync/check' && method === 'GET') {
 		return await withDatabase(db, requiredDb => handleCheckChanges(request, requiredDb));
 	}
@@ -52,6 +57,12 @@ export async function handleSyncRoute(
 	}
 	if (path === '/sync/batch-delete' && method === 'POST') {
 		return await withDatabase(db, requiredDb => handleBatchDelete(request, bucket, requiredDb));
+	}
+	if (path === '/sync/versions' && method === 'GET') {
+		return await withDatabase(db, requiredDb => handleListFileVersions(request, requiredDb));
+	}
+	if (path === '/sync/restore-version' && method === 'POST') {
+		return await withDatabase(db, requiredDb => handleRestoreFileVersion(request, bucket, requiredDb));
 	}
 	if (path === '/settings' && method === 'GET') return await handleGetSettings(bucket);
 	if (path === '/settings' && method === 'PUT') return await handlePutSettings(request, bucket);

@@ -1,7 +1,9 @@
 import { HttpError } from './api';
 import { createLogger } from '../plugin/logger';
+import { createAbortError } from './abort';
 
 const logger = createLogger('SyncEngine');
+const MAX_SERVER_RETRY_DELAY_MS = 60_000;
 
 const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
@@ -52,13 +54,19 @@ export async function retryWithBackoff<T>(
 			if (attempt === options.maxRetries) throw error;
 			let delay: number;
 			if (error instanceof HttpError && error.retryAfter !== null) {
-				delay = error.retryAfter;
+				delay = Math.min(error.retryAfter, MAX_SERVER_RETRY_DELAY_MS);
 			} else {
 				const exponentialDelay = options.baseDelayMs * Math.pow(2, attempt);
 				delay = Math.round(exponentialDelay * (0.75 + Math.random() * 0.5));
 			}
 			logger.warn(`Retry ${attempt + 1}/${options.maxRetries} after ${delay}ms`);
-			await new Promise(resolve => setTimeout(resolve, delay));
+			let remaining = delay;
+			while (remaining > 0) {
+				if (options.isDestroyed()) throw createAbortError('Sync retry aborted');
+				const interval = Math.min(remaining, 250);
+				await new Promise(resolve => setTimeout(resolve, interval));
+				remaining -= interval;
+			}
 		}
 	}
 

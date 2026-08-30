@@ -1,5 +1,9 @@
 import { parseReminderDateValue } from '@/reminders/utils/reminderDate';
-import { cancelScheduledReminder, scheduleScheduledReminder } from '../reminder-handlers';
+import {
+	enqueueCancelNotification,
+	enqueueScheduleNotification,
+	processNotificationJob,
+} from '../notification-outbox';
 import type { Env } from '../types';
 import type { RemoteReminderRecord } from './types';
 
@@ -41,18 +45,18 @@ export async function syncReminderNotification(
 	try {
 		const effectiveDatetime = resolveNotificationDatetime(reminder, allDayNotificationTime);
 		if (!effectiveDatetime || reminder.completed || new Date(effectiveDatetime).getTime() <= Date.now()) {
-			await cancelScheduledReminder(env, reminder.id);
-			return undefined;
+			const token = await enqueueCancelNotification(env.DB, reminder.id);
+			return await processNotificationJob(env, reminder.id, token);
 		}
 
-		await scheduleScheduledReminder(env, {
+		const token = await enqueueScheduleNotification(env.DB, {
 			reminderId: reminder.id,
 			content: reminder.content,
 			project: reminder.project,
 			dueDatetime: effectiveDatetime,
 			priority: reminder.priority,
 		});
-		return undefined;
+		return await processNotificationJob(env, reminder.id, token);
 	} catch (error) {
 		return error instanceof Error ? error.message : String(error);
 	}
@@ -60,8 +64,8 @@ export async function syncReminderNotification(
 
 export async function cancelReminderNotification(env: Env, reminderId: string): Promise<string | undefined> {
 	try {
-		await cancelScheduledReminder(env, reminderId);
-		return undefined;
+		const token = await enqueueCancelNotification(env.DB, reminderId);
+		return await processNotificationJob(env, reminderId, token);
 	} catch (error) {
 		return error instanceof Error ? error.message : String(error);
 	}

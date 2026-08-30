@@ -15,7 +15,7 @@ type ManifestEntry = {
 
 type MockAdapter = {
 	readBinary: ReturnType<typeof vi.fn>;
-	stat: ReturnType<typeof vi.fn>;
+	stat: ReturnType<typeof vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>>;
 	exists: ReturnType<typeof vi.fn>;
 	remove: ReturnType<typeof vi.fn>;
 	writeBinary: ReturnType<typeof vi.fn>;
@@ -163,7 +163,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 
 	const adapter: MockAdapter = {
 		readBinary: vi.fn(),
-		stat: vi.fn(),
+		stat: vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>(),
 		exists: vi.fn(),
 		remove: vi.fn(),
 		writeBinary: vi.fn(),
@@ -181,6 +181,13 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 		createBinary: vi.fn(),
 		getFiles: vi.fn(),
 	};
+	adapter.stat.mockImplementation(async (path: string) => {
+		const abstractFile = vault.getAbstractFileByPath(path) as { stat?: { size: number; mtime: number } } | null;
+		const indexedFile = (vault.getFiles() as Array<{ path: string; stat?: { size: number; mtime: number } }> | undefined)
+			?.find(file => file.path === path);
+		const stat = abstractFile?.stat ?? indexedFile?.stat;
+		return stat ? { type: 'file', size: stat.size, mtime: stat.mtime } : null;
+	});
 
 	const api = {
 		isConfigured: vi.fn().mockReturnValue(true),
@@ -238,8 +245,12 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 			for (const path of Object.keys(manifestFiles)) {
 				delete manifestFiles[path];
 			}
-			}),
-		};
+		}),
+		replaceManifest: vi.fn((manifest: FileManifest) => {
+			for (const path of Object.keys(manifestFiles)) delete manifestFiles[path];
+			Object.assign(manifestFiles, structuredClone(manifest.files));
+		}),
+	};
 
 	setEngineLocalManifest(engine, localManifest);
 

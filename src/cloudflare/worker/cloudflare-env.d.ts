@@ -18,9 +18,16 @@ interface R2HttpMetadata {
 interface R2PutOptions {
 	httpMetadata?: R2HttpMetadata;
 	customMetadata?: Record<string, string>;
+	onlyIf?: {
+		etagMatches?: string;
+		etagDoesNotMatch?: string;
+	};
 }
 
 interface R2ObjectBody {
+	key: string;
+	etag: string;
+	uploaded: Date;
 	body: ReadableStream | null;
 	size: number;
 	httpMetadata?: R2HttpMetadata;
@@ -29,10 +36,33 @@ interface R2ObjectBody {
 	text(): Promise<string>;
 }
 
+interface R2Object {
+	key: string;
+	etag: string;
+	uploaded: Date;
+	size: number;
+	httpMetadata?: R2HttpMetadata;
+	customMetadata?: Record<string, string>;
+}
+
+interface R2ListOptions {
+	prefix?: string;
+	limit?: number;
+	cursor?: string;
+}
+
+interface R2ListResult {
+	objects: R2Object[];
+	truncated: boolean;
+	cursor?: string;
+}
+
 interface R2Bucket {
 	get(key: string): Promise<R2ObjectBody | null>;
-	put(key: string, value: BodyInit | null, options?: R2PutOptions): Promise<unknown>;
+	head(key: string): Promise<R2Object | null>;
+	put(key: string, value: BodyInit | null, options?: R2PutOptions): Promise<R2Object | null>;
 	delete(keys: string | string[]): Promise<void>;
+	list(options?: R2ListOptions): Promise<R2ListResult>;
 }
 
 interface DurableObjectId {

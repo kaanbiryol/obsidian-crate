@@ -1,4 +1,5 @@
 import { sha256HexBytes } from './auth';
+import { readLimitedRequestBody } from './body-reader';
 import { corsHeaders, corsResponse } from './cors';
 import { isSha256Hex, parseJsonObject, parseOptionalString, sanitizePath } from './utils';
 import { commitFileDelete, commitStagedFile } from './sync-mutations';
@@ -49,16 +50,18 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 	const contentType = request.headers.get('Content-Type') || 'application/octet-stream';
 
 	try {
-		const body = await request.arrayBuffer();
+		const bodyResult = await readLimitedRequestBody(request, MAX_FILE_BYTES, 'File exceeds 25MB limit');
+		if (!bodyResult.ok) return bodyResult.response;
+		const body = bodyResult.bytes;
 		const computedSize = body.byteLength;
-		if (computedSize > MAX_FILE_BYTES) {
-			return corsResponse({ error: 'File exceeds 25MB limit' }, 413);
-		}
 		if (declaredSize !== null && declaredSize !== computedSize) {
 			return corsResponse({ error: 'File size does not match X-File-Size header' }, 400);
 		}
 
-		const computedHash = await sha256HexBytes(body);
+		const computedHash = await sha256HexBytes(body.buffer.slice(
+			body.byteOffset,
+			body.byteOffset + body.byteLength,
+		));
 		if (hashHeader && hashHeader !== computedHash) {
 			return corsResponse({ error: 'File hash does not match X-File-Hash header' }, 400);
 		}

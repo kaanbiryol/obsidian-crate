@@ -89,6 +89,9 @@ describe('planner local diff helpers', () => {
 				vault: { adapter } as never,
 				localManifest: {
 					getEntry: (path: string) => entries[path],
+					setEntry: (path: string, entry: FileEntry) => {
+						entries[path] = entry;
+					},
 				} as never,
 				shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),

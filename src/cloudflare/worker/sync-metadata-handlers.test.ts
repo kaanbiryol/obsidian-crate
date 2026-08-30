@@ -64,6 +64,8 @@ describe('sync metadata snapshots', () => {
 				'notes/a.md': { hash: 'hash', size: 4, modified: 'now' },
 			},
 			lastSeq: 11,
+			snapshotSeq: 11,
+			hasMore: false,
 		});
 	});
 });

@@ -5,6 +5,7 @@
 
 import type { Vault, TFile } from 'obsidian';
 import { createLogger } from '../plugin/logger';
+import { assertPortablePaths } from '../protocol/portable-path';
 
 const logger = createLogger('FileDiscovery');
 
@@ -119,6 +120,7 @@ export async function getAllVaultFiles(
 		});
 	}
 
+	assertPortablePaths(result.map(file => file.path));
 	return result;
 }
 

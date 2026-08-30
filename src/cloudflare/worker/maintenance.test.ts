@@ -28,6 +28,8 @@ describe('scheduled Worker maintenance', () => {
 				statements.push(statement);
 				return statement;
 			}),
+			batch: vi.fn(async (batchStatements: Array<{ run(): Promise<unknown> }>) =>
+				Promise.all(batchStatements.map(statement => statement.run()))),
 		};
 		const bucket = { delete: vi.fn(async () => {}) };
 

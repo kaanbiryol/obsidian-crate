@@ -1,8 +1,9 @@
 import { changedRows } from './db';
+import { portablePathKey } from '../../protocol/portable-path';
 import {
 	collectCleanupKeys,
 	deleteBucketObjectsOrQueue,
-	deleteQueuedBucketObjects,
+	FILE_VERSION_RETENTION_MS,
 	getStoredFileRow,
 	type ExpectedFileHash,
 	type FileStorageRow,
@@ -17,16 +18,16 @@ function uploadMutation(
 	expectedHash: ExpectedFileHash,
 ): D1PreparedStatement {
 	if (expectedHash === null) {
-		return db.prepare(`INSERT INTO files (path, hash, size, modified, storage_key)
-			VALUES (?, ?, ?, datetime('now'), ?)
+		return db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
+			VALUES (?, ?, ?, ?, datetime('now'), ?)
 			ON CONFLICT(path) DO NOTHING`)
-			.bind(path, hash, size, objectKey);
+			.bind(path, portablePathKey(path), hash, size, objectKey);
 	}
 
 	return db.prepare(`UPDATE files
-		SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?
+		SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
 		WHERE path = ? AND hash = ?`)
-		.bind(hash, size, objectKey, path, expectedHash);
+		.bind(portablePathKey(path), hash, size, objectKey, path, expectedHash);
 }
 
 export interface CommitResult {
@@ -63,10 +64,19 @@ export async function commitStagedFile(
 			WHERE EXISTS (
 				SELECT 1 FROM files WHERE path = ? AND storage_key = ?
 			)`).bind(params.path, params.hash, params.size, params.path, params.objectKey),
-		...cleanupKeys.map((key) => db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key)
-			SELECT ? WHERE EXISTS (
+		...cleanupKeys.map((key) => db.prepare(`INSERT OR IGNORE INTO file_versions
+			(storage_key, path, hash, size, reason, expires_at)
+			SELECT ?, ?, ?, ?, 'replaced', ? WHERE EXISTS (
 				SELECT 1 FROM files WHERE path = ? AND storage_key = ?
-			)`).bind(key, params.path, params.objectKey)),
+			)`).bind(
+			key,
+			params.path,
+			params.previousFile?.hash ?? '',
+			params.previousFile?.size ?? 0,
+			Date.now() + FILE_VERSION_RETENTION_MS,
+			params.path,
+			params.objectKey,
+		)),
 	]);
 
 	if (changedRows(results[0]) !== 1) {
@@ -78,16 +88,11 @@ export async function commitStagedFile(
 		return { committed: false, currentHash: current?.hash ?? null };
 	}
 
-	await deleteQueuedBucketObjects(
-		bucket,
-		db,
-		cleanupKeys,
-	);
 	return { committed: true, currentHash: params.hash };
 }
 
 export async function commitFileDelete(
-	bucket: R2Bucket,
+	_bucket: R2Bucket,
 	db: D1Database,
 	params: {
 		path: string;
@@ -95,7 +100,6 @@ export async function commitFileDelete(
 		previousFile: FileStorageRow | null;
 	},
 ): Promise<CommitResult> {
-	const cleanupKeys = collectCleanupKeys(params.previousFile);
 	const expectedPredicate = params.expectedHash === null
 			? 'path = ? AND 0'
 			: 'path = ? AND hash = ?';
@@ -106,21 +110,20 @@ export async function commitFileDelete(
 		db.prepare(`INSERT INTO changelog (path, action, hash, size)
 			SELECT path, 'delete', '', 0 FROM files WHERE ${expectedPredicate}`)
 			.bind(...predicateArgs),
+		db.prepare(`INSERT OR IGNORE INTO file_versions
+			(storage_key, path, hash, size, reason, expires_at)
+			SELECT storage_key, path, hash, size, 'deleted', ? FROM files WHERE ${expectedPredicate}`)
+			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...predicateArgs),
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
-		...cleanupKeys.map((key) => db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key)
-			SELECT ? WHERE NOT EXISTS (SELECT 1 FROM files WHERE path = ?)`)
-			.bind(key, params.path)),
 	]);
 
-	if (changedRows(results[1]) !== 1) {
+	if (changedRows(results[2]) !== 1) {
 		const current = await getStoredFileRow(db, params.path);
 		if (!current) {
-			await deleteBucketObjectsOrQueue(bucket, db, cleanupKeys);
 			return { committed: true, currentHash: null, idempotent: true };
 		}
 		return { committed: false, currentHash: current.hash };
 	}
 
-	await deleteQueuedBucketObjects(bucket, db, cleanupKeys);
 	return { committed: true, currentHash: null };
 }

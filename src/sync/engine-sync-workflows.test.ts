@@ -129,7 +129,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 		expect(harness.settings.lastSync).toBeNull();
 	});
 
-	it('reuses discovered mtimes during initial sync uploads', async () => {
+		it('restats files during initial sync uploads', async () => {
 		const harness = createHarness();
 		const mtime = 1700000000000;
 		const file = {
@@ -145,11 +145,11 @@ describe('SyncEngine slice 5 safeguards', () => {
 		const result = await harness.engine.initialSync();
 
 		expect(result.success).toBe(true);
-		expect(harness.vault.adapter.stat).not.toHaveBeenCalled();
-		expect(harness.localManifest.setEntry).toHaveBeenCalledWith(
-			'notes/a.md',
-			expect.objectContaining({ modified: new Date(mtime).toISOString() }),
-		);
+			expect(harness.vault.adapter.stat).toHaveBeenCalledWith('notes/a.md');
+			expect(harness.localManifest.setEntry).toHaveBeenCalledWith(
+				'notes/a.md',
+				expect.objectContaining({ modified: new Date(mtime + 5000).toISOString() }),
+			);
 	});
 
 	it('sets state to error when force full sync finishes with non-fatal errors', async () => {

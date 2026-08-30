@@ -89,4 +89,17 @@ describe('CloudflareApiClient', () => {
 			}),
 		);
 	});
+
+	it('rejects a D1 response when any SQL statement reports failure', async () => {
+		const client = new CloudflareApiClient('token', vi.fn(async () => ({
+			status: 200,
+			text: JSON.stringify({
+				success: true,
+				result: [{ success: false, error: 'duplicate column' }],
+			}),
+		})));
+
+		await expect(client.queryD1('account', 'database', 'ALTER TABLE example'))
+			.rejects.toThrow('failed SQL statement');
+	});
 });

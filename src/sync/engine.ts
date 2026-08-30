@@ -21,8 +21,8 @@ import {
 	processDiff as transferProcessDiff,
 	prepareUploadsFromVaultFiles as transferPrepareUploadsFromVaultFiles,
 	uploadPreparedFiles as transferUploadPreparedFiles,
-	createVaultFileChunks as transferCreateVaultFileChunks,
 } from './transfer';
+import { createByteBudgetedVaultFileChunks } from './transfer-budget';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type {
 	SyncState,
@@ -36,6 +36,7 @@ import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/types';
 import { DOWNLOAD_CONCURRENCY, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
 import { shouldIgnoreSyncPath } from './engine-ignore';
 import { hasHiddenFileChanges } from './hidden-file-changes';
+import { deleteFilesInBatches } from './delete-batches';
 import {
 	runForceFullSyncWorkflow,
 	runInitialSyncWorkflow,
@@ -134,7 +135,7 @@ export class SyncEngine {
 				this.uploadPreparedFiles(prepared, result, options),
 			prepareUploadsFromVaultFiles: (files, onPrepared) =>
 				this.prepareUploadsFromVaultFiles(files, onPrepared),
-			createVaultFileChunks: (files, chunkSize) => this.createVaultFileChunks(files, chunkSize),
+			createVaultFileChunks: files => this.createVaultFileChunks(files),
 			updateState: this.updateState.bind(this),
 			isAbortError: this.isAbortError.bind(this),
 			throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
@@ -166,6 +167,27 @@ export class SyncEngine {
 
 	getPendingPaths(): string[] {
 		return this.queueController.getPendingPaths();
+	}
+
+	async previewIgnoredRemoteFiles(): Promise<string[]> {
+		const manifest = await this.api.getManifest();
+		return Object.keys(manifest.files).filter(path => this.shouldIgnore(path)).sort();
+	}
+
+	async purgeIgnoredRemoteFiles(): Promise<{ deleted: string[]; errors: string[] }> {
+		const manifest = await this.api.getManifest();
+		const paths = Object.keys(manifest.files).filter(path => this.shouldIgnore(path)).sort();
+		this.lifecycle.throwIfDestroyed();
+		const result = await deleteFilesInBatches({
+			batchDelete: (batchPaths, expectedHashes) =>
+				this.retryWithBackoff(() => this.api.batchDelete(batchPaths, expectedHashes)),
+		}, paths.map(path => ({ path, expectedHash: manifest.files[path]!.hash })));
+		for (const path of result.deleted) this.localManifest.removeEntry(path);
+		await this.localManifest.save();
+		return {
+			deleted: result.deleted,
+			errors: result.errors.map(error => `${error.path}: ${error.error}`),
+		};
 	}
 
 	private updateState(updates: Partial<SyncState>): void {
@@ -321,8 +343,8 @@ export class SyncEngine {
 		await transferUploadPreparedFiles(this.contexts.transfer(), prepared, result, options);
 	}
 
-	private createVaultFileChunks(files: VaultFile[], chunkSize: number): VaultFile[][] {
-		return transferCreateVaultFileChunks(files, chunkSize);
+	private createVaultFileChunks(files: VaultFile[]): VaultFile[][] {
+		return createByteBudgetedVaultFileChunks(files);
 	}
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {

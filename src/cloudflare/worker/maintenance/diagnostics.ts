@@ -1,0 +1,41 @@
+import { corsResponse } from '../cors';
+
+function firstCount(result: unknown): number {
+	if (!result || typeof result !== 'object') return 0;
+	const rows = (result as { results?: Array<{ count?: number }> }).results;
+	return rows?.[0]?.count ?? 0;
+}
+
+export async function handleDiagnostics(db: D1Database): Promise<Response> {
+	const results = await db.batch([
+		db.prepare('SELECT COUNT(*) AS count FROM files'),
+		db.prepare('SELECT COUNT(*) AS count FROM changelog'),
+		db.prepare('SELECT COUNT(*) AS count FROM file_versions'),
+		db.prepare('SELECT COUNT(*) AS count FROM object_cleanup_queue'),
+		db.prepare('SELECT COUNT(*) AS count FROM notification_jobs'),
+		db.prepare('SELECT COUNT(*) AS count FROM scheduled_reminders'),
+		db.prepare('SELECT COUNT(*) AS count FROM auth_tokens WHERE expires_at IS NULL OR expires_at > ?').bind(Date.now()),
+		db.prepare('SELECT COUNT(*) AS count FROM push_subscriptions WHERE disabled_at IS NULL'),
+		db.prepare('SELECT COUNT(*) AS count FROM push_subscriptions WHERE disabled_at IS NOT NULL'),
+	]);
+	const [lastRun, lastError] = await Promise.all([
+		db.prepare("SELECT value FROM maintenance_state WHERE key = 'last_run'").first<{ value: string }>(),
+		db.prepare("SELECT value FROM maintenance_state WHERE key = 'last_error'").first<{ value: string }>(),
+	]);
+	return corsResponse({
+		status: 'ok',
+		counts: {
+			files: firstCount(results[0]),
+			changelog: firstCount(results[1]),
+			retainedVersions: firstCount(results[2]),
+			pendingObjectCleanup: firstCount(results[3]),
+			pendingNotificationJobs: firstCount(results[4]),
+			scheduledReminders: firstCount(results[5]),
+			activeAuthTokens: firstCount(results[6]),
+			activePushSubscriptions: firstCount(results[7]),
+			disabledPushSubscriptions: firstCount(results[8]),
+		},
+		lastMaintenanceAt: lastRun?.value ?? null,
+		lastMaintenanceError: lastError?.value ?? null,
+	});
+}

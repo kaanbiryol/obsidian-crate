@@ -1,4 +1,3 @@
-import { requestUrl, type RequestUrlParam, type RequestUrlResponse } from 'obsidian';
 import { createLogger, errorMessage } from '../../plugin/logger';
 import { createAbortError } from '../abort';
 import { normalizeWorkerUrl } from '../worker-url';
@@ -7,7 +6,19 @@ const logger = createLogger('ApiClient');
 
 export const TRANSFER_TIMEOUT_MS = 120_000;
 
-export type ApiRequestOptions = Pick<RequestUrlParam, 'body' | 'contentType' | 'headers' | 'method'>;
+export interface ApiRequestOptions {
+	body?: string | ArrayBuffer;
+	contentType?: string;
+	headers?: Record<string, string>;
+	method?: string;
+}
+
+interface ApiHttpResponse {
+	status: number;
+	headers: Record<string, string>;
+	arrayBuffer: ArrayBuffer;
+	text: string;
+}
 
 export class HttpError extends Error {
 	constructor(message: string, readonly status: number, readonly retryAfter: number | null = null) {
@@ -94,30 +105,17 @@ export class WorkerApiHttpClient {
 		path: string,
 		options: ApiRequestOptions,
 		timeout: number,
-	): Promise<RequestUrlResponse> {
+	): Promise<ApiHttpResponse> {
 		const externalSignal = this.externalSignal;
-		let timeoutId: ReturnType<typeof setTimeout> | null = null;
-		let onAbort: (() => void) | null = null;
-
-		const timeoutPromise = new Promise<never>((_, reject) => {
-			timeoutId = setTimeout(() => {
-				reject(new Error(`Request timed out after ${timeout}ms`));
-			}, timeout);
-		});
-
-		const abortPromise = externalSignal
-			? new Promise<never>((_, reject) => {
-				if (externalSignal.aborted) {
-					reject(createAbortError('Sync request aborted'));
-					return;
-				}
-
-				onAbort = () => {
-					reject(createAbortError('Sync request aborted'));
-				};
-				externalSignal.addEventListener('abort', onAbort, { once: true });
-			})
-			: null;
+		if (externalSignal?.aborted) throw createAbortError('Sync request aborted');
+		const controller = new AbortController();
+		let timedOut = false;
+		const onAbort = () => controller.abort();
+		externalSignal?.addEventListener('abort', onAbort, { once: true });
+		const timeoutId = setTimeout(() => {
+			timedOut = true;
+			controller.abort();
+		}, timeout);
 
 		const headersWithoutContentType = Object.fromEntries(
 			Object.entries(options.headers ?? {}).filter(([key]) => key.toLowerCase() !== 'content-type'),
@@ -126,31 +124,35 @@ export class WorkerApiHttpClient {
 			?? getHeader(options.headers ?? {}, 'Content-Type')
 			?? undefined;
 
-		const requestPromise = requestUrl({
-			url: `${this.workerUrl}${path}`,
-			method: options.method,
-			body: options.body,
-			contentType: resolvedContentType,
-			headers: {
-				Authorization: `Bearer ${this.authToken}`,
-				...headersWithoutContentType,
-			},
-			throw: false,
-		});
-
 		try {
-			return await Promise.race([
-				requestPromise,
-				timeoutPromise,
-				...(abortPromise ? [abortPromise] : []),
-			]);
+			const response = await globalThis.fetch(`${this.workerUrl}${path}`, {
+				method: options.method,
+				body: options.body,
+				signal: controller.signal,
+				headers: {
+					Authorization: `Bearer ${this.authToken}`,
+					...(resolvedContentType ? { 'Content-Type': resolvedContentType } : {}),
+					...headersWithoutContentType,
+				},
+			});
+			const arrayBuffer = await response.arrayBuffer();
+			const responseHeaders: Record<string, string> = {};
+			response.headers.forEach((value, key) => {
+				responseHeaders[key] = value;
+			});
+			return {
+				status: response.status,
+				headers: responseHeaders,
+				arrayBuffer,
+				text: new TextDecoder().decode(arrayBuffer),
+			};
+		} catch (error) {
+			if (externalSignal?.aborted) throw createAbortError('Sync request aborted');
+			if (timedOut) throw new Error(`Request timed out after ${timeout}ms`);
+			throw error;
 		} finally {
-			if (timeoutId !== null) {
-				clearTimeout(timeoutId);
-			}
-			if (onAbort && externalSignal) {
-				externalSignal.removeEventListener('abort', onAbort);
-			}
+			clearTimeout(timeoutId);
+			externalSignal?.removeEventListener('abort', onAbort);
 		}
 	}
 

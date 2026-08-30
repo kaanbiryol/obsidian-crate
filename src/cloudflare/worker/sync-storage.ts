@@ -10,6 +10,7 @@ export {
 const MANAGED_FILES_PREFIX = '__crate__/files/';
 const CLEANUP_BATCH_LIMIT = 25;
 const MAX_D1_BOUND_PARAMETERS = 100;
+export const FILE_VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface FileStorageRow {
 	hash: string;
@@ -99,7 +100,7 @@ async function removeQueuedObjectCleanup(db: D1Database, keys: string[]): Promis
 	}
 }
 
-export async function deleteQueuedBucketObjects(
+async function deleteQueuedBucketObjects(
 	bucket: R2Bucket,
 	db: D1Database,
 	keys: string[],
@@ -126,6 +127,14 @@ export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database):
 	} catch {
 		// The scheduled handler will retry on its next invocation.
 	}
+}
+
+export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now()): Promise<void> {
+	await db.batch([
+		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key)
+			SELECT storage_key FROM file_versions WHERE expires_at <= ?`).bind(now),
+		db.prepare('DELETE FROM file_versions WHERE expires_at <= ?').bind(now),
+	]);
 }
 
 export async function deleteBucketObjectsOrQueue(

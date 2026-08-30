@@ -205,11 +205,15 @@ export class CloudflareApiClient {
 		params?: string[],
 	): Promise<D1QueryResult[]> {
 		const body = params === undefined ? { sql } : { sql, params };
-		return this.request(`/accounts/${accountId}/d1/database/${databaseId}/query`, {
+		const results = await this.request<D1QueryResult[]>(`/accounts/${accountId}/d1/database/${databaseId}/query`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body),
 		});
+		if (!Array.isArray(results) || results.some(result => result.success === false)) {
+			throw new CloudflareApiError('Cloudflare D1 reported a failed SQL statement', 200, null);
+		}
+		return results;
 	}
 
 	async uploadWorker(input: {

@@ -34,7 +34,7 @@ Entry point: `planner.ts:runIncrementalSync()`
 Triggered when incremental sync fails or `lastSeq` is 0:
 
 1. Discover all local vault files
-2. Fetch full remote manifest from `GET /sync/manifest`
+2. Fetch the remote manifest in 2,000-file pages, then replay changes that landed after the first-page snapshot
 3. Compute hashes for local files (skip unchanged via manifest mtime/size)
 4. 3-way diff using `reconciliation.ts:detectConflicts()`
 5. Execute uploads, downloads, conflicts, deletes
@@ -43,13 +43,13 @@ Entry point: `engine.ts:sync()` -> `planner.ts:createFullSyncPlan()`
 
 ### 5. Initial Sync
 
-First-time upload of all vault files. Processes files in pipelined chunks - prepares the next chunk while uploading the current one.
+First-time upload of all vault files. Files are prepared and uploaded in sequential byte-budgeted chunks so binary contents cannot accumulate without bound in memory.
 
 Entry point: `engine.ts:initialSync()`
 
 ### 6. Force Full Sync
 
-Clears local manifest, uploads all local files regardless of hash, deletes remote-only files.
+Snapshots and clears the local manifest, uploads all local files regardless of hash, and only then deletes remote-only files. If any upload fails or the operation is aborted, remote deletion never begins and the previous local manifest is restored. Replaced and deleted remote objects remain recoverable for 30 days.
 
 Entry point: `engine.ts:forceFullSync()`
 
@@ -107,6 +107,7 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
    - Non-hidden folders are walked iteratively at any depth while looking for nested hidden subfolders
 3. **Deduplication:** via Set to avoid processing the same file twice
 4. **Early filtering:** ignore patterns applied during discovery, before hashing
+5. **Portability validation:** reject Windows-incompatible names plus case and Unicode-normalization collisions before any upload begins
 
 The active Obsidian configuration folder's entire `plugins/` tree is always excluded, including plugin JavaScript, manifests, styles, and data files.
 
@@ -122,12 +123,12 @@ The active Obsidian configuration folder's entire `plugins/` tree is always excl
 | `BATCH_DOWNLOAD_MAX_FILES` | 50 | `protocol/sync-limits.ts` |
 | `BATCH_MAX_BYTES` | 10 MB | `types.ts` |
 | `BATCH_FILE_SIZE_LIMIT` | 1 MB | `types.ts` |
-| `UPLOAD_CONCURRENCY` | 10 | `engine.ts` |
-| `DOWNLOAD_CONCURRENCY` | 5 | `engine.ts` |
+| `UPLOAD_CONCURRENCY` | 2 | `engine-constants.ts` |
+| `DOWNLOAD_CONCURRENCY` | 2 | `engine-constants.ts` |
 | `FORCE_SYNC_CONCURRENCY` | 2 | `engine.ts` |
-| `PREPARE_CONCURRENCY` | 20 | `engine.ts` |
-| `INITIAL_SYNC_PIPELINE_CHUNK_FILES` | 500 | `engine.ts` |
-| `BATCH_UPLOAD_CONCURRENCY` | 5 | `engine-constants.ts` |
+| `PREPARE_CONCURRENCY` | 2 | `engine-constants.ts` |
+| Transfer chunk budget | 48 MiB mobile / 128 MiB desktop, max 128 files | `transfer-budget.ts` |
+| `BATCH_UPLOAD_CONCURRENCY` | 1 | `engine-constants.ts` |
 | `MAX_RETRIES` | 3 | `engine.ts` |
 | `RETRY_BASE_DELAY_MS` | 1,000 ms | `engine.ts` |
 
@@ -179,7 +180,10 @@ Implementation: `manifest.ts:LocalManifest`
 ## Error Recovery
 
 - **Retry:** failed uploads retry up to 3 times with exponential backoff (1s base delay)
+- **Cancellation:** in-flight HTTP transfers use `AbortController`; stopping or unloading sync aborts the underlying request, not only the caller's wait
 - **Incremental-to-full fallback:** if incremental sync returns `null` (error/cursor expiry), engine runs full sync
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file
 - **Queue retry:** retryable flush failures are re-added to `pendingPaths`; version and validation conflicts request a full three-way reconciliation instead of spinning or dropping the path
 - **Large files:** files > 25 MB are skipped with error message, not crashed
+- **Remote recovery:** replaced and deleted R2 objects are retained for 30 days, integrity-checked, and restorable with an expected-hash compare-and-swap
+- **Ignored remote cleanup:** changing ignore patterns never deletes data implicitly; settings provide an explicit preview-and-confirm purge action

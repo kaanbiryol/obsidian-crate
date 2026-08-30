@@ -9,6 +9,7 @@ import type {
 	CrateSettings,
 	FileDiff,
 	FileEntry,
+	FileManifest,
 	PreparedUpload,
 	SyncResult,
 	SyncState,
@@ -41,7 +42,7 @@ interface SyncEngineContextDependencies {
 		files: VaultFile[],
 		onPrepared?: (completed: number) => void,
 	) => Promise<PreparedUpload[]>;
-	createVaultFileChunks: (files: VaultFile[], chunkSize: number) => VaultFile[][];
+	createVaultFileChunks: (files: VaultFile[]) => VaultFile[][];
 	updateState: (updates: Partial<SyncState>) => void;
 	isAbortError: (error: unknown) => boolean;
 	throwIfDestroyed: () => void;
@@ -162,9 +163,12 @@ export class SyncEngineContexts {
 			shouldIgnore: dependencies.shouldIgnore,
 			isAbortError: dependencies.isAbortError,
 			getManifest: () => dependencies.api.getManifest(),
+			snapshotLocalManifest: () => structuredClone(dependencies.getLocalManifest().getManifest()),
 			clearLocalManifest: () => dependencies.getLocalManifest().clear(),
+			replaceLocalManifest: (manifest: FileManifest) => dependencies.getLocalManifest().replaceManifest(manifest),
 			prepareUploadsFromVaultFiles: dependencies.prepareUploadsFromVaultFiles,
 			uploadPreparedFiles: dependencies.uploadPreparedFiles,
+			createVaultFileChunks: dependencies.createVaultFileChunks,
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			deleteRemoteFile: async (path: string, expectedHash: string) => {
 				await dependencies.api.deleteFile(path, expectedHash);

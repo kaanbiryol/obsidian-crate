@@ -1,6 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 import { setPluginDeviceId } from '../../plugin/deviceId';
 import { openConfirmationModal } from '../confirmation-modal';
+import { openRemoteRecoveryModal } from '../remote-recovery-modal';
 import {
 	createFileSyncProgress,
 	hideFileSyncProgress,
@@ -107,9 +108,9 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 				const confirmed = await openConfirmationModal(plugin.app, {
 					title: 'Force full sync',
 					message: 'Overwrite the remote vault with local files?',
-					details: [
-						'Remote-only files will be deleted.',
-						'This action cannot be undone.',
+						details: [
+							'Remote-only files will be deleted.',
+							'Deleted and replaced remote files remain recoverable for 30 days.',
 					],
 					confirmText: 'Force full update',
 					warning: true,
@@ -146,4 +147,49 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 				});
 			}));
 	const forceProgress = createFileSyncProgress(forceSyncSetting);
+
+	new Setting(containerEl)
+		.setName('Restore remote file')
+		.setDesc('Restore a file that was replaced or deleted during the last 30 days')
+		.addButton(button => button
+			.setButtonText('View retained files')
+			.onClick(() => openRemoteRecoveryModal(plugin.app, plugin.syncRuntime)));
+
+	new Setting(containerEl)
+		.setName('Remove ignored remote files')
+		.setDesc('Delete remote copies that now match an ignore pattern; local files are not changed')
+		.addButton(button => button
+			.setButtonText('Review and remove')
+			.setDestructive()
+			.onClick(async () => {
+				await runButtonTask({
+					button,
+					idleText: 'Review and remove',
+					runningText: 'Checking...',
+					task: async () => {
+						const paths = await plugin.syncRuntime.previewIgnoredRemoteFiles();
+						if (paths.length === 0) return null;
+						const confirmed = await openConfirmationModal(plugin.app, {
+							title: 'Remove ignored remote files',
+							message: `Delete ${paths.length} ignored remote ${paths.length === 1 ? 'file' : 'files'}?`,
+							details: [
+								...paths.slice(0, 5),
+								...(paths.length > 5 ? [`…and ${paths.length - 5} more`] : []),
+								'Deleted files remain recoverable for 30 days.',
+							],
+							confirmText: 'Remove remote copies',
+							warning: true,
+						});
+						return confirmed ? plugin.syncRuntime.purgeIgnoredRemoteFiles() : undefined;
+					},
+					onSuccess: result => {
+						if (result === null) new Notice('No ignored remote files found');
+						else if (result?.errors.length) new Notice(`Removed ${result.deleted.length} files; ${result.errors.length} failed`);
+						else if (result) new Notice(`Removed ${result.deleted.length} ignored remote files`);
+					},
+					onError: () => {
+						new Notice('Could not remove ignored remote files');
+					},
+				});
+			}));
 }

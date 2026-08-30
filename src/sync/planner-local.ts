@@ -45,6 +45,11 @@ export async function getLocalChanges(
     if (!existing || existing.hash !== hash) {
       return { path: file.path, hash };
     }
+    context.localManifest.setEntry(file.path, {
+      hash,
+      size: file.size,
+      modified: new Date(file.mtime).toISOString(),
+    });
     return null;
   });
 

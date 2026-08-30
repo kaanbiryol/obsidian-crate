@@ -73,6 +73,13 @@ function createDb(options?: {
 	const hashes = new Map<string, string>(Object.entries(options?.fileHashes ?? {}));
 	const sizes = new Map<string, number>(Object.entries(options?.fileSizes ?? {}));
 	const scheduled = new Map<string, { content: string; project: string | null; dueDatetime: string }>();
+	const notificationJobs = new Map<string, {
+		reminder_id: string;
+		job_token: string;
+		operation: 'schedule' | 'cancel';
+		payload_json: string | null;
+		attempts: number;
+	}>();
 	const reminderCache = new Map<string, ReminderCacheValue>();
 	const reminderCacheKey = (folderPath: string, filePath: string) => `${folderPath}\0${filePath}`;
 
@@ -107,6 +114,24 @@ function createDb(options?: {
 						scheduled.delete(getBoundString(statement._args, 0));
 					}
 
+					if (sql.includes('INSERT INTO notification_jobs')) {
+						const reminderId = getBoundString(statement._args, 0);
+						notificationJobs.set(reminderId, {
+							reminder_id: reminderId,
+							job_token: getBoundString(statement._args, 1),
+							operation: getBoundString(statement._args, 2) as 'schedule' | 'cancel',
+							payload_json: statement._args[3] === null ? null : getBoundString(statement._args, 3),
+							attempts: 0,
+						});
+					}
+
+					if (sql.includes('DELETE FROM notification_jobs WHERE reminder_id = ? AND job_token = ?')) {
+						const reminderId = getBoundString(statement._args, 0);
+						if (notificationJobs.get(reminderId)?.job_token === getBoundString(statement._args, 1)) {
+							notificationJobs.delete(reminderId);
+						}
+					}
+
 					if (sql.startsWith('DELETE FROM reminder_file_cache')) {
 						const folderPath = getBoundString(statement._args, 0);
 						for (const key of reminderCache.keys()) {
@@ -120,6 +145,9 @@ function createDb(options?: {
 					return {};
 				}),
 				first: vi.fn(async () => {
+					if (sql.includes('FROM notification_jobs WHERE reminder_id = ?')) {
+						return notificationJobs.get(getBoundString(statement._args, 0)) ?? null;
+					}
 					if (sql.includes('FROM files WHERE path = ?')) {
 						const path = getBoundString(statement._args, 0);
 						if (!files.has(path)) {
@@ -154,8 +182,8 @@ function createDb(options?: {
 								})),
 						};
 					}
-					if (sql.includes("instr(path, ? || '/') = 1")) {
-						const prefix = `${getBoundString(statement._args, 0)}/`;
+					if (sql.includes('path >= ?') && sql.includes("lower(path) LIKE '%.md'")) {
+						const prefix = getBoundString(statement._args, 0);
 						return {
 							results: Array.from(files.keys())
 								.filter((path) => path.startsWith(prefix) && path.toLowerCase().endsWith('.md'))
@@ -182,38 +210,38 @@ function createDb(options?: {
 				let changes = 0;
 				if (statement._sql.includes('atomic-destination-insert')) {
 					const destinationPath = getBoundString(statement._args, 0);
-					const sourcePath = getBoundString(statement._args, 5);
-					const sourceExpectedHash = getBoundString(statement._args, 6);
+					const sourcePath = getBoundString(statement._args, 6);
+					const sourceExpectedHash = getBoundString(statement._args, 7);
 					if (!files.has(destinationPath) && hashes.get(sourcePath) === sourceExpectedHash) {
+						files.set(destinationPath, getBoundString(statement._args, 4));
+						hashes.set(destinationPath, getBoundString(statement._args, 2));
+						sizes.set(destinationPath, Number(statement._args[3]));
+						options?.committedPaths?.push(destinationPath);
+						changes = 1;
+					}
+				} else if (statement._sql.includes('atomic-destination-update')) {
+					const destinationPath = getBoundString(statement._args, 4);
+					const sourcePath = getBoundString(statement._args, 6);
+					if (
+						hashes.get(destinationPath) === getBoundString(statement._args, 5)
+						&& hashes.get(sourcePath) === getBoundString(statement._args, 7)
+					) {
 						files.set(destinationPath, getBoundString(statement._args, 3));
 						hashes.set(destinationPath, getBoundString(statement._args, 1));
 						sizes.set(destinationPath, Number(statement._args[2]));
 						options?.committedPaths?.push(destinationPath);
 						changes = 1;
 					}
-				} else if (statement._sql.includes('atomic-destination-update')) {
-					const destinationPath = getBoundString(statement._args, 3);
-					const sourcePath = getBoundString(statement._args, 5);
-					if (
-						hashes.get(destinationPath) === getBoundString(statement._args, 4)
-						&& hashes.get(sourcePath) === getBoundString(statement._args, 6)
-					) {
-						files.set(destinationPath, getBoundString(statement._args, 2));
-						hashes.set(destinationPath, getBoundString(statement._args, 0));
-						sizes.set(destinationPath, Number(statement._args[1]));
-						options?.committedPaths?.push(destinationPath);
-						changes = 1;
-					}
 				} else if (statement._sql.includes('atomic-source-update')) {
-					const sourcePath = getBoundString(statement._args, 3);
-					const destinationPath = getBoundString(statement._args, 5);
+					const sourcePath = getBoundString(statement._args, 4);
+					const destinationPath = getBoundString(statement._args, 6);
 					if (
-						hashes.get(sourcePath) === getBoundString(statement._args, 4)
-						&& files.get(destinationPath) === getBoundString(statement._args, 6)
+						hashes.get(sourcePath) === getBoundString(statement._args, 5)
+						&& files.get(destinationPath) === getBoundString(statement._args, 7)
 					) {
-						files.set(sourcePath, getBoundString(statement._args, 2));
-						hashes.set(sourcePath, getBoundString(statement._args, 0));
-						sizes.set(sourcePath, Number(statement._args[1]));
+						files.set(sourcePath, getBoundString(statement._args, 3));
+						hashes.set(sourcePath, getBoundString(statement._args, 1));
+						sizes.set(sourcePath, Number(statement._args[2]));
 						options?.committedPaths?.push(sourcePath);
 						changes = 1;
 					}
@@ -229,21 +257,21 @@ function createDb(options?: {
 						});
 						changes = 1;
 					}
-				} else if (statement._sql.includes('INSERT INTO files (path, hash, size, modified, storage_key)')) {
+				} else if (statement._sql.includes('INSERT INTO files (path, portable_path, hash, size, modified, storage_key)')) {
 					const path = getBoundString(statement._args, 0);
 					if (!statement._sql.includes('DO NOTHING') || !files.has(path)) {
-						files.set(path, getBoundString(statement._args, 3));
-						hashes.set(path, getBoundString(statement._args, 1));
-						sizes.set(path, Number(statement._args[2]));
+						files.set(path, getBoundString(statement._args, 4));
+						hashes.set(path, getBoundString(statement._args, 2));
+						sizes.set(path, Number(statement._args[3]));
 						options?.committedPaths?.push(path);
 						changes = 1;
 					}
 				} else if (statement._sql.startsWith('UPDATE files')) {
-					const path = getBoundString(statement._args, 3);
-					if (hashes.get(path) === getBoundString(statement._args, 4)) {
-						files.set(path, getBoundString(statement._args, 2));
-						hashes.set(path, getBoundString(statement._args, 0));
-						sizes.set(path, Number(statement._args[1]));
+					const path = getBoundString(statement._args, 4);
+					if (hashes.get(path) === getBoundString(statement._args, 5)) {
+						files.set(path, getBoundString(statement._args, 3));
+						hashes.set(path, getBoundString(statement._args, 1));
+						sizes.set(path, Number(statement._args[2]));
 						options?.committedPaths?.push(path);
 						changes = 1;
 					}

@@ -68,6 +68,7 @@ describe('transfer download/process helpers', () => {
 			stat: { size: 5, mtime: 1700000000000 },
 		});
 		harness.adapter.readBinary.mockResolvedValue(content);
+		harness.adapter.stat.mockResolvedValue({ type: 'file', size: 5, mtime: 1700000000000 });
 		harness.localManifest.hashMatches.mockReturnValue(true);
 		harness.api.uploadFile.mockResolvedValue({
 			success: true,
@@ -106,6 +107,7 @@ describe('transfer download/process helpers', () => {
 			stat: { size: content.byteLength, mtime: 1700000000000 },
 		});
 		harness.adapter.readBinary.mockResolvedValue(content);
+		harness.adapter.stat.mockResolvedValue({ type: 'file', size: content.byteLength, mtime: 1700000000000 });
 		harness.api.uploadFile.mockResolvedValue({
 			success: true,
 			path: 'notes/a.md',
@@ -169,6 +171,7 @@ describe('transfer download/process helpers', () => {
 		};
 		harness.vault.getAbstractFileByPath.mockReturnValue(file);
 		harness.adapter.readBinary.mockResolvedValue(changedContent);
+		harness.adapter.stat.mockResolvedValue({ type: 'file', size: changedContent.byteLength, mtime: 1700000000000 });
 		harness.api.uploadFile.mockResolvedValue({
 			success: true,
 			path: 'notes/a.md',

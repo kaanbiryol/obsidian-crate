@@ -153,7 +153,10 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 
 		const getResponse = await handleGetSettings(bucket);
 		expect(getResponse.status).toBe(200);
-		expect(await responseJson(getResponse)).toEqual({ settings: null });
+		expect(await responseJson(getResponse)).toEqual({
+			settings: null,
+			settingsVersion: 'initial-__crate__/settings.json',
+		});
 
 		await bucket.put(
 			'__crate__/settings.json',
@@ -174,12 +177,15 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 				showStatusBar: true,
 				pushEnabled: false,
 			},
+			settingsVersion: 'etag-1',
 		});
+		const currentVersion = (await bucket.head('__crate__/settings.json'))?.etag ?? null;
 
 		const badPutResponse = await handlePutSettings(
 			new Request('https://worker.test/settings', {
 				method: 'PUT',
 				body: JSON.stringify({
+					expectedVersion: currentVersion,
 					settings: {
 						ignorePatterns: ['ok'],
 						syncOnStartup: 'yes',
@@ -199,6 +205,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 			new Request('https://worker.test/settings', {
 				method: 'PUT',
 				body: JSON.stringify({
+					expectedVersion: currentVersion,
 					settings: {
 						ignorePatterns: ['.git/'],
 						syncOnStartup: true,
@@ -213,6 +220,31 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 			bucket,
 		);
 		expect(goodPutResponse.status).toBe(200);
+	});
+
+	it('rejects a stale shared-settings write instead of losing a concurrent edit', async () => {
+		const { bucket } = createMockR2Bucket();
+		const firstSettings = {
+			ignorePatterns: ['first'],
+			syncOnStartup: true,
+			syncOnResume: true,
+			syncInterval: 30,
+			showStatusBar: true,
+			pushEnabled: false,
+		};
+		const firstWrite = await bucket.put('__crate__/settings.json', JSON.stringify(firstSettings));
+		if (!firstWrite) throw new Error('Expected settings fixture write');
+		await bucket.put('__crate__/settings.json', JSON.stringify({ ...firstSettings, ignorePatterns: ['concurrent'] }));
+
+		const response = await handlePutSettings(new Request('https://worker.test/settings', {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ expectedVersion: firstWrite.etag, settings: firstSettings }),
+		}), bucket);
+
+		expect(response.status).toBe(409);
+		expect(await bucket.get('__crate__/settings.json').then(object => object?.text()))
+			.toContain('concurrent');
 	});
 
 	it('rejects malformed batch upload entries without writing them', async () => {

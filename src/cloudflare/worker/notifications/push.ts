@@ -22,6 +22,7 @@ export interface PushDeliveryResult {
 	sent: number;
 	failed: number;
 	pruned: number;
+	quarantined: number;
 	errors: string[];
 	failedSubscriptionIds: string[];
 }
@@ -97,7 +98,7 @@ export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVa
 }
 
 export async function listPushSubscriptionIds(db: D1Database): Promise<string[]> {
-	const rows = await queryRows<{ id: string }>(db.prepare('SELECT id FROM push_subscriptions'));
+	const rows = await queryRows<{ id: string }>(db.prepare('SELECT id FROM push_subscriptions WHERE disabled_at IS NULL'));
 	return rows.map((row) => row.id);
 }
 
@@ -121,13 +122,17 @@ function isExpiredSubscriptionStatus(status: number): boolean {
 	return status === 404 || status === 410;
 }
 
+function isRetryablePushStatus(status: number): boolean {
+	return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
 export async function sendToAllSubscriptions(
 	db: D1Database,
 	payload: PushNotificationPayload,
 	options: { subscriptionIds?: readonly string[] } = {},
 ): Promise<PushDeliveryResult> {
 	const allSubscriptions = await queryRows<PushSubscriptionRow>(
-		db.prepare('SELECT id, endpoint, p256dh, auth FROM push_subscriptions'),
+		db.prepare('SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE disabled_at IS NULL'),
 	);
 	const requestedIds = options.subscriptionIds ? new Set(options.subscriptionIds) : null;
 	const subscriptions = requestedIds
@@ -139,6 +144,7 @@ export async function sendToAllSubscriptions(
 			sent: 0,
 			failed: 0,
 			pruned: 0,
+			quarantined: 0,
 			errors: requestedIds?.size ? [] : ['no subscriptions in db'],
 			failedSubscriptionIds: [],
 		};
@@ -150,6 +156,7 @@ export async function sendToAllSubscriptions(
 	let sent = 0;
 	let failed = 0;
 	let pruned = 0;
+	let quarantined = 0;
 	const errors: string[] = [];
 	const failedSubscriptionIds: string[] = [];
 
@@ -170,13 +177,23 @@ export async function sendToAllSubscriptions(
 				pruned += 1;
 			} else if (response.ok) {
 				sent += 1;
-			} else {
+			} else if (isRetryablePushStatus(response.status)) {
 				const body = await response.text().catch(() => '');
 				const message = `${subscription.id}: ${response.status} ${body}`;
 				console.error('Push failed:', message);
 				errors.push(message);
 				failed += 1;
 				failedSubscriptionIds.push(subscription.id);
+			} else {
+				const body = await response.text().catch(() => '');
+				const message = `${subscription.id}: ${response.status} ${body}`;
+				await db.prepare(`UPDATE push_subscriptions
+					SET disabled_at = datetime('now'), last_error = ? WHERE id = ?`)
+					.bind(message.slice(0, 1024), subscription.id)
+					.run();
+				console.error('Push subscription quarantined:', message);
+				errors.push(message);
+				quarantined += 1;
 			}
 		} catch (error) {
 			const message = `${subscription.id}: ${error instanceof Error ? error.message : String(error)}`;
@@ -187,5 +204,5 @@ export async function sendToAllSubscriptions(
 		}
 	});
 
-	return { sent, failed, pruned, errors, failedSubscriptionIds };
+	return { sent, failed, pruned, quarantined, errors, failedSubscriptionIds };
 }

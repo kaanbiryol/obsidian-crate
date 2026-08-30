@@ -97,7 +97,8 @@ export async function handleUnsubscribe(request: Request, db: D1Database): Promi
 
 export async function handleListSubscriptions(db: D1Database): Promise<Response> {
 	const rows = await queryRows(
-		db.prepare('SELECT id, device_name, created_at FROM push_subscriptions ORDER BY created_at DESC')
+		db.prepare(`SELECT id, device_name, created_at, disabled_at, last_error
+			FROM push_subscriptions ORDER BY created_at DESC`)
 	);
 	return corsResponse({ subscriptions: rows });
 }
@@ -112,6 +113,7 @@ export async function handleTestPush(db: D1Database): Promise<Response> {
 		sent: delivery.sent,
 		failed: delivery.failed,
 		pruned: delivery.pruned,
+		quarantined: delivery.quarantined,
 		errors: delivery.errors,
 	});
 }

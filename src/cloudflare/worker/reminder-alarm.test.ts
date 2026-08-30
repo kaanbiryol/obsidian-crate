@@ -86,6 +86,7 @@ describe('reminder alarm delivery', () => {
 				sent: 1,
 				failed: 1,
 				pruned: 0,
+				quarantined: 0,
 				errors: ['temporary failure'],
 				failedSubscriptionIds: ['subscription-2'],
 			})
@@ -93,6 +94,7 @@ describe('reminder alarm delivery', () => {
 				sent: 1,
 				failed: 0,
 				pruned: 0,
+				quarantined: 0,
 				errors: [],
 				failedSubscriptionIds: [],
 			});
@@ -124,6 +126,7 @@ describe('reminder alarm delivery', () => {
 			sent: 0,
 			failed: 1,
 			pruned: 0,
+			quarantined: 0,
 			errors: ['temporary failure'],
 			failedSubscriptionIds: ['subscription-1'],
 		});
@@ -136,12 +139,37 @@ describe('reminder alarm delivery', () => {
 		expect(harness.deleteAll).not.toHaveBeenCalled();
 	});
 
+	it('records a terminal delivery failure after the retry budget is exhausted', async () => {
+		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1']);
+		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
+			sent: 0,
+			failed: 1,
+			pruned: 0,
+			quarantined: 0,
+			errors: ['temporary failure'],
+			failedSubscriptionIds: ['subscription-1'],
+		});
+		const harness = createHarness();
+		harness.storedValues.set('retryAttempt', 10);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		await harness.alarm.alarm();
+
+		expect(harness.storedValues.get('deliveryFailure')).toEqual(expect.objectContaining({
+			attempts: 10,
+			error: 'Push delivery failed for 1 subscription(s)',
+		}));
+		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+		expect(harness.setAlarm).not.toHaveBeenCalled();
+	});
+
 	it('cleans up only after delivery finishes without retryable failures', async () => {
 		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1']);
 		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
 			sent: 1,
 			failed: 0,
 			pruned: 0,
+			quarantined: 0,
 			errors: [],
 			failedSubscriptionIds: [],
 		});
@@ -158,6 +186,7 @@ describe('reminder alarm delivery', () => {
 			sent: 1,
 			failed: 0,
 			pruned: 0,
+			quarantined: 0,
 			errors: [],
 			failedSubscriptionIds: [],
 		});
@@ -204,6 +233,7 @@ describe('reminder alarm delivery', () => {
 			sent: 0,
 			failed: 0,
 			pruned: 0,
+			quarantined: 0,
 			errors: [],
 			failedSubscriptionIds: [],
 		});

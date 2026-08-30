@@ -7,10 +7,21 @@ import { runScheduledMaintenance } from './maintenance';
 
 export { ReminderAlarm } from './notifications';
 
+function withRequestId(response: Response, requestId: string): Response {
+	const headers = new Headers(response.headers);
+	headers.set('X-Crate-Request-Id', requestId);
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers,
+	});
+}
+
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
+		const requestId = crypto.randomUUID();
 		if (request.method === 'OPTIONS') {
-			return new Response(null, { status: 204, headers: corsHeaders() });
+			return withRequestId(new Response(null, { status: 204, headers: corsHeaders() }), requestId);
 		}
 
 		const url = new URL(request.url);
@@ -21,30 +32,32 @@ export default {
 		try {
 			const publicResponse = await handlePublicRoute(request, env, path, method);
 			if (publicResponse) {
-				return publicResponse;
+				return withRequestId(publicResponse, requestId);
 			}
 
 			const authResult = await authenticateWorkerRequest(request, db);
 			if (authResult.response) {
-				return authResult.response;
+				return withRequestId(authResult.response, requestId);
 			}
 
-			return await handleAuthenticatedRoute(request, env, path, method, authResult.principal)
+			const response = await handleAuthenticatedRoute(request, env, path, method, authResult.principal)
 				?? corsResponse({ error: 'Not found' }, 404);
+			return withRequestId(response, requestId);
 		} catch (error) {
 			if (error instanceof FileVersionConflictError) {
-				return corsResponse({
+				return withRequestId(corsResponse({
 					error: 'The reminder file changed. Refresh and retry your edit.',
 					path: error.path,
 					currentHash: error.currentHash,
-				}, 409);
+				}, 409), requestId);
 			}
 			console.error('Unhandled worker request error', {
 				method,
 				path,
+				requestId,
 				error: error instanceof Error ? error.message : String(error),
 			});
-			return corsResponse({ error: 'Internal server error' }, 500);
+			return withRequestId(corsResponse({ error: 'Internal server error' }, 500), requestId);
 		}
 	},
 	async scheduled(_controller: ScheduledController, env: Env): Promise<void> {

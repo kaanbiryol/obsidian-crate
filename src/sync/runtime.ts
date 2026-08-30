@@ -1,7 +1,14 @@
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
-import { SECRET_KEYS, type CrateSettings, type SyncHistoryEntry, type SyncResult, type SyncState } from '../plugin/types';
+import {
+	SECRET_KEYS,
+	type CrateSettings,
+	type RemoteFileVersion,
+	type SyncHistoryEntry,
+	type SyncResult,
+	type SyncState,
+} from '../plugin/types';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
@@ -33,6 +40,21 @@ export class SyncRuntime {
 	private initializationRevision = 0;
 	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
 	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+	async listRecentFileVersions(): Promise<RemoteFileVersion[]> {
+		if (!this.apiClient) throw new Error('Sync is not configured');
+		return (await this.apiClient.listFileVersions()).versions;
+	}
+
+	async restoreRecentFileVersion(version: RemoteFileVersion): Promise<SyncResult> {
+		if (!this.apiClient) throw new Error('Sync is not configured');
+		const manifest = await this.apiClient.getManifest();
+		await this.apiClient.restoreFileVersion(
+			version.storage_key,
+			manifest.files[version.path]?.hash ?? null,
+		);
+		return this.sync();
+	}
 	private lastForegroundSyncAt: number | null = null;
 
 	private onStatusBarClick: (() => void) | undefined;
@@ -57,6 +79,16 @@ export class SyncRuntime {
 
 	getPendingPaths(): string[] {
 		return this.syncEngine?.getPendingPaths() ?? [];
+	}
+
+	async previewIgnoredRemoteFiles(): Promise<string[]> {
+		if (!this.syncEngine) throw new Error('Sync is not configured');
+		return this.syncEngine.previewIgnoredRemoteFiles();
+	}
+
+	async purgeIgnoredRemoteFiles(): Promise<{ deleted: string[]; errors: string[] }> {
+		if (!this.syncEngine) throw new Error('Sync is not configured');
+		return this.syncEngine.purgeIgnoredRemoteFiles();
 	}
 
 	getConflictFiles(): string[] {

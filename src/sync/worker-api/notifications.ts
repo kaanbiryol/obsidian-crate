@@ -22,6 +22,8 @@ export interface PushSubscriptionsResponse {
 		id: string;
 		device_name: string | null;
 		created_at: string;
+		disabled_at?: string | null;
+		last_error?: string | null;
 	}>;
 }
 
@@ -29,6 +31,7 @@ export interface PushTestResponse {
 	sent: number;
 	failed: number;
 	pruned: number;
+	quarantined: number;
 	errors: string[];
 }
 

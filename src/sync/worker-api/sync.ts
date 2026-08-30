@@ -5,10 +5,12 @@ import type {
 	BatchDownloadResponse,
 	BatchUploadFile,
 	BatchUploadResponse,
+	BackendDiagnostics,
 	ChangesResponse,
 	CheckResponse,
 	FileManifest,
 	HealthResponse,
+	RemoteFileVersion,
 	UploadResult,
 } from '../../plugin/types';
 import {
@@ -16,6 +18,7 @@ import {
 	parseCrateServerInfo,
 	type CrateServerInfo,
 } from '../../protocol';
+import { assertPortablePaths } from '../../protocol/portable-path';
 import {
 	getHeader,
 	TRANSFER_TIMEOUT_MS,
@@ -57,12 +60,53 @@ export class SyncWorkerApi {
 		}
 	}
 
+	async getDiagnostics(): Promise<BackendDiagnostics> {
+		return this.http.requestJson<BackendDiagnostics>('/diagnostics');
+	}
+
 	async getManifest(): Promise<FileManifest> {
-		const manifest = await this.http.requestJson<FileManifest>('/sync/manifest');
-		if (manifest.truncated) {
-			throw new Error('Remote manifest is too large to sync safely');
+		const files: FileManifest['files'] = {};
+		let after: string | undefined;
+		let snapshotSeq: number | undefined;
+		let lastSeq = 0;
+		while (true) {
+			const params = new URLSearchParams({ limit: '2000' });
+			if (after) params.set('after', after);
+			if (snapshotSeq !== undefined) params.set('snapshotSeq', String(snapshotSeq));
+			const page = await this.http.requestJson<FileManifest>(`/sync/manifest?${params.toString()}`);
+			if (page.truncated) throw new Error('Remote manifest is too large to sync safely');
+			Object.assign(files, page.files);
+			lastSeq = page.lastSeq ?? lastSeq;
+			snapshotSeq ??= page.snapshotSeq ?? page.lastSeq ?? 0;
+			if (!page.hasMore) break;
+			if (!page.nextCursor || page.nextCursor === after) {
+				throw new Error('Remote manifest pagination did not advance');
+			}
+			after = page.nextCursor;
 		}
-		return manifest;
+
+		let changeCursor = snapshotSeq ?? lastSeq;
+		while (true) {
+			const changes = await this.getChanges(changeCursor);
+			if (changes.cursorExpired) throw new Error('Remote manifest changed too quickly to load safely');
+			for (const change of changes.changes) {
+				if (change.action === 'delete') {
+					delete files[change.path];
+				} else {
+					files[change.path] = {
+						hash: change.hash,
+						size: change.size,
+						modified: change.created_at,
+					};
+				}
+			}
+			lastSeq = changes.lastSeq;
+			if (!changes.hasMore || changes.changes.length === 0) break;
+			changeCursor = changes.changes.at(-1)?.seq ?? changeCursor;
+		}
+
+		assertPortablePaths(Object.keys(files));
+		return { version: 1, files, lastSeq };
 	}
 
 	async uploadFile(
@@ -113,7 +157,9 @@ export class SyncWorkerApi {
 	}
 
 	async getChanges(since: number): Promise<ChangesResponse> {
-		return this.http.requestJson<ChangesResponse>(`/sync/changes?since=${since}`);
+		const response = await this.http.requestJson<ChangesResponse>(`/sync/changes?since=${since}`);
+		assertPortablePaths(response.changes.map(change => change.path));
+		return response;
 	}
 
 	async batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
@@ -144,6 +190,21 @@ export class SyncWorkerApi {
 		return this.http.requestJson<BatchDeleteResponse>('/sync/batch-delete', {
 			method: 'POST',
 			body: JSON.stringify({ files }),
+		});
+	}
+
+	async listFileVersions(path?: string): Promise<{ versions: RemoteFileVersion[] }> {
+		const query = path ? `?path=${encodeURIComponent(path)}` : '';
+		return this.http.requestJson<{ versions: RemoteFileVersion[] }>(`/sync/versions${query}`);
+	}
+
+	async restoreFileVersion(
+		storageKey: string,
+		expectedHash: string | null,
+	): Promise<{ success: boolean; path: string; hash: string; size: number }> {
+		return this.http.requestJson('/sync/restore-version', {
+			method: 'POST',
+			body: JSON.stringify({ storageKey, expectedHash }),
 		});
 	}
 }

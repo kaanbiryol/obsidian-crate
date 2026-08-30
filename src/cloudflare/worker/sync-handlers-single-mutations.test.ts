@@ -186,13 +186,10 @@ it('rejects traversal-style upload paths', async () => {
 		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
 	});
 
-	it('returns success when delete cleanup fails after the D1 commit', async () => {
+	it('retains deleted content instead of racing another delete cleanup', async () => {
 		const managedKey = '__crate__/files/hash/object-to-delete';
 		const { bucket, store } = createMockR2Bucket({
 			[managedKey]: 'before',
-		});
-		bucket.delete = vi.fn(async () => {
-			throw new Error('cleanup unavailable');
 		});
 		const { db, files } = createMockD1Database({
 			files: {
@@ -217,5 +214,6 @@ it('rejects traversal-style upload paths', async () => {
 		});
 		expect(files.has('notes/test.md')).toBe(false);
 		expect(new TextDecoder().decode(store.get(managedKey)?.body)).toBe('before');
+		expect(bucket.delete).not.toHaveBeenCalled();
 	});
 });

@@ -6,7 +6,7 @@ import {
 } from './sync-result';
 import { FORCE_SYNC_CONCURRENCY } from './engine-constants';
 import { createLogger, errorMessage } from '../plugin/logger';
-import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
+import type { FileManifest, PreparedUpload, SyncResult, SyncState } from '../plugin/types';
 import {
 	completeWorkflowResult,
 	getStartFailureResult,
@@ -25,7 +25,10 @@ export interface ForceSyncWorkflowContext {
 	shouldIgnore(path: string): boolean;
 	isAbortError(error: unknown): boolean;
 	getManifest(): Promise<RemoteManifest>;
+	snapshotLocalManifest(): FileManifest;
 	clearLocalManifest(): void;
+	replaceLocalManifest(manifest: FileManifest): void;
+	createVaultFileChunks(files: VaultFile[]): VaultFile[][];
 	prepareUploadsFromVaultFiles(
 		files: VaultFile[],
 		onPrepared?: (completed: number) => void
@@ -51,6 +54,8 @@ export async function runForceFullSyncWorkflow(
 
 	context.updateState({ status: 'syncing' });
 	const result = createEmptySyncResult();
+	const previousLocalManifest = context.snapshotLocalManifest();
+	let manifestCommitted = false;
 
 	try {
 		const remoteManifest = await context.getManifest();
@@ -68,20 +73,24 @@ export async function runForceFullSyncWorkflow(
 
 		context.clearLocalManifest();
 
-		const prepared = await context.prepareUploadsFromVaultFiles(files, completed => {
-			current = completed;
-			progressCallback?.(current, total);
-		});
-		for (const upload of prepared) {
-			upload.expectedHash = remoteManifest.files[upload.path]?.hash ?? null;
+		for (const chunk of context.createVaultFileChunks(files)) {
+			const prepared = await context.prepareUploadsFromVaultFiles(chunk, () => {
+				current++;
+				progressCallback?.(current, total);
+			});
+			for (const upload of prepared) {
+				upload.expectedHash = remoteManifest.files[upload.path]?.hash ?? null;
+			}
+
+			context.throwIfDestroyed();
+			await context.uploadPreparedFiles(prepared, result, {
+				concurrency: FORCE_SYNC_CONCURRENCY,
+				retry: true,
+			});
+			if (result.errors.length > 0) {
+				throw new Error('Force full sync stopped before deleting remote files because an upload failed');
+			}
 		}
-
-		context.throwIfDestroyed();
-
-		await context.uploadPreparedFiles(prepared, result, {
-			concurrency: FORCE_SYNC_CONCURRENCY,
-			retry: true,
-		});
 
 		context.throwIfDestroyed();
 
@@ -101,6 +110,7 @@ export async function runForceFullSyncWorkflow(
 		}
 
 		await context.saveLocalManifest();
+		manifestCommitted = result.errors.length === 0;
 
 		logger.info(
 			`Force full sync completed: ${result.uploaded} uploaded, ${result.deleted} remote-only deleted`,
@@ -109,12 +119,21 @@ export async function runForceFullSyncWorkflow(
 			errorFallback: 'Force full sync completed with errors',
 		});
 	} catch (error) {
-		handleWorkflowError(context, result, error, {
+			handleWorkflowError(context, result, error, {
 			abortLogMessage: 'Force full sync aborted',
 			failureLogPrefix: 'Force full sync failed',
 			logger,
 			logGenericError: true,
 		});
+	} finally {
+		if (!manifestCommitted) {
+			context.replaceLocalManifest(previousLocalManifest);
+			try {
+				await context.saveLocalManifest();
+			} catch (error) {
+				result.errors.push(`restore local manifest: ${errorMessage(error)}`);
+			}
+		}
 	}
 
 	finalizeSyncResult(result);

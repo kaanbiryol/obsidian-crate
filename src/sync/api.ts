@@ -7,11 +7,13 @@ import type {
 	BatchDownloadResponse,
 	BatchUploadFile,
 	BatchUploadResponse,
+	BackendDiagnostics,
 	ChangesResponse,
 	CheckResponse,
 	FileManifest,
 	HealthResponse,
 	RegisteredDevice,
+	RemoteFileVersion,
 	SharedSettings,
 	UploadResult,
 } from '../plugin/types';
@@ -73,6 +75,10 @@ export class SyncApiClient {
 		return this.syncApi.testConnection();
 	}
 
+	async getDiagnostics(): Promise<BackendDiagnostics> {
+		return this.syncApi.getDiagnostics();
+	}
+
 	async getManifest(): Promise<FileManifest> {
 		return this.syncApi.getManifest();
 	}
@@ -119,6 +125,17 @@ export class SyncApiClient {
 		return this.syncApi.batchDelete(paths, expectedHashes);
 	}
 
+	async listFileVersions(path?: string): Promise<{ versions: RemoteFileVersion[] }> {
+		return this.syncApi.listFileVersions(path);
+	}
+
+	async restoreFileVersion(
+		storageKey: string,
+		expectedHash: string | null,
+	): Promise<{ success: boolean; path: string; hash: string; size: number }> {
+		return this.syncApi.restoreFileVersion(storageKey, expectedHash);
+	}
+
 	async revokeToken(id: string): Promise<{ success: boolean }> {
 		return this.authApi.revokeToken(id);
 	}
@@ -131,11 +148,11 @@ export class SyncApiClient {
 		return this.authApi.listTokens();
 	}
 
-	async getSharedSettings(): Promise<{ settings: SharedSettings | null }> {
+	async getSharedSettings(): Promise<{ settings: SharedSettings | null; settingsVersion: string | null }> {
 		return this.sharedSettingsApi.getSharedSettings();
 	}
 
-	async putSharedSettings(settings: SharedSettings): Promise<{ success: boolean }> {
+	async putSharedSettings(settings: SharedSettings): Promise<{ success: boolean; settingsVersion: string }> {
 		return this.sharedSettingsApi.putSharedSettings(settings);
 	}
 

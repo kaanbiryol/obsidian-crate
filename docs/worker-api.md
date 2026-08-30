@@ -16,13 +16,16 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `GET` | `/health` | Health check, returns `{ status, timestamp }` |
 | `GET` | `/sync/check?since=<seq>` | Lightweight check: are there changes since this sequence? |
 | `GET` | `/sync/changes?since=<seq>` | Paginated changelog entries (limit 5000 per page) |
-| `GET` | `/sync/manifest` | Full remote manifest (gzip-compressed if accepted) |
+| `GET` | `/sync/manifest?limit=<n>&after=<path>&snapshotSeq=<seq>` | Stable, cursor-paginated remote manifest |
 | `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB) |
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
 | `POST` | `/sync/delete` | Delete single file `{ path }` |
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 6 files, 10 MB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
 | `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 6 files) |
+| `GET` | `/sync/versions?path=<path>` | List unexpired recoverable file versions |
+| `POST` | `/sync/restore-version` | Restore a retained version with expected-hash compare-and-swap |
+| `GET` | `/diagnostics` | Backend counts, queue pressure, and scheduled-maintenance state |
 | `DELETE` | `/auth/tokens` | Revoke an auth token `{ id }` |
 | `GET` | `/auth/tokens` | List all registered auth tokens |
 | `DELETE` | `/auth/session` | Revoke the current bearer token when disconnecting this device |
@@ -67,7 +70,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 - Query: `?path=<url-encoded-path>`
 - Headers: `X-File-Hash`, `X-File-Size`, `X-Crate-Expected-Hash`, `Content-Type`
 - `X-Crate-Expected-Hash` is the 64-character remote hash observed while planning, or `absent` for a new path
-- Body: raw binary, buffered only after declared-size and content-length preflight, with a hard 25 MB cap
+- Body: raw binary, consumed incrementally with a hard 25 MB cap; oversized declared or chunked requests stop before the remainder is buffered
 - Response: `{ success, path, hash }`
 - A stale expected hash returns `409` and does not replace the committed object
 
@@ -132,14 +135,19 @@ Paginated at 5000 entries. Client loops until `hasMore` is false.
 
 ### GET /sync/manifest
 
-Response (gzip-compressed when `Accept-Encoding: gzip`):
+The plugin requests pages of at most 2,000 entries. The first page establishes `snapshotSeq`; later pages reuse it, and the plugin replays the changelog after that sequence before accepting the manifest.
+
+Response:
 ```json
 {
   "version": 1,
   "files": {
     "path": { "hash": "...", "size": 1024, "modified": "datetime" }
   },
-  "lastSeq": 42
+  "lastSeq": 42,
+  "snapshotSeq": 42,
+  "hasMore": false,
+  "nextCursor": "optional/last/path.md"
 }
 ```
 
@@ -167,15 +175,15 @@ Response: `{ success: true }`
 
 Returns shared plugin preferences stored in R2 as `__crate__/settings.json`. Used by second devices to inherit settings during setup.
 
-Response: `{ settings: { ignorePatterns, syncOnStartup, syncOnResume, syncInterval, showStatusBar, pushEnabled } }` or `{ settings: null }` if not yet stored or corrupt.
+Response: `{ settings: { ignorePatterns, syncOnStartup, syncOnResume, syncInterval, showStatusBar, pushEnabled }, settingsVersion }` or `{ settings: null, settingsVersion }` if not yet stored or corrupt.
 
 ### PUT /settings
 
 Stores shared plugin preferences to R2.
 
-Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncOnResume: true, syncInterval: 300, showStatusBar: true, pushEnabled: false } }`
+Request: `{ settings: { ignorePatterns: [...], syncOnStartup: true, syncOnResume: true, syncInterval: 300, showStatusBar: true, pushEnabled: false }, expectedVersion }`
 
-Response: `{ success: true }`
+Response: `{ success: true, settingsVersion }`. A stale version returns `409` instead of overwriting another device's edit.
 
 ### GET /reminders/list
 
@@ -328,7 +336,7 @@ Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarat
 
 ## D1 Database Schema
 
-Eleven tables, initialized from `src/cloudflare/schema.sql` before the Worker is uploaded. Future upgrades are recorded in `d1_migrations` and applied before the new Worker bundle:
+Fourteen tables are initialized from `src/cloudflare/schema.sql` before the Worker is uploaded. Future upgrades are recorded in `d1_migrations`, checked statement-by-statement, and applied before the new Worker bundle:
 
 ### d1_migrations
 
@@ -362,6 +370,7 @@ Every upload or deletion inserts a row. `seq` is the cursor for incremental sync
 ```sql
 CREATE TABLE IF NOT EXISTS files (
   path     TEXT PRIMARY KEY,
+  portable_path TEXT NOT NULL,
   hash     TEXT NOT NULL DEFAULT '',
   size     INTEGER NOT NULL DEFAULT 0,
   modified TEXT NOT NULL DEFAULT (datetime('now')),
@@ -369,7 +378,7 @@ CREATE TABLE IF NOT EXISTS files (
 );
 ```
 
-D1-backed remote manifest. Updated atomically with changelog entries via `db.batch()`. `storage_key` points at the committed R2 blob for the path, so D1 is the visibility boundary even if best-effort R2 cleanup later fails.
+D1-backed remote manifest. `portable_path` is a unique normalized key that prevents case and Unicode collisions across supported filesystems. Rows are updated atomically with changelog entries via `db.batch()`. `storage_key` points at the committed R2 blob for the path, so D1 is the visibility boundary.
 
 ### reminder_file_cache
 
@@ -442,11 +451,13 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   p256dh TEXT NOT NULL,
   auth TEXT NOT NULL,
   device_name TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  disabled_at TEXT,
+  last_error TEXT
 );
 ```
 
-Web Push subscriptions. Each subscribed device gets a row. Expired subscriptions (404/410 on push send) are automatically pruned.
+Web Push subscriptions. Expired subscriptions (404/410) are pruned, transient statuses retry with bounded alarm backoff, and permanent failures are quarantined with their last error instead of retrying forever.
 
 ### push_enrollment_tokens
 
@@ -483,15 +494,19 @@ CREATE TABLE IF NOT EXISTS object_cleanup_queue (
 
 Retry queue for R2 objects whose best-effort deletion failed after their D1 metadata mutation committed.
 
+### file_versions, notification_jobs, and maintenance_state
+
+`file_versions` retains replaced and deleted objects for 30 days and supports integrity-checked recovery. `notification_jobs` is a durable schedule/cancel outbox so a committed PWA reminder edit is retried when its Durable Object call fails. `maintenance_state` stores the R2 sweep cursor plus the last maintenance run and error for diagnostics.
+
 ## R2 Key Convention
 
 Committed file blobs are stored under `__crate__/files/<hash>/<uuid>` and referenced through the required `files.storage_key`. D1 is required for every sync transfer; the Worker returns `503` instead of accepting an untracked R2 mutation when the database binding is unavailable.
 
-Failed R2 deletions are recorded in `object_cleanup_queue` and retried by the Worker's 15-minute maintenance Cron Trigger. The OAuth provisioner applies the initial schema and configures that trigger before enabling the Worker; the Wrangler deploy path declares the same trigger and runs `db:init:remote` in `predeploy`, so request cold starts do not execute schema DDL.
+The 15-minute maintenance trigger expires retained versions, drains object cleanup and notification jobs, prunes expired tokens and changelog rows, and incrementally sweeps unreferenced managed R2 objects older than 24 hours. The OAuth provisioner applies the initial schema and configures that trigger before enabling the Worker; request cold starts do not execute schema DDL.
 
 ## Path Sanitization
 
-`sanitizePath()` rejects null bytes, resolves `..` and `.` segments, strips empty segments. Returns null for invalid paths.
+`sanitizePath()` rejects null bytes, traversal, empty segments, backslashes, Windows-reserved names and characters, and trailing dots/spaces. A normalized unique D1 key additionally prevents case-insensitive and Unicode-normalizing collisions.
 
 ## Changelog Pruning
 

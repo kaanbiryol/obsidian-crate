@@ -19,11 +19,14 @@ CREATE INDEX IF NOT EXISTS changelog_created_at_idx ON changelog(created_at);
 
 CREATE TABLE IF NOT EXISTS files (
 	path TEXT PRIMARY KEY,
+	portable_path TEXT NOT NULL,
 	hash TEXT NOT NULL DEFAULT '',
 	size INTEGER NOT NULL DEFAULT 0,
 	modified TEXT NOT NULL DEFAULT (datetime('now')),
 	storage_key TEXT NOT NULL
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS files_portable_path_idx ON files(portable_path);
 
 CREATE TABLE IF NOT EXISTS auth_tokens (
 	id TEXT PRIMARY KEY,
@@ -48,6 +51,20 @@ CREATE TABLE IF NOT EXISTS scheduled_reminders (
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS notification_jobs (
+	reminder_id TEXT PRIMARY KEY,
+	job_token TEXT NOT NULL,
+	operation TEXT NOT NULL CHECK (operation IN ('schedule', 'cancel')),
+	payload_json TEXT,
+	attempts INTEGER NOT NULL DEFAULT 0,
+	available_at INTEGER NOT NULL,
+	last_error TEXT,
+	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS notification_jobs_available_at_idx
+	ON notification_jobs(available_at);
+
 CREATE TABLE IF NOT EXISTS vapid_keys (
 	id INTEGER PRIMARY KEY CHECK (id = 1),
 	public_key TEXT NOT NULL,
@@ -61,7 +78,9 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 	p256dh TEXT NOT NULL,
 	auth TEXT NOT NULL,
 	device_name TEXT,
-	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+	created_at TEXT NOT NULL DEFAULT (datetime('now')),
+	disabled_at TEXT,
+	last_error TEXT
 );
 
 CREATE TABLE IF NOT EXISTS push_enrollment_tokens (
@@ -83,6 +102,25 @@ CREATE INDEX IF NOT EXISTS web_enrollment_tokens_expires_at_idx ON web_enrollmen
 CREATE TABLE IF NOT EXISTS object_cleanup_queue (
 	storage_key TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS file_versions (
+	storage_key TEXT PRIMARY KEY,
+	path TEXT NOT NULL,
+	hash TEXT NOT NULL,
+	size INTEGER NOT NULL,
+	reason TEXT NOT NULL CHECK (reason IN ('replaced', 'deleted')),
+	created_at TEXT NOT NULL DEFAULT (datetime('now')),
+	expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS file_versions_expires_at_idx ON file_versions(expires_at);
+CREATE INDEX IF NOT EXISTS file_versions_path_idx ON file_versions(path, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS maintenance_state (
+	key TEXT PRIMARY KEY,
+	value TEXT NOT NULL,
+	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS reminder_file_cache (

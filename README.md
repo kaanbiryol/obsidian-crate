@@ -125,6 +125,9 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 - Files larger than 25 MiB (25 × 1024 × 1024 bytes) are skipped and reported as sync errors. They are not uploaded to or downloaded from the remote vault.
 - The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, and `.DS_Store`. Crate always ignores the active Obsidian configuration folder's entire `plugins/` tree, its Markdown merge cache, conflict copies, and `workspace*` files.
 - Change ignore patterns under **Settings → Crate → Sync → Ignore patterns**. A pattern ending in `/` ignores that directory tree; `*` and `?` wildcards are supported.
+- Adding an ignore pattern stops future transfers but does not silently delete an existing remote copy. Use **Settings → Crate → Infrastructure → Remove ignored remote files** to review and remove those copies explicitly.
+- Remote files replaced or deleted by sync are retained for 30 days. Use **Restore remote file** in Crate settings to recover one; a force full sync also keeps its remote deletions recoverable for that period.
+- Synced paths must be portable across desktop and mobile filesystems. Windows-reserved names, unsupported characters, trailing dots/spaces, and case- or Unicode-normalization collisions are rejected before transfer.
 - Cloudflare account and plan quotas still apply to R2, Workers, D1, and push-notification resources.
 
 ## Reminders

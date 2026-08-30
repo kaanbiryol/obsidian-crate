@@ -46,32 +46,62 @@ export async function handleGetChanges(request: Request, db: D1Database): Promis
 }
 
 export async function handleGetManifest(request: Request, db: D1Database): Promise<Response> {
-	const MAX_MANIFEST_FILES = 200000;
+	const url = new URL(request.url);
+	const requestedLimit = Number(url.searchParams.get('limit') || '5000');
+	if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 5000) {
+		return corsResponse({ error: 'Manifest page limit must be between 1 and 5000' }, 400);
+	}
+	const after = url.searchParams.get('after');
+	const requestedSnapshotSeq = url.searchParams.has('snapshotSeq')
+		? Number(url.searchParams.get('snapshotSeq'))
+		: null;
+	if (requestedSnapshotSeq !== null && (!Number.isSafeInteger(requestedSnapshotSeq) || requestedSnapshotSeq < 0)) {
+		return corsResponse({ error: 'Invalid manifest snapshot cursor' }, 400);
+	}
+	const filesStatement = after
+		? db.prepare(`SELECT path, hash, size, modified FROM files
+			WHERE path > ? ORDER BY path ASC LIMIT ?`).bind(after, requestedLimit + 1)
+		: db.prepare('SELECT path, hash, size, modified FROM files ORDER BY path ASC LIMIT ?')
+			.bind(requestedLimit + 1);
 	const [filesResult, seqResult] = await db.batch([
-		db.prepare('SELECT path, hash, size, modified FROM files LIMIT 200001'),
+		filesStatement,
 		db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'),
 	]);
 	const filesRows = batchRows<{ path: string; hash: string; size: number; modified: string }>(filesResult);
 	const seqRows = batchRows<{ lastSeq: number | null }>(seqResult);
-	const truncated = filesRows.length > MAX_MANIFEST_FILES;
-	const rows = truncated ? filesRows.slice(0, MAX_MANIFEST_FILES) : filesRows;
+	const hasMore = filesRows.length > requestedLimit;
+	const rows = hasMore ? filesRows.slice(0, requestedLimit) : filesRows;
 	const files: Record<string, { hash: string; size: number; modified: string }> = {};
 	for (const row of rows) {
 		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified };
 	}
 	const lastSeq = seqRows[0]?.lastSeq ?? 0;
+	const snapshotSeq = requestedSnapshotSeq ?? lastSeq;
+	const nextCursor = hasMore ? rows.at(-1)?.path : undefined;
+	const paginatedRequest = url.searchParams.has('limit') || url.searchParams.has('after');
 
-	return corsResponse({ version: 1, files, lastSeq, ...(truncated && { truncated: true }) });
+	return corsResponse({
+		version: 1,
+		files,
+		lastSeq,
+		snapshotSeq,
+		hasMore,
+		...(nextCursor && { nextCursor }),
+		...(!paginatedRequest && hasMore && { truncated: true }),
+	});
 }
 
 export async function handleGetSettings(bucket: R2Bucket): Promise<Response> {
 	const obj = await bucket.get('__crate__/settings.json');
-	if (!obj) return corsResponse({ settings: null });
+	if (!obj) return corsResponse({ settings: null, settingsVersion: null });
 	try {
 		const body = await obj.text();
-		return corsResponse({ settings: normalizeSharedSettingsValue(JSON.parse(body)) });
+		return corsResponse({
+			settings: normalizeSharedSettingsValue(JSON.parse(body)),
+			settingsVersion: obj.etag,
+		});
 	} catch {
-		return corsResponse({ settings: null });
+		return corsResponse({ settings: null, settingsVersion: obj.etag });
 	}
 }
 
@@ -82,10 +112,23 @@ export async function handlePutSettings(request: Request, bucket: R2Bucket): Pro
 	}
 
 	const settings = normalizeSharedSettingsValue(parsedBody.value.settings);
+	const expectedVersion = parsedBody.value.expectedVersion;
 	if (!settings) {
 		return corsResponse({ error: 'Invalid shared settings payload' }, 400);
 	}
+	if (expectedVersion !== null && typeof expectedVersion !== 'string') {
+		return corsResponse({ error: 'expectedVersion must be a string or null' }, 400);
+	}
 
-	await bucket.put('__crate__/settings.json', JSON.stringify(settings));
-	return corsResponse({ success: true });
+	const current = await bucket.head('__crate__/settings.json');
+	if ((current?.etag ?? null) !== expectedVersion) {
+		return corsResponse({ error: 'Shared settings changed on another device' }, 409);
+	}
+	const written = await bucket.put('__crate__/settings.json', JSON.stringify(settings), {
+		onlyIf: current
+			? { etagMatches: current.etag }
+			: { etagDoesNotMatch: '*' },
+	});
+	if (!written) return corsResponse({ error: 'Shared settings changed on another device' }, 409);
+	return corsResponse({ success: true, settingsVersion: written.etag });
 }

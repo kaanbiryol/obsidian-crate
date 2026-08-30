@@ -11,6 +11,9 @@ export interface FileManifest {
 	files: Record<string, FileEntry>;
 	lastSeq?: number;
 	truncated?: boolean;
+	hasMore?: boolean;
+	nextCursor?: string;
+	snapshotSeq?: number;
 }
 
 export interface FileEntry {
@@ -166,6 +169,23 @@ export interface BatchDeleteResponse {
 	errors?: Array<{ path: string; error: string; status?: number; currentHash?: string | null }>;
 }
 
+export interface BackendDiagnostics {
+	status: 'ok';
+	counts: {
+		files: number;
+		changelog: number;
+		retainedVersions: number;
+		pendingObjectCleanup: number;
+		pendingNotificationJobs: number;
+		scheduledReminders: number;
+		activeAuthTokens: number;
+		activePushSubscriptions: number;
+		disabledPushSubscriptions: number;
+	};
+	lastMaintenanceAt: string | null;
+	lastMaintenanceError: string | null;
+}
+
 export interface RegisteredDevice {
 	id: string;
 	device_id: string | null;
@@ -174,6 +194,16 @@ export interface RegisteredDevice {
 	created_at: string;
 	last_seen_at: string | null;
 	is_current: boolean;
+}
+
+export interface RemoteFileVersion {
+	storage_key: string;
+	path: string;
+	hash: string;
+	size: number;
+	reason: 'replaced' | 'deleted';
+	created_at: string;
+	expires_at: number;
 }
 
 // ============================================================================

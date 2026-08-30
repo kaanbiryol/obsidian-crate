@@ -134,4 +134,51 @@ describe('sendToAllSubscriptions', () => {
 		expect(result).toMatchObject({ sent: 12, failed: 0 });
 		expect(maximumActiveRequests).toBe(6);
 	});
+
+	it('quarantines permanent push failures without retrying them', async () => {
+		vi.mocked(deserializeVapidKeys).mockResolvedValue({} as never);
+		vi.mocked(sendPushNotification).mockResolvedValue(new Response('forbidden', { status: 403 }));
+		const run = vi.fn(async () => ({}));
+		const prepare = vi.fn((sql: string) => {
+			const statement = {
+				bind: vi.fn(() => statement),
+				run,
+				all: vi.fn(async () => ({
+					results: sql.includes('FROM push_subscriptions')
+						? [{ id: 'bad-subscription', endpoint: 'https://push.example/bad', p256dh: 'key', auth: 'auth' }]
+						: [{ public_key: 'public', private_key: 'private' }],
+				})),
+			};
+			return statement;
+		});
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		const result = await sendToAllSubscriptions({ prepare } as unknown as D1Database, { title: 'Test', body: '' });
+
+		expect(result).toMatchObject({ failed: 0, quarantined: 1, failedSubscriptionIds: [] });
+		expect(prepare).toHaveBeenCalledWith(expect.stringContaining('UPDATE push_subscriptions'));
+		expect(run).toHaveBeenCalledOnce();
+	});
+
+	it('returns transient push failures for bounded alarm retries', async () => {
+		vi.mocked(deserializeVapidKeys).mockResolvedValue({} as never);
+		vi.mocked(sendPushNotification).mockResolvedValue(new Response('busy', { status: 503 }));
+		const prepare = vi.fn((sql: string) => {
+			const statement = {
+				bind: vi.fn(() => statement),
+				run: vi.fn(async () => ({})),
+				all: vi.fn(async () => ({
+					results: sql.includes('FROM push_subscriptions')
+						? [{ id: 'retry-subscription', endpoint: 'https://push.example/retry', p256dh: 'key', auth: 'auth' }]
+						: [{ public_key: 'public', private_key: 'private' }],
+				})),
+			};
+			return statement;
+		});
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		const result = await sendToAllSubscriptions({ prepare } as unknown as D1Database, { title: 'Test', body: '' });
+
+		expect(result).toMatchObject({ failed: 1, quarantined: 0, failedSubscriptionIds: ['retry-subscription'] });
+	});
 });

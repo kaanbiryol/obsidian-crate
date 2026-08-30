@@ -1,2 +1,2 @@
 export { FileVersionConflictError } from '../storage';
-export { drainObjectCleanupQueue } from '../sync-storage';
+export { drainObjectCleanupQueue, enqueueExpiredFileVersions } from '../sync-storage';
