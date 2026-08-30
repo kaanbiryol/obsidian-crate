@@ -14,12 +14,19 @@ beforeEach(() => {
 function createHarness() {
 	const reminder = {
 		reminderId: 'reminder-1',
+		scheduleToken: 'schedule-token-1',
 		content: 'Ship it',
 		project: 'Work',
 		dueDatetime: '2099-01-01T00:00:00.000Z',
 	};
 	const storedValues = new Map<string, unknown>([['reminder', reminder]]);
-	const deleteAll = vi.fn(async () => {});
+	const deleteAll = vi.fn(async () => {
+		storedValues.clear();
+	});
+	const deleteValue = vi.fn(async (key: string) => storedValues.delete(key));
+	const setAlarm = vi.fn(async () => {});
+	const deleteAlarm = vi.fn(async () => {});
+	const getAlarm = vi.fn(async () => Date.parse(reminder.dueDatetime));
 	const put = vi.fn(async (key: string, value: unknown) => {
 		storedValues.set(key, value);
 	});
@@ -27,14 +34,34 @@ function createHarness() {
 	const state = {
 		storage: {
 			get: vi.fn(async (key: string) => storedValues.get(key)),
+			getAlarm,
 			put,
+			delete: deleteValue,
 			deleteAll,
+			setAlarm,
+			deleteAlarm,
 		},
 	} as unknown as DurableObjectState;
+	const scheduledReminder = {
+		schedule_token: reminder.scheduleToken,
+		content: reminder.content,
+		project: reminder.project,
+		due_datetime: reminder.dueDatetime,
+	};
+	const first = vi.fn(async (): Promise<typeof scheduledReminder | null> => scheduledReminder);
 	const db = {
-		prepare: vi.fn(() => ({ bind: vi.fn(() => ({ run })) })),
+		prepare: vi.fn(() => ({ bind: vi.fn(() => ({ run, first })) })),
 	} as unknown as D1Database;
-	return { alarm: new ReminderAlarm(state, { DB: db }), deleteAll, put, run, storedValues };
+	return {
+		alarm: new ReminderAlarm(state, { DB: db }),
+		deleteAll,
+		deleteAlarm,
+		first,
+		put,
+		run,
+		setAlarm,
+		storedValues,
+	};
 }
 
 describe('reminder alarm delivery', () => {
@@ -105,5 +132,104 @@ describe('reminder alarm delivery', () => {
 		await harness.alarm.alarm();
 		expect(harness.run).toHaveBeenCalledTimes(1);
 		expect(harness.deleteAll).toHaveBeenCalledTimes(1);
+	});
+
+	it('retries D1 cleanup without sending a duplicate push', async () => {
+		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1']);
+		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
+			sent: 1,
+			failed: 0,
+			pruned: 0,
+			errors: [],
+			failedSubscriptionIds: [],
+		});
+		const harness = createHarness();
+		harness.run.mockRejectedValueOnce(new Error('D1 unavailable'));
+
+		await harness.alarm.alarm();
+
+		expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
+		expect(harness.storedValues.get('deliveryComplete')).toBe(true);
+		expect(harness.setAlarm).toHaveBeenCalledOnce();
+		expect(harness.deleteAll).not.toHaveBeenCalled();
+
+		await harness.alarm.alarm();
+
+		expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
+		expect(harness.run).toHaveBeenCalledTimes(2);
+		expect(harness.deleteAll).toHaveBeenCalledOnce();
+	});
+
+	it('does not clear a newer schedule after an older alarm finishes', async () => {
+		vi.mocked(listPushSubscriptionIds).mockResolvedValue([]);
+		vi.mocked(sendToAllSubscriptions).mockResolvedValue({
+			sent: 0,
+			failed: 0,
+			pruned: 0,
+			errors: [],
+			failedSubscriptionIds: [],
+		});
+		const harness = createHarness();
+		const newerReminder = {
+			reminderId: 'reminder-1',
+			scheduleToken: 'newer-schedule-token',
+			content: 'Rescheduled',
+			dueDatetime: '2099-02-01T00:00:00.000Z',
+		};
+		harness.run.mockImplementationOnce(async () => {
+			harness.storedValues.set('reminder', newerReminder);
+			return {};
+		});
+
+		await harness.alarm.alarm();
+
+		expect(harness.deleteAll).not.toHaveBeenCalled();
+		expect(harness.storedValues.get('reminder')).toEqual(newerReminder);
+	});
+
+	it('discards an orphan alarm without sending when its D1 schedule is missing', async () => {
+		const harness = createHarness();
+		harness.first.mockResolvedValueOnce(null);
+
+		await harness.alarm.alarm();
+
+		expect(sendToAllSubscriptions).not.toHaveBeenCalled();
+		expect(harness.deleteAll).toHaveBeenCalledOnce();
+	});
+
+	it('discards stale alarm state when its schedule token no longer matches D1', async () => {
+		const harness = createHarness();
+		harness.first.mockResolvedValueOnce({
+			schedule_token: 'newer-schedule-token',
+			content: 'Updated',
+			project: 'Work',
+			due_datetime: '2099-02-01T00:00:00.000Z',
+		});
+
+		await harness.alarm.alarm();
+
+		expect(sendToAllSubscriptions).not.toHaveBeenCalled();
+		expect(harness.deleteAll).toHaveBeenCalledOnce();
+	});
+
+	it('rolls back alarm state when D1 cannot persist a schedule', async () => {
+		const harness = createHarness();
+		harness.run.mockRejectedValueOnce(new Error('D1 unavailable'));
+
+		const response = await harness.alarm.fetch(new Request('https://do/schedule', {
+			method: 'PUT',
+			body: JSON.stringify({
+				reminderId: 'reminder-1',
+				content: 'Updated reminder',
+				dueDatetime: '2099-02-01T00:00:00.000Z',
+			}),
+		}));
+
+		expect(response.status).toBe(500);
+		expect(harness.storedValues.get('reminder')).toMatchObject({
+			scheduleToken: 'schedule-token-1',
+			content: 'Ship it',
+		});
+		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
 	});
 });

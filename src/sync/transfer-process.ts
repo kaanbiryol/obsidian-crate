@@ -6,7 +6,7 @@ import { isMarkdownPath } from "./markdown-base-cache";
 import { mergeMarkdownContent } from "./markdown-merge";
 import { downloadAndSaveFile, validateDownloadedContent } from "./transfer-download";
 import { isVaultTFileLike, prepareUploadFromPath } from "./transfer-prepare";
-import { deletePathLocally } from "./planner-helpers";
+import { deletePathLocallyIfUnchanged } from "./planner-helpers";
 import type { TransferContext } from "./transfer-types";
 import type { FileDiff, FileEntry, SyncResult } from "../plugin/types";
 import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
@@ -153,16 +153,25 @@ export async function processDiff(
       break;
     }
 
-	case "delete-local": {
-	  const deletedLocally = await deletePathLocally(context, diff.path);
-	  delete localFiles[diff.path];
-	  context.localManifest.removeEntry(diff.path);
-	  if (deletedLocally) {
-		result.deleted++;
-		result.deletedPaths.push(diff.path);
-	  }
-	  break;
-	}
+    case "delete-local": {
+      const localDelete = await deletePathLocallyIfUnchanged(context, diff.path, diff.localHash ?? null);
+      if (localDelete.status === "changed") {
+        await processDiff(context, {
+          path: diff.path,
+          action: "upload",
+          localHash: localDelete.hash,
+          conflict: true,
+        }, localFiles, result);
+        break;
+      }
+      delete localFiles[diff.path];
+      context.localManifest.removeEntry(diff.path);
+      if (localDelete.status === "deleted") {
+        result.deleted++;
+        result.deletedPaths.push(diff.path);
+      }
+      break;
+    }
   }
 }
 

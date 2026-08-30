@@ -177,6 +177,10 @@ function installDomHelpers(): void {
 
 installDomHelpers();
 
+export function normalizePath(path: string): string {
+	return path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').replace(/\/{2,}/g, '/');
+}
+
 export class TAbstractFile {
 	path: string;
 	name: string;
@@ -266,6 +270,11 @@ export class ButtonComponent extends BaseMockComponent {
 
 	setWarning(): this {
 		this.buttonEl.addClass('mod-warning');
+		return this;
+	}
+
+	setDestructive(): this {
+		this.buttonEl.addClass('mod-destructive');
 		return this;
 	}
 
@@ -554,6 +563,10 @@ export class PluginSettingTab {
 	}
 
 	display(): void {}
+
+	update(): void {
+		this.display();
+	}
 
 	hide(): void {}
 }

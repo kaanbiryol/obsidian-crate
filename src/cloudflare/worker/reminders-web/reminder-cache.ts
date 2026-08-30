@@ -10,6 +10,10 @@ import type { RemoteReminderRecord } from './types';
 // Bump when parsing behavior or the cached reminder shape changes. The list
 // ETag includes this value so clients revalidate even when file hashes do not.
 export const REMINDER_CACHE_PARSER_VERSION = 1;
+export const REMINDER_INDEX_MAX_FILE_BYTES = 1024 * 1024;
+const REMINDER_INDEX_WARM_MAX_FILES = 20;
+const REMINDER_INDEX_WARM_MAX_BYTES = 2 * 1024 * 1024;
+const REMINDER_CACHE_MAX_VALUE_BYTES = 1536 * 1024;
 
 interface ReminderFileCacheRow {
 	file_path: string;
@@ -18,7 +22,7 @@ interface ReminderFileCacheRow {
 	reminders_json: string;
 }
 
-export interface ReminderFileCacheEntry {
+interface ReminderFileCacheEntry {
 	filePath: string;
 	fileHash: string;
 	reminders: RemoteReminderRecord[];
@@ -93,12 +97,32 @@ function createCacheUpsertStatement(
 		);
 }
 
+function selectReminderIndexWarmBatch(
+	metadata: StoredMarkdownFileMetadata[],
+): StoredMarkdownFileMetadata[] {
+	const selected: StoredMarkdownFileMetadata[] = [];
+	let selectedBytes = 0;
+	for (const file of metadata) {
+		if (selected.length >= REMINDER_INDEX_WARM_MAX_FILES) break;
+		if (selected.length > 0 && selectedBytes + file.size > REMINDER_INDEX_WARM_MAX_BYTES) break;
+		selected.push(file);
+		selectedBytes += file.size;
+	}
+	return selected;
+}
+
+function isCacheValueWithinLimit(entry: ReminderFileCacheEntry): boolean {
+	return new TextEncoder().encode(JSON.stringify(entry.reminders)).byteLength <= REMINDER_CACHE_MAX_VALUE_BYTES;
+}
+
 async function writeReminderFileCacheEntries(
 	db: D1Database,
 	folderPath: string,
 	entries: ReminderFileCacheEntry[],
 ): Promise<void> {
-	const statements = entries.map((entry) => createCacheUpsertStatement(db, folderPath, entry));
+	const statements = entries
+		.filter(isCacheValueWithinLimit)
+		.map((entry) => createCacheUpsertStatement(db, folderPath, entry));
 	for (let index = 0; index < statements.length; index += 50) {
 		await db.batch(statements.slice(index, index + 50));
 	}
@@ -130,12 +154,15 @@ export async function loadIncrementalReminderIndex(
 	env: Env,
 	folderPath: string,
 	metadata: StoredMarkdownFileMetadata[],
-): Promise<{ reminders: RemoteReminderRecord[]; projects: string[] }> {
+): Promise<
+	| { ready: false; remainingFiles: number }
+	| { ready: true; reminders: RemoteReminderRecord[]; projects: string[] }
+> {
 	let cachedFiles = new Map<string, ReminderFileCacheEntry>();
 	try {
 		cachedFiles = await loadReminderFileCache(env.DB, folderPath);
 	} catch {
-		// Missing migrations or a transient D1 error fall back to reading R2.
+		// A missing cache table or transient D1 error falls back to reading R2.
 	}
 
 	const resolvedFiles = new Map<string, ReminderFileCacheEntry>();
@@ -149,7 +176,11 @@ export async function loadIncrementalReminderIndex(
 		}
 	}
 
-	const freshFiles = await readStoredMarkdownFiles(env.BUCKET, staleMetadata);
+	const warmMetadata = selectReminderIndexWarmBatch(staleMetadata);
+	const freshFiles = await readStoredMarkdownFiles(env.BUCKET, warmMetadata);
+	if (freshFiles.length !== warmMetadata.length) {
+		throw new Error('One or more reminder files could not be read from storage');
+	}
 	const freshEntries = freshFiles.map((file): ReminderFileCacheEntry => ({
 		filePath: file.path,
 		fileHash: file.hash,
@@ -159,11 +190,21 @@ export async function loadIncrementalReminderIndex(
 		resolvedFiles.set(entry.filePath, entry);
 	}
 
+	let cacheWriteSucceeded = false;
 	try {
 		await writeReminderFileCacheEntries(env.DB, folderPath, freshEntries);
 		await pruneReminderFileCache(env.DB, folderPath);
+		cacheWriteSucceeded = true;
 	} catch {
 		// Serve the freshly parsed response even when cache maintenance fails.
+	}
+
+	const remainingFiles = staleMetadata.length - warmMetadata.length;
+	if (remainingFiles > 0) {
+		if (!cacheWriteSucceeded) {
+			throw new Error('Reminder index cache could not be warmed');
+		}
+		return { ready: false, remainingFiles };
 	}
 
 	const reminders: RemoteReminderRecord[] = [];
@@ -176,6 +217,7 @@ export async function loadIncrementalReminderIndex(
 	}
 
 	return {
+		ready: true,
 		reminders,
 		projects: Array.from(projects).sort((left, right) => left.localeCompare(right)),
 	};

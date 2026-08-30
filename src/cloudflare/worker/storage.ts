@@ -1,8 +1,8 @@
 import { sha256HexBytes } from './auth';
 import { queryRows } from './db';
-import { commitFileDelete, commitStagedFile } from './sync-mutations';
+import { stageMarkdownFile } from './markdown-file-staging';
+import { commitStagedFile } from './sync-mutations';
 import {
-	createManagedObjectKey,
 	deleteBucketObjectsOrQueue,
 	getStoredFileRow,
 	MAX_FILE_BYTES,
@@ -55,8 +55,8 @@ export async function readStoredMarkdownFiles(
 ): Promise<StoredTextFile[]> {
 	const decoder = new TextDecoder();
 	const files: Array<StoredTextFile | null> = [];
-	for (let index = 0; index < rows.length; index += 8) {
-		const chunk = rows.slice(index, index + 8);
+	for (let index = 0; index < rows.length; index += 6) {
+		const chunk = rows.slice(index, index + 6);
 		files.push(...await Promise.all(chunk.map(async (row) => {
 			if (row.size > MAX_FILE_BYTES) return null;
 			const objectKey = row.storageKey;
@@ -112,25 +112,14 @@ export async function writeCommittedMarkdownFile(
 	expectedHash: string | null,
 ): Promise<{ hash: string; size: number }> {
 	const previousFile = await getStoredFileRow(db, path);
-	const bytes = new TextEncoder().encode(content);
-	const hash = await sha256HexBytes(bytes.buffer);
-	const size = bytes.byteLength;
-	if (size > MAX_FILE_BYTES) {
-		throw new Error('Reminder file exceeds 25MB limit');
-	}
-	const objectKey = createManagedObjectKey(hash);
-
-	await bucket.put(objectKey, bytes, {
-		httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
-		customMetadata: { hash },
-	});
+	const staged = await stageMarkdownFile(bucket, path, content, expectedHash);
 
 	try {
 		const commit = await commitStagedFile(bucket, db, {
 			path,
-			hash,
-			size,
-			objectKey,
+			hash: staged.hash,
+			size: staged.size,
+			objectKey: staged.objectKey,
 			expectedHash,
 			previousFile,
 		});
@@ -139,27 +128,10 @@ export async function writeCommittedMarkdownFile(
 		}
 	} catch (error) {
 		if (!(error instanceof FileVersionConflictError)) {
-			await deleteBucketObjectsOrQueue(bucket, db, [objectKey]);
+			await deleteBucketObjectsOrQueue(bucket, db, [staged.objectKey]);
 		}
 		throw error;
 	}
 
-	return { hash, size };
-}
-
-export async function deleteCommittedMarkdownFile(
-	bucket: R2Bucket,
-	db: D1Database,
-	path: string,
-	expectedHash: string,
-): Promise<void> {
-	const previousFile = await getStoredFileRow(db, path);
-	const commit = await commitFileDelete(bucket, db, {
-		path,
-		expectedHash,
-		previousFile,
-	});
-	if (!commit.committed) {
-		throw new FileVersionConflictError(path, commit.currentHash);
-	}
+	return { hash: staged.hash, size: staged.size };
 }

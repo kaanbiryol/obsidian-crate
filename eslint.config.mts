@@ -18,6 +18,7 @@ export default tseslint.config(
 						'tailwind.config.js',
 						'tailwind.theme.js',
 						'vite.config.mts',
+						'vitest.cloudflare.config.ts',
 						'vitest.config.ts',
 						'site/assets/*.js',
 					]
@@ -28,7 +29,7 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['scripts/**/*.mjs', 'vite.config.mts', 'vitest.config.ts'],
+		files: ['scripts/**/*.mjs', 'vite.config.mts', 'vitest.cloudflare.config.ts', 'vitest.config.ts'],
 		languageOptions: {
 			globals: {
 				...globals.node,

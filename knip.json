@@ -19,6 +19,7 @@
 		"src/cloudflare/worker/raw-text.d.ts"
 	],
 	"ignoreDependencies": [
+		"cloudflare",
 		"preact"
 	]
 }

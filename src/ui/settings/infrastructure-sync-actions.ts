@@ -55,7 +55,7 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 		.setDesc('Upload all local files to the server (use for first-time setup)')
 		.addButton(button => button
 			.setButtonText('Upload all')
-			.setWarning()
+			.setDestructive()
 			.onClick(async () => {
 				const confirmed = await openConfirmationModal(plugin.app, {
 					title: 'Upload all local files',
@@ -102,7 +102,7 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 		.setDesc('Overwrite all remote files with local vault and remove remote-only files')
 		.addButton(button => button
 			.setButtonText('Force full update')
-			.setWarning()
+			.setDestructive()
 			.onClick(async () => {
 				const confirmed = await openConfirmationModal(plugin.app, {
 					title: 'Force full sync',

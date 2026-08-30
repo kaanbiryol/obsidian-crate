@@ -67,6 +67,14 @@ interface DurableObject {
 	alarm?(): Promise<void>;
 }
 
+declare module 'cloudflare:workers' {
+	export const env: {
+		BUCKET: R2Bucket;
+		DB: D1Database;
+		REMINDER_ALARMS: DurableObjectNamespace;
+	};
+}
+
 interface ScheduledController {
 	readonly cron: string;
 	readonly scheduledTime: number;

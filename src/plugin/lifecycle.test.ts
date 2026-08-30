@@ -6,6 +6,8 @@ type SyncRuntimeTarget = {
 	syncRuntime?: {
 		isConfigured: () => boolean;
 		initialize: () => Promise<void>;
+		waitForStartupSync: () => Promise<boolean>;
+		destroy?: () => void;
 	};
 };
 
@@ -62,6 +64,7 @@ async function loadLifecycleModule() {
 	vi.doMock('./logger', () => ({
 		createLogger: vi.fn(() => ({
 			info: vi.fn(),
+			warn: vi.fn(),
 			error: vi.fn(),
 		})),
 		errorMessage: vi.fn((error: unknown) => String(error)),
@@ -157,6 +160,7 @@ describe('bootstrapPlugin', () => {
 			target.syncRuntime = {
 				isConfigured: vi.fn(() => true),
 				initialize: syncInitialize,
+				waitForStartupSync: vi.fn(async () => false),
 			};
 		});
 
@@ -169,7 +173,9 @@ describe('bootstrapPlugin', () => {
 		expect(syncInitialize).toHaveBeenCalledTimes(1);
 		expect(registerSyncCommands).toHaveBeenCalledWith(plugin);
 		expect(initializeReminders).toHaveBeenCalledWith(plugin);
-		expect(reconcileReminderNotifications).toHaveBeenCalledWith(plugin);
+		await vi.waitFor(() => {
+			expect(reconcileReminderNotifications).toHaveBeenCalledWith(plugin);
+		});
 		expect(createCloudflareDeploymentService).toHaveBeenCalledWith(plugin);
 		expect(showCloudflareServerUpdateNotice).toHaveBeenCalledWith(plugin);
 		expect(plugin.registerObsidianProtocolHandler).toHaveBeenCalledTimes(2);
@@ -203,6 +209,7 @@ describe('bootstrapPlugin', () => {
 			target.syncRuntime = {
 				isConfigured: vi.fn(() => false),
 				initialize: syncInitialize,
+				waitForStartupSync: vi.fn(async () => false),
 			};
 		});
 
@@ -212,6 +219,72 @@ describe('bootstrapPlugin', () => {
 		expect(initializeReminders).toHaveBeenCalledWith(plugin);
 		expect(noticeMessages).toHaveLength(1);
 		expect(noticeMessages[0]).toBeInstanceOf(FakeDocumentFragment);
+	});
+
+	it('reloads the reminder index and reconciles only after startup sync finishes', async () => {
+		const { bootstrapPlugin } = await loadLifecycleModule();
+		let finishStartupSync!: (ran: boolean) => void;
+		const startupSync = new Promise<boolean>((resolve) => {
+			finishStartupSync = resolve;
+		});
+		const reminderIndexLoad = vi.fn(async () => undefined);
+		const plugin = createPlugin({
+			reminderIndex: { load: reminderIndexLoad },
+		});
+
+		initializeSyncManagers.mockImplementation((target) => {
+			target.syncRuntime = {
+				isConfigured: vi.fn(() => true),
+				initialize: vi.fn(async () => undefined),
+				waitForStartupSync: vi.fn(() => startupSync),
+			};
+		});
+
+		await bootstrapPlugin(plugin as never);
+
+		expect(reminderIndexLoad).not.toHaveBeenCalled();
+		expect(reconcileReminderNotifications).not.toHaveBeenCalled();
+
+		finishStartupSync(true);
+		await vi.waitFor(() => {
+			expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
+			expect(reconcileReminderNotifications).toHaveBeenCalledWith(plugin);
+		});
+		expect(reminderIndexLoad.mock.invocationCallOrder[0]).toBeLessThan(
+			reconcileReminderNotifications.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+		);
+	});
+
+	it('does not reconcile after the plugin unloads during startup sync', async () => {
+		const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
+		let finishStartupSync!: (ran: boolean) => void;
+		const startupSync = new Promise<boolean>((resolve) => {
+			finishStartupSync = resolve;
+		});
+		const reminderIndexLoad = vi.fn(async () => undefined);
+		const syncDestroy = vi.fn();
+		const plugin = createPlugin({
+			reminderIndex: { load: reminderIndexLoad },
+		});
+
+		initializeSyncManagers.mockImplementation((target) => {
+			target.syncRuntime = {
+				isConfigured: vi.fn(() => true),
+				initialize: vi.fn(async () => undefined),
+				waitForStartupSync: vi.fn(() => startupSync),
+				destroy: syncDestroy,
+			};
+		});
+
+		await bootstrapPlugin(plugin as never);
+		shutdownPlugin(plugin as never);
+		finishStartupSync(true);
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(syncDestroy).toHaveBeenCalledTimes(1);
+		expect(reminderIndexLoad).not.toHaveBeenCalled();
+		expect(reconcileReminderNotifications).not.toHaveBeenCalled();
 	});
 
 	it('restores a managed Worker URL when an earlier save kept only the scoped credential', async () => {
@@ -239,6 +312,7 @@ describe('bootstrapPlugin', () => {
 			target.syncRuntime = {
 				isConfigured: vi.fn(() => true),
 				initialize: vi.fn(async () => {}),
+				waitForStartupSync: vi.fn(async () => false),
 			};
 		});
 

@@ -8,6 +8,8 @@ import {
 } from '../../test/fakes/obsidian-ui';
 
 let lastQrCodeData: string | null = null;
+const disableReminderNotifications = vi.fn();
+const reconcileReminderNotifications = vi.fn();
 
 async function flushMicrotasks(): Promise<void> {
 	await Promise.resolve();
@@ -17,7 +19,8 @@ async function flushMicrotasks(): Promise<void> {
 async function loadNotificationsSectionModule() {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../../reminders/plugin-integration', () => ({
-		reconcileReminderNotifications: vi.fn(),
+		disableReminderNotifications,
+		reconcileReminderNotifications,
 	}));
 	vi.doMock('../qr-modal', () => ({
 		QRModal: class QRModal {
@@ -43,6 +46,8 @@ describe('renderNotificationsSection', () => {
 	beforeEach(() => {
 		resetObsidianUiMocks();
 		lastQrCodeData = null;
+		disableReminderNotifications.mockReset();
+		reconcileReminderNotifications.mockReset();
 	});
 
 	afterEach(() => {
@@ -82,6 +87,57 @@ describe('renderNotificationsSection', () => {
 		expect(getSettingByName('Enabled devices').descEl.textContent).toContain('receive reminder push notifications');
 		expect(getSettingByName('iPhone').descEl.textContent).toContain('Subscribed');
 		expect(getSettingByName('Test notification').descEl.textContent).toBe('Send a test push to all enabled devices');
+	});
+
+	it('cancels existing schedules before disabling push notifications', async () => {
+		disableReminderNotifications.mockResolvedValue(undefined);
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const plugin = createPlugin({
+			getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
+			deletePushSubscription: vi.fn(),
+			testPush: vi.fn(async () => ({ sent: 0, failed: 0, pruned: 0, errors: [] })),
+		}) as unknown as {
+			writeSettings: ReturnType<typeof vi.fn>;
+		};
+
+		renderNotificationsSection({
+			containerEl: new FakeElement('div') as never,
+			plugin: plugin as never,
+			rerender: vi.fn(),
+		});
+		getSettingByName('Enable push notifications').toggles[0]?.change(false);
+		await flushMicrotasks();
+
+		expect(disableReminderNotifications).toHaveBeenCalledWith(plugin);
+		expect(plugin.writeSettings).toHaveBeenCalledWith({ pushEnabled: false });
+		expect(disableReminderNotifications.mock.invocationCallOrder[0]).toBeLessThan(
+			plugin.writeSettings.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+		);
+	});
+
+	it('restores schedules when disabling persistence fails after cancellation', async () => {
+		disableReminderNotifications.mockResolvedValue(undefined);
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const plugin = createPlugin({
+			getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
+			deletePushSubscription: vi.fn(),
+			testPush: vi.fn(async () => ({ sent: 0, failed: 0, pruned: 0, errors: [] })),
+		}) as unknown as {
+			settings: { pushEnabled: boolean };
+			writeSettings: ReturnType<typeof vi.fn>;
+		};
+		plugin.writeSettings.mockRejectedValueOnce(new Error('disk full'));
+
+		renderNotificationsSection({
+			containerEl: new FakeElement('div') as never,
+			plugin: plugin as never,
+			rerender: vi.fn(),
+		});
+		getSettingByName('Enable push notifications').toggles[0]?.change(false);
+		await flushMicrotasks();
+
+		expect(plugin.settings.pushEnabled).toBe(true);
+		expect(reconcileReminderNotifications).toHaveBeenCalledWith(plugin);
 	});
 
 	it('removes enabled notification devices through the push subscription API', async () => {
@@ -202,6 +258,9 @@ function createPlugin(apiClient: Record<string, unknown>): never {
 			upcomingDaysDefault: 7,
 		},
 		saveSettings: vi.fn(),
+		writeSettings: vi.fn(async function (this: { settings: { pushEnabled: boolean } }, update: { pushEnabled: boolean }) {
+			this.settings.pushEnabled = update.pushEnabled;
+		}),
 		writeRemindersSettings: vi.fn(),
 		syncRuntime: {
 			getApiClient: () => ({

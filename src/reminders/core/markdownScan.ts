@@ -26,12 +26,11 @@ export interface ReminderMarkdownScanResult {
 }
 
 export function getProjectFromPath(filePath: string, remindersFolderPath: string): string {
-  const normalizedFile = filePath.toLowerCase();
-  const normalizedFolder = remindersFolderPath.replace(/^\/|\/$/g, '').toLowerCase();
+  const normalizedFolder = remindersFolderPath.replace(/^\/|\/$/g, '');
 
   let relativePath = filePath;
-  if (normalizedFile.startsWith(normalizedFolder + "/")) {
-    relativePath = filePath.slice(remindersFolderPath.length + 1);
+  if (filePath.startsWith(normalizedFolder + "/")) {
+    relativePath = filePath.slice(normalizedFolder.length + 1);
   }
 
   if (relativePath.toLowerCase().endsWith(".md")) {

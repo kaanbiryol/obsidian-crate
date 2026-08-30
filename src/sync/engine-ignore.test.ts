@@ -44,7 +44,6 @@ describe('shouldIgnoreSyncPath', () => {
 
 		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/data.json', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/file-manifest.json', context)).toBe(true);
-		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/reminders-settings.json', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/main.js', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('.vault-config/plugins/other-plugin/manifest.json', context)).toBe(true);
 	});

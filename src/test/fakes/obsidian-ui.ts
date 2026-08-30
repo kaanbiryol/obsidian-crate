@@ -129,6 +129,11 @@ export class MockButtonComponent {
 		return this;
 	}
 
+	setDestructive(): this {
+		this.buttonEl.addClass('mod-destructive');
+		return this;
+	}
+
 	setCta(): this {
 		this.buttonEl.addClass('mod-cta');
 		return this;

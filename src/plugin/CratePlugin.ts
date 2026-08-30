@@ -10,14 +10,12 @@ import { type ReminderRepository } from '../reminders/data/reminder-repository';
 import { reinitializeReminders } from '../reminders/plugin-integration';
 import {
 	type RemindersSettings,
+	normalizeRemindersSettings,
 	useRemindersSettingsStore,
 } from '../reminders/settings';
-import {
-	loadRemindersSettings as loadReminderSettingsState,
-	writeRemindersSettings as writeReminderSettingsState,
-} from '../reminders/settings-storage';
 import { type VaultWatcher } from '../reminders/services/vaultWatcher';
 import { activateOrRevealRemindersLeaf } from '../reminders/ui/workspaceLayout';
+import { configureLogger as configureRemindersLogger } from '../reminders/utils/logger';
 import { SyncRuntime } from '../sync/runtime';
 import type { CrateSettingTab } from '../ui/settings-tab';
 import { configureSyncLogger } from './logger';
@@ -26,6 +24,10 @@ import { createSettingsUiState, type SettingsUiState } from './settings-ui-state
 import { SecretStorageService } from './secret-storage';
 import { buildPersistedCrateSettings, normalizeCrateSettings, type CrateSettings } from './settings';
 
+type PluginData = Partial<CrateSettings> & {
+	reminders?: Partial<RemindersSettings>;
+};
+
 export default class CratePlugin extends Plugin {
 	settings!: CrateSettings;
 	secretStorage!: SecretStorageService;
@@ -33,6 +35,7 @@ export default class CratePlugin extends Plugin {
 	cloudflareDeploymentService!: CloudflareDeploymentService;
 	readonly settingsUiState: SettingsUiState = createSettingsUiState();
 	private settingTab?: CrateSettingTab;
+	private settingsWriteQueue: Promise<void> = Promise.resolve();
 
 	// Reminders
 	reminderIndex!: ReminderIndex;
@@ -54,32 +57,52 @@ export default class CratePlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		const data = await this.loadData() as Partial<CrateSettings> | null;
+		const data = await this.loadData() as PluginData | null;
 		this.settings = normalizeCrateSettings(data, this.app.vault.configDir);
+		const remindersSettings = normalizeRemindersSettings(data?.reminders);
+		useRemindersSettingsStore.setState(remindersSettings, true);
 		configureSyncLogger({ enabled: this.settings.syncDebugLogging });
+		configureRemindersLogger({ prefix: 'Crate', enabled: remindersSettings.debugLogging });
 	}
 
 	async saveSettings(): Promise<void> {
-		const normalizedSettings = normalizeCrateSettings(this.settings, this.app.vault.configDir);
-		await this.saveData(buildPersistedCrateSettings(normalizedSettings));
-		Object.assign(this.settings, normalizedSettings);
+		await this.enqueueSettingsWrite(async () => {
+			const normalizedSettings = normalizeCrateSettings(this.settings, this.app.vault.configDir);
+			await this.saveData({
+				...buildPersistedCrateSettings(normalizedSettings),
+				reminders: this.remindersSettings,
+			});
+			Object.assign(this.settings, normalizedSettings);
+		});
 	}
 
 	async writeSettings(update: Partial<CrateSettings>): Promise<void> {
-		const nextSettings = normalizeCrateSettings(
-			{ ...this.settings, ...update },
-			this.app.vault.configDir,
-		);
-		await this.saveData(buildPersistedCrateSettings(nextSettings));
-		Object.assign(this.settings, nextSettings);
-	}
-
-	async loadRemindersSettings(): Promise<void> {
-		await loadReminderSettingsState(this);
+		await this.enqueueSettingsWrite(async () => {
+			const nextSettings = normalizeCrateSettings(
+				{ ...this.settings, ...update },
+				this.app.vault.configDir,
+			);
+			await this.saveData({
+				...buildPersistedCrateSettings(nextSettings),
+				reminders: this.remindersSettings,
+			});
+			Object.assign(this.settings, nextSettings);
+		});
 	}
 
 	async writeRemindersSettings(update: Partial<RemindersSettings>): Promise<void> {
-		await writeReminderSettingsState(this, update);
+		await this.enqueueSettingsWrite(async () => {
+			const nextSettings = normalizeRemindersSettings({
+				...this.remindersSettings,
+				...update,
+			});
+			await this.saveData({
+				...buildPersistedCrateSettings(this.settings),
+				reminders: nextSettings,
+			});
+			useRemindersSettingsStore.setState(nextSettings, true);
+			configureRemindersLogger({ prefix: 'Crate', enabled: nextSettings.debugLogging });
+		});
 	}
 
 	async activateRemindersView(): Promise<void> {
@@ -113,6 +136,12 @@ export default class CratePlugin extends Plugin {
 	}
 
 	refreshSettingsTab(): void {
-		this.settingTab?.display();
+		this.settingTab?.update();
+	}
+
+	private enqueueSettingsWrite(operation: () => Promise<void>): Promise<void> {
+		const pendingWrite = this.settingsWriteQueue.then(operation, operation);
+		this.settingsWriteQueue = pendingWrite.catch(() => undefined);
+		return pendingWrite;
 	}
 }

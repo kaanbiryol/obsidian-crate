@@ -50,7 +50,7 @@ class ConfirmationModal extends Modal {
 			.addButton(button => {
 				button.setButtonText(confirmText);
 				if (warning) {
-					button.setWarning();
+					button.setDestructive();
 				} else {
 					button.setCta();
 				}

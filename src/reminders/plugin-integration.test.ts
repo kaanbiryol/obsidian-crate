@@ -62,7 +62,6 @@ const notificationOnReminderChange = vi.fn<(...args: unknown[]) => Promise<{ suc
 	async () => ({ success: true }),
 );
 const openFullScreenReminderModal = vi.fn();
-const loadRemindersSettings = vi.fn<(plugin: MockPlugin) => Promise<void>>();
 
 let latestWriter: MockWriter;
 let latestWatcher: {
@@ -77,6 +76,7 @@ async function flushMicrotasks(): Promise<void> {
 
 async function loadPluginIntegrationModule() {
 	vi.doMock('obsidian', () => ({
+		normalizePath: (path: string) => path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''),
 		Notice: class Notice {
 			constructor(message?: string) {
 				if (message) {
@@ -137,10 +137,6 @@ async function loadPluginIntegrationModule() {
 			error: vi.fn(),
 		})),
 	}));
-	vi.doMock('./settings-storage', () => ({
-		loadRemindersSettings,
-	}));
-
 	return import('./plugin-integration');
 }
 
@@ -194,7 +190,6 @@ beforeEach(() => {
 	notificationReconcile.mockReset();
 	notificationOnReminderChange.mockReset();
 	openFullScreenReminderModal.mockReset();
-	loadRemindersSettings.mockReset();
 
 	latestWriter = {
 		setOnFileWritten: vi.fn((callback: FileWrittenCallback) => {
@@ -219,13 +214,6 @@ beforeEach(() => {
 		getProjects: vi.fn(() => ['Inbox', 'Work']),
 	});
 	createRemindersBlockExtension.mockReturnValue('extension');
-	loadRemindersSettings.mockImplementation(async (plugin) => {
-		plugin.remindersSettings = {
-			debugLogging: false,
-			remindersFolderPath: 'Reminders',
-			autoOpenView: 'sidebar',
-		};
-	});
 });
 
 afterEach(() => {
@@ -243,7 +231,6 @@ afterEach(() => {
 	vi.doUnmock('./ui/adapters/modals');
 	vi.doUnmock('./ui/adapters/reminders-view');
 	vi.doUnmock('./utils/logger');
-	vi.doUnmock('./settings-storage');
 });
 
 describe('initializeReminders', () => {
@@ -253,7 +240,6 @@ describe('initializeReminders', () => {
 
 		await initializeReminders(plugin as never);
 
-		expect(loadRemindersSettings).toHaveBeenCalledWith(plugin);
 		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders');
 		expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
 		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex);

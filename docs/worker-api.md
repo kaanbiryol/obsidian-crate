@@ -183,6 +183,8 @@ Query: `?folderPath=<reminders-folder>`
 
 Reads synced Markdown reminder files from the configured folder and returns web-ready reminder records plus known projects. Conditional requests use an ETag derived from file metadata and the reminder parser version. On an ETag miss, D1-cached parses are reused by file hash, so only new or changed Markdown objects are fetched from R2 and parsed.
 
+Cold indexes are warmed in batches of at most 20 files and 2 MiB per request. While more files remain, the endpoint responds with `202` and `{ warming: true, remainingFiles }`; clients should repeat the request until it returns `200`. Individual reminder Markdown files must be no larger than 1 MiB.
+
 Response: `{ reminders: [...], projects: [...] }`
 
 ### POST /reminders/create
@@ -195,21 +197,21 @@ Response: `{ success: true, notificationWarning? }`
 
 ### POST /reminders/update
 
-Updates an existing reminder by `id`. The request includes `folderPath` and any mutable reminder fields: `content`, `description`, `priority`, `project`, `dueDate`, `dueDatetime`, `recurrence`, and `allDayNotificationTime`.
+Updates an existing reminder by `id`. The request requires `folderPath` and the reminder's `filePath`, plus any mutable reminder fields: `content`, `description`, `priority`, `project`, `dueDate`, `dueDatetime`, `recurrence`, and `allDayNotificationTime`.
 
-If `project` changes, the worker removes the reminder from the old project file and creates it in the new project file.
+If `project` changes, the worker commits the source and destination Markdown files atomically with hash-based compare-and-swap checks.
 
 Response: `{ success: true, notificationWarning? }`
 
 ### POST /reminders/set-completed
 
-Request: `{ folderPath, id, completed, allDayNotificationTime? }`
+Request: `{ folderPath, filePath, id, completed, allDayNotificationTime? }`
 
 Response: `{ success: true, notificationWarning? }`
 
 ### DELETE /reminders/delete
 
-Request: `{ folderPath, id, allDayNotificationTime? }`
+Request: `{ folderPath, filePath, id, allDayNotificationTime? }`
 
 Response: `{ success: true, notificationWarning? }`
 
@@ -384,7 +386,7 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
   platform TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_seen_at TEXT,
-  scope TEXT NOT NULL DEFAULT 'vault',
+  scope TEXT NOT NULL DEFAULT 'vault' CHECK (scope IN ('vault', 'reminders')),
   expires_at INTEGER
 );
 ```
@@ -396,6 +398,7 @@ Per-device auth tokens. Token hashes are SHA-256 hex of the bearer token. Vault 
 ```sql
 CREATE TABLE IF NOT EXISTS scheduled_reminders (
   reminder_id TEXT PRIMARY KEY,
+  schedule_token TEXT NOT NULL,
   content TEXT NOT NULL,
   project TEXT,
   due_datetime TEXT NOT NULL,

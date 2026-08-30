@@ -22,10 +22,10 @@ export async function handleSetReminderCompleted(request: Request, env: Env): Pr
 	}
 
 	const sourceFilePath = parseReminderSourceFilePath(parsedBody.value.filePath, workspaceResult.folderPath);
-	if (parsedBody.value.filePath !== undefined && !sourceFilePath) {
-		return corsResponse({ error: 'Invalid filePath' }, 400);
+	if (!sourceFilePath) {
+		return corsResponse({ error: 'Valid filePath required' }, 400);
 	}
-	const source = await loadReminderSource(env, workspaceResult.folderPath, id, sourceFilePath ?? undefined);
+	const source = await loadReminderSource(env, workspaceResult.folderPath, id, sourceFilePath);
 	if (!source) return corsResponse({ error: 'Reminder not found' }, 404);
 	const { file, reminder } = source;
 

@@ -31,8 +31,6 @@ export async function scheduleScheduledReminder(
 		throw new Error(dueDatetimeError);
 	}
 
-	const db = env.DB;
-
 	const id = env.REMINDER_ALARMS.idFromName(reminderId);
 	const stub = env.REMINDER_ALARMS.get(id);
 	const doResp = await stub.fetch('https://do/schedule', {
@@ -49,29 +47,23 @@ export async function scheduleScheduledReminder(
 	if (!doResp.ok) {
 		throw new Error('Failed to schedule alarm');
 	}
-
-	await db.prepare(
-		'INSERT OR REPLACE INTO scheduled_reminders (reminder_id, content, project, due_datetime) VALUES (?, ?, ?, ?)'
-	).bind(reminderId, content, project, dueDatetime).run();
 }
 
 export async function cancelScheduledReminder(env: Env, reminderId: string): Promise<void> {
-	const db = env.DB;
-
 	const id = env.REMINDER_ALARMS.idFromName(reminderId);
 	const stub = env.REMINDER_ALARMS.get(id);
 	let response: Response;
 	try {
-		response = await stub.fetch('https://do/cancel', { method: 'DELETE' });
+		response = await stub.fetch(
+			`https://do/cancel?reminderId=${encodeURIComponent(reminderId)}`,
+			{ method: 'DELETE' },
+		);
 	} catch {
 		throw new Error('Failed to cancel alarm');
 	}
 	if (!response.ok) {
 		throw new Error('Failed to cancel alarm');
 	}
-
-	await db.prepare('DELETE FROM scheduled_reminders WHERE reminder_id = ?')
-		.bind(reminderId).run();
 }
 
 export async function handleScheduleReminder(request: Request, env: Env): Promise<Response> {

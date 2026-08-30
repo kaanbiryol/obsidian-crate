@@ -186,8 +186,15 @@ describe('SyncRuntime startup event handling', () => {
 		await runtime.initialize();
 
 		expect(isAcceptingEvents(runtime)).toBe(false);
+		let startupWaitSettled = false;
+		void runtime.waitForStartupSync().then(() => {
+			startupWaitSettled = true;
+		});
+		await flushMicrotasks();
+		expect(startupWaitSettled).toBe(false);
 
 		startupSync.resolve(createEmptySyncResult());
+		expect(await runtime.waitForStartupSync()).toBe(true);
 		await vi.waitFor(() => {
 			expect(isAcceptingEvents(runtime)).toBe(true);
 		});

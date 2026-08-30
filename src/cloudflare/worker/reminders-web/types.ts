@@ -16,19 +16,6 @@ export interface RemoteReminderRecord {
 	contentHash: string;
 }
 
-interface ReminderFileRecord {
-	path: string;
-	content: string;
-	hash: string;
-}
-
-export interface ReminderWorkspace {
-	folderPath: string;
-	files: Map<string, ReminderFileRecord>;
-	reminders: RemoteReminderRecord[];
-	projects: string[];
-}
-
 export interface ReminderMutationWorkspace {
 	folderPath: string;
 	allDayNotificationTime?: string | null;

@@ -41,7 +41,11 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	plugin.reminderRepository = createReminderRepository(plugin.reminderIndex, plugin.markdownWriter);
 	configureReminderWriterCallbacks(plugin);
 
-	plugin.remindersVaultWatcher = new VaultWatcher(plugin, plugin.reminderIndex);
+	plugin.remindersVaultWatcher = new VaultWatcher(
+		plugin,
+		plugin.reminderIndex,
+		() => reconcileReminderNotifications(plugin),
+	);
 	plugin.remindersVaultWatcher.register();
 }
 
@@ -51,4 +55,8 @@ export async function reconcileReminderNotifications(plugin: CratePlugin): Promi
 	} catch (error) {
 		remindersLogger.warn('Failed to reconcile reminder notifications:', error);
 	}
+}
+
+export async function disableReminderNotifications(plugin: CratePlugin): Promise<void> {
+	await createNotificationService(plugin).cancelAll();
 }

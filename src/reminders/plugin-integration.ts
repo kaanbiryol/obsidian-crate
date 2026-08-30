@@ -1,19 +1,14 @@
 import type CratePlugin from '../main';
 import { registerReminderIntegrations } from './register-integrations';
-import { reconcileReminderNotifications, setupReminderBackend } from './runtime';
+import { disableReminderNotifications, reconcileReminderNotifications, setupReminderBackend } from './runtime';
 import { normalizeRemindersFolderPath } from './settings';
-import { loadRemindersSettings } from './settings-storage';
-import { configureLogger, createLogger } from './utils/logger';
+import { createLogger } from './utils/logger';
 
 const remindersLogger = createLogger('Reminders');
 
-export { reconcileReminderNotifications };
+export { disableReminderNotifications, reconcileReminderNotifications };
 
 export async function initializeReminders(plugin: CratePlugin): Promise<void> {
-	await loadRemindersSettings(plugin);
-
-	configureLogger({ prefix: 'Crate', enabled: plugin.remindersSettings.debugLogging });
-
 	remindersLogger.info(`Initializing reminders for folder: ${plugin.remindersSettings.remindersFolderPath}`);
 	await setupReminderBackend(plugin, plugin.remindersSettings.remindersFolderPath);
 	remindersLogger.info(`Index loaded: ${plugin.reminderIndex.getAll().length} reminders`);

@@ -9,8 +9,11 @@
 
 ```bash
 npm test                                  # run all tests
+npm run test:worker-runtime               # run D1/R2/Durable Object tests in the Workers runtime
 npx vitest run src/sync/planner.test.ts   # single test file
 ```
+
+`vitest.cloudflare.config.ts` uses Cloudflare's Vitest plugin with `wrangler.jsonc`. The runtime suite applies the initial schema to an isolated D1 database and exercises real D1, R2, and Durable Object bindings locally.
 
 ## Release verification
 

@@ -31,6 +31,7 @@ export class SyncRuntime {
 	private progressListeners = new Set<(current: number, total: number) => void>();
 	private acceptingEvents = false;
 	private initializationRevision = 0;
+	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
 	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
 	private lastForegroundSyncAt: number | null = null;
 
@@ -88,11 +89,16 @@ export class SyncRuntime {
 		return this.apiClient;
 	}
 
+	waitForStartupSync(): Promise<boolean> {
+		return this.startupSyncTask;
+	}
+
 	async initialize(options: { skipStartupSync?: boolean } = {}): Promise<void> {
 		logger.info('Initializing sync engine');
 
 		const initializationRevision = ++this.initializationRevision;
 		this.acceptingEvents = false;
+		this.startupSyncTask = Promise.resolve(false);
 		this.clearForegroundSyncTimer();
 
 		this.syncEngine?.destroy();
@@ -122,12 +128,14 @@ export class SyncRuntime {
 		this.statusBar?.update(this.syncEngine.getState());
 
 		if (this.settings.syncOnStartup && !options.skipStartupSync) {
-			this.sync()
+			this.startupSyncTask = this.sync()
 				.then(result => {
 					notifyConflicts(result.conflicts);
+					return true;
 				})
 				.catch(error => {
 					logger.error('Startup sync failed:', error);
+					return true;
 				})
 				.finally(() => {
 					if (this.initializationRevision === initializationRevision && this.syncEngine === syncEngine) {
@@ -143,6 +151,7 @@ export class SyncRuntime {
 	destroy(): void {
 		this.initializationRevision++;
 		this.acceptingEvents = false;
+		this.startupSyncTask = Promise.resolve(false);
 		this.clearForegroundSyncTimer();
 		this.syncEngine?.destroy();
 		this.statusBar?.destroy();

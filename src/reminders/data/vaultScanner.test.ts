@@ -19,16 +19,17 @@ function makeMockFile(path: string): TFile {
 }
 
 describe('vaultScanner', () => {
-  it('derives project from path with nested folders and case-insensitive folder', () => {
+  it('derives project from paths using case-sensitive vault semantics', () => {
     expect(getProjectFromPath('Reminders/Work.md', 'Reminders')).toBe('Work');
     expect(getProjectFromPath('Reminders/Personal/Health.md', 'Reminders')).toBe('Personal/Health');
-    expect(getProjectFromPath('reminders/Inbox.md', 'Reminders')).toBe('Inbox');
+    expect(getProjectFromPath('reminders/Inbox.md', 'Reminders')).toBe('reminders/Inbox');
   });
 
   it('detects files within reminders folder', () => {
     expect(isInRemindersFolder('Reminders/Work.md', 'Reminders')).toBe(true);
     expect(isInRemindersFolder('Notes/Work.md', 'Reminders')).toBe(false);
     expect(isInRemindersFolder('Reminders', 'Reminders')).toBe(true);
+    expect(isInRemindersFolder('reminders/Work.md', 'Reminders')).toBe(false);
   });
 
   it('scans a file and ignores empty checkbox content', async () => {
@@ -107,11 +108,13 @@ describe('vaultScanner', () => {
   });
 
   it('persists missing reminder IDs before indexing them', async () => {
-    const modify = vi.fn().mockResolvedValue(undefined);
+    const process = vi.fn(async (_file: TFile, mutation: (content: string) => string) => (
+      mutation('- [ ] Task A\n- [ ] Task A')
+    ));
     const app = {
       vault: {
         cachedRead: vi.fn().mockResolvedValue('- [ ] Task A\n- [ ] Task A'),
-        modify,
+        process,
       },
     } as unknown as App;
 
@@ -121,7 +124,28 @@ describe('vaultScanner', () => {
     expect(result.error).toBeUndefined();
     expect(result.reminders).toHaveLength(2);
     expect(result.reminders[0]?.id).not.toBe(result.reminders[1]?.id);
-    expect(modify).toHaveBeenCalledOnce();
+    expect(process).toHaveBeenCalledOnce();
+  });
+
+  it('preserves edits made between the initial read and id normalization', async () => {
+    const latestContent = '# Added concurrently\n- [ ] Task A';
+    let persistedContent = '';
+    const process = vi.fn(async (_file: TFile, mutation: (content: string) => string) => {
+      persistedContent = mutation(latestContent);
+      return persistedContent;
+    });
+    const app = {
+      vault: {
+        cachedRead: vi.fn().mockResolvedValue('- [ ] Task A'),
+        process,
+      },
+    } as unknown as App;
+
+    const result = await scanFile(app, makeMockFile('Reminders/Work.md'), 'Reminders');
+
+    expect(result.reminders).toHaveLength(1);
+    expect(persistedContent).toContain('# Added concurrently');
+    expect(persistedContent).toContain('<!-- crate-id:');
   });
 
   it('reports file read failures explicitly', async () => {

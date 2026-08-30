@@ -139,44 +139,51 @@ export class ReminderNotificationService {
 
 		const api = this.getApiClient();
 		if (!api) return;
-		try {
-			const { scheduled } = await api.getScheduledReminders();
-			const scheduledById = new Map(scheduled.map((entry) => [entry.reminder_id, entry] as const));
+		const { scheduled } = await api.getScheduledReminders();
+		const scheduledById = new Map(scheduled.map((entry) => [entry.reminder_id, entry] as const));
 
-			const resolvedDatetimes = new Map<string, string>();
-			const shouldBeScheduled = reminders.filter(r => {
-				if (r.completed) return false;
-				const effectiveDatetime = this.resolveNotificationDatetime(r);
-				if (!effectiveDatetime || !this.getSchedulableDueDate(effectiveDatetime)) return false;
-				resolvedDatetimes.set(r.id, effectiveDatetime);
-				return true;
-			});
-			const shouldBeScheduledIds = new Set(shouldBeScheduled.map(r => r.id));
-			const operations: Array<Promise<NotificationMutationResult>> = [];
+		const resolvedDatetimes = new Map<string, string>();
+		const shouldBeScheduled = reminders.filter(r => {
+			if (r.completed) return false;
+			const effectiveDatetime = this.resolveNotificationDatetime(r);
+			if (!effectiveDatetime || !this.getSchedulableDueDate(effectiveDatetime)) return false;
+			resolvedDatetimes.set(r.id, effectiveDatetime);
+			return true;
+		});
+		const shouldBeScheduledIds = new Set(shouldBeScheduled.map(r => r.id));
+		const operations: Array<Promise<NotificationMutationResult>> = [];
 
-			for (const s of scheduled) {
-				if (!shouldBeScheduledIds.has(s.reminder_id)) {
-					operations.push(this.cancel(s.reminder_id));
-				}
+		for (const s of scheduled) {
+			if (!shouldBeScheduledIds.has(s.reminder_id)) {
+				operations.push(this.cancel(s.reminder_id));
 			}
+		}
 
-			for (const r of shouldBeScheduled) {
-				const existing = scheduledById.get(r.id);
-				const effectiveDatetime = resolvedDatetimes.get(r.id);
-				if (!effectiveDatetime) continue;
-				if (!existing || this.shouldReschedule(existing, r, effectiveDatetime)) {
-					operations.push(this.schedule(r, effectiveDatetime));
-				}
+		for (const r of shouldBeScheduled) {
+			const existing = scheduledById.get(r.id);
+			const effectiveDatetime = resolvedDatetimes.get(r.id);
+			if (!effectiveDatetime) continue;
+			if (!existing || this.shouldReschedule(existing, r, effectiveDatetime)) {
+				operations.push(this.schedule(r, effectiveDatetime));
 			}
+		}
 
-			const results = await Promise.allSettled(operations);
-			const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
-			const [firstFailure] = failures;
-			if (firstFailure) {
-				throw firstFailure.reason;
-			}
-		} catch (err) {
-			log.error('Failed to reconcile reminders:', err);
+		const results = await Promise.allSettled(operations);
+		const firstFailure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+		if (firstFailure) {
+			throw firstFailure.reason;
+		}
+	}
+
+	async cancelAll(): Promise<void> {
+		const api = this.getApiClient();
+		if (!api) return;
+
+		const { scheduled } = await api.getScheduledReminders();
+		const results = await Promise.allSettled(scheduled.map(({ reminder_id: reminderId }) => this.cancel(reminderId)));
+		const firstFailure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+		if (firstFailure) {
+			throw firstFailure.reason;
 		}
 	}
 

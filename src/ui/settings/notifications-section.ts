@@ -1,7 +1,7 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
-import { reconcileReminderNotifications } from '../../reminders/plugin-integration';
+import { disableReminderNotifications, reconcileReminderNotifications } from '../../reminders/plugin-integration';
 import { normalizeTimeString } from '../../reminders/settings';
 import type { SyncApiClient } from '../../sync/api';
 import { QRModal } from '../qr-modal';
@@ -24,12 +24,23 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 		.addToggle(toggle => {
 			toggle.setValue(plugin.settings.pushEnabled)
 				.onChange(async (value) => {
+					let cancelledExistingSchedules = false;
 					try {
+						if (!value && plugin.settings.pushEnabled) {
+							await disableReminderNotifications(plugin);
+							cancelledExistingSchedules = true;
+						}
 						await plugin.writeSettings({ pushEnabled: value });
+						if (value) {
+							await reconcileReminderNotifications(plugin);
+						}
 						context.rerender();
 					} catch (error) {
 						new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
 						toggle.setValue(plugin.settings.pushEnabled);
+						if (cancelledExistingSchedules && plugin.settings.pushEnabled) {
+							void reconcileReminderNotifications(plugin);
+						}
 					}
 				});
 		});
@@ -205,7 +216,7 @@ async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin): P
 				.setDesc(`Subscribed ${new Date(sub.created_at).toLocaleDateString()}`)
 				.addButton(button => {
 					button.setButtonText('Remove');
-					button.setWarning();
+					button.setDestructive();
 					button.onClick(async () => {
 						try {
 							await apiClient.deletePushSubscription(sub.id);

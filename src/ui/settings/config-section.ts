@@ -52,7 +52,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 			.setDesc('Clears this device credential but remembers which Cloudflare server belongs to this vault')
 			.addButton(button => button
 				.setButtonText('Disconnect device')
-				.setWarning()
+				.setDestructive()
 				.onClick(async () => {
 					const confirmed = await openConfirmationModal(plugin.app, {
 						title: 'Disconnect this device',

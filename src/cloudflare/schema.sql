@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
 	platform TEXT,
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	last_seen_at TEXT,
-	scope TEXT NOT NULL DEFAULT 'vault',
+	scope TEXT NOT NULL DEFAULT 'vault' CHECK (scope IN ('vault', 'reminders')),
 	expires_at INTEGER
 );
 
@@ -33,6 +33,7 @@ CREATE INDEX IF NOT EXISTS auth_tokens_expires_at_idx ON auth_tokens(expires_at)
 
 CREATE TABLE IF NOT EXISTS scheduled_reminders (
 	reminder_id TEXT PRIMARY KEY,
+	schedule_token TEXT NOT NULL,
 	content TEXT NOT NULL,
 	project TEXT,
 	due_datetime TEXT NOT NULL,

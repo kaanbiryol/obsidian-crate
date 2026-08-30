@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import { fetchReadyReminderList } from '../reminder-api';
 import { loadCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
 import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, StoredConfig } from '../types';
@@ -97,9 +98,10 @@ export function useReminderSync({
 			try {
 				const headers = new Headers();
 				if (etagRef.current) headers.set('If-None-Match', etagRef.current);
-				const response = await apiFetch(
+				const response = await fetchReadyReminderList(
+					apiFetch,
 					`/reminders/list?folderPath=${encodeURIComponent(config.folderPath)}`,
-					{ headers },
+					headers,
 				);
 				if (response.status === 304) {
 					if (!requestCoordinatorRef.current.shouldApplyRead(readToken)) return;

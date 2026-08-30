@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { normalizePath } from 'obsidian';
 import { isRecord } from '../plugin/settings';
 import type { TabId } from './ui/layoutConstants';
 
@@ -118,6 +119,9 @@ export function normalizeRemindersFolderPath(rawPath: string | null | undefined)
 	const segments = normalized.split('/');
 	const safeSegments: string[] = [];
 	for (const segment of segments) {
+		if (!segment) {
+			continue;
+		}
 		const safeSegment = segment.trim();
 		if (
 			!safeSegment
@@ -130,7 +134,7 @@ export function normalizeRemindersFolderPath(rawPath: string | null | undefined)
 		safeSegments.push(safeSegment);
 	}
 
-	return safeSegments.join('/');
+	return normalizePath(safeSegments.join('/'));
 }
 
 export function normalizeRemindersSettings(

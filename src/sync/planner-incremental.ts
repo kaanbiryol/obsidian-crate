@@ -1,6 +1,6 @@
 import { computeHash } from "./hasher";
 import { isHiddenPath } from "./file-discovery";
-import { deletePathLocally, isVaultTFileLike } from "./planner-helpers";
+import { deletePathLocallyIfUnchanged, isVaultTFileLike } from "./planner-helpers";
 import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
 import { createEmptySyncResult, finalizeSyncResult } from "./sync-result";
@@ -90,9 +90,16 @@ export async function runIncrementalSync(
             continue;
           }
 
-          const deletedLocally = await deletePathLocally(context, path);
+          const expectedLocalHash = context.localManifest.getEntry(path)?.hash ?? null;
+          const localDelete = await deletePathLocallyIfUnchanged(context, path, expectedLocalHash);
+          if (localDelete.status === "changed") {
+            resurrectPaths.add(path);
+            localChangedPaths.add(path);
+            localChanges.push({ path, hash: localDelete.hash });
+            continue;
+          }
           context.localManifest.removeEntry(path);
-          if (deletedLocally) {
+          if (localDelete.status === "deleted") {
             result.deleted++;
             result.deletedPaths.push(path);
           }

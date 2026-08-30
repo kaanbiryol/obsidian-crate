@@ -137,6 +137,27 @@ describe('ReminderNotificationService', () => {
 		});
 	});
 
+	it('cancels every existing schedule even after push is disabled locally', async () => {
+		getScheduledReminders.mockResolvedValueOnce({
+			scheduled: [
+				{ reminder_id: 'rem-1' },
+				{ reminder_id: 'rem-2' },
+			],
+		});
+		cancelReminder.mockResolvedValue({ success: true });
+		const service = new ReminderNotificationService(
+			() => createSettings({ pushEnabled: false }),
+			() => createRemindersSettings(),
+			() => apiClient as never,
+		);
+
+		await service.cancelAll();
+
+		expect(cancelReminder).toHaveBeenCalledTimes(2);
+		expect(cancelReminder).toHaveBeenCalledWith('rem-1');
+		expect(cancelReminder).toHaveBeenCalledWith('rem-2');
+	});
+
 	it('schedules date-only reminders at the configured all-day notification time', async () => {
 		scheduleReminder.mockResolvedValueOnce({ success: true });
 

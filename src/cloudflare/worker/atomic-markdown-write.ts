@@ -1,0 +1,175 @@
+import { changedRows } from './db';
+import { stageMarkdownFile, type StagedMarkdownFile } from './markdown-file-staging';
+import { FileVersionConflictError } from './storage';
+import {
+	collectCleanupKeys,
+	deleteBucketObjectsOrQueue,
+	deleteQueuedBucketObjects,
+	getStoredFileRow,
+} from './sync-storage';
+
+function destinationMutation(
+	db: D1Database,
+	destination: StagedMarkdownFile,
+	source: StagedMarkdownFile,
+): D1PreparedStatement {
+	if (destination.expectedHash === null) {
+		return db.prepare(`/* atomic-destination-insert */
+			INSERT INTO files (path, hash, size, modified, storage_key)
+			SELECT ?, ?, ?, datetime('now'), ?
+			WHERE NOT EXISTS (SELECT 1 FROM files WHERE path = ?)
+			AND EXISTS (SELECT 1 FROM files WHERE path = ? AND hash = ?)
+			ON CONFLICT(path) DO NOTHING`)
+			.bind(
+				destination.path,
+				destination.hash,
+				destination.size,
+				destination.objectKey,
+				destination.path,
+				source.path,
+				source.expectedHash,
+			);
+	}
+
+	return db.prepare(`/* atomic-destination-update */
+		UPDATE files SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?
+		WHERE path = ? AND hash = ?
+		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND hash = ?)`)
+		.bind(
+			destination.hash,
+			destination.size,
+			destination.objectKey,
+			destination.path,
+			destination.expectedHash,
+			source.path,
+			source.expectedHash,
+		);
+}
+
+function sourceMutation(
+	db: D1Database,
+	source: StagedMarkdownFile,
+	destination: StagedMarkdownFile,
+): D1PreparedStatement {
+	return db.prepare(`/* atomic-source-update */
+		UPDATE files SET hash = ?, size = ?, modified = datetime('now'), storage_key = ?
+		WHERE path = ? AND hash = ?
+		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
+		.bind(
+			source.hash,
+			source.size,
+			source.objectKey,
+			source.path,
+			source.expectedHash,
+			destination.path,
+			destination.objectKey,
+		);
+}
+
+function changelogStatement(db: D1Database, staged: StagedMarkdownFile): D1PreparedStatement {
+	return db.prepare(`INSERT INTO changelog (path, action, hash, size)
+		SELECT ?, 'put', ?, ?
+		WHERE EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
+		.bind(staged.path, staged.hash, staged.size, staged.path, staged.objectKey);
+}
+
+function cleanupStatement(
+	db: D1Database,
+	storageKey: string,
+	source: StagedMarkdownFile,
+	destination: StagedMarkdownFile,
+): D1PreparedStatement {
+	return db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key)
+		SELECT ?
+		WHERE EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)
+		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
+		.bind(
+			storageKey,
+			source.path,
+			source.objectKey,
+			destination.path,
+			destination.objectKey,
+		);
+}
+
+export async function writeCommittedMarkdownFilePair(
+	bucket: R2Bucket,
+	db: D1Database,
+	params: {
+		source: { path: string; content: string; expectedHash: string };
+		destination: { path: string; content: string; expectedHash: string | null };
+	},
+): Promise<{
+	source: { hash: string; size: number };
+	destination: { hash: string; size: number };
+}> {
+	if (params.source.path === params.destination.path) {
+		throw new Error('Atomic reminder move requires two distinct files');
+	}
+
+	const [previousSource, previousDestination] = await Promise.all([
+		getStoredFileRow(db, params.source.path),
+		getStoredFileRow(db, params.destination.path),
+	]);
+	const stagedFiles: StagedMarkdownFile[] = [];
+	try {
+		stagedFiles.push(await stageMarkdownFile(
+			bucket,
+			params.destination.path,
+			params.destination.content,
+			params.destination.expectedHash,
+		));
+		stagedFiles.push(await stageMarkdownFile(
+			bucket,
+			params.source.path,
+			params.source.content,
+			params.source.expectedHash,
+		));
+	} catch (error) {
+		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => file.objectKey));
+		throw error;
+	}
+
+	const [destination, source] = stagedFiles as [StagedMarkdownFile, StagedMarkdownFile];
+	const cleanupKeys = [
+		...collectCleanupKeys(previousSource, source.objectKey),
+		...collectCleanupKeys(previousDestination, destination.objectKey),
+	];
+
+	let results: unknown[];
+	try {
+		results = await db.batch([
+			destinationMutation(db, destination, source),
+			sourceMutation(db, source, destination),
+			changelogStatement(db, destination),
+			changelogStatement(db, source),
+			...cleanupKeys.map(key => cleanupStatement(db, key, source, destination)),
+		]);
+	} catch (error) {
+		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => file.objectKey));
+		throw error;
+	}
+
+	const destinationCommitted = changedRows(results[0]) === 1;
+	const sourceCommitted = changedRows(results[1]) === 1;
+	if (!destinationCommitted || !sourceCommitted) {
+		if (destinationCommitted !== sourceCommitted) {
+			throw new Error('Atomic reminder move committed only one file');
+		}
+		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => file.objectKey));
+		const [currentSource, currentDestination] = await Promise.all([
+			getStoredFileRow(db, source.path),
+			getStoredFileRow(db, destination.path),
+		]);
+		if (currentSource?.hash !== source.expectedHash) {
+			throw new FileVersionConflictError(source.path, currentSource?.hash ?? null);
+		}
+		throw new FileVersionConflictError(destination.path, currentDestination?.hash ?? null);
+	}
+
+	await deleteQueuedBucketObjects(bucket, db, cleanupKeys);
+	return {
+		source: { hash: source.hash, size: source.size },
+		destination: { hash: destination.hash, size: destination.size },
+	};
+}

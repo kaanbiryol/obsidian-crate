@@ -6,6 +6,7 @@ import { parseFolderPath } from '../requests';
 import {
 	loadIncrementalReminderIndex,
 	REMINDER_CACHE_PARSER_VERSION,
+	REMINDER_INDEX_MAX_FILE_BYTES,
 } from '../reminder-cache';
 import { toReminderPayload } from '../scan';
 
@@ -16,6 +17,13 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	}
 
 	const metadata = await listStoredMarkdownFileMetadataByPrefix(env.DB, folderPath);
+	const oversizedFile = metadata.find(file => file.size > REMINDER_INDEX_MAX_FILE_BYTES);
+	if (oversizedFile) {
+		return corsResponse({
+			error: 'Reminder Markdown files must be 1 MiB or smaller',
+			path: oversizedFile.path,
+		}, 413);
+	}
 	const revision = await sha256Hex([
 		`parser:${REMINDER_CACHE_PARSER_VERSION}`,
 		...metadata.map((file) => `${file.path}\0${file.hash}\0${file.size}`),
@@ -36,6 +44,15 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 	}
 
 	const workspace = await loadIncrementalReminderIndex(env, folderPath, metadata);
+	if (!workspace.ready) {
+		return corsResponse({
+			warming: true,
+			remainingFiles: workspace.remainingFiles,
+		}, 202, {
+			'Cache-Control': 'private, no-store',
+			'Retry-After': '0',
+		});
+	}
 	return corsResponse({
 		reminders: workspace.reminders.map(reminder => toReminderPayload(reminder)),
 		projects: workspace.projects,

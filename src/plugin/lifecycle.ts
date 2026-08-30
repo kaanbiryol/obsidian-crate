@@ -19,6 +19,7 @@ import {
 import { showCloudflareServerUpdateNotice } from "../cloudflare/update-notice";
 
 const logger = createLogger("Plugin");
+const activePlugins = new WeakSet<CratePlugin>();
 
 export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
   logger.info("Plugin loaded");
@@ -27,18 +28,20 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
   if (!coreInitialized) {
     return;
   }
+  activePlugins.add(plugin);
 
   plugin.registerSettingsTab(new CrateSettingTab(plugin.app, plugin));
   registerVaultSyncEventHandlers(plugin);
   await initializePluginReminders(plugin);
   await initializePluginSync(plugin);
-  await reconcileReminderNotifications(plugin);
   showCloudflareServerUpdateNotice(plugin);
   registerPluginCommands(plugin);
   registerPluginProtocols(plugin);
+  void reconcileNotificationsAfterStartupSync(plugin);
 }
 
 export function shutdownPlugin(plugin: CratePlugin): void {
+  activePlugins.delete(plugin);
   plugin.syncRuntime?.destroy();
   plugin.cloudflareDeploymentService?.destroy();
   plugin.remindersVaultWatcher?.unregister();
@@ -90,6 +93,20 @@ async function initializePluginSync(plugin: CratePlugin): Promise<void> {
     const message = errorMessage(error);
     logger.error("Sync initialization failed:", message);
     new Notice(`Crate sync failed to start: ${message}`);
+  }
+}
+
+async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin): Promise<void> {
+  try {
+    const startupSyncRan = await plugin.syncRuntime.waitForStartupSync();
+    if (!activePlugins.has(plugin)) return;
+    if (startupSyncRan) {
+      await plugin.reminderIndex.load();
+    }
+    if (!activePlugins.has(plugin)) return;
+    await reconcileReminderNotifications(plugin);
+  } catch (error) {
+    logger.warn("Failed to refresh reminders after startup sync:", errorMessage(error));
   }
 }
 

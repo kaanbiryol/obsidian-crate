@@ -26,11 +26,12 @@ const CONFIG_DIR = '.vault-config';
 const HIDDEN_CONFIG_PATH = `${CONFIG_DIR}/config.json`;
 
 function createTransferHarness() {
-	const adapter = {
-		readBinary: vi.fn(),
-		stat: vi.fn(),
-		exists: vi.fn(),
-		mkdir: vi.fn(),
+		const adapter = {
+			readBinary: vi.fn(),
+			stat: vi.fn(),
+			exists: vi.fn(),
+			remove: vi.fn(),
+			mkdir: vi.fn(),
 		writeBinary: vi.fn(),
 	};
 	const vault = {
@@ -50,8 +51,9 @@ function createTransferHarness() {
 		batchUpload: vi.fn(),
 		batchDownload: vi.fn(),
 	};
-	const localManifest = {
-		hashMatches: vi.fn(() => false),
+		const localManifest = {
+			getEntry: vi.fn(),
+			hashMatches: vi.fn(() => false),
 		setEntry: vi.fn(),
 		removeEntry: vi.fn(),
 	};
@@ -310,8 +312,11 @@ describe('transfer download/process helpers', () => {
 
 	it('moves a local file to trash when the remote delete wins', async () => {
 		const harness = createTransferHarness();
+		const content = new TextEncoder().encode('base').buffer as ArrayBuffer;
+		const hash = await computeHash(content);
 		const file = { path: 'notes/a.md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(file);
+		harness.adapter.readBinary.mockResolvedValue(content);
 		const result = emptyResult();
 		const localFiles = {
 			'notes/a.md': { hash: 'base', size: 4, modified: '2026-02-15T00:00:00.000Z' },
@@ -319,7 +324,7 @@ describe('transfer download/process helpers', () => {
 
 		await processDiff(
 			harness.context,
-			{ path: 'notes/a.md', action: 'delete-local', localHash: 'base' },
+			{ path: 'notes/a.md', action: 'delete-local', localHash: hash },
 			localFiles,
 			result,
 		);
@@ -328,6 +333,50 @@ describe('transfer download/process helpers', () => {
 		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/a.md');
 		expect(result.deletedPaths).toEqual(['notes/a.md']);
 		expect(localFiles).not.toHaveProperty('notes/a.md');
+	});
+
+	it('uploads a local edit made after a full-sync remote delete was planned', async () => {
+		const harness = createTransferHarness();
+		const baseContent = new TextEncoder().encode('base').buffer as ArrayBuffer;
+		const changedContent = new TextEncoder().encode('edited during sync').buffer as ArrayBuffer;
+		const baseHash = await computeHash(baseContent);
+		const changedHash = await computeHash(changedContent);
+		const file = {
+			path: 'notes/a.md',
+			extension: 'md',
+			stat: { size: changedContent.byteLength, mtime: 1700000000000 },
+		};
+		harness.vault.getAbstractFileByPath.mockReturnValue(file);
+		harness.adapter.readBinary.mockResolvedValue(changedContent);
+		harness.api.uploadFile.mockResolvedValue({
+			success: true,
+			path: 'notes/a.md',
+			hash: changedHash,
+		});
+		const result = emptyResult();
+		const localFiles = {
+			'notes/a.md': { hash: baseHash, size: baseContent.byteLength, modified: '2026-02-15T00:00:00.000Z' },
+		};
+
+		await processDiff(
+			harness.context,
+			{ path: 'notes/a.md', action: 'delete-local', localHash: baseHash },
+			localFiles,
+			result,
+		);
+
+		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
+		expect(harness.api.uploadFile).toHaveBeenCalledWith(
+			'notes/a.md',
+			changedContent,
+			changedHash,
+			changedContent.byteLength,
+			'text/markdown',
+			null,
+		);
+		expect(result.uploadedPaths).toEqual(['notes/a.md']);
+		expect(result.conflicts).toEqual(['notes/a.md']);
+		expect(localFiles['notes/a.md']?.hash).toBe(changedHash);
 	});
 
 	it('aggregates per-path download errors during batch downloads', async () => {

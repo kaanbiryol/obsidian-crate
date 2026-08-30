@@ -27,7 +27,7 @@ function createDb() {
 }
 
 describe('worker reminder handlers', () => {
-	it('stores scheduled reminders without referencing legacy schema columns', async () => {
+	it('delegates scheduled reminder persistence to its Durable Object', async () => {
 		const { db, statements } = createDb();
 		const alarmFetch = vi.fn(async () => new Response(null, { status: 200 }));
 		const env = {
@@ -53,9 +53,7 @@ describe('worker reminder handlers', () => {
 		);
 
 		expect(response.status).toBe(200);
-		const insertStatement = statements.find((sql) => sql.includes('INSERT OR REPLACE INTO scheduled_reminders'));
-		expect(insertStatement).toContain('(reminder_id, content, project, due_datetime)');
-		expect(insertStatement).not.toContain('ntfy_topic');
+		expect(statements).toEqual([]);
 		expect(alarmFetch).toHaveBeenCalledTimes(1);
 	});
 
@@ -90,7 +88,7 @@ describe('worker reminder handlers', () => {
 		expect(statements.some((sql) => sql.includes('INSERT OR REPLACE INTO scheduled_reminders'))).toBe(false);
 	});
 
-	it('does not delete scheduled reminders when alarm cancellation fails', async () => {
+	it('reports a Durable Object cancellation failure', async () => {
 		const { db, statements } = createDb();
 		const alarmFetch = vi.fn(async () => new Response(null, { status: 500 }));
 		const env = {
@@ -112,6 +110,38 @@ describe('worker reminder handlers', () => {
 
 		expect(response.status).toBe(500);
 		expect(await response.json()).toEqual({ error: 'Failed to cancel alarm' });
-		expect(statements.some((sql) => sql.includes('DELETE FROM scheduled_reminders'))).toBe(false);
+		expect(statements).toEqual([]);
+		expect(alarmFetch).toHaveBeenCalledWith(
+			'https://do/cancel?reminderId=rem-1',
+			{ method: 'DELETE' },
+		);
+	});
+
+	it('reports a Durable Object scheduling failure', async () => {
+		const { db } = createDb();
+		const alarmFetch = vi.fn(async () => new Response(null, { status: 500 }));
+		const env = {
+			DB: db,
+			REMINDER_ALARMS: {
+				idFromName: vi.fn(() => 'alarm-id'),
+				get: vi.fn(() => ({ fetch: alarmFetch })),
+			},
+		};
+
+		const response = await handleScheduleReminder(
+			new Request('https://worker.test/reminders/schedule', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					reminderId: 'rem-1',
+					content: 'Pay rent',
+					dueDatetime: '2027-01-10T10:00:00.000Z',
+				}),
+			}),
+			env as never,
+		);
+
+		expect(response.status).toBe(500);
+		expect(alarmFetch).toHaveBeenCalledTimes(1);
 	});
 });

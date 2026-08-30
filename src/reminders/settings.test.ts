@@ -70,7 +70,7 @@ describe('normalizeRemindersSettings', () => {
 	it('rejects unsafe reminders folder paths and normalizes Windows separators', () => {
 		expect(normalizeRemindersFolderPath('Reminders\\Work')).toBe('Reminders/Work');
 		expect(normalizeRemindersFolderPath('../Secrets')).toBe(DEFAULT_REMINDERS_FOLDER_PATH);
-		expect(normalizeRemindersFolderPath('Reminders//Nested')).toBe(DEFAULT_REMINDERS_FOLDER_PATH);
+		expect(normalizeRemindersFolderPath('Reminders//Nested')).toBe('Reminders/Nested');
 		expect(normalizeRemindersFolderPath('Reminders/\u0000Hidden')).toBe(DEFAULT_REMINDERS_FOLDER_PATH);
 	});
 });

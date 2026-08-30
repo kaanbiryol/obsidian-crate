@@ -8,7 +8,7 @@ describe('markdownScan', () => {
 	it('derives projects from reminder file paths', () => {
 		expect(getProjectFromPath('Reminders/Inbox.md', 'Reminders')).toBe('Inbox');
 		expect(getProjectFromPath('Reminders/Personal/Health.md', 'Reminders')).toBe('Personal/Health');
-		expect(getProjectFromPath('reminders/Work.md', 'Reminders')).toBe('Work');
+		expect(getProjectFromPath('reminders/Work.md', 'Reminders')).toBe('reminders/Work');
 	});
 
 	it('scans checkbox reminders with descriptions and persisted ids', () => {

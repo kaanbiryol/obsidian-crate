@@ -35,6 +35,9 @@ export async function authenticateWorkerRequest(
 		if (!row?.id) {
 			return { response: corsResponse({ error: 'Invalid token' }, 401) };
 		}
+		if (row.scope !== 'vault' && row.scope !== 'reminders') {
+			return { response: corsResponse({ error: 'Invalid token' }, 401) };
+		}
 
 		await db.prepare(`UPDATE auth_tokens
 			SET last_seen_at = datetime('now')
@@ -44,7 +47,7 @@ export async function authenticateWorkerRequest(
 		return {
 			principal: {
 				tokenId: row.id,
-				scope: row.scope === 'reminders' ? 'reminders' : 'vault',
+				scope: row.scope,
 			},
 		};
 	} catch (error) {

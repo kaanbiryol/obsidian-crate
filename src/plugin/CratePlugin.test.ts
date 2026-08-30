@@ -1,15 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CratePlugin from './CratePlugin';
 import { normalizeCrateSettings } from './settings';
+import {
+	DEFAULT_REMINDERS_SETTINGS,
+	useRemindersSettingsStore,
+} from '../reminders/settings';
 
 vi.mock('../reminders/plugin-integration', () => ({ reinitializeReminders: vi.fn() }));
-vi.mock('../reminders/settings', () => ({
-	useRemindersSettingsStore: { getState: () => ({}) },
-}));
-vi.mock('../reminders/settings-storage', () => ({
-	loadRemindersSettings: vi.fn(),
-	writeRemindersSettings: vi.fn(),
-}));
 vi.mock('../reminders/ui/workspaceLayout', () => ({
 	activateOrRevealRemindersLeaf: vi.fn(),
 }));
@@ -19,6 +16,32 @@ vi.mock('./lifecycle', () => ({
 }));
 
 describe('CratePlugin settings persistence', () => {
+	beforeEach(() => {
+		useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS }, true);
+	});
+
+	it('loads core and reminder settings from one plugin data record', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			loadData: vi.fn(async () => ({
+				syncInterval: 120,
+				reminders: {
+					upcomingDaysDefault: 14,
+					remindersFolderPath: 'Reminders/Work',
+				},
+			})),
+		});
+
+		await plugin.loadSettings();
+
+		expect(plugin.settings.syncInterval).toBe(120);
+		expect(plugin.remindersSettings).toMatchObject({
+			upcomingDaysDefault: 14,
+			remindersFolderPath: 'Reminders/Work',
+		});
+	});
+
 	it('preserves the shared settings object across deployment and connection saves', async () => {
 		const plugin = new CratePlugin({} as never, {} as never);
 		const saveData = vi.fn(async () => {});
@@ -50,6 +73,7 @@ describe('CratePlugin settings persistence', () => {
 
 		expect(saveData).toHaveBeenLastCalledWith(expect.objectContaining({
 			workerUrl: 'https://crate.example.workers.dev',
+			reminders: DEFAULT_REMINDERS_SETTINGS,
 		}));
 	});
 
@@ -83,5 +107,76 @@ describe('CratePlugin settings persistence', () => {
 
 		expect(plugin.settings).toBe(settings);
 		expect(plugin.settings.syncInterval).toBe(300);
+	});
+
+	it('applies reminder settings only after the combined data write succeeds', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const saveData = vi.fn(async (_data: unknown) => undefined);
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			saveData,
+			settings: normalizeCrateSettings({}, 'vault-config'),
+		});
+
+		await plugin.writeRemindersSettings({ upcomingDaysDefault: 14 });
+
+		expect(plugin.remindersSettings.upcomingDaysDefault).toBe(14);
+		const persisted = saveData.mock.calls[0]?.[0] as {
+			reminders?: { upcomingDaysDefault?: number };
+		};
+		expect(persisted.reminders?.upcomingDaysDefault).toBe(14);
+	});
+
+	it('keeps reminder settings unchanged when their combined data write fails', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			saveData: vi.fn().mockRejectedValue(new Error('disk full')),
+			settings: normalizeCrateSettings({}, 'vault-config'),
+		});
+
+		await expect(plugin.writeRemindersSettings({ upcomingDaysDefault: 14 }))
+			.rejects.toThrow('disk full');
+
+		expect(plugin.remindersSettings.upcomingDaysDefault).toBe(
+			DEFAULT_REMINDERS_SETTINGS.upcomingDaysDefault,
+		);
+	});
+
+	it('serializes combined writes so concurrent core and reminder updates are not lost', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		let finishFirstWrite!: () => void;
+		const firstWrite = new Promise<void>((resolve) => {
+			finishFirstWrite = resolve;
+		});
+		const persisted: unknown[] = [];
+		const saveData = vi.fn(async (data: unknown) => {
+			persisted.push(data);
+			if (persisted.length === 1) {
+				await firstWrite;
+			}
+		});
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			saveData,
+			settings: normalizeCrateSettings({}, 'vault-config'),
+		});
+
+		const coreUpdate = plugin.writeSettings({ syncInterval: 120 });
+		await vi.waitFor(() => {
+			expect(saveData).toHaveBeenCalledTimes(1);
+		});
+		const reminderUpdate = plugin.writeRemindersSettings({ upcomingDaysDefault: 14 });
+
+		expect(saveData).toHaveBeenCalledTimes(1);
+		finishFirstWrite();
+		await Promise.all([coreUpdate, reminderUpdate]);
+
+		const lastPersisted = persisted.at(-1) as {
+			syncInterval?: number;
+			reminders?: { upcomingDaysDefault?: number };
+		};
+		expect(lastPersisted.syncInterval).toBe(120);
+		expect(lastPersisted.reminders?.upcomingDaysDefault).toBe(14);
 	});
 });

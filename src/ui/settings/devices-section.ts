@@ -66,7 +66,7 @@ async function loadDevices(container: HTMLElement, plugin: CratePlugin): Promise
 
 			setting.addButton((button) => {
 				button.setButtonText('Remove');
-				button.setWarning();
+				button.setDestructive();
 				button.onClick(async () => {
 					const confirmed = await openConfirmationModal(plugin.app, {
 						title: 'Remove device',

@@ -63,8 +63,8 @@ function createBucket(
 					text: async () => new TextDecoder().decode(entry.body),
 				};
 			}),
-			delete: vi.fn(async (key: string) => {
-				store.delete(key);
+			delete: vi.fn(async (key: string | string[]) => {
+				for (const entry of Array.isArray(key) ? key : [key]) store.delete(entry);
 			}),
 		},
 	};
@@ -75,6 +75,7 @@ function createDb(options?: {
 	fileSizes?: Record<string, number>;
 	fileHashes?: Record<string, string>;
 	committedPaths?: string[];
+	atomicSourceConflictPath?: string;
 }) {
 	const files = new Map<string, string>(Object.entries(options?.files ?? {}));
 	const hashes = new Map<string, string>(Object.entries(options?.fileHashes ?? {}));
@@ -181,10 +182,50 @@ function createDb(options?: {
 			return statement;
 		}),
 		batch: vi.fn(async (statements: Array<{ _sql: string; _args: unknown[] }>) => {
+			if (options?.atomicSourceConflictPath && statements.some(statement => statement._sql.includes('atomic-'))) {
+				hashes.set(options.atomicSourceConflictPath, 'f'.repeat(64));
+			}
 			const results: Array<{ meta: { changes: number } }> = [];
 			for (const statement of statements) {
 				let changes = 0;
-				if (statement._sql.includes('INSERT INTO reminder_file_cache')) {
+				if (statement._sql.includes('atomic-destination-insert')) {
+					const destinationPath = getBoundString(statement._args, 0);
+					const sourcePath = getBoundString(statement._args, 5);
+					const sourceExpectedHash = getBoundString(statement._args, 6);
+					if (!files.has(destinationPath) && hashes.get(sourcePath) === sourceExpectedHash) {
+						files.set(destinationPath, getBoundString(statement._args, 3));
+						hashes.set(destinationPath, getBoundString(statement._args, 1));
+						sizes.set(destinationPath, Number(statement._args[2]));
+						options?.committedPaths?.push(destinationPath);
+						changes = 1;
+					}
+				} else if (statement._sql.includes('atomic-destination-update')) {
+					const destinationPath = getBoundString(statement._args, 3);
+					const sourcePath = getBoundString(statement._args, 5);
+					if (
+						hashes.get(destinationPath) === getBoundString(statement._args, 4)
+						&& hashes.get(sourcePath) === getBoundString(statement._args, 6)
+					) {
+						files.set(destinationPath, getBoundString(statement._args, 2));
+						hashes.set(destinationPath, getBoundString(statement._args, 0));
+						sizes.set(destinationPath, Number(statement._args[1]));
+						options?.committedPaths?.push(destinationPath);
+						changes = 1;
+					}
+				} else if (statement._sql.includes('atomic-source-update')) {
+					const sourcePath = getBoundString(statement._args, 3);
+					const destinationPath = getBoundString(statement._args, 5);
+					if (
+						hashes.get(sourcePath) === getBoundString(statement._args, 4)
+						&& files.get(destinationPath) === getBoundString(statement._args, 6)
+					) {
+						files.set(sourcePath, getBoundString(statement._args, 2));
+						hashes.set(sourcePath, getBoundString(statement._args, 0));
+						sizes.set(sourcePath, Number(statement._args[1]));
+						options?.committedPaths?.push(sourcePath);
+						changes = 1;
+					}
+				} else if (statement._sql.includes('INSERT INTO reminder_file_cache')) {
 					const folderPath = getBoundString(statement._args, 0);
 					const filePath = getBoundString(statement._args, 1);
 					const fileHash = getBoundString(statement._args, 2);
@@ -241,6 +282,7 @@ async function createEnv(input: {
 	bucketEntries: Record<string, string>;
 	files: Record<string, string | null>;
 	failPutWhen?: (key: string, content: string) => boolean;
+	atomicSourceConflictPath?: string;
 }) {
 	const committedPaths: string[] = [];
 	const { bucket, store } = createBucket(input.bucketEntries, { failPutWhen: input.failPutWhen });
@@ -261,6 +303,7 @@ async function createEnv(input: {
 		fileSizes,
 		fileHashes,
 		committedPaths,
+		atomicSourceConflictPath: input.atomicSourceConflictPath,
 	});
 
 	return {
@@ -279,7 +322,7 @@ async function createEnv(input: {
 								dueDatetime: body.dueDatetime,
 							});
 						}
-						if (url.endsWith('/cancel')) {
+						if (new URL(url).pathname.endsWith('/cancel')) {
 							scheduled.delete(name);
 						}
 						return new Response(null, { status: 200 });
@@ -341,6 +384,37 @@ describe('reminders web handlers', () => {
 		expect(result.reminders.map((reminder) => reminder.id)).toEqual(['r1', 'r2']);
 		expect(result.projects).toEqual(['Inbox']);
 		expect(result.reminders[0]).not.toHaveProperty('projectColor');
+	});
+
+	it('warms a cold reminder index across bounded requests', async () => {
+		const bucketEntries: Record<string, string> = {};
+		const files: Record<string, null> = {};
+		for (let index = 0; index < 25; index += 1) {
+			const path = `Reminders/Project-${String(index).padStart(2, '0')}.md`;
+			bucketEntries[`files/${path}`] = `# Project ${index}\n\n- [ ] Task ${index} <!-- crate-id:r-${index} -->\n`;
+			files[path] = null;
+		}
+		const workspace = await createEnv({ bucketEntries, files });
+		const bucketGet = workspace.env.BUCKET.get as ReturnType<typeof vi.fn>;
+		const dbBatch = workspace.env.DB.batch as ReturnType<typeof vi.fn>;
+
+		const warmingResponse = await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+		expect(warmingResponse.status).toBe(202);
+		expect(await warmingResponse.json()).toEqual({ warming: true, remainingFiles: 5 });
+		expect(bucketGet).toHaveBeenCalledTimes(20);
+
+		const readyResponse = await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+		expect(readyResponse.status).toBe(200);
+		const result = await readyResponse.json() as { reminders: Array<{ id: string }> };
+		expect(result.reminders).toHaveLength(25);
+		expect(bucketGet).toHaveBeenCalledTimes(25);
+		expect(Math.max(...dbBatch.mock.calls.map(call => (call[0] as unknown[]).length))).toBeLessThanOrEqual(20);
 	});
 
 	it('returns 304 from file metadata without reading markdown objects again', async () => {
@@ -579,6 +653,32 @@ describe('reminders web handlers', () => {
 		});
 	});
 
+	it('requires a source file path for reminder mutations', async () => {
+		const workspace = await createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] Existing task <!-- crate-id:r-existing -->\n',
+			},
+			files: { 'Reminders/Inbox.md': null },
+		});
+
+		const response = await handleUpdateReminder(
+			new Request('https://worker.test/reminders/update', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					id: 'r-existing',
+					content: 'Updated task',
+				}),
+			}),
+			workspace.env as never,
+		);
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({ error: 'Valid filePath required' });
+		expect(workspace.env.BUCKET.get).not.toHaveBeenCalled();
+	});
+
 	it('creates and deletes reminders against the source markdown files', async () => {
 		const workspace = await createEnv({
 			bucketEntries: {
@@ -622,6 +722,7 @@ describe('reminders web handlers', () => {
 				body: JSON.stringify({
 					folderPath: 'Reminders',
 					id: createdId,
+					filePath: 'Reminders/Inbox.md',
 				}),
 			}),
 			workspace.env as never,
@@ -710,6 +811,7 @@ describe('reminders web handlers', () => {
 				body: JSON.stringify({
 					folderPath: 'Reminders',
 					id: 'r-existing',
+					filePath: 'Reminders/Inbox.md',
 					recurrence: { frequency: 'weekly', daysOfWeek: [1, 3], hour: 10, minute: 30 },
 				}),
 			}),
@@ -726,6 +828,7 @@ describe('reminders web handlers', () => {
 				body: JSON.stringify({
 					folderPath: 'Reminders',
 					id: 'r-existing',
+					filePath: 'Reminders/Inbox.md',
 					recurrence: null,
 				}),
 			}),
@@ -738,7 +841,7 @@ describe('reminders web handlers', () => {
 		expect(workspace.readCurrentFile('Reminders/Inbox.md')).not.toContain('every Mon, Wed 10:30');
 	});
 
-	it('moves completed reminders by writing the destination before removing the source', async () => {
+	it('moves completed reminders by committing both files atomically', async () => {
 		const workspace = await createEnv({
 			bucketEntries: {
 				'files/Reminders/Inbox.md': '# Inbox\n\n- [x] Done task Jan 1, 2026 <!-- crate-id:r-done -->\n',
@@ -755,6 +858,7 @@ describe('reminders web handlers', () => {
 				body: JSON.stringify({
 					folderPath: 'Reminders',
 					id: 'r-done',
+					filePath: 'Reminders/Inbox.md',
 					project: 'Personal',
 				}),
 			}),
@@ -768,6 +872,34 @@ describe('reminders web handlers', () => {
 		]);
 		expect(workspace.readCurrentFile('Reminders/Inbox.md')).not.toContain('Done task');
 		expect(workspace.readCurrentFile('Reminders/Personal.md')).toContain('- [x] Done task Jan 1, 2026 <!-- crate-id:r-done -->');
+	});
+
+	it('leaves both files unchanged when the source CAS fails during a move', async () => {
+		const workspace = await createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] Keep task Jan 1, 2026 <!-- crate-id:r-keep -->\n',
+			},
+			files: { 'Reminders/Inbox.md': null },
+			atomicSourceConflictPath: 'Reminders/Inbox.md',
+		});
+
+		await expect(handleUpdateReminder(
+			new Request('https://worker.test/reminders/update', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					id: 'r-keep',
+					filePath: 'Reminders/Inbox.md',
+					project: 'Personal',
+				}),
+			}),
+			workspace.env as never,
+		)).rejects.toMatchObject({ path: 'Reminders/Inbox.md' });
+
+		expect(workspace.committedPaths).toEqual([]);
+		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('Keep task');
+		expect(workspace.readCurrentFile('Reminders/Personal.md')).toBeNull();
 	});
 
 	it('keeps the source reminder when the destination move write fails', async () => {
@@ -788,6 +920,7 @@ describe('reminders web handlers', () => {
 				body: JSON.stringify({
 					folderPath: 'Reminders',
 					id: 'r-keep',
+					filePath: 'Reminders/Inbox.md',
 					project: 'Personal',
 				}),
 			}),

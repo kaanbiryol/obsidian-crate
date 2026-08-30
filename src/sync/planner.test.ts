@@ -252,6 +252,8 @@ describe('runIncrementalSync', () => {
 	});
 
 	it('applies remote delete changes through the file manager', async () => {
+		const content = new TextEncoder().encode('remote delete base').buffer as ArrayBuffer;
+		const hash = await computeHash(content);
 		const harness = createIncrementalHarness({
 			settings: { lastSeq: 4 },
 			changes: [
@@ -268,6 +270,12 @@ describe('runIncrementalSync', () => {
 		});
 		const note = { path: 'notes/old.md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(note);
+		harness.vault.adapter.readBinary.mockResolvedValue(content);
+		harness.localManifest.getEntry.mockReturnValue({
+			hash,
+			size: content.byteLength,
+			modified: '2026-02-06T12:00:00.000Z',
+		});
 
 		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
 
@@ -280,6 +288,8 @@ describe('runIncrementalSync', () => {
 	});
 
 	it('hard deletes hidden files for remote delete changes', async () => {
+		const content = new TextEncoder().encode('hidden base').buffer as ArrayBuffer;
+		const hash = await computeHash(content);
 		const harness = createIncrementalHarness({
 			settings: { lastSeq: 4 },
 			changes: [
@@ -296,6 +306,12 @@ describe('runIncrementalSync', () => {
 		});
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		harness.vault.adapter.exists.mockResolvedValue(true);
+		harness.vault.adapter.readBinary.mockResolvedValue(content);
+		harness.localManifest.getEntry.mockReturnValue({
+			hash,
+			size: content.byteLength,
+			modified: '2026-02-06T12:00:00.000Z',
+		});
 
 		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
 
@@ -305,6 +321,56 @@ describe('runIncrementalSync', () => {
 		expect(harness.vault.adapter.remove).toHaveBeenCalledWith('.vault-config/workspace.json');
 		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('.vault-config/workspace.json');
 		expect(harness.settings.lastSeq).toBe(6);
+	});
+
+	it.each([
+		{ path: 'notes/edited-during-sync.md', hidden: false },
+		{ path: '.vault-config/edited-during-sync.json', hidden: true },
+	])('preserves a newer local edit before applying a remote delete ($path)', async ({ path, hidden }) => {
+		const baseContent = new TextEncoder().encode('planned content').buffer as ArrayBuffer;
+		const changedContent = new TextEncoder().encode('edited during sync').buffer as ArrayBuffer;
+		const baseHash = await computeHash(baseContent);
+		const changedHash = await computeHash(changedContent);
+		const prepared: PreparedUpload = {
+			path,
+			content: changedContent,
+			hash: changedHash,
+			size: changedContent.byteLength,
+			contentType: hidden ? 'application/json' : 'text/markdown',
+		};
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 4 },
+			changes: [{
+				seq: 6,
+				path,
+				action: 'delete',
+				hash: '',
+				size: 0,
+				created_at: '2026-02-06T12:00:00.000Z',
+			}],
+			lastSeq: 6,
+		});
+		harness.vault.getAbstractFileByPath.mockReturnValue(hidden ? null : { path });
+		harness.vault.adapter.exists.mockResolvedValue(hidden);
+		harness.vault.adapter.readBinary.mockResolvedValue(changedContent);
+		harness.localManifest.getEntry.mockReturnValue({
+			hash: baseHash,
+			size: baseContent.byteLength,
+			modified: '2026-02-06T12:00:00.000Z',
+		});
+		harness.context.prepareUploadFromPath = vi.fn(async () => prepared);
+		harness.context.uploadPreparedFiles = vi.fn(async (uploads: PreparedUpload[], result: SyncResult) => {
+			result.uploaded += uploads.length;
+			result.uploadedPaths.push(...uploads.map(upload => upload.path));
+		});
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
+		expect(harness.vault.adapter.remove).not.toHaveBeenCalled();
+		expect(prepared.expectedHash).toBeNull();
+		expect(result?.uploadedPaths).toContain(path);
+		expect(result?.conflicts).toContain(path);
 	});
 
 	it('cleans manifest state when a remote delete targets an already missing file', async () => {

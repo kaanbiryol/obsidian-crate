@@ -9,7 +9,7 @@
  * - [x] completed task
  */
 
-import { TAbstractFile, TFile, TFolder, type App } from "obsidian";
+import { normalizePath, TAbstractFile, TFile, TFolder, type App } from "obsidian";
 import {
   getProjectFromPath as deriveProjectFromPath,
   scanReminderMarkdownContent,
@@ -74,9 +74,8 @@ export function normalizeReminderIds(content: string): ReminderIdNormalizationRe
  * Check if a file is within the reminders folder
  */
 export function isInRemindersFolder(filePath: string, remindersFolderPath: string): boolean {
-  // Normalize paths for case-insensitive comparison
-  const normalizedFile = filePath.toLowerCase();
-  const normalizedFolder = remindersFolderPath.replace(/^\/|\/$/g, '').toLowerCase();
+  const normalizedFile = normalizePath(filePath);
+  const normalizedFolder = normalizePath(remindersFolderPath);
   return normalizedFile.startsWith(normalizedFolder + "/") || normalizedFile === normalizedFolder;
 }
 
@@ -130,10 +129,18 @@ export async function scanFile(
 
   try {
     const originalContent = await app.vault.cachedRead(file);
-    const normalized = normalizeReminderIds(originalContent);
+    let normalized = normalizeReminderIds(originalContent);
     if (normalized.remindersUpdated > 0) {
-      await app.vault.modify(file, normalized.content);
-      log.info(` Added ${normalized.remindersUpdated} reminder identifiers to ${filePath}`);
+      let remindersUpdated = 0;
+      const content = await app.vault.process(file, (currentContent) => {
+        const currentNormalization = normalizeReminderIds(currentContent);
+        remindersUpdated = currentNormalization.remindersUpdated;
+        return currentNormalization.content;
+      });
+      normalized = { content, remindersUpdated };
+      if (remindersUpdated > 0) {
+        log.info(` Added ${remindersUpdated} reminder identifiers to ${filePath}`);
+      }
     }
     const result = scanReminderMarkdownContent(filePath, normalized.content, remindersFolderPath);
 

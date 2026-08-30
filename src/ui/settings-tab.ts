@@ -10,7 +10,6 @@ import { renderInfrastructureSection } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
 import { renderRemindersSection } from './settings/reminders-section';
 import { renderNotificationsSection } from './settings/notifications-section';
-import { createSettingsRootHeading } from './settings/section-helpers';
 import { getSettingsTabSections } from './settings/settings-tab-model';
 
 export class CrateSettingTab extends PluginSettingTab {
@@ -29,8 +28,6 @@ export class CrateSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass('crate-settings');
 
-		createSettingsRootHeading(containerEl, 'Crate settings');
-
 		const isConfigured = this.plugin.syncRuntime.isConfigured();
 		const sections = getSettingsTabSections({
 			isConfigured,
@@ -39,7 +36,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		renderConfigSection({
 			containerEl,
 			plugin: this.plugin,
-			rerender: () => this.display(),
+			rerender: () => this.update(),
 		});
 
 		if (isConfigured) {
@@ -53,7 +50,7 @@ export class CrateSettingTab extends PluginSettingTab {
 			const syncCleanup = renderSyncSection({
 				containerEl,
 				plugin: this.plugin,
-				rerender: () => this.display(),
+				rerender: () => this.update(),
 			});
 			this.cleanupFns.push(syncCleanup);
 		}
@@ -62,7 +59,7 @@ export class CrateSettingTab extends PluginSettingTab {
 			renderRemindersSection({
 				containerEl,
 				plugin: this.plugin,
-				rerender: () => this.display(),
+				rerender: () => this.update(),
 			});
 		}
 
@@ -70,7 +67,7 @@ export class CrateSettingTab extends PluginSettingTab {
 			renderNotificationsSection({
 				containerEl,
 				plugin: this.plugin,
-				rerender: () => this.display(),
+				rerender: () => this.update(),
 			});
 		}
 
@@ -79,7 +76,7 @@ export class CrateSettingTab extends PluginSettingTab {
 				containerEl,
 				plugin: this.plugin,
 				isConfigured,
-				rerender: () => this.display(),
+				rerender: () => this.update(),
 			});
 		}
 	}
