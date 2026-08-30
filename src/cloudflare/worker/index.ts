@@ -1,11 +1,11 @@
 import { corsHeaders, corsResponse } from './cors';
-import { authenticateWorkerRequest } from './authenticate';
+import { authenticateWorkerRequest } from './auth/index';
 import { handleAuthenticatedRoute, handlePublicRoute } from './router';
 import type { Env } from './types';
-import { FileVersionConflictError } from './storage';
+import { FileVersionConflictError } from './storage/index';
 import { runScheduledMaintenance } from './maintenance';
 
-export { ReminderAlarm } from './reminder-alarm';
+export { ReminderAlarm } from './notifications';
 
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {

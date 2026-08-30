@@ -38,5 +38,9 @@ describe('scheduled Worker maintenance', () => {
 			statement.sql.startsWith('DELETE FROM object_cleanup_queue'))).toBe(true);
 		expect(statements.some((statement) =>
 			statement.sql.startsWith('DELETE FROM changelog'))).toBe(true);
+		expect(statements.find((statement) =>
+			statement.sql.startsWith('DELETE FROM changelog'))?.sql).toContain(
+			'seq < (SELECT MAX(seq) FROM changelog)',
+		);
 	});
 });

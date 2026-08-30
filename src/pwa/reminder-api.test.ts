@@ -26,4 +26,21 @@ describe('fetchReadyReminderList', () => {
 		)).rejects.toThrow('Reminder index is taking too long to prepare');
 		expect(apiFetch).toHaveBeenCalledTimes(100);
 	});
+
+	it('honors bounded Retry-After delays between warm-up requests', async () => {
+		vi.useFakeTimers();
+		const apiFetch = vi.fn()
+			.mockResolvedValueOnce(new Response(JSON.stringify({ warming: true }), {
+				status: 202,
+				headers: { 'Retry-After': '1' },
+			}))
+			.mockResolvedValueOnce(new Response(JSON.stringify({ reminders: [] }), { status: 200 }));
+
+		const result = fetchReadyReminderList(apiFetch, '/reminders/list', new Headers());
+		await vi.advanceTimersByTimeAsync(999);
+		expect(apiFetch).toHaveBeenCalledOnce();
+		await vi.advanceTimersByTimeAsync(1);
+		await expect(result).resolves.toMatchObject({ status: 200 });
+		vi.useRealTimers();
+	});
 });

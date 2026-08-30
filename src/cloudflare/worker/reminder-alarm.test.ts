@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReminderAlarm } from './reminder-alarm';
-import { listPushSubscriptionIds, sendToAllSubscriptions } from './push';
+import { listPushSubscriptionIds, sendToAllSubscriptions } from './notifications/push';
 
-vi.mock('./push', () => ({
+vi.mock('./notifications/push', () => ({
 	listPushSubscriptionIds: vi.fn(),
 	sendToAllSubscriptions: vi.fn(),
 }));
@@ -24,7 +24,7 @@ function createHarness() {
 		storedValues.clear();
 	});
 	const deleteValue = vi.fn(async (key: string) => storedValues.delete(key));
-	const setAlarm = vi.fn(async () => {});
+	const setAlarm = vi.fn(async (_scheduledTime: number | Date) => {});
 	const deleteAlarm = vi.fn(async () => {});
 	const getAlarm = vi.fn(async () => Date.parse(reminder.dueDatetime));
 	const put = vi.fn(async (key: string, value: unknown) => {
@@ -98,8 +98,10 @@ describe('reminder alarm delivery', () => {
 			});
 		const harness = createHarness();
 
-		await expect(harness.alarm.alarm()).rejects.toThrow('Push delivery failed');
+		await harness.alarm.alarm();
 		expect(harness.storedValues.get('pendingSubscriptionIds')).toEqual(['subscription-2']);
+		expect(harness.storedValues.get('retryAttempt')).toBe(1);
+		expect(harness.setAlarm).toHaveBeenCalledOnce();
 		expect(harness.run).not.toHaveBeenCalled();
 		expect(harness.deleteAll).not.toHaveBeenCalled();
 
@@ -127,7 +129,9 @@ describe('reminder alarm delivery', () => {
 		});
 		const harness = createHarness();
 
-		await expect(harness.alarm.alarm()).rejects.toThrow('Push delivery failed');
+		await harness.alarm.alarm();
+		expect(harness.storedValues.get('retryAttempt')).toBe(1);
+		expect(harness.setAlarm).toHaveBeenCalledOnce();
 		expect(harness.run).not.toHaveBeenCalled();
 		expect(harness.deleteAll).not.toHaveBeenCalled();
 	});
@@ -172,6 +176,26 @@ describe('reminder alarm delivery', () => {
 		expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
 		expect(harness.run).toHaveBeenCalledTimes(2);
 		expect(harness.deleteAll).toHaveBeenCalledOnce();
+	});
+
+	it('keeps explicitly rescheduling transient D1 failures with bounded backoff', async () => {
+		const harness = createHarness();
+		harness.first.mockRejectedValueOnce(new Error('D1 unavailable'));
+
+		await harness.alarm.alarm();
+
+		expect(harness.storedValues.get('retryAttempt')).toBe(1);
+		expect(harness.setAlarm).toHaveBeenCalledOnce();
+		expect(harness.deleteAll).not.toHaveBeenCalled();
+
+		harness.first.mockRejectedValueOnce(new Error('D1 still unavailable'));
+		await harness.alarm.alarm();
+
+		expect(harness.storedValues.get('retryAttempt')).toBe(2);
+		expect(harness.setAlarm).toHaveBeenCalledTimes(2);
+		const firstRetry = Number(harness.setAlarm.mock.calls[0]?.[0]);
+		const secondRetry = Number(harness.setAlarm.mock.calls[1]?.[0]);
+		expect(secondRetry - Date.now()).toBeGreaterThan(firstRetry - Date.now());
 	});
 
 	it('does not clear a newer schedule after an older alarm finishes', async () => {

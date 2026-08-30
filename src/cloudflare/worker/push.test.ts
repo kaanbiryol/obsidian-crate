@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateVapidKeys, serializeVapidKeys } from 'web-push-browser';
-import { createDeclarativePushPayload, getOrCreateVapidKeys } from './push';
+import {
+	deserializeVapidKeys,
+	generateVapidKeys,
+	sendPushNotification,
+	serializeVapidKeys,
+} from 'web-push-browser';
+import { createDeclarativePushPayload, getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
 
 vi.mock('web-push-browser', async (importOriginal) => {
 	const original = await importOriginal<typeof import('web-push-browser')>();
 	return {
 		...original,
+		deserializeVapidKeys: vi.fn(),
 		generateVapidKeys: vi.fn(),
+		sendPushNotification: vi.fn(),
 		serializeVapidKeys: vi.fn(),
 	};
 });
@@ -85,5 +92,46 @@ describe('getOrCreateVapidKeys', () => {
 		});
 		expect(run).toHaveBeenCalledOnce();
 		expect(prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR IGNORE'));
+	});
+});
+
+describe('sendToAllSubscriptions', () => {
+	it('never exceeds the Worker outgoing-connection concurrency limit', async () => {
+		vi.mocked(deserializeVapidKeys).mockResolvedValue({} as never);
+		let activeRequests = 0;
+		let maximumActiveRequests = 0;
+		vi.mocked(sendPushNotification).mockImplementation(async () => {
+			activeRequests += 1;
+			maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests);
+			await new Promise((resolve) => setTimeout(resolve, 1));
+			activeRequests -= 1;
+			return new Response(null, { status: 201 });
+		});
+		const subscriptions = Array.from({ length: 12 }, (_, index) => ({
+			id: `subscription-${index}`,
+			endpoint: `https://push.example/${index}`,
+			p256dh: `p256dh-${index}`,
+			auth: `auth-${index}`,
+		}));
+		const prepare = vi.fn((sql: string) => {
+			const statement = {
+				bind: vi.fn(() => statement),
+				run: vi.fn(async () => ({})),
+				all: vi.fn(async () => ({
+					results: sql.includes('FROM push_subscriptions')
+						? subscriptions
+						: [{ public_key: 'public', private_key: 'private' }],
+				})),
+			};
+			return statement;
+		});
+
+		const result = await sendToAllSubscriptions(
+			{ prepare } as unknown as D1Database,
+			{ title: 'Test', body: '' },
+		);
+
+		expect(result).toMatchObject({ sent: 12, failed: 0 });
+		expect(maximumActiveRequests).toBe(6);
 	});
 });

@@ -5,7 +5,7 @@ import { handleRemindersRoute } from './routes/reminders';
 import { handleSyncRoute } from './routes/sync';
 import type { RouteMethod } from './routes/shared';
 import type { Env } from './types';
-import type { AuthPrincipal } from './authenticate';
+import type { AuthPrincipal } from './auth/index';
 import { corsResponse } from './cors';
 
 export { handlePublicRoute };

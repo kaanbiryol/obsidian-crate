@@ -189,7 +189,12 @@ export function createReminderIndex(app: App, remindersFolderPath: string): Remi
       log.info(` Rescanning file: ${filePath}`);
       fileRescanTimestamps.set(filePath, now);
 
-      const result = await scanFile(app, file, remindersFolderPath);
+      const reservedIds = new Set(
+        reminders
+          .filter((reminder) => reminder.filePath !== filePath)
+          .map((reminder) => reminder.id),
+      );
+      const result = await scanFile(app, file, remindersFolderPath, reservedIds);
       if (result.error) {
         log.error(` Keeping the previous reminder index for ${filePath}: ${result.error}`);
         return;

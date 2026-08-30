@@ -1,8 +1,8 @@
 import {
 	handleExchangeRemindersEnrollmentToken,
 	handleVapidPublicKey,
-} from '../notification-enrollment-handlers';
-import { handleSubscribe } from '../notification-subscription-handlers';
+} from '../notifications';
+import { handleSubscribe } from '../notifications';
 import {
 	handleAppleTouchIcon,
 	handleCrateIcon192,

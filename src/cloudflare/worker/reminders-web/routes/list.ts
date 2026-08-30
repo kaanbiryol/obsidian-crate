@@ -45,12 +45,18 @@ export async function handleListReminders(request: Request, env: Env): Promise<R
 
 	const workspace = await loadIncrementalReminderIndex(env, folderPath, metadata);
 	if (!workspace.ready) {
+		if (workspace.reason === 'cache-entry-too-large') {
+			return corsResponse({
+				error: 'Parsed reminder data for this Markdown file is too large to cache',
+				path: workspace.path,
+			}, 413);
+		}
 		return corsResponse({
 			warming: true,
 			remainingFiles: workspace.remainingFiles,
 		}, 202, {
 			'Cache-Control': 'private, no-store',
-			'Retry-After': '0',
+			'Retry-After': '1',
 		});
 	}
 	return corsResponse({

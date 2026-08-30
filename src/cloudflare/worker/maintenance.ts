@@ -1,5 +1,5 @@
 import { pruneChangelog } from './db';
-import { drainObjectCleanupQueue } from './sync-storage';
+import { drainObjectCleanupQueue } from './storage/index';
 import type { Env } from './types';
 
 export async function runScheduledMaintenance(env: Env): Promise<void> {

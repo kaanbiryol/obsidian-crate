@@ -2,13 +2,15 @@ import {
 	handleCancelReminder,
 	handleListScheduled,
 	handleScheduleReminder,
-} from '../reminder-handlers';
-import { handleSetReminderCompleted } from '../reminders-web/routes/complete';
-import { handleCreateReminder } from '../reminders-web/routes/create';
-import { handleDeleteReminder } from '../reminders-web/routes/delete';
-import { handleListReminders } from '../reminders-web/routes/list';
-import { handleReorderReminders } from '../reminders-web/routes/reorder';
-import { handleUpdateReminder } from '../reminders-web/routes/update';
+} from '../reminders';
+import {
+	handleCreateReminder,
+	handleDeleteReminder,
+	handleListReminders,
+	handleReorderReminders,
+	handleSetReminderCompleted,
+	handleUpdateReminder,
+} from '../reminders';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';

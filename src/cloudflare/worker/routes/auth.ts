@@ -2,7 +2,7 @@ import {
 	handleListTokens,
 	handleRevokeCurrentToken,
 	handleRevokeToken,
-} from '../auth-handlers';
+} from '../auth/index';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';

@@ -48,19 +48,38 @@ export interface ReminderIdNormalizationResult {
  * manually-authored checkboxes discoverable without a separate vault-wide
  * rewrite.
  */
-export function normalizeReminderIds(content: string): ReminderIdNormalizationResult {
+function createUniqueReminderId(usedIds: Set<string>): string {
+  let reminderId = createReminderId();
+  while (usedIds.has(reminderId)) {
+    reminderId = createReminderId();
+  }
+  return reminderId;
+}
+
+export function normalizeReminderIds(
+  content: string,
+  reservedIds: ReadonlySet<string> = new Set(),
+): ReminderIdNormalizationResult {
   const lines = content.split("\n");
+  const usedIds = new Set(reservedIds);
   let remindersUpdated = 0;
 
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
     if (line === undefined) continue;
     const parsed = parseCheckboxLine(line);
-    if (!parsed || !parsed.parsed.cleanContent.trim() || parsed.reminderId) {
+    if (!parsed || !parsed.parsed.cleanContent.trim()) {
       continue;
     }
 
-    lines[index] = setReminderIdMarker(line, createReminderId());
+    if (parsed.reminderId && !usedIds.has(parsed.reminderId)) {
+      usedIds.add(parsed.reminderId);
+      continue;
+    }
+
+    const reminderId = createUniqueReminderId(usedIds);
+    usedIds.add(reminderId);
+    lines[index] = setReminderIdMarker(line, reminderId);
     remindersUpdated++;
   }
 
@@ -123,17 +142,18 @@ function collectMarkdownFilesInFolder(app: App, remindersFolderPath: string): TF
 export async function scanFile(
   app: App,
   file: TFile,
-  remindersFolderPath: string
+  remindersFolderPath: string,
+  reservedIds: ReadonlySet<string> = new Set(),
 ): Promise<FileScanResult> {
   const filePath = file.path;
 
   try {
     const originalContent = await app.vault.cachedRead(file);
-    let normalized = normalizeReminderIds(originalContent);
+    let normalized = normalizeReminderIds(originalContent, reservedIds);
     if (normalized.remindersUpdated > 0) {
       let remindersUpdated = 0;
       const content = await app.vault.process(file, (currentContent) => {
-        const currentNormalization = normalizeReminderIds(currentContent);
+        const currentNormalization = normalizeReminderIds(currentContent, reservedIds);
         remindersUpdated = currentNormalization.remindersUpdated;
         return currentNormalization.content;
       });
@@ -187,18 +207,17 @@ export async function scanVault(
     discoveredProjects.add(project);
   }
 
-  // Scan files in batches for better performance
-  const BATCH_SIZE = 50;
-  for (let i = 0; i < reminderFiles.length; i += BATCH_SIZE) {
-    const batch = reminderFiles.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(
-      batch.map((file) => scanFile(app, file, remindersFolderPath))
-    );
-
-    for (const result of results) {
-      if (result.error) continue;
-      allReminders.push(...result.reminders);
-      totalLines += result.lineCount;
+  // Scan in stable path order so the first occurrence of a pasted identifier
+  // remains canonical and later duplicates receive fresh identifiers.
+  reminderFiles.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+  const usedReminderIds = new Set<string>();
+  for (const file of reminderFiles) {
+    const result = await scanFile(app, file, remindersFolderPath, usedReminderIds);
+    if (result.error) continue;
+    allReminders.push(...result.reminders);
+    totalLines += result.lineCount;
+    for (const reminder of result.reminders) {
+      usedReminderIds.add(reminder.id);
     }
   }
 

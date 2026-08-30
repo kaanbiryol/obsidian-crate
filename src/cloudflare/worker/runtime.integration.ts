@@ -5,6 +5,7 @@ import { env } from 'cloudflare:workers';
 import { reset, runDurableObjectAlarm } from 'cloudflare:test';
 import schemaSql from '../schema.sql?raw';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
+import { pruneChangelog } from './db';
 import { scheduleScheduledReminder } from './reminder-handlers';
 import type { Env } from './types';
 import { handleListReminders } from './reminders-web/routes/list';
@@ -169,6 +170,27 @@ describe('Cloudflare runtime integration', () => {
 
 		expect(response.status).toBe(200);
 		expect(result.reminders.map(reminder => reminder.id)).toEqual(['included']);
+	});
+
+	it('retains the latest sync cursor after pruning a quiet changelog', async () => {
+		await runtimeEnv.DB.batch([
+			runtimeEnv.DB.prepare(
+				"INSERT INTO changelog (path, action, created_at) VALUES ('old.md', 'put', datetime('now', '-60 days'))",
+			),
+			runtimeEnv.DB.prepare(
+				"INSERT INTO changelog (path, action, created_at) VALUES ('latest.md', 'put', datetime('now', '-45 days'))",
+			),
+		]);
+		const latestBeforePrune = await runtimeEnv.DB.prepare(
+			'SELECT MAX(seq) AS seq FROM changelog',
+		).first<{ seq: number }>();
+
+		await pruneChangelog(runtimeEnv.DB);
+
+		const retained = await runtimeEnv.DB.prepare(
+			'SELECT seq, path FROM changelog ORDER BY seq',
+		).all<{ seq: number; path: string }>();
+		expect(retained.results).toEqual([{ seq: latestBeforePrune?.seq, path: 'latest.md' }]);
 	});
 
 	it('runs a registered reminder alarm against real Durable Object storage', async () => {

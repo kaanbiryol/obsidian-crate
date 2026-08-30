@@ -79,6 +79,39 @@ describe('vaultScanner', () => {
     expect(result.discoveredProjects).toEqual(['Empty', 'Work']);
   });
 
+  it('repairs duplicate IDs across files in stable path order', async () => {
+    const files = [
+      makeMockFile('Reminders/B.md'),
+      makeMockFile('Reminders/A.md'),
+    ];
+    const contentByPath: Record<string, string> = {
+      'Reminders/A.md': '- [ ] Canonical <!-- crate-id:shared -->',
+      'Reminders/B.md': '- [ ] Pasted <!-- crate-id:shared -->',
+    };
+    const process = vi.fn(async (file: TFile, mutation: (content: string) => string) => {
+      const content = mutation(contentByPath[file.path] ?? '');
+      contentByPath[file.path] = content;
+      return content;
+    });
+    const app = {
+      vault: {
+        getAbstractFileByPath: vi.fn().mockReturnValue(Object.assign(new TFolder(), {
+          path: 'Reminders',
+          children: files,
+        })),
+        cachedRead: vi.fn((file: TFile) => Promise.resolve(contentByPath[file.path] ?? '')),
+        process,
+      },
+    } as unknown as App;
+
+    const result = await scanVault(app, 'Reminders');
+
+    expect(result.reminders).toHaveLength(2);
+    expect(result.reminders.find((reminder) => reminder.filePath.endsWith('/A.md'))?.id).toBe('shared');
+    expect(result.reminders.find((reminder) => reminder.filePath.endsWith('/B.md'))?.id).not.toBe('shared');
+    expect(process).toHaveBeenCalledOnce();
+  });
+
   it('returns an empty result when the reminders folder does not exist', async () => {
     const app = {
       vault: {

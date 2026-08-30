@@ -11,7 +11,7 @@ import {
 	handleHealth,
 	handlePutSettings,
 	handleUpload,
-} from '../sync-handlers';
+} from '../sync';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';

@@ -22,4 +22,18 @@ describe('reminder ID normalization', () => {
     const content = '- [ ] Existing <!-- crate-id:r1 -->\n- [ ] \nBody';
     expect(normalizeReminderIds(content)).toEqual({ content, remindersUpdated: 0 });
   });
+
+  it('replaces pasted duplicate IDs while preserving the first occurrence', () => {
+    const result = normalizeReminderIds([
+      '- [ ] Original <!-- crate-id:r1 -->',
+      '- [ ] Pasted <!-- crate-id:r1 -->',
+      '- [ ] Reserved collision <!-- crate-id:r2 -->',
+    ].join('\n'), new Set(['r2']));
+
+    expect(result.remindersUpdated).toBe(2);
+    const ids = [...result.content.matchAll(/crate-id:([^\s>]+)/g)].map((match) => match[1]);
+    expect(ids[0]).toBe('r1');
+    expect(new Set(ids).size).toBe(3);
+    expect(ids).not.toContain('r2');
+  });
 });
