@@ -162,8 +162,8 @@ function createDb(options?: {
 								})),
 						};
 					}
-					if (sql.includes('FROM files WHERE path LIKE')) {
-						const prefix = getBoundString(statement._args, 0).slice(0, -1);
+					if (sql.includes("instr(path, ? || '/') = 1")) {
+						const prefix = `${getBoundString(statement._args, 0)}/`;
 						return {
 							results: Array.from(files.keys())
 								.filter((path) => path.startsWith(prefix) && path.toLowerCase().endsWith('.md'))

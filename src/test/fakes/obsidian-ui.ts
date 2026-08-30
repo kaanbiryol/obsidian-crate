@@ -124,11 +124,6 @@ export class MockButtonComponent {
 		return this;
 	}
 
-	setWarning(): this {
-		this.buttonEl.addClass('mod-warning');
-		return this;
-	}
-
 	setDestructive(): this {
 		this.buttonEl.addClass('mod-destructive');
 		return this;

@@ -58,6 +58,7 @@ const reminderQueryOnUpcomingBlock = vi.fn();
 const createRemindersBlockExtension = vi.fn(() => 'extension');
 const registerReminderCommands = vi.fn();
 const notificationReconcile = vi.fn(async () => {});
+const notificationCancelAll = vi.fn(async () => {});
 const notificationOnReminderChange = vi.fn<(...args: unknown[]) => Promise<{ success: boolean; error?: string }>>(
 	async () => ({ success: true }),
 );
@@ -110,6 +111,7 @@ async function loadPluginIntegrationModule() {
 	vi.doMock('./services/notificationService', () => ({
 		ReminderNotificationService: class ReminderNotificationService {
 			reconcile = notificationReconcile;
+			cancelAll = notificationCancelAll;
 			onReminderChange = notificationOnReminderChange;
 		},
 	}));
@@ -188,6 +190,7 @@ beforeEach(() => {
 	createRemindersBlockExtension.mockReset();
 	registerReminderCommands.mockReset();
 	notificationReconcile.mockReset();
+	notificationCancelAll.mockReset();
 	notificationOnReminderChange.mockReset();
 	openFullScreenReminderModal.mockReset();
 
@@ -306,5 +309,40 @@ describe('reinitializeReminders', () => {
 		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders/Work');
 		expect(notificationReconcile).toHaveBeenCalledWith([{ id: 'r1' }]);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('notification lifecycle', () => {
+	it('cancels after in-flight reconciliation and suppresses new reconciliation until enabled', async () => {
+		const {
+			disableReminderNotifications,
+			enableReminderNotifications,
+			reconcileReminderNotifications,
+		} = await loadPluginIntegrationModule();
+		let finishReconcile!: () => void;
+		const inFlightReconcile = new Promise<void>((resolve) => {
+			finishReconcile = resolve;
+		});
+		notificationReconcile.mockImplementationOnce(() => inFlightReconcile);
+		const plugin = createPlugin({
+			reminderIndex: { getAll: vi.fn(() => []) },
+		});
+
+		const initialReconcile = reconcileReminderNotifications(plugin as never);
+		await vi.waitFor(() => {
+			expect(notificationReconcile).toHaveBeenCalledTimes(1);
+		});
+		const disable = disableReminderNotifications(plugin as never);
+		const suppressedReconcile = reconcileReminderNotifications(plugin as never);
+
+		expect(notificationCancelAll).not.toHaveBeenCalled();
+		finishReconcile();
+		await Promise.all([initialReconcile, disable, suppressedReconcile]);
+
+		expect(notificationCancelAll).toHaveBeenCalledTimes(1);
+		expect(notificationReconcile).toHaveBeenCalledTimes(1);
+
+		await enableReminderNotifications(plugin as never);
+		expect(notificationReconcile).toHaveBeenCalledTimes(2);
 	});
 });

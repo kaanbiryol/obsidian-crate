@@ -8,6 +8,20 @@ import { VaultWatcher } from './services/vaultWatcher';
 import { createLogger } from './utils/logger';
 
 const remindersLogger = createLogger('Reminders');
+const notificationTasks = new WeakMap<CratePlugin, Promise<void>>();
+const notificationReconciliationSuspended = new WeakSet<CratePlugin>();
+
+function enqueueNotificationWork(plugin: CratePlugin, work: () => Promise<void>): Promise<void> {
+	const previousTask = notificationTasks.get(plugin) ?? Promise.resolve();
+	const currentTask = previousTask.catch(() => undefined).then(work);
+	notificationTasks.set(plugin, currentTask);
+	void currentTask.finally(() => {
+		if (notificationTasks.get(plugin) === currentTask) {
+			notificationTasks.delete(plugin);
+		}
+	}).catch(() => undefined);
+	return currentTask;
+}
 
 function createNotificationService(plugin: CratePlugin): ReminderNotificationService {
 	return new ReminderNotificationService(
@@ -50,13 +64,29 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 }
 
 export async function reconcileReminderNotifications(plugin: CratePlugin): Promise<void> {
-	try {
-		await createNotificationService(plugin).reconcile(plugin.reminderIndex.getAll());
-	} catch (error) {
-		remindersLogger.warn('Failed to reconcile reminder notifications:', error);
-	}
+	if (notificationReconciliationSuspended.has(plugin)) return;
+	await enqueueNotificationWork(plugin, async () => {
+		if (notificationReconciliationSuspended.has(plugin)) return;
+		try {
+			await createNotificationService(plugin).reconcile(plugin.reminderIndex.getAll());
+		} catch (error) {
+			remindersLogger.warn('Failed to reconcile reminder notifications:', error);
+		}
+	});
 }
 
 export async function disableReminderNotifications(plugin: CratePlugin): Promise<void> {
-	await createNotificationService(plugin).cancelAll();
+	notificationReconciliationSuspended.add(plugin);
+	try {
+		await enqueueNotificationWork(plugin, () => createNotificationService(plugin).cancelAll());
+	} catch (error) {
+		notificationReconciliationSuspended.delete(plugin);
+		await reconcileReminderNotifications(plugin);
+		throw error;
+	}
+}
+
+export async function enableReminderNotifications(plugin: CratePlugin): Promise<void> {
+	notificationReconciliationSuspended.delete(plugin);
+	await reconcileReminderNotifications(plugin);
 }

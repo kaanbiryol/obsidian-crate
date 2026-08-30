@@ -1,7 +1,11 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
-import { disableReminderNotifications, reconcileReminderNotifications } from '../../reminders/plugin-integration';
+import {
+	disableReminderNotifications,
+	enableReminderNotifications,
+	reconcileReminderNotifications,
+} from '../../reminders/plugin-integration';
 import { normalizeTimeString } from '../../reminders/settings';
 import type { SyncApiClient } from '../../sync/api';
 import { QRModal } from '../qr-modal';
@@ -32,14 +36,14 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 						}
 						await plugin.writeSettings({ pushEnabled: value });
 						if (value) {
-							await reconcileReminderNotifications(plugin);
+							await enableReminderNotifications(plugin);
 						}
 						context.rerender();
 					} catch (error) {
 						new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
 						toggle.setValue(plugin.settings.pushEnabled);
 						if (cancelledExistingSchedules && plugin.settings.pushEnabled) {
-							void reconcileReminderNotifications(plugin);
+							void enableReminderNotifications(plugin);
 						}
 					}
 				});

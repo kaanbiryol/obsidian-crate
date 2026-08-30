@@ -8,10 +8,6 @@ import {
 	MAX_FILE_BYTES,
 } from './sync-storage';
 
-function escapeLikePattern(value: string): string {
-	return value.replace(/[\\%_]/g, (character) => `\\${character}`);
-}
-
 export interface StoredTextFile {
 	path: string;
 	content: string;
@@ -38,8 +34,8 @@ export async function listStoredMarkdownFileMetadataByPrefix(
 ): Promise<StoredMarkdownFileMetadata[]> {
 	const rows = await queryRows<{ path: string; hash: string; size: number; storage_key: string }>(
 		db.prepare(
-			"SELECT path, hash, size, storage_key FROM files WHERE path LIKE ? ESCAPE '\\' AND lower(path) LIKE '%.md' ORDER BY path ASC",
-		).bind(`${escapeLikePattern(pathPrefix)}/%`),
+			"SELECT path, hash, size, storage_key FROM files WHERE instr(path, ? || '/') = 1 AND lower(path) LIKE '%.md' ORDER BY path ASC",
+		).bind(pathPrefix),
 	);
 	return rows.map((row) => ({
 		path: row.path,

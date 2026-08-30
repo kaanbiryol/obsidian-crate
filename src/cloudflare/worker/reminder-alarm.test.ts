@@ -65,6 +65,20 @@ function createHarness() {
 }
 
 describe('reminder alarm delivery', () => {
+	it('deletes authoritative schedule metadata before clearing an alarm', async () => {
+		const harness = createHarness();
+
+		const response = await harness.alarm.fetch(new Request(
+			'https://do/cancel?reminderId=reminder-1',
+			{ method: 'DELETE' },
+		));
+
+		expect(response.status).toBe(200);
+		expect(harness.run).toHaveBeenCalledOnce();
+		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+		expect(harness.deleteAll).toHaveBeenCalledOnce();
+	});
+
 	it('retries only subscriptions whose push delivery failed', async () => {
 		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1', 'subscription-2']);
 		vi.mocked(sendToAllSubscriptions)

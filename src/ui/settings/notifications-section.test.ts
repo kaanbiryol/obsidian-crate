@@ -9,6 +9,7 @@ import {
 
 let lastQrCodeData: string | null = null;
 const disableReminderNotifications = vi.fn();
+const enableReminderNotifications = vi.fn();
 const reconcileReminderNotifications = vi.fn();
 
 async function flushMicrotasks(): Promise<void> {
@@ -20,6 +21,7 @@ async function loadNotificationsSectionModule() {
 	vi.doMock('obsidian', () => createObsidianUiModule());
 	vi.doMock('../../reminders/plugin-integration', () => ({
 		disableReminderNotifications,
+		enableReminderNotifications,
 		reconcileReminderNotifications,
 	}));
 	vi.doMock('../qr-modal', () => ({
@@ -47,6 +49,7 @@ describe('renderNotificationsSection', () => {
 		resetObsidianUiMocks();
 		lastQrCodeData = null;
 		disableReminderNotifications.mockReset();
+		enableReminderNotifications.mockReset();
 		reconcileReminderNotifications.mockReset();
 	});
 
@@ -137,7 +140,7 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 
 		expect(plugin.settings.pushEnabled).toBe(true);
-		expect(reconcileReminderNotifications).toHaveBeenCalledWith(plugin);
+		expect(enableReminderNotifications).toHaveBeenCalledWith(plugin);
 	});
 
 	it('removes enabled notification devices through the push subscription API', async () => {

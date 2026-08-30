@@ -143,6 +143,34 @@ describe('Cloudflare runtime integration', () => {
 		expect(result.reminders).toHaveLength(25);
 	});
 
+	it('keeps reminder folder matching case-sensitive', async () => {
+		await Promise.all([
+			writeCommittedMarkdownFile(
+				runtimeEnv.BUCKET,
+				runtimeEnv.DB,
+				'Reminders/Included.md',
+				'- [ ] Included <!-- crate-id:included -->',
+				null,
+			),
+			writeCommittedMarkdownFile(
+				runtimeEnv.BUCKET,
+				runtimeEnv.DB,
+				'reminders/Excluded.md',
+				'- [ ] Excluded <!-- crate-id:excluded -->',
+				null,
+			),
+		]);
+
+		const response = await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			runtimeEnv,
+		);
+		const result = await response.json() as { reminders: Array<{ id: string }> };
+
+		expect(response.status).toBe(200);
+		expect(result.reminders.map(reminder => reminder.id)).toEqual(['included']);
+	});
+
 	it('runs a registered reminder alarm against real Durable Object storage', async () => {
 		const reminderId = 'runtime-reminder';
 		await scheduleScheduledReminder(runtimeEnv, {
