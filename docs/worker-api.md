@@ -181,7 +181,7 @@ Response: `{ success: true }`
 
 Query: `?folderPath=<reminders-folder>`
 
-Reads synced Markdown reminder files from the configured folder and returns web-ready reminder records plus known projects.
+Reads synced Markdown reminder files from the configured folder and returns web-ready reminder records plus known projects. Conditional requests use an ETag derived from file metadata and the reminder parser version. On an ETag miss, D1-cached parses are reused by file hash, so only new or changed Markdown objects are fetched from R2 and parsed.
 
 Response: `{ reminders: [...], projects: [...] }`
 
@@ -326,7 +326,7 @@ Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarat
 
 ## D1 Database Schema
 
-Nine tables, initialized from `src/cloudflare/schema.sql` before the Worker is uploaded:
+Ten tables, initialized from `src/cloudflare/schema.sql` before the Worker is uploaded:
 
 ### changelog
 
@@ -356,6 +356,22 @@ CREATE TABLE IF NOT EXISTS files (
 ```
 
 D1-backed remote manifest. Updated atomically with changelog entries via `db.batch()`. `storage_key` points at the committed R2 blob for the path, so D1 is the visibility boundary even if best-effort R2 cleanup later fails.
+
+### reminder_file_cache
+
+```sql
+CREATE TABLE IF NOT EXISTS reminder_file_cache (
+  folder_path TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  file_hash TEXT NOT NULL,
+  parser_version INTEGER NOT NULL,
+  reminders_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (folder_path, file_path)
+);
+```
+
+Stores parsed reminder records for each Markdown file and reminders-folder context. Cache entries are accepted only when both the file hash and parser version match. Writes are conditional on the current `files` row, preventing a stale parse from replacing data for a newer committed file.
 
 ### auth_tokens
 

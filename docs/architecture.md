@@ -37,7 +37,7 @@
 |---|---|
 | **Cloudflare Worker** | HTTPS API - receives uploads, serves downloads, manages changelog, serves the reminders PWA |
 | **Cloudflare R2** | Object storage for vault file content and shared settings |
-| **Cloudflare D1** | SQLite database with sync metadata, auth tokens, push subscriptions, and reminder alarm records |
+| **Cloudflare D1** | SQLite database with sync metadata, auth tokens, push subscriptions, reminder alarm records, and parsed reminder caches |
 | **Cloudflare OAuth deployment** | Uses PKCE in Obsidian to provision the build-time Worker and initial schema, then revokes the temporary token |
 | **Static GitHub Pages callback** | Removes OAuth parameters and hands the response to Obsidian; has no backend, analytics, or token exchange |
 | **OS Keychain** | Stores auth tokens via Obsidian's `secretStorage` API |
@@ -47,7 +47,7 @@
 | Binding | Type | Purpose |
 |---|---|---|
 | `BUCKET` | R2 Bucket | File storage |
-| `DB` | D1 Database | Changelog + file manifest |
+| `DB` | D1 Database | Changelog, file manifest, authentication, subscriptions, and parsed reminder cache |
 | `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
 
 ## Component Ownership

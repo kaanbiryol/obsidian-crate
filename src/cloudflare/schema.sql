@@ -75,3 +75,13 @@ CREATE TABLE IF NOT EXISTS object_cleanup_queue (
 	storage_key TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS reminder_file_cache (
+	folder_path TEXT NOT NULL,
+	file_path TEXT NOT NULL,
+	file_hash TEXT NOT NULL,
+	parser_version INTEGER NOT NULL,
+	reminders_json TEXT NOT NULL,
+	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+	PRIMARY KEY (folder_path, file_path)
+);

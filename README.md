@@ -30,14 +30,14 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 
 ## How It Works
 
-The Obsidian plugin owns sync planning, change detection, conflict handling, and local settings. The independently deployed Cloudflare Worker is the storage API. It stores file contents in R2, metadata in D1, and reminder notification alarms in Durable Objects.
+The Obsidian plugin owns sync planning, change detection, conflict handling, and local settings. The independently deployed Cloudflare Worker is the storage API. It stores file contents in R2, sync metadata and parsed reminder caches in D1, and reminder notification alarms in Durable Objects.
 
 The plugin never asks for a Cloudflare account API token. Deployment and device connection use Cloudflare OAuth Authorization Code + PKCE. Crate discovers or creates the account's server, registers a permanent device credential whose plaintext stays in Obsidian, and then revokes the temporary OAuth token.
 
 ## Privacy and Security
 
 - Vault files are sent to your Worker and stored in your R2 bucket.
-- Sync metadata and registered device records are stored in your D1 database.
+- Sync metadata, registered device records, and parsed reminder caches are stored in your D1 database.
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
 - OAuth state and PKCE material exist only in memory during one deployment; authorization codes and OAuth access tokens are never stored or logged.

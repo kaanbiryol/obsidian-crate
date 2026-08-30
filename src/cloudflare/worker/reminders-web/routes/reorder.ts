@@ -4,6 +4,8 @@ import type { Env } from '../../types';
 import { parseJsonObject, parseStringArray } from '../../utils';
 import { getProjectFilePath, reorderReminderBlocksInFileContent } from '../file-content';
 import { parseFolderPath, parseProjectPath } from '../requests';
+import { saveReminderFileCache } from '../reminder-cache';
+import { scanReminderMarkdownFile } from '../scan';
 
 export async function handleReorderReminders(request: Request, env: Env): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -21,6 +23,13 @@ export async function handleReorderReminders(request: Request, env: Env): Promis
 	if (!file) return corsResponse({ error: 'Project file not found' }, 404);
 
 	const nextContent = reorderReminderBlocksInFileContent(file.content, orderedIds);
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, file.hash);
+	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, file.hash);
+	await saveReminderFileCache(
+		env.DB,
+		folderPath,
+		filePath,
+		write.hash,
+		scanReminderMarkdownFile(filePath, nextContent, folderPath),
+	);
 	return corsResponse({ success: true });
 }

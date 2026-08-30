@@ -16,6 +16,7 @@ import {
 	parseRecurrenceMutationValue,
 	parseReminderMutationWorkspace,
 } from '../requests';
+import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
 
 export async function handleCreateReminder(request: Request, env: Env): Promise<Response> {
@@ -68,9 +69,11 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 		hasTime: createArgs.hasTime,
 		reminderId,
 	});
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, existingFile?.hash ?? null);
+	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, existingFile?.hash ?? null);
 
-	const reminder = scanReminderMarkdownFile(filePath, nextContent, workspaceResult.folderPath)
+	const reminders = scanReminderMarkdownFile(filePath, nextContent, workspaceResult.folderPath);
+	await saveReminderFileCache(env.DB, workspaceResult.folderPath, filePath, write.hash, reminders);
+	const reminder = reminders
 		.find(candidate => candidate.id === reminderId);
 	const notificationWarning = reminder
 		? await syncReminderNotification(env, reminder, workspaceResult.allDayNotificationTime)

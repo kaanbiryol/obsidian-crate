@@ -25,6 +25,7 @@ import {
 	parseReminderMutationWorkspace,
 	parseReminderSourceFilePath,
 } from '../requests';
+import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
 import { loadReminderSource } from '../workspace';
 
@@ -129,9 +130,10 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 			newFile?.hash ?? null,
 		);
 
+		const oldContent = deleteReminderFromFileContent(oldFile.content, reminder);
+		let oldWrite;
 		try {
-			const oldContent = deleteReminderFromFileContent(oldFile.content, reminder);
-			await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, oldContent, oldFile.hash);
+			oldWrite = await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, oldContent, oldFile.hash);
 		} catch (error) {
 			try {
 				if (newFile) {
@@ -150,12 +152,20 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 			}
 			throw error;
 		}
-		updatedReminder = scanReminderMarkdownFile(newFilePath, movedContent, workspaceResult.folderPath)
+		const movedReminders = scanReminderMarkdownFile(newFilePath, movedContent, workspaceResult.folderPath);
+		const oldReminders = scanReminderMarkdownFile(reminder.filePath, oldContent, workspaceResult.folderPath);
+		await Promise.all([
+			saveReminderFileCache(env.DB, workspaceResult.folderPath, newFilePath, newWrite.hash, movedReminders),
+			saveReminderFileCache(env.DB, workspaceResult.folderPath, reminder.filePath, oldWrite.hash, oldReminders),
+		]);
+		updatedReminder = movedReminders
 			.find(candidate => candidate.id === id);
 	} else {
 		const nextContent = updateReminderInFileContent(oldFile.content, reminder, update);
-		await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, oldFile.hash);
-		updatedReminder = scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath)
+		const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, oldFile.hash);
+		const reminders = scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath);
+		await saveReminderFileCache(env.DB, workspaceResult.folderPath, reminder.filePath, write.hash, reminders);
+		updatedReminder = reminders
 			.find(candidate => candidate.id === id);
 	}
 

@@ -5,6 +5,7 @@ import { parseJsonObject, parseOptionalString } from '../../utils';
 import { setReminderCompletedInFileContent } from '../file-content';
 import { cancelReminderNotification, syncReminderNotification } from '../notifications';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
+import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
 import { loadReminderSource } from '../workspace';
 
@@ -29,9 +30,11 @@ export async function handleSetReminderCompleted(request: Request, env: Env): Pr
 	const { file, reminder } = source;
 
 	const nextContent = setReminderCompletedInFileContent(file.content, reminder, parsedBody.value.completed);
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash);
+	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash);
 
-	const updatedReminder = scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath)
+	const reminders = scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath);
+	await saveReminderFileCache(env.DB, workspaceResult.folderPath, reminder.filePath, write.hash, reminders);
+	const updatedReminder = reminders
 		.find(candidate => candidate.id === id);
 	const notificationWarning = updatedReminder
 		? await syncReminderNotification(env, updatedReminder, workspaceResult.allDayNotificationTime)

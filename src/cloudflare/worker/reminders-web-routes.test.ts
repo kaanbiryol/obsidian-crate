@@ -5,11 +5,19 @@ import { handleDeleteReminder } from './reminders-web/routes/delete';
 import { handleListReminders } from './reminders-web/routes/list';
 import { handleReorderReminders } from './reminders-web/routes/reorder';
 import { handleUpdateReminder } from './reminders-web/routes/update';
+import { saveReminderFileCache } from './reminders-web/reminder-cache';
+import { scanReminderMarkdownFile } from './reminders-web/scan';
 
 type StoredObject = {
 	body: ArrayBuffer;
 	httpMetadata?: { contentType?: string };
 	customMetadata?: { hash?: string };
+};
+
+type ReminderCacheValue = {
+	fileHash: string;
+	parserVersion: number;
+	remindersJson: string;
 };
 
 function createBucket(
@@ -72,6 +80,8 @@ function createDb(options?: {
 	const hashes = new Map<string, string>(Object.entries(options?.fileHashes ?? {}));
 	const sizes = new Map<string, number>(Object.entries(options?.fileSizes ?? {}));
 	const scheduled = new Map<string, { content: string; project: string | null; dueDatetime: string }>();
+	const reminderCache = new Map<string, ReminderCacheValue>();
+	const reminderCacheKey = (folderPath: string, filePath: string) => `${folderPath}\0${filePath}`;
 
 	function getBoundString(args: unknown[], index: number): string {
 		const value = args[index];
@@ -104,6 +114,16 @@ function createDb(options?: {
 						scheduled.delete(getBoundString(statement._args, 0));
 					}
 
+					if (sql.startsWith('DELETE FROM reminder_file_cache')) {
+						const folderPath = getBoundString(statement._args, 0);
+						for (const key of reminderCache.keys()) {
+							const [cachedFolderPath, cachedFilePath] = key.split('\0');
+							if (cachedFolderPath === folderPath && cachedFilePath && !files.has(cachedFilePath)) {
+								reminderCache.delete(key);
+							}
+						}
+					}
+
 					return {};
 				}),
 				first: vi.fn(async () => {
@@ -128,6 +148,19 @@ function createDb(options?: {
 					if (sql.includes('PRAGMA table_info(auth_tokens)')) {
 						return { results: [{ name: 'id' }, { name: 'token_hash' }, { name: 'device_id' }, { name: 'device_name' }, { name: 'platform' }, { name: 'last_seen_at' }] };
 					}
+					if (sql.includes('FROM reminder_file_cache')) {
+						const folderPath = getBoundString(statement._args, 0);
+						return {
+							results: Array.from(reminderCache.entries())
+								.filter(([key]) => key.startsWith(`${folderPath}\0`))
+								.map(([key, value]) => ({
+									file_path: key.slice(folderPath.length + 1),
+									file_hash: value.fileHash,
+									parser_version: value.parserVersion,
+									reminders_json: value.remindersJson,
+								})),
+						};
+					}
 					if (sql.includes('FROM files WHERE path LIKE')) {
 						const prefix = getBoundString(statement._args, 0).slice(0, -1);
 						return {
@@ -151,7 +184,19 @@ function createDb(options?: {
 			const results: Array<{ meta: { changes: number } }> = [];
 			for (const statement of statements) {
 				let changes = 0;
-				if (statement._sql.includes('INSERT INTO files (path, hash, size, modified, storage_key)')) {
+				if (statement._sql.includes('INSERT INTO reminder_file_cache')) {
+					const folderPath = getBoundString(statement._args, 0);
+					const filePath = getBoundString(statement._args, 1);
+					const fileHash = getBoundString(statement._args, 2);
+					if (files.has(filePath) && hashes.get(filePath) === fileHash) {
+						reminderCache.set(reminderCacheKey(folderPath, filePath), {
+							fileHash,
+							parserVersion: Number(statement._args[3]),
+							remindersJson: getBoundString(statement._args, 4),
+						});
+						changes = 1;
+					}
+				} else if (statement._sql.includes('INSERT INTO files (path, hash, size, modified, storage_key)')) {
 					const path = getBoundString(statement._args, 0);
 					if (!statement._sql.includes('DO NOTHING') || !files.has(path)) {
 						files.set(path, getBoundString(statement._args, 3));
@@ -189,7 +234,7 @@ function createDb(options?: {
 		exec: vi.fn(async () => ({})),
 	};
 
-	return { db, files, scheduled };
+	return { db, files, hashes, reminderCache, scheduled, sizes };
 }
 
 async function createEnv(input: {
@@ -211,7 +256,12 @@ async function createEnv(input: {
 		return [path, body ? await sha256HexBytes(body) : ''] as const;
 	}));
 	const fileHashes: Record<string, string> = Object.fromEntries(hashEntries);
-	const { db, files, scheduled } = createDb({ files: resolvedFiles, fileSizes, fileHashes, committedPaths });
+	const { db, files, hashes, reminderCache, scheduled, sizes } = createDb({
+		files: resolvedFiles,
+		fileSizes,
+		fileHashes,
+		committedPaths,
+	});
 
 	return {
 		env: {
@@ -241,6 +291,27 @@ async function createEnv(input: {
 		files,
 		scheduled,
 		committedPaths,
+		getCurrentHash(path: string) {
+			return hashes.get(path) ?? null;
+		},
+		async replaceCurrentFile(path: string, content: string) {
+			const storageKey = files.get(path) ?? `files/${path}`;
+			const body = new TextEncoder().encode(content).buffer;
+			store.set(storageKey, { body });
+			files.set(path, storageKey);
+			hashes.set(path, await sha256HexBytes(body));
+			sizes.set(path, body.byteLength);
+		},
+		setCachedParserVersion(folderPath: string, filePath: string, parserVersion: number) {
+			const key = `${folderPath}\0${filePath}`;
+			const cached = reminderCache.get(key);
+			if (cached) cached.parserVersion = parserVersion;
+		},
+		corruptCachedReminders(folderPath: string, filePath: string) {
+			const key = `${folderPath}\0${filePath}`;
+			const cached = reminderCache.get(key);
+			if (cached) cached.remindersJson = '{not json';
+		},
 		readCurrentFile(path: string): string | null {
 			const storageKey = files.get(path);
 			const entry = storageKey ? store.get(storageKey) : null;
@@ -301,6 +372,171 @@ describe('reminders web handlers', () => {
 
 		expect(secondResponse.status).toBe(304);
 		expect(bucketGet).toHaveBeenCalledTimes(2);
+	});
+
+	it('reuses cached parses when the client requests a full response again', async () => {
+		const workspace = await createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] First task <!-- crate-id:r1 -->\n',
+				'files/Reminders/Work.md': '# Work\n\n- [ ] Second task <!-- crate-id:r2 -->\n',
+			},
+			files: {
+				'Reminders/Inbox.md': null,
+				'Reminders/Work.md': null,
+			},
+		});
+		const bucketGet = workspace.env.BUCKET.get as ReturnType<typeof vi.fn>;
+
+		await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+		const response = await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(bucketGet).toHaveBeenCalledTimes(2);
+		const result = await response.json() as { reminders: Array<{ id: string }> };
+		expect(result.reminders.map((reminder) => reminder.id)).toEqual(['r1', 'r2']);
+	});
+
+	it('reads and reparses only the file whose hash changed', async () => {
+		const workspace = await createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] First task <!-- crate-id:r1 -->\n',
+				'files/Reminders/Work.md': '# Work\n\n- [ ] Second task <!-- crate-id:r2 -->\n',
+			},
+			files: {
+				'Reminders/Inbox.md': null,
+				'Reminders/Work.md': null,
+			},
+		});
+		const bucketGet = workspace.env.BUCKET.get as ReturnType<typeof vi.fn>;
+
+		await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+		await workspace.replaceCurrentFile(
+			'Reminders/Work.md',
+			'# Work\n\n- [ ] Updated task <!-- crate-id:r2 -->\n- [ ] Added task <!-- crate-id:r3 -->\n',
+		);
+		const response = await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+
+		expect(bucketGet).toHaveBeenCalledTimes(3);
+		const result = await response.json() as { reminders: Array<{ id: string; content: string }> };
+		expect(result.reminders).toMatchObject([
+			{ id: 'r1', content: 'First task' },
+			{ id: 'r2', content: 'Updated task' },
+			{ id: 'r3', content: 'Added task' },
+		]);
+	});
+
+	it('reparses cache entries with an old parser version or invalid JSON', async () => {
+		const workspace = await createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] First task <!-- crate-id:r1 -->\n',
+				'files/Reminders/Work.md': '# Work\n\n- [ ] Second task <!-- crate-id:r2 -->\n',
+			},
+			files: {
+				'Reminders/Inbox.md': null,
+				'Reminders/Work.md': null,
+			},
+		});
+		const bucketGet = workspace.env.BUCKET.get as ReturnType<typeof vi.fn>;
+
+		await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+		workspace.setCachedParserVersion('Reminders', 'Reminders/Inbox.md', 0);
+		workspace.corruptCachedReminders('Reminders', 'Reminders/Work.md');
+		const response = await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+
+		expect(response.status).toBe(200);
+		expect(bucketGet).toHaveBeenCalledTimes(4);
+	});
+
+	it('does not let a stale parser overwrite a newer file cache entry', async () => {
+		const originalContent = '# Inbox\n\n- [ ] Original task <!-- crate-id:r1 -->\n';
+		const workspace = await createEnv({
+			bucketEntries: { 'files/Reminders/Inbox.md': originalContent },
+			files: { 'Reminders/Inbox.md': null },
+		});
+		const bucketGet = workspace.env.BUCKET.get as ReturnType<typeof vi.fn>;
+
+		await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+		const oldHash = workspace.getCurrentHash('Reminders/Inbox.md');
+		expect(oldHash).toBeTruthy();
+
+		await workspace.replaceCurrentFile(
+			'Reminders/Inbox.md',
+			'# Inbox\n\n- [ ] Current task <!-- crate-id:r1 -->\n',
+		);
+		await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+		await saveReminderFileCache(
+			workspace.env.DB as never,
+			'Reminders',
+			'Reminders/Inbox.md',
+			oldHash ?? '',
+			scanReminderMarkdownFile('Reminders/Inbox.md', originalContent, 'Reminders'),
+		);
+
+		const response = await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+		const result = await response.json() as { reminders: Array<{ content: string }> };
+		expect(result.reminders.map((reminder) => reminder.content)).toEqual(['Current task']);
+		expect(bucketGet).toHaveBeenCalledTimes(2);
+	});
+
+	it('updates the parsed cache eagerly after a reminder mutation', async () => {
+		const workspace = await createEnv({
+			bucketEntries: {
+				'files/Reminders/Inbox.md': '# Inbox\n\n- [ ] Existing task <!-- crate-id:r-existing -->\n',
+			},
+			files: { 'Reminders/Inbox.md': null },
+		});
+		const bucketGet = workspace.env.BUCKET.get as ReturnType<typeof vi.fn>;
+
+		const updateResponse = await handleUpdateReminder(
+			new Request('https://worker.test/reminders/update', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					folderPath: 'Reminders',
+					id: 'r-existing',
+					filePath: 'Reminders/Inbox.md',
+					content: 'Updated task',
+				}),
+			}),
+			workspace.env as never,
+		);
+		expect(updateResponse.status).toBe(200);
+		expect(bucketGet).toHaveBeenCalledTimes(1);
+
+		const listResponse = await handleListReminders(
+			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
+			workspace.env as never,
+		);
+		const result = await listResponse.json() as { reminders: Array<{ content: string }> };
+		expect(result.reminders.map((reminder) => reminder.content)).toEqual(['Updated task']);
+		expect(bucketGet).toHaveBeenCalledTimes(1);
 	});
 
 	it('updates a known source file without scanning unrelated project files', async () => {

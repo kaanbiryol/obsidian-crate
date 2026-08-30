@@ -5,6 +5,8 @@ import { parseJsonObject, parseOptionalString } from '../../utils';
 import { deleteReminderFromFileContent } from '../file-content';
 import { cancelReminderNotification } from '../notifications';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
+import { saveReminderFileCache } from '../reminder-cache';
+import { scanReminderMarkdownFile } from '../scan';
 import { loadReminderSource } from '../workspace';
 
 export async function handleDeleteReminder(request: Request, env: Env): Promise<Response> {
@@ -26,7 +28,14 @@ export async function handleDeleteReminder(request: Request, env: Env): Promise<
 	const { file, reminder } = source;
 
 	const nextContent = deleteReminderFromFileContent(file.content, reminder);
-	await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash);
+	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, file.hash);
+	await saveReminderFileCache(
+		env.DB,
+		workspaceResult.folderPath,
+		reminder.filePath,
+		write.hash,
+		scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath),
+	);
 	const notificationWarning = await cancelReminderNotification(env, id);
 	return corsResponse({ success: true, id, notificationWarning });
 }
