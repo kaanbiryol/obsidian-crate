@@ -32,9 +32,13 @@
     }
 }
 
-// Keep the sidebar FAB visually connected to its bottom navigation.
+// Keep the sidebar controls anchored to the reminders pane instead of the app viewport.
 .reminders-view:not(.is-modal):not(.is-fullscreen):not(.is-compact) {
     --reminders-fab-gap: 12px;
+
+    .animated-tab-bar-bottom {
+        position: absolute;
+    }
 }
 
 // Modal-specific fullscreen adjustments
