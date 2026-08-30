@@ -41,7 +41,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
 - OAuth state and PKCE material exist only in memory during one deployment; authorization codes and OAuth access tokens are never stored or logged.
-- The Worker module and D1 migrations are versioned build-time artifacts inside the plugin. Crate does not fetch deployment code at runtime.
+- The Worker module and initial D1 schema are versioned build-time artifacts inside the plugin. Crate does not fetch deployment code at runtime.
 - Vault devices can be authorized only through the Cloudflare account that owns the server.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - Remote code is not fetched or evaluated at runtime.
@@ -107,23 +107,23 @@ After installing the plugin, open the Crate settings tab in Obsidian:
 
 1. Select **Connect with Cloudflare**. Your browser opens Cloudflare OAuth.
 2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
-3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate reuses an existing Crate server in that account or provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and migrations.
+3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate reuses an existing Crate server in that account or provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and initial schema.
 4. Crate registers this device through the Cloudflare-authorized D1 API, revokes the temporary OAuth token, and connects automatically.
 5. Run **Initial sync → Upload all** when you are ready to seed the remote vault.
 
-The OAuth deployment uses the build-time Worker and migrations included in the installed plugin. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered in D1.
+The OAuth deployment uses the build-time Worker and initial schema included in the installed plugin. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered in D1.
 
 To connect another computer or mobile device, install Crate there and select **Connect with Cloudflare**. Access to the Cloudflare account is the source of truth for vault membership. If the account contains more than one Crate server, Obsidian asks which one belongs to the vault.
 
 **Disconnect this device** removes the local sync credential while retaining the non-secret deployment identity. Signing in to Cloudflare again reconnects the same server.
 
-For the one-time GitHub Pages and OAuth-client configuration, updates, and recovery instructions, see [Deploying and operating the server](docs/deployment.md). When the installed Crate build contains newer Worker, web app, or migration artifacts, Obsidian shows a server-update notice and **Authorize update** appears in Crate settings. Updating reuses the resource IDs saved by the initial OAuth deployment.
+For the one-time GitHub Pages and OAuth-client configuration, updates, and recovery instructions, see [Deploying and operating the server](docs/deployment.md). When the installed Crate build contains newer Worker, web app, or schema artifacts, Obsidian shows a server-update notice and **Authorize update** appears in Crate settings. Updating reuses the resource IDs saved by the initial OAuth deployment.
 
 ## Sync Scope and Limits
 
 - Crate syncs files inside the vault, including attachments. Hidden dotfiles and dot-folders can also be synced; they are not excluded as a group.
 - Files larger than 25 MiB (25 × 1024 × 1024 bytes) are skipped and reported as sync errors. They are not uploaded to or downloaded from the remote vault.
-- The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, and `.DS_Store`. Crate also ignores its own plugin data, conflict copies, and the active Obsidian configuration folder's `workspace*` files.
+- The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, and `.DS_Store`. Crate always ignores the active Obsidian configuration folder's entire `plugins/` tree, its Markdown merge cache, conflict copies, and `workspace*` files.
 - Change ignore patterns under **Settings → Crate → Sync → Ignore patterns**. A pattern ending in `/` ignores that directory tree; `*` and `?` wildcards are supported.
 - Cloudflare account and plan quotas still apply to R2, Workers, D1, and push-notification resources.
 

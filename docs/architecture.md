@@ -38,7 +38,7 @@
 | **Cloudflare Worker** | HTTPS API - receives uploads, serves downloads, manages changelog, serves the reminders PWA |
 | **Cloudflare R2** | Object storage for vault file content and shared settings |
 | **Cloudflare D1** | SQLite database with sync metadata, auth tokens, push subscriptions, and reminder alarm records |
-| **Cloudflare OAuth deployment** | Uses PKCE in Obsidian to provision build-time Worker and migration artifacts, then revokes the temporary token |
+| **Cloudflare OAuth deployment** | Uses PKCE in Obsidian to provision the build-time Worker and initial schema, then revokes the temporary token |
 | **Static GitHub Pages callback** | Removes OAuth parameters and hands the response to Obsidian; has no backend, analytics, or token exchange |
 | **OS Keychain** | Stores auth tokens via Obsidian's `secretStorage` API |
 
@@ -74,7 +74,7 @@ CratePlugin (src/plugin/CratePlugin.ts)
 1. The plugin creates a cryptographically random OAuth `state` and a fresh PKCE S256 verifier/challenge in memory.
 2. Cloudflare redirects to `https://crate.kaanbiryol.com/oauth/callback/`. The static page immediately clears its query string and opens the `crate-cloudflare-oauth` Obsidian protocol.
 3. The plugin verifies `state` before exchanging the authorization code. The access token is held only in a local stack frame.
-4. The plugin discovers Crate Workers in the selected account. It reuses the saved or selected deployment, or creates new D1 and R2 resources when none exists. Ordered D1 migrations are applied before the new Worker bundle is uploaded; request cold starts never mutate the schema.
+4. The plugin discovers Crate Workers in the selected account. It reuses the saved or selected deployment, or creates new D1 and R2 resources when none exists. The idempotent initial D1 schema is applied before the new Worker bundle is uploaded; request cold starts never mutate the schema.
 5. The plugin generates a permanent device secret locally and writes only its hash and device metadata to the deployment's D1 database using the temporary Cloudflare authorization.
 6. The OAuth token is revoked and discarded. Only non-secret resource identifiers remain in plugin settings for reconnects and updates.
 
@@ -111,7 +111,7 @@ The browser-facing PWA source lives in `src/pwa/`, while its Worker-served HTML,
 
 The Obsidian plugin and PWA own separate application shells so viewport, navigation, safe-area, and modal behavior can follow each host. They share reminder panels, cards, and view-model logic rather than sharing host chrome.
 
-The Worker remains an independently deployable build product, but the production plugin also includes a gzip-compressed copy of `.generated/cloudflare/worker.mjs` and every ordered SQL file in `migrations/`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or migration is fetched from the network at runtime.
+The Worker remains an independently deployable build product, but the production plugin also includes a gzip-compressed copy of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime.
 
 `npm run release:check` enforces Worker and combined-plugin size budgets and checks that the OAuth entry point remains present.
 

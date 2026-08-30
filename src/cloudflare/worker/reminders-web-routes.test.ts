@@ -63,12 +63,12 @@ function createBucket(
 }
 
 function createDb(options?: {
-	files?: Record<string, string | null>;
+	files?: Record<string, string>;
 	fileSizes?: Record<string, number>;
 	fileHashes?: Record<string, string>;
 	committedPaths?: string[];
 }) {
-	const files = new Map<string, string | null>(Object.entries(options?.files ?? {}));
+	const files = new Map<string, string>(Object.entries(options?.files ?? {}));
 	const hashes = new Map<string, string>(Object.entries(options?.fileHashes ?? {}));
 	const sizes = new Map<string, number>(Object.entries(options?.fileSizes ?? {}));
 	const scheduled = new Map<string, { content: string; project: string | null; dueDatetime: string }>();
@@ -154,7 +154,7 @@ function createDb(options?: {
 				if (statement._sql.includes('INSERT INTO files (path, hash, size, modified, storage_key)')) {
 					const path = getBoundString(statement._args, 0);
 					if (!statement._sql.includes('DO NOTHING') || !files.has(path)) {
-						files.set(path, typeof statement._args[3] === 'string' ? statement._args[3] : null);
+						files.set(path, getBoundString(statement._args, 3));
 						hashes.set(path, getBoundString(statement._args, 1));
 						sizes.set(path, Number(statement._args[2]));
 						options?.committedPaths?.push(path);
@@ -163,7 +163,7 @@ function createDb(options?: {
 				} else if (statement._sql.startsWith('UPDATE files')) {
 					const path = getBoundString(statement._args, 3);
 					if (hashes.get(path) === getBoundString(statement._args, 4)) {
-						files.set(path, getBoundString(statement._args, 2) || null);
+						files.set(path, getBoundString(statement._args, 2));
 						hashes.set(path, getBoundString(statement._args, 0));
 						sizes.set(path, Number(statement._args[1]));
 						options?.committedPaths?.push(path);
@@ -199,17 +199,19 @@ async function createEnv(input: {
 }) {
 	const committedPaths: string[] = [];
 	const { bucket, store } = createBucket(input.bucketEntries, { failPutWhen: input.failPutWhen });
-	const fileSizes = Object.fromEntries(Object.entries(input.files).map(([path, storageKey]) => {
-		const objectKey = storageKey ?? `files/${path}`;
+	const resolvedFiles = Object.fromEntries(Object.entries(input.files).map(([path, storageKey]) => [
+		path,
+		storageKey ?? `files/${path}`,
+	]));
+	const fileSizes = Object.fromEntries(Object.entries(resolvedFiles).map(([path, objectKey]) => {
 		return [path, store.get(objectKey)?.body.byteLength ?? 0];
 	}));
-	const hashEntries = await Promise.all(Object.entries(input.files).map(async ([path, storageKey]) => {
-		const objectKey = storageKey ?? `files/${path}`;
+	const hashEntries = await Promise.all(Object.entries(resolvedFiles).map(async ([path, objectKey]) => {
 		const body = store.get(objectKey)?.body;
 		return [path, body ? await sha256HexBytes(body) : ''] as const;
 	}));
 	const fileHashes: Record<string, string> = Object.fromEntries(hashEntries);
-	const { db, files, scheduled } = createDb({ files: input.files, fileSizes, fileHashes, committedPaths });
+	const { db, files, scheduled } = createDb({ files: resolvedFiles, fileSizes, fileHashes, committedPaths });
 
 	return {
 		env: {
@@ -241,8 +243,7 @@ async function createEnv(input: {
 		committedPaths,
 		readCurrentFile(path: string): string | null {
 			const storageKey = files.get(path);
-			const objectKey = storageKey ?? `files/${path}`;
-			const entry = store.get(objectKey);
+			const entry = storageKey ? store.get(storageKey) : null;
 			return entry ? new TextDecoder().decode(entry.body) : null;
 		},
 	};

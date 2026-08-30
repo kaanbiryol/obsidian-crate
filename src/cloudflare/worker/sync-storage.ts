@@ -1,16 +1,17 @@
 import { queryRows } from './db';
-import { FILES_PREFIX } from './utils';
 
 export const MAX_BATCH_FILES = 50;
 export const MAX_BATCH_TOTAL_BYTES = 10 * 1024 * 1024;
 export const MAX_BATCH_DOWNLOAD_BYTES = 8 * 1024 * 1024;
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MANAGED_FILES_PREFIX = '__crate__/files/';
+const CLEANUP_BATCH_LIMIT = 25;
+const CLEANUP_DRAIN_PROBABILITY = 0.05;
 
 export interface FileStorageRow {
 	hash: string;
 	size: number;
-	storageKey: string | null;
+	storageKey: string;
 }
 
 export type ExpectedFileHash = string | null;
@@ -38,10 +39,6 @@ export function formatMutationError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
-function legacyObjectKey(path: string): string {
-	return FILES_PREFIX + path;
-}
-
 export function createManagedObjectKey(hash: string): string {
 	return `${MANAGED_FILES_PREFIX}${hash}/${crypto.randomUUID()}`;
 }
@@ -55,19 +52,10 @@ function normalizeStorageKey(value: unknown): string | null {
 	return trimmed.length > 0 ? trimmed : null;
 }
 
-export function resolveStoredObjectKey(path: string, storageKey: string | null): string {
-	return storageKey ?? legacyObjectKey(path);
-}
-
-export function collectCleanupKeys(path: string, previousFile: FileStorageRow | null, preserve?: string): string[] {
+export function collectCleanupKeys(previousFile: FileStorageRow | null, preserve?: string): string[] {
 	const keys = new Set<string>();
-	const legacyKey = legacyObjectKey(path);
-	if (legacyKey !== preserve) {
-		keys.add(legacyKey);
-	}
-
 	if (previousFile) {
-		const previousKey = resolveStoredObjectKey(path, previousFile.storageKey);
+		const previousKey = previousFile.storageKey;
 		if (previousKey !== preserve) {
 			keys.add(previousKey);
 		}
@@ -76,9 +64,74 @@ export function collectCleanupKeys(path: string, previousFile: FileStorageRow | 
 	return Array.from(keys);
 }
 
-export async function deleteBucketObjectsQuietly(bucket: R2Bucket, keys: string[]): Promise<void> {
+async function queueObjectCleanup(db: D1Database, keys: string[]): Promise<void> {
+	if (keys.length === 0) return;
+
+	try {
+		await db.batch(keys.map((key) => db.prepare(
+			'INSERT OR IGNORE INTO object_cleanup_queue (storage_key) VALUES (?)',
+		).bind(key)));
+	} catch {
+		// Cleanup must never turn an already-committed file mutation into a failure.
+	}
+}
+
+async function removeQueuedObjectCleanup(db: D1Database, keys: string[]): Promise<void> {
+	if (keys.length === 0) return;
+
+	try {
+		await db.batch(keys.map((key) => db.prepare(
+			'DELETE FROM object_cleanup_queue WHERE storage_key = ?',
+		).bind(key)));
+	} catch {
+		// A later drain will repeat the idempotent R2 deletion and clear the row.
+	}
+}
+
+export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database): Promise<void> {
+	try {
+		const rows = await queryRows<{ storage_key: string }>(
+			db.prepare('SELECT storage_key FROM object_cleanup_queue ORDER BY created_at LIMIT ?')
+				.bind(CLEANUP_BATCH_LIMIT),
+		);
+		const outcomes = await Promise.all(rows.map(async ({ storage_key: key }) => {
+			try {
+				await bucket.delete(key);
+				return key;
+			} catch {
+				return null;
+			}
+		}));
+		const deletedKeys = outcomes.filter((key): key is string => key !== null);
+		if (deletedKeys.length > 0) {
+			await db.batch(deletedKeys.map((key) => db.prepare(
+				'DELETE FROM object_cleanup_queue WHERE storage_key = ?',
+			).bind(key)));
+		}
+	} catch {
+		// The queue is best effort and will be retried by a later mutation.
+	}
+}
+
+export async function deleteBucketObjectsOrQueue(
+	bucket: R2Bucket,
+	db: D1Database,
+	keys: string[],
+): Promise<void> {
 	const uniqueKeys = Array.from(new Set(keys.filter((key) => key.length > 0)));
-	await Promise.allSettled(uniqueKeys.map((key) => bucket.delete(key)));
+	await queueObjectCleanup(db, uniqueKeys);
+	const outcomes = await Promise.all(uniqueKeys.map(async (key) => {
+		try {
+			await bucket.delete(key);
+			return key;
+		} catch {
+			return null;
+		}
+	}));
+	await removeQueuedObjectCleanup(db, outcomes.filter((key): key is string => key !== null));
+	if (Math.random() < CLEANUP_DRAIN_PROBABILITY) {
+		await drainObjectCleanupQueue(bucket, db);
+	}
 }
 
 export function storedObjectMatchesMetadata(
@@ -96,15 +149,16 @@ export function formatMetadataCommitFailure(actionLabel: 'Upload' | 'Delete', me
 export async function getStoredFileRow(db: D1Database, path: string): Promise<FileStorageRow | null> {
 	const row = await db.prepare('SELECT hash, size, storage_key FROM files WHERE path = ?')
 		.bind(path)
-		.first<{ hash?: string; size?: number; storage_key?: string | null }>();
-	if (!row) {
+		.first<{ hash?: string; size?: number; storage_key?: string }>();
+	const storageKey = normalizeStorageKey(row?.storage_key);
+	if (!row || !storageKey) {
 		return null;
 	}
 
 	return {
 		hash: typeof row.hash === 'string' ? row.hash : '',
 		size: typeof row.size === 'number' ? row.size : 0,
-		storageKey: normalizeStorageKey(row.storage_key),
+		storageKey,
 	};
 }
 
@@ -121,10 +175,11 @@ export async function getChangelogBounds(db: D1Database): Promise<{
 	lastSeq: number;
 	minSeq: number | null;
 }> {
-	const maxRows = await queryRows<{ lastSeq: number }>(db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'));
-	const minRows = await queryRows<{ minSeq: number | null }>(db.prepare('SELECT MIN(seq) as minSeq FROM changelog'));
+	const rows = await queryRows<{ lastSeq: number | null; minSeq: number | null }>(
+		db.prepare('SELECT MAX(seq) as lastSeq, MIN(seq) as minSeq FROM changelog'),
+	);
 	return {
-		lastSeq: maxRows[0]?.lastSeq || 0,
-		minSeq: minRows[0]?.minSeq ?? null,
+		lastSeq: rows[0]?.lastSeq ?? 0,
+		minSeq: rows[0]?.minSeq ?? null,
 	};
 }

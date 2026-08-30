@@ -1,5 +1,5 @@
 import { computeHash } from "./hasher";
-import { detectConflicts } from "./conflict";
+import { detectConflicts } from "./reconciliation";
 import { getAllVaultFiles } from "./file-discovery";
 import type { FullSyncPlan, FullSyncPlannerContext } from "./planner-types";
 import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
@@ -52,17 +52,9 @@ export async function createFullSyncPlan(
     diffMap.set(diff.path, diff);
   }
 
-  const localDeletes = await context.getLocalDeletes();
-  for (const path of localDeletes) {
-    const remoteEntry = remoteFiles[path];
-    if (!remoteEntry) {
+  for (const path of Object.keys(manifestEntries)) {
+    if (!localFiles[path] && !remoteFiles[path]) {
       context.localManifest.removeEntry(path);
-      continue;
-    }
-
-    const manifestEntry = manifestEntries[path];
-    if (manifestEntry && remoteEntry.hash === manifestEntry.hash) {
-      diffMap.set(path, { path, action: "delete", remoteHash: remoteEntry.hash });
     }
   }
 
@@ -94,7 +86,9 @@ export async function createFullSyncPlan(
     diffs,
     uploadDiffs: diffs.filter((diff) => diff.action === "upload"),
     downloadDiffs: diffs.filter((diff) => diff.action === "download"),
-    remainingDiffs: diffs.filter((diff) => diff.action === "conflict" || diff.action === "delete"),
+    remainingDiffs: diffs.filter((diff) =>
+      diff.action === "conflict" || diff.action === "delete" || diff.action === "delete-local"
+    ),
     errors,
   };
 }

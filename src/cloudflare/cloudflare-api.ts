@@ -113,7 +113,6 @@ export function buildWorkerMultipartBody(input: {
 			],
 		exports: {
 			ReminderAlarm: { type: 'durable-object', storage: 'sqlite', state: 'created' },
-			SetupCoordinator: { type: 'durable-object', state: 'deleted' },
 		},
 	};
 	const parts = [

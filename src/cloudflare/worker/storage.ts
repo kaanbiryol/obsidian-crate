@@ -3,10 +3,9 @@ import { queryRows } from './db';
 import { commitFileDelete, commitStagedFile } from './sync-mutations';
 import {
 	createManagedObjectKey,
-	deleteBucketObjectsQuietly,
+	deleteBucketObjectsOrQueue,
 	getStoredFileRow,
 	MAX_FILE_BYTES,
-	resolveStoredObjectKey,
 } from './sync-storage';
 
 function escapeLikePattern(value: string): string {
@@ -23,7 +22,7 @@ export interface StoredMarkdownFileMetadata {
 	path: string;
 	hash: string;
 	size: number;
-	storageKey: string | null;
+	storageKey: string;
 }
 
 export class FileVersionConflictError extends Error {
@@ -37,7 +36,7 @@ export async function listStoredMarkdownFileMetadataByPrefix(
 	db: D1Database,
 	pathPrefix: string,
 ): Promise<StoredMarkdownFileMetadata[]> {
-	const rows = await queryRows<{ path: string; hash: string; size: number; storage_key?: string | null }>(
+	const rows = await queryRows<{ path: string; hash: string; size: number; storage_key: string }>(
 		db.prepare(
 			"SELECT path, hash, size, storage_key FROM files WHERE path LIKE ? ESCAPE '\\' AND lower(path) LIKE '%.md' ORDER BY path ASC",
 		).bind(`${escapeLikePattern(pathPrefix)}/%`),
@@ -46,7 +45,7 @@ export async function listStoredMarkdownFileMetadataByPrefix(
 		path: row.path,
 		hash: row.hash,
 		size: row.size,
-		storageKey: row.storage_key ?? null,
+		storageKey: row.storage_key,
 	}));
 }
 
@@ -60,7 +59,7 @@ export async function readStoredMarkdownFiles(
 		const chunk = rows.slice(index, index + 8);
 		files.push(...await Promise.all(chunk.map(async (row) => {
 			if (row.size > MAX_FILE_BYTES) return null;
-			const objectKey = resolveStoredObjectKey(row.path, row.storageKey);
+			const objectKey = row.storageKey;
 			const object = await bucket.get(objectKey);
 			if (!object || (row.size > 0 && object.size !== row.size)) return null;
 
@@ -78,15 +77,6 @@ export async function readStoredMarkdownFiles(
 	return files.filter((file): file is StoredTextFile => file !== null);
 }
 
-export async function listStoredMarkdownFilesByPrefix(
-	bucket: R2Bucket,
-	db: D1Database,
-	pathPrefix: string,
-): Promise<StoredTextFile[]> {
-	const rows = await listStoredMarkdownFileMetadataByPrefix(db, pathPrefix);
-	return readStoredMarkdownFiles(bucket, rows);
-}
-
 export async function readCommittedMarkdownFileVersion(
 	bucket: R2Bucket,
 	db: D1Database,
@@ -97,7 +87,7 @@ export async function readCommittedMarkdownFileVersion(
 		return null;
 	}
 
-	const objectKey = resolveStoredObjectKey(path, file.storageKey);
+	const objectKey = file.storageKey;
 	const object = await bucket.get(objectKey);
 	if (!object || (file.size > 0 && object.size !== file.size)) {
 		return null;
@@ -149,7 +139,7 @@ export async function writeCommittedMarkdownFile(
 		}
 	} catch (error) {
 		if (!(error instanceof FileVersionConflictError)) {
-			await deleteBucketObjectsQuietly(bucket, [objectKey]);
+			await deleteBucketObjectsOrQueue(bucket, db, [objectKey]);
 		}
 		throw error;
 	}

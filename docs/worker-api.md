@@ -322,11 +322,11 @@ Response: `{ sent, failed, pruned, errors }`
 
 Exported class `ReminderAlarm` from the worker. Each reminder gets its own DO instance keyed by `reminderId`. When the alarm fires, the DO sends Web Push notifications to all subscribed devices via `web-push-browser`, then deletes itself from D1.
 
-Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and migration metadata on deploy.
+Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarative `exports.ReminderAlarm` entry with SQLite storage on deploy.
 
 ## D1 Database Schema
 
-Eight tables, created lazily via `initDb()`:
+Nine tables, initialized from `src/cloudflare/schema.sql` before the Worker is uploaded:
 
 ### changelog
 
@@ -351,7 +351,7 @@ CREATE TABLE IF NOT EXISTS files (
   hash     TEXT NOT NULL DEFAULT '',
   size     INTEGER NOT NULL DEFAULT 0,
   modified TEXT NOT NULL DEFAULT (datetime('now')),
-  storage_key TEXT
+  storage_key TEXT NOT NULL
 );
 ```
 
@@ -441,11 +441,22 @@ CREATE TABLE IF NOT EXISTS web_enrollment_tokens (
 
 One-time, short-lived tokens embedded in reminders PWA setup links. Each link contains separate browser and install tokens. `POST /notifications/reminders-exchange` consumes one token and creates a scoped, expiring PWA auth token that cannot access vault sync APIs.
 
+### object_cleanup_queue
+
+```sql
+CREATE TABLE IF NOT EXISTS object_cleanup_queue (
+  storage_key TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+Retry queue for R2 objects whose best-effort deletion failed after their D1 metadata mutation committed.
+
 ## R2 Key Convention
 
-Committed file blobs are stored under `__crate__/files/<hash>/<uuid>` and referenced through `files.storage_key`. Legacy rows without `storage_key` still fall back to `files/<vault-path>`. D1 is required for every sync transfer; the Worker returns `503` instead of accepting an untracked R2 mutation when the database binding is unavailable.
+Committed file blobs are stored under `__crate__/files/<hash>/<uuid>` and referenced through the required `files.storage_key`. D1 is required for every sync transfer; the Worker returns `503` instead of accepting an untracked R2 mutation when the database binding is unavailable.
 
-Versioned migrations are the only production schema writer. The OAuth provisioner applies them before uploading the Worker, and the Wrangler deploy script migrates D1 in `predeploy`, so request cold starts do not execute schema DDL.
+Failed best-effort R2 deletions are recorded in `object_cleanup_queue` and retried during later mutations. The OAuth provisioner applies the initial schema before uploading the Worker, and the Wrangler deploy script runs `db:init:remote` in `predeploy`, so request cold starts do not execute schema DDL.
 
 ## Path Sanitization
 

@@ -3,9 +3,6 @@ declare module 'virtual:crate-cloudflare-artifacts' {
 	export const workerBundleGzipBase64: string;
 	export const workerBundleSha256: string;
 	export const artifactFingerprint: string;
-	export const d1Migrations: Array<{
-		name: string;
-		sql: string;
-		sha256: string;
-	}>;
+	export const d1Schema: string;
+	export const d1SchemaSha256: string;
 }

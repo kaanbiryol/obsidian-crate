@@ -28,7 +28,7 @@ export async function loadReminderWorkspace(
 	};
 }
 
-export function findReminderById(workspace: ReminderWorkspace, id: string): RemoteReminderRecord | undefined {
+function findReminderById(workspace: ReminderWorkspace, id: string): RemoteReminderRecord | undefined {
 	return workspace.reminders.find((reminder) => reminder.id === id);
 }
 

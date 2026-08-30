@@ -66,7 +66,6 @@ export class SyncEngine {
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
-	private pluginIgnorePaths: Set<string>;
 	private destroyed = false;
 	private abortController = new AbortController();
 	private consecutiveCheckFailures = 0;
@@ -84,12 +83,6 @@ export class SyncEngine {
 		this.localManifest = new LocalManifest(plugin.app, plugin.manifest);
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
 		this.ignoredDirPrefixes = this.getIgnoredDirPrefixes(settings);
-		const dir = plugin.manifest.dir ?? '';
-		this.pluginIgnorePaths = new Set([
-			`${dir}/data.json`,
-			`${dir}/file-manifest.json`,
-			`${dir}/reminders-settings.json`,
-		]);
 		this.api.setAbortSignal(this.abortController.signal);
 		this.state = {
 			status: 'idle',
@@ -178,7 +171,6 @@ export class SyncEngine {
 
 	private shouldIgnore(path: string): boolean {
 		return shouldIgnoreSyncPath(path, {
-			pluginIgnorePaths: this.pluginIgnorePaths,
 			ignoredDirPrefixes: this.ignoredDirPrefixes,
 			ignorePatterns: this.settings.ignorePatterns,
 			patternCache: this.patternCache,
@@ -186,10 +178,14 @@ export class SyncEngine {
 	}
 
 	private getIgnoredDirPrefixes(settings: CrateSettings): string[] {
-		return [
+		const configDir = this.vault.configDir.replace(/\/+$/, '');
+		const pluginDir = this.plugin.manifest.dir?.replace(/\/+$/, '');
+		return [...new Set([
+			`${configDir}/plugins/`,
+			...(pluginDir ? [`${pluginDir}/`] : []),
 			...settings.ignorePatterns.filter(p => p.endsWith('/')),
 			this.markdownBaseCache.getIgnoredPrefix(),
-		];
+		])];
 	}
 
 	private seedMarkdownBaseCacheInBackground(): void {
@@ -220,6 +216,7 @@ export class SyncEngine {
 	private getTransferContext() {
 		return {
 			vault: this.vault,
+			fileManager: this.plugin.app.fileManager,
 			api: this.api,
 			localManifest: this.localManifest,
 			markdownBaseCache: this.markdownBaseCache,
@@ -311,7 +308,6 @@ export class SyncEngine {
 			localManifest: this.localManifest,
 			shouldIgnore: this.shouldIgnore.bind(this),
 			runConcurrent: this.runConcurrent.bind(this),
-			getLocalDeletes: () => this.getLocalDeletes(),
 		};
 	}
 

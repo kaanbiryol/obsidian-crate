@@ -173,6 +173,7 @@ function createHarness(settingsOverrides: Partial<CrateSettings> = {}): Harness 
 	};
 
 	const vault = {
+		configDir: CONFIG_DIR,
 		adapter,
 		getAbstractFileByPath: vi.fn(),
 		delete: vi.fn(),

@@ -112,10 +112,10 @@ export function createMockR2Bucket(initialEntries: Record<string, string> = {}) 
 interface MockFileRecord {
 	hash: string;
 	size: number;
-	storageKey: string | null;
+	storageKey: string;
 }
 
-type MockFileInput = string | null | MockFileRecord;
+type MockFileInput = string | MockFileRecord;
 
 export function createMockD1Database(options?: { failBatch?: boolean; files?: Record<string, MockFileInput> }) {
 	const files = new Map<string, MockFileRecord>(
@@ -183,7 +183,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 						files.set(path, {
 							hash: getBoundString(statement._args, 1),
 							size: Number(statement._args[2]),
-							storageKey: getBoundString(statement._args, 3) || null,
+							storageKey: getBoundString(statement._args, 3),
 						});
 						changes = 1;
 					}
@@ -195,7 +195,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 						files.set(path, {
 							hash: getBoundString(statement._args, 0),
 							size: Number(statement._args[1]),
-							storageKey: getBoundString(statement._args, 2) || null,
+							storageKey: getBoundString(statement._args, 2),
 						});
 						changes = 1;
 					}

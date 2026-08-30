@@ -88,6 +88,16 @@ describe('runPeriodicCheckWorkflow', () => {
 		expect(harness.sync).toHaveBeenCalledTimes(1);
 	});
 
+	it('syncs when the remote changelog cursor expired even if no rows remain', async () => {
+		const harness = createContext({
+			checkForChanges: async () => ({ hasChanges: false, cursorExpired: true }),
+		});
+
+		await runPeriodicCheckWorkflow(harness.context);
+
+		expect(harness.sync).toHaveBeenCalledTimes(1);
+	});
+
 	it('skips checks within the backoff window after a failure', async () => {
 		const now = 1_800_000_000_000;
 		vi.spyOn(Date, 'now').mockReturnValue(now);

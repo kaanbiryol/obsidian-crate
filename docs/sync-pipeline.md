@@ -4,7 +4,7 @@
 
 ### 1. Periodic Check
 
-Every N seconds (configurable via `syncInterval`, default 300s), the engine calls `GET /sync/check?since=<lastSeq>`. If the server reports changes or local `pendingPaths` is non-empty, triggers an incremental sync.
+Every N seconds (configurable via `syncInterval`, default 300s), the engine calls `GET /sync/check?since=<lastSeq>`. If the server reports changes, reports an expired cursor, or local `pendingPaths` is non-empty, it triggers a sync. An expired cursor falls through to full reconciliation.
 
 Entry point: `engine.ts:periodicCheck()`
 
@@ -36,7 +36,7 @@ Triggered when incremental sync fails or `lastSeq` is 0:
 1. Discover all local vault files
 2. Fetch full remote manifest from `GET /sync/manifest`
 3. Compute hashes for local files (skip unchanged via manifest mtime/size)
-4. 3-way diff using `conflict.ts:detectConflicts()`
+4. 3-way diff using `reconciliation.ts:detectConflicts()`
 5. Execute uploads, downloads, conflicts, deletes
 
 Entry point: `engine.ts:sync()` -> `planner.ts:createFullSyncPlan()`
@@ -71,6 +71,15 @@ For each file, three states are compared:
 | Yes | Yes, same hash | Skip (converged) |
 | Yes | Yes, different hash | Conflict |
 
+Delete/edit races use an edit-wins rule:
+
+| Local state | Remote state | Action |
+|---|---|---|
+| Unchanged | Deleted | Delete local file |
+| Deleted | Unchanged | Delete remote file |
+| Edited | Deleted | Re-upload edited file and flag for review |
+| Deleted | Edited | Restore remote edit and flag for review |
+
 "Changed" = current hash differs from manifest hash at last sync.
 
 ## Conflict Resolution
@@ -82,7 +91,7 @@ When both sides changed with different content:
    ```
    filename (conflict YYYY-MM-DD HH-mm-ss xxxx).ext
    ```
-   Suffix includes timestamp (to seconds) + 4-char random hex.
+   Suffix includes timestamp (to seconds) + 4 random alphanumeric characters.
 
 Conflict files are auto-ignored by `isConflictFile()` to prevent sync loops.
 
@@ -98,6 +107,8 @@ Two-pass discovery in `file-discovery.ts:getAllVaultFiles()`:
    - Non-hidden folders are walked up to depth 5 (`MAX_NESTED_WALK_DEPTH`) looking for nested hidden subfolders
 3. **Deduplication:** via Set to avoid processing the same file twice
 4. **Early filtering:** ignore patterns applied during discovery, before hashing
+
+The active Obsidian configuration folder's entire `plugins/` tree is always excluded, including plugin JavaScript, manifests, styles, and data files.
 
 ## Constants
 

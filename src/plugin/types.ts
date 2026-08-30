@@ -65,9 +65,10 @@ export interface SyncHistoryEntry {
 
 export interface FileDiff {
 	path: string;
-	action: 'upload' | 'download' | 'delete' | 'conflict';
+	action: 'upload' | 'download' | 'delete' | 'delete-local' | 'conflict';
 	localHash?: string;
 	remoteHash?: string;
+	conflict?: boolean;
 }
 
 // ============================================================================

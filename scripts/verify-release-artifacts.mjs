@@ -49,7 +49,7 @@ for (const forbiddenMarker of [
 }
 assert(
 	pluginBundle.includes('CREATE TABLE IF NOT EXISTS auth_tokens'),
-	'Plugin bundle is missing the versioned D1 migration artifact',
+	'Plugin bundle is missing the initial D1 schema artifact',
 );
 assert(pluginBundle.includes('https://dash.cloudflare.com/oauth2/auth'), 'Plugin bundle is missing the Cloudflare OAuth entry point');
 assert(

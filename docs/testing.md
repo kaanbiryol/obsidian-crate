@@ -56,7 +56,7 @@ After the Pages site and a private or public Cloudflare OAuth client are configu
 3. Use a disposable Cloudflare test account with R2 already active. Open **Settings → Crate → Configuration → Connect with Cloudflare**.
 4. Confirm the consent screen shows the expected verified publisher and exactly Workers Scripts Write, D1 Write, Workers R2 Storage Write, and Memberships Read. Cloudflare may display the three write permissions using its legacy **Edit** label. Select exactly one account.
 5. Confirm the browser lands at `/oauth/callback/`, its address bar no longer contains OAuth parameters, and Obsidian opens. If automatic launch is blocked, select **Open Obsidian**.
-6. Confirm Crate creates one `crate-<16 hex>` Worker, D1 database, and R2 bucket, applies the migration, enables the workers.dev endpoint, and connects the current device.
+6. Confirm Crate creates one `crate-<16 hex>` Worker, D1 database, and R2 bucket, initializes the schema, enables the workers.dev endpoint, and connects the current device.
 7. Select **Disconnect this device**, connect with Cloudflare again, and confirm Crate reuses the same Worker instead of creating another deployment.
 8. Exercise initial sync with non-critical notes only.
 9. Select **Authorize update** and confirm the same Worker, D1 database, R2 bucket, and Durable Object namespaces are reused.

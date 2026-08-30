@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const VIRTUAL_ID = 'virtual:crate-cloudflare-artifacts';
@@ -22,20 +22,11 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
 			const packageJson = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf8'));
 			const workerBundle = readFileSync(resolve(rootDir, '.generated/cloudflare/worker.mjs'));
 			const workerBundleSha256 = sha256(workerBundle);
-			const migrationsDir = resolve(rootDir, 'migrations');
-			const migrations = readdirSync(migrationsDir)
-				.filter(name => name.endsWith('.sql'))
-				.sort()
-				.map(name => {
-					const sql = readFileSync(resolve(migrationsDir, name), 'utf8');
-					return { name, sql, sha256: sha256(sql) };
-				});
+			const d1Schema = readFileSync(resolve(rootDir, 'src/cloudflare/schema.sql'), 'utf8');
+			const d1SchemaSha256 = sha256(d1Schema);
 			const artifactFingerprint = sha256(JSON.stringify({
 				workerBundleSha256,
-				migrations: migrations.map(({ name, sha256: migrationSha256 }) => ({
-					name,
-					sha256: migrationSha256,
-				})),
+				d1SchemaSha256,
 			}));
 
 			return [
@@ -43,7 +34,8 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
 				`export const workerBundleGzipBase64 = ${JSON.stringify(gzipSync(workerBundle).toString('base64'))};`,
 				`export const workerBundleSha256 = ${JSON.stringify(workerBundleSha256)};`,
 				`export const artifactFingerprint = ${JSON.stringify(artifactFingerprint)};`,
-				`export const d1Migrations = ${JSON.stringify(migrations)};`,
+				`export const d1Schema = ${JSON.stringify(d1Schema)};`,
+				`export const d1SchemaSha256 = ${JSON.stringify(d1SchemaSha256)};`,
 			].join('\n');
 		},
 	};

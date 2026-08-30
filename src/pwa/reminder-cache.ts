@@ -1,7 +1,5 @@
 import type { CachedReminderSnapshot, ReminderRecord } from './types';
 
-export const REMINDERS_CACHE_KEY = 'crate-reminders-cache-v1';
-
 const CACHE_DATABASE_NAME = 'crate-reminders';
 const CACHE_DATABASE_VERSION = 1;
 const CACHE_STORE_NAME = 'snapshots';
@@ -74,33 +72,12 @@ async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise
 	}
 }
 
-function readLegacySnapshot(folderPath: string): CachedReminderSnapshot | null {
+export async function loadCachedReminderSnapshot(folderPath: string): Promise<CachedReminderSnapshot | null> {
 	try {
-		const raw = localStorage.getItem(REMINDERS_CACHE_KEY);
-		return raw ? normalizeSnapshot(JSON.parse(raw), folderPath) : null;
+		return await readIndexedDbSnapshot(folderPath);
 	} catch {
 		return null;
 	}
-}
-
-export async function loadCachedReminderSnapshot(folderPath: string): Promise<CachedReminderSnapshot | null> {
-	try {
-		const snapshot = await readIndexedDbSnapshot(folderPath);
-		if (snapshot) return snapshot;
-	} catch {
-		// Fall through to the legacy cache for browsers that block IndexedDB.
-	}
-
-	const legacySnapshot = readLegacySnapshot(folderPath);
-	if (!legacySnapshot) return null;
-
-	try {
-		await writeIndexedDbSnapshot(legacySnapshot);
-		localStorage.removeItem(REMINDERS_CACHE_KEY);
-	} catch {
-		// Keep the legacy value as a fallback when migration is unavailable.
-	}
-	return legacySnapshot;
 }
 
 export async function saveCachedReminderSnapshot(
@@ -113,26 +90,12 @@ export async function saveCachedReminderSnapshot(
 	const snapshot: CachedReminderSnapshot = { folderPath, reminders, projects, savedAt, etag };
 	try {
 		await writeIndexedDbSnapshot(snapshot);
-		localStorage.removeItem(REMINDERS_CACHE_KEY);
-		return;
-	} catch {
-		// IndexedDB can be unavailable in private or restricted browsing contexts.
-	}
-
-	try {
-		localStorage.setItem(REMINDERS_CACHE_KEY, JSON.stringify(snapshot));
 	} catch {
 		// Offline caching is best effort.
 	}
 }
 
 export async function clearCachedReminderSnapshots(): Promise<void> {
-	try {
-		localStorage.removeItem(REMINDERS_CACHE_KEY);
-	} catch {
-		// Storage may be unavailable in restricted contexts.
-	}
-
 	try {
 		const database = await openCacheDatabase();
 		try {

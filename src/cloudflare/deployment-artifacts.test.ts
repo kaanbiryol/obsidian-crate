@@ -8,24 +8,21 @@ async function gzipBase64(content: string): Promise<string> {
 }
 
 describe('embedded Cloudflare deployment artifacts', () => {
-	it('decompresses and verifies the build-time Worker and migrations', async () => {
+	it('decompresses and verifies the build-time Worker and initial schema', async () => {
 		const workerBundle = 'export default { fetch() { return new Response("ok"); } };';
-		const migrationSql = 'CREATE TABLE example (id TEXT PRIMARY KEY);';
+		const schemaSql = 'CREATE TABLE IF NOT EXISTS example (id TEXT PRIMARY KEY);';
 		const artifacts = await decodeAndVerifyArtifacts({
 			version: '0.1.0',
 			fingerprint: 'f'.repeat(64),
 			workerBundleGzipBase64: await gzipBase64(workerBundle),
 			workerBundleSha256: await sha256Hex(workerBundle),
-			d1Migrations: [{
-				name: '0001.sql',
-				sql: migrationSql,
-				sha256: await sha256Hex(migrationSql),
-			}],
+			d1Schema: schemaSql,
+			d1SchemaSha256: await sha256Hex(schemaSql),
 		});
 
 		expect(artifacts.workerBundle).toBe(workerBundle);
 		expect(artifacts.fingerprint).toBe('f'.repeat(64));
-		expect(artifacts.d1Migrations[0]?.sql).toBe(migrationSql);
+		expect(artifacts.d1Schema).toBe(schemaSql);
 	});
 
 	it('rejects an artifact whose declared hash does not match', async () => {
@@ -34,7 +31,8 @@ describe('embedded Cloudflare deployment artifacts', () => {
 			fingerprint: 'f'.repeat(64),
 			workerBundleGzipBase64: await gzipBase64('worker-code'),
 			workerBundleSha256: '0'.repeat(64),
-			d1Migrations: [],
+			d1Schema: '',
+			d1SchemaSha256: await sha256Hex(''),
 		})).rejects.toThrow('integrity check');
 	});
 });

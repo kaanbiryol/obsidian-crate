@@ -3,8 +3,6 @@ import { CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import { randomHex } from './pkce';
 
-const MIGRATIONS_TABLE = '_crate_migrations';
-
 async function ensureD1Database(
 	api: CloudflareApiClient,
 	accountId: string,
@@ -40,7 +38,7 @@ async function ensureR2Bucket(
 	}
 }
 
-async function applyD1Migrations(input: {
+async function initializeD1Schema(input: {
 	api: CloudflareApiClient;
 	accountId: string;
 	databaseId: string;
@@ -49,30 +47,8 @@ async function applyD1Migrations(input: {
 	await input.api.queryD1(
 		input.accountId,
 		input.databaseId,
-		`CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (name TEXT PRIMARY KEY, sha256 TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT (datetime('now')));`,
+		input.artifacts.d1Schema,
 	);
-	const appliedResult = await input.api.queryD1(
-		input.accountId,
-		input.databaseId,
-		`SELECT name, sha256 FROM ${MIGRATIONS_TABLE};`,
-	);
-	const appliedRows = appliedResult.flatMap(result => result.results ?? []);
-	const applied = new Map(appliedRows.map(row => [String(row.name), String(row.sha256)]));
-
-	for (const migration of input.artifacts.d1Migrations) {
-		const previousHash = applied.get(migration.name);
-		if (previousHash === migration.sha256) continue;
-		if (previousHash) {
-			throw new Error(`D1 migration ${migration.name} changed after it was applied`);
-		}
-		await input.api.queryD1(input.accountId, input.databaseId, migration.sql);
-		await input.api.queryD1(
-			input.accountId,
-			input.databaseId,
-			`INSERT INTO ${MIGRATIONS_TABLE} (name, sha256) VALUES (?, ?);`,
-			[migration.name, migration.sha256],
-		);
-	}
 }
 
 async function ensureWorkersSubdomain(
@@ -114,7 +90,7 @@ export async function provisionCloudflareDeployment(input: {
 	}
 
 	await ensureR2Bucket(input.api, input.accountId, input.metadata.r2BucketName);
-	await applyD1Migrations({
+	await initializeD1Schema({
 		api: input.api,
 		accountId: input.accountId,
 		databaseId,

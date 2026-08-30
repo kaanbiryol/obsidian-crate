@@ -4,14 +4,13 @@ import { isSha256Hex, parseJsonObject, parseOptionalString, sanitizePath } from 
 import { commitFileDelete, commitStagedFile } from './sync-mutations';
 import {
 	createManagedObjectKey,
-	deleteBucketObjectsQuietly,
+	deleteBucketObjectsOrQueue,
 	formatMetadataCommitFailure,
 	formatMutationError,
 	getStoredFileRow,
 	MAX_FILE_BYTES,
 	parseExpectedFileHash,
 	parseDeclaredSize,
-	resolveStoredObjectKey,
 	storedObjectMatchesMetadata,
 	type FileStorageRow,
 } from './sync-storage';
@@ -101,7 +100,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 				}, 409);
 			}
 		} catch (error: unknown) {
-			await deleteBucketObjectsQuietly(bucket, [objectKey]);
+			await deleteBucketObjectsOrQueue(bucket, db, [objectKey]);
 			return corsResponse({
 				success: false,
 				path: safePath,
@@ -131,7 +130,7 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 		return corsResponse({ error: 'Sync metadata unavailable' }, 503);
 	}
 
-	const objectKey = storedFile ? resolveStoredObjectKey(path, storedFile.storageKey) : null;
+	const objectKey = storedFile?.storageKey ?? null;
 	if (!objectKey) return corsResponse({ error: 'File not found' }, 404);
 	if (storedFile && storedFile.size > MAX_FILE_BYTES) {
 		return corsResponse({ error: 'File exceeds 25MB download limit' }, 413);

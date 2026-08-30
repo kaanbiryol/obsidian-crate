@@ -104,5 +104,3 @@ export function parseNonNegativeInteger(value: unknown): number | null {
 export function isSha256Hex(value: string): boolean {
 	return SHA256_HEX_REGEX.test(value);
 }
-
-export const FILES_PREFIX = 'files/';

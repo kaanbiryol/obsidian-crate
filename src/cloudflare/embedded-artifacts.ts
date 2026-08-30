@@ -1,7 +1,8 @@
 import {
 	artifactFingerprint,
 	artifactVersion,
-	d1Migrations,
+	d1Schema,
+	d1SchemaSha256,
 	workerBundleGzipBase64,
 	workerBundleSha256,
 } from 'virtual:crate-cloudflare-artifacts';
@@ -20,7 +21,8 @@ export function loadEmbeddedCloudflareArtifacts(): Promise<CloudflareDeploymentA
 		fingerprint: artifactFingerprint,
 		workerBundleGzipBase64,
 		workerBundleSha256,
-		d1Migrations,
+		d1Schema,
+		d1SchemaSha256,
 	});
 	return decodedArtifacts;
 }

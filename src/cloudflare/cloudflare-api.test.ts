@@ -7,7 +7,8 @@ const artifacts = {
 	fingerprint: 'f'.repeat(64),
 	workerBundle: 'export class ReminderAlarm {}',
 	workerBundleSha256: 'worker-hash',
-	d1Migrations: [],
+	d1Schema: 'CREATE TABLE IF NOT EXISTS example (id TEXT);',
+	d1SchemaSha256: 'schema-hash',
 };
 
 describe('CloudflareApiClient', () => {
@@ -24,7 +25,7 @@ describe('CloudflareApiClient', () => {
 		expect(body).toContain('"type":"r2_bucket","name":"BUCKET"');
 		expect(body).toContain('"name":"REMINDER_ALARMS","class_name":"ReminderAlarm"');
 		expect(body).not.toContain('"name":"SETUP"');
-		expect(body).toContain('"SetupCoordinator":{"type":"durable-object","state":"deleted"}');
+		expect(body).not.toContain('SetupCoordinator');
 		expect(body).toContain('"storage":"sqlite","state":"created"');
 		expect(body).toContain('"workers/tag":"crate"');
 		expect(body).toContain(`"workers/message":"Crate 0.1.0 ${'f'.repeat(64)}"`);

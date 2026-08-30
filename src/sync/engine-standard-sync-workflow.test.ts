@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FileDiff, FileEntry } from '../plugin/types';
+import type { FileDiff, FileEntry, SyncResult } from '../plugin/types';
 import { runSyncWorkflow, type SyncWorkflowContext } from './engine-standard-sync-workflow';
 
 function createContext(options: {
@@ -100,5 +100,41 @@ describe('runSyncWorkflow', () => {
 		expect(spies.setLocalManifestEntry).toHaveBeenCalledWith('notes/a.md', localFiles['notes/a.md']);
 		expect(spies.setLastSync).toHaveBeenCalledWith(expect.any(String));
 		expect(spies.setLastSeq).toHaveBeenCalledWith(9);
+	});
+
+	it('records an edit/delete conflict after the remote edit is restored', async () => {
+		const { context } = createContext();
+		const path = 'notes/restored.md';
+		const remoteContent = new TextEncoder().encode('remote edit').buffer as ArrayBuffer;
+		const downloadDiff: FileDiff = {
+			path,
+			action: 'download',
+			remoteHash: 'remote-hash',
+			conflict: true,
+		};
+		context.getManifest = vi.fn(async () => ({
+			files: {
+				[path]: { hash: 'remote-hash', size: remoteContent.byteLength, modified: 'now' },
+			},
+			lastSeq: 9,
+		}));
+		context.createFullSyncPlan = vi.fn(async () => ({
+			localFiles: {},
+			diffs: [downloadDiff],
+			uploadDiffs: [],
+			downloadDiffs: [downloadDiff],
+			remainingDiffs: [],
+			errors: [],
+		}));
+		context.parallelDownloadAndSaveFiles = vi.fn(async (_requests: unknown, result: SyncResult) => {
+			result.downloaded++;
+			result.downloadedPaths.push(path);
+		});
+		context.readBinary = vi.fn(async () => remoteContent);
+
+		const result = await runSyncWorkflow(context);
+
+		expect(result.conflicts).toContain(path);
+		expect(result.downloadedPaths).toContain(path);
 	});
 });

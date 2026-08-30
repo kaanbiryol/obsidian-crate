@@ -1,4 +1,4 @@
-import type { Vault } from "obsidian";
+import type { TAbstractFile, Vault } from "obsidian";
 import type {
   BatchDownloadResponse,
   BatchUploadFile,
@@ -36,6 +36,9 @@ interface TransferApi {
 
 export interface TransferContext {
   vault: Vault;
+  fileManager?: {
+    trashFile(file: TAbstractFile): Promise<void>;
+  };
   api: TransferApi;
   localManifest: TransferManifest;
   markdownBaseCache?: TransferMarkdownBaseCache;

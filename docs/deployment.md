@@ -49,7 +49,7 @@ Select only these four scopes in the dashboard:
 | Cloudflare scope label | OAuth scope ID | Why Crate needs it |
 |---|---|---|
 | Workers Scripts Write (shown as **Workers Scripts Edit** in some dashboard accounts) | `workers-scripts.write` | Upload the Worker module, declare Durable Object bindings, configure the account workers.dev subdomain, and enable the script endpoint |
-| D1 Write (may be shown as **D1 Edit**) | `d1.write` | Find/create the D1 database and run versioned migrations |
+| D1 Write (may be shown as **D1 Edit**) | `d1.write` | Find/create the D1 database and initialize its schema |
 | Workers R2 Storage Write (may be shown as **Workers R2 Storage Edit**) | `workers-r2.write` | Find/create the R2 bucket |
 | Memberships Read | `memberships.read` | Call `GET /memberships` to discover the account ID selected during consent |
 
@@ -96,11 +96,11 @@ Official references:
 4. In Cloudflare, select exactly one account, review the four permissions, and authorize Crate.
 5. Cloudflare returns to the static callback page. It removes the OAuth query from the browser URL immediately and opens `obsidian://crate-cloudflare-oauth`.
 6. Crate verifies the random OAuth state before exchanging the code with its in-memory PKCE verifier.
-7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, workers.dev endpoint, and versioned D1 migrations when none exists. Migrations finish before the Worker bundle is uploaded, keeping schema work out of request cold starts.
+7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, and workers.dev endpoint when none exists. The idempotent initial D1 schema is applied before the Worker bundle is uploaded, keeping schema work out of request cold starts.
 8. Crate registers this device's hashed credential through the Cloudflare D1 API, then revokes and discards the access token.
 9. In Crate, run **Initial sync → Upload all** when ready.
 
-If the Cloudflare API returns R2 error `10042`, Crate tells the user to activate the R2 subscription and try again. Resource names and Cloudflare IDs are saved without credentials, so retries converge on the same deployment. When the installed plugin contains different Worker, web app, or migration artifacts, **Authorize update** appears and reuses those same Worker, D1, R2, and Durable Object resources. It is hidden when the server already has the exact embedded artifact or was deployed by a newer plugin version.
+If the Cloudflare API returns R2 error `10042`, Crate tells the user to activate the R2 subscription and try again. Resource names and Cloudflare IDs are saved without credentials, so retries converge on the same deployment. When the installed plugin contains different Worker, web app, or schema artifacts, **Authorize update** appears and reuses those same Worker, D1, R2, and Durable Object resources. It is hidden when the server already has the exact embedded artifact or was deployed by a newer plugin version.
 
 Cloudflare account access is the source of truth for vault devices. The plugin never exposes a Worker claim page or a vault-device setup link. A device credential can be created or rotated only during a successful Cloudflare OAuth session.
 

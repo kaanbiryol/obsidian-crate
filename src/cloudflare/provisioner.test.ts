@@ -23,21 +23,18 @@ const artifacts = {
 	fingerprint: 'f'.repeat(64),
 	workerBundle: 'export default {};',
 	workerBundleSha256: 'worker-hash',
-	d1Migrations: [{ name: '0001.sql', sql: 'CREATE TABLE example (id TEXT);', sha256: 'migration-hash' }],
+	d1Schema: 'CREATE TABLE IF NOT EXISTS example (id TEXT);',
+	d1SchemaSha256: 'schema-hash',
 };
 
 function createApi() {
-	let queryCount = 0;
 	return {
 		getD1Database: vi.fn(async (_accountId: string, databaseId: string) => ({ uuid: databaseId })),
 		findD1Database: vi.fn(),
 		createD1Database: vi.fn(),
 		getR2Bucket: vi.fn(async () => ({ name: 'crate-0123456789abcdef' })),
 		createR2Bucket: vi.fn(),
-		queryD1: vi.fn(async () => {
-			queryCount += 1;
-			return queryCount === 2 ? [{ results: [] }] : [];
-		}),
+		queryD1: vi.fn(async () => []),
 		uploadWorker: vi.fn(async () => {}),
 		getWorkersSubdomain: vi.fn(async () => 'personal-crate'),
 		createWorkersSubdomain: vi.fn(),
@@ -46,7 +43,7 @@ function createApi() {
 }
 
 describe('provisionCloudflareDeployment', () => {
-	it('reuses persisted resources and applies each versioned migration once', async () => {
+	it('reuses persisted resources and initializes the idempotent schema before upload', async () => {
 		const api = createApi();
 		const metadata = createMetadata();
 		const onMetadataChanged = vi.fn(async () => {});
@@ -62,7 +59,12 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.createD1Database).not.toHaveBeenCalled();
 		expect(api.createR2Bucket).not.toHaveBeenCalled();
 		expect(api.createWorkersSubdomain).not.toHaveBeenCalled();
-		expect(api.queryD1).toHaveBeenCalledTimes(4);
+		expect(api.queryD1).toHaveBeenCalledOnce();
+		expect(api.queryD1).toHaveBeenCalledWith(
+			metadata.accountId,
+			metadata.d1DatabaseId,
+			artifacts.d1Schema,
+		);
 		expect(api.uploadWorker).toHaveBeenCalledWith(expect.objectContaining({
 			workerName: metadata.workerName,
 			d1DatabaseId: metadata.d1DatabaseId,

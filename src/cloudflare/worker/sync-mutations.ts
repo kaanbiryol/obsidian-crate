@@ -1,7 +1,7 @@
 import { changedRows, maybePruneChangelog } from './db';
 import {
 	collectCleanupKeys,
-	deleteBucketObjectsQuietly,
+	deleteBucketObjectsOrQueue,
 	getStoredFileRow,
 	type ExpectedFileHash,
 	type FileStorageRow,
@@ -46,6 +46,7 @@ export async function commitStagedFile(
 		previousFile: FileStorageRow | null;
 	},
 ): Promise<CommitResult> {
+	const cleanupKeys = collectCleanupKeys(params.previousFile, params.objectKey);
 	const mutation = uploadMutation(
 		db,
 		params.path,
@@ -61,11 +62,15 @@ export async function commitStagedFile(
 			WHERE EXISTS (
 				SELECT 1 FROM files WHERE path = ? AND storage_key = ?
 			)`).bind(params.path, params.hash, params.size, params.path, params.objectKey),
+		...cleanupKeys.map((key) => db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key)
+			SELECT ? WHERE EXISTS (
+				SELECT 1 FROM files WHERE path = ? AND storage_key = ?
+			)`).bind(key, params.path, params.objectKey)),
 	]);
 
 	if (changedRows(results[0]) !== 1) {
 		const current = await getStoredFileRow(db, params.path);
-		await deleteBucketObjectsQuietly(bucket, [params.objectKey]);
+		await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
 		if (current?.hash === params.hash) {
 			return { committed: true, currentHash: current.hash, idempotent: true };
 		}
@@ -73,9 +78,10 @@ export async function commitStagedFile(
 	}
 
 	await maybePruneChangelog(db);
-	await deleteBucketObjectsQuietly(
+	await deleteBucketObjectsOrQueue(
 		bucket,
-		collectCleanupKeys(params.path, params.previousFile, params.objectKey),
+		db,
+		cleanupKeys,
 	);
 	return { committed: true, currentHash: params.hash };
 }
@@ -89,6 +95,7 @@ export async function commitFileDelete(
 		previousFile: FileStorageRow | null;
 	},
 ): Promise<CommitResult> {
+	const cleanupKeys = collectCleanupKeys(params.previousFile);
 	const expectedPredicate = params.expectedHash === null
 			? 'path = ? AND 0'
 			: 'path = ? AND hash = ?';
@@ -100,17 +107,21 @@ export async function commitFileDelete(
 			SELECT path, 'delete', '', 0 FROM files WHERE ${expectedPredicate}`)
 			.bind(...predicateArgs),
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
+		...cleanupKeys.map((key) => db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key)
+			SELECT ? WHERE NOT EXISTS (SELECT 1 FROM files WHERE path = ?)`)
+			.bind(key, params.path)),
 	]);
 
 	if (changedRows(results[1]) !== 1) {
 		const current = await getStoredFileRow(db, params.path);
 		if (!current) {
+			await deleteBucketObjectsOrQueue(bucket, db, cleanupKeys);
 			return { committed: true, currentHash: null, idempotent: true };
 		}
 		return { committed: false, currentHash: current.hash };
 	}
 
 	await maybePruneChangelog(db);
-	await deleteBucketObjectsQuietly(bucket, collectCleanupKeys(params.path, params.previousFile));
+	await deleteBucketObjectsOrQueue(bucket, db, cleanupKeys);
 	return { committed: true, currentHash: null };
 }

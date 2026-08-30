@@ -24,7 +24,7 @@ const embedded = {
 };
 
 describe('isCloudflareServerUpdateAvailable', () => {
-	it('detects changed Worker, PWA, or migration artifacts within the same plugin version', () => {
+	it('detects changed Worker, PWA, or schema artifacts within the same plugin version', () => {
 		expect(isCloudflareServerUpdateAvailable(createDeployment(), embedded)).toBe(true);
 	});
 

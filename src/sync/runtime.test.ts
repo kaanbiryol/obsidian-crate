@@ -89,6 +89,7 @@ function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 	const plugin = {
 		app: {
 			vault: {
+				configDir: CONFIG_DIR,
 				adapter: {
 					exists: vi.fn().mockResolvedValue(false),
 					read: vi.fn(),

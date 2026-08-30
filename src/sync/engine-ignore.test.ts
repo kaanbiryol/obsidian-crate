@@ -3,12 +3,10 @@ import { matchIgnorePattern, shouldIgnoreSyncPath } from './engine-ignore';
 
 function createIgnoreContext(ignorePatterns: string[] = []) {
 	return {
-		pluginIgnorePaths: new Set([
-			'.vault-config/plugins/crate/data.json',
-			'.vault-config/plugins/crate/file-manifest.json',
-			'.vault-config/plugins/crate/reminders-settings.json',
-		]),
-		ignoredDirPrefixes: ignorePatterns.filter(pattern => pattern.endsWith('/')),
+		ignoredDirPrefixes: [
+			'.vault-config/plugins/',
+			...ignorePatterns.filter(pattern => pattern.endsWith('/')),
+		],
 		ignorePatterns,
 		patternCache: new Map<string, RegExp>(),
 	};
@@ -41,13 +39,14 @@ describe('matchIgnorePattern', () => {
 });
 
 describe('shouldIgnoreSyncPath', () => {
-	it('ignores plugin state files but not other plugin files', () => {
+	it('always ignores executable plugin directories', () => {
 		const context = createIgnoreContext();
 
 		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/data.json', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/file-manifest.json', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/reminders-settings.json', context)).toBe(true);
-		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/main.js', context)).toBe(false);
+		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/main.js', context)).toBe(true);
+		expect(shouldIgnoreSyncPath('.vault-config/plugins/other-plugin/manifest.json', context)).toBe(true);
 	});
 
 	it('ignores conflict files and configured filename patterns', () => {

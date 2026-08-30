@@ -271,15 +271,16 @@ describe('worker sync handlers', () => {
 	});
 
 	it('returns success when delete cleanup fails after the D1 commit', async () => {
+		const managedKey = '__crate__/files/hash/object-to-delete';
 		const { bucket, store } = createMockR2Bucket({
-			'files/notes/test.md': 'before',
+			[managedKey]: 'before',
 		});
 		bucket.delete = vi.fn(async () => {
 			throw new Error('cleanup unavailable');
 		});
 		const { db, files } = createMockD1Database({
 			files: {
-					'notes/test.md': { hash: 'a'.repeat(64), size: 6, storageKey: null },
+				'notes/test.md': { hash: 'a'.repeat(64), size: 6, storageKey: managedKey },
 			},
 		});
 
@@ -299,7 +300,7 @@ describe('worker sync handlers', () => {
 			path: 'notes/test.md',
 		});
 		expect(files.has('notes/test.md')).toBe(false);
-		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
+		expect(new TextDecoder().decode(store.get(managedKey)?.body)).toBe('before');
 	});
 
 	it('leaves batch uploads uncommitted when the D1 metadata write fails', async () => {
@@ -396,13 +397,14 @@ describe('worker sync handlers', () => {
 		expect(bucket.get).toHaveBeenCalledWith(managedKey);
 	});
 
-	it('batch downloads legacy path-backed files when migrated rows have no storage key yet', async () => {
+	it('batch downloads committed files through their D1 storage keys', async () => {
+		const managedKey = '__crate__/files/hash/batch-object';
 		const { bucket } = createMockR2Bucket({
-			'files/notes/test.md': 'hello',
+			[managedKey]: 'hello',
 		});
 		const { db } = createMockD1Database({
 			files: {
-				'notes/test.md': null,
+				'notes/test.md': managedKey,
 			},
 		});
 
@@ -430,7 +432,7 @@ describe('worker sync handlers', () => {
 				},
 			],
 		});
-		expect(bucket.get).toHaveBeenCalledWith('files/notes/test.md');
+		expect(bucket.get).toHaveBeenCalledWith(managedKey);
 	});
 
 	it('validates shared settings writes and treats corrupt stored settings as absent', async () => {

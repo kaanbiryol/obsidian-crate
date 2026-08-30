@@ -8,8 +8,7 @@
 		{
 			"binding": "DB",
 			"database_name": "crate-sync",
-			"database_id": "00000000-0000-0000-0000-000000000000",
-			"migrations_dir": "migrations"
+			"database_id": "00000000-0000-0000-0000-000000000000"
 		}
 	],
 	"r2_buckets": [
@@ -26,18 +25,10 @@
 			}
 		]
 	},
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": ["ReminderAlarm"]
-		},
-		{
-			"tag": "v2",
-			"new_sqlite_classes": ["SetupCoordinator"]
-		},
-		{
-			"tag": "v3",
-			"deleted_classes": ["SetupCoordinator"]
+	"exports": {
+		"ReminderAlarm": {
+			"type": "durable-object",
+			"storage": "sqlite"
 		}
-	]
+	}
 }

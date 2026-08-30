@@ -1,6 +1,6 @@
 import type { TAbstractFile, TFile } from "obsidian";
 import { isHiddenPath } from "./file-discovery";
-import type { IncrementalSyncPlannerContext } from "./planner-types";
+import type { Vault } from "obsidian";
 
 export function isVaultTFileLike(file: TAbstractFile | null): file is TFile {
   return typeof file === "object"
@@ -12,8 +12,11 @@ export function isVaultTFileLike(file: TAbstractFile | null): file is TFile {
     && file.stat !== null;
 }
 
-export async function deleteRemotePathLocally(
-  context: IncrementalSyncPlannerContext,
+export async function deletePathLocally(
+	context: {
+		vault: Vault;
+		fileManager?: { trashFile(file: TAbstractFile): Promise<void> };
+	},
   path: string,
 ): Promise<boolean> {
   if (isHiddenPath(path)) {

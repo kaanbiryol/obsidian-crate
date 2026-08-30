@@ -130,6 +130,58 @@ describe('detectConflicts (3-way hash)', () => {
 			remoteHash: 'xyz',
 		});
 	});
+
+	it('deletes an unchanged local file when the remote side deleted it', () => {
+		const base = entry('base', '2026-02-06T10:00:00.000Z');
+		const diffs = detectConflicts({ 'note.md': base }, {}, { 'note.md': base });
+
+		expect(diffs).toEqual([{
+			path: 'note.md',
+			action: 'delete-local',
+			localHash: 'base',
+		}]);
+	});
+
+	it('re-uploads an edited local file after a concurrent remote delete', () => {
+		const diffs = detectConflicts(
+			{ 'note.md': entry('local-edit', '2026-02-06T12:00:00.000Z') },
+			{},
+			{ 'note.md': entry('base', '2026-02-06T10:00:00.000Z') },
+		);
+
+		expect(diffs).toEqual([{
+			path: 'note.md',
+			action: 'upload',
+			localHash: 'local-edit',
+			conflict: true,
+		}]);
+	});
+
+	it('deletes an unchanged remote file when the local side deleted it', () => {
+		const base = entry('base', '2026-02-06T10:00:00.000Z');
+		const diffs = detectConflicts({}, { 'note.md': base }, { 'note.md': base });
+
+		expect(diffs).toEqual([{
+			path: 'note.md',
+			action: 'delete',
+			remoteHash: 'base',
+		}]);
+	});
+
+	it('restores a remotely edited file after a concurrent local delete', () => {
+		const diffs = detectConflicts(
+			{},
+			{ 'note.md': entry('remote-edit', '2026-02-06T12:00:00.000Z') },
+			{ 'note.md': entry('base', '2026-02-06T10:00:00.000Z') },
+		);
+
+		expect(diffs).toEqual([{
+			path: 'note.md',
+			action: 'download',
+			remoteHash: 'remote-edit',
+			conflict: true,
+		}]);
+	});
 });
 
 describe('conflict naming helpers', () => {

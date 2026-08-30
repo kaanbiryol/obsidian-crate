@@ -139,6 +139,13 @@ export async function runSyncWorkflow(
 				result,
 			);
 			for (const diff of downloadDiffs) {
+				if (
+					diff.conflict
+					&& result.downloadedPaths.includes(diff.path)
+					&& !result.conflicts.includes(diff.path)
+				) {
+					result.conflicts.push(diff.path);
+				}
 				try {
 					const content = await context.readBinary(diff.path);
 					const hash = await computeHash(content);

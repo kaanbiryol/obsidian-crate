@@ -4,8 +4,9 @@
 
 import { Notice, type Vault } from 'obsidian';
 import { createLogger } from '../plugin/logger';
-import type { FileEntry, FileDiff } from '../plugin/types';
 import { isHiddenPath } from './file-discovery';
+
+export { detectConflicts } from './reconciliation';
 
 const logger = createLogger('Conflict');
 
@@ -32,64 +33,6 @@ export function getConflictFileName(originalPath: string): string {
 	const name = originalPath.substring(0, lastDot);
 	const ext = originalPath.substring(lastDot);
 	return `${name} (${tag})${ext}`;
-}
-
-/**
- * Detect conflicts between local and remote manifests using 3-way hash comparison.
- * The manifestEntries parameter provides the common ancestor (last known synced state)
- * to determine which side changed, avoiding timestamp-based decisions that break under clock skew.
- */
-export function detectConflicts(
-	localFiles: Record<string, FileEntry>,
-	remoteFiles: Record<string, FileEntry>,
-	manifestEntries: Record<string, FileEntry>,
-): FileDiff[] {
-	const diffs: FileDiff[] = [];
-	const allPaths = new Set([
-		...Object.keys(localFiles),
-		...Object.keys(remoteFiles),
-	]);
-
-	for (const path of allPaths) {
-		const local = localFiles[path];
-		const remote = remoteFiles[path];
-
-		if (local && remote) {
-			if (local.hash === remote.hash) continue; // in sync
-
-			const manifestHash = manifestEntries[path]?.hash;
-
-			if (!manifestHash) {
-				// New file on both sides with different content → conflict
-				diffs.push({ path, action: 'conflict', localHash: local.hash, remoteHash: remote.hash });
-			} else if (local.hash !== manifestHash && remote.hash !== manifestHash) {
-				// Both sides changed since last sync → conflict
-				diffs.push({ path, action: 'conflict', localHash: local.hash, remoteHash: remote.hash });
-			} else if (local.hash !== manifestHash) {
-				// Only local changed → upload
-				diffs.push({ path, action: 'upload', localHash: local.hash, remoteHash: remote.hash });
-			} else {
-				// Only remote changed (or local unchanged) → download
-				diffs.push({ path, action: 'download', localHash: local.hash, remoteHash: remote.hash });
-			}
-		} else if (local && !remote) {
-			// Local only - needs upload (new file)
-			diffs.push({
-				path,
-				action: 'upload',
-				localHash: local.hash,
-			});
-		} else if (!local && remote) {
-			// Remote only - needs download (new file from another device)
-			diffs.push({
-				path,
-				action: 'download',
-				remoteHash: remote.hash,
-			});
-		}
-	}
-
-	return diffs;
 }
 
 /**
@@ -147,8 +90,8 @@ export function notifyConflicts(conflictPaths: string[]): void {
 	if (conflictPaths.length === 0) return;
 
 	const message = conflictPaths.length === 1
-		? `Sync conflict: ${conflictPaths[0]}\nLocal version saved as conflict copy.`
-		: `${conflictPaths.length} sync conflicts detected.\nSearch your vault for "conflict" to find the copies.`;
+		? `Sync conflict: ${conflictPaths[0]}\nReview the affected file; a local version may have been saved as a conflict copy.`
+		: `${conflictPaths.length} sync conflicts detected.\nReview the affected files and any conflict copies.`;
 
 	new Notice(message, 0);
 }

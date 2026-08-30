@@ -64,7 +64,6 @@ export interface FullSyncPlannerContext {
   localManifest: PlannerManifest;
   shouldIgnore(path: string): boolean;
   runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
-  getLocalDeletes(): Promise<string[]>;
 }
 
 export interface FullSyncPlan {

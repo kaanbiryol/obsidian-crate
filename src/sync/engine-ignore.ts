@@ -4,7 +4,6 @@ import { createLogger, errorMessage } from '../plugin/logger';
 const logger = createLogger('SyncEngine');
 
 export interface IgnoreMatcherContext {
-	pluginIgnorePaths: Set<string>;
 	ignoredDirPrefixes: string[];
 	ignorePatterns: string[];
 	patternCache: Map<string, RegExp>;
@@ -47,10 +46,6 @@ export function shouldIgnoreSyncPath(
 	path: string,
 	context: IgnoreMatcherContext
 ): boolean {
-	if (context.pluginIgnorePaths.has(path)) {
-		return true;
-	}
-
 	if (isConflictFile(path)) {
 		return true;
 	}

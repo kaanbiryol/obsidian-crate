@@ -4,7 +4,6 @@ import {
 	loadStoredFileRows,
 	MAX_BATCH_DOWNLOAD_BYTES,
 	MAX_BATCH_FILES,
-	resolveStoredObjectKey,
 	storedObjectMatchesMetadata,
 	type FileStorageRow,
 } from '../sync-storage';
@@ -60,9 +59,7 @@ export async function handleBatchDownload(
 
 		try {
 			const storedFile = storedFiles.get(safePath) ?? null;
-			const objectKey = storedFile
-				? resolveStoredObjectKey(safePath, storedFile.storageKey)
-				: null;
+			const objectKey = storedFile?.storageKey ?? null;
 			if (!objectKey) {
 				files.push({ path: safePath, content: '', hash: '', size: 0, contentType: '', error: 'File not found' });
 				continue;

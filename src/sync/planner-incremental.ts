@@ -1,14 +1,13 @@
-import { createConflictCopy } from "./conflict";
 import { computeHash } from "./hasher";
 import { isHiddenPath } from "./file-discovery";
-import { deleteRemotePathLocally, isVaultTFileLike } from "./planner-helpers";
+import { deletePathLocally, isVaultTFileLike } from "./planner-helpers";
 import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
 import { createEmptySyncResult, finalizeSyncResult } from "./sync-result";
 import { createLogger, errorMessage } from "../plugin/logger";
 import type { ChangelogEntry, FileDiff, FileEntry, PreparedUpload, SyncResult } from "../plugin/types";
 import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
-import { validateDownloadedContent, type DownloadRequest } from './transfer-download';
+import type { DownloadRequest } from './transfer-download';
 
 const logger = createLogger("SyncPlanner");
 
@@ -72,6 +71,8 @@ export async function runIncrementalSync(
     const localChangedPaths = new Set(localChanges.map((file) => file.path));
     const localDeletedPaths = new Set(localDeletes);
     const resurrectPaths = new Set<string>();
+    const restoreDeletedPaths = new Set<string>();
+    const remoteUnchangedLocalDeletes = new Set<string>();
     const reclassifiedPaths = new Set<string>();
 	const downloadRequests: DownloadRequest[] = [];
     const conflicts: FileDiff[] = [];
@@ -85,11 +86,10 @@ export async function runIncrementalSync(
         if (entry.action === "delete") {
           if (localChangedPaths.has(path)) {
             resurrectPaths.add(path);
-            result.conflicts.push(path);
             continue;
           }
 
-          const deletedLocally = await deleteRemotePathLocally(context, path);
+          const deletedLocally = await deletePathLocally(context, path);
           context.localManifest.removeEntry(path);
           if (deletedLocally) {
             result.deleted++;
@@ -104,10 +104,19 @@ export async function runIncrementalSync(
         }
 
         if (localDeletedPaths.has(path)) {
-          const response = await context.api.downloadFile(path);
-		  await validateDownloadedContent(path, response.content, response.size, response.hash, entry.hash);
-          const conflictPath = await createConflictCopy(context.vault, path, response.content);
-          result.conflicts.push(conflictPath);
+		  const manifestEntry = context.localManifest.getEntry(path);
+		  if (manifestEntry && entry.hash === manifestEntry.hash) {
+			remoteUnchangedLocalDeletes.add(path);
+			continue;
+		  }
+
+		  restoreDeletedPaths.add(path);
+		  downloadRequests.push({
+			path,
+			expectedLocalHash: null,
+			expectedRemoteHash: entry.hash,
+			remoteSize: entry.size,
+		  });
           continue;
         }
 
@@ -160,13 +169,19 @@ export async function runIncrementalSync(
         && !context.shouldIgnore(file.path),
     );
     const localOnlyDeletes = localDeletes.filter(
-      (path) => !changesByPath.has(path) && !context.shouldIgnore(path),
+      (path) => (!changesByPath.has(path) || remoteUnchangedLocalDeletes.has(path))
+		&& !context.shouldIgnore(path),
     );
     const total = changesByPath.size + localOnlyChanges.length + localOnlyDeletes.length;
     let current = 0;
 
     if (downloadRequests.length > 0) {
 	  await context.parallelDownloadAndSaveFiles(downloadRequests, result);
+	  for (const path of restoreDeletedPaths) {
+		if (result.downloadedPaths.includes(path) && !result.conflicts.includes(path)) {
+		  result.conflicts.push(path);
+		}
+	  }
     }
     current += changesByPath.size;
     options.progressCallback?.(current, total);
@@ -185,6 +200,9 @@ export async function runIncrementalSync(
       try {
         const uploadFile = await context.prepareUploadFromPath(file.path);
         if (uploadFile) {
+		  if (resurrectPaths.has(file.path)) {
+			uploadFile.expectedHash = null;
+		  }
           localOnlyUploads.push(uploadFile);
         }
       } catch (error) {
@@ -198,6 +216,11 @@ export async function runIncrementalSync(
       concurrency: options.uploadConcurrency,
 	  retry: true,
     });
+	for (const path of resurrectPaths) {
+	  if (result.uploadedPaths.includes(path) && !result.conflicts.includes(path)) {
+		result.conflicts.push(path);
+	  }
+	}
 
     if (localOnlyDeletes.length > 0) {
 		try {

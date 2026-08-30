@@ -10,7 +10,7 @@ import {
 } from '../utils';
 import {
 	createManagedObjectKey,
-	deleteBucketObjectsQuietly,
+	deleteBucketObjectsOrQueue,
 	formatMetadataCommitFailure,
 	formatMutationError,
 	loadStoredFileRows,
@@ -177,7 +177,7 @@ export async function handleBatchUpload(
 			results.push({ path: file.safePath, success: true, hash: file.hash });
 		} catch (error: unknown) {
 			metadataFailure = true;
-			await deleteBucketObjectsQuietly(bucket, [file.objectKey]);
+			await deleteBucketObjectsOrQueue(bucket, db, [file.objectKey]);
 			results.push({
 				path: file.safePath,
 				success: false,

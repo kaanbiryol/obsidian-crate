@@ -21,6 +21,9 @@ vi.mock('./file-discovery', () => ({
 
 vi.mock('./conflict', () => ({
 	createConflictCopy: conflictMocks.createConflictCopy,
+}));
+
+vi.mock('./reconciliation', () => ({
 	detectConflicts: conflictMocks.detectConflicts,
 }));
 
@@ -438,8 +441,74 @@ describe('runIncrementalSync', () => {
 			expect.any(Object),
 			expect.objectContaining({ concurrency: 5 }),
 		);
+		expect(prepared.expectedHash).toBeNull();
 		expect(result?.conflicts).toContain('notes/live.md');
 		expect(result?.uploaded).toBe(1);
+	});
+
+	it('restores a remote edit when the same path was deleted locally', async () => {
+		const path = 'notes/remote-edit.md';
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 10 },
+			changes: [{
+				seq: 11,
+				path,
+				action: 'put',
+				hash: 'remote-edit',
+				size: 12,
+				created_at: '2026-02-06T12:00:00.000Z',
+			}],
+			lastSeq: 11,
+			localDeletes: [path],
+		});
+		harness.localManifest.getEntry.mockReturnValue({
+			hash: 'base',
+			size: 8,
+			modified: '2026-02-06T10:00:00.000Z',
+		});
+		harness.context.parallelDownloadAndSaveFiles = vi.fn(async (requests: unknown, result: SyncResult) => {
+			result.downloaded++;
+			result.downloadedPaths.push(path);
+			expect(requests).toEqual([{
+				path,
+				expectedLocalHash: null,
+				expectedRemoteHash: 'remote-edit',
+				remoteSize: 12,
+			}]);
+		});
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(harness.api.batchDelete).not.toHaveBeenCalled();
+		expect(result?.downloadedPaths).toContain(path);
+		expect(result?.conflicts).toContain(path);
+	});
+
+	it('keeps a local delete when the remote put still matches the common version', async () => {
+		const path = 'notes/delete.md';
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 10 },
+			changes: [{
+				seq: 11,
+				path,
+				action: 'put',
+				hash: 'base',
+				size: 8,
+				created_at: '2026-02-06T12:00:00.000Z',
+			}],
+			lastSeq: 11,
+			localDeletes: [path],
+		});
+		harness.localManifest.getEntry.mockReturnValue({
+			hash: 'base',
+			size: 8,
+			modified: '2026-02-06T10:00:00.000Z',
+		});
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(harness.api.batchDelete).toHaveBeenCalledWith([path], { [path]: 'base' });
+		expect(result?.deletedPaths).toContain(path);
 	});
 
 	it('applies remote downloads and local deletes during incremental planning', async () => {
@@ -904,6 +973,7 @@ describe('createFullSyncPlan', () => {
 			{ path: 'notes/local-big.bin', action: 'upload' },
 			{ path: 'ignored/path.md', action: 'upload' },
 			{ path: 'notes/conflict.md', action: 'conflict' },
+			{ path: 'notes/deleted.md', action: 'delete', remoteHash: 'same-hash' },
 		]);
 
 		const removeEntry = vi.fn();
@@ -926,13 +996,17 @@ describe('createFullSyncPlan', () => {
 								size: 1,
 								modified: new Date(0).toISOString(),
 							},
+							'notes/orphan.md': {
+								hash: 'orphan-hash',
+								size: 1,
+								modified: new Date(0).toISOString(),
+							},
 						},
 					}),
 					removeEntry,
 				} as never,
 				shouldIgnore: (path: string) => path.startsWith('ignored/'),
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
-				getLocalDeletes: async () => ['notes/deleted.md', 'notes/orphan.md'],
 			},
 			{
 				'notes/deleted.md': { hash: 'same-hash', size: 1, modified: new Date(0).toISOString() },
@@ -994,7 +1068,6 @@ describe('createFullSyncPlan', () => {
 				} as never,
 				shouldIgnore: () => false,
 				runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
-				getLocalDeletes: async () => [],
 			},
 			{},
 			5,
