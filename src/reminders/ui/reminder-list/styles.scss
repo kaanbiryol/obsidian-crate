@@ -70,8 +70,9 @@ $reminder-motion-curve: cubic-bezier(0.33, 1, 0.68, 1); // Smooth ease-out
       }
 
       .reminders-count-overdue {
-        background-color: var(--text-error);
-        color: var(--text-on-accent);
+        border: 1px solid color-mix(in srgb, var(--text-error) 18%, transparent);
+        background: color-mix(in srgb, var(--text-error) 9%, transparent);
+        color: color-mix(in srgb, var(--text-error) 60%, var(--text-normal));
         padding: 2px 8px;
         border-radius: 10px;
         font-size: var(--reminder-font-sm); // Apple HIG 14pt minimum for labels

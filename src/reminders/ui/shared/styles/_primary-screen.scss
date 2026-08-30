@@ -68,6 +68,10 @@
         box-shadow: var(--crate-reminder-card-shadow, none);
     }
 
+    .reorderable-reminder-item[data-reorder-interaction="handle"] .premium-reminder-content {
+        padding-right: 56px;
+    }
+
     .premium-reminder-card:hover .premium-reminder-content {
         background: var(--crate-reminder-card-hover-bg, var(--crate-surface-hover-bg));
         border-color: var(--crate-reminder-card-hover-border, var(--crate-surface-border-hover));

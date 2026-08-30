@@ -43,9 +43,33 @@
     position: relative;
     touch-action: pan-y;
 
-    .premium-reminder-content,
-    .reminder-card__main {
-        padding-right: 52px;
+    &[data-reorder-interaction="handle"] {
+        .premium-reminder-content,
+        .reminder-card__main {
+            padding-right: 56px;
+        }
+
+        &:has(.premium-priority-flag) {
+            .premium-reminder-content {
+                min-height: 80px;
+            }
+
+            .premium-priority-flag {
+                position: absolute;
+                top: 50%;
+                right: -38px;
+                width: 20px;
+                height: 20px;
+                margin: 0;
+                border-radius: 6px;
+                transform: translateY(-50%);
+
+                svg {
+                    width: 12px;
+                    height: 12px;
+                }
+            }
+        }
     }
 
     &[data-reorder-interaction="long-press"] {
@@ -210,8 +234,9 @@
 }
 
 .premium-reminder-title-row {
+    position: relative;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 8px;
     min-width: 0;
@@ -273,8 +298,20 @@
 }
 
 .premium-priority-flag {
-    flex-shrink: 0;
+    flex: 0 0 26px;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin-top: -3px;
+    border: 1px solid color-mix(in srgb, var(--crate-danger) 18%, transparent);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--crate-danger) 9%, transparent);
     color: var(--crate-danger);
+
+    svg {
+        display: block;
+    }
 }
 
 // Metadata pills

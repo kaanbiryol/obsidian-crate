@@ -122,9 +122,10 @@
 
 .view-header-overdue {
     padding: 4px 12px;
+    border: 1px solid color-mix(in srgb, var(--text-error) 18%, transparent);
     border-radius: 12px;
-    background: var(--reminder-red, var(--text-error));
-    color: var(--text-on-accent);
+    background: color-mix(in srgb, var(--text-error) 9%, transparent);
+    color: color-mix(in srgb, var(--text-error) 60%, var(--text-normal));
     font-size: 14px;
     font-weight: var(--reminder-font-weight-semibold);
 }

@@ -158,7 +158,7 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
             e.preventDefault();
           }}
         >
-          <GripVertical size={18} strokeWidth={2} aria-hidden="true" />
+          <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
         </button>
       )}
     </Reorder.Item>

@@ -32,6 +32,11 @@
     }
 }
 
+// Keep the sidebar FAB visually connected to its bottom navigation.
+.reminders-view:not(.is-modal):not(.is-fullscreen):not(.is-compact) {
+    --reminders-fab-gap: 12px;
+}
+
 // Modal-specific fullscreen adjustments
 .reminders-view.is-modal {
     // Use Obsidian's primary background for consistency with status bar

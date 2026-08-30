@@ -84,6 +84,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     const isOverdue = isReminderOverdue(reminder);
     const isImportant = reminder.priority === 1;
     const isCheckboxChecked = reminder.completed || completionPreview;
+    const showPriority = isImportant && !reminder.completed;
 
     const projectColors = reminder.project ? getProjectColor(reminder.project) : null;
     const projectThemeColors = projectColors?.[colorScheme];
@@ -163,11 +164,16 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                             {renderContentWithLinks(reminder.content)}
                         </span>
 
-                        {/* Priority flag */}
-                        {isImportant && !reminder.completed && (
-                            <div className="premium-priority-flag">
-                                <Flag size={14} fill="currentColor" strokeWidth={1.5} stroke="currentColor" />
-                            </div>
+                        {showPriority && (
+                            <span className="premium-priority-flag" aria-label="High priority" title="High priority">
+                                <Flag
+                                    size={14}
+                                    fill="currentColor"
+                                    strokeWidth={1.5}
+                                    stroke="currentColor"
+                                    aria-hidden="true"
+                                />
+                            </span>
                         )}
                     </div>
 
