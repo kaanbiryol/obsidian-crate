@@ -38,7 +38,7 @@
 .pwa-editor-title-rich-input{white-space:pre-wrap;word-break:break-word;caret-color:var(--text-normal)}
 .pwa-editor-title-rich-input:empty::before{content:attr(data-placeholder);color:rgba(255,255,255,.32);pointer-events:none}
 .pwa-editor-title-rich-input .rich-text-chip{line-height:1.45}
-.pwa-editor-description-input{flex:1 1 auto;height:auto;min-height:82px;max-height:140px;font-size:13.5px;font-weight:450;line-height:20px;color:var(--text-muted);overflow-y:auto;overscroll-behavior-y:contain}
+.pwa-editor-description-input{flex:1 1 auto;height:auto;min-height:82px;max-height:140px;font-size:16px;font-weight:450;line-height:22px;color:var(--text-muted);overflow-y:auto;overscroll-behavior-y:contain}
 .pwa-editor-title-input::placeholder,.pwa-editor-description-input::placeholder{color:rgba(255,255,255,.32)}
 .pwa-editor-divider{height:1px;background:rgba(255,255,255,.05);margin:12px 0 14px}
 .pwa-editor-actions{flex:0 0 auto;min-width:0}
@@ -54,7 +54,7 @@
 .pwa-picker-header{display:grid;grid-template-columns:minmax(72px,1fr) minmax(0,1.4fr) minmax(72px,1fr);align-items:center;gap:8px;margin-bottom:18px}
 .pwa-picker-header>:last-child{justify-self:end}
 .pwa-picker-header h3{margin:0;text-align:center;font-size:18px;font-weight:650;line-height:1.2;letter-spacing:-.02em;color:var(--text-normal)}
-.pwa-picker-icon-button{width:40px;height:40px;min-width:40px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:var(--text-muted);padding:0}
+.pwa-picker-icon-button{width:44px;height:44px;min-width:44px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:var(--text-muted);padding:0}
 .pwa-picker-icon-button--done{background:linear-gradient(145deg,#9b75f7,#7c4ce5);border-color:rgba(255,255,255,.11);color:white;box-shadow:inset 0 1px 0 rgba(255,255,255,.17),0 8px 22px rgba(var(--accent-rgb),.18)}
 .pwa-picker-content{display:flex;flex:1;min-height:0;overflow:auto;overscroll-behavior-y:contain;flex-direction:column;gap:14px}
 .pwa-picker-presets,.pwa-project-list{display:flex;flex-direction:column;gap:8px}
@@ -67,7 +67,7 @@
 .pwa-project-picker-sheet .pwa-picker-content{gap:0;padding:22px 18px 2px}
 .pwa-project-picker-header{min-height:68px;margin-bottom:0;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.055)}
 .pwa-project-picker-header h3{margin:0;font-size:20px;font-weight:650;letter-spacing:-.025em}
-.pwa-project-picker-close,.pwa-project-picker-header__spacer{width:32px;height:32px;min-width:32px}
+.pwa-project-picker-close,.pwa-project-picker-header__spacer{width:44px;height:44px;min-width:44px}
 .pwa-project-picker-close{border:0;border-radius:8px;background:transparent;color:var(--text-faint)}
 .pwa-project-picker-close:hover{background:rgba(255,255,255,.055);color:var(--text-normal)}
 .pwa-project-picker-close svg{width:18px;height:18px}
@@ -82,8 +82,8 @@
 .pwa-picker-sheet.pwa-date-picker-sheet{padding:0 0 calc(18px + env(safe-area-inset-bottom));background:#0f0f12}
 .pwa-schedule-header{min-height:68px;margin-bottom:0;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.055)}
 .pwa-schedule-header h3{font-size:20px;font-weight:650;letter-spacing:-.025em}
-.pwa-schedule-header .pwa-picker-icon-button{width:32px;height:32px;min-width:32px;border:0;border-radius:8px;background:transparent;color:var(--text-faint)}
-.pwa-schedule-done{min-width:48px;min-height:32px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:#bda7ff;font-size:13px;font-weight:620}
+.pwa-schedule-header .pwa-picker-icon-button{width:44px;height:44px;min-width:44px;border:0;border-radius:10px;background:transparent;color:var(--text-faint)}
+.pwa-schedule-done{min-width:48px;min-height:44px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:#bda7ff;font-size:13px;font-weight:620}
 .pwa-schedule-done:hover,.pwa-schedule-header .pwa-picker-icon-button:hover{background:rgba(255,255,255,.055)}
 .pwa-schedule-content{gap:22px;padding:22px 18px 2px}
 .pwa-schedule-current{display:flex;min-height:50px;align-items:center;justify-content:space-between;gap:16px;padding:10px 13px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:12px;background:rgba(var(--accent-rgb),.065)}
@@ -101,25 +101,25 @@
 .pwa-schedule-preset__copy{display:flex;min-width:0;flex-direction:column;gap:3px}
 .pwa-schedule-preset__copy strong,.pwa-schedule-preset__copy small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pwa-schedule-preset__copy strong{color:var(--text-normal);font-size:13px;font-weight:580;line-height:1.25}
-.pwa-schedule-preset__copy small{color:var(--text-faint);font-size:10.5px;font-weight:500;line-height:1.25}
+.pwa-schedule-preset__copy small{color:var(--text-faint);font-size:11px;font-weight:500;line-height:1.25}
 .pwa-schedule-preset__check{color:var(--accent)}
 .pwa-schedule-fields{overflow:hidden;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.018)}
 .pwa-schedule-field{display:flex;min-height:52px;align-items:center;gap:12px;padding:8px 13px}
 .pwa-schedule-field+.pwa-schedule-field{border-top:1px solid rgba(255,255,255,.055)}
 .pwa-schedule-field__copy{display:flex;min-width:54px;flex:1 1 auto;flex-direction:column;gap:2px}
 .pwa-schedule-field__copy strong{color:var(--text-muted);font-size:13px;font-weight:500;line-height:1.25}
-.pwa-schedule-field__copy small{margin-left:3px;color:var(--text-faint);font-size:10.5px;font-weight:500;line-height:1.2}
-.pwa-schedule-field input{width:clamp(126px,48%,180px);height:34px;min-width:0;margin:0;padding:0 8px;border:1px solid rgba(255,255,255,.055);border-radius:8px;outline:0;background:rgba(255,255,255,.028);color:var(--text-normal);font-family:inherit;font-size:13px;text-align:right;color-scheme:dark}
+.pwa-schedule-field__copy small{margin-left:3px;color:var(--text-faint);font-size:11px;font-weight:500;line-height:1.2}
+.pwa-schedule-field input{width:clamp(126px,48%,180px);height:44px;min-width:0;margin:0;padding:0 10px;border:1px solid rgba(255,255,255,.055);border-radius:8px;outline:0;background:rgba(255,255,255,.028);color:var(--text-normal);font-family:inherit;font-size:16px;text-align:right;color-scheme:dark}
 .pwa-schedule-field input::-webkit-date-and-time-value{text-align:right}
 .pwa-schedule-field input:focus{border-color:rgba(var(--accent-rgb),.42);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.11)}
-.pwa-schedule-clear{align-self:flex-start;min-height:36px;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:-2px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:#db7c7c;font-size:12.5px;font-weight:560;transition:transform 160ms ease,background 180ms ease,color 180ms ease}
+.pwa-schedule-clear{align-self:flex-start;min-height:44px;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:-2px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:#db7c7c;font-size:12.5px;font-weight:560;transition:transform 160ms ease,background 180ms ease,color 180ms ease}
 .pwa-schedule-clear:hover{background:rgba(248,113,113,.07);color:#f39797}
 .pwa-schedule-clear:active{transform:scale(.98)}
 .pwa-picker-sheet.pwa-repeat-picker-sheet{padding:0 0 calc(18px + env(safe-area-inset-bottom));background:#0f0f12}
 .pwa-repeat-header{min-height:68px;margin-bottom:0;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.055)}
 .pwa-repeat-header h3{font-size:20px;font-weight:650;letter-spacing:-.025em}
-.pwa-repeat-header .pwa-picker-icon-button{width:32px;height:32px;min-width:32px;border:0;border-radius:8px;background:transparent;color:var(--text-faint)}
-.pwa-repeat-apply{min-width:48px;min-height:32px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:#bda7ff;font-size:13px;font-weight:620}
+.pwa-repeat-header .pwa-picker-icon-button{width:44px;height:44px;min-width:44px;border:0;border-radius:10px;background:transparent;color:var(--text-faint)}
+.pwa-repeat-apply{min-width:48px;min-height:44px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:#bda7ff;font-size:13px;font-weight:620}
 .pwa-repeat-apply:hover,.pwa-repeat-header .pwa-picker-icon-button:hover{background:rgba(255,255,255,.055)}
 .pwa-repeat-content{gap:22px;padding:22px 18px 2px}
 .pwa-repeat-summary{display:flex;min-height:50px;align-items:center;justify-content:space-between;gap:16px;padding:10px 13px;border:1px solid rgba(var(--accent-rgb),.18);border-radius:12px;background:rgba(var(--accent-rgb),.065)}
@@ -136,18 +136,18 @@
 .pwa-repeat-control-card,.pwa-repeat-time-card{display:flex;min-height:52px;align-items:center;gap:12px;padding:8px 13px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.018)}
 .pwa-repeat-control-card__copy,.pwa-repeat-time-card__copy{display:flex;min-width:0;flex:1 1 auto;flex-direction:column;gap:2px}
 .pwa-repeat-control-card__copy strong,.pwa-repeat-time-card__copy strong{overflow:hidden;color:var(--text-muted);font-size:13px;font-weight:500;line-height:1.25;text-overflow:ellipsis;white-space:nowrap}
-.pwa-repeat-control-card__copy span{overflow:hidden;color:var(--text-faint);font-size:10.5px;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}
-.pwa-repeat-stepper{display:grid;grid-template-columns:32px minmax(34px,auto) 32px;align-items:center;gap:3px;flex:0 0 auto}
-.pwa-repeat-stepper__button{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.055);border-radius:8px;background:rgba(255,255,255,.028);color:var(--text-normal)}
+.pwa-repeat-control-card__copy span{overflow:hidden;color:var(--text-faint);font-size:11px;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}
+.pwa-repeat-stepper{display:grid;grid-template-columns:44px minmax(34px,auto) 44px;align-items:center;gap:3px;flex:0 0 auto}
+.pwa-repeat-stepper__button{width:44px;height:44px;min-width:44px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(255,255,255,.028);color:var(--text-normal)}
 .pwa-repeat-stepper__value{min-width:34px;color:var(--text-normal);font-size:13.5px;font-weight:600;line-height:1;text-align:center}
-.pwa-repeat-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:7px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.018)}
+.pwa-repeat-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;padding:6px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.018)}
 .pwa-repeat-day{width:100%;height:auto;min-width:0;aspect-ratio:1;border:0;border-radius:8px;background:transparent;color:var(--text-muted);font-size:11px;font-weight:650;transition:transform 160ms ease,background 180ms ease,color 180ms ease}
 .pwa-repeat-day:active{transform:scale(.94)}
 .pwa-repeat-day.is-active{background:rgba(var(--accent-rgb),.13);color:#c9b9fa}
-.pwa-repeat-time-card input{width:clamp(126px,48%,180px);height:34px;min-width:0;margin:0;padding:0 8px;border:1px solid rgba(255,255,255,.055);border-radius:8px;outline:0;background:rgba(255,255,255,.028);color:var(--text-normal);font-family:inherit;font-size:13px;text-align:right;color-scheme:dark}
+.pwa-repeat-time-card input{width:clamp(126px,48%,180px);height:44px;min-width:0;margin:0;padding:0 10px;border:1px solid rgba(255,255,255,.055);border-radius:8px;outline:0;background:rgba(255,255,255,.028);color:var(--text-normal);font-family:inherit;font-size:16px;text-align:right;color-scheme:dark}
 .pwa-repeat-time-card input::-webkit-date-and-time-value{text-align:right}
 .pwa-repeat-time-card input:focus{border-color:rgba(var(--accent-rgb),.42);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.11)}
-.pwa-repeat-remove{align-self:flex-start;min-height:36px;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:-2px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:#db7c7c;font-size:12.5px;font-weight:560;transition:transform 160ms ease,background 180ms ease,color 180ms ease}
+.pwa-repeat-remove{align-self:flex-start;min-height:44px;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:-2px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:#db7c7c;font-size:12.5px;font-weight:560;transition:transform 160ms ease,background 180ms ease,color 180ms ease}
 .pwa-repeat-remove:hover{background:rgba(248,113,113,.07);color:#f39797}
 .pwa-repeat-remove:active{transform:scale(.98)}
 .pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor{padding-bottom:16px}

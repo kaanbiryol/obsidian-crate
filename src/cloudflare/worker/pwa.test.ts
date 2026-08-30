@@ -90,10 +90,12 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('browserToken=browser-token');
 	});
 
-	it('locks the PWA shell to the native app scale', () => {
+	it('keeps the PWA viewport fitted while allowing user zoom', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+		expect(html).toContain('width=device-width, initial-scale=1, viewport-fit=cover');
+		expect(html).not.toContain('maximum-scale=1');
+		expect(html).not.toContain('user-scalable=no');
 		expect(html).not.toContain('height=device-height');
 	});
 
@@ -118,8 +120,11 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--crate-fab-bg:#8057e6;');
 		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;border-radius:50%;');
 		expect(html).toContain('.pwa-editor-icon-button{width:44px;height:44px;min-width:44px;border-radius:50%;');
-		expect(html).toContain('.pwa-picker-icon-button{width:40px;height:40px;min-width:40px;border-radius:50%;');
-		expect(html).toContain('.settings-sheet__close{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border:0;border-radius:8px;');
+		expect(html).toContain('.pwa-picker-icon-button{width:44px;height:44px;min-width:44px;border-radius:50%;');
+		expect(html).toContain('.settings-sheet__close{width:44px;height:44px;min-width:44px;display:grid;place-items:center;border:0;border-radius:10px;');
+		expect(html).toContain('.pwa-repeat-stepper__button{width:44px;height:44px;min-width:44px;');
+		expect(html).toContain('.pwa-schedule-field input{width:clamp(126px,48%,180px);height:44px;');
+		expect(html).toContain('.pwa-reminders-view .completed-section-toggle{height:44px;min-height:44px}');
 		expect(html).toContain('.pwa-editor-submit-button{min-width:52px;height:44px;');
 		expect(html).toContain('.pwa-editor-submit-button.is-saving:disabled{color:#bda7ff;');
 		expect(html).toContain('.pwa-editor-submit-button.pwa-editor-submit-button--danger{color:var(--danger)}');
@@ -250,7 +255,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-schedule-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:hidden;');
 		expect(html).toContain('.pwa-schedule-fields{overflow:hidden;border:1px solid rgba(255,255,255,.07);border-radius:12px;');
 		expect(html).toContain('.pwa-repeat-frequency-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:hidden;');
-		expect(html).toContain('.pwa-repeat-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;');
+		expect(html).toContain('.pwa-repeat-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;padding:6px;');
 		expect(html).not.toContain('@keyframes pwa-nested-sheet-in');
 		expect(html).toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:var(--pwa-sheet-surface);');
 		expect(html).not.toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:#0f0f12;');
@@ -266,8 +271,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-card{flex:1 1 auto;min-height:0;max-height:none;padding:14px 16px 16px}');
 		expect(html).toContain('.pwa-editor-title-input{flex:0 1 auto;min-height:44px;max-height:108px;');
 		expect(html).toContain('.pwa-editor-description-input{flex:1 1 auto;height:auto;min-height:82px;max-height:140px;');
-		expect(html).toContain('font-size:13.5px;font-weight:450;line-height:20px;color:var(--text-muted);');
-		expect(html).not.toContain('font-size:13.5px;font-weight:450;line-height:1.5;color:var(--text-muted);');
+		expect(html).toContain('font-size:16px;font-weight:450;line-height:22px;color:var(--text-muted);');
 		expect(html).toContain('.pwa-editor-description-input{flex:1 1 auto;min-height:40px;max-height:68px}');
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-title-input{flex:.9 1 0;min-height:42px;max-height:96px}');
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-editor-description-input{flex:1.1 1 0;height:auto;min-height:42px;max-height:none}');

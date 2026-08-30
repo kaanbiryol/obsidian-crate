@@ -25,7 +25,6 @@ import { usePwaRefreshLifecycle } from './hooks/usePwaRefreshLifecycle';
 import { usePwaSessionLifecycle } from './hooks/usePwaSessionLifecycle';
 import { usePwaStatus } from './hooks/usePwaStatus';
 import { useLaunchReminderModal } from './hooks/useLaunchReminderModal';
-import { usePwaZoomLock } from './hooks/usePwaZoomLock';
 import { useReminderSync } from './hooks/useReminderSync';
 import { useReminderMutations } from './hooks/useReminderMutations';
 import { useSheetTransition } from './hooks/useSheetTransition';
@@ -62,8 +61,6 @@ function App() {
 	const finalizeSettingsClose = useCallback(() => setSettingsOpen(false), []);
 	const modalTransition = useSheetTransition(finalizeModalClose);
 	const settingsTransition = useSheetTransition(finalizeSettingsClose);
-
-	usePwaZoomLock();
 
 	useEffect(() => {
 		void registerPwaServiceWorker().catch((error: unknown) => {
