@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { matchIgnorePattern, shouldIgnoreSyncPath } from './engine-ignore';
+import {
+	matchIgnorePattern,
+	shouldIgnoreConfiguredPath,
+	shouldIgnoreSyncPath,
+} from './engine-ignore';
 
 function createIgnoreContext(ignorePatterns: string[] = []) {
 	return {
@@ -55,5 +59,12 @@ describe('shouldIgnoreSyncPath', () => {
 		expect(shouldIgnoreSyncPath('notes/file.tmp', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('notes/.DS_Store', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('notes/file.md', context)).toBe(false);
+	});
+
+	it('lets conflict recovery apply configured rules without blanket-ignoring conflict names', () => {
+		const context = createIgnoreContext(['.trash/', '*.tmp']);
+
+		expect(shouldIgnoreConfiguredPath('.trash/a (conflict 2026-01-02 03-04-05 a1b2).md', context)).toBe(true);
+		expect(shouldIgnoreConfiguredPath('notes/a (conflict 2026-01-02 03-04-05 a1b2).md', context)).toBe(false);
 	});
 });

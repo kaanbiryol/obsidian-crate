@@ -60,7 +60,15 @@ describe('ConflictStore', () => {
 		expect(harness.files.get('.obsidian/plugins/crate/conflicts.json')).toContain('notes/shared.md');
 	});
 
-	it('recovers an untracked visible or hidden conflict copy during load', async () => {
+	it('loads persisted metadata without scanning the vault', async () => {
+		const harness = createHarness();
+
+		await harness.store.load();
+
+		expect(getAllVaultFilesMock).not.toHaveBeenCalled();
+	});
+
+	it('recovers an untracked visible or hidden conflict copy in the background', async () => {
 		const conflictPath = '.archive/shared (conflict 2026-01-02 03-04-05 ab12).md';
 		getAllVaultFilesMock.mockResolvedValue([{
 			path: conflictPath,
@@ -71,12 +79,30 @@ describe('ConflictStore', () => {
 		const harness = createHarness({ [conflictPath]: 'copy' });
 
 		await harness.store.load();
+		await harness.store.recoverFromVault(() => false);
 
 		expect(harness.store.getActiveConflicts()).toMatchObject([{
 			originalPath: '.archive/shared.md',
 			conflictPath,
 			cause: 'unknown',
 		}]);
+	});
+
+	it('uses configured ignore rules and excludes its own data during recovery', async () => {
+		const harness = createHarness();
+
+		await harness.store.load();
+		await harness.store.recoverFromVault(
+			(path) => path === '.git' || path.startsWith('.git/'),
+		);
+
+		const shouldIgnore = getAllVaultFilesMock.mock.calls[0]?.[1];
+		expect(shouldIgnore).toBeDefined();
+		expect(shouldIgnore?.('.git')).toBe(true);
+		expect(shouldIgnore?.('.git/objects')).toBe(true);
+		expect(shouldIgnore?.('.obsidian/plugins/crate')).toBe(true);
+		expect(shouldIgnore?.('.obsidian/plugins/crate/cache/data')).toBe(true);
+		expect(shouldIgnore?.('notes/shared (conflict 2026-01-02 03-04-05 ab12).md')).toBe(false);
 	});
 
 	it('recovers a corrupt main store from its temporary file', async () => {
