@@ -180,7 +180,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
     const scheduleSelectionRestore = useCallback((position: number | null, afterRestore?: () => void) => {
         const requestId = ++restoreRequestIdRef.current;
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
             if (restoreRequestIdRef.current !== requestId || !actualRef.current) {
                 return;
             }
@@ -251,10 +251,8 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             return;
         }
 
-        const root = actualRef.current.getRootNode();
-        const activeElement = root instanceof ShadowRoot
-            ? root.activeElement
-            : actualRef.current.ownerDocument.activeElement;
+        const root = actualRef.current.getRootNode() as Document | ShadowRoot;
+        const activeElement = root.activeElement;
         const isFocused = activeElement === actualRef.current;
         const shouldPreserveCursor = preserveSelection && isFocused;
         const cursorPos = shouldPreserveCursor ? saveCursorPosition(actualRef.current) : null;

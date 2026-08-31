@@ -62,7 +62,7 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
     onDragEnd();
     // Suppress the click event that fires after drag release
     // Use requestAnimationFrame so the flag clears after the click event
-    requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       didDragRef.current = false;
     });
   }, [onDragEnd]);

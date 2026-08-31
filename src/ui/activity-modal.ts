@@ -108,7 +108,7 @@ export class ActivityModal extends Modal {
 		this.deps.addStateChangeListener(this.onStateChange);
 
 		// Position indicator after layout
-		requestAnimationFrame(() => this.positionIndicator(0));
+		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(0));
 	}
 
 	private switchTab(index: number): void {
@@ -181,7 +181,7 @@ export class ActivityModal extends Modal {
 		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths());
 		this.conflictsPanel.empty();
 		renderConflictsPanel(this.conflictsPanel, this.deps.getConflictFiles());
-		requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
+		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
 	}
 
 	private formatLastSync(): string {

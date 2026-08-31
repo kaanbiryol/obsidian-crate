@@ -88,7 +88,7 @@ export function insertPlainTextAtSelection(text: string): void {
   range.insertNode(fragment);
 
   const nextRange = document.createRange();
-  if (lastInsertedNode instanceof Text) {
+  if (lastInsertedNode.nodeType === Node.TEXT_NODE) {
     nextRange.setStart(lastInsertedNode, lastInsertedNode.textContent?.length ?? 0);
   } else {
     nextRange.setStartAfter(lastInsertedNode);

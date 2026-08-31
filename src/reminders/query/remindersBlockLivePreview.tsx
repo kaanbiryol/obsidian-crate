@@ -100,7 +100,7 @@ class RemindersBlockWidget extends WidgetType {
     if (root && shadowRoot) {
       // Update dark mode class
       if (mountPoint) {
-        if (document.body.classList.contains("theme-dark")) {
+        if (mountPoint.doc.body.classList.contains("theme-dark")) {
           mountPoint.classList.add("dark");
         } else {
           mountPoint.classList.remove("dark");
@@ -141,13 +141,12 @@ class RemindersBlockWidget extends WidgetType {
   };
 
   toDOM(): HTMLElement {
-    const container = document.createElement("div") as WidgetHost;
-    container.className = "reminders-block-widget";
+    const container = createDiv({ cls: "reminders-block-widget" }) as WidgetHost;
 
     const mount = createShadowRootMount(container, {
       configureMountPoint: (mountPoint) => {
         // Sync dark mode
-        if (document.body.classList.contains("theme-dark")) {
+        if (mountPoint.doc.body.classList.contains("theme-dark")) {
           mountPoint.classList.add("dark");
         }
       },

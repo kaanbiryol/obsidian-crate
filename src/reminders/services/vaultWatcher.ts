@@ -80,11 +80,11 @@ export class VaultWatcher {
 
     // Clear any pending scans
     for (const timeout of this.pendingScans.values()) {
-      clearTimeout(timeout);
+      window.clearTimeout(timeout);
     }
     this.pendingScans.clear();
     if (this.pendingIndexChangedNotification !== null) {
-      clearTimeout(this.pendingIndexChangedNotification);
+      window.clearTimeout(this.pendingIndexChangedNotification);
       this.pendingIndexChangedNotification = null;
     }
 
@@ -103,7 +103,7 @@ export class VaultWatcher {
     // Clear any pending scan for this file
     const existing = this.pendingScans.get(filePath);
     if (existing) {
-      clearTimeout(existing);
+      window.clearTimeout(existing);
     }
 
     // Schedule a debounced scan
@@ -138,7 +138,7 @@ export class VaultWatcher {
     // Clear any pending scan for this file
     const existing = this.pendingScans.get(file.path);
     if (existing) {
-      clearTimeout(existing);
+      window.clearTimeout(existing);
       this.pendingScans.delete(file.path);
     }
 
@@ -158,7 +158,7 @@ export class VaultWatcher {
     // Update pending scans if any
     const existing = this.pendingScans.get(oldPath);
     if (existing) {
-      clearTimeout(existing);
+      window.clearTimeout(existing);
       this.pendingScans.delete(oldPath);
     }
 
@@ -195,7 +195,7 @@ export class VaultWatcher {
   private scheduleIndexChangedNotification(): void {
     if (!this.onIndexChanged) return;
     if (this.pendingIndexChangedNotification !== null) {
-      clearTimeout(this.pendingIndexChangedNotification);
+      window.clearTimeout(this.pendingIndexChangedNotification);
     }
     this.pendingIndexChangedNotification = window.setTimeout(() => {
       this.pendingIndexChangedNotification = null;

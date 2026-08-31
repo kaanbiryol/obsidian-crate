@@ -84,14 +84,14 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? "browse" : (initialTab ?? "inbox"));
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transitionTimeoutRef = useRef<number | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     return () => {
       if (transitionTimeoutRef.current) {
-        clearTimeout(transitionTimeoutRef.current);
+        window.clearTimeout(transitionTimeoutRef.current);
       }
     };
   }, []);
@@ -104,10 +104,10 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
     setIsTransitioning(true);
 
     if (transitionTimeoutRef.current) {
-      clearTimeout(transitionTimeoutRef.current);
+      window.clearTimeout(transitionTimeoutRef.current);
     }
 
-    transitionTimeoutRef.current = setTimeout(() => {
+    transitionTimeoutRef.current = window.setTimeout(() => {
       setIsTransitioning(false);
     }, PAGE_TRANSITION_DURATION * 1000);
   }, []);

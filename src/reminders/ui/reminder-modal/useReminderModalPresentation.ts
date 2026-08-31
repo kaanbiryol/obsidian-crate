@@ -29,10 +29,10 @@ export function useReminderModalPresentation({
 	const prevProjectRef = useRef(project);
 
 	useEffect(() => {
-		const timer = setTimeout(() => {
+		const timer = window.setTimeout(() => {
 			hasMounted.current = true;
 		}, 50);
-		return () => clearTimeout(timer);
+		return () => window.clearTimeout(timer);
 	}, []);
 
 	useEffect(() => {
@@ -46,10 +46,10 @@ export function useReminderModalPresentation({
 			return;
 		}
 		setAllowAutoFocus(false);
-		const timer = setTimeout(() => {
+		const timer = window.setTimeout(() => {
 			setAllowAutoFocus(true);
 		}, focusDelayMs);
-		return () => clearTimeout(timer);
+		return () => window.clearTimeout(timer);
 	}, [focusDelayMs]);
 
 	const handleClose = useCallback(() => {
@@ -60,7 +60,7 @@ export function useReminderModalPresentation({
 		richTextInputRef.current?.blur();
 		setIsClosing(true);
 		setShowModal(false);
-		setTimeout(onClose, CLOSE_ANIMATION_DURATION);
+		window.setTimeout(onClose, CLOSE_ANIMATION_DURATION);
 	}, [isClosing, onClose, richTextInputRef]);
 
 	const transitionToView = useCallback((targetView: 'main' | 'date' | 'project' | 'recurrence') => {

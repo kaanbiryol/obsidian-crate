@@ -146,6 +146,27 @@ export default tseslint.config(
 			'obsidianmd/prefer-file-manager-trash-file': 'off',
 		},
 	},
+	{
+		// These modules also execute in the standalone PWA or Node-based tests,
+		// where Obsidian's DOM helpers and renderer-specific globals do not exist.
+		files: [
+			'src/reminders/components/richTextInputDom.ts',
+			'src/sync/**/*.{ts,tsx}',
+		],
+		rules: {
+			'obsidianmd/no-global-this': 'off',
+			'obsidianmd/prefer-create-el': 'off',
+			'obsidianmd/prefer-window-timers': 'off',
+		},
+	},
+	{
+		// Crate's settings tab is a dynamic workflow with section-specific cleanup
+		// and OAuth/device actions that are not representable as static controls.
+		files: ['src/ui/settings-tab.ts'],
+		rules: {
+			'obsidianmd/settings-tab/prefer-setting-definitions': 'off',
+		},
+	},
 	globalIgnores([
 		"node_modules",
 		"node_modules/**",
