@@ -261,6 +261,7 @@ describe('worker entrypoint', () => {
 		);
 
 		expect(response.status).toBe(200);
+		expect(response.headers.get('Cache-Control')).toBe('private, no-store');
 		const result = await response.json() as { token: string; browserToken: string; expiresAt: string };
 		expect(result.token).toHaveLength(64);
 		expect(result.browserToken).toHaveLength(64);
@@ -396,6 +397,7 @@ describe('worker entrypoint', () => {
 		);
 
 		expect(response.status).toBe(401);
+		expect(response.headers.get('Cache-Control')).toBe('private, no-store');
 		expect(await response.json()).toEqual({ error: 'Unauthorized' });
 	});
 

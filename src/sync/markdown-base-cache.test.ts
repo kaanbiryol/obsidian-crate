@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
 import { MarkdownBaseCache } from './markdown-base-cache';
-import type { FileEntry } from '../plugin/types';
+import type { FileEntry } from '../protocol/sync-types';
 
 const PLUGIN_DIR = '.vault-config/plugins/crate';
 

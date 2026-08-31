@@ -1,4 +1,4 @@
-import type { CloudflareDeploymentMetadata } from '../plugin/types';
+import type { CloudflareDeploymentMetadata } from './deployment-types';
 import type {
 	CloudflareAccount,
 	CloudflareApiClient,

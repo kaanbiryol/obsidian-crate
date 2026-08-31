@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReminderNotificationService } from './notificationService';
-import type { CrateSettings } from '../../plugin/types';
+import type { CrateSettings } from '../../plugin/settings-types';
 import type { SyncApiClient } from '../../sync/api';
 import { DEFAULT_REMINDERS_SETTINGS, type RemindersSettings } from '../settings';
 import type { Reminder } from '../types/reminder';

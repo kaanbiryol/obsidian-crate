@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SecretStorageService } from '../plugin/secret-storage';
-import { SECRET_KEYS, type CrateSettings } from '../plugin/types';
+import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
 import { clearSyncConfigurationState } from './runtime-config';
 
 describe('clearSyncConfigurationState', () => {

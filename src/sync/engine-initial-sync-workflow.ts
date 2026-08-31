@@ -9,7 +9,7 @@ import {
 	UPLOAD_CONCURRENCY,
 } from './engine-constants';
 import { createLogger } from '../plugin/logger';
-import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
+import type { PreparedUpload, SyncResult, SyncState } from './types';
 import {
 	completeWorkflowResult,
 	getStartFailureResult,

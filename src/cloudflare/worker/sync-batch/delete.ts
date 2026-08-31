@@ -10,7 +10,7 @@ import {
 	type FileStorageRow,
 } from '../sync-storage';
 import type { BatchDeleteFile } from './types';
-import type { MutationFailure } from '../../../plugin/types';
+import type { MutationFailure } from '../../../protocol/sync-types';
 
 export async function handleBatchDelete(
 	request: Request,

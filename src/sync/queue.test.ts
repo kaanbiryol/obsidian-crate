@@ -7,7 +7,7 @@ import {
 	onFileRename,
 } from './queue';
 import { processPendingChanges } from './queue-flush';
-import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
+import type { PreparedUpload, SyncResult, SyncState } from './types';
 import { HttpError } from './api';
 
 type QueueState = SyncState;

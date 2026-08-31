@@ -1,5 +1,7 @@
 import type { TAbstractFile, Vault } from "obsidian";
-import type { ChangelogEntry, CrateSettings, DownloadDiff, FileDiff, FileEntry, MutationFailure, PreparedUpload, SyncResult, UploadDiff } from "../plugin/types";
+import type { ChangelogEntry, FileEntry, MutationFailure } from '../protocol/sync-types';
+import type { CrateSettings } from '../plugin/settings-types';
+import type { DownloadDiff, FileDiff, PreparedUpload, SyncResult, UploadDiff } from './types';
 import type { DownloadRequest } from './transfer-download';
 import type { DiffApplyOutcome } from './transfer-types';
 import type { UploadPreparedFilesOptions } from './transfer-upload';

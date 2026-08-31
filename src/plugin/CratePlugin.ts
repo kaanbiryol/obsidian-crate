@@ -7,7 +7,7 @@ import { type CloudflareDeploymentService } from '../cloudflare/deployment-servi
 import { type ReminderIndex } from '../reminders/data/reminder-index';
 import { type MarkdownWriter } from '../reminders/data/markdown-writer';
 import { type ReminderRepository } from '../reminders/data/reminder-repository';
-import { reinitializeReminders } from '../reminders/plugin-integration';
+import { initializeReminders, reinitializeReminders } from '../reminders/plugin-integration';
 import {
 	type RemindersSettings,
 	normalizeRemindersSettings,
@@ -105,11 +105,29 @@ export default class CratePlugin extends Plugin {
 		});
 	}
 
+	async enableReminders(): Promise<void> {
+		if (this.remindersSettings.enabled && this.reminderIndex) {
+			return;
+		}
+
+		await this.writeRemindersSettings({ enabled: true });
+		try {
+			await initializeReminders(this);
+		} catch (error) {
+			this.remindersVaultWatcher?.unregister();
+			await this.writeRemindersSettings({ enabled: false });
+			throw error;
+		}
+	}
+
 	async activateRemindersView(): Promise<void> {
 		await activateOrRevealRemindersLeaf(this.app.workspace, 'reminders-view');
 	}
 
 	async reinitializeWithFolder(newFolderPath: string): Promise<void> {
+		if (!this.remindersSettings.enabled) {
+			return;
+		}
 		await reinitializeReminders(this, newFolderPath);
 	}
 

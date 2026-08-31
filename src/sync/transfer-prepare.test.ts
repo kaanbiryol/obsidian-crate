@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { prepareUploadFromPath, prepareUploadFromVaultFile } from './transfer';
 import { HIDDEN_CONFIG_PATH, createTransferHarness } from './transfer-test-harness';
 

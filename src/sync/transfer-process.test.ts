@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
 import { processDiff } from './transfer-process';
 import { createEmptySyncResult } from './sync-result';
-import type { FileEntry } from '../plugin/types';
+import type { FileEntry } from '../protocol/sync-types';
 import type { TransferContext } from './transfer-types';
 
 function toArrayBuffer(text: string): ArrayBuffer {

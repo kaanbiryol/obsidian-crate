@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CloudflareDeploymentMetadata } from '../plugin/types';
+import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiError } from './cloudflare-api';
 import { provisionCloudflareDeployment } from './provisioner';
 

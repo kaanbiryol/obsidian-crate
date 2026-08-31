@@ -1,7 +1,7 @@
 import { BATCH_DELETE_MAX_FILES } from '../protocol/sync-limits';
 import { HttpError } from './api';
 import { errorMessage } from '../plugin/logger';
-import type { MutationFailure } from '../plugin/types';
+import type { MutationFailure } from '../protocol/sync-types';
 
 export interface ConditionalDeleteCandidate {
 	path: string;

@@ -2,7 +2,8 @@ import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
 import { createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "./sync-result";
 import { createLogger, errorMessage } from "../plugin/logger";
-import type { ChangelogEntry, FileEntry, MutationFailure, PreparedUpload, SyncResult } from "../plugin/types";
+import type { ChangelogEntry, FileEntry, MutationFailure } from '../protocol/sync-types';
+import type { PreparedUpload, SyncResult } from './types';
 import { deleteFilesInBatches } from './delete-batches';
 import { planIncrementalRemoteChanges } from './planner-incremental-remote-plan';
 

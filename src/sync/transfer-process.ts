@@ -7,8 +7,9 @@ import { hasUnresolvedConflict, recordResolvedRace, recordUnresolvedConflict } f
 import { downloadAndSaveFile, validateDownloadedContent } from "./transfer-download";
 import { prepareUploadFromPath } from "./transfer-prepare";
 import type { DiffApplyOutcome, TransferContext } from "./transfer-types";
-import type { ConflictDiff, FileDiff, FileEntry, SyncResult } from "../plugin/types";
-import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
+import type { ConflictDiff, FileDiff, SyncResult } from './types';
+import type { FileEntry } from '../protocol/sync-types';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export async function processDiff(
   context: TransferContext,

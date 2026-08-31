@@ -46,7 +46,9 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 				}
 
 				await plugin.writeRemindersSettings({ remindersFolderPath: normalizedPath });
-				await plugin.reinitializeWithFolder(normalizedPath);
+				if (plugin.remindersSettings.enabled) {
+					await plugin.reinitializeWithFolder(normalizedPath);
+				}
 				new Notice(`Reminders folder updated to "${normalizedPath}"`);
 			};
 
@@ -68,6 +70,28 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 				}
 			});
 		});
+
+	if (!settings.enabled) {
+		new Setting(containerEl)
+			.setName('Enable reminders')
+			.setDesc('Adopt this folder for reminders. Crate will scan its Markdown files and add stable Crate ID comments to checkbox lines so reminders can be updated safely.')
+			.addButton(button => {
+				button.setButtonText('Enable reminders')
+					.setCta()
+					.onClick(async () => {
+						button.setDisabled(true);
+						try {
+							await plugin.enableReminders();
+							new Notice('Reminders enabled');
+							rerender();
+						} catch (error) {
+							new Notice(`Failed to enable reminders: ${errorMessage(error)}`);
+							button.setDisabled(false);
+						}
+					});
+			});
+		return;
+	}
 
 	new Setting(containerEl)
 		.setName('Default due date')

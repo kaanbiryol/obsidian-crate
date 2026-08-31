@@ -1,4 +1,4 @@
-import type { SyncResult, SyncState } from '../plugin/types';
+import type { SyncResult, SyncState } from './types';
 import { isAbortError } from './abort';
 import { MAX_RETRIES, RETRY_BASE_DELAY_MS } from './engine-constants';
 import { runPeriodicCheckWorkflow } from './engine-periodic-workflow';

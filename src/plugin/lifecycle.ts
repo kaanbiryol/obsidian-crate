@@ -10,7 +10,7 @@ import {
   registerVaultSyncEventHandlers,
 } from "../sync/plugin-integration";
 import { ensurePluginDeviceId } from "./deviceId";
-import { SECRET_KEYS } from "./types";
+import { SECRET_KEYS } from "./settings-types";
 import type CratePlugin from "./CratePlugin";
 import {
   createCloudflareDeploymentService,
@@ -32,7 +32,9 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
 
   plugin.registerSettingsTab(new CrateSettingTab(plugin.app, plugin));
   registerVaultSyncEventHandlers(plugin);
-  await initializePluginReminders(plugin);
+  if (plugin.remindersSettings.enabled) {
+    await initializePluginReminders(plugin);
+  }
   await initializePluginSync(plugin);
   showCloudflareServerUpdateNotice(plugin);
   registerPluginCommands(plugin);
@@ -100,6 +102,7 @@ async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin): Prom
   try {
     const startupSyncRan = await plugin.syncRuntime.waitForStartupSync();
     if (!activePlugins.has(plugin)) return;
+    if (!plugin.remindersSettings.enabled || !plugin.reminderIndex) return;
     if (startupSyncRan) {
       await plugin.reminderIndex.load();
     }
@@ -119,6 +122,11 @@ function registerPluginProtocols(plugin: CratePlugin): void {
     void handleCloudflareOAuthProtocol(plugin, params);
   });
   plugin.registerObsidianProtocolHandler("crate-reminders", (params) => {
+    if (!plugin.remindersSettings.enabled) {
+      new Notice("Enable reminders in Crate settings before opening the reminders app.");
+      plugin.openSettingsTab();
+      return;
+    }
     openFullScreenReminderModal(plugin, params.project || undefined);
   });
 }

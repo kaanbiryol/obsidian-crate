@@ -1,6 +1,6 @@
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles } from './file-discovery';
-import type { FileEntry } from '../plugin/types';
+import type { FileEntry } from '../protocol/sync-types';
 
 interface LocalFileManifest {
 	getAllPaths(): string[];

@@ -1,4 +1,4 @@
-import type { ResolvedSyncRace, SyncResult } from '../plugin/types';
+import type { ResolvedSyncRace, SyncResult } from './types';
 
 export const SYNC_ERROR_MESSAGES = {
 	NOT_CONFIGURED: 'Not configured',

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PreparedUpload } from '../plugin/types';
+import type { PreparedUpload } from './types';
 import { HttpError } from './api';
 import { createVaultFileChunks, uploadPreparedFiles } from './transfer';
 import { createTransferHarness, emptyResult } from './transfer-test-harness';

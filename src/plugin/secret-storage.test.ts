@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SECRET_KEYS } from './types';
+import { SECRET_KEYS } from './settings-types';
 import { SecretStorageService } from './secret-storage';
 
 function createSecretStorage(scopeProvider?: () => string | null) {

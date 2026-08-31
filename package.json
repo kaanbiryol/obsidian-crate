@@ -36,6 +36,8 @@
 		"size-check": "npm run size-check:plugin && npm run size-check:worker && npm run size-check:pwa",
 		"check:css-scope": "node scripts/check-css-scope.mjs",
 		"verify:release-artifacts": "node scripts/verify-release-artifacts.mjs",
+		"notices:generate": "node scripts/generate-third-party-notices.mjs",
+		"notices:check": "node scripts/generate-third-party-notices.mjs --check",
 		"release:check": "npm run check && npm run test:pwa-preview && npm run build:plugin && npm run check:css-scope && npm run size-check && npm run verify:release-artifacts",
 		"predeploy": "npm run build:worker && npm run db:init:remote",
 		"deploy": "npx --yes wrangler@4.123.0 deploy",
@@ -47,7 +49,7 @@
 		"deadcode": "knip",
 		"test": "vitest run",
 		"test:worker-runtime": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts",
-		"check": "npm run lint && npm run typecheck && npm run typecheck:worker && npm run deadcode && npm test && npm run test:worker-runtime"
+		"check": "npm run lint && npm run typecheck && npm run typecheck:worker && npm run deadcode && npm run notices:check && npm test && npm run test:worker-runtime"
 	},
 	"keywords": [
 		"obsidian",

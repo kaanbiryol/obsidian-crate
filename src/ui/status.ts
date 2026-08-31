@@ -3,7 +3,7 @@
  */
 
 import { setIcon, type Plugin } from 'obsidian';
-import type { SyncState, SyncStatus } from '../plugin/types';
+import type { SyncState, SyncStatus } from '../sync/types';
 
 export class StatusBarManager {
 	private plugin: Plugin;

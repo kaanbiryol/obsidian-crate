@@ -10,6 +10,7 @@ import {
 describe('normalizeRemindersSettings', () => {
 	it('normalizes persisted reminders settings defensively', () => {
 		const settings = normalizeRemindersSettings({
+			enabled: true,
 			debugLogging: false,
 			taskCreationDefaultDueDate: 'tomorrow',
 			remindersFolderPath: ' /Reminders/Work/ ',
@@ -25,6 +26,7 @@ describe('normalizeRemindersSettings', () => {
 		});
 
 		expect(settings).toEqual({
+			enabled: true,
 			debugLogging: false,
 			taskCreationDefaultDueDate: 'tomorrow',
 			remindersFolderPath: 'Reminders/Work',
@@ -39,7 +41,7 @@ describe('normalizeRemindersSettings', () => {
 		});
 	});
 
-	it('falls back to safe defaults for malformed reminders settings', () => {
+	it('keeps prerelease reminder users enabled while normalizing malformed settings', () => {
 		const settings = normalizeRemindersSettings({
 			debugLogging: 'nope' as never,
 			taskCreationDefaultDueDate: 'later' as never,
@@ -51,7 +53,19 @@ describe('normalizeRemindersSettings', () => {
 			fullscreenDefaultTab: 'other' as never,
 		});
 
-		expect(settings).toEqual(DEFAULT_REMINDERS_SETTINGS);
+		expect(settings).toEqual({
+			...DEFAULT_REMINDERS_SETTINGS,
+			enabled: true,
+		});
+	});
+
+	it('keeps reminders disabled for a new install until the user opts in', () => {
+		expect(normalizeRemindersSettings(undefined)).toEqual(DEFAULT_REMINDERS_SETTINGS);
+		expect(normalizeRemindersSettings(null)).toEqual(DEFAULT_REMINDERS_SETTINGS);
+	});
+
+	it('preserves an explicit disabled setting', () => {
+		expect(normalizeRemindersSettings({ enabled: false }).enabled).toBe(false);
 	});
 
 	it('normalizes allDayNotificationTime values', () => {

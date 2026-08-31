@@ -1,6 +1,6 @@
 import type { Plugin } from "obsidian";
 import type { SecretStorageService } from "../plugin/secret-storage";
-import { SECRET_KEYS, type CrateSettings, type SharedSettings } from "../plugin/types";
+import { SECRET_KEYS, type CrateSettings, type SharedSettings } from '../plugin/settings-types';
 import { requireNormalizedWorkerUrl } from "./worker-url";
 
 interface ApplyInfrastructureConfigInput {

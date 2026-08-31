@@ -1,5 +1,5 @@
 import { setIcon } from 'obsidian';
-import type { SyncHistoryEntry } from '../../plugin/types';
+import type { SyncHistoryEntry } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard, type FileCardType } from './rendering';
 
 export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryEntry[]): void {

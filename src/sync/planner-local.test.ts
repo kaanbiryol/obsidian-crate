@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
-import type { FileEntry } from '../plugin/types';
-import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
+import type { FileEntry } from '../protocol/sync-types';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { getLocalChanges, getLocalDeletes } from './planner';
 
 const fileDiscoveryMocks = vi.hoisted(() => ({

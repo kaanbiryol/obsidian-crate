@@ -1,11 +1,5 @@
 import type { TAbstractFile, Vault } from "obsidian";
-import type {
-  BatchDownloadResponse,
-  BatchUploadFile,
-  BatchUploadResponse,
-  FileEntry,
-  UploadResult,
-} from "../plugin/types";
+import type { BatchDownloadResponse, BatchUploadFile, BatchUploadResponse, FileEntry, UploadResult } from '../protocol/sync-types';
 import type { RecordConflictInput } from './conflict-store';
 
 interface TransferManifest {

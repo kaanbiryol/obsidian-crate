@@ -5,7 +5,8 @@ import { classifyPath } from './reconciliation';
 import { isQueueVersionConflict } from './queue-failure';
 import { createEmptySyncResult, finalizeSyncResult } from './sync-result';
 import { RemoteVersionChangedError } from './transfer-download';
-import type { FileDiff, FileEntry, SyncResult } from '../plugin/types';
+import type { FileDiff, SyncResult } from './types';
+import type { FileEntry } from '../protocol/sync-types';
 import { errorMessage } from '../plugin/logger';
 import type { DiffApplyOutcome } from './transfer-types';
 

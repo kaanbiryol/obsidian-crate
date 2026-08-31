@@ -110,6 +110,7 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 			id: 'crate',
 		},
 		loadSettings: vi.fn(async () => {}),
+		remindersSettings: { enabled: true },
 		registerSettingsTab: vi.fn(),
 		openSettingsTab: vi.fn(),
 		registerObsidianProtocolHandler: vi.fn(),
@@ -119,7 +120,11 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
 	noticeMessages.length = 0;
-	initializeReminders.mockReset();
+	initializeReminders.mockReset().mockImplementation(async (target: {
+		reminderIndex?: { load: () => Promise<void> };
+	}) => {
+		target.reminderIndex ??= { load: vi.fn(async () => undefined) };
+	});
 	reconcileReminderNotifications.mockReset();
 	initializeSyncManagers.mockReset();
 	registerSyncCommands.mockReset();
@@ -219,6 +224,38 @@ describe('bootstrapPlugin', () => {
 		expect(initializeReminders).toHaveBeenCalledWith(plugin);
 		expect(noticeMessages).toHaveLength(1);
 		expect(noticeMessages[0]).toBeInstanceOf(FakeDocumentFragment);
+	});
+
+	it('does not scan reminder files until a new user enables reminders', async () => {
+		const { bootstrapPlugin } = await loadLifecycleModule();
+		const plugin = createPlugin({
+			remindersSettings: { enabled: false },
+		});
+
+		initializeSyncManagers.mockImplementation((target) => {
+			target.syncRuntime = {
+				isConfigured: vi.fn(() => true),
+				initialize: vi.fn(async () => undefined),
+				waitForStartupSync: vi.fn(async () => false),
+			};
+		});
+
+		await bootstrapPlugin(plugin as never);
+		await Promise.resolve();
+
+		expect(initializeReminders).not.toHaveBeenCalled();
+		expect(reconcileReminderNotifications).not.toHaveBeenCalled();
+
+		const remindersHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
+			([name]) => name === 'crate-reminders',
+		)?.[1] as ProtocolHandler | undefined;
+		remindersHandler?.({ project: 'Work' });
+
+		expect(openFullScreenReminderModal).not.toHaveBeenCalled();
+		expect(plugin.openSettingsTab).toHaveBeenCalledTimes(1);
+		expect(noticeMessages).toContain(
+			'Enable reminders in Crate settings before opening the reminders app.',
+		);
 	});
 
 	it('reloads the reminder index and reconciles only after startup sync finishes', async () => {

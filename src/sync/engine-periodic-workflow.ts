@@ -1,7 +1,7 @@
 import { notifyConflicts } from './conflict';
 import { MAX_CHECK_BACKOFF_MULTIPLIER } from './engine-constants';
 import { createLogger, errorMessage } from '../plugin/logger';
-import type { SyncResult } from '../plugin/types';
+import type { SyncResult } from './types';
 import type { SyncStatus } from './engine-workflow-shared';
 
 const logger = createLogger('SyncEngine');

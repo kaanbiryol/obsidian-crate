@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
-import type { PreparedUpload } from '../plugin/types';
+import type { PreparedUpload } from './types';
 import { runIncrementalSync } from './planner';
 import { createSettings } from './planner-test-harness';
 

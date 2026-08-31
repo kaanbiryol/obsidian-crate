@@ -1,5 +1,5 @@
 import type { CrateSettings } from '../plugin/settings';
-import type { CloudflareDeploymentMetadata } from '../plugin/types';
+import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiClient, type CloudflareAccount } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import type { HttpTransport } from './http';

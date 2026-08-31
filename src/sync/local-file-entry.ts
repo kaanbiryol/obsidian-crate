@@ -1,8 +1,8 @@
 import type { Vault } from 'obsidian';
 import { computeHash } from './hasher';
 import { isVaultTFileLike } from './planner-helpers';
-import type { FileEntry } from '../plugin/types';
-import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
+import type { FileEntry } from '../protocol/sync-types';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 /** Read the current local metadata used by all reconciliation paths. */
 export async function readLocalFileEntry(

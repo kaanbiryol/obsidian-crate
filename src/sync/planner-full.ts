@@ -2,14 +2,14 @@ import { computeHash } from "./hasher";
 import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "./file-discovery";
 import type { FullSyncPlan, FullSyncPlannerContext } from "./planner-types";
-import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export async function createFullSyncPlan(
   context: FullSyncPlannerContext,
-  remoteFiles: Record<string, import("../plugin/types").FileEntry>,
+  remoteFiles: Record<string, import("../protocol/sync-types").FileEntry>,
   prepareConcurrency: number,
 ): Promise<FullSyncPlan> {
-  const localFiles: Record<string, import("../plugin/types").FileEntry> = {};
+  const localFiles: Record<string, import("../protocol/sync-types").FileEntry> = {};
   const files = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context));
   const largeLocalPaths = new Set(
     files.filter((file) => file.size > MAX_FILE_SIZE_BYTES).map((file) => file.path),
@@ -47,7 +47,7 @@ export async function createFullSyncPlan(
   }
 
   const manifestEntries = context.localManifest.getManifest().files;
-  const diffMap = new Map<string, import("../plugin/types").FileDiff>();
+  const diffMap = new Map<string, import("./types").FileDiff>();
   for (const diff of classifyPaths(localFiles, remoteFiles, manifestEntries)) {
     diffMap.set(diff.path, diff);
   }
@@ -84,8 +84,8 @@ export async function createFullSyncPlan(
   return {
     localFiles,
     diffs,
-    uploadDiffs: diffs.filter((diff): diff is import("../plugin/types").UploadDiff => diff.action === "upload"),
-    downloadDiffs: diffs.filter((diff): diff is import("../plugin/types").DownloadDiff => diff.action === "download"),
+    uploadDiffs: diffs.filter((diff): diff is import("./types").UploadDiff => diff.action === "upload"),
+    downloadDiffs: diffs.filter((diff): diff is import("./types").DownloadDiff => diff.action === "download"),
     remainingDiffs: diffs.filter((diff) =>
       diff.action === "conflict" || diff.action === "delete" || diff.action === "delete-local"
     ),

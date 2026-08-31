@@ -26,16 +26,10 @@ import {
 } from './transfer';
 import { createByteBudgetedVaultFileChunks } from './transfer-budget';
 import { createLogger, errorMessage } from '../plugin/logger';
-import type {
-	SyncState,
-	SyncResult,
-	FileDiff,
-	PreparedUpload,
-	FileEntry,
-	CrateSettings,
-	ConflictRecord,
-} from '../plugin/types';
-import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/types';
+import type { SyncState, SyncResult, FileDiff, PreparedUpload, ConflictRecord } from './types';
+import type { FileEntry } from '../protocol/sync-types';
+import type { CrateSettings } from '../plugin/settings-types';
+import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/settings-types';
 import { DOWNLOAD_CONCURRENCY, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
 import { shouldIgnoreSyncPath } from './engine-ignore';
 import { hasLocalFileChanges } from './local-file-changes';

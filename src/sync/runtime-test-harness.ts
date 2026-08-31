@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import { SyncRuntime } from './runtime';
-import type { CrateSettings, SyncResult, SyncState } from '../plugin/types';
+import type { CrateSettings } from '../plugin/settings-types';
+import type { SyncResult, SyncState } from './types';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;

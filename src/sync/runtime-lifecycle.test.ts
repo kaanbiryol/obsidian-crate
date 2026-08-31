@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
 import { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
-import type { SyncResult } from '../plugin/types';
+import type { SyncResult } from './types';
 import {
 	createDeferred,
 	createRuntimeHarness,

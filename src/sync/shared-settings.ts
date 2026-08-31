@@ -1,5 +1,5 @@
 import { isRecord } from '../plugin/settings';
-import { DEFAULT_SETTINGS, type CrateSettings, type SharedSettings } from '../plugin/types';
+import { DEFAULT_SETTINGS, type CrateSettings, type SharedSettings } from '../plugin/settings-types';
 
 function normalizeStringArray(value: unknown): string[] | null {
 	if (!Array.isArray(value)) {

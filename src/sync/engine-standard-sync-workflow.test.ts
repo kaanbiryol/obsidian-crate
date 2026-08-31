@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FileDiff, FileEntry, SyncResult } from '../plugin/types';
+import type { FileDiff, SyncResult } from './types';
+import type { FileEntry } from '../protocol/sync-types';
 import { runSyncWorkflow, type SyncWorkflowContext } from './engine-standard-sync-workflow';
 
 function createContext(options: {

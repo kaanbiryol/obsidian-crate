@@ -1,4 +1,4 @@
-import type { PreparedUpload, SyncState } from '../plugin/types';
+import type { PreparedUpload, SyncState } from './types';
 
 interface QueueApi {
 	isConfigured(): boolean;

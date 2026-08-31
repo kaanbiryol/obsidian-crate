@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CloudflareDeploymentMetadata } from '../plugin/types';
+import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { isCloudflareServerUpdateAvailable } from './deployment-update';
 
 function createDeployment(overrides: Partial<CloudflareDeploymentMetadata> = {}): CloudflareDeploymentMetadata {

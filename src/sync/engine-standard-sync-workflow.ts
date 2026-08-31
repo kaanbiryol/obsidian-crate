@@ -9,7 +9,8 @@ import {
 	UPLOAD_CONCURRENCY,
 } from './engine-constants';
 import { createLogger, errorMessage } from '../plugin/logger';
-import type { FileDiff, FileEntry, SyncResult, SyncState } from '../plugin/types';
+import type { FileDiff, SyncResult, SyncState } from './types';
+import type { FileEntry } from '../protocol/sync-types';
 import type { DownloadRequest } from './transfer-download';
 import type { DiffApplyOutcome } from './transfer-types';
 import {

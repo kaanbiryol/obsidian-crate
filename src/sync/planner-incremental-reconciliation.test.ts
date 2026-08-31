@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PreparedUpload, SyncResult } from '../plugin/types';
-import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
+import type { PreparedUpload, SyncResult } from './types';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { runIncrementalSync } from './planner';
 import { createIncrementalHarness, createSettings } from './planner-test-harness';
 

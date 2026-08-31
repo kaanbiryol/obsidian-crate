@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FileEntry } from '../plugin/types';
+import type { FileEntry } from '../protocol/sync-types';
 import { classifyPath } from './reconciliation';
 
 interface Replica {

@@ -156,6 +156,7 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 		headers: {
 			'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
 			'Content-Length': String(obj.size),
+			'Cache-Control': 'private, no-store',
 			'X-File-Hash': storedFile?.hash || obj.customMetadata?.hash || '',
 			...corsHeaders(),
 		},

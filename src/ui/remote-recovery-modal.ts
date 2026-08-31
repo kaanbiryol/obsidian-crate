@@ -1,5 +1,5 @@
 import { Modal, Notice, Setting, type App } from 'obsidian';
-import type { RemoteFileVersion } from '../plugin/types';
+import type { RemoteFileVersion } from '../protocol/sync-types';
 import type { SyncRuntime } from '../sync/runtime';
 import { openConfirmationModal } from './confirmation-modal';
 

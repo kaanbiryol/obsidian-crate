@@ -1,6 +1,6 @@
 import type { App, PluginManifest } from 'obsidian';
 import { isRecord } from '../plugin/settings';
-import type { ConflictRecord } from '../plugin/types';
+import type { ConflictRecord } from './types';
 import { createLogger, errorMessage } from '../plugin/logger';
 import { getOriginalPathFromConflictFile, isConflictFile } from './conflict';
 import { getAllVaultFiles } from './file-discovery';

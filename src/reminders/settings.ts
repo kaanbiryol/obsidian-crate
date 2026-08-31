@@ -19,6 +19,7 @@ type QueryViewPreference = {
 };
 
 export type RemindersSettings = {
+	enabled: boolean;
 	debugLogging: boolean;
 	taskCreationDefaultDueDate: DueDateDefaultSetting;
 	remindersFolderPath: string;
@@ -31,6 +32,7 @@ export type RemindersSettings = {
 };
 
 export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
+	enabled: false,
 	debugLogging: false,
 	taskCreationDefaultDueDate: 'none',
 	remindersFolderPath: DEFAULT_REMINDERS_FOLDER_PATH,
@@ -141,6 +143,12 @@ export function normalizeRemindersSettings(
 	value: Partial<RemindersSettings> | null | undefined,
 ): RemindersSettings {
 	return {
+		// Settings saved by prerelease builds predate the explicit adoption flag.
+		// Preserve those users' existing reminders behavior while keeping new
+		// installs read-only until they opt in.
+		enabled: typeof value?.enabled === 'boolean'
+			? value.enabled
+			: value !== null && value !== undefined,
 		debugLogging: typeof value?.debugLogging === 'boolean'
 			? value.debugLogging
 			: DEFAULT_REMINDERS_SETTINGS.debugLogging,
