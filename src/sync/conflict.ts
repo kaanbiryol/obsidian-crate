@@ -7,6 +7,7 @@ import { createLogger } from '../plugin/logger';
 import { isHiddenPath } from './file-discovery';
 
 const logger = createLogger('Conflict');
+const CONFLICT_TAG_PATTERN = / \(conflict \d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} [a-z0-9]{4}\)(?=\.[^/]+$|$)/;
 
 /**
  * Generate conflict file name
@@ -76,7 +77,12 @@ export async function createConflictCopy(
  * Check if a file is a conflict copy
  */
 export function isConflictFile(path: string): boolean {
-	return /\(conflict \d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} [a-z0-9]{4}\)/.test(path);
+	return CONFLICT_TAG_PATTERN.test(path);
+}
+
+export function getOriginalPathFromConflictFile(path: string): string | null {
+	if (!isConflictFile(path)) return null;
+	return path.replace(CONFLICT_TAG_PATTERN, '');
 }
 
 /**

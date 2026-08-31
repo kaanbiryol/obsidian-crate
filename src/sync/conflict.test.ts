@@ -3,6 +3,7 @@ import type { Vault } from 'obsidian';
 import {
 	createConflictCopy,
 	getConflictFileName,
+	getOriginalPathFromConflictFile,
 	isConflictFile,
 } from './conflict';
 import { detectConflicts } from './reconciliation';
@@ -233,6 +234,16 @@ describe('conflict naming helpers', () => {
 			true,
 		);
 		expect(isConflictFile('notes/test.md')).toBe(false);
+	});
+
+	it('recovers the original path from visible and hidden conflict copies', () => {
+		expect(getOriginalPathFromConflictFile(
+			'notes/test (conflict 2026-01-02 03-04-05 a1b2).md',
+		)).toBe('notes/test.md');
+		expect(getOriginalPathFromConflictFile(
+			'.archive/README (conflict 2026-01-02 03-04-05 a1b2)',
+		)).toBe('.archive/README');
+		expect(getOriginalPathFromConflictFile('notes/test.md')).toBeNull();
 	});
 
 });

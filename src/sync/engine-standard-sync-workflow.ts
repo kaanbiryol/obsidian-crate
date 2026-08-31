@@ -66,7 +66,6 @@ export async function runSyncWorkflow(
 		if (incrementalResult) {
 			completeWorkflowResult(context, incrementalResult, {
 				errorFallback: 'Incremental sync completed with errors',
-				conflictCount: incrementalResult.conflicts.length,
 			});
 			return incrementalResult;
 		}
@@ -190,7 +189,6 @@ export async function runSyncWorkflow(
 		}
 		completeWorkflowResult(context, result, {
 			errorFallback: 'Full sync completed with errors',
-			conflictCount: result.conflicts.length,
 		});
 
 		logger.info(

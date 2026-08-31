@@ -51,6 +51,32 @@ export function recordResolvedRace(
 	}
 }
 
+export function mergeSyncResults(target: SyncResult, source: SyncResult): void {
+	target.uploaded += source.uploaded;
+	target.downloaded += source.downloaded;
+	target.merged += source.merged;
+	target.deleted += source.deleted;
+	appendUnique(target.conflicts, source.conflicts);
+	for (const conflict of source.unresolvedConflicts) {
+		if (!target.unresolvedConflicts.some((candidate) => candidate.conflictPath === conflict.conflictPath)) {
+			target.unresolvedConflicts.push(conflict);
+		}
+	}
+	for (const race of source.resolvedRaces) recordResolvedRace(target, race.path, race.resolution);
+	appendUnique(target.settledPaths, source.settledPaths);
+	target.errors.push(...source.errors);
+	appendUnique(target.uploadedPaths, source.uploadedPaths);
+	appendUnique(target.downloadedPaths, source.downloadedPaths);
+	appendUnique(target.mergedPaths, source.mergedPaths);
+	appendUnique(target.deletedPaths, source.deletedPaths);
+}
+
+function appendUnique(target: string[], additions: string[]): void {
+	for (const value of additions) {
+		if (!target.includes(value)) target.push(value);
+	}
+}
+
 export function createSyncFailureResult(error: string): SyncResult {
 	const result = createEmptySyncResult();
 	result.success = false;

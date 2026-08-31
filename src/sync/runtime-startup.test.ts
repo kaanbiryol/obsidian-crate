@@ -20,6 +20,7 @@ describe('SyncRuntime startup event handling', () => {
 
 		vi.spyOn(SyncEngine.prototype, 'initialize').mockResolvedValue(undefined);
 		vi.spyOn(SyncEngine.prototype, 'sync').mockImplementation(async () => startupSync.promise);
+		vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges').mockResolvedValue(false);
 		vi.spyOn(SyncQueueController.prototype as unknown as { debouncedSync(): void }, 'debouncedSync').mockImplementation(() => {});
 	});
 
@@ -84,5 +85,31 @@ describe('SyncRuntime startup event handling', () => {
 		runtime.onFileChange({ path: 'notes/existing.md' } as never);
 
 		expect(runtime.getPendingPaths()).toEqual(['notes/existing.md']);
+	});
+
+	it('still forwards conflict-copy deletes while startup sync is in flight', async () => {
+		const onFileDelete = vi.spyOn(SyncEngine.prototype, 'onFileDelete');
+		const { runtime } = createRuntimeHarness();
+		await runtime.initialize();
+		const conflictFile = {
+			path: 'notes/shared (conflict 2026-01-02 03-04-05 ab12).md',
+		} as never;
+
+		runtime.onFileDelete(conflictFile);
+
+		expect(onFileDelete).toHaveBeenCalledWith(conflictFile);
+	});
+
+	it('runs one recovery pass when a visible edit was missed during startup sync', async () => {
+		vi.spyOn(SyncEngine.prototype, 'hasUnsyncedLocalChanges').mockResolvedValue(true);
+		const sync = vi.spyOn(SyncEngine.prototype, 'sync');
+		const { runtime } = createRuntimeHarness();
+
+		await runtime.initialize();
+		startupSync.resolve(createEmptySyncResult());
+
+		await expect(runtime.waitForStartupSync()).resolves.toBe(true);
+		expect(sync).toHaveBeenCalledTimes(2);
+		expect(isAcceptingEvents(runtime)).toBe(true);
 	});
 });

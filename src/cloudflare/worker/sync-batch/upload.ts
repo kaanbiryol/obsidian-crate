@@ -21,6 +21,7 @@ import {
 	type FileStorageRow,
 } from '../sync-storage';
 import type { BatchFile } from './types';
+import type { BatchUploadResponse } from '../../../plugin/types';
 
 export async function handleBatchUpload(
 	request: Request,
@@ -40,7 +41,7 @@ export async function handleBatchUpload(
 		return corsResponse({ error: `Maximum ${MAX_BATCH_UPLOAD_FILES} files per batch` }, 400);
 	}
 
-	const results: Array<{ path: string; success: boolean; hash?: string; error?: string }> = [];
+	const results: BatchUploadResponse['results'] = [];
 	const uploads: Array<{
 		safePath: string;
 		bytes: ArrayBuffer;
@@ -55,28 +56,27 @@ export async function handleBatchUpload(
 
 	for (const file of files as BatchFile[]) {
 		if (typeof file?.content !== 'string') {
-			results.push({
-				path: typeof file?.path === 'string' ? file.path : '',
-				success: false,
-				error: 'Invalid file payload',
-			});
+			results.push(validationFailure(
+				typeof file?.path === 'string' ? file.path : '',
+				'Invalid file payload',
+			));
 			continue;
 		}
 
 		const safePath = sanitizePath(file.path);
 		if (!safePath) {
-			results.push({ path: file.path, success: false, error: 'Invalid path' });
+			results.push(validationFailure(file.path, 'Invalid path'));
 			continue;
 		}
 		if (seenPaths.has(safePath)) {
-			results.push({ path: safePath, success: false, error: 'Duplicate path in batch' });
+			results.push(validationFailure(safePath, 'Duplicate path in batch'));
 			continue;
 		}
 		seenPaths.add(safePath);
 
 		const expectedHash = parseExpectedFileHash(file.expectedHash);
 		if (expectedHash === undefined) {
-			results.push({ path: safePath, success: false, error: 'Valid expectedHash required' });
+			results.push(validationFailure(safePath, 'Valid expectedHash required'));
 			continue;
 		}
 
@@ -86,32 +86,32 @@ export async function handleBatchUpload(
 			for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
 			const size = bytes.byteLength;
 			if (file.size !== undefined && parseNonNegativeInteger(file.size) === null) {
-				results.push({ path: safePath, success: false, error: 'Invalid declared file size' });
+				results.push(validationFailure(safePath, 'Invalid declared file size'));
 				continue;
 			}
 			if (typeof file.size === 'number' && file.size !== size) {
-				results.push({ path: safePath, success: false, error: 'Declared file size does not match content' });
+				results.push(validationFailure(safePath, 'Declared file size does not match content'));
 				continue;
 			}
 
 			if (file.hash !== undefined && typeof file.hash !== 'string') {
-				results.push({ path: safePath, success: false, error: 'Invalid file hash' });
+				results.push(validationFailure(safePath, 'Invalid file hash'));
 				continue;
 			}
 			const providedHash = file.hash?.trim().toLowerCase() || '';
 			if (providedHash && !isSha256Hex(providedHash)) {
-				results.push({ path: safePath, success: false, error: 'Invalid file hash' });
+				results.push(validationFailure(safePath, 'Invalid file hash'));
 				continue;
 			}
 
 			if (file.contentType !== undefined && typeof file.contentType !== 'string') {
-				results.push({ path: safePath, success: false, error: 'Invalid content type' });
+				results.push(validationFailure(safePath, 'Invalid content type'));
 				continue;
 			}
 
 			const computedHash = await sha256HexBytes(bytes);
 			if (providedHash && providedHash !== computedHash) {
-				results.push({ path: safePath, success: false, error: 'Declared file hash does not match content' });
+				results.push(validationFailure(safePath, 'Declared file hash does not match content'));
 				continue;
 			}
 
@@ -130,7 +130,7 @@ export async function handleBatchUpload(
 				expectedHash: expectedHash ?? null,
 			});
 		} catch (error: unknown) {
-			results.push({ path: safePath, success: false, error: formatMutationError(error) });
+			results.push(validationFailure(safePath, formatMutationError(error)));
 		}
 	}
 
@@ -145,6 +145,8 @@ export async function handleBatchUpload(
 					path: file.safePath,
 					success: false as const,
 					error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
+					code: 'storage' as const,
+					status: 503,
 				}))),
 			}, 503);
 		}
@@ -170,6 +172,9 @@ export async function handleBatchUpload(
 					path: file.safePath,
 					success: false,
 					error: `Remote file changed since it was read${commit.currentHash ? ` (current hash: ${commit.currentHash})` : ''}`,
+					code: 'version_conflict',
+					status: 409,
+					currentHash: commit.currentHash,
 				});
 				return;
 			}
@@ -182,9 +187,18 @@ export async function handleBatchUpload(
 				path: file.safePath,
 				success: false,
 				error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
+				code: 'storage',
+				status: 503,
 			});
 		}
 	}));
 
 	return corsResponse({ success: results.every((result) => result.success), results }, metadataFailure ? 503 : 200);
+}
+
+function validationFailure(
+	path: string,
+	error: string,
+): BatchUploadResponse['results'][number] {
+	return { path, success: false, error, code: 'validation', status: 400 };
 }

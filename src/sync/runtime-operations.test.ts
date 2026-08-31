@@ -21,6 +21,8 @@ describe('SyncRuntime operation wrappers', () => {
 			success: true,
 			uploaded: 2,
 			uploadedPaths: ['notes/a.md'],
+			conflicts: ['notes/a (conflict 2026-01-02 03-04-05 ab12).md'],
+			resolvedRaces: [{ path: 'notes/restored.md', resolution: 'kept-remote-edit' }],
 		};
 		const progressCallback = vi.fn();
 		const listener = vi.fn();
@@ -58,6 +60,8 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(persistSettings).toHaveBeenCalledTimes(1);
 		expect(settings.syncHistory[0]?.type).toBe(historyType);
 		expect(settings.syncHistory[0]?.uploaded).toBe(2);
+		expect(settings.syncHistory[0]?.conflictPaths).toEqual(result.conflicts);
+		expect(settings.syncHistory[0]?.resolvedRaces).toEqual(result.resolvedRaces);
 	});
 
 	it('caps stored sync history file paths', async () => {

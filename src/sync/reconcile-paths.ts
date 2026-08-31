@@ -1,14 +1,11 @@
 import type { Vault } from 'obsidian';
 import { HttpError } from './api';
-import { computeHash } from './hasher';
-import { isHiddenPath } from './file-discovery';
+import { readLocalFileEntry } from './local-file-entry';
 import { classifyPath } from './reconciliation';
 import { isQueueVersionConflict } from './queue-failure';
 import { createEmptySyncResult, finalizeSyncResult } from './sync-result';
 import { RemoteVersionChangedError } from './transfer-download';
-import { isVaultTFileLike } from './transfer-prepare';
 import type { FileDiff, FileEntry, SyncResult } from '../plugin/types';
-import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
 import { errorMessage } from '../plugin/logger';
 import type { DiffApplyOutcome } from './transfer-types';
 
@@ -26,7 +23,6 @@ export interface TargetedReconcileContext {
 	localManifest: TargetedManifest;
 	getRemoteEntries(paths: string[]): Promise<Record<string, FileEntry>>;
 	shouldIgnore(path: string): boolean;
-	getModifiedIso(path: string): Promise<string>;
 	processDiff(
 		diff: FileDiff,
 		localFiles: Record<string, FileEntry>,
@@ -55,7 +51,7 @@ export async function reconcileQueuePaths(
 		let settled = false;
 		for (let attempt = 1; attempt <= MAX_RECONCILE_ATTEMPTS; attempt++) {
 			try {
-				const localEntry = await readLocalEntry(context, path);
+				const localEntry = await readLocalFileEntry(context.vault, path);
 				const remoteEntry = remoteEntries[path];
 				const baseEntry = context.localManifest.getEntry(path);
 				const decision = classifyPath(path, localEntry, remoteEntry, baseEntry);
@@ -73,7 +69,7 @@ export async function reconcileQueuePaths(
 				} else if (localEntry && remoteEntry) {
 					context.localManifest.setEntry(path, {
 						...remoteEntry,
-						modified: await context.getModifiedIso(path),
+						modified: localEntry.modified,
 					});
 				} else {
 					context.localManifest.removeEntry(path);
@@ -113,24 +109,4 @@ async function refreshRemoteEntry(
 	const entry = refreshed[path];
 	if (entry) remoteEntries[path] = entry;
 	else delete remoteEntries[path];
-}
-
-async function readLocalEntry(
-	context: Pick<TargetedReconcileContext, 'vault' | 'getModifiedIso'>,
-	path: string,
-): Promise<FileEntry | undefined> {
-	const abstractFile = context.vault.getAbstractFileByPath(path);
-	const exists = isVaultTFileLike(abstractFile)
-		|| (isHiddenPath(path) && await context.vault.adapter.exists(path));
-	if (!exists) return undefined;
-
-	const content = await context.vault.adapter.readBinary(path);
-	if (content.byteLength > MAX_FILE_SIZE_BYTES) {
-		throw new Error('Skipped local file larger than 25MB');
-	}
-	return {
-		hash: await computeHash(content),
-		size: content.byteLength,
-		modified: await context.getModifiedIso(path),
-	};
 }

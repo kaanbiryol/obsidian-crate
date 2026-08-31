@@ -1,31 +1,25 @@
 import { BATCH_DELETE_MAX_FILES } from '../protocol/sync-limits';
 import { HttpError } from './api';
 import { errorMessage } from '../plugin/logger';
+import type { MutationFailure } from '../plugin/types';
 
 export interface ConditionalDeleteCandidate {
 	path: string;
 	expectedHash: string;
 }
 
-interface ConditionalDeleteFailure {
-	path: string;
-	error: string;
-	status?: number;
-	currentHash?: string | null;
-}
-
 interface ConditionalDeleteApi {
 	batchDelete(paths: string[], expectedHashes?: Record<string, string>): Promise<{
 		success: boolean;
 		deleted: string[];
-		errors?: ConditionalDeleteFailure[];
+		errors?: MutationFailure[];
 	}>;
 }
 
 export interface ConditionalDeleteResult {
 	success: boolean;
 	deleted: string[];
-	errors: ConditionalDeleteFailure[];
+	errors: MutationFailure[];
 }
 
 export async function deleteFilesInBatches(
@@ -33,7 +27,7 @@ export async function deleteFilesInBatches(
 	files: ConditionalDeleteCandidate[],
 ): Promise<ConditionalDeleteResult> {
 	const deleted: string[] = [];
-	const errors: ConditionalDeleteFailure[] = [];
+	const errors: MutationFailure[] = [];
 
 	for (let index = 0; index < files.length; index += BATCH_DELETE_MAX_FILES) {
 		const chunk = files.slice(index, index + BATCH_DELETE_MAX_FILES);
@@ -64,13 +58,30 @@ export async function deleteFilesInBatches(
 			}
 		} catch (error) {
 			const status = error instanceof HttpError ? error.status : undefined;
+			const code = error instanceof HttpError && isMutationFailureCode(error.code)
+				? error.code
+				: undefined;
+			const currentHash = error instanceof HttpError ? error.currentHash : undefined;
 			const message = errorMessage(error);
 			for (const file of files.slice(index)) {
-				errors.push({ path: file.path, error: message, ...(status === undefined ? {} : { status }) });
+				errors.push({
+					path: file.path,
+					error: message,
+					...(status === undefined ? {} : { status }),
+					...(code === undefined ? {} : { code }),
+					...(currentHash === undefined ? {} : { currentHash }),
+				});
 			}
 			break;
 		}
 	}
 
 	return { success: errors.length === 0, deleted, errors };
+}
+
+function isMutationFailureCode(value: string | undefined): value is NonNullable<MutationFailure['code']> {
+	return value === 'version_conflict'
+		|| value === 'validation'
+		|| value === 'storage'
+		|| value === 'unknown';
 }

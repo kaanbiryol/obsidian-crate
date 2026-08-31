@@ -6,6 +6,7 @@ import type { BatchUploadFile, PreparedUpload, SyncResult } from "../plugin/type
 import { BATCH_FILE_SIZE_LIMIT } from "../plugin/types";
 import { createLogger } from "../plugin/logger";
 import type { VaultFile } from "./file-discovery";
+import { HttpError } from './api';
 
 const logger = createLogger("SyncTransfer");
 
@@ -32,7 +33,7 @@ export async function uploadPreparedFiles(
   context: TransferContext,
   prepared: PreparedUpload[],
   result: SyncResult,
-  options: { concurrency: number; retry: boolean; batchConcurrency?: number },
+  options: UploadPreparedFilesOptions,
 ): Promise<void> {
   if (prepared.length === 0) {
     return;
@@ -42,6 +43,7 @@ export async function uploadPreparedFiles(
 
   const batchable = prepared.filter((file) => file.size < BATCH_FILE_SIZE_LIMIT);
   const individual = prepared.filter((file) => file.size >= BATCH_FILE_SIZE_LIMIT);
+  const versionConflictPaths = new Set<string>();
 
   if (batchable.length > 0) {
     const chunks = createBatchUploadChunks(batchable);
@@ -53,22 +55,22 @@ export async function uploadPreparedFiles(
           hash: upload.hash,
           size: upload.size,
           contentType: upload.contentType || "application/octet-stream",
-		  expectedHash: upload.expectedHash ?? null,
+          expectedHash: upload.expectedHash ?? null,
         }));
 
         const doBatch = () => context.api.batchUpload(files);
         const response = options.retry
           ? await context.retryWithBackoff(doBatch)
           : await doBatch();
-		const expectedPaths = new Set(chunk.map((upload) => upload.path));
-		const responsePaths = response.results.map((file) => file.path);
-		if (
-			new Set(responsePaths).size !== responsePaths.length
-			|| responsePaths.length !== chunk.length
-			|| responsePaths.some((path) => !expectedPaths.has(path))
-		) {
-			throw new Error("Batch upload response did not match the requested paths");
-		}
+        const expectedPaths = new Set(chunk.map((upload) => upload.path));
+        const responsePaths = response.results.map((file) => file.path);
+        if (
+          new Set(responsePaths).size !== responsePaths.length
+          || responsePaths.length !== chunk.length
+          || responsePaths.some((path) => !expectedPaths.has(path))
+        ) {
+          throw new Error("Batch upload response did not match the requested paths");
+        }
 
         for (const fileResult of response.results) {
           const upload = chunk.find((candidate) => candidate.path === fileResult.path);
@@ -94,6 +96,8 @@ export async function uploadPreparedFiles(
             if (isMarkdownPath(upload.path)) {
               await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
             }
+          } else if (fileResult.code === 'version_conflict' || fileResult.status === 409) {
+            versionConflictPaths.add(upload.path);
           } else {
             result.errors.push(`${upload.path}: ${fileResult.error || "Upload failed"}`);
           }
@@ -110,16 +114,40 @@ export async function uploadPreparedFiles(
   }
 
   if (individual.length > 0) {
-    await uploadPreparedFilesIndividually(context, individual, result, options);
+    const individualConflicts = await uploadPreparedFilesIndividually(context, individual, result, options);
+    for (const path of individualConflicts) versionConflictPaths.add(path);
   }
+
+  if (versionConflictPaths.size > 0) {
+    const paths = [...versionConflictPaths];
+    if (options.onVersionConflicts) {
+      try {
+        await options.onVersionConflicts(paths, result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Version-conflict reconciliation failed';
+        for (const path of paths) result.errors.push(`${path}: ${message}`);
+      }
+    } else {
+      for (const path of paths) {
+        result.errors.push(`${path}: Remote file changed since it was read`);
+      }
+    }
+  }
+}
+
+export interface UploadPreparedFilesOptions {
+  concurrency: number;
+  retry: boolean;
+  batchConcurrency?: number;
+  onVersionConflicts?: (paths: string[], result: SyncResult) => Promise<void>;
 }
 
 async function uploadPreparedFilesIndividually(
   context: TransferContext,
   prepared: PreparedUpload[],
   result: SyncResult,
-  options: { concurrency: number; retry: boolean },
-): Promise<void> {
+  options: Pick<UploadPreparedFilesOptions, 'concurrency' | 'retry'>,
+): Promise<string[]> {
   const tasks = prepared.map((upload) => async () => {
     try {
       const doUpload = () => context.api.uploadFile(
@@ -128,7 +156,7 @@ async function uploadPreparedFilesIndividually(
         upload.hash,
         upload.size,
         upload.contentType || "application/octet-stream",
-		upload.expectedHash ?? null,
+        upload.expectedHash ?? null,
       );
       const uploadResult = options.retry
         ? await context.retryWithBackoff(doUpload)
@@ -139,7 +167,7 @@ async function uploadPreparedFilesIndividually(
           result.errors.push(
             `${upload.path}: Hash mismatch after upload (expected ${upload.hash}, got ${uploadResult.hash})`,
           );
-          return;
+          return null;
         }
 
         result.uploaded++;
@@ -152,15 +180,23 @@ async function uploadPreparedFilesIndividually(
         if (isMarkdownPath(upload.path)) {
           await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
         }
-        return;
+        return null;
       }
 
+      if (uploadResult.code === 'version_conflict' || uploadResult.status === 409) {
+        return upload.path;
+      }
       result.errors.push(`${upload.path}: ${uploadResult.error || "Upload failed"}`);
     } catch (error) {
+      if (error instanceof HttpError && (error.code === 'version_conflict' || error.status === 409)) {
+        return upload.path;
+      }
       const uploadError = error instanceof Error ? error.message : "Upload failed";
       result.errors.push(`${upload.path}: ${uploadError}`);
     }
+    return null;
   });
 
-  await context.runConcurrent(tasks, options.concurrency);
+  const versionConflicts = await context.runConcurrent(tasks, options.concurrency);
+  return versionConflicts.filter((path): path is string => path !== null);
 }

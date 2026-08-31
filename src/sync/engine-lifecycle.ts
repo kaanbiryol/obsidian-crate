@@ -10,7 +10,7 @@ interface SyncEngineLifecycleDependencies {
 	getSyncIntervalSeconds(): number;
 	getLastSeq(): number;
 	getPendingPathCount(): number;
-	hasHiddenFileChanges(): Promise<boolean>;
+	hasLocalFileChanges(): Promise<boolean>;
 	checkForChanges(lastSeq: number): Promise<{ hasChanges: boolean; cursorExpired?: boolean }>;
 	sync(): Promise<SyncResult>;
 }

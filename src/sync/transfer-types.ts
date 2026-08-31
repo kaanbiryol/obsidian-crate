@@ -6,6 +6,7 @@ import type {
   FileEntry,
   UploadResult,
 } from "../plugin/types";
+import type { RecordConflictInput } from './conflict-store';
 
 interface TransferManifest {
   getEntry?(path: string): FileEntry | undefined;
@@ -17,6 +18,10 @@ interface TransferManifest {
 interface TransferMarkdownBaseCache {
   readBase(path: string, hash: string): Promise<ArrayBuffer | null>;
   putBase(path: string, hash: string, content: ArrayBuffer): Promise<void>;
+}
+
+interface TransferConflictStore {
+  record(conflict: RecordConflictInput): Promise<void>;
 }
 
 interface TransferApi {
@@ -42,6 +47,7 @@ export interface TransferContext {
   api: TransferApi;
   localManifest: TransferManifest;
   markdownBaseCache?: TransferMarkdownBaseCache;
+  conflictStore?: TransferConflictStore;
   runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
   retryWithBackoff<T>(fn: () => Promise<T>): Promise<T>;
   getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;

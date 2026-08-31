@@ -10,7 +10,12 @@ const FILE_CARD_ICONS: Record<FileCardType, string> = {
 	conflict: 'alert-triangle',
 };
 
-export function renderFileMicroCard(container: HTMLElement, filePath: string, type: FileCardType): void {
+export function renderFileMicroCard(
+	container: HTMLElement,
+	filePath: string,
+	type: FileCardType,
+	description?: string,
+): void {
 	const card = container.createDiv({
 		cls: `crate-activity-file-card${type === 'conflict' ? ' crate-file-card-conflict' : ''}`,
 	});
@@ -24,7 +29,8 @@ export function renderFileMicroCard(container: HTMLElement, filePath: string, ty
 	const fileName = parts.pop() ?? filePath;
 	const dirPath = parts.join('/');
 	info.createSpan({ text: fileName, cls: 'crate-file-name', attr: { title: filePath } });
-	if (dirPath) info.createSpan({ text: dirPath, cls: 'crate-file-path' });
+	if (description) info.createSpan({ text: description, cls: 'crate-file-path' });
+	else if (dirPath) info.createSpan({ text: dirPath, cls: 'crate-file-path' });
 }
 
 export function renderEmptyState(container: HTMLElement, icon: string, title: string, description: string): void {

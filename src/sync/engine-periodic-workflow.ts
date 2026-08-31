@@ -16,7 +16,7 @@ export interface PeriodicCheckWorkflowContext {
 	setConsecutiveCheckFailures(value: number): void;
 	getLastCheckAttempt(): number;
 	setLastCheckAttempt(value: number): void;
-	hasHiddenFileChanges(): Promise<boolean>;
+	hasLocalFileChanges(): Promise<boolean>;
 	checkForChanges(lastSeq: number): Promise<{ hasChanges: boolean; cursorExpired?: boolean }>;
 	sync(): Promise<SyncResult>;
 }
@@ -40,12 +40,12 @@ export async function runPeriodicCheckWorkflow(
 	context.setLastCheckAttempt(Date.now());
 
 	try {
-		const [{ hasChanges, cursorExpired }, hiddenFilesChanged] = await Promise.all([
+		const [{ hasChanges, cursorExpired }, localFilesChanged] = await Promise.all([
 			context.checkForChanges(context.getLastSeq()),
-			context.hasHiddenFileChanges(),
+			context.hasLocalFileChanges(),
 		]);
 
-		if (!hasChanges && !cursorExpired && !hiddenFilesChanged && context.getPendingPathCount() === 0) {
+		if (!hasChanges && !cursorExpired && !localFilesChanged && context.getPendingPathCount() === 0) {
 			logger.debug('Periodic check: no changes');
 			context.setConsecutiveCheckFailures(0);
 			return;

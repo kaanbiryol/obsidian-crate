@@ -1,11 +1,11 @@
 import { Modal, setIcon, type App } from 'obsidian';
-import type { CrateSettings, SyncState } from '../plugin/types';
+import type { ConflictRecord, CrateSettings, SyncState } from '../plugin/types';
 import { renderHistoryPanel } from './activity/history';
 import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
 
 export interface ActivityModalDeps {
 	getPendingPaths(): string[];
-	getConflictFiles(): string[];
+	getActiveConflicts(): ConflictRecord[];
 	getState(): SyncState;
 	sync(): Promise<unknown>;
 	addStateChangeListener(listener: (state: SyncState) => void): void;
@@ -96,7 +96,7 @@ export class ActivityModal extends Modal {
 		this.allPanels = [this.pendingPanel, this.conflictsPanel, historyPanel];
 
 		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths());
-		renderConflictsPanel(this.conflictsPanel, this.deps.getConflictFiles());
+		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts());
 		renderHistoryPanel(historyPanel, this.settings.syncHistory ?? []);
 
 		for (let i = 0; i < this.allTabs.length; i++) {
@@ -137,7 +137,7 @@ export class ActivityModal extends Modal {
 
 	private updateTabCounts(): void {
 		const pendingLen = this.deps.getPendingPaths().length;
-		const conflictLen = this.deps.getConflictFiles().length;
+		const conflictLen = this.deps.getActiveConflicts().length;
 
 		this.pendingCount.setText(pendingLen > 0 ? `(${pendingLen})` : '');
 		this.conflictsCount.setText(conflictLen > 0 ? `(${conflictLen})` : '');
@@ -180,7 +180,7 @@ export class ActivityModal extends Modal {
 		this.pendingPanel.empty();
 		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths());
 		this.conflictsPanel.empty();
-		renderConflictsPanel(this.conflictsPanel, this.deps.getConflictFiles());
+		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts());
 		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
 	}
 

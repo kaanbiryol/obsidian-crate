@@ -4,7 +4,7 @@ import { createEmptySyncResult } from './sync-result';
 
 function createContext(overrides: Partial<{
 	checkForChanges: PeriodicCheckWorkflowContext['checkForChanges'];
-	hiddenFilesChanged: boolean;
+	localFilesChanged: boolean;
 	pendingPathCount: number;
 	syncIntervalSeconds: number;
 }> = {}) {
@@ -33,7 +33,7 @@ function createContext(overrides: Partial<{
 			setLastCheckAttempt: (value: number) => {
 				lastCheckAttempt = value;
 			},
-			hasHiddenFileChanges: async () => overrides.hiddenFilesChanged ?? false,
+			hasLocalFileChanges: async () => overrides.localFilesChanged ?? false,
 			checkForChanges,
 			sync,
 		},
@@ -80,8 +80,8 @@ describe('runPeriodicCheckWorkflow', () => {
 		expect(harness.getFailures()).toBe(0);
 	});
 
-	it('syncs when hidden files changed without remote changes', async () => {
-		const harness = createContext({ hiddenFilesChanged: true });
+	it('syncs when local files changed without remote changes', async () => {
+		const harness = createContext({ localFilesChanged: true });
 
 		await runPeriodicCheckWorkflow(harness.context);
 

@@ -64,6 +64,17 @@ interface UnresolvedConflict {
 	conflictPath: string;
 }
 
+export interface ConflictRecord {
+	originalPath: string;
+	conflictPath: string;
+	createdAt: string;
+	cause: 'concurrent-create' | 'concurrent-edit' | 'unknown';
+	status: 'active' | 'resolved';
+	localHash?: string;
+	remoteHash?: string;
+	baseHash?: string;
+}
+
 export interface ResolvedSyncRace {
 	path: string;
 	resolution: 'kept-local-edit' | 'kept-remote-edit';
@@ -80,6 +91,8 @@ export interface SyncHistoryEntry {
 	errorCount: number;
 	conflictCount: number;
 	resolvedRaceCount?: number;
+	conflictPaths?: string[];
+	resolvedRaces?: ResolvedSyncRace[];
 	uploadedPaths?: string[];
 	downloadedPaths?: string[];
 	mergedPaths?: string[];
@@ -169,6 +182,19 @@ export interface UploadResult {
 	path: string;
 	hash?: string;
 	error?: string;
+	code?: MutationFailureCode;
+	status?: number;
+	currentHash?: string | null;
+}
+
+type MutationFailureCode = 'version_conflict' | 'validation' | 'storage' | 'unknown';
+
+export interface MutationFailure {
+	path: string;
+	error: string;
+	code?: MutationFailureCode;
+	status?: number;
+	currentHash?: string | null;
 }
 
 export interface HealthResponse {
@@ -197,7 +223,15 @@ export interface BatchDeleteFile {
 
 export interface BatchUploadResponse {
 	success: boolean;
-	results: Array<{ path: string; success: boolean; hash?: string; error?: string }>;
+	results: Array<{
+		path: string;
+		success: boolean;
+		hash?: string;
+		error?: string;
+		code?: MutationFailureCode;
+		status?: number;
+		currentHash?: string | null;
+	}>;
 }
 
 interface BatchDownloadFile {
@@ -216,7 +250,7 @@ export interface BatchDownloadResponse {
 export interface BatchDeleteResponse {
 	success: boolean;
 	deleted: string[];
-	errors?: Array<{ path: string; error: string; status?: number; currentHash?: string | null }>;
+	errors?: MutationFailure[];
 }
 
 export interface BackendDiagnostics {

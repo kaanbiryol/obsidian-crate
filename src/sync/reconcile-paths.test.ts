@@ -26,7 +26,11 @@ async function createHarness(options: {
 	};
 	const vault = {
 		adapter,
-		getAbstractFileByPath: vi.fn((path: string) => ({ path, extension: 'md' })),
+		getAbstractFileByPath: vi.fn((path: string) => ({
+			path,
+			extension: 'md',
+			stat: { size: localContent.byteLength, mtime: Date.parse('2026-02-15T00:00:00.000Z') },
+		})),
 	};
 	let manifestIndex = 0;
 	const processDiff = vi.fn<TargetedReconcileContext['processDiff']>(async (_diff, _localFiles, result: SyncResult) => {
@@ -52,7 +56,6 @@ async function createHarness(options: {
 		localManifest,
 		getRemoteEntries,
 		shouldIgnore: vi.fn(() => false),
-		getModifiedIso: vi.fn(async () => '2026-02-15T00:00:00.000Z'),
 		processDiff,
 	};
 	return { context, processDiff, getRemoteEntries, localManifest, adapter };

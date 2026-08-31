@@ -183,6 +183,47 @@ it('chunks more than one server batch of local deletes', async () => {
 		expect(localManifest.save).toHaveBeenCalledTimes(1);
 	});
 
+	it('reconciles a stale batch delete instead of reporting a generic failure', async () => {
+		const harness = createIncrementalHarness({
+			settings: { lastSeq: 7 },
+			lastSeq: 8,
+			localDeletes: ['notes/changed-remotely.md'],
+		});
+		harness.localManifest.getEntry.mockReturnValue({
+			hash: 'base-hash',
+			size: 1,
+			modified: '2026-02-15T00:00:00.000Z',
+		});
+		harness.api.batchDelete.mockResolvedValue({
+			success: false,
+			deleted: [],
+			errors: [{
+				path: 'notes/changed-remotely.md',
+				error: 'Remote file changed since it was read',
+				code: 'version_conflict',
+				status: 409,
+				currentHash: 'remote-hash',
+			}],
+		});
+		const reconcileVersionConflicts = vi.fn(async (paths: string[], result: SyncResult) => {
+			result.downloaded++;
+			result.downloadedPaths.push('notes/changed-remotely.md');
+			result.settledPaths.push(...paths);
+		});
+		harness.context.reconcileVersionConflicts = reconcileVersionConflicts;
+
+		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
+
+		expect(reconcileVersionConflicts).toHaveBeenCalledWith(
+			['delete:notes/changed-remotely.md'],
+			expect.any(Object),
+		);
+		expect(result?.success).toBe(true);
+		expect(result?.errors).toEqual([]);
+		expect(result?.downloadedPaths).toEqual(['notes/changed-remotely.md']);
+		expect(harness.settings.lastSeq).toBe(8);
+	});
+
 	it('keeps cursor unchanged when incremental sync finishes with errors', async () => {
 		const settings = createSettings({ lastSeq: 11 });
 		const localManifest = {

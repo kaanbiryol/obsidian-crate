@@ -73,7 +73,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 - `X-Crate-Expected-Hash` is the 64-character remote hash observed while planning, or `absent` for a new path
 - Body: raw binary, consumed incrementally with a hard 25 MB cap; oversized declared or chunked requests stop before the remainder is buffered
 - Response: `{ success, path, hash }`
-- A stale expected hash returns `409` and does not replace the committed object
+- A stale expected hash returns `409` with `{ success: false, path, error, code: "version_conflict", currentHash }` and does not replace the committed object
 
 ### GET /sync/download
 
@@ -100,7 +100,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 
 Worker validates: max 6 files, total decoded content <= 10 MB. Mutation batches are deliberately smaller than download batches to stay within Workers Free D1 query limits even on stale-write cleanup paths.
 
-Response: `{ success, results: [{ path, success, hash?, error? }] }`
+Response: `{ success, results: [{ path, success, hash?, error?, code?, status?, currentHash? }] }`. A stale per-file write uses `code: "version_conflict"`, `status: 409`, and the current remote hash; storage failures use `code: "storage"` and `status: 503`.
 
 ### POST /sync/batch-download
 
@@ -114,7 +114,7 @@ Content is base64-encoded. The Worker rejects a batch before reading R2 if D1 me
 
 Single: `{ path: "notes/file.md", expectedHash: "sha256..." }` -> `{ success, path }`
 
-Batch: `{ files: [{ path, expectedHash }, ...] }` (max 6) -> `{ success, deleted: [...] }`
+Batch: `{ files: [{ path, expectedHash }, ...] }` (max 6) -> `{ success, deleted: [...], errors?: [{ path, error, code?, status?, currentHash? }] }`
 
 Uploads, deletes, and PWA reminder edits compare the D1 hash they originally read. D1 applies the file-row mutation and changelog append atomically; stale writers receive `409` instead of silently overwriting a newer version.
 

@@ -48,9 +48,20 @@ function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry): vo
 		{ paths: entry.downloadedPaths ?? [], type: 'download' },
 		{ paths: entry.mergedPaths ?? [], type: 'merge' },
 		{ paths: entry.deletedPaths ?? [], type: 'delete' },
+		{ paths: entry.conflictPaths ?? [], type: 'conflict' },
 	];
 	for (const group of groups) {
 		for (const filePath of group.paths) renderFileMicroCard(filesEl, filePath, group.type);
+	}
+	for (const race of entry.resolvedRaces ?? []) {
+		renderFileMicroCard(
+			filesEl,
+			race.path,
+			race.resolution === 'kept-local-edit' ? 'upload' : 'download',
+			race.resolution === 'kept-local-edit'
+				? 'Edit/delete race: kept local edit'
+				: 'Edit/delete race: restored remote edit',
+		);
 	}
 }
 
@@ -58,7 +69,9 @@ function hasFilePaths(entry: SyncHistoryEntry): boolean {
 	return (entry.uploadedPaths?.length ?? 0) > 0
 		|| (entry.downloadedPaths?.length ?? 0) > 0
 		|| (entry.mergedPaths?.length ?? 0) > 0
-		|| (entry.deletedPaths?.length ?? 0) > 0;
+		|| (entry.deletedPaths?.length ?? 0) > 0
+		|| (entry.conflictPaths?.length ?? 0) > 0
+		|| (entry.resolvedRaces?.length ?? 0) > 0;
 }
 
 function formatTimestamp(iso: string): string {

@@ -14,6 +14,8 @@ type ManifestEntry = {
 };
 
 type MockAdapter = {
+	read: ReturnType<typeof vi.fn>;
+	write: ReturnType<typeof vi.fn>;
 	readBinary: ReturnType<typeof vi.fn>;
 	stat: ReturnType<typeof vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>>;
 	exists: ReturnType<typeof vi.fn>;
@@ -162,6 +164,8 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 	const settings = { ...createSettings(), ...settingsOverrides };
 
 	const adapter: MockAdapter = {
+		read: vi.fn(),
+		write: vi.fn(),
 		readBinary: vi.fn(),
 		stat: vi.fn<(path: string) => Promise<{ type: string; size: number; mtime: number } | null>>(),
 		exists: vi.fn(),

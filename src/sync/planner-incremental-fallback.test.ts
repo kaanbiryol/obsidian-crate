@@ -102,7 +102,11 @@ it('falls back to full sync when cursor is expired', async () => {
 			settings,
 			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
-				getAbstractFileByPath: vi.fn(() => ({ stat: { size: 18, mtime: 200 } })),
+				getAbstractFileByPath: vi.fn(() => ({
+					path: 'notes/queued.md',
+					extension: 'md',
+					stat: { size: 18, mtime: 200 },
+				})),
 				delete: vi.fn(),
 				adapter: {
 					exists: vi.fn(async () => true),
@@ -176,7 +180,11 @@ it('falls back to full sync when cursor is expired', async () => {
 			settings,
 			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
-				getAbstractFileByPath: vi.fn(() => ({ stat: { size: 10, mtime: 200 } })),
+				getAbstractFileByPath: vi.fn(() => ({
+					path: 'notes/shared.md',
+					extension: 'md',
+					stat: { size: 10, mtime: 200 },
+				})),
 				delete: vi.fn(),
 				adapter: {
 					exists: vi.fn(async () => true),

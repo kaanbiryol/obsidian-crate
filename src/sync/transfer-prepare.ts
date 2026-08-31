@@ -1,6 +1,6 @@
-import type { TFile } from "obsidian";
 import { computeHash } from "./hasher";
 import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from "./file-discovery";
+import { isVaultTFileLike } from './planner-helpers';
 import type { VaultFile } from "./file-discovery";
 import type { PreparedUpload } from "../plugin/types";
 import { BATCH_MAX_BYTES, BATCH_MAX_FILES, MAX_FILE_SIZE_BYTES } from "../plugin/types";
@@ -8,15 +8,6 @@ import { createLogger } from "../plugin/logger";
 import type { TransferContext } from "./transfer-types";
 
 const logger = createLogger("SyncTransfer");
-
-export function isVaultTFileLike(file: unknown): file is TFile {
-  return typeof file === "object"
-    && file !== null
-    && "path" in file
-    && typeof file.path === "string"
-    && "extension" in file
-    && typeof file.extension === "string";
-}
 
 export async function prepareUploadFromVaultFile(
   context: TransferContext,

@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { ChangelogEntry, CrateSettings } from '../plugin/types';
+import type { ChangelogEntry, CrateSettings, MutationFailure } from '../plugin/types';
 import type { IncrementalSyncPlannerContext } from './planner-types';
 
 export function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
@@ -60,7 +60,11 @@ export function createIncrementalHarness(overrides: Partial<{
 		})),
 		downloadFile: vi.fn(),
 		deleteFile: vi.fn(),
-		batchDelete: vi.fn(async (paths: string[]) => ({ success: true, deleted: paths })),
+		batchDelete: vi.fn(async (paths: string[]) => ({
+			success: true,
+			deleted: paths,
+			errors: [] as MutationFailure[],
+		})),
 	};
 	const context: IncrementalSyncPlannerContext = {
 		settings,
@@ -75,6 +79,7 @@ export function createIncrementalHarness(overrides: Partial<{
 		processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 		prepareUploadFromPath: vi.fn(async () => null),
 		uploadPreparedFiles: vi.fn(async () => {}),
+		reconcileVersionConflicts: vi.fn(async () => {}),
 	};
 
 	return {

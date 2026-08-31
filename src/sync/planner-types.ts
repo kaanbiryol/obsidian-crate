@@ -1,7 +1,8 @@
 import type { TAbstractFile, Vault } from "obsidian";
-import type { ChangelogEntry, CrateSettings, DownloadDiff, FileDiff, FileEntry, PreparedUpload, SyncResult, UploadDiff } from "../plugin/types";
+import type { ChangelogEntry, CrateSettings, DownloadDiff, FileDiff, FileEntry, MutationFailure, PreparedUpload, SyncResult, UploadDiff } from "../plugin/types";
 import type { DownloadRequest } from './transfer-download';
 import type { DiffApplyOutcome } from './transfer-types';
+import type { UploadPreparedFilesOptions } from './transfer-upload';
 
 interface PlannerManifest {
   getEntry(path: string): FileEntry | undefined;
@@ -24,7 +25,7 @@ interface PlannerApi {
   batchDelete(paths: string[], expectedHashes?: Record<string, string>): Promise<{
     success: boolean;
     deleted: string[];
-    errors?: Array<{ path: string; error: string; status?: number; currentHash?: string | null }>;
+    errors?: MutationFailure[];
   }>;
 }
 
@@ -56,8 +57,9 @@ export interface IncrementalSyncPlannerContext {
   uploadPreparedFiles(
     prepared: PreparedUpload[],
     result: SyncResult,
-    options: { concurrency: number; retry: boolean; batchConcurrency?: number },
+    options: UploadPreparedFilesOptions,
   ): Promise<void>;
+	reconcileVersionConflicts?(paths: string[], result: SyncResult): Promise<void>;
 }
 
 export interface FullSyncPlannerContext {

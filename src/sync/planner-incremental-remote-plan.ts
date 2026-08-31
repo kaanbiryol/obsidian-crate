@@ -1,6 +1,5 @@
-import { computeHash } from './hasher';
-import { isHiddenPath } from './file-discovery';
-import { deletePathLocallyIfUnchanged, isVaultTFileLike } from './planner-helpers';
+import { readLocalFileEntry } from './local-file-entry';
+import { deletePathLocallyIfUnchanged } from './planner-helpers';
 import { classifyPath } from './reconciliation';
 import type { IncrementalSyncPlannerContext } from './planner-types';
 import type { DownloadRequest } from './transfer-download';
@@ -101,8 +100,8 @@ export async function planIncrementalRemoteChanges(
 				continue;
 			}
 
-			const localFile = context.vault.getAbstractFileByPath(path);
-			if (!localFile && !(isHiddenPath(path) && await context.vault.adapter.exists(path))) {
+			const localEntry = await readLocalFileEntry(context.vault, path);
+			if (!localEntry) {
 				downloadRequests.push({
 					path,
 					expectedLocalHash: null,
@@ -112,34 +111,19 @@ export async function planIncrementalRemoteChanges(
 				continue;
 			}
 
-			const stat = isVaultTFileLike(localFile)
-				? localFile.stat
-				: await context.vault.adapter.stat(path);
-			if ((stat?.size ?? 0) > MAX_FILE_SIZE_BYTES) {
-				result.errors.push(`${path}: Skipped local file larger than 25MB`);
-				continue;
-			}
-
-			const content = await context.vault.adapter.readBinary(path);
-			const localHash = await computeHash(content);
-			const localModified = new Date(stat?.mtime ?? Date.now()).toISOString();
 			const decision = classifyPath(
 				path,
-				{ hash: localHash, size: stat?.size ?? content.byteLength, modified: localModified },
+				localEntry,
 				{ hash: entry.hash, size: entry.size, modified: entry.created_at },
 				context.localManifest.getEntry(path),
 			);
 
 			if (!decision) {
-				context.localManifest.setEntry(path, {
-					hash: localHash,
-					size: stat?.size ?? 0,
-					modified: localModified,
-				});
+				context.localManifest.setEntry(path, localEntry);
 			} else if (decision.action === 'upload') {
 				if (!localChangedPaths.has(path)) {
 					localChangedPaths.add(path);
-					const localChange = { path, hash: localHash };
+					const localChange = { path, hash: localEntry.hash };
 					localChanges.push(localChange);
 					localChangeByPath.set(path, localChange);
 				}
@@ -149,7 +133,7 @@ export async function planIncrementalRemoteChanges(
 			} else if (decision.action === 'download') {
 				downloadRequests.push({
 					path,
-					expectedLocalHash: localHash,
+					expectedLocalHash: localEntry.hash,
 					expectedRemoteHash: entry.hash,
 					remoteSize: entry.size,
 				});

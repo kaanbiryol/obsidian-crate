@@ -2,7 +2,7 @@ import type { TFile, Vault } from 'obsidian';
 import { createConflictCopy } from './conflict';
 import { isHiddenPath } from './file-discovery';
 import { computeHash } from './hasher';
-import { isVaultTFileLike } from './transfer-prepare';
+import { isVaultTFileLike } from './planner-helpers';
 import type { DiffApplyOutcome } from './transfer-types';
 
 const MAX_CONFLICT_COPY_ATTEMPTS = 3;
@@ -18,7 +18,10 @@ interface LocalApplyContext {
 	vault: Vault;
 }
 
-export type ConflictPreservingApplyOutcome = DiffApplyOutcome & { conflictPaths: string[] };
+interface CreatedConflictCopy {
+	path: string;
+	hash: string;
+}
 
 export async function applyRemoteContentIfUnchanged(
 	context: LocalApplyContext,
@@ -47,18 +50,19 @@ export async function preserveLocalVersionsAndApplyRemote(
 	path: string,
 	initialLocalContent: ArrayBuffer,
 	remoteContent: ArrayBuffer,
-): Promise<ConflictPreservingApplyOutcome> {
+	onConflictCopy?: (copy: CreatedConflictCopy) => Promise<void>,
+): Promise<DiffApplyOutcome> {
 	await ensureParentFolder(context.vault, path);
-	const conflictPaths: string[] = [];
 	let localContent = initialLocalContent;
 	let localHash = await computeHash(localContent);
 
 	for (let attempt = 0; attempt < MAX_CONFLICT_COPY_ATTEMPTS; attempt++) {
-		conflictPaths.push(await createConflictCopy(context.vault, path, localContent));
+		const conflictPath = await createConflictCopy(context.vault, path, localContent);
+		await onConflictCopy?.({ path: conflictPath, hash: localHash });
 		const latest = await readLocalSnapshot(context.vault, path);
 		if (!latest.exists || latest.hash === localHash) {
 			await writeLocalContent(context.vault, path, remoteContent, latest);
-			return { status: 'applied', conflictPaths };
+			return { status: 'applied' };
 		}
 
 		if (!latest.content || !latest.hash) {
@@ -71,7 +75,6 @@ export async function preserveLocalVersionsAndApplyRemote(
 	return {
 		status: 'deferred',
 		reason: 'Local file kept changing while its conflict copy was being created',
-		conflictPaths,
 	};
 }
 

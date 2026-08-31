@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload } from '../plugin/types';
+import { HttpError } from './api';
 import { createVaultFileChunks, uploadPreparedFiles } from './transfer';
 import { createTransferHarness, emptyResult } from './transfer-test-harness';
 
@@ -90,6 +91,62 @@ describe('transfer upload helpers', () => {
 		expect(harness.api.batchUpload).not.toHaveBeenCalled();
 		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
 		expect(result.uploaded).toBe(1);
+	});
+
+	it('reconciles structured version conflicts returned by a batch upload', async () => {
+		const harness = createTransferHarness();
+		harness.api.batchUpload.mockResolvedValue({
+			success: false,
+			results: [{
+				path: 'notes/a.md',
+				success: false,
+				error: 'Remote file changed since it was read',
+				code: 'version_conflict',
+				status: 409,
+				currentHash: 'remote-hash',
+			}],
+		});
+		const result = emptyResult();
+		const onVersionConflicts = vi.fn(async (paths: string[], syncResult: typeof result) => {
+			syncResult.downloaded++;
+			syncResult.downloadedPaths.push(paths[0]!);
+		});
+
+		await uploadPreparedFiles(harness.context, [{
+			path: 'notes/a.md',
+			content: new TextEncoder().encode('local').buffer as ArrayBuffer,
+			hash: 'local-hash',
+			size: 5,
+			expectedHash: 'base-hash',
+		}], result, { concurrency: 2, retry: false, onVersionConflicts });
+
+		expect(onVersionConflicts).toHaveBeenCalledWith(['notes/a.md'], result);
+		expect(result.errors).toEqual([]);
+		expect(result.downloadedPaths).toEqual(['notes/a.md']);
+	});
+
+	it('reconciles a 409 from an individual large-file upload', async () => {
+		const harness = createTransferHarness();
+		harness.api.uploadFile.mockRejectedValue(new HttpError(
+			'Remote file changed since it was read',
+			409,
+			null,
+			'version_conflict',
+			'remote-hash',
+		));
+		const result = emptyResult();
+		const onVersionConflicts = vi.fn(async () => {});
+
+		await uploadPreparedFiles(harness.context, [{
+			path: 'large.bin',
+			content: new ArrayBuffer(1024 * 1024),
+			hash: 'local-hash',
+			size: 1024 * 1024,
+			expectedHash: 'base-hash',
+		}], result, { concurrency: 2, retry: false, onVersionConflicts });
+
+		expect(onVersionConflicts).toHaveBeenCalledWith(['large.bin'], result);
+		expect(result.errors).toEqual([]);
 	});
 
 	it('chunks files for initial sync pipelining', () => {

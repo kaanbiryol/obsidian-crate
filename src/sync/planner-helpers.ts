@@ -6,11 +6,10 @@ import { computeHash } from "./hasher";
 export function isVaultTFileLike(file: TAbstractFile | null): file is TFile {
   return typeof file === "object"
     && file !== null
+	&& "path" in file
+	&& typeof file.path === "string"
     && "extension" in file
-    && typeof file.extension === "string"
-    && "stat" in file
-    && typeof file.stat === "object"
-    && file.stat !== null;
+    && typeof file.extension === "string";
 }
 
 interface LocalDeleteContext {

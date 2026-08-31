@@ -10,6 +10,7 @@ import {
 	type FileStorageRow,
 } from '../sync-storage';
 import type { BatchDeleteFile } from './types';
+import type { MutationFailure } from '../../../plugin/types';
 
 export async function handleBatchDelete(
 	request: Request,
@@ -26,7 +27,7 @@ export async function handleBatchDelete(
 	}
 
 	const deleted: string[] = [];
-	const errors: Array<{ path: string; error: string; status?: number; currentHash?: string | null }> = [];
+	const errors: MutationFailure[] = [];
 	const validFiles: Array<{ path: string; expectedHash: string }> = [];
 	const seenPaths = new Set<string>();
 
@@ -34,17 +35,17 @@ export async function handleBatchDelete(
 		const rawPath = typeof rawFile?.path === 'string' ? rawFile.path : '';
 		const safePath = sanitizePath(rawPath);
 		if (!safePath) {
-			errors.push({ path: rawPath, error: 'Invalid path' });
+			errors.push(validationFailure(rawPath, 'Invalid path'));
 			continue;
 		}
 		if (seenPaths.has(safePath)) {
-			errors.push({ path: safePath, error: 'Duplicate path in batch' });
+			errors.push(validationFailure(safePath, 'Duplicate path in batch'));
 			continue;
 		}
 		seenPaths.add(safePath);
 		const expectedHash = parseExpectedFileHash(rawFile.expectedHash);
 		if (expectedHash === undefined || expectedHash === null) {
-			errors.push({ path: safePath, error: 'Valid expectedHash required' });
+			errors.push(validationFailure(safePath, 'Valid expectedHash required'));
 			continue;
 		}
 
@@ -62,6 +63,8 @@ export async function handleBatchDelete(
 				errors: errors.concat(validFiles.map((file) => ({
 					path: file.path,
 					error: formatMetadataCommitFailure('Delete', formatMutationError(error)),
+					code: 'storage' as const,
+					status: 503,
 				}))),
 			}, 503);
 		}
@@ -79,6 +82,7 @@ export async function handleBatchDelete(
 				errors.push({
 					path: file.path,
 					error: 'Remote file changed since it was read',
+					code: 'version_conflict',
 					status: 409,
 					currentHash: commit.currentHash,
 				});
@@ -90,6 +94,8 @@ export async function handleBatchDelete(
 			errors.push({
 				path: file.path,
 				error: formatMetadataCommitFailure('Delete', formatMutationError(error)),
+				code: 'storage',
+				status: 503,
 			});
 		}
 	}
@@ -99,4 +105,8 @@ export async function handleBatchDelete(
 		deleted,
 		...(errors.length > 0 ? { errors } : {}),
 	}, metadataFailure ? 503 : 200);
+}
+
+function validationFailure(path: string, error: string): MutationFailure {
+	return { path, error, code: 'validation', status: 400 };
 }

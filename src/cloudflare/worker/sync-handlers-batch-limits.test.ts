@@ -103,7 +103,17 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 		);
 
 		expect(response.status).toBe(200);
-		expect(await responseJson(response)).toEqual(expect.objectContaining({ success: false }));
+		const responseBody = await responseJson(response) as {
+			success: boolean;
+			results: Array<{ code?: string; status?: number; currentHash?: string | null }>;
+		};
+		expect(responseBody.success).toBe(false);
+		expect(responseBody.results).toHaveLength(paths.length);
+		expect(responseBody.results.every((result) =>
+			result.code === 'version_conflict'
+			&& result.status === 409
+			&& result.currentHash === currentHash,
+		)).toBe(true);
 		// Reserve two of the 50 available queries for request authentication.
 		expect(db.prepare.mock.calls.length).toBeGreaterThan(0);
 		expect(db.prepare.mock.calls.length).toBeLessThanOrEqual(48);
@@ -133,6 +143,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 		expect(response.status).toBe(409);
 		expect(await responseJson(response)).toEqual(expect.objectContaining({
 			success: false,
+			code: 'version_conflict',
 			currentHash,
 		}));
 		expect(new TextDecoder().decode(store.get(managedKey)?.body)).toBe('current');
@@ -160,8 +171,49 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 		);
 
 		expect(response.status).toBe(409);
+		expect(await responseJson(response)).toEqual(expect.objectContaining({
+			success: false,
+			code: 'version_conflict',
+			currentHash,
+		}));
 		expect(files.has('notes/test.md')).toBe(true);
 		expect(store.has(managedKey)).toBe(true);
+	});
+
+	it('returns structured version conflicts for stale batch deletes', async () => {
+		const currentHash = 'e'.repeat(64);
+		const { bucket } = createMockR2Bucket();
+		const { db, files } = createMockD1Database({
+			files: {
+				'notes/test.md': { hash: currentHash, size: 7, storageKey: 'current-key' },
+			},
+		});
+
+		const response = await handleBatchDelete(
+			new Request('https://worker.test/sync/batch-delete', {
+				method: 'POST',
+				body: JSON.stringify({
+					files: [{ path: 'notes/test.md', expectedHash: 'f'.repeat(64) }],
+				}),
+				headers: { 'Content-Type': 'application/json' },
+			}),
+			bucket,
+			db,
+		);
+
+		expect(response.status).toBe(200);
+		expect(await responseJson(response)).toEqual({
+			success: false,
+			deleted: [],
+			errors: [{
+				path: 'notes/test.md',
+				error: 'Remote file changed since it was read',
+				code: 'version_conflict',
+				status: 409,
+				currentHash,
+			}],
+		});
+		expect(files.has('notes/test.md')).toBe(true);
 	});
 
 	it('preflights batch download size before reading R2 objects', async () => {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles } from './file-discovery';
-import { hasHiddenFileChanges } from './hidden-file-changes';
+import { hasLocalFileChanges } from './local-file-changes';
 
 vi.mock('./file-discovery', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./file-discovery')>();
@@ -28,7 +28,7 @@ function createHarness() {
 	return { entries, exists, manifest, vault };
 }
 
-describe('hasHiddenFileChanges', () => {
+describe('hasLocalFileChanges for hidden paths', () => {
 	beforeEach(() => {
 		getAllVaultFilesMock.mockReset();
 	});
@@ -42,7 +42,7 @@ describe('hasHiddenFileChanges', () => {
 			extension: 'json',
 		}]);
 
-		await expect(hasHiddenFileChanges(harness.vault, harness.manifest, () => false))
+		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false))
 			.resolves.toBe(false);
 	});
 
@@ -55,7 +55,7 @@ describe('hasHiddenFileChanges', () => {
 			extension: 'json',
 		}]);
 
-		await expect(hasHiddenFileChanges(harness.vault, harness.manifest, () => false))
+		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false))
 			.resolves.toBe(true);
 	});
 
@@ -64,7 +64,7 @@ describe('hasHiddenFileChanges', () => {
 		harness.exists.mockResolvedValue(false);
 		getAllVaultFilesMock.mockResolvedValue([]);
 
-		await expect(hasHiddenFileChanges(harness.vault, harness.manifest, () => false))
+		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false))
 			.resolves.toBe(true);
 	});
 
@@ -72,7 +72,44 @@ describe('hasHiddenFileChanges', () => {
 		const harness = createHarness();
 		getAllVaultFilesMock.mockResolvedValue([]);
 
-		await expect(hasHiddenFileChanges(harness.vault, harness.manifest, () => false))
+		await expect(hasLocalFileChanges(harness.vault, harness.manifest, () => false))
 			.resolves.toBe(false);
+	});
+});
+
+describe('hasLocalFileChanges', () => {
+	beforeEach(() => {
+		getAllVaultFilesMock.mockReset();
+	});
+
+	it('detects a modified visible file that has no pending vault event', async () => {
+		const path = 'notes/visible.md';
+		const modified = new Date(1_700_000_000_000).toISOString();
+		const vault = { adapter: { exists: vi.fn(async () => true) } } as unknown as Vault;
+		const manifest = {
+			getAllPaths: () => [path],
+			getEntry: () => ({ hash: 'hash', size: 12, modified }),
+		};
+		getAllVaultFilesMock.mockResolvedValue([{
+			path,
+			size: 12,
+			mtime: 1_700_000_000_001,
+			extension: 'md',
+		}]);
+
+		await expect(hasLocalFileChanges(vault, manifest, () => false)).resolves.toBe(true);
+	});
+
+	it('detects a missing visible file', async () => {
+		const path = 'notes/deleted.md';
+		const exists = vi.fn(async () => false);
+		const vault = { adapter: { exists } } as unknown as Vault;
+		const manifest = {
+			getAllPaths: () => [path],
+			getEntry: () => ({ hash: 'hash', size: 12, modified: new Date(0).toISOString() }),
+		};
+		getAllVaultFilesMock.mockResolvedValue([]);
+
+		await expect(hasLocalFileChanges(vault, manifest, () => false)).resolves.toBe(true);
 	});
 });

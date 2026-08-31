@@ -4,6 +4,7 @@ import type { SecretStorageService } from '../plugin/secret-storage';
 import {
 	SECRET_KEYS,
 	type CrateSettings,
+	type ConflictRecord,
 	type RemoteFileVersion,
 	type SyncHistoryEntry,
 	type SyncResult,
@@ -91,10 +92,8 @@ export class SyncRuntime {
 		return this.syncEngine.purgeIgnoredRemoteFiles();
 	}
 
-	getConflictFiles(): string[] {
-		return this.plugin.app.vault.getFiles()
-			.filter(f => isConflictFile(f.path))
-			.map(f => f.path);
+	getActiveConflicts(): ConflictRecord[] {
+		return this.syncEngine?.getActiveConflicts() ?? [];
 	}
 
 	addStateChangeListener(listener: (state: SyncState) => void): void {
@@ -161,8 +160,22 @@ export class SyncRuntime {
 
 		if (this.settings.syncOnStartup && !options.skipStartupSync) {
 			this.startupSyncTask = this.sync()
-				.then(result => {
+				.then(async result => {
 					notifyConflicts(result.conflicts);
+					if (
+						result.success
+						&& this.initializationRevision === initializationRevision
+						&& this.syncEngine === syncEngine
+					) {
+						// Resume event capture before probing so edits made after the
+						// startup operation cannot fall into a second blind window.
+						this.acceptingEvents = true;
+						if (await syncEngine.hasUnsyncedLocalChanges()) {
+							logger.info('Local changes detected after startup sync; running a recovery pass');
+							const recoveryResult = await this.sync();
+							notifyConflicts(recoveryResult.conflicts);
+						}
+					}
 					return true;
 				})
 				.catch(error => {
@@ -193,17 +206,17 @@ export class SyncRuntime {
 	}
 
 	onFileChange(file: TAbstractFile): void {
-		if (!this.acceptingEvents) return;
+		if (!this.acceptingEvents && !isConflictFile(file.path)) return;
 		this.syncEngine?.onFileChange(file);
 	}
 
 	onFileDelete(file: TAbstractFile): void {
-		if (!this.acceptingEvents) return;
+		if (!this.acceptingEvents && !isConflictFile(file.path)) return;
 		this.syncEngine?.onFileDelete(file);
 	}
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
-		if (!this.acceptingEvents) return;
+		if (!this.acceptingEvents && !isConflictFile(file.path) && !isConflictFile(oldPath)) return;
 		this.syncEngine?.onFileRename(file, oldPath);
 	}
 

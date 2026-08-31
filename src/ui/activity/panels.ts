@@ -1,3 +1,4 @@
+import type { ConflictRecord } from '../../plugin/types';
 import { renderEmptyState, renderFileMicroCard } from './rendering';
 
 export function renderPendingPanel(container: HTMLElement, paths: string[]): void {
@@ -18,12 +19,19 @@ export function renderPendingPanel(container: HTMLElement, paths: string[]): voi
 	for (const filePath of deletes) renderFileMicroCard(list, filePath, 'delete');
 }
 
-export function renderConflictsPanel(container: HTMLElement, paths: string[]): void {
-	if (paths.length === 0) {
+export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[]): void {
+	if (conflicts.length === 0) {
 		renderEmptyState(container, 'shield-check', 'No conflicts', 'Everything looks good.');
 		return;
 	}
 
 	const list = container.createDiv({ cls: 'crate-activity-list' });
-	for (const filePath of paths) renderFileMicroCard(list, filePath, 'conflict');
+	for (const conflict of conflicts) {
+		renderFileMicroCard(
+			list,
+			conflict.conflictPath,
+			'conflict',
+			`Original: ${conflict.originalPath} · Local-only copy`,
+		);
+	}
 }

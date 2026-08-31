@@ -2,10 +2,10 @@ import { computeHash } from "./hasher";
 import { applyRemoteContentIfUnchanged, preserveLocalVersionsAndApplyRemote } from "./local-apply";
 import { isMarkdownPath } from "./markdown-base-cache";
 import { mergeMarkdownContent } from "./markdown-merge";
-import { deletePathLocallyIfUnchanged } from "./planner-helpers";
+import { deletePathLocallyIfUnchanged, isVaultTFileLike } from "./planner-helpers";
 import { hasUnresolvedConflict, recordResolvedRace, recordUnresolvedConflict } from "./sync-result";
 import { downloadAndSaveFile, validateDownloadedContent } from "./transfer-download";
-import { isVaultTFileLike, prepareUploadFromPath } from "./transfer-prepare";
+import { prepareUploadFromPath } from "./transfer-prepare";
 import type { DiffApplyOutcome, TransferContext } from "./transfer-types";
 import type { ConflictDiff, FileDiff, FileEntry, SyncResult } from "../plugin/types";
 import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
@@ -105,6 +105,7 @@ export async function processDiff(
       }
 
       const localContent = await context.vault.adapter.readBinary(diff.path);
+      const baseHash = context.localManifest.getEntry?.(diff.path)?.hash;
       const autoMergeOutcome = await tryAutoMergeMarkdownConflict(
         context,
         diff,
@@ -120,10 +121,18 @@ export async function processDiff(
         diff.path,
         localContent,
         remoteContent,
+        async (copy) => {
+          recordUnresolvedConflict(result, diff.path, copy.path);
+          await context.conflictStore?.record({
+            originalPath: diff.path,
+            conflictPath: copy.path,
+            cause: diff.cause,
+            localHash: copy.hash,
+            remoteHash: diff.remoteHash,
+            ...(baseHash ? { baseHash } : {}),
+          });
+        },
       );
-      for (const conflictPath of applyOutcome.conflictPaths) {
-        recordUnresolvedConflict(result, diff.path, conflictPath);
-      }
       if (applyOutcome.status === "deferred") return applyOutcome;
 
       const hash = await computeHash(remoteContent);

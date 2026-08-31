@@ -2,7 +2,7 @@ import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
 import { createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "./sync-result";
 import { createLogger, errorMessage } from "../plugin/logger";
-import type { ChangelogEntry, FileEntry, PreparedUpload, SyncResult } from "../plugin/types";
+import type { ChangelogEntry, FileEntry, MutationFailure, PreparedUpload, SyncResult } from "../plugin/types";
 import { deleteFilesInBatches } from './delete-batches';
 import { planIncrementalRemoteChanges } from './planner-incremental-remote-plan';
 
@@ -64,15 +64,15 @@ export async function runIncrementalSync(
       changesByPath.set(entry.path, entry);
     }
 
-	const result = createEmptySyncResult();
-	const {
-		resurrectPaths,
-		restoreDeletedPaths,
-		remoteUnchangedLocalDeletes,
-		reclassifiedPaths,
-		downloadRequests,
-		conflicts,
-	} = await planIncrementalRemoteChanges(context, changesByPath, localChanges, localDeletes, result);
+    const result = createEmptySyncResult();
+    const {
+      resurrectPaths,
+      restoreDeletedPaths,
+      remoteUnchangedLocalDeletes,
+      reclassifiedPaths,
+      downloadRequests,
+      conflicts,
+    } = await planIncrementalRemoteChanges(context, changesByPath, localChanges, localDeletes, result);
 
     const localOnlyChanges = localChanges.filter(
       (file) =>
@@ -81,18 +81,18 @@ export async function runIncrementalSync(
     );
     const localOnlyDeletes = localDeletes.filter(
       (path) => (!changesByPath.has(path) || remoteUnchangedLocalDeletes.has(path))
-		&& !context.shouldIgnore(path),
+        && !context.shouldIgnore(path),
     );
     const total = changesByPath.size + localOnlyChanges.length + localOnlyDeletes.length;
     let current = 0;
 
     if (downloadRequests.length > 0) {
-	  await context.parallelDownloadAndSaveFiles(downloadRequests, result);
-	  for (const path of restoreDeletedPaths) {
-		if (result.downloadedPaths.includes(path) && !hasUnresolvedConflict(result, path)) {
-		  recordResolvedRace(result, path, "kept-remote-edit");
-		}
-	  }
+      await context.parallelDownloadAndSaveFiles(downloadRequests, result);
+      for (const path of restoreDeletedPaths) {
+        if (result.downloadedPaths.includes(path) && !hasUnresolvedConflict(result, path)) {
+          recordResolvedRace(result, path, "kept-remote-edit");
+        }
+      }
     }
     current += changesByPath.size;
     options.progressCallback?.(current, total);
@@ -114,9 +114,9 @@ export async function runIncrementalSync(
       try {
         const uploadFile = await context.prepareUploadFromPath(file.path);
         if (uploadFile) {
-		  if (resurrectPaths.has(file.path)) {
-			uploadFile.expectedHash = null;
-		  }
+          if (resurrectPaths.has(file.path)) {
+            uploadFile.expectedHash = null;
+          }
           localOnlyUploads.push(uploadFile);
         }
       } catch (error) {
@@ -126,31 +126,35 @@ export async function runIncrementalSync(
       options.progressCallback?.(current, total);
     }
 
-	await context.uploadPreparedFiles(localOnlyUploads, result, {
+    await context.uploadPreparedFiles(localOnlyUploads, result, {
       concurrency: options.uploadConcurrency,
-	  retry: true,
+      retry: true,
+      ...(context.reconcileVersionConflicts ? {
+        onVersionConflicts: (paths: string[], syncResult: SyncResult) =>
+          context.reconcileVersionConflicts!(paths, syncResult),
+      } : {}),
     });
-	for (const path of resurrectPaths) {
-	  if (result.uploadedPaths.includes(path)) {
-		recordResolvedRace(result, path, "kept-local-edit");
-	  }
-	}
+    for (const path of resurrectPaths) {
+      if (result.uploadedPaths.includes(path)) {
+        recordResolvedRace(result, path, "kept-local-edit");
+      }
+    }
 
     if (localOnlyDeletes.length > 0) {
-		try {
-			const deleteFiles = localOnlyDeletes.flatMap((path) => {
-				const expectedHash = context.localManifest.getEntry(path)?.hash;
-				return expectedHash ? [{ path, expectedHash }] : [];
-			});
-			const missingExpectedPaths = localOnlyDeletes.filter(
-				(path) => !context.localManifest.getEntry(path)?.hash,
-			);
-			for (const path of missingExpectedPaths) {
-				result.errors.push(`${path}: Missing remote version for delete`);
-			}
-			const deleteResult = deleteFiles.length > 0
-				? await deleteFilesInBatches(context.api, deleteFiles)
-				: { success: true, deleted: [], errors: [] };
+      try {
+        const deleteFiles = localOnlyDeletes.flatMap((path) => {
+          const expectedHash = context.localManifest.getEntry(path)?.hash;
+          return expectedHash ? [{ path, expectedHash }] : [];
+        });
+        const missingExpectedPaths = localOnlyDeletes.filter(
+          (path) => !context.localManifest.getEntry(path)?.hash,
+        );
+        for (const path of missingExpectedPaths) {
+          result.errors.push(`${path}: Missing remote version for delete`);
+        }
+        const deleteResult = deleteFiles.length > 0
+          ? await deleteFilesInBatches(context.api, deleteFiles)
+          : { success: true, deleted: [], errors: [] };
         for (const path of deleteResult.deleted) {
           context.localManifest.removeEntry(path);
           result.deleted++;
@@ -159,14 +163,30 @@ export async function runIncrementalSync(
 
         if (!deleteResult.success) {
           const deletedSet = new Set(deleteResult.deleted);
-          const failures = deleteResult.errors && deleteResult.errors.length > 0
+          const failures: MutationFailure[] = deleteResult.errors && deleteResult.errors.length > 0
             ? deleteResult.errors
             : localOnlyDeletes
                 .filter((path) => !deletedSet.has(path))
                 .map((path) => ({ path, error: "Batch delete failed" }));
 
-          for (const failure of failures) {
+          const versionConflicts = failures.filter(
+            (failure) => failure.code === 'version_conflict' || failure.status === 409,
+          );
+          const otherFailures = failures.filter((failure) => !versionConflicts.includes(failure));
+          for (const failure of otherFailures) {
             result.errors.push(`${failure.path}: ${failure.error}`);
+          }
+          if (versionConflicts.length > 0) {
+            if (context.reconcileVersionConflicts) {
+              await context.reconcileVersionConflicts(
+                versionConflicts.map((failure) => `delete:${failure.path}`),
+                result,
+              );
+            } else {
+              for (const failure of versionConflicts) {
+                result.errors.push(`${failure.path}: ${failure.error}`);
+              }
+            }
           }
         }
       } catch (error) {

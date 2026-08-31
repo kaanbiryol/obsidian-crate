@@ -45,7 +45,13 @@ const obsidianHttpTransport: ApiHttpTransport = async request => {
 };
 
 export class HttpError extends Error {
-	constructor(message: string, readonly status: number, readonly retryAfter: number | null = null) {
+	constructor(
+		message: string,
+		readonly status: number,
+		readonly retryAfter: number | null = null,
+		readonly code?: string,
+		readonly currentHash?: string | null,
+	) {
 		super(message);
 		this.name = 'HttpError';
 	}
@@ -79,12 +85,24 @@ function parseRetryAfter(headers: Record<string, string>): number | null {
 	return delay > 0 ? delay : null;
 }
 
-function parseErrorMessage(status: number, responseText: string): string {
+function parseErrorDetails(status: number, responseText: string): {
+	message: string;
+	code?: string;
+	currentHash?: string | null;
+} {
 	try {
-		const errorJson = JSON.parse(responseText) as { error?: string };
-		return errorJson.error || `HTTP ${status}`;
+		const errorJson = JSON.parse(responseText) as {
+			error?: string;
+			code?: string;
+			currentHash?: string | null;
+		};
+		return {
+			message: errorJson.error || `HTTP ${status}`,
+			...(typeof errorJson.code === 'string' ? { code: errorJson.code } : {}),
+			...('currentHash' in errorJson ? { currentHash: errorJson.currentHash ?? null } : {}),
+		};
 	} catch {
-		return `HTTP ${status}: ${responseText}`;
+		return { message: `HTTP ${status}: ${responseText}` };
 	}
 }
 
@@ -201,9 +219,15 @@ export class WorkerApiHttpClient {
 		}, timeout);
 
 		if (response.status >= 400) {
-			const message = parseErrorMessage(response.status, response.text);
-			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} -> ${message}`);
-			throw new HttpError(message, response.status, parseRetryAfter(response.headers));
+			const details = parseErrorDetails(response.status, response.text);
+			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} -> ${details.message}`);
+			throw new HttpError(
+				details.message,
+				response.status,
+				parseRetryAfter(response.headers),
+				details.code,
+				details.currentHash,
+			);
 		}
 
 		logger.info(`${options.method ?? 'GET'} ${path} -> ${response.status}`);
@@ -219,9 +243,15 @@ export class WorkerApiHttpClient {
 		const response = await this.runRequest(path, options, timeout);
 
 		if (response.status >= 400) {
-			const message = parseErrorMessage(response.status, response.text);
-			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} -> ${message}`);
-			throw new HttpError(message, response.status, parseRetryAfter(response.headers));
+			const details = parseErrorDetails(response.status, response.text);
+			logger.error(`Request failed: ${options.method ?? 'GET'} ${path} -> ${details.message}`);
+			throw new HttpError(
+				details.message,
+				response.status,
+				parseRetryAfter(response.headers),
+				details.code,
+				details.currentHash,
+			);
 		}
 
 		logger.info(`${options.method ?? 'GET'} ${path} -> ${response.status} (binary)`);

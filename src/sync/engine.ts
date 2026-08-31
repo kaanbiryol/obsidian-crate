@@ -6,6 +6,8 @@ import { type Plugin, type TAbstractFile, type Vault } from 'obsidian';
 import { SyncApiClient } from './api';
 import { LocalManifest } from './manifest';
 import { MarkdownBaseCache } from './markdown-base-cache';
+import { ConflictStore } from './conflict-store';
+import { isConflictFile } from './conflict';
 import type { VaultFile } from './file-discovery';
 import type { DownloadRequest } from './transfer-download';
 import { SyncQueueController } from './queue-controller';
@@ -31,11 +33,12 @@ import type {
 	PreparedUpload,
 	FileEntry,
 	CrateSettings,
+	ConflictRecord,
 } from '../plugin/types';
 import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/types';
 import { DOWNLOAD_CONCURRENCY, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
 import { shouldIgnoreSyncPath } from './engine-ignore';
-import { hasHiddenFileChanges } from './hidden-file-changes';
+import { hasLocalFileChanges } from './local-file-changes';
 import { deleteFilesInBatches } from './delete-batches';
 import {
 	runForceFullSyncWorkflow,
@@ -47,6 +50,8 @@ import { SyncEngineLifecycle } from './engine-lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
 import { createSyncFailureResult } from './sync-result';
 import type { DiffApplyOutcome } from './transfer-types';
+import type { UploadPreparedFilesOptions } from './transfer-upload';
+import { mergeSyncResults } from './sync-result';
 
 const logger = createLogger('SyncEngine');
 
@@ -56,6 +61,7 @@ export class SyncEngine {
 	private api: SyncApiClient;
 	private localManifest: LocalManifest;
 	private markdownBaseCache: MarkdownBaseCache;
+	private conflictStore: ConflictStore;
 	private settings: CrateSettings;
 	private state: SyncState;
 	private queueController: SyncQueueController;
@@ -76,7 +82,6 @@ export class SyncEngine {
 		this.settings = settings;
 		this.localManifest = new LocalManifest(plugin.app, plugin.manifest);
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
-		this.ignoredDirPrefixes = this.getIgnoredDirPrefixes(settings);
 		this.state = {
 			status: 'idle',
 			lastSync: settings.lastSync,
@@ -84,13 +89,17 @@ export class SyncEngine {
 			pendingChanges: 0,
 			conflictCount: 0,
 		};
+		this.conflictStore = new ConflictStore(plugin.app, plugin.manifest, (conflictCount) => {
+			this.updateState({ conflictCount });
+		});
+		this.ignoredDirPrefixes = this.getIgnoredDirPrefixes(settings);
 		this.lifecycle = new SyncEngineLifecycle({
 			apiConfigured: () => this.api.isConfigured(),
 			getStatus: () => this.state.status,
 			getSyncIntervalSeconds: () => this.settings.syncInterval,
 			getLastSeq: () => this.settings.lastSeq,
 			getPendingPathCount: () => this.queueController.getPendingPathCount(),
-			hasHiddenFileChanges: () => hasHiddenFileChanges(
+			hasLocalFileChanges: () => hasLocalFileChanges(
 				this.vault,
 				this.localManifest,
 				this.shouldIgnore.bind(this),
@@ -121,6 +130,7 @@ export class SyncEngine {
 			api: this.api,
 			getLocalManifest: () => this.localManifest,
 			markdownBaseCache: this.markdownBaseCache,
+			conflictStore: this.conflictStore,
 			getSettings: () => this.settings,
 			getStatus: () => this.state.status,
 			shouldIgnore: this.shouldIgnore.bind(this),
@@ -136,6 +146,8 @@ export class SyncEngine {
 			prepareUploadFromPath: (path) => this.prepareUploadFromPath(path),
 			uploadPreparedFiles: (prepared, result, options) =>
 				this.uploadPreparedFiles(prepared, result, options),
+			reconcileVersionConflicts: (paths, result) =>
+				this.reconcileVersionConflicts(paths, result),
 			prepareUploadsFromVaultFiles: (files, onPrepared) =>
 				this.prepareUploadsFromVaultFiles(files, onPrepared),
 			createVaultFileChunks: files => this.createVaultFileChunks(files),
@@ -147,6 +159,7 @@ export class SyncEngine {
 
 	async initialize(): Promise<void> {
 		await this.localManifest.load();
+		await this.conflictStore.load();
 		logger.info('Engine initialized');
 		this.seedMarkdownBaseCacheInBackground();
 
@@ -170,6 +183,18 @@ export class SyncEngine {
 
 	getPendingPaths(): string[] {
 		return this.queueController.getPendingPaths();
+	}
+
+	getActiveConflicts(): ConflictRecord[] {
+		return this.conflictStore.getActiveConflicts();
+	}
+
+	async hasUnsyncedLocalChanges(): Promise<boolean> {
+		return hasLocalFileChanges(
+			this.vault,
+			this.localManifest,
+			this.shouldIgnore.bind(this),
+		);
 	}
 
 	async previewIgnoredRemoteFiles(): Promise<string[]> {
@@ -237,14 +262,34 @@ export class SyncEngine {
 	}
 
 	onFileChange(file: TAbstractFile): void {
+		if (isConflictFile(file.path)) {
+			void this.conflictStore.registerDiscovered(file.path).catch((error) => {
+				logger.warn('Failed to register conflict copy:', errorMessage(error));
+			});
+		}
 		this.queueController.onFileChange(file);
 	}
 
 	onFileDelete(file: TAbstractFile): void {
+		if (isConflictFile(file.path)) {
+			void this.conflictStore.markResolved(file.path).catch((error) => {
+				logger.warn('Failed to resolve conflict copy:', errorMessage(error));
+			});
+		}
 		this.queueController.onFileDelete(file);
 	}
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
+		if (isConflictFile(oldPath)) {
+			void this.conflictStore.markResolved(oldPath).catch((error) => {
+				logger.warn('Failed to resolve renamed conflict copy:', errorMessage(error));
+			});
+		}
+		if (isConflictFile(file.path)) {
+			void this.conflictStore.registerDiscovered(file.path).catch((error) => {
+				logger.warn('Failed to register renamed conflict copy:', errorMessage(error));
+			});
+		}
 		this.queueController.onFileRename(file, oldPath);
 	}
 
@@ -310,15 +355,7 @@ export class SyncEngine {
 		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 		this.updateState({ status: 'syncing' });
 		try {
-			const result = await reconcileQueuePaths({
-				vault: this.vault,
-				localManifest: this.localManifest,
-				getRemoteEntries: async (paths) => (await this.api.getFileMetadata(paths)).files,
-				shouldIgnore: this.shouldIgnore.bind(this),
-				getModifiedIso: (path) => this.getModifiedIso(path),
-				processDiff: (diff, localFiles, syncResult) =>
-					this.processDiff(diff, localFiles, syncResult),
-			}, queueKeys);
+			const result = await this.reconcilePaths(queueKeys);
 			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 			if (result.success) {
 				const lastSync = new Date().toISOString();
@@ -327,7 +364,6 @@ export class SyncEngine {
 					status: 'idle',
 					lastSync,
 					lastError: null,
-					conflictCount: result.conflicts.length,
 				});
 				this.pruneMarkdownBaseCacheInBackground();
 			} else {
@@ -339,6 +375,22 @@ export class SyncEngine {
 			this.updateState({ status: 'error', lastError: message });
 			return createSyncFailureResult(message);
 		}
+	}
+
+	private async reconcileVersionConflicts(paths: string[], result: SyncResult): Promise<void> {
+		const reconciliation = await this.reconcilePaths(paths);
+		mergeSyncResults(result, reconciliation);
+	}
+
+	private async reconcilePaths(queueKeys: string[]): Promise<SyncResult> {
+		return reconcileQueuePaths({
+			vault: this.vault,
+			localManifest: this.localManifest,
+			getRemoteEntries: async (paths) => (await this.api.getFileMetadata(paths)).files,
+			shouldIgnore: this.shouldIgnore.bind(this),
+			processDiff: (diff, localFiles, syncResult) =>
+				this.processDiff(diff, localFiles, syncResult),
+		}, queueKeys);
 	}
 
 	private async processDiff(
@@ -364,7 +416,7 @@ export class SyncEngine {
 	private async uploadPreparedFiles(
 		prepared: PreparedUpload[],
 		result: SyncResult,
-		options: { concurrency: number; retry: boolean; batchConcurrency?: number },
+		options: UploadPreparedFilesOptions,
 	): Promise<void> {
 		await transferUploadPreparedFiles(this.contexts.transfer(), prepared, result, options);
 	}

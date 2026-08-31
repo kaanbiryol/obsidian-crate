@@ -99,6 +99,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 					success: false,
 					path: safePath,
 					error: 'Remote file changed since it was read',
+					code: 'version_conflict',
 					currentHash: commit.currentHash,
 				}, 409);
 			}
@@ -190,6 +191,7 @@ export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Dat
 				success: false,
 				path: safePath,
 				error: 'Remote file changed since it was read',
+				code: 'version_conflict',
 				currentHash: commit.currentHash,
 			}, 409);
 		}

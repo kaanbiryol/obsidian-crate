@@ -2,9 +2,11 @@ import type { FileManager, Vault } from 'obsidian';
 import type { SyncApiClient } from './api';
 import type { LocalManifest } from './manifest';
 import type { MarkdownBaseCache } from './markdown-base-cache';
+import type { ConflictStore } from './conflict-store';
 import type { DownloadRequest } from './transfer-download';
 import type { DiffApplyOutcome } from './transfer-types';
 import type { VaultFile } from './file-discovery';
+import type { UploadPreparedFilesOptions } from './transfer-upload';
 import { createFullSyncPlan } from './planner';
 import type {
 	CrateSettings,
@@ -22,6 +24,7 @@ interface SyncEngineContextDependencies {
 	api: SyncApiClient;
 	getLocalManifest: () => LocalManifest;
 	markdownBaseCache: MarkdownBaseCache;
+	conflictStore: ConflictStore;
 	getSettings: () => CrateSettings;
 	getStatus: () => SyncState['status'];
 	shouldIgnore: (path: string) => boolean;
@@ -37,8 +40,9 @@ interface SyncEngineContextDependencies {
 	uploadPreparedFiles: (
 		prepared: PreparedUpload[],
 		result: SyncResult,
-		options: { concurrency: number; retry: boolean; batchConcurrency?: number },
+		options: UploadPreparedFilesOptions,
 	) => Promise<void>;
+	reconcileVersionConflicts: (paths: string[], result: SyncResult) => Promise<void>;
 	prepareUploadsFromVaultFiles: (
 		files: VaultFile[],
 		onPrepared?: (completed: number) => void,
@@ -60,6 +64,7 @@ export class SyncEngineContexts {
 			api: dependencies.api,
 			localManifest: dependencies.getLocalManifest(),
 			markdownBaseCache: dependencies.markdownBaseCache,
+			conflictStore: dependencies.conflictStore,
 			runConcurrent: dependencies.runConcurrent,
 			retryWithBackoff: dependencies.retryWithBackoff,
 			getModifiedIso: dependencies.getModifiedIso,
@@ -91,6 +96,7 @@ export class SyncEngineContexts {
 			processDiff: dependencies.processDiff,
 			prepareUploadFromPath: dependencies.prepareUploadFromPath,
 			uploadPreparedFiles: dependencies.uploadPreparedFiles,
+			reconcileVersionConflicts: dependencies.reconcileVersionConflicts,
 		};
 	}
 

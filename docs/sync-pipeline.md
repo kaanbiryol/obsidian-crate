@@ -4,7 +4,7 @@
 
 ### 1. Periodic Check
 
-Every N seconds (configurable via `syncInterval`, default 300s), the engine calls `GET /sync/check?since=<lastSeq>`. If the server reports changes, reports an expired cursor, or local `pendingPaths` is non-empty, it triggers a sync. An expired cursor falls through to full reconciliation.
+Every N seconds (configurable via `syncInterval`, default 300s), the engine calls `GET /sync/check?since=<lastSeq>` and compares local file metadata with the local manifest. If the server reports changes, reports an expired cursor, queued paths exist, or any visible or hidden local file has changed, it triggers a sync. An expired cursor falls through to full reconciliation.
 
 Entry point: `engine.ts:periodicCheck()`
 
@@ -103,9 +103,17 @@ If the merge overlaps, the conflict remains unresolved:
 Only unresolved conflicts create a conflict copy and increment the user-visible
 conflict count. Edit/delete races are recorded separately as resolved races in
 sync history and do not trigger a conflict notice. Conflict files are
-auto-ignored by `isConflictFile()` to prevent sync loops.
+auto-ignored by `isConflictFile()` to prevent sync loops, so they remain
+local-only until the user reviews or deletes them.
 
-Implementation: `conflict.ts:createConflictCopy()`
+Active conflicts are stored in the plugin's `conflicts.json`, including the
+original path, conflict-copy path, cause, timestamp, and available hashes. The
+store is recovered through `conflicts.json.tmp`, scans visible and hidden files
+for untracked conflict copies on startup, and marks a conflict resolved when its
+copy is deleted or renamed. This keeps the status-bar and activity counts stable
+across restarts and unrelated sync runs.
+
+Implementation: `conflict.ts:createConflictCopy()`, `conflict-store.ts:ConflictStore`
 
 ## File Discovery
 
@@ -146,10 +154,10 @@ The active Obsidian configuration folder's entire `plugins/` tree is always excl
 
 Files are split by size at the `BATCH_FILE_SIZE_LIMIT` (1 MB) threshold:
 
-- **< 1 MB:** batched into JSON payloads with base64-encoded content. Each batch respects `BATCH_UPLOAD_MAX_FILES` (6) and `BATCH_MAX_BYTES` (10 MB) limits. Sent via `POST /sync/batch-upload`. The smaller mutation limit keeps worst-case conditional-write cleanup below Workers Free D1 query limits.
+- **< 1 MB:** batched into JSON payloads with base64-encoded content. Each batch respects `BATCH_UPLOAD_MAX_FILES` (6) and `BATCH_MAX_BYTES` (10 MB) limits. Sent via `POST /sync/batch-upload`. Per-path failures carry a stable code and status; version conflicts are sent through targeted three-way reconciliation instead of becoming generic upload errors. The smaller mutation limit keeps worst-case conditional-write cleanup below Workers Free D1 query limits.
 - **>= 1 MB:** uploaded individually as binary via `PUT /sync/upload` with retry.
 
-Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable. Conditional deletes are chunked into six-file requests and their partial results are aggregated.
+Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable. Conditional deletes are chunked into six-file requests; partial results are aggregated and stale deletes are targeted for reconciliation.
 
 Implementation: `transfer.ts:uploadPreparedFiles()`, `transfer.ts:createBatchUploadChunks()`
 
@@ -196,6 +204,8 @@ Implementation: `manifest.ts:LocalManifest`
 - **Cancellation:** in-flight HTTP transfers use `AbortController`; stopping or unloading sync aborts the underlying request, not only the caller's wait
 - **Incremental-to-full fallback:** if incremental sync returns `null` (error/cursor expiry), engine runs full sync
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file
+- **Startup event recovery:** event capture resumes before a post-startup metadata probe; if the startup sync missed a local edit, one recovery sync runs without opening another event blind window
+- **Conflict recovery:** the durable conflict registry recovers from `.tmp` and discovers visible or hidden conflict copies that were created before their metadata was committed
 - **Queue retry:** retryable flush failures are re-added to `pendingPaths`; version and validation conflicts request a targeted three-way replan for only the affected paths, with at most three compare-and-swap attempts
 - **Large files:** files > 25 MB are skipped with error message, not crashed
 - **Remote recovery:** replaced and deleted R2 objects are retained for 30 days, integrity-checked, and restorable with an expected-hash compare-and-swap

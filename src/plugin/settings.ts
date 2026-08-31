@@ -9,6 +9,7 @@ import {
 	DEFAULT_SETTINGS,
 	MAX_SYNC_HISTORY,
 	MAX_SYNC_HISTORY_PATHS,
+	type ResolvedSyncRace,
 	type SyncHistoryEntry,
 } from './types';
 
@@ -128,6 +129,18 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 		deleted: normalizeNonNegativeInteger(value.deleted, 0),
 		errorCount: normalizeNonNegativeInteger(value.errorCount, 0),
 		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
+		...(typeof value.resolvedRaceCount === 'number' ? {
+			resolvedRaceCount: normalizeNonNegativeInteger(value.resolvedRaceCount, 0),
+		} : {}),
+		...(Array.isArray(value.conflictPaths) ? {
+			conflictPaths: normalizeStringArray(value.conflictPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS),
+		} : {}),
+		...(Array.isArray(value.resolvedRaces) ? {
+			resolvedRaces: value.resolvedRaces
+				.map(normalizeResolvedSyncRace)
+				.filter((race): race is ResolvedSyncRace => race !== null)
+				.slice(0, MAX_SYNC_HISTORY_PATHS),
+		} : {}),
 		uploadedPaths: Array.isArray(value.uploadedPaths)
 			? normalizeStringArray(value.uploadedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
 			: undefined,
@@ -141,6 +154,12 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 			? normalizeStringArray(value.deletedPaths, []).slice(0, MAX_SYNC_HISTORY_PATHS)
 			: undefined,
 	};
+}
+
+function normalizeResolvedSyncRace(value: unknown): ResolvedSyncRace | null {
+	if (!isRecord(value) || typeof value.path !== 'string') return null;
+	if (value.resolution !== 'kept-local-edit' && value.resolution !== 'kept-remote-edit') return null;
+	return { path: value.path, resolution: value.resolution };
 }
 
 function normalizeSyncHistory(value: unknown): SyncHistoryEntry[] {

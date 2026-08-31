@@ -48,12 +48,8 @@ export function completeWorkflowResult(
 	result: SyncResult,
 	options: {
 		errorFallback: string;
-		conflictCount?: number;
 	},
 ): void {
-	const stateExtras = options.conflictCount === undefined
-		? {}
-		: { conflictCount: options.conflictCount };
 	const hadExplicitFailure = !result.success;
 
 	if (finalizeSyncResult(result) && !hadExplicitFailure) {
@@ -62,7 +58,6 @@ export function completeWorkflowResult(
 			status: 'idle',
 			lastSync,
 			lastError: null,
-			...stateExtras,
 		});
 		context.setLastSync(lastSync);
 		return;
@@ -72,7 +67,6 @@ export function completeWorkflowResult(
 	context.updateState({
 		status: 'error',
 		lastError: getSyncResultError(result, options.errorFallback),
-		...stateExtras,
 	});
 }
 

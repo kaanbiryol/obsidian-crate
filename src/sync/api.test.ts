@@ -63,6 +63,21 @@ describe('SyncApiClient', () => {
 		await expect(client.health()).rejects.toThrow('Unauthorized');
 	});
 
+	it('preserves structured mutation conflict details', async () => {
+		const transport = mockTransport(new Response(JSON.stringify({
+			error: 'Remote file changed since it was read',
+			code: 'version_conflict',
+			currentHash: 'remote-hash',
+		}), { status: 409 }));
+		const client = new SyncApiClient('https://worker.example', 'token', transport);
+
+		await expect(client.deleteFile('notes/a.md', 'base-hash')).rejects.toMatchObject({
+			status: 409,
+			code: 'version_conflict',
+			currentHash: 'remote-hash',
+		});
+	});
+
 	it('falls back to HTTP status and body for non-JSON errors', async () => {
 		const transport = mockTransport(new Response('Service unavailable', { status: 503 }));
 		const client = new SyncApiClient('https://worker.example', 'token', transport);

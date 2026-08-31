@@ -48,6 +48,8 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 					path: 'notes/test.md',
 					success: false,
 					error: 'Upload not committed because sync metadata update failed: D1 unavailable',
+					code: 'storage',
+					status: 503,
 				},
 			],
 		});
@@ -80,6 +82,8 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 				{
 					path: 'notes/test.md',
 					error: 'Delete not committed because sync metadata update failed: D1 unavailable',
+					code: 'storage',
+					status: 503,
 				},
 			],
 		});
@@ -276,6 +280,8 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 					path: 'notes/test.md',
 					success: false,
 					error: 'Invalid file payload',
+					code: 'validation',
+					status: 400,
 				},
 			],
 		});

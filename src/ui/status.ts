@@ -138,7 +138,7 @@ export class StatusBarManager {
 					return {
 						icon: '⚠',
 						text: state.conflictCount === 1 ? '1 conflict' : `${state.conflictCount} conflicts`,
-						tooltip: 'Conflict copies were created during sync. Search your vault for "conflict" to find them.',
+						tooltip: 'Local-only conflict copies need review. Open Sync activity → Conflicts.',
 					};
 				}
 
