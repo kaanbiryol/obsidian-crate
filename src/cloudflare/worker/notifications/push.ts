@@ -1,10 +1,10 @@
 import {
 	deserializeVapidKeys,
 	generateVapidKeys,
-	sendPushNotification,
 	serializeVapidKeys,
 } from 'web-push-browser';
 import { queryRows } from '../db';
+import { sendPushNotificationWithoutContact } from './web-push';
 
 interface SerializedVapidKeys {
 	publicKey: string;
@@ -27,7 +27,6 @@ export interface PushDeliveryResult {
 	failedSubscriptionIds: string[];
 }
 
-const VAPID_EMAIL = 'crate-push@example.com';
 const PUSH_DELIVERY_CONCURRENCY = 6;
 
 export interface PushNotificationPayload {
@@ -162,13 +161,12 @@ export async function sendToAllSubscriptions(
 
 	await runBounded(subscriptions, async (subscription) => {
 		try {
-			const response = await sendPushNotification(
+			const response = await sendPushNotificationWithoutContact(
 				keys,
 				{
 					endpoint: subscription.endpoint,
 					keys: { p256dh: subscription.p256dh, auth: subscription.auth },
 				},
-				VAPID_EMAIL,
 				payloadString,
 			);
 

@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	deserializeVapidKeys,
 	generateVapidKeys,
-	sendPushNotification,
 	serializeVapidKeys,
 } from 'web-push-browser';
 import { createDeclarativePushPayload, getOrCreateVapidKeys, sendToAllSubscriptions } from './push';
+import { createVapidAuthorizationToken, sendPushNotificationWithoutContact } from './notifications/web-push';
 
 vi.mock('web-push-browser', async (importOriginal) => {
 	const original = await importOriginal<typeof import('web-push-browser')>();
@@ -13,8 +13,15 @@ vi.mock('web-push-browser', async (importOriginal) => {
 		...original,
 		deserializeVapidKeys: vi.fn(),
 		generateVapidKeys: vi.fn(),
-		sendPushNotification: vi.fn(),
 		serializeVapidKeys: vi.fn(),
+	};
+});
+
+vi.mock('./notifications/web-push', async (importOriginal) => {
+	const original = await importOriginal<typeof import('./notifications/web-push')>();
+	return {
+		...original,
+		sendPushNotificationWithoutContact: vi.fn(),
 	};
 });
 
@@ -61,6 +68,29 @@ describe('createDeclarativePushPayload', () => {
 	});
 });
 
+describe('createVapidAuthorizationToken', () => {
+	it('omits the optional VAPID contact claim', async () => {
+		const keyPair = await crypto.subtle.generateKey(
+			{ name: 'ECDSA', namedCurve: 'P-256' },
+			true,
+			['sign', 'verify'],
+		);
+		const token = await createVapidAuthorizationToken(
+			keyPair.privateKey,
+			new URL('https://push.example/subscription'),
+		);
+		const encodedPayload = token.split('.')[1];
+		expect(encodedPayload).toBeDefined();
+		const payloadJson = new TextDecoder().decode(
+			new Uint8Array(Buffer.from(encodedPayload!, 'base64url')),
+		);
+
+		expect(payloadJson).toContain('"aud":"https://push.example"');
+		expect(payloadJson).toMatch(/"exp":\d+/);
+		expect(payloadJson).not.toContain('"sub"');
+	});
+});
+
 describe('getOrCreateVapidKeys', () => {
 	it('returns the persisted winner when concurrent initialization wins the insert race', async () => {
 		vi.mocked(generateVapidKeys).mockResolvedValue({} as never);
@@ -100,7 +130,7 @@ describe('sendToAllSubscriptions', () => {
 		vi.mocked(deserializeVapidKeys).mockResolvedValue({} as never);
 		let activeRequests = 0;
 		let maximumActiveRequests = 0;
-		vi.mocked(sendPushNotification).mockImplementation(async () => {
+		vi.mocked(sendPushNotificationWithoutContact).mockImplementation(async () => {
 			activeRequests += 1;
 			maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests);
 			await new Promise((resolve) => setTimeout(resolve, 1));
@@ -137,7 +167,7 @@ describe('sendToAllSubscriptions', () => {
 
 	it('quarantines permanent push failures without retrying them', async () => {
 		vi.mocked(deserializeVapidKeys).mockResolvedValue({} as never);
-		vi.mocked(sendPushNotification).mockResolvedValue(new Response('forbidden', { status: 403 }));
+		vi.mocked(sendPushNotificationWithoutContact).mockResolvedValue(new Response('forbidden', { status: 403 }));
 		const run = vi.fn(async () => ({}));
 		const prepare = vi.fn((sql: string) => {
 			const statement = {
@@ -162,7 +192,7 @@ describe('sendToAllSubscriptions', () => {
 
 	it('returns transient push failures for bounded alarm retries', async () => {
 		vi.mocked(deserializeVapidKeys).mockResolvedValue({} as never);
-		vi.mocked(sendPushNotification).mockResolvedValue(new Response('busy', { status: 503 }));
+		vi.mocked(sendPushNotificationWithoutContact).mockResolvedValue(new Response('busy', { status: 503 }));
 		const prepare = vi.fn((sql: string) => {
 			const statement = {
 				bind: vi.fn(() => statement),
