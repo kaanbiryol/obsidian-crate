@@ -1,14 +1,55 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
 	createHarness,
 	createNamedAbortError,
 	getConsecutiveCheckFailures,
 	runPeriodicCheck,
 	setEngineLocalManifest,
+	spyOnConflictRecovery,
 	spyOnIncrementalSync,
 	spyOnPrepareUploadsFromVaultFiles,
 	toArrayBuffer,
 } from './engine-test-harness';
+
+describe('SyncEngine initialization', () => {
+	it('defers conflict recovery until the workspace layout is ready', async () => {
+		vi.useFakeTimers();
+		const harness = createHarness();
+		const recoverFromVault = spyOnConflictRecovery(harness.engine).mockResolvedValue();
+		try {
+			await harness.engine.initialize();
+
+			expect(harness.workspace.onLayoutReady).toHaveBeenCalledOnce();
+			expect(recoverFromVault).not.toHaveBeenCalled();
+
+			harness.workspace.runLayoutReady();
+			expect(recoverFromVault).not.toHaveBeenCalled();
+
+			await vi.runAllTimersAsync();
+			expect(recoverFromVault).toHaveBeenCalledOnce();
+		} finally {
+			harness.engine.destroy();
+			vi.useRealTimers();
+		}
+	});
+
+	it('does not start deferred conflict recovery after destruction', async () => {
+		vi.useFakeTimers();
+		const harness = createHarness();
+		const recoverFromVault = spyOnConflictRecovery(harness.engine).mockResolvedValue();
+		try {
+			await harness.engine.initialize();
+			harness.workspace.runLayoutReady();
+			harness.engine.destroy();
+			await vi.runAllTimersAsync();
+
+			expect(recoverFromVault).not.toHaveBeenCalled();
+		} finally {
+			harness.engine.destroy();
+			vi.useRealTimers();
+		}
+	});
+});
 
 describe('SyncEngine abort-on-destroy', () => {
 	it('does not advance lastSeq when incremental sync is aborted', async () => {

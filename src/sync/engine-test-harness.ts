@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import { SyncEngine } from './engine';
+import type { ConflictStore } from './conflict-store';
 import type { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
 import type { CrateSettings } from '../plugin/settings-types';
@@ -32,6 +33,10 @@ export type Harness = {
 	settings: CrateSettings;
 	fileManager: {
 		trashFile: ReturnType<typeof vi.fn>;
+	};
+	workspace: {
+		onLayoutReady: ReturnType<typeof vi.fn>;
+		runLayoutReady: () => void;
 	};
 	api: {
 		isConfigured: ReturnType<typeof vi.fn>;
@@ -110,6 +115,11 @@ export function getConsecutiveCheckFailures(engine: SyncEngine): number {
 
 export async function runPeriodicCheck(engine: SyncEngine): Promise<void> {
 	await (engine as unknown as { lifecycle: { periodicCheck(): Promise<void> } }).lifecycle.periodicCheck();
+}
+
+export function spyOnConflictRecovery(engine: SyncEngine) {
+	const conflictStore = (engine as unknown as { conflictStore: ConflictStore }).conflictStore;
+	return vi.spyOn(conflictStore, 'recoverFromVault');
 }
 
 export function createSyncResult(): SyncResult {
@@ -224,9 +234,16 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 	const fileManager = {
 		trashFile: vi.fn(),
 	};
+	let layoutReadyCallback: (() => void) | null = null;
+	const workspace = {
+		onLayoutReady: vi.fn((callback: () => void) => {
+			layoutReadyCallback = callback;
+		}),
+		runLayoutReady: () => layoutReadyCallback?.(),
+	};
 
 	const plugin = {
-		app: { vault, fileManager },
+		app: { vault, fileManager, workspace },
 		manifest: { dir: PLUGIN_DIR },
 	};
 
@@ -260,5 +277,5 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 
 	setEngineLocalManifest(engine, localManifest);
 
-	return { engine, settings, fileManager, api, vault, localManifest };
+	return { engine, settings, fileManager, workspace, api, vault, localManifest };
 }

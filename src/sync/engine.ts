@@ -31,7 +31,11 @@ import type { FileEntry } from '../protocol/sync-types';
 import type { CrateSettings } from '../plugin/settings-types';
 import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/settings-types';
 import { DOWNLOAD_CONCURRENCY, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
-import { shouldIgnoreSyncPath } from './engine-ignore';
+import {
+	type IgnoreMatcherContext,
+	shouldIgnoreConfiguredPath,
+	shouldIgnoreSyncPath,
+} from './engine-ignore';
 import { hasLocalFileChanges } from './local-file-changes';
 import { deleteFilesInBatches } from './delete-batches';
 import {
@@ -64,6 +68,7 @@ export class SyncEngine {
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
+	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(
 		plugin: Plugin,
@@ -155,6 +160,9 @@ export class SyncEngine {
 		await this.localManifest.load();
 		await this.conflictStore.load();
 		logger.info('Engine initialized');
+		this.plugin.app.workspace.onLayoutReady(() => {
+			this.scheduleConflictRecovery();
+		});
 		this.seedMarkdownBaseCacheInBackground();
 
 		this.lifecycle.startPeriodicSync();
@@ -218,11 +226,15 @@ export class SyncEngine {
 	}
 
 	private shouldIgnore(path: string): boolean {
-		return shouldIgnoreSyncPath(path, {
+		return shouldIgnoreSyncPath(path, this.getIgnoreMatcherContext());
+	}
+
+	private getIgnoreMatcherContext(): IgnoreMatcherContext {
+		return {
 			ignoredDirPrefixes: this.ignoredDirPrefixes,
 			ignorePatterns: this.settings.ignorePatterns,
 			patternCache: this.patternCache,
-		});
+		};
 	}
 
 	private getIgnoredDirPrefixes(settings: CrateSettings): string[] {
@@ -243,6 +255,25 @@ export class SyncEngine {
 		}).catch((error) => {
 			logger.warn('Markdown base cache seed failed:', errorMessage(error));
 		});
+	}
+
+	private recoverConflictStoreInBackground(): void {
+		if (this.lifecycle.isDestroyed) return;
+		const ignoreMatcherContext = this.getIgnoreMatcherContext();
+		void this.conflictStore.recoverFromVault(
+			(path) => shouldIgnoreConfiguredPath(path, ignoreMatcherContext),
+			() => this.lifecycle.isDestroyed,
+		).catch((error) => {
+			logger.warn('Conflict recovery failed:', errorMessage(error));
+		});
+	}
+
+	private scheduleConflictRecovery(): void {
+		if (this.lifecycle.isDestroyed || this.conflictRecoveryTimer !== null) return;
+		this.conflictRecoveryTimer = setTimeout(() => {
+			this.conflictRecoveryTimer = null;
+			this.recoverConflictStoreInBackground();
+		}, 0);
 	}
 
 	private pruneMarkdownBaseCacheInBackground(): void {
@@ -440,6 +471,10 @@ export class SyncEngine {
 	}
 
 	destroy(): void {
+		if (this.conflictRecoveryTimer !== null) {
+			clearTimeout(this.conflictRecoveryTimer);
+			this.conflictRecoveryTimer = null;
+		}
 		this.lifecycle.destroy();
 		this.queueController.destroy();
 	}

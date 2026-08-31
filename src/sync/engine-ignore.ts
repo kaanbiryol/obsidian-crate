@@ -50,6 +50,13 @@ export function shouldIgnoreSyncPath(
 		return true;
 	}
 
+	return shouldIgnoreConfiguredPath(path, context);
+}
+
+export function shouldIgnoreConfiguredPath(
+	path: string,
+	context: IgnoreMatcherContext,
+): boolean {
 	for (const prefix of context.ignoredDirPrefixes) {
 		if (path.startsWith(prefix) || path === prefix.slice(0, -1)) {
 			return true;

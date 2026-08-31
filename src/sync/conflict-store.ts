@@ -62,16 +62,72 @@ export class ConflictStore {
 			}
 		}
 
-		if (recoveredFromTmp) this.dirty = true;
-		await this.refreshFromVault();
-		if (await adapter.exists(this.tmpPath)) {
+		if (recoveredFromTmp) {
+			this.dirty = true;
+			await this.save();
+		} else if (await adapter.exists(this.tmpPath)) {
 			try {
 				await adapter.remove(this.tmpPath);
 			} catch {
-				// Best effort cleanup after recovery.
+				// Best effort cleanup of a stale temp file.
 			}
 		}
 		this.notifyCountChanged();
+	}
+
+	async recoverFromVault(
+		shouldIgnore: (path: string) => boolean,
+		isCancelled: () => boolean = () => false,
+	): Promise<void> {
+		if (isCancelled()) return;
+
+		let discoveredPaths: Set<string>;
+		try {
+			const files = await getAllVaultFiles(
+				this.app.vault,
+				(path) => this.isStorePath(path) || shouldIgnore(path),
+			);
+			discoveredPaths = new Set(files.map((file) => file.path).filter(isConflictFile));
+		} catch (error) {
+			logger.warn('Failed to discover conflict copies:', errorMessage(error));
+			return;
+		}
+
+		if (isCancelled()) return;
+		await this.enqueueMutation(async () => {
+			if (isCancelled()) return;
+			let changed = false;
+
+			for (const conflictPath of discoveredPaths) {
+				if (!this.data.conflicts.some((conflict) => conflict.conflictPath === conflictPath)) {
+					this.data.conflicts.push({
+						originalPath: getOriginalPathFromConflictFile(conflictPath) ?? conflictPath,
+						conflictPath,
+						createdAt: new Date().toISOString(),
+						cause: 'unknown',
+						status: 'active',
+					});
+					this.dirty = true;
+					changed = true;
+				}
+			}
+
+			for (const conflict of this.data.conflicts) {
+				if (conflict.status !== 'active' || discoveredPaths.has(conflict.conflictPath)) continue;
+				try {
+					if (!await this.app.vault.adapter.exists(conflict.conflictPath)) {
+						conflict.status = 'resolved';
+						this.dirty = true;
+						changed = true;
+					}
+				} catch {
+					// A transient adapter failure must not resolve a conflict.
+				}
+			}
+
+			await this.save();
+			if (changed) this.notifyCountChanged();
+		});
 	}
 
 	getActiveConflicts(): ConflictRecord[] {
@@ -135,46 +191,12 @@ export class ConflictStore {
 		});
 	}
 
-	private async refreshFromVault(): Promise<void> {
-		let discoveredPaths = new Set<string>();
-		try {
-			const files = await getAllVaultFiles(
-				this.app.vault,
-				(path) => path === this.storePath
-					|| path === this.tmpPath
-					|| path.startsWith(`${this.storePath.substring(0, this.storePath.lastIndexOf('/'))}/`),
-			);
-			discoveredPaths = new Set(files.map((file) => file.path).filter(isConflictFile));
-		} catch (error) {
-			logger.warn('Failed to discover conflict copies:', errorMessage(error));
-		}
-
-		for (const conflictPath of discoveredPaths) {
-			if (!this.data.conflicts.some((conflict) => conflict.conflictPath === conflictPath)) {
-				this.data.conflicts.push({
-					originalPath: getOriginalPathFromConflictFile(conflictPath) ?? conflictPath,
-					conflictPath,
-					createdAt: new Date().toISOString(),
-					cause: 'unknown',
-					status: 'active',
-				});
-				this.dirty = true;
-			}
-		}
-
-		for (const conflict of this.data.conflicts) {
-			if (conflict.status !== 'active' || discoveredPaths.has(conflict.conflictPath)) continue;
-			try {
-				if (!await this.app.vault.adapter.exists(conflict.conflictPath)) {
-					conflict.status = 'resolved';
-					this.dirty = true;
-				}
-			} catch {
-				// A transient adapter failure must not resolve a conflict.
-			}
-		}
-
-		await this.save();
+	private isStorePath(path: string): boolean {
+		const storeDir = this.storePath.substring(0, this.storePath.lastIndexOf('/'));
+		return path === this.storePath
+			|| path === this.tmpPath
+			|| path === storeDir
+			|| path.startsWith(`${storeDir}/`);
 	}
 
 	private async save(): Promise<void> {

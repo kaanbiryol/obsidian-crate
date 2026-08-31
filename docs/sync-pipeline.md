@@ -108,10 +108,11 @@ local-only until the user reviews or deletes them.
 
 Active conflicts are stored in the plugin's `conflicts.json`, including the
 original path, conflict-copy path, cause, timestamp, and available hashes. The
-store is recovered through `conflicts.json.tmp`, scans visible and hidden files
-for untracked conflict copies on startup, and marks a conflict resolved when its
-copy is deleted or renamed. This keeps the status-bar and activity counts stable
-across restarts and unrelated sync runs.
+store is recovered through `conflicts.json.tmp` during startup. After the
+workspace layout is ready, a deferred recovery pass scans non-ignored visible
+and hidden files for untracked conflict copies and marks conflicts resolved when
+their copies are deleted or renamed. This keeps startup responsive and the
+status-bar and activity counts stable across restarts and unrelated sync runs.
 
 Implementation: `conflict.ts:createConflictCopy()`, `conflict-store.ts:ConflictStore`
 
