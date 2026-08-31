@@ -1,4 +1,4 @@
-import type { SyncState } from "../plugin/types";
+import type { SyncState } from './types';
 
 export function emitStateChange(
   listeners: Set<(state: SyncState) => void>,

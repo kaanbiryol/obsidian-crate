@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CratePlugin from './CratePlugin';
 import { normalizeCrateSettings } from './settings';
+import { initializeReminders } from '../reminders/plugin-integration';
 import {
 	DEFAULT_REMINDERS_SETTINGS,
 	useRemindersSettingsStore,
 } from '../reminders/settings';
 
-vi.mock('../reminders/plugin-integration', () => ({ reinitializeReminders: vi.fn() }));
+vi.mock('../reminders/plugin-integration', () => ({
+	initializeReminders: vi.fn(),
+	reinitializeReminders: vi.fn(),
+}));
 vi.mock('../reminders/ui/workspaceLayout', () => ({
 	activateOrRevealRemindersLeaf: vi.fn(),
 }));
@@ -17,6 +21,7 @@ vi.mock('./lifecycle', () => ({
 
 describe('CratePlugin settings persistence', () => {
 	beforeEach(() => {
+		vi.mocked(initializeReminders).mockReset();
 		useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS }, true);
 	});
 
@@ -37,9 +42,58 @@ describe('CratePlugin settings persistence', () => {
 
 		expect(plugin.settings.syncInterval).toBe(120);
 		expect(plugin.remindersSettings).toMatchObject({
+			enabled: true,
 			upcomingDaysDefault: 14,
 			remindersFolderPath: 'Reminders/Work',
 		});
+	});
+
+	it('keeps reminders disabled when no reminders settings have been saved', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			loadData: vi.fn(async () => ({ syncInterval: 120 })),
+		});
+
+		await plugin.loadSettings();
+
+		expect(plugin.remindersSettings.enabled).toBe(false);
+	});
+
+	it('persists consent before scanning reminder files', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const saveData = vi.fn<(data: unknown) => Promise<void>>(async () => undefined);
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			saveData,
+			settings: normalizeCrateSettings({}, 'vault-config'),
+		});
+
+		await plugin.enableReminders();
+
+		expect(plugin.remindersSettings.enabled).toBe(true);
+		const persisted = saveData.mock.calls[0]?.[0] as {
+			reminders?: { enabled?: boolean };
+		};
+		expect(persisted.reminders?.enabled).toBe(true);
+		expect(vi.mocked(initializeReminders)).toHaveBeenCalledWith(plugin);
+		expect(saveData.mock.invocationCallOrder[0]).toBeLessThan(
+			vi.mocked(initializeReminders).mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+		);
+	});
+
+	it('rolls back the reminder opt-in when initialization fails', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		Object.assign(plugin, {
+			app: { vault: { configDir: 'vault-config' } },
+			saveData: vi.fn(async () => undefined),
+			settings: normalizeCrateSettings({}, 'vault-config'),
+		});
+		vi.mocked(initializeReminders).mockRejectedValueOnce(new Error('scan failed'));
+
+		await expect(plugin.enableReminders()).rejects.toThrow('scan failed');
+
+		expect(plugin.remindersSettings.enabled).toBe(false);
 	});
 
 	it('preserves the shared settings object across deployment and connection saves', async () => {

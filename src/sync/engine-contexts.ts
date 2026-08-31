@@ -8,15 +8,9 @@ import type { DiffApplyOutcome } from './transfer-types';
 import type { VaultFile } from './file-discovery';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import { createFullSyncPlan } from './planner';
-import type {
-	CrateSettings,
-	FileDiff,
-	FileEntry,
-	FileManifest,
-	PreparedUpload,
-	SyncResult,
-	SyncState,
-} from '../plugin/types';
+import type { CrateSettings } from '../plugin/settings-types';
+import type { FileDiff, PreparedUpload, SyncResult, SyncState } from './types';
+import type { FileEntry, FileManifest } from '../protocol/sync-types';
 
 interface SyncEngineContextDependencies {
 	vault: Vault;

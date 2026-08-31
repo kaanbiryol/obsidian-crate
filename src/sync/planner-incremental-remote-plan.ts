@@ -4,8 +4,9 @@ import { classifyPath } from './reconciliation';
 import type { IncrementalSyncPlannerContext } from './planner-types';
 import type { DownloadRequest } from './transfer-download';
 import { errorMessage } from '../plugin/logger';
-import type { ChangelogEntry, FileDiff, SyncResult } from '../plugin/types';
-import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
+import type { ChangelogEntry } from '../protocol/sync-types';
+import type { FileDiff, SyncResult } from './types';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export interface IncrementalRemotePlan {
 	resurrectPaths: Set<string>;

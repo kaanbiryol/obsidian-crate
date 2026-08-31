@@ -1,5 +1,5 @@
 import type CratePlugin from './CratePlugin';
-import { SECRET_KEYS } from './types';
+import { SECRET_KEYS } from './settings-types';
 
 function normalizeDeviceId(value: string | null | undefined): string {
 	return typeof value === 'string' ? value.trim() : '';

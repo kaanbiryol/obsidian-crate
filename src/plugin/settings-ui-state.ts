@@ -1,5 +1,5 @@
 import type { DiagnosticResult } from '../sync/diagnostics';
-import type { CrateSettings } from './types';
+import type { CrateSettings } from './settings-types';
 
 interface CachedDiagnosticsState {
 	key: string;

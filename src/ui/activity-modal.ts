@@ -1,5 +1,6 @@
 import { Modal, setIcon, type App } from 'obsidian';
-import type { ConflictRecord, CrateSettings, SyncState } from '../plugin/types';
+import type { CrateSettings } from '../plugin/settings-types';
+import type { ConflictRecord, SyncState } from '../sync/types';
 import { renderHistoryPanel } from './activity/history';
 import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
 

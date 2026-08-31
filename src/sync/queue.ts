@@ -1,6 +1,6 @@
 import type { TAbstractFile } from 'obsidian';
 import { TFolder } from 'obsidian';
-import type { SyncResult, SyncState } from '../plugin/types';
+import type { SyncResult, SyncState } from './types';
 
 export interface QueueDebounceContext {
 	pendingPaths: Set<string>;

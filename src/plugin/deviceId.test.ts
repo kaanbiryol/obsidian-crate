@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ensurePluginDeviceId, setPluginDeviceId } from './deviceId';
-import { SECRET_KEYS } from './types';
+import { SECRET_KEYS } from './settings-types';
 
 function createPlugin(options?: {
 	secrets?: Record<string, string | null>;

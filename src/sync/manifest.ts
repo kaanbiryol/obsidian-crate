@@ -7,7 +7,7 @@
 import type { App, PluginManifest } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import { isRecord } from '../plugin/settings';
-import type { FileManifest, FileEntry } from '../plugin/types';
+import type { FileManifest, FileEntry } from '../protocol/sync-types';
 
 const logger = createLogger('Manifest');
 

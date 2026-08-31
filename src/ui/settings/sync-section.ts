@@ -1,7 +1,8 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { configureSyncLogger, errorMessage } from '../../plugin/logger';
-import type { CrateSettings, SyncState } from '../../plugin/types';
+import type { CrateSettings } from '../../plugin/settings-types';
+import type { SyncState } from '../../sync/types';
 import { createFileSyncProgress, hideFileSyncProgress, runButtonTask, showFileSyncProgress, updateFileSyncProgress } from './action-helpers';
 import { createSettingsSectionHeading } from './section-helpers';
 

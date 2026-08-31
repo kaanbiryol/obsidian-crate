@@ -2,8 +2,12 @@ import { computeHash } from "./hasher";
 import { getExtensionFromPath, isHiddenPath, tfileToVaultFile } from "./file-discovery";
 import { isVaultTFileLike } from './planner-helpers';
 import type { VaultFile } from "./file-discovery";
-import type { PreparedUpload } from "../plugin/types";
-import { BATCH_MAX_BYTES, BATCH_MAX_FILES, MAX_FILE_SIZE_BYTES } from "../plugin/types";
+import type { PreparedUpload } from './types';
+import {
+	BATCH_UPLOAD_MAX_BYTES as BATCH_MAX_BYTES,
+	BATCH_UPLOAD_MAX_FILES as BATCH_MAX_FILES,
+	MAX_FILE_SIZE_BYTES,
+} from '../protocol/sync-limits';
 import { createLogger } from "../plugin/logger";
 import type { TransferContext } from "./transfer-types";
 

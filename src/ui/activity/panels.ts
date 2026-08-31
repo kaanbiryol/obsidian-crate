@@ -1,4 +1,4 @@
-import type { ConflictRecord } from '../../plugin/types';
+import type { ConflictRecord } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard } from './rendering';
 
 export function renderPendingPanel(container: HTMLElement, paths: string[]): void {

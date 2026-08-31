@@ -3,7 +3,7 @@ import { SyncEngine } from './engine';
 import { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
 import { SyncRuntime } from './runtime';
-import type { SyncResult } from '../plugin/types';
+import type { SyncResult } from './types';
 import {
 	createDeferred,
 	createRuntimeHarness,

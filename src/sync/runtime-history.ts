@@ -1,4 +1,5 @@
-import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, type CrateSettings, type SyncHistoryEntry, type SyncResult } from "../plugin/types";
+import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, type CrateSettings } from '../plugin/settings-types';
+import type { SyncHistoryEntry, SyncResult } from './types';
 
 export function recordSyncHistory(
   settings: CrateSettings,

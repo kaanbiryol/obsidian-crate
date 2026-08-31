@@ -1,4 +1,5 @@
-import type { FileDiff, FileEntry } from '../plugin/types';
+import type { FileDiff } from './types';
+import type { FileEntry } from '../protocol/sync-types';
 
 /**
  * Classify one path using its local, remote, and last-common states.

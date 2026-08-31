@@ -1,5 +1,5 @@
 import { isMarkdownPath } from './markdown-base-cache';
-import type { PreparedUpload } from '../plugin/types';
+import type { PreparedUpload } from './types';
 import type { QueueFlushContext, QueueOperations, QueueUploadFailure } from './queue-flush-types';
 import { HttpError } from './api';
 import { errorMessage } from '../plugin/logger';

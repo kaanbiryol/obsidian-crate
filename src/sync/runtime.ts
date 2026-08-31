@@ -1,15 +1,9 @@
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
-import {
-	SECRET_KEYS,
-	type CrateSettings,
-	type ConflictRecord,
-	type RemoteFileVersion,
-	type SyncHistoryEntry,
-	type SyncResult,
-	type SyncState,
-} from '../plugin/types';
+import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
+import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from './types';
+import type { RemoteFileVersion } from '../protocol/sync-types';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';

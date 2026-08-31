@@ -1,4 +1,4 @@
-import type { SharedSettings } from '../../plugin/types';
+import type { SharedSettings } from '../../plugin/settings-types';
 import { HttpError, type WorkerApiHttpClient } from './http';
 
 export class SharedSettingsWorkerApi {

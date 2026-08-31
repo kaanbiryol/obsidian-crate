@@ -2,7 +2,9 @@ import { vi } from 'vitest';
 import { SyncEngine } from './engine';
 import type { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
-import type { CrateSettings, FileManifest, PreparedUpload, SyncResult, UploadResult } from '../plugin/types';
+import type { CrateSettings } from '../plugin/settings-types';
+import type { FileManifest, UploadResult } from '../protocol/sync-types';
+import type { PreparedUpload, SyncResult } from './types';
 
 const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;

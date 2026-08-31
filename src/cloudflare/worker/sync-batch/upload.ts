@@ -21,7 +21,7 @@ import {
 	type FileStorageRow,
 } from '../sync-storage';
 import type { BatchFile } from './types';
-import type { BatchUploadResponse } from '../../../plugin/types';
+import type { BatchUploadResponse } from '../../../protocol/sync-types';
 
 export async function handleBatchUpload(
 	request: Request,

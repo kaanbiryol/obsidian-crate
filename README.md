@@ -45,6 +45,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - Vault devices can be authorized only through the Cloudflare account that owns the server.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - Push notifications are optional. When enabled, your Worker sends encrypted payloads containing reminder text and project names through the push service used by the browser or operating system. The provider can observe delivery metadata such as the subscription endpoint, timing, and payload size, but cannot read the encrypted payload.
+- The reminders web app stores its scoped session in browser local storage and caches reminder and project content in IndexedDB for offline use. Signing out clears both.
 - Remote code is not fetched or evaluated at runtime.
 - Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker can access the synced data.
 - Sync is not a backup. Keep an independent backup of any vault you use with Crate.
@@ -137,7 +138,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 
 ## Reminders
 
-Crate stores reminders as Markdown in a configurable vault folder. The plugin indexes those files, provides sidebar and full-screen reminder views, and registers commands for creating reminders, opening projects, and viewing reminder storage statistics.
+Crate stores reminders as Markdown in a configurable vault folder. Reminders are disabled on new installs until you explicitly adopt a folder in **Settings → Crate → Reminders**. Adoption scans that folder and adds stable `<!-- crate-id:... -->` comments to checkbox lines so reminders can be updated safely. The plugin then provides sidebar and full-screen reminder views and registers commands for creating reminders, opening projects, and viewing reminder storage statistics.
 
 Reminder code blocks can be embedded in notes:
 
@@ -222,3 +223,5 @@ Generated files under `.generated/`, `dist/`, and root-level release artifacts s
 ## License
 
 Crate is licensed under the [0BSD license](LICENSE).
+
+Licenses and notices for bundled dependencies are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). See [SECURITY.md](SECURITY.md) to report a vulnerability privately.

@@ -1,6 +1,7 @@
 import { Notice } from 'obsidian';
 import { errorMessage, type Logger } from '../plugin/logger';
-import type { DownloadDiff, FileDiff, FileEntry, SyncResult, SyncState, UploadDiff } from '../plugin/types';
+import type { DownloadDiff, FileDiff, SyncResult, SyncState, UploadDiff } from './types';
+import type { FileEntry } from '../protocol/sync-types';
 import { AUTH_ERROR_MESSAGE, isAuthError } from './engine-constants';
 import {
 	createSyncFailureResult,

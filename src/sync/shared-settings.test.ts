@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, type SharedSettings } from '../plugin/types';
+import { DEFAULT_SETTINGS, type SharedSettings } from '../plugin/settings-types';
 import { applySharedSettings, normalizeSharedSettingsValue } from './shared-settings';
 
 describe('shared-settings helpers', () => {

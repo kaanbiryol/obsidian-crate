@@ -1,6 +1,6 @@
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
-import type { RegisteredDevice } from '../../plugin/types';
+import type { RegisteredDevice } from '../../protocol/sync-types';
 import { openConfirmationModal } from '../confirmation-modal';
 import { createSettingsSectionHeading } from './section-helpers';
 

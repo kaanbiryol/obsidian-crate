@@ -1,7 +1,7 @@
 import { computeHash } from "./hasher";
 import { getAllVaultFiles } from "./file-discovery";
 import type { LocalDiffPlannerContext } from "./planner-types";
-import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 export async function getLocalDeletes(
   context: LocalDiffPlannerContext,

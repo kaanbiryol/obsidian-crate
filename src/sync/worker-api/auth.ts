@@ -1,4 +1,4 @@
-import type { RegisteredDevice } from '../../plugin/types';
+import type { RegisteredDevice } from '../../protocol/sync-types';
 import type { WorkerApiHttpClient } from './http';
 
 export class AuthWorkerApi {

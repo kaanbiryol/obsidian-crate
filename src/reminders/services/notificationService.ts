@@ -1,5 +1,5 @@
 import { errorMessage } from '../../plugin/logger';
-import type { CrateSettings } from '../../plugin/types';
+import type { CrateSettings } from '../../plugin/settings-types';
 import type { SyncApiClient } from '../../sync/api';
 import type { RemindersSettings } from '../settings';
 import type { Reminder } from '../types/reminder';

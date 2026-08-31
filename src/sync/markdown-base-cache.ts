@@ -1,7 +1,7 @@
 import type { App, PluginManifest } from 'obsidian';
 import { createLogger, errorMessage } from '../plugin/logger';
-import type { FileEntry } from '../plugin/types';
-import { MAX_FILE_SIZE_BYTES } from '../plugin/types';
+import type { FileEntry } from '../protocol/sync-types';
+import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { computeHash } from './hasher';
 
 const logger = createLogger('MarkdownBaseCache');

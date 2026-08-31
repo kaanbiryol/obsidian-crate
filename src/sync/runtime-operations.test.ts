@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS, type SyncResult } from '../plugin/types';
+import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS } from '../plugin/settings-types';
+import type { SyncResult } from './types';
 import { createEmptySyncResult } from './sync-result';
 import { SyncRuntime } from './runtime';
 import {

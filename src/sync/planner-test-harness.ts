@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
-import type { ChangelogEntry, CrateSettings, MutationFailure } from '../plugin/types';
+import type { ChangelogEntry, MutationFailure } from '../protocol/sync-types';
+import type { CrateSettings } from '../plugin/settings-types';
 import type { IncrementalSyncPlannerContext } from './planner-types';
 
 export function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {

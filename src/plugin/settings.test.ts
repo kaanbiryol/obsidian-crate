@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPersistedCrateSettings, DEFAULT_SETTINGS, normalizeCrateSettings } from './settings';
-import { MAX_SYNC_HISTORY_PATHS } from './types';
+import { MAX_SYNC_HISTORY_PATHS } from './settings-types';
 
 describe('normalizeCrateSettings', () => {
 	it('keeps valid non-secret Cloudflare deployment metadata', () => {

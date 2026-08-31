@@ -3,7 +3,8 @@ import { HttpError } from './api';
 import { RemoteVersionChangedError } from './transfer-download';
 import { computeHash } from './hasher';
 import { reconcileQueuePaths, type TargetedReconcileContext } from './reconcile-paths';
-import type { FileEntry, FileManifest, SyncResult } from '../plugin/types';
+import type { FileEntry, FileManifest } from '../protocol/sync-types';
+import type { SyncResult } from './types';
 
 function bytes(text: string): ArrayBuffer {
 	return new TextEncoder().encode(text).buffer as ArrayBuffer;

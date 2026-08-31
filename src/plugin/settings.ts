@@ -3,15 +3,14 @@
  */
 
 import { normalizeWorkerUrl } from '../sync/worker-url';
+import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment-types';
+import type { ResolvedSyncRace, SyncHistoryEntry } from '../sync/types';
 import {
 	type CrateSettings,
-	type CloudflareDeploymentMetadata,
 	DEFAULT_SETTINGS,
 	MAX_SYNC_HISTORY,
 	MAX_SYNC_HISTORY_PATHS,
-	type ResolvedSyncRace,
-	type SyncHistoryEntry,
-} from './types';
+} from './settings-types';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);

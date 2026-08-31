@@ -13,7 +13,7 @@ import type {
 	HealthResponse,
 	RemoteFileVersion,
 	UploadResult,
-} from '../../plugin/types';
+} from '../../protocol/sync-types';
 import {
 	isCompatibleCrateServer,
 	parseCrateServerInfo,

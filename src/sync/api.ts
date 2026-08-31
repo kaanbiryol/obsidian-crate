@@ -15,9 +15,9 @@ import type {
 	HealthResponse,
 	RegisteredDevice,
 	RemoteFileVersion,
-	SharedSettings,
 	UploadResult,
-} from '../plugin/types';
+} from '../protocol/sync-types';
+import type { SharedSettings } from '../plugin/settings-types';
 import type { CrateServerInfo } from '../protocol';
 import { AuthWorkerApi } from './worker-api/auth';
 import { WorkerApiHttpClient } from './worker-api/http';

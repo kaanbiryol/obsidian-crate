@@ -6,7 +6,8 @@ import {
 } from './sync-result';
 import { FORCE_SYNC_CONCURRENCY } from './engine-constants';
 import { createLogger, errorMessage } from '../plugin/logger';
-import type { FileManifest, PreparedUpload, SyncResult, SyncState } from '../plugin/types';
+import type { FileManifest } from '../protocol/sync-types';
+import type { PreparedUpload, SyncResult, SyncState } from './types';
 import {
 	completeWorkflowResult,
 	getStartFailureResult,

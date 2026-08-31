@@ -16,6 +16,7 @@ export function corsResponse(
 		status,
 		headers: {
 			'Content-Type': 'application/json',
+			'Cache-Control': 'private, no-store',
 			...corsHeaders(),
 			...headers,
 		},

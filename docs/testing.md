@@ -69,6 +69,8 @@ The test creates real resources only when a person completes Cloudflare consent.
 
 ## Public-release acceptance
 
+Copy [the release acceptance template](release-checklist.md) for each candidate and record the exact artifact checksums and results. Do not publish while any required item is incomplete.
+
 Record the Obsidian version, operating-system version, and result for each device. Complete this matrix against the exact release assets before publishing:
 
 - Run at least one pass on Obsidian 1.13.0, the version declared in `manifest.json`. If it is unavailable or any required flow fails, raise `minAppVersion` and the matching `versions.json` entry to the oldest version actually tested.

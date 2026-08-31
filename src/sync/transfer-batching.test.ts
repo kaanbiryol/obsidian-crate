@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PreparedUpload } from '../plugin/types';
+import type { PreparedUpload } from './types';
 import { createBatchUploadChunks } from './transfer';
 
 describe('batch upload chunking', () => {

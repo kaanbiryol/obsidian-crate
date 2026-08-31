@@ -19,7 +19,7 @@ jobs:
       - name: Use Node.js 20
         uses: actions/setup-node@v6
         with:
-          node-version: 20.x
+          node-version: 20.19.0
           cache: npm
 
       - run: npm ci
@@ -30,27 +30,36 @@ jobs:
       - name: Verify release on Node.js 20
         run: npm run release:check
 
+      - name: Record release artifact hashes
+        run: sha256sum dist/main.js dist/styles.css > /tmp/crate-release-artifacts.sha256
+
       - name: Use Node.js 22
         uses: actions/setup-node@v6
         with:
-          node-version: 22.x
+          node-version: 22.12.0
           cache: npm
 
       - run: npm ci
 
-      - name: Build release on Node.js 22
+      - name: Verify release on Node.js 22
         run: npm run release:check
+
+      - name: Verify reproducible artifacts on Node.js 22
+        run: sha256sum --check /tmp/crate-release-artifacts.sha256
 
       - name: Use Node.js 24
         uses: actions/setup-node@v6
         with:
-          node-version: 24.x
+          node-version: 24.0.0
           cache: npm
 
       - run: npm ci
 
-      - name: Build release on Node.js 24
+      - name: Verify release on Node.js 24
         run: npm run release:check
+
+      - name: Verify reproducible artifacts on Node.js 24
+        run: sha256sum --check /tmp/crate-release-artifacts.sha256
 
       - name: Prepare release assets
         run: |
@@ -58,6 +67,7 @@ jobs:
           cp dist/main.js release/main.js
           cp dist/styles.css release/styles.css
           cp manifest.json release/manifest.json
+          cp THIRD_PARTY_NOTICES.md release/THIRD_PARTY_NOTICES.md
 
       - name: Attest release assets
         uses: actions/attest-build-provenance@v3
@@ -67,4 +77,4 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" release/main.js release/manifest.json release/styles.css --generate-notes --verify-tag --title "$GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" release/main.js release/manifest.json release/styles.css release/THIRD_PARTY_NOTICES.md --generate-notes --verify-tag --title "$GITHUB_REF_NAME"

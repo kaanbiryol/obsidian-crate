@@ -5,13 +5,9 @@ import { applyRemoteContentIfUnchanged, writeRemoteContent } from "./local-apply
 import { isMarkdownPath } from "./markdown-base-cache";
 import type { DiffApplyOutcome, TransferContext } from "./transfer-types";
 import { createLogger, errorMessage } from "../plugin/logger";
-import type { FileEntry, SyncResult } from "../plugin/types";
-import {
-  BATCH_DOWNLOAD_MAX_BYTES,
-  BATCH_DOWNLOAD_MAX_FILES,
-  BATCH_FILE_SIZE_LIMIT,
-  MAX_FILE_SIZE_BYTES,
-} from "../plugin/types";
+import type { FileEntry } from '../protocol/sync-types';
+import type { SyncResult } from './types';
+import { BATCH_DOWNLOAD_MAX_BYTES, BATCH_DOWNLOAD_MAX_FILES, BATCH_FILE_SIZE_LIMIT, MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 
 const logger = createLogger("SyncTransfer");
 

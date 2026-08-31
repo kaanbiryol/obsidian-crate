@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { SyncResult } from '../plugin/types';
+import type { SyncResult } from './types';
 
 const CONFIG_DIR = '.vault-config';
 export const HIDDEN_CONFIG_PATH = `${CONFIG_DIR}/config.json`;

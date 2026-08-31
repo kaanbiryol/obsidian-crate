@@ -1,5 +1,5 @@
 import type { TAbstractFile } from 'obsidian';
-import type { PreparedUpload, SyncResult, SyncState } from '../plugin/types';
+import type { PreparedUpload, SyncResult, SyncState } from './types';
 import {
 	clearSyncedPendingPaths as clearSyncedQueuePaths,
 	debouncedSync as runDebouncedQueueSync,
