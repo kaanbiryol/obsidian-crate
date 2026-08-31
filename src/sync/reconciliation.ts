@@ -1,11 +1,86 @@
 import type { FileDiff, FileEntry } from '../plugin/types';
 
 /**
+ * Classify one path using its local, remote, and last-common states.
+ * This is the single policy boundary used by both full and incremental sync.
+ */
+export function classifyPath(
+	path: string,
+	local: FileEntry | undefined,
+	remote: FileEntry | undefined,
+	base: FileEntry | undefined,
+): FileDiff | null {
+	if (local && remote) {
+		if (local.hash === remote.hash) return null;
+
+		if (!base) {
+			return {
+				path,
+				action: 'conflict',
+				localHash: local.hash,
+				remoteHash: remote.hash,
+				cause: 'concurrent-create',
+			};
+		}
+
+		const localChanged = local.hash !== base.hash;
+		const remoteChanged = remote.hash !== base.hash;
+		if (localChanged && remoteChanged) {
+			return {
+				path,
+				action: 'conflict',
+				localHash: local.hash,
+				remoteHash: remote.hash,
+				cause: 'concurrent-edit',
+			};
+		}
+		if (localChanged) {
+			return {
+				path,
+				action: 'upload',
+				localHash: local.hash,
+				remoteHash: remote.hash,
+				cause: 'local-edited',
+			};
+		}
+		return {
+			path,
+			action: 'download',
+			localHash: local.hash,
+			remoteHash: remote.hash,
+			cause: 'remote-edited',
+		};
+	}
+
+	if (local) {
+		if (!base) {
+			return { path, action: 'upload', localHash: local.hash, cause: 'local-created' };
+		}
+		if (local.hash === base.hash) {
+			return { path, action: 'delete-local', localHash: local.hash, cause: 'remote-deleted' };
+		}
+		return { path, action: 'upload', localHash: local.hash, cause: 'remote-deleted' };
+	}
+
+	if (remote) {
+		if (!base) {
+			return { path, action: 'download', remoteHash: remote.hash, cause: 'remote-created' };
+		}
+		if (remote.hash === base.hash) {
+			return { path, action: 'delete', remoteHash: remote.hash, cause: 'local-deleted' };
+		}
+		return { path, action: 'download', remoteHash: remote.hash, cause: 'local-deleted' };
+	}
+
+	return null;
+}
+
+/**
  * Plan a three-way reconciliation from the local state, remote state, and their
  * last common manifest. Concurrent edit/delete pairs resolve in favor of the
  * edited content and are flagged so the user can review the outcome.
  */
-export function detectConflicts(
+export function classifyPaths(
 	localFiles: Record<string, FileEntry>,
 	remoteFiles: Record<string, FileEntry>,
 	manifestEntries: Record<string, FileEntry>,
@@ -18,44 +93,12 @@ export function detectConflicts(
 	]);
 
 	for (const path of allPaths) {
-		const local = localFiles[path];
-		const remote = remoteFiles[path];
-		const base = manifestEntries[path];
-
-		if (local && remote) {
-			if (local.hash === remote.hash) continue;
-
-			if (!base || (local.hash !== base.hash && remote.hash !== base.hash)) {
-				diffs.push({ path, action: 'conflict', localHash: local.hash, remoteHash: remote.hash });
-			} else if (local.hash !== base.hash) {
-				diffs.push({ path, action: 'upload', localHash: local.hash, remoteHash: remote.hash });
-			} else {
-				diffs.push({ path, action: 'download', localHash: local.hash, remoteHash: remote.hash });
-			}
-			continue;
-		}
-
-		if (local) {
-			if (!base) {
-				diffs.push({ path, action: 'upload', localHash: local.hash });
-			} else if (local.hash === base.hash) {
-				diffs.push({ path, action: 'delete-local', localHash: local.hash });
-			} else {
-				diffs.push({ path, action: 'upload', localHash: local.hash, conflict: true });
-			}
-			continue;
-		}
-
-		if (remote) {
-			if (!base) {
-				diffs.push({ path, action: 'download', remoteHash: remote.hash });
-			} else if (remote.hash === base.hash) {
-				diffs.push({ path, action: 'delete', remoteHash: remote.hash });
-			} else {
-				diffs.push({ path, action: 'download', remoteHash: remote.hash, conflict: true });
-			}
-		}
+		const decision = classifyPath(path, localFiles[path], remoteFiles[path], manifestEntries[path]);
+		if (decision) diffs.push(decision);
 	}
 
 	return diffs;
 }
+
+// Compatibility name for integrations that still import the original helper.
+export const detectConflicts = classifyPaths;

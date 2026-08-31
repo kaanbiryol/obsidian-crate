@@ -77,6 +77,9 @@ function formatSummary(entry: SyncHistoryEntry): string {
 		if (entry.conflictCount > 0) {
 			parts.push(`${entry.conflictCount} conflict${entry.conflictCount !== 1 ? 's' : ''}`);
 		}
+		if ((entry.resolvedRaceCount ?? 0) > 0) {
+			parts.push(`${entry.resolvedRaceCount} race${entry.resolvedRaceCount !== 1 ? 's' : ''} resolved`);
+		}
 		return parts.join(', ');
 	}
 
@@ -86,6 +89,7 @@ function formatSummary(entry: SyncHistoryEntry): string {
 		&& entry.merged === 0
 		&& entry.deleted === 0
 		&& entry.conflictCount === 0
+		&& (entry.resolvedRaceCount ?? 0) === 0
 	) return 'no changes';
 
 	const parts: string[] = [];
@@ -95,6 +99,9 @@ function formatSummary(entry: SyncHistoryEntry): string {
 	if (entry.deleted > 0) parts.push(`${entry.deleted} del`);
 	if (entry.conflictCount > 0) {
 		parts.push(`${entry.conflictCount} conflict${entry.conflictCount !== 1 ? 's' : ''}`);
+	}
+	if ((entry.resolvedRaceCount ?? 0) > 0) {
+		parts.push(`${entry.resolvedRaceCount} race${entry.resolvedRaceCount !== 1 ? 's' : ''} resolved`);
 	}
 	return parts.join(', ');
 }

@@ -42,12 +42,27 @@ export interface SyncResult {
 	downloaded: number;
 	merged: number;
 	deleted: number;
+	/** Paths of conflict copies that still require the user's attention. */
 	conflicts: string[];
+	unresolvedConflicts: UnresolvedConflict[];
+	resolvedRaces: ResolvedSyncRace[];
+	/** Queue keys proven reconciled by a targeted recovery pass. */
+	settledPaths: string[];
 	errors: string[];
 	uploadedPaths: string[];
 	downloadedPaths: string[];
 	mergedPaths: string[];
 	deletedPaths: string[];
+}
+
+export interface UnresolvedConflict {
+	path: string;
+	conflictPath: string;
+}
+
+export interface ResolvedSyncRace {
+	path: string;
+	resolution: 'kept-local-edit' | 'kept-remote-edit';
 }
 
 export interface SyncHistoryEntry {
@@ -60,19 +75,50 @@ export interface SyncHistoryEntry {
 	deleted: number;
 	errorCount: number;
 	conflictCount: number;
+	resolvedRaceCount?: number;
 	uploadedPaths?: string[];
 	downloadedPaths?: string[];
 	mergedPaths?: string[];
 	deletedPaths?: string[];
 }
 
-export interface FileDiff {
+interface ReconcileDecisionBase {
 	path: string;
-	action: 'upload' | 'download' | 'delete' | 'delete-local' | 'conflict';
-	localHash?: string;
-	remoteHash?: string;
-	conflict?: boolean;
 }
+
+export type FileDiff =
+	| (ReconcileDecisionBase & {
+		action: 'upload';
+		localHash: string;
+		remoteHash?: string;
+		cause: 'local-created' | 'local-edited' | 'remote-deleted';
+	})
+	| (ReconcileDecisionBase & {
+		action: 'download';
+		localHash?: string;
+		remoteHash: string;
+		cause: 'remote-created' | 'remote-edited' | 'local-deleted';
+	})
+	| (ReconcileDecisionBase & {
+		action: 'conflict';
+		localHash: string;
+		remoteHash: string;
+		cause: 'concurrent-create' | 'concurrent-edit';
+	})
+	| (ReconcileDecisionBase & {
+		action: 'delete';
+		remoteHash: string;
+		cause: 'local-deleted';
+	})
+	| (ReconcileDecisionBase & {
+		action: 'delete-local';
+		localHash: string;
+		cause: 'remote-deleted';
+	});
+
+export type UploadDiff = Extract<FileDiff, { action: 'upload' }>;
+export type DownloadDiff = Extract<FileDiff, { action: 'download' }>;
+export type ConflictDiff = Extract<FileDiff, { action: 'conflict' }>;
 
 // ============================================================================
 // Changelog Types

@@ -55,7 +55,7 @@ export async function processPendingChanges(
 		paths.map(path => [path, context.pendingRevisions?.get(path)] as const),
 	);
 	const completedQueueKeys = new Set<string>();
-	let reconciliationRequested = false;
+	const reconciliationPaths = new Set<string>();
 	for (const path of paths) {
 		context.pendingPaths.delete(path);
 		context.inFlightPaths.add(path);
@@ -71,7 +71,7 @@ export async function processPendingChanges(
 			const uploadFailures = await uploadPendingFiles(context, uploads, completedQueueKeys, uploadConcurrency);
 			for (const failure of uploadFailures) {
 				context.pendingPaths.add(failure.path);
-				reconciliationRequested ||= requiresReconciliation(failure.status);
+				if (requiresReconciliation(failure.status)) reconciliationPaths.add(failure.path);
 			}
 			failures.push(...uploadFailures);
 		}
@@ -79,7 +79,7 @@ export async function processPendingChanges(
 		if (deletes.length > 0) {
 			const deleteResult = await deletePendingFiles(context, deletes, completedQueueKeys);
 			failures.push(...deleteResult.failures);
-			reconciliationRequested ||= deleteResult.requiresReconciliation;
+			for (const path of deleteResult.reconciliationPaths) reconciliationPaths.add(path);
 		}
 
 		await context.localManifest.save();
@@ -90,7 +90,7 @@ export async function processPendingChanges(
 				lastError: failures.map(failure => `${failure.path}: ${failure.error}`).join('; '),
 				pendingChanges: context.pendingPaths.size,
 			});
-			if (reconciliationRequested) context.requestReconciliation();
+			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);
 			return;
 		}
 
@@ -109,17 +109,21 @@ export async function processPendingChanges(
 			for (const path of paths) {
 				if (!completedQueueKeys.has(path)) context.pendingPaths.add(path);
 			}
-			reconciliationRequested = !retryable;
+			if (!retryable) {
+				for (const path of paths) {
+					if (!completedQueueKeys.has(path)) reconciliationPaths.add(path);
+				}
+			}
 			context.updateState({
 				status: 'error',
 				lastError: errorMessage(error),
 				pendingChanges: context.pendingPaths.size,
 			});
-			if (reconciliationRequested) context.requestReconciliation();
+			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);
 		}
 	} finally {
 		context.inFlightPaths.clear();
-		if (!context.isDestroyed() && context.pendingPaths.size > 0 && !reconciliationRequested) {
+		if (!context.isDestroyed() && context.pendingPaths.size > 0 && reconciliationPaths.size === 0) {
 			context.triggerDebouncedSync();
 		}
 	}

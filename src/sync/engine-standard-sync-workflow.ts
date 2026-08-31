@@ -2,6 +2,8 @@ import { computeHash } from './hasher';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
+	hasUnresolvedConflict,
+	recordResolvedRace,
 } from './sync-result';
 import {
 	PREPARE_CONCURRENCY,
@@ -140,11 +142,11 @@ export async function runSyncWorkflow(
 			);
 			for (const diff of downloadDiffs) {
 				if (
-					diff.conflict
+					diff.cause === 'local-deleted'
 					&& result.downloadedPaths.includes(diff.path)
-					&& !result.conflicts.includes(diff.path)
+					&& !hasUnresolvedConflict(result, diff.path)
 				) {
-					result.conflicts.push(diff.path);
+					recordResolvedRace(result, diff.path, 'kept-remote-edit');
 				}
 				try {
 					const content = await context.readBinary(diff.path);

@@ -7,8 +7,9 @@ import { mergeMarkdownContent } from "./markdown-merge";
 import { downloadAndSaveFile, validateDownloadedContent } from "./transfer-download";
 import { isVaultTFileLike, prepareUploadFromPath } from "./transfer-prepare";
 import { deletePathLocallyIfUnchanged } from "./planner-helpers";
+import { hasUnresolvedConflict, recordResolvedRace, recordUnresolvedConflict } from "./sync-result";
 import type { TransferContext } from "./transfer-types";
-import type { FileDiff, FileEntry, SyncResult } from "../plugin/types";
+import type { ConflictDiff, FileDiff, FileEntry, SyncResult } from "../plugin/types";
 import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
 
 export async function processDiff(
@@ -57,8 +58,8 @@ export async function processDiff(
         await context.markdownBaseCache?.putBase(uploadFile.path, uploadFile.hash, uploadFile.content);
       }
       localFiles[uploadFile.path] = entry;
-	  if (diff.conflict) {
-		result.conflicts.push(diff.path);
+	  if (diff.cause === "remote-deleted") {
+		recordResolvedRace(result, diff.path, "kept-local-edit");
 	  }
       break;
     }
@@ -78,8 +79,8 @@ export async function processDiff(
         size: content.byteLength,
         modified: await context.getModifiedIso(diff.path),
       };
-	  if (diff.conflict) {
-		result.conflicts.push(diff.path);
+	  if (diff.cause === "local-deleted" && !hasUnresolvedConflict(result, diff.path)) {
+		recordResolvedRace(result, diff.path, "kept-remote-edit");
 	  }
       break;
     }
@@ -126,7 +127,7 @@ export async function processDiff(
           await context.vault.adapter.writeBinary(diff.path, remoteContent);
         }
 
-        result.conflicts.push(conflictPath);
+        recordUnresolvedConflict(result, diff.path, conflictPath);
 
         const hash = await computeHash(remoteContent);
         const entry: FileEntry = {
@@ -160,7 +161,7 @@ export async function processDiff(
           path: diff.path,
           action: "upload",
           localHash: localDelete.hash,
-          conflict: true,
+          cause: "remote-deleted",
         }, localFiles, result);
         break;
       }
@@ -177,7 +178,7 @@ export async function processDiff(
 
 async function tryAutoMergeMarkdownConflict(
   context: TransferContext,
-  diff: FileDiff,
+  diff: ConflictDiff,
   visibleFile: TFile | null,
   localContent: ArrayBuffer,
   remoteContent: ArrayBuffer,
@@ -206,12 +207,6 @@ async function tryAutoMergeMarkdownConflict(
   const mergedContent = mergeResult.content;
   const mergedHash = await computeHash(mergedContent);
 
-  if (visibleFile) {
-    await context.vault.modifyBinary(visibleFile, mergedContent);
-  } else {
-    await context.vault.adapter.writeBinary(diff.path, mergedContent);
-  }
-
   const uploadResult = await context.api.uploadFile(
     diff.path,
     mergedContent,
@@ -228,15 +223,35 @@ async function tryAutoMergeMarkdownConflict(
     throw new Error(`Hash mismatch after upload (expected ${mergedHash}, got ${uploadResult.hash})`);
   }
 
+  // The remote compare-and-swap happens first. Revalidate the local file before
+  // replacing it so an edit made while the request was in flight is retained.
+  const plannedLocalHash = await computeHash(localContent);
+  const latestLocalContent = await context.vault.adapter.readBinary(diff.path);
+  const latestLocalHash = await computeHash(latestLocalContent);
+  const localChangedDuringMerge = latestLocalHash !== plannedLocalHash;
+
+  if (!localChangedDuringMerge) {
+    if (visibleFile) {
+      await context.vault.modifyBinary(visibleFile, mergedContent);
+    } else {
+      await context.vault.adapter.writeBinary(diff.path, mergedContent);
+    }
+  }
+
   const entry: FileEntry = {
     hash: mergedHash,
     size: mergedContent.byteLength,
-    modified: await context.getModifiedIso(diff.path),
+    modified: localChangedDuringMerge
+      ? new Date().toISOString()
+      : await context.getModifiedIso(diff.path),
   };
   localFiles[diff.path] = entry;
   context.localManifest.setEntry(diff.path, entry);
   await context.markdownBaseCache.putBase(diff.path, mergedHash, mergedContent);
   result.merged++;
   result.mergedPaths.push(diff.path);
+  if (localChangedDuringMerge) {
+    recordResolvedRace(result, diff.path, "kept-local-edit");
+  }
   return true;
 }

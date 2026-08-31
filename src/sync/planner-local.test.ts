@@ -23,7 +23,8 @@ vi.mock('./conflict', () => ({
 	createConflictCopy: conflictMocks.createConflictCopy,
 }));
 
-vi.mock('./reconciliation', () => ({
+vi.mock('./reconciliation', async (importOriginal) => ({
+	...await importOriginal<typeof import('./reconciliation')>(),
 	detectConflicts: conflictMocks.detectConflicts,
 }));
 

@@ -11,7 +11,7 @@ export async function deletePendingFiles(
 	context: QueueFlushContext,
 	deletes: QueueDeleteCandidate[],
 	completedQueueKeys: Set<string>,
-): Promise<{ failures: QueueDeleteFailure[]; requiresReconciliation: boolean }> {
+): Promise<{ failures: QueueDeleteFailure[]; reconciliationPaths: string[] }> {
 	const result = await deleteFilesInBatches(context.api, deletes);
 
 	for (const path of result.deleted) {
@@ -19,7 +19,7 @@ export async function deletePendingFiles(
 		completedQueueKeys.add(`delete:${path}`);
 	}
 	if (result.success) {
-		return { failures: [], requiresReconciliation: false };
+		return { failures: [], reconciliationPaths: [] };
 	}
 
 	const deletedPaths = new Set(result.deleted);
@@ -29,12 +29,12 @@ export async function deletePendingFiles(
 			.filter(file => !deletedPaths.has(file.path))
 			.map(file => ({ path: file.path, error: 'Batch delete failed' }));
 
-	let requiresReconciliation = false;
+	const reconciliationPaths: string[] = [];
 	for (const failure of failures) {
 		context.pendingPaths.add(`delete:${failure.path}`);
 		if (failure.status !== undefined && !RETRYABLE_DELETE_STATUSES.has(failure.status)) {
-			requiresReconciliation = true;
+			reconciliationPaths.push(`delete:${failure.path}`);
 		}
 	}
-	return { failures, requiresReconciliation };
+	return { failures, reconciliationPaths };
 }

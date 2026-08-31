@@ -6,7 +6,7 @@ import { Notice, type Vault } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import { isHiddenPath } from './file-discovery';
 
-export { detectConflicts } from './reconciliation';
+export { classifyPath, classifyPaths, detectConflicts } from './reconciliation';
 
 const logger = createLogger('Conflict');
 
@@ -71,7 +71,6 @@ export async function createConflictCopy(
 		await vault.createBinary(conflictPath, content);
 	}
 	logger.info('Created conflict copy:', conflictPath);
-	new Notice(`Sync conflict: ${originalPath}\nLocal version saved as conflict copy, remote version kept as original.`);
 	return conflictPath;
 }
 

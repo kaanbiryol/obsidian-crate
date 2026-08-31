@@ -140,6 +140,7 @@ export function clearSyncedPendingPaths(
 	for (const path of result.downloadedPaths) clearIfUnchanged(path);
 	for (const path of result.mergedPaths ?? []) clearIfUnchanged(path);
 	for (const path of result.deletedPaths) clearIfUnchanged(`delete:${path}`);
+	for (const queueKey of result.settledPaths) clearIfUnchanged(queueKey);
 
 	if (context.pendingPaths.size === previousPendingCount) {
 		return;

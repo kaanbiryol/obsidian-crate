@@ -1,6 +1,6 @@
 import { Notice } from 'obsidian';
 import { errorMessage, type Logger } from '../plugin/logger';
-import type { FileDiff, FileEntry, SyncResult, SyncState } from '../plugin/types';
+import type { DownloadDiff, FileDiff, FileEntry, SyncResult, SyncState, UploadDiff } from '../plugin/types';
 import { AUTH_ERROR_MESSAGE, isAuthError } from './engine-constants';
 import {
 	createSyncFailureResult,
@@ -19,8 +19,8 @@ export interface RemoteManifest {
 export interface FullSyncPlan {
 	localFiles: Record<string, FileEntry>;
 	diffs: FileDiff[];
-	uploadDiffs: FileDiff[];
-	downloadDiffs: FileDiff[];
+	uploadDiffs: UploadDiff[];
+	downloadDiffs: DownloadDiff[];
 	remainingDiffs: FileDiff[];
 	errors: string[];
 }

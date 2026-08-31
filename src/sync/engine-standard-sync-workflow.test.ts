@@ -17,6 +17,7 @@ function createContext(options: {
 		action: 'upload',
 		localHash: 'local-hash',
 		remoteHash: 'remote-hash',
+		cause: 'local-edited',
 	};
 	const spies = {
 		apiConfigured: vi.fn(() => true),
@@ -110,7 +111,7 @@ describe('runSyncWorkflow', () => {
 			path,
 			action: 'download',
 			remoteHash: 'remote-hash',
-			conflict: true,
+			cause: 'local-deleted',
 		};
 		context.getManifest = vi.fn(async () => ({
 			files: {
@@ -134,7 +135,8 @@ describe('runSyncWorkflow', () => {
 
 		const result = await runSyncWorkflow(context);
 
-		expect(result.conflicts).toContain(path);
+		expect(result.conflicts).toEqual([]);
+		expect(result.resolvedRaces).toContainEqual({ path, resolution: 'kept-remote-edit' });
 		expect(result.downloadedPaths).toContain(path);
 	});
 });

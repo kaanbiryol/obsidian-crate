@@ -64,5 +64,5 @@ export interface QueueFlushContext {
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	triggerDebouncedSync(): void;
-	requestReconciliation(): void;
+	requestReconciliation(queueKeys: string[]): void;
 }

@@ -1,14 +1,10 @@
-import { computeHash } from "./hasher";
-import { isHiddenPath } from "./file-discovery";
-import { deletePathLocallyIfUnchanged, isVaultTFileLike } from "./planner-helpers";
 import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
-import { createEmptySyncResult, finalizeSyncResult } from "./sync-result";
+import { createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "./sync-result";
 import { createLogger, errorMessage } from "../plugin/logger";
-import type { ChangelogEntry, FileDiff, FileEntry, PreparedUpload, SyncResult } from "../plugin/types";
-import { MAX_FILE_SIZE_BYTES } from "../plugin/types";
-import type { DownloadRequest } from './transfer-download';
+import type { ChangelogEntry, FileEntry, PreparedUpload, SyncResult } from "../plugin/types";
 import { deleteFilesInBatches } from './delete-batches';
+import { planIncrementalRemoteChanges } from './planner-incremental-remote-plan';
 
 const logger = createLogger("SyncPlanner");
 
@@ -68,108 +64,15 @@ export async function runIncrementalSync(
       changesByPath.set(entry.path, entry);
     }
 
-    const result = createEmptySyncResult();
-    const localChangedPaths = new Set(localChanges.map((file) => file.path));
-    const localDeletedPaths = new Set(localDeletes);
-    const resurrectPaths = new Set<string>();
-    const restoreDeletedPaths = new Set<string>();
-    const remoteUnchangedLocalDeletes = new Set<string>();
-    const reclassifiedPaths = new Set<string>();
-	const downloadRequests: DownloadRequest[] = [];
-    const conflicts: FileDiff[] = [];
-
-    for (const [path, entry] of changesByPath) {
-      if (context.shouldIgnore(path)) {
-        continue;
-      }
-
-      try {
-        if (entry.action === "delete") {
-          if (localChangedPaths.has(path)) {
-            resurrectPaths.add(path);
-            continue;
-          }
-
-          const expectedLocalHash = context.localManifest.getEntry(path)?.hash ?? null;
-          const localDelete = await deletePathLocallyIfUnchanged(context, path, expectedLocalHash);
-          if (localDelete.status === "changed") {
-            resurrectPaths.add(path);
-            localChangedPaths.add(path);
-            localChanges.push({ path, hash: localDelete.hash });
-            continue;
-          }
-          context.localManifest.removeEntry(path);
-          if (localDelete.status === "deleted") {
-            result.deleted++;
-            result.deletedPaths.push(path);
-          }
-          continue;
-        }
-
-        if (entry.size > MAX_FILE_SIZE_BYTES) {
-          result.errors.push(`${path}: Skipped remote file larger than 25MB`);
-          continue;
-        }
-
-        if (localDeletedPaths.has(path)) {
-		  const manifestEntry = context.localManifest.getEntry(path);
-		  if (manifestEntry && entry.hash === manifestEntry.hash) {
-			remoteUnchangedLocalDeletes.add(path);
-			continue;
-		  }
-
-		  restoreDeletedPaths.add(path);
-		  downloadRequests.push({
-			path,
-			expectedLocalHash: null,
-			expectedRemoteHash: entry.hash,
-			remoteSize: entry.size,
-		  });
-          continue;
-        }
-
-        const localFile = context.vault.getAbstractFileByPath(path);
-        if (!localFile && !(isHiddenPath(path) && await context.vault.adapter.exists(path))) {
-			downloadRequests.push({ path, expectedLocalHash: null, expectedRemoteHash: entry.hash, remoteSize: entry.size });
-          continue;
-        }
-
-        const stat = isVaultTFileLike(localFile)
-          ? localFile.stat
-          : await context.vault.adapter.stat(path);
-        if ((stat?.size ?? 0) > MAX_FILE_SIZE_BYTES) {
-          result.errors.push(`${path}: Skipped local file larger than 25MB`);
-          continue;
-        }
-
-        const content = await context.vault.adapter.readBinary(path);
-        const localHash = await computeHash(content);
-
-        if (localHash === entry.hash) {
-          context.localManifest.setEntry(path, {
-            hash: localHash,
-            size: stat?.size ?? 0,
-            modified: new Date(stat?.mtime ?? Date.now()).toISOString(),
-          });
-        } else if (localChangedPaths.has(path)) {
-          const manifestEntry = context.localManifest.getEntry(path);
-          if (manifestEntry && entry.hash === manifestEntry.hash) {
-            reclassifiedPaths.add(path);
-          } else {
-            conflicts.push({
-              path,
-              action: "conflict",
-              localHash,
-              remoteHash: entry.hash,
-            });
-          }
-        } else {
-			downloadRequests.push({ path, expectedLocalHash: localHash, expectedRemoteHash: entry.hash, remoteSize: entry.size });
-        }
-      } catch (error) {
-        result.errors.push(`${path}: ${errorMessage(error)}`);
-      }
-    }
+	const result = createEmptySyncResult();
+	const {
+		resurrectPaths,
+		restoreDeletedPaths,
+		remoteUnchangedLocalDeletes,
+		reclassifiedPaths,
+		downloadRequests,
+		conflicts,
+	} = await planIncrementalRemoteChanges(context, changesByPath, localChanges, localDeletes, result);
 
     const localOnlyChanges = localChanges.filter(
       (file) =>
@@ -186,8 +89,8 @@ export async function runIncrementalSync(
     if (downloadRequests.length > 0) {
 	  await context.parallelDownloadAndSaveFiles(downloadRequests, result);
 	  for (const path of restoreDeletedPaths) {
-		if (result.downloadedPaths.includes(path) && !result.conflicts.includes(path)) {
-		  result.conflicts.push(path);
+		if (result.downloadedPaths.includes(path) && !hasUnresolvedConflict(result, path)) {
+		  recordResolvedRace(result, path, "kept-remote-edit");
 		}
 	  }
     }
@@ -225,8 +128,8 @@ export async function runIncrementalSync(
 	  retry: true,
     });
 	for (const path of resurrectPaths) {
-	  if (result.uploadedPaths.includes(path) && !result.conflicts.includes(path)) {
-		result.conflicts.push(path);
+	  if (result.uploadedPaths.includes(path)) {
+		recordResolvedRace(result, path, "kept-local-edit");
 	  }
 	}
 

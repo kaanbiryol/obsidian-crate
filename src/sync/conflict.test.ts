@@ -40,6 +40,7 @@ describe('detectConflicts (3-way hash)', () => {
 			action: 'conflict',
 			localHash: 'local-v2',
 			remoteHash: 'remote-v2',
+			cause: 'concurrent-edit',
 		});
 	});
 
@@ -55,6 +56,7 @@ describe('detectConflicts (3-way hash)', () => {
 			action: 'conflict',
 			localHash: 'local',
 			remoteHash: 'remote',
+			cause: 'concurrent-create',
 		});
 	});
 
@@ -70,6 +72,7 @@ describe('detectConflicts (3-way hash)', () => {
 			action: 'upload',
 			localHash: 'local-v2',
 			remoteHash: 'base-v1',
+			cause: 'local-edited',
 		});
 	});
 
@@ -85,6 +88,7 @@ describe('detectConflicts (3-way hash)', () => {
 			action: 'download',
 			localHash: 'base-v1',
 			remoteHash: 'remote-v2',
+			cause: 'remote-edited',
 		});
 	});
 
@@ -100,6 +104,7 @@ describe('detectConflicts (3-way hash)', () => {
 			action: 'download',
 			localHash: 'base',
 			remoteHash: 'remote',
+			cause: 'remote-edited',
 		});
 	});
 
@@ -114,6 +119,7 @@ describe('detectConflicts (3-way hash)', () => {
 			path: 'local.md',
 			action: 'upload',
 			localHash: 'abc',
+			cause: 'local-created',
 		});
 	});
 
@@ -128,6 +134,7 @@ describe('detectConflicts (3-way hash)', () => {
 			path: 'remote.md',
 			action: 'download',
 			remoteHash: 'xyz',
+			cause: 'remote-created',
 		});
 	});
 
@@ -139,6 +146,7 @@ describe('detectConflicts (3-way hash)', () => {
 			path: 'note.md',
 			action: 'delete-local',
 			localHash: 'base',
+			cause: 'remote-deleted',
 		}]);
 	});
 
@@ -153,7 +161,7 @@ describe('detectConflicts (3-way hash)', () => {
 			path: 'note.md',
 			action: 'upload',
 			localHash: 'local-edit',
-			conflict: true,
+			cause: 'remote-deleted',
 		}]);
 	});
 
@@ -165,6 +173,7 @@ describe('detectConflicts (3-way hash)', () => {
 			path: 'note.md',
 			action: 'delete',
 			remoteHash: 'base',
+			cause: 'local-deleted',
 		}]);
 	});
 
@@ -179,7 +188,7 @@ describe('detectConflicts (3-way hash)', () => {
 			path: 'note.md',
 			action: 'download',
 			remoteHash: 'remote-edit',
-			conflict: true,
+			cause: 'local-deleted',
 		}]);
 	});
 });

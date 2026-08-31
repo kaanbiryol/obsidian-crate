@@ -14,6 +14,7 @@ import { createLogger, errorMessage } from "../plugin/logger";
 import type { TransferContext } from "./transfer-types";
 import { isVaultTFileLike } from "./transfer-prepare";
 import { createConflictCopy } from "./conflict";
+import { recordUnresolvedConflict } from "./sync-result";
 
 const logger = createLogger("SyncTransfer");
 
@@ -44,7 +45,7 @@ async function preserveLocalChangeIfNeeded(
 	if (request.expectedLocalHash === currentHash) return;
 
 	const conflictPath = await createConflictCopy(context.vault, request.path, localContent);
-	result.conflicts.push(conflictPath);
+	recordUnresolvedConflict(result, request.path, conflictPath);
 }
 
 export async function validateDownloadedContent(

@@ -1,5 +1,5 @@
 import type { TAbstractFile, Vault } from "obsidian";
-import type { ChangelogEntry, CrateSettings, FileDiff, FileEntry, PreparedUpload, SyncResult } from "../plugin/types";
+import type { ChangelogEntry, CrateSettings, DownloadDiff, FileDiff, FileEntry, PreparedUpload, SyncResult, UploadDiff } from "../plugin/types";
 import type { DownloadRequest } from './transfer-download';
 
 interface PlannerManifest {
@@ -69,8 +69,8 @@ export interface FullSyncPlannerContext {
 export interface FullSyncPlan {
   localFiles: Record<string, FileEntry>;
   diffs: FileDiff[];
-  uploadDiffs: FileDiff[];
-  downloadDiffs: FileDiff[];
+  uploadDiffs: UploadDiff[];
+  downloadDiffs: DownloadDiff[];
   remainingDiffs: FileDiff[];
   errors: string[];
 }

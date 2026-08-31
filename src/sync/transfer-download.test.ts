@@ -44,7 +44,7 @@ describe('transfer download/process helpers', () => {
 
 		await processDiff(
 			harness.context,
-			{ path: 'notes/a.md', action: 'conflict', localHash: 'l', remoteHash: await computeHash(remote) },
+			{ path: 'notes/a.md', action: 'conflict', localHash: 'l', remoteHash: await computeHash(remote), cause: 'concurrent-edit' },
 			localFiles,
 			result,
 		);
@@ -81,7 +81,7 @@ describe('transfer download/process helpers', () => {
 
 		await processDiff(
 			harness.context,
-			{ path: 'notes/a.md', action: 'upload', localHash: 'l' },
+			{ path: 'notes/a.md', action: 'upload', localHash: 'l', cause: 'local-created' },
 			localFiles,
 			result,
 		);
@@ -117,7 +117,7 @@ describe('transfer download/process helpers', () => {
 
 		await processDiff(
 			harness.context,
-			{ path: 'notes/a.md', action: 'upload', localHash: 'local', conflict: true },
+			{ path: 'notes/a.md', action: 'upload', localHash: 'local', cause: 'remote-deleted' },
 			{},
 			result,
 		);
@@ -130,7 +130,8 @@ describe('transfer download/process helpers', () => {
 			'text/markdown',
 			null,
 		);
-		expect(result.conflicts).toEqual(['notes/a.md']);
+		expect(result.conflicts).toEqual([]);
+		expect(result.resolvedRaces).toEqual([{ path: 'notes/a.md', resolution: 'kept-local-edit' }]);
 	});
 
 	it('moves a local file to trash when the remote delete wins', async () => {
@@ -147,7 +148,7 @@ describe('transfer download/process helpers', () => {
 
 		await processDiff(
 			harness.context,
-			{ path: 'notes/a.md', action: 'delete-local', localHash: hash },
+			{ path: 'notes/a.md', action: 'delete-local', localHash: hash, cause: 'remote-deleted' },
 			localFiles,
 			result,
 		);
@@ -184,7 +185,7 @@ describe('transfer download/process helpers', () => {
 
 		await processDiff(
 			harness.context,
-			{ path: 'notes/a.md', action: 'delete-local', localHash: baseHash },
+			{ path: 'notes/a.md', action: 'delete-local', localHash: baseHash, cause: 'remote-deleted' },
 			localFiles,
 			result,
 		);
@@ -199,7 +200,8 @@ describe('transfer download/process helpers', () => {
 			null,
 		);
 		expect(result.uploadedPaths).toEqual(['notes/a.md']);
-		expect(result.conflicts).toEqual(['notes/a.md']);
+		expect(result.conflicts).toEqual([]);
+		expect(result.resolvedRaces).toEqual([{ path: 'notes/a.md', resolution: 'kept-local-edit' }]);
 		expect(localFiles['notes/a.md']?.hash).toBe(changedHash);
 	});
 
@@ -256,6 +258,42 @@ describe('transfer download/process helpers', () => {
 			{ path, extension: 'md' },
 			remote,
 		);
+	});
+
+	it('does not report a download race as resolved when it created a conflict copy', async () => {
+		const harness = createTransferHarness();
+		const lateLocal = new TextEncoder().encode('created during sync').buffer as ArrayBuffer;
+		const remote = new TextEncoder().encode('remote edit').buffer as ArrayBuffer;
+		const path = 'notes/race.md';
+		harness.vault.getAbstractFileByPath.mockReturnValue({ path, extension: 'md' });
+		harness.adapter.readBinary
+			.mockResolvedValueOnce(lateLocal)
+			.mockResolvedValueOnce(remote);
+		harness.api.downloadFile.mockResolvedValue({
+			content: remote,
+			contentType: 'text/markdown',
+			hash: await computeHash(remote),
+			size: remote.byteLength,
+		});
+		const result = emptyResult();
+
+		await processDiff(
+			harness.context,
+			{
+				path,
+				action: 'download',
+				remoteHash: await computeHash(remote),
+				cause: 'local-deleted',
+			},
+			{},
+			result,
+		);
+
+		expect(result.unresolvedConflicts).toEqual([{
+			path,
+			conflictPath: 'notes/file (conflict).md',
+		}]);
+		expect(result.resolvedRaces).toEqual([]);
 	});
 
 	it('falls back to individual downloads when batch fails', async () => {

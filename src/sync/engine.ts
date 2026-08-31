@@ -44,6 +44,8 @@ import {
 } from './engine-workflows';
 import { SyncEngineContexts } from './engine-contexts';
 import { SyncEngineLifecycle } from './engine-lifecycle';
+import { reconcileQueuePaths } from './reconcile-paths';
+import { createSyncFailureResult } from './sync-result';
 
 const logger = createLogger('SyncEngine');
 
@@ -110,7 +112,7 @@ export class SyncEngine {
 			getDebounceDelayMs: () => (this.settings.debounceDelay ?? 5) * 1000,
 			uploadConcurrency: UPLOAD_CONCURRENCY,
 			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
-			reconcile: () => this.reconcileFromQueue(),
+			reconcile: (queueKeys) => this.reconcileFromQueue(queueKeys),
 		});
 		this.contexts = new SyncEngineContexts({
 			vault: this.vault,
@@ -303,16 +305,39 @@ export class SyncEngine {
 		return result;
 	}
 
-	private async reconcileFromQueue(): Promise<SyncResult> {
+	private async reconcileFromQueue(queueKeys: string[]): Promise<SyncResult> {
 		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
-		const workflowContext = this.contexts.syncWorkflow();
-		workflowContext.incrementalSync = async () => null;
-		const result = await runSyncWorkflow(workflowContext);
-		this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
-		if (result.success) {
-			this.pruneMarkdownBaseCacheInBackground();
+		this.updateState({ status: 'syncing' });
+		try {
+			const result = await reconcileQueuePaths({
+				vault: this.vault,
+				localManifest: this.localManifest,
+				getRemoteManifest: () => this.api.getManifest(),
+				shouldIgnore: this.shouldIgnore.bind(this),
+				getModifiedIso: (path) => this.getModifiedIso(path),
+				processDiff: (diff, localFiles, syncResult) =>
+					this.processDiff(diff, localFiles, syncResult),
+			}, queueKeys);
+			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+			if (result.success) {
+				const lastSync = new Date().toISOString();
+				this.settings.lastSync = lastSync;
+				this.updateState({
+					status: 'idle',
+					lastSync,
+					lastError: null,
+					conflictCount: result.conflicts.length,
+				});
+				this.pruneMarkdownBaseCacheInBackground();
+			} else {
+				this.updateState({ status: 'error', lastError: result.errors[0] ?? 'Reconciliation failed' });
+			}
+			return result;
+		} catch (error) {
+			const message = errorMessage(error);
+			this.updateState({ status: 'error', lastError: message });
+			return createSyncFailureResult(message);
 		}
-		return result;
 	}
 
 	private async processDiff(

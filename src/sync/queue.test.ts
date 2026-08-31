@@ -148,6 +148,9 @@ function createSyncResult(overrides: Partial<SyncResult> = {}): SyncResult {
 		merged: 0,
 		deleted: 0,
 		conflicts: [],
+		unresolvedConflicts: [],
+		resolvedRaces: [],
+		settledPaths: [],
 		errors: [],
 		uploadedPaths: [],
 		downloadedPaths: [],
@@ -482,6 +485,7 @@ describe('processPendingChanges', () => {
 		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
 		expect(harness.requestReconciliation).toHaveBeenCalledTimes(1);
+		expect(harness.requestReconciliation).toHaveBeenCalledWith(['notes/a.md']);
 	});
 
 	it('chunks mass deletes to the shared server limit', async () => {

@@ -21,7 +21,7 @@ Primary sync mode. Fetches only changelog entries since `lastSeq`:
 1. Paginate `GET /sync/changes?since=<seq>` (5000 entries per page)
 2. Deduplicate by path - only the latest entry per file matters
 3. Detect local changes (hash comparison) and local deletes (missing manifest paths)
-4. Categorize each file: upload, download, delete, or conflict
+4. Classify each affected path with the shared three-way reconciliation policy
 5. Execute all operations
 6. Update local manifest and `lastSeq`
 
@@ -36,7 +36,7 @@ Triggered when incremental sync fails or `lastSeq` is 0:
 1. Discover all local vault files
 2. Fetch the remote manifest in 2,000-file pages, then replay changes that landed after the first-page snapshot
 3. Compute hashes for local files (skip unchanged via manifest mtime/size)
-4. 3-way diff using `reconciliation.ts:detectConflicts()`
+4. 3-way diff using `reconciliation.ts:classifyPaths()`, which applies the same `classifyPath()` policy as incremental sync
 5. Execute uploads, downloads, conflicts, deletes
 
 Entry point: `engine.ts:sync()` -> `planner.ts:createFullSyncPlan()`
@@ -77,14 +77,21 @@ Delete/edit races use an edit-wins rule:
 |---|---|---|
 | Unchanged | Deleted | Delete local file |
 | Deleted | Unchanged | Delete remote file |
-| Edited | Deleted | Re-upload edited file and flag for review |
-| Deleted | Edited | Restore remote edit and flag for review |
+| Edited | Deleted | Re-upload edited file and record an automatically resolved race |
+| Deleted | Edited | Restore remote edit and record an automatically resolved race |
 
 "Changed" = current hash differs from manifest hash at last sync.
 
 ## Conflict Resolution
 
-When both sides changed with different content:
+When both sides changed with different content, Markdown files first attempt a
+three-way line merge using the cached common base. Independent edits and
+same-point insertions merge deterministically, so devices that see the two sides
+in opposite order still produce identical bytes. The remote compare-and-swap is
+committed before the local file is replaced, and the local hash is checked again
+after the request so an edit made in flight is retained for the next pass.
+
+If the merge overlaps, the conflict remains unresolved:
 
 1. **Remote version** is downloaded and saved at the original path
 2. **Local version** is saved as a conflict copy:
@@ -93,7 +100,10 @@ When both sides changed with different content:
    ```
    Suffix includes timestamp (to seconds) + 4 random alphanumeric characters.
 
-Conflict files are auto-ignored by `isConflictFile()` to prevent sync loops.
+Only unresolved conflicts create a conflict copy and increment the user-visible
+conflict count. Edit/delete races are recorded separately as resolved races in
+sync history and do not trigger a conflict notice. Conflict files are
+auto-ignored by `isConflictFile()` to prevent sync loops.
 
 Implementation: `conflict.ts:createConflictCopy()`
 
@@ -152,7 +162,8 @@ File events (create, modify, delete, rename) are debounced before syncing:
 3. Rename events emit both a `delete:` for old path and an add for new path
 4. Debounce timer (default 5s) resets with each new event, with a 30s maximum wait
 5. After the quiet period or maximum wait, `processPendingChanges()` flushes the queue
-6. Each event receives a revision so full-sync reconciliation cannot clear a newer edit that arrived while the sync was running; opposite upload/delete events for one path are coalesced
+6. Each event receives a revision so reconciliation cannot clear a newer edit that arrived while the sync was running; opposite upload/delete events for one path are coalesced
+7. A conditional-write conflict sends only the affected queue keys through a bounded three-attempt reconciliation pass; unrelated vault paths are not scanned
 
 Implementation: `queue.ts`
 
@@ -183,7 +194,7 @@ Implementation: `manifest.ts:LocalManifest`
 - **Cancellation:** in-flight HTTP transfers use `AbortController`; stopping or unloading sync aborts the underlying request, not only the caller's wait
 - **Incremental-to-full fallback:** if incremental sync returns `null` (error/cursor expiry), engine runs full sync
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file
-- **Queue retry:** retryable flush failures are re-added to `pendingPaths`; version and validation conflicts request a full three-way reconciliation instead of spinning or dropping the path
+- **Queue retry:** retryable flush failures are re-added to `pendingPaths`; version and validation conflicts request a targeted three-way replan for only the affected paths, with at most three compare-and-swap attempts
 - **Large files:** files > 25 MB are skipped with error message, not crashed
 - **Remote recovery:** replaced and deleted R2 objects are retained for 30 days, integrity-checked, and restorable with an expected-hash compare-and-swap
 - **Ignored remote cleanup:** changing ignore patterns never deletes data implicitly; settings provide an explicit preview-and-confirm purge action

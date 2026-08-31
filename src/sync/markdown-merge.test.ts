@@ -23,7 +23,7 @@ describe('mergeMarkdownContent', () => {
 		}
 	});
 
-	it('merges independent insertions at the same point in stable local-then-remote order', () => {
+	it('merges independent insertions at the same point in stable content order', () => {
 		const result = mergeMarkdownContent(
 			toArrayBuffer('a\nb\n'),
 			toArrayBuffer('a\nlocal\nb\n'),
@@ -59,7 +59,7 @@ describe('mergeMarkdownContent', () => {
 		expect(result).toEqual({ success: false, reason: 'overlap' });
 	});
 
-	it('preserves the local file line ending and final newline style', () => {
+	it('preserves the common base line ending and final newline style', () => {
 		const result = mergeMarkdownContent(
 			toArrayBuffer('a\r\nbase local\r\nbase remote\r\n'),
 			toArrayBuffer('a\r\nlocal edit\r\nbase remote'),
@@ -68,8 +68,24 @@ describe('mergeMarkdownContent', () => {
 
 		expect(result.success).toBe(true);
 		if (result.success) {
-			expect(result.text).toBe('a\r\nlocal edit\r\nremote edit');
+			expect(result.text).toBe('a\r\nlocal edit\r\nremote edit\r\n');
 			expect(fromArrayBuffer(result.content)).toBe(result.text);
+		}
+	});
+
+	it('produces identical bytes when the two devices swap local and remote inputs', () => {
+		const base = toArrayBuffer('a\r\nb\r\n');
+		const left = toArrayBuffer('a\nleft\nb\n');
+		const right = toArrayBuffer('a\r\nright\r\nb');
+
+		const leftFirst = mergeMarkdownContent(base, left, right);
+		const rightFirst = mergeMarkdownContent(base, right, left);
+
+		expect(leftFirst.success).toBe(true);
+		expect(rightFirst.success).toBe(true);
+		if (leftFirst.success && rightFirst.success) {
+			expect(fromArrayBuffer(leftFirst.content)).toBe(fromArrayBuffer(rightFirst.content));
+			expect(leftFirst.text).toBe('a\r\nleft\r\nright\r\nb\r\n');
 		}
 	});
 });

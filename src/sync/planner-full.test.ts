@@ -10,7 +10,7 @@ const fileDiscoveryMocks = vi.hoisted(() => ({
 
 const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
-	detectConflicts: vi.fn(),
+	classifyPaths: vi.fn(),
 }));
 
 vi.mock('./file-discovery', () => ({
@@ -22,14 +22,15 @@ vi.mock('./conflict', () => ({
 	createConflictCopy: conflictMocks.createConflictCopy,
 }));
 
-vi.mock('./reconciliation', () => ({
-	detectConflicts: conflictMocks.detectConflicts,
+vi.mock('./reconciliation', async (importOriginal) => ({
+	...await importOriginal<typeof import('./reconciliation')>(),
+	classifyPaths: conflictMocks.classifyPaths,
 }));
 
 describe('createFullSyncPlan', () => {
 	beforeEach(() => {
 		fileDiscoveryMocks.getAllVaultFiles.mockReset();
-		conflictMocks.detectConflicts.mockReset();
+		conflictMocks.classifyPaths.mockReset();
 	});
 
 	it('filters ignored/missing/oversized diffs and classifies remaining work', async () => {
@@ -38,7 +39,7 @@ describe('createFullSyncPlan', () => {
 			{ path: 'notes/conflict.md', size: 3, mtime: 100, extension: 'md' },
 			{ path: 'notes/local-big.bin', size: MAX_FILE_SIZE_BYTES + 1, mtime: 100, extension: 'bin' },
 		]);
-		conflictMocks.detectConflicts.mockReturnValue([
+		conflictMocks.classifyPaths.mockReturnValue([
 			{ path: 'notes/upload.md', action: 'upload' },
 			{ path: 'notes/download-missing.md', action: 'download' },
 			{ path: 'notes/remote-big.md', action: 'download' },
@@ -113,7 +114,7 @@ describe('createFullSyncPlan', () => {
 			{ path: 'notes/size-changed.md', size: 20, mtime: 1000, extension: 'md' },
 			{ path: 'notes/mtime-changed.md', size: 5, mtime: 3000, extension: 'md' },
 		]);
-		conflictMocks.detectConflicts.mockReturnValue([]);
+		conflictMocks.classifyPaths.mockReturnValue([]);
 
 		const readBinary = vi.fn(async () => newContent);
 

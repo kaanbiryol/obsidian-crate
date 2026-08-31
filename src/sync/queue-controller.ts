@@ -29,7 +29,7 @@ export interface SyncQueueControllerContext {
 	getDebounceDelayMs(): number;
 	uploadConcurrency: number;
 	maxDebounceWaitMs: number;
-	reconcile(): Promise<SyncResult>;
+	reconcile(queueKeys: string[]): Promise<SyncResult>;
 }
 
 export class SyncQueueController {
@@ -40,6 +40,7 @@ export class SyncQueueController {
 	private pendingRevisions = new Map<string, number>();
 	private nextRevision = 0;
 	private reconciliationScheduled = false;
+	private reconciliationPaths = new Set<string>();
 
 	constructor(private readonly context: SyncQueueControllerContext) {}
 
@@ -79,6 +80,7 @@ export class SyncQueueController {
 		this.inFlightPaths.clear();
 		this.pendingRevisions.clear();
 		this.reconciliationScheduled = false;
+		this.reconciliationPaths.clear();
 	}
 
 	private getQueueEventContext(): QueueEventContext {
@@ -130,7 +132,7 @@ export class SyncQueueController {
 			getModifiedIso: (path: string, fallbackMtime?: number) =>
 				this.context.getModifiedIso(path, fallbackMtime),
 			triggerDebouncedSync: () => this.debouncedSync(),
-			requestReconciliation: () => this.requestReconciliation(),
+			requestReconciliation: (queueKeys: string[]) => this.requestReconciliation(queueKeys),
 		};
 	}
 
@@ -155,13 +157,16 @@ export class SyncQueueController {
 		await flushPendingQueueChanges(this.getQueueFlushContext(), this.context.uploadConcurrency);
 	}
 
-	private requestReconciliation(): void {
+	private requestReconciliation(queueKeys: string[]): void {
+		for (const queueKey of queueKeys) this.reconciliationPaths.add(queueKey);
 		if (this.reconciliationScheduled || this.context.isDestroyed()) return;
 		this.reconciliationScheduled = true;
 		queueMicrotask(() => {
 			this.reconciliationScheduled = false;
 			if (this.context.isDestroyed()) return;
-			void this.context.reconcile().catch(() => {
+			const paths = [...this.reconciliationPaths];
+			this.reconciliationPaths.clear();
+			void this.context.reconcile(paths).catch(() => {
 				// Sync state already reports the failure; periodic/manual sync can retry.
 			});
 		});

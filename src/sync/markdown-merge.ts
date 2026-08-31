@@ -63,8 +63,8 @@ export function mergeMarkdownContent(
 
 	const mergedText = joinLines(
 		mergedLines,
-		hasFinalNewline(localText),
-		detectEol(localText),
+		hasFinalNewline(baseText),
+		detectEol(baseText),
 	);
 
 	return {
@@ -330,7 +330,10 @@ function mergeHunks(
 
 		if (isSamePointInsertion(localHunk, remoteHunk)) {
 			merged.push(...baseLines.slice(baseIndex, localHunk.start));
-			merged.push(...localHunk.replacement, ...remoteHunk.replacement);
+			const [first, second] = compareReplacements(localHunk.replacement, remoteHunk.replacement) <= 0
+				? [localHunk.replacement, remoteHunk.replacement]
+				: [remoteHunk.replacement, localHunk.replacement];
+			merged.push(...first, ...second);
 			baseIndex = localHunk.start;
 			localIndex++;
 			remoteIndex++;
@@ -356,6 +359,10 @@ function mergeHunks(
 
 	merged.push(...baseLines.slice(baseIndex));
 	return merged;
+}
+
+function compareReplacements(left: string[], right: string[]): number {
+	return JSON.stringify(left).localeCompare(JSON.stringify(right), 'en');
 }
 
 function appendBaseAndHunk(

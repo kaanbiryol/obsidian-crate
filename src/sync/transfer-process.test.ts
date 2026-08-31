@@ -93,7 +93,7 @@ describe('processDiff conflict handling', () => {
 
 		await processDiff(
 			harness.context,
-			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)) },
+			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)), cause: 'concurrent-edit' },
 			localFiles,
 			result,
 		);
@@ -154,7 +154,7 @@ describe('processDiff conflict handling', () => {
 
 		await processDiff(
 			harness.context,
-			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)) },
+			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)), cause: 'concurrent-edit' },
 			localFiles,
 			result,
 		);
@@ -181,6 +181,101 @@ describe('processDiff conflict handling', () => {
 		);
 	});
 
+	it('keeps a local edit made while an auto-merge upload is in flight', async () => {
+		const harness = createProcessHarness();
+		const path = 'notes/merge.md';
+		const base = 'title\nbase local\nbase remote\n';
+		const local = 'title\nlocal edit\nbase remote\n';
+		const remote = 'title\nbase local\nremote edit\n';
+		const lateLocal = 'title\nlocal edit again\nbase remote\n';
+		const localFile = { path, extension: 'md' };
+		const baseHash = await computeHash(toArrayBuffer(base));
+		harness.localManifest.getEntry.mockReturnValue({
+			hash: baseHash,
+			size: base.length,
+			modified: '2026-02-14T00:00:00.000Z',
+		});
+		harness.markdownBaseCache.readBase.mockResolvedValue(toArrayBuffer(base));
+		harness.vault.getAbstractFileByPath.mockReturnValue(localFile);
+		harness.adapter.readBinary
+			.mockResolvedValueOnce(toArrayBuffer(local))
+			.mockResolvedValueOnce(toArrayBuffer(lateLocal));
+		harness.api.downloadFile.mockResolvedValue({
+			content: toArrayBuffer(remote),
+			contentType: 'text/markdown',
+			size: remote.length,
+		});
+		harness.api.uploadFile.mockImplementation(async (
+			_uploadPath: string,
+			_content: ArrayBuffer,
+			hash: string,
+		) => ({ success: true, path, hash }));
+
+		const localFiles: Record<string, FileEntry> = {};
+		const result = createEmptySyncResult();
+		await processDiff(
+			harness.context,
+			{
+				path,
+				action: 'conflict',
+				localHash: await computeHash(toArrayBuffer(local)),
+				remoteHash: await computeHash(toArrayBuffer(remote)),
+				cause: 'concurrent-edit',
+			},
+			localFiles,
+			result,
+		);
+
+		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
+		expect(harness.vault.modifyBinary).not.toHaveBeenCalled();
+		expect(harness.vault.createBinary).not.toHaveBeenCalled();
+		expect(result.conflicts).toEqual([]);
+		expect(result.resolvedRaces).toEqual([{ path, resolution: 'kept-local-edit' }]);
+		expect(result.mergedPaths).toEqual([path]);
+		expect(harness.api.uploadFile.mock.invocationCallOrder[0])
+			.toBeLessThan(harness.adapter.readBinary.mock.invocationCallOrder[1]!);
+	});
+
+	it('does not replace the local file when the merged remote compare-and-swap fails', async () => {
+		const harness = createProcessHarness();
+		const path = 'notes/merge.md';
+		const base = 'title\nbase local\nbase remote\n';
+		const local = 'title\nlocal edit\nbase remote\n';
+		const remote = 'title\nbase local\nremote edit\n';
+		const baseHash = await computeHash(toArrayBuffer(base));
+		harness.localManifest.getEntry.mockReturnValue({
+			hash: baseHash,
+			size: base.length,
+			modified: '2026-02-14T00:00:00.000Z',
+		});
+		harness.markdownBaseCache.readBase.mockResolvedValue(toArrayBuffer(base));
+		harness.vault.getAbstractFileByPath.mockReturnValue({ path, extension: 'md' });
+		harness.adapter.readBinary.mockResolvedValue(toArrayBuffer(local));
+		harness.api.downloadFile.mockResolvedValue({
+			content: toArrayBuffer(remote),
+			contentType: 'text/markdown',
+			size: remote.length,
+		});
+		harness.api.uploadFile.mockRejectedValue(new Error('remote changed again'));
+
+		await expect(processDiff(
+			harness.context,
+			{
+				path,
+				action: 'conflict',
+				localHash: await computeHash(toArrayBuffer(local)),
+				remoteHash: await computeHash(toArrayBuffer(remote)),
+				cause: 'concurrent-edit',
+			},
+			{},
+			createEmptySyncResult(),
+		)).rejects.toThrow('remote changed again');
+
+		expect(harness.vault.modifyBinary).not.toHaveBeenCalled();
+		expect(harness.vault.createBinary).not.toHaveBeenCalled();
+		expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
+	});
+
 	it('uses deterministic timestamp format for visible conflict copies', async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
@@ -203,7 +298,7 @@ describe('processDiff conflict handling', () => {
 
 		await processDiff(
 			harness.context,
-			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)) },
+			{ path, action: 'conflict', localHash: 'l', remoteHash: await computeHash(toArrayBuffer(remote)), cause: 'concurrent-edit' },
 			localFiles,
 			result,
 		);

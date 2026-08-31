@@ -1,4 +1,4 @@
-import type { SyncResult } from '../plugin/types';
+import type { ResolvedSyncRace, SyncResult } from '../plugin/types';
 
 export const SYNC_ERROR_MESSAGES = {
 	NOT_CONFIGURED: 'Not configured',
@@ -13,12 +13,42 @@ export function createEmptySyncResult(): SyncResult {
 		merged: 0,
 		deleted: 0,
 		conflicts: [],
+		unresolvedConflicts: [],
+		resolvedRaces: [],
+		settledPaths: [],
 		errors: [],
 		uploadedPaths: [],
 		downloadedPaths: [],
 		mergedPaths: [],
 		deletedPaths: [],
 	};
+}
+
+export function recordUnresolvedConflict(
+	result: SyncResult,
+	path: string,
+	conflictPath: string,
+): void {
+	if (!result.conflicts.includes(conflictPath)) {
+		result.conflicts.push(conflictPath);
+	}
+	if (!result.unresolvedConflicts.some((conflict) => conflict.conflictPath === conflictPath)) {
+		result.unresolvedConflicts.push({ path, conflictPath });
+	}
+}
+
+export function hasUnresolvedConflict(result: SyncResult, path: string): boolean {
+	return result.unresolvedConflicts.some((conflict) => conflict.path === path);
+}
+
+export function recordResolvedRace(
+	result: SyncResult,
+	path: string,
+	resolution: ResolvedSyncRace['resolution'],
+): void {
+	if (!result.resolvedRaces.some((race) => race.path === path && race.resolution === resolution)) {
+		result.resolvedRaces.push({ path, resolution });
+	}
 }
 
 export function createSyncFailureResult(error: string): SyncResult {

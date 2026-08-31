@@ -23,7 +23,8 @@ vi.mock('./conflict', () => ({
 	createConflictCopy: conflictMocks.createConflictCopy,
 }));
 
-vi.mock('./reconciliation', () => ({
+vi.mock('./reconciliation', async (importOriginal) => ({
+	...await importOriginal<typeof import('./reconciliation')>(),
 	detectConflicts: conflictMocks.detectConflicts,
 }));
 
@@ -78,6 +79,9 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 			merged: 0,
 			deleted: 0,
 			conflicts: [],
+			unresolvedConflicts: [],
+			resolvedRaces: [],
+			settledPaths: [],
 			errors: [],
 			uploadedPaths: [],
 			downloadedPaths: [],
@@ -207,7 +211,8 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 		expect(harness.vault.adapter.remove).not.toHaveBeenCalled();
 		expect(prepared.expectedHash).toBeNull();
 		expect(result?.uploadedPaths).toContain(path);
-		expect(result?.conflicts).toContain(path);
+		expect(result?.conflicts).toEqual([]);
+		expect(result?.resolvedRaces).toContainEqual({ path, resolution: 'kept-local-edit' });
 	});
 
 	it('cleans manifest state when a remote delete targets an already missing file', async () => {
@@ -345,7 +350,8 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 			expect.objectContaining({ concurrency: 5 }),
 		);
 		expect(prepared.expectedHash).toBeNull();
-		expect(result?.conflicts).toContain('notes/live.md');
+		expect(result?.conflicts).toEqual([]);
+		expect(result?.resolvedRaces).toContainEqual({ path: 'notes/live.md', resolution: 'kept-local-edit' });
 		expect(result?.uploaded).toBe(1);
 	});
 
@@ -384,7 +390,8 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 
 		expect(harness.api.batchDelete).not.toHaveBeenCalled();
 		expect(result?.downloadedPaths).toContain(path);
-		expect(result?.conflicts).toContain(path);
+		expect(result?.conflicts).toEqual([]);
+		expect(result?.resolvedRaces).toContainEqual({ path, resolution: 'kept-remote-edit' });
 	});
 
 	it('keeps a local delete when the remote put still matches the common version', async () => {
