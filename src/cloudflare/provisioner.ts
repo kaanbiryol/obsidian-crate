@@ -4,6 +4,20 @@ import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import { randomHex } from './pkce';
 import { CLOUDFLARE_MAINTENANCE_CRON } from './maintenance-schedule';
 
+const INITIAL_MIGRATION_NAME = '0001_initial.sql';
+const LAUNCH_HARDENING_MIGRATION_NAME = '0002_launch_hardening.sql';
+const CREATE_MIGRATIONS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS d1_migrations (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL UNIQUE,
+	applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);`;
+const FIND_FILES_TABLE_SQL = "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'files';";
+const INSPECT_LAUNCH_HARDENING_SQL = `PRAGMA table_info(files);
+PRAGMA table_info(push_subscriptions);
+SELECT name FROM sqlite_master
+	WHERE type = 'table'
+		AND name IN ('notification_jobs', 'file_versions', 'maintenance_state');`;
+
 async function ensureD1Database(
 	api: CloudflareApiClient,
 	accountId: string,
@@ -48,9 +62,38 @@ async function initializeD1Schema(input: {
 	await input.api.queryD1(
 		input.accountId,
 		input.databaseId,
-		input.artifacts.d1Schema,
+		CREATE_MIGRATIONS_TABLE_SQL,
 	);
 
+	const filesTableResults = await input.api.queryD1(
+		input.accountId,
+		input.databaseId,
+		FIND_FILES_TABLE_SQL,
+	);
+	const hasFilesTable = filesTableResults.some(result =>
+		(result.results ?? []).some(row => row.name === 'files'),
+	);
+
+	if (!hasFilesTable) {
+		await input.api.queryD1(
+			input.accountId,
+			input.databaseId,
+			input.artifacts.d1Schema,
+		);
+		if (input.artifacts.d1Migrations.length > 0) {
+			const statements = input.artifacts.d1Migrations
+				.map(migration => `INSERT OR IGNORE INTO d1_migrations (name) VALUES ('${migration.name}');`)
+				.join('\n');
+			await input.api.queryD1(input.accountId, input.databaseId, statements);
+		}
+		return;
+	}
+
+	await input.api.queryD1(
+		input.accountId,
+		input.databaseId,
+		`INSERT OR IGNORE INTO d1_migrations (name) VALUES ('${INITIAL_MIGRATION_NAME}');`,
+	);
 	const appliedResults = await input.api.queryD1(
 		input.accountId,
 		input.databaseId,
@@ -65,12 +108,47 @@ async function initializeD1Schema(input: {
 
 	for (const migration of input.artifacts.d1Migrations) {
 		if (appliedNames.has(migration.name)) continue;
+		if (migration.name === LAUNCH_HARDENING_MIGRATION_NAME) {
+			const schemaResults = await input.api.queryD1(
+				input.accountId,
+				input.databaseId,
+				INSPECT_LAUNCH_HARDENING_SQL,
+			);
+			const schemaNames = new Set(
+				schemaResults
+					.flatMap(result => result.results ?? [])
+					.map(row => row.name)
+					.filter((name): name is string => typeof name === 'string'),
+			);
+			const launchHardeningAlreadyApplied = [
+				'portable_path',
+				'disabled_at',
+				'last_error',
+				'notification_jobs',
+				'file_versions',
+				'maintenance_state',
+			].every(name => schemaNames.has(name));
+			if (launchHardeningAlreadyApplied) {
+				await input.api.queryD1(
+					input.accountId,
+					input.databaseId,
+					`INSERT INTO d1_migrations (name) VALUES ('${migration.name}');`,
+				);
+				continue;
+			}
+		}
 		await input.api.queryD1(
 			input.accountId,
 			input.databaseId,
 			`${migration.sql.trim()}\nINSERT INTO d1_migrations (name) VALUES ('${migration.name}');`,
 		);
 	}
+
+	await input.api.queryD1(
+		input.accountId,
+		input.databaseId,
+		input.artifacts.d1Schema,
+	);
 }
 
 async function ensureWorkersSubdomain(

@@ -70,6 +70,7 @@ it('chunks more than one server batch of local deletes', async () => {
 
 		const context = {
 			settings,
+			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
 				getAbstractFileByPath: vi.fn(() => null),
 				delete: vi.fn(),
@@ -143,6 +144,7 @@ it('chunks more than one server batch of local deletes', async () => {
 
 		const context = {
 			settings,
+			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
 				getAbstractFileByPath: vi.fn(() => null),
 				delete: vi.fn(),
@@ -198,6 +200,7 @@ it('chunks more than one server batch of local deletes', async () => {
 		};
 		const context = {
 			settings,
+			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
 				getAbstractFileByPath: vi.fn(),
 				delete: vi.fn(),

@@ -42,6 +42,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 		};
 		const context = {
 			settings,
+			fileManager: { trashFile: vi.fn(async () => {}) },
 			vault: {
 				getAbstractFileByPath: vi.fn(),
 				delete: vi.fn(),

@@ -37,7 +37,7 @@ export interface LocalDiffPlannerContext {
 export interface IncrementalSyncPlannerContext {
   settings: CrateSettings;
   vault: Vault;
-  fileManager?: {
+  fileManager: {
     trashFile(file: TAbstractFile): Promise<void>;
   };
   api: PlannerApi;

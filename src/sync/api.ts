@@ -20,6 +20,7 @@ import type {
 import type { CrateServerInfo } from '../protocol';
 import { AuthWorkerApi } from './worker-api/auth';
 import { WorkerApiHttpClient } from './worker-api/http';
+import type { ApiHttpTransport } from './worker-api/http';
 import type {
 	PushSubscriptionsResponse,
 	PushTestResponse,
@@ -39,8 +40,8 @@ export class SyncApiClient {
 	private readonly sharedSettingsApi: SharedSettingsWorkerApi;
 	private readonly notificationsApi: NotificationsWorkerApi;
 
-	constructor(workerUrl: string, authToken: string) {
-		this.http = new WorkerApiHttpClient(workerUrl, authToken);
+	constructor(workerUrl: string, authToken: string, transport?: ApiHttpTransport) {
+		this.http = new WorkerApiHttpClient(workerUrl, authToken, transport);
 		this.syncApi = new SyncWorkerApi(this.http);
 		this.authApi = new AuthWorkerApi(this.http);
 		this.sharedSettingsApi = new SharedSettingsWorkerApi(this.http);

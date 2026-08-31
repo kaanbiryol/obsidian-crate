@@ -41,6 +41,17 @@ jobs:
       - name: Build release on Node.js 22
         run: npm run release:check
 
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build release on Node.js 24
+        run: npm run release:check
+
       - name: Prepare release assets
         run: |
           mkdir release

@@ -15,7 +15,7 @@ export function isVaultTFileLike(file: TAbstractFile | null): file is TFile {
 
 interface LocalDeleteContext {
   vault: Vault;
-  fileManager?: { trashFile(file: TAbstractFile): Promise<void> };
+  fileManager: { trashFile(file: TAbstractFile): Promise<void> };
 }
 
 export type LocalDeleteOutcome =
@@ -54,11 +54,7 @@ async function deletePathLocally(
 
   const file = context.vault.getAbstractFileByPath(path);
   if (file) {
-    if (context.fileManager) {
-      await context.fileManager.trashFile(file);
-    } else {
-      await context.vault.delete(file);
-    }
+    await context.fileManager.trashFile(file);
     return true;
   }
 

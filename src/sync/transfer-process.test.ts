@@ -35,6 +35,9 @@ function createProcessHarness() {
 		batchUpload: vi.fn(),
 		batchDownload: vi.fn(),
 	};
+	const fileManager = {
+		trashFile: vi.fn(async () => {}),
+	};
 	const localManifest = {
 		getEntry: vi.fn(),
 		hashMatches: vi.fn(() => false),
@@ -47,6 +50,7 @@ function createProcessHarness() {
 	};
 	const context: TransferContext = {
 		vault: vault as never,
+		fileManager,
 		api,
 		localManifest,
 		markdownBaseCache,

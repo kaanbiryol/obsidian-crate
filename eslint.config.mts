@@ -141,21 +141,17 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ['src/sync/planner-helpers.ts'],
+		// This DOM adapter is shared with the standalone PWA, where Obsidian's
+		// element helpers do not exist.
+		files: ['src/reminders/components/richTextInputDom.ts'],
 		rules: {
-			'obsidianmd/prefer-file-manager-trash-file': 'off',
+			'obsidianmd/prefer-create-el': 'off',
 		},
 	},
 	{
-		// These modules also execute in the standalone PWA or Node-based tests,
-		// where Obsidian's DOM helpers and renderer-specific globals do not exist.
-		files: [
-			'src/reminders/components/richTextInputDom.ts',
-			'src/sync/**/*.{ts,tsx}',
-		],
+		// Sync timers also run in Node-based unit tests.
+		files: ['src/sync/**/*.{ts,tsx}'],
 		rules: {
-			'obsidianmd/no-global-this': 'off',
-			'obsidianmd/prefer-create-el': 'off',
 			'obsidianmd/prefer-window-timers': 'off',
 		},
 	},

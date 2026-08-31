@@ -1,3 +1,4 @@
+import { requestUrl } from 'obsidian';
 import { createLogger, errorMessage } from '../../plugin/logger';
 import { createAbortError } from '../abort';
 import { normalizeWorkerUrl } from '../worker-url';
@@ -13,12 +14,35 @@ export interface ApiRequestOptions {
 	method?: string;
 }
 
-interface ApiHttpResponse {
+interface ApiHttpRequest extends ApiRequestOptions {
+	url: string;
+}
+
+export interface ApiHttpResponse {
 	status: number;
 	headers: Record<string, string>;
 	arrayBuffer: ArrayBuffer;
 	text: string;
 }
+
+export type ApiHttpTransport = (request: ApiHttpRequest) => Promise<ApiHttpResponse>;
+
+const obsidianHttpTransport: ApiHttpTransport = async request => {
+	const response = await requestUrl({
+		url: request.url,
+		method: request.method,
+		body: request.body,
+		contentType: request.contentType,
+		headers: request.headers,
+		throw: false,
+	});
+	return {
+		status: response.status,
+		headers: response.headers,
+		arrayBuffer: response.arrayBuffer,
+		text: response.text,
+	};
+};
 
 export class HttpError extends Error {
 	constructor(message: string, readonly status: number, readonly retryAfter: number | null = null) {
@@ -79,7 +103,11 @@ export class WorkerApiHttpClient {
 	private authToken: string;
 	private externalSignal: AbortSignal | undefined;
 
-	constructor(workerUrl: string, authToken: string) {
+	constructor(
+		workerUrl: string,
+		authToken: string,
+		private readonly transport: ApiHttpTransport = obsidianHttpTransport,
+	) {
 		this.workerUrl = normalizeWorkerUrl(workerUrl);
 		this.authToken = authToken;
 	}
@@ -108,14 +136,6 @@ export class WorkerApiHttpClient {
 	): Promise<ApiHttpResponse> {
 		const externalSignal = this.externalSignal;
 		if (externalSignal?.aborted) throw createAbortError('Sync request aborted');
-		const controller = new AbortController();
-		let timedOut = false;
-		const onAbort = () => controller.abort();
-		externalSignal?.addEventListener('abort', onAbort, { once: true });
-		const timeoutId = setTimeout(() => {
-			timedOut = true;
-			controller.abort();
-		}, timeout);
 
 		const headersWithoutContentType = Object.fromEntries(
 			Object.entries(options.headers ?? {}).filter(([key]) => key.toLowerCase() !== 'content-type'),
@@ -124,36 +144,49 @@ export class WorkerApiHttpClient {
 			?? getHeader(options.headers ?? {}, 'Content-Type')
 			?? undefined;
 
-		try {
-			const response = await globalThis.fetch(`${this.workerUrl}${path}`, {
+		return await new Promise<ApiHttpResponse>((resolve, reject) => {
+			let settled = false;
+			let timeoutId: number | undefined;
+			const cleanup = () => {
+				if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+				externalSignal?.removeEventListener('abort', onAbort);
+			};
+			const resolveOnce = (response: ApiHttpResponse) => {
+				if (settled) return;
+				settled = true;
+				cleanup();
+				resolve(response);
+			};
+			const rejectOnce = (error: unknown) => {
+				if (settled) return;
+				settled = true;
+				cleanup();
+				reject(error instanceof Error ? error : new Error(errorMessage(error)));
+			};
+			const onAbort = () => rejectOnce(createAbortError('Sync request aborted'));
+
+			externalSignal?.addEventListener('abort', onAbort, { once: true });
+			timeoutId = window.setTimeout(
+				() => rejectOnce(new Error(`Request timed out after ${timeout}ms`)),
+				timeout,
+			);
+			void this.transport({
+				url: `${this.workerUrl}${path}`,
 				method: options.method,
 				body: options.body,
-				signal: controller.signal,
+				contentType: resolvedContentType,
 				headers: {
 					Authorization: `Bearer ${this.authToken}`,
-					...(resolvedContentType ? { 'Content-Type': resolvedContentType } : {}),
 					...headersWithoutContentType,
 				},
+			}).then(resolveOnce, error => {
+				if (externalSignal?.aborted) {
+					rejectOnce(createAbortError('Sync request aborted'));
+					return;
+				}
+				rejectOnce(error);
 			});
-			const arrayBuffer = await response.arrayBuffer();
-			const responseHeaders: Record<string, string> = {};
-			response.headers.forEach((value, key) => {
-				responseHeaders[key] = value;
-			});
-			return {
-				status: response.status,
-				headers: responseHeaders,
-				arrayBuffer,
-				text: new TextDecoder().decode(arrayBuffer),
-			};
-		} catch (error) {
-			if (externalSignal?.aborted) throw createAbortError('Sync request aborted');
-			if (timedOut) throw new Error(`Request timed out after ${timeout}ms`);
-			throw error;
-		} finally {
-			clearTimeout(timeoutId);
-			externalSignal?.removeEventListener('abort', onAbort);
-		}
+		});
 	}
 
 	async requestJson<T>(

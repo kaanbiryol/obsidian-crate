@@ -36,7 +36,7 @@ interface TransferApi {
 
 export interface TransferContext {
   vault: Vault;
-  fileManager?: {
+  fileManager: {
     trashFile(file: TAbstractFile): Promise<void>;
   };
   api: TransferApi;

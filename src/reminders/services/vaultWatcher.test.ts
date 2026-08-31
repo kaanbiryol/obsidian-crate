@@ -41,7 +41,7 @@ function createHarness() {
 describe('VaultWatcher notification reconciliation', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
-		vi.stubGlobal('window', { setTimeout });
+		vi.stubGlobal('window', { clearTimeout, setTimeout });
 	});
 
 	afterEach(() => {

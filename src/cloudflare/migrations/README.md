@@ -2,6 +2,8 @@
 
 `schema.sql` is the complete schema for newly created databases and records the
 `0001_initial.sql` baseline in Cloudflare's standard `d1_migrations` table.
+`0002_launch_hardening.sql` upgrades databases created by pre-release builds;
+the provisioner applies migrations before reconciling the complete schema.
 
 For every schema change after the first public release:
 
