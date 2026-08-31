@@ -11,7 +11,6 @@ const fileDiscoveryMocks = vi.hoisted(() => ({
 
 const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
-	detectConflicts: vi.fn(),
 }));
 
 vi.mock('./file-discovery', () => ({
@@ -21,11 +20,6 @@ vi.mock('./file-discovery', () => ({
 
 vi.mock('./conflict', () => ({
 	createConflictCopy: conflictMocks.createConflictCopy,
-}));
-
-vi.mock('./reconciliation', async (importOriginal) => ({
-	...await importOriginal<typeof import('./reconciliation')>(),
-	detectConflicts: conflictMocks.detectConflicts,
 }));
 
 describe('runIncrementalSync', () => {
@@ -65,7 +59,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 			getLocalChanges: vi.fn(async () => []),
 			getLocalDeletes: vi.fn(async () => []),
 			parallelDownloadAndSaveFiles: vi.fn(async () => {}),
-			processDiff: vi.fn(async () => {}),
+			processDiff: vi.fn(async () => ({ status: 'applied' as const })),
 			prepareUploadFromPath: vi.fn(async () => null),
 			uploadPreparedFiles: vi.fn(async () => {}),
 		};

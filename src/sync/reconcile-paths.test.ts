@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HttpError } from './api';
+import { RemoteVersionChangedError } from './transfer-download';
 import { computeHash } from './hasher';
 import { reconcileQueuePaths, type TargetedReconcileContext } from './reconcile-paths';
 import type { FileEntry, FileManifest, SyncResult } from '../plugin/types';
@@ -31,9 +32,15 @@ async function createHarness(options: {
 	const processDiff = vi.fn<TargetedReconcileContext['processDiff']>(async (_diff, _localFiles, result: SyncResult) => {
 		result.merged++;
 		result.mergedPaths.push('notes/a.md');
+		return { status: 'applied' };
 	});
-	const getRemoteManifest = vi.fn(async () =>
-		options.remoteManifests[Math.min(manifestIndex++, options.remoteManifests.length - 1)]!);
+	const getRemoteEntries = vi.fn(async (paths: string[]) => {
+		const manifest = options.remoteManifests[Math.min(manifestIndex++, options.remoteManifests.length - 1)]!;
+		return Object.fromEntries(paths.flatMap(path => {
+			const entry = manifest.files[path];
+			return entry ? [[path, entry] as const] : [];
+		}));
+	});
 	const localManifest = {
 		getEntry: vi.fn(() => baseEntry),
 		setEntry: vi.fn(),
@@ -43,12 +50,12 @@ async function createHarness(options: {
 	const context: TargetedReconcileContext = {
 		vault: vault as never,
 		localManifest,
-		getRemoteManifest,
+		getRemoteEntries,
 		shouldIgnore: vi.fn(() => false),
 		getModifiedIso: vi.fn(async () => '2026-02-15T00:00:00.000Z'),
 		processDiff,
 	};
-	return { context, processDiff, getRemoteManifest, localManifest, adapter };
+	return { context, processDiff, getRemoteEntries, localManifest, adapter };
 }
 
 describe('reconcileQueuePaths', () => {
@@ -96,11 +103,57 @@ describe('reconcileQueuePaths', () => {
 			.mockImplementationOnce(async (_diff, _localFiles, result: SyncResult) => {
 				result.merged++;
 				result.mergedPaths.push('notes/a.md');
+				return { status: 'applied' };
 			});
 
 		const result = await reconcileQueuePaths(harness.context, ['notes/a.md']);
 
-		expect(harness.getRemoteManifest).toHaveBeenCalledTimes(2);
+		expect(harness.getRemoteEntries).toHaveBeenCalledTimes(2);
+		expect(harness.getRemoteEntries).toHaveBeenNthCalledWith(1, ['notes/a.md']);
+		expect(harness.getRemoteEntries).toHaveBeenNthCalledWith(2, ['notes/a.md']);
+		expect(harness.processDiff).toHaveBeenCalledTimes(2);
+		expect(harness.processDiff.mock.calls[1]?.[0]).toEqual(expect.objectContaining({ remoteHash: 'remote-v3' }));
+		expect(result.settledPaths).toEqual(['notes/a.md']);
+		expect(result.errors).toEqual([]);
+	});
+
+	it('replans when applying a diff is deferred by a newer local edit', async () => {
+		const harness = await createHarness({
+			baseHash: 'base',
+			localText: 'local edit',
+			remoteManifests: [
+				{ version: 1, files: { 'notes/a.md': { hash: 'remote-v2', size: 1, modified: 'now' } } },
+				{ version: 1, files: { 'notes/a.md': { hash: 'remote-v3', size: 1, modified: 'now' } } },
+			],
+		});
+		harness.processDiff
+			.mockResolvedValueOnce({ status: 'deferred', reason: 'Local file changed' })
+			.mockResolvedValueOnce({ status: 'applied' });
+
+		const result = await reconcileQueuePaths(harness.context, ['notes/a.md']);
+
+		expect(harness.getRemoteEntries).toHaveBeenCalledTimes(2);
+		expect(harness.processDiff).toHaveBeenCalledTimes(2);
+		expect(result.settledPaths).toEqual(['notes/a.md']);
+		expect(result.errors).toEqual([]);
+	});
+
+	it('replans when the remote version changes between metadata lookup and download', async () => {
+		const harness = await createHarness({
+			baseHash: 'base',
+			localText: 'local edit',
+			remoteManifests: [
+				{ version: 1, files: { 'notes/a.md': { hash: 'remote-v2', size: 1, modified: 'now' } } },
+				{ version: 1, files: { 'notes/a.md': { hash: 'remote-v3', size: 1, modified: 'now' } } },
+			],
+		});
+		harness.processDiff
+			.mockRejectedValueOnce(new RemoteVersionChangedError('notes/a.md'))
+			.mockResolvedValueOnce({ status: 'applied' });
+
+		const result = await reconcileQueuePaths(harness.context, ['notes/a.md']);
+
+		expect(harness.getRemoteEntries).toHaveBeenCalledTimes(2);
 		expect(harness.processDiff).toHaveBeenCalledTimes(2);
 		expect(harness.processDiff.mock.calls[1]?.[0]).toEqual(expect.objectContaining({ remoteHash: 'remote-v3' }));
 		expect(result.settledPaths).toEqual(['notes/a.md']);

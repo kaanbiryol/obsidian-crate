@@ -46,6 +46,7 @@ import { SyncEngineContexts } from './engine-contexts';
 import { SyncEngineLifecycle } from './engine-lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
 import { createSyncFailureResult } from './sync-result';
+import type { DiffApplyOutcome } from './transfer-types';
 
 const logger = createLogger('SyncEngine');
 
@@ -312,7 +313,7 @@ export class SyncEngine {
 			const result = await reconcileQueuePaths({
 				vault: this.vault,
 				localManifest: this.localManifest,
-				getRemoteManifest: () => this.api.getManifest(),
+				getRemoteEntries: async (paths) => (await this.api.getFileMetadata(paths)).files,
 				shouldIgnore: this.shouldIgnore.bind(this),
 				getModifiedIso: (path) => this.getModifiedIso(path),
 				processDiff: (diff, localFiles, syncResult) =>
@@ -344,8 +345,8 @@ export class SyncEngine {
 		diff: FileDiff,
 		localFiles: Record<string, FileEntry>,
 		result: SyncResult
-	): Promise<void> {
-		await transferProcessDiff(this.contexts.transfer(), diff, localFiles, result);
+	): Promise<DiffApplyOutcome> {
+		return transferProcessDiff(this.contexts.transfer(), diff, localFiles, result);
 	}
 
 	private async prepareUploadsFromVaultFiles(

@@ -22,6 +22,10 @@ export interface FileEntry {
 	modified: string;
 }
 
+export interface FileMetadataResponse {
+	files: Record<string, FileEntry>;
+}
+
 // ============================================================================
 // Sync Types
 // ============================================================================
@@ -55,7 +59,7 @@ export interface SyncResult {
 	deletedPaths: string[];
 }
 
-export interface UnresolvedConflict {
+interface UnresolvedConflict {
 	path: string;
 	conflictPath: string;
 }

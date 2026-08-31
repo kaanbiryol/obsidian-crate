@@ -1,7 +1,8 @@
 import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
 import { corsResponse } from './cors';
-import { parseJsonObject } from './utils';
+import { parseJsonObject, sanitizePath } from './utils';
 import { getChangelogBounds } from './sync-storage';
+import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';
 
 function batchRows<T>(result: unknown): T[] {
 	if (!result || typeof result !== 'object') return [];
@@ -89,6 +90,41 @@ export async function handleGetManifest(request: Request, db: D1Database): Promi
 		...(nextCursor && { nextCursor }),
 		...(!paginatedRequest && hasMore && { truncated: true }),
 	});
+}
+
+export async function handleGetFileMetadata(request: Request, db: D1Database): Promise<Response> {
+	const parsedBody = await parseJsonObject(request);
+	if (!parsedBody.ok) return parsedBody.response;
+
+	const rawPaths = parsedBody.value.paths;
+	if (!Array.isArray(rawPaths) || rawPaths.length > BATCH_DOWNLOAD_MAX_FILES) {
+		return corsResponse({ error: `paths must contain at most ${BATCH_DOWNLOAD_MAX_FILES} entries` }, 400);
+	}
+
+	const paths: string[] = [];
+	for (const rawPath of rawPaths) {
+		if (typeof rawPath !== 'string') return corsResponse({ error: 'Invalid path' }, 400);
+		const path = sanitizePath(rawPath);
+		if (!path) return corsResponse({ error: 'Invalid path' }, 400);
+		paths.push(path);
+	}
+	if (new Set(paths).size !== paths.length) {
+		return corsResponse({ error: 'Duplicate paths are not allowed' }, 400);
+	}
+	if (paths.length === 0) return corsResponse({ files: {} });
+
+	const placeholders = paths.map(() => '?').join(', ');
+	const result = await db.prepare(
+		`SELECT path, hash, size, modified FROM files WHERE path IN (${placeholders})`,
+	).bind(...paths).all();
+	const rows = Array.isArray(result.results)
+		? result.results as Array<{ path: string; hash: string; size: number; modified: string }>
+		: [];
+	const files: Record<string, { hash: string; size: number; modified: string }> = {};
+	for (const row of rows) {
+		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified };
+	}
+	return corsResponse({ files });
 }
 
 export async function handleGetSettings(bucket: R2Bucket): Promise<Response> {

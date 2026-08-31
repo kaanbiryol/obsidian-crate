@@ -6,6 +6,7 @@ export {
 	handleDelete,
 	handleDownload,
 	handleGetChanges,
+	handleGetFileMetadata,
 	handleGetManifest,
 	handleGetSettings,
 	handleHealth,

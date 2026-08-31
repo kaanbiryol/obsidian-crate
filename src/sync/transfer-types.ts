@@ -46,3 +46,7 @@ export interface TransferContext {
   retryWithBackoff<T>(fn: () => Promise<T>): Promise<T>;
   getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 }
+
+export type DiffApplyOutcome =
+  | { status: "applied" }
+  | { status: "deferred"; reason: string };

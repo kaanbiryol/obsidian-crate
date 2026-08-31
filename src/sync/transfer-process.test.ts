@@ -181,7 +181,7 @@ describe('processDiff conflict handling', () => {
 		);
 	});
 
-	it('keeps a local edit made while an auto-merge upload is in flight', async () => {
+	it('rebases a deferred merge when the local file changes after the remote compare-and-swap', async () => {
 		const harness = createProcessHarness();
 		const path = 'notes/merge.md';
 		const base = 'title\nbase local\nbase remote\n';
@@ -213,7 +213,7 @@ describe('processDiff conflict handling', () => {
 
 		const localFiles: Record<string, FileEntry> = {};
 		const result = createEmptySyncResult();
-		await processDiff(
+		const outcome = await processDiff(
 			harness.context,
 			{
 				path,
@@ -230,10 +230,65 @@ describe('processDiff conflict handling', () => {
 		expect(harness.vault.modifyBinary).not.toHaveBeenCalled();
 		expect(harness.vault.createBinary).not.toHaveBeenCalled();
 		expect(result.conflicts).toEqual([]);
-		expect(result.resolvedRaces).toEqual([{ path, resolution: 'kept-local-edit' }]);
-		expect(result.mergedPaths).toEqual([path]);
+		expect(result.resolvedRaces).toEqual([]);
+		expect(result.mergedPaths).toEqual([]);
+		expect(harness.localManifest.setEntry).toHaveBeenCalledWith(path, {
+			hash: await computeHash(toArrayBuffer(local)),
+			size: toArrayBuffer(local).byteLength,
+			modified: '2026-02-14T00:00:00.000Z',
+		});
+		expect(harness.markdownBaseCache.putBase).toHaveBeenCalledWith(
+			path,
+			await computeHash(toArrayBuffer(local)),
+			toArrayBuffer(local),
+		);
+		expect(outcome).toEqual({
+			status: 'deferred',
+			reason: 'Local file changed while applying the merged version',
+		});
 		expect(harness.api.uploadFile.mock.invocationCallOrder[0])
 			.toBeLessThan(harness.adapter.readBinary.mock.invocationCallOrder[1]!);
+	});
+
+	it('preserves every observed local edit before replacing an unresolved conflict with remote content', async () => {
+		const harness = createProcessHarness();
+		const path = 'notes/conflict.md';
+		const firstLocal = toArrayBuffer('first local');
+		const latestLocal = toArrayBuffer('latest local');
+		const remote = toArrayBuffer('remote');
+		const localFile = { path, extension: 'md' };
+		harness.vault.getAbstractFileByPath.mockReturnValue(localFile);
+		harness.adapter.readBinary
+			.mockResolvedValueOnce(firstLocal)
+			.mockResolvedValueOnce(latestLocal)
+			.mockResolvedValueOnce(latestLocal);
+		harness.api.downloadFile.mockResolvedValue({
+			content: remote,
+			contentType: 'text/markdown',
+			hash: await computeHash(remote),
+			size: remote.byteLength,
+		});
+
+		const result = createEmptySyncResult();
+		const outcome = await processDiff(
+			harness.context,
+			{
+				path,
+				action: 'conflict',
+				localHash: await computeHash(firstLocal),
+				remoteHash: await computeHash(remote),
+				cause: 'concurrent-edit',
+			},
+			{},
+			result,
+		);
+
+		expect(outcome).toEqual({ status: 'applied' });
+		expect(harness.vault.createBinary).toHaveBeenCalledTimes(2);
+		expect(fromArrayBuffer(harness.vault.createBinary.mock.calls[0]?.[1] as ArrayBuffer)).toBe('first local');
+		expect(fromArrayBuffer(harness.vault.createBinary.mock.calls[1]?.[1] as ArrayBuffer)).toBe('latest local');
+		expect(result.unresolvedConflicts).toHaveLength(2);
+		expect(harness.vault.modifyBinary).toHaveBeenCalledWith(localFile, remote);
 	});
 
 	it('does not replace the local file when the merged remote compare-and-swap fails', async () => {

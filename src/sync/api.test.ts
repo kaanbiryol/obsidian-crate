@@ -112,6 +112,66 @@ describe('SyncApiClient', () => {
 		]);
 	});
 
+	it('loads metadata for only the requested sync paths', async () => {
+		const transport = mockTransport(new Response(JSON.stringify({
+			files: {
+				'notes/a.md': { hash: 'hash-a', size: 4, modified: 'now' },
+			},
+		})));
+		const client = new SyncApiClient('https://worker.example', 'token', transport);
+
+		await expect(client.getFileMetadata(['notes/a.md', 'notes/missing.md'])).resolves.toEqual({
+			files: {
+				'notes/a.md': { hash: 'hash-a', size: 4, modified: 'now' },
+			},
+		});
+		const [request] = transport.mock.calls[0]!;
+		expect(request.url).toBe('https://worker.example/sync/metadata');
+		expect(request.method).toBe('POST');
+		expect(JSON.parse(request.body as string)).toEqual({ paths: ['notes/a.md', 'notes/missing.md'] });
+	});
+
+	it('chunks targeted metadata requests at the worker limit', async () => {
+		const paths = Array.from({ length: 51 }, (_, index) => `notes/${index}.md`);
+		const transport = mockTransport(
+			new Response(JSON.stringify({ files: {} })),
+			new Response(JSON.stringify({ files: {} })),
+		);
+		const client = new SyncApiClient('https://worker.example', 'token', transport);
+
+		await expect(client.getFileMetadata(paths)).resolves.toEqual({ files: {} });
+		expect(transport).toHaveBeenCalledTimes(2);
+		const firstBody = JSON.parse(transport.mock.calls[0]![0].body as string) as { paths: string[] };
+		const secondBody = JSON.parse(transport.mock.calls[1]![0].body as string) as { paths: string[] };
+		expect(firstBody.paths).toHaveLength(50);
+		expect(secondBody.paths).toEqual(['notes/50.md']);
+	});
+
+	it('falls back to the manifest when an older worker lacks targeted metadata', async () => {
+		const transport = mockTransport(
+			new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }),
+			new Response(JSON.stringify({
+				version: 1,
+				files: {
+					'notes/a.md': { hash: 'hash-a', size: 4, modified: 'now' },
+					'notes/unrelated.md': { hash: 'other', size: 5, modified: 'now' },
+				},
+				lastSeq: 3,
+				snapshotSeq: 3,
+				hasMore: false,
+			})),
+			new Response(JSON.stringify({ changes: [], lastSeq: 3, hasMore: false })),
+		);
+		const client = new SyncApiClient('https://worker.example', 'token', transport);
+
+		await expect(client.getFileMetadata(['notes/a.md'])).resolves.toEqual({
+			files: {
+				'notes/a.md': { hash: 'hash-a', size: 4, modified: 'now' },
+			},
+		});
+		expect(transport).toHaveBeenCalledTimes(3);
+	});
+
 	it('updates credentials used by subsequent requests', async () => {
 		const transport = mockTransport(new Response('{"status":"ok","timestamp":"now"}'));
 		const client = new SyncApiClient('https://old.example/', 'old-token', transport);

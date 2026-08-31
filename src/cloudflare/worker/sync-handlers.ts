@@ -9,6 +9,7 @@ export {
 export {
 	handleCheckChanges,
 	handleGetChanges,
+	handleGetFileMetadata,
 	handleGetManifest,
 	handleGetSettings,
 	handleHealth,

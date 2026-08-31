@@ -6,8 +6,6 @@ import { Notice, type Vault } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import { isHiddenPath } from './file-discovery';
 
-export { classifyPath, classifyPaths, detectConflicts } from './reconciliation';
-
 const logger = createLogger('Conflict');
 
 /**

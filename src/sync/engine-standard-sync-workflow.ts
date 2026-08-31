@@ -1,4 +1,3 @@
-import { computeHash } from './hasher';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
@@ -12,6 +11,7 @@ import {
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { FileDiff, FileEntry, SyncResult, SyncState } from '../plugin/types';
 import type { DownloadRequest } from './transfer-download';
+import type { DiffApplyOutcome } from './transfer-types';
 import {
 	completeWorkflowResult,
 	getStartFailureResult,
@@ -41,11 +41,10 @@ export interface SyncWorkflowContext {
 		diff: FileDiff,
 		localFiles: Record<string, FileEntry>,
 		result: SyncResult
-	): Promise<void>;
+	): Promise<DiffApplyOutcome>;
 	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult): Promise<void>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
-	readBinary(path: string): Promise<ArrayBuffer>;
-	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
+	getLocalManifestEntry(path: string): FileEntry | undefined;
 	setLocalManifestEntry(path: string, entry: FileEntry): void;
 	saveLocalManifest(): Promise<void>;
 	setLastSync(value: string): void;
@@ -110,7 +109,10 @@ export async function runSyncWorkflow(
 		if (uploadDiffs.length > 0) {
 			const uploadTasks = uploadDiffs.map(diff => async () => {
 				try {
-					await context.processDiff(diff, localFiles, result);
+					const outcome = await context.processDiff(diff, localFiles, result);
+					if (outcome.status === 'deferred') {
+						result.errors.push(`${diff.path}: ${outcome.reason}`);
+					}
 				} catch (error) {
 					result.errors.push(`${diff.path}: ${errorMessage(error)}`);
 				}
@@ -148,16 +150,9 @@ export async function runSyncWorkflow(
 				) {
 					recordResolvedRace(result, diff.path, 'kept-remote-edit');
 				}
-				try {
-					const content = await context.readBinary(diff.path);
-					const hash = await computeHash(content);
-					localFiles[diff.path] = {
-						hash,
-						size: content.byteLength,
-						modified: await context.getModifiedIso(diff.path),
-					};
-				} catch {
-					// File may have failed to download; error already recorded.
+				if (result.downloadedPaths.includes(diff.path)) {
+					const manifestEntry = context.getLocalManifestEntry(diff.path);
+					if (manifestEntry) localFiles[diff.path] = manifestEntry;
 				}
 			}
 			current += downloadDiffs.length;
@@ -168,7 +163,10 @@ export async function runSyncWorkflow(
 
 		for (const diff of remainingDiffs) {
 			try {
-				await context.processDiff(diff, localFiles, result);
+				const outcome = await context.processDiff(diff, localFiles, result);
+				if (outcome.status === 'deferred') {
+					result.errors.push(`${diff.path}: ${outcome.reason}`);
+				}
 			} catch (error) {
 				result.errors.push(`${diff.path}: ${errorMessage(error)}`);
 			}

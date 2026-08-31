@@ -101,4 +101,10 @@ export function classifyPaths(
 }
 
 // Compatibility name for integrations that still import the original helper.
-export const detectConflicts = classifyPaths;
+export function detectConflicts(
+	localFiles: Record<string, FileEntry>,
+	remoteFiles: Record<string, FileEntry>,
+	manifestEntries: Record<string, FileEntry>,
+): FileDiff[] {
+	return classifyPaths(localFiles, remoteFiles, manifestEntries);
+}

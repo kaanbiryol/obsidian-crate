@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleGetChanges, handleGetManifest } from './sync-metadata-handlers';
+import { handleGetChanges, handleGetFileMetadata, handleGetManifest } from './sync-metadata-handlers';
 
 function createStatement(sql: string) {
 	const statement = {
@@ -66,6 +66,35 @@ describe('sync metadata snapshots', () => {
 			lastSeq: 11,
 			snapshotSeq: 11,
 			hasMore: false,
+		});
+	});
+
+	it('loads metadata only for the requested paths', async () => {
+		const statement = {
+			args: [] as unknown[],
+			bind: vi.fn(function (this: { args: unknown[] }, ...args: unknown[]) {
+				this.args = args;
+				return this;
+			}),
+			all: vi.fn(async () => ({
+				results: [{ path: 'notes/a.md', hash: 'hash-a', size: 4, modified: 'now' }],
+			})),
+		};
+		const db = { prepare: vi.fn(() => statement) };
+
+		const response = await handleGetFileMetadata(
+			new Request('https://worker.test/sync/metadata', {
+				method: 'POST',
+				body: JSON.stringify({ paths: ['notes/a.md', 'notes/missing.md'] }),
+			}),
+			db as never,
+		);
+
+		expect(statement.args).toEqual(['notes/a.md', 'notes/missing.md']);
+		expect(await response.json()).toEqual({
+			files: {
+				'notes/a.md': { hash: 'hash-a', size: 4, modified: 'now' },
+			},
 		});
 	});
 });

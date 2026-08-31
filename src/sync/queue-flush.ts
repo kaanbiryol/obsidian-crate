@@ -4,15 +4,12 @@ import { isRetryableSyncError } from './engine-utils';
 import { deletePendingFiles } from './queue-delete';
 import type { QueueFlushContext } from './queue-flush-types';
 import { prepareQueueOperations, uploadPendingFiles } from './queue-upload';
+import { isQueueTerminalFailure, isQueueVersionConflict } from './queue-failure';
+import { HttpError } from './api';
 
 export type { QueueFlushContext } from './queue-flush-types';
 
 const logger = createLogger('SyncQueue');
-const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
-
-function requiresReconciliation(status: number | undefined): boolean {
-	return status !== undefined && !RETRYABLE_HTTP_STATUSES.has(status);
-}
 
 function clearCompletedRevisions(
 	context: QueueFlushContext,
@@ -56,6 +53,7 @@ export async function processPendingChanges(
 	);
 	const completedQueueKeys = new Set<string>();
 	const reconciliationPaths = new Set<string>();
+	let hasTerminalFailure = false;
 	for (const path of paths) {
 		context.pendingPaths.delete(path);
 		context.inFlightPaths.add(path);
@@ -71,7 +69,8 @@ export async function processPendingChanges(
 			const uploadFailures = await uploadPendingFiles(context, uploads, completedQueueKeys, uploadConcurrency);
 			for (const failure of uploadFailures) {
 				context.pendingPaths.add(failure.path);
-				if (requiresReconciliation(failure.status)) reconciliationPaths.add(failure.path);
+				if (isQueueVersionConflict(failure.status)) reconciliationPaths.add(failure.path);
+				if (isQueueTerminalFailure(failure.status)) hasTerminalFailure = true;
 			}
 			failures.push(...uploadFailures);
 		}
@@ -80,6 +79,7 @@ export async function processPendingChanges(
 			const deleteResult = await deletePendingFiles(context, deletes, completedQueueKeys);
 			failures.push(...deleteResult.failures);
 			for (const path of deleteResult.reconciliationPaths) reconciliationPaths.add(path);
+			if (deleteResult.hasTerminalFailure) hasTerminalFailure = true;
 		}
 
 		await context.localManifest.save();
@@ -110,8 +110,12 @@ export async function processPendingChanges(
 				if (!completedQueueKeys.has(path)) context.pendingPaths.add(path);
 			}
 			if (!retryable) {
-				for (const path of paths) {
-					if (!completedQueueKeys.has(path)) reconciliationPaths.add(path);
+				if (error instanceof HttpError && isQueueVersionConflict(error.status)) {
+					for (const path of paths) {
+						if (!completedQueueKeys.has(path)) reconciliationPaths.add(path);
+					}
+				} else {
+					hasTerminalFailure = true;
 				}
 			}
 			context.updateState({
@@ -123,7 +127,12 @@ export async function processPendingChanges(
 		}
 	} finally {
 		context.inFlightPaths.clear();
-		if (!context.isDestroyed() && context.pendingPaths.size > 0 && reconciliationPaths.size === 0) {
+		if (
+			!context.isDestroyed()
+			&& context.pendingPaths.size > 0
+			&& reconciliationPaths.size === 0
+			&& !hasTerminalFailure
+		) {
 			context.triggerDebouncedSync();
 		}
 	}

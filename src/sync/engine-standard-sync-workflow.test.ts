@@ -35,10 +35,9 @@ function createContext(options: {
 			remainingDiffs: [],
 			errors: [],
 		})),
-		processDiff: vi.fn(options.processDiff ?? (async () => {})),
+		processDiff: vi.fn(options.processDiff ?? (async () => ({ status: 'applied' as const }))),
 		parallelDownloadAndSaveFiles: vi.fn(async () => {}),
-		readBinary: vi.fn(async () => new ArrayBuffer(0)),
-		getModifiedIso: vi.fn(async () => '2026-02-06T12:00:00.000Z'),
+		getLocalManifestEntry: vi.fn((path: string) => localFiles[path]),
 		setLocalManifestEntry: vi.fn(),
 		saveLocalManifest: vi.fn(async () => {}),
 		setLastSync: vi.fn(),
@@ -58,8 +57,7 @@ function createContext(options: {
 		parallelDownloadAndSaveFiles: spies.parallelDownloadAndSaveFiles,
 		runConcurrent: async <T>(tasks: Array<() => Promise<T>>, _concurrency: number): Promise<T[]> =>
 			Promise.all(tasks.map(task => task())),
-		readBinary: spies.readBinary,
-		getModifiedIso: spies.getModifiedIso,
+		getLocalManifestEntry: spies.getLocalManifestEntry,
 		setLocalManifestEntry: spies.setLocalManifestEntry,
 		saveLocalManifest: spies.saveLocalManifest,
 		setLastSync: spies.setLastSync,
@@ -131,7 +129,11 @@ describe('runSyncWorkflow', () => {
 			result.downloaded++;
 			result.downloadedPaths.push(path);
 		});
-		context.readBinary = vi.fn(async () => remoteContent);
+		context.getLocalManifestEntry = vi.fn(() => ({
+			hash: 'remote-hash',
+			size: remoteContent.byteLength,
+			modified: 'now',
+		}));
 
 		const result = await runSyncWorkflow(context);
 

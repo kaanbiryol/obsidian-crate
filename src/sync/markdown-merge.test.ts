@@ -88,4 +88,17 @@ describe('mergeMarkdownContent', () => {
 			expect(leftFirst.text).toBe('a\r\nleft\r\nright\r\nb\r\n');
 		}
 	});
+
+	it('orders same-point Unicode insertions by code unit instead of platform collation', () => {
+		const result = mergeMarkdownContent(
+			toArrayBuffer('a\nb\n'),
+			toArrayBuffer('a\né\nb\n'),
+			toArrayBuffer('a\nz\nb\n'),
+		);
+
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.text).toBe('a\nz\né\nb\n');
+		}
+	});
 });

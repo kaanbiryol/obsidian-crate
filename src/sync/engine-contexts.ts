@@ -3,6 +3,7 @@ import type { SyncApiClient } from './api';
 import type { LocalManifest } from './manifest';
 import type { MarkdownBaseCache } from './markdown-base-cache';
 import type { DownloadRequest } from './transfer-download';
+import type { DiffApplyOutcome } from './transfer-types';
 import type { VaultFile } from './file-discovery';
 import { createFullSyncPlan } from './planner';
 import type {
@@ -31,7 +32,7 @@ interface SyncEngineContextDependencies {
 	getLocalDeletes: () => Promise<string[]>;
 	incrementalSync: (progressCallback?: (current: number, total: number) => void) => Promise<SyncResult | null>;
 	parallelDownloadAndSaveFiles: (requests: string[] | DownloadRequest[], result: SyncResult) => Promise<void>;
-	processDiff: (diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult) => Promise<void>;
+	processDiff: (diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult) => Promise<DiffApplyOutcome>;
 	prepareUploadFromPath: (path: string) => Promise<PreparedUpload | null>;
 	uploadPreparedFiles: (
 		prepared: PreparedUpload[],
@@ -118,8 +119,7 @@ export class SyncEngineContexts {
 			processDiff: dependencies.processDiff,
 			parallelDownloadAndSaveFiles: dependencies.parallelDownloadAndSaveFiles,
 			runConcurrent: dependencies.runConcurrent,
-			readBinary: (path: string) => dependencies.vault.adapter.readBinary(path),
-			getModifiedIso: dependencies.getModifiedIso,
+			getLocalManifestEntry: (path: string) => dependencies.getLocalManifest().getEntry(path),
 			setLocalManifestEntry: (path: string, entry: FileEntry) => {
 				dependencies.getLocalManifest().setEntry(path, entry);
 			},

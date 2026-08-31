@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Vault } from 'obsidian';
 import {
 	createConflictCopy,
-	detectConflicts,
 	getConflictFileName,
 	isConflictFile,
 } from './conflict';
+import { detectConflicts } from './reconciliation';
 
 const CONFIG_DIR = '.vault-config';
 

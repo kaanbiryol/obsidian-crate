@@ -6,6 +6,7 @@ import {
 	handleDelete,
 	handleDownload,
 	handleGetChanges,
+	handleGetFileMetadata,
 	handleGetManifest,
 	handleGetSettings,
 	handleHealth,
@@ -39,6 +40,9 @@ export async function handleSyncRoute(
 	}
 	if (path === '/sync/manifest' && method === 'GET') {
 		return await withDatabase(db, requiredDb => handleGetManifest(request, requiredDb));
+	}
+	if (path === '/sync/metadata' && method === 'POST') {
+		return await withDatabase(db, requiredDb => handleGetFileMetadata(request, requiredDb));
 	}
 	if (path === '/sync/upload' && method === 'PUT') {
 		return await withDatabase(db, requiredDb => handleUpload(request, bucket, requiredDb));

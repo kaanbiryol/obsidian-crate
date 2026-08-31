@@ -9,6 +9,7 @@ import type {
 	ChangesResponse,
 	CheckResponse,
 	FileManifest,
+	FileMetadataResponse,
 	HealthResponse,
 	RemoteFileVersion,
 	UploadResult,
@@ -19,9 +20,11 @@ import {
 	type CrateServerInfo,
 } from '../../protocol';
 import { assertPortablePaths } from '../../protocol/portable-path';
+import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import {
 	getHeader,
 	TRANSFER_TIMEOUT_MS,
+	HttpError,
 	type WorkerApiHttpClient,
 } from './http';
 
@@ -107,6 +110,34 @@ export class SyncWorkerApi {
 
 		assertPortablePaths(Object.keys(files));
 		return { version: 1, files, lastSeq };
+	}
+
+	async getFileMetadata(paths: string[]): Promise<FileMetadataResponse> {
+		const uniquePaths = [...new Set(paths)];
+		assertPortablePaths(uniquePaths);
+		const files: FileMetadataResponse['files'] = {};
+
+		for (let index = 0; index < uniquePaths.length; index += BATCH_DOWNLOAD_MAX_FILES) {
+			const chunk = uniquePaths.slice(index, index + BATCH_DOWNLOAD_MAX_FILES);
+			try {
+				const response = await this.http.requestJson<FileMetadataResponse>('/sync/metadata', {
+					method: 'POST',
+					body: JSON.stringify({ paths: chunk }),
+				});
+				Object.assign(files, response.files);
+			} catch (error) {
+				if (!(error instanceof HttpError) || error.status !== 404) throw error;
+				const manifest = await this.getManifest();
+				return {
+					files: Object.fromEntries(uniquePaths.flatMap(path => {
+						const entry = manifest.files[path];
+						return entry ? [[path, entry] as const] : [];
+					})),
+				};
+			}
+		}
+
+		return { files };
 	}
 
 	async uploadFile(

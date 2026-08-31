@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
 import { parallelDownloadAndSaveFiles, processDiff, saveDownloadedContent } from './transfer';
 import { createNamedAbortError, createTransferHarness, emptyResult } from './transfer-test-harness';
@@ -12,6 +12,10 @@ vi.mock('./conflict', () => ({
 }));
 
 describe('transfer download/process helpers', () => {
+	beforeEach(() => {
+		conflictMocks.createConflictCopy.mockClear();
+	});
+
 	it('saves downloaded content and records manifest entry', async () => {
 		const harness = createTransferHarness();
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
@@ -226,7 +230,7 @@ describe('transfer download/process helpers', () => {
 		expect(result.errors).toContain('bad.md: File not found');
 	});
 
-	it('preserves a local edit made after download planning as a conflict copy', async () => {
+	it('defers a remote download when the local file changed after planning', async () => {
 		const harness = createTransferHarness();
 		const plannedLocal = new TextEncoder().encode('planned local').buffer as ArrayBuffer;
 		const changedLocal = new TextEncoder().encode('changed during sync').buffer as ArrayBuffer;
@@ -252,15 +256,14 @@ describe('transfer download/process helpers', () => {
 			remoteSize: remote.byteLength,
 		}], result, 5);
 
-		expect(conflictMocks.createConflictCopy).toHaveBeenCalledWith(harness.vault, path, changedLocal);
-		expect(result.conflicts).toEqual(['notes/file (conflict).md']);
-		expect(harness.vault.modifyBinary).toHaveBeenCalledWith(
-			{ path, extension: 'md' },
-			remote,
-		);
+		expect(conflictMocks.createConflictCopy).not.toHaveBeenCalled();
+		expect(result.conflicts).toEqual([]);
+		expect(result.downloaded).toBe(0);
+		expect(result.errors).toContain(`${path}: Local file changed while the remote version was downloading`);
+		expect(harness.vault.modifyBinary).not.toHaveBeenCalled();
 	});
 
-	it('does not report a download race as resolved when it created a conflict copy', async () => {
+	it('returns a deferred outcome when a locally deleted path is recreated during download', async () => {
 		const harness = createTransferHarness();
 		const lateLocal = new TextEncoder().encode('created during sync').buffer as ArrayBuffer;
 		const remote = new TextEncoder().encode('remote edit').buffer as ArrayBuffer;
@@ -277,7 +280,7 @@ describe('transfer download/process helpers', () => {
 		});
 		const result = emptyResult();
 
-		await processDiff(
+		const outcome = await processDiff(
 			harness.context,
 			{
 				path,
@@ -289,11 +292,13 @@ describe('transfer download/process helpers', () => {
 			result,
 		);
 
-		expect(result.unresolvedConflicts).toEqual([{
-			path,
-			conflictPath: 'notes/file (conflict).md',
-		}]);
+		expect(outcome).toEqual({
+			status: 'deferred',
+			reason: 'Local file changed while the remote version was downloading',
+		});
+		expect(result.unresolvedConflicts).toEqual([]);
 		expect(result.resolvedRaces).toEqual([]);
+		expect(harness.vault.modifyBinary).not.toHaveBeenCalled();
 	});
 
 	it('falls back to individual downloads when batch fails', async () => {

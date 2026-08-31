@@ -362,7 +362,10 @@ function mergeHunks(
 }
 
 function compareReplacements(left: string[], right: string[]): number {
-	return JSON.stringify(left).localeCompare(JSON.stringify(right), 'en');
+	const leftText = JSON.stringify(left);
+	const rightText = JSON.stringify(right);
+	if (leftText === rightText) return 0;
+	return leftText < rightText ? -1 : 1;
 }
 
 function appendBaseAndHunk(

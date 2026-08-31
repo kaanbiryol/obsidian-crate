@@ -100,7 +100,10 @@ export async function runIncrementalSync(
     for (const diff of conflicts) {
       try {
         const localFiles: Record<string, FileEntry> = {};
-        await context.processDiff(diff, localFiles, result);
+        const outcome = await context.processDiff(diff, localFiles, result);
+        if (outcome.status === "deferred") {
+          result.errors.push(`${diff.path}: ${outcome.reason}`);
+        }
       } catch (error) {
         result.errors.push(`${diff.path}: ${errorMessage(error)}`);
       }

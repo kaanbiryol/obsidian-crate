@@ -4,14 +4,13 @@ import type {
 	QueueFlushContext,
 } from './queue-flush-types';
 import { deleteFilesInBatches } from './delete-batches';
-
-const RETRYABLE_DELETE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+import { isQueueTerminalFailure, isQueueVersionConflict } from './queue-failure';
 
 export async function deletePendingFiles(
 	context: QueueFlushContext,
 	deletes: QueueDeleteCandidate[],
 	completedQueueKeys: Set<string>,
-): Promise<{ failures: QueueDeleteFailure[]; reconciliationPaths: string[] }> {
+): Promise<{ failures: QueueDeleteFailure[]; reconciliationPaths: string[]; hasTerminalFailure: boolean }> {
 	const result = await deleteFilesInBatches(context.api, deletes);
 
 	for (const path of result.deleted) {
@@ -19,7 +18,7 @@ export async function deletePendingFiles(
 		completedQueueKeys.add(`delete:${path}`);
 	}
 	if (result.success) {
-		return { failures: [], reconciliationPaths: [] };
+		return { failures: [], reconciliationPaths: [], hasTerminalFailure: false };
 	}
 
 	const deletedPaths = new Set(result.deleted);
@@ -30,11 +29,13 @@ export async function deletePendingFiles(
 			.map(file => ({ path: file.path, error: 'Batch delete failed' }));
 
 	const reconciliationPaths: string[] = [];
+	let hasTerminalFailure = false;
 	for (const failure of failures) {
 		context.pendingPaths.add(`delete:${failure.path}`);
-		if (failure.status !== undefined && !RETRYABLE_DELETE_STATUSES.has(failure.status)) {
+		if (isQueueVersionConflict(failure.status)) {
 			reconciliationPaths.push(`delete:${failure.path}`);
 		}
+		if (isQueueTerminalFailure(failure.status)) hasTerminalFailure = true;
 	}
-	return { failures, reconciliationPaths };
+	return { failures, reconciliationPaths, hasTerminalFailure };
 }

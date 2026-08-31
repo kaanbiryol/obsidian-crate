@@ -17,6 +17,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `GET` | `/sync/check?since=<seq>` | Lightweight check: are there changes since this sequence? |
 | `GET` | `/sync/changes?since=<seq>` | Paginated changelog entries (limit 5000 per page) |
 | `GET` | `/sync/manifest?limit=<n>&after=<path>&snapshotSeq=<seq>` | Stable, cursor-paginated remote manifest |
+| `POST` | `/sync/metadata` | Fetch current metadata for up to 50 selected paths |
 | `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB) |
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
 | `POST` | `/sync/delete` | Delete single file `{ path }` |
@@ -150,6 +151,12 @@ Response:
   "nextCursor": "optional/last/path.md"
 }
 ```
+
+### POST /sync/metadata
+
+Request: `{ paths: ["notes/file.md", ...] }` (max 50, no duplicates)
+
+Response: `{ files: { "notes/file.md": { hash, size, modified } } }`. Missing paths are omitted. Queue conflict recovery uses this endpoint so a version race does not require loading the entire remote manifest.
 
 ### DELETE /auth/tokens
 

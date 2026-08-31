@@ -1,6 +1,7 @@
 import type { TAbstractFile, Vault } from "obsidian";
 import type { ChangelogEntry, CrateSettings, DownloadDiff, FileDiff, FileEntry, PreparedUpload, SyncResult, UploadDiff } from "../plugin/types";
 import type { DownloadRequest } from './transfer-download';
+import type { DiffApplyOutcome } from './transfer-types';
 
 interface PlannerManifest {
   getEntry(path: string): FileEntry | undefined;
@@ -50,7 +51,7 @@ export interface IncrementalSyncPlannerContext {
     diff: FileDiff,
     localFiles: Record<string, FileEntry>,
     result: SyncResult,
-  ): Promise<void>;
+  ): Promise<DiffApplyOutcome>;
   prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
   uploadPreparedFiles(
     prepared: PreparedUpload[],

@@ -488,6 +488,29 @@ describe('processPendingChanges', () => {
 		expect(harness.requestReconciliation).toHaveBeenCalledWith(['notes/a.md']);
 	});
 
+	it('keeps authentication failures pending without attempting reconciliation or automatic retry', async () => {
+		const harness = createFlushHarness({
+			prepareUploadFromPath: async path => ({
+				path,
+				content: new TextEncoder().encode('hello').buffer as ArrayBuffer,
+				hash: 'abc123',
+				size: 5,
+				contentType: 'text/plain',
+			}),
+			uploadFile: async () => {
+				throw new HttpError('unauthorized', 401);
+			},
+		});
+		harness.pendingPaths.add('notes/a.md');
+
+		await processPendingChanges(harness.context, 4);
+
+		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.requestReconciliation).not.toHaveBeenCalled();
+		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
+		expect(harness.state.lastError).toContain('unauthorized');
+	});
+
 	it('chunks mass deletes to the shared server limit', async () => {
 		const harness = createFlushHarness();
 		for (let index = 0; index < 14; index++) {

@@ -11,7 +11,6 @@ const fileDiscoveryMocks = vi.hoisted(() => ({
 
 const conflictMocks = vi.hoisted(() => ({
 	createConflictCopy: vi.fn(async () => 'notes/file (conflict).md'),
-	detectConflicts: vi.fn(),
 }));
 
 vi.mock('./file-discovery', () => ({
@@ -23,15 +22,9 @@ vi.mock('./conflict', () => ({
 	createConflictCopy: conflictMocks.createConflictCopy,
 }));
 
-vi.mock('./reconciliation', async (importOriginal) => ({
-	...await importOriginal<typeof import('./reconciliation')>(),
-	detectConflicts: conflictMocks.detectConflicts,
-}));
-
 describe('planner local diff helpers', () => {
 	beforeEach(() => {
 		fileDiscoveryMocks.getAllVaultFiles.mockReset();
-		conflictMocks.detectConflicts.mockReset();
 	});
 
 	it('finds local deletes for non-ignored manifest paths', async () => {

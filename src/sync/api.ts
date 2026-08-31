@@ -11,6 +11,7 @@ import type {
 	ChangesResponse,
 	CheckResponse,
 	FileManifest,
+	FileMetadataResponse,
 	HealthResponse,
 	RegisteredDevice,
 	RemoteFileVersion,
@@ -82,6 +83,10 @@ export class SyncApiClient {
 
 	async getManifest(): Promise<FileManifest> {
 		return this.syncApi.getManifest();
+	}
+
+	async getFileMetadata(paths: string[]): Promise<FileMetadataResponse> {
+		return this.syncApi.getFileMetadata(paths);
 	}
 
 	async uploadFile(
