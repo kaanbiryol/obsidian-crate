@@ -96,7 +96,7 @@ async function runForceFullSync(plugin: CratePlugin): Promise<void> {
 		message: 'Overwrite the remote vault with local files?',
 		details: [
 			'Remote-only files will be deleted.',
-			'This action cannot be undone.',
+			'Deleted and replaced remote files remain recoverable for 30 days.',
 		],
 		confirmText: 'Force full sync',
 		warning: true,

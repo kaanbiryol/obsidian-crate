@@ -44,6 +44,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - The Worker module, complete D1 schema, and ordered schema upgrades are versioned build-time artifacts inside the plugin. Crate does not fetch deployment code at runtime.
 - Vault devices can be authorized only through the Cloudflare account that owns the server.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
+- Push notifications are optional. When enabled, your Worker sends encrypted payloads containing reminder text and project names through the push service used by the browser or operating system. The provider can observe delivery metadata such as the subscription endpoint, timing, and payload size, but cannot read the encrypted payload.
 - Remote code is not fetched or evaluated at runtime.
 - Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker can access the synced data.
 - Sync is not a backup. Keep an independent backup of any vault you use with Crate.
@@ -124,6 +125,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 
 ## Sync Scope and Limits
 
+- After the initial sync, Crate syncs on startup, when Obsidian resumes, and every five minutes by default. These automatic sync options can be changed under **Settings → Crate → Sync**.
 - Crate syncs files inside the vault, including attachments. Hidden dotfiles and dot-folders can also be synced; they are not excluded as a group.
 - Files larger than 25 MiB (25 × 1024 × 1024 bytes) are skipped and reported as sync errors. They are not uploaded to or downloaded from the remote vault.
 - The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, and `.DS_Store`. Crate always ignores the active Obsidian configuration folder's entire `plugins/` tree, its Markdown merge cache, conflict copies, and `workspace*` files.
@@ -131,7 +133,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 - Adding an ignore pattern stops future transfers but does not silently delete an existing remote copy. Use **Settings → Crate → Infrastructure → Remove ignored remote files** to review and remove those copies explicitly.
 - Remote files replaced or deleted by sync are retained for 30 days. Use **Restore remote file** in Crate settings to recover one; a force full sync also keeps its remote deletions recoverable for that period.
 - Synced paths must be portable across desktop and mobile filesystems. Windows-reserved names, unsupported characters, trailing dots/spaces, and case- or Unicode-normalization collisions are rejected before transfer.
-- Cloudflare account and plan quotas still apply to R2, Workers, D1, and push-notification resources.
+- Creating a server provisions Worker, R2, D1, and Durable Object resources in your Cloudflare account. Cloudflare plan limits and possible usage charges apply to those resources.
 
 ## Reminders
 

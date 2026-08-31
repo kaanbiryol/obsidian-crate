@@ -15,7 +15,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 	if (!isConfigured) {
 		new Setting(containerEl)
 			.setName('Connect with Cloudflare')
-			.setDesc('Sign in to reuse an existing Crate server or create a new private sync server')
+			.setDesc('Sign in to reuse an existing Crate server or create private Worker, R2, D1, and Durable object resources. Cloudflare plan limits and possible usage charges apply')
 			.addButton(button => button
 				.setButtonText('Connect with Cloudflare')
 				.setCta()

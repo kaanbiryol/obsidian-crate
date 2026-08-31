@@ -10,7 +10,7 @@
 ```bash
 npm test                                  # run all tests
 npm run test:worker-runtime               # run D1/R2/Durable Object tests in the Workers runtime
-npx vitest run src/sync/planner.test.ts   # single test file
+npx vitest run src/sync/planner-full.test.ts   # single test file
 ```
 
 `vitest.cloudflare.config.ts` uses Cloudflare's Vitest plugin with `wrangler.jsonc`. The runtime suite applies the initial schema to an isolated D1 database and exercises real D1, R2, and Durable Object bindings locally.
@@ -71,11 +71,12 @@ The test creates real resources only when a person completes Cloudflare consent.
 
 Record the Obsidian version, operating-system version, and result for each device. Complete this matrix against the exact release assets before publishing:
 
+- Run at least one pass on Obsidian 1.13.0, the version declared in `manifest.json`. If it is unavailable or any required flow fails, raise `minAppVersion` and the matching `versions.json` entry to the oldest version actually tested.
 - Use a Cloudflare account that is not owned by or a member of the OAuth-client publisher. Confirm the verified publisher and exactly Workers Scripts Write, D1 Write, Workers R2 Storage Write, and Memberships Read.
 - Install `main.js`, `manifest.json`, and `styles.css` from the prepared release assets into a clean desktop vault. Complete OAuth, explicit initial upload, restart, reconnect, and server update.
 - On a physical iOS device, join the existing server with **Sync now**. Create, edit, rename, and delete Markdown and binary files; preserve a concurrent-edit conflict; background and resume Obsidian; then disable and re-enable Crate.
 - Repeat the same existing-server flow on a physical Android device.
-- On both mobile platforms, create, edit, complete, reorder, and delete reminders. Open the reminders web app, verify its install and sign-out paths, and confirm a signed-out browser cannot use the previous session.
+- On both mobile platforms, create, edit, complete, reorder, and delete reminders. Install the reminders web app, enable push, receive both a test notification and a scheduled reminder, verify sign-out, and confirm a signed-out browser cannot use the previous session.
 - Confirm **Disconnect this device** removes only the local credential, while explicit Cloudflare resource deletion removes the remote copy as documented.
 
 ## Obsidian Mock
@@ -107,7 +108,7 @@ type Harness = {
 
 A `createHarness()` function wires up the engine with all mocks pre-configured for the happy path. Tests override specific mocks as needed.
 
-### Module-Level Harness (transfer.test.ts)
+### Module-Level Harness (`transfer-download.test.ts`)
 
 For testing extracted modules (planner, transfer, queue), a lighter harness creates just the context interface:
 
@@ -124,7 +125,7 @@ function createTransferHarness() {
 }
 ```
 
-### Module Mocking with vi.hoisted() (planner.test.ts, transfer.test.ts)
+### Module Mocking with `vi.hoisted()` (`planner-incremental-reconciliation.test.ts`, `transfer-download.test.ts`)
 
 When a module under test imports other modules that need mocking:
 

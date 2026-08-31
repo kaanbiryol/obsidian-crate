@@ -69,6 +69,9 @@ describe('renderConfigSection integration', () => {
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
 			'Connect with Cloudflare',
 		]);
+		expect(getSettingByName('Connect with Cloudflare').descEl.textContent).toBe(
+			'Sign in to reuse an existing Crate server or create private Worker, R2, D1, and Durable object resources. Cloudflare plan limits and possible usage charges apply',
+		);
 		getSettingByName('Connect with Cloudflare').buttons[0]?.click();
 		expect(startCloudflareDeployment).toHaveBeenCalledTimes(1);
 	});
