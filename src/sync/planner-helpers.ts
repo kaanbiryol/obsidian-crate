@@ -57,7 +57,6 @@ async function deletePathLocally(
     if (context.fileManager) {
       await context.fileManager.trashFile(file);
     } else {
-      // eslint-disable-next-line obsidianmd/prefer-file-manager-trash-file -- fileManager is optional in planner-only contexts
       await context.vault.delete(file);
     }
     return true;

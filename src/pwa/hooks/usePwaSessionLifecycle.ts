@@ -4,6 +4,37 @@ import { AUTH_TOKEN_KEY } from '../config';
 import { clearCachedReminderSnapshots } from '../reminder-cache';
 import type { ApiFetch, ModalState, ShowToast } from '../types';
 
+interface PwaLogoutOperations {
+	apiFetch: ApiFetch;
+	clearLocalSession: () => void | Promise<void>;
+	disablePushNotifications: () => Promise<void>;
+}
+
+export async function performPwaLogout({
+	apiFetch,
+	clearLocalSession,
+	disablePushNotifications,
+}: PwaLogoutOperations): Promise<boolean> {
+	let remoteCleanupFailed = false;
+
+	try {
+		await disablePushNotifications();
+	} catch {
+		remoteCleanupFailed = true;
+	}
+
+	try {
+		const response = await apiFetch('/auth/session', { method: 'DELETE' });
+		if (!response.ok) remoteCleanupFailed = true;
+	} catch {
+		remoteCleanupFailed = true;
+	} finally {
+		await clearLocalSession();
+	}
+
+	return remoteCleanupFailed;
+}
+
 export function usePwaSessionLifecycle({
 	apiFetch,
 	cancelModalClose,
@@ -34,48 +65,50 @@ export function usePwaSessionLifecycle({
 } {
 	const [loggingOut, setLoggingOut] = useState(false);
 
-	const clearLocalSession = useCallback((showMessage: boolean) => {
+	const clearLocalSession = useCallback(async () => {
 		localStorage.removeItem(AUTH_TOKEN_KEY);
-		void clearCachedReminderSnapshots();
 		setAuthToken(null);
 		resetReminderState();
 		cancelSettingsClose();
 		cancelModalClose();
 		setSettingsOpen(false);
 		setModal(null);
-		if (showMessage) {
-			setError(null);
-			showToast('info', 'Logged out');
-		}
+		await clearCachedReminderSnapshots();
 	}, [
 		cancelModalClose,
 		cancelSettingsClose,
 		resetReminderState,
 		setAuthToken,
-		setError,
 		setModal,
 		setSettingsOpen,
-		showToast,
 	]);
 
 	useEffect(() => {
-		handleUnauthorizedRef.current = () => clearLocalSession(false);
+		handleUnauthorizedRef.current = () => {
+			void clearLocalSession();
+		};
 	}, [clearLocalSession, handleUnauthorizedRef]);
 
 	const logOut = useCallback(async () => {
 		if (loggingOut) return;
 		setLoggingOut(true);
 		try {
-			await disablePushNotifications();
-			const response = await apiFetch('/auth/session', { method: 'DELETE' });
-			if (!response.ok) throw new Error(await response.text());
-			clearLocalSession(true);
-		} catch (error) {
-			showToast('error', error instanceof Error ? error.message : String(error));
+			const remoteCleanupFailed = await performPwaLogout({
+				apiFetch,
+				clearLocalSession,
+				disablePushNotifications,
+			});
+			setError(null);
+			showToast(
+				'info',
+				remoteCleanupFailed
+					? 'Logged out locally. Remote session cleanup could not finish.'
+					: 'Logged out',
+			);
 		} finally {
 			setLoggingOut(false);
 		}
-	}, [apiFetch, clearLocalSession, disablePushNotifications, loggingOut, showToast]);
+	}, [apiFetch, clearLocalSession, disablePushNotifications, loggingOut, setError, showToast]);
 
 	return { loggingOut, logOut };
 }

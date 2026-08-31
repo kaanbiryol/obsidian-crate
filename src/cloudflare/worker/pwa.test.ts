@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Script } from 'node:vm';
 import {
 	OPEN_OBSIDIAN_HTML,
@@ -315,7 +315,7 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("const PWA_SHELL_URL = '/notifications'");
 		expect(SERVICE_WORKER_JS).toContain("cache.addAll(PWA_PRECACHE_URLS)");
 		expect(SERVICE_WORKER_JS).not.toContain('apple-startup');
-		expect(SERVICE_WORKER_JS).toContain("event.request.mode === 'navigate' || url.pathname === PWA_SHELL_URL");
+		expect(SERVICE_WORKER_JS).toContain("url.pathname === PWA_SHELL_URL");
 		expect(SERVICE_WORKER_JS).toContain("return cache.match(PWA_SHELL_URL)");
 		expect(SERVICE_WORKER_JS).toContain('previousShellCaches.slice(0, -1)');
 		expect(SERVICE_WORKER_JS.indexOf("cache.match(PWA_SHELL_URL)")).toBeLessThan(
@@ -329,6 +329,66 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-icon-512.png'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/crate-mark-256.png'");
 		expect(SERVICE_WORKER_JS).toContain("|| url.pathname === '/notifications/apple-touch-icon-180.png'");
+	});
+
+	it('does not replace the Obsidian handoff navigation with the cached app shell', () => {
+		type FetchEvent = {
+			request: { method: string; mode: string; url: string };
+			respondWith: (response: Promise<Response>) => void;
+		};
+		const fetchHandlers: Array<(event: FetchEvent) => void> = [];
+		const self = {
+			location: { origin: 'https://worker.test' },
+			addEventListener: (type: string, handler: (event: never) => void) => {
+				if (type === 'fetch') fetchHandlers.push(handler as (event: FetchEvent) => void);
+			},
+			skipWaiting: vi.fn(),
+			clients: { claim: vi.fn() },
+		};
+		new Script(SERVICE_WORKER_JS).runInNewContext({
+			URL,
+			URLSearchParams,
+			Response,
+			caches: {
+				keys: vi.fn().mockResolvedValue([]),
+				open: vi.fn().mockResolvedValue({
+					addAll: vi.fn().mockResolvedValue(undefined),
+					match: vi.fn().mockResolvedValue(new Response('shell')),
+					put: vi.fn().mockResolvedValue(undefined),
+				}),
+				match: vi.fn().mockResolvedValue(undefined),
+			},
+			clients: {
+				matchAll: vi.fn().mockResolvedValue([]),
+				openWindow: vi.fn(),
+			},
+			fetch: vi.fn(),
+			self,
+		});
+		const fetchHandler = fetchHandlers[0];
+		expect(fetchHandler).toBeDefined();
+
+		const handoffRespondWith = vi.fn();
+		fetchHandler?.({
+			request: {
+				method: 'GET',
+				mode: 'navigate',
+				url: 'https://worker.test/notifications/open-obsidian?project=Work',
+			},
+			respondWith: handoffRespondWith,
+		});
+		expect(handoffRespondWith).not.toHaveBeenCalled();
+
+		const shellRespondWith = vi.fn();
+		fetchHandler?.({
+			request: {
+				method: 'GET',
+				mode: 'navigate',
+				url: 'https://worker.test/notifications?project=Work',
+			},
+			respondWith: shellRespondWith,
+		});
+		expect(shellRespondWith).toHaveBeenCalledOnce();
 	});
 
 	it('ships parseable external scripts under the strict PWA CSP', () => {

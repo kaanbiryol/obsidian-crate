@@ -6,6 +6,7 @@ export {
 } from './richTextMatchers';
 export {
     buildHTML,
+    buildRichTextSegments,
     createChipHTML,
 } from './richTextRenderer';
 export { getPlainText } from './richTextPlainText';

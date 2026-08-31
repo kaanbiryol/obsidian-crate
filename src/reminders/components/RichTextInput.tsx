@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
-import { buildHTML, getPlainText } from '../utils/richTextParsing';
+import { buildHTML, buildRichTextSegments, getPlainText } from '../utils/richTextParsing';
 import { getLogicalTextLength, saveCursorPosition, restoreCursorPosition } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
 import {
@@ -55,6 +55,41 @@ interface RichTextInputProps {
     syncContentBeforePaint?: boolean;
 }
 
+function renderTextWithLineBreaks(text: string, keyPrefix: string): React.ReactNode[] {
+    return text.split('\n').flatMap((line, index, lines) => [
+        line,
+        ...(index < lines.length - 1 ? [<br key={`${keyPrefix}-br-${index}`} />] : []),
+    ]);
+}
+
+function renderInitialRichText(text: string, knownProjects?: string[]): React.ReactNode[] {
+    return buildRichTextSegments(text, knownProjects).map((segment, index) => {
+        const key = `${segment.kind}-${index}`;
+        if (segment.kind === 'text') {
+            return <React.Fragment key={key}>{renderTextWithLineBreaks(segment.text, key)}</React.Fragment>;
+        }
+        if (segment.kind === 'link') {
+            return (
+                <a
+                    key={key}
+                    href={segment.url}
+                    className="reminder-markdown-link"
+                    data-markdown-link="true"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    {renderTextWithLineBreaks(segment.text, key)}
+                </a>
+            );
+        }
+        return (
+            <span key={key} className={`rich-text-chip rich-text-chip-${segment.type}`}>
+                {renderTextWithLineBreaks(segment.text, key)}
+            </span>
+        );
+    });
+}
+
 export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>(({
     value,
     onChange,
@@ -86,11 +121,14 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const pendingCursorRef = useRef<number | null>(null);
     const pendingScrollTopRef = useRef<number | null>(null);
     const restoreRequestIdRef = useRef(0);
-    const initialHtmlRef = useRef<{ html: string } | null>(null);
+    const initialContentRef = useRef<{ text: string; knownProjects?: string[] } | null>(null);
     const lastFocusRequestRef = useRef(focusRequestKey);
 
-    if ((syncContentBeforePaint || autoFocus) && !initialHtmlRef.current) {
-        initialHtmlRef.current = { html: buildHTML(value, knownProjects) || '' };
+    if ((syncContentBeforePaint || autoFocus) && !initialContentRef.current) {
+        initialContentRef.current = {
+            text: value,
+            knownProjects: knownProjects ? [...knownProjects] : undefined,
+        };
     }
 
     // Use provided ref or internal one
@@ -164,7 +202,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         const normalizedHtml = html || '';
         const shouldRerender = actualRef.current.innerHTML !== normalizedHtml;
         if (shouldRerender) {
-            renderRichText(actualRef.current, normalizedHtml);
+            renderRichText(actualRef.current, plainText, knownProjects);
         }
 
         // Call onChange with plain text
@@ -221,7 +259,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         const shouldPreserveCursor = preserveSelection && isFocused;
         const cursorPos = shouldPreserveCursor ? saveCursorPosition(actualRef.current) : null;
 
-        renderRichText(actualRef.current, normalizedHtml);
+        renderRichText(actualRef.current, value, knownProjects);
 
         if (pendingCursorRef.current !== null) {
             const pendingPos = pendingCursorRef.current;
@@ -301,12 +339,13 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 onPointerDown={onPointerDown}
                 className={`rich-text-input-editor${className ? ` ${className}` : ''}`}
                 data-placeholder={!value ? placeholder : ''}
-                dangerouslySetInnerHTML={initialHtmlRef.current
-                    ? { __html: initialHtmlRef.current.html }
-                    : undefined}
                 suppressContentEditableWarning
                 style={style}
-            />
+            >
+                {initialContentRef.current
+                    ? renderInitialRichText(initialContentRef.current.text, initialContentRef.current.knownProjects)
+                    : undefined}
+            </div>
         </div>
     );
 });

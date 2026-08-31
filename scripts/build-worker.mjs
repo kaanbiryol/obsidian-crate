@@ -53,7 +53,7 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion) {
 		target: 'esnext',
 		write: false,
 		minify: true,
-		legalComments: 'none',
+		legalComments: 'eof',
 		mainFields: ['module', 'main'],
 		conditions: ['worker', 'browser', 'import'],
 		loader: { '.png': 'binary' },
@@ -96,6 +96,7 @@ async function bundlePwaClient(assetVersion) {
 		},
 		mainFields: ['browser', 'module', 'main'],
 		conditions: ['browser', 'import'],
+		legalComments: 'eof',
 	});
 	return Object.fromEntries(result.outputFiles.map(output => [basename(output.path), output.text]));
 }

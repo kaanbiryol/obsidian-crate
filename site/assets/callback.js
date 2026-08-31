@@ -27,7 +27,6 @@
 	const obsidianUrl = `obsidian://crate-cloudflare-oauth?${outgoing.toString()}`;
 	fallback.href = obsidianUrl;
 	fallback.hidden = false;
-	// eslint-disable-next-line obsidianmd/ui/sentence-case -- Obsidian and Crate are product names.
 	status.textContent = 'Opening Obsidian to continue with Crate…';
 	window.location.replace(obsidianUrl);
 })();

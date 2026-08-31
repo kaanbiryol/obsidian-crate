@@ -1,19 +1,56 @@
 import { moveCursorToEnd } from "../utils/cursorPosition";
+import { buildRichTextSegments } from "../utils/richTextRenderer";
 
 export type RichTextFocusOptions = {
   select?: boolean;
 };
 
-export function renderRichText(element: HTMLDivElement, html: string): void {
-  if (!html) {
-    element.replaceChildren();
-    return;
-  }
+function appendTextWithLineBreaks(parent: Node, text: string, ownerDocument: Document): void {
+	const lines = text.split("\n");
+	for (let index = 0; index < lines.length; index++) {
+		const line = lines[index] ?? "";
+		if (line) {
+			parent.appendChild(ownerDocument.createTextNode(line));
+		}
+		if (index < lines.length - 1) {
+			parent.appendChild(ownerDocument.createElement("br"));
+		}
+	}
+}
 
-  const range = element.ownerDocument.createRange();
-  range.selectNodeContents(element);
-  const fragment = range.createContextualFragment(html);
-  element.replaceChildren(fragment);
+export function renderRichText(
+	element: HTMLDivElement,
+	text: string,
+	knownProjects?: string[],
+): void {
+	if (!text) {
+		element.replaceChildren();
+		return;
+	}
+
+	const ownerDocument = element.ownerDocument;
+	const fragment = ownerDocument.createDocumentFragment();
+	for (const segment of buildRichTextSegments(text, knownProjects)) {
+		if (segment.kind === "text") {
+			appendTextWithLineBreaks(fragment, segment.text, ownerDocument);
+		} else if (segment.kind === "link") {
+			const link = ownerDocument.createElement("a");
+			link.setAttribute("href", segment.url);
+			link.classList.add("reminder-markdown-link");
+			link.dataset.markdownLink = "true";
+			link.target = "_blank";
+			link.rel = "noopener noreferrer";
+			appendTextWithLineBreaks(link, segment.text, ownerDocument);
+			fragment.appendChild(link);
+		} else {
+			const chip = ownerDocument.createElement("span");
+			chip.classList.add("rich-text-chip", `rich-text-chip-${segment.type}`);
+			appendTextWithLineBreaks(chip, segment.text, ownerDocument);
+			fragment.appendChild(chip);
+		}
+	}
+
+	element.replaceChildren(fragment);
 }
 
 export function insertPlainTextAtSelection(text: string): void {

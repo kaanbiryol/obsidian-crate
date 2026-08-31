@@ -1,5 +1,10 @@
 import { findAllMatches } from './richTextMatchers';
 
+type RichTextSegment =
+    | { kind: 'text'; text: string }
+    | { kind: 'chip'; text: string; type: 'priority' | 'date' | 'project' }
+    | { kind: 'link'; text: string; url: string };
+
 /**
  * Escape HTML special characters
  */
@@ -22,41 +27,42 @@ export const createChipHTML = (type: string, text: string): string => {
     return `<span class="rich-text-chip rich-text-chip-${chipType}">${escapedText}</span>`;
 };
 
+export const buildRichTextSegments = (text: string, knownProjects?: string[]): RichTextSegment[] => {
+    if (!text) return [];
+
+    const segments: RichTextSegment[] = [];
+    let lastIndex = 0;
+
+    for (const match of findAllMatches(text, knownProjects)) {
+        if (match.index > lastIndex) {
+            segments.push({ kind: 'text', text: text.slice(lastIndex, match.index) });
+        }
+
+        if (match.type === 'link' && match.linkText !== undefined && match.linkUrl !== undefined) {
+            segments.push({ kind: 'link', text: match.linkText, url: match.linkUrl });
+        } else if (match.type !== 'link') {
+            segments.push({ kind: 'chip', text: match.text, type: match.type });
+        }
+
+        lastIndex = match.index + match.length;
+    }
+
+    if (lastIndex < text.length) {
+        segments.push({ kind: 'text', text: text.slice(lastIndex) });
+    }
+
+    return segments;
+};
+
 /**
  * Build HTML with chips from plain text
  * @param text The text to render
  * @param knownProjects Optional array of known project names for multi-word matching
  */
 export const buildHTML = (text: string, knownProjects?: string[]): string => {
-    if (!text) return '';
-
-    const parts: string[] = [];
-    let lastIndex = 0;
-    const matches = findAllMatches(text, knownProjects);
-
-    // Build HTML parts
-    matches.forEach((match) => {
-        // Add text before match
-        if (match.index > lastIndex) {
-            const beforeText = text.slice(lastIndex, match.index);
-            parts.push(escapeHTML(beforeText));
-        }
-
-        if (match.type === 'link' && match.linkText !== undefined && match.linkUrl !== undefined) {
-            parts.push(
-                `<a href="${escapeHTML(match.linkUrl)}" class="reminder-markdown-link" data-markdown-link="true" target="_blank" rel="noopener noreferrer">${escapeHTML(match.linkText)}</a>`
-            );
-        } else {
-            parts.push(createChipHTML(match.type, match.text));
-        }
-
-        lastIndex = match.index + match.length;
-    });
-
-    // Add remaining text
-    if (lastIndex < text.length) {
-        parts.push(escapeHTML(text.slice(lastIndex)));
-    }
-
-    return parts.join('');
+    return buildRichTextSegments(text, knownProjects).map((segment) => {
+        if (segment.kind === 'text') return escapeHTML(segment.text);
+        if (segment.kind === 'chip') return createChipHTML(segment.type, segment.text);
+        return `<a href="${escapeHTML(segment.url)}" class="reminder-markdown-link" data-markdown-link="true" target="_blank" rel="noopener noreferrer">${escapeHTML(segment.text)}</a>`;
+    }).join('');
 };

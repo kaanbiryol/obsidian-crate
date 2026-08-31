@@ -46,6 +46,9 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - Remote code is not fetched or evaluated at runtime.
 - Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker can access the synced data.
+- Sync is not a backup. Keep an independent backup of any vault you use with Crate.
+
+Read the full [privacy policy](https://crate.kaanbiryol.com/privacy/).
 
 ## Prerequisites
 

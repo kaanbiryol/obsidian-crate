@@ -48,6 +48,9 @@ export default defineConfig(({ mode }) => ({
 				...builtinModules.map((m) => `node:${m}`),
 			],
 			output: {
+				comments: {
+					legal: true,
+				},
 				globals: {
 					obsidian: "obsidian",
 				},

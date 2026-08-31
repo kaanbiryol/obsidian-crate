@@ -54,7 +54,7 @@ self.addEventListener('fetch', function(event) {
 	var url = new URL(event.request.url);
 	if (url.origin !== self.location.origin || url.pathname.indexOf('/notifications') !== 0) return;
 
-	if (event.request.mode === 'navigate' || url.pathname === PWA_SHELL_URL) {
+	if (url.pathname === PWA_SHELL_URL) {
 		event.respondWith(
 			caches.open(PWA_SHELL_CACHE).then(function(cache) {
 				return cache.match(PWA_SHELL_URL);

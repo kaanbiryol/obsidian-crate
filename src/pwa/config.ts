@@ -49,6 +49,28 @@ function currentQueryParams(): URLSearchParams {
 	return new URLSearchParams(window.location.search);
 }
 
+export function urlWithoutEnrollmentTokens({
+	pathname,
+	search,
+	hash,
+}: Pick<Location, 'pathname' | 'search' | 'hash'>): string {
+	const params = new URLSearchParams(search);
+	params.delete('token');
+	params.delete('browserToken');
+	const nextSearch = params.toString();
+	return `${pathname}${nextSearch ? `?${nextSearch}` : ''}${hash}`;
+}
+
+function clearEnrollmentTokensFromAddressBar(): void {
+	const params = currentQueryParams();
+	if (!params.has('token') && !params.has('browserToken')) return;
+	const nextUrl = urlWithoutEnrollmentTokens(window.location);
+	const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+	if (nextUrl !== currentUrl) {
+		window.history.replaceState(window.history.state, '', nextUrl);
+	}
+}
+
 type DeviceNavigator = Pick<Navigator, 'maxTouchPoints' | 'userAgent'>;
 
 export function isIosOrIpados(deviceNavigator: DeviceNavigator = navigator): boolean {
@@ -103,6 +125,8 @@ export function applyConfigFromUrl(config: StoredConfig): {
 	reminderId: string | null;
 } {
 	const params = currentQueryParams();
+	const token = enrollmentTokenFromParams(params);
+	clearEnrollmentTokensFromAddressBar();
 	const nextConfig = { ...config };
 	const folderPath = params.get('folder');
 	const upcomingDays = params.get('upcomingDays');
@@ -123,7 +147,7 @@ export function applyConfigFromUrl(config: StoredConfig): {
 	saveConfig(nextConfig);
 	return {
 		config: nextConfig,
-		token: enrollmentTokenFromParams(params),
+		token,
 		project: params.get('project'),
 		tab: parseStartTab(params.get('tab')),
 		reminderId: reminderId || null,

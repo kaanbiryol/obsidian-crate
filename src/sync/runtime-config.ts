@@ -38,8 +38,8 @@ export function clearSyncConfigurationState(
   settings: CrateSettings,
   secretStorage: SecretStorageService,
 ): void {
-  settings.workerUrl = "";
   secretStorage.delete(SECRET_KEYS.AUTH_TOKEN);
+  settings.workerUrl = "";
 }
 
 export function buildSharedSettings(settings: CrateSettings): SharedSettings {

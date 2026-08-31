@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { detectDeviceName, enrollmentTokenFromParams, isIosOrIpados } from './config';
+import {
+	detectDeviceName,
+	enrollmentTokenFromParams,
+	isIosOrIpados,
+	urlWithoutEnrollmentTokens,
+} from './config';
 
 function device(userAgent: string, maxTouchPoints = 0): Pick<Navigator, 'maxTouchPoints' | 'userAgent'> {
 	return { userAgent, maxTouchPoints };
@@ -43,5 +48,23 @@ describe('PWA enrollment token selection', () => {
 		const params = new URLSearchParams('token=install-token&browserToken=%20');
 
 		expect(enrollmentTokenFromParams(params, false)).toBe('install-token');
+	});
+});
+
+describe('PWA enrollment URL cleanup', () => {
+	it('removes enrollment secrets while preserving navigation state', () => {
+		expect(urlWithoutEnrollmentTokens({
+			pathname: '/notifications',
+			search: '?token=install-token&browserToken=browser-token&project=Work&tab=today',
+			hash: '#reminder',
+		})).toBe('/notifications?project=Work&tab=today#reminder');
+	});
+
+	it('leaves URLs without enrollment secrets unchanged', () => {
+		expect(urlWithoutEnrollmentTokens({
+			pathname: '/notifications',
+			search: '?project=Work',
+			hash: '',
+		})).toBe('/notifications?project=Work');
 	});
 });

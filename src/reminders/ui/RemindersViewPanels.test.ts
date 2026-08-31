@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- React test doubles intentionally expose partial component props. */
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -152,3 +152,5 @@ describe('RemindersViewPanels', () => {
 		}));
 	});
 });
+
+/* eslint-enable @typescript-eslint/no-unsafe-assignment -- End test-only rule relaxation. */
