@@ -11,6 +11,7 @@ import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/
 import { ProjectAutocompleteDropdown } from '@/reminders/ui/reminder-modal/ProjectAutocompleteDropdown';
 import { useProjectAutocomplete } from '@/reminders/ui/reminder-modal/useProjectAutocomplete';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
+import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
 import { useKeyboardDoneSave } from '../hooks/useKeyboardDoneSave';
 import {
 	applyReminderTextUpdate,
@@ -274,7 +275,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 							onClick={() => onOpenPicker('date')}
 						>
 							<Calendar size={16} />
-							<span>{draft.dueDate ? formatModalDueSummary(draft) : 'Date'}</span>
+							<span>{draft.dueDate ? formatModalDueSummary(draft) : REMINDER_PICKER_COPY.editor.date}</span>
 						</Button>
 						<Button
 							className="pwa-editor-chip"
@@ -286,7 +287,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 							onClick={() => onOpenPicker('project')}
 						>
 							<Hash size={16} />
-							<span>{draft.project || 'Inbox'}</span>
+							<span>{draft.project || REMINDER_PICKER_COPY.editor.defaultProject}</span>
 						</Button>
 						<Button
 							isIconOnly
@@ -299,7 +300,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 							onClick={togglePriority}
 						>
 							<Flag size={16} fill={draft.priority === 1 ? 'currentColor' : 'none'} />
-							<span className="pwa-editor-chip__mobile-label">Priority</span>
+							<span className="pwa-editor-chip__mobile-label">{REMINDER_PICKER_COPY.editor.priority}</span>
 						</Button>
 						<Button
 							isIconOnly
@@ -308,12 +309,12 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 							data-action="toggle-picker"
 							data-picker="recurrence"
 							isDisabled={saving || !canInteract}
-							aria-label={draft.recurrence ? formatRecurrence(draft.recurrence) : 'Recurrence'}
+							aria-label={draft.recurrence ? formatRecurrence(draft.recurrence) : REMINDER_PICKER_COPY.editor.recurrenceLabel}
 							onPointerDown={(event) => event.preventDefault()}
 							onClick={() => onOpenPicker('recurrence')}
 						>
 							<Repeat size={16} />
-							<span className="pwa-editor-chip__mobile-label">Repeat</span>
+							<span className="pwa-editor-chip__mobile-label">{REMINDER_PICKER_COPY.editor.repeat}</span>
 						</Button>
 					</div>
 				</div>

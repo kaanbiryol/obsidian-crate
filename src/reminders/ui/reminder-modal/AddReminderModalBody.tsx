@@ -5,7 +5,6 @@ import { ReminderActionChips } from './ReminderActionChips';
 import { ReminderEditorFields } from './ReminderEditorFields';
 
 interface AddReminderModalBodyProps {
-    isEditing: boolean;
     content: string;
     onContentChange: (value: string) => void;
     description: string;
@@ -31,7 +30,6 @@ interface AddReminderModalBodyProps {
 }
 
 export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
-    isEditing,
     content,
     onContentChange,
     description,
@@ -58,7 +56,6 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     return (
         <div className="reminder-modal-body px-5 pt-3 pb-3">
             <ReminderEditorFields
-                isEditing={isEditing}
                 content={content}
                 onContentChange={onContentChange}
                 description={description}

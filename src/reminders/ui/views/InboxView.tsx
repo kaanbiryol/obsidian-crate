@@ -117,8 +117,9 @@ export const InboxView = memo(function InboxView({
 
   return (
     <div className={`flex flex-col h-full relative ${className}`}>
-      <div
+      <motion.div
         ref={scrollRef}
+        layoutScroll
         className={`flex-1 overflow-y-auto space-y-2 ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
       >
         <LayoutGroup id="inbox-reminder-sections">
@@ -231,7 +232,7 @@ export const InboxView = memo(function InboxView({
             </div>
           )}
         </LayoutGroup>
-      </div>
+      </motion.div>
     </div>
   );
 });

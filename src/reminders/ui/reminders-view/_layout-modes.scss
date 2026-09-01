@@ -32,23 +32,45 @@
     }
 }
 
-// Keep the sidebar controls anchored to the reminders pane instead of the app viewport.
+// Keep the sidebar controls in the pane's flex layout. The content viewport
+// therefore ends above the tab bar and cannot render underneath it.
 .reminders-view:not(.is-modal):not(.is-fullscreen):not(.is-compact) {
+    --reminders-tabbar-overlay: 0px;
+    --reminders-tabbar-bottom-offset: 0px;
+    --reminders-safe-area: 0px;
     --reminders-fab-gap: 12px;
 
+    .bottom-tab-bar {
+        background: color-mix(in srgb, var(--background-primary) 92%, transparent);
+        backdrop-filter: blur(20px) saturate(140%);
+        -webkit-backdrop-filter: blur(20px) saturate(140%);
+    }
+
     .animated-tab-bar-bottom {
-        position: absolute;
+        position: relative;
+        bottom: auto;
+        left: auto;
+        right: auto;
+        flex-shrink: 0;
     }
 }
 
 // Modal-specific fullscreen adjustments
 .reminders-view.is-modal {
     // Use Obsidian's primary background for consistency with status bar
-    background: var(--background-primary);
+    background:
+        radial-gradient(
+            circle at 84% -10%,
+            color-mix(in srgb, var(--interactive-accent) 5%, transparent),
+            transparent 34%
+        ),
+        var(--background-primary);
 
     // Transparent to inherit modal background
     .animated-tab-bar {
-        background: transparent;
+        background: color-mix(in srgb, var(--background-primary) 90%, transparent);
+        backdrop-filter: blur(24px) saturate(140%);
+        -webkit-backdrop-filter: blur(24px) saturate(140%);
     }
 
     // In modal mode, don't offset for Obsidian's nav bar
@@ -87,7 +109,13 @@
 
 .reminders-view.is-fullscreen {
     // Use Obsidian's primary background for consistency with status bar
-    background: var(--background-primary);
+    background:
+        radial-gradient(
+            circle at 84% -10%,
+            color-mix(in srgb, var(--interactive-accent) 5%, transparent),
+            transparent 34%
+        ),
+        var(--background-primary);
     --reminders-tabbar-overlay: 0px;
     --reminders-safe-area: 0px;
     // Obsidian owns the mobile navbar and includes its safe-area padding in this height.
@@ -104,7 +132,9 @@
 
     // Transparent to inherit view background
     .animated-tab-bar {
-        background: transparent;
+        background: color-mix(in srgb, var(--background-primary) 90%, transparent);
+        backdrop-filter: blur(24px) saturate(140%);
+        -webkit-backdrop-filter: blur(24px) saturate(140%);
     }
 
     // Convert from fixed positioning to flex child

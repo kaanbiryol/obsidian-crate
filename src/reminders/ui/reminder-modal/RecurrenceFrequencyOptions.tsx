@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { Minus, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { RecurrenceRule } from '../../types';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
@@ -6,6 +7,9 @@ import {
 	RECURRENCE_DAY_LABELS,
 	getOrdinalSuffix,
 } from './recurrencePickerShared';
+import { REMINDER_PICKER_COPY } from './pickerCopy';
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 
 interface RecurrenceFrequencyOptionsProps {
 	frequency: RecurrenceRule['frequency'];
@@ -19,10 +23,12 @@ interface RecurrenceFrequencyOptionsProps {
 }
 
 function StepperButton({
+	label,
 	disabled,
 	onClick,
 	children,
 }: {
+	label: string;
 	disabled?: boolean;
 	onClick: () => void;
 	children: ReactNode;
@@ -30,11 +36,56 @@ function StepperButton({
 	return (
 		<ShadowDOMNativeButton
 			onClick={onClick}
+			aria-label={label}
 			className="recurrence-stepper-button flex items-center justify-center w-9 h-9 rounded-lg active:scale-95"
 			disabled={disabled}
 		>
 			{children}
 		</ShadowDOMNativeButton>
+	);
+}
+
+function StepperControl({
+	label,
+	detail,
+	value,
+	onDecrease,
+	onIncrease,
+	decreaseDisabled,
+	increaseDisabled,
+}: {
+	label: string;
+	detail: string;
+	value: ReactNode;
+	onDecrease: () => void;
+	onIncrease: () => void;
+	decreaseDisabled?: boolean;
+	increaseDisabled?: boolean;
+}) {
+	return (
+		<div className="recurrence-option-row">
+			<div className="recurrence-option-copy">
+				<strong>{label}</strong>
+				<span>{detail}</span>
+			</div>
+			<div className="recurrence-stepper">
+				<StepperButton
+					label={`Decrease ${label.toLowerCase()}`}
+					disabled={decreaseDisabled}
+					onClick={onDecrease}
+				>
+					<Minus size={16} />
+				</StepperButton>
+				<strong className="recurrence-stepper-value" aria-live="polite">{value}</strong>
+				<StepperButton
+					label={`Increase ${label.toLowerCase()}`}
+					disabled={increaseDisabled}
+					onClick={onIncrease}
+				>
+					<Plus size={16} />
+				</StepperButton>
+			</div>
+		</div>
 	);
 }
 
@@ -60,41 +111,18 @@ export function RecurrenceFrequencyOptions({
 					className="recurrence-options-panel"
 				>
 					{frequency === 'daily' && (
-						<div
-							className="recurrence-option-row"
-						>
-							<span className="recurrence-option-label">
-								Every
-							</span>
-							<div className="flex items-center gap-1">
-								<StepperButton
-									disabled={interval <= 1}
-									onClick={() => onIntervalChange(Math.max(1, interval - 1))}
-								>
-									-
-								</StepperButton>
-								<span
-									className="recurrence-stepper-value"
-								>
-									{interval}
-								</span>
-								<StepperButton
-									onClick={() => onIntervalChange(Math.min(30, interval + 1))}
-								>
-									+
-								</StepperButton>
-							</div>
-							<span className="recurrence-option-label">
-								{interval === 1 ? 'day' : 'days'}
-							</span>
-						</div>
+						<StepperControl
+							label={REMINDER_PICKER_COPY.repeat.every}
+							detail={interval === 1 ? 'day' : 'days'}
+							value={interval}
+							decreaseDisabled={interval <= 1}
+							onDecrease={() => onIntervalChange(Math.max(1, interval - 1))}
+							onIncrease={() => onIntervalChange(Math.min(30, interval + 1))}
+						/>
 					)}
 
 					{frequency === 'weekly' && (
 						<div>
-							<div className="recurrence-option-heading">
-								Repeat on
-							</div>
 							<div className="recurrence-day-list">
 								{RECURRENCE_DAY_LABELS.map((label, idx) => {
 									const isSelected = selectedDays.includes(idx);
@@ -102,6 +130,8 @@ export function RecurrenceFrequencyOptions({
 										<ShadowDOMNativeButton
 											key={idx}
 											onClick={() => onToggleDay(idx)}
+											aria-label={DAY_NAMES[idx]}
+											aria-pressed={isSelected}
 											className={`recurrence-day-button${isSelected ? ' is-selected' : ''}`}
 										>
 											{label}
@@ -113,35 +143,15 @@ export function RecurrenceFrequencyOptions({
 					)}
 
 					{frequency === 'monthly' && (
-						<div
-							className="recurrence-option-row"
-						>
-							<span className="recurrence-option-label">
-								Day
-							</span>
-							<div className="flex items-center gap-1">
-								<StepperButton
-									disabled={dayOfMonth <= 1}
-									onClick={() => onDayOfMonthChange(Math.max(1, dayOfMonth - 1))}
-								>
-									-
-								</StepperButton>
-								<span
-									className="recurrence-stepper-value is-ordinal"
-								>
-									{getOrdinalSuffix(dayOfMonth)}
-								</span>
-								<StepperButton
-									disabled={dayOfMonth >= 31}
-									onClick={() => onDayOfMonthChange(Math.min(31, dayOfMonth + 1))}
-								>
-									+
-								</StepperButton>
-							</div>
-							<span className="recurrence-option-label">
-								of each month
-							</span>
-						</div>
+						<StepperControl
+							label={REMINDER_PICKER_COPY.repeat.dayOfMonth}
+							detail={REMINDER_PICKER_COPY.repeat.calendarDate}
+							value={getOrdinalSuffix(dayOfMonth)}
+							decreaseDisabled={dayOfMonth <= 1}
+							increaseDisabled={dayOfMonth >= 31}
+							onDecrease={() => onDayOfMonthChange(Math.max(1, dayOfMonth - 1))}
+							onIncrease={() => onDayOfMonthChange(Math.min(31, dayOfMonth + 1))}
+						/>
 					)}
 				</motion.div>
 			</AnimatePresence>

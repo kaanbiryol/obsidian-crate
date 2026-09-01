@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
-import { LayoutGroup } from 'framer-motion';
+import { LayoutGroup, motion } from 'framer-motion';
 import { ChevronLeft, FolderOpen } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
@@ -127,8 +127,9 @@ export const ProjectDetailView = memo(function ProjectDetailView({
           />
         </div>
       ) : (
-        <div
+        <motion.div
           ref={scrollRef}
+          layoutScroll
           className={`flex-1 overflow-y-scroll ios-scroll reminders-view-scroll will-change-transform${hasFab ? ' has-fab' : ''}`}
         >
           <LayoutGroup id={`project-${project}-reminder-sections`}>
@@ -149,7 +150,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
               renderCard={cardRenderer}
             />
           </LayoutGroup>
-        </div>
+        </motion.div>
       )}
     </div>
   );
