@@ -6,9 +6,10 @@ import {
 	X,
 } from 'lucide-react';
 import {
-	RECURRENCE_DAY_LABELS,
 	RECURRENCE_FREQUENCIES,
 	buildRecurrencePickerDraft,
+	getRecurrenceDayLabels,
+	getRecurrenceDayNames,
 	getOrdinalSuffix,
 	recurrenceRuleFromPickerDraft,
 	type RecurrencePickerDraft,
@@ -18,7 +19,6 @@ import { formatRecurrence } from '@/reminders/utils/rruleConverter';
 import { applyReminderTextUpdate } from '../reminder-state';
 import type { ModalDraft } from '../types';
 
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 const FREQUENCY_DETAILS = {
 	daily: { label: 'Daily', unit: 'day' },
 	weekly: { label: 'Weekly', unit: 'week' },
@@ -68,6 +68,8 @@ export function ReminderRecurrencePicker({
 	onClose: () => void;
 }) {
 	const [recurrenceDraft, setRecurrenceDraft] = useState<RecurrencePickerDraft>(() => buildRecurrencePickerDraft(draft.recurrence));
+	const dayLabels = getRecurrenceDayLabels();
+	const dayNames = getRecurrenceDayNames();
 
 	useEffect(() => {
 		setRecurrenceDraft(buildRecurrencePickerDraft(draft.recurrence));
@@ -145,7 +147,7 @@ export function ReminderRecurrencePicker({
 							<h4 id="repeat-days-title">{REMINDER_PICKER_COPY.repeat.days}</h4>
 						</div>
 						<div className="pwa-repeat-days" aria-label="Repeat days">
-							{RECURRENCE_DAY_LABELS.map((label, index) => {
+							{dayLabels.map((label, index) => {
 								const selected = recurrenceDraft.daysOfWeek.includes(index);
 								return (
 									<Button
@@ -153,7 +155,7 @@ export function ReminderRecurrencePicker({
 										key={`${label}-${index}`}
 										className={`pwa-repeat-day${selected ? ' is-active' : ''}`}
 										type="button"
-										aria-label={DAY_NAMES[index]}
+										aria-label={dayNames[index]}
 										aria-pressed={selected}
 										onClick={() => setRecurrenceDraft((current) => ({
 											...current,

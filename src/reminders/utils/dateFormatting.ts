@@ -1,6 +1,12 @@
-import { format, isToday, isTomorrow, isPast } from 'date-fns';
+import { isToday, isTomorrow, isPast } from 'date-fns';
 import type { Reminder } from '../types/reminder';
 import { formatLocalDateKey, parseReminderDateValue } from './reminderDate';
+import { getUiLocale, sentenceCaseLocalized } from './uiLocale';
+
+function formatRelativeDay(offset: number, locale = getUiLocale()): string {
+  const value = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(offset, 'day');
+  return sentenceCaseLocalized(value, locale);
+}
 
 /**
  * Format a due date for display
@@ -8,7 +14,10 @@ import { formatLocalDateKey, parseReminderDateValue } from './reminderDate';
  * @param dateString - ISO date string
  * @returns Formatted date string or null
  */
-export function formatDueDate(dateString: string | undefined): string | null {
+export function formatDueDate(
+  dateString: string | undefined,
+  locale = getUiLocale(),
+): string | null {
   if (!dateString) return null;
   const hasTime = dateString.includes('T');
   const date = parseReminderDateValue(dateString, hasTime);
@@ -16,18 +25,25 @@ export function formatDueDate(dateString: string | undefined): string | null {
 
   let dateText = '';
   if (isToday(date)) {
-    dateText = 'Today';
+    dateText = formatRelativeDay(0, locale);
   } else if (isTomorrow(date)) {
-    dateText = 'Tomorrow';
+    dateText = formatRelativeDay(1, locale);
   } else {
-    dateText = format(date, 'MMM d');
+    dateText = new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+    }).format(date);
   }
 
   // Add time if available (presence of 'T' indicates time component)
   // Note: Don't check hours/minutes as date-only strings like 'YYYY-MM-DD'
   // are parsed as UTC by JavaScript, causing timezone issues
   if (dateString.includes('T')) {
-    dateText += `, ${format(date, 'HH:mm')}`;
+    const timeText = new Intl.DateTimeFormat(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+    dateText += `, ${timeText}`;
   }
 
   return dateText;
@@ -38,10 +54,14 @@ export function formatDueDate(dateString: string | undefined): string | null {
  * @param date - Date to format
  * @returns Formatted date header
  */
-export function formatDateHeader(date: Date): string {
-  if (isToday(date)) return 'Today';
-  if (isTomorrow(date)) return 'Tomorrow';
-  return format(date, 'EEEE, MMM d');
+export function formatDateHeader(date: Date, locale = getUiLocale()): string {
+  if (isToday(date)) return formatRelativeDay(0, locale);
+  if (isTomorrow(date)) return formatRelativeDay(1, locale);
+  return new Intl.DateTimeFormat(locale, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
 }
 
 /**

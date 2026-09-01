@@ -17,7 +17,14 @@ const MiniProgressBar = memo(function MiniProgressBar({
   const progressColor = isComplete ? 'var(--text-success)' : accentColor;
 
   return (
-    <div className="premium-mini-progress">
+    <div
+      className="premium-mini-progress"
+      role="progressbar"
+      aria-label="Project completion"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percentage}
+    >
       <div
         className="premium-mini-progress-fill"
         style={{

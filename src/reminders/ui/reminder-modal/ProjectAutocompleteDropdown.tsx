@@ -39,11 +39,15 @@ export const ProjectAutocompleteDropdown: React.FC<ProjectAutocompleteDropdownPr
             ref={scrollRef}
             onMouseDown={(e) => e.preventDefault()}
             className="project-autocomplete-dropdown"
+            id="project-autocomplete-listbox"
+            role="listbox"
+            aria-label="Project suggestions"
             style={{ top }}
         >
             {filteredProjects.map((project, index) => (
                 <div
                     key={project}
+                    id={`project-autocomplete-option-${index}`}
                     onClick={() => onSelect(project)}
                     role="option"
                     aria-selected={index === highlightedIndex}

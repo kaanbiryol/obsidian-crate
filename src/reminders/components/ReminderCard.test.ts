@@ -22,6 +22,7 @@ describe('ReminderCard', () => {
         expect(markup).toContain('aria-disabled="true"');
         expect(markup).toContain('premium-checkbox-visual');
         expect(markup).toContain('premium-checkbox-icon');
+        expect(markup).not.toContain('background-color:var(--text-success)');
         expect(markup).not.toContain('premium-reminder-card is-completed');
         expect(markup).not.toContain('premium-reminder-title is-completed');
     });
@@ -33,6 +34,7 @@ describe('ReminderCard', () => {
         }));
 
         expect(markup).toContain('class="premium-priority-flag"');
+        expect(markup).toContain('premium-checkbox is-important');
         expect(markup).toContain('aria-label="High priority"');
         expect(markup).toMatch(/premium-reminder-title-row[\s\S]*premium-priority-flag/);
     });

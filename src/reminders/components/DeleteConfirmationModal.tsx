@@ -35,7 +35,8 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
         onConfirm();
     };
 
-    const isAnimationEnabled = animationConfig.enabled && !useObsidianReducedMotion();
+    const reduceMotion = useObsidianReducedMotion();
+    const isAnimationEnabled = animationConfig.enabled && !reduceMotion;
 
     const backdropVariants = isAnimationEnabled ? {
         hidden: { opacity: 0 },
@@ -90,7 +91,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
         <AnimatePresence>
             {isOpen && (
                 <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                    className={`fixed inset-0 z-[100] flex items-center justify-center p-4${reduceMotion ? ' is-reduced-motion' : ''}`}
                 >
                     {/* Backdrop - faster animation for perceived performance */}
                     <motion.div
@@ -112,6 +113,9 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                         animate="visible"
                         exit="exit"
                         className="delete-confirmation-surface relative w-full"
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-label={title}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="delete-confirmation-copy">

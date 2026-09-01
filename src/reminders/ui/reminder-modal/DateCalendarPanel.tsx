@@ -1,23 +1,19 @@
 import { CalendarDate } from '@internationalized/date';
-import { format } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { ObsidianIcon } from '../../components/obsidian-icon';
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-
-function calendarGrid(displayMonth: CalendarDate): Date[] {
-	const firstWeekday = new Date(displayMonth.year, displayMonth.month - 1, 1).getDay();
-	return Array.from({ length: 42 }, (_, index) => (
-		new Date(displayMonth.year, displayMonth.month - 1, index - firstWeekday + 1)
-	));
-}
-
-function isSameLocalDay(left: Date, right: Date): boolean {
-	return left.getFullYear() === right.getFullYear()
-		&& left.getMonth() === right.getMonth()
-		&& left.getDate() === right.getDate();
-}
+import {
+	addCalendarDays,
+	addCalendarMonths,
+	buildCalendarGrid,
+	calendarDateKey,
+	getLocaleWeekStart,
+	getLocalizedWeekdays,
+	getUiLocale,
+	isInDisplayMonth,
+	isSameLocalDay,
+} from './calendarLocalization';
 
 const calendarVariants = {
 	enter: (direction: number) => ({
@@ -61,8 +57,99 @@ export function DateCalendarPanel({
 	onNextMonth,
 	onDateChange,
 }: DateCalendarPanelProps) {
-	const days = calendarGrid(displayMonth);
+	const locale = useMemo(getUiLocale, []);
+	const weekStart = useMemo(() => getLocaleWeekStart(locale), [locale]);
+	const weekdays = useMemo(() => getLocalizedWeekdays(locale, weekStart), [locale, weekStart]);
+	const days = useMemo(() => buildCalendarGrid(displayMonth, weekStart), [displayMonth, weekStart]);
 	const today = new Date();
+	const [focusedDate, setFocusedDate] = useState(() => currentDate ?? today);
+	const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
+	const restoreGridFocusRef = useRef(false);
+	const monthFormatter = useMemo(() => new Intl.DateTimeFormat(locale, {
+		month: 'long',
+		year: 'numeric',
+	}), [locale]);
+	const dateLabelFormatter = useMemo(() => new Intl.DateTimeFormat(locale, {
+		weekday: 'long',
+		year: 'numeric',
+		month: 'long',
+		day: 'numeric',
+	}), [locale]);
+
+	useEffect(() => {
+		if (restoreGridFocusRef.current) return;
+		if (currentDate && isInDisplayMonth(currentDate, displayMonth)) {
+			if (!isSameLocalDay(currentDate, focusedDate)) {
+				setFocusedDate(currentDate);
+			}
+			return;
+		}
+
+		if (!isInDisplayMonth(focusedDate, displayMonth)) {
+			const lastDay = new Date(displayMonth.year, displayMonth.month, 0).getDate();
+			setFocusedDate(new Date(
+				displayMonth.year,
+				displayMonth.month - 1,
+				Math.min(focusedDate.getDate(), lastDay),
+			));
+		}
+	}, [currentDate, displayMonth, focusedDate]);
+
+	useLayoutEffect(() => {
+		if (!restoreGridFocusRef.current) return;
+		const target = buttonRefs.current.get(calendarDateKey(focusedDate));
+		if (!target) return;
+		restoreGridFocusRef.current = false;
+		target.focus();
+	}, [displayMonth, focusedDate]);
+
+	const moveFocus = (targetDate: Date) => {
+		restoreGridFocusRef.current = true;
+		setFocusedDate(targetDate);
+		if (targetDate.getFullYear() < displayMonth.year
+			|| (targetDate.getFullYear() === displayMonth.year && targetDate.getMonth() < displayMonth.month - 1)) {
+			onPrevMonth();
+		} else if (targetDate.getFullYear() > displayMonth.year
+			|| (targetDate.getFullYear() === displayMonth.year && targetDate.getMonth() > displayMonth.month - 1)) {
+			onNextMonth();
+		}
+	};
+
+	const handleDateKeyDown = (event: KeyboardEvent<HTMLButtonElement>, date: Date) => {
+		const isRtl = typeof document !== 'undefined' && document.dir === 'rtl';
+		let targetDate: Date | null = null;
+		switch (event.key) {
+			case 'ArrowLeft':
+				targetDate = addCalendarDays(date, isRtl ? 1 : -1);
+				break;
+			case 'ArrowRight':
+				targetDate = addCalendarDays(date, isRtl ? -1 : 1);
+				break;
+			case 'ArrowUp':
+				targetDate = addCalendarDays(date, -7);
+				break;
+			case 'ArrowDown':
+				targetDate = addCalendarDays(date, 7);
+				break;
+			case 'Home':
+				targetDate = addCalendarDays(date, -((date.getDay() - weekStart + 7) % 7));
+				break;
+			case 'End':
+				targetDate = addCalendarDays(date, 6 - ((date.getDay() - weekStart + 7) % 7));
+				break;
+			case 'PageUp':
+				targetDate = addCalendarMonths(date, -1);
+				break;
+			case 'PageDown':
+				targetDate = addCalendarMonths(date, 1);
+				break;
+			default:
+				return;
+		}
+
+		event.preventDefault();
+		moveFocus(targetDate);
+	};
 
 	return (
 		<div className="date-calendar-panel px-4 pt-2">
@@ -76,7 +163,7 @@ export function DateCalendarPanel({
 				</ShadowDOMNativeButton>
 
 				<span className="date-calendar-title">
-					{format(new Date(displayMonth.year, displayMonth.month - 1), 'MMMM yyyy')}
+					{monthFormatter.format(new Date(displayMonth.year, displayMonth.month - 1))}
 				</span>
 
 				<ShadowDOMNativeButton
@@ -102,7 +189,9 @@ export function DateCalendarPanel({
 						<table className="date-calendar-grid" aria-label="Date picker">
 							<thead>
 								<tr>
-									{WEEKDAYS.map(weekday => <th key={weekday} scope="col">{weekday}</th>)}
+									{weekdays.map(({ weekday, short, long }) => (
+										<th key={weekday} scope="col" aria-label={long}>{short}</th>
+									))}
 								</tr>
 							</thead>
 							<tbody>
@@ -112,22 +201,32 @@ export function DateCalendarPanel({
 											const selected = currentDate ? isSameLocalDay(date, currentDate) : false;
 											const isToday = isSameLocalDay(date, today);
 											const outsideMonth = date.getMonth() !== displayMonth.month - 1;
-											const key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+											const key = calendarDateKey(date);
 											return (
 												<td key={key}>
 													<button
+														ref={(element) => {
+															if (element) buttonRefs.current.set(key, element);
+															else buttonRefs.current.delete(key);
+														}}
 														type="button"
-														aria-label={format(date, 'MMMM d, yyyy')}
+														aria-label={dateLabelFormatter.format(date)}
 														aria-current={isToday ? 'date' : undefined}
 														aria-pressed={selected}
+														tabIndex={isSameLocalDay(date, focusedDate) ? 0 : -1}
 														data-outside-month={outsideMonth || undefined}
 														data-selected={selected || undefined}
 														data-today={isToday || undefined}
-														onClick={() => onDateChange(new CalendarDate(
-															date.getFullYear(),
-															date.getMonth() + 1,
-															date.getDate(),
-														))}
+														onFocus={() => setFocusedDate(date)}
+														onKeyDown={(event) => handleDateKeyDown(event, date)}
+														onClick={() => {
+															setFocusedDate(date);
+															onDateChange(new CalendarDate(
+																date.getFullYear(),
+																date.getMonth() + 1,
+																date.getDate(),
+															));
+														}}
 													>
 														{date.getDate()}
 													</button>

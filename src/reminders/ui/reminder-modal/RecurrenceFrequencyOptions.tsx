@@ -4,12 +4,11 @@ import type { RecurrenceRule } from '../../types';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { ObsidianIcon } from '../../components/obsidian-icon';
 import {
-	RECURRENCE_DAY_LABELS,
+	getRecurrenceDayLabels,
+	getRecurrenceDayNames,
 	getOrdinalSuffix,
 } from './recurrencePickerShared';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
-
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 
 interface RecurrenceFrequencyOptionsProps {
 	frequency: RecurrenceRule['frequency'];
@@ -99,6 +98,8 @@ export function RecurrenceFrequencyOptions({
 	onToggleDay,
 	onDayOfMonthChange,
 }: RecurrenceFrequencyOptionsProps) {
+	const dayLabels = getRecurrenceDayLabels();
+	const dayNames = getRecurrenceDayNames();
 	return (
 		<div className="recurrence-options">
 			<AnimatePresence mode="wait">
@@ -109,6 +110,9 @@ export function RecurrenceFrequencyOptions({
 					exit={animationsEnabled ? { opacity: 0 } : undefined}
 					transition={{ duration: 0.15 }}
 					className="recurrence-options-panel"
+					id="recurrence-options-panel"
+					role="tabpanel"
+					aria-labelledby={`recurrence-frequency-${frequency}`}
 				>
 					{frequency === 'daily' && (
 						<StepperControl
@@ -124,13 +128,13 @@ export function RecurrenceFrequencyOptions({
 					{frequency === 'weekly' && (
 						<div>
 							<div className="recurrence-day-list">
-								{RECURRENCE_DAY_LABELS.map((label, idx) => {
+								{dayLabels.map((label, idx) => {
 									const isSelected = selectedDays.includes(idx);
 									return (
 										<ShadowDOMNativeButton
 											key={idx}
 											onClick={() => onToggleDay(idx)}
-											aria-label={DAY_NAMES[idx]}
+											aria-label={dayNames[idx]}
 											aria-pressed={isSelected}
 											className={`recurrence-day-button${isSelected ? ' is-selected' : ''}`}
 										>

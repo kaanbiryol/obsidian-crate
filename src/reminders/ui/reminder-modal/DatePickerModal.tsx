@@ -37,7 +37,8 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
     isDark,
     onDateTimeChange,
 }) => {
-    const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
+    const reduceMotion = useObsidianReducedMotion();
+    const animationsEnabled = animationConfig.enabled && !reduceMotion;
     const currentDate = parseReminderDateValue(dueDate, hasTime) ?? null;
     const modalProps = getPickerModalProps(pickerMode);
 
@@ -97,7 +98,8 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
             isOpen={isOpen}
             onClose={onClose}
             animationConfig={animationConfig}
-            className="crate-reminder-picker-surface is-date-picker"
+            className={`crate-reminder-picker-surface is-date-picker${reduceMotion ? ' is-reduced-motion' : ''}`}
+            ariaLabel={REMINDER_PICKER_COPY.schedule.dialogLabel}
             {...modalProps}
         >
             <div className={`reminder-picker reminder-date-picker${isDark ? ' dark' : ''}`}>

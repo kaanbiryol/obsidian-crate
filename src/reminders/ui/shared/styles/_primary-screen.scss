@@ -5,6 +5,7 @@
 
 .reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail) {
     --reminders-fab-size: 44px;
+    --crate-project-progress-width: 42px;
 
     .view-header {
         min-height: 80px;
@@ -82,12 +83,6 @@
         transform: var(--crate-reminder-card-active-transform, none);
         background: var(--crate-reminder-card-active-bg, var(--crate-surface-active-bg));
         border-color: var(--crate-reminder-card-active-border, var(--crate-surface-border-hover));
-    }
-
-    .premium-checkbox {
-        --premium-checkbox-size: 18px;
-        --premium-checkbox-offset: -13px;
-        --premium-checkbox-border-width: 1.5px;
     }
 
     .premium-reminder-body {
@@ -226,13 +221,8 @@
     }
 
     .premium-project-progress {
-        min-width: 42px;
+        min-width: var(--crate-project-progress-width);
         gap: 3px;
-    }
-
-    .premium-mini-progress {
-        width: 42px;
-        height: 3px;
     }
 
     .premium-project-percentage {

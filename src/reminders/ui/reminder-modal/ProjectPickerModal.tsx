@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
 import { AnimationConfig } from '../animations';
@@ -8,6 +8,7 @@ import { PickerHeader } from './PickerHeader';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
 import { ObsidianIcon } from '../../components/obsidian-icon';
 import { ProjectDot } from './ProjectDot';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 
 interface ProjectPickerModalProps {
     isOpen: boolean;
@@ -27,6 +28,9 @@ interface ProjectRowProps {
     isDark: boolean;
     onSelect: () => void;
     rowRef?: React.Ref<HTMLButtonElement>;
+    tabIndex: number;
+    onFocus: () => void;
+    onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
 }
 
 const ProjectRow: React.FC<ProjectRowProps> = ({
@@ -35,13 +39,19 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
     isDark,
     onSelect,
     rowRef,
+    tabIndex,
+    onFocus,
+    onKeyDown,
 }) => {
     return (
         <ShadowDOMNativeButton
             ref={rowRef}
             role="option"
             aria-selected={isSelected}
+            tabIndex={tabIndex}
             onClick={onSelect}
+            onFocus={onFocus}
+            onKeyDown={onKeyDown}
             className={`project-picker-row w-full flex items-center gap-3 px-4 min-h-[52px]${isSelected ? ' is-selected' : ''}`}
         >
             <ProjectDot projectName={projectName} isDark={isDark} />
@@ -68,19 +78,26 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
     isDark,
     onSelectProject,
 }) => {
+    const reduceMotion = useObsidianReducedMotion();
     const selectedProject = project || defaultProject || 'Inbox';
+    const selectedIndex = Math.max(0, projects.indexOf(selectedProject));
+    const [activeIndex, setActiveIndex] = useState(selectedIndex);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const selectedRowRef = useRef<HTMLButtonElement>(null);
+    const rowRefs = useRef(new Map<number, HTMLButtonElement>());
     const modalProps = getPickerModalProps(pickerMode);
+
+    useEffect(() => {
+        if (isOpen) setActiveIndex(selectedIndex);
+    }, [isOpen, selectedIndex]);
 
     // Scroll selected item into view when modal opens
     useLayoutEffect(() => {
         const container = scrollContainerRef.current;
-        const selectedRow = selectedRowRef.current;
-        if (!isOpen || !container || !selectedRow) return;
+        const activeRow = rowRefs.current.get(activeIndex);
+        if (!isOpen || !container || !activeRow) return;
 
         const containerRect = container.getBoundingClientRect();
-        const rowRect = selectedRow.getBoundingClientRect();
+        const rowRect = activeRow.getBoundingClientRect();
         container.scrollTop = Math.max(
             0,
             container.scrollTop
@@ -88,7 +105,25 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
                 - containerRect.top
                 - ((container.clientHeight - rowRect.height) / 2),
         );
-    }, [isOpen, projects, selectedProject]);
+    }, [activeIndex, isOpen, projects]);
+
+    const focusIndex = useCallback((index: number) => {
+        if (projects.length === 0) return;
+        const nextIndex = Math.min(projects.length - 1, Math.max(0, index));
+        setActiveIndex(nextIndex);
+        rowRefs.current.get(nextIndex)?.focus();
+    }, [projects.length]);
+
+    const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+        let nextIndex: number | null = null;
+        if (event.key === 'ArrowDown') nextIndex = (index + 1) % projects.length;
+        if (event.key === 'ArrowUp') nextIndex = (index - 1 + projects.length) % projects.length;
+        if (event.key === 'Home') nextIndex = 0;
+        if (event.key === 'End') nextIndex = projects.length - 1;
+        if (nextIndex === null) return;
+        event.preventDefault();
+        focusIndex(nextIndex);
+    }, [focusIndex, projects.length]);
 
     const handleSelectProject = (projectName: string) => {
         onSelectProject(projectName);
@@ -100,7 +135,8 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
             isOpen={isOpen}
             onClose={onClose}
             animationConfig={animationConfig}
-            className="crate-reminder-picker-surface is-project-picker"
+            className={`crate-reminder-picker-surface is-project-picker${reduceMotion ? ' is-reduced-motion' : ''}`}
+            ariaLabel={REMINDER_PICKER_COPY.project.dialogLabel}
             {...modalProps}
         >
             <div className={`reminder-picker reminder-project-picker${isDark ? ' dark' : ''}`}>
@@ -116,13 +152,19 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
                     className="project-picker-scroll overflow-y-auto"
                 >
                     <div className="project-picker-list" role="listbox" aria-label={REMINDER_PICKER_COPY.project.listLabel}>
-                        {projects.map((p) => (
+                        {projects.map((p, index) => (
                             <ProjectRow
                                 key={p}
                                 projectName={p}
                                 isSelected={p === selectedProject}
                                 isDark={isDark}
-                                rowRef={p === selectedProject ? selectedRowRef : undefined}
+                                rowRef={(element) => {
+                                    if (element) rowRefs.current.set(index, element);
+                                    else rowRefs.current.delete(index);
+                                }}
+                                tabIndex={index === activeIndex ? 0 : -1}
+                                onFocus={() => setActiveIndex(index)}
+                                onKeyDown={(event) => handleRowKeyDown(event, index)}
                                 onSelect={() => handleSelectProject(p)}
                             />
                         ))}

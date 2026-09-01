@@ -55,7 +55,7 @@ describe('recurrencePickerShared', () => {
 			dayOfMonth: 1,
 			hour: 8,
 			minute: 15,
-		})).toBe('Every 3 days at 08:15');
+		}, 'en-GB')).toBe('Every 3 days at 08:15');
 		expect(summarizeRecurrencePickerState({
 			frequency: 'weekly',
 			interval: 1,
@@ -63,7 +63,7 @@ describe('recurrencePickerShared', () => {
 			dayOfMonth: 1,
 			hour: 8,
 			minute: 15,
-		})).toBe('Mon, Wed at 08:15');
+		}, 'en-GB')).toBe('Mon, Wed at 08:15');
 		expect(getOrdinalSuffix(21)).toBe('21st');
 	});
 });
