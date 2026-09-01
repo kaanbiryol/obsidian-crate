@@ -36,4 +36,20 @@ describe('RichTextInput', () => {
         expect(markup).toContain('Edit this reminder');
         expect(markup).not.toContain('autofocus');
     });
+
+    it('exposes autocomplete state to assistive technology', () => {
+        const markup = renderToStaticMarkup(React.createElement(RichTextInput, {
+            value: '#pro',
+            onChange: vi.fn(),
+            ariaLabel: 'Reminder title',
+            ariaControls: 'project-autocomplete-listbox',
+            ariaActiveDescendant: 'project-autocomplete-option-1',
+            ariaExpanded: true,
+        }));
+
+        expect(markup).toContain('aria-autocomplete="list"');
+        expect(markup).toContain('aria-controls="project-autocomplete-listbox"');
+        expect(markup).toContain('aria-activedescendant="project-autocomplete-option-1"');
+        expect(markup).toContain('aria-expanded="true"');
+    });
 });

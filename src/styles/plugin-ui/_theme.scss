@@ -102,6 +102,12 @@
   --crate-selection-bg: var(--nav-item-background-active, var(--crate-control-active-bg));
   --crate-selection-color: var(--nav-item-color-active, var(--text-normal));
   --crate-selection-weight: var(--nav-item-weight-active, var(--font-semibold));
+  --crate-selection-border: var(--background-modifier-border-hover, var(--crate-divider));
+  --crate-picker-selection-bg: var(--crate-selection-bg);
+  --crate-picker-selection-color: var(--crate-selection-color);
+  --crate-picker-selection-border: var(--crate-selection-border);
+  --crate-picker-primary-bg: var(--interactive-accent);
+  --crate-picker-primary-color: var(--text-on-accent);
 
   /* Compatibility aliases for existing shared components. */
   --crate-surface-bg: var(--crate-panel-bg);
@@ -125,11 +131,8 @@
   --crate-project-card-shadow: var(--crate-reminder-card-shadow);
   --crate-project-card-hover-bg: var(--crate-reminder-card-hover-bg);
   --crate-project-card-hover-border: var(--crate-reminder-card-hover-border);
-  --crate-tab-active-bg: var(
-    --nav-item-background-active,
-    color-mix(in srgb, var(--crate-accent) 10%, transparent)
-  );
-  --crate-tab-active-color: var(--nav-item-color-active, var(--crate-accent));
+  --crate-tab-active-bg: var(--crate-selection-bg);
+  --crate-tab-active-color: var(--crate-selection-color);
   --crate-fab-bg: var(--crate-accent);
   --crate-fab-border: var(--background-modifier-border);
   --crate-fab-shadow: var(--shadow-s, none);
@@ -149,6 +152,7 @@
   --crate-motion-duration-fast: var(--anim-duration-fast, 160ms);
   --crate-motion-duration-moderate: var(--anim-duration-moderate, 250ms);
   --crate-motion-easing: var(--anim-motion-baseline, ease);
+  --crate-project-progress-width: 48px;
 
   /* Reminder semantics also inherit the theme instead of HeroUI's palette. */
   --reminder-p1-border: var(--crate-danger);
@@ -207,11 +211,25 @@
     --crate-app-bg: var(--crate-modal-bg);
   }
 
+  .is-reduced-motion {
+    --crate-motion-duration-fast: 0ms;
+    --crate-motion-duration-moderate: 0ms;
+
+    .shadow-dom-button__spinner,
+    .premium-checkbox-icon {
+      animation: none;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     --crate-motion-duration-fast: 0ms;
     --crate-motion-duration-moderate: 0ms;
 
     .shadow-dom-button__spinner {
+      animation: none;
+    }
+
+    .premium-checkbox-icon {
       animation: none;
     }
   }

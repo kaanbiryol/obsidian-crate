@@ -125,7 +125,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                 {/* Custom checkbox */}
                 <button
                     type="button"
-                    className={`premium-checkbox${isCheckboxChecked ? ' is-checked' : ''}${completionPreview ? ' is-completing' : ''}`}
+                    className={`premium-checkbox${isCheckboxChecked ? ' is-checked' : ''}${isImportant ? ' is-important' : ''}${completionPreview ? ' is-completing' : ''}`}
                     role="checkbox"
                     aria-checked={isCheckboxChecked}
                     aria-disabled={completionPreview}
@@ -137,14 +137,6 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                 >
                     <span
                         className="premium-checkbox-visual"
-                        style={{
-                            borderColor: isCheckboxChecked
-                                ? 'var(--text-success)'
-                                : (isImportant
-                                    ? 'var(--text-error)'
-                                    : 'var(--background-modifier-border-hover, var(--background-modifier-border))'),
-                            backgroundColor: isCheckboxChecked ? 'var(--text-success)' : 'transparent',
-                        }}
                         aria-hidden="true"
                     >
                         {isCheckboxChecked && (
@@ -186,11 +178,6 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                             {(dueDate || reminder.recurrence) && (
                                 <span
                                     className={`premium-pill ${isOverdue && !reminder.recurrence ? 'is-overdue' : ''}`}
-                                    style={isOverdue && !reminder.recurrence ? {
-                                        backgroundColor: 'color-mix(in srgb, var(--text-error) 12%, transparent)',
-                                        color: 'var(--text-error)',
-                                        borderColor: 'color-mix(in srgb, var(--text-error) 20%, transparent)',
-                                    } : undefined}
                                 >
                                     {reminder.recurrence ? (
                                         <ThemeIcon size="xs" id="repeat" />

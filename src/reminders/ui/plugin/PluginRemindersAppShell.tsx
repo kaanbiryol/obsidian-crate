@@ -103,6 +103,11 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
   }, [providedProjects, reminders]);
 
   const startTransition = useCallback(() => {
+    if (prefersReducedMotion) {
+      setIsTransitioning(false);
+      return;
+    }
+
     setIsTransitioning(true);
 
     if (transitionTimeoutRef.current) {
@@ -112,7 +117,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
     transitionTimeoutRef.current = window.setTimeout(() => {
       setIsTransitioning(false);
     }, PAGE_TRANSITION_DURATION * 1000);
-  }, []);
+  }, [prefersReducedMotion]);
 
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     startTransition();
@@ -221,6 +226,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
           isFullScreen ? "is-fullscreen" : "",
           isModal ? "is-modal" : "",
           isCompact || hideTabBar ? "is-compact" : "",
+          prefersReducedMotion ? "is-reduced-motion" : "",
           viewMode === "browse" && selectedProject ? "is-project-detail" : `is-${viewMode}`,
           className,
         ].filter(Boolean).join(" ")}

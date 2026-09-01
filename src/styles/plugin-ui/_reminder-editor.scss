@@ -67,7 +67,7 @@
   transition: transform var(--crate-motion-duration-fast) var(--crate-motion-easing), background-color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &:hover {
-    background: color-mix(in srgb, var(--crate-accent) 8%, transparent);
+    background: var(--crate-control-hover-bg);
   }
 
   &:active {
@@ -91,9 +91,9 @@
   justify-content: space-between;
   gap: 16px;
   padding: 10px 13px;
-  border: 1px solid color-mix(in srgb, var(--crate-accent) 18%, transparent);
+  border: 1px solid var(--crate-picker-selection-border);
   border-radius: var(--crate-radius-card);
-  background: color-mix(in srgb, var(--crate-accent) 6.5%, transparent);
+  background: var(--crate-picker-selection-bg);
 
   span {
     color: var(--text-faint);
@@ -104,7 +104,7 @@
   strong {
     min-width: 0;
     overflow: hidden;
-    color: var(--crate-accent);
+    color: var(--crate-picker-selection-color);
     font-size: var(--reminder-font-sm);
     font-weight: var(--reminder-font-weight-medium);
     line-height: 1.3;
@@ -237,9 +237,9 @@
   top: 4px;
   bottom: 4px;
   width: calc(33.333333% - 8px);
-  border: 1px solid color-mix(in srgb, var(--crate-accent) 18%, transparent);
+  border: 1px solid var(--crate-picker-selection-border);
   border-radius: var(--crate-radius-button);
-  background: color-mix(in srgb, var(--crate-accent) 10%, transparent);
+  background: var(--crate-picker-selection-bg);
   box-shadow: none;
 
   &.is-daily {
@@ -275,7 +275,7 @@
   transition: color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &.is-selected {
-    color: var(--crate-accent);
+    color: var(--crate-picker-selection-color);
     font-weight: var(--reminder-font-weight-semibold);
   }
 }
@@ -399,8 +399,8 @@
   transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &.is-selected {
-    background: color-mix(in srgb, var(--crate-accent) 13%, transparent);
-    color: var(--crate-accent);
+    background: var(--crate-picker-selection-bg);
+    color: var(--crate-picker-selection-color);
   }
 }
 
@@ -432,8 +432,8 @@
   }
 
   &.is-active {
-    background: color-mix(in srgb, var(--crate-accent) 10%, transparent);
-    color: var(--crate-accent);
+    background: var(--crate-picker-selection-bg);
+    color: var(--crate-picker-selection-color);
   }
 
   & + & {
@@ -477,6 +477,17 @@
     color: var(--text-faint);
     font-size: var(--reminder-font-xxs);
     font-weight: var(--reminder-font-weight-medium);
+  }
+}
+
+.date-quick-button.is-active .date-quick-button-copy {
+  strong {
+    color: currentColor;
+  }
+
+  small {
+    color: currentColor;
+    opacity: 0.75;
   }
 }
 
@@ -666,7 +677,7 @@
   font-weight: var(--reminder-font-weight-semibold);
   letter-spacing: normal;
   cursor: pointer;
-  transition: all var(--crate-motion-duration-moderate) var(--crate-motion-easing);
+  transition: background-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), color var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing), box-shadow var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .picker-footer {
@@ -791,11 +802,11 @@
     cursor: pointer;
 
     &:hover {
-      background: color-mix(in srgb, var(--crate-accent) 8%, transparent);
+      background: var(--crate-control-hover-bg);
     }
 
     &:active {
-      background: color-mix(in srgb, var(--crate-accent) 12%, transparent);
+      background: var(--crate-control-active-bg);
       transform: scale(0.97);
     }
   }

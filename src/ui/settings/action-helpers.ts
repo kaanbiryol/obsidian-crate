@@ -89,6 +89,7 @@ export async function runButtonTask<T>(options: RunButtonTaskOptions<T>): Promis
 export interface FileSyncProgress {
 	container: HTMLElement;
 	label: HTMLElement;
+	bar: HTMLElement;
 	fill: HTMLElement;
 }
 
@@ -97,9 +98,14 @@ export function createFileSyncProgress(setting: Setting): FileSyncProgress {
 	container.hide();
 	const label = container.createDiv({ cls: 'crate-sync-progress-label' });
 	const progressBar = container.createDiv({ cls: 'crate-sync-progress-bar' });
+	progressBar.setAttribute('role', 'progressbar');
+	progressBar.setAttribute('aria-label', 'File sync progress');
+	progressBar.setAttribute('aria-valuemin', '0');
+	progressBar.setAttribute('aria-valuemax', '100');
+	progressBar.setAttribute('aria-valuenow', '0');
 	const fill = progressBar.createDiv({ cls: 'crate-sync-progress-fill' });
 
-	return { container, label, fill };
+	return { container, label, bar: progressBar, fill };
 }
 
 export function showFileSyncProgress(progress: FileSyncProgress): void {
@@ -112,11 +118,13 @@ export function updateFileSyncProgress(progress: FileSyncProgress, current: numb
 	const safeTotal = total > 0 ? total : 1;
 	const pct = Math.round((current / safeTotal) * 100);
 	progress.fill.setCssProps({ width: `${Math.min(Math.max(pct, 0), 100)}%` });
+	progress.bar.setAttribute('aria-valuenow', String(Math.min(Math.max(pct, 0), 100)));
 	progress.label.textContent = `${current} / ${total} files`;
 }
 
 export function hideFileSyncProgress(progress: FileSyncProgress): void {
 	progress.container.hide();
 	progress.fill.setCssProps({ width: '0%' });
+	progress.bar.setAttribute('aria-valuenow', '0');
 	progress.label.textContent = '';
 }

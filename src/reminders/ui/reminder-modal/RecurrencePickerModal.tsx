@@ -35,7 +35,8 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     recurrence,
     onApply,
 }) => {
-    const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
+    const reduceMotion = useObsidianReducedMotion();
+    const animationsEnabled = animationConfig.enabled && !reduceMotion;
     const modalProps = getPickerModalProps(pickerMode);
 
     const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>(recurrence?.frequency || 'daily');
@@ -96,7 +97,8 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
             isOpen={isOpen}
             onClose={onClose}
             animationConfig={animationConfig}
-            className="crate-reminder-picker-surface is-recurrence-picker"
+            className={`crate-reminder-picker-surface is-recurrence-picker${reduceMotion ? ' is-reduced-motion' : ''}`}
+            ariaLabel={REMINDER_PICKER_COPY.repeat.dialogLabel}
             {...modalProps}
         >
             <div className={`reminder-picker reminder-recurrence-picker${isDark ? ' dark' : ''}`}>

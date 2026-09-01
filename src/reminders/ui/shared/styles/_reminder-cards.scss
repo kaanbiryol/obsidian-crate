@@ -143,9 +143,9 @@
 
 // Custom checkbox
 .premium-checkbox {
-    --premium-checkbox-size: var(--checkbox-size, 18px);
+    --premium-checkbox-size: var(--checkbox-size, var(--icon-size-s, 18px));
     --premium-checkbox-offset: -12px;
-    --premium-checkbox-border-width: var(--checkbox-border-width, 2px);
+    --premium-checkbox-border-width: var(--checkbox-border-width, var(--input-border-width, 1px));
 
     flex: 0 0 44px;
     width: 44px;
@@ -163,7 +163,7 @@
     cursor: pointer;
 
     &:hover .premium-checkbox-visual {
-        border-color: var(--text-muted);
+        border-color: var(--checkbox-border-color-hover, var(--text-muted));
         transform: scale(1.05);
     }
 
@@ -181,13 +181,18 @@
     }
 
     &.is-checked .premium-checkbox-visual {
-        border-color: var(--crate-success);
-        background: var(--crate-success);
+        border-color: var(--checkbox-color, var(--interactive-accent));
+        background: var(--checkbox-color, var(--interactive-accent));
         box-shadow: var(--crate-checkbox-checked-shadow, none);
 
         &:hover {
-            border-color: var(--crate-success);
+            border-color: var(--checkbox-color-hover, var(--interactive-accent-hover));
+            background: var(--checkbox-color-hover, var(--interactive-accent-hover));
         }
+    }
+
+    &.is-important:not(.is-checked) .premium-checkbox-visual {
+        border-color: var(--text-error);
     }
 }
 
@@ -195,19 +200,19 @@
     flex: 0 0 var(--premium-checkbox-size);
     width: var(--premium-checkbox-size);
     height: var(--premium-checkbox-size);
-    border-radius: var(--checkbox-radius, 50%);
-    border: var(--premium-checkbox-border-width) solid var(--background-modifier-border-hover);
+    border-radius: var(--checkbox-radius, var(--radius-s));
+    border: var(--premium-checkbox-border-width) solid var(--checkbox-border-color, var(--background-modifier-border-hover));
     display: flex;
     align-items: center;
     justify-content: center;
     color: inherit;
     background: transparent;
     pointer-events: none;
-    transition: all var(--crate-motion-duration-moderate) var(--crate-motion-easing);
+    transition: border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), background-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), color var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing), box-shadow var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .premium-checkbox-icon {
-    color: var(--text-on-accent);
+    color: var(--checkbox-marker-color, var(--text-on-accent));
     animation: crate-checkmark-pop var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
@@ -343,6 +348,10 @@
     }
 
     &.is-overdue {
+        border-color: color-mix(in srgb, var(--text-error) 20%, transparent);
+        background: color-mix(in srgb, var(--text-error) 12%, transparent);
+        color: var(--text-error);
+
         svg {
             opacity: 1;
         }

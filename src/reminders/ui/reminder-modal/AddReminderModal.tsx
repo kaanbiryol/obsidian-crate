@@ -11,6 +11,7 @@ import { useReminderDraft } from './useReminderDraft';
 import { useReminderModalPresentation } from './useReminderModalPresentation';
 import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
 import { AnimationConfig } from '../animations';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { Reminder, RecurrenceRule } from '../../types';
 
 interface AddReminderModalProps {
@@ -91,6 +92,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         dueDateChanged,
         projectChanged,
         handleClose,
+        handleModalExitComplete,
         transitionToView,
         closePickerModal,
         handleEntryAnimationComplete,
@@ -129,6 +131,8 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
 
     // Keep project accents and picker chrome in sync when the active theme changes.
     const isDark = useObsidianDarkMode();
+    const reduceMotion = useObsidianReducedMotion();
+    const animationsEnabled = animationConfig.enabled && !reduceMotion;
 
     const handlePriorityToggle = useCallback(() => {
         const nextContent = togglePriority();
@@ -165,9 +169,11 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             isOpen={showModal && (pickerMode === 'overlay' || currentView === 'main')}
             onClose={handleClose}
             onAnimationComplete={handleEntryAnimationComplete}
+            onExitComplete={handleModalExitComplete}
             animationConfig={animationConfig}
             variant={variant}
-            className="crate-reminder-editor-surface"
+            className={`crate-reminder-editor-surface${reduceMotion ? ' is-reduced-motion' : ''}`}
+            ariaLabel={isEditing ? 'Edit reminder' : 'New reminder'}
             showBackdrop={false}
             disableSwipeToDismiss={currentView !== 'main'}
             style={{
@@ -175,14 +181,18 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 ...(pickerMode === 'overlay' && currentView !== 'main' ? {
                     opacity: 0.5,
                     transform: 'scale(0.98)',
-                    filter: 'blur(1px)',
+                    filter: 'blur(var(--blur-s, 1px))',
                 } : {}),
-                transition: 'opacity 220ms ease-out, transform 220ms ease-out, filter 220ms ease-out',
+                transition: animationsEnabled
+                    ? 'opacity var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing), filter var(--crate-motion-duration-moderate) var(--crate-motion-easing)'
+                    : 'none',
             }}
             contentStyle={{
                 // Lift modal with keyboard (animate margin for smoother sync)
                 ...(keyboardOffset > 0 ? { marginBottom: keyboardOffset } : {}),
-                transition: 'margin-bottom 220ms ease-out',
+                transition: animationsEnabled
+                    ? 'margin-bottom var(--crate-motion-duration-moderate) var(--crate-motion-easing)'
+                    : 'none',
             }}
         >
             <AddReminderModalHeader

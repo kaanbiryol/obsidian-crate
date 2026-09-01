@@ -31,6 +31,9 @@ interface RichTextInputProps {
     onPointerDown?: (e: React.PointerEvent<HTMLDivElement>) => void;
     placeholder?: string;
     ariaLabel?: string;
+    ariaControls?: string;
+    ariaActiveDescendant?: string;
+    ariaExpanded?: boolean;
     inputRef?: React.RefObject<HTMLDivElement | null>;
     className?: string;
     style?: React.CSSProperties;
@@ -99,6 +102,9 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     onPointerDown,
     placeholder,
     ariaLabel,
+    ariaControls,
+    ariaActiveDescendant,
+    ariaExpanded,
     inputRef,
     className,
     style,
@@ -325,6 +331,10 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 aria-label={ariaLabel ?? placeholder}
                 aria-multiline="true"
                 aria-readonly={readOnly}
+                aria-autocomplete={ariaControls ? 'list' : undefined}
+                aria-controls={ariaControls}
+                aria-activedescendant={ariaActiveDescendant}
+                aria-expanded={ariaExpanded}
                 inputMode="text"
                 autoCorrect={autoCorrect}
                 spellCheck={spellCheck}

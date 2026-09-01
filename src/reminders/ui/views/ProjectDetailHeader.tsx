@@ -40,7 +40,14 @@ export const ProjectDetailHeader = memo(function ProjectDetailHeader({
               <span className="project-detail-stat-label">done</span>
             </span>
           </div>
-          <div className="project-detail-progress-bar">
+          <div
+            className="project-detail-progress-bar"
+            role="progressbar"
+            aria-label={`${project} completion`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={header.completionPercentage}
+          >
             <div
               className="project-detail-progress-fill"
               style={{

@@ -52,15 +52,15 @@
       }
 
       &[data-selected] {
-        background: var(--crate-accent);
+        background: var(--crate-picker-primary-bg);
         box-shadow: var(--shadow-s, none);
-        color: var(--crate-on-accent);
+        color: var(--crate-picker-primary-color);
         font-weight: var(--reminder-font-weight-semibold);
       }
 
       &[data-today]:not([data-selected]) {
-        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--crate-accent) 35%, transparent);
-        color: var(--crate-accent);
+        box-shadow: inset 0 0 0 1px var(--crate-picker-selection-border);
+        color: var(--text-accent, var(--crate-accent));
         font-weight: var(--reminder-font-weight-bold);
       }
 

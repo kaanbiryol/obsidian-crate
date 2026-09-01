@@ -1,15 +1,43 @@
 import type { RecurrenceRule } from '../../types';
 import { normalizeRecurrenceRule } from '../../utils/recurrenceRule';
+import { getUiLocale } from '../../utils/uiLocale';
 
 export const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const;
-export const RECURRENCE_DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
-const RECURRENCE_DAY_FULL_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 export const RECURRENCE_FREQUENCY_LABELS: Record<RecurrenceRule['frequency'], string> = {
 	daily: 'Daily',
 	weekly: 'Weekly',
 	monthly: 'Monthly',
 };
+
+function recurrenceWeekdayDates(): Date[] {
+	const sunday = new Date(2021, 7, 1);
+	return Array.from({ length: 7 }, (_, day) => {
+		const date = new Date(sunday);
+		date.setDate(sunday.getDate() + day);
+		return date;
+	});
+}
+
+export function getRecurrenceDayLabels(locale = getUiLocale()): string[] {
+	const formatter = new Intl.DateTimeFormat(locale, { weekday: 'narrow' });
+	return recurrenceWeekdayDates().map((date) => formatter.format(date));
+}
+
+export function getRecurrenceDayNames(
+	locale = getUiLocale(),
+	width: 'long' | 'short' = 'long',
+): string[] {
+	const formatter = new Intl.DateTimeFormat(locale, { weekday: width });
+	return recurrenceWeekdayDates().map((date) => formatter.format(date));
+}
+
+function formatRecurrenceTime(hour: number, minute: number, locale = getUiLocale()): string {
+	return new Intl.DateTimeFormat(locale, {
+		hour: '2-digit',
+		minute: '2-digit',
+	}).format(new Date(2021, 7, 1, hour, minute));
+}
 
 export interface RecurrencePickerState {
 	frequency: RecurrenceRule['frequency'];
@@ -75,8 +103,11 @@ export function recurrenceRuleFromPickerDraft(draft: RecurrencePickerDraft): Rec
 	});
 }
 
-export function summarizeRecurrencePickerState(state: RecurrencePickerState): string {
-	const timeStr = `${state.hour.toString().padStart(2, '0')}:${state.minute.toString().padStart(2, '0')}`;
+export function summarizeRecurrencePickerState(
+	state: RecurrencePickerState,
+	locale = getUiLocale(),
+): string {
+	const timeStr = formatRecurrenceTime(state.hour, state.minute, locale);
 	switch (state.frequency) {
 		case 'daily':
 			if (state.interval > 1) return `Every ${state.interval} days at ${timeStr}`;
@@ -84,7 +115,8 @@ export function summarizeRecurrencePickerState(state: RecurrencePickerState): st
 		case 'weekly': {
 			if (state.daysOfWeek.length === 0) return `Weekly at ${timeStr}`;
 			if (state.daysOfWeek.length === 7) return `Every day at ${timeStr}`;
-			const dayNames = state.daysOfWeek.map((day) => RECURRENCE_DAY_FULL_NAMES[day]).join(', ');
+			const localizedDayNames = getRecurrenceDayNames(locale, 'short');
+			const dayNames = state.daysOfWeek.map((day) => localizedDayNames[day]).join(', ');
 			return `${dayNames} at ${timeStr}`;
 		}
 		case 'monthly':

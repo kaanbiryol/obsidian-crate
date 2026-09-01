@@ -29,6 +29,10 @@ interface BaseModalProps {
     onAnimationComplete?: () => void;
     /** Disable swipe-to-dismiss gesture (default: false for bottom-sheet, true for centered) */
     disableSwipeToDismiss?: boolean;
+    /** Accessible name for the dialog surface. */
+    ariaLabel?: string;
+    /** ID of an element that labels the dialog surface. */
+    ariaLabelledBy?: string;
 }
 
 // Swipe-to-dismiss threshold constants
@@ -61,6 +65,8 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     onExitComplete,
     onAnimationComplete,
     disableSwipeToDismiss,
+    ariaLabel,
+    ariaLabelledBy,
 }) => {
     const isAnimationEnabled = animationConfig.enabled && !useObsidianReducedMotion();
     const isBottomSheet = variant === 'bottom-sheet';
@@ -205,6 +211,11 @@ export const BaseModal: React.FC<BaseModalProps> = ({
                             y: swipeEnabled ? dragY : undefined
                         }}
                         className={`${modalBaseClass} ${className}`}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={ariaLabelledBy ? undefined : ariaLabel}
+                        aria-labelledby={ariaLabelledBy}
+                        tabIndex={-1}
                         // Prevent taps on content from closing the modal
                         onTouchStart={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}

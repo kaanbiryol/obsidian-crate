@@ -81,10 +81,13 @@ describe('file sync progress helpers', () => {
 		updateFileSyncProgress(progress, 2, 5);
 		expect(progress.label.textContent).toBe('2 / 5 files');
 		expect(progress.fill.style.getPropertyValue('width')).toBe('40%');
+		expect(progress.bar.getAttribute('role')).toBe('progressbar');
+		expect(progress.bar.getAttribute('aria-valuenow')).toBe('40');
 
 		hideFileSyncProgress(progress);
 		expect(progress.container.style.display).toBe('none');
 		expect(progress.fill.style.getPropertyValue('width')).toBe('0%');
+		expect(progress.bar.getAttribute('aria-valuenow')).toBe('0');
 		expect(progress.label.textContent).toBe('');
 	});
 });

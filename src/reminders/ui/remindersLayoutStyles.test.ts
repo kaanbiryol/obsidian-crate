@@ -23,6 +23,8 @@ describe('plugin reminder layout styles', () => {
     expect(themeStyles).toContain('--crate-radius-sheet: var(--modal-radius');
     expect(themeStyles).toContain('--crate-elevation-sheet: var(--shadow-l');
     expect(themeStyles).toContain('--crate-selection-bg: var(--nav-item-background-active');
+    expect(themeStyles).toContain('--crate-picker-selection-bg: var(--crate-selection-bg)');
+    expect(themeStyles).toContain('--crate-tab-active-bg: var(--crate-selection-bg)');
     expect(themeStyles).toContain('--crate-icon-button-size: var(--clickable-icon-size');
     expect(themeStyles).toContain('--reminder-font-base: var(--font-ui-medium');
     expect(themeStyles).toContain('--crate-motion-duration-fast: var(--anim-duration-fast');
@@ -30,6 +32,25 @@ describe('plugin reminder layout styles', () => {
     expect(modalStyles).not.toContain('backdrop-filter: blur(8px)');
     expect(editorStyles).toContain('background: var(--crate-selection-bg)');
     expect(editorStyles).toContain('color: var(--crate-selection-color)');
+    expect(editorStyles).toContain('background: var(--crate-picker-selection-bg)');
+    expect(editorStyles).not.toContain('transition: all');
+  });
+
+  it('uses Obsidian checkbox and progress tokens without primary-screen overrides', async () => {
+    const cardStyles = await readFile(
+      new URL('./shared/styles/_reminder-cards.scss', import.meta.url),
+      'utf8',
+    );
+    const primaryStyles = await readFile(
+      new URL('./shared/styles/_primary-screen.scss', import.meta.url),
+      'utf8',
+    );
+
+    expect(cardStyles).toContain('--checkbox-color');
+    expect(cardStyles).toContain('--checkbox-marker-color');
+    expect(cardStyles).toContain('--checkbox-border-color');
+    expect(primaryStyles).not.toContain('--premium-checkbox-size: 18px');
+    expect(primaryStyles).not.toContain('height: 3px');
   });
 
   it('uses Obsidian icon geometry instead of a bundled icon style', async () => {

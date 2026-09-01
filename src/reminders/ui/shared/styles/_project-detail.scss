@@ -165,7 +165,7 @@
 }
 
 .project-detail-progress-bar {
-    width: 48px;
+    width: var(--crate-project-progress-width, 48px);
     height: var(--progress-bar-height, 4px);
     border-radius: var(--progress-bar-radius, var(--radius-s));
     background: var(--background-modifier-border);

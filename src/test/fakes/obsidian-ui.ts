@@ -88,6 +88,10 @@ export class FakeElement {
 		this.attributes.set(name, value);
 	}
 
+	getAttribute(name: string): string | null {
+		return this.attributes.get(name) ?? null;
+	}
+
 	addEventListener(_type: string, _listener: (event: Event) => unknown): void {}
 
 	show(): void {

@@ -11,11 +11,7 @@
     color: var(--text-normal);
     font-family: var(--font-interface);
     font-size: var(--font-ui-medium);
-    // No background for code blocks - they inherit from Obsidian
-    // Modal/fullscreen modes set their own background
-    --reminders-noise: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyB2aWV3Qm94PScwIDAgMTIwIDEyMCc+CjxmaWx0ZXIgaWQ9J24nPgogIDxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjknIG51bU9jdGF2ZXM9JzEnIHN0aXRjaFRpbGVzPSdzdGl0Y2gnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJyBmaWx0ZXI9J3VybCgjbiknIG9wYWNpdHk9JzAuMjUnLz4KPC9zdmc+");
-    --reminders-noise-size: 180px 180px;
-
+    // Modal/fullscreen modes set their own background.
 }
 
 .reminders-view {
@@ -454,7 +450,7 @@
     background: var(--crate-glass-back-bg, var(--background-primary-alt));
     box-shadow: var(--crate-glass-back-shadow, var(--shadow-s));
     color: var(--text-muted);
-    transition: all var(--crate-motion-duration-moderate) var(--crate-motion-easing);
+    transition: background-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), box-shadow var(--crate-motion-duration-moderate) var(--crate-motion-easing), color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 
     &:hover {
         background: var(--crate-glass-back-hover-bg, var(--background-modifier-hover));

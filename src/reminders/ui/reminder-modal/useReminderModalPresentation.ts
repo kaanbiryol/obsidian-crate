@@ -9,8 +9,6 @@ interface UseReminderModalPresentationOptions {
 	richTextInputRef: RefObject<RichTextInputHandle | null>;
 }
 
-const CLOSE_ANIMATION_DURATION = 200;
-
 export function useReminderModalPresentation({
 	focusDelayMs,
 	dueDate,
@@ -27,6 +25,7 @@ export function useReminderModalPresentation({
 	const hasMounted = useRef(false);
 	const prevDueDateRef = useRef(dueDate);
 	const prevProjectRef = useRef(project);
+	const hasClosedRef = useRef(false);
 
 	useEffect(() => {
 		const timer = window.setTimeout(() => {
@@ -60,8 +59,16 @@ export function useReminderModalPresentation({
 		richTextInputRef.current?.blur();
 		setIsClosing(true);
 		setShowModal(false);
-		window.setTimeout(onClose, CLOSE_ANIMATION_DURATION);
-	}, [isClosing, onClose, richTextInputRef]);
+	}, [isClosing, richTextInputRef]);
+
+	const handleModalExitComplete = useCallback(() => {
+		if (!isClosing || hasClosedRef.current) {
+			return;
+		}
+
+		hasClosedRef.current = true;
+		onClose();
+	}, [isClosing, onClose]);
 
 	const transitionToView = useCallback((targetView: 'main' | 'date' | 'project' | 'recurrence') => {
 		setCurrentView(targetView);
@@ -88,6 +95,7 @@ export function useReminderModalPresentation({
 		dueDateChanged: hasMounted.current && prevDueDateRef.current !== dueDate,
 		projectChanged: hasMounted.current && prevProjectRef.current !== project,
 		handleClose,
+		handleModalExitComplete,
 		transitionToView,
 		closePickerModal,
 		handleEntryAnimationComplete,

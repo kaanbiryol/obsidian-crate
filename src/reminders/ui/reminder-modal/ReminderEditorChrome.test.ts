@@ -73,6 +73,8 @@ describe('reminder editor chrome', () => {
         expect(dateMarkup).toContain('This evening');
         expect(dateMarkup).toContain('Next week');
         expect(dateMarkup).toContain('crate-reminder-picker-surface is-date-picker');
+        expect(dateMarkup).toContain('role="dialog"');
+        expect(dateMarkup).toContain('aria-label="Schedule reminder"');
         expect(dateMarkup).toContain('picker-header-action');
         expect(dateMarkup).toContain('>Done<');
         expect(recurrenceMarkup).toContain('Remove repeat');
@@ -83,6 +85,8 @@ describe('reminder editor chrome', () => {
         expect(recurrenceMarkup).toContain('>Reminder time<');
         expect(recurrenceMarkup).toContain('data-icon="minus"');
         expect(recurrenceMarkup).toContain('data-icon="plus"');
+        expect(recurrenceMarkup).toContain('role="tabpanel"');
+        expect(recurrenceMarkup).toContain('tabindex="-1"');
         expect(recurrenceMarkup).toContain('>Done<');
     });
 
@@ -130,6 +134,8 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('data-icon="x"');
         expect(markup).not.toContain('data-icon="chevron-left"');
         expect(markup).toContain('aria-selected="true"');
+        expect(markup).toContain('tabindex="0"');
+        expect(markup).toContain('aria-label="Select project"');
         expect(markup).not.toContain('Select Project');
     });
 
