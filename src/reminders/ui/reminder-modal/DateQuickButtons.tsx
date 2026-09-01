@@ -1,38 +1,59 @@
-import { addDays, isSameDay, nextMonday } from 'date-fns';
+import { isSameDay } from 'date-fns';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
-
-interface QuickDateOption {
-	label: string;
-	getDate: () => Date;
-}
-
-const QUICK_DATES: QuickDateOption[] = [
-	{ label: 'Today', getDate: () => new Date() },
-	{ label: 'Tomorrow', getDate: () => addDays(new Date(), 1) },
-	{ label: 'Next week', getDate: () => nextMonday(new Date()) },
-];
+import {
+	getReminderDateForPreset,
+	REMINDER_DATE_PRESETS,
+	type ReminderDatePreset,
+} from './datePresets';
 
 interface DateQuickButtonsProps {
 	currentDate: Date | null;
-	onSelectDate: (date: Date) => void;
+	hasTime: boolean;
+	onSelectPreset: (preset: ReminderDatePreset) => void;
 }
 
 export function DateQuickButtons({
 	currentDate,
-	onSelectDate,
+	hasTime,
+	onSelectPreset,
 }: DateQuickButtonsProps) {
+	const now = new Date();
+	const dateFormatter = new Intl.DateTimeFormat(undefined, {
+		weekday: 'short',
+		month: 'short',
+		day: 'numeric',
+	});
+	const timeFormatter = new Intl.DateTimeFormat(undefined, {
+		hour: 'numeric',
+		minute: '2-digit',
+	});
+	const weekdayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+
 	return (
-		<div className="flex gap-2 px-4 pb-3">
-			{QUICK_DATES.map(({ label, getDate }) => {
-				const optionDate = getDate();
-				const isActive = currentDate && isSameDay(currentDate, optionDate);
+		<div className="date-quick-options flex gap-2 px-4 pb-3">
+			{REMINDER_DATE_PRESETS.map(({ id, label }) => {
+				const optionDate = getReminderDateForPreset(id, now);
+				const isActive = Boolean(
+					currentDate
+					&& isSameDay(currentDate, optionDate)
+					&& (id === 'evening'
+						? hasTime && currentDate.getHours() === 18 && currentDate.getMinutes() === 0
+						: !hasTime),
+				);
+				const detail = id === 'evening'
+					? `${weekdayFormatter.format(optionDate)}, ${timeFormatter.format(optionDate)}`
+					: dateFormatter.format(optionDate);
 				return (
 					<ShadowDOMNativeButton
-						key={label}
-						onClick={() => onSelectDate(optionDate)}
+						key={id}
+						onClick={() => onSelectPreset(id)}
+						aria-pressed={isActive}
 						className={`date-quick-button flex-1 h-9 rounded-xl active:scale-95${isActive ? ' is-active' : ''}`}
 					>
-						{label}
+						<span className="date-quick-button-copy">
+							<strong>{label}</strong>
+							<small>{detail}</small>
+						</span>
 					</ShadowDOMNativeButton>
 				);
 			})}

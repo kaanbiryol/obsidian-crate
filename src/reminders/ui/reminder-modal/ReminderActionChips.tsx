@@ -1,11 +1,11 @@
 import React from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Calendar as CalendarIcon, Flag, Hash, Repeat } from 'lucide-react';
-import { format } from 'date-fns';
 import { ShadowDOMButton, ShadowDOMMotionButton } from '../../components/ShadowDOMButton';
 import type { RecurrenceRule } from '../../types';
-import { parseReminderDateValue } from '../../utils/reminderDate';
 import { formatRecurrence } from '../../utils/rruleConverter';
+import { formatDueDate } from '../../utils/dateFormatting';
+import { REMINDER_PICKER_COPY } from './pickerCopy';
 
 interface ReminderActionChipsProps {
     dueDate: string | null;
@@ -25,7 +25,6 @@ interface ReminderActionChipsProps {
 
 export function ReminderActionChips({
     dueDate,
-    hasTime,
     project,
     defaultProject,
     priority,
@@ -38,9 +37,7 @@ export function ReminderActionChips({
     onOpenRecurrencePicker,
     onTogglePriority,
 }: ReminderActionChipsProps) {
-    const dueDateDisplay = dueDate
-        ? parseReminderDateValue(dueDate, hasTime)
-        : undefined;
+    const dueDateDisplay = formatDueDate(dueDate ?? undefined);
 
     return (
         <div className="reminder-action-chips flex flex-wrap items-center mt-4 pt-3 pb-3">
@@ -57,7 +54,7 @@ export function ReminderActionChips({
                     transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                 >
                     <CalendarIcon
-                        size={14}
+                        size={16}
                         strokeWidth={dueDate ? 2 : 1.5}
                     />
                 </motion.div>
@@ -68,7 +65,7 @@ export function ReminderActionChips({
                     transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
                     className="whitespace-nowrap"
                 >
-                    {dueDateDisplay ? format(dueDateDisplay, hasTime ? 'MMM d, HH:mm' : 'MMM d') : 'Date'}
+                    {dueDateDisplay ?? REMINDER_PICKER_COPY.editor.date}
                 </motion.span>
             </ShadowDOMButton>
 
@@ -85,7 +82,7 @@ export function ReminderActionChips({
                     transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                 >
                     <Hash
-                        size={14}
+                        size={16}
                         strokeWidth={project !== defaultProject ? 2 : 1.5}
                     />
                 </motion.div>
@@ -96,7 +93,7 @@ export function ReminderActionChips({
                     transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
                     className="whitespace-nowrap"
                 >
-                    {project || defaultProject || 'Inbox'}
+                    {project || defaultProject || REMINDER_PICKER_COPY.editor.defaultProject}
                 </motion.span>
             </ShadowDOMButton>
 
@@ -119,18 +116,19 @@ export function ReminderActionChips({
                     transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
                 >
                     <Flag
-                        size={14}
+                        size={16}
                         strokeWidth={1.5}
                         fill={priority === 1 ? 'currentColor' : 'none'}
                         stroke="currentColor"
                     />
                 </motion.div>
-                <span className="reminder-action-label">Priority</span>
+                <span className="reminder-action-label">{REMINDER_PICKER_COPY.editor.priority}</span>
             </ShadowDOMMotionButton>
 
             <ShadowDOMMotionButton
                 variant="light"
                 onPress={onOpenRecurrencePicker}
+                aria-label={recurrence ? formatRecurrence(recurrence) : REMINDER_PICKER_COPY.editor.recurrenceLabel}
                 layout={hasMounted}
                 animate={hasMounted ? { scale: recurrence ? [1, 1.02, 1] : 1 } : {}}
                 transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
@@ -140,20 +138,9 @@ export function ReminderActionChips({
                     animate={hasMounted ? { rotate: recurrence ? 360 : 0 } : {}}
                     transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                 >
-                    <Repeat size={14} strokeWidth={1.5} />
+                    <Repeat size={16} strokeWidth={1.5} />
                 </motion.div>
-                <AnimatePresence mode="popLayout" initial={false}>
-                    <motion.span
-                        key={recurrence ? 'recurrence-value' : 'recurrence-label'}
-                        initial={hasMounted ? { opacity: 0, width: 0, x: -8 } : false}
-                        animate={{ opacity: 1, width: 'auto', x: 0 }}
-                        exit={{ opacity: 0, width: 0, x: -8 }}
-                        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                        className="reminder-action-label"
-                    >
-                        {recurrence ? formatRecurrence(recurrence) : 'Repeat'}
-                    </motion.span>
-                </AnimatePresence>
+                <span className="reminder-action-label">{REMINDER_PICKER_COPY.editor.repeat}</span>
             </ShadowDOMMotionButton>
         </div>
     );

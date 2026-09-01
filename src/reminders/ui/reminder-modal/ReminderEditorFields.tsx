@@ -6,7 +6,6 @@ import { autosizeTextarea, useAutosizeTextarea } from './useAutosizeTextarea';
 import { useBottomFade } from './useBottomFade';
 
 interface ReminderEditorFieldsProps {
-    isEditing: boolean;
     content: string;
     onContentChange: (value: string) => void;
     description: string;
@@ -19,7 +18,6 @@ interface ReminderEditorFieldsProps {
 }
 
 export function ReminderEditorFields({
-    isEditing,
     content,
     onContentChange,
     description,
@@ -58,7 +56,7 @@ export function ReminderEditorFields({
                 value={content}
                 onChange={onContentChange}
                 onKeyDown={onKeyDown}
-                placeholder={isEditing ? "Edit your reminder..." : "What do you need to remember?"}
+                placeholder="Reminder title"
                 inputRef={textareaRef}
                 autoFocus={allowAutoFocus}
                 knownProjects={projects}
@@ -81,7 +79,7 @@ export function ReminderEditorFields({
                     ref={descriptionRef}
                     value={description}
                     onChange={(event) => onDescriptionChange(event.target.value)}
-                    placeholder="Add description..."
+                    placeholder="Description"
                     rows={1}
                     className={`reminder-description-input ios-scroll focus:outline-none focus:ring-0 focus:shadow-none${descFade ? ' has-bottom-fade' : ''}`}
                     onInput={(event) => autosizeTextarea(event.currentTarget)}

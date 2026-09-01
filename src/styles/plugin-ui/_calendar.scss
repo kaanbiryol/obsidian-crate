@@ -39,7 +39,7 @@
       transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
 
       &:hover {
-        background: var(--background-modifier-hover);
+        background: var(--crate-control-hover-bg);
       }
 
       &:active {
@@ -47,20 +47,20 @@
       }
 
       &:focus-visible {
-        outline: 2px solid var(--interactive-accent);
+        outline: 2px solid var(--crate-focus-ring);
         outline-offset: 2px;
       }
 
       &[data-selected] {
-        background: var(--interactive-accent);
-        box-shadow: 0 0 12px color-mix(in srgb, var(--interactive-accent) 50%, transparent);
-        color: var(--text-on-accent);
+        background: var(--crate-accent);
+        box-shadow: 0 4px 12px color-mix(in srgb, var(--crate-accent) 24%, transparent);
+        color: var(--crate-on-accent);
         font-weight: 600;
       }
 
       &[data-today]:not([data-selected]) {
-        box-shadow: 0 0 8px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
-        color: var(--interactive-accent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--crate-accent) 35%, transparent);
+        color: var(--crate-accent);
         font-weight: 700;
       }
 

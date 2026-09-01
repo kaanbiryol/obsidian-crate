@@ -13,6 +13,7 @@ import {
 	recurrenceRuleFromPickerState,
 	summarizeRecurrencePickerState,
 } from './recurrencePickerShared';
+import { REMINDER_PICKER_COPY } from './pickerCopy';
 
 interface RecurrencePickerModalProps {
     isOpen: boolean;
@@ -94,48 +95,78 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
             isOpen={isOpen}
             onClose={onClose}
             animationConfig={animationConfig}
+            className="crate-reminder-picker-surface is-recurrence-picker"
             {...modalProps}
         >
-            <div className={isDark ? 'dark' : ''}>
+            <div className={`reminder-picker reminder-recurrence-picker${isDark ? ' dark' : ''}`}>
                 <PickerHeader
                     onBack={onClose}
-                    title={summaryText}
+                    closeLabel={REMINDER_PICKER_COPY.repeat.closeLabel}
+                    title={REMINDER_PICKER_COPY.repeat.title}
+                    actionLabel={REMINDER_PICKER_COPY.repeat.done}
+                    onAction={handleDone}
                 />
 
-                <div className="recurrence-picker-content">
-                    <RecurrenceFrequencyTabs
-                        frequency={frequency}
-                        onChange={setFrequency}
-                    />
+                <div className="reminder-picker-scroll">
+                    <div className="recurrence-picker-content">
+                        <div className="picker-current-summary" aria-live="polite">
+                            <span>{REMINDER_PICKER_COPY.repeat.current}</span>
+                            <strong>{summaryText}</strong>
+                        </div>
 
-                    <RecurrenceFrequencyOptions
-                        frequency={frequency}
-                        animationsEnabled={animationsEnabled}
-                        interval={interval}
-                        selectedDays={selectedDays}
-                        dayOfMonth={dayOfMonth}
-                        onIntervalChange={setInterval}
-                        onToggleDay={toggleDay}
-                        onDayOfMonthChange={setDayOfMonth}
-                    />
+                        <section className="picker-section" aria-labelledby="plugin-repeat-frequency-title">
+                            <div className="picker-section-heading">
+                                <h4 id="plugin-repeat-frequency-title">{REMINDER_PICKER_COPY.repeat.frequency}</h4>
+                            </div>
+                            <RecurrenceFrequencyTabs
+                                frequency={frequency}
+                                onChange={setFrequency}
+                            />
+                        </section>
 
-                    {/* Time picker */}
-                    <div className="recurrence-picker-time">
-                        <PickerTimeCard
-                            hour={hour}
-                            minute={minute}
-                            onChange={(h, m) => { setHour(h); setMinute(m); }}
-                        />
+                        <section className="picker-section" aria-labelledby="plugin-repeat-options-title">
+                            <div className="picker-section-heading">
+                                <h4 id="plugin-repeat-options-title">
+                                    {frequency === 'weekly'
+                                        ? REMINDER_PICKER_COPY.repeat.days
+                                        : frequency === 'monthly'
+                                            ? REMINDER_PICKER_COPY.repeat.monthDay
+                                            : REMINDER_PICKER_COPY.repeat.interval}
+                                </h4>
+                            </div>
+                            <RecurrenceFrequencyOptions
+                                frequency={frequency}
+                                animationsEnabled={animationsEnabled}
+                                interval={interval}
+                                selectedDays={selectedDays}
+                                dayOfMonth={dayOfMonth}
+                                onIntervalChange={setInterval}
+                                onToggleDay={toggleDay}
+                                onDayOfMonthChange={setDayOfMonth}
+                            />
+                        </section>
+
+                        <section className="picker-section recurrence-picker-time" aria-labelledby="plugin-repeat-time-title">
+                            <div className="picker-section-heading">
+                                <h4 id="plugin-repeat-time-title">{REMINDER_PICKER_COPY.repeat.time}</h4>
+                            </div>
+                            <PickerTimeCard
+                                label={REMINDER_PICKER_COPY.repeat.reminderTime}
+                                hour={hour}
+                                minute={minute}
+                                onChange={(h, m) => { setHour(h); setMinute(m); }}
+                            />
+                        </section>
                     </div>
-                </div>
 
-                <PickerDoneButton
-                    onClick={handleDone}
-                    removeAction={recurrence ? {
-                        label: 'Remove repeat',
-                        onClick: handleRemoveRepeat,
-                    } : undefined}
-                />
+                    <PickerDoneButton
+                        showPrimary={false}
+                        removeAction={recurrence ? {
+                            label: REMINDER_PICKER_COPY.repeat.remove,
+                            onClick: handleRemoveRepeat,
+                        } : undefined}
+                    />
+                </div>
             </div>
         </BaseModal>
     );

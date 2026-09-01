@@ -47,6 +47,10 @@
     }
   }
 
+  .shadow-dom-button.completed-section-toggle {
+    justify-content: space-between;
+  }
+
   .shadow-dom-button__spinner {
     width: 1em;
     height: 1em;
@@ -60,29 +64,69 @@
     --reminder-#{$name}: #{$color};
   }
 
-  /* Plugin chrome follows the active Obsidian theme. */
-  --crate-surface-bg: var(--background-primary-alt, var(--background-primary));
-  --crate-surface-hover-bg: var(--background-modifier-hover);
-  --crate-surface-active-bg: var(--background-modifier-active-hover, var(--background-modifier-hover));
-  --crate-surface-border: var(--background-modifier-border);
-  --crate-surface-border-hover: var(--background-modifier-border-hover, var(--background-modifier-border));
+  /*
+   * Crate's semantic visual roles mirror the PWA palette. The plugin maps
+   * those roles to the active Obsidian theme instead of copying fixed colors.
+   */
+  --crate-app-bg: var(--background-primary);
+  --crate-panel-bg: var(--background-primary-alt, var(--background-primary));
+  --crate-control-bg: color-mix(in srgb, var(--text-normal) 3.5%, transparent);
+  --crate-control-hover-bg: var(--background-modifier-hover);
+  --crate-control-active-bg: var(--background-modifier-active-hover, var(--background-modifier-hover));
+  --crate-divider: var(--background-modifier-border);
+  --crate-divider-strong: var(--background-modifier-border-hover, var(--background-modifier-border));
   --crate-shadow-color: var(--background-modifier-box-shadow);
+  --crate-focus-ring: var(--interactive-accent);
   --crate-accent: var(--interactive-accent);
   --crate-accent-hover: var(--interactive-accent-hover);
   --crate-danger: var(--text-error);
   --crate-warning: var(--text-warning);
   --crate-success: var(--text-success);
   --crate-on-accent: var(--text-on-accent);
+  --crate-radius-card: 10px;
+  --crate-radius-control: 9px;
+  --crate-radius-sheet: 20px;
+  --crate-elevation-card: inset 0 1px 0 color-mix(in srgb, var(--text-normal) 2.5%, transparent),
+    0 8px 24px color-mix(in srgb, var(--crate-shadow-color) 32%, transparent);
+  --crate-elevation-sheet: 0 24px 70px color-mix(in srgb, var(--crate-shadow-color) 72%, transparent);
 
-  --crate-glass-back-bg: var(--crate-surface-bg);
-  --crate-glass-back-border: var(--crate-surface-border);
-  --crate-glass-back-hover-bg: var(--crate-surface-hover-bg);
-  --crate-glass-back-shadow: 0 2px 8px var(--crate-shadow-color);
+  /* Compatibility aliases for existing shared components. */
+  --crate-surface-bg: var(--crate-panel-bg);
+  --crate-surface-hover-bg: var(--crate-control-hover-bg);
+  --crate-surface-active-bg: var(--crate-control-active-bg);
+  --crate-surface-border: var(--crate-divider);
+  --crate-surface-border-hover: var(--crate-divider-strong);
+
+  /* Shared reminder chrome mirrors the PWA while retaining theme colors. */
+  --crate-reminder-card-bg: color-mix(in srgb, var(--crate-panel-bg) 88%, transparent);
+  --crate-reminder-card-border: var(--crate-divider);
+  --crate-reminder-card-shadow: var(--crate-elevation-card);
+  --crate-reminder-card-hover-bg: var(--crate-control-hover-bg);
+  --crate-reminder-card-hover-border: var(--crate-divider-strong);
+  --crate-reminder-card-hover-shadow: var(--crate-elevation-card);
+  --crate-reminder-card-active-bg: var(--crate-control-active-bg);
+  --crate-reminder-card-active-border: var(--crate-divider-strong);
+  --crate-reminder-card-active-transform: scale(0.99);
+  --crate-project-card-bg: var(--crate-reminder-card-bg);
+  --crate-project-card-border: var(--crate-reminder-card-border);
+  --crate-project-card-shadow: var(--crate-reminder-card-shadow);
+  --crate-project-card-hover-bg: var(--crate-reminder-card-hover-bg);
+  --crate-project-card-hover-border: var(--crate-reminder-card-hover-border);
+  --crate-tab-active-color: var(--crate-accent);
+  --crate-fab-bg: var(--crate-accent);
+  --crate-fab-border: color-mix(in srgb, var(--crate-on-accent) 16%, transparent);
+  --crate-fab-shadow: inset 0 1px 0 color-mix(in srgb, var(--crate-on-accent) 18%, transparent),
+    0 10px 24px color-mix(in srgb, var(--crate-accent) 24%, transparent);
+
+  --crate-glass-back-bg: var(--crate-control-bg);
+  --crate-glass-back-border: var(--crate-divider);
+  --crate-glass-back-hover-bg: var(--crate-control-hover-bg);
+  --crate-glass-back-shadow: none;
   --crate-glass-back-hover-shadow: var(--shadow-s);
-  --crate-glass-surface-bg: var(--crate-surface-bg);
-  --crate-glass-surface-border: var(--crate-surface-border);
-  --crate-glass-surface-hover-bg: var(--crate-surface-hover-bg);
-  --crate-glass-surface-hover-border: var(--crate-surface-border-hover);
+  --crate-glass-surface-bg: var(--crate-control-bg);
+  --crate-glass-surface-border: var(--crate-divider);
+  --crate-glass-surface-hover-bg: var(--crate-control-hover-bg);
+  --crate-glass-surface-hover-border: var(--crate-divider-strong);
   --crate-glass-text-secondary: var(--text-muted);
   --crate-glass-text-tertiary: var(--text-faint);
   --crate-picker-icon-color: var(--text-muted);

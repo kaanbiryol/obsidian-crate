@@ -6,35 +6,23 @@ import {
 } from 'lucide-react';
 import { formatLocalDateKey } from '@/reminders/utils/reminderDate';
 import {
+	getReminderDateForPreset,
+	REMINDER_DATE_PRESETS,
+	type ReminderDatePreset,
+} from '@/reminders/ui/reminder-modal/datePresets';
+import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
+import {
 	applyDateFieldsToDraft,
 	applyDatePresetToDraft,
 	formatModalDueSummary,
 } from '../reminder-state';
 import type { ModalDraft } from '../types';
 
-type DatePreset = 'today' | 'tomorrow' | 'evening' | 'next-week';
-
-const DATE_PRESETS = [
-	{ preset: 'today', label: 'Today' },
-	{ preset: 'tomorrow', label: 'Tomorrow' },
-	{ preset: 'evening', label: 'This evening' },
-	{ preset: 'next-week', label: 'Next week' },
-] as const;
-
-function dateForPreset(preset: DatePreset, now: Date): Date {
-	const date = new Date(now);
-	if (preset === 'tomorrow') date.setDate(date.getDate() + 1);
-	if (preset === 'evening' && date.getHours() >= 18) date.setDate(date.getDate() + 1);
-	if (preset === 'next-week') date.setDate(date.getDate() + 7);
-	date.setHours(preset === 'evening' ? 18 : 0, 0, 0, 0);
-	return date;
-}
-
-function activePresetForDraft(draft: ModalDraft, now: Date): DatePreset | null {
-	for (const { preset } of DATE_PRESETS) {
-		const expected = dateForPreset(preset, now);
+function activePresetForDraft(draft: ModalDraft, now: Date): ReminderDatePreset | null {
+	for (const { id } of REMINDER_DATE_PRESETS) {
+		const expected = getReminderDateForPreset(id, now);
 		if (draft.dueDate !== formatLocalDateKey(expected)) continue;
-		if (preset === 'evening' ? draft.dueTime === '18:00' : !draft.dueTime) return preset;
+		if (id === 'evening' ? draft.dueTime === '18:00' : !draft.dueTime) return id;
 	}
 	return null;
 }
@@ -69,45 +57,45 @@ export function ReminderDatePicker({
 	const hasSchedule = Boolean(draft.dueDate);
 
 	return (
-		<section ref={dialogRef} className="pwa-picker-sheet pwa-date-picker-sheet" role="dialog" aria-modal="true" aria-label="Schedule reminder" tabIndex={-1}>
+		<section ref={dialogRef} className="pwa-picker-sheet pwa-date-picker-sheet" role="dialog" aria-modal="true" aria-label={REMINDER_PICKER_COPY.schedule.dialogLabel} tabIndex={-1}>
 			<div className="pwa-picker-header pwa-schedule-header">
-				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Close schedule" onClick={onClose}>
+				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label={REMINDER_PICKER_COPY.schedule.closeLabel} onClick={onClose}>
 					<X size={18} />
 				</Button>
-				<h3>Schedule</h3>
+				<h3>{REMINDER_PICKER_COPY.schedule.title}</h3>
 				<Button className="pwa-schedule-done" type="button" onClick={onClose}>
-					Done
+					{REMINDER_PICKER_COPY.schedule.done}
 				</Button>
 			</div>
 
 			<div className="pwa-picker-content pwa-schedule-content">
 				{hasSchedule && (
 					<div className="pwa-schedule-current" aria-live="polite">
-						<span>Scheduled</span>
+						<span>{REMINDER_PICKER_COPY.schedule.current}</span>
 						<strong>{formatModalDueSummary(draft)}</strong>
 					</div>
 				)}
 
 				<section className="pwa-schedule-section" aria-labelledby="quick-schedule-title">
 					<div className="pwa-schedule-section__heading">
-						<h4 id="quick-schedule-title">Quick options</h4>
+						<h4 id="quick-schedule-title">{REMINDER_PICKER_COPY.schedule.quickOptions}</h4>
 					</div>
 					<div className="pwa-schedule-preset-grid">
-						{DATE_PRESETS.map(({ preset, label }) => {
-							const presetDate = dateForPreset(preset, now);
-							const detail = preset === 'evening'
+						{REMINDER_DATE_PRESETS.map(({ id, label }) => {
+							const presetDate = getReminderDateForPreset(id, now);
+							const detail = id === 'evening'
 								? `${weekdayFormatter.format(presetDate)}, ${timeFormatter.format(presetDate)}`
 								: dateFormatter.format(presetDate);
-							const selected = activePreset === preset;
+							const selected = activePreset === id;
 							return (
 								<Button
-									key={preset}
+									key={id}
 									className={`pwa-schedule-preset${selected ? ' is-active' : ''}`}
 									type="button"
 									aria-pressed={selected}
 									data-action="apply-date-preset"
-									data-preset={preset}
-									onClick={() => onSelect(applyDatePresetToDraft(draft, projectOptions, preset))}
+									data-preset={id}
+									onClick={() => onSelect(applyDatePresetToDraft(draft, projectOptions, id))}
 								>
 									<span className="pwa-schedule-preset__copy"><strong>{label}</strong><small>{detail}</small></span>
 									{selected && <Check className="pwa-schedule-preset__check" size={15} aria-hidden="true" />}
@@ -119,11 +107,11 @@ export function ReminderDatePicker({
 
 				<section className="pwa-schedule-section" aria-labelledby="custom-schedule-title">
 					<div className="pwa-schedule-section__heading">
-						<h4 id="custom-schedule-title">Custom</h4>
+						<h4 id="custom-schedule-title">{REMINDER_PICKER_COPY.schedule.custom}</h4>
 					</div>
 					<div className="pwa-schedule-fields">
 						<label className="pwa-schedule-field">
-							<span className="pwa-schedule-field__copy"><strong>Date</strong></span>
+							<span className="pwa-schedule-field__copy"><strong>{REMINDER_PICKER_COPY.schedule.date}</strong></span>
 							<input
 								type="date"
 								value={draft.dueDate}
@@ -131,7 +119,7 @@ export function ReminderDatePicker({
 							/>
 						</label>
 						<label className="pwa-schedule-field">
-							<span className="pwa-schedule-field__copy"><strong>Time <small>Optional</small></strong></span>
+							<span className="pwa-schedule-field__copy"><strong>{REMINDER_PICKER_COPY.schedule.time} <small>{REMINDER_PICKER_COPY.schedule.optional}</small></strong></span>
 							<input
 								type="time"
 								value={draft.dueTime}
@@ -149,7 +137,7 @@ export function ReminderDatePicker({
 						data-preset="clear"
 						onClick={() => onSelect(applyDatePresetToDraft(draft, projectOptions, 'clear'))}
 					>
-						<X size={15} /> Remove schedule
+						<X size={15} /> {REMINDER_PICKER_COPY.schedule.remove}
 					</Button>
 				)}
 			</div>

@@ -6,6 +6,10 @@ import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
 import { formatDueDate } from '@/reminders/utils/dateFormatting';
 import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/utils/reminderDate';
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
+import {
+	getReminderDateForPreset,
+	type ReminderDatePreset,
+} from '@/reminders/ui/reminder-modal/datePresets';
 import type { ModalDraft } from './types';
 
 export function formatModalDueSummary(draft: ModalDraft): string {
@@ -163,25 +167,13 @@ export function applyDateFieldsToDraft(
 export function applyDatePresetToDraft(
 	draft: ModalDraft,
 	projectOptions: string[],
-	preset: 'today' | 'tomorrow' | 'evening' | 'next-week' | 'clear',
+	preset: ReminderDatePreset | 'clear',
 ): Partial<ModalDraft> {
 	if (preset === 'clear') {
 		return applyReminderTextUpdate(draft, projectOptions, { dueDateValue: null, hasTime: false, recurrence: null });
 	}
 
-	const next = new Date();
-	if (preset === 'tomorrow') {
-		next.setDate(next.getDate() + 1);
-		next.setHours(0, 0, 0, 0);
-	} else if (preset === 'evening') {
-		if (next.getHours() >= 18) next.setDate(next.getDate() + 1);
-		next.setHours(18, 0, 0, 0);
-	} else if (preset === 'next-week') {
-		next.setDate(next.getDate() + 7);
-		next.setHours(0, 0, 0, 0);
-	} else {
-		next.setHours(0, 0, 0, 0);
-	}
+	const next = getReminderDateForPreset(preset);
 
 	return applyReminderTextUpdate(draft, projectOptions, {
 		dueDateValue: preset === 'evening' ? next.toISOString() : formatLocalDateKey(next),

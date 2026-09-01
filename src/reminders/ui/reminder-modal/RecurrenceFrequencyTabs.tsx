@@ -16,7 +16,7 @@ export function RecurrenceFrequencyTabs({
 	onChange,
 }: RecurrenceFrequencyTabsProps) {
 	return (
-		<div className="recurrence-frequency-tabs">
+		<div className="recurrence-frequency-tabs" role="tablist" aria-label="Repeat frequency">
 			<motion.div
 				layout
 				transition={{ type: 'spring', stiffness: 400, damping: 30 }}
@@ -28,6 +28,8 @@ export function RecurrenceFrequencyTabs({
 					<ShadowDOMNativeButton
 						key={freq}
 						onClick={() => onChange(freq)}
+						role="tab"
+						aria-selected={isSelected}
 						className={`recurrence-frequency-button${isSelected ? ' is-selected' : ''}`}
 					>
 						{RECURRENCE_FREQUENCY_LABELS[freq]}

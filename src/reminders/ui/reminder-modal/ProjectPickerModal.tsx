@@ -7,6 +7,7 @@ import { getProjectColor } from '../../utils/projectColors';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { getPickerModalProps } from '../glassStyles';
 import { PickerHeader } from './PickerHeader';
+import { REMINDER_PICKER_COPY } from './pickerCopy';
 
 interface ProjectPickerModalProps {
     isOpen: boolean;
@@ -110,12 +111,14 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
             isOpen={isOpen}
             onClose={onClose}
             animationConfig={animationConfig}
+            className="crate-reminder-picker-surface is-project-picker"
             {...modalProps}
         >
-            <div className={isDark ? 'dark' : ''}>
+            <div className={`reminder-picker reminder-project-picker${isDark ? ' dark' : ''}`}>
                 <PickerHeader
                     onBack={onClose}
-                    title="Project"
+                    closeLabel={REMINDER_PICKER_COPY.project.closeLabel}
+                    title={REMINDER_PICKER_COPY.project.title}
                 />
 
                 {/* Project List */}
@@ -123,7 +126,7 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
                     ref={scrollContainerRef}
                     className="project-picker-scroll overflow-y-auto"
                 >
-                    <div className="project-picker-list" role="listbox" aria-label="Project selection">
+                    <div className="project-picker-list" role="listbox" aria-label={REMINDER_PICKER_COPY.project.listLabel}>
                         {projects.map((p) => (
                             <ProjectRow
                                 key={p}

@@ -13,6 +13,7 @@ import {
 	recurrenceRuleFromPickerDraft,
 	type RecurrencePickerDraft,
 } from '@/reminders/ui/reminder-modal/recurrencePickerShared';
+import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
 import { formatRecurrence } from '@/reminders/utils/rruleConverter';
 import { applyReminderTextUpdate } from '../reminder-state';
 import type { ModalDraft } from '../types';
@@ -82,26 +83,26 @@ export function ReminderRecurrencePicker({
 	}));
 
 	return (
-		<section ref={dialogRef} className="pwa-picker-sheet pwa-repeat-picker-sheet" role="dialog" aria-modal="true" aria-label="Repeat reminder" tabIndex={-1}>
+		<section ref={dialogRef} className="pwa-picker-sheet pwa-repeat-picker-sheet" role="dialog" aria-modal="true" aria-label={REMINDER_PICKER_COPY.repeat.dialogLabel} tabIndex={-1}>
 			<div className="pwa-picker-header pwa-repeat-header">
-				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label="Close repeat" onClick={onClose}>
+				<Button isIconOnly className="pwa-picker-icon-button" type="button" aria-label={REMINDER_PICKER_COPY.repeat.closeLabel} onClick={onClose}>
 					<X size={18} />
 				</Button>
-				<h3>Repeat</h3>
+				<h3>{REMINDER_PICKER_COPY.repeat.title}</h3>
 				<Button className="pwa-repeat-apply" type="button" onClick={applyRepeat}>
-					Done
+					{REMINDER_PICKER_COPY.repeat.done}
 				</Button>
 			</div>
 
 			<div className="pwa-picker-content pwa-repeat-content">
 				<div className="pwa-repeat-summary" aria-live="polite">
-					<span>Repeats</span>
+					<span>{REMINDER_PICKER_COPY.repeat.current}</span>
 					<strong>{formatRecurrence(liveRule)}</strong>
 				</div>
 
 				<section className="pwa-repeat-section" aria-labelledby="repeat-frequency-title">
 					<div className="pwa-repeat-section__heading">
-						<h4 id="repeat-frequency-title">Frequency</h4>
+						<h4 id="repeat-frequency-title">{REMINDER_PICKER_COPY.repeat.frequency}</h4>
 					</div>
 					<div className="pwa-repeat-frequency-grid" role="tablist" aria-label="Repeat frequency">
 						{RECURRENCE_FREQUENCIES.map((option) => {
@@ -125,10 +126,10 @@ export function ReminderRecurrencePicker({
 
 				<section className="pwa-repeat-section" aria-labelledby="repeat-interval-title">
 					<div className="pwa-repeat-section__heading">
-						<h4 id="repeat-interval-title">Interval</h4>
+						<h4 id="repeat-interval-title">{REMINDER_PICKER_COPY.repeat.interval}</h4>
 					</div>
 					<RepeatStepper
-						label="Every"
+						label={REMINDER_PICKER_COPY.repeat.every}
 						detail={intervalDetail}
 						value={recurrenceDraft.interval}
 						decreaseDisabled={recurrenceDraft.interval <= 1}
@@ -141,7 +142,7 @@ export function ReminderRecurrencePicker({
 				{recurrenceDraft.frequency === 'weekly' && (
 					<section className="pwa-repeat-section" aria-labelledby="repeat-days-title">
 						<div className="pwa-repeat-section__heading">
-							<h4 id="repeat-days-title">Days</h4>
+							<h4 id="repeat-days-title">{REMINDER_PICKER_COPY.repeat.days}</h4>
 						</div>
 						<div className="pwa-repeat-days" aria-label="Repeat days">
 							{RECURRENCE_DAY_LABELS.map((label, index) => {
@@ -172,11 +173,11 @@ export function ReminderRecurrencePicker({
 				{recurrenceDraft.frequency === 'monthly' && (
 					<section className="pwa-repeat-section" aria-labelledby="repeat-month-day-title">
 						<div className="pwa-repeat-section__heading">
-							<h4 id="repeat-month-day-title">Month day</h4>
+							<h4 id="repeat-month-day-title">{REMINDER_PICKER_COPY.repeat.monthDay}</h4>
 						</div>
 						<RepeatStepper
-							label="Day of month"
-							detail="Calendar date"
+							label={REMINDER_PICKER_COPY.repeat.dayOfMonth}
+							detail={REMINDER_PICKER_COPY.repeat.calendarDate}
 							value={getOrdinalSuffix(recurrenceDraft.dayOfMonth)}
 							decreaseDisabled={recurrenceDraft.dayOfMonth <= 1}
 							increaseDisabled={recurrenceDraft.dayOfMonth >= 31}
@@ -188,17 +189,17 @@ export function ReminderRecurrencePicker({
 
 				<section className="pwa-repeat-section" aria-labelledby="repeat-time-title">
 					<div className="pwa-repeat-section__heading">
-						<h4 id="repeat-time-title">Time</h4>
+						<h4 id="repeat-time-title">{REMINDER_PICKER_COPY.repeat.time}</h4>
 					</div>
 					<label className="pwa-repeat-time-card">
-						<span className="pwa-repeat-time-card__copy"><strong>Reminder time</strong></span>
+					<span className="pwa-repeat-time-card__copy"><strong>{REMINDER_PICKER_COPY.repeat.reminderTime}</strong></span>
 						<input type="time" value={recurrenceDraft.time} onChange={(event) => setRecurrenceDraft((current) => ({ ...current, time: event.currentTarget.value }))} />
 					</label>
 				</section>
 
 				{draft.recurrence && (
 					<Button className="pwa-repeat-remove" type="button" onClick={() => onSelect(applyReminderTextUpdate(draft, projectOptions, { recurrence: null, dueDateValue: null, hasTime: false }))}>
-						<X size={15} /> Remove repeat
+						<X size={15} /> {REMINDER_PICKER_COPY.repeat.remove}
 					</Button>
 				)}
 			</div>

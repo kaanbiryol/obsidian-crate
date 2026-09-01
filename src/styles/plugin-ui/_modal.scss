@@ -4,19 +4,67 @@
 }
 
 .base-modal-surface {
-  border: 1px solid var(--crate-surface-border);
-  background: var(--background-primary);
-  box-shadow: var(--shadow-l);
+  overflow: hidden;
+  border: 1px solid var(--crate-divider);
+  background: var(--crate-app-bg);
+  box-shadow: var(--crate-elevation-sheet);
   color: var(--text-normal);
+  font-family: var(--reminder-font-ui);
   will-change: transform, opacity;
 
   &.is-centered {
-    padding-bottom: 16px;
+    padding-bottom: 20px;
   }
 
   &.is-bottom-sheet {
-    padding-bottom: max(env(safe-area-inset-bottom), 16px);
+    max-height: 90dvh;
+    padding-bottom: max(env(safe-area-inset-bottom), 18px);
   }
+}
+
+.crate-reminder-editor-surface,
+.crate-reminder-picker-surface {
+  width: min(620px, calc(100vw - 40px));
+  max-width: 620px;
+  border-radius: var(--crate-radius-sheet);
+}
+
+.crate-reminder-editor-surface.is-bottom-sheet,
+.crate-reminder-picker-surface.is-bottom-sheet {
+  width: 100%;
+  max-width: none;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: var(--crate-radius-sheet) var(--crate-radius-sheet) 0 0;
+}
+
+.crate-reminder-picker-surface {
+  display: flex;
+  width: min(520px, calc(100vw - 40px));
+  max-width: 520px;
+  max-height: min(720px, calc(100dvh - 48px));
+  flex-direction: column;
+}
+
+.crate-reminder-picker-surface.is-project-picker {
+  max-height: min(680px, calc(100dvh - 48px));
+}
+
+.reminder-picker {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.reminder-picker-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--crate-divider) transparent;
 }
 
 .base-modal-drag-region {
@@ -25,18 +73,31 @@
 
 .base-modal-drag-handle {
   width: 40px;
-  height: 5px;
+  height: 4px;
   border-radius: 9999px;
-  background: var(--crate-surface-border);
+  background: var(--text-faint);
+  opacity: 0.45;
 }
 
 .modal-backdrop {
   background: var(--background-modifier-cover);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   pointer-events: none;
   will-change: opacity;
 
   &.is-interactive {
     pointer-events: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .crate-reminder-editor-surface.is-bottom-sheet {
+    min-height: min(326px, 90dvh);
+  }
+
+  .crate-reminder-picker-surface.is-bottom-sheet {
+    min-height: min(520px, 90dvh);
   }
 }
 

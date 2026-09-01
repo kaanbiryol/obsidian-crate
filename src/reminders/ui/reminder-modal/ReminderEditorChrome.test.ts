@@ -21,6 +21,8 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('Edit reminder');
         expect(markup).toContain('Save');
         expect(markup).toContain('aria-label="Save reminder"');
+        expect(markup).toContain('reminder-editor-header');
+        expect(markup).toContain('<h2 class="reminder-header-title">');
         expect(markup).not.toContain('lucide-check');
     });
 
@@ -66,8 +68,22 @@ describe('reminder editor chrome', () => {
         }));
 
         expect(dateMarkup).toContain('Remove schedule');
+        expect(dateMarkup).toContain('>Schedule<');
+        expect(dateMarkup).toContain('Quick options');
+        expect(dateMarkup).toContain('This evening');
         expect(dateMarkup).toContain('Next week');
+        expect(dateMarkup).toContain('crate-reminder-picker-surface is-date-picker');
+        expect(dateMarkup).toContain('picker-header-action');
+        expect(dateMarkup).toContain('>Done<');
         expect(recurrenceMarkup).toContain('Remove repeat');
+        expect(recurrenceMarkup).toContain('crate-reminder-picker-surface is-recurrence-picker');
+        expect(recurrenceMarkup).toContain('>Repeat<');
+        expect(recurrenceMarkup).toContain('>Repeats<');
+        expect(recurrenceMarkup).toContain('>Frequency<');
+        expect(recurrenceMarkup).toContain('>Reminder time<');
+        expect(recurrenceMarkup).toContain('lucide-minus');
+        expect(recurrenceMarkup).toContain('lucide-plus');
+        expect(recurrenceMarkup).toContain('>Done<');
     });
 
     it('keeps removal actions hidden for new date and recurrence selections', () => {
@@ -89,7 +105,7 @@ describe('reminder editor chrome', () => {
             onApply: vi.fn(),
         }));
 
-        expect(dateMarkup).toContain('Select date');
+        expect(dateMarkup).toContain('>Schedule<');
         expect(dateMarkup).not.toContain('Remove schedule');
         expect(recurrenceMarkup).not.toContain('Remove repeat');
     });
@@ -109,6 +125,10 @@ describe('reminder editor chrome', () => {
 
         expect(markup).toContain('>Project<');
         expect(markup).toContain('project-picker-list');
+        expect(markup).toContain('crate-reminder-picker-surface is-project-picker');
+        expect(markup).toContain('aria-label="Close project selection"');
+        expect(markup).toContain('lucide-x');
+        expect(markup).not.toContain('lucide-chevron-left');
         expect(markup).toContain('aria-selected="true"');
         expect(markup).not.toContain('Select Project');
     });

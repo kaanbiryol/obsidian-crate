@@ -65,7 +65,7 @@ export function DateCalendarPanel({
 	const today = new Date();
 
 	return (
-		<div className="px-4 pt-2">
+		<div className="date-calendar-panel px-4 pt-2">
 			<div className="flex items-center justify-center gap-4 mb-3">
 				<ShadowDOMNativeButton
 					onClick={onPrevMonth}

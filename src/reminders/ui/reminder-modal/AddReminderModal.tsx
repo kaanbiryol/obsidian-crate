@@ -166,6 +166,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             onAnimationComplete={handleEntryAnimationComplete}
             animationConfig={animationConfig}
             variant={variant}
+            className="crate-reminder-editor-surface"
             showBackdrop={false}
             disableSwipeToDismiss={currentView !== 'main'}
             style={{
@@ -193,7 +194,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 }}
             />
             <AddReminderModalBody
-                isEditing={isEditing}
                 content={content}
                 onContentChange={setContent}
                 description={description}
