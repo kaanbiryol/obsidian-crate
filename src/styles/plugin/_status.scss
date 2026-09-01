@@ -18,24 +18,25 @@
 }
 
 .crate-status-icon {
-	font-size: 12px;
+	font-size: var(--font-ui-smaller);
 	display: flex;
 	align-items: center;
 }
 
 .crate-status-icon svg {
-	width: 14px;
-	height: 14px;
+	width: var(--icon-s, 14px);
+	height: var(--icon-s, 14px);
+	stroke-width: var(--icon-s-stroke-width, 2px);
 }
 
 .crate-status-text {
-	font-size: 11px;
+	font-size: var(--font-ui-smaller);
 	opacity: 0.8;
 }
 
 /* Syncing animation */
 .crate-status-bar[data-status="syncing"] .crate-status-icon svg {
-	animation: crate-spin 1s linear infinite;
+	animation: crate-spin var(--anim-duration-slow, 1s) linear infinite;
 	color: var(--text-warning);
 }
 
@@ -61,4 +62,8 @@
 .crate-status-bar[data-status="syncing"] .crate-status-text {
 	color: var(--text-warning);
 	opacity: 1;
+}
+
+body.reduce-motion .crate-status-bar[data-status="syncing"] .crate-status-icon svg {
+	animation: none;
 }

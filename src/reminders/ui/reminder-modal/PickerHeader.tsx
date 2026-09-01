@@ -1,7 +1,7 @@
 import React from 'react';
-import { X } from 'lucide-react';
 
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 
 interface PickerHeaderProps {
     onBack: () => void;
@@ -23,9 +23,9 @@ export const PickerHeader: React.FC<PickerHeaderProps> = ({
             <ShadowDOMNativeButton
                 onClick={onBack}
                 aria-label={closeLabel}
-                className="picker-header-button flex items-center justify-center w-11 h-11 rounded-xl active:scale-95"
+                className="picker-header-button"
             >
-                <X size={18} strokeWidth={2} />
+                <ObsidianIcon size="m" id="x" />
             </ShadowDOMNativeButton>
 
             <div className="picker-header-copy flex flex-col items-center">

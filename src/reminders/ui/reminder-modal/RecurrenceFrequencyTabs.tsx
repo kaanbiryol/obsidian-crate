@@ -5,6 +5,7 @@ import {
 	RECURRENCE_FREQUENCIES,
 	RECURRENCE_FREQUENCY_LABELS,
 } from './recurrencePickerShared';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 
 interface RecurrenceFrequencyTabsProps {
 	frequency: RecurrenceRule['frequency'];
@@ -15,11 +16,12 @@ export function RecurrenceFrequencyTabs({
 	frequency,
 	onChange,
 }: RecurrenceFrequencyTabsProps) {
+	const reduceMotion = useObsidianReducedMotion();
 	return (
 		<div className="recurrence-frequency-tabs" role="tablist" aria-label="Repeat frequency">
 			<motion.div
-				layout
-				transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+				layout={!reduceMotion}
+				transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }}
 				className={`recurrence-frequency-indicator is-${frequency}`}
 			/>
 			{RECURRENCE_FREQUENCIES.map((freq) => {

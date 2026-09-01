@@ -1,7 +1,7 @@
 import React from 'react';
-import { Trash2, X } from 'lucide-react';
 
 import { ShadowDOMButton } from '../../components/ShadowDOMButton';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 
 interface AddReminderModalHeaderProps {
     isEditing: boolean;
@@ -29,9 +29,9 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                     variant="light"
                     onPress={onDelete}
                     aria-label="Delete reminder"
-                    className="reminder-header-icon reminder-header-delete min-w-8 w-8 h-8 rounded-full"
+                    className="reminder-header-icon reminder-header-delete"
                 >
-                    <Trash2 size={16} strokeWidth={2} />
+                    <ObsidianIcon size="s" id="trash-2" />
                 </ShadowDOMButton>
             ) : (
                 <ShadowDOMButton
@@ -40,9 +40,9 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                     variant="light"
                     onPress={onClose}
                     aria-label="Close reminder editor"
-                    className="reminder-header-icon reminder-header-close min-w-8 w-8 h-8 rounded-full"
+                    className="reminder-header-icon reminder-header-close"
                 >
-                    <X size={18} strokeWidth={2} />
+                    <ObsidianIcon size="m" id="x" />
                 </ShadowDOMButton>
             )}
         </div>
@@ -62,7 +62,7 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                 onPress={onSubmit}
                 isDisabled={!canSubmit}
                 aria-label={isEditing ? 'Save reminder' : 'Add reminder'}
-                className={`reminder-header-submit h-9 min-w-0 rounded-lg${canSubmit ? ' is-enabled' : ''}`}
+                className={`reminder-header-submit${canSubmit ? ' is-enabled' : ''}`}
                 disableAnimation={!canSubmit}
             >
                 {isEditing ? 'Save' : 'Add'}

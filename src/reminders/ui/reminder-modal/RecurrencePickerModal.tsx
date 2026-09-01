@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
-import { AnimationConfig, prefersReducedMotion } from '../animations';
+import type { AnimationConfig } from '../animations';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { RecurrenceRule } from '../../types';
 import { getPickerModalProps } from '../glassStyles';
 import { PickerHeader } from './PickerHeader';
@@ -34,7 +35,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     recurrence,
     onApply,
 }) => {
-    const animationsEnabled = animationConfig.enabled && !prefersReducedMotion();
+    const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
     const modalProps = getPickerModalProps(pickerMode);
 
     const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>(recurrence?.frequency || 'daily');

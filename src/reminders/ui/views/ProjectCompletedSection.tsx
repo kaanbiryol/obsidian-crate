@@ -1,10 +1,11 @@
 import React, { memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown } from 'lucide-react';
 
 import type { Reminder } from '../../types/reminder';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { CARD_ANIMATION } from '../layoutConstants';
+import { ThemeIcon } from '../../components/theme-icon';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 
 export const ProjectCompletedSection = memo(function ProjectCompletedSection({
   reminders,
@@ -17,6 +18,8 @@ export const ProjectCompletedSection = memo(function ProjectCompletedSection({
   onToggle: () => void;
   renderCard: (reminder: Reminder, index: number) => React.ReactNode;
 }) {
+  const reduceMotion = useObsidianReducedMotion();
+
   if (reminders.length === 0) {
     return null;
   }
@@ -33,16 +36,16 @@ export const ProjectCompletedSection = memo(function ProjectCompletedSection({
 		onClick={onToggle}
 		className="completed-section-toggle w-full justify-between h-10 px-0"
 	  >
-		<span className="text-sm font-semibold reminders-muted-label">
+		<span className="reminders-muted-label">
 		  Completed ({reminders.length})
 		</span>
 		{
 		  <motion.span
             animate={{ rotate: showCompleted ? 180 : 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
             className="inline-flex"
           >
-            <ChevronDown size={18} />
+            <ThemeIcon size="m" id="chevron-down" />
 		  </motion.span>
 		}
 	  </ShadowDOMNativeButton>
@@ -50,8 +53,8 @@ export const ProjectCompletedSection = memo(function ProjectCompletedSection({
       <AnimatePresence mode="popLayout" initial={false}>
         {showCompleted && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{
+            initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+            animate={reduceMotion ? { opacity: 1, height: 'auto' } : {
               opacity: 1,
               height: 'auto',
               transition: {
@@ -59,7 +62,7 @@ export const ProjectCompletedSection = memo(function ProjectCompletedSection({
                 opacity: { duration: 0.2, delay: 0.05 }
               }
             }}
-            exit={{
+            exit={reduceMotion ? undefined : {
               opacity: 0,
               height: 0,
               transition: {
@@ -73,11 +76,11 @@ export const ProjectCompletedSection = memo(function ProjectCompletedSection({
               {reminders.map((reminder, index) => (
                 <motion.div
                   key={reminder.id}
-                  layoutId={`reminder-card-${reminder.id}`}
-                  layout="position"
+                  layoutId={reduceMotion ? undefined : `reminder-card-${reminder.id}`}
+                  layout={reduceMotion ? false : 'position'}
                   initial={false}
                   animate={{ opacity: 1 }}
-                  exit={{ ...CARD_ANIMATION.exit, x: 20 }}
+                  exit={reduceMotion ? undefined : { ...CARD_ANIMATION.exit, x: 20 }}
 				  className="premium-reminder-card-wrapper reminder-render-item"
                   data-reminder-scroll-anchor="true"
                   data-reminder-id={reminder.id}

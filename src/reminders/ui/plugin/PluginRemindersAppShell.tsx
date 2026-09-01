@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 
 import { BottomTabBar } from "@/reminders/components/BottomTabBar";
 import { FloatingActionButton } from "@/reminders/components/FloatingActionButton";
+import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
+import { ThemeIconProvider } from "@/reminders/components/theme-icon";
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ViewHeader } from "@/reminders/components/ViewHeader";
 import type { Reminder } from "@/reminders/types/reminder";
@@ -12,6 +13,7 @@ import {
   type TabId,
 } from "@/reminders/ui/layoutConstants";
 import { RemindersViewPanels } from "@/reminders/ui/RemindersViewPanels";
+import { useObsidianReducedMotion } from "@/reminders/ui/useObsidianReducedMotion";
 import {
   getCurrentHeaderData,
   getReminderCreateProject,
@@ -86,7 +88,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
   const [isTransitioning, setIsTransitioning] = useState(false);
   const transitionTimeoutRef = useRef<number | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useObsidianReducedMotion();
 
   useEffect(() => {
     return () => {
@@ -162,18 +164,18 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
       endContent={
         <motion.span
           animate={{ rotate: showCompleted ? 180 : 0 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
+          transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.2, ease: "easeOut" }}
           className="inline-flex"
         >
-          <ChevronDown size={18} />
+          <ObsidianIcon size="m" id="chevron-down" />
         </motion.span>
       }
     >
-      <span className="text-sm font-semibold reminders-muted-label">
+      <span className="reminders-muted-label">
         Completed ({count})
       </span>
     </ShadowDOMButton>
-  ), []);
+  ), [prefersReducedMotion]);
 
   const currentProject = getReorderProject(viewMode, selectedProject);
 
@@ -200,6 +202,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
         onReorderDragActiveChange={onReorderDragActiveChange}
         colorScheme={isDarkMode ? "dark" : "light"}
         reorderInteraction={reorderInteraction}
+        animationsEnabled={!prefersReducedMotion}
       />
     </AnimatePresence>
   );
@@ -209,7 +212,9 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
     : { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
 
   return (
-    <div
+    <ThemeIconProvider renderer={ObsidianIcon}>
+      <MotionConfig reducedMotion={prefersReducedMotion ? "always" : "user"}>
+        <div
         className={[
           "reminders-view",
           isDarkMode ? "dark" : "light",
@@ -226,10 +231,10 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
           {!(viewMode === "browse" && selectedProject) && (
             <motion.div
               key="view-header"
-              initial={{ opacity: 0, height: 0 }}
+              initial={prefersReducedMotion ? false : { opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{
+              transition={prefersReducedMotion ? { duration: 0 } : {
                 height: { duration: PAGE_TRANSITION_DURATION, ease: "easeOut" },
                 opacity: { duration: 0.18, ease: "easeOut" },
               }}
@@ -281,6 +286,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
             activeTab={viewMode}
             onTabChange={handleViewModeChange}
             className="animated-tab-bar animated-tab-bar-bottom"
+            animateActiveIndicator={!prefersReducedMotion}
           />
         )}
 
@@ -295,6 +301,8 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
         </AnimatePresence>
 
         {children}
-    </div>
+        </div>
+      </MotionConfig>
+    </ThemeIconProvider>
   );
 };

@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { Minus, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { RecurrenceRule } from '../../types';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 import {
 	RECURRENCE_DAY_LABELS,
 	getOrdinalSuffix,
@@ -37,7 +37,7 @@ function StepperButton({
 		<ShadowDOMNativeButton
 			onClick={onClick}
 			aria-label={label}
-			className="recurrence-stepper-button flex items-center justify-center w-9 h-9 rounded-lg active:scale-95"
+			className="recurrence-stepper-button"
 			disabled={disabled}
 		>
 			{children}
@@ -74,7 +74,7 @@ function StepperControl({
 					disabled={decreaseDisabled}
 					onClick={onDecrease}
 				>
-					<Minus size={16} />
+					<ObsidianIcon size="s" id="minus" />
 				</StepperButton>
 				<strong className="recurrence-stepper-value" aria-live="polite">{value}</strong>
 				<StepperButton
@@ -82,7 +82,7 @@ function StepperControl({
 					disabled={increaseDisabled}
 					onClick={onIncrease}
 				>
-					<Plus size={16} />
+					<ObsidianIcon size="s" id="plus" />
 				</StepperButton>
 			</div>
 		</div>

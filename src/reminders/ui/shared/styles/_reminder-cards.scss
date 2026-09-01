@@ -15,14 +15,14 @@
     align-items: flex-start;
     gap: 12px;
     padding: 14px 16px;
-    border-radius: 12px;
+    border-radius: var(--crate-radius-card);
     cursor: pointer;
 
     background: var(--crate-surface-bg);
     border: 1px solid var(--crate-surface-border);
-    box-shadow: 0 2px 8px var(--crate-shadow-color);
+    box-shadow: var(--crate-elevation-card);
 
-    transition: background 200ms ease-out, border-color 200ms ease-out;
+    transition: background var(--crate-motion-duration-moderate) var(--crate-motion-easing), border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .premium-reminder-card:hover .premium-reminder-content {
@@ -61,12 +61,13 @@
                 width: 20px;
                 height: 20px;
                 margin: 0;
-                border-radius: 6px;
+                border-radius: var(--crate-radius-icon);
                 transform: translateY(-50%);
 
                 svg {
-                    width: 12px;
-                    height: 12px;
+					width: var(--icon-xs, 12px);
+					height: var(--icon-xs, 12px);
+					stroke-width: var(--icon-xs-stroke-width, 2px);
                 }
             }
         }
@@ -122,7 +123,7 @@
     place-items: center;
     padding: 0;
     border: none;
-    border-radius: 12px;
+    border-radius: var(--clickable-icon-radius, var(--crate-radius-control));
     color: var(--text-faint);
     background: transparent;
     cursor: grab;
@@ -142,9 +143,9 @@
 
 // Custom checkbox
 .premium-checkbox {
-    --premium-checkbox-size: 20px;
+    --premium-checkbox-size: var(--checkbox-size, 18px);
     --premium-checkbox-offset: -12px;
-    --premium-checkbox-border-width: 2px;
+    --premium-checkbox-border-width: var(--checkbox-border-width, 2px);
 
     flex: 0 0 44px;
     width: 44px;
@@ -175,7 +176,7 @@
     }
 
     &:focus-visible .premium-checkbox-visual {
-        outline: 2px solid var(--interactive-accent);
+        outline: 2px solid var(--crate-focus-ring);
         outline-offset: 2px;
     }
 
@@ -194,7 +195,7 @@
     flex: 0 0 var(--premium-checkbox-size);
     width: var(--premium-checkbox-size);
     height: var(--premium-checkbox-size);
-    border-radius: 50%;
+    border-radius: var(--checkbox-radius, 50%);
     border: var(--premium-checkbox-border-width) solid var(--background-modifier-border-hover);
     display: flex;
     align-items: center;
@@ -202,12 +203,12 @@
     color: inherit;
     background: transparent;
     pointer-events: none;
-    transition: all 200ms ease-out;
+    transition: all var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .premium-checkbox-icon {
     color: var(--text-on-accent);
-    animation: crate-checkmark-pop 200ms ease-out;
+    animation: crate-checkmark-pop var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 @keyframes crate-checkmark-pop {
@@ -244,12 +245,12 @@
 
 .premium-reminder-title {
     display: -webkit-box;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: var(--reminder-font-base);
+    font-weight: var(--reminder-font-weight-medium);
     line-height: 1.5;
     color: var(--text-normal);
     position: relative;
-    transition: color 200ms ease-out;
+    transition: color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
@@ -265,7 +266,7 @@
 }
 
 .premium-reminder-description {
-    font-size: 12px;
+    font-size: var(--reminder-font-xs);
     color: var(--text-muted);
     margin-top: 2px;
     line-height: 1.4;
@@ -281,7 +282,7 @@
     text-decoration: none;
     cursor: pointer;
     border-bottom: 1px solid color-mix(in srgb, var(--interactive-accent) 30%, transparent);
-    transition: border-color 200ms ease-out, color 200ms ease-out;
+    transition: border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 
     &:hover {
         border-bottom-color: color-mix(in srgb, var(--interactive-accent) 70%, transparent);
@@ -305,7 +306,7 @@
     height: 26px;
     margin-top: -3px;
     border: 1px solid color-mix(in srgb, var(--crate-danger) 18%, transparent);
-    border-radius: 7px;
+    border-radius: var(--crate-radius-icon);
     background: color-mix(in srgb, var(--crate-danger) 9%, transparent);
     color: var(--crate-danger);
 
@@ -327,9 +328,9 @@
     align-items: center;
     gap: 4px;
     padding: 4px 10px 4px 8px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 500;
+    border-radius: var(--tag-radius, var(--radius-s));
+    font-size: var(--reminder-font-xxs);
+    font-weight: var(--reminder-font-weight-medium);
     line-height: 1;
 
     // Default glass pill style

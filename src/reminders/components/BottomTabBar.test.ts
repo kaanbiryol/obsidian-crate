@@ -4,14 +4,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { BottomTabBar } from './BottomTabBar';
 
 describe('BottomTabBar', () => {
-    it('keeps icon stroke geometry stable across active states', () => {
+    it('delegates every tab icon to Obsidian at the themed large size', () => {
         const markup = renderToStaticMarkup(React.createElement(BottomTabBar, {
             activeTab: 'inbox',
             onTabChange: vi.fn(),
         }));
 
-        expect(markup).not.toContain('stroke-width="2.5"');
-        expect(markup.match(/stroke-width="2"/g)).toHaveLength(4);
+        expect(markup.match(/data-icon-size="l"/g)).toHaveLength(4);
+        expect(markup).toContain('data-icon="inbox"');
+        expect(markup).toContain('data-icon="calendar"');
+        expect(markup).toContain('data-icon="calendar-range"');
+        expect(markup).toContain('data-icon="folder-open"');
     });
 
     it('renders one persistent slider outside the tab buttons', () => {

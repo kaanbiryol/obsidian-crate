@@ -1,30 +1,39 @@
 .crate-reminders-ui .obsidian-icon {
+  --icon-size: var(--icon-m, 18px);
+  --icon-stroke: var(--icon-m-stroke-width, 1.75px);
+
   display: inline-flex;
   align-items: center;
   justify-content: center;
 
-  &[data-icon-size="xs"] svg {
-    width: 12px;
-    height: 12px;
+  &[data-icon-size="xs"] {
+    --icon-size: var(--icon-xs, 14px);
+    --icon-stroke: var(--icon-xs-stroke-width, 2px);
   }
 
-  &[data-icon-size="s"] svg {
-    width: 16px;
-    height: 16px;
+  &[data-icon-size="s"] {
+    --icon-size: var(--icon-s, 16px);
+    --icon-stroke: var(--icon-s-stroke-width, 2px);
   }
 
-  &[data-icon-size="m"] svg {
-    width: 18px;
-    height: 18px;
+  &[data-icon-size="m"] {
+    --icon-size: var(--icon-m, 18px);
+    --icon-stroke: var(--icon-m-stroke-width, 1.75px);
   }
 
-  &[data-icon-size="l"] svg {
-    width: 24px;
-    height: 24px;
+  &[data-icon-size="l"] {
+    --icon-size: var(--icon-l, 20px);
+    --icon-stroke: var(--icon-l-stroke-width, 1.75px);
   }
 
-  &[data-icon-size="xl"] svg {
-    width: 32px;
-    height: 32px;
+  &[data-icon-size="xl"] {
+    --icon-size: var(--icon-xl, 32px);
+    --icon-stroke: var(--icon-xl-stroke-width, 1.25px);
+  }
+
+  svg {
+    width: var(--icon-size);
+    height: var(--icon-size);
+    stroke-width: var(--icon-stroke);
   }
 }

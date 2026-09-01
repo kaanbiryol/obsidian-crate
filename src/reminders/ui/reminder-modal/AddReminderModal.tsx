@@ -9,6 +9,7 @@ import { AddReminderModalOverlays } from './AddReminderModalOverlays';
 import { useReminderModalActions } from './useReminderModalActions';
 import { useReminderDraft } from './useReminderDraft';
 import { useReminderModalPresentation } from './useReminderModalPresentation';
+import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
 import { AnimationConfig } from '../animations';
 import { Reminder, RecurrenceRule } from '../../types';
 
@@ -126,8 +127,8 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         onError,
     });
 
-    // Detect dark mode for input/dropdown styling
-    const isDark = document.body.classList.contains('theme-dark');
+    // Keep project accents and picker chrome in sync when the active theme changes.
+    const isDark = useObsidianDarkMode();
 
     const handlePriorityToggle = useCallback(() => {
         const nextContent = togglePriority();

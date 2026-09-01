@@ -4,7 +4,7 @@
 
 @mixin styles {
 
-// Premium glassmorphism back button
+// Theme-aware project navigation button
 .premium-back-button {
     display: inline-flex;
     align-items: center;
@@ -14,27 +14,24 @@
     margin: 10px 16px 4px;
     width: fit-content;
     flex-shrink: 0;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: var(--reminder-font-sm);
+    font-weight: var(--reminder-font-weight-medium);
     color: var(--text-muted);
     cursor: pointer;
 
     // Theme-aware surface styling
     background: var(--crate-surface-bg);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
     border: 1px solid var(--crate-surface-border);
-    border-radius: 20px;
+    border-radius: var(--crate-radius-button);
 
-    // Subtle shadow
-    box-shadow: 0 2px 8px var(--crate-shadow-color);
+    box-shadow: var(--crate-elevation-card);
 
     transition:
-        color 200ms ease-out,
-        background-color 200ms ease-out,
-        border-color 200ms ease-out,
-        transform 200ms ease-out,
-        box-shadow 200ms ease-out;
+        color var(--crate-motion-duration-moderate) var(--crate-motion-easing),
+        background-color var(--crate-motion-duration-moderate) var(--crate-motion-easing),
+        border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing),
+        transform var(--crate-motion-duration-moderate) var(--crate-motion-easing),
+        box-shadow var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 
     // Reset button styles
     appearance: none;
@@ -43,9 +40,10 @@
     font-family: inherit;
 
     svg {
-        width: 16px;
-        height: 16px;
-        transition: transform 200ms ease-out;
+		width: var(--icon-s, 16px);
+		height: var(--icon-s, 16px);
+		stroke-width: var(--icon-s-stroke-width, 2px);
+        transition: transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
     }
 
     &:hover {
@@ -61,7 +59,7 @@
 
     &:active {
         transform: scale(0.96);
-        box-shadow: 0 1px 4px var(--crate-shadow-color);
+        box-shadow: var(--crate-elevation-card);
     }
 
     &:focus {
@@ -69,7 +67,7 @@
     }
 
     &:focus-visible {
-        outline: 2px solid var(--interactive-accent);
+        outline: 2px solid var(--crate-focus-ring);
         outline-offset: 2px;
     }
 
@@ -98,9 +96,9 @@
 }
 
 .project-detail-title {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-size: var(--reminder-font-title);
+    font-weight: var(--reminder-font-weight-bold);
+    letter-spacing: normal;
     color: var(--text-normal);
     margin: 0;
     line-height: 1.2;
@@ -112,8 +110,8 @@
 }
 
 .project-detail-percentage {
-    font-size: 14px;
-    font-weight: 600;
+    font-size: var(--reminder-font-base);
+    font-weight: var(--reminder-font-weight-semibold);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
     line-height: 1.2;
@@ -137,8 +135,8 @@
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: var(--reminder-font-xs);
+    font-weight: var(--reminder-font-weight-medium);
     font-variant-numeric: tabular-nums;
     color: var(--text-muted);
 
@@ -149,7 +147,7 @@
 
 .project-detail-stat-label {
     color: var(--text-faint);
-    font-weight: 400;
+    font-weight: var(--reminder-font-weight-normal);
 }
 
 .project-detail-stat-done {
@@ -162,14 +160,14 @@
 
 .project-detail-stat-dot {
     color: var(--text-faint);
-    font-size: 10px;
+    font-size: var(--reminder-font-xxs);
     line-height: 1;
 }
 
 .project-detail-progress-bar {
     width: 48px;
-    height: 4px;
-    border-radius: 2px;
+    height: var(--progress-bar-height, 4px);
+    border-radius: var(--progress-bar-radius, var(--radius-s));
     background: var(--background-modifier-border);
     overflow: hidden;
     flex-shrink: 0;
@@ -177,8 +175,8 @@
 
 .project-detail-progress-fill {
     height: 100%;
-    border-radius: 2px;
-    transition: width 400ms cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: inherit;
+    transition: width var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 // ============================================
@@ -192,12 +190,6 @@
 .premium-divider {
     height: 1px;
     margin: 8px 0 12px;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        var(--background-modifier-border) 20%,
-        var(--background-modifier-border) 80%,
-        transparent 100%
-    );
+    background: var(--background-modifier-border);
 }
 }

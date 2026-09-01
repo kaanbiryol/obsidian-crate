@@ -6,6 +6,7 @@ import { BottomTabBar } from '@/reminders/components/BottomTabBar';
 import { FloatingActionButton } from '@/reminders/components/FloatingActionButton';
 import { ShadowDOMNativeButton } from '@/reminders/components/ShadowDOMNativeButton';
 import { ViewHeader } from '@/reminders/components/ViewHeader';
+import { ThemeIconProvider } from '@/reminders/components/theme-icon';
 import type { Reminder } from '@/reminders/types/reminder';
 import {
 	PAGE_TRANSITION_DURATION,
@@ -20,6 +21,7 @@ import {
 	shouldShowReminderFab,
 	type ViewMode,
 } from '@/reminders/ui/remindersViewModel';
+import { PwaThemeIcon } from './PwaThemeIcon';
 
 export type PwaReminderCardRenderer = (props: {
 	reminder: Reminder;
@@ -186,7 +188,8 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	);
 
 	return (
-		<div
+		<ThemeIconProvider renderer={PwaThemeIcon}>
+		  <div
 				className={[
 					'reminders-view',
 					isDarkMode ? 'dark' : 'light',
@@ -236,6 +239,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 				</AnimatePresence>
 
 				{children}
-		</div>
+		  </div>
+		</ThemeIconProvider>
 	);
 };

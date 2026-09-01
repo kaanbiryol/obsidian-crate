@@ -5,8 +5,10 @@
 
 .base-modal-surface {
   overflow: hidden;
-  border: 1px solid var(--crate-divider);
-  background: var(--crate-app-bg);
+  border: var(--crate-modal-border-width) solid var(--crate-modal-border-color);
+  background: var(--crate-modal-bg);
+  backdrop-filter: var(--crate-modal-backdrop-filter);
+  -webkit-backdrop-filter: var(--crate-modal-backdrop-filter);
   box-shadow: var(--crate-elevation-sheet);
   color: var(--text-normal);
   font-family: var(--reminder-font-ui);
@@ -14,11 +16,13 @@
 
   &.is-centered {
     padding-bottom: 20px;
+    border-radius: var(--crate-radius-sheet);
   }
 
   &.is-bottom-sheet {
     max-height: 90dvh;
     padding-bottom: max(env(safe-area-inset-bottom), 18px);
+    border-radius: var(--crate-radius-sheet) var(--crate-radius-sheet) 0 0;
   }
 }
 
@@ -36,7 +40,7 @@
   border-right: 0;
   border-bottom: 0;
   border-left: 0;
-  border-radius: var(--crate-radius-sheet) var(--crate-radius-sheet) 0 0;
+  border-radius: var(--crate-radius-sheet);
 }
 
 .crate-reminder-picker-surface {
@@ -81,8 +85,6 @@
 
 .modal-backdrop {
   background: var(--background-modifier-cover);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   pointer-events: none;
   will-change: opacity;
 
@@ -99,6 +101,51 @@
   .crate-reminder-picker-surface.is-bottom-sheet {
     min-height: min(520px, 90dvh);
   }
+}
+
+.delete-confirmation-surface {
+  max-width: 360px;
+  padding: var(--size-4-5, 20px);
+  border: var(--crate-modal-border-width) solid var(--crate-modal-border-color);
+  border-radius: var(--crate-radius-sheet);
+  background: var(--crate-modal-bg);
+  backdrop-filter: var(--crate-modal-backdrop-filter);
+  -webkit-backdrop-filter: var(--crate-modal-backdrop-filter);
+  box-shadow: var(--crate-elevation-sheet);
+}
+
+.delete-confirmation-copy {
+  padding-bottom: var(--size-4-5, 20px);
+}
+
+.delete-confirmation-title {
+  margin: 0 0 var(--size-2-2, 8px);
+  color: var(--text-normal);
+  font-size: var(--reminder-font-title);
+  font-weight: var(--reminder-font-weight-semibold);
+  line-height: var(--reminder-line-height-tight);
+  text-align: start;
+}
+
+.delete-confirmation-message {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--reminder-font-base);
+  line-height: var(--reminder-line-height-normal);
+  text-align: start;
+}
+
+.delete-confirmation-actions {
+  display: flex;
+  gap: var(--size-2-2, 8px);
+}
+
+.delete-confirmation-button {
+  min-height: var(--input-height, 40px);
+  flex: 1;
+  border-radius: var(--crate-radius-button);
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-medium);
 }
 
 .delete-confirmation-cancel {

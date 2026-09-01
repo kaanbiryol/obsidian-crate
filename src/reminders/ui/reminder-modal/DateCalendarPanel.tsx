@@ -1,8 +1,8 @@
 import { CalendarDate } from '@internationalized/date';
 import { format } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
@@ -70,12 +70,9 @@ export function DateCalendarPanel({
 				<ShadowDOMNativeButton
 					onClick={onPrevMonth}
 					aria-label="Previous month"
-					className="date-calendar-navigation-button flex items-center justify-center w-9 h-9 rounded-xl active:scale-95"
+					className="date-calendar-navigation-button"
 				>
-					<ChevronLeft
-						size={18}
-						strokeWidth={2}
-					/>
+					<ObsidianIcon size="m" id="chevron-left" />
 				</ShadowDOMNativeButton>
 
 				<span className="date-calendar-title">
@@ -85,12 +82,9 @@ export function DateCalendarPanel({
 				<ShadowDOMNativeButton
 					onClick={onNextMonth}
 					aria-label="Next month"
-					className="date-calendar-navigation-button flex items-center justify-center w-9 h-9 rounded-xl active:scale-95"
+					className="date-calendar-navigation-button"
 				>
-					<ChevronRight
-						size={18}
-						strokeWidth={2}
-					/>
+					<ObsidianIcon size="m" id="chevron-right" />
 				</ShadowDOMNativeButton>
 			</div>
 

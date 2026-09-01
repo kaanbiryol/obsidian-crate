@@ -6,10 +6,13 @@ import { STAGGERED_CARD_ANIMATION } from "@/reminders/ui/layoutConstants";
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { PluginContext } from "@/reminders/ui/reminders-context";
 import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
+import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
+import { useObsidianReducedMotion } from "@/reminders/ui/useObsidianReducedMotion";
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
 import { ReorderableReminderList } from "@/reminders/components/ReorderableReminderList";
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
+import { ThemeIconProvider } from "@/reminders/components/theme-icon";
 import { openReminderCreationModal } from "@/reminders/ui/adapters/modals";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import {
@@ -35,6 +38,9 @@ export const RemindersList: React.FC<Props> = ({
   onToggleShowCompleted,
 }) => {
   const plugin = PluginContext.use();
+  const isDarkMode = useObsidianDarkMode();
+  const reduceMotion = useObsidianReducedMotion();
+  const colorScheme = isDarkMode ? "dark" : "light";
   // Use setting default for upcoming days
   const effectiveDays = plugin.remindersSettings.upcomingDaysDefault ?? 7;
   const [showCompletedState, setShowCompletedState] = useState(showCompleted);
@@ -92,8 +98,9 @@ export const RemindersList: React.FC<Props> = ({
       key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
       reminder={reminder}
       onUpdate={triggerRefresh}
+      colorScheme={colorScheme}
     />
-  ), [triggerRefresh]);
+  ), [colorScheme, triggerRefresh]);
 
   const handleAdd = () => {
     void openReminderCreationModal(
@@ -106,7 +113,8 @@ export const RemindersList: React.FC<Props> = ({
   };
 
   return (
-    <div className="reminders-list-container">
+    <ThemeIconProvider renderer={ObsidianIcon}>
+      <div className="reminders-list-container">
       <div className="reminders-list-header">
         <div className="reminders-count">
           {showToday && <span className="reminders-count-title">Today · </span>}
@@ -165,15 +173,16 @@ export const RemindersList: React.FC<Props> = ({
                   {group.reminders.map((reminder, index) => (
                     <motion.div
                       key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
-                      layout="position"
-                      initial={STAGGERED_CARD_ANIMATION.initial}
-                      animate={STAGGERED_CARD_ANIMATION.animate(index)}
-                      exit={STAGGERED_CARD_ANIMATION.exit}
+                      layout={reduceMotion ? false : 'position'}
+                      initial={reduceMotion ? false : STAGGERED_CARD_ANIMATION.initial}
+                      animate={reduceMotion ? { opacity: 1 } : STAGGERED_CARD_ANIMATION.animate(index)}
+                      exit={reduceMotion ? undefined : STAGGERED_CARD_ANIMATION.exit}
                       className="mb-2"
                     >
                       <ReminderCardWrapper
                         reminder={reminder}
                         onUpdate={triggerRefresh}
+                        colorScheme={colorScheme}
                       />
                     </motion.div>
                   ))}
@@ -197,6 +206,7 @@ export const RemindersList: React.FC<Props> = ({
                   key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
                   reminder={reminder}
                   onUpdate={triggerRefresh}
+                  colorScheme={colorScheme}
                 />
               ))}
             </>
@@ -206,11 +216,13 @@ export const RemindersList: React.FC<Props> = ({
                 key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
                 reminder={reminder}
                 onUpdate={triggerRefresh}
+                colorScheme={colorScheme}
               />
             ))
           )}
         </div>
       )}
-    </div>
+      </div>
+    </ThemeIconProvider>
   );
 };

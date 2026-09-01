@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
-import { useReducedMotion } from 'framer-motion';
-import { Plus } from 'lucide-react';
 import { ShadowDOMNativeMotionButton } from './ShadowDOMNativeMotionButton';
+import { ThemeIcon } from './theme-icon';
+import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 
 interface FloatingActionButtonProps {
   onClick: () => void;
@@ -24,7 +24,7 @@ export const FloatingActionButton = memo(function FloatingActionButton({
   'aria-label': ariaLabel = 'Add reminder',
   'data-action': dataAction,
 }: FloatingActionButtonProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useObsidianReducedMotion();
 
   return (
     <ShadowDOMNativeMotionButton
@@ -41,7 +41,7 @@ export const FloatingActionButton = memo(function FloatingActionButton({
       aria-label={ariaLabel}
       data-action={dataAction}
     >
-      {icon || <Plus size={24} strokeWidth={2.5} />}
+      {icon || <ThemeIcon size="l" id="plus" />}
     </ShadowDOMNativeMotionButton>
   );
 });

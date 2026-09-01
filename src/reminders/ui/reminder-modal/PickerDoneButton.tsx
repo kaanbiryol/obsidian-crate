@@ -1,7 +1,7 @@
 import React from 'react';
-import { X } from 'lucide-react';
 
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 
 interface PickerDoneButtonProps {
     onClick?: () => void;
@@ -24,16 +24,16 @@ export const PickerDoneButton: React.FC<PickerDoneButtonProps> = ({
             {removeAction && (
                 <ShadowDOMNativeButton
                     onClick={removeAction.onClick}
-                    className="picker-remove-button w-full h-9 rounded-xl active:scale-[0.98]"
+                    className="picker-remove-button"
                 >
-                    <X size={15} aria-hidden="true" />
+                    <ObsidianIcon size="s" id="x" aria-hidden="true" />
                     {removeAction.label}
                 </ShadowDOMNativeButton>
             )}
             {showPrimary && onClick && (
                 <ShadowDOMNativeButton
                     onClick={onClick}
-                    className="picker-done-button w-full h-12 rounded-2xl active:scale-[0.98]"
+                    className="picker-done-button"
                 >
                     {label}
                 </ShadowDOMNativeButton>

@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
-import { Circle, CheckCircle2 } from 'lucide-react';
 
 import type { ProjectDetailHeaderViewModel } from './viewModels';
+import { ThemeIcon } from '../../components/theme-icon';
 
 export const ProjectDetailHeader = memo(function ProjectDetailHeader({
   project,
@@ -29,13 +29,13 @@ export const ProjectDetailHeader = memo(function ProjectDetailHeader({
         <div className="project-detail-header-bottom">
           <div className="project-detail-stats-text">
             <span className="project-detail-stat">
-              <Circle size={10} strokeWidth={2.5} />
+              <ThemeIcon size="xs" id="circle" />
               {header.activeCount}
               <span className="project-detail-stat-label">active</span>
             </span>
             <span className="project-detail-stat-dot">&middot;</span>
             <span className="project-detail-stat project-detail-stat-done">
-              <CheckCircle2 size={10} strokeWidth={2.5} />
+              <ThemeIcon size="xs" id="circle-check" />
               {header.completedCount}
               <span className="project-detail-stat-label">done</span>
             </span>
@@ -46,9 +46,6 @@ export const ProjectDetailHeader = memo(function ProjectDetailHeader({
               style={{
                 width: `${header.completionPercentage}%`,
                 backgroundColor: progressColor,
-                boxShadow: header.completionPercentage > 0
-                  ? `0 0 4px color-mix(in srgb, ${progressColor} 30%, transparent)`
-                  : 'none',
               }}
             />
           </div>

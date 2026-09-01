@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
 import { LayoutGroup, motion } from 'framer-motion';
-import { ChevronLeft, FolderOpen } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
@@ -13,6 +12,7 @@ import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
+import { ThemeIcon } from '../../components/theme-icon';
 
 
 export interface ProjectDetailViewProps {
@@ -108,7 +108,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
           onClick={onBack}
           className="premium-back-button"
         >
-          <ChevronLeft size={14} />
+          <ThemeIcon size="xs" id="chevron-left" />
           <span>Projects</span>
         </ShadowDOMNativeButton>
       </div>
@@ -119,7 +119,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
       {!hasContent ? (
         <div className="flex-1 flex items-center justify-center">
           <EmptyState
-            icon={FolderOpen}
+            icon="folder-open"
             title="No reminders"
             description="Add a reminder to this project"
             iconColor="primary"

@@ -31,6 +31,11 @@
     &:focus {
         outline: none;
     }
+
+    &:focus-visible .premium-project-content {
+        outline: 2px solid var(--crate-focus-ring);
+        outline-offset: 2px;
+    }
 }
 
 .premium-project-content {
@@ -40,13 +45,13 @@
     justify-content: space-between;
     gap: 12px;
     padding: 14px 16px;
-    border-radius: 14px;
+    border-radius: var(--crate-radius-card);
 
     background: var(--crate-surface-bg);
     border: 1px solid var(--crate-surface-border);
-    box-shadow: 0 2px 8px var(--crate-shadow-color);
+    box-shadow: var(--crate-elevation-card);
 
-    transition: background 200ms ease-out, border-color 200ms ease-out, transform 200ms ease-out;
+    transition: background var(--crate-motion-duration-moderate) var(--crate-motion-easing), border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .premium-project-card:hover .premium-project-content {
@@ -74,11 +79,11 @@
     width: 4px;
     height: 32px;
     border-radius: 2px;
-    transition: box-shadow 300ms ease-out;
+    transition: box-shadow var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .premium-project-card:hover .premium-project-accent {
-    box-shadow: var(--crate-project-accent-hover-shadow, 0 0 16px currentColor);
+    box-shadow: none;
 }
 
 .premium-project-info {
@@ -90,8 +95,8 @@
 }
 
 .premium-project-name {
-    font-size: 15px;
-    font-weight: 600;
+    font-size: var(--reminder-font-base);
+    font-weight: var(--reminder-font-weight-semibold);
     color: var(--text-normal);
     line-height: 1.3;
     white-space: nowrap;
@@ -109,8 +114,8 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: var(--reminder-font-xs);
+    font-weight: var(--reminder-font-weight-medium);
     color: var(--text-muted);
 
     svg {
@@ -127,7 +132,7 @@
 }
 
 .premium-project-stat-empty {
-    font-size: 12px;
+    font-size: var(--reminder-font-xs);
     color: var(--text-faint);
     font-style: italic;
 }
@@ -136,8 +141,8 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: var(--reminder-font-xs);
+    font-weight: var(--reminder-font-weight-medium);
     color: var(--crate-success);
 }
 
@@ -158,21 +163,21 @@
 
 .premium-mini-progress {
     width: 48px;
-    height: 4px;
-    border-radius: 2px;
+    height: var(--progress-bar-height, 4px);
+    border-radius: var(--progress-bar-radius, var(--radius-s));
     background: var(--background-modifier-border);
     overflow: hidden;
 }
 
 .premium-mini-progress-fill {
     height: 100%;
-    border-radius: 2px;
-    transition: width 400ms cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: inherit;
+    transition: width var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .premium-project-percentage {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: var(--reminder-font-xxs);
+    font-weight: var(--reminder-font-weight-semibold);
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
 }
@@ -180,7 +185,7 @@
 .premium-project-chevron {
     color: var(--text-faint);
     opacity: 0.4;
-    transition: opacity 200ms ease-out, transform 200ms ease-out;
+    transition: opacity var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .premium-project-card:hover .premium-project-chevron {

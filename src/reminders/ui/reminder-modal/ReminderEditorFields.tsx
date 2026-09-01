@@ -49,7 +49,7 @@ export function ReminderEditorFields({
     return (
         <div
             ref={containerRef}
-            className="reminder-editor-fields relative rounded-lg"
+            className="reminder-editor-fields relative"
         >
             <RichTextInput
                 ref={richTextInputRef}
@@ -62,7 +62,7 @@ export function ReminderEditorFields({
                 knownProjects={projects}
                 onAutocompleteQuery={handleAutocompleteQuery}
                 onAutocompleteKeyDown={autocomplete.handleKeyDown}
-                className={`reminder-title-input w-full px-0 py-0 bg-transparent border-none outline-none resize-none min-h-[32px] ios-scroll${titleFade ? ' has-bottom-fade' : ''}`}
+                className={`reminder-title-input w-full min-h-[32px] ios-scroll${titleFade ? ' has-bottom-fade' : ''}`}
             />
             {autocomplete.isOpen && (
                 <ProjectAutocompleteDropdown
@@ -81,7 +81,7 @@ export function ReminderEditorFields({
                     onChange={(event) => onDescriptionChange(event.target.value)}
                     placeholder="Description"
                     rows={1}
-                    className={`reminder-description-input ios-scroll focus:outline-none focus:ring-0 focus:shadow-none${descFade ? ' has-bottom-fade' : ''}`}
+                    className={`reminder-description-input ios-scroll${descFade ? ' has-bottom-fade' : ''}`}
                     onInput={(event) => autosizeTextarea(event.currentTarget)}
                 />
             </div>

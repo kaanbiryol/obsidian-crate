@@ -1,6 +1,5 @@
 import React, { useMemo, memo } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { CalendarRange } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
@@ -11,6 +10,7 @@ import { buildUpcomingViewModel } from './viewModels';
 import { STAGGERED_CARD_ANIMATION } from '../layoutConstants';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 
 export interface UpcomingViewProps {
   reminders: Reminder[];
@@ -39,11 +39,12 @@ export const UpcomingView = memo(function UpcomingView({
   className = '',
   colorScheme = 'dark',
 }: UpcomingViewProps) {
+  const reduceMotion = useObsidianReducedMotion();
   const scrollRef = useStableReminderScroll();
   const { upcomingReminders, dateGroups } = useMemo(() => {
     return buildUpcomingViewModel(reminders, days);
   }, [reminders, days]);
-	const enableListAnimations = animationConfig.enabled && upcomingReminders.length <= 80;
+	const enableListAnimations = animationConfig.enabled && !reduceMotion && upcomingReminders.length <= 80;
 
   // Default card renderer
   const defaultRenderCard = (reminder: Reminder, index: number) => (
@@ -62,7 +63,7 @@ export const UpcomingView = memo(function UpcomingView({
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
         <EmptyState
-          icon={CalendarRange}
+          icon="calendar-range"
           title="No upcoming reminders"
           description="Schedule something for the future"
           iconColor="secondary"

@@ -1,5 +1,3 @@
-@use '../colors';
-
 @mixin styles {
 @tailwind utilities;
 
@@ -18,6 +16,11 @@
   :where(button, input, textarea, select) {
     color: inherit;
     font: inherit;
+  }
+
+  :where(button, input, textarea, select, [role="button"]):focus-visible {
+    outline: 2px solid var(--crate-focus-ring);
+    outline-offset: 2px;
   }
 
   :where(button) {
@@ -57,38 +60,48 @@
     border: 2px solid currentColor;
     border-right-color: transparent;
     border-radius: 9999px;
-    animation: crate-spin 0.8s linear infinite;
-  }
-
-  @each $name, $color in colors.$reminder-colors {
-    --reminder-#{$name}: #{$color};
+    animation: crate-spin var(--anim-duration-slow, 800ms) linear infinite;
   }
 
   /*
-   * Crate's semantic visual roles mirror the PWA palette. The plugin maps
-   * those roles to the active Obsidian theme instead of copying fixed colors.
+   * Keep Crate's semantic roles, but source their presentation from Obsidian's
+   * component tokens so community themes can control more than the palette.
    */
   --crate-app-bg: var(--background-primary);
+  --crate-modal-bg: var(--modal-background, var(--background-primary));
   --crate-panel-bg: var(--background-primary-alt, var(--background-primary));
-  --crate-control-bg: color-mix(in srgb, var(--text-normal) 3.5%, transparent);
+  --crate-control-bg: var(
+    --background-modifier-form-field,
+    var(--interactive-normal, var(--background-primary-alt, var(--background-primary)))
+  );
   --crate-control-hover-bg: var(--background-modifier-hover);
   --crate-control-active-bg: var(--background-modifier-active-hover, var(--background-modifier-hover));
   --crate-divider: var(--background-modifier-border);
   --crate-divider-strong: var(--background-modifier-border-hover, var(--background-modifier-border));
   --crate-shadow-color: var(--background-modifier-box-shadow);
-  --crate-focus-ring: var(--interactive-accent);
+  --crate-focus-ring: var(--background-modifier-border-focus, var(--interactive-accent));
   --crate-accent: var(--interactive-accent);
   --crate-accent-hover: var(--interactive-accent-hover);
   --crate-danger: var(--text-error);
   --crate-warning: var(--text-warning);
   --crate-success: var(--text-success);
   --crate-on-accent: var(--text-on-accent);
-  --crate-radius-card: 10px;
-  --crate-radius-control: 9px;
-  --crate-radius-sheet: 20px;
-  --crate-elevation-card: inset 0 1px 0 color-mix(in srgb, var(--text-normal) 2.5%, transparent),
-    0 8px 24px color-mix(in srgb, var(--crate-shadow-color) 32%, transparent);
-  --crate-elevation-sheet: 0 24px 70px color-mix(in srgb, var(--crate-shadow-color) 72%, transparent);
+  --crate-radius-card: var(--radius-m, 10px);
+  --crate-radius-control: var(--input-radius, var(--radius-s, 4px));
+  --crate-radius-button: var(--button-radius, var(--crate-radius-control));
+  --crate-radius-sheet: var(--modal-radius, var(--radius-l, 12px));
+  --crate-radius-icon: var(--clickable-icon-radius, var(--crate-radius-control));
+  --crate-icon-button-size: var(--clickable-icon-size, var(--input-height, 36px));
+  --crate-elevation-card: var(--shadow-s, none);
+  --crate-elevation-sheet: var(--shadow-l, none);
+  --crate-modal-border-width: var(--modal-border-width, 1px);
+  --crate-modal-border-color: var(--modal-border-color, var(--crate-divider));
+  --crate-modal-backdrop-filter: var(--blur-l, none);
+
+  /* Selection roles follow themed navigation states instead of tinting Crate's accent. */
+  --crate-selection-bg: var(--nav-item-background-active, var(--crate-control-active-bg));
+  --crate-selection-color: var(--nav-item-color-active, var(--text-normal));
+  --crate-selection-weight: var(--nav-item-weight-active, var(--font-semibold));
 
   /* Compatibility aliases for existing shared components. */
   --crate-surface-bg: var(--crate-panel-bg);
@@ -98,7 +111,7 @@
   --crate-surface-border-hover: var(--crate-divider-strong);
 
   /* Shared reminder chrome mirrors the PWA while retaining theme colors. */
-  --crate-reminder-card-bg: color-mix(in srgb, var(--crate-panel-bg) 88%, transparent);
+  --crate-reminder-card-bg: var(--crate-panel-bg);
   --crate-reminder-card-border: var(--crate-divider);
   --crate-reminder-card-shadow: var(--crate-elevation-card);
   --crate-reminder-card-hover-bg: var(--crate-control-hover-bg);
@@ -112,11 +125,14 @@
   --crate-project-card-shadow: var(--crate-reminder-card-shadow);
   --crate-project-card-hover-bg: var(--crate-reminder-card-hover-bg);
   --crate-project-card-hover-border: var(--crate-reminder-card-hover-border);
-  --crate-tab-active-color: var(--crate-accent);
+  --crate-tab-active-bg: var(
+    --nav-item-background-active,
+    color-mix(in srgb, var(--crate-accent) 10%, transparent)
+  );
+  --crate-tab-active-color: var(--nav-item-color-active, var(--crate-accent));
   --crate-fab-bg: var(--crate-accent);
-  --crate-fab-border: color-mix(in srgb, var(--crate-on-accent) 16%, transparent);
-  --crate-fab-shadow: inset 0 1px 0 color-mix(in srgb, var(--crate-on-accent) 18%, transparent),
-    0 10px 24px color-mix(in srgb, var(--crate-accent) 24%, transparent);
+  --crate-fab-border: var(--background-modifier-border);
+  --crate-fab-shadow: var(--shadow-s, none);
 
   --crate-glass-back-bg: var(--crate-control-bg);
   --crate-glass-back-border: var(--crate-divider);
@@ -130,6 +146,9 @@
   --crate-glass-text-secondary: var(--text-muted);
   --crate-glass-text-tertiary: var(--text-faint);
   --crate-picker-icon-color: var(--text-muted);
+  --crate-motion-duration-fast: var(--anim-duration-fast, 160ms);
+  --crate-motion-duration-moderate: var(--anim-duration-moderate, 250ms);
+  --crate-motion-easing: var(--anim-motion-baseline, ease);
 
   /* Reminder semantics also inherit the theme instead of HeroUI's palette. */
   --reminder-p1-border: var(--crate-danger);
@@ -163,23 +182,37 @@
    * Maps to Obsidian's CSS variables for consistent theming
    */
   /* Font sizes - mapped to Obsidian variables */
-  --reminder-font-base: var(--font-text-size);
-  --reminder-font-sm: var(--font-small);
-  --reminder-font-xs: var(--font-smaller);
-  --reminder-font-xxs: var(--font-smallest);
+  --reminder-font-base: var(--font-ui-medium, var(--font-text-size));
+  --reminder-font-sm: var(--font-ui-small, var(--font-small));
+  --reminder-font-xs: var(--font-ui-smaller, var(--font-smaller));
+  --reminder-font-xxs: var(--font-smallest, var(--font-ui-smaller));
+  --reminder-font-title: var(--font-ui-large, 20px);
 
   /* Font families */
   --reminder-font-ui: var(--font-interface);
   --reminder-font-text: var(--font-text);
 
   /* Font weights */
-  --reminder-font-weight-normal: 400;
-  --reminder-font-weight-medium: 500;
-  --reminder-font-weight-semibold: var(--font-semibold);
+  --reminder-font-weight-normal: var(--font-normal, 400);
+  --reminder-font-weight-medium: var(--font-medium, 500);
+  --reminder-font-weight-semibold: var(--font-semibold, 600);
+  --reminder-font-weight-bold: var(--font-bold, 700);
 
   /* Line heights */
-  --reminder-line-height-tight: 1.2;
-  --reminder-line-height-normal: 1.4;
-  --reminder-line-height-relaxed: 1.6;
+  --reminder-line-height-tight: var(--line-height-tight, 1.2);
+  --reminder-line-height-normal: var(--line-height-normal, 1.4);
+  --reminder-line-height-relaxed: var(--line-height-normal, 1.6);
 
+  .reminders-view.is-modal:not(.is-fullscreen) {
+    --crate-app-bg: var(--crate-modal-bg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    --crate-motion-duration-fast: 0ms;
+    --crate-motion-duration-moderate: 0ms;
+
+    .shadow-dom-button__spinner {
+      animation: none;
+    }
+  }
 }

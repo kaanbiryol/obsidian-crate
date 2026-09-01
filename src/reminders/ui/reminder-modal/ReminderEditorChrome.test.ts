@@ -23,7 +23,7 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('aria-label="Save reminder"');
         expect(markup).toContain('reminder-editor-header');
         expect(markup).toContain('<h2 class="reminder-header-title">');
-        expect(markup).not.toContain('lucide-check');
+        expect(markup).not.toContain('data-icon="check"');
     });
 
     it('labels unset priority and recurrence actions', () => {
@@ -81,8 +81,8 @@ describe('reminder editor chrome', () => {
         expect(recurrenceMarkup).toContain('>Repeats<');
         expect(recurrenceMarkup).toContain('>Frequency<');
         expect(recurrenceMarkup).toContain('>Reminder time<');
-        expect(recurrenceMarkup).toContain('lucide-minus');
-        expect(recurrenceMarkup).toContain('lucide-plus');
+        expect(recurrenceMarkup).toContain('data-icon="minus"');
+        expect(recurrenceMarkup).toContain('data-icon="plus"');
         expect(recurrenceMarkup).toContain('>Done<');
     });
 
@@ -127,8 +127,8 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('project-picker-list');
         expect(markup).toContain('crate-reminder-picker-surface is-project-picker');
         expect(markup).toContain('aria-label="Close project selection"');
-        expect(markup).toContain('lucide-x');
-        expect(markup).not.toContain('lucide-chevron-left');
+        expect(markup).toContain('data-icon="x"');
+        expect(markup).not.toContain('data-icon="chevron-left"');
         expect(markup).toContain('aria-selected="true"');
         expect(markup).not.toContain('Select Project');
     });
@@ -145,6 +145,6 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('Delete reminder?');
         expect(markup).toContain('Delete &quot;Buy milk&quot;? This can&#x27;t be undone.');
         expect(markup).not.toContain('delete-confirmation-close');
-        expect(markup).not.toContain('lucide-triangle-alert');
+        expect(markup).not.toContain('data-icon="triangle-alert"');
     });
 });

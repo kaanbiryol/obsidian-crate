@@ -1,9 +1,9 @@
 import React, { memo } from 'react';
-import { ChevronRight, Circle, CheckCircle2, Sparkles } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { ShadowDOMNativeMotionButton } from '../../components/ShadowDOMNativeMotionButton';
 import type { BrowseProjectCardViewModel } from './viewModels';
+import { ThemeIcon } from '../../components/theme-icon';
 
 const MiniProgressBar = memo(function MiniProgressBar({
   percentage,
@@ -23,9 +23,6 @@ const MiniProgressBar = memo(function MiniProgressBar({
         style={{
           width: `${percentage}%`,
           backgroundColor: progressColor,
-          boxShadow: percentage > 0
-            ? `0 0 4px color-mix(in srgb, ${progressColor} 30%, transparent)`
-            : 'none',
         }}
       />
     </div>
@@ -52,7 +49,7 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
       initial={false}
       animate={{ opacity: 1 }}
       transition={{ duration: 0 }}
-      whileTap={{ scale: 0.98 }}
+      whileTap={animationConfig.enabled ? { scale: 0.98 } : undefined}
     >
       <div className="premium-project-content">
         <div className="premium-project-left">
@@ -61,7 +58,6 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
               className="premium-project-accent"
               style={{
                 backgroundColor: accentColor,
-                boxShadow: `0 0 6px ${accentColor}40`,
               }}
             />
           </div>
@@ -74,18 +70,18 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
                 <span className="premium-project-stat-empty">No reminders</span>
               ) : isComplete ? (
                 <span className="premium-project-stat-complete">
-                  <Sparkles size={12} />
+                  <ThemeIcon size="xs" id="sparkles" />
                   All done
                 </span>
               ) : (
                 <>
                   <span className="premium-project-stat">
-                    <Circle size={10} strokeWidth={2.5} />
+                    <ThemeIcon size="xs" id="circle" />
                     {stats.active}
                   </span>
                   {stats.completed > 0 && (
                     <span className="premium-project-stat premium-project-stat-done">
-                      <CheckCircle2 size={10} strokeWidth={2.5} />
+                      <ThemeIcon size="xs" id="circle-check" />
                       {stats.completed}
                     </span>
                   )}
@@ -109,10 +105,10 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
             </div>
           )}
 
-          <ChevronRight
-            size={16}
+          <ThemeIcon
+            size="s"
+            id="chevron-right"
             className="premium-project-chevron"
-            strokeWidth={2}
           />
         </div>
       </div>

@@ -1,6 +1,5 @@
 import React, { useMemo, useState, memo } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { Calendar } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
@@ -11,6 +10,7 @@ import { buildTodayViewModel } from './viewModels';
 import { CARD_ANIMATION } from '../layoutConstants';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 
 export interface TodayViewProps {
   reminders: Reminder[];
@@ -36,10 +36,11 @@ export const TodayView = memo(function TodayView({
   className = '',
   colorScheme = 'dark',
 }: TodayViewProps) {
+  const reduceMotion = useObsidianReducedMotion();
   const [showCompleted, setShowCompleted] = useState(false);
   const scrollRef = useStableReminderScroll();
   const { active, completed } = useMemo(() => buildTodayViewModel(reminders), [reminders]);
-	const enableListAnimations = animationConfig.enabled && active.length <= 80;
+	const enableListAnimations = animationConfig.enabled && !reduceMotion && active.length <= 80;
   const hasContent = active.length > 0 || completed.length > 0;
 
   // Default card renderer
@@ -60,7 +61,7 @@ export const TodayView = memo(function TodayView({
       <div className={`flex flex-col h-full relative ${className}`}>
         <div className="flex-1 flex items-center justify-center">
           <EmptyState
-            icon={Calendar}
+            icon="calendar"
             title="Nothing due today"
             description="Enjoy your free time!"
             iconColor="warning"
