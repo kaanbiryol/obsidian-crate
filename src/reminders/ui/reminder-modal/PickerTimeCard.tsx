@@ -1,4 +1,4 @@
-import { Clock } from 'lucide-react';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 
 interface PickerTimeCardProps {
 	label: string;
@@ -13,11 +13,7 @@ export function PickerTimeCard({ label, optionalLabel, hour, minute, onChange }:
 
 	return (
 		<label className="picker-time-card">
-			<Clock
-				size={16}
-				strokeWidth={1.75}
-				className="picker-time-icon"
-			/>
+			<ObsidianIcon size="s" id="clock" className="picker-time-icon" />
 			<span className="picker-time-label">
 				{label}
 				{optionalLabel && <small>{optionalLabel}</small>}

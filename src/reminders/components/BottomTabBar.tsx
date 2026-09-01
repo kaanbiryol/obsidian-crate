@@ -1,16 +1,9 @@
 import React, { memo } from 'react';
 import { motion } from 'framer-motion';
-import { Inbox, Calendar, CalendarRange, FolderOpen } from 'lucide-react';
 import { TABS, SPRING_CONFIG, type TabId } from '../ui/layoutConstants';
 import { ShadowDOMNativeButton } from './ShadowDOMNativeButton';
-
-// Icon component map
-const IconMap = {
-  Inbox,
-  Calendar,
-  CalendarRange,
-  FolderOpen,
-} as const;
+import { ThemeIcon } from './theme-icon';
+import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 
 interface TabButtonProps {
   tab: typeof TABS[number];
@@ -27,8 +20,6 @@ const TabButton = memo(function TabButton({
   isActive,
   onTabChange,
 }: TabButtonProps) {
-  const Icon = IconMap[tab.iconName];
-
   return (
     <ShadowDOMNativeButton
       onClick={() => onTabChange(tab.id)}
@@ -38,10 +29,7 @@ const TabButton = memo(function TabButton({
     >
       <div className="bottom-tab-content">
         <div className="bottom-tab-icon">
-          <Icon
-            size={24}
-            strokeWidth={2}
-          />
+          <ThemeIcon size="l" id={tab.iconName} />
         </div>
         <span className="bottom-tab-label">
           {tab.label}
@@ -69,6 +57,7 @@ export const BottomTabBar = memo(function BottomTabBar({
   className = '',
   animateActiveIndicator = true,
 }: BottomTabBarProps) {
+  const shouldAnimateIndicator = animateActiveIndicator && !useObsidianReducedMotion();
   const activeIndex = Math.max(0, TABS.findIndex((tab) => tab.id === activeTab));
 
   return (
@@ -77,7 +66,7 @@ export const BottomTabBar = memo(function BottomTabBar({
     >
       <div className="bottom-tab-items">
         <div className="bottom-tab-slider-track" aria-hidden="true">
-          {animateActiveIndicator ? (
+          {shouldAnimateIndicator ? (
             <motion.div
               layout
               initial={false}

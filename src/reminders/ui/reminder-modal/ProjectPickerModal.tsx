@@ -1,13 +1,13 @@
 import React, { useLayoutEffect, useRef } from 'react';
-import { Check } from 'lucide-react';
 
 import { BaseModal } from '../../components/BaseModal';
 import { AnimationConfig } from '../animations';
-import { getProjectColor } from '../../utils/projectColors';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { getPickerModalProps } from '../glassStyles';
 import { PickerHeader } from './PickerHeader';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
+import { ObsidianIcon } from '../../components/obsidian-icon';
+import { ProjectDot } from './ProjectDot';
 
 interface ProjectPickerModalProps {
     isOpen: boolean;
@@ -21,22 +21,10 @@ interface ProjectPickerModalProps {
     onSelectProject: (project: string) => void;
 }
 
-export const ProjectDot: React.FC<{ projectName: string }> = ({ projectName }) => {
-    const colors = getProjectColor(projectName);
-
-    return (
-        <svg className="project-picker-dot" viewBox="0 0 12 12" aria-hidden="true">
-            <circle className="project-picker-dot-glow is-light" cx="6" cy="6" r="5" fill={colors.light.accent} />
-            <circle className="project-picker-dot-core is-light" cx="6" cy="6" r="5" fill={colors.light.accent} />
-            <circle className="project-picker-dot-glow is-dark" cx="6" cy="6" r="5" fill={colors.dark.accent} />
-            <circle className="project-picker-dot-core is-dark" cx="6" cy="6" r="5" fill={colors.dark.accent} />
-        </svg>
-    );
-};
-
 interface ProjectRowProps {
     projectName: string;
     isSelected: boolean;
+    isDark: boolean;
     onSelect: () => void;
     rowRef?: React.Ref<HTMLButtonElement>;
 }
@@ -44,6 +32,7 @@ interface ProjectRowProps {
 const ProjectRow: React.FC<ProjectRowProps> = ({
     projectName,
     isSelected,
+    isDark,
     onSelect,
     rowRef,
 }) => {
@@ -53,16 +42,16 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
             role="option"
             aria-selected={isSelected}
             onClick={onSelect}
-            className={`project-picker-row w-full flex items-center gap-3 px-4 min-h-[52px] focus:outline-none${isSelected ? ' is-selected' : ''}`}
+            className={`project-picker-row w-full flex items-center gap-3 px-4 min-h-[52px]${isSelected ? ' is-selected' : ''}`}
         >
-            <ProjectDot projectName={projectName} />
+            <ProjectDot projectName={projectName} isDark={isDark} />
             <span
                 className={`project-picker-row-label flex-1 text-left truncate${isSelected ? ' is-selected' : ''}`}
             >
                 {projectName}
             </span>
             {isSelected && (
-                <Check size={18} strokeWidth={2.5} className="project-picker-row-check flex-shrink-0" />
+                <ObsidianIcon size="m" id="check" className="project-picker-row-check flex-shrink-0" />
             )}
         </ShadowDOMNativeButton>
     );
@@ -132,6 +121,7 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
                                 key={p}
                                 projectName={p}
                                 isSelected={p === selectedProject}
+                                isDark={isDark}
                                 rowRef={p === selectedProject ? selectedRowRef : undefined}
                                 onSelect={() => handleSelectProject(p)}
                             />

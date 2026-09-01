@@ -48,7 +48,7 @@ export function DateQuickButtons({
 						key={id}
 						onClick={() => onSelectPreset(id)}
 						aria-pressed={isActive}
-						className={`date-quick-button flex-1 h-9 rounded-xl active:scale-95${isActive ? ' is-active' : ''}`}
+						className={`date-quick-button${isActive ? ' is-active' : ''}`}
 					>
 						<span className="date-quick-button-copy">
 							<strong>{label}</strong>

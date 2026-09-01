@@ -1,5 +1,4 @@
 import React, { memo, useMemo } from 'react';
-import { FolderOpen } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
@@ -7,6 +6,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { BrowseProjectCard } from './BrowseProjectCard';
 import { buildBrowseProjectCardsViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../../utils/projectColors';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 
 export interface BrowseViewProps {
   projects: string[];
@@ -36,6 +36,8 @@ export const BrowseView = memo(function BrowseView({
   className = '',
   colorScheme = 'dark',
 }: BrowseViewProps) {
+  const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
+  const effectiveAnimationConfig = { ...animationConfig, enabled: animationsEnabled };
   const cards = useMemo(
     () => buildBrowseProjectCardsViewModel(projects, reminders, colorScheme),
     [colorScheme, projects, reminders],
@@ -48,11 +50,11 @@ export const BrowseView = memo(function BrowseView({
         {showHeader && headerContent}
         <div className="flex-1 flex items-center justify-center">
           <EmptyState
-            icon={FolderOpen}
+            icon="folder-open"
             title="No projects yet"
             description="Add a reminder to create your first project"
             iconColor="primary"
-            animationConfig={animationConfig}
+            animationConfig={effectiveAnimationConfig}
           />
         </div>
       </div>
@@ -73,7 +75,7 @@ export const BrowseView = memo(function BrowseView({
               key={card.project}
               card={card}
               onClick={() => onProjectSelect(card.project)}
-              animationConfig={animationConfig}
+              animationConfig={effectiveAnimationConfig}
             />
           ))}
         </div>

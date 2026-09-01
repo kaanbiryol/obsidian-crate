@@ -1,11 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Flag, Check, Hash, Repeat } from 'lucide-react';
+import { ThemeIcon } from './theme-icon';
 import { getProjectColor, type ProjectColorScheme } from '../utils/projectColors';
 import { formatDueDate, isReminderOverdue } from '../utils/dateFormatting';
 import { parseMarkdownLinks, isSafeUrl } from '../utils/markdownLinks';
 import type { AnimationConfig } from '../types/componentAdapter';
 import type { RecurrenceRule } from '../types/reminder';
+import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 
 function renderContentWithLinks(content: string): React.ReactNode[] {
     const links = parseMarkdownLinks(content);
@@ -80,6 +81,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     colorScheme = 'dark',
     completionPreview = false,
 }) => {
+    const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
     const dueDate = reminder.dueDatetime || reminder.dueDate;
     const isOverdue = isReminderOverdue(reminder);
     const isImportant = reminder.priority === 1;
@@ -93,8 +95,8 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     const hasPills = dueDate || reminder.recurrence || (reminder.project && !hideProject);
 
     // Wrapper component based on animation config
-    const Wrapper = animationConfig.enabled ? motion.div : 'div';
-    const wrapperProps = animationConfig.enabled ? {
+    const Wrapper = animationsEnabled ? motion.div : 'div';
+    const wrapperProps = animationsEnabled ? {
         initial: { opacity: 0, y: 6 },
         animate: {
             opacity: 1,
@@ -142,16 +144,11 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                                     ? 'var(--text-error)'
                                     : 'var(--background-modifier-border-hover, var(--background-modifier-border))'),
                             backgroundColor: isCheckboxChecked ? 'var(--text-success)' : 'transparent',
-                            boxShadow: isCheckboxChecked
-                                ? '0 0 6px color-mix(in srgb, var(--text-success) 35%, transparent)'
-                                : isImportant
-                                    ? '0 0 4px color-mix(in srgb, var(--text-error) 25%, transparent)'
-                                    : 'none',
                         }}
                         aria-hidden="true"
                     >
                         {isCheckboxChecked && (
-                            <Check size={12} strokeWidth={3} className="premium-checkbox-icon" />
+                            <ThemeIcon size="xs" id="check" className="premium-checkbox-icon" />
                         )}
                     </span>
                 </button>
@@ -166,11 +163,9 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
 
                         {showPriority && (
                             <span className="premium-priority-flag" aria-label="High priority" title="High priority">
-                                <Flag
-                                    size={14}
-                                    fill="currentColor"
-                                    strokeWidth={1.5}
-                                    stroke="currentColor"
+                                <ThemeIcon
+                                    size="xs"
+                                    id="flag"
                                     aria-hidden="true"
                                 />
                             </span>
@@ -198,9 +193,9 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                                     } : undefined}
                                 >
                                     {reminder.recurrence ? (
-                                        <Repeat size={12} strokeWidth={2} />
+                                        <ThemeIcon size="xs" id="repeat" />
                                     ) : (
-                                        <Clock size={12} strokeWidth={2} />
+                                        <ThemeIcon size="xs" id="clock" />
                                     )}
                                     <span>{dueDate ? formatDueDate(dueDate) : null}</span>
                                 </span>
@@ -216,9 +211,9 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                                         borderColor: `color-mix(in srgb, ${projectThemeColors.accent} 20%, transparent)`,
                                     }}
                                 >
-                                    <Hash
-                                        size={10}
-                                        strokeWidth={2.5}
+                                    <ThemeIcon
+                                        size="xs"
+                                        id="hash"
                                         style={{ color: projectThemeColors.accent, flexShrink: 0 }}
                                     />
                                     <span>{reminder.project}</span>

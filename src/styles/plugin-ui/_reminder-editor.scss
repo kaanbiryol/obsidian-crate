@@ -9,13 +9,18 @@
 }
 
 .picker-header-button {
+  display: inline-flex;
+  width: var(--crate-icon-button-size);
+  height: var(--crate-icon-button-size);
+  align-items: center;
+  justify-content: center;
   justify-self: start;
   border: 0;
-  border-radius: var(--crate-radius-control);
+  border-radius: var(--clickable-icon-radius, var(--crate-radius-control));
   background: transparent;
   color: var(--text-faint);
   box-shadow: none;
-  transition: transform 160ms ease, background-color 160ms ease, color 160ms ease;
+  transition: transform var(--crate-motion-duration-fast) var(--crate-motion-easing), background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &:hover {
     background: var(--crate-control-hover-bg);
@@ -39,10 +44,10 @@
   width: 100%;
   overflow: hidden;
   color: var(--text-normal);
-  font-size: 20px;
-  font-weight: 650;
+  font-size: var(--reminder-font-title);
+  font-weight: var(--reminder-font-weight-semibold);
   line-height: 1.2;
-  letter-spacing: -0.025em;
+  letter-spacing: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -53,13 +58,13 @@
   min-height: 44px;
   padding: 0 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--crate-radius-button);
   background: transparent;
   color: var(--crate-accent);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-semibold);
   cursor: pointer;
-  transition: transform 160ms ease, background-color 160ms ease;
+  transition: transform var(--crate-motion-duration-fast) var(--crate-motion-easing), background-color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &:hover {
     background: color-mix(in srgb, var(--crate-accent) 8%, transparent);
@@ -87,21 +92,21 @@
   gap: 16px;
   padding: 10px 13px;
   border: 1px solid color-mix(in srgb, var(--crate-accent) 18%, transparent);
-  border-radius: 12px;
+  border-radius: var(--crate-radius-card);
   background: color-mix(in srgb, var(--crate-accent) 6.5%, transparent);
 
   span {
     color: var(--text-faint);
-    font-size: 12px;
-    font-weight: 560;
+    font-size: var(--reminder-font-xs);
+    font-weight: var(--reminder-font-weight-medium);
   }
 
   strong {
     min-width: 0;
     overflow: hidden;
     color: var(--crate-accent);
-    font-size: 13px;
-    font-weight: 580;
+    font-size: var(--reminder-font-sm);
+    font-weight: var(--reminder-font-weight-medium);
     line-height: 1.3;
     text-align: right;
     text-overflow: ellipsis;
@@ -127,10 +132,10 @@
   strong {
     margin: 0;
     color: var(--text-faint);
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--reminder-font-xs);
+    font-weight: var(--reminder-font-weight-semibold);
     line-height: 1.25;
-    letter-spacing: 0;
+    letter-spacing: normal;
   }
 }
 
@@ -150,7 +155,7 @@
   min-height: 52px;
   padding: 8px 13px;
   border: 1px solid var(--crate-divider);
-  border-radius: 12px;
+  border-radius: var(--crate-radius-card);
   background: var(--crate-control-bg);
 }
 
@@ -175,14 +180,14 @@
 
 .picker-time-label {
   color: var(--text-normal);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--reminder-font-base);
+  font-weight: var(--reminder-font-weight-semibold);
 
   small {
     margin-left: 3px;
     color: var(--text-faint);
-    font-size: 11px;
-    font-weight: 500;
+    font-size: var(--reminder-font-xxs);
+    font-weight: var(--reminder-font-weight-medium);
   }
 }
 
@@ -191,17 +196,17 @@
   min-height: 44px;
   padding: 0 10px;
   border: 1px solid var(--crate-divider);
-  border-radius: 8px;
+  border-radius: var(--input-radius, var(--crate-radius-control));
   background: var(--crate-control-bg);
   color: var(--text-normal);
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--reminder-font-base);
+  font-weight: var(--reminder-font-weight-medium);
   text-align: right;
 
   &:focus {
     border-color: color-mix(in srgb, var(--crate-accent) 42%, var(--crate-divider));
     outline: 0;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--crate-accent) 11%, transparent);
+    box-shadow: 0 0 0 2px var(--crate-focus-ring);
   }
 }
 
@@ -223,7 +228,7 @@
   overflow: hidden;
   padding: 0;
   border: 1px solid var(--crate-divider);
-  border-radius: 12px;
+  border-radius: var(--crate-radius-card);
   background: var(--crate-control-bg);
 }
 
@@ -233,7 +238,7 @@
   bottom: 4px;
   width: calc(33.333333% - 8px);
   border: 1px solid color-mix(in srgb, var(--crate-accent) 18%, transparent);
-  border-radius: 8px;
+  border-radius: var(--crate-radius-button);
   background: color-mix(in srgb, var(--crate-accent) 10%, transparent);
   box-shadow: none;
 
@@ -261,17 +266,17 @@
   flex: 1;
   min-height: 44px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--crate-radius-control);
   background: transparent;
   color: var(--text-muted);
-  font-size: 12.5px;
-  font-weight: 560;
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-medium);
   cursor: pointer;
-  transition: color 150ms ease;
+  transition: color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &.is-selected {
     color: var(--crate-accent);
-    font-weight: 620;
+    font-weight: var(--reminder-font-weight-semibold);
   }
 }
 
@@ -304,41 +309,45 @@
 
   strong {
     color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 500;
+    font-size: var(--reminder-font-sm);
+    font-weight: var(--reminder-font-weight-medium);
     line-height: 1.25;
   }
 
   span {
     color: var(--text-faint);
-    font-size: 11px;
+    font-size: var(--reminder-font-xxs);
     line-height: 1.2;
   }
 }
 
 .recurrence-option-label {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--reminder-font-sm);
 }
 
 .recurrence-option-heading {
   margin-bottom: 10px;
   color: var(--text-faint);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-size: var(--reminder-font-xxs);
+  font-weight: var(--reminder-font-weight-medium);
+  letter-spacing: normal;
   text-transform: uppercase;
 }
 
 .recurrence-stepper-button {
-  width: 44px;
-  height: 44px;
+  display: inline-flex;
+  width: var(--input-height, 36px);
+  height: var(--input-height, 36px);
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--crate-divider);
   background: var(--crate-control-bg);
   color: var(--text-normal);
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--reminder-font-base);
+  font-weight: var(--reminder-font-weight-semibold);
   cursor: pointer;
+  border-radius: var(--crate-radius-button);
 
   &:disabled {
     opacity: 0.3;
@@ -347,7 +356,7 @@
 
 .recurrence-stepper {
   display: grid;
-  grid-template-columns: 44px minmax(34px, auto) 44px;
+  grid-template-columns: var(--input-height, 36px) minmax(34px, auto) var(--input-height, 36px);
   align-items: center;
   gap: 3px;
   flex: 0 0 auto;
@@ -356,8 +365,8 @@
 .recurrence-stepper-value {
   min-width: 34px;
   color: var(--text-normal);
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-semibold);
   text-align: center;
 
   &.is-ordinal {
@@ -371,7 +380,7 @@
   gap: 3px;
   padding: 6px;
   border: 1px solid var(--crate-divider);
-  border-radius: 12px;
+  border-radius: var(--crate-radius-card);
   background: var(--crate-control-bg);
 }
 
@@ -381,13 +390,13 @@
   max-width: none;
   aspect-ratio: 1;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--crate-radius-button);
   background: transparent;
   color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: var(--reminder-font-xxs);
+  font-weight: var(--reminder-font-weight-semibold);
   cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &.is-selected {
     background: color-mix(in srgb, var(--crate-accent) 13%, transparent);
@@ -403,18 +412,19 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--crate-divider);
-  border-radius: 12px;
+  border-radius: var(--crate-radius-card);
   background: var(--crate-control-bg);
 }
 
 .date-quick-button {
+  width: 100%;
   min-height: 62px;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-medium);
   cursor: pointer;
 
   &:hover {
@@ -459,14 +469,14 @@
 
   strong {
     color: var(--text-normal);
-    font-size: 13px;
-    font-weight: 580;
+    font-size: var(--reminder-font-sm);
+    font-weight: var(--reminder-font-weight-medium);
   }
 
   small {
     color: var(--text-faint);
-    font-size: 11px;
-    font-weight: 500;
+    font-size: var(--reminder-font-xxs);
+    font-weight: var(--reminder-font-weight-medium);
   }
 }
 
@@ -474,7 +484,7 @@
   margin: 0;
   padding: 14px 12px 8px;
   border: 1px solid var(--crate-divider);
-  border-radius: 12px;
+  border-radius: var(--crate-radius-card);
   background: var(--crate-control-bg);
 }
 
@@ -483,11 +493,17 @@
 }
 
 .date-calendar-navigation-button {
+  display: inline-flex;
+  width: var(--crate-icon-button-size);
+  height: var(--crate-icon-button-size);
+  align-items: center;
+  justify-content: center;
   padding: 0;
   border: 1px solid var(--crate-divider);
   background: transparent;
   color: var(--crate-picker-icon-color);
   cursor: pointer;
+  border-radius: var(--crate-radius-icon);
 
   &:hover {
     border-color: var(--crate-divider-strong);
@@ -498,9 +514,9 @@
 .date-calendar-title {
   min-width: 140px;
   color: var(--text-normal);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: var(--reminder-font-base);
+  font-weight: var(--reminder-font-weight-semibold);
+  letter-spacing: normal;
   text-align: center;
 }
 
@@ -512,7 +528,7 @@
   margin: 20px 18px 18px;
   overflow: hidden;
   border: 1px solid var(--crate-divider);
-  border-radius: 12px;
+  border-radius: var(--crate-radius-card);
   background: var(--crate-control-bg);
   box-shadow: none;
 }
@@ -523,7 +539,7 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  transition: transform 200ms ease-out, background-color 150ms ease, border-color 150ms ease;
+  transition: transform var(--crate-motion-duration-moderate) var(--crate-motion-easing), background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), border-color var(--crate-motion-duration-fast) var(--crate-motion-easing);
   -webkit-tap-highlight-color: transparent;
 
   &:last-child {
@@ -531,11 +547,12 @@
   }
 
   &:hover:not(.is-selected) {
-    background: var(--crate-control-hover-bg);
+    background: var(--nav-item-background-hover, var(--crate-control-hover-bg));
   }
 
   &.is-selected {
-    background: color-mix(in srgb, var(--crate-accent) 9%, transparent);
+    background: var(--crate-selection-bg);
+    color: var(--crate-selection-color);
   }
 
   &:focus-visible {
@@ -544,19 +561,19 @@
 }
 
 .project-picker-row-label {
-  color: var(--text-normal);
-  font-size: 13px;
-  font-weight: 560;
+  color: currentColor;
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-medium);
   line-height: 1.4;
-  letter-spacing: -0.01em;
+  letter-spacing: normal;
 
   &.is-selected {
-    font-weight: 600;
+    font-weight: var(--crate-selection-weight);
   }
 }
 
 .project-picker-row-check {
-  color: var(--crate-accent);
+  color: currentColor;
 }
 
 .project-picker-scroll {
@@ -576,7 +593,7 @@
   overflow: hidden;
   padding: 16px 18px 18px;
   border: 1px solid var(--crate-divider);
-  border-radius: 12px;
+  border-radius: var(--crate-radius-card);
   background: var(--crate-control-bg);
   box-shadow: none;
 }
@@ -587,10 +604,10 @@
   overflow-y: auto;
   color: var(--text-normal);
   caret-color: var(--text-normal);
-  font-size: 17px;
-  font-weight: 580;
+  font-size: var(--reminder-font-base);
+  font-weight: var(--reminder-font-weight-medium);
   line-height: 1.35;
-  letter-spacing: -0.012em;
+  letter-spacing: normal;
 
   &:empty::before {
     color: var(--text-faint);
@@ -625,9 +642,9 @@
   color: var(--text-muted);
   caret-color: var(--text-muted);
   font-family: inherit;
-  font-size: 16px;
-  font-weight: 450;
-  line-height: 22px;
+  font-size: var(--reminder-font-base);
+  font-weight: var(--reminder-font-weight-normal);
+  line-height: var(--reminder-line-height-normal);
   resize: none;
   appearance: none;
 
@@ -638,15 +655,18 @@
 }
 
 .picker-done-button {
+  width: 100%;
+  min-height: var(--input-height, 36px);
   border: 0;
+  border-radius: var(--crate-radius-button);
   background: var(--crate-accent);
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--crate-accent) 15%, transparent);
+  box-shadow: var(--shadow-s, none);
   color: var(--crate-on-accent);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: var(--reminder-font-base);
+  font-weight: var(--reminder-font-weight-semibold);
+  letter-spacing: normal;
   cursor: pointer;
-  transition: all 200ms ease-out;
+  transition: all var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .picker-footer {
@@ -663,14 +683,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  min-height: var(--input-height, 36px);
   gap: 7px;
   border: 0;
+  border-radius: var(--crate-radius-button);
   background: transparent;
   color: var(--text-error);
-  font-size: 13px;
-  font-weight: 550;
+  font-size: var(--reminder-font-sm);
+  font-weight: var(--reminder-font-weight-medium);
   cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &:hover {
     background: color-mix(in srgb, var(--text-error) 8%, transparent);
@@ -681,7 +704,7 @@
   border: 1px solid color-mix(in srgb, var(--crate-danger) 14%, transparent);
   background: color-mix(in srgb, var(--crate-danger) 5%, transparent);
   color: color-mix(in srgb, var(--crate-danger) 78%, var(--text-muted));
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), border-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &:hover {
     border-color: color-mix(in srgb, var(--crate-danger) 24%, transparent);
@@ -715,9 +738,9 @@
 
 .reminder-header-icon {
   display: grid;
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
+  width: var(--crate-icon-button-size);
+  height: var(--crate-icon-button-size);
+  min-width: var(--crate-icon-button-size);
   place-items: center;
   border-radius: 50%;
 }
@@ -727,7 +750,7 @@
   border: 1px solid var(--crate-divider);
   background: var(--crate-control-bg);
   color: var(--text-muted);
-  transition: transform 160ms ease, background-color 160ms ease, color 160ms ease;
+  transition: transform var(--crate-motion-duration-fast) var(--crate-motion-easing), background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 }
 
 .reminder-header-close:hover {
@@ -739,10 +762,10 @@
   margin: 0;
   overflow: hidden;
   color: var(--text-normal);
-  font-size: 20px;
-  font-weight: 650;
+  font-size: var(--reminder-font-title);
+  font-weight: var(--reminder-font-weight-semibold);
   line-height: 1.2;
-  letter-spacing: -0.025em;
+  letter-spacing: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -752,14 +775,14 @@
   height: 44px;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--crate-radius-button);
   background: transparent;
   color: var(--text-faint);
-  font-size: 15px;
-  font-weight: 650;
+  font-size: var(--reminder-font-base);
+  font-weight: var(--reminder-font-weight-semibold);
   cursor: default;
   opacity: 1;
-  transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
+  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing), transform var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &.is-enabled {
     background: transparent;
@@ -804,11 +827,11 @@
   border-radius: var(--crate-radius-control);
   background: var(--crate-control-bg);
   color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 560;
+  font-size: var(--reminder-font-xs);
+  font-weight: var(--reminder-font-weight-medium);
   line-height: 1;
-  letter-spacing: 0.005em;
-  transition: transform 160ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  letter-spacing: normal;
+  transition: transform var(--crate-motion-duration-fast) var(--crate-motion-easing), background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), border-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   &.tone-secondary {
     --reminder-chip-color: var(--crate-accent);
@@ -870,7 +893,7 @@
     padding: 3px;
     overflow: hidden;
     border: 1px solid var(--crate-divider);
-    border-radius: 10px;
+    border-radius: var(--crate-radius-card);
     background: var(--crate-control-bg);
   }
 
@@ -882,21 +905,16 @@
     gap: 3px;
     padding: 3px;
     border: 0;
-    border-radius: 7px;
+    border-radius: var(--crate-radius-button);
     background: transparent;
     box-shadow: none;
-    font-size: 11px;
+    font-size: var(--reminder-font-xxs);
     line-height: 1.1;
 
     &.is-active {
       border-color: transparent;
       background: color-mix(in srgb, var(--reminder-chip-color) 8%, transparent);
       box-shadow: none;
-    }
-
-    svg {
-      width: 18px;
-      height: 18px;
     }
 
     .reminder-action-label,

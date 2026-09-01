@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, Reorder, useDragControls } from 'framer-motion';
-import { GripVertical } from 'lucide-react';
+import { ThemeIcon } from './theme-icon';
 import type { Reminder } from '../types/reminder';
 import { REMINDER_LIST_LAYOUT_TRANSITION } from '../ui/layoutConstants';
+import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 
 interface ReorderableReminderListProps {
   reminders: Reminder[];
@@ -21,6 +22,7 @@ interface ReorderableItemProps {
   onDragEnd: () => void;
   interaction: 'handle' | 'long-press';
 	enableLayoutAnimations: boolean;
+  reduceMotion: boolean;
 }
 
 const LONG_PRESS_DELAY_MS = 380;
@@ -29,7 +31,7 @@ const LONG_PRESS_INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, [co
 
 const LARGE_LIST_ANIMATION_LIMIT = 80;
 
-function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction, enableLayoutAnimations }: ReorderableItemProps) {
+function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction, enableLayoutAnimations, reduceMotion }: ReorderableItemProps) {
   const didDragRef = useRef(false);
   const dragControls = useDragControls();
   const longPressTimerRef = useRef<number | null>(null);
@@ -126,9 +128,9 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
       data-reminder-section="active"
       data-reorder-interaction={interaction}
       className={`reorderable-reminder-item mb-2${isLongPressArmed ? ' is-long-press-armed' : ''}${isReordering ? ' is-reordering' : ''}`}
-      animate={usesLongPress ? { scale: isLifted ? 1.02 : 1 } : undefined}
+      animate={usesLongPress && !reduceMotion ? { scale: isLifted ? 1.02 : 1 } : undefined}
       whileTap={usesLongPress ? undefined : { scale: 1 }}
-      whileDrag={usesLongPress ? { zIndex: 50 } : { scale: 1.02, zIndex: 50 }}
+      whileDrag={usesLongPress || reduceMotion ? { zIndex: 50 } : { scale: 1.02, zIndex: 50 }}
       transition={usesLongPress
         ? {
             layout: REMINDER_LIST_LAYOUT_TRANSITION,
@@ -158,7 +160,7 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
             e.preventDefault();
           }}
         >
-          <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
+          <ThemeIcon size="xs" id="grip-vertical" aria-hidden="true" />
         </button>
       )}
     </Reorder.Item>
@@ -173,7 +175,8 @@ export function ReorderableReminderList({
   renderCard,
   interaction = 'handle',
 }: ReorderableReminderListProps) {
-	const enableLayoutAnimations = reminders.length <= LARGE_LIST_ANIMATION_LIMIT;
+  const reduceMotion = useObsidianReducedMotion();
+	const enableLayoutAnimations = !reduceMotion && reminders.length <= LARGE_LIST_ANIMATION_LIMIT;
   const latestOrderRef = useRef(reminders);
   latestOrderRef.current = reminders;
   const orderBeforeDragRef = useRef<string[]>([]);
@@ -211,6 +214,7 @@ export function ReorderableReminderList({
           onDragEnd={handleDragEnd}
           interaction={interaction}
 		  enableLayoutAnimations={enableLayoutAnimations}
+          reduceMotion={reduceMotion}
         />
       ))}
     </Reorder.Group>

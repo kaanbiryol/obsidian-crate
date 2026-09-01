@@ -1,6 +1,6 @@
 import React from "react";
-import { X } from "lucide-react";
 import { ShadowDOMNativeButton } from "@/reminders/components/ShadowDOMNativeButton";
+import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
 
 interface RemindersViewCloseButtonProps {
   onClose: () => void;
@@ -12,10 +12,10 @@ export const RemindersViewCloseButton: React.FC<RemindersViewCloseButtonProps> =
   return (
     <ShadowDOMNativeButton
       onClick={onClose}
-      className="reminders-view-close flex items-center justify-center w-11 h-11 rounded-full active:scale-95"
+      className="reminders-view-close"
       aria-label="Close"
     >
-      <X size={24} strokeWidth={2.5} />
+      <ObsidianIcon size="l" id="x" />
     </ShadowDOMNativeButton>
   );
 };

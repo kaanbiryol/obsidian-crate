@@ -2,7 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { parseDate, today, getLocalTimeZone, CalendarDate } from '@internationalized/date';
 
 import { BaseModal } from '../../components/BaseModal';
-import { AnimationConfig, prefersReducedMotion } from '../animations';
+import type { AnimationConfig } from '../animations';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { getPickerModalProps } from '../glassStyles';
 import { DateCalendarPanel } from './DateCalendarPanel';
 import { DateQuickButtons } from './DateQuickButtons';
@@ -36,7 +37,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
     isDark,
     onDateTimeChange,
 }) => {
-    const animationsEnabled = animationConfig.enabled && !prefersReducedMotion();
+    const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
     const currentDate = parseReminderDateValue(dueDate, hasTime) ?? null;
     const modalProps = getPickerModalProps(pickerMode);
 

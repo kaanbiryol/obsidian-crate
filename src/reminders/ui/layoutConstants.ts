@@ -88,12 +88,12 @@ export type TabId = 'inbox' | 'today' | 'upcoming' | 'browse';
 interface TabDefinition {
   id: TabId;
   label: string;
-  iconName: 'Inbox' | 'Calendar' | 'CalendarRange' | 'FolderOpen';
+  iconName: string;
 }
 
 export const TABS: TabDefinition[] = [
-  { id: 'inbox', label: 'Inbox', iconName: 'Inbox' },
-  { id: 'today', label: 'Today', iconName: 'Calendar' },
-  { id: 'upcoming', label: 'Upcoming', iconName: 'CalendarRange' },
-  { id: 'browse', label: 'Projects', iconName: 'FolderOpen' },
+  { id: 'inbox', label: 'Inbox', iconName: 'inbox' },
+  { id: 'today', label: 'Today', iconName: 'calendar' },
+  { id: 'upcoming', label: 'Upcoming', iconName: 'calendar-range' },
+  { id: 'browse', label: 'Projects', iconName: 'folder-open' },
 ];

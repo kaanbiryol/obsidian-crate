@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { prefersReducedMotion } from '../ui/animations';
 import type { AnimationConfig } from '../types/componentAdapter';
+import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 
 interface ModalBackdropProps {
     /** Controls backdrop visibility */
@@ -40,7 +40,7 @@ export const ModalBackdrop: React.FC<ModalBackdropProps> = ({
     className = '',
     onExitComplete,
 }) => {
-    const isAnimationEnabled = animationConfig.enabled && !prefersReducedMotion();
+    const isAnimationEnabled = animationConfig.enabled && !useObsidianReducedMotion();
 
     return (
         <AnimatePresence onExitComplete={onExitComplete}>

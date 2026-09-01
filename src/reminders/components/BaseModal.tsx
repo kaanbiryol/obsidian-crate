@@ -1,12 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { motion, AnimatePresence, PanInfo, useMotionValue, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig, PanInfo, useMotionValue, useTransform } from 'framer-motion';
 import type { AnimationConfig, ModalVariant } from '../types/componentAdapter';
 import {
-    prefersReducedMotion,
     IOS_SPRING,
     IOS_EXIT,
     BACKDROP_ANIMATION,
 } from '../ui/animations';
+import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 
 interface BaseModalProps {
     /** Controls modal visibility - triggers enter/exit animations */
@@ -62,7 +62,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     onAnimationComplete,
     disableSwipeToDismiss,
 }) => {
-    const isAnimationEnabled = animationConfig.enabled && !prefersReducedMotion();
+    const isAnimationEnabled = animationConfig.enabled && !useObsidianReducedMotion();
     const isBottomSheet = variant === 'bottom-sheet';
 
     // Swipe-to-dismiss is enabled by default for bottom-sheet, disabled for centered
@@ -86,8 +86,8 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
     // Remove shadow/border classes - handled in modalStyle for glass effect
     const modalBaseClass = variant === 'centered'
-        ? "base-modal-surface is-centered rounded-2xl max-w-lg w-full mx-4"
-        : "base-modal-surface is-bottom-sheet relative w-full rounded-t-3xl";
+        ? "base-modal-surface is-centered max-w-lg w-full mx-4"
+        : "base-modal-surface is-bottom-sheet relative w-full";
 
     // iOS-native bottom-sheet animation (UISheetPresentationController-style)
     const bottomSheetVariants = isAnimationEnabled ? {
@@ -146,6 +146,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     const dragElastic = { top: 0, bottom: 0.4 };
 
     return (
+      <MotionConfig reducedMotion={isAnimationEnabled ? 'user' : 'always'}>
         <AnimatePresence onExitComplete={onExitComplete}>
             {isOpen && (
                 <motion.div
@@ -223,5 +224,6 @@ export const BaseModal: React.FC<BaseModalProps> = ({
                 </motion.div>
             )}
         </AnimatePresence>
+      </MotionConfig>
     );
 };

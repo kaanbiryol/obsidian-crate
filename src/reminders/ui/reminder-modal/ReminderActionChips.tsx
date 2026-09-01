@@ -1,11 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Calendar as CalendarIcon, Flag, Hash, Repeat } from 'lucide-react';
 import { ShadowDOMButton, ShadowDOMMotionButton } from '../../components/ShadowDOMButton';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 import type { RecurrenceRule } from '../../types';
 import { formatRecurrence } from '../../utils/rruleConverter';
 import { formatDueDate } from '../../utils/dateFormatting';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 
 interface ReminderActionChipsProps {
     dueDate: string | null;
@@ -37,6 +38,7 @@ export function ReminderActionChips({
     onOpenRecurrencePicker,
     onTogglePriority,
 }: ReminderActionChipsProps) {
+    const reduceMotion = useObsidianReducedMotion();
     const dueDateDisplay = formatDueDate(dueDate ?? undefined);
 
     return (
@@ -47,22 +49,19 @@ export function ReminderActionChips({
                 className={`reminder-action-chip tone-primary flex items-center h-auto min-w-0 px-0 gap-0${dueDate ? ' is-active' : ''}`}
             >
                 <motion.div
-                    animate={{
+                    animate={reduceMotion ? undefined : {
                         scale: dueDateChanged && dueDate ? [1, 1.2, 1] : 1,
                         rotate: dueDateChanged && dueDate ? [0, -10, 10, 0] : 0,
                     }}
-                    transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                 >
-                    <CalendarIcon
-                        size={16}
-                        strokeWidth={dueDate ? 2 : 1.5}
-                    />
+                    <ObsidianIcon size="s" id="calendar" />
                 </motion.div>
                 <motion.span
                     key={dueDate || 'no-date'}
-                    initial={dueDateChanged ? { opacity: 0, scale: 0.9 } : false}
+                    initial={!reduceMotion && dueDateChanged ? { opacity: 0, scale: 0.9 } : false}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
                     className="whitespace-nowrap"
                 >
                     {dueDateDisplay ?? REMINDER_PICKER_COPY.editor.date}
@@ -75,22 +74,19 @@ export function ReminderActionChips({
                 className={`reminder-action-chip tone-secondary flex items-center h-auto min-w-0 px-0 gap-0${project !== defaultProject ? ' is-active' : ''}`}
             >
                 <motion.div
-                    animate={{
+                    animate={reduceMotion ? undefined : {
                         scale: projectChanged && project !== defaultProject ? [1, 1.2, 1] : 1,
                         rotate: projectChanged && project !== defaultProject ? [0, -10, 10, 0] : 0,
                     }}
-                    transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                 >
-                    <Hash
-                        size={16}
-                        strokeWidth={project !== defaultProject ? 2 : 1.5}
-                    />
+                    <ObsidianIcon size="s" id="hash" />
                 </motion.div>
                 <motion.span
                     key={project}
-                    initial={projectChanged ? { opacity: 0, scale: 0.9 } : false}
+                    initial={!reduceMotion && projectChanged ? { opacity: 0, scale: 0.9 } : false}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
                     className="whitespace-nowrap"
                 >
                     {project || defaultProject || REMINDER_PICKER_COPY.editor.defaultProject}
@@ -102,25 +98,20 @@ export function ReminderActionChips({
                 onMouseDown={(event: React.MouseEvent) => event.preventDefault()}
                 onPress={onTogglePriority}
                 aria-label={priority === 1 ? 'Remove priority' : 'Set priority'}
-                animate={hasMounted ? {
+                animate={hasMounted && !reduceMotion ? {
                     scale: priority === 1 ? [1, 1.1, 1] : 1,
                 } : {}}
-                transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                 className={`reminder-action-chip tone-danger flex items-center h-auto min-w-0 px-0${priority === 1 ? ' is-active' : ''}`}
             >
                 <motion.div
-                    animate={hasMounted ? {
+                    animate={hasMounted && !reduceMotion ? {
                         scale: priority === 1 ? [1, 1.2, 1] : 1,
                         rotate: priority === 1 ? [0, -10, 10, 0] : 0
                     } : {}}
-                    transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
                 >
-                    <Flag
-                        size={16}
-                        strokeWidth={1.5}
-                        fill={priority === 1 ? 'currentColor' : 'none'}
-                        stroke="currentColor"
-                    />
+                    <ObsidianIcon size="s" id="flag" />
                 </motion.div>
                 <span className="reminder-action-label">{REMINDER_PICKER_COPY.editor.priority}</span>
             </ShadowDOMMotionButton>
@@ -129,16 +120,16 @@ export function ReminderActionChips({
                 variant="light"
                 onPress={onOpenRecurrencePicker}
                 aria-label={recurrence ? formatRecurrence(recurrence) : REMINDER_PICKER_COPY.editor.recurrenceLabel}
-                layout={hasMounted}
-                animate={hasMounted ? { scale: recurrence ? [1, 1.02, 1] : 1 } : {}}
-                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                layout={hasMounted && !reduceMotion}
+                animate={hasMounted && !reduceMotion ? { scale: recurrence ? [1, 1.02, 1] : 1 } : {}}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
                 className={`reminder-action-chip tone-warning flex items-center h-auto min-w-0 px-0 gap-0${recurrence ? ' is-active' : ''}`}
             >
                 <motion.div
-                    animate={hasMounted ? { rotate: recurrence ? 360 : 0 } : {}}
-                    transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+                    animate={hasMounted && !reduceMotion ? { rotate: recurrence ? 360 : 0 } : {}}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                 >
-                    <Repeat size={16} strokeWidth={1.5} />
+                    <ObsidianIcon size="s" id="repeat" />
                 </motion.div>
                 <span className="reminder-action-label">{REMINDER_PICKER_COPY.editor.repeat}</span>
             </ShadowDOMMotionButton>

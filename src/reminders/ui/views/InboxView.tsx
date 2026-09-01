@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { Inbox, ChevronDown } from 'lucide-react';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
@@ -14,6 +13,8 @@ import {
 } from '../layoutConstants';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
+import { ThemeIcon } from '../../components/theme-icon';
+import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 
 export interface InboxViewProps {
   reminders: Reminder[];
@@ -53,6 +54,7 @@ export const InboxView = memo(function InboxView({
   reorderInteraction = 'handle',
   colorScheme = 'dark',
 }: InboxViewProps) {
+  const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
   const [showCompleted, setShowCompleted] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const scrollRef = useStableReminderScroll(isReordering);
@@ -105,7 +107,7 @@ export const InboxView = memo(function InboxView({
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
         <EmptyState
-          icon={Inbox}
+          icon="inbox"
           title="Your inbox is empty"
           description="Add a new reminder to get started"
           iconColor="primary"
@@ -154,17 +156,17 @@ export const InboxView = memo(function InboxView({
 				className="completed-section-toggle w-full justify-between h-10 px-0"
 			  >
 				<span
-				  className="text-sm font-semibold reminders-muted-label"
+				  className="reminders-muted-label"
 				>
 				  Completed ({completed.length})
 				</span>
 				{
 				  <motion.span
                     animate={{ rotate: showCompleted ? 180 : 0 }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    transition={animationsEnabled ? { duration: 0.2, ease: 'easeOut' } : { duration: 0 }}
                     className="inline-flex"
                   >
-                    <ChevronDown size={18} />
+                    <ThemeIcon size="m" id="chevron-down" />
 				  </motion.span>
 				}
 			  </button>
@@ -173,7 +175,7 @@ export const InboxView = memo(function InboxView({
             <AnimatePresence mode="popLayout" initial={false}>
               {showCompleted && (
                 <motion.div
-                  initial={animationConfig.enabled && shouldAnimateCompletedReveal
+                  initial={animationsEnabled && shouldAnimateCompletedReveal
                     ? { opacity: 0, height: 0, overflow: 'hidden' }
                     : false}
                   animate={{
@@ -202,7 +204,7 @@ export const InboxView = memo(function InboxView({
                         key={reminder.id}
                         initial={false}
                         animate={{ opacity: 1 }}
-                        exit={animationConfig.enabled ? {
+                        exit={animationsEnabled ? {
                           opacity: 0,
                           transition: { duration: 0.14, ease: 'easeOut' }
                         } : undefined}
@@ -215,9 +217,9 @@ export const InboxView = memo(function InboxView({
                         data-reminder-section="completed"
                       >
                         <motion.div
-                          layoutId={`reminder-card-${reminder.id}`}
+                          layoutId={animationsEnabled ? `reminder-card-${reminder.id}` : undefined}
                           layoutCrossfade={false}
-                          layout="position"
+                          layout={animationsEnabled ? 'position' : false}
                           layoutDependency={reminder.id}
                           transition={{ layout: REMINDER_LIST_LAYOUT_TRANSITION }}
                         >

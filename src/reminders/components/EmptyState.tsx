@@ -2,9 +2,11 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import type { AnimationConfig } from '../types/componentAdapter';
 import { EASE_EXPO_OUT, EASE_STANDARD, CONTENT_TRANSITION_DURATION } from '../ui/layoutConstants';
+import { ThemeIcon } from './theme-icon';
+import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 
 interface EmptyStateProps {
-    icon: React.ComponentType<{ size?: number; className?: string }>;
+    icon: string;
     title: string;
     description: string;
     iconColor?: 'primary' | 'secondary' | 'warning';
@@ -17,13 +19,14 @@ interface EmptyStateProps {
  * Reusable empty state component with icon, title, and description.
  */
 export const EmptyState: React.FC<EmptyStateProps> = ({
-    icon: Icon,
+    icon,
     title,
     description,
     iconColor = 'primary',
     animationConfig = { enabled: true },
     compact = false
 }) => {
+    const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
     const duration = animationConfig.duration ?? CONTENT_TRANSITION_DURATION;
     const variants = {
         hidden: { opacity: 0 },
@@ -38,22 +41,20 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     };
 
     // Conditional wrapper for animations
-    const Wrapper = animationConfig.enabled ? motion.div : 'div';
-    const IconWrapper = animationConfig.enabled ? motion.div : 'div';
+    const Wrapper = animationsEnabled ? motion.div : 'div';
+    const IconWrapper = animationsEnabled ? motion.div : 'div';
 
-    const wrapperProps = animationConfig.enabled ? {
+    const wrapperProps = animationsEnabled ? {
         initial: 'hidden',
         animate: 'visible',
         exit: 'exit',
         variants
     } : {};
 
-    const iconMotionProps = animationConfig.enabled ? {
+    const iconMotionProps = animationsEnabled ? {
         initial: { opacity: 0 },
         animate: { opacity: 1, transition: { duration, delay: 0.05, ease: EASE_EXPO_OUT } }
     } : {};
-
-    const iconInnerSize = compact ? 26 : 40;
 
     return (
         <Wrapper
@@ -64,7 +65,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
                 {...iconMotionProps}
                 className={`reminders-empty-state-icon tone-${iconColor} flex items-center justify-center rounded-full`}
             >
-                <Icon size={iconInnerSize} className="reminders-empty-state-glyph" />
+                <ThemeIcon size={compact ? "l" : "xl"} id={icon} className="reminders-empty-state-glyph" />
             </IconWrapper>
             <h3 className="reminders-empty-state-title">
                 {title}

@@ -36,6 +36,7 @@ interface RemindersViewPanelsProps {
   onReorderDragActiveChange?: (active: boolean) => void;
   colorScheme: ProjectColorScheme;
   reorderInteraction?: 'handle' | 'long-press';
+  animationsEnabled?: boolean;
 }
 
 export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
@@ -54,13 +55,14 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
   onReorderDragActiveChange,
   colorScheme,
   reorderInteraction = 'handle',
+  animationsEnabled = true,
 }) => {
   const pageTransition = {
-    initial: { opacity: 0 },
+    initial: animationsEnabled ? { opacity: 0 } : false,
     animate: { opacity: 1 },
-    exit: { opacity: 0 },
+    exit: animationsEnabled ? { opacity: 0 } : undefined,
     transition: {
-      duration: PAGE_TRANSITION_DURATION,
+      duration: animationsEnabled ? PAGE_TRANSITION_DURATION : 0,
       ease: EASE_EXPO_OUT,
     },
   };
@@ -78,13 +80,14 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
             onReorderDragActiveChange={onReorderDragActiveChange}
             colorScheme={colorScheme}
             reorderInteraction={reorderInteraction}
+            animationConfig={{ enabled: animationsEnabled }}
           />
         </motion.div>
       );
     case "today":
       return (
         <motion.div key="today" className="reminders-view-panel" {...pageTransition}>
-          <TodayView reminders={reminders} renderCard={renderCard} hasFab={showFab} colorScheme={colorScheme} />
+          <TodayView reminders={reminders} renderCard={renderCard} hasFab={showFab} colorScheme={colorScheme} animationConfig={{ enabled: animationsEnabled }} />
         </motion.div>
       );
     case "upcoming":
@@ -96,6 +99,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
             days={upcomingDays}
             hasFab={showFab}
             colorScheme={colorScheme}
+            animationConfig={{ enabled: animationsEnabled }}
           />
         </motion.div>
       );
@@ -108,6 +112,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
               reminders={reminders}
               onProjectSelect={onProjectSelect}
               colorScheme={colorScheme}
+              animationConfig={{ enabled: animationsEnabled }}
             />
           </motion.div>
         );

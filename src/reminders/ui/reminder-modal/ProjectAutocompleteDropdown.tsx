@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 
-import { ProjectDot } from './ProjectPickerModal';
+import { useObsidianDarkMode } from '../hooks/useObsidianDarkMode';
+import { ProjectDot } from './ProjectDot';
 
 interface ProjectAutocompleteDropdownProps {
     filteredProjects: string[];
@@ -18,6 +19,7 @@ export const ProjectAutocompleteDropdown: React.FC<ProjectAutocompleteDropdownPr
     onSelect,
 }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
+    const isDark = useObsidianDarkMode();
 
     useEffect(() => {
         if (!scrollRef.current) return;
@@ -47,7 +49,7 @@ export const ProjectAutocompleteDropdown: React.FC<ProjectAutocompleteDropdownPr
                     aria-selected={index === highlightedIndex}
                     className="project-autocomplete-option"
                 >
-                    <ProjectDot projectName={project} />
+                    <ProjectDot projectName={project} isDark={isDark} />
                     <span className="project-autocomplete-label">
                         {project}
                     </span>

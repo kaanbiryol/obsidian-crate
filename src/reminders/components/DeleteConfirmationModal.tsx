@@ -1,7 +1,8 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import type { AnimationConfig } from '../types/componentAdapter';
-import { IOS_SPRING, IOS_EXIT, BACKDROP_ANIMATION, prefersReducedMotion } from '../ui/animations';
+import { IOS_SPRING, IOS_EXIT, BACKDROP_ANIMATION } from '../ui/animations';
+import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 import { ShadowDOMButton } from './ShadowDOMButton';
 
 interface DeleteConfirmationModalProps {
@@ -17,8 +18,7 @@ interface DeleteConfirmationModalProps {
 }
 
 /**
- * A refined delete confirmation modal that replaces native confirm() dialogs
- * Features smooth animations, clear visual hierarchy, and a premium feel
+ * Theme-aware delete confirmation used in the reminders shadow root.
  */
 export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
     isOpen,
@@ -35,13 +35,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
         onConfirm();
     };
 
-    const styles = {
-        backdrop: 'modal-backdrop is-interactive backdrop-blur-sm',
-        container: 'bg-[var(--background-primary)] border-[var(--background-modifier-border)]',
-        title: 'text-[var(--text-normal)]',
-        message: 'text-[var(--text-muted)]',
-    };
-    const isAnimationEnabled = animationConfig.enabled && !prefersReducedMotion();
+    const isAnimationEnabled = animationConfig.enabled && !useObsidianReducedMotion();
 
     const backdropVariants = isAnimationEnabled ? {
         hidden: { opacity: 0 },
@@ -92,6 +86,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
     };
 
     return (
+      <MotionConfig reducedMotion={isAnimationEnabled ? 'user' : 'always'}>
         <AnimatePresence>
             {isOpen && (
                 <div
@@ -105,7 +100,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                         animate="visible"
                         exit="exit"
                         transition={isAnimationEnabled ? BACKDROP_ANIMATION.enter : { duration: 0 }}
-                        className={`absolute inset-0 ${styles.backdrop}`}
+                        className="modal-backdrop is-interactive absolute inset-0"
                         onClick={onClose}
                     />
 
@@ -116,20 +111,17 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                         initial="hidden"
                         animate="visible"
                         exit="exit"
-                        className={`
-                            relative w-full max-w-[360px] rounded-xl border shadow-xl py-5
-                            ${styles.container}
-                        `}
+                        className="delete-confirmation-surface relative w-full"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="px-5 pb-5">
+                        <div className="delete-confirmation-copy">
                             {/* Title */}
                             <motion.h3
                                 custom={0}
                                 variants={contentVariants}
                                 initial="hidden"
                                 animate="visible"
-                                className={`text-left text-lg font-semibold mb-2 ${styles.title}`}
+                                className="delete-confirmation-title"
                             >
                                 {title}
                             </motion.h3>
@@ -140,7 +132,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                                 variants={contentVariants}
                                 initial="hidden"
                                 animate="visible"
-                                className={`text-left text-sm leading-relaxed ${styles.message}`}
+                                className="delete-confirmation-message"
                             >
                                 {message}
                             </motion.p>
@@ -152,13 +144,13 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                             variants={contentVariants}
                             initial="hidden"
                             animate="visible"
-                            className="px-5 flex gap-2"
+                            className="delete-confirmation-actions"
                         >
                             <ShadowDOMButton
                                 size="lg"
                                 variant="flat"
                                 onPress={onClose}
-                                className="delete-confirmation-cancel flex-1 font-medium text-sm h-10"
+                                className="delete-confirmation-button delete-confirmation-cancel"
                                 isDisabled={isLoading}
                             >
                                 {cancelLabel}
@@ -167,7 +159,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                                 size="lg"
                                 color="danger"
                                 onPress={handleConfirm}
-                                className="delete-confirmation-confirm flex-1 font-medium text-sm h-10"
+                                className="delete-confirmation-button delete-confirmation-confirm"
                                 isLoading={isLoading}
                             >
                                 {confirmLabel}
@@ -177,5 +169,6 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                 </div>
             )}
         </AnimatePresence>
+      </MotionConfig>
     );
 };
