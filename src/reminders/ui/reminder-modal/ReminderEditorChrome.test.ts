@@ -22,8 +22,10 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('Save');
         expect(markup).toContain('aria-label="Save reminder"');
         expect(markup).toContain('reminder-editor-header');
+        expect(markup).toContain('reminder-editor-header-side is-right');
         expect(markup).toContain('<h2 class="reminder-header-title">');
         expect(markup).not.toContain('data-icon="check"');
+        expect(markup).not.toContain('w-16');
     });
 
     it('labels unset priority and recurrence actions', () => {

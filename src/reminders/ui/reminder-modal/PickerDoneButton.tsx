@@ -20,7 +20,7 @@ export const PickerDoneButton: React.FC<PickerDoneButtonProps> = ({
     removeAction,
 }) => {
     return (
-        <div className="picker-footer px-4 pt-4 pb-2">
+        <div className="picker-footer">
             {removeAction && (
                 <ShadowDOMNativeButton
                     onClick={removeAction.onClick}

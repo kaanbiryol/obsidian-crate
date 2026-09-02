@@ -42,11 +42,11 @@ export function ReminderActionChips({
     const dueDateDisplay = formatDueDate(dueDate ?? undefined);
 
     return (
-        <div className="reminder-action-chips flex flex-wrap items-center mt-4 pt-3 pb-3">
+        <div className="reminder-action-chips">
             <ShadowDOMButton
                 variant="light"
                 onPress={onOpenDatePicker}
-                className={`reminder-action-chip tone-primary flex items-center h-auto min-w-0 px-0 gap-0${dueDate ? ' is-active' : ''}`}
+                className={`reminder-action-chip tone-primary${dueDate ? ' is-active' : ''}`}
             >
                 <motion.div
                     animate={reduceMotion ? undefined : {
@@ -62,7 +62,7 @@ export function ReminderActionChips({
                     initial={!reduceMotion && dueDateChanged ? { opacity: 0, scale: 0.9 } : false}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={reduceMotion ? { duration: 0 } : { duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
-                    className="whitespace-nowrap"
+                    className="reminder-action-label"
                 >
                     {dueDateDisplay ?? REMINDER_PICKER_COPY.editor.date}
                 </motion.span>
@@ -71,7 +71,7 @@ export function ReminderActionChips({
             <ShadowDOMButton
                 variant="light"
                 onPress={onOpenProjectPicker}
-                className={`reminder-action-chip tone-secondary flex items-center h-auto min-w-0 px-0 gap-0${project !== defaultProject ? ' is-active' : ''}`}
+                className={`reminder-action-chip tone-secondary${project !== defaultProject ? ' is-active' : ''}`}
             >
                 <motion.div
                     animate={reduceMotion ? undefined : {
@@ -87,7 +87,7 @@ export function ReminderActionChips({
                     initial={!reduceMotion && projectChanged ? { opacity: 0, scale: 0.9 } : false}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={reduceMotion ? { duration: 0 } : { duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
-                    className="whitespace-nowrap"
+                    className="reminder-action-label"
                 >
                     {project || defaultProject || REMINDER_PICKER_COPY.editor.defaultProject}
                 </motion.span>
@@ -102,7 +102,7 @@ export function ReminderActionChips({
                     scale: priority === 1 ? [1, 1.1, 1] : 1,
                 } : {}}
                 transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-                className={`reminder-action-chip tone-danger flex items-center h-auto min-w-0 px-0${priority === 1 ? ' is-active' : ''}`}
+                className={`reminder-action-chip tone-danger${priority === 1 ? ' is-active' : ''}`}
             >
                 <motion.div
                     animate={hasMounted && !reduceMotion ? {
@@ -123,7 +123,7 @@ export function ReminderActionChips({
                 layout={hasMounted && !reduceMotion}
                 animate={hasMounted && !reduceMotion ? { scale: recurrence ? [1, 1.02, 1] : 1 } : {}}
                 transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                className={`reminder-action-chip tone-warning flex items-center h-auto min-w-0 px-0 gap-0${recurrence ? ' is-active' : ''}`}
+                className={`reminder-action-chip tone-warning${recurrence ? ' is-active' : ''}`}
             >
                 <motion.div
                     animate={hasMounted && !reduceMotion ? { rotate: recurrence ? 360 : 0 } : {}}

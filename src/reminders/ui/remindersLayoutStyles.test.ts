@@ -36,6 +36,22 @@ describe('plugin reminder layout styles', () => {
     expect(editorStyles).not.toContain('transition: all');
   });
 
+  it('keeps editor actions aligned and uses the compact spacing at sheet widths', async () => {
+    const styles = await readFile(
+      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+      'utf8',
+    );
+    const headerSide = styles.match(/\.reminder-editor-header-side \{([\s\S]*?)\n\}/)?.[1];
+    const removeButton = styles.match(/\.picker-remove-button \{([\s\S]*?)\n\}/)?.[1];
+
+    expect(headerSide).toContain('width: 100%');
+    expect(headerSide).toContain('justify-content: flex-start');
+    expect(headerSide).toContain('justify-content: flex-end');
+    expect(styles).toContain('@container (max-width: 600px)');
+    expect(removeButton).toContain('width: fit-content');
+    expect(removeButton).toContain('align-self: flex-start');
+  });
+
   it('uses Obsidian checkbox and progress tokens without primary-screen overrides', async () => {
     const cardStyles = await readFile(
       new URL('./shared/styles/_reminder-cards.scss', import.meta.url),

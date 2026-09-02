@@ -52,16 +52,16 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
             onClick={onSelect}
             onFocus={onFocus}
             onKeyDown={onKeyDown}
-            className={`project-picker-row w-full flex items-center gap-3 px-4 min-h-[52px]${isSelected ? ' is-selected' : ''}`}
+            className={`project-picker-row${isSelected ? ' is-selected' : ''}`}
         >
             <ProjectDot projectName={projectName} isDark={isDark} />
             <span
-                className={`project-picker-row-label flex-1 text-left truncate${isSelected ? ' is-selected' : ''}`}
+                className={`project-picker-row-label${isSelected ? ' is-selected' : ''}`}
             >
                 {projectName}
             </span>
             {isSelected && (
-                <ObsidianIcon size="m" id="check" className="project-picker-row-check flex-shrink-0" />
+                <ObsidianIcon size="m" id="check" className="project-picker-row-check" />
             )}
         </ShadowDOMNativeButton>
     );
@@ -149,7 +149,7 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
                 {/* Project List */}
                 <div
                     ref={scrollContainerRef}
-                    className="project-picker-scroll overflow-y-auto"
+                    className="project-picker-scroll"
                 >
                     <div className="project-picker-list" role="listbox" aria-label={REMINDER_PICKER_COPY.project.listLabel}>
                         {projects.map((p, index) => (
