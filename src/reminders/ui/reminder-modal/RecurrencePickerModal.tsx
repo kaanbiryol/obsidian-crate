@@ -127,27 +127,16 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                             />
                         </section>
 
-                        <section className="picker-section" aria-labelledby="plugin-repeat-options-title">
-                            <div className="picker-section-heading">
-                                <h4 id="plugin-repeat-options-title">
-                                    {frequency === 'weekly'
-                                        ? REMINDER_PICKER_COPY.repeat.days
-                                        : frequency === 'monthly'
-                                            ? REMINDER_PICKER_COPY.repeat.monthDay
-                                            : REMINDER_PICKER_COPY.repeat.interval}
-                                </h4>
-                            </div>
-                            <RecurrenceFrequencyOptions
-                                frequency={frequency}
-                                animationsEnabled={animationsEnabled}
-                                interval={interval}
-                                selectedDays={selectedDays}
-                                dayOfMonth={dayOfMonth}
-                                onIntervalChange={setInterval}
-                                onToggleDay={toggleDay}
-                                onDayOfMonthChange={setDayOfMonth}
-                            />
-                        </section>
+                        <RecurrenceFrequencyOptions
+                            frequency={frequency}
+                            animationsEnabled={animationsEnabled}
+                            interval={interval}
+                            selectedDays={selectedDays}
+                            dayOfMonth={dayOfMonth}
+                            onIntervalChange={setInterval}
+                            onToggleDay={toggleDay}
+                            onDayOfMonthChange={setDayOfMonth}
+                        />
 
                         <section className="picker-section recurrence-picker-time" aria-labelledby="plugin-repeat-time-title">
                             <div className="picker-section-heading">

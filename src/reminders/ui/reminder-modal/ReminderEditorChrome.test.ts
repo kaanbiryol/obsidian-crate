@@ -76,18 +76,51 @@ describe('reminder editor chrome', () => {
         expect(dateMarkup).toContain('role="dialog"');
         expect(dateMarkup).toContain('aria-label="Schedule reminder"');
         expect(dateMarkup).toContain('picker-header-action');
+        expect(dateMarkup).toContain('picker-schedule-fields');
+        expect(dateMarkup).toContain('type="date"');
+        expect(dateMarkup).toContain('type="time"');
+        expect(dateMarkup).not.toContain('date-calendar-grid');
         expect(dateMarkup).toContain('>Done<');
         expect(recurrenceMarkup).toContain('Remove repeat');
         expect(recurrenceMarkup).toContain('crate-reminder-picker-surface is-recurrence-picker');
         expect(recurrenceMarkup).toContain('>Repeat<');
         expect(recurrenceMarkup).toContain('>Repeats<');
         expect(recurrenceMarkup).toContain('>Frequency<');
+        expect(recurrenceMarkup).toContain('>Interval<');
         expect(recurrenceMarkup).toContain('>Reminder time<');
         expect(recurrenceMarkup).toContain('data-icon="minus"');
         expect(recurrenceMarkup).toContain('data-icon="plus"');
         expect(recurrenceMarkup).toContain('role="tabpanel"');
         expect(recurrenceMarkup).toContain('tabindex="-1"');
         expect(recurrenceMarkup).toContain('>Done<');
+    });
+
+    it('keeps interval separate from weekly and monthly repeat options', () => {
+        const weeklyMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
+            isOpen: true,
+            onClose: vi.fn(),
+            animationConfig: { enabled: false },
+            pickerMode: 'replace',
+            isDark: true,
+            recurrence: { frequency: 'weekly', interval: 2, daysOfWeek: [1], hour: 9, minute: 0 },
+            onApply: vi.fn(),
+        }));
+        const monthlyMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
+            isOpen: true,
+            onClose: vi.fn(),
+            animationConfig: { enabled: false },
+            pickerMode: 'replace',
+            isDark: true,
+            recurrence: { frequency: 'monthly', interval: 2, dayOfMonth: 15, hour: 9, minute: 0 },
+            onApply: vi.fn(),
+        }));
+
+        expect(weeklyMarkup).toContain('>Interval<');
+        expect(weeklyMarkup).toContain('>Days<');
+        expect(weeklyMarkup).toContain('>weeks<');
+        expect(monthlyMarkup).toContain('>Interval<');
+        expect(monthlyMarkup).toContain('>Month day<');
+        expect(monthlyMarkup).toContain('>months<');
     });
 
     it('keeps removal actions hidden for new date and recurrence selections', () => {

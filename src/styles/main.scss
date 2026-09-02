@@ -3,7 +3,6 @@
 @use "plugin-ui/theme" as plugin-theme;
 @use "plugin-ui/reminder-editor";
 @use "plugin-ui/modal";
-@use "plugin-ui/calendar";
 @use "plugin-ui/settings-alignment";
 @config "../../tailwind.config.js";
 @source not "../../site";
@@ -12,7 +11,6 @@
   @include plugin-theme.styles;
   @include reminder-editor.styles;
   @include modal.styles;
-  @include calendar.styles;
 }
 
 @include settings-alignment.styles;

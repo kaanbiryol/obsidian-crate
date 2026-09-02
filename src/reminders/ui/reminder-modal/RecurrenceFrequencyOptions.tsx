@@ -10,6 +10,12 @@ import {
 } from './recurrencePickerShared';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
 
+const FREQUENCY_UNITS: Record<RecurrenceRule['frequency'], string> = {
+	daily: 'day',
+	weekly: 'week',
+	monthly: 'month',
+};
+
 interface RecurrenceFrequencyOptionsProps {
 	frequency: RecurrenceRule['frequency'];
 	animationsEnabled: boolean;
@@ -100,53 +106,78 @@ export function RecurrenceFrequencyOptions({
 }: RecurrenceFrequencyOptionsProps) {
 	const dayLabels = getRecurrenceDayLabels();
 	const dayNames = getRecurrenceDayNames();
+	const intervalUnit = FREQUENCY_UNITS[frequency];
+	const intervalDetail = interval === 1 ? intervalUnit : `${intervalUnit}s`;
+	const transitionProps = {
+		initial: animationsEnabled ? { opacity: 0 } : false,
+		animate: { opacity: 1 },
+		exit: animationsEnabled ? { opacity: 0 } : undefined,
+		transition: { duration: 0.15 },
+	};
+
 	return (
-		<div className="recurrence-options">
+		<div
+			className="recurrence-options"
+			id="recurrence-options-panel"
+			role="tabpanel"
+			aria-labelledby={`recurrence-frequency-${frequency}`}
+			tabIndex={-1}
+		>
+			<section className="picker-section" aria-labelledby="plugin-repeat-interval-title">
+				<div className="picker-section-heading">
+					<h4 id="plugin-repeat-interval-title">{REMINDER_PICKER_COPY.repeat.interval}</h4>
+				</div>
+				<StepperControl
+					label={REMINDER_PICKER_COPY.repeat.every}
+					detail={intervalDetail}
+					value={interval}
+					decreaseDisabled={interval <= 1}
+					increaseDisabled={interval >= 30}
+					onDecrease={() => onIntervalChange(Math.max(1, interval - 1))}
+					onIncrease={() => onIntervalChange(Math.min(30, interval + 1))}
+				/>
+			</section>
+
 			<AnimatePresence mode="wait">
-				<motion.div
-					key={frequency}
-					initial={animationsEnabled ? { opacity: 0 } : false}
-					animate={{ opacity: 1 }}
-					exit={animationsEnabled ? { opacity: 0 } : undefined}
-					transition={{ duration: 0.15 }}
-					className="recurrence-options-panel"
-					id="recurrence-options-panel"
-					role="tabpanel"
-					aria-labelledby={`recurrence-frequency-${frequency}`}
-				>
-					{frequency === 'daily' && (
-						<StepperControl
-							label={REMINDER_PICKER_COPY.repeat.every}
-							detail={interval === 1 ? 'day' : 'days'}
-							value={interval}
-							decreaseDisabled={interval <= 1}
-							onDecrease={() => onIntervalChange(Math.max(1, interval - 1))}
-							onIncrease={() => onIntervalChange(Math.min(30, interval + 1))}
-						/>
-					)}
-
-					{frequency === 'weekly' && (
-						<div>
-							<div className="recurrence-day-list">
-								{dayLabels.map((label, idx) => {
-									const isSelected = selectedDays.includes(idx);
-									return (
-										<ShadowDOMNativeButton
-											key={idx}
-											onClick={() => onToggleDay(idx)}
-											aria-label={dayNames[idx]}
-											aria-pressed={isSelected}
-											className={`recurrence-day-button${isSelected ? ' is-selected' : ''}`}
-										>
-											{label}
-										</ShadowDOMNativeButton>
-									);
-								})}
-							</div>
+				{frequency === 'weekly' && (
+					<motion.section
+						key="weekly-days"
+						{...transitionProps}
+						className="picker-section"
+						aria-labelledby="plugin-repeat-days-title"
+					>
+						<div className="picker-section-heading">
+							<h4 id="plugin-repeat-days-title">{REMINDER_PICKER_COPY.repeat.days}</h4>
 						</div>
-					)}
+						<div className="recurrence-day-list" aria-label="Repeat days">
+							{dayLabels.map((label, idx) => {
+								const isSelected = selectedDays.includes(idx);
+								return (
+									<ShadowDOMNativeButton
+										key={idx}
+										onClick={() => onToggleDay(idx)}
+										aria-label={dayNames[idx]}
+										aria-pressed={isSelected}
+										className={`recurrence-day-button${isSelected ? ' is-selected' : ''}`}
+									>
+										{label}
+									</ShadowDOMNativeButton>
+								);
+							})}
+						</div>
+					</motion.section>
+				)}
 
-					{frequency === 'monthly' && (
+				{frequency === 'monthly' && (
+					<motion.section
+						key="monthly-day"
+						{...transitionProps}
+						className="picker-section"
+						aria-labelledby="plugin-repeat-month-day-title"
+					>
+						<div className="picker-section-heading">
+							<h4 id="plugin-repeat-month-day-title">{REMINDER_PICKER_COPY.repeat.monthDay}</h4>
+						</div>
 						<StepperControl
 							label={REMINDER_PICKER_COPY.repeat.dayOfMonth}
 							detail={REMINDER_PICKER_COPY.repeat.calendarDate}
@@ -156,8 +187,8 @@ export function RecurrenceFrequencyOptions({
 							onDecrease={() => onDayOfMonthChange(Math.max(1, dayOfMonth - 1))}
 							onIncrease={() => onDayOfMonthChange(Math.min(31, dayOfMonth + 1))}
 						/>
-					)}
-				</motion.div>
+					</motion.section>
+				)}
 			</AnimatePresence>
 		</div>
 	);

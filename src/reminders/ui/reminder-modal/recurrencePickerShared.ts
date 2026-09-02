@@ -113,13 +113,15 @@ export function summarizeRecurrencePickerState(
 			if (state.interval > 1) return `Every ${state.interval} days at ${timeStr}`;
 			return `Daily at ${timeStr}`;
 		case 'weekly': {
-			if (state.daysOfWeek.length === 0) return `Weekly at ${timeStr}`;
-			if (state.daysOfWeek.length === 7) return `Every day at ${timeStr}`;
+			const base = state.interval === 1 ? 'Weekly' : `Every ${state.interval} weeks`;
+			if (state.daysOfWeek.length === 0) return `${base} at ${timeStr}`;
 			const localizedDayNames = getRecurrenceDayNames(locale, 'short');
 			const dayNames = state.daysOfWeek.map((day) => localizedDayNames[day]).join(', ');
-			return `${dayNames} at ${timeStr}`;
+			return `${base} on ${dayNames} at ${timeStr}`;
 		}
-		case 'monthly':
-			return `${getOrdinalSuffix(state.dayOfMonth)} of month at ${timeStr}`;
+		case 'monthly': {
+			const base = state.interval === 1 ? 'Monthly' : `Every ${state.interval} months`;
+			return `${base} on the ${getOrdinalSuffix(state.dayOfMonth)} at ${timeStr}`;
+		}
 	}
 }

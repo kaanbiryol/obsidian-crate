@@ -1,16 +1,14 @@
-import React, { useState, useCallback } from 'react';
-import { parseDate, today, getLocalTimeZone, CalendarDate } from '@internationalized/date';
+import React, { useCallback } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
 import type { AnimationConfig } from '../animations';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { getPickerModalProps } from '../glassStyles';
-import { DateCalendarPanel } from './DateCalendarPanel';
 import { DateQuickButtons } from './DateQuickButtons';
 import { PickerHeader } from './PickerHeader';
 import { PickerTimeCard } from './PickerTimeCard';
 import { PickerDoneButton } from './PickerDoneButton';
-import { formatLocalDateKey, parseReminderDateValue } from '../../utils/reminderDate';
+import { formatLocalDateKey, parseLocalDateKey, parseReminderDateValue } from '../../utils/reminderDate';
 import { buildDatePickerDateSelection, buildDatePickerTimeSelection } from './datePickerSelection';
 import { getReminderDateForPreset, type ReminderDatePreset } from './datePresets';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
@@ -38,24 +36,8 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
     onDateTimeChange,
 }) => {
     const reduceMotion = useObsidianReducedMotion();
-    const animationsEnabled = animationConfig.enabled && !reduceMotion;
     const currentDate = parseReminderDateValue(dueDate, hasTime) ?? null;
     const modalProps = getPickerModalProps(pickerMode);
-
-    const [calendarDirection, setCalendarDirection] = useState(0);
-    const [displayMonth, setDisplayMonth] = useState<CalendarDate>(() =>
-        currentDate ? parseDate(formatLocalDateKey(currentDate)) : today(getLocalTimeZone())
-    );
-
-    const handlePrevMonth = useCallback(() => {
-        setCalendarDirection(-1);
-        setDisplayMonth(prev => prev.subtract({ months: 1 }));
-    }, []);
-
-    const handleNextMonth = useCallback(() => {
-        setCalendarDirection(1);
-        setDisplayMonth(prev => prev.add({ months: 1 }));
-    }, []);
 
     const handleQuickDate = useCallback((preset: ReminderDatePreset) => {
         const date = getReminderDateForPreset(preset);
@@ -66,17 +48,20 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
             presetHasTime,
         );
         onDateTimeChange(selection.value, selection.hasTime);
-        setDisplayMonth(parseDate(formatLocalDateKey(date)));
     }, [onDateTimeChange]);
 
-    const handleCalendarDateChange = useCallback((date: CalendarDate) => {
+    const handleDateChange = useCallback((value: string) => {
+        if (!value) {
+            onDateTimeChange(null, false);
+            return;
+        }
+
         const selection = buildDatePickerDateSelection(
-            new Date(date.year, date.month - 1, date.day),
+            parseLocalDateKey(value),
             parseReminderDateValue(dueDate, hasTime) ?? null,
             hasTime ?? false,
         );
         onDateTimeChange(selection.value, selection.hasTime);
-        setDisplayMonth(date);
     }, [dueDate, hasTime, onDateTimeChange]);
 
     const handleTimeChange = useCallback((hour: number, minute: number) => {
@@ -87,6 +72,16 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
         );
         onDateTimeChange(selection.value, selection.hasTime);
     }, [dueDate, hasTime, onDateTimeChange]);
+
+    const handleTimeClear = useCallback(() => {
+        if (!currentDate) {
+            onDateTimeChange(null, false);
+            return;
+        }
+
+        const selection = buildDatePickerDateSelection(currentDate, currentDate, false);
+        onDateTimeChange(selection.value, selection.hasTime);
+    }, [currentDate, onDateTimeChange]);
 
     const handleRemoveSchedule = useCallback(() => {
         onDateTimeChange(null, false);
@@ -134,26 +129,26 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                         <div className="picker-section-heading">
                             <h4 id="plugin-custom-schedule-title">{REMINDER_PICKER_COPY.schedule.custom}</h4>
                         </div>
-                        <div className="picker-field-label">
-                            <strong>{REMINDER_PICKER_COPY.schedule.date}</strong>
-                        </div>
-                        <DateCalendarPanel
-                            currentDate={currentDate}
-                            displayMonth={displayMonth}
-                            calendarDirection={calendarDirection}
-                            animationsEnabled={animationsEnabled}
-                            onPrevMonth={handlePrevMonth}
-                            onNextMonth={handleNextMonth}
-                            onDateChange={handleCalendarDateChange}
-                        />
-
-                        <div className="picker-time-section-card">
+                        <div className="picker-schedule-fields">
+                            <label className="picker-date-field">
+                                <span className="picker-field-copy">
+                                    <strong>{REMINDER_PICKER_COPY.schedule.date}</strong>
+                                </span>
+                                <input
+                                    type="date"
+                                    aria-label={REMINDER_PICKER_COPY.schedule.date}
+                                    value={currentDate ? formatLocalDateKey(currentDate) : ''}
+                                    onChange={(event) => handleDateChange(event.currentTarget.value)}
+                                    className="picker-date-input"
+                                />
+                            </label>
                             <PickerTimeCard
                                 label={REMINDER_PICKER_COPY.schedule.time}
                                 optionalLabel={REMINDER_PICKER_COPY.schedule.optional}
-                                hour={currentDate ? (hasTime ? currentDate.getHours() : 9) : 9}
-                                minute={currentDate ? (hasTime ? currentDate.getMinutes() : 0) : 0}
+                                hour={currentDate && hasTime ? currentDate.getHours() : undefined}
+                                minute={currentDate && hasTime ? currentDate.getMinutes() : undefined}
                                 onChange={handleTimeChange}
+                                onClear={handleTimeClear}
                             />
                         </div>
                     </section>

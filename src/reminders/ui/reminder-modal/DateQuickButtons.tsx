@@ -1,5 +1,6 @@
 import { isSameDay } from 'date-fns';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 import {
 	getReminderDateForPreset,
 	REMINDER_DATE_PRESETS,
@@ -30,7 +31,7 @@ export function DateQuickButtons({
 	const weekdayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
 
 	return (
-		<div className="date-quick-options flex gap-2 px-4 pb-3">
+		<div className="date-quick-options">
 			{REMINDER_DATE_PRESETS.map(({ id, label }) => {
 				const optionDate = getReminderDateForPreset(id, now);
 				const isActive = Boolean(
@@ -54,6 +55,9 @@ export function DateQuickButtons({
 							<strong>{label}</strong>
 							<small>{detail}</small>
 						</span>
+						{isActive && (
+							<ObsidianIcon size="s" id="check" className="date-quick-button-check" aria-hidden="true" />
+						)}
 					</ShadowDOMNativeButton>
 				);
 			})}
