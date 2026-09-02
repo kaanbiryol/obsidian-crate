@@ -18,9 +18,9 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
     onClose,
     onSubmit
 }) => (
-    <div className="reminder-editor-header flex justify-between items-center px-5 pt-3 pb-4">
+    <div className="reminder-editor-header">
         {/* Left side - Delete (when editing) or Cancel */}
-        <div className="reminder-editor-header-side w-16">
+        <div className="reminder-editor-header-side">
             {isEditing ? (
                 <ShadowDOMButton
                     isIconOnly
@@ -48,14 +48,14 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
         </div>
 
         {/* Title (center) - Refined typography */}
-        <div className="reminder-editor-header-copy flex-1 text-center">
+        <div className="reminder-editor-header-copy">
             <h2 className="reminder-header-title">
                 {isEditing ? 'Edit reminder' : 'New reminder'}
             </h2>
         </div>
 
         {/* Right side - explicit text keeps the primary action unambiguous */}
-        <div className="reminder-editor-header-side is-right w-16 flex justify-end">
+        <div className="reminder-editor-header-side is-right">
             <ShadowDOMButton
                 size="sm"
                 variant="light"

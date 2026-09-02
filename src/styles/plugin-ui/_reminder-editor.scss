@@ -141,7 +141,7 @@
 .reminder-date-picker {
   .picker-current-summary,
   .picker-section {
-    margin: 20px 18px 0;
+    margin: 22px 18px 0;
   }
 
   .picker-section + .picker-section {
@@ -234,7 +234,7 @@
   display: flex;
   flex-direction: column;
   gap: 22px;
-  padding: 20px 18px 2px;
+  padding: 22px 18px 2px;
 }
 
 .recurrence-picker-time {
@@ -502,7 +502,7 @@
 }
 
 .project-picker-list {
-  margin: 20px 18px 18px;
+  margin: 22px 18px 18px;
   overflow: hidden;
   border: 1px solid var(--crate-divider);
   border-radius: var(--crate-radius-card);
@@ -511,6 +511,12 @@
 }
 
 .project-picker-row {
+  display: flex;
+  width: 100%;
+  min-height: 50px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
   border: 0;
   border-bottom: 1px solid var(--crate-divider);
   border-radius: 0;
@@ -538,11 +544,17 @@
 }
 
 .project-picker-row-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
   color: currentColor;
   font-size: var(--reminder-font-sm);
   font-weight: var(--reminder-font-weight-medium);
   line-height: 1.4;
   letter-spacing: normal;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 
   &.is-selected {
     font-weight: var(--crate-selection-weight);
@@ -550,6 +562,7 @@
 }
 
 .project-picker-row-check {
+  flex: 0 0 auto;
   color: currentColor;
 }
 
@@ -557,6 +570,7 @@
   min-height: 0;
   max-height: calc(70dvh - 100px);
   flex: 1;
+  overflow-y: auto;
   overflow-scrolling: touch;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
@@ -568,6 +582,7 @@
   max-height: 300px;
   flex-direction: column;
   overflow: hidden;
+  overscroll-behavior: none;
   padding: 16px 18px 18px;
   border: 1px solid var(--crate-divider);
   border-radius: var(--crate-radius-card);
@@ -575,9 +590,18 @@
   box-shadow: none;
 }
 
-.reminder-title-input {
+.reminder-editor-fields .rich-text-input-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+.reminder-editor-fields .reminder-title-input {
+  display: block;
+  width: 100%;
   min-height: 44px;
   max-height: 100px;
+  margin: 0;
+  padding: 0;
   overflow-y: auto;
   color: var(--text-normal);
   caret-color: var(--text-normal);
@@ -610,6 +634,7 @@
   width: 100%;
   min-height: 82px;
   max-height: 140px;
+  margin: 0;
   padding: 0;
   overflow-y: auto;
   border: 0;
@@ -650,6 +675,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 22px;
+  padding: 0 18px 2px;
 
   &:empty {
     display: none;
@@ -660,9 +687,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  min-height: var(--input-height, 36px);
+  width: fit-content;
+  min-height: 44px;
+  align-self: flex-start;
   gap: 7px;
+  padding: 0 10px;
   border: 0;
   border-radius: var(--crate-radius-button);
   background: transparent;
@@ -701,6 +730,8 @@
 
 .reminder-editor-header-side {
   display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   justify-content: flex-start;
 
@@ -711,6 +742,7 @@
 
 .reminder-editor-header-copy {
   min-width: 0;
+  text-align: center;
 }
 
 .reminder-header-icon {
@@ -780,12 +812,16 @@
 
 .reminder-modal-body {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   container-type: inline-size;
-  padding: 20px 24px 24px;
+  padding: 20px 24px 12px;
 }
 
 .reminder-action-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
   padding: 0;
@@ -796,6 +832,8 @@
   --reminder-chip-color: var(--crate-accent);
 
   display: inline-flex;
+  min-width: 40px;
+  max-width: 100%;
   align-items: center;
   gap: 6px;
   height: 40px;
@@ -845,8 +883,9 @@
   }
 }
 
-@container (max-width: 430px) {
+@container (max-width: 600px) {
   .reminder-editor-fields {
+    flex: 0 1 auto;
     min-height: 148px;
     max-height: 188px;
     padding: 14px 16px 16px;
@@ -855,6 +894,10 @@
   .reminder-description-wrap {
     margin-top: 11px;
     padding-top: 13px;
+  }
+
+  .reminder-editor-fields .reminder-title-input {
+    min-height: 42px;
   }
 
   .reminder-description-input {
@@ -868,7 +911,7 @@
     gap: 2px;
     margin-top: 12px;
     padding: 3px;
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid var(--crate-divider);
     border-radius: var(--crate-radius-card);
     background: var(--crate-control-bg);
@@ -915,7 +958,7 @@
   }
 
   .reminder-modal-body {
-    padding: 16px 18px 20px;
+    padding: 16px 18px 12px;
   }
 
   .picker-header {
@@ -932,6 +975,11 @@
   }
 
   .recurrence-picker-content {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .picker-footer {
     padding-right: 14px;
     padding-left: 14px;
   }

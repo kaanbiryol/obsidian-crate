@@ -67,7 +67,7 @@ export function ReminderEditorFields({
                     ? `project-autocomplete-option-${autocomplete.highlightedIndex}`
                     : undefined}
                 ariaExpanded={autocomplete.isOpen}
-                className={`reminder-title-input w-full min-h-[32px] ios-scroll${titleFade ? ' has-bottom-fade' : ''}`}
+                className={`reminder-title-input ios-scroll${titleFade ? ' has-bottom-fade' : ''}`}
             />
             {autocomplete.isOpen && (
                 <ProjectAutocompleteDropdown

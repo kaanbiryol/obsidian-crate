@@ -19,7 +19,7 @@ export const PickerHeader: React.FC<PickerHeaderProps> = ({
     onAction,
 }) => {
     return (
-        <div className="picker-header flex items-center justify-between px-5 pt-2 pb-3">
+        <div className="picker-header">
             <ShadowDOMNativeButton
                 onClick={onBack}
                 aria-label={closeLabel}
@@ -28,7 +28,7 @@ export const PickerHeader: React.FC<PickerHeaderProps> = ({
                 <ObsidianIcon size="m" id="x" />
             </ShadowDOMNativeButton>
 
-            <div className="picker-header-copy flex flex-col items-center">
+            <div className="picker-header-copy">
                 <span className="picker-header-title">
                     {title}
                 </span>
@@ -42,7 +42,7 @@ export const PickerHeader: React.FC<PickerHeaderProps> = ({
                     {actionLabel}
                 </ShadowDOMNativeButton>
             ) : (
-                <div className="picker-header-spacer w-11" />
+                <div className="picker-header-spacer" />
             )}
         </div>
     );
