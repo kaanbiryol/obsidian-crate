@@ -10,6 +10,11 @@ import {
     selectElementContents,
     syncActiveProjectChip,
 } from './richTextInputDom';
+import {
+    RichTextInputHistory,
+    type RichTextHistoryAction,
+    type RichTextHistorySnapshot,
+} from './richTextInputHistory';
 import { useRichTextInputInteractions } from './useRichTextInputInteractions';
 
 export interface RichTextInputHandle {
@@ -134,6 +139,14 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const restoreRequestIdRef = useRef(0);
     const initialContentRef = useRef<{ text: string; knownProjects?: string[] } | null>(null);
     const lastFocusRequestRef = useRef(focusRequestKey);
+    const historyRef = useRef<RichTextInputHistory | null>(null);
+
+    if (!historyRef.current) {
+        historyRef.current = new RichTextInputHistory({
+            value,
+            cursor: value.length,
+        });
+    }
 
     if ((syncContentBeforePaint || autoFocus) && !initialContentRef.current) {
         initialContentRef.current = {
@@ -222,6 +235,57 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         });
     }, [actualRef]);
 
+    const getCurrentHistorySnapshot = useCallback((): RichTextHistorySnapshot | null => {
+        if (!actualRef.current) return null;
+        return {
+            value: getPlainText(actualRef.current),
+            cursor: saveCursorPosition(actualRef.current),
+        };
+    }, [actualRef]);
+
+    const updateAutocompleteQuery = useCallback((plainText: string, cursorPos: number | null) => {
+        if (!onAutocompleteQuery || cursorPos === null) {
+            return;
+        }
+
+        const hashInfo = extractHashtagQuery(plainText, cursorPos);
+        if (hashInfo) {
+            const sel = window.getSelection();
+            const rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
+            onAutocompleteQuery(hashInfo.query, rect ?? null);
+            return;
+        }
+
+        onAutocompleteQuery(null, null);
+    }, [onAutocompleteQuery]);
+
+    const captureHistorySnapshot = useCallback(() => {
+        const snapshot = getCurrentHistorySnapshot();
+        if (snapshot) {
+            historyRef.current?.capture(snapshot);
+        }
+    }, [getCurrentHistorySnapshot]);
+
+    const applyHistoryAction = useCallback((action: RichTextHistoryAction): boolean => {
+        if (!actualRef.current) return false;
+
+        const current = getCurrentHistorySnapshot();
+        if (!current) return false;
+
+        const snapshot = action === 'undo'
+            ? historyRef.current?.undo(current)
+            : historyRef.current?.redo(current);
+        if (!snapshot) return false;
+
+        restoreRequestIdRef.current += 1;
+        renderRichText(actualRef.current, snapshot.value, knownProjects);
+        restoreCursorPosition(actualRef.current, snapshot.cursor);
+        syncActiveProjectChip(actualRef.current);
+        onChange(snapshot.value);
+        updateAutocompleteQuery(snapshot.value, snapshot.cursor);
+        return true;
+    }, [actualRef, getCurrentHistorySnapshot, knownProjects, onChange, updateAutocompleteQuery]);
+
     // Handle input changes
     const handleInput = () => {
         if (readOnly || !actualRef.current) return;
@@ -231,6 +295,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
         const cursorPos = saveCursorPosition(actualRef.current);
         const plainText = getPlainText(actualRef.current);
+        historyRef.current?.record({ value: plainText, cursor: cursorPos });
 
         // Build and render HTML with chips
         const html = buildHTML(plainText, knownProjects);
@@ -247,23 +312,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         // Call onChange with plain text
         onChange(plainText);
 
-        const updateAutocompleteQuery = () => {
-            if (!onAutocompleteQuery || cursorPos === null) {
-                return;
-            }
-
-            const hashInfo = extractHashtagQuery(plainText, cursorPos);
-            if (hashInfo) {
-                const sel = window.getSelection();
-                const rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
-                onAutocompleteQuery(hashInfo.query, rect ?? null);
-                return;
-            }
-
-            onAutocompleteQuery(null, null);
-        };
-
-        updateAutocompleteQuery();
+        updateAutocompleteQuery(plainText, cursorPos);
     };
 
     const syncExternalContent = useCallback(() => {
@@ -292,6 +341,10 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         const cursorPos = shouldPreserveCursor ? saveCursorPosition(actualRef.current) : null;
 
         renderRichText(actualRef.current, value, knownProjects);
+
+        if (currentPlainText !== value) {
+            historyRef.current?.reset({ value, cursor: value.length });
+        }
 
         if (pendingCursorRef.current !== null) {
             const pendingPos = pendingCursorRef.current;
@@ -343,6 +396,9 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     } = useRichTextInputInteractions({
         onKeyDown,
         onAutocompleteKeyDown,
+        onUndo: () => applyHistoryAction('undo'),
+        onRedo: () => applyHistoryAction('redo'),
+        captureHistorySnapshot,
         handleInput,
     });
 
@@ -366,6 +422,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 inputMode="text"
                 autoCorrect={autoCorrect}
                 spellCheck={spellCheck}
+                onBeforeInput={captureHistorySnapshot}
                 onInput={handleInput}
                 onClick={handleClick}
                 onKeyDown={handleKeyDownInternal}
