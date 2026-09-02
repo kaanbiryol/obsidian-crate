@@ -26,6 +26,7 @@ const TabButton = memo(function TabButton({
       className={`bottom-tab-button${isActive ? ' is-active' : ''}`}
       data-action="switch-tab"
       data-tab={tab.id === 'browse' ? 'projects' : tab.id}
+      aria-current={isActive ? 'page' : undefined}
     >
       <div className="bottom-tab-content">
         <div className="bottom-tab-icon">
@@ -61,8 +62,9 @@ export const BottomTabBar = memo(function BottomTabBar({
   const activeIndex = Math.max(0, TABS.findIndex((tab) => tab.id === activeTab));
 
   return (
-    <div
+    <nav
       className={`bottom-tab-bar${position === 'bottom' ? ' is-bottom' : ''} ${className}`}
+      aria-label="Reminder views"
     >
       <div className="bottom-tab-items">
         <div className="bottom-tab-slider-track" aria-hidden="true">
@@ -90,6 +92,6 @@ export const BottomTabBar = memo(function BottomTabBar({
           />
         ))}
       </div>
-    </div>
+    </nav>
   );
 });

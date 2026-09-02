@@ -43,6 +43,20 @@ describe('reminder editor chrome', () => {
         expect(markup).not.toContain('w-16');
     });
 
+    it('uses the picker close control in the new-reminder header', () => {
+        const markup = renderToStaticMarkup(React.createElement(AddReminderModalHeader, {
+            isEditing: false,
+            canSubmit: false,
+            onDelete: vi.fn(),
+            onClose: vi.fn(),
+            onSubmit: vi.fn(),
+        }));
+
+        expect(markup).toContain('aria-label="Close reminder editor"');
+        expect(markup).toContain('class="picker-header-button"');
+        expect(markup).not.toContain('reminder-header-close');
+    });
+
     it('labels unset priority and recurrence actions', () => {
         const markup = renderToStaticMarkup(React.createElement(ReminderActionChips, {
             dueDate: null,
