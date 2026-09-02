@@ -5,6 +5,19 @@ type RichTextSegment =
     | { kind: 'chip'; text: string; type: 'priority' | 'date' | 'project' }
     | { kind: 'link'; text: string; url: string };
 
+export interface RichTextChipParts {
+    marker: string;
+    label: string;
+}
+
+export function getRichTextChipParts(type: string, text: string): RichTextChipParts {
+    if (type === 'project' && text.startsWith('#')) {
+        return { marker: '#', label: text.slice(1) };
+    }
+
+    return { marker: '', label: text };
+}
+
 /**
  * Escape HTML special characters
  */
@@ -22,9 +35,12 @@ const escapeHTML = (str: string): string => {
  * Create HTML for a chip
  */
 export const createChipHTML = (type: string, text: string): string => {
-    const escapedText = escapeHTML(text);
     const chipType = ['priority', 'date', 'project'].includes(type) ? type : 'default';
-    return `<span class="rich-text-chip rich-text-chip-${chipType}">${escapedText}</span>`;
+    const { marker, label } = getRichTextChipParts(chipType, text);
+    const markerHTML = marker
+        ? `<span class="rich-text-chip-marker">${escapeHTML(marker)}</span>`
+        : '';
+    return `<span class="rich-text-chip rich-text-chip-${chipType}">${markerHTML}${escapeHTML(label)}</span>`;
 };
 
 export const buildRichTextSegments = (text: string, knownProjects?: string[]): RichTextSegment[] => {

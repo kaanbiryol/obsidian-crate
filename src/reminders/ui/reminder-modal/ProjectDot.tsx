@@ -6,6 +6,10 @@ export const ProjectDot: React.FC<{ projectName: string; isDark: boolean }> = ({
     const color = getProjectColor(projectName)[isDark ? 'dark' : 'light'].accent;
 
     return (
-        <span className="project-picker-dot" style={{ backgroundColor: color }} aria-hidden="true" />
+        <span
+            className="project-picker-dot"
+            style={{ '--project-picker-dot-accent': color } as React.CSSProperties}
+            aria-hidden="true"
+        />
     );
 };

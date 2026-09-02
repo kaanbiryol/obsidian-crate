@@ -23,6 +23,27 @@
 	}
 }
 
+/*
+ * The editor renders its own fixed overlay inside Obsidian's modal element.
+ * Some community themes animate `.modal` with a transform, which otherwise
+ * turns the native, intrinsically empty element into a zero-width containing
+ * block for that overlay.
+ */
+.modal.crate-reminder-editor-modal {
+	position: fixed !important;
+	inset: 0 !important;
+	width: auto !important;
+	min-width: 0 !important;
+	max-width: none !important;
+	height: auto !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	margin: 0 !important;
+	transform: none !important;
+	translate: none !important;
+	scale: none !important;
+}
+
 .crate-reminder-editor-modal__content {
 	all: unset;
 	position: relative;

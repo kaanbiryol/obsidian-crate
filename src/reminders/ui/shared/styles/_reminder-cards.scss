@@ -49,27 +49,13 @@
             padding-right: 56px;
         }
 
-        &:has(.premium-priority-flag) {
-            .premium-reminder-content {
-                min-height: 80px;
-            }
-
-            .premium-priority-flag {
-                position: absolute;
-                top: 50%;
-                right: -38px;
-                width: 20px;
-                height: 20px;
-                margin: 0;
-                border-radius: var(--crate-radius-icon);
-                transform: translateY(-50%);
-
-                svg {
-					width: var(--icon-xs, 12px);
-					height: var(--icon-xs, 12px);
-					stroke-width: var(--icon-xs-stroke-width, 2px);
-                }
-            }
+        // Keep the shared flag treatment, but place it in the trailing control
+        // rail so reserving room for the drag handle does not pull it left.
+        .premium-priority-flag {
+            position: absolute;
+            top: 50%;
+            right: -38px;
+            transform: translateY(-50%);
         }
     }
 
@@ -304,19 +290,20 @@
 }
 
 .premium-priority-flag {
-    flex: 0 0 26px;
+    flex: 0 0 20px;
     display: grid;
     place-items: center;
-    width: 26px;
-    height: 26px;
-    margin-top: -3px;
-    border: 1px solid color-mix(in srgb, var(--crate-danger) 18%, transparent);
-    border-radius: var(--crate-radius-icon);
-    background: color-mix(in srgb, var(--crate-danger) 9%, transparent);
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    border: 0;
+    background: transparent;
     color: var(--crate-danger);
 
     svg {
         display: block;
+        fill: currentColor;
+        stroke: currentColor;
     }
 }
 

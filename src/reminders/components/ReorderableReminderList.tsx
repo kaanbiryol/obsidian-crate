@@ -129,7 +129,7 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
       data-reorder-interaction={interaction}
       className={`reorderable-reminder-item mb-2${isLongPressArmed ? ' is-long-press-armed' : ''}${isReordering ? ' is-reordering' : ''}`}
       animate={usesLongPress && !reduceMotion ? { scale: isLifted ? 1.02 : 1 } : undefined}
-      whileTap={usesLongPress ? undefined : { scale: 1 }}
+      whileTap={usesLongPress || reduceMotion ? undefined : { scale: 0.99 }}
       whileDrag={usesLongPress || reduceMotion ? { zIndex: 50 } : { scale: 1.02, zIndex: 50 }}
       transition={usesLongPress
         ? {

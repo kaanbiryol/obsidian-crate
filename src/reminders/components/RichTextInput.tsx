@@ -1,11 +1,13 @@
 import React, { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
-import { buildHTML, buildRichTextSegments, getPlainText } from '../utils/richTextParsing';
+import { buildHTML, buildRichTextSegments, getPlainText, getRichTextChipParts } from '../utils/richTextParsing';
 import { getLogicalTextLength, saveCursorPosition, restoreCursorPosition } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
 import {
+    clearActiveProjectChip,
     focusRichTextElement,
     renderRichText,
     selectElementContents,
+    syncActiveProjectChip,
 } from './richTextInputDom';
 import { useRichTextInputInteractions } from './useRichTextInputInteractions';
 
@@ -85,9 +87,11 @@ function renderInitialRichText(text: string, knownProjects?: string[]): React.Re
                 </a>
             );
         }
+        const { marker, label } = getRichTextChipParts(segment.type, segment.text);
         return (
             <span key={key} className={`rich-text-chip rich-text-chip-${segment.type}`}>
-                {renderTextWithLineBreaks(segment.text, key)}
+                {marker ? <span className="rich-text-chip-marker">{marker}</span> : null}
+                {renderTextWithLineBreaks(label, key)}
             </span>
         );
     });
@@ -184,6 +188,26 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         },
     }));
 
+    useEffect(() => {
+        const element = actualRef.current;
+        if (!element) return;
+
+        const ownerDocument = element.ownerDocument;
+        const syncCursorChip = () => syncActiveProjectChip(element);
+        const clearCursorChip = () => clearActiveProjectChip(element);
+
+        ownerDocument.addEventListener('selectionchange', syncCursorChip);
+        element.addEventListener('focus', syncCursorChip);
+        element.addEventListener('blur', clearCursorChip);
+        syncCursorChip();
+
+        return () => {
+            ownerDocument.removeEventListener('selectionchange', syncCursorChip);
+            element.removeEventListener('focus', syncCursorChip);
+            element.removeEventListener('blur', clearCursorChip);
+        };
+    }, [actualRef]);
+
     const scheduleSelectionRestore = useCallback((position: number | null, afterRestore?: () => void) => {
         const requestId = ++restoreRequestIdRef.current;
         window.requestAnimationFrame(() => {
@@ -192,6 +216,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             }
 
             restoreCursorPosition(actualRef.current, position);
+            syncActiveProjectChip(actualRef.current);
             afterRestore?.();
         });
     }, [actualRef]);

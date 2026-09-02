@@ -31,7 +31,7 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                     aria-label="Delete reminder"
                     className="reminder-header-icon reminder-header-delete"
                 >
-                    <ObsidianIcon size="s" id="trash-2" />
+                    <ObsidianIcon size="m" id="trash-2" />
                 </ShadowDOMButton>
             ) : (
                 <ShadowDOMButton

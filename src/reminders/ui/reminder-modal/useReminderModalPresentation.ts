@@ -83,7 +83,10 @@ export function useReminderModalPresentation({
 
 	const handleEntryAnimationComplete = useCallback(() => {
 		setIsEntryAnimationComplete(true);
-	}, []);
+		if (currentView === 'main' && showModal && !isClosing) {
+			richTextInputRef.current?.focus();
+		}
+	}, [currentView, isClosing, richTextInputRef, showModal]);
 
 	return {
 		currentView,

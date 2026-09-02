@@ -17,6 +17,10 @@
 	overflow: hidden;
 }
 
+.workspace-leaf-content[data-type="reminders-view"] > .view-content.crate-reminders-view-container {
+	padding: 0;
+}
+
 .crate-status-icon {
 	font-size: var(--font-ui-smaller);
 	display: flex;

@@ -32,23 +32,35 @@
     }
 }
 
-// Keep the sidebar controls in the pane's flex layout. The content viewport
-// therefore ends above the tab bar and cannot render underneath it.
+// Extend the desktop sidebar bar behind Obsidian's status bar while lifting the
+// interactive items above it with measured internal padding.
 .reminders-view:not(.is-modal):not(.is-fullscreen):not(.is-compact) {
-    --reminders-tabbar-overlay: 0px;
-    --reminders-tabbar-bottom-offset: 0px;
-    --reminders-safe-area: 0px;
+    --reminders-tabbar-overlay: var(--reminders-tabbar-height);
+    --reminders-tabbar-bottom-offset: var(--reminders-host-bottom-inset, 0px);
+    --reminders-safe-area: var(--reminders-tabbar-bottom-offset);
     --reminders-fab-gap: 12px;
 
+    .bottom-tab-bar,
+    .bottom-tab-items {
+        width: 100%;
+        max-width: none;
+    }
+
     .bottom-tab-bar {
+        padding-bottom: var(--reminders-tabbar-bottom-offset);
         background: var(--background-primary);
     }
 
+    .bottom-tab-items {
+        margin-right: 0;
+        margin-left: 0;
+    }
+
     .animated-tab-bar-bottom {
-        position: relative;
-        bottom: auto;
-        left: auto;
-        right: auto;
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
         flex-shrink: 0;
     }
 }
