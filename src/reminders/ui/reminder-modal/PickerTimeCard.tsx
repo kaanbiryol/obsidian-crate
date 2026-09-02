@@ -1,28 +1,34 @@
-import { ObsidianIcon } from '../../components/obsidian-icon';
-
 interface PickerTimeCardProps {
 	label: string;
 	optionalLabel?: string;
-	hour: number;
-	minute: number;
+	hour?: number;
+	minute?: number;
 	onChange: (hour: number, minute: number) => void;
+	onClear?: () => void;
 }
 
-export function PickerTimeCard({ label, optionalLabel, hour, minute, onChange }: PickerTimeCardProps) {
-	const value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+export function PickerTimeCard({ label, optionalLabel, hour, minute, onChange, onClear }: PickerTimeCardProps) {
+	const value = hour === undefined || minute === undefined
+		? ''
+		: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 
 	return (
 		<label className="picker-time-card">
-			<ObsidianIcon size="s" id="clock" className="picker-time-icon" />
-			<span className="picker-time-label">
-				{label}
-				{optionalLabel && <small>{optionalLabel}</small>}
+			<span className="picker-field-copy">
+				<strong>
+					{label}
+					{optionalLabel && <small>{optionalLabel}</small>}
+				</strong>
 			</span>
 			<input
 				type="time"
 				aria-label={label}
 				value={value}
 				onChange={(event) => {
+					if (!event.currentTarget.value) {
+						onClear?.();
+						return;
+					}
 					const [nextHour, nextMinute] = event.currentTarget.value
 						.split(':')
 						.map(part => Number.parseInt(part, 10));

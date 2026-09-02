@@ -74,7 +74,6 @@ describe('plugin reminder layout styles', () => {
       '../../styles/plugin-ui/_theme.scss',
       '../../styles/plugin-ui/_modal.scss',
       '../../styles/plugin-ui/_reminder-editor.scss',
-      '../../styles/plugin-ui/_calendar.scss',
       './shared/styles/_shell.scss',
       './shared/styles/_projects.scss',
       './shared/styles/_project-detail.scss',

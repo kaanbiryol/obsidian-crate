@@ -63,7 +63,15 @@ describe('recurrencePickerShared', () => {
 			dayOfMonth: 1,
 			hour: 8,
 			minute: 15,
-		}, 'en-GB')).toBe('Mon, Wed at 08:15');
+		}, 'en-GB')).toBe('Weekly on Mon, Wed at 08:15');
+		expect(summarizeRecurrencePickerState({
+			frequency: 'monthly',
+			interval: 2,
+			daysOfWeek: [],
+			dayOfMonth: 21,
+			hour: 8,
+			minute: 15,
+		}, 'en-GB')).toBe('Every 2 months on the 21st at 08:15');
 		expect(getOrdinalSuffix(21)).toBe('21st');
 	});
 });
