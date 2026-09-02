@@ -18,9 +18,9 @@ export function calculateBottomOverlayInset(hostRect: RectEdges, overlayRect: Re
 }
 
 /**
- * Obsidian's status bar is fixed app chrome, so it does not reduce an ItemView's
- * layout height. Measure its real overlap instead of assuming a theme-specific
- * status bar height.
+ * Obsidian themes can either reserve room for the status bar or overlay it.
+ * Measure overlap against the rendered Shadow DOM mount so reserved space is
+ * not counted twice and overlaid bars still receive the correct clearance.
  */
 export function useObsidianStatusBarInset(shadowRoot: ShadowRoot, enabled: boolean): void {
   useEffect(() => {
@@ -30,6 +30,7 @@ export function useObsidianStatusBarInset(shadowRoot: ShadowRoot, enabled: boole
       return;
     }
 
+    const insetTarget = shadowRoot.querySelector<HTMLElement>(".reminders-shadow-root") ?? host;
     const statusBar = document.querySelector<HTMLElement>(".status-bar");
     const updateInset = () => {
       if (!statusBar) {
@@ -42,7 +43,7 @@ export function useObsidianStatusBarInset(shadowRoot: ShadowRoot, enabled: boole
         && style.visibility !== "hidden"
         && Number.parseFloat(style.opacity || "1") > 0;
       const inset = isVisible
-        ? calculateBottomOverlayInset(host.getBoundingClientRect(), statusBar.getBoundingClientRect())
+        ? calculateBottomOverlayInset(insetTarget.getBoundingClientRect(), statusBar.getBoundingClientRect())
         : 0;
       host.setCssProps({ [STATUS_BAR_INSET_PROPERTY]: `${inset}px` });
     };
@@ -50,7 +51,7 @@ export function useObsidianStatusBarInset(shadowRoot: ShadowRoot, enabled: boole
     updateInset();
 
     const resizeObserver = new ResizeObserver(updateInset);
-    resizeObserver.observe(host);
+    resizeObserver.observe(insetTarget);
     if (statusBar) {
       resizeObserver.observe(statusBar);
     }

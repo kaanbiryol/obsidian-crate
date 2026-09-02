@@ -37,6 +37,18 @@ describe('RichTextInput', () => {
         expect(markup).not.toContain('autofocus');
     });
 
+    it('renders the editable project marker separately from its label', () => {
+        const markup = renderToStaticMarkup(React.createElement(RichTextInput, {
+            value: 'Review #Crate Demo',
+            onChange: vi.fn(),
+            ariaLabel: 'Reminder title',
+            knownProjects: ['Crate Demo'],
+            syncContentBeforePaint: true,
+        }));
+
+        expect(markup).toContain('<span class="rich-text-chip-marker">#</span>Crate Demo');
+    });
+
     it('exposes autocomplete state to assistive technology', () => {
         const markup = renderToStaticMarkup(React.createElement(RichTextInput, {
             value: '#pro',

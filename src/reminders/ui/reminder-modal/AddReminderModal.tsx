@@ -182,6 +182,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                     opacity: 0.5,
                     transform: 'scale(0.98)',
                     filter: 'blur(var(--blur-s, 1px))',
+                    pointerEvents: 'none',
                 } : {}),
                 transition: animationsEnabled
                     ? 'opacity var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing), filter var(--crate-motion-duration-moderate) var(--crate-motion-easing)'

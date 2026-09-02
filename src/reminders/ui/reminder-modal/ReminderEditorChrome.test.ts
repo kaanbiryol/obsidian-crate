@@ -1,4 +1,5 @@
 import React from 'react';
+import { readFile } from 'node:fs/promises';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
@@ -9,6 +10,20 @@ import { RecurrencePickerModal } from './RecurrencePickerModal';
 import { ReminderActionChips } from './ReminderActionChips';
 
 describe('reminder editor chrome', () => {
+    it('focuses the title after the main editor finishes opening', async () => {
+        const presentation = await readFile(
+            new URL('./useReminderModalPresentation.ts', import.meta.url),
+            'utf8',
+        );
+        const entryHandler = presentation.match(
+            /const handleEntryAnimationComplete = useCallback\(\(\) => \{([\s\S]*?)\n\t\},/,
+        )?.[1];
+
+        expect(entryHandler).toContain("currentView === 'main'");
+        expect(entryHandler).toContain('showModal && !isClosing');
+        expect(entryHandler).toContain('richTextInputRef.current?.focus()');
+    });
+
     it('uses sentence case and an explicit save action', () => {
         const markup = renderToStaticMarkup(React.createElement(AddReminderModalHeader, {
             isEditing: true,
@@ -46,6 +61,7 @@ describe('reminder editor chrome', () => {
 
         expect(markup).toContain('Priority');
         expect(markup).toContain('Repeat');
+        expect(markup).not.toContain('data-icon="chevron-down"');
     });
 
     it('offers removal actions for an existing schedule and recurrence', () => {
@@ -166,11 +182,16 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('project-picker-list');
         expect(markup).toContain('crate-reminder-picker-surface is-project-picker');
         expect(markup).toContain('aria-label="Close project selection"');
+        expect(markup).toContain('class="picker-header-button"');
+        expect(markup).not.toContain('reminder-header-close');
         expect(markup).toContain('data-icon="x"');
         expect(markup).not.toContain('data-icon="chevron-left"');
         expect(markup).toContain('aria-selected="true"');
         expect(markup).toContain('tabindex="0"');
         expect(markup).toContain('aria-label="Select project"');
+        expect(markup).toContain('project-picker-dot');
+        expect(markup).toContain('project-picker-row-check');
+        expect(markup).toContain('--project-picker-dot-accent');
         expect(markup).not.toContain('Select Project');
     });
 

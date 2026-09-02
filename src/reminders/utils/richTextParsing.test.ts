@@ -4,7 +4,7 @@ import { createChipHTML, buildHTML, findProjectMatches, findPriorityMatches, fin
 describe('createChipHTML', () => {
     it('wraps text in a rich-text-chip span', () => {
         const html = createChipHTML('project', '#forge');
-        expect(html).toBe('<span class="rich-text-chip rich-text-chip-project">#forge</span>');
+        expect(html).toBe('<span class="rich-text-chip rich-text-chip-project"><span class="rich-text-chip-marker">#</span>forge</span>');
     });
 
     it('escapes HTML entities', () => {
@@ -50,8 +50,13 @@ describe('buildHTML', () => {
     it('wraps project tags in chip spans', () => {
         const html = buildHTML('buy milk #forge');
         expect(html).toContain('<span class="rich-text-chip rich-text-chip-project"');
-        expect(html).toContain('#forge');
+        expect(html).toContain('<span class="rich-text-chip-marker">#</span>forge');
         expect(html).toMatch(/^buy milk /);
+    });
+
+    it('removes project chip markup when the hash marker is deleted', () => {
+        expect(buildHTML('#Crate Demo', ['Crate Demo'])).toContain('rich-text-chip-project');
+        expect(buildHTML('Crate Demo', ['Crate Demo'])).toBe('Crate Demo');
     });
 
     it('leaves plain text unmodified', () => {
@@ -168,6 +173,17 @@ describe('getPlainText', () => {
             textNode(' text'),
         ]);
         expect(getPlainText(root as unknown as HTMLElement)).toBe('just plain text');
+    });
+
+    it('preserves a project marker split from its visible label', () => {
+        const root = elementNode('div', [
+            elementNode('span', [
+                elementNode('span', [textNode('#')]),
+                textNode('Crate Demo'),
+            ]),
+        ]);
+
+        expect(getPlainText(root as unknown as HTMLElement)).toBe('#Crate Demo');
     });
 
 });

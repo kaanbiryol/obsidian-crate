@@ -150,6 +150,8 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
                 <div
                     ref={scrollContainerRef}
                     className="project-picker-scroll"
+                    onWheel={(event) => event.stopPropagation()}
+                    onTouchMove={(event) => event.stopPropagation()}
                 >
                     <div className="project-picker-list" role="listbox" aria-label={REMINDER_PICKER_COPY.project.listLabel}>
                         {projects.map((p, index) => (

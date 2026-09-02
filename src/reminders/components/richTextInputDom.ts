@@ -1,5 +1,7 @@
 import { moveCursorToEnd } from "../utils/cursorPosition";
-import { buildRichTextSegments } from "../utils/richTextRenderer";
+import { buildRichTextSegments, getRichTextChipParts } from "../utils/richTextRenderer";
+
+const ELEMENT_NODE_TYPE = typeof Node !== "undefined" ? Node.ELEMENT_NODE : 1;
 
 export type RichTextFocusOptions = {
   select?: boolean;
@@ -45,12 +47,49 @@ export function renderRichText(
 		} else {
 			const chip = ownerDocument.createElement("span");
 			chip.classList.add("rich-text-chip", `rich-text-chip-${segment.type}`);
-			appendTextWithLineBreaks(chip, segment.text, ownerDocument);
+			const { marker, label } = getRichTextChipParts(segment.type, segment.text);
+			if (marker) {
+				const markerElement = ownerDocument.createElement("span");
+				markerElement.classList.add("rich-text-chip-marker");
+				markerElement.textContent = marker;
+				chip.appendChild(markerElement);
+			}
+			appendTextWithLineBreaks(chip, label, ownerDocument);
 			fragment.appendChild(chip);
 		}
 	}
 
 	element.replaceChildren(fragment);
+}
+
+const ACTIVE_PROJECT_CHIP_CLASS = "is-cursor-active";
+
+export function clearActiveProjectChip(element: HTMLDivElement): void {
+	element.querySelectorAll(`.rich-text-chip-project.${ACTIVE_PROJECT_CHIP_CLASS}`).forEach((chip) => {
+		chip.classList.remove(ACTIVE_PROJECT_CHIP_CLASS);
+	});
+}
+
+export function syncActiveProjectChip(element: HTMLDivElement): void {
+	clearActiveProjectChip(element);
+
+	const root = element.getRootNode() as Document | ShadowRoot;
+	if (root.activeElement !== element) {
+		return;
+	}
+
+	const focusNode = element.ownerDocument.getSelection()?.focusNode ?? null;
+	if (!focusNode || !element.contains(focusNode)) {
+		return;
+	}
+
+	const focusElement = focusNode.nodeType === ELEMENT_NODE_TYPE
+		? focusNode as Element
+		: focusNode.parentElement;
+	const activeChip = focusElement?.closest(".rich-text-chip-project") ?? null;
+	if (activeChip && element.contains(activeChip)) {
+		activeChip.classList.add(ACTIVE_PROJECT_CHIP_CLASS);
+	}
 }
 
 export function insertPlainTextAtSelection(text: string): void {

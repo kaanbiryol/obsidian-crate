@@ -85,6 +85,12 @@
         border-color: var(--crate-reminder-card-active-border, var(--crate-surface-border-hover));
     }
 
+    // The reorder wrapper scales the card and its trailing handle together.
+    .reorderable-reminder-item[data-reorder-interaction="handle"]
+        .premium-reminder-card:active .premium-reminder-content {
+        transform: none;
+    }
+
     .premium-reminder-body {
         gap: 5px;
     }
@@ -104,7 +110,7 @@
     }
 
     .premium-reminder-pills {
-        gap: 4px;
+        gap: 6px;
     }
 
     .premium-pill {
