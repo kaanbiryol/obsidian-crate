@@ -5,6 +5,7 @@ import { extractHashtagQuery } from '../utils/projectSearch';
 import {
     clearActiveProjectChip,
     focusRichTextElement,
+    isRichTextRenderingCurrent,
     renderRichText,
     selectElementContents,
     syncActiveProjectChip,
@@ -225,15 +226,22 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const handleInput = () => {
         if (readOnly || !actualRef.current) return;
 
+        // A native edit supersedes any caret restoration queued for an older DOM state.
+        restoreRequestIdRef.current += 1;
+
         const cursorPos = saveCursorPosition(actualRef.current);
         const plainText = getPlainText(actualRef.current);
 
         // Build and render HTML with chips
         const html = buildHTML(plainText, knownProjects);
         const normalizedHtml = html || '';
-        const shouldRerender = actualRef.current.innerHTML !== normalizedHtml;
+        const shouldRerender = !isRichTextRenderingCurrent(actualRef.current, normalizedHtml);
         if (shouldRerender) {
             renderRichText(actualRef.current, plainText, knownProjects);
+            // Keep selection valid before another keyboard event can arrive. Waiting for
+            // animationFrame here leaves fast typing vulnerable to a reset caret.
+            restoreCursorPosition(actualRef.current, cursorPos);
+            syncActiveProjectChip(actualRef.current);
         }
 
         // Call onChange with plain text
@@ -255,11 +263,6 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             onAutocompleteQuery(null, null);
         };
 
-        if (shouldRerender) {
-            scheduleSelectionRestore(cursorPos, updateAutocompleteQuery);
-            return;
-        }
-
         updateAutocompleteQuery();
     };
 
@@ -278,7 +281,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         const html = buildHTML(value, knownProjects);
         const normalizedHtml = html || '';
 
-        if (actualRef.current.innerHTML === normalizedHtml) {
+        if (isRichTextRenderingCurrent(actualRef.current, normalizedHtml)) {
             return;
         }
 
