@@ -70,6 +70,29 @@ export function clearActiveProjectChip(element: HTMLDivElement): void {
 	});
 }
 
+export function isRichTextRenderingCurrent(
+	element: HTMLDivElement,
+	expectedHtml: string,
+): boolean {
+	if (element.innerHTML === expectedHtml) {
+		return true;
+	}
+
+	const activeChips = Array.from(
+		element.querySelectorAll(`.rich-text-chip-project.${ACTIVE_PROJECT_CHIP_CLASS}`),
+	);
+	if (!activeChips.length) {
+		return false;
+	}
+
+	// Cursor-only presentation must not make the editor rebuild its content.
+	// Removing and restoring the class synchronously avoids a visible style change.
+	activeChips.forEach((chip) => chip.classList.remove(ACTIVE_PROJECT_CHIP_CLASS));
+	const isCurrent = element.innerHTML === expectedHtml;
+	activeChips.forEach((chip) => chip.classList.add(ACTIVE_PROJECT_CHIP_CLASS));
+	return isCurrent;
+}
+
 export function syncActiveProjectChip(element: HTMLDivElement): void {
 	clearActiveProjectChip(element);
 

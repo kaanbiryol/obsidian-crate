@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { focusRichTextElement, syncActiveProjectChip } from './richTextInputDom';
+import {
+  focusRichTextElement,
+  isRichTextRenderingCurrent,
+  syncActiveProjectChip,
+} from './richTextInputDom';
 
 function createClassList(initialClasses: string[] = []) {
   const classes = new Set(initialClasses);
@@ -80,5 +84,43 @@ describe('syncActiveProjectChip', () => {
     focusNode = null;
     syncActiveProjectChip(editor);
     expect(chipClassList.contains('is-cursor-active')).toBe(false);
+  });
+});
+
+describe('isRichTextRenderingCurrent', () => {
+  it('ignores the cursor-only class when comparing rendered content', () => {
+    const chipClassList = createClassList([
+      'rich-text-chip',
+      'rich-text-chip-project',
+      'is-cursor-active',
+    ]);
+    const projectChip = { classList: chipClassList };
+    const editor = {
+      get innerHTML() {
+        const activeClass = chipClassList.contains('is-cursor-active')
+          ? ' is-cursor-active'
+          : '';
+        return `<span class="rich-text-chip rich-text-chip-project${activeClass}">#Work</span>`;
+      },
+      querySelectorAll: () => [projectChip],
+    } as unknown as HTMLDivElement;
+
+    expect(isRichTextRenderingCurrent(
+      editor,
+      '<span class="rich-text-chip rich-text-chip-project">#Work</span>',
+    )).toBe(true);
+    expect(chipClassList.contains('is-cursor-active')).toBe(true);
+  });
+
+  it('still detects a real content change', () => {
+    const editor = {
+      innerHTML: '<span class="rich-text-chip rich-text-chip-project">#Work</span>',
+      querySelectorAll: () => [],
+    } as unknown as HTMLDivElement;
+
+    expect(isRichTextRenderingCurrent(
+      editor,
+      '<span class="rich-text-chip rich-text-chip-project">#Home</span>',
+    )).toBe(false);
   });
 });
