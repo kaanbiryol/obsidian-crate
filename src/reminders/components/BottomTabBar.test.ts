@@ -39,4 +39,15 @@ describe('BottomTabBar', () => {
         expect(markup).toContain('grid-column:3');
         expect(markup).not.toContain('data-framer');
     });
+
+    it('identifies the reminder navigation and its current view', () => {
+        const markup = renderToStaticMarkup(React.createElement(BottomTabBar, {
+            activeTab: 'upcoming',
+            onTabChange: vi.fn(),
+        }));
+
+        expect(markup).toContain('<nav class="bottom-tab-bar is-bottom " aria-label="Reminder views">');
+        expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
+        expect(markup).toContain('data-tab="upcoming" aria-current="page"');
+    });
 });

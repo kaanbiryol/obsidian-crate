@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { ShadowDOMButton } from '../../components/ShadowDOMButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { ObsidianIcon } from '../../components/obsidian-icon';
 
 interface AddReminderModalHeaderProps {
@@ -34,16 +35,13 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                     <ObsidianIcon size="m" id="trash-2" />
                 </ShadowDOMButton>
             ) : (
-                <ShadowDOMButton
-                    isIconOnly
-                    size="sm"
-                    variant="light"
-                    onPress={onClose}
+                <ShadowDOMNativeButton
+                    onClick={onClose}
                     aria-label="Close reminder editor"
-                    className="reminder-header-icon reminder-header-close"
+                    className="picker-header-button"
                 >
                     <ObsidianIcon size="m" id="x" />
-                </ShadowDOMButton>
+                </ShadowDOMNativeButton>
             )}
         </div>
 

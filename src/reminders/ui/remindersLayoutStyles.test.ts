@@ -120,7 +120,21 @@ describe('plugin reminder layout styles', () => {
     expect(description).toContain('color: var(--text-faint)');
   });
 
-  it('keeps inline reminder chips compact, larger, and vertically centered', async () => {
+  it('shows the reminder title placeholder when the rich text field is empty', async () => {
+    const styles = await readFile(
+      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+      'utf8',
+    );
+    const titleInput = styles.match(
+      /\.reminder-editor-fields \.reminder-title-input \{([\s\S]*?)\n\}/,
+    )?.[1];
+
+    expect(titleInput).toContain('&:empty::before');
+    expect(titleInput).toContain('content: attr(data-placeholder)');
+    expect(titleInput).toContain('pointer-events: none');
+  });
+
+  it('keeps inline reminder chips compact and aligned to the title baseline', async () => {
     const styles = await readFile(
       new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
       'utf8',
@@ -138,10 +152,13 @@ describe('plugin reminder layout styles', () => {
     expect(dateChip).toContain('margin: 2px 1px');
     expect(dateChip).toContain('font-size: calc(var(--reminder-font-base) + 1px)');
     expect(dateChip).toContain('min-height: 32px');
+    expect(dateChip).toContain('display: inline-block');
+    expect(dateChip).toContain('vertical-align: baseline');
+    expect(dateChip).toContain('vertical-align: -0.125em');
     expect(dateChip).toContain('width: 1em');
     expect(dateChip).toContain('height: 1em');
-    expect(projectChip).toContain('display: inline-flex');
-    expect(projectChip).toContain('align-items: center');
+    expect(projectChip).toContain('display: inline-block');
+    expect(projectChip).toContain('vertical-align: baseline');
     expect(projectChip).toContain('margin: 2px 1px');
     expect(projectChip).toContain('min-height: 32px');
     expect(projectChip).toContain('width: 1em');
@@ -150,6 +167,7 @@ describe('plugin reminder layout styles', () => {
     expect(priorityChip).toContain('width: 32px');
     expect(priorityChip).toContain('height: 32px');
     expect(priorityChip).toContain('margin: 2px 1px');
+    expect(priorityChip).toContain('vertical-align: baseline');
   });
 
   it('does not draw a divider between the description and reminder actions', async () => {
@@ -166,7 +184,7 @@ describe('plugin reminder layout styles', () => {
 
     expect(actionChips).toBeDefined();
     expect(actionChips).not.toContain('&::before');
-    expect(actionChips).toContain('gap: 8px 4px');
+    expect(actionChips).toContain('gap: 8px');
     expect(actionChip).toContain('margin: 0 !important');
   });
 
@@ -183,7 +201,7 @@ describe('plugin reminder layout styles', () => {
     expect(editorStyles).toContain('min-height: 32px');
     expect(editorStyles).toContain('padding: 12px 18px 14px');
     expect(editorStyles).toContain('height: 40px');
-    expect(editorStyles).toContain('vertical-align: middle');
+    expect(editorStyles).toContain('vertical-align: baseline');
     expect(modalStyles).toContain('.crate-reminder-editor-surface.is-centered');
     expect(modalStyles).toContain('padding-bottom: 8px');
   });
