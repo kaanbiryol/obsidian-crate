@@ -120,6 +120,38 @@ describe('plugin reminder layout styles', () => {
     expect(description).toContain('color: var(--text-faint)');
   });
 
+  it('keeps inline reminder chips compact, larger, and vertically centered', async () => {
+    const styles = await readFile(
+      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+      'utf8',
+    );
+    const dateChip = styles.match(
+      /\.reminder-editor-fields \.reminder-title-input \.rich-text-chip-date \{([\s\S]*?)\n\}/,
+    )?.[1];
+    const projectChip = styles.match(
+      /\.reminder-editor-fields \.reminder-title-input \.rich-text-chip-project \{([\s\S]*?)\n\}/,
+    )?.[1];
+    const priorityChip = styles.match(
+      /\.reminder-editor-fields \.reminder-title-input \.rich-text-chip-priority \{([\s\S]*?)\n\}/,
+    )?.[1];
+
+    expect(dateChip).toContain('margin: 2px 1px');
+    expect(dateChip).toContain('font-size: calc(var(--reminder-font-base) + 1px)');
+    expect(dateChip).toContain('min-height: 32px');
+    expect(dateChip).toContain('width: 1em');
+    expect(dateChip).toContain('height: 1em');
+    expect(projectChip).toContain('display: inline-flex');
+    expect(projectChip).toContain('align-items: center');
+    expect(projectChip).toContain('margin: 2px 1px');
+    expect(projectChip).toContain('min-height: 32px');
+    expect(projectChip).toContain('width: 1em');
+    expect(projectChip).toContain('height: 1em');
+    expect(priorityChip).toContain('box-sizing: border-box');
+    expect(priorityChip).toContain('width: 32px');
+    expect(priorityChip).toContain('height: 32px');
+    expect(priorityChip).toContain('margin: 2px 1px');
+  });
+
   it('does not draw a divider between the description and reminder actions', async () => {
     const styles = await readFile(
       new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
