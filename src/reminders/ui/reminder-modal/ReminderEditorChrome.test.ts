@@ -214,12 +214,17 @@ describe('reminder editor chrome', () => {
             isOpen: true,
             onClose: vi.fn(),
             onConfirm: vi.fn(),
-            animationConfig: { enabled: false },
             message: 'Delete "Buy milk"? This can\'t be undone.',
         }));
 
         expect(markup).toContain('Delete reminder?');
         expect(markup).toContain('Delete &quot;Buy milk&quot;? This can&#x27;t be undone.');
+        expect(markup).toContain('role="alertdialog"');
+        expect(markup).toContain('aria-labelledby=');
+        expect(markup).toContain('aria-describedby=');
+        expect(markup).toContain('autofocus=""');
+        expect(markup).not.toContain('style="opacity:0');
+        expect(markup).not.toContain('transform:');
         expect(markup).not.toContain('delete-confirmation-close');
         expect(markup).not.toContain('data-icon="triangle-alert"');
     });

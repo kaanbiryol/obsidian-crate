@@ -91,7 +91,6 @@ export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> =
         onConfirm={onConfirmDelete}
         title="Delete reminder?"
         message={deleteMessage}
-        animationConfig={animationConfig}
         isLoading={isDeleting}
       />
     </>
