@@ -135,6 +135,7 @@ export class SyncRuntime {
 		);
 		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, this.settings);
 		const syncEngine = this.syncEngine;
+		syncEngine.setQueueSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
 
 		if (this.settings.showStatusBar) {
 			this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
@@ -318,6 +319,28 @@ export class SyncRuntime {
 
 	private recordSyncResult(type: SyncHistoryEntry['type'], result: SyncResult): void {
 		recordSyncHistory(this.settings, type, result);
+	}
+
+	private emitCurrentState(): void {
+		if (!this.syncEngine) return;
+		emitStateChange(this.stateChangeListeners, this.syncEngine.getState(), (nextState) => {
+			this.statusBar?.update(nextState);
+		});
+	}
+
+	private async recordAutomaticSyncResult(engine: SyncEngine, result: SyncResult): Promise<void> {
+		if (this.syncEngine !== engine) return;
+		const state = engine.getState();
+		if (result.success && state.lastSync) {
+			this.settings.lastSync = state.lastSync;
+		}
+		this.recordSyncResult('sync', result);
+		this.emitCurrentState();
+		try {
+			await this.persistSettings();
+		} catch (error) {
+			logger.error('Failed to persist automatic sync activity:', error);
+		}
 	}
 
 	private async runSyncOperation(

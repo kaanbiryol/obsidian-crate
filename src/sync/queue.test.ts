@@ -70,6 +70,7 @@ function createFlushHarness(overrides: Partial<{
 	});
 	const triggerDebouncedSync = vi.fn();
 	const requestReconciliation = vi.fn();
+	const onFlushResult = vi.fn(async () => {});
 	const prepareUploadFromPath = vi.fn(
 		overrides.prepareUploadFromPath ??
 			(async () => null),
@@ -99,6 +100,7 @@ function createFlushHarness(overrides: Partial<{
 		updateStateCalls,
 		triggerDebouncedSync,
 		requestReconciliation,
+		onFlushResult,
 		prepareUploadFromPath,
 		uploadFile,
 		deleteFile,
@@ -136,6 +138,7 @@ function createFlushHarness(overrides: Partial<{
 			getModifiedIso,
 			triggerDebouncedSync,
 			requestReconciliation,
+			onFlushResult,
 		},
 	};
 }
@@ -413,6 +416,13 @@ describe('processPendingChanges', () => {
 		expect(harness.state.lastError).toBeNull();
 		expect(harness.pendingPaths.size).toBe(0);
 		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
+		expect(harness.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
+			success: true,
+			uploaded: 1,
+			deleted: 1,
+			uploadedPaths: ['notes/a.md'],
+			deletedPaths: ['notes/old.md'],
+		}));
 	});
 
 	it('reschedules when a sync is already in progress', async () => {
@@ -461,6 +471,11 @@ describe('processPendingChanges', () => {
 		expect(harness.state.lastError).toContain('quota exceeded');
 		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
+		expect(harness.onFlushResult).toHaveBeenCalledWith(expect.objectContaining({
+			success: false,
+			uploaded: 0,
+			errors: ['notes/a.md: quota exceeded'],
+		}));
 	});
 
 	it('runs full reconciliation after a permanent version conflict', async () => {

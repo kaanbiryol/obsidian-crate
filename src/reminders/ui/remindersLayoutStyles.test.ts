@@ -26,9 +26,14 @@ describe('plugin reminder layout styles', () => {
     expect(themeStyles).toContain('--crate-picker-selection-bg: var(--crate-selection-bg)');
     expect(themeStyles).toContain('--crate-tab-active-bg: var(--crate-selection-bg)');
     expect(themeStyles).toContain('--crate-icon-button-size: var(--clickable-icon-size');
+    expect(themeStyles).toContain('--crate-accent-text: var(--text-accent');
     expect(themeStyles).toContain('--reminder-font-base: var(--font-ui-medium');
+    expect(themeStyles).toContain('--reminder-font-title: var(--font-ui-large, var(--font-ui-medium))');
+    expect(themeStyles).toContain('--reminder-font-editor-title: clamp(');
     expect(themeStyles).toContain('--crate-motion-duration-fast: var(--anim-duration-fast');
     expect(modalStyles).toContain('backdrop-filter: var(--crate-modal-backdrop-filter)');
+    expect(modalStyles).toContain('font-family: var(--reminder-font-ui)');
+    expect(modalStyles).toContain('font-size: var(--reminder-font-base)');
     expect(modalStyles).not.toContain('backdrop-filter: blur(8px)');
     expect(editorStyles).toContain('background: var(--crate-control-active-bg)');
     expect(editorStyles).toContain('color: var(--text-normal)');
@@ -57,18 +62,25 @@ describe('plugin reminder layout styles', () => {
       new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
       'utf8',
     );
+    const editorHeader = styles.match(/\.reminder-editor-header \{([\s\S]*?)\n\}/)?.[1];
     const headerSide = styles.match(/\.reminder-editor-header-side \{([\s\S]*?)\n\}/)?.[1];
+    const headerCopy = styles.match(/\.reminder-editor-header-copy \{([\s\S]*?)\n\}/)?.[1];
     const headerIcon = styles.match(/\.reminder-header-icon \{([\s\S]*?)\n\}/)?.[1];
     const pickerHeaderAction = styles.match(/\.picker-header-action \{([\s\S]*?)\n\}/)?.[1];
     const removeButton = styles.match(/\.picker-remove-button \{([\s\S]*?)\n\}/)?.[1];
 
+    expect(editorHeader).toContain('--reminder-editor-header-control-size: var(--crate-icon-button-size)');
+    expect(editorHeader).toContain('grid-template-columns: var(--reminder-editor-header-control-size) minmax(0, 1fr) auto');
+    expect(editorHeader).toContain('min-height: 44px');
     expect(headerSide).toContain('width: 100%');
     expect(headerSide).toContain('justify-content: flex-start');
     expect(headerSide).toContain('justify-content: flex-end');
+    expect(headerSide).toContain('gap: var(--size-4-2, 8px)');
     expect(headerIcon).toContain('padding: 0');
+    expect(headerCopy).toContain('text-align: left');
     expect(pickerHeaderAction).toContain('border: 0 !important');
     expect(pickerHeaderAction).toContain('box-shadow: none !important');
-    expect(styles).toContain('@container (max-width: 600px)');
+    expect(styles).toContain('@container (max-width: 420px)');
     expect(removeButton).toContain('width: fit-content');
     expect(removeButton).toContain('align-self: flex-start');
   });
@@ -95,7 +107,7 @@ describe('plugin reminder layout styles', () => {
       'utf8',
     );
     const submitButton = styles.match(
-      /^\.reminder-header-submit \{(?=\n\s{2}min-width: 52px)([\s\S]*?)^\}/m,
+      /^\.reminder-header-submit \{(?=\n\s{2}min-width: 0)([\s\S]*?)^\}/m,
     )?.[1];
     const disabledSubmitButton = submitButton?.match(
       /&:disabled \{([\s\S]*?)\}/,
@@ -106,6 +118,12 @@ describe('plugin reminder layout styles', () => {
     expect(disabledSubmitButton).toContain('border: 0 !important');
     expect(disabledSubmitButton).toContain('background: transparent !important');
     expect(disabledSubmitButton).toContain('box-shadow: none !important');
+    expect(submitButton).toContain('&.is-enabled');
+    expect(submitButton).toContain('height: var(--reminder-editor-header-control-size)');
+    expect(submitButton).toContain('font-weight: var(--reminder-font-weight-medium)');
+    expect(submitButton).toContain('background: transparent');
+    expect(submitButton).toContain('color: var(--crate-accent-text)');
+    expect(submitButton).toContain('color-mix(in srgb, var(--crate-accent-text) 9%, transparent)');
   });
 
   it('keeps reminder descriptions visually subordinate to their titles', async () => {
@@ -117,7 +135,27 @@ describe('plugin reminder layout styles', () => {
       /\.reminder-description-input \{([\s\S]*?)\n\}/,
     )?.[1];
 
+    expect(description).toContain('color: var(--text-muted)');
     expect(description).toContain('color: var(--text-faint)');
+    expect(description).toContain('font-size: var(--reminder-font-sm)');
+  });
+
+  it('keeps the dialog title and editable reminder text one typography step apart', async () => {
+    const styles = await readFile(
+      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+      'utf8',
+    );
+    const headerTitle = styles.match(
+      /\.reminder-header-title \{([\s\S]*?)\n\}/,
+    )?.[1];
+    const titleInput = styles.match(
+      /\.reminder-editor-fields \.reminder-title-input \{([\s\S]*?)\n\}/,
+    )?.[1];
+
+    expect(headerTitle).toContain('font-size: var(--reminder-font-base)');
+    expect(headerTitle).toContain('font-weight: var(--reminder-font-weight-medium)');
+    expect(titleInput).toContain('font-size: var(--reminder-font-editor-title)');
+    expect(titleInput).toContain('font-weight: var(--reminder-font-weight-semibold)');
   });
 
   it('shows the reminder title placeholder when the rich text field is empty', async () => {
@@ -152,26 +190,39 @@ describe('plugin reminder layout styles', () => {
       /\.reminder-editor-fields \.reminder-title-input \.rich-text-chip-priority \{([\s\S]*?)\n\}/,
     )?.[1];
 
-    expect(chipLayout).toContain('display: inline-flex');
-    expect(chipLayout).toContain('height: 32px');
-    expect(chipLayout).toContain('align-items: center');
-    expect(chipLayout).toContain('margin: 2px 1px');
-    expect(chipLayout).toContain('font-size: calc(var(--reminder-font-base) + 1px)');
-    expect(chipLayout).toContain('line-height: 1');
-    expect(chipLayout).toContain('vertical-align: middle');
-    expect(dateChip).toContain('padding: 0 9px');
-    expect(dateChip).toContain('width: 1em');
-    expect(dateChip).toContain('height: 1em');
-    expect(dateChip).toContain('flex: 0 0 auto');
-    expect(projectChip).toContain('padding: 0 9px');
-    expect(projectChip).toContain('width: 1em');
-    expect(projectChip).toContain('height: 1em');
-    expect(projectChip).toContain('flex: 0 0 auto');
-    expect(priorityChip).toContain('width: 32px');
-    expect(priorityChip).toContain('justify-content: center');
+    expect(chipLayout).toContain('display: inline');
+    expect(chipLayout).not.toContain('height:');
+    expect(chipLayout).not.toContain('align-items:');
+    expect(chipLayout).toContain('margin: 0 0.08em');
+    expect(chipLayout).toContain(
+      'font-size: clamp(var(--reminder-font-base), 0.92em, var(--reminder-font-editor-title))',
+    );
+    expect(chipLayout).toContain('line-height: var(--reminder-line-height-tight)');
+    expect(chipLayout).toContain('vertical-align: baseline');
+    expect(dateChip).toContain('padding: 0.05em 0.4em');
+    expect(dateChip).toContain('width: 0.9em');
+    expect(dateChip).toContain('height: 0.9em');
+    expect(dateChip).toContain('margin-right: 0.25em');
+    expect(dateChip).toContain('vertical-align: -0.1em');
+    expect(dateChip).toContain('color: var(--crate-accent-text)');
+    expect(dateChip).not.toContain('var(--crate-success)');
+    expect(projectChip).toContain('padding: 0.05em 0.4em');
+    expect(projectChip).toContain('width: 0.9em');
+    expect(projectChip).toContain('height: 0.9em');
+    expect(projectChip).toContain('margin-right: 0.25em');
+    expect(projectChip).toContain('vertical-align: -0.1em');
+    expect(projectChip).toContain(
+      'color: var(--reminder-project-color, var(--crate-accent-text))',
+    );
+    expect(priorityChip).toContain('width: 1.2em');
+    expect(priorityChip).toContain('display: inline-block');
+    expect(priorityChip).toContain('border: 0');
+    expect(priorityChip).toContain(
+      'background: color-mix(in srgb, var(--crate-danger) 7%, transparent)',
+    );
   });
 
-  it('does not draw a divider between the description and reminder actions', async () => {
+  it('keeps unset properties neutral and colors selected property values', async () => {
     const styles = await readFile(
       new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
       'utf8',
@@ -185,8 +236,30 @@ describe('plugin reminder layout styles', () => {
 
     expect(actionChips).toBeDefined();
     expect(actionChips).not.toContain('&::before');
-    expect(actionChips).toContain('gap: 8px');
+    expect(actionChips).toContain('gap: 4px');
     expect(actionChip).toContain('margin: 0 !important');
+    expect(actionChip).toContain('--reminder-action-chip-height: max(');
+    expect(actionChip).toContain('min-height: var(--reminder-action-chip-height)');
+    expect(actionChip).toContain('gap: 0.3em');
+    expect(actionChip).toContain('padding: 0 0.375em');
+    expect(actionChip).toContain('border-radius: var(--crate-radius-control)');
+    expect(actionChip).toContain('--reminder-chip-color: var(--crate-accent-text)');
+    expect(actionChip).toContain(
+      '--reminder-chip-color: var(--reminder-project-color, var(--crate-accent-text))',
+    );
+    expect(actionChip).toContain('--reminder-chip-color: var(--crate-danger)');
+    expect(actionChip).toContain('--reminder-chip-color: var(--crate-warning)');
+    expect(actionChip).toContain(
+      'border: 1px solid color-mix(in srgb, var(--crate-divider) 35%, transparent)',
+    );
+    expect(actionChip).toContain('background: transparent');
+    expect(actionChip).toContain('color: var(--text-faint)');
+    expect(actionChip).toContain('font-size: var(--reminder-font-sm)');
+    expect(actionChip).toContain('line-height: var(--reminder-line-height-tight)');
+    expect(actionChip).toContain('background: color-mix(in srgb, var(--reminder-chip-color) 8%, transparent)');
+    expect(actionChip).toContain('color: var(--reminder-chip-color)');
+    expect(actionChip).toContain('var(--crate-control-hover-bg)');
+    expect(actionChip).toContain('outline: 2px solid var(--crate-focus-ring)');
   });
 
   it('keeps the reminder editor vertical rhythm compact', async () => {
@@ -200,7 +273,8 @@ describe('plugin reminder layout styles', () => {
     );
 
     expect(editorStyles).toContain('min-height: 32px');
-    expect(editorStyles).toContain('padding: 12px 18px 14px');
+    expect(editorStyles).toContain('padding: 8px 12px 12px');
+    expect(editorStyles).toContain('min-height: var(--reminder-action-chip-height)');
     expect(editorStyles).toContain('height: 40px');
     expect(editorStyles).toContain('vertical-align: middle');
     expect(modalStyles).toContain('.crate-reminder-editor-surface.is-centered');
@@ -265,6 +339,41 @@ describe('plugin reminder layout styles', () => {
     expect(primaryStyles).toContain(
       '.premium-reminder-card:active .premium-reminder-content {\n        transform: none;',
     );
+  });
+
+  it('uses restrained Linear-style highlight and selection states for plugin cards', async () => {
+    const interactionStyles = await readFile(
+      new URL('./reminders-view/_card-interactions.scss', import.meta.url),
+      'utf8',
+    );
+    const projectCard = await readFile(
+      new URL('./views/BrowseProjectCard.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(interactionStyles).toContain('--crate-card-highlight-duration: 90ms');
+    expect(interactionStyles).toContain('transform: none');
+    expect(interactionStyles).not.toContain('translateY(');
+    expect(interactionStyles).not.toContain('scale(');
+    expect(interactionStyles).toContain(
+      '.sidebar-reminder-card-wrapper:focus-visible .premium-reminder-content',
+    );
+    expect(interactionStyles).toContain(
+      'box-shadow: inset 0 0 0 1px var(--crate-focus-ring)',
+    );
+    expect(interactionStyles).toContain(
+      '.reminders-view.light:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail)',
+    );
+    expect(interactionStyles).toContain('--crate-reminder-card-bg: var(--background-primary)');
+    expect(interactionStyles).toContain(
+      '--crate-reminder-card-border: color-mix(in srgb, var(--text-normal) 9%, transparent)',
+    );
+    expect(interactionStyles).toContain('color: var(--text-muted)');
+    expect(interactionStyles).toContain('--crate-card-press-duration: 45ms');
+    expect(interactionStyles).toContain(
+      'transition-duration: var(--crate-card-press-duration)',
+    );
+    expect(projectCard).not.toContain('whileTap');
   });
 
   it('uses Obsidian icon geometry instead of a bundled icon style', async () => {

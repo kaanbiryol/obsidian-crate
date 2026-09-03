@@ -30,6 +30,7 @@ export interface SyncQueueControllerContext {
 	uploadConcurrency: number;
 	maxDebounceWaitMs: number;
 	reconcile(queueKeys: string[]): Promise<SyncResult>;
+	onFlushResult(result: SyncResult): void | Promise<void>;
 }
 
 export class SyncQueueController {
@@ -133,6 +134,7 @@ export class SyncQueueController {
 				this.context.getModifiedIso(path, fallbackMtime),
 			triggerDebouncedSync: () => this.debouncedSync(),
 			requestReconciliation: (queueKeys: string[]) => this.requestReconciliation(queueKeys),
+			onFlushResult: (result: SyncResult) => this.context.onFlushResult(result),
 		};
 	}
 

@@ -20,9 +20,24 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
     onSubmit
 }) => (
     <div className="reminder-editor-header">
-        {/* Left side - Delete (when editing) or Cancel */}
         <div className="reminder-editor-header-side">
-            {isEditing ? (
+            <ShadowDOMNativeButton
+                onClick={onClose}
+                aria-label="Close reminder editor"
+                className="picker-header-button"
+            >
+                <ObsidianIcon size="m" id="x" />
+            </ShadowDOMNativeButton>
+        </div>
+
+        <div className="reminder-editor-header-copy">
+            <h2 className="reminder-header-title">
+                {isEditing ? 'Edit reminder' : 'New reminder'}
+            </h2>
+        </div>
+
+        <div className="reminder-editor-header-side is-right">
+            {isEditing && (
                 <ShadowDOMButton
                     isIconOnly
                     size="sm"
@@ -34,26 +49,7 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
                 >
                     <ObsidianIcon size="m" id="trash-2" />
                 </ShadowDOMButton>
-            ) : (
-                <ShadowDOMNativeButton
-                    onClick={onClose}
-                    aria-label="Close reminder editor"
-                    className="picker-header-button"
-                >
-                    <ObsidianIcon size="m" id="x" />
-                </ShadowDOMNativeButton>
             )}
-        </div>
-
-        {/* Title (center) - Refined typography */}
-        <div className="reminder-editor-header-copy">
-            <h2 className="reminder-header-title">
-                {isEditing ? 'Edit reminder' : 'New reminder'}
-            </h2>
-        </div>
-
-        {/* Right side - explicit text keeps the primary action unambiguous */}
-        <div className="reminder-editor-header-side is-right">
             <ShadowDOMButton
                 size="sm"
                 variant="light"

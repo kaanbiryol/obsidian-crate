@@ -1,6 +1,5 @@
 import React, { memo } from 'react';
 
-import type { AnimationConfig } from '../../types/componentAdapter';
 import { ShadowDOMNativeMotionButton } from '../../components/ShadowDOMNativeMotionButton';
 import type { BrowseProjectCardViewModel } from './viewModels';
 import { ThemeIcon } from '../../components/theme-icon';
@@ -39,11 +38,9 @@ const MiniProgressBar = memo(function MiniProgressBar({
 export const BrowseProjectCard = memo(function BrowseProjectCard({
   card,
   onClick,
-  animationConfig,
 }: {
   card: BrowseProjectCardViewModel;
   onClick: () => void;
-  animationConfig: AnimationConfig;
 }) {
   const { project, stats, accentColor, isComplete } = card;
 
@@ -56,7 +53,6 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
       initial={false}
       animate={{ opacity: 1 }}
       transition={{ duration: 0 }}
-      whileTap={animationConfig.enabled ? { scale: 0.98 } : undefined}
     >
       <div className="premium-project-content">
         <div className="premium-project-left">

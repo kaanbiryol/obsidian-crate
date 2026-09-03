@@ -6,6 +6,8 @@ import type { QueueFlushContext } from './queue-flush-types';
 import { prepareQueueOperations, uploadPendingFiles } from './queue-upload';
 import { isQueueTerminalFailure, isQueueVersionConflict } from './queue-failure';
 import { HttpError } from './api';
+import { createEmptySyncResult } from './sync-result';
+import type { PreparedUpload, SyncResult } from './types';
 
 export type { QueueFlushContext } from './queue-flush-types';
 
@@ -24,6 +26,34 @@ function clearCompletedRevisions(
 		) {
 			context.pendingRevisions?.delete(path);
 		}
+	}
+}
+
+function buildQueueSyncResult(
+	uploads: PreparedUpload[],
+	deletes: Array<{ path: string }>,
+	completedQueueKeys: Set<string>,
+	errors: string[] = [],
+): SyncResult {
+	const result = createEmptySyncResult();
+	result.uploadedPaths = uploads
+		.filter(upload => completedQueueKeys.has(upload.path))
+		.map(upload => upload.path);
+	result.deletedPaths = deletes
+		.filter(file => completedQueueKeys.has(`delete:${file.path}`))
+		.map(file => file.path);
+	result.uploaded = result.uploadedPaths.length;
+	result.deleted = result.deletedPaths.length;
+	result.errors.push(...errors);
+	result.success = errors.length === 0;
+	return result;
+}
+
+async function reportFlushResult(context: QueueFlushContext, result: SyncResult): Promise<void> {
+	try {
+		await context.onFlushResult?.(result);
+	} catch (error) {
+		logger.error('Failed to record automatic sync activity:', error);
 	}
 }
 
@@ -85,11 +115,16 @@ export async function processPendingChanges(
 		await context.localManifest.save();
 		clearCompletedRevisions(context, completedQueueKeys, revisionSnapshot);
 		if (failures.length > 0) {
+			const errors = failures.map(failure => `${failure.path}: ${failure.error}`);
 			context.updateState({
 				status: 'error',
-				lastError: failures.map(failure => `${failure.path}: ${failure.error}`).join('; '),
+				lastError: errors.join('; '),
 				pendingChanges: context.pendingPaths.size,
 			});
+			await reportFlushResult(
+				context,
+				buildQueueSyncResult(uploads, deletes, completedQueueKeys, errors),
+			);
 			if (reconciliationPaths.size > 0) context.requestReconciliation([...reconciliationPaths]);
 			return;
 		}
@@ -101,6 +136,12 @@ export async function processPendingChanges(
 			...(didWork ? { lastSync: new Date().toISOString(), lastError: null } : {}),
 			pendingChanges: context.pendingPaths.size,
 		});
+		if (didWork) {
+			await reportFlushResult(
+				context,
+				buildQueueSyncResult(uploads, deletes, completedQueueKeys),
+			);
+		}
 	} catch (error) {
 		if (isAbortError(error)) {
 			logger.info('Queue processing aborted');

@@ -26,7 +26,8 @@ export class ActivityModal extends Modal {
 	private conflictsCount!: HTMLSpanElement;
 	private pendingPanel!: HTMLDivElement;
 	private conflictsPanel!: HTMLDivElement;
-	private allTabs: HTMLElement[] = [];
+	private historyPanel!: HTMLDivElement;
+	private allTabs: HTMLButtonElement[] = [];
 	private allPanels: HTMLDivElement[] = [];
 	private currentTabIndex = 0;
 	private readonly onStateChange = () => this.refresh();
@@ -38,16 +39,33 @@ export class ActivityModal extends Modal {
 	}
 
 	onOpen(): void {
-		const { contentEl, modalEl } = this;
+		const { containerEl, contentEl, modalEl } = this;
+		containerEl.addClass('crate-activity-modal-container');
 		modalEl.addClass('crate-activity-modal');
+		const nativeHeaderButtons: NodeListOf<HTMLElement> = containerEl.querySelectorAll(
+			'.modal-close-button, .modal-header-button',
+		);
+		nativeHeaderButtons.forEach((nativeHeaderButton) => {
+			nativeHeaderButton.remove();
+		});
 
 		// Header
 		const header = contentEl.createDiv({ cls: 'crate-activity-header' });
+		const closeButton = header.createEl('button', {
+			cls: 'crate-activity-close-btn',
+			attr: { type: 'button', 'aria-label': 'Close sync activity', title: 'Close' },
+		});
+		setIcon(closeButton, 'x');
+		closeButton.addEventListener('click', () => this.close());
+
 		const headerText = header.createDiv({ cls: 'crate-activity-header-text' });
-		headerText.createEl('h3', { text: 'Sync activity', cls: 'crate-activity-title' });
+		headerText.createEl('h2', { text: 'Sync activity', cls: 'crate-activity-title' });
 		this.subtitleEl = headerText.createSpan({ text: this.formatLastSync(), cls: 'crate-activity-subtitle' });
 
-		this.syncBtn = header.createEl('button', { cls: 'crate-sync-now-btn' });
+		this.syncBtn = header.createEl('button', {
+			cls: 'crate-sync-now-btn',
+			attr: { type: 'button', 'aria-label': 'Sync now', title: 'Sync now' },
+		});
 		this.syncBtnIcon = this.syncBtn.createSpan({ cls: 'crate-sync-btn-icon' });
 		setIcon(this.syncBtnIcon, 'refresh-cw');
 		this.syncBtn.createSpan({ text: 'Sync now', cls: 'crate-sync-btn-text' });
@@ -71,15 +89,24 @@ export class ActivityModal extends Modal {
 		const tabBar = contentEl.createDiv({ cls: 'crate-activity-tab-bar' });
 		const tabs = tabBar.createDiv({ cls: 'crate-activity-tabs' });
 
-		const pendingTab = tabs.createDiv({ cls: 'crate-activity-tab crate-activity-tab-active', attr: { tabindex: '0', role: 'tab' } });
+		const pendingTab = tabs.createEl('button', {
+			cls: 'crate-activity-tab crate-activity-tab-active',
+			attr: { type: 'button', role: 'tab', 'aria-selected': 'true' },
+		});
 		pendingTab.createSpan({ text: 'Pending' });
 		this.pendingCount = pendingTab.createSpan({ cls: 'crate-tab-count' });
 
-		const conflictsTab = tabs.createDiv({ cls: 'crate-activity-tab', attr: { tabindex: '0', role: 'tab' } });
+		const conflictsTab = tabs.createEl('button', {
+			cls: 'crate-activity-tab',
+			attr: { type: 'button', role: 'tab', 'aria-selected': 'false' },
+		});
 		conflictsTab.createSpan({ text: 'Conflicts' });
 		this.conflictsCount = conflictsTab.createSpan({ cls: 'crate-tab-count' });
 
-		const historyTab = tabs.createDiv({ cls: 'crate-activity-tab', attr: { tabindex: '0', role: 'tab' } });
+		const historyTab = tabs.createEl('button', {
+			cls: 'crate-activity-tab',
+			attr: { type: 'button', role: 'tab', 'aria-selected': 'false' },
+		});
 		historyTab.createSpan({ text: 'History' });
 
 		this.tabIndicator = tabs.createDiv({ cls: 'crate-activity-tab-indicator' });
@@ -89,16 +116,16 @@ export class ActivityModal extends Modal {
 		// Panels
 		this.pendingPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
 		this.conflictsPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
-		const historyPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
+		this.historyPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
 		this.conflictsPanel.hide();
-		historyPanel.hide();
+		this.historyPanel.hide();
 
 		this.allTabs = [pendingTab, conflictsTab, historyTab];
-		this.allPanels = [this.pendingPanel, this.conflictsPanel, historyPanel];
+		this.allPanels = [this.pendingPanel, this.conflictsPanel, this.historyPanel];
 
 		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths());
 		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts());
-		renderHistoryPanel(historyPanel, this.settings.syncHistory ?? []);
+		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? []);
 
 		for (let i = 0; i < this.allTabs.length; i++) {
 			const tab = this.allTabs[i];
@@ -120,9 +147,11 @@ export class ActivityModal extends Modal {
 			if (!tab || !panel) continue;
 			if (i === index) {
 				tab.addClass('crate-activity-tab-active');
+				tab.setAttribute('aria-selected', 'true');
 				panel.show();
 			} else {
 				tab.removeClass('crate-activity-tab-active');
+				tab.setAttribute('aria-selected', 'false');
 				panel.hide();
 			}
 		}
@@ -153,6 +182,8 @@ export class ActivityModal extends Modal {
 	private updateSyncBtn(): void {
 		const syncing = this.deps.getState().status === 'syncing';
 		this.syncBtn.disabled = syncing;
+		this.syncBtn.setAttribute('aria-label', syncing ? 'Syncing' : 'Sync now');
+		this.syncBtn.setAttribute('title', syncing ? 'Syncing' : 'Sync now');
 		if (syncing) {
 			this.syncBtn.addClass('is-syncing');
 		} else {
@@ -182,19 +213,21 @@ export class ActivityModal extends Modal {
 		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths());
 		this.conflictsPanel.empty();
 		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts());
+		this.historyPanel.empty();
+		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? []);
 		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
 	}
 
 	private formatLastSync(): string {
 		const lastSync = this.deps.getState().lastSync;
-		if (!lastSync) return 'Never synced';
+		if (!lastSync) return 'Not synced yet';
 		const diffMs = Date.now() - new Date(lastSync).getTime();
 		const diffMin = Math.floor(diffMs / 60000);
-		if (diffMin < 1) return 'Last synced just now';
-		if (diffMin < 60) return `Last synced ${diffMin}m ago`;
+		if (diffMin < 1) return 'Synced just now';
+		if (diffMin < 60) return `Synced ${diffMin}m ago`;
 		const diffHr = Math.floor(diffMin / 60);
-		if (diffHr < 24) return `Last synced ${diffHr}h ago`;
-		return `Last synced ${Math.floor(diffHr / 24)}d ago`;
+		if (diffHr < 24) return `Synced ${diffHr}h ago`;
+		return `Synced ${Math.floor(diffHr / 24)}d ago`;
 	}
 
 	onClose(): void {
