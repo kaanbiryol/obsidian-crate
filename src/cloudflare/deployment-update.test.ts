@@ -28,6 +28,15 @@ describe('isCloudflareServerUpdateAvailable', () => {
 		expect(isCloudflareServerUpdateAvailable(createDeployment(), embedded)).toBe(true);
 	});
 
+	it('ignores a newer plugin release when its deployable artifacts are unchanged', () => {
+		expect(isCloudflareServerUpdateAvailable(createDeployment({
+			lastDeployedFingerprint: embedded.fingerprint,
+		}), {
+			...embedded,
+			version: '0.2.0',
+		})).toBe(false);
+	});
+
 	it('reports an exact deployed artifact as up to date', () => {
 		expect(isCloudflareServerUpdateAvailable(createDeployment({
 			lastDeployedFingerprint: embedded.fingerprint,
@@ -37,6 +46,13 @@ describe('isCloudflareServerUpdateAvailable', () => {
 	it('does not offer to downgrade a server deployed by a newer plugin', () => {
 		expect(isCloudflareServerUpdateAvailable(createDeployment({
 			lastDeployedVersion: '0.2.0',
+		}), embedded)).toBe(false);
+	});
+
+	it('does not offer to downgrade a newer legacy server without a fingerprint', () => {
+		expect(isCloudflareServerUpdateAvailable(createDeployment({
+			lastDeployedVersion: '0.2.0',
+			lastDeployedFingerprint: null,
 		}), embedded)).toBe(false);
 	});
 

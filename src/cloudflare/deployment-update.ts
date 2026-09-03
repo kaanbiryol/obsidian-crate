@@ -25,6 +25,9 @@ export function isCloudflareServerUpdateAvailable(
 	deployment: CloudflareDeploymentMetadata,
 	embedded: CloudflareArtifactIdentity,
 ): boolean {
+	// A fingerprint is derived only from the deployable Worker, PWA, and D1
+	// artifacts. Plugin releases can change independently, so their versions
+	// must not by themselves prompt a Cloudflare deployment.
 	if (!deployment.lastDeployedVersion) return true;
 
 	const embeddedVersion = semanticVersionCore(embedded.version);
@@ -32,10 +35,9 @@ export function isCloudflareServerUpdateAvailable(
 	if (embeddedVersion && deployedVersion) {
 		const comparison = compareVersionCore(embeddedVersion, deployedVersion);
 		if (comparison < 0) return false;
-		if (comparison > 0) return true;
-	} else if (embedded.version !== deployment.lastDeployedVersion) {
-		return true;
 	}
+
+	if (!deployment.lastDeployedFingerprint) return true;
 
 	return deployment.lastDeployedFingerprint !== embedded.fingerprint;
 }

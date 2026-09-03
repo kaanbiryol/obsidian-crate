@@ -8,8 +8,10 @@ import { rawTextPlugin } from './raw-text-plugin.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const generatedDir = resolve(root, '.generated/cloudflare');
-const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-8'));
-const serverVersion = typeof packageJson.version === 'string' ? packageJson.version : 'dev';
+// This identifies the Cloudflare service, not the Obsidian plugin release.
+// Keeping it stable prevents an otherwise unrelated plugin version bump from
+// changing the Worker bundle and prompting users to redeploy their server.
+const serverVersion = 'crate';
 const PWA_VERSION_PLACEHOLDER = 'crate-pwa-version-placeholder';
 
 function listFiles(directory) {
