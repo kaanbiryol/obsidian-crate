@@ -37,7 +37,7 @@ export function PickerTimeCard({ label, optionalLabel, hour, minute, onChange, o
 						onChange(nextHour, nextMinute);
 					}
 				}}
-				className="picker-time-input"
+				className={`picker-time-input${value ? ' has-value' : ''}`}
 			/>
 		</label>
 	);

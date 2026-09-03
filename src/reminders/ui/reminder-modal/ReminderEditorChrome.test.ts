@@ -134,9 +134,13 @@ describe('reminder editor chrome', () => {
         expect(dateMarkup).toContain('role="dialog"');
         expect(dateMarkup).toContain('aria-label="Schedule reminder"');
         expect(dateMarkup).toContain('reminder-modal-header-action is-enabled');
+        expect(dateMarkup).toContain('picker-current-label');
+        expect(dateMarkup).toContain('picker-current-value');
+        expect(dateMarkup).toContain('data-icon="calendar"');
         expect(dateMarkup).toContain('picker-schedule-fields');
         expect(dateMarkup).toContain('type="date"');
         expect(dateMarkup).toContain('type="time"');
+        expect(dateMarkup.match(/has-value/g)).toHaveLength(1);
         expect(dateMarkup).not.toContain('date-calendar-grid');
         expect(dateMarkup).toContain('>Done<');
         expect(recurrenceMarkup).toContain('Remove repeat');

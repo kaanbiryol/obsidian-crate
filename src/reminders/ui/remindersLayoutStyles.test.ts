@@ -154,18 +154,21 @@ describe('plugin reminder layout styles', () => {
     expect(styles).not.toContain('.reminder-date-picker .reminder-modal-header');
     expect(styles).toContain('min-height: 44px');
     expect(styles).toContain('.reminder-date-picker .picker-current-summary');
-    expect(styles).toContain('background: color-mix(in srgb, var(--text-normal) 3%, transparent)');
-    expect(styles).toContain('border-color: transparent');
+    expect(styles).toContain('.picker-current-value');
+    expect(styles).toContain('background: color-mix(in srgb, var(--crate-accent-text) 6%, transparent)');
+    expect(styles).toContain('border: 0');
     expect(styles).toContain('.reminder-date-picker .date-quick-button');
-    expect(styles).toContain('border: 1px solid transparent');
+    expect(styles).toContain('border: 1px solid color-mix(in srgb, var(--crate-divider) 55%, transparent)');
     expect(styles).toContain('.reminder-date-picker .picker-schedule-fields');
     expect(styles).toContain('border: 0');
     expect(styles).toContain('.reminder-date-picker :is(.picker-date-input, .picker-time-input)');
-    expect(styles).toContain('height: 28px');
+    expect(styles).toContain('height: 30px');
+    expect(styles).toContain('&.has-value');
     expect(styles).toContain('.reminder-date-picker .picker-remove-button');
-    expect(styles).toContain('min-height: 28px');
-    expect(modalStyles).toContain('.crate-reminder-picker-surface.is-date-picker.is-centered');
-    expect(modalStyles).toContain('border-radius: var(--radius-m, 8px)');
+    expect(styles).toContain('min-height: 32px');
+    expect(modalStyles).toContain('.crate-reminder-editor-surface,\n.crate-reminder-picker-surface.is-date-picker');
+    expect(modalStyles).toContain('width: min(560px, calc(100vw - 40px))');
+    expect(modalStyles).toContain('.crate-reminder-editor-surface.is-centered,\n.crate-reminder-picker-surface.is-date-picker.is-centered');
   });
 
   it('keeps the dialog title and editable reminder text one typography step apart', async () => {

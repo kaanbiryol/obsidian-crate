@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
 import { ModalHeader } from '../../components/ModalHeader';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 import type { AnimationConfig } from '../animations';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { getPickerModalProps } from '../glassStyles';
@@ -111,8 +112,11 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                 <div className="reminder-picker-scroll">
                     {currentDate && (
                         <div className="picker-current-summary" aria-live="polite">
-                            <span>{REMINDER_PICKER_COPY.schedule.current}</span>
-                            <strong>{formatDueDate(dueDate ?? undefined)}</strong>
+                            <span className="picker-current-label">{REMINDER_PICKER_COPY.schedule.current}</span>
+                            <span className="picker-current-value">
+                                <ObsidianIcon size="s" id="calendar" aria-hidden="true" />
+                                <strong>{formatDueDate(dueDate ?? undefined)}</strong>
+                            </span>
                         </div>
                     )}
 
@@ -141,7 +145,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                                     aria-label={REMINDER_PICKER_COPY.schedule.date}
                                     value={currentDate ? formatLocalDateKey(currentDate) : ''}
                                     onChange={(event) => handleDateChange(event.currentTarget.value)}
-                                    className="picker-date-input"
+                                    className={`picker-date-input${currentDate ? ' has-value' : ''}`}
                                 />
                             </label>
                             <PickerTimeCard

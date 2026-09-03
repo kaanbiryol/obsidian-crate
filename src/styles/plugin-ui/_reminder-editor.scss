@@ -537,39 +537,56 @@
 
 .reminder-date-picker .picker-current-summary,
 .reminder-date-picker .picker-section {
-  margin: 12px 12px 0;
+  margin: 16px 16px 0;
 }
 
 .reminder-date-picker .picker-section + .picker-section {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .reminder-date-picker .picker-section {
-  gap: 6px;
+  gap: 8px;
 }
 
 .reminder-date-picker .picker-current-summary {
-  min-height: 38px;
-  align-items: flex-start;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0;
-  padding: 5px 8px;
-  border-color: transparent;
-  border-radius: var(--radius-s, 4px);
-  background: color-mix(in srgb, var(--text-normal) 3%, transparent);
+  min-height: 28px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 
-  span {
+  > .picker-current-label {
     color: var(--text-muted);
     font-size: var(--reminder-font-xxs);
-    font-weight: var(--reminder-font-weight-normal);
+    font-weight: var(--reminder-font-weight-medium);
   }
 
-  strong {
-    color: var(--text-normal);
-    font-size: var(--reminder-font-sm);
-    line-height: 1.2;
-    text-align: left;
+  .picker-current-value {
+    display: inline-flex;
+    min-width: 0;
+    min-height: 28px;
+    align-items: center;
+    gap: 5px;
+    padding: 0 8px;
+    border: 1px solid color-mix(in srgb, var(--crate-accent-text) 16%, transparent);
+    border-radius: var(--tag-radius, var(--crate-radius-control));
+    background: color-mix(in srgb, var(--crate-accent-text) 6%, transparent);
+    color: var(--crate-accent-text);
+
+    .obsidian-icon {
+      flex: 0 0 auto;
+    }
+
+    strong {
+      color: currentColor;
+      font-size: var(--reminder-font-xs);
+      font-weight: var(--reminder-font-weight-medium);
+      line-height: 1.2;
+      text-align: left;
+    }
   }
 }
 
@@ -578,41 +595,42 @@
 
   h4,
   strong {
-    color: var(--text-faint);
+    color: var(--text-muted);
     font-size: var(--reminder-font-xxs);
-    font-weight: var(--reminder-font-weight-normal);
+    font-weight: var(--reminder-font-weight-medium);
   }
 }
 
 .reminder-date-picker .date-quick-options {
-  gap: 4px;
+  gap: 8px;
   overflow: visible;
   border: 0;
   background: transparent;
 }
 
 .reminder-date-picker .date-quick-button {
-  min-height: 40px;
-  gap: 5px;
-  padding: 5px 8px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-s, 4px);
-  background: color-mix(in srgb, var(--text-normal) 3%, transparent);
+  min-height: 44px;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--crate-divider) 55%, transparent);
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
 
   & + &,
   &:nth-child(n + 3),
   &:nth-child(3) {
-    border: 1px solid transparent;
+    border: 1px solid color-mix(in srgb, var(--crate-divider) 55%, transparent);
   }
 
   &:hover {
-    border-color: color-mix(in srgb, var(--text-normal) 8%, transparent);
+    border-color: var(--crate-divider);
+    background: var(--crate-control-hover-bg);
   }
 
   &.is-active {
-    border-color: color-mix(in srgb, var(--crate-accent-text) 14%, transparent);
-    background: color-mix(in srgb, var(--crate-accent-text) 6%, transparent);
-    color: var(--text-accent);
+    border-color: color-mix(in srgb, var(--crate-accent-text) 20%, transparent);
+    background: color-mix(in srgb, var(--crate-accent-text) 8%, transparent);
+    color: var(--crate-accent-text);
   }
 }
 
@@ -634,7 +652,7 @@
   display: flex;
   overflow: visible;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -644,15 +662,15 @@
   min-height: 40px;
   gap: 8px;
   padding: 4px 8px;
-  border: 0;
-  border-radius: var(--radius-s, 4px);
-  background: color-mix(in srgb, var(--text-normal) 3%, transparent);
+  border: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
 }
 
 .reminder-date-picker .picker-schedule-fields .picker-time-card {
-  border: 0;
-  border-radius: var(--radius-s, 4px);
-  background: color-mix(in srgb, var(--text-normal) 3%, transparent);
+  border: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
 }
 
 .reminder-date-picker .picker-field-copy strong {
@@ -671,16 +689,27 @@
 
 .reminder-date-picker :is(.picker-date-input, .picker-time-input) {
   width: clamp(116px, 42%, 148px);
-  height: 28px;
+  height: 30px;
   padding: 0 6px;
   border-color: transparent;
-  border-radius: var(--radius-s, 4px);
+  border-radius: var(--tag-radius, var(--crate-radius-control));
   background: transparent;
   font-size: var(--reminder-font-sm);
 
   &:hover {
     border-color: color-mix(in srgb, var(--text-normal) 16%, transparent);
     background: var(--crate-control-hover-bg);
+  }
+
+  &.has-value {
+    border-color: color-mix(in srgb, var(--crate-accent-text) 14%, transparent);
+    background: color-mix(in srgb, var(--crate-accent-text) 5%, transparent);
+    color: var(--crate-accent-text);
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--crate-accent-text) 22%, transparent);
+      background: color-mix(in srgb, var(--crate-accent-text) 8%, transparent);
+    }
   }
 
   &:focus {
@@ -691,18 +720,18 @@
 }
 
 .reminder-date-picker .picker-footer {
-  margin-top: 16px;
-  padding: 0 12px;
+  margin-top: 20px;
+  padding: 0 16px;
 }
 
 .reminder-date-picker .picker-remove-button {
-  min-height: 28px;
-  gap: 4px;
-  padding: 0 4px;
-  border-radius: var(--radius-s, 4px);
-  color: color-mix(in srgb, var(--text-error) 58%, var(--text-muted));
-  font-size: var(--reminder-font-xxs);
-  font-weight: var(--reminder-font-weight-normal);
+  min-height: 32px;
+  gap: 6px;
+  padding: 0 6px;
+  border-radius: var(--crate-radius-control);
+  color: color-mix(in srgb, var(--text-error) 72%, var(--text-muted));
+  font-size: var(--reminder-font-xs);
+  font-weight: var(--reminder-font-weight-medium);
 
   &:hover {
     background: color-mix(in srgb, var(--text-error) 7%, transparent);
