@@ -59,8 +59,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     keyboardOffset = 0,
 }) => {
     const isEditing = !!reminder;
-    const isMobileSheet = variant === 'bottom-sheet';
-    const focusDelayMs = isMobileSheet ? (isEditing ? 0 : 120) : 0;
+    const focusDelayMs = 0;
     const textareaRef = useRef<HTMLDivElement>(null);
     const richTextInputRef = useRef<RichTextInputHandle>(null);
     const {

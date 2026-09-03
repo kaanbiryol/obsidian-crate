@@ -10,18 +10,21 @@ import { RecurrencePickerModal } from './RecurrencePickerModal';
 import { ReminderActionChips } from './ReminderActionChips';
 
 describe('reminder editor chrome', () => {
-    it('focuses the title after the main editor finishes opening', async () => {
+    it('focuses the title on the next paint instead of waiting for the opening animation', async () => {
         const presentation = await readFile(
             new URL('./useReminderModalPresentation.ts', import.meta.url),
             'utf8',
         );
-        const entryHandler = presentation.match(
-            /const handleEntryAnimationComplete = useCallback\(\(\) => \{([\s\S]*?)\n\t\},/,
-        )?.[1];
+        const modal = await readFile(
+            new URL('./AddReminderModal.tsx', import.meta.url),
+            'utf8',
+        );
 
-        expect(entryHandler).toContain("currentView === 'main'");
-        expect(entryHandler).toContain('showModal && !isClosing');
-        expect(entryHandler).toContain('richTextInputRef.current?.focus()');
+        expect(modal).toContain('const focusDelayMs = 0');
+        expect(presentation).toContain("currentView !== 'main'");
+        expect(presentation).toContain('window.requestAnimationFrame');
+        expect(presentation).toContain('richTextInputRef.current?.focus()');
+        expect(presentation).toContain('window.cancelAnimationFrame(frame)');
     });
 
     it('uses sentence case and an explicit save action', () => {
