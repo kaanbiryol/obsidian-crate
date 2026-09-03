@@ -51,6 +51,17 @@ export function useReminderModalPresentation({
 		return () => window.clearTimeout(timer);
 	}, [focusDelayMs]);
 
+	useEffect(() => {
+		if (!allowAutoFocus || currentView !== 'main' || !showModal || isClosing) {
+			return;
+		}
+
+		const frame = window.requestAnimationFrame(() => {
+			richTextInputRef.current?.focus();
+		});
+		return () => window.cancelAnimationFrame(frame);
+	}, [allowAutoFocus, currentView, isClosing, richTextInputRef, showModal]);
+
 	const handleClose = useCallback(() => {
 		if (isClosing) {
 			return;
@@ -83,10 +94,7 @@ export function useReminderModalPresentation({
 
 	const handleEntryAnimationComplete = useCallback(() => {
 		setIsEntryAnimationComplete(true);
-		if (currentView === 'main' && showModal && !isClosing) {
-			richTextInputRef.current?.focus();
-		}
-	}, [currentView, isClosing, richTextInputRef, showModal]);
+	}, []);
 
 	return {
 		currentView,
