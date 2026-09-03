@@ -161,15 +161,16 @@
     min-width: var(--crate-project-progress-width, 48px);
 }
 
-.premium-mini-progress {
+.crate-progress-meter {
     width: var(--crate-project-progress-width, 48px);
     height: var(--progress-bar-height, 4px);
+    flex-shrink: 0;
+    overflow: hidden;
     border-radius: var(--progress-bar-radius, var(--radius-s));
     background: var(--background-modifier-border);
-    overflow: hidden;
 }
 
-.premium-mini-progress-fill {
+.crate-progress-meter-fill {
     height: 100%;
     border-radius: inherit;
     transition: width var(--crate-motion-duration-moderate) var(--crate-motion-easing);

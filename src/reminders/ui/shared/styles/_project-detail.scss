@@ -164,21 +164,6 @@
     line-height: 1;
 }
 
-.project-detail-progress-bar {
-    width: var(--crate-project-progress-width, 48px);
-    height: var(--progress-bar-height, 4px);
-    border-radius: var(--progress-bar-radius, var(--radius-s));
-    background: var(--background-modifier-border);
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.project-detail-progress-fill {
-    height: 100%;
-    border-radius: inherit;
-    transition: width var(--crate-motion-duration-moderate) var(--crate-motion-easing);
-}
-
 // ============================================
 // Completed section
 // ============================================

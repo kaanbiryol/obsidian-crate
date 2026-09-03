@@ -1,5 +1,4 @@
 import React, { forwardRef } from 'react';
-import { motion } from 'framer-motion';
 import { useShadowDomClickBridge } from './shadowDomClickBridge';
 
 interface ButtonBehaviorProps {
@@ -20,11 +19,6 @@ interface ButtonBehaviorProps {
 type NativeButtonProps = Omit<
 	React.ButtonHTMLAttributes<HTMLButtonElement>,
 	'children' | 'color' | 'disabled' | 'onClick' | 'size'
-> & ButtonBehaviorProps;
-
-type MotionButtonProps = Omit<
-	React.ComponentProps<typeof motion.button>,
-	'children' | 'color' | 'disabled' | 'onClick'
 > & ButtonBehaviorProps;
 
 function buttonClassName(className: string | undefined): string {
@@ -88,39 +82,5 @@ export const ShadowDOMButton = forwardRef<HTMLButtonElement, NativeButtonProps>(
 		>
 			{buttonContent(behavior)}
 		</button>
-	);
-});
-
-export const ShadowDOMMotionButton = forwardRef<HTMLButtonElement, MotionButtonProps>(function ShadowDOMMotionButton({
-	onPress,
-	children,
-	type = 'button',
-	className,
-	isDisabled,
-	isLoading,
-	disableAnimation: _disableAnimation,
-	startContent,
-	endContent,
-	variant,
-	color,
-	size,
-	radius,
-	isIconOnly,
-	...props
-}, ref) {
-	const combinedRef = useShadowDomClickBridge(onPress, ref);
-	const behavior = { onPress, children, isDisabled, isLoading, startContent, endContent, variant, color, size, radius, isIconOnly };
-
-	return (
-		<motion.button
-			ref={combinedRef}
-			type={type}
-			className={buttonClassName(typeof className === 'string' ? className : undefined)}
-			disabled={isDisabled || isLoading}
-			{...semanticAttributes(behavior)}
-			{...props}
-		>
-			{buttonContent(behavior)}
-		</motion.button>
 	);
 });

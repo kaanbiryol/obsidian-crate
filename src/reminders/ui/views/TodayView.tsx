@@ -5,7 +5,7 @@ import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
 import { ReminderCard } from '../../components/ReminderCard';
 import { EmptyState } from '../../components/EmptyState';
-import { ProjectCompletedSection } from './ProjectCompletedSection';
+import { CompletedReminderSection } from './CompletedReminderSection';
 import { buildTodayViewModel } from './viewModels';
 import { CARD_ANIMATION } from '../layoutConstants';
 import type { ProjectColorScheme } from '../../utils/projectColors';
@@ -98,11 +98,12 @@ export const TodayView = memo(function TodayView({
             ))}
           </AnimatePresence>
 
-          <ProjectCompletedSection
+          <CompletedReminderSection
             reminders={completed}
             showCompleted={showCompleted}
             onToggle={() => setShowCompleted((previous) => !previous)}
             renderCard={cardRenderer}
+            animationConfig={animationConfig}
           />
         </LayoutGroup>
       </div>

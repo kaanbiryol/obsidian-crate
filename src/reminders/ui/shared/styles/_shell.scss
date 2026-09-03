@@ -438,26 +438,10 @@
 }
 
 .reminders-view-close {
-    display: inline-flex;
-    width: var(--crate-icon-button-size);
-    height: var(--crate-icon-button-size);
-    align-items: center;
-    justify-content: center;
     position: absolute;
     top: 12px;
     right: 16px;
     z-index: 100;
-    border: 1px solid var(--crate-glass-back-border, var(--background-modifier-border));
-    border-radius: var(--clickable-icon-radius, var(--crate-radius-control));
-    background: var(--crate-glass-back-bg, var(--background-primary-alt));
-    box-shadow: var(--crate-glass-back-shadow, var(--shadow-s));
-    color: var(--text-muted);
-    transition: background-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), box-shadow var(--crate-motion-duration-moderate) var(--crate-motion-easing), color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
-
-    &:hover {
-        background: var(--crate-glass-back-hover-bg, var(--background-modifier-hover));
-        box-shadow: var(--crate-glass-back-hover-shadow, var(--shadow-s));
-    }
 }
 
 .project-picker-dot {

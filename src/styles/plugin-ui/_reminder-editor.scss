@@ -12,29 +12,8 @@
 }
 
 .reminder-modal-header-close {
-  display: inline-flex;
-  width: var(--reminder-modal-header-control-size);
-  height: var(--reminder-modal-header-control-size);
-  align-items: center;
-  justify-content: center;
   justify-self: start;
-  border: 0;
-  border-radius: var(--clickable-icon-radius, var(--crate-radius-control));
-  background: transparent;
   color: var(--text-faint);
-  box-shadow: none;
-  transition: transform var(--crate-motion-duration-fast) var(--crate-motion-easing), background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
-
-  &:hover {
-    background: var(--crate-control-hover-bg);
-    color: var(--text-normal);
-    box-shadow: none;
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--crate-focus-ring);
-    outline-offset: 2px;
-  }
 }
 
 .reminder-modal-header-copy {
@@ -69,13 +48,7 @@
 }
 
 .reminder-modal-header-icon {
-  display: grid;
-  width: var(--reminder-modal-header-control-size);
-  height: var(--reminder-modal-header-control-size);
-  min-width: var(--reminder-modal-header-control-size);
-  padding: 0;
-  place-items: center;
-  border-radius: var(--crate-radius-control);
+  --crate-icon-button-control-size: var(--reminder-modal-header-control-size);
 }
 
 .reminder-modal-header-action {
@@ -221,6 +194,13 @@
   }
 }
 
+.picker-field-copy > span {
+  color: var(--text-faint);
+  font-size: var(--reminder-font-xxs);
+  font-weight: var(--reminder-font-weight-normal);
+  line-height: 1.2;
+}
+
 .picker-date-input,
 .picker-time-input {
   width: clamp(116px, 42%, 148px);
@@ -314,28 +294,6 @@
   flex: 0 0 auto;
 }
 
-.recurrence-option-copy {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 0;
-
-  strong {
-    color: var(--text-muted);
-    font-size: var(--reminder-font-xs);
-    font-weight: var(--reminder-font-weight-medium);
-    line-height: 1.25;
-  }
-
-  span {
-    color: var(--text-faint);
-    font-size: var(--reminder-font-xxs);
-    font-weight: var(--reminder-font-weight-normal);
-    line-height: 1.2;
-  }
-}
-
 .recurrence-option-label {
   color: var(--text-muted);
   font-size: var(--reminder-font-sm);
@@ -351,28 +309,7 @@
 }
 
 .recurrence-stepper-button {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: var(--reminder-font-base);
-  font-weight: var(--reminder-font-weight-semibold);
-  cursor: pointer;
-  border-radius: var(--crate-radius-control);
-
-  &:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--crate-divider) 65%, transparent);
-    background: var(--crate-control-hover-bg);
-    color: var(--text-normal);
-  }
-
-  &:disabled {
-    opacity: 0.3;
-  }
+  --crate-icon-button-control-size: 28px;
 }
 
 .recurrence-stepper {
@@ -542,8 +479,6 @@
 }
 
 .picker-current-summary.is-inline {
-  --picker-current-value-color: var(--crate-accent-text);
-
   min-height: 28px;
   align-items: center;
   justify-content: flex-start;
@@ -552,10 +487,6 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-
-  &.tone-warning {
-    --picker-current-value-color: var(--crate-warning);
-  }
 
   > .picker-current-label {
     color: var(--text-muted);
@@ -570,10 +501,10 @@
     align-items: center;
     gap: 5px;
     padding: 0 8px;
-    border: 1px solid color-mix(in srgb, var(--picker-current-value-color) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--crate-semantic-color) 16%, transparent);
     border-radius: var(--tag-radius, var(--crate-radius-control));
-    background: color-mix(in srgb, var(--picker-current-value-color) 6%, transparent);
-    color: var(--picker-current-value-color);
+    background: color-mix(in srgb, var(--crate-semantic-color) 6%, transparent);
+    color: var(--crate-semantic-color);
 
     .obsidian-icon {
       flex: 0 0 auto;
@@ -965,26 +896,7 @@
 }
 
 .reminder-header-delete {
-  width: var(--reminder-modal-header-control-size);
-  height: var(--reminder-modal-header-control-size);
-  min-width: var(--reminder-modal-header-control-size);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
   color: var(--text-faint);
-  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
-
-  &:hover {
-    background: var(--crate-control-hover-bg);
-    box-shadow: none;
-    color: var(--crate-danger);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--crate-focus-ring);
-    outline-offset: 1px;
-  }
 }
 
 .reminder-modal-body {
@@ -1007,7 +919,6 @@
 }
 
 .reminder-action-chip {
-  --reminder-chip-color: var(--crate-accent-text);
   --reminder-action-chip-height: max(
     26px,
     calc(var(--input-height, 32px) - 6px)
@@ -1034,23 +945,11 @@
   letter-spacing: normal;
   transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), border-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
-  &.tone-secondary {
-    --reminder-chip-color: var(--reminder-project-color, var(--crate-accent-text));
-  }
-
-  &.tone-danger {
-    --reminder-chip-color: var(--crate-danger);
-  }
-
-  &.tone-warning {
-    --reminder-chip-color: var(--crate-warning);
-  }
-
   &.is-active {
-    border-color: color-mix(in srgb, var(--reminder-chip-color) 20%, transparent);
-    background: color-mix(in srgb, var(--reminder-chip-color) 8%, transparent);
+    border-color: var(--crate-semantic-border);
+    background: var(--crate-semantic-bg);
     box-shadow: none;
-    color: var(--reminder-chip-color);
+    color: var(--crate-semantic-color);
   }
 
   &:hover:not(.is-active) {
@@ -1061,9 +960,9 @@
 
   &.is-active:hover,
   &:active {
-    border-color: color-mix(in srgb, var(--reminder-chip-color) 26%, transparent);
-    background: color-mix(in srgb, var(--reminder-chip-color) 11%, var(--crate-control-active-bg));
-    color: var(--reminder-chip-color);
+    border-color: color-mix(in srgb, var(--crate-semantic-color) 26%, transparent);
+    background: color-mix(in srgb, var(--crate-semantic-color) 11%, var(--crate-control-active-bg));
+    color: var(--crate-semantic-color);
   }
 
   &:focus-visible {
@@ -1129,8 +1028,8 @@
     line-height: var(--reminder-line-height-tight);
 
     &.is-active {
-      border-color: color-mix(in srgb, var(--reminder-chip-color) 20%, transparent);
-      background: color-mix(in srgb, var(--reminder-chip-color) 8%, transparent);
+      border-color: var(--crate-semantic-border);
+      background: var(--crate-semantic-bg);
       box-shadow: none;
     }
 

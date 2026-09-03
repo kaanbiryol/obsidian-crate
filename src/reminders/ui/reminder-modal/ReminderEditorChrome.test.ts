@@ -58,7 +58,7 @@ describe('reminder editor chrome', () => {
         }));
 
         expect(markup).toContain('aria-label="Close reminder editor"');
-        expect(markup).toContain('class="reminder-modal-header-close"');
+        expect(markup).toContain('crate-icon-button reminder-modal-header-close');
         expect(markup).not.toContain('reminder-header-close');
     });
 
@@ -149,7 +149,7 @@ describe('reminder editor chrome', () => {
         expect(recurrenceMarkup).toContain('crate-reminder-picker-surface is-recurrence-picker');
         expect(recurrenceMarkup).toContain('>Repeat<');
         expect(recurrenceMarkup).toContain('>Repeats<');
-        expect(recurrenceMarkup).toContain('picker-current-summary is-inline tone-warning');
+        expect(recurrenceMarkup).toContain('picker-current-value crate-semantic-token tone-warning');
         expect(recurrenceMarkup).toContain('class="picker-content"');
         expect(recurrenceMarkup).toContain('data-icon="repeat"');
         expect(recurrenceMarkup).toContain('>Frequency<');
@@ -233,7 +233,7 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('project-picker-list');
         expect(markup).toContain('crate-reminder-picker-surface is-project-picker');
         expect(markup).toContain('aria-label="Close project selection"');
-        expect(markup).toContain('class="reminder-modal-header-close"');
+        expect(markup).toContain('crate-icon-button reminder-modal-header-close');
         expect(markup).not.toContain('reminder-header-close');
         expect(markup).toContain('data-icon="x"');
         expect(markup).not.toContain('data-icon="chevron-left"');

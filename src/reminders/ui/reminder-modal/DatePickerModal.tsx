@@ -10,6 +10,8 @@ import { PickerTimeCard } from './PickerTimeCard';
 import { PickerDoneButton } from './PickerDoneButton';
 import { PickerContent } from './PickerContent';
 import { PickerCurrentSummary } from './PickerCurrentSummary';
+import { PickerFieldRow } from './PickerFieldRow';
+import { PickerSection } from './PickerSection';
 import { formatLocalDateKey, parseLocalDateKey, parseReminderDateValue } from '../../utils/reminderDate';
 import { buildDatePickerDateSelection, buildDatePickerTimeSelection } from './datePickerSelection';
 import { getReminderDateForPreset, type ReminderDatePreset } from './datePresets';
@@ -120,26 +122,27 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                             />
                         )}
 
-                        <section className="picker-section" aria-labelledby="plugin-quick-schedule-title">
-                            <div className="picker-section-heading">
-                                <h4 id="plugin-quick-schedule-title">{REMINDER_PICKER_COPY.schedule.quickOptions}</h4>
-                            </div>
+                        <PickerSection
+                            headingId="plugin-quick-schedule-title"
+                            title={REMINDER_PICKER_COPY.schedule.quickOptions}
+                        >
                             <DateQuickButtons
                                 currentDate={currentDate}
                                 hasTime={hasTime ?? false}
                                 onSelectPreset={handleQuickDate}
                             />
-                        </section>
+                        </PickerSection>
 
-                        <section className="picker-section" aria-labelledby="plugin-custom-schedule-title">
-                            <div className="picker-section-heading">
-                                <h4 id="plugin-custom-schedule-title">{REMINDER_PICKER_COPY.schedule.custom}</h4>
-                            </div>
+                        <PickerSection
+                            headingId="plugin-custom-schedule-title"
+                            title={REMINDER_PICKER_COPY.schedule.custom}
+                        >
                             <div className="picker-schedule-fields">
-                                <label className="picker-control-row picker-date-field">
-                                    <span className="picker-field-copy">
-                                        <strong>{REMINDER_PICKER_COPY.schedule.date}</strong>
-                                    </span>
+                                <PickerFieldRow
+                                    label={REMINDER_PICKER_COPY.schedule.date}
+                                    className="picker-date-field"
+                                    asLabel
+                                >
                                     <input
                                         type="date"
                                         aria-label={REMINDER_PICKER_COPY.schedule.date}
@@ -147,7 +150,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                                         onChange={(event) => handleDateChange(event.currentTarget.value)}
                                         className={`picker-date-input${currentDate ? ' has-value' : ''}`}
                                     />
-                                </label>
+                                </PickerFieldRow>
                                 <PickerTimeCard
                                     label={REMINDER_PICKER_COPY.schedule.time}
                                     optionalLabel={REMINDER_PICKER_COPY.schedule.optional}
@@ -157,7 +160,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                                     onClear={handleTimeClear}
                                 />
                             </div>
-                        </section>
+                        </PickerSection>
                     </PickerContent>
 
                     <PickerDoneButton

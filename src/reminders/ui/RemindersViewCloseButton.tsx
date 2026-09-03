@@ -1,6 +1,5 @@
 import React from "react";
-import { ShadowDOMNativeButton } from "@/reminders/components/ShadowDOMNativeButton";
-import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
+import { IconButton } from "@/reminders/components/IconButton";
 
 interface RemindersViewCloseButtonProps {
   onClose: () => void;
@@ -10,12 +9,14 @@ export const RemindersViewCloseButton: React.FC<RemindersViewCloseButtonProps> =
   onClose,
 }) => {
   return (
-    <ShadowDOMNativeButton
+    <IconButton
+      icon="x"
+      iconSize="l"
       onClick={onClose}
       className="reminders-view-close"
-      aria-label="Close"
-    >
-      <ObsidianIcon size="l" id="x" />
-    </ShadowDOMNativeButton>
+      label="Close"
+      size="large"
+      variant="surface"
+    />
   );
 };

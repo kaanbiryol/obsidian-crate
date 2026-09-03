@@ -1,8 +1,7 @@
 import React from 'react';
 
+import { IconButton } from '../../components/IconButton';
 import { ModalHeader } from '../../components/ModalHeader';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
-import { ObsidianIcon } from '../../components/obsidian-icon';
 
 interface AddReminderModalHeaderProps {
     isEditing: boolean;
@@ -24,13 +23,14 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
         closeLabel="Close reminder editor"
         onClose={onClose}
         secondaryActions={isEditing ? (
-            <ShadowDOMNativeButton
+            <IconButton
+                icon="trash-2"
+                iconSize="m"
                 onClick={onDelete}
-                aria-label="Delete reminder"
+                label="Delete reminder"
+                tone="danger"
                 className="reminder-modal-header-icon reminder-header-delete"
-            >
-                <ObsidianIcon size="m" id="trash-2" />
-            </ShadowDOMNativeButton>
+            />
         ) : undefined}
         action={{
             label: isEditing ? 'Save' : 'Add',

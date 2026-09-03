@@ -14,9 +14,9 @@ export function PickerCurrentSummary({
     tone = 'accent',
 }: PickerCurrentSummaryProps) {
     return (
-        <div className={`picker-current-summary is-inline tone-${tone}`} aria-live="polite">
+        <div className="picker-current-summary is-inline" aria-live="polite">
             <span className="picker-current-label">{label}</span>
-            <span className="picker-current-value">
+            <span className={`picker-current-value crate-semantic-token tone-${tone}`}>
                 <ObsidianIcon size="s" id={icon} aria-hidden="true" />
                 <strong>{value}</strong>
             </span>
