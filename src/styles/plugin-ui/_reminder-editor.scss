@@ -267,56 +267,73 @@
 .recurrence-picker-content {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  padding: 22px 18px 2px;
+  gap: 16px;
+  padding: 16px 16px 2px;
 }
 
 .recurrence-picker-time {
   margin-top: 0;
 }
 
+.reminder-recurrence-picker .picker-section {
+  gap: 8px;
+}
+
+.reminder-recurrence-picker .picker-section-heading {
+  padding: 0 1px;
+
+  h4,
+  strong {
+    color: var(--text-muted);
+    font-size: var(--reminder-font-xxs);
+    font-weight: var(--reminder-font-weight-medium);
+  }
+}
+
 .recurrence-frequency-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   overflow: hidden;
-  padding: 0;
-  border: 1px solid var(--crate-divider);
-  border-radius: var(--crate-radius-card);
-  background: var(--crate-control-bg);
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--crate-divider) 55%, transparent);
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
 }
 
 .recurrence-frequency-button {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
+  min-height: 34px;
   border: 0;
-  border-radius: 0;
+  border-radius: calc(var(--crate-radius-control) - 1px);
   background: transparent;
   color: var(--text-muted);
   font-size: var(--reminder-font-sm);
   font-weight: var(--reminder-font-weight-medium);
   cursor: pointer;
-  transition: transform var(--crate-motion-duration-fast) var(--crate-motion-easing), background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   & + & {
-    border-left: 1px solid var(--crate-divider);
+    border-left: 0;
   }
 
-  &:active {
-    transform: scale(0.97);
+  &:hover:not(.is-selected) {
+    background: var(--crate-control-hover-bg);
+    color: var(--text-normal);
   }
 
   &.is-selected {
-    background: var(--crate-picker-selection-bg);
-    color: var(--crate-picker-selection-color);
-    font-weight: var(--reminder-font-weight-semibold);
+    background: color-mix(in srgb, var(--crate-warning) 9%, transparent);
+    color: var(--crate-warning);
+    font-weight: var(--reminder-font-weight-medium);
   }
 }
 
 .recurrence-options {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
   min-height: 0;
   margin: 0;
   outline: 0;
@@ -324,14 +341,14 @@
 
 .recurrence-option-row {
   display: flex;
-  min-height: 52px;
+  min-height: 40px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  border: 1px solid var(--crate-divider);
-  border-radius: var(--crate-radius-card);
-  background: var(--crate-control-bg);
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
 }
 
 .recurrence-option-copy {
@@ -339,11 +356,11 @@
   min-width: 0;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
 
   strong {
     color: var(--text-muted);
-    font-size: var(--reminder-font-sm);
+    font-size: var(--reminder-font-xs);
     font-weight: var(--reminder-font-weight-medium);
     line-height: 1.25;
   }
@@ -351,6 +368,7 @@
   span {
     color: var(--text-faint);
     font-size: var(--reminder-font-xxs);
+    font-weight: var(--reminder-font-weight-normal);
     line-height: 1.2;
   }
 }
@@ -371,17 +389,23 @@
 
 .recurrence-stepper-button {
   display: inline-flex;
-  width: var(--input-height, 36px);
-  height: var(--input-height, 36px);
+  width: 28px;
+  height: 28px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--crate-divider);
-  background: var(--crate-control-bg);
-  color: var(--text-normal);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
   font-size: var(--reminder-font-base);
   font-weight: var(--reminder-font-weight-semibold);
   cursor: pointer;
-  border-radius: var(--crate-radius-button);
+  border-radius: var(--crate-radius-control);
+
+  &:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--crate-divider) 65%, transparent);
+    background: var(--crate-control-hover-bg);
+    color: var(--text-normal);
+  }
 
   &:disabled {
     opacity: 0.3;
@@ -390,14 +414,14 @@
 
 .recurrence-stepper {
   display: grid;
-  grid-template-columns: var(--input-height, 36px) minmax(34px, auto) var(--input-height, 36px);
+  grid-template-columns: 28px minmax(28px, auto) 28px;
   align-items: center;
   gap: 3px;
   flex: 0 0 auto;
 }
 
 .recurrence-stepper-value {
-  min-width: 34px;
+  min-width: 28px;
   color: var(--text-normal);
   font-size: var(--reminder-font-sm);
   font-weight: var(--reminder-font-weight-semibold);
@@ -411,30 +435,73 @@
 .recurrence-day-list {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 3px;
-  padding: 6px;
-  border: 1px solid var(--crate-divider);
-  border-radius: var(--crate-radius-card);
-  background: var(--crate-control-bg);
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .recurrence-day-button {
   flex: 1;
   width: 100%;
   max-width: none;
-  aspect-ratio: 1;
-  border: 0;
-  border-radius: var(--crate-radius-button);
-  background: transparent;
+  height: 32px;
+  aspect-ratio: auto;
+  border: 1px solid transparent;
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
   color: var(--text-muted);
   font-size: var(--reminder-font-xxs);
   font-weight: var(--reminder-font-weight-semibold);
   cursor: pointer;
   transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
+  &:hover:not(.is-selected) {
+    background: var(--crate-control-hover-bg);
+    color: var(--text-normal);
+  }
+
   &.is-selected {
-    background: var(--crate-picker-selection-bg);
-    color: var(--crate-picker-selection-color);
+    border-color: color-mix(in srgb, var(--crate-warning) 18%, transparent);
+    background: color-mix(in srgb, var(--crate-warning) 8%, transparent);
+    color: var(--crate-warning);
+  }
+}
+
+.reminder-recurrence-picker .picker-time-card {
+  min-height: 40px;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
+}
+
+.reminder-recurrence-picker .picker-field-copy strong {
+  color: var(--text-muted);
+  font-size: var(--reminder-font-xs);
+}
+
+.reminder-recurrence-picker .picker-time-input {
+  width: clamp(116px, 42%, 148px);
+  height: 30px;
+  padding: 0 6px;
+  border-color: color-mix(in srgb, var(--crate-warning) 14%, transparent);
+  border-radius: var(--tag-radius, var(--crate-radius-control));
+  background: color-mix(in srgb, var(--crate-warning) 5%, transparent);
+  color: var(--crate-warning);
+  font-size: var(--reminder-font-sm);
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--crate-warning) 22%, transparent);
+    background: color-mix(in srgb, var(--crate-warning) 8%, transparent);
+  }
+
+  &:focus {
+    border-color: transparent;
+    background: var(--crate-control-hover-bg);
+    box-shadow: 0 0 0 1px var(--crate-focus-ring);
   }
 }
 
@@ -548,7 +615,9 @@
   gap: 8px;
 }
 
-.reminder-date-picker .picker-current-summary {
+.picker-current-summary.is-inline {
+  --picker-current-value-color: var(--crate-accent-text);
+
   min-height: 28px;
   align-items: center;
   justify-content: flex-start;
@@ -557,6 +626,10 @@
   border: 0;
   border-radius: 0;
   background: transparent;
+
+  &.tone-warning {
+    --picker-current-value-color: var(--crate-warning);
+  }
 
   > .picker-current-label {
     color: var(--text-muted);
@@ -571,10 +644,10 @@
     align-items: center;
     gap: 5px;
     padding: 0 8px;
-    border: 1px solid color-mix(in srgb, var(--crate-accent-text) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--picker-current-value-color) 16%, transparent);
     border-radius: var(--tag-radius, var(--crate-radius-control));
-    background: color-mix(in srgb, var(--crate-accent-text) 6%, transparent);
-    color: var(--crate-accent-text);
+    background: color-mix(in srgb, var(--picker-current-value-color) 6%, transparent);
+    color: var(--picker-current-value-color);
 
     .obsidian-icon {
       flex: 0 0 auto;
@@ -719,12 +792,14 @@
   }
 }
 
-.reminder-date-picker .picker-footer {
+.reminder-date-picker .picker-footer,
+.reminder-recurrence-picker .picker-footer {
   margin-top: 20px;
   padding: 0 16px;
 }
 
-.reminder-date-picker .picker-remove-button {
+.reminder-date-picker .picker-remove-button,
+.reminder-recurrence-picker .picker-remove-button {
   min-height: 32px;
   gap: 6px;
   padding: 0 6px;
@@ -1208,16 +1283,33 @@
   }
 
   .reminder-date-picker .date-quick-button,
-  .reminder-date-picker :is(.picker-date-field, .picker-time-card) {
+  .reminder-date-picker :is(.picker-date-field, .picker-time-card),
+  .reminder-recurrence-picker :is(.recurrence-option-row, .picker-time-card) {
     min-height: 44px;
   }
 
-  .reminder-date-picker :is(.picker-date-input, .picker-time-input) {
+  .reminder-date-picker :is(.picker-date-input, .picker-time-input),
+  .reminder-recurrence-picker .picker-time-input {
     height: 32px;
   }
 
-  .reminder-date-picker .picker-remove-button {
+  .reminder-date-picker .picker-remove-button,
+  .reminder-recurrence-picker .picker-remove-button {
     min-height: 36px;
+  }
+
+  .reminder-recurrence-picker .recurrence-frequency-button,
+  .reminder-recurrence-picker .recurrence-day-button {
+    min-height: 44px;
+  }
+
+  .reminder-recurrence-picker .recurrence-stepper-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .reminder-recurrence-picker .recurrence-stepper {
+    grid-template-columns: 36px minmax(32px, auto) 36px;
   }
 
   .reminder-modal-body {

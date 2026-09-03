@@ -7,6 +7,7 @@ import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { RecurrenceRule } from '../../types';
 import { getPickerModalProps } from '../glassStyles';
 import { PickerTimeCard } from './PickerTimeCard';
+import { PickerCurrentSummary } from './PickerCurrentSummary';
 import { RecurrenceFrequencyOptions } from './RecurrenceFrequencyOptions';
 import { RecurrenceFrequencyTabs } from './RecurrenceFrequencyTabs';
 import { PickerDoneButton } from './PickerDoneButton';
@@ -114,10 +115,12 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
 
                 <div className="reminder-picker-scroll">
                     <div className="recurrence-picker-content">
-                        <div className="picker-current-summary" aria-live="polite">
-                            <span>{REMINDER_PICKER_COPY.repeat.current}</span>
-                            <strong>{summaryText}</strong>
-                        </div>
+                        <PickerCurrentSummary
+                            label={REMINDER_PICKER_COPY.repeat.current}
+                            value={summaryText}
+                            icon="repeat"
+                            tone="warning"
+                        />
 
                         <section className="picker-section" aria-labelledby="plugin-repeat-frequency-title">
                             <div className="picker-section-heading">

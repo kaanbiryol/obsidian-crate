@@ -2,13 +2,13 @@ import React, { useCallback } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
 import { ModalHeader } from '../../components/ModalHeader';
-import { ObsidianIcon } from '../../components/obsidian-icon';
 import type { AnimationConfig } from '../animations';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { getPickerModalProps } from '../glassStyles';
 import { DateQuickButtons } from './DateQuickButtons';
 import { PickerTimeCard } from './PickerTimeCard';
 import { PickerDoneButton } from './PickerDoneButton';
+import { PickerCurrentSummary } from './PickerCurrentSummary';
 import { formatLocalDateKey, parseLocalDateKey, parseReminderDateValue } from '../../utils/reminderDate';
 import { buildDatePickerDateSelection, buildDatePickerTimeSelection } from './datePickerSelection';
 import { getReminderDateForPreset, type ReminderDatePreset } from './datePresets';
@@ -111,13 +111,11 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
 
                 <div className="reminder-picker-scroll">
                     {currentDate && (
-                        <div className="picker-current-summary" aria-live="polite">
-                            <span className="picker-current-label">{REMINDER_PICKER_COPY.schedule.current}</span>
-                            <span className="picker-current-value">
-                                <ObsidianIcon size="s" id="calendar" aria-hidden="true" />
-                                <strong>{formatDueDate(dueDate ?? undefined)}</strong>
-                            </span>
-                        </div>
+                        <PickerCurrentSummary
+                            label={REMINDER_PICKER_COPY.schedule.current}
+                            value={formatDueDate(dueDate ?? undefined) ?? ''}
+                            icon="calendar"
+                        />
                     )}
 
                     <section className="picker-section" aria-labelledby="plugin-quick-schedule-title">

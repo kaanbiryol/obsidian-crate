@@ -1,0 +1,25 @@
+import { ObsidianIcon } from '../../components/obsidian-icon';
+
+interface PickerCurrentSummaryProps {
+    label: string;
+    value: string;
+    icon: string;
+    tone?: 'accent' | 'warning';
+}
+
+export function PickerCurrentSummary({
+    label,
+    value,
+    icon,
+    tone = 'accent',
+}: PickerCurrentSummaryProps) {
+    return (
+        <div className={`picker-current-summary is-inline tone-${tone}`} aria-live="polite">
+            <span className="picker-current-label">{label}</span>
+            <span className="picker-current-value">
+                <ObsidianIcon size="s" id={icon} aria-hidden="true" />
+                <strong>{value}</strong>
+            </span>
+        </div>
+    );
+}

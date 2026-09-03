@@ -147,11 +147,14 @@ describe('reminder editor chrome', () => {
         expect(recurrenceMarkup).toContain('crate-reminder-picker-surface is-recurrence-picker');
         expect(recurrenceMarkup).toContain('>Repeat<');
         expect(recurrenceMarkup).toContain('>Repeats<');
+        expect(recurrenceMarkup).toContain('picker-current-summary is-inline tone-warning');
+        expect(recurrenceMarkup).toContain('data-icon="repeat"');
         expect(recurrenceMarkup).toContain('>Frequency<');
         expect(recurrenceMarkup).toContain('>Interval<');
         expect(recurrenceMarkup).toContain('>Reminder time<');
         expect(recurrenceMarkup).toContain('data-icon="minus"');
         expect(recurrenceMarkup).toContain('data-icon="plus"');
+        expect(recurrenceMarkup).toContain('picker-time-input has-value');
         expect(recurrenceMarkup).toContain('role="tabpanel"');
         expect(recurrenceMarkup).toContain('tabindex="-1"');
         expect(recurrenceMarkup).toContain('>Done<');
