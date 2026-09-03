@@ -151,65 +151,50 @@
 .picker-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--crate-picker-space-control);
+}
+
+.picker-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crate-picker-space-section);
+  padding: var(--crate-picker-space-section) var(--crate-picker-space-inline) 2px;
 }
 
 .picker-section-heading {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  padding: 0 2px;
+  gap: var(--crate-picker-space-control);
+  padding: 0 1px;
 
   h4,
   strong {
     margin: 0;
-    color: var(--text-faint);
-    font-size: var(--reminder-font-xs);
-    font-weight: var(--reminder-font-weight-semibold);
+    color: var(--text-muted);
+    font-size: var(--reminder-font-xxs);
+    font-weight: var(--reminder-font-weight-medium);
     line-height: 1.25;
     letter-spacing: normal;
   }
 }
 
-.reminder-date-picker {
-  .picker-current-summary,
-  .picker-section {
-    margin: 22px 18px 0;
-  }
-
-  .picker-section + .picker-section {
-    margin-top: 22px;
-  }
-}
-
 .picker-schedule-fields {
-  overflow: hidden;
-  border: 1px solid var(--crate-divider);
-  border-radius: var(--crate-radius-card);
-  background: var(--crate-control-bg);
-}
-
-.picker-date-field,
-.picker-time-card {
   display: flex;
-  min-height: 52px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.picker-control-row {
+  display: flex;
+  min-height: var(--crate-picker-row-height);
   align-items: center;
-  gap: 12px;
-  padding: 8px 13px;
-}
-
-.picker-time-card {
-  border: 1px solid var(--crate-divider);
-  border-radius: var(--crate-radius-card);
-  background: var(--crate-control-bg);
-}
-
-.picker-schedule-fields .picker-time-card {
-  border: 0;
-  border-top: 1px solid var(--crate-divider);
-  border-radius: 0;
-  background: transparent;
+  justify-content: space-between;
+  gap: var(--crate-picker-space-control);
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
+  border-radius: var(--crate-radius-control);
+  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
 }
 
 .picker-field-copy {
@@ -217,43 +202,51 @@
   min-width: 54px;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
 }
 
 .picker-field-copy strong {
+  display: inline-flex;
+  align-items: baseline;
   color: var(--text-muted);
-  font-size: var(--reminder-font-sm);
+  font-size: var(--reminder-font-xs);
   font-weight: var(--reminder-font-weight-medium);
   line-height: 1.25;
 
   small {
-    margin-left: 3px;
+    margin-left: 6px;
     color: var(--text-faint);
     font-size: var(--reminder-font-xxs);
-    font-weight: var(--reminder-font-weight-medium);
+    font-weight: var(--reminder-font-weight-normal);
   }
 }
 
 .picker-date-input,
 .picker-time-input {
-  width: clamp(126px, 48%, 180px);
-  height: 44px;
+  width: clamp(116px, 42%, 148px);
+  height: var(--crate-picker-input-height);
   min-width: 0;
   margin: 0;
-  padding: 0 10px;
-  border: 1px solid var(--crate-divider);
-  border-radius: var(--input-radius, var(--crate-radius-control));
-  background: var(--crate-control-bg);
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--tag-radius, var(--crate-radius-control));
+  background: transparent;
   color: var(--text-normal);
-  font-size: var(--reminder-font-base);
+  font-size: var(--reminder-font-sm);
   font-weight: var(--reminder-font-weight-medium);
   text-align: right;
   color-scheme: light;
 
+  &:hover {
+    border-color: color-mix(in srgb, var(--text-normal) 16%, transparent);
+    background: var(--crate-control-hover-bg);
+  }
+
   &:focus {
-    border-color: color-mix(in srgb, var(--crate-accent) 42%, var(--crate-divider));
+    border-color: transparent;
+    background: var(--crate-control-hover-bg);
     outline: 0;
-    box-shadow: 0 0 0 2px var(--crate-focus-ring);
+    box-shadow: 0 0 0 1px var(--crate-focus-ring);
   }
 }
 
@@ -264,30 +257,8 @@
   color-scheme: dark;
 }
 
-.recurrence-picker-content {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px 16px 2px;
-}
-
 .recurrence-picker-time {
   margin-top: 0;
-}
-
-.reminder-recurrence-picker .picker-section {
-  gap: 8px;
-}
-
-.reminder-recurrence-picker .picker-section-heading {
-  padding: 0 1px;
-
-  h4,
-  strong {
-    color: var(--text-muted);
-    font-size: var(--reminder-font-xxs);
-    font-weight: var(--reminder-font-weight-medium);
-  }
 }
 
 .recurrence-frequency-tabs {
@@ -309,7 +280,7 @@
   border-radius: calc(var(--crate-radius-control) - 1px);
   background: transparent;
   color: var(--text-muted);
-  font-size: var(--reminder-font-sm);
+  font-size: var(--reminder-font-xs);
   font-weight: var(--reminder-font-weight-medium);
   cursor: pointer;
   transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
@@ -333,22 +304,14 @@
 .recurrence-options {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--crate-picker-space-section);
   min-height: 0;
   margin: 0;
   outline: 0;
 }
 
 .recurrence-option-row {
-  display: flex;
-  min-height: 40px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 8px;
-  border: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
-  border-radius: var(--crate-radius-control);
-  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
+  flex: 0 0 auto;
 }
 
 .recurrence-option-copy {
@@ -469,40 +432,16 @@
   }
 }
 
-.reminder-recurrence-picker .picker-time-card {
-  min-height: 40px;
-  gap: 8px;
-  padding: 4px 8px;
-  border: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
-  border-radius: var(--crate-radius-control);
-  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
-}
-
-.reminder-recurrence-picker .picker-field-copy strong {
-  color: var(--text-muted);
-  font-size: var(--reminder-font-xs);
-}
-
-.reminder-recurrence-picker .picker-time-input {
-  width: clamp(116px, 42%, 148px);
-  height: 30px;
-  padding: 0 6px;
+.reminder-recurrence-picker .picker-time-input.has-value {
   border-color: color-mix(in srgb, var(--crate-warning) 14%, transparent);
-  border-radius: var(--tag-radius, var(--crate-radius-control));
   background: color-mix(in srgb, var(--crate-warning) 5%, transparent);
   color: var(--crate-warning);
-  font-size: var(--reminder-font-sm);
 
   &:hover {
     border-color: color-mix(in srgb, var(--crate-warning) 22%, transparent);
     background: color-mix(in srgb, var(--crate-warning) 8%, transparent);
   }
 
-  &:focus {
-    border-color: transparent;
-    background: var(--crate-control-hover-bg);
-    box-shadow: 0 0 0 1px var(--crate-focus-ring);
-  }
 }
 
 .date-quick-options {
@@ -602,26 +541,13 @@
   }
 }
 
-.reminder-date-picker .picker-current-summary,
-.reminder-date-picker .picker-section {
-  margin: 16px 16px 0;
-}
-
-.reminder-date-picker .picker-section + .picker-section {
-  margin-top: 16px;
-}
-
-.reminder-date-picker .picker-section {
-  gap: 8px;
-}
-
 .picker-current-summary.is-inline {
   --picker-current-value-color: var(--crate-accent-text);
 
   min-height: 28px;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
+  gap: var(--crate-picker-space-control);
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -663,19 +589,8 @@
   }
 }
 
-.reminder-date-picker .picker-section-heading {
-  padding: 0 1px;
-
-  h4,
-  strong {
-    color: var(--text-muted);
-    font-size: var(--reminder-font-xxs);
-    font-weight: var(--reminder-font-weight-medium);
-  }
-}
-
 .reminder-date-picker .date-quick-options {
-  gap: 8px;
+  gap: var(--crate-picker-space-control);
   overflow: visible;
   border: 0;
   background: transparent;
@@ -722,80 +637,26 @@
 }
 
 .reminder-date-picker .picker-schedule-fields {
-  display: flex;
-  overflow: visible;
-  flex-direction: column;
-  gap: 4px;
   border: 0;
   border-radius: 0;
   background: transparent;
 }
 
-.reminder-date-picker :is(.picker-date-field, .picker-time-card) {
-  min-height: 40px;
-  gap: 8px;
-  padding: 4px 8px;
-  border: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
-  border-radius: var(--crate-radius-control);
-  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
-}
-
-.reminder-date-picker .picker-schedule-fields .picker-time-card {
-  border: 1px solid color-mix(in srgb, var(--crate-divider) 45%, transparent);
-  border-radius: var(--crate-radius-control);
-  background: color-mix(in srgb, var(--text-normal) 2.5%, transparent);
-}
-
-.reminder-date-picker .picker-field-copy strong {
-  display: inline-flex;
-  align-items: baseline;
-  color: var(--text-muted);
-  font-size: var(--reminder-font-xs);
-
-  small {
-    margin-left: 6px;
-    color: var(--text-faint);
-    font-size: var(--reminder-font-xxs);
-    font-weight: var(--reminder-font-weight-normal);
-  }
-}
-
-.reminder-date-picker :is(.picker-date-input, .picker-time-input) {
-  width: clamp(116px, 42%, 148px);
-  height: 30px;
-  padding: 0 6px;
-  border-color: transparent;
-  border-radius: var(--tag-radius, var(--crate-radius-control));
-  background: transparent;
-  font-size: var(--reminder-font-sm);
+.reminder-date-picker :is(.picker-date-input, .picker-time-input).has-value {
+  border-color: color-mix(in srgb, var(--crate-accent-text) 14%, transparent);
+  background: color-mix(in srgb, var(--crate-accent-text) 5%, transparent);
+  color: var(--crate-accent-text);
 
   &:hover {
-    border-color: color-mix(in srgb, var(--text-normal) 16%, transparent);
-    background: var(--crate-control-hover-bg);
-  }
-
-  &.has-value {
-    border-color: color-mix(in srgb, var(--crate-accent-text) 14%, transparent);
-    background: color-mix(in srgb, var(--crate-accent-text) 5%, transparent);
-    color: var(--crate-accent-text);
-
-    &:hover {
-      border-color: color-mix(in srgb, var(--crate-accent-text) 22%, transparent);
-      background: color-mix(in srgb, var(--crate-accent-text) 8%, transparent);
-    }
-  }
-
-  &:focus {
-    border-color: transparent;
-    background: var(--crate-control-hover-bg);
-    box-shadow: 0 0 0 1px var(--crate-focus-ring);
+    border-color: color-mix(in srgb, var(--crate-accent-text) 22%, transparent);
+    background: color-mix(in srgb, var(--crate-accent-text) 8%, transparent);
   }
 }
 
 .reminder-date-picker .picker-footer,
 .reminder-recurrence-picker .picker-footer {
-  margin-top: 20px;
-  padding: 0 16px;
+  margin-top: var(--crate-picker-space-section);
+  padding: 0 var(--crate-picker-space-inline);
 }
 
 .reminder-date-picker .picker-remove-button,
@@ -818,7 +679,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: 8px 12px 10px;
+  margin: 8px var(--crate-picker-space-inline) 10px;
 }
 
 .project-picker-row {
@@ -1277,19 +1138,22 @@
 }
 
 @media (max-width: 640px) {
+  .reminder-picker {
+    --crate-picker-space-inline: 14px;
+  }
+
   .reminder-modal-header {
     padding-right: 12px;
     padding-left: 12px;
   }
 
   .reminder-date-picker .date-quick-button,
-  .reminder-date-picker :is(.picker-date-field, .picker-time-card),
-  .reminder-recurrence-picker :is(.recurrence-option-row, .picker-time-card) {
+  .picker-control-row {
     min-height: 44px;
   }
 
-  .reminder-date-picker :is(.picker-date-input, .picker-time-input),
-  .reminder-recurrence-picker .picker-time-input {
+  .picker-date-input,
+  .picker-time-input {
     height: 32px;
   }
 
@@ -1316,28 +1180,8 @@
     padding: 0;
   }
 
-  .reminder-date-picker .picker-current-summary,
-  .reminder-date-picker .picker-section {
-    margin-right: 14px;
-    margin-left: 14px;
-  }
-
-  .project-picker-list {
-    margin: 8px;
-  }
-
   .project-picker-row {
     min-height: 44px;
-  }
-
-  .recurrence-picker-content {
-    padding-right: 14px;
-    padding-left: 14px;
-  }
-
-  .picker-footer {
-    padding-right: 14px;
-    padding-left: 14px;
   }
 }
 }

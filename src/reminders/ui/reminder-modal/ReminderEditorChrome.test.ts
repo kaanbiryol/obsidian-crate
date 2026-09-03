@@ -136,8 +136,10 @@ describe('reminder editor chrome', () => {
         expect(dateMarkup).toContain('reminder-modal-header-action is-enabled');
         expect(dateMarkup).toContain('picker-current-label');
         expect(dateMarkup).toContain('picker-current-value');
+        expect(dateMarkup).toContain('class="picker-content"');
         expect(dateMarkup).toContain('data-icon="calendar"');
         expect(dateMarkup).toContain('picker-schedule-fields');
+        expect(dateMarkup.match(/picker-control-row/g)).toHaveLength(2);
         expect(dateMarkup).toContain('type="date"');
         expect(dateMarkup).toContain('type="time"');
         expect(dateMarkup.match(/has-value/g)).toHaveLength(1);
@@ -148,6 +150,7 @@ describe('reminder editor chrome', () => {
         expect(recurrenceMarkup).toContain('>Repeat<');
         expect(recurrenceMarkup).toContain('>Repeats<');
         expect(recurrenceMarkup).toContain('picker-current-summary is-inline tone-warning');
+        expect(recurrenceMarkup).toContain('class="picker-content"');
         expect(recurrenceMarkup).toContain('data-icon="repeat"');
         expect(recurrenceMarkup).toContain('>Frequency<');
         expect(recurrenceMarkup).toContain('>Interval<');
@@ -155,6 +158,7 @@ describe('reminder editor chrome', () => {
         expect(recurrenceMarkup).toContain('data-icon="minus"');
         expect(recurrenceMarkup).toContain('data-icon="plus"');
         expect(recurrenceMarkup).toContain('picker-time-input has-value');
+        expect(recurrenceMarkup.match(/picker-control-row/g)).toHaveLength(2);
         expect(recurrenceMarkup).toContain('role="tabpanel"');
         expect(recurrenceMarkup).toContain('tabindex="-1"');
         expect(recurrenceMarkup).toContain('>Done<');
