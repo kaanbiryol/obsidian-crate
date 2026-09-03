@@ -38,7 +38,7 @@ export function ReminderActionChips({
                 variant="light"
                 onPress={onOpenDatePicker}
                 aria-haspopup="dialog"
-                className={`reminder-action-chip tone-primary${dueDate ? ' is-active' : ''}`}
+                className={`reminder-action-chip crate-semantic-token tone-primary${dueDate ? ' is-active' : ''}`}
             >
                 <ObsidianIcon size="xs" id="calendar" />
                 <span className="reminder-action-label">
@@ -50,7 +50,7 @@ export function ReminderActionChips({
                 variant="light"
                 onPress={onOpenProjectPicker}
                 aria-haspopup="dialog"
-                className={`reminder-action-chip tone-secondary${project !== defaultProject ? ' is-active' : ''}`}
+                className={`reminder-action-chip crate-semantic-token tone-secondary${project !== defaultProject ? ' is-active' : ''}`}
             >
                 <ObsidianIcon size="xs" id="hash" />
                 <span className="reminder-action-label">
@@ -64,7 +64,7 @@ export function ReminderActionChips({
                 onPress={onTogglePriority}
                 aria-label={priority === 1 ? 'Remove priority' : 'Set priority'}
                 aria-pressed={priority === 1}
-                className={`reminder-action-chip tone-danger${priority === 1 ? ' is-active' : ''}`}
+                className={`reminder-action-chip crate-semantic-token tone-danger${priority === 1 ? ' is-active' : ''}`}
             >
                 <ObsidianIcon size="xs" id="flag" />
                 <span className="reminder-action-label">{REMINDER_PICKER_COPY.editor.priority}</span>
@@ -75,7 +75,7 @@ export function ReminderActionChips({
                 onPress={onOpenRecurrencePicker}
                 aria-label={recurrence ? formatRecurrence(recurrence) : REMINDER_PICKER_COPY.editor.recurrenceLabel}
                 aria-haspopup="dialog"
-                className={`reminder-action-chip tone-warning${recurrence ? ' is-active' : ''}`}
+                className={`reminder-action-chip crate-semantic-token tone-warning${recurrence ? ' is-active' : ''}`}
             >
                 <ObsidianIcon size="xs" id="repeat" />
                 <span className="reminder-action-label">{REMINDER_PICKER_COPY.editor.repeat}</span>

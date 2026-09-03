@@ -1,39 +1,9 @@
 import React, { memo } from 'react';
 
+import { ProgressMeter } from '../../components/ProgressMeter';
 import { ShadowDOMNativeMotionButton } from '../../components/ShadowDOMNativeMotionButton';
 import type { BrowseProjectCardViewModel } from './viewModels';
 import { ThemeIcon } from '../../components/theme-icon';
-
-const MiniProgressBar = memo(function MiniProgressBar({
-  percentage,
-  accentColor,
-  isComplete
-}: {
-  percentage: number;
-  accentColor: string;
-  isComplete: boolean;
-}) {
-  const progressColor = isComplete ? 'var(--text-success)' : accentColor;
-
-  return (
-    <div
-      className="premium-mini-progress"
-      role="progressbar"
-      aria-label="Project completion"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={percentage}
-    >
-      <div
-        className="premium-mini-progress-fill"
-        style={{
-          width: `${percentage}%`,
-          backgroundColor: progressColor,
-        }}
-      />
-    </div>
-  );
-});
 
 export const BrowseProjectCard = memo(function BrowseProjectCard({
   card,
@@ -97,10 +67,10 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
         <div className="premium-project-right">
           {stats.total > 0 && (
             <div className="premium-project-progress">
-              <MiniProgressBar
+              <ProgressMeter
                 percentage={stats.completionPercentage}
-                accentColor={accentColor}
-                isComplete={isComplete}
+                color={isComplete ? 'var(--text-success)' : accentColor}
+                label={`${project} completion`}
               />
               <span className="premium-project-percentage">
                 {stats.completionPercentage}%

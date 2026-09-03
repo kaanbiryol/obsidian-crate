@@ -13,13 +13,12 @@ export function PickerTimeCard({ label, optionalLabel, hour, minute, onChange, o
 		: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 
 	return (
-		<label className="picker-control-row picker-time-card">
-			<span className="picker-field-copy">
-				<strong>
-					{label}
-					{optionalLabel && <small>{optionalLabel}</small>}
-				</strong>
-			</span>
+		<PickerFieldRow
+			label={label}
+			detail={optionalLabel}
+			className="picker-time-card"
+			asLabel
+		>
 			<input
 				type="time"
 				aria-label={label}
@@ -39,6 +38,7 @@ export function PickerTimeCard({ label, optionalLabel, hour, minute, onChange, o
 				}}
 				className={`picker-time-input${value ? ' has-value' : ''}`}
 			/>
-		</label>
+		</PickerFieldRow>
 	);
 }
+import { PickerFieldRow } from './PickerFieldRow';

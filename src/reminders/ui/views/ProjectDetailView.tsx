@@ -7,7 +7,7 @@ import type { Reminder } from '../../types/reminder';
 import { ReminderCard } from '../../components/ReminderCard';
 import { ReorderableReminderList } from '../../components/ReorderableReminderList';
 import { EmptyState } from '../../components/EmptyState';
-import { ProjectCompletedSection } from './ProjectCompletedSection';
+import { CompletedReminderSection } from './CompletedReminderSection';
 import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../../utils/projectColors';
@@ -143,11 +143,12 @@ export const ProjectDetailView = memo(function ProjectDetailView({
               interaction={reorderInteraction}
             />
 
-            <ProjectCompletedSection
+            <CompletedReminderSection
               reminders={completed}
               showCompleted={showCompleted}
               onToggle={() => setShowCompleted((prev) => !prev)}
               renderCard={cardRenderer}
+              animationConfig={animationConfig}
             />
           </LayoutGroup>
         </motion.div>

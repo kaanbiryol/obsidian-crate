@@ -109,7 +109,7 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .premium-project-content,.premium-back-button{background:var(--crate-project-card-bg);border-color:var(--crate-project-card-border);box-shadow:var(--crate-project-card-shadow)}
 .premium-project-card:hover .premium-project-content,.premium-back-button:hover{background:var(--crate-project-card-hover-bg);border-color:var(--crate-project-card-hover-border)}
 .premium-reminder-card.is-completed .premium-reminder-content{opacity:.74}
-.premium-mini-progress,.project-detail-progress-bar{background:var(--background-modifier-border)}
+.crate-progress-meter{background:var(--background-modifier-border)}
 .premium-project-chevron{opacity:.65}
 .premium-project-stat-done,.premium-project-stat-complete,.project-detail-stat-done,.settings-status.is-success{color:var(--pwa-light-success-text)}
 .settings-sheet__close{color:var(--text-muted)}

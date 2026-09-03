@@ -1,9 +1,9 @@
 import React from 'react';
 
-import { ObsidianIcon } from './obsidian-icon';
 import { ShadowDOMNativeButton } from './ShadowDOMNativeButton';
+import { IconButton } from './IconButton';
 
-export interface ModalHeaderAction {
+interface ModalHeaderAction {
     label: string;
     onClick: () => void;
     ariaLabel?: string;
@@ -33,14 +33,14 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
 }) => (
     <header className="reminder-modal-header">
         <div className="reminder-modal-header-side">
-            <ShadowDOMNativeButton
+            <IconButton
+                icon="x"
+                iconSize="m"
                 onClick={onClose}
-                aria-label={closeLabel}
+                label={closeLabel}
                 title="Close"
                 className="reminder-modal-header-close"
-            >
-                <ObsidianIcon size="m" id="x" />
-            </ShadowDOMNativeButton>
+            />
         </div>
 
         <div className="reminder-modal-header-copy">

@@ -9,6 +9,7 @@ import { getPickerModalProps } from '../glassStyles';
 import { PickerTimeCard } from './PickerTimeCard';
 import { PickerContent } from './PickerContent';
 import { PickerCurrentSummary } from './PickerCurrentSummary';
+import { PickerSection } from './PickerSection';
 import { RecurrenceFrequencyOptions } from './RecurrenceFrequencyOptions';
 import { RecurrenceFrequencyTabs } from './RecurrenceFrequencyTabs';
 import { PickerDoneButton } from './PickerDoneButton';
@@ -123,15 +124,15 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                             tone="warning"
                         />
 
-                        <section className="picker-section" aria-labelledby="plugin-repeat-frequency-title">
-                            <div className="picker-section-heading">
-                                <h4 id="plugin-repeat-frequency-title">{REMINDER_PICKER_COPY.repeat.frequency}</h4>
-                            </div>
+                        <PickerSection
+                            headingId="plugin-repeat-frequency-title"
+                            title={REMINDER_PICKER_COPY.repeat.frequency}
+                        >
                             <RecurrenceFrequencyTabs
                                 frequency={frequency}
                                 onChange={setFrequency}
                             />
-                        </section>
+                        </PickerSection>
 
                         <RecurrenceFrequencyOptions
                             frequency={frequency}
@@ -144,17 +145,18 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                             onDayOfMonthChange={setDayOfMonth}
                         />
 
-                        <section className="picker-section recurrence-picker-time" aria-labelledby="plugin-repeat-time-title">
-                            <div className="picker-section-heading">
-                                <h4 id="plugin-repeat-time-title">{REMINDER_PICKER_COPY.repeat.time}</h4>
-                            </div>
+                        <PickerSection
+                            headingId="plugin-repeat-time-title"
+                            title={REMINDER_PICKER_COPY.repeat.time}
+                            className="recurrence-picker-time"
+                        >
                             <PickerTimeCard
                                 label={REMINDER_PICKER_COPY.repeat.reminderTime}
                                 hour={hour}
                                 minute={minute}
                                 onChange={(h, m) => { setHour(h); setMinute(m); }}
                             />
-                        </section>
+                        </PickerSection>
                     </PickerContent>
 
                     <PickerDoneButton

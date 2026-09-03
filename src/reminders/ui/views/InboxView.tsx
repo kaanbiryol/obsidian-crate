@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import React, { useMemo, useState, useCallback, useEffect, memo } from 'react';
+import { motion, LayoutGroup } from 'framer-motion';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
@@ -7,14 +7,12 @@ import { ReminderCard } from '../../components/ReminderCard';
 import { ReorderableReminderList } from '../../components/ReorderableReminderList';
 import { EmptyState } from '../../components/EmptyState';
 import { buildInboxViewModel } from './viewModels';
-import {
-  REMINDER_LIST_LAYOUT_TRANSITION,
-  SPRING_CONFIG_BOUNCY,
-} from '../layoutConstants';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
-import { ThemeIcon } from '../../components/theme-icon';
-import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import {
+  CompletedReminderSection,
+  type CompletedSectionToggleProps,
+} from './CompletedReminderSection';
 
 export interface InboxViewProps {
   reminders: Reminder[];
@@ -26,11 +24,7 @@ export interface InboxViewProps {
   /** Custom class name for the container */
   className?: string;
   /** Custom render function for the completed section toggle button (for Shadow DOM compatibility) */
-  renderToggleButton?: (props: {
-    onPress: () => void;
-    showCompleted: boolean;
-    count: number;
-  }) => React.ReactNode;
+  renderToggleButton?: (props: CompletedSectionToggleProps) => React.ReactNode;
   /** Callback when reminders are reordered via drag */
   onReorder?: (orderedIds: string[]) => void;
   onReorderDragActiveChange?: (active: boolean) => void;
@@ -54,19 +48,11 @@ export const InboxView = memo(function InboxView({
   reorderInteraction = 'handle',
   colorScheme = 'dark',
 }: InboxViewProps) {
-  const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
   const [showCompleted, setShowCompleted] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const scrollRef = useStableReminderScroll(isReordering);
 
   const { active, completed } = useMemo(() => buildInboxViewModel(reminders), [reminders]);
-  const previousCompletedCountRef = useRef(completed.length);
-  const shouldAnimateCompletedReveal = previousCompletedCountRef.current > 0;
-
-  useEffect(() => {
-    previousCompletedCountRef.current = completed.length;
-  }, [completed.length]);
-
   // Local state for optimistic reorder (visual only during drag)
   const [localOrder, setLocalOrder] = useState<Reminder[]>(active);
 
@@ -134,105 +120,14 @@ export const InboxView = memo(function InboxView({
             interaction={reorderInteraction}
           />
 
-          {/* Completed section */}
-          {completed.length > 0 && (
-            <div
-              className="mt-6 pb-4"
-              data-reminder-scroll-anchor="true"
-              data-reminder-id="completed-section"
-              data-reminder-section="section"
-            >
-            <div className="mb-3 premium-divider" role="separator" />
-            {renderToggleButton ? (
-              renderToggleButton({
-                onPress: () => setShowCompleted(prev => !prev),
-                showCompleted,
-                count: completed.length
-              })
-            ) : (
-              <button
-				type="button"
-				onClick={() => setShowCompleted(prev => !prev)}
-				className="completed-section-toggle w-full justify-between h-10 px-0"
-			  >
-				<span
-				  className="reminders-muted-label"
-				>
-				  Completed ({completed.length})
-				</span>
-				{
-				  <motion.span
-                    animate={{ rotate: showCompleted ? 180 : 0 }}
-                    transition={animationsEnabled ? { duration: 0.2, ease: 'easeOut' } : { duration: 0 }}
-                    className="inline-flex"
-                  >
-                    <ThemeIcon size="m" id="chevron-down" />
-				  </motion.span>
-				}
-			  </button>
-            )}
-
-            <AnimatePresence mode="popLayout" initial={false}>
-              {showCompleted && (
-                <motion.div
-                  initial={animationsEnabled && shouldAnimateCompletedReveal
-                    ? { opacity: 0, height: 0, overflow: 'hidden' }
-                    : false}
-                  animate={{
-                    opacity: 1,
-                    height: 'auto',
-                    transition: {
-                      height: { type: 'spring', ...SPRING_CONFIG_BOUNCY },
-                      opacity: { duration: 0.2, delay: 0.05 }
-                    },
-                    transitionEnd: { overflow: 'visible' }
-                  }}
-                  exit={{
-                    opacity: 0,
-                    height: 0,
-                    overflow: 'hidden',
-                    transition: {
-                      height: { duration: 0.2 },
-                      opacity: { duration: 0.15 }
-                    }
-                  }}
-                  className="mt-3"
-                >
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    {completed.map((reminder, index) => (
-                      <motion.div
-                        key={reminder.id}
-                        initial={false}
-                        animate={{ opacity: 1 }}
-                        exit={animationsEnabled ? {
-                          opacity: 0,
-                          transition: { duration: 0.14, ease: 'easeOut' }
-                        } : undefined}
-                        transition={{
-                          opacity: { duration: 0.14, ease: 'easeOut' },
-                        }}
-						className="mb-2 reminder-render-item"
-                        data-reminder-scroll-anchor="true"
-                        data-reminder-id={reminder.id}
-                        data-reminder-section="completed"
-                      >
-                        <motion.div
-                          layoutId={animationsEnabled ? `reminder-card-${reminder.id}` : undefined}
-                          layoutCrossfade={false}
-                          layout={animationsEnabled ? 'position' : false}
-                          layoutDependency={reminder.id}
-                          transition={{ layout: REMINDER_LIST_LAYOUT_TRANSITION }}
-                        >
-                          {cardRenderer(reminder, index)}
-                        </motion.div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            </div>
-          )}
+          <CompletedReminderSection
+            reminders={completed}
+            showCompleted={showCompleted}
+            onToggle={() => setShowCompleted((previous) => !previous)}
+            renderCard={cardRenderer}
+            renderToggleButton={renderToggleButton}
+            animationConfig={animationConfig}
+          />
         </LayoutGroup>
       </motion.div>
     </div>
