@@ -347,4 +347,21 @@ describe('plugin reminder layout styles', () => {
     expect(panelBlock).toContain('min-height: 0');
     expect(panelBlock).toContain('overflow: hidden');
   });
+
+  it('keeps reminder card width stable while switching tabs', async () => {
+    const styles = await readFile(
+      new URL('./shared/styles/_shell.scss', import.meta.url),
+      'utf8',
+    );
+    const transitionBlock = styles.match(
+      /\.reminders-content \{([\s\S]*?)\/\/ Minimal scrollbar/,
+    )?.[1];
+    const scrollBlock = styles.match(
+      /\.reminders-view-scroll \{([\s\S]*?)\n\}/,
+    )?.[1];
+
+    expect(transitionBlock).toBeDefined();
+    expect(transitionBlock).not.toContain('overflow-y: hidden');
+    expect(scrollBlock).toContain('scrollbar-gutter: stable');
+  });
 });
