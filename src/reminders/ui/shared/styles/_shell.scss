@@ -230,10 +230,11 @@
         // Firefox: hide via scrollbar-color
         scrollbar-color: transparent transparent;
 
-        // Hide inner view scrollbars during transitions (browse/project)
+        // Keep the scroll container's width stable while hiding its thumb.
+        // Changing overflow here removes the scrollbar gutter until the
+        // transition ends, which makes the reminder cards jump sideways.
         .ios-scroll {
             scrollbar-color: transparent transparent;
-            overflow-y: hidden;
         }
 
         .ios-scroll::-webkit-scrollbar {
@@ -279,6 +280,7 @@
     padding: 16px;
     touch-action: pan-y;
     overflow-anchor: none;
+    scrollbar-gutter: stable;
 
     &.has-fab {
         padding-bottom: calc(var(--reminders-tabbar-overlay, 0px) + var(--reminders-fab-gap, 24px) + var(--reminders-fab-size, 56px) + var(--reminders-safe-area, env(safe-area-inset-bottom)));
