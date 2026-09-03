@@ -29,7 +29,8 @@
 
 .crate-reminder-editor-surface,
 .crate-reminder-picker-surface.is-date-picker,
-.crate-reminder-picker-surface.is-project-picker {
+.crate-reminder-picker-surface.is-project-picker,
+.crate-reminder-picker-surface.is-recurrence-picker {
   width: min(560px, calc(100vw - 40px));
   max-width: 560px;
   border-radius: var(--crate-radius-sheet);
@@ -37,7 +38,8 @@
 
 .crate-reminder-editor-surface.is-centered,
 .crate-reminder-picker-surface.is-date-picker.is-centered,
-.crate-reminder-picker-surface.is-project-picker.is-centered {
+.crate-reminder-picker-surface.is-project-picker.is-centered,
+.crate-reminder-picker-surface.is-recurrence-picker.is-centered {
   padding-bottom: 8px;
 }
 

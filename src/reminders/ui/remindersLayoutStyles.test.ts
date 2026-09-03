@@ -155,7 +155,7 @@ describe('plugin reminder layout styles', () => {
     expect(styles).toContain('min-height: 44px');
     expect(styles).toContain('.reminder-date-picker .picker-current-summary');
     expect(styles).toContain('.picker-current-value');
-    expect(styles).toContain('background: color-mix(in srgb, var(--crate-accent-text) 6%, transparent)');
+    expect(styles).toContain('background: color-mix(in srgb, var(--picker-current-value-color) 6%, transparent)');
     expect(styles).toContain('border: 0');
     expect(styles).toContain('.reminder-date-picker .date-quick-button');
     expect(styles).toContain('border: 1px solid color-mix(in srgb, var(--crate-divider) 55%, transparent)');
@@ -193,6 +193,40 @@ describe('plugin reminder layout styles', () => {
     expect(projectRow).toContain('var(--project-picker-row-accent) 7%');
     expect(styles).toContain('color: var(--project-picker-row-accent)');
     expect(styles).toContain('scroll-padding: 8px');
+  });
+
+  it('uses compact, semantic controls for the recurrence picker', async () => {
+    const styles = await readFile(
+      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+      'utf8',
+    );
+    const modalStyles = await readFile(
+      new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
+      'utf8',
+    );
+    const content = styles.match(/^\.recurrence-picker-content \{([\s\S]*?)^\}/m)?.[1];
+    const tabs = styles.match(/^\.recurrence-frequency-tabs \{([\s\S]*?)^\}/m)?.[1];
+    const frequencyButton = styles.match(/^\.recurrence-frequency-button \{([\s\S]*?)^\}/m)?.[1];
+    const optionRow = styles.match(/^\.recurrence-option-row \{([\s\S]*?)^\}/m)?.[1];
+    const stepperButton = styles.match(/^\.recurrence-stepper-button \{([\s\S]*?)^\}/m)?.[1];
+    const dayButton = styles.match(/^\.recurrence-day-button \{([\s\S]*?)^\}/m)?.[1];
+
+    expect(modalStyles).toContain('.crate-reminder-picker-surface.is-recurrence-picker');
+    expect(modalStyles).toContain('width: min(560px, calc(100vw - 40px))');
+    expect(content).toContain('gap: 16px');
+    expect(content).toContain('padding: 16px 16px 2px');
+    expect(tabs).toContain('gap: 3px');
+    expect(tabs).toContain('border-radius: var(--crate-radius-control)');
+    expect(frequencyButton).toContain('min-height: 34px');
+    expect(frequencyButton).toContain('var(--crate-warning) 9%');
+    expect(optionRow).toContain('min-height: 40px');
+    expect(optionRow).toContain('var(--crate-divider) 45%');
+    expect(stepperButton).toContain('width: 28px');
+    expect(stepperButton).toContain('height: 28px');
+    expect(dayButton).toContain('height: 32px');
+    expect(dayButton).toContain('var(--crate-warning) 8%');
+    expect(styles).toContain('.reminder-recurrence-picker .picker-time-input');
+    expect(styles).toContain('.reminder-recurrence-picker .picker-remove-button');
   });
 
   it('keeps the dialog title and editable reminder text one typography step apart', async () => {
