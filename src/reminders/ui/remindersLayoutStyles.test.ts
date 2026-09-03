@@ -35,7 +35,7 @@ describe('plugin reminder layout styles', () => {
     expect(modalStyles).toContain('font-family: var(--reminder-font-ui)');
     expect(modalStyles).toContain('font-size: var(--reminder-font-base)');
     expect(modalStyles).not.toContain('backdrop-filter: blur(8px)');
-    expect(editorStyles).toContain('background: var(--crate-control-active-bg)');
+    expect(editorStyles).toContain('background: var(--crate-control-hover-bg)');
     expect(editorStyles).toContain('color: var(--text-normal)');
     expect(editorStyles).toContain('background: var(--crate-picker-selection-bg)');
     expect(editorStyles).not.toContain('transition: all');
@@ -169,6 +169,30 @@ describe('plugin reminder layout styles', () => {
     expect(modalStyles).toContain('.crate-reminder-editor-surface,\n.crate-reminder-picker-surface.is-date-picker');
     expect(modalStyles).toContain('width: min(560px, calc(100vw - 40px))');
     expect(modalStyles).toContain('.crate-reminder-editor-surface.is-centered,\n.crate-reminder-picker-surface.is-date-picker.is-centered');
+  });
+
+  it('aligns the project picker shell and rows with the reminder editor', async () => {
+    const styles = await readFile(
+      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+      'utf8',
+    );
+    const modalStyles = await readFile(
+      new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
+      'utf8',
+    );
+    const projectRow = styles.match(
+      /^\.project-picker-row \{([\s\S]*?)^\}/m,
+    )?.[1];
+
+    expect(modalStyles).toContain('.crate-reminder-picker-surface.is-project-picker');
+    expect(modalStyles).toContain('width: min(560px, calc(100vw - 40px))');
+    expect(projectRow).toContain('min-height: 40px');
+    expect(projectRow).toContain('border: 1px solid transparent');
+    expect(projectRow).toContain('border-radius: var(--crate-radius-control)');
+    expect(projectRow).toContain('var(--project-picker-row-accent) 16%');
+    expect(projectRow).toContain('var(--project-picker-row-accent) 7%');
+    expect(styles).toContain('color: var(--project-picker-row-accent)');
+    expect(styles).toContain('scroll-padding: 8px');
   });
 
   it('keeps the dialog title and editable reminder text one typography step apart', async () => {
