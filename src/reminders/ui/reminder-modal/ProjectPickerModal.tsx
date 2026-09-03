@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
+import { ModalHeader } from '../../components/ModalHeader';
 import { AnimationConfig } from '../animations';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { getPickerModalProps } from '../glassStyles';
-import { PickerHeader } from './PickerHeader';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
 import { ObsidianIcon } from '../../components/obsidian-icon';
 import { ProjectDot } from './ProjectDot';
@@ -140,8 +140,8 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
             {...modalProps}
         >
             <div className={`reminder-picker reminder-project-picker${isDark ? ' dark' : ''}`}>
-                <PickerHeader
-                    onBack={onClose}
+                <ModalHeader
+                    onClose={onClose}
                     closeLabel={REMINDER_PICKER_COPY.project.closeLabel}
                     title={REMINDER_PICKER_COPY.project.title}
                 />

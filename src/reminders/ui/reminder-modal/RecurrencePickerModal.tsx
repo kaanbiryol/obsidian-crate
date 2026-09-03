@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
+import { ModalHeader } from '../../components/ModalHeader';
 import type { AnimationConfig } from '../animations';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { RecurrenceRule } from '../../types';
 import { getPickerModalProps } from '../glassStyles';
-import { PickerHeader } from './PickerHeader';
 import { PickerTimeCard } from './PickerTimeCard';
 import { RecurrenceFrequencyOptions } from './RecurrenceFrequencyOptions';
 import { RecurrenceFrequencyTabs } from './RecurrenceFrequencyTabs';
@@ -102,12 +102,14 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
             {...modalProps}
         >
             <div className={`reminder-picker reminder-recurrence-picker${isDark ? ' dark' : ''}`}>
-                <PickerHeader
-                    onBack={onClose}
+                <ModalHeader
+                    onClose={onClose}
                     closeLabel={REMINDER_PICKER_COPY.repeat.closeLabel}
                     title={REMINDER_PICKER_COPY.repeat.title}
-                    actionLabel={REMINDER_PICKER_COPY.repeat.done}
-                    onAction={handleDone}
+                    action={{
+                        label: REMINDER_PICKER_COPY.repeat.done,
+                        onClick: handleDone,
+                    }}
                 />
 
                 <div className="reminder-picker-scroll">

@@ -62,15 +62,15 @@ describe('plugin reminder layout styles', () => {
       new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
       'utf8',
     );
-    const editorHeader = styles.match(/\.reminder-editor-header \{([\s\S]*?)\n\}/)?.[1];
-    const headerSide = styles.match(/\.reminder-editor-header-side \{([\s\S]*?)\n\}/)?.[1];
-    const headerCopy = styles.match(/\.reminder-editor-header-copy \{([\s\S]*?)\n\}/)?.[1];
-    const headerIcon = styles.match(/\.reminder-header-icon \{([\s\S]*?)\n\}/)?.[1];
-    const pickerHeaderAction = styles.match(/\.picker-header-action \{([\s\S]*?)\n\}/)?.[1];
-    const removeButton = styles.match(/\.picker-remove-button \{([\s\S]*?)\n\}/)?.[1];
+    const editorHeader = styles.match(/\.reminder-modal-header \{([\s\S]*?)\n\}/)?.[1];
+    const headerSide = styles.match(/\.reminder-modal-header-side \{([\s\S]*?)\n\}/)?.[1];
+    const headerCopy = styles.match(/\.reminder-modal-header-copy \{([\s\S]*?)\n\}/)?.[1];
+    const headerIcon = styles.match(/\.reminder-modal-header-icon \{([\s\S]*?)\n\}/)?.[1];
+    const headerAction = styles.match(/\.reminder-modal-header-action \{([\s\S]*?)\n\}/)?.[1];
+    const removeButton = styles.match(/^\.picker-remove-button \{([\s\S]*?)^\}/m)?.[1];
 
-    expect(editorHeader).toContain('--reminder-editor-header-control-size: var(--crate-icon-button-size)');
-    expect(editorHeader).toContain('grid-template-columns: var(--reminder-editor-header-control-size) minmax(0, 1fr) auto');
+    expect(editorHeader).toContain('--reminder-modal-header-control-size: var(--crate-icon-button-size)');
+    expect(editorHeader).toContain('grid-template-columns: var(--reminder-modal-header-control-size) minmax(0, 1fr) auto');
     expect(editorHeader).toContain('min-height: 44px');
     expect(headerSide).toContain('width: 100%');
     expect(headerSide).toContain('justify-content: flex-start');
@@ -78,8 +78,8 @@ describe('plugin reminder layout styles', () => {
     expect(headerSide).toContain('gap: var(--size-4-2, 8px)');
     expect(headerIcon).toContain('padding: 0');
     expect(headerCopy).toContain('text-align: left');
-    expect(pickerHeaderAction).toContain('border: 0 !important');
-    expect(pickerHeaderAction).toContain('box-shadow: none !important');
+    expect(headerAction).toContain('border: 0 !important');
+    expect(headerAction).toContain('box-shadow: none !important');
     expect(styles).toContain('@container (max-width: 420px)');
     expect(removeButton).toContain('width: fit-content');
     expect(removeButton).toContain('align-self: flex-start');
@@ -107,7 +107,7 @@ describe('plugin reminder layout styles', () => {
       'utf8',
     );
     const submitButton = styles.match(
-      /^\.reminder-header-submit \{(?=\n\s{2}min-width: 0)([\s\S]*?)^\}/m,
+      /^\.reminder-modal-header-action \{(?=\n\s{2}min-width: 0)([\s\S]*?)^\}/m,
     )?.[1];
     const disabledSubmitButton = submitButton?.match(
       /&:disabled \{([\s\S]*?)\}/,
@@ -119,7 +119,7 @@ describe('plugin reminder layout styles', () => {
     expect(disabledSubmitButton).toContain('background: transparent !important');
     expect(disabledSubmitButton).toContain('box-shadow: none !important');
     expect(submitButton).toContain('&.is-enabled');
-    expect(submitButton).toContain('height: var(--reminder-editor-header-control-size)');
+    expect(submitButton).toContain('height: var(--reminder-modal-header-control-size)');
     expect(submitButton).toContain('font-weight: var(--reminder-font-weight-medium)');
     expect(submitButton).toContain('background: transparent');
     expect(submitButton).toContain('color: var(--crate-accent-text)');
@@ -140,13 +140,41 @@ describe('plugin reminder layout styles', () => {
     expect(description).toContain('font-size: var(--reminder-font-sm)');
   });
 
+  it('uses compact, restrained styling for the schedule picker', async () => {
+    const styles = await readFile(
+      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+      'utf8',
+    );
+    const modalStyles = await readFile(
+      new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
+      'utf8',
+    );
+
+    expect(styles).toContain('.reminder-modal-header');
+    expect(styles).not.toContain('.reminder-date-picker .reminder-modal-header');
+    expect(styles).toContain('min-height: 44px');
+    expect(styles).toContain('.reminder-date-picker .picker-current-summary');
+    expect(styles).toContain('background: color-mix(in srgb, var(--text-normal) 3%, transparent)');
+    expect(styles).toContain('border-color: transparent');
+    expect(styles).toContain('.reminder-date-picker .date-quick-button');
+    expect(styles).toContain('border: 1px solid transparent');
+    expect(styles).toContain('.reminder-date-picker .picker-schedule-fields');
+    expect(styles).toContain('border: 0');
+    expect(styles).toContain('.reminder-date-picker :is(.picker-date-input, .picker-time-input)');
+    expect(styles).toContain('height: 28px');
+    expect(styles).toContain('.reminder-date-picker .picker-remove-button');
+    expect(styles).toContain('min-height: 28px');
+    expect(modalStyles).toContain('.crate-reminder-picker-surface.is-date-picker.is-centered');
+    expect(modalStyles).toContain('border-radius: var(--radius-m, 8px)');
+  });
+
   it('keeps the dialog title and editable reminder text one typography step apart', async () => {
     const styles = await readFile(
       new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
       'utf8',
     );
     const headerTitle = styles.match(
-      /\.reminder-header-title \{([\s\S]*?)\n\}/,
+      /\.reminder-modal-header-title \{([\s\S]*?)\n\}/,
     )?.[1];
     const titleInput = styles.match(
       /\.reminder-editor-fields \.reminder-title-input \{([\s\S]*?)\n\}/,
@@ -191,7 +219,7 @@ describe('plugin reminder layout styles', () => {
     )?.[1];
 
     expect(chipLayout).toContain('display: inline');
-    expect(chipLayout).not.toContain('height:');
+    expect(chipLayout).not.toMatch(/^\s*height:/m);
     expect(chipLayout).not.toContain('align-items:');
     expect(chipLayout).toContain('margin: 0 0.08em');
     expect(chipLayout).toContain(
@@ -276,7 +304,7 @@ describe('plugin reminder layout styles', () => {
     expect(editorStyles).toContain('padding: 8px 12px 12px');
     expect(editorStyles).toContain('min-height: var(--reminder-action-chip-height)');
     expect(editorStyles).toContain('height: 40px');
-    expect(editorStyles).toContain('vertical-align: middle');
+    expect(editorStyles).toContain('vertical-align: baseline');
     expect(modalStyles).toContain('.crate-reminder-editor-surface.is-centered');
     expect(modalStyles).toContain('padding-bottom: 8px');
   });
