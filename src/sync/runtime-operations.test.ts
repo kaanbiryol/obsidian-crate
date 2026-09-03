@@ -86,6 +86,44 @@ describe('SyncRuntime operation wrappers', () => {
 		expect(settings.syncHistory[0]?.uploadedPaths?.at(-1)).toBe(`notes/${MAX_SYNC_HISTORY_PATHS - 1}.md`);
 	});
 
+	it('records, persists, and announces automatic queue sync activity', async () => {
+		const { runtime, persistSettings, settings } = createRuntimeHarness();
+		const state = {
+			status: 'idle' as const,
+			lastSync: '2026-02-15T12:00:00.000Z',
+			lastError: null,
+			pendingChanges: 0,
+			conflictCount: 0,
+		};
+		const engine = {
+			getState: () => state,
+			sync: vi.fn(async () => createEmptySyncResult()),
+			initialSync: vi.fn(async () => createEmptySyncResult()),
+			forceFullSync: vi.fn(async () => createEmptySyncResult()),
+		};
+		const result: SyncResult = {
+			...createEmptySyncResult(),
+			uploaded: 1,
+			uploadedPaths: ['notes/automatic.md'],
+		};
+		const listener = vi.fn();
+		setSyncEngine(runtime, engine);
+		runtime.addStateChangeListener(listener);
+
+		await (runtime as unknown as {
+			recordAutomaticSyncResult(currentEngine: unknown, syncResult: SyncResult): Promise<void>;
+		}).recordAutomaticSyncResult(engine, result);
+
+		expect(settings.lastSync).toBe(state.lastSync);
+		expect(settings.syncHistory[0]).toEqual(expect.objectContaining({
+			type: 'sync',
+			uploaded: 1,
+			uploadedPaths: ['notes/automatic.md'],
+		}));
+		expect(listener).toHaveBeenCalledWith(state);
+		expect(persistSettings).toHaveBeenCalledTimes(1);
+	});
+
 	it('resets sync state when applying infrastructure config', async () => {
 		const { runtime, settings } = createRuntimeHarness({
 			lastSeq: 42,

@@ -1,10 +1,12 @@
 import React from 'react';
 import type { RichTextInputHandle } from '../../components/RichTextInput';
 import type { RecurrenceRule } from '../../types';
+import { getProjectColor } from '../../utils/projectColors';
 import { ReminderActionChips } from './ReminderActionChips';
 import { ReminderEditorFields } from './ReminderEditorFields';
 
 interface AddReminderModalBodyProps {
+    isDark: boolean;
     content: string;
     onContentChange: (value: string) => void;
     description: string;
@@ -20,9 +22,6 @@ interface AddReminderModalBodyProps {
     defaultProject: string;
     priority: number;
     recurrence?: RecurrenceRule;
-    dueDateChanged: boolean;
-    projectChanged: boolean;
-    hasMounted: boolean;
     onOpenDatePicker: () => void;
     onOpenProjectPicker: () => void;
     onOpenRecurrencePicker: () => void;
@@ -30,6 +29,7 @@ interface AddReminderModalBodyProps {
 }
 
 export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
+    isDark,
     content,
     onContentChange,
     description,
@@ -45,16 +45,18 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     defaultProject,
     priority,
     recurrence,
-    dueDateChanged,
-    projectChanged,
-    hasMounted,
     onOpenDatePicker,
     onOpenProjectPicker,
     onOpenRecurrencePicker,
     onTogglePriority,
 }) => {
+    const projectColor = getProjectColor(project || defaultProject)[isDark ? 'dark' : 'light'].accent;
+
     return (
-        <div className="reminder-modal-body">
+        <div
+            className="reminder-modal-body"
+            style={{ '--reminder-project-color': projectColor } as React.CSSProperties}
+        >
             <ReminderEditorFields
                 content={content}
                 onContentChange={onContentChange}
@@ -74,9 +76,6 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
                 defaultProject={defaultProject}
                 priority={priority}
                 recurrence={recurrence}
-                dueDateChanged={dueDateChanged}
-                projectChanged={projectChanged}
-                hasMounted={hasMounted}
                 onOpenDatePicker={onOpenDatePicker}
                 onOpenProjectPicker={onOpenProjectPicker}
                 onOpenRecurrencePicker={onOpenRecurrencePicker}

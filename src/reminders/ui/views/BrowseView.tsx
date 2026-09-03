@@ -75,7 +75,6 @@ export const BrowseView = memo(function BrowseView({
               key={card.project}
               card={card}
               onClick={() => onProjectSelect(card.project)}
-              animationConfig={effectiveAnimationConfig}
             />
           ))}
         </div>

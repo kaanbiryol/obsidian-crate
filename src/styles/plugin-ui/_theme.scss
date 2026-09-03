@@ -81,6 +81,7 @@
   --crate-shadow-color: var(--background-modifier-box-shadow);
   --crate-focus-ring: var(--background-modifier-border-focus, var(--interactive-accent));
   --crate-accent: var(--interactive-accent);
+  --crate-accent-text: var(--text-accent, var(--interactive-accent));
   --crate-accent-hover: var(--interactive-accent-hover);
   --crate-danger: var(--text-error);
   --crate-warning: var(--text-warning);
@@ -190,7 +191,12 @@
   --reminder-font-sm: var(--font-ui-small, var(--font-small));
   --reminder-font-xs: var(--font-ui-smaller, var(--font-smaller));
   --reminder-font-xxs: var(--font-smallest, var(--font-ui-smaller));
-  --reminder-font-title: var(--font-ui-large, 20px);
+  --reminder-font-title: var(--font-ui-large, var(--font-ui-medium));
+  --reminder-font-editor-title: clamp(
+    var(--reminder-font-base),
+    calc(var(--reminder-font-title) - 2px),
+    var(--reminder-font-title)
+  );
 
   /* Font families */
   --reminder-font-ui: var(--font-interface);

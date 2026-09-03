@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	createHarness,
 	createSyncResult,
@@ -61,6 +61,28 @@ describe('SyncEngine event queue behavior', () => {
 		await flushPendingChanges(harness.engine);
 
 		expect(idlePendingCounts.at(-1)).toBe(0);
+	});
+
+	it('reports successful automatic uploads for sync activity history', async () => {
+		const content = toArrayBuffer('A');
+		harness.vault.getAbstractFileByPath.mockReturnValue({
+			path: 'notes/a.md',
+			extension: 'md',
+			stat: { size: 1, mtime: 1700000000000 },
+		});
+		harness.vault.adapter.readBinary.mockResolvedValue(content);
+		harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
+		const onQueueSyncResult = vi.fn(async () => {});
+		harness.engine.setQueueSyncResultCallback(onQueueSyncResult);
+
+		getPendingPaths(harness.engine).add('notes/a.md');
+		await flushPendingChanges(harness.engine);
+
+		expect(onQueueSyncResult).toHaveBeenCalledWith(expect.objectContaining({
+			success: true,
+			uploaded: 1,
+			uploadedPaths: ['notes/a.md'],
+		}));
 	});
 
 	it('keeps new paths queued when they arrive during pending flush', async () => {

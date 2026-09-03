@@ -14,7 +14,6 @@ describe('project progress', () => {
 				isComplete: false,
 			},
 			onClick: vi.fn(),
-			animationConfig: { enabled: false },
 		}));
 		const detailMarkup = renderToStaticMarkup(React.createElement(ProjectDetailHeader, {
 			project: 'Work',

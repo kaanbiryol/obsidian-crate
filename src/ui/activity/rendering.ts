@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 
 export type FileCardType = 'upload' | 'download' | 'merge' | 'delete' | 'conflict';
+export type EmptyStateTone = 'accent' | 'success';
 
 const FILE_CARD_ICONS: Record<FileCardType, string> = {
 	upload: 'upload',
@@ -20,8 +21,7 @@ export function renderFileMicroCard(
 		cls: `crate-activity-file-card${type === 'conflict' ? ' crate-file-card-conflict' : ''}`,
 	});
 
-	card.createDiv({ cls: `crate-file-accent crate-file-accent-${type}` });
-	const iconEl = card.createDiv({ cls: 'crate-file-icon' });
+	const iconEl = card.createDiv({ cls: `crate-file-icon crate-file-icon-${type}` });
 	setIcon(iconEl, FILE_CARD_ICONS[type]);
 
 	const info = card.createDiv({ cls: 'crate-file-info' });
@@ -33,9 +33,15 @@ export function renderFileMicroCard(
 	else if (dirPath) info.createSpan({ text: dirPath, cls: 'crate-file-path' });
 }
 
-export function renderEmptyState(container: HTMLElement, icon: string, title: string, description: string): void {
+export function renderEmptyState(
+	container: HTMLElement,
+	icon: string,
+	title: string,
+	description: string,
+	tone: EmptyStateTone = 'accent',
+): void {
 	const wrapper = container.createDiv({ cls: 'crate-activity-empty-state' });
-	const iconEl = wrapper.createDiv({ cls: 'crate-empty-icon' });
+	const iconEl = wrapper.createDiv({ cls: `crate-empty-icon crate-empty-icon-${tone}` });
 	setIcon(iconEl, icon);
 	const textEl = wrapper.createDiv({ cls: 'crate-empty-text' });
 	textEl.createSpan({ text: title, cls: 'crate-empty-title' });

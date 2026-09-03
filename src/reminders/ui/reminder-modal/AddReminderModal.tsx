@@ -87,9 +87,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         isClosing,
         showModal,
         allowAutoFocus,
-        hasMounted,
-        dueDateChanged,
-        projectChanged,
         handleClose,
         handleModalExitComplete,
         transitionToView,
@@ -97,8 +94,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         handleEntryAnimationComplete,
     } = useReminderModalPresentation({
         focusDelayMs,
-        dueDate,
-        project,
         onClose,
         richTextInputRef,
     });
@@ -205,6 +200,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 }}
             />
             <AddReminderModalBody
+                isDark={isDark}
                 content={content}
                 onContentChange={setContent}
                 description={description}
@@ -220,9 +216,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 defaultProject={defaultProject}
                 priority={priority}
                 recurrence={recurrence}
-                dueDateChanged={dueDateChanged}
-                projectChanged={projectChanged}
-                hasMounted={hasMounted}
                 onOpenDatePicker={() => transitionToView('date')}
                 onOpenProjectPicker={() => transitionToView('project')}
                 onOpenRecurrencePicker={() => transitionToView('recurrence')}

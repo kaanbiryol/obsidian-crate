@@ -66,6 +66,7 @@ export class SyncEngine {
 	private lifecycle: SyncEngineLifecycle;
 	private contexts: SyncEngineContexts;
 	private onStateChange: ((state: SyncState) => void) | null = null;
+	private onQueueSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
 	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -122,6 +123,7 @@ export class SyncEngine {
 			uploadConcurrency: UPLOAD_CONCURRENCY,
 			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
 			reconcile: (queueKeys) => this.reconcileFromQueue(queueKeys),
+			onFlushResult: (result) => this.onQueueSyncResult?.(result),
 		});
 		this.contexts = new SyncEngineContexts({
 			vault: this.vault,
@@ -170,6 +172,10 @@ export class SyncEngine {
 
 	setStateChangeCallback(callback: (state: SyncState) => void): void {
 		this.onStateChange = callback;
+	}
+
+	setQueueSyncResultCallback(callback: (result: SyncResult) => void | Promise<void>): void {
+		this.onQueueSyncResult = callback;
 	}
 
 	updateSettings(settings: CrateSettings): void {

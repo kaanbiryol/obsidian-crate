@@ -1,4 +1,4 @@
-import type { PreparedUpload, SyncState } from './types';
+import type { PreparedUpload, SyncResult, SyncState } from './types';
 
 interface QueueApi {
 	isConfigured(): boolean;
@@ -65,4 +65,5 @@ export interface QueueFlushContext {
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	triggerDebouncedSync(): void;
 	requestReconciliation(queueKeys: string[]): void;
+	onFlushResult?(result: SyncResult): void | Promise<void>;
 }

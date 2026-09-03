@@ -3,7 +3,7 @@ import { renderEmptyState, renderFileMicroCard } from './rendering';
 
 export function renderPendingPanel(container: HTMLElement, paths: string[]): void {
 	if (paths.length === 0) {
-		renderEmptyState(container, 'check-circle', 'All synced', 'Your vault is up to date.');
+		renderEmptyState(container, 'check', 'All synced', 'Your vault is up to date.', 'success');
 		return;
 	}
 
@@ -21,7 +21,7 @@ export function renderPendingPanel(container: HTMLElement, paths: string[]): voi
 
 export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[]): void {
 	if (conflicts.length === 0) {
-		renderEmptyState(container, 'shield-check', 'No conflicts', 'Everything looks good.');
+		renderEmptyState(container, 'shield-check', 'No conflicts', 'Everything looks good.', 'success');
 		return;
 	}
 

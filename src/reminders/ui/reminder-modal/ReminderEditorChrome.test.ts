@@ -39,6 +39,8 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('Edit reminder');
         expect(markup).toContain('Save');
         expect(markup).toContain('aria-label="Save reminder"');
+        expect(markup).toContain('aria-label="Close reminder editor"');
+        expect(markup).toContain('aria-label="Delete reminder"');
         expect(markup).toContain('reminder-editor-header');
         expect(markup).toContain('reminder-editor-header-side is-right');
         expect(markup).toContain('<h2 class="reminder-header-title">');
@@ -67,9 +69,6 @@ describe('reminder editor chrome', () => {
             defaultProject: 'Inbox',
             priority: 4,
             recurrence: undefined,
-            dueDateChanged: false,
-            projectChanged: false,
-            hasMounted: false,
             onOpenDatePicker: vi.fn(),
             onOpenProjectPicker: vi.fn(),
             onOpenRecurrencePicker: vi.fn(),
@@ -78,7 +77,31 @@ describe('reminder editor chrome', () => {
 
         expect(markup).toContain('Priority');
         expect(markup).toContain('Repeat');
+        expect(markup.match(/aria-haspopup="dialog"/g)).toHaveLength(3);
+        expect(markup).toContain('aria-pressed="false"');
         expect(markup).not.toContain('data-icon="chevron-down"');
+    });
+
+    it('uses a single CSS transition when an action chip becomes selected', async () => {
+        const component = await readFile(
+            new URL('./ReminderActionChips.tsx', import.meta.url),
+            'utf8',
+        );
+        const styles = await readFile(
+            new URL('../../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+            'utf8',
+        );
+        const actionChipStyles = styles.match(
+            /^\.reminder-action-chip \{([\s\S]*?)^\}/m,
+        )?.[1];
+
+        expect(component).not.toContain('motion.');
+        expect(component).not.toContain('ShadowDOMMotionButton');
+        expect(component).not.toContain('dueDateChanged');
+        expect(component).not.toContain('projectChanged');
+        expect(actionChipStyles).toBeDefined();
+        expect(actionChipStyles).toContain('&:hover:not(.is-active)');
+        expect(actionChipStyles).not.toContain('transform: scale(0.97)');
     });
 
     it('offers removal actions for an existing schedule and recurrence', () => {
