@@ -11,16 +11,18 @@
 	--crate-activity-motion-fast: var(--anim-duration-fast, 160ms);
 	--crate-activity-motion-moderate: var(--anim-duration-moderate, 250ms);
 	--crate-activity-motion-easing: var(--anim-motion-baseline, ease);
+	--crate-activity-header-control-size: var(--clickable-icon-size, var(--input-height, 36px));
+	--crate-activity-space-inline: var(--size-4-4, 16px);
 }
 
 /* Header */
 .crate-activity-header {
 	display: grid;
-	grid-template-columns: 32px minmax(0, 1fr) 32px;
+	grid-template-columns: var(--crate-activity-header-control-size) minmax(0, 1fr) var(--crate-activity-header-control-size);
 	align-items: center;
-	column-gap: 8px;
-	min-height: 52px;
-	padding: 6px 14px;
+	column-gap: 6px;
+	min-height: 44px;
+	padding: 4px 10px;
 }
 
 .crate-activity-header-text {
@@ -32,8 +34,8 @@
 }
 
 .crate-activity-title {
-	font-size: var(--font-ui-small);
-	font-weight: var(--font-semibold);
+	font-size: var(--font-ui-medium, var(--font-text-size));
+	font-weight: var(--font-medium);
 	letter-spacing: normal;
 	color: var(--text-normal);
 	margin: 0;
@@ -61,10 +63,10 @@
 
 .crate-activity-close-btn {
 	display: inline-flex;
-	width: 28px;
-	height: 28px;
-	min-width: 28px;
-	max-width: 28px;
+	width: var(--crate-activity-header-control-size);
+	height: var(--crate-activity-header-control-size);
+	min-width: var(--crate-activity-header-control-size);
+	max-width: var(--crate-activity-header-control-size);
 	align-items: center;
 	justify-content: center;
 	justify-self: start;
@@ -104,7 +106,7 @@
 	display: flex;
 	align-items: flex-start;
 	gap: 10px;
-	margin: 14px 18px 0;
+	margin: 14px var(--crate-activity-space-inline) 0;
 	padding: 10px 12px;
 	border: 1px solid color-mix(in srgb, var(--text-error) 25%, transparent);
 	border-radius: var(--radius-m);
@@ -150,10 +152,10 @@
 	display: inline-flex;
 	justify-self: end;
 	align-items: center;
-	width: 28px;
-	height: 28px;
-	min-width: 28px;
-	min-height: 28px;
+	width: var(--crate-activity-header-control-size);
+	height: var(--crate-activity-header-control-size);
+	min-width: var(--crate-activity-header-control-size);
+	min-height: var(--crate-activity-header-control-size);
 	justify-content: center;
 	gap: 0;
 	padding: 0;
@@ -215,7 +217,7 @@
 .crate-activity-tab-bar {
 	position: relative;
 	display: flex;
-	margin: 0 14px 10px;
+	margin: 0 var(--crate-activity-space-inline) 10px;
 }
 
 .crate-activity-tabs {
@@ -294,7 +296,7 @@
 	min-height: 196px;
 	max-height: min(420px, 52vh);
 	overflow-y: auto;
-	padding: 4px 14px 14px;
+	padding: 4px var(--crate-activity-space-inline) 14px;
 	scrollbar-width: thin;
 	scrollbar-color: var(--crate-activity-divider) transparent;
 
@@ -614,10 +616,14 @@ body.is-mobile .crate-activity-panel {
 }
 
 @media (max-width: 480px) {
+	.crate-activity-modal {
+		--crate-activity-space-inline: 14px;
+	}
+
 	.crate-activity-header {
-		grid-template-columns: 32px minmax(0, 1fr) 32px;
-		min-height: 52px;
-		column-gap: 8px;
+		grid-template-columns: var(--crate-activity-header-control-size) minmax(0, 1fr) var(--crate-activity-header-control-size);
+		min-height: 44px;
+		column-gap: 6px;
 		padding-right: 12px;
 		padding-left: 12px;
 	}
@@ -628,21 +634,6 @@ body.is-mobile .crate-activity-panel {
 			height: var(--icon-s, 16px);
 			stroke-width: var(--icon-s-stroke-width, 2px);
 		}
-	}
-
-	.crate-activity-tab-bar {
-		margin-right: 12px;
-		margin-left: 12px;
-	}
-
-	.crate-activity-panel {
-		padding-right: 14px;
-		padding-left: 14px;
-	}
-
-	.crate-sync-error-notice {
-		margin-right: 14px;
-		margin-left: 14px;
 	}
 
 	.crate-history-header {

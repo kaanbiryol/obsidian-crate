@@ -13,7 +13,7 @@ export function PickerTimeCard({ label, optionalLabel, hour, minute, onChange, o
 		: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 
 	return (
-		<label className="picker-time-card">
+		<label className="picker-control-row picker-time-card">
 			<span className="picker-field-copy">
 				<strong>
 					{label}

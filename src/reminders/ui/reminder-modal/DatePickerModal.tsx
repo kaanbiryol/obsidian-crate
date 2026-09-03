@@ -8,6 +8,7 @@ import { getPickerModalProps } from '../glassStyles';
 import { DateQuickButtons } from './DateQuickButtons';
 import { PickerTimeCard } from './PickerTimeCard';
 import { PickerDoneButton } from './PickerDoneButton';
+import { PickerContent } from './PickerContent';
 import { PickerCurrentSummary } from './PickerCurrentSummary';
 import { formatLocalDateKey, parseLocalDateKey, parseReminderDateValue } from '../../utils/reminderDate';
 import { buildDatePickerDateSelection, buildDatePickerTimeSelection } from './datePickerSelection';
@@ -110,52 +111,54 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                 />
 
                 <div className="reminder-picker-scroll">
-                    {currentDate && (
-                        <PickerCurrentSummary
-                            label={REMINDER_PICKER_COPY.schedule.current}
-                            value={formatDueDate(dueDate ?? undefined) ?? ''}
-                            icon="calendar"
-                        />
-                    )}
-
-                    <section className="picker-section" aria-labelledby="plugin-quick-schedule-title">
-                        <div className="picker-section-heading">
-                            <h4 id="plugin-quick-schedule-title">{REMINDER_PICKER_COPY.schedule.quickOptions}</h4>
-                        </div>
-                        <DateQuickButtons
-                            currentDate={currentDate}
-                            hasTime={hasTime ?? false}
-                            onSelectPreset={handleQuickDate}
-                        />
-                    </section>
-
-                    <section className="picker-section" aria-labelledby="plugin-custom-schedule-title">
-                        <div className="picker-section-heading">
-                            <h4 id="plugin-custom-schedule-title">{REMINDER_PICKER_COPY.schedule.custom}</h4>
-                        </div>
-                        <div className="picker-schedule-fields">
-                            <label className="picker-date-field">
-                                <span className="picker-field-copy">
-                                    <strong>{REMINDER_PICKER_COPY.schedule.date}</strong>
-                                </span>
-                                <input
-                                    type="date"
-                                    aria-label={REMINDER_PICKER_COPY.schedule.date}
-                                    value={currentDate ? formatLocalDateKey(currentDate) : ''}
-                                    onChange={(event) => handleDateChange(event.currentTarget.value)}
-                                    className={`picker-date-input${currentDate ? ' has-value' : ''}`}
-                                />
-                            </label>
-                            <PickerTimeCard
-                                label={REMINDER_PICKER_COPY.schedule.time}
-                                optionalLabel={REMINDER_PICKER_COPY.schedule.optional}
-                                hour={currentDate && hasTime ? currentDate.getHours() : undefined}
-                                minute={currentDate && hasTime ? currentDate.getMinutes() : undefined}
-                                onChange={handleTimeChange}
-                                onClear={handleTimeClear}
+                    <PickerContent>
+                        {currentDate && (
+                            <PickerCurrentSummary
+                                label={REMINDER_PICKER_COPY.schedule.current}
+                                value={formatDueDate(dueDate ?? undefined) ?? ''}
+                                icon="calendar"
                             />
-                        </div>
-                    </section>
+                        )}
+
+                        <section className="picker-section" aria-labelledby="plugin-quick-schedule-title">
+                            <div className="picker-section-heading">
+                                <h4 id="plugin-quick-schedule-title">{REMINDER_PICKER_COPY.schedule.quickOptions}</h4>
+                            </div>
+                            <DateQuickButtons
+                                currentDate={currentDate}
+                                hasTime={hasTime ?? false}
+                                onSelectPreset={handleQuickDate}
+                            />
+                        </section>
+
+                        <section className="picker-section" aria-labelledby="plugin-custom-schedule-title">
+                            <div className="picker-section-heading">
+                                <h4 id="plugin-custom-schedule-title">{REMINDER_PICKER_COPY.schedule.custom}</h4>
+                            </div>
+                            <div className="picker-schedule-fields">
+                                <label className="picker-control-row picker-date-field">
+                                    <span className="picker-field-copy">
+                                        <strong>{REMINDER_PICKER_COPY.schedule.date}</strong>
+                                    </span>
+                                    <input
+                                        type="date"
+                                        aria-label={REMINDER_PICKER_COPY.schedule.date}
+                                        value={currentDate ? formatLocalDateKey(currentDate) : ''}
+                                        onChange={(event) => handleDateChange(event.currentTarget.value)}
+                                        className={`picker-date-input${currentDate ? ' has-value' : ''}`}
+                                    />
+                                </label>
+                                <PickerTimeCard
+                                    label={REMINDER_PICKER_COPY.schedule.time}
+                                    optionalLabel={REMINDER_PICKER_COPY.schedule.optional}
+                                    hour={currentDate && hasTime ? currentDate.getHours() : undefined}
+                                    minute={currentDate && hasTime ? currentDate.getMinutes() : undefined}
+                                    onChange={handleTimeChange}
+                                    onClear={handleTimeClear}
+                                />
+                            </div>
+                        </section>
+                    </PickerContent>
 
                     <PickerDoneButton
                         showPrimary={false}

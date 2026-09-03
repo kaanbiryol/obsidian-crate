@@ -155,6 +155,13 @@
   --crate-motion-easing: var(--anim-motion-baseline, ease);
   --crate-project-progress-width: 48px;
 
+  /* Shared density for editor-adjacent picker screens. */
+  --crate-picker-space-inline: var(--size-4-4, 16px);
+  --crate-picker-space-section: var(--size-4-4, 16px);
+  --crate-picker-space-control: var(--size-4-2, 8px);
+  --crate-picker-row-height: 40px;
+  --crate-picker-input-height: 30px;
+
   /* Reminder semantics also inherit the theme instead of HeroUI's palette. */
   --reminder-p1-border: var(--crate-danger);
   --reminder-p1-border-hover: color-mix(in srgb, var(--crate-danger) 50%, transparent);

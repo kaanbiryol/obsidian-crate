@@ -68,7 +68,7 @@ function StepperControl({
 	increaseDisabled?: boolean;
 }) {
 	return (
-		<div className="recurrence-option-row">
+		<div className="picker-control-row recurrence-option-row">
 			<div className="recurrence-option-copy">
 				<strong>{label}</strong>
 				<span>{detail}</span>
