@@ -37,6 +37,11 @@
   padding-bottom: 8px;
 }
 
+.crate-reminder-picker-surface.is-date-picker.is-centered {
+  padding-bottom: 8px;
+  border-radius: var(--radius-m, 8px);
+}
+
 .crate-reminder-picker-surface {
   width: min(620px, calc(100vw - 40px));
   max-width: 620px;

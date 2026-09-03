@@ -41,9 +41,9 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('aria-label="Save reminder"');
         expect(markup).toContain('aria-label="Close reminder editor"');
         expect(markup).toContain('aria-label="Delete reminder"');
-        expect(markup).toContain('reminder-editor-header');
-        expect(markup).toContain('reminder-editor-header-side is-right');
-        expect(markup).toContain('<h2 class="reminder-header-title">');
+        expect(markup).toContain('reminder-modal-header');
+        expect(markup).toContain('reminder-modal-header-side is-right');
+        expect(markup).toContain('<h2 class="reminder-modal-header-title">');
         expect(markup).not.toContain('data-icon="check"');
         expect(markup).not.toContain('w-16');
     });
@@ -58,7 +58,7 @@ describe('reminder editor chrome', () => {
         }));
 
         expect(markup).toContain('aria-label="Close reminder editor"');
-        expect(markup).toContain('class="picker-header-button"');
+        expect(markup).toContain('class="reminder-modal-header-close"');
         expect(markup).not.toContain('reminder-header-close');
     });
 
@@ -133,7 +133,7 @@ describe('reminder editor chrome', () => {
         expect(dateMarkup).toContain('crate-reminder-picker-surface is-date-picker');
         expect(dateMarkup).toContain('role="dialog"');
         expect(dateMarkup).toContain('aria-label="Schedule reminder"');
-        expect(dateMarkup).toContain('picker-header-action');
+        expect(dateMarkup).toContain('reminder-modal-header-action is-enabled');
         expect(dateMarkup).toContain('picker-schedule-fields');
         expect(dateMarkup).toContain('type="date"');
         expect(dateMarkup).toContain('type="time"');
@@ -222,7 +222,7 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('project-picker-list');
         expect(markup).toContain('crate-reminder-picker-surface is-project-picker');
         expect(markup).toContain('aria-label="Close project selection"');
-        expect(markup).toContain('class="picker-header-button"');
+        expect(markup).toContain('class="reminder-modal-header-close"');
         expect(markup).not.toContain('reminder-header-close');
         expect(markup).toContain('data-icon="x"');
         expect(markup).not.toContain('data-icon="chevron-left"');

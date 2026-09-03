@@ -1,11 +1,11 @@
 import React, { useCallback } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
+import { ModalHeader } from '../../components/ModalHeader';
 import type { AnimationConfig } from '../animations';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { getPickerModalProps } from '../glassStyles';
 import { DateQuickButtons } from './DateQuickButtons';
-import { PickerHeader } from './PickerHeader';
 import { PickerTimeCard } from './PickerTimeCard';
 import { PickerDoneButton } from './PickerDoneButton';
 import { formatLocalDateKey, parseLocalDateKey, parseReminderDateValue } from '../../utils/reminderDate';
@@ -98,12 +98,14 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
             {...modalProps}
         >
             <div className={`reminder-picker reminder-date-picker${isDark ? ' dark' : ''}`}>
-                <PickerHeader
-                    onBack={onClose}
+                <ModalHeader
+                    onClose={onClose}
                     closeLabel={REMINDER_PICKER_COPY.schedule.closeLabel}
                     title={REMINDER_PICKER_COPY.schedule.title}
-                    actionLabel={REMINDER_PICKER_COPY.schedule.done}
-                    onAction={onClose}
+                    action={{
+                        label: REMINDER_PICKER_COPY.schedule.done,
+                        onClick: onClose,
+                    }}
                 />
 
                 <div className="reminder-picker-scroll">
