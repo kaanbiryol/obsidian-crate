@@ -28,11 +28,16 @@
 }
 
 .crate-reminder-editor-surface,
-.crate-reminder-picker-surface.is-date-picker,
 .crate-reminder-picker-surface.is-project-picker,
 .crate-reminder-picker-surface.is-recurrence-picker {
   width: min(560px, calc(100vw - 40px));
   max-width: 560px;
+  border-radius: var(--crate-radius-sheet);
+}
+
+.crate-reminder-picker-surface.is-date-picker {
+  width: min(380px, calc(100vw - 40px));
+  max-width: 380px;
   border-radius: var(--crate-radius-sheet);
 }
 
