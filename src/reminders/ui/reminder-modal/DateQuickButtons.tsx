@@ -13,6 +13,13 @@ interface DateQuickButtonsProps {
 	onSelectPreset: (preset: ReminderDatePreset) => void;
 }
 
+const PRESET_ICONS: Record<ReminderDatePreset, string> = {
+	today: 'sun',
+	tomorrow: 'sunrise',
+	evening: 'sunset',
+	'next-week': 'calendar-plus',
+};
+
 export function DateQuickButtons({
 	currentDate,
 	hasTime,
@@ -51,13 +58,16 @@ export function DateQuickButtons({
 						aria-pressed={isActive}
 						className={`date-quick-button${isActive ? ' is-active' : ''}`}
 					>
+						<ObsidianIcon
+							size="s"
+							id={isActive ? 'check' : PRESET_ICONS[id]}
+							className={isActive ? 'date-quick-button-check' : 'date-quick-button-icon'}
+							aria-hidden="true"
+						/>
 						<span className="date-quick-button-copy">
 							<strong>{label}</strong>
 							<small>{detail}</small>
 						</span>
-						{isActive && (
-							<ObsidianIcon size="s" id="check" className="date-quick-button-check" aria-hidden="true" />
-						)}
 					</ShadowDOMNativeButton>
 				);
 			})}
