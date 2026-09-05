@@ -9,7 +9,6 @@ import { REMINDER_PICKER_COPY } from './pickerCopy';
 import { ObsidianIcon } from '../../components/obsidian-icon';
 import { ProjectDot } from './ProjectDot';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
-import { getProjectColor } from '../../utils/projectColors';
 
 interface ProjectPickerModalProps {
     isOpen: boolean;
@@ -44,8 +43,6 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
     onFocus,
     onKeyDown,
 }) => {
-    const projectAccent = getProjectColor(projectName)[isDark ? 'dark' : 'light'].accent;
-
     return (
         <ShadowDOMNativeButton
             ref={rowRef}
@@ -56,7 +53,6 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
             onFocus={onFocus}
             onKeyDown={onKeyDown}
             className={`project-picker-row${isSelected ? ' is-selected' : ''}`}
-            style={{ '--project-picker-row-accent': projectAccent } as React.CSSProperties}
         >
             <ProjectDot projectName={projectName} isDark={isDark} />
             <span
@@ -65,7 +61,7 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
                 {projectName}
             </span>
             {isSelected && (
-                <ObsidianIcon size="m" id="check" className="project-picker-row-check" />
+                <ObsidianIcon size="s" id="check" className="project-picker-row-check" />
             )}
         </ShadowDOMNativeButton>
     );
@@ -149,6 +145,7 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
                     onClose={onClose}
                     closeLabel={REMINDER_PICKER_COPY.project.closeLabel}
                     title={REMINDER_PICKER_COPY.project.title}
+                    action={{ label: REMINDER_PICKER_COPY.project.done, onClick: onClose }}
                 />
 
                 {/* Project List */}

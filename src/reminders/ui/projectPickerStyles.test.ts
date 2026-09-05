@@ -23,12 +23,12 @@ describe('project picker styles', () => {
       /&\[aria-selected="true"\] \{([\s\S]*?)\n\s{4}\}/,
     )?.[1];
 
-    expect(selectedRow).toContain('var(--project-picker-row-accent) 7%');
-    expect(selectedRow).toContain('var(--project-picker-row-accent) 16%');
+    expect(selectedRow).toContain('background: var(--picker-selected-bg)');
+    expect(pickerStyles).not.toContain('--project-picker-row-accent');
     expect(selectedRow).toContain('box-shadow: none');
     expect(selectedSuggestion).toContain('background: var(--crate-control-active-bg)');
     expect(selectedSuggestion).toContain('box-shadow: none');
-    expect(modalStyles).toContain('width: min(560px, calc(100vw - 40px))');
+    expect(modalStyles).toContain('width: min(380px, calc(100vw - 40px))');
   });
 
   it('contains project-list scrolling inside the foreground picker', async () => {
