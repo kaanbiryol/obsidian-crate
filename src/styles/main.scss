@@ -4,8 +4,9 @@
 @use "plugin-ui/reminder-editor";
 @use "plugin-ui/modal";
 @use "plugin-ui/settings-alignment";
-@config "../../tailwind.config.js";
-@source not "../../site";
+@source "../**/*.{ts,tsx,js,jsx}";
+@source not "../**/*.test.ts";
+@source not "../test";
 
 .crate-reminders-ui {
   @include plugin-theme.styles;

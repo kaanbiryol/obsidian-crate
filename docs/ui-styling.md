@@ -30,7 +30,8 @@ both hosts together.
 - Each host retains its own sheet, keyboard, navigation, and persistence
   behavior. The PWA editor layout sets browser sheet height, safe areas, and
   touch target sizes. Its focus/keyboard-save hook remains in the PWA adapter.
-  Picker content remains host-specific for a later migration.
+  Date, project, and repeat picker content and styles are shared too. Host adapters
+  keep native modal behavior, apply/cancel semantics, and date-input commit timing.
 
 ## Making a visual change
 
@@ -56,3 +57,24 @@ project navigation, and light/dark switching when changing shared styles.
 assets and Worker PWA sources. Changes to transitive shared imports therefore
 invalidate the installed PWA shell cache. Plugin-only styles do not change the
 PWA version. `src/pwa/pwa-asset-version.test.ts` protects that boundary.
+
+## Visual regression coverage
+
+`npm run build && npm run preview:ui` serves the isolated gallery on port 8790.
+It renders production cards, editor fields, and all three picker contents with
+plugin or PWA styles. Query parameters select `host=plugin|pwa`,
+`theme=light|dark`, and `scene=cards|editor|date|project|weekly|monthly`.
+The plugin fixture supplies deterministic Obsidian-style variables; it does not
+replace testing actual community themes or native modal/keyboard integration.
+
+`npm run test:visual` compares 48 screenshots at 390px and 1280px widths and
+checks project/repeat keyboard navigation. CI pins browser dependencies, locale,
+timezone, and clock. Failures upload screenshots, diffs, and traces. To propose
+new baselines, dispatch **Shared UI visual checks** with **Generate candidate
+baselines for review**, inspect its artifact, and commit only approved images
+from `tests/visual/baselines`. Normal CI never updates baselines automatically.
+
+The CSS cleanup reduced the plugin stylesheet from approximately 146 KB to
+138 KB by limiting Tailwind scanning to application source, shortening repeated
+primary-screen selectors, and removing obsolete picker/footer rules. The raw
+budget is now 140,000 bytes; the existing 20,000-byte gzip limit is unchanged.

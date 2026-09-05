@@ -146,6 +146,7 @@ export function ReminderSheet({
 				{activeScreen !== 'editor' && (
 					<div className="pwa-reminder-sheet-screen pwa-reminder-sheet-screen--picker is-active">
 						<ReminderPickerSheet
+							isDark={colorScheme === 'dark'}
 							draft={modal.draft}
 							dialogRef={setDialogRef}
 							projectOptions={projectOptions}

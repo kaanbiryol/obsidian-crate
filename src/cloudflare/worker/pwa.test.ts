@@ -116,15 +116,12 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-icon svg {');
 		expect(html).not.toContain('.pwa-reminders-view .bottom-tab-button.is-active svg{');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-label {');
-		expect(html).toContain('.crate-reminders-ui .reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail) .reminders-fab {');
+		expect(html).toContain('.crate-reminders-ui .reminders-view.is-primary .reminders-fab {');
 		expect(html).toContain('--crate-fab-bg: var(--crate-accent);');
 		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;border-radius:50%;');
 		expect(html).toContain('--crate-icon-button-size: 44px;');
 		expect(html).toContain('.crate-reminders-ui .crate-icon-button {');
-		expect(html).toContain('.pwa-picker-icon-button{width:44px;height:44px;min-width:44px;border-radius:50%;');
 		expect(html).toContain('.settings-sheet__close{width:44px;height:44px;min-width:44px;display:grid;place-items:center;border:0;border-radius:10px;');
-		expect(html).toContain('.pwa-repeat-stepper__button{width:44px;height:44px;min-width:44px;');
-		expect(html).toContain('.pwa-schedule-field input{width:clamp(126px,48%,180px);height:44px;');
 		expect(html).toContain('.pwa-reminders-view .completed-section-toggle{height:44px;min-height:44px}');
 		expect(html).toContain('.crate-reminders-ui .reminder-modal-header-action:disabled {');
 		expect(html).toContain('.crate-reminders-ui .reminder-modal-header-action[data-tone=danger].is-enabled {');
@@ -224,8 +221,6 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-modal-sheet{color:var(--text-normal);color-scheme:light}');
 		expect(html).toContain('.crate-reminders-ui .reminder-editor-fields .reminder-title-input {');
 		expect(html).toContain('color: var(--text-normal);');
-		expect(html).toContain('.pwa-project-option,.pwa-project-picker-sheet .pwa-project-list,.pwa-schedule-preset-grid,.pwa-schedule-fields,.pwa-repeat-frequency-grid,.pwa-repeat-control-card,.pwa-repeat-time-card,.pwa-repeat-days,.settings-group{background:var(--pwa-light-surface-soft);');
-		expect(html).toContain('.pwa-schedule-field input,.pwa-repeat-time-card input{color-scheme:light}');
 		expect(html).toContain('.crate-reminders-ui .premium-reminder-card.is-completed .premium-reminder-content {\n  opacity: 0.6;');
 		expect(html).toContain('.settings-theme-option.is-active{background:var(--pwa-light-surface);color:var(--pwa-light-accent-text);');
 	});
@@ -254,10 +249,9 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('.pwa-modal-sheet.is-keyboard-open .pwa-modal-sheet__container--reminder{bottom:');
 		expect(html).toContain('.pwa-modal-sheet__content,.pwa-modal-sheet__scroller{height:100%;min-height:0;overflow:hidden!important}');
 		expect(html).toContain('.pwa-picker-sheet{position:relative;z-index:1;display:flex;width:100%;height:100%;');
-		expect(html).toContain('.pwa-schedule-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:hidden;');
-		expect(html).toContain('.pwa-schedule-fields{overflow:hidden;border:1px solid rgba(255,255,255,.07);border-radius:12px;');
-		expect(html).toContain('.pwa-repeat-frequency-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:hidden;');
-		expect(html).toContain('.pwa-repeat-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;padding:6px;');
+		expect(html).toContain('.crate-reminders-ui .reminder-date-picker .picker-schedule-fields {');
+		expect(html).toContain('.crate-reminders-ui .project-picker-row {');
+		expect(html).toContain('.crate-reminders-ui .recurrence-frequency-tabs {');
 		expect(html).not.toContain('@keyframes pwa-nested-sheet-in');
 		expect(html).toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:var(--pwa-sheet-surface);');
 		expect(html).not.toContain('.pwa-modal-sheet--settings .settings-sheet{position:relative;display:flex;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - 28px);min-height:0;overflow:hidden;flex-direction:column;background:#0f0f12;');
@@ -287,9 +281,8 @@ describe('PWA activation metadata', () => {
 
 		expect(html).not.toContain('pwa-sheet-grabber');
 		expect(html).not.toContain('--pwa-sheet-drag-');
-		expect(html).toContain('.crate-reminders-ui .reorderable-reminder-item[data-reorder-interaction=long-press] {');
-		expect(html).toContain('.crate-reminders-ui .reorderable-reminder-item[data-reorder-interaction=long-press].is-reordering .premium-reminder-content');
-		expect(html).toContain('.crate-reminders-ui .reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail) [data-reminder-section=completed] {');
+		expect(html).toContain('.crate-reminders-ui .reorderable-reminder-item[data-reorder-interaction] {');
+		expect(html).toContain('.crate-reminders-ui .reorderable-reminder-item[data-reorder-interaction].is-reordering .premium-reminder-content');
 		expect(html).toContain('--crate-reminder-card-hover-shadow: none;');
 		expect(html).not.toContain('transform:scale(1.025)');
 		expect(html).toContain('.crate-reminders-ui .premium-checkbox {');

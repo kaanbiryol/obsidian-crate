@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import type { RecurrenceRule } from '../../types';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
-import { IconButton } from '../../components/IconButton';
+import { Button } from '../../../ui/shared/Button';
+import { IconButton } from '../../../ui/shared/IconButton';
 import {
 	getRecurrenceDayLabels,
 	getRecurrenceDayNames,
@@ -127,7 +127,7 @@ export function RecurrenceFrequencyOptions({
 										{dayLabels.map((label, idx) => {
 											const isSelected = selectedDays.includes(idx);
 											return (
-												<ShadowDOMNativeButton
+												<Button
 													key={idx}
 													onClick={() => onToggleDay(idx)}
 													aria-label={dayNames[idx]}
@@ -135,7 +135,7 @@ export function RecurrenceFrequencyOptions({
 													className={`recurrence-day-button${isSelected ? ' is-selected' : ''}`}
 												>
 													{label}
-												</ShadowDOMNativeButton>
+												</Button>
 											);
 										})}
 									</div>

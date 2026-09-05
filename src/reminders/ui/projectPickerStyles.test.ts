@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 describe('project picker styles', () => {
   it('uses compact theme-aware selection without an accent rail', async () => {
     const pickerStyles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+      new URL('./shared/styles/_pickers.scss', import.meta.url),
       'utf8',
     );
     const sharedStyles = await readFile(
@@ -33,11 +33,11 @@ describe('project picker styles', () => {
 
   it('contains project-list scrolling inside the foreground picker', async () => {
     const pickerStyles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+      new URL('./shared/styles/_pickers.scss', import.meta.url),
       'utf8',
     );
     const pickerComponent = await readFile(
-      new URL('./reminder-modal/ProjectPickerModal.tsx', import.meta.url),
+      new URL('./reminder-modal/ProjectPickerContent.tsx', import.meta.url),
       'utf8',
     );
     const editorComponent = await readFile(

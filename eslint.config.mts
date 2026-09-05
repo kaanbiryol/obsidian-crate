@@ -15,7 +15,6 @@ export default tseslint.config(
 						'eslint.config.mts',
 						'manifest.json',
 						'postcss.config.js',
-						'tailwind.config.js',
 						'vite.config.mts',
 						'vitest.cloudflare.config.ts',
 						'vitest.config.ts',
@@ -29,7 +28,7 @@ export default tseslint.config(
 	},
 	...obsidianmd.configs.recommended,
 	{
-		files: ['scripts/**/*.mjs', 'vite.config.mts', 'vitest.cloudflare.config.ts', 'vitest.config.ts'],
+		files: ['scripts/**/*.mjs', 'vite.visual.config.mts', 'playwright.config.ts', 'vite.config.mts', 'vitest.cloudflare.config.ts', 'vitest.config.ts'],
 		extends: [tseslint.configs.disableTypeChecked],
 		languageOptions: {
 			globals: {
@@ -83,6 +82,9 @@ export default tseslint.config(
 			'src/pwa/**/*.{ts,tsx}',
 			'src/test/**/*.{ts,tsx}',
 			'src/**/*.test.{ts,tsx}',
+			'tests/**/*.{ts,tsx}',
+			'vite.visual.config.mts',
+			'playwright.config.ts',
 			'vite.config.mts',
 			'vitest.cloudflare.config.ts',
 			'vitest.config.ts',
@@ -154,6 +156,11 @@ export default tseslint.config(
 		rules: {
 			'obsidianmd/no-static-styles-assignment': 'off',
 		},
+	},
+	{
+		// The standalone visual fixture loads the selected host stylesheet explicitly.
+		files: ['tests/visual/gallery/main.tsx'],
+		rules: { 'obsidianmd/no-forbidden-elements': 'off' },
 	},
 	{
 		// Sync timers also run in Node-based unit tests.

@@ -4,6 +4,7 @@ import { parseLocalDateKey } from '../../utils/reminderDate';
 import { PickerNativeControl } from './PickerNativeControl';
 
 interface EditableDateControlProps {
+	commitOnChange?: boolean;
 	label: string;
 	emptyLabel: string;
 	invalidMessage: string;
@@ -22,7 +23,7 @@ export function formatDisplayDate(value: string, locale?: string): string {
 	}).format(parseLocalDateKey(value));
 }
 
-export function EditableDateControl({ label, emptyLabel, invalidMessage, value, onChange }: EditableDateControlProps) {
+export function EditableDateControl({ commitOnChange = false, label, emptyLabel, invalidMessage, value, onChange }: EditableDateControlProps) {
 	const [draft, setDraft] = useState(value);
 	const [invalid, setInvalid] = useState(false);
 
@@ -46,12 +47,15 @@ export function EditableDateControl({ label, emptyLabel, invalidMessage, value, 
 				onChange={(event) => {
 					const input = event.currentTarget;
 					setInvalid(!input.validity.valid);
-					if (input.validity.valid) setDraft(input.value);
+					if (input.validity.valid) {
+						setDraft(input.value);
+						if (commitOnChange) onChange(input.value);
+					}
 				}}
 				onBlur={(event) => {
 					const input = event.currentTarget;
 					if (input.validity.valid) {
-						onChange(input.value);
+						if (!commitOnChange) onChange(input.value);
 					} else {
 						input.value = value;
 						setDraft(value);

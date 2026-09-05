@@ -3,7 +3,7 @@
 
 @mixin styles {
 
-.reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail) {
+.reminders-view.is-primary {
     --crate-card-highlight-duration: 90ms;
     --crate-card-press-duration: 45ms;
     --crate-card-highlight-easing: ease-out;

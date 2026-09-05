@@ -2,7 +2,7 @@
 @use "../../ui/shared/styles/tokens";
 
 @mixin styles {
-@tailwind utilities;
+@tailwind utilities source(none);
 
   // Let Obsidian own the surrounding surface.
   background-color: transparent;

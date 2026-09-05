@@ -192,6 +192,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		  <div
 				className={[
 					'reminders-view',
+                    'is-primary',
 					isDarkMode ? 'dark' : 'light',
 					'is-fullscreen',
 					'is-modal',

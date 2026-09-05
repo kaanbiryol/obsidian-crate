@@ -1,0 +1,30 @@
+// Browser sheets retain their viewport geometry; content and controls are shared.
+@mixin styles {
+  .pwa-picker-sheet {
+    --crate-icon-button-size: 44px;
+    --crate-picker-row-height: 44px;
+    --crate-picker-input-height: 44px;
+    --reminder-font-base: 16px;
+
+    .reminder-picker {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    .reminder-modal-header { flex-shrink: 0; }
+    .reminder-picker-scroll {
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    :is(.date-quick-button, .project-picker-row, .recurrence-frequency-button, .recurrence-day-button) {
+      min-height: 44px;
+    }
+
+    .recurrence-stepper-button { --crate-icon-button-control-size: 44px; }
+    .picker-native-control input { min-height: 44px; font-size: 16px; }
+  }
+}

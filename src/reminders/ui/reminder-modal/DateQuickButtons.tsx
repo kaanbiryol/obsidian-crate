@@ -1,6 +1,6 @@
 import { isSameDay } from 'date-fns';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
-import { ObsidianIcon } from '../../components/obsidian-icon';
+import { Button } from '../../../ui/shared/Button';
+import { ThemeIcon } from '../../components/theme-icon';
 import {
 	getReminderDateForPreset,
 	REMINDER_DATE_PRESETS,
@@ -52,13 +52,13 @@ export function DateQuickButtons({
 					? `${weekdayFormatter.format(optionDate)}, ${timeFormatter.format(optionDate)}`
 					: dateFormatter.format(optionDate);
 				return (
-					<ShadowDOMNativeButton
+					<Button
 						key={id}
 						onClick={() => onSelectPreset(id)}
 						aria-pressed={isActive}
 						className={`date-quick-button${isActive ? ' is-active' : ''}`}
 					>
-						<ObsidianIcon
+						<ThemeIcon
 							size="s"
 							id={isActive ? 'check' : PRESET_ICONS[id]}
 							className={isActive ? 'date-quick-button-check' : 'date-quick-button-icon'}
@@ -68,7 +68,7 @@ export function DateQuickButtons({
 							<strong>{label}</strong>
 							<small>{detail}</small>
 						</span>
-					</ShadowDOMNativeButton>
+					</Button>
 				);
 			})}
 		</div>
