@@ -11,6 +11,9 @@ for (const host of ['plugin', 'pwa']) {
           const surface = page.getByTestId('visual-surface');
           await expect(surface).toBeVisible();
           await expect(page.getByTestId('result')).toHaveText('Ready');
+          if (scene === 'editor') {
+            await page.getByRole('textbox', { name: 'Reminder title', exact: true }).focus();
+          }
           await expect(surface).toHaveScreenshot(`${host}-${theme}-${width}-${scene}.png`, { animations: 'disabled', maxDiffPixelRatio: 0.001 });
           expect(await surface.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
           if (scene === 'project') {
