@@ -1,3 +1,5 @@
+@use "../../ui/shared/styles/delete-confirmation";
+
 @mixin styles {
 .base-modal-container {
   position: fixed;
@@ -134,72 +136,5 @@
   }
 }
 
-.delete-confirmation-surface {
-  max-width: 400px;
-  padding: var(--size-4-4, 16px);
-  border: var(--crate-modal-border-width) solid var(--crate-modal-border-color);
-  border-radius: var(--radius-m, var(--crate-radius-control));
-  background: var(--crate-modal-bg);
-  box-shadow: var(--crate-elevation-sheet);
-  color: var(--text-normal);
-  font-family: var(--reminder-font-ui);
-}
-
-.delete-confirmation-copy {
-  padding-bottom: var(--size-4-4, 16px);
-}
-
-.delete-confirmation-title {
-  margin: 0 0 var(--size-2-1, 4px);
-  color: var(--text-normal);
-  font-size: var(--reminder-font-base);
-  font-weight: var(--reminder-font-weight-semibold);
-  line-height: var(--reminder-line-height-normal);
-  text-align: start;
-}
-
-.delete-confirmation-message {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--reminder-font-sm);
-  line-height: var(--reminder-line-height-normal);
-  text-align: start;
-}
-
-.delete-confirmation-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--size-2-2, 8px);
-}
-
-.delete-confirmation-button {
-  min-width: 72px;
-  min-height: 32px;
-  padding: 0 var(--size-4-3, 12px);
-  border: 1px solid transparent;
-  border-radius: var(--crate-radius-button);
-  font-size: var(--reminder-font-sm);
-  font-weight: var(--reminder-font-weight-medium);
-  line-height: var(--reminder-line-height-tight);
-}
-
-.delete-confirmation-cancel {
-  border-color: var(--crate-divider);
-  background: var(--crate-control-bg);
-  color: var(--text-normal);
-
-  &:hover {
-    border-color: var(--crate-divider-strong);
-    background: var(--crate-control-hover-bg);
-  }
-}
-
-.delete-confirmation-confirm {
-  background: var(--crate-danger);
-  color: var(--crate-on-accent);
-
-  &:hover {
-    background: color-mix(in srgb, var(--crate-danger) 88%, black);
-  }
-}
+@include delete-confirmation.styles;
 }

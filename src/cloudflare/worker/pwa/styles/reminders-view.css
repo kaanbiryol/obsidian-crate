@@ -123,5 +123,7 @@ html,body{background:var(--background-primary);font-family:var(--font-interface)
 .pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]{flex:1 1 0%!important;width:auto!important;max-width:100%!important;min-width:0!important;height:100%!important;min-height:0!important;padding:0!important;transform:none!important}
 .pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}
 .pwa-reminders-view .bottom-tab-content{width:100%;height:100%;justify-content:center}
-.pwa-reminders-view .bottom-tab-bar,.pwa-reminders-view .bottom-tab-items,.pwa-reminders-view .bottom-tab-slider,.pwa-reminders-view .bottom-tab-button,.pwa-reminders-view .bottom-tab-icon,.pwa-reminders-view .bottom-tab-label{animation:none!important;transition:none!important}
+.pwa-reminders-view .bottom-tab-icon{transition:transform 180ms cubic-bezier(.2,.8,.2,1),color 160ms ease}
+.pwa-reminders-view .bottom-tab-button:active .bottom-tab-icon{transform:scale(.88)}
+@media (prefers-reduced-motion:reduce){.pwa-reminders-view .bottom-tab-icon{transition:none}.pwa-reminders-view .bottom-tab-button:active .bottom-tab-icon{transform:none}}
 .pwa-reminders-view .reminders-fab{position:absolute;bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))}

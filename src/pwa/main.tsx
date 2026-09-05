@@ -20,6 +20,7 @@ import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
 import { usePwaRefreshLifecycle } from './hooks/usePwaRefreshLifecycle';
+import { usePwaUpdate } from './hooks/usePwaUpdate';
 import { usePwaSessionLifecycle } from './hooks/usePwaSessionLifecycle';
 import { usePwaStatus } from './hooks/usePwaStatus';
 import { useLaunchReminderModal } from './hooks/useLaunchReminderModal';
@@ -37,8 +38,8 @@ import type {
 	StoredConfig,
 } from './types';
 
-const ReminderSheet = lazy(() => import('./components/ReminderSheet')
-	.then(module => ({ default: module.ReminderSheet })));
+// Keep the editor ready for the tap's synchronous focus/keyboard activation.
+import { ReminderSheet } from './components/ReminderSheet';
 const SettingsSheet = lazy(() => import('./components/SettingsSheet')
 	.then(module => ({ default: module.SettingsSheet })));
 
@@ -56,6 +57,7 @@ function App() {
 	const [modal, setModal] = useState<ModalState | null>(null);
 	const [reorderDragging, setReorderDragging] = useState(false);
 	const { toast, showToast } = useToast();
+	const { updating, update } = usePwaUpdate(showToast);
 	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
 	const finalizeModalClose = useCallback(() => setModal(null), []);
 	const finalizeSettingsClose = useCallback(() => setSettingsOpen(false), []);
@@ -286,7 +288,7 @@ function App() {
 						onToggleSettings={toggleSettings}
 					/>
 				) : undefined}
-				belowHeaderContent={bootstrapped && authToken ? (
+				belowHeaderContent={bootstrapped && authToken ? (isProjectDetail) => (
 					<>
 						<PwaPullRefreshIndicator
 							enabled={Boolean(!loading && !modal && !settingsOpen && !reorderDragging)}
@@ -296,8 +298,9 @@ function App() {
 							statusText={statusText}
 							statusKind={statusKind}
 							updateAvailable={updateAvailable}
-							showNotificationPrompt={canShowNotificationPrompt}
-							onReload={() => window.location.reload()}
+							updating={updating}
+							showNotificationPrompt={canShowNotificationPrompt && !isProjectDetail}
+							onReload={update}
 							onEnableNotifications={enablePushNotifications}
 						/>
 					</>
@@ -323,7 +326,7 @@ function App() {
 					/></Suspense>
 				)}
 				{modal && (
-					<Suspense fallback={null}><ReminderSheet
+					<ReminderSheet
 						colorScheme={colorScheme}
 						modal={modal}
 						projects={projects}
@@ -334,7 +337,7 @@ function App() {
 						onClosed={modalTransition.finishClose}
 						onSave={saveReminder}
 						onDelete={deleteReminder}
-					/></Suspense>
+					/>
 				)}
 				{toast && (
 					<div

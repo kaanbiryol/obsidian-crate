@@ -1,11 +1,77 @@
 // Touch density belongs to the standalone host, not the shared plugin UI.
 @mixin styles {
   @media (max-width: 759px) {
+    .modal-card.pwa-reminder-editor,
+    .pwa-picker-sheet {
+      --reminder-font-base: 16px;
+      --reminder-font-sm: 15px;
+      --reminder-font-xs: 14px;
+      --reminder-font-xxs: 13px;
+    }
+
+    .modal-card.pwa-reminder-editor .reminder-action-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .modal-card.pwa-reminder-editor .reminder-action-chip {
+      --reminder-action-chip-height: 44px;
+      height: auto;
+      min-height: 44px;
+      padding: 0 6px;
+      font-size: 14px;
+    }
+
+    .pwa-picker-sheet .reminder-picker {
+      --crate-picker-row-height: 48px;
+      --crate-picker-input-height: 48px;
+
+      .date-quick-button,
+      .picker-control-row,
+      .project-picker-row,
+      .recurrence-frequency-button {
+        min-height: 48px;
+        height: auto;
+      }
+
+      .date-quick-button-copy strong,
+      .picker-field-copy strong,
+      .project-picker-row-label {
+        font-size: 16px;
+      }
+
+      .date-quick-button-copy {
+        flex-wrap: wrap;
+        gap: 2px 12px;
+        padding-block: 8px;
+      }
+
+      .recurrence-stepper {
+        --stepper-button-size: 44px;
+        grid-template-columns: 44px minmax(6ch, auto) 44px;
+      }
+
+      .recurrence-stepper-button {
+        width: 44px;
+        height: 44px;
+      }
+
+      .recurrence-day-list {
+        grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+        gap: 2px;
+      }
+
+      .recurrence-day-button {
+        min-height: 44px;
+      }
+    }
+
     .pwa-reminders-view.is-primary {
       --reminder-font-base: 16px;
-      --reminder-font-sm: 14px;
-      --reminder-font-xs: 13px;
-      --reminder-font-xxs: 12px;
+      --reminder-font-sm: 15px;
+      --reminder-font-xs: 14px;
+      --reminder-font-xxs: 13px;
       --reminder-font-title: 32px;
       --crate-radius-card: 16px;
       --checkbox-size: 22px;
@@ -21,6 +87,24 @@
 
       .view-header-meta {
         margin-top: 6px;
+      }
+
+      .premium-back-button {
+        margin: calc(var(--pwa-safe-area-top, 0px) + 8px) 16px 4px;
+        padding: 0 8px 0 0;
+        min-height: 44px;
+        gap: 4px;
+        color: var(--interactive-accent);
+        font-size: 16px;
+
+        svg {
+          width: 20px;
+          height: 20px;
+        }
+      }
+
+      .project-detail-header {
+        margin: 0 16px 4px;
       }
 
       .reminders-view-scroll {
@@ -46,10 +130,12 @@
 
       .premium-reminder-description {
         margin-top: 3px;
+        font-size: 15px;
       }
 
       .premium-pill {
         border-radius: 6px;
+        min-height: 24px;
       }
 
       .pwa-header-settings-button,
@@ -69,8 +155,8 @@
       }
 
       .bottom-tab-label {
-        font-size: 11px;
-        line-height: 14px;
+        font-size: 12px;
+        line-height: 16px;
       }
 
       .bottom-tab-slider {
@@ -97,4 +183,5 @@
       --reminders-fab-size: 56px;
     }
   }
+
 }

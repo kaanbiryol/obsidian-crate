@@ -29,9 +29,11 @@
     transition: background var(--crate-motion-duration-moderate) var(--crate-motion-easing), border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
-.premium-reminder-card:hover .premium-reminder-content {
-    background: var(--crate-reminder-card-hover-bg);
-    border-color: var(--crate-reminder-card-hover-border);
+@media (hover: hover) and (pointer: fine) {
+    .premium-reminder-card:hover .premium-reminder-content {
+        background: var(--crate-reminder-card-hover-bg);
+        border-color: var(--crate-reminder-card-hover-border);
+    }
 }
 
 .premium-reminder-card:active .premium-reminder-content {

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { Suspense, lazy, useCallback, useMemo, useRef } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -12,7 +12,8 @@ import {
 	type ReminderEditorScreenHandle,
 } from './ReminderEditorScreen';
 import { PwaModalSheet } from './PwaModalSheet';
-import { ReminderPickerSheet } from './ReminderPickerSheet';
+const ReminderPickerSheet = lazy(() => import('./ReminderPickerSheet')
+	.then(module => ({ default: module.ReminderPickerSheet })));
 
 export function ReminderSheet({
 	modal,
@@ -145,7 +146,7 @@ export function ReminderSheet({
 				/>
 				{activeScreen !== 'editor' && (
 					<div className="pwa-reminder-sheet-screen pwa-reminder-sheet-screen--picker is-active">
-						<ReminderPickerSheet
+						<Suspense fallback={null}><ReminderPickerSheet
 							isDark={colorScheme === 'dark'}
 							draft={modal.draft}
 							dialogRef={setDialogRef}
@@ -153,7 +154,7 @@ export function ReminderSheet({
 							onPatch={patchDraft}
 							onSelect={returnToEditor}
 							onClose={() => returnToEditor()}
-						/>
+						/></Suspense>
 					</div>
 				)}
 			</motion.div>

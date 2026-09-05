@@ -36,7 +36,8 @@ export const BrowseView = memo(function BrowseView({
   className = '',
   colorScheme = 'dark',
 }: BrowseViewProps) {
-  const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
+  const reduceMotion = useObsidianReducedMotion();
+  const animationsEnabled = animationConfig.enabled && !reduceMotion;
   const effectiveAnimationConfig = { ...animationConfig, enabled: animationsEnabled };
   const cards = useMemo(
     () => buildBrowseProjectCardsViewModel(projects, reminders, colorScheme),

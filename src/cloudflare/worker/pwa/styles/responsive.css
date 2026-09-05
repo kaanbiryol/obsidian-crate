@@ -24,7 +24,6 @@
 	.pwa-picker-sheet{padding:0 0 calc(16px + env(safe-area-inset-bottom))}
 }
 @media (max-width: 420px){
-	.settings-sheet__header{padding-right:16px;padding-left:16px}
 	.settings-panel{padding-right:14px;padding-left:14px}
 	.settings-row{padding-right:13px;padding-left:13px}
 }

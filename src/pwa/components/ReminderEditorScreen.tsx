@@ -7,6 +7,8 @@ import React, {
 } from 'react';
 import { getProjectColor } from '@/reminders/utils/projectColors';
 import { IconButton } from '@/ui/shared/IconButton';
+import { DeleteConfirmationModal } from '@/reminders/components/DeleteConfirmationModal';
+import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-modal/deleteConfirmation';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
 import { ReminderEditorFields } from '@/reminders/ui/reminder-modal/ReminderEditorFields';
@@ -71,7 +73,8 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	const isEditing = modal.mode === 'edit';
 	const title = isEditing ? 'Edit reminder' : 'New reminder';
 	const editorInteractive = isActive || isReturningToEditor;
-	const canSubmit = !saving
+	const canSubmit = !draft.deleteConfirm
+		&& !saving
 		&& !isClosing
 		&& hasReminderDraftTitle(draft.content, projectOptions, draft.defaultProject);
 	const performSave = useCallback(() => {
@@ -144,7 +147,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 				}}
 			>
 				<ModalHeader
-					title={draft.deleteConfirm ? 'Delete reminder?' : title}
+					title={title}
 					titleLive="polite"
 					closeLabel="Close reminder editor"
 					onClose={closeReminder}
@@ -152,21 +155,20 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 					preventFocusOnPress
 					secondaryActions={isEditing ? (
 						<IconButton
-							icon={draft.deleteConfirm ? 'x' : 'trash-2'}
-							label={draft.deleteConfirm ? 'Keep reminder' : 'Delete reminder'}
-							tone={draft.deleteConfirm ? 'neutral' : 'danger'}
+							icon="trash-2"
+							label="Delete reminder"
+							tone="danger"
 							className="reminder-modal-header-icon reminder-header-delete"
 							disabled={saving}
 							preventFocusOnPress
 							data-action="toggle-delete-confirm"
-							onClick={() => onPatchDraft({ deleteConfirm: !draft.deleteConfirm, activePicker: null })}
+							onClick={() => {
+								dismissEditorKeyboard();
+								onPatchDraft({ deleteConfirm: true, activePicker: null });
+							}}
 						/>
 					) : undefined}
-					action={isEditing && draft.deleteConfirm ? {
-						label: 'Delete', ariaLabel: 'Delete reminder', tone: 'danger',
-						disabled: saving, dataAction: 'delete-reminder',
-						onClick: () => { if (modal.reminderId) onDelete(modal.reminderId); },
-					} : {
+					action={{
 						label: saving ? 'Saving…' : isEditing ? 'Save' : 'Add',
 						ariaLabel: saving ? 'Saving reminder' : isEditing ? 'Save reminder' : 'Add reminder',
 						type: 'submit', disabled: !canSubmit, busy: saving, dataAction: 'save-reminder',
@@ -215,6 +217,16 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 					/>
 				</div>
 			</form>
+			<DeleteConfirmationModal
+				isOpen={isEditing && draft.deleteConfirm}
+				useNativeDialog
+				message={buildDeleteConfirmationMessage(draft)}
+				isLoading={saving}
+				onClose={() => { if (!saving) onPatchDraft({ deleteConfirm: false }); }}
+				onConfirm={() => {
+					if (!saving && !isClosing && modal.reminderId) onDelete(modal.reminderId);
+				}}
+			/>
 		</div>
 	);
 });

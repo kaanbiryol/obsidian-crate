@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 
 import { BottomTabBar } from '@/reminders/components/BottomTabBar';
 import { FloatingActionButton } from '@/reminders/components/FloatingActionButton';
@@ -8,10 +8,9 @@ import { ShadowDOMNativeButton } from '@/reminders/components/ShadowDOMNativeBut
 import { ViewHeader } from '@/reminders/components/ViewHeader';
 import { ThemeIconProvider } from '@/reminders/components/theme-icon';
 import type { Reminder } from '@/reminders/types/reminder';
-import {
-	PAGE_TRANSITION_DURATION,
-	type TabId,
-} from '@/reminders/ui/layoutConstants';
+import type { TabId } from '@/reminders/ui/layoutConstants';
+import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
+import { PwaNavigationScreen, type PwaNavigationMotion } from './PwaNavigationScreen';
 import { RemindersViewPanels } from '@/reminders/ui/RemindersViewPanels';
 import {
 	getCurrentHeaderData,
@@ -37,7 +36,7 @@ interface PwaRemindersAppShellProps {
 	initialProject?: string;
 	upcomingDays: number;
 	headerRightContent?: React.ReactNode;
-	belowHeaderContent?: React.ReactNode;
+	belowHeaderContent?: (isProjectDetail: boolean) => React.ReactNode;
 	children?: React.ReactNode;
 	className?: string;
 	suppressFab?: boolean;
@@ -72,45 +71,26 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	onReorderDragActiveChange,
 }) => {
 	const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? 'browse' : initialTab);
-	const [isTransitioning, setIsTransitioning] = useState(false);
-	const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const [direction, setDirection] = useState<PwaNavigationMotion['direction']>(0);
+	const reduceMotion = useObsidianReducedMotion();
+	const navigationMotion = { direction, reduceMotion };
 	const [selectedProject, setSelectedProject] = useState<string | null>(initialProject ?? null);
 
-	useEffect(() => {
-		return () => {
-			if (transitionTimeoutRef.current) {
-				clearTimeout(transitionTimeoutRef.current);
-			}
-		};
-	}, []);
-
-	const startTransition = useCallback(() => {
-		setIsTransitioning(true);
-
-		if (transitionTimeoutRef.current) {
-			clearTimeout(transitionTimeoutRef.current);
-		}
-
-		transitionTimeoutRef.current = setTimeout(() => {
-			setIsTransitioning(false);
-		}, PAGE_TRANSITION_DURATION * 1000);
-	}, []);
-
 	const handleViewModeChange = useCallback((mode: ViewMode) => {
-		startTransition();
+		setDirection(mode === 'browse' && selectedProject ? -1 : 0);
 		setViewMode(mode);
 		setSelectedProject(null);
-	}, [startTransition]);
+	}, [selectedProject]);
 
 	const handleProjectSelect = useCallback((project: string) => {
-		startTransition();
+		setDirection(1);
 		setSelectedProject(project);
-	}, [startTransition]);
+	}, []);
 
 	const handleBackToProjects = useCallback(() => {
-		startTransition();
+		setDirection(-1);
 		setSelectedProject(null);
-	}, [startTransition]);
+	}, []);
 
 	const headerData = useMemo(() => {
 		return getRemindersHeaderData(reminders, projects, upcomingDays);
@@ -149,14 +129,14 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 			{
 				<motion.span
 					animate={{ rotate: showCompleted ? 180 : 0 }}
-					transition={{ duration: 0.2, ease: 'easeOut' }}
+					transition={{ duration: reduceMotion ? 0 : 0.2, ease: 'easeOut' }}
 					className="inline-flex"
 				>
 					<ChevronDown size={18} />
 				</motion.span>
 			}
 		</ShadowDOMNativeButton>
-	), []);
+	), [reduceMotion]);
 
 	const currentProject = getReorderProject(viewMode, selectedProject);
 
@@ -166,25 +146,25 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	}, [currentProject, onReorder]);
 
 	const viewPanels = (
-		<AnimatePresence initial={false} mode="sync">
-			<RemindersViewPanels
-				viewMode={viewMode}
-				selectedProject={selectedProject}
-				isInitialLoadComplete
-				reminders={reminders}
-				projects={projects}
-				showFab={showFab}
-				upcomingDays={upcomingDays}
-				renderCard={panelCardRenderer}
-				renderToggleButton={renderToggleButton}
-				onProjectSelect={handleProjectSelect}
-				onBackToProjects={handleBackToProjects}
-				onReorder={handleReorder}
-				onReorderDragActiveChange={onReorderDragActiveChange}
-				colorScheme={isDarkMode ? 'dark' : 'light'}
-				reorderInteraction="long-press"
-			/>
-		</AnimatePresence>
+		<RemindersViewPanels
+			viewMode={viewMode}
+			selectedProject={selectedProject}
+			isInitialLoadComplete
+			reminders={reminders}
+			projects={projects}
+			showFab={showFab}
+			upcomingDays={upcomingDays}
+			renderCard={panelCardRenderer}
+			renderToggleButton={renderToggleButton}
+			onProjectSelect={handleProjectSelect}
+			onBackToProjects={handleBackToProjects}
+			onReorder={handleReorder}
+			onReorderDragActiveChange={onReorderDragActiveChange}
+			colorScheme={isDarkMode ? 'dark' : 'light'}
+			reorderInteraction="long-press"
+			pageTransitionsEnabled={false}
+			animationsEnabled={!reduceMotion}
+		/>
 	);
 
 	return (
@@ -192,7 +172,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		  <div
 				className={[
 					'reminders-view',
-                    'is-primary',
+					'is-primary',
 					isDarkMode ? 'dark' : 'light',
 					'is-fullscreen',
 					'is-modal',
@@ -200,33 +180,44 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					className,
 				].filter(Boolean).join(' ')}
 			>
-				{!(viewMode === 'browse' && selectedProject) && (
-					<div className="overflow-hidden">
-						<ViewHeader
-							{...currentHeader}
-							countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
-							large
-							showMeta
-							rightContent={headerRightContent}
-						/>
-					</div>
-				)}
+				<div className="pwa-navigation-viewport">
+					<AnimatePresence initial={false} custom={navigationMotion}>
+						{/* Keep shared header actions mounted when switching main tabs. */}
+						<PwaNavigationScreen
+							key={selectedProject === null ? 'tabs' : `project-${selectedProject}`}
+							motion={navigationMotion}
+						>
+							{!(viewMode === 'browse' && selectedProject) && (
+								<div className="overflow-hidden">
+									<ViewHeader
+										{...currentHeader}
+										countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
+										large
+										showMeta
+										rightContent={headerRightContent}
+									/>
+								</div>
+							)}
 
-				{belowHeaderContent && (
-					<div className="pwa-below-header-content">
-						{belowHeaderContent}
-					</div>
-				)}
+							{belowHeaderContent && (
+								<div className="pwa-below-header-content">
+									{belowHeaderContent(viewMode === 'browse' && selectedProject !== null)}
+								</div>
+							)}
 
-				<div className={`reminders-content${isTransitioning ? ' is-transitioning' : ''}`}>
-					{viewPanels}
+							<div className="reminders-content">
+								{viewPanels}
+							</div>
+
+						</PwaNavigationScreen>
+					</AnimatePresence>
 				</div>
 
 				<BottomTabBar
 					activeTab={viewMode}
 					onTabChange={handleViewModeChange}
 					className="animated-tab-bar animated-tab-bar-bottom"
-					animateActiveIndicator={false}
+					animateActiveIndicator={!reduceMotion}
 				/>
 
 				<AnimatePresence>

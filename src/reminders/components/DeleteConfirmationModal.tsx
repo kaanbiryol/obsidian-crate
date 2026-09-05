@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { ShadowDOMButton } from './ShadowDOMButton';
 
 interface DeleteConfirmationModalProps {
@@ -10,6 +10,7 @@ interface DeleteConfirmationModalProps {
     confirmLabel?: string;
     cancelLabel?: string;
     isLoading?: boolean;
+    useNativeDialog?: boolean;
 }
 
 /**
@@ -23,10 +24,19 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
     message = "Delete this reminder? This can't be undone.",
     confirmLabel = 'Delete',
     cancelLabel = 'Cancel',
-    isLoading = false
+    isLoading = false,
+    useNativeDialog = false,
 }) => {
     const titleId = useId();
     const messageId = useId();
+    const dialogRef = useRef<HTMLDialogElement>(null);
+
+    useEffect(() => {
+        if (!isOpen || !useNativeDialog) return;
+        const dialog = dialogRef.current;
+        dialog?.showModal();
+        return () => dialog?.close();
+    }, [isOpen, useNativeDialog]);
 
     const handleConfirm = () => {
         onConfirm();
@@ -34,7 +44,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
 
     if (!isOpen) return null;
 
-    return (
+    const content = (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div
                 className="modal-backdrop is-interactive absolute inset-0"
@@ -87,4 +97,20 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
             </div>
         </div>
     );
+
+    return useNativeDialog ? (
+        <dialog
+            ref={dialogRef}
+            className="delete-confirmation-dialog"
+            aria-label={title}
+            onCancel={(event) => {
+                event.preventDefault();
+                if (!isLoading) onClose();
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+        >
+            {content}
+        </dialog>
+    ) : content;
 };

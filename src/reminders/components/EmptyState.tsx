@@ -26,7 +26,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     animationConfig = { enabled: true },
     compact = false
 }) => {
-    const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
+    const reduceMotion = useObsidianReducedMotion();
+    const animationsEnabled = animationConfig.enabled && !reduceMotion;
     const duration = animationConfig.duration ?? CONTENT_TRANSITION_DURATION;
     const variants = {
         hidden: { opacity: 0 },

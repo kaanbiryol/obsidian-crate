@@ -121,7 +121,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;border-radius:50%;');
 		expect(html).toContain('--crate-icon-button-size: 44px;');
 		expect(html).toContain('.crate-reminders-ui .crate-icon-button {');
-		expect(html).toContain('.settings-sheet__close{width:44px;height:44px;min-width:44px;display:grid;place-items:center;border:0;border-radius:10px;');
+		expect(html).toContain('.pwa-modal-sheet .reminder-modal-header .reminder-modal-header-close {');
 		expect(html).toContain('.pwa-reminders-view .completed-section-toggle{height:44px;min-height:44px}');
 		expect(html).toContain('.crate-reminders-ui .reminder-modal-header-action:disabled {');
 		expect(html).toContain('.crate-reminders-ui .reminder-modal-header-action[data-tone=danger].is-enabled {');
@@ -190,7 +190,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('height:100%!important;min-height:0!important;padding:0!important');
 		expect(html).toContain('padding:0!important;transform:none!important');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar [data-action="switch-tab"]>div:last-child{transform:none}');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar,.pwa-reminders-view .bottom-tab-items,.pwa-reminders-view .bottom-tab-slider,.pwa-reminders-view .bottom-tab-button,.pwa-reminders-view .bottom-tab-icon,.pwa-reminders-view .bottom-tab-label{animation:none!important;transition:none!important}');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-button:active .bottom-tab-icon{transform:scale(.88)}');
+		expect(html).toContain('@media (prefers-reduced-motion:reduce){.pwa-reminders-view .bottom-tab-icon{transition:none}');
 		expect(html).toContain('bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))');
 		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;');
 		expect(html).toContain('.pwa-reminders-view .ios-scroll{scrollbar-width:none;overscroll-behavior-y:contain}');

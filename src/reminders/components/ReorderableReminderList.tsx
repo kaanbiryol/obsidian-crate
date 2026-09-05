@@ -5,6 +5,7 @@ import { ReminderListPresence } from './ReminderListPresence';
 import { REMINDER_DRAG_SCALE, REMINDER_LIST_LAYOUT_TRANSITION, REMINDER_SECTION_TRANSITION } from '../ui/layoutConstants';
 import { reminderRowMotion } from '../ui/reminderRowMotion';
 import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
+import { createReorderClickGuard } from './reorderClickGuard';
 
 interface ReorderableReminderListProps {
   reminders: Reminder[];
@@ -36,7 +37,13 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
   const isPresent = useIsPresent();
   const rowMotion = reminderRowMotion(enableLayoutAnimations);
   const [isDragPressed, setIsDragPressed] = useState(false);
-  const didDragRef = useRef(false);
+  const clickGuardRef = useRef(createReorderClickGuard());
+  const elementRef = useRef<HTMLDivElement | null>(null);
+  const setElementRef = useCallback((element: HTMLDivElement | null) => {
+    elementRef.current = element;
+    if (typeof ref === 'function') ref(element);
+    else if (ref) ref.current = element;
+  }, [ref]);
   const dragControls = useDragControls();
   const longPressTimerRef = useRef<number | null>(null);
   const pressStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -56,6 +63,24 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
   useEffect(() => cancelLongPress, [cancelLongPress]);
 
   useEffect(() => {
+    const element = elementRef.current;
+    if (!element) return;
+    const guard = clickGuardRef.current;
+    const handleClick = (event: MouseEvent) => {
+      if (!guard.shouldBlock(event)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    // Cards use native capture listeners, so block at their native ancestor too.
+    element.addEventListener('click', handleClick, true);
+    element.addEventListener('pointerdown', guard.reset, true);
+    return () => {
+      element.removeEventListener('click', handleClick, true);
+      element.removeEventListener('pointerdown', guard.reset, true);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isDragPressed && !isLongPressArmed) return;
     // A drag may be released outside the row, where its pointer-up won't bubble.
     window.addEventListener('pointerup', cancelLongPress);
@@ -68,7 +93,7 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
 
   const handleDragStart = useCallback(() => {
     cancelLongPress();
-    didDragRef.current = true;
+    clickGuardRef.current.block();
     setIsReordering(true);
     onDragStart();
   }, [cancelLongPress, onDragStart]);
@@ -77,15 +102,11 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
     cancelLongPress();
     setIsReordering(false);
     onDragEnd();
-    // Suppress the click event that fires after drag release
-    // Use requestAnimationFrame so the flag clears after the click event
-    window.requestAnimationFrame(() => {
-      didDragRef.current = false;
-    });
+    // Keep suppression until the next pointerdown: touch clicks can arrive late.
   }, [cancelLongPress, onDragEnd]);
 
   const handleClickCapture = useCallback((e: React.MouseEvent) => {
-    if (didDragRef.current) {
+    if (clickGuardRef.current.shouldBlock(e)) {
       e.stopPropagation();
       e.preventDefault();
     }
@@ -107,6 +128,7 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
       longPressTimerRef.current = null;
       pressStartRef.current = null;
       setIsLongPressArmed(true);
+      clickGuardRef.current.block();
       dragControls.start(event);
     }, LONG_PRESS_DELAY_MS);
   }, [cancelLongPress, dragControls, interaction]);
@@ -125,7 +147,7 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
   return (
     <Reorder.Item
       {...rowMotion}
-      ref={ref}
+      ref={setElementRef}
       as="div"
       dragMomentum={false}
       dragTransition={{

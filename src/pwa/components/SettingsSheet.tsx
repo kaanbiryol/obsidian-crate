@@ -6,8 +6,8 @@ import {
 	Monitor,
 	Moon,
 	Sun,
-	X,
 } from 'lucide-react';
+import { ModalHeader } from '@/ui/shared/ModalHeader';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import type { PwaThemePreference } from '../theme';
 import type { PushState, StoredConfig } from '../types';
@@ -55,12 +55,12 @@ export function SettingsSheet({
 			onKeyDown={handleDialogKeyDown}
 		>
 			<aside ref={setDialogRef} className="settings-sheet" role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut || isClosing} tabIndex={-1}>
-				<div className="settings-sheet__header">
-					<h2>Settings</h2>
-					<Button isIconOnly className="settings-sheet__close" type="button" data-action="close-settings" aria-label="Close settings" isDisabled={loggingOut || isClosing} onClick={onClose}>
-						<X size={18} />
-					</Button>
-				</div>
+				<ModalHeader
+					title="Settings"
+					closeLabel="Close settings"
+					closeDisabled={loggingOut || isClosing}
+					onClose={onClose}
+				/>
 				<div className="settings-panel">
 					<section className="settings-panel__section" aria-labelledby="settings-appearance-title">
 						<h3 id="settings-appearance-title" className="settings-panel__title">Appearance</h3>
