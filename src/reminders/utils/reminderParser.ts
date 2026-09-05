@@ -6,6 +6,7 @@ import {
 } from './priorityMarker';
 import { parseRecurrenceFromContent } from './recurrenceParser';
 import { parseLocalDateKey } from './reminderDate';
+import { findAllMatches } from './richTextMatchers';
 
 export interface ParsedReminder {
   cleanContent: string;
@@ -84,7 +85,11 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
 
   // Try to extract ISO format date: 2025-11-02T14:00 or 2025-11-02 (@ prefix optional)
   // Also handle seconds/milliseconds + timezone suffix (e.g., 2025-11-02T14:00:00.000Z)
-  const dateParseContent = stripUrlsForDateParsing(taskContent);
+  // Stored reminder lines append their authoritative date after the title. Keep
+  // earlier date mentions in the title when the editor saves and reloads them.
+  const dateParseContent = findAllMatches(stripUrlsForDateParsing(taskContent), knownProjects)
+    .filter(match => match.type === 'date' && !parseRecurrenceFromContent(match.text))
+    .at(-1)?.text ?? '';
   const isoDateMatch = dateParseContent.match(
     /@?(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?(?:Z|[+-]\d{2}:\d{2})?)?)/
   );

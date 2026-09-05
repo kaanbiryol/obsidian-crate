@@ -82,7 +82,7 @@ export function applyReminderTextUpdate(
 			hasTime: update.hasTime,
 			recurrence: update.recurrence === undefined
 				? undefined
-				: normalizeRecurrenceRule(update.recurrence ?? undefined),
+				: update.recurrence === null ? null : normalizeRecurrenceRule(update.recurrence),
 			project: update.project,
 			priority: update.priority,
 		},

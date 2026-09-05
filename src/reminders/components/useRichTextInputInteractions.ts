@@ -9,7 +9,7 @@ interface UseRichTextInputInteractionsOptions {
 	onUndo?: () => boolean;
 	onRedo?: () => boolean;
 	captureHistorySnapshot?: () => void;
-	handleInput: () => void;
+	handleInput: (paste?: boolean) => void;
 }
 
 export function useRichTextInputInteractions({
@@ -53,7 +53,7 @@ export function useRichTextInputInteractions({
 		captureHistorySnapshot?.();
 		const text = e.clipboardData.getData('text/plain');
 		insertPlainTextAtSelection(text);
-		handleInput();
+		handleInput(true);
 	}, [captureHistorySnapshot, handleInput]);
 
 	const handleMouseDown = useCallback((e: React.MouseEvent) => {

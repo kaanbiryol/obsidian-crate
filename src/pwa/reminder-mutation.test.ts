@@ -25,6 +25,19 @@ function createDraft(overrides: Partial<ModalDraft> = {}): ModalDraft {
 }
 
 describe('buildReminderMutationBody', () => {
+    it('saves the active chips and clears a stale recurrence when a date replaces it', () => {
+        const body = buildReminderMutationBody({
+            config, mode: 'edit', projects: ['Personal', 'Work'], selectedProject: null,
+            draft: createDraft({
+                content: 'Task #Personal #Work ! ! weekly 2026-04-03',
+                recurrence: { frequency: 'weekly' },
+            }),
+        });
+        expect(body).toMatchObject({
+            content: 'Task', project: 'Work', priority: 1, dueDate: '2026-04-03', recurrence: null,
+        });
+    });
+
 	it('normalizes inline project, priority, and date metadata from content', () => {
 		const body = buildReminderMutationBody({
 			config,

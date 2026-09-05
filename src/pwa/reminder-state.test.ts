@@ -43,6 +43,13 @@ function createReminderRecord(id: string, lineNumber: number, overrides: Partial
 }
 
 describe('PWA reminder state', () => {
+    it('clears recurrence without allowing the old inline rule to return', () => {
+        const draft = createModalDraft({ content: 'Task every week', recurrence: { frequency: 'weekly' } });
+        const patch = applyReminderTextUpdate(draft, ['Inbox'], { recurrence: null });
+        expect(patch.content?.trim()).toBe('Task');
+        expect(patch.recurrence).toBeUndefined();
+    });
+
 	it('requires a human-readable title instead of metadata-only content', () => {
 		const projects = ['Inbox', 'Work'];
 

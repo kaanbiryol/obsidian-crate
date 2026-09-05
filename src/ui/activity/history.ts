@@ -11,11 +11,10 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 	const timeline = container.createDiv({ cls: 'crate-activity-timeline' });
 	for (const entry of history) {
 		const entryEl = timeline.createDiv({ cls: 'crate-history-entry' });
-		const dot = entryEl.createDiv({ cls: 'crate-history-dot' });
-		if (!entry.success) dot.addClass('is-error');
+		if (!entry.success) entryEl.addClass('is-error');
 
 		if (hasFilePaths(entry)) {
-			const details = entryEl.createEl('details', { cls: 'crate-history-details' });
+			const details = entryEl.createEl('details', { cls: 'crate-history-details', attr: { 'data-history-key': `${entry.timestamp}:${entry.type}` } });
 			const summary = details.createEl('summary', { cls: 'crate-history-card' });
 			renderHistoryHeader(summary, entry, true);
 			renderHistoryFiles(details, entry);
@@ -29,15 +28,21 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expandable: boolean): void {
 	const header = element.createDiv({ cls: 'crate-history-header' });
 	const meta = header.createDiv({ cls: 'crate-history-meta' });
-	meta.createSpan({ text: entry.type, cls: 'crate-history-type' });
-	meta.createSpan({ text: formatTimestamp(entry.timestamp), cls: 'crate-history-time' });
+	if (entry.type !== 'sync') {
+        meta.createSpan({ text: entry.type === 'initial' ? 'Initial sync' : 'Full sync', cls: 'crate-history-type' });
+    }
+	const timestamp = meta.createSpan({ text: formatTimestamp(entry.timestamp), cls: 'crate-history-time' });
+    timestamp.setAttribute('title', new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'long', timeStyle: 'long',
+    }).format(new Date(entry.timestamp)));
 	header.createSpan({
 		text: formatSummary(entry),
 		cls: `crate-history-summary${entry.success ? '' : ' crate-history-summary-error'}`,
 	});
 	if (expandable) {
 		const chevron = header.createDiv({ cls: 'crate-history-chevron' });
-		setIcon(chevron, 'chevron-right');
+		setIcon(chevron, 'chevron-down');
+        chevron.setAttribute('aria-hidden', 'true');
 	}
 }
 
@@ -76,16 +81,14 @@ function hasFilePaths(entry: SyncHistoryEntry): boolean {
 
 function formatTimestamp(iso: string): string {
 	const date = new Date(iso);
-	const month = date.toLocaleString(undefined, { month: 'short' });
-	const day = date.getDate();
-	const hours = String(date.getHours()).padStart(2, '0');
-	const minutes = String(date.getMinutes()).padStart(2, '0');
-	return `${month} ${day}, ${hours}:${minutes}`;
+	return new Intl.DateTimeFormat(undefined, {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    }).format(date);
 }
 
 function formatSummary(entry: SyncHistoryEntry): string {
 	if (!entry.success) {
-		const parts = [`failed (${entry.errorCount} error${entry.errorCount !== 1 ? 's' : ''})`];
+		const parts = [`Failed (${entry.errorCount} error${entry.errorCount !== 1 ? 's' : ''})`];
 		if (entry.merged > 0) parts.push(`${entry.merged} merged`);
 		if (entry.conflictCount > 0) {
 			parts.push(`${entry.conflictCount} conflict${entry.conflictCount !== 1 ? 's' : ''}`);
@@ -103,13 +106,13 @@ function formatSummary(entry: SyncHistoryEntry): string {
 		&& entry.deleted === 0
 		&& entry.conflictCount === 0
 		&& (entry.resolvedRaceCount ?? 0) === 0
-	) return 'no changes';
+	) return 'No changes';
 
 	const parts: string[] = [];
-	if (entry.uploaded > 0) parts.push(`${entry.uploaded} up`);
-	if (entry.downloaded > 0) parts.push(`${entry.downloaded} down`);
+	if (entry.uploaded > 0) parts.push(`${entry.uploaded} uploaded`);
+	if (entry.downloaded > 0) parts.push(`${entry.downloaded} downloaded`);
 	if (entry.merged > 0) parts.push(`${entry.merged} merged`);
-	if (entry.deleted > 0) parts.push(`${entry.deleted} del`);
+	if (entry.deleted > 0) parts.push(`${entry.deleted} deleted`);
 	if (entry.conflictCount > 0) {
 		parts.push(`${entry.conflictCount} conflict${entry.conflictCount !== 1 ? 's' : ''}`);
 	}

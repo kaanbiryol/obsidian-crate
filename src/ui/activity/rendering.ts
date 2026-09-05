@@ -23,6 +23,8 @@ export function renderFileMicroCard(
 
 	const iconEl = card.createDiv({ cls: `crate-file-icon crate-file-icon-${type}` });
 	setIcon(iconEl, FILE_CARD_ICONS[type]);
+    iconEl.setAttribute('aria-label', type === 'merge' ? 'Merged' : type === 'conflict' ? 'Conflict' : type === 'delete' ? 'Delete' : type === 'upload' ? 'Upload' : 'Download');
+    iconEl.setAttribute('role', 'img');
 
 	const info = card.createDiv({ cls: 'crate-file-info' });
 	const parts = filePath.split('/');
