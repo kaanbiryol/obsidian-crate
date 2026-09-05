@@ -2,12 +2,14 @@ import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import {
 	normalizeRemindersFolderPath,
-	type AutoOpenSetting,
 	type DueDateDefaultSetting,
 	type RemindersSettings,
 } from '../../reminders/settings';
 import type { TabId } from '../../reminders/ui/layoutConstants';
 import { errorMessage } from '../../plugin/logger';
+import { RemindersFolderSuggest } from './folder-suggest';
+import { renderRemindersWebApp } from './reminders-web-app';
+import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
 import { createSettingsSectionHeading } from './section-helpers';
 
 export interface RemindersSectionContext {
@@ -16,7 +18,7 @@ export interface RemindersSectionContext {
 	rerender: () => void;
 }
 
-export function renderRemindersSection(context: RemindersSectionContext): void {
+export function renderRemindersSection(context: RemindersSectionContext): () => void {
 	const { containerEl, plugin, rerender } = context;
 	const settings = plugin.remindersSettings;
 	const persistSettings = async (update: Partial<RemindersSettings>): Promise<void> => {
@@ -29,15 +31,17 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 	};
 
 	createSettingsSectionHeading(containerEl, 'Reminders');
+	renderRemindersWebApp(containerEl, plugin);
+	let folderSuggest: RemindersFolderSuggest;
 
 	new Setting(containerEl)
 		.setName('Reminders folder')
-		.setDesc('Folder where reminder Markdown files are stored')
+		.setDesc('The vault folder containing your reminder files. Changing this folder does not move existing files.')
 		.addText(text => {
-			let draftValue = settings.remindersFolderPath;
+			folderSuggest = new RemindersFolderSuggest(plugin.app, text.inputEl);
 
 			const commitFolderPath = async (): Promise<void> => {
-				const normalizedPath = normalizeRemindersFolderPath(draftValue);
+				const normalizedPath = normalizeRemindersFolderPath(text.inputEl.value);
 				const currentPath = plugin.remindersSettings.remindersFolderPath;
 				text.setValue(normalizedPath);
 
@@ -53,10 +57,7 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 			};
 
 			text.setPlaceholder('Reminders')
-				.setValue(settings.remindersFolderPath)
-				.onChange((value) => {
-					draftValue = value;
-				});
+				.setValue(settings.remindersFolderPath);
 			text.inputEl.addEventListener('blur', () => {
 				void commitFolderPath().catch((error: unknown) => {
 					new Notice(`Failed to update reminders folder: ${errorMessage(error)}`);
@@ -74,7 +75,7 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 	if (!settings.enabled) {
 		new Setting(containerEl)
 			.setName('Enable reminders')
-			.setDesc('Adopt this folder for reminders. Crate will scan its Markdown files and add stable Crate ID comments to checkbox lines so reminders can be updated safely.')
+			.setDesc('Use this folder for reminders. Crate scans its Markdown files and adds ID comments to checkbox lines to track reminders when they change.')
 			.addButton(button => {
 				button.setButtonText('Enable reminders')
 					.setCta()
@@ -90,12 +91,12 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 						}
 					});
 			});
-		return;
+		return () => folderSuggest.close();
 	}
 
 	new Setting(containerEl)
 		.setName('Default due date')
-		.setDesc('Fill in a due date when creating new reminders')
+		.setDesc('Choose the due date filled in for new reminders.')
 		.addDropdown(dropdown => {
 			dropdown.addOption('none', 'None');
 			dropdown.addOption('today', 'Today');
@@ -109,21 +110,17 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 		});
 
 	new Setting(containerEl)
-		.setName('Auto-open view on startup')
-		.addDropdown(dropdown => {
-			dropdown.addOption('none', 'None');
-			dropdown.addOption('sidebar', 'Sidebar');
-			dropdown.addOption('fullscreen', 'Full screen');
-			dropdown.setValue(settings.autoOpenView)
-				.onChange(async (value) => {
-					await persistSettings({
-						autoOpenView: value as AutoOpenSetting,
-					});
-				});
-		});
+		.setName('Open reminders on startup')
+		.setDesc('Open the reminders view when Obsidian starts.')
+		.addToggle(toggle => toggle
+			.setValue(settings.autoOpenView === 'sidebar')
+			.onChange(async value => {
+				await persistSettings({ autoOpenView: value ? 'sidebar' : 'none' });
+			}));
 
 	new Setting(containerEl)
-		.setName('Sidebar default tab')
+		.setName('Default reminders tab')
+		.setDesc('The tab shown when you open the reminders view.')
 		.addDropdown(dropdown => {
 			dropdown.addOption('inbox', 'Inbox');
 			dropdown.addOption('today', 'Today');
@@ -138,40 +135,15 @@ export function renderRemindersSection(context: RemindersSectionContext): void {
 		});
 
 	new Setting(containerEl)
-		.setName('Full screen default tab')
-		.addDropdown(dropdown => {
-			dropdown.addOption('inbox', 'Inbox');
-			dropdown.addOption('today', 'Today');
-			dropdown.addOption('upcoming', 'Upcoming');
-			dropdown.addOption('browse', 'Browse');
-			dropdown.setValue(settings.fullscreenDefaultTab)
-				.onChange(async (value) => {
-					await persistSettings({
-						fullscreenDefaultTab: value as TabId,
-					});
-				});
-		});
-
-	new Setting(containerEl)
-		.setName('Upcoming days')
-		.setDesc('Number of days to show in upcoming view')
+		.setName('Upcoming range (days)')
+		.setDesc('How many days ahead to show in the upcoming view.')
 		.addText(text => {
-			text.setValue(String(settings.upcomingDaysDefault))
-				.onChange(async (value) => {
-					const num = parseInt(value, 10);
-					if (!isNaN(num) && num > 0) {
-						await persistSettings({ upcomingDaysDefault: num });
-					}
-				});
+			text.setValue(String(settings.upcomingDaysDefault));
+			configureIntegerInput(text, 1);
+			bindCommittedText(text, () => String(plugin.remindersSettings.upcomingDaysDefault),
+				value => persistSettings({ upcomingDaysDefault: Number(value) }),
+				value => parseSettingInteger(value, 1) !== null);
 		});
 
-	new Setting(containerEl)
-		.setName('Debug logging')
-		.setDesc('Enable verbose reminders logging to console')
-		.addToggle(toggle => {
-			toggle.setValue(settings.debugLogging)
-				.onChange(async (value) => {
-					await persistSettings({ debugLogging: value });
-				});
-		});
+	return () => folderSuggest.close();
 }

@@ -1,4 +1,4 @@
-import { ItemView, Platform, WorkspaceLeaf } from "obsidian";
+import { ItemView, Platform, WorkspaceLeaf, type ViewStateResult } from "obsidian";
 import React, { useCallback, useEffect, useState } from "react";
 import type CratePlugin from "@/main";
 import { PluginContext } from "@/reminders/ui/reminders-context";
@@ -24,6 +24,8 @@ export class RemindersView extends ItemView {
     private plugin: CratePlugin;
     private shadowMount: ShadowReactMount | null = null;
     private isOpen = false;
+    private initialProject: string | undefined;
+    private navigationVersion = 0;
 
     constructor(leaf: WorkspaceLeaf, plugin: CratePlugin) {
         super(leaf);
@@ -73,12 +75,29 @@ export class RemindersView extends ItemView {
         }
         this.shadowMount = shadowMount;
 
+        this.renderContent();
+    }
+
+    async setState(state: unknown, result: ViewStateResult): Promise<void> {
+        if (typeof state === "object" && state !== null && "project" in state && typeof state.project === "string") {
+            this.initialProject = state.project || undefined;
+            this.navigationVersion++;
+            this.renderContent();
+        }
+        await super.setState(state, result);
+    }
+
+    private renderContent(): void {
+        const shadowMount = this.shadowMount;
+        if (!shadowMount) return;
         // Determine if we're in full-screen mode (main content on mobile)
         const isFullScreen = Platform.isMobile && this.isInMainContent();
 
         shadowMount.render(
             <PluginContext.Provider value={this.plugin}>
                 <RemindersViewContent
+                    key={this.navigationVersion}
+                    initialProject={this.initialProject}
                     plugin={this.plugin}
                     shadowRoot={shadowMount.shadowRoot}
                     isFullScreen={isFullScreen}

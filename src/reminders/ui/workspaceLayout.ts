@@ -1,5 +1,5 @@
 type RemindersLeaf = {
-	setViewState(state: { type: string; active: boolean }): Promise<void>;
+	setViewState(state: { type: string; active: boolean; state?: { project: string } }): Promise<void>;
 };
 
 export type RemindersWorkspace = {
@@ -11,18 +11,18 @@ export type RemindersWorkspace = {
 export async function activateOrRevealRemindersLeaf(
 	workspace: RemindersWorkspace,
 	viewType: string,
+	project?: string,
 ): Promise<void> {
-	let leaf = workspace.getLeavesOfType(viewType)[0];
+	const existingLeaf = workspace.getLeavesOfType(viewType)[0];
+	const leaf = existingLeaf ?? workspace.getRightLeaf(false);
+	if (!leaf) return;
 
-	if (!leaf) {
-		const rightLeaf = workspace.getRightLeaf(false);
-		if (rightLeaf) {
-			leaf = rightLeaf;
-			await leaf.setViewState({ type: viewType, active: true });
-		}
+	if (!existingLeaf || project) {
+		await leaf.setViewState({
+			type: viewType,
+			active: true,
+			...(project ? { state: { project } } : {}),
+		});
 	}
-
-	if (leaf) {
-		workspace.revealLeaf(leaf);
-	}
+	workspace.revealLeaf(leaf);
 }

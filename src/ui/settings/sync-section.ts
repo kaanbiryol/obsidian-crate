@@ -1,9 +1,12 @@
-import { Notice, Setting } from 'obsidian';
+import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../main';
-import { configureSyncLogger, errorMessage } from '../../plugin/logger';
+import { errorMessage } from '../../plugin/logger';
 import type { CrateSettings } from '../../plugin/settings-types';
 import type { SyncState } from '../../sync/types';
 import { createFileSyncProgress, hideFileSyncProgress, runButtonTask, showFileSyncProgress, updateFileSyncProgress } from './action-helpers';
+import { renderSyncInterval } from './sync-interval';
+import { renderExclusionsSetting } from './exclusions-setting';
+import { bindCommittedText, configureIntegerInput, parseSettingInteger } from './input-helpers';
 import { createSettingsSectionHeading } from './section-helpers';
 
 export interface SyncSectionContext {
@@ -33,10 +36,12 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 		? 'Sync in progress...'
 		: lastSync ? `Last synced: ${new Date(lastSync).toLocaleString()}` : 'Never synced';
 
+	let syncButton: ButtonComponent;
 	const syncSetting = new Setting(containerEl)
 		.setName('Sync now')
 		.setDesc(lastSyncDesc)
 		.addButton(button => {
+			syncButton = button;
 			if (isSyncing) {
 				button.setButtonText('Syncing...');
 				button.setDisabled(true);
@@ -67,9 +72,6 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 					onError: () => {
 						new Notice('Sync failed');
 					},
-					onFinally: () => {
-						rerender();
-					},
 				});
 			});
 		});
@@ -79,17 +81,17 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 	const onProgress = (current: number, total: number) => {
 		updateFileSyncProgress(syncProgress, current, total);
 	};
-	let previousStatus: SyncState['status'] = plugin.syncRuntime.getState().status;
 	const onStateChange = (state: SyncState) => {
 		if (state.status === 'syncing') {
 			showFileSyncProgress(syncProgress);
 		} else {
 			hideFileSyncProgress(syncProgress);
-			if (previousStatus === 'syncing') {
-				rerender();
-			}
 		}
-		previousStatus = state.status;
+		const syncing = state.status === 'syncing';
+		syncButton.setDisabled(syncing).setButtonText(syncing ? 'Syncing...' : 'Sync now');
+		const timestamp = state.lastSync ?? plugin.settings.lastSync;
+		syncSetting.setDesc(syncing ? 'Sync in progress...' : timestamp
+			? `Last synced: ${new Date(timestamp).toLocaleString()}` : 'Never synced');
 	};
 	plugin.syncRuntime.addProgressListener(onProgress);
 	plugin.syncRuntime.addStateChangeListener(onStateChange);
@@ -105,7 +107,7 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 
 	new Setting(containerEl)
 		.setName('Sync on startup')
-		.setDesc('Automatically sync when Obsidian starts')
+		.setDesc('Sync when Obsidian starts. Applies to all devices.')
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.syncOnStartup)
 			.onChange(async (value) => {
@@ -114,49 +116,24 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 
 	new Setting(containerEl)
 		.setName('Sync when Obsidian resumes')
-		.setDesc('Automatically sync when the app comes back into focus or reconnects')
+		.setDesc('Sync when you return to Obsidian or reconnect to the internet. Applies to all devices.')
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.syncOnResume)
 			.onChange(async (value) => {
 				await persistSettings({ syncOnResume: value });
 			}));
 
-	new Setting(containerEl)
-		.setName('Sync interval')
-		.setDesc('How often to check for remote changes (seconds, 0 disables)')
-		.addText(text => text
-			.setValue(String(plugin.settings.syncInterval))
-			.onChange(async (value) => {
-				const interval = parseInt(value, 10);
-				if (!isNaN(interval) && interval >= 0) {
-					if (await persistSettings({ syncInterval: interval })) {
-						plugin.syncRuntime.updateSyncSettings();
-					}
-				}
-			}));
+	renderSyncInterval(containerEl, () => plugin.settings.syncInterval, async syncInterval => {
+		if (await persistSettings({ syncInterval })) plugin.syncRuntime.updateSyncSettings();
+	});
+
+	renderExclusionsSetting(containerEl, plugin, async ignorePatterns => {
+		if (await persistSettings({ ignorePatterns })) plugin.syncRuntime.updateSyncSettings();
+	});
 
 	new Setting(containerEl)
-		.setName('Ignore patterns')
-		.setDesc('Files matching these patterns will not be synced (one per line)')
-		.addTextArea(text => {
-			text
-				.setValue(plugin.settings.ignorePatterns.join('\n'))
-				.onChange(async (value) => {
-					const ignorePatterns = value
-						.split('\n')
-						.map(p => p.trim())
-						.filter(p => p.length > 0);
-					if (await persistSettings({ ignorePatterns })) {
-						plugin.syncRuntime.updateSyncSettings();
-					}
-				});
-			text.inputEl.rows = 6;
-			text.inputEl.cols = 40;
-		});
-
-	new Setting(containerEl)
-		.setName('Show status bar')
-		.setDesc('Display sync status in the status bar')
+		.setName('Show sync status')
+		.setDesc('Show sync activity in the status bar. Applies to all devices.')
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.showStatusBar)
 			.onChange(async (value) => {
@@ -166,27 +143,16 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 			}));
 
 	new Setting(containerEl)
-		.setName('Debounce delay')
-		.setDesc('Seconds to wait after a file change before syncing (0 to sync immediately)')
-		.addText(text => text
-			.setValue(String(plugin.settings.debounceDelay))
-			.onChange(async (value) => {
-				const delay = parseInt(value, 10);
-				if (!isNaN(delay) && delay >= 0) {
-					await persistSettings({ debounceDelay: delay });
-				}
-			}));
-
-	new Setting(containerEl)
-		.setName('Debug logging')
-		.setDesc('Enable verbose sync logging to the developer console')
-		.addToggle(toggle => toggle
-			.setValue(plugin.settings.syncDebugLogging)
-			.onChange(async (value) => {
-				if (await persistSettings({ syncDebugLogging: value })) {
-					configureSyncLogger({ enabled: value });
-				}
-			}));
+		.setName('Sync delay after editing (seconds)')
+		.setDesc('Wait this many seconds after a file changes before syncing. Set to 0 to sync immediately.')
+		.addText(text => {
+			text.setValue(String(plugin.settings.debounceDelay));
+			const maximum = Math.floor(2_147_483_647 / 1000);
+			configureIntegerInput(text, 0, maximum);
+			bindCommittedText(text, () => String(plugin.settings.debounceDelay), async value => {
+				if (await persistSettings({ debounceDelay: Number(value) })) plugin.syncRuntime.updateSyncSettings();
+			}, value => parseSettingInteger(value, 0, maximum) !== null);
+		});
 
 	return cleanup;
 }

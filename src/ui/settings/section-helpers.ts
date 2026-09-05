@@ -13,3 +13,9 @@ export function createSettingsSubsectionHeading(containerEl: HTMLElement, title:
 		.setHeading()
 		.setClass('crate-settings-subsection-heading');
 }
+
+export function createSettingsDisclosure(containerEl: HTMLElement, title: string): HTMLElement {
+	const details = containerEl.createEl('details', { cls: 'crate-settings-disclosure' });
+	details.createEl('summary', { text: title });
+	return details.createDiv();
+}

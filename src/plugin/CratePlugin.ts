@@ -120,8 +120,8 @@ export default class CratePlugin extends Plugin {
 		}
 	}
 
-	async activateRemindersView(): Promise<void> {
-		await activateOrRevealRemindersLeaf(this.app.workspace, 'reminders-view');
+	async activateRemindersView(project?: string): Promise<void> {
+		await activateOrRevealRemindersLeaf(this.app.workspace, 'reminders-view', project);
 	}
 
 	async reinitializeWithFolder(newFolderPath: string): Promise<void> {
@@ -133,6 +133,7 @@ export default class CratePlugin extends Plugin {
 
 	clearSettingsUiState(): void {
 		this.settingsUiState.diagnostics = null;
+		this.settingsUiState.devices = null;
 	}
 
 	registerSettingsTab(settingTab: CrateSettingTab): void {

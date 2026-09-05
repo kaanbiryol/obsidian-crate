@@ -13,7 +13,7 @@ import { buildDiagnosticsSettingsStateKey } from '../../plugin/settings-ui-state
 export function renderInfrastructureManagementSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin, isConfigured } = context;
 
-	createSettingsSubsectionHeading(containerEl, 'Infrastructure management');
+	createSettingsSubsectionHeading(containerEl, 'Server management');
 
 	const diagnosticsContainer = containerEl.createDiv({ cls: 'crate-diagnostics' });
 	diagnosticsContainer.hide();
@@ -24,15 +24,15 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 
 	if (isConfigured) {
 		new Setting(containerEl)
-			.setName('Worker URL')
-			.setDesc('Current sync endpoint')
+			.setName('Server address')
+			.setDesc('The Cloudflare address this vault uses for sync.')
 			.addText(text => text
 				.setValue(plugin.settings.workerUrl)
 				.setDisabled(true));
 
 		const diagnosticsSetting = new Setting(containerEl)
 			.setName('Run diagnostics')
-			.setDesc('Check server compatibility, authentication, health, and manifest access')
+			.setDesc('Check server compatibility, sign-in, health, and access to the synced file list.')
 			.addButton(button => button
 				.setButtonText('Run')
 				.onClick(async () => {
@@ -65,7 +65,7 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 
 		new Setting(containerEl)
 			.setName('Manage server')
-			.setDesc('Use the Cloudflare dashboard to view logs, update the deployment, or delete its resources')
+			.setDesc('Open the Cloudflare dashboard to view logs and manage your server resources.')
 			.addButton(button => button
 				.setButtonText('Open Cloudflare')
 				.onClick(() => {

@@ -17,7 +17,6 @@ const initializeSyncManagers = vi.fn<(target: SyncRuntimeTarget) => void>();
 const registerSyncCommands = vi.fn();
 const registerVaultSyncEventHandlers = vi.fn();
 const ensurePluginDeviceId = vi.fn();
-const openFullScreenReminderModal = vi.fn();
 const handleCloudflareOAuthProtocol = vi.fn();
 const showCloudflareServerUpdateNotice = vi.fn();
 const cloudflareDeploymentDestroy = vi.fn();
@@ -74,9 +73,6 @@ async function loadLifecycleModule() {
 			constructor(public readonly app: unknown, public readonly plugin: unknown) {}
 		},
 	}));
-	vi.doMock('../reminders/ui/adapters/modals', () => ({
-		openFullScreenReminderModal,
-	}));
 	vi.doMock('../reminders/plugin-integration', () => ({
 		initializeReminders,
 		reconcileReminderNotifications,
@@ -113,6 +109,7 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
 		remindersSettings: { enabled: true },
 		registerSettingsTab: vi.fn(),
 		openSettingsTab: vi.fn(),
+		activateRemindersView: vi.fn(async () => {}),
 		registerObsidianProtocolHandler: vi.fn(),
 		...overrides,
 	};
@@ -130,7 +127,6 @@ beforeEach(() => {
 	registerSyncCommands.mockReset();
 	registerVaultSyncEventHandlers.mockReset();
 	ensurePluginDeviceId.mockReset();
-	openFullScreenReminderModal.mockReset();
 	handleCloudflareOAuthProtocol.mockReset();
 	showCloudflareServerUpdateNotice.mockReset();
 	cloudflareDeploymentDestroy.mockReset();
@@ -147,7 +143,6 @@ afterEach(() => {
 	vi.doUnmock('./secret-storage');
 	vi.doUnmock('./logger');
 	vi.doUnmock('../ui/settings-tab');
-	vi.doUnmock('../reminders/ui/adapters/modals');
 	vi.doUnmock('../reminders/plugin-integration');
 	vi.doUnmock('../sync/plugin-integration');
 	vi.doUnmock('./deviceId');
@@ -198,7 +193,7 @@ describe('bootstrapPlugin', () => {
 		remindersHandler?.({ project: 'Work' });
 		cloudflareHandler?.({ code: 'authorization-code', state: 'oauth-state' });
 
-		expect(openFullScreenReminderModal).toHaveBeenCalledWith(plugin, 'Work');
+		expect(plugin.activateRemindersView).toHaveBeenCalledWith('Work');
 		expect(handleCloudflareOAuthProtocol).toHaveBeenCalledWith(plugin, {
 			code: 'authorization-code',
 			state: 'oauth-state',
@@ -251,7 +246,7 @@ describe('bootstrapPlugin', () => {
 		)?.[1] as ProtocolHandler | undefined;
 		remindersHandler?.({ project: 'Work' });
 
-		expect(openFullScreenReminderModal).not.toHaveBeenCalled();
+		expect(plugin.activateRemindersView).not.toHaveBeenCalled();
 		expect(plugin.openSettingsTab).toHaveBeenCalledTimes(1);
 		expect(noticeMessages).toContain(
 			'Enable reminders in Crate settings before opening the reminders app.',

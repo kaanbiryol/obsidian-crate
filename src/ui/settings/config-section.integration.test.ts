@@ -70,14 +70,14 @@ describe('renderConfigSection integration', () => {
 			'Connect with Cloudflare',
 		]);
 		expect(getSettingByName('Connect with Cloudflare').descEl.textContent).toBe(
-			'Sign in to reuse an existing Crate server or create private Worker, R2, D1, and Durable object resources. Cloudflare plan limits and possible usage charges apply',
+			'Sign in to connect to an existing Crate server or create one in your Cloudflare account. Cloudflare plan limits and usage charges may apply.',
 		);
 		getSettingByName('Connect with Cloudflare').buttons[0]?.click();
 		expect(startCloudflareDeployment).toHaveBeenCalledTimes(1);
 	});
 
 	it('disconnects locally without offering device setup links', async () => {
-		const { renderConfigSection } = await loadConfigSectionModule();
+		const { renderDisconnectSetting } = await loadConfigSectionModule();
 		const clearSyncConfiguration = vi.fn(async () => {});
 		const rerender = vi.fn();
 		openConfirmationModal.mockResolvedValue(true);
@@ -91,7 +91,7 @@ describe('renderConfigSection integration', () => {
 			},
 		};
 
-		renderConfigSection({
+		renderDisconnectSetting({
 			containerEl: new FakeElement('div') as never,
 			plugin: plugin as never,
 			rerender,
@@ -145,7 +145,7 @@ describe('renderConfigSection integration', () => {
 		});
 
 		const serverSetting = getSettingByName('Cloudflare server');
-		expect(serverSetting.descEl.textContent).toBe('Your Worker and web app are up to date');
+		expect(serverSetting.descEl.textContent).toBe('Your sync server and reminders web app are up to date.');
 		expect(serverSetting.buttons).toHaveLength(0);
 	});
 });

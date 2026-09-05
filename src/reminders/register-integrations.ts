@@ -3,7 +3,6 @@ import type CratePlugin from '../main';
 import { registerReminderCommands } from './commands';
 import { ReminderQueryInjector } from './query/injector';
 import { createRemindersBlockExtension } from './query/remindersBlockLivePreview';
-import { openFullScreenReminderModal } from './ui/adapters/modals';
 import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/adapters/reminders-view';
 import { createLogger } from './utils/logger';
 
@@ -59,8 +58,6 @@ export function registerReminderIntegrations(plugin: CratePlugin): void {
 		plugin.app.workspace.onLayoutReady(() => {
 			if (plugin.remindersSettings.autoOpenView === 'sidebar') {
 				void plugin.activateRemindersView();
-			} else if (plugin.remindersSettings.autoOpenView === 'fullscreen') {
-				openFullScreenReminderModal(plugin);
 			}
 		});
 	}

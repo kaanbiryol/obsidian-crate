@@ -7,15 +7,15 @@ import type { ConfigSectionContext } from './config-types';
 import { createSettingsSectionHeading } from './section-helpers';
 
 export function renderConfigSection(context: ConfigSectionContext): void {
-	const { containerEl, plugin, rerender } = context;
+	const { containerEl, plugin } = context;
 	const isConfigured = plugin.syncRuntime.isConfigured();
 
-	createSettingsSectionHeading(containerEl, 'Configuration');
+	createSettingsSectionHeading(containerEl, 'Connection');
 
 	if (!isConfigured) {
 		new Setting(containerEl)
 			.setName('Connect with Cloudflare')
-			.setDesc('Sign in to reuse an existing Crate server or create private Worker, R2, D1, and Durable object resources. Cloudflare plan limits and possible usage charges apply')
+			.setDesc('Sign in to connect to an existing Crate server or create one in your Cloudflare account. Cloudflare plan limits and usage charges may apply.')
 			.addButton(button => button
 				.setButtonText('Connect with Cloudflare')
 				.setCta()
@@ -33,8 +33,8 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 		const updateSetting = new Setting(containerEl)
 			.setName(updateAvailable ? 'Cloudflare update available' : 'Cloudflare server')
 			.setDesc(updateAvailable
-				? 'An updated Worker and web app are included with this Crate build'
-				: 'Your Worker and web app are up to date');
+				? 'This Crate version includes an update for your sync server and reminders web app.'
+				: 'Your sync server and reminders web app are up to date.');
 
 		if (updateAvailable) {
 			updateSetting.addButton(button => button
@@ -45,11 +45,15 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				}));
 		}
 	}
+}
 
+export function renderDisconnectSetting(context: ConfigSectionContext): void {
+	const { containerEl, plugin, rerender } = context;
+	const isConfigured = plugin.syncRuntime.isConfigured();
 	if (isConfigured) {
 		new Setting(containerEl)
 			.setName('Disconnect this device')
-			.setDesc('Clears this device credential but remembers which Cloudflare server belongs to this vault')
+			.setDesc('Sign out on this device. Crate remembers your server, and your local files and server data are kept.')
 			.addButton(button => button
 				.setButtonText('Disconnect device')
 				.setDestructive()
