@@ -2,7 +2,18 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 async function readPluginThemeStyles() {
-  const paths = ['../../styles/plugin-ui/_theme.scss', '../../ui/shared/styles/_tokens.scss'];
+  const paths = ['../../styles/plugin-ui/_theme.scss', '../../ui/shared/styles/_tokens.scss', '../../ui/shared/styles/_controls.scss'];
+  return (await Promise.all(paths.map(path => readFile(new URL(path, import.meta.url), 'utf8')))).join('\n');
+}
+
+
+async function readEditorStyles() {
+  const paths = [
+    '../../ui/shared/styles/_modal-header.scss',
+    '../../styles/plugin-ui/_reminder-editor.scss',
+    './shared/styles/_editor-fields.scss',
+    './shared/styles/_editor-actions.scss',
+  ];
   return (await Promise.all(paths.map(path => readFile(new URL(path, import.meta.url), 'utf8')))).join('\n');
 }
 
@@ -13,10 +24,7 @@ describe('plugin reminder layout styles', () => {
       new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
       'utf8',
     );
-    const editorStyles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const editorStyles = await readEditorStyles();
 
     expect(themeStyles).toContain('--crate-app-bg: var(--background-primary)');
     expect(themeStyles).toContain('--crate-modal-bg: var(--modal-background');
@@ -64,10 +72,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('keeps editor actions aligned and uses the compact spacing at sheet widths', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const themeStyles = await readPluginThemeStyles();
     const editorHeader = styles.match(/\.reminder-modal-header \{([\s\S]*?)\n\}/)?.[1];
     const headerSide = styles.match(/\.reminder-modal-header-side \{([\s\S]*?)\n\}/)?.[1];
@@ -99,10 +104,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('keeps the reminder delete icon quiet until its destructive hover state', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const themeStyles = await readPluginThemeStyles();
     const deleteButton = styles.match(
       /\.reminder-header-delete \{([\s\S]*?)\n\}/,
@@ -117,10 +119,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('keeps the disabled reminder submit action borderless', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const submitButton = styles.match(
       /^\.reminder-modal-header-action \{(?=\n\s{2}min-width: 0)([\s\S]*?)^\}/m,
     )?.[1];
@@ -142,10 +141,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('keeps reminder descriptions visually subordinate to their titles', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const description = styles.match(
       /\.reminder-description-input \{([\s\S]*?)\n\}/,
     )?.[1];
@@ -156,10 +152,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('uses compact, restrained styling for the schedule picker', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const modalStyles = await readFile(
       new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
       'utf8',
@@ -260,10 +253,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('aligns the project picker shell and rows with the reminder editor', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const modalStyles = await readFile(
       new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
       'utf8',
@@ -284,10 +274,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('uses compact, semantic controls for the recurrence picker', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const modalStyles = await readFile(
       new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
       'utf8',
@@ -325,10 +312,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('uses one spacing and typography contract across reminder picker screens', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
 
     expect(styles).not.toContain('.recurrence-picker-content');
     expect(styles).not.toContain('.reminder-date-picker .picker-section-heading');
@@ -340,10 +324,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('keeps the dialog title and editable reminder text one typography step apart', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const headerTitle = styles.match(
       /\.reminder-modal-header-title \{([\s\S]*?)\n\}/,
     )?.[1];
@@ -358,10 +339,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('shows the reminder title placeholder when the rich text field is empty', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const titleInput = styles.match(
       /\.reminder-editor-fields \.reminder-title-input \{([\s\S]*?)\n\}/,
     )?.[1];
@@ -372,10 +350,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('keeps inline reminder chips evenly sized and vertically centered', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const chipLayout = styles.match(
       /\.reminder-editor-fields \.reminder-title-input :is\(([\s\S]*?)\) \{([\s\S]*?)\n\}/,
     )?.[2];
@@ -424,10 +399,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('keeps unset properties neutral and colors selected property values', async () => {
-    const styles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const styles = await readEditorStyles();
     const themeStyles = await readPluginThemeStyles();
     const actionChips = styles.match(
       /^\.reminder-action-chips \{([\s\S]*?)^\}/m,
@@ -465,10 +437,7 @@ describe('plugin reminder layout styles', () => {
   });
 
   it('keeps the reminder editor vertical rhythm compact', async () => {
-    const editorStyles = await readFile(
-      new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
-      'utf8',
-    );
+    const editorStyles = await readEditorStyles();
     const modalStyles = await readFile(
       new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
       'utf8',
@@ -596,6 +565,9 @@ describe('plugin reminder layout styles', () => {
       '../../styles/plugin-ui/_theme.scss',
       '../../styles/plugin-ui/_modal.scss',
       '../../styles/plugin-ui/_reminder-editor.scss',
+      '../../ui/shared/styles/_modal-header.scss',
+      './shared/styles/_editor-fields.scss',
+      './shared/styles/_editor-actions.scss',
       './shared/styles/_shell.scss',
       './shared/styles/_projects.scss',
       './shared/styles/_project-detail.scss',

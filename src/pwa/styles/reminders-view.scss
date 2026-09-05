@@ -1,3 +1,8 @@
+@use "../../ui/shared/styles/controls";
+@use "../../ui/shared/styles/modal-header";
+@use "../../reminders/ui/shared/styles/editor-fields";
+@use "../../reminders/ui/shared/styles/editor-actions";
+@use "./editor-layout";
 @use "../../ui/shared/styles/tokens";
 @use '../../reminders/ui/shared/styles/shell';
 @use '../../reminders/ui/shared/styles/projects';
@@ -8,6 +13,11 @@
 
 .crate-reminders-ui {
 	@include tokens.styles;
+	@include controls.styles;
+	@include modal-header.styles;
+	@include editor-fields.styles;
+	@include editor-actions.styles;
+	@include editor-layout.styles;
 	@include shell.styles;
 	@include projects.styles;
 	@include project-detail.styles;

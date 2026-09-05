@@ -71,19 +71,10 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .pwa-modal-sheet__backdrop{background:rgba(24,24,27,.42)}
 .pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage{border-color:var(--pwa-light-border);box-shadow:0 -1px 0 rgba(255,255,255,.72),0 -24px 70px rgba(24,24,27,.16)}
 .pwa-picker-sheet.pwa-project-picker-sheet,.pwa-picker-sheet.pwa-date-picker-sheet,.pwa-picker-sheet.pwa-repeat-picker-sheet{background:var(--pwa-sheet-surface)}
-.pwa-editor-title-rich-input:empty::before,.pwa-editor-title-input::placeholder,.pwa-editor-description-input::placeholder{color:var(--pwa-light-placeholder)}
-.secondary-button.is-danger,.pwa-editor-icon-button--danger,.pwa-schedule-clear,.pwa-repeat-remove,.settings-logout-button{color:var(--pwa-light-danger-text)}
-.pwa-editor-header,.pwa-project-picker-header,.pwa-schedule-header,.pwa-repeat-header,.settings-sheet__header{border-color:var(--pwa-light-border)}
-.pwa-editor-icon-button,.pwa-picker-icon-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
-.pwa-editor-icon-button--danger{background:rgba(180,35,24,.07);border-color:rgba(180,35,24,.18)}
-.pwa-editor-submit-button{color:var(--pwa-light-accent-text)}
-.pwa-editor-submit-button:disabled{background:transparent;color:var(--text-faint);opacity:.55}
-.pwa-editor-card{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}
-.pwa-editor-divider{background:var(--pwa-light-border)}
-.pwa-editor-chip-row{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border)}
-.pwa-editor-chip{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
-.pwa-editor-chip.is-active,.pwa-schedule-done,.pwa-schedule-current strong,.pwa-repeat-apply,.pwa-repeat-summary strong,.pwa-repeat-frequency.is-active,.pwa-repeat-day.is-active,.settings-action-button,.pwa-project-picker-sheet .pwa-project-option svg{color:var(--pwa-light-accent-text)}
-.pwa-editor-chip.is-important{color:var(--pwa-light-danger-text)}
+.secondary-button.is-danger,.pwa-schedule-clear,.pwa-repeat-remove,.settings-logout-button{color:var(--pwa-light-danger-text)}
+.pwa-project-picker-header,.pwa-schedule-header,.pwa-repeat-header,.settings-sheet__header{border-color:var(--pwa-light-border)}
+.pwa-picker-icon-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
+.pwa-schedule-done,.pwa-schedule-current strong,.pwa-repeat-apply,.pwa-repeat-summary strong,.pwa-repeat-frequency.is-active,.pwa-repeat-day.is-active,.settings-action-button,.pwa-project-picker-sheet .pwa-project-option svg{color:var(--pwa-light-accent-text)}
 .pwa-project-picker-close:hover,.pwa-schedule-done:hover,.pwa-schedule-header .pwa-picker-icon-button:hover,.pwa-repeat-apply:hover,.pwa-repeat-header .pwa-picker-icon-button:hover,.settings-sheet__close:hover{background:var(--pwa-light-surface-hover)}
 .pwa-schedule-clear:hover,.pwa-repeat-remove:hover,.settings-logout-button:hover{background:rgba(180,35,24,.07);color:var(--pwa-light-danger-text)}
 .pwa-project-option,.pwa-project-picker-sheet .pwa-project-list,.pwa-schedule-preset-grid,.pwa-schedule-fields,.pwa-repeat-frequency-grid,.pwa-repeat-control-card,.pwa-repeat-time-card,.pwa-repeat-days,.settings-group{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}

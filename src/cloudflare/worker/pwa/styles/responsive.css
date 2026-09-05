@@ -6,7 +6,7 @@
 @keyframes pwa-toast-in{from{opacity:0;transform:translate3d(-50%,6px,0) scale(.98)}to{opacity:1;transform:translate3d(-50%,0,0) scale(1)}}
 @media (prefers-reduced-motion: reduce){
 	.view-transition,.modal-card,.settings-sheet,.pwa-picker-sheet,.pwa-pull-refresh__glyph svg,.pwa-update-banner,.toast,.premium-checkbox.is-completing .premium-checkbox-visual,.premium-checkbox-icon{animation:none!important}
-	.pwa-reminders-view .bottom-tab-button,.pwa-reminders-view .bottom-tab-icon,.pwa-reminders-view .bottom-tab-label,.pwa-reminders-view .view-header-meta,.premium-reminder-content,.fab,.pwa-pull-refresh,.pwa-pull-refresh__glyph,.modal-card.pwa-reminder-editor{transition:none!important}
+	.pwa-reminders-view .bottom-tab-button,.pwa-reminders-view .bottom-tab-icon,.pwa-reminders-view .bottom-tab-label,.pwa-reminders-view .view-header-meta,.premium-reminder-content,.fab,.pwa-pull-refresh,.pwa-pull-refresh__glyph{transition:none!important}
 }
 @keyframes sheet-in{from{translate:0 18px;opacity:.92}to{translate:0 0;opacity:1}}
 @media (min-width: 760px){
@@ -21,33 +21,7 @@
 @media (max-width: 640px){
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{width:100vw!important;border-right:0;border-left:0}
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{max-height:90dvh!important}
-	.pwa-modal-sheet--reminder.is-editor-screen:not(.is-keyboard-open) .pwa-modal-sheet__container--reminder{height:min(calc(326px + env(safe-area-inset-bottom)),90dvh)!important;max-height:90dvh!important}
-	.pwa-modal-sheet--reminder.is-editor-screen.is-keyboard-open .pwa-modal-sheet__container--reminder{height:min(calc(320px + var(--pwa-keyboard-inset,0px)),90dvh)!important;max-height:90dvh!important}
-	.modal-card.pwa-reminder-editor{padding:0 18px calc(20px + env(safe-area-inset-bottom))}
-	.pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor{padding-bottom:16px}
-	.pwa-editor-header{grid-template-columns:minmax(56px,1fr) minmax(0,1.7fr) minmax(56px,1fr);min-height:68px;margin:0 -18px 16px;padding:0 18px}
-	.pwa-editor-icon-button{width:44px;height:44px;min-width:44px}
-	.pwa-editor-card{flex:0 1 auto;min-height:148px;max-height:188px;padding:14px 16px 16px}
-	.pwa-editor-title-input{font-size:17px;min-height:42px}
-	.pwa-editor-description-input{flex:1 1 auto;min-height:40px;max-height:68px}
-	.pwa-modal-sheet.is-keyboard-open .pwa-editor-card{flex:0 1 auto;min-height:128px;max-height:188px}
-	.pwa-modal-sheet.is-keyboard-open .pwa-editor-title-input{flex:0 1 auto;min-height:42px;max-height:72px}
-	.pwa-modal-sheet.is-keyboard-open .pwa-editor-description-input{flex:1 1 auto;height:auto;min-height:36px;max-height:68px}
-	.pwa-editor-divider{margin:11px 0 13px}
-	.pwa-editor-chip-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;margin-top:12px;padding:3px;overflow:visible;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(255,255,255,.018)}
-	.pwa-editor-chip-row::-webkit-scrollbar{display:none}
-	.pwa-editor-chip{width:100%;height:46px;min-width:0;border-color:transparent;border-radius:7px;background:transparent;flex-direction:column;gap:3px;padding:3px;font-size:11.5px}
-	.pwa-editor-chip:not(.pwa-editor-chip--icon){max-width:none}
-	.pwa-editor-chip--icon{width:100%;min-width:0;padding:5px 4px 4px}
-	.pwa-editor-chip .pwa-editor-chip__mobile-label{display:block}
-	.pwa-editor-chip svg{width:16px;height:16px;flex:0 0 auto}
 	.pwa-picker-sheet{padding:16px 24px calc(24px + env(safe-area-inset-bottom))}
-}
-@media (max-height: 900px) and (min-width: 641px){
-	.modal-card.pwa-reminder-editor{padding-bottom:calc(32px + env(safe-area-inset-bottom))}
-	.pwa-editor-header{margin-bottom:42px}
-	.pwa-editor-card{min-height:320px}
-	.pwa-editor-chip-row{margin-top:24px;padding-top:20px}
 }
 @media (max-width: 420px){
 	.settings-sheet__header{padding-right:16px;padding-left:16px}

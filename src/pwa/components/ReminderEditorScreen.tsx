@@ -5,13 +5,12 @@ import React, {
 	useImperativeHandle,
 	useRef,
 } from 'react';
-import { PwaButton as Button } from './PwaButton';
-import { Calendar, Flag, Hash, Repeat, Trash2, X } from 'lucide-react';
-import { RichTextInput, type RichTextInputHandle } from '@/reminders/components/RichTextInput';
-import { ProjectAutocompleteDropdown } from '@/reminders/ui/reminder-modal/ProjectAutocompleteDropdown';
-import { useProjectAutocomplete } from '@/reminders/ui/reminder-modal/useProjectAutocomplete';
-import { formatRecurrence } from '@/reminders/utils/rruleConverter';
-import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
+import { getProjectColor } from '@/reminders/utils/projectColors';
+import { IconButton } from '@/ui/shared/IconButton';
+import { ModalHeader } from '@/ui/shared/ModalHeader';
+import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
+import { ReminderEditorFields } from '@/reminders/ui/reminder-modal/ReminderEditorFields';
+import { ReminderActionChips } from '@/reminders/ui/reminder-modal/ReminderActionChips';
 import { useKeyboardDoneSave } from '../hooks/useKeyboardDoneSave';
 import {
 	applyReminderTextUpdate,
@@ -27,6 +26,7 @@ export interface ReminderEditorScreenHandle {
 
 export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	modal: ModalState;
+	colorScheme: 'dark' | 'light';
 	projectOptions: string[];
 	saving: boolean;
 	isClosing: boolean;
@@ -42,6 +42,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	onDelete: (id: string) => void;
 }>(function ReminderEditorScreen({
 	modal,
+	colorScheme,
 	projectOptions,
 	saving,
 	isClosing,
@@ -59,7 +60,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-	const editorCardRef = useRef<HTMLDivElement | null>(null);
 	const draft = modal.draft;
 	const isEditing = modal.mode === 'edit';
 	const title = isEditing ? 'Edit reminder' : 'New reminder';
@@ -95,13 +95,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	useImperativeHandle(ref, () => ({
 		dismissKeyboard: dismissEditorKeyboard,
 	}), [dismissEditorKeyboard]);
-
-	const autocomplete = useProjectAutocomplete({
-		content: draft.content,
-		projects: projectOptions,
-		onContentChange: (content) => onPatchDraft({ content }),
-		richTextInputRef,
-	});
 
 	useEffect(() => {
 		if (!isActive || !canInteract) return;
@@ -143,180 +136,76 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 					saveReminder();
 				}}
 			>
-				<div className="pwa-editor-header">
-					<div className="pwa-editor-header__side">
-						{isEditing ? (
-							<Button
-								isIconOnly
-								className={`pwa-editor-icon-button ${draft.deleteConfirm ? 'pwa-editor-icon-button--muted' : 'pwa-editor-icon-button--danger'}`}
-								type="button"
-								data-action="toggle-delete-confirm"
-								aria-label={draft.deleteConfirm ? 'Keep reminder' : 'Delete reminder'}
-								isDisabled={saving}
-								preventFocusOnPress
-								onPointerDown={(event) => event.preventDefault()}
-								onClick={() => onPatchDraft({
-									deleteConfirm: !draft.deleteConfirm,
-									activePicker: null,
-								})}
-							>
-								{draft.deleteConfirm ? <X size={20} /> : <Trash2 size={20} />}
-							</Button>
-						) : (
-							<Button
-								isIconOnly
-								className="pwa-editor-icon-button pwa-editor-icon-button--muted"
-								type="button"
-								aria-label="Close modal"
-								isDisabled={saving}
-								preventFocusOnPress
-								onPointerDown={(event) => event.preventDefault()}
-								onClick={closeReminder}
-							>
-								<X size={20} />
-							</Button>
-						)}
-					</div>
-					<h2 className="pwa-editor-title" aria-live="polite">
-						{draft.deleteConfirm ? 'Delete reminder?' : title}
-					</h2>
-					<div className="pwa-editor-header__side pwa-editor-header__side--right">
-						{isEditing && draft.deleteConfirm ? (
-							<Button
-								className="pwa-editor-submit-button pwa-editor-submit-button--danger"
-								type="button"
-								data-action="delete-reminder"
-								aria-label="Delete reminder"
-								isDisabled={saving}
-								preventFocusOnPress
-								onPointerDown={(event) => event.preventDefault()}
-								onClick={() => modal.reminderId && onDelete(modal.reminderId)}
-							>
-								Delete
-							</Button>
-						) : (
-							<Button
-								className={`pwa-editor-submit-button${saving ? ' is-saving' : ''}`}
-								type="submit"
-								data-action="save-reminder"
-								aria-label={saving ? 'Saving reminder' : isEditing ? 'Save reminder' : 'Add reminder'}
-								aria-busy={saving}
-								isDisabled={!canSubmit}
-								preventFocusOnPress
-								onPointerDown={(event) => event.preventDefault()}
-							>
-								{saving ? 'Saving…' : isEditing ? 'Save' : 'Add'}
-							</Button>
-						)}
-					</div>
-				</div>
-
-				<div ref={editorCardRef} className="pwa-editor-card">
-					<RichTextInput
-						ref={richTextInputRef}
-						value={draft.content}
-						onChange={(content) => onPatchDraft({ content })}
-						placeholder="Reminder title"
-						ariaLabel="Reminder title"
-						readOnly={saving || !editorInteractive}
-						inputRef={contentRef}
-						preserveSelection
-						externalChangeCursor="end"
-						syncContentBeforePaint
-						autoFocus={!saving && !isClosing}
-						autoComplete="off"
-						autoCorrect="off"
-						spellCheck={false}
-						onFocus={handleTitleFocus}
-						onBlur={handleEditorFieldBlur}
-						focusRequestKey={editorFocusRequest}
-						knownProjects={projectOptions}
-						onAutocompleteQuery={autocomplete.updateAutocomplete}
-						onAutocompleteKeyDown={autocomplete.handleKeyDown}
-						className="pwa-editor-title-input pwa-editor-title-rich-input ios-scroll"
-					/>
-					{!saving && autocomplete.isOpen && (
-						<ProjectAutocompleteDropdown
-							filteredProjects={autocomplete.filteredProjects}
-							highlightedIndex={autocomplete.highlightedIndex}
-							anchorRect={autocomplete.rect}
-							containerRef={editorCardRef}
-							onSelect={autocomplete.selectProject}
-						/>
-					)}
-					<div className="pwa-editor-divider" />
-					<textarea
-						ref={descriptionRef}
-						className="pwa-editor-description-input ios-scroll"
-						rows={2}
-						maxLength={4096}
-						placeholder="Description"
-						aria-label="Reminder description"
-						autoComplete="off"
-						autoCorrect="off"
-						spellCheck={false}
-						value={draft.description}
-						disabled={saving || !editorInteractive}
-						onFocus={handleDescriptionFocus}
-						onBlur={handleEditorFieldBlur}
-						onChange={(event) => onPatchDraft({ description: event.currentTarget.value })}
-					/>
-				</div>
-
-				<div className="pwa-editor-actions">
-					<div className="pwa-editor-chip-row">
-						<Button
-							className={`pwa-editor-chip${draft.dueDate ? ' is-active' : ''}`}
-							type="button"
-							data-action="toggle-picker"
-							data-picker="date"
-							isDisabled={saving || !canInteract}
-							onPointerDown={(event) => event.preventDefault()}
-							onClick={() => onOpenPicker('date')}
-						>
-							<Calendar size={16} />
-							<span>{draft.dueDate ? formatModalDueSummary(draft) : REMINDER_PICKER_COPY.editor.date}</span>
-						</Button>
-						<Button
-							className="pwa-editor-chip"
-							type="button"
-							data-action="toggle-picker"
-							data-picker="project"
-							isDisabled={saving || !canInteract}
-							onPointerDown={(event) => event.preventDefault()}
-							onClick={() => onOpenPicker('project')}
-						>
-							<Hash size={16} />
-							<span>{draft.project || REMINDER_PICKER_COPY.editor.defaultProject}</span>
-						</Button>
-						<Button
-							isIconOnly
-							className={`pwa-editor-chip pwa-editor-chip--icon${draft.priority === 1 ? ' is-important' : ''}`}
-							type="button"
-							data-action="toggle-priority"
-							aria-label={draft.priority === 1 ? 'Remove priority' : 'Set priority'}
-							isDisabled={saving}
+				<ModalHeader
+					title={draft.deleteConfirm ? 'Delete reminder?' : title}
+					titleLive="polite"
+					closeLabel="Close reminder editor"
+					onClose={closeReminder}
+					closeDisabled={saving}
+					preventFocusOnPress
+					secondaryActions={isEditing ? (
+						<IconButton
+							icon={draft.deleteConfirm ? 'x' : 'trash-2'}
+							label={draft.deleteConfirm ? 'Keep reminder' : 'Delete reminder'}
+							tone={draft.deleteConfirm ? 'neutral' : 'danger'}
+							className="reminder-modal-header-icon reminder-header-delete"
+							disabled={saving}
 							preventFocusOnPress
-							onClick={togglePriority}
-						>
-							<Flag size={16} fill={draft.priority === 1 ? 'currentColor' : 'none'} />
-							<span className="pwa-editor-chip__mobile-label">{REMINDER_PICKER_COPY.editor.priority}</span>
-						</Button>
-						<Button
-							isIconOnly
-							className={`pwa-editor-chip pwa-editor-chip--icon${draft.recurrence ? ' is-active' : ''}`}
-							type="button"
-							data-action="toggle-picker"
-							data-picker="recurrence"
-							isDisabled={saving || !canInteract}
-							aria-label={draft.recurrence ? formatRecurrence(draft.recurrence) : REMINDER_PICKER_COPY.editor.recurrenceLabel}
-							onPointerDown={(event) => event.preventDefault()}
-							onClick={() => onOpenPicker('recurrence')}
-						>
-							<Repeat size={16} />
-							<span className="pwa-editor-chip__mobile-label">{REMINDER_PICKER_COPY.editor.repeat}</span>
-						</Button>
-					</div>
+							data-action="toggle-delete-confirm"
+							onClick={() => onPatchDraft({ deleteConfirm: !draft.deleteConfirm, activePicker: null })}
+						/>
+					) : undefined}
+					action={isEditing && draft.deleteConfirm ? {
+						label: 'Delete', ariaLabel: 'Delete reminder', tone: 'danger',
+						disabled: saving, dataAction: 'delete-reminder',
+						onClick: () => { if (modal.reminderId) onDelete(modal.reminderId); },
+					} : {
+						label: saving ? 'Saving…' : isEditing ? 'Save' : 'Add',
+						ariaLabel: saving ? 'Saving reminder' : isEditing ? 'Save reminder' : 'Add reminder',
+						type: 'submit', disabled: !canSubmit, busy: saving, dataAction: 'save-reminder',
+					}}
+				/>
+				<div className="reminder-modal-body" style={{
+					'--reminder-project-color': getProjectColor(draft.project || draft.defaultProject)[colorScheme].accent,
+				} as React.CSSProperties}>
+					<ReminderEditorFields
+						content={draft.content}
+						onContentChange={(content) => onPatchDraft({ content })}
+						description={draft.description}
+						onDescriptionChange={(description) => onPatchDraft({ description })}
+						projects={projectOptions}
+						richTextInputRef={richTextInputRef}
+						textareaRef={contentRef}
+						descriptionRef={descriptionRef}
+						disabled={saving || !editorInteractive}
+						allowAutoFocus={!saving && !isClosing}
+						titleInputProps={{
+							preserveSelection: true, externalChangeCursor: 'end', syncContentBeforePaint: true,
+							autoComplete: 'off', autoCorrect: 'off', spellCheck: false,
+							onFocus: handleTitleFocus, onBlur: handleEditorFieldBlur,
+							focusRequestKey: editorFocusRequest,
+							className: 'pwa-editor-title-input pwa-editor-title-rich-input',
+						}}
+						descriptionInputProps={{
+							maxLength: 4096, autoComplete: 'off', autoCorrect: 'off', spellCheck: false,
+							onFocus: handleDescriptionFocus, onBlur: handleEditorFieldBlur,
+							className: 'pwa-editor-description-input',
+						}}
+					/>
+					<ReminderActionChips
+						dueDate={draft.dueDate || null}
+						dueDateLabel={draft.dueDate ? formatModalDueSummary(draft) : undefined}
+						project={draft.project}
+						defaultProject={draft.defaultProject || 'Inbox'}
+						priority={draft.priority}
+						recurrence={draft.recurrence}
+						disabled={saving || !canInteract}
+						preventFocusOnPress
+						onOpenDatePicker={() => onOpenPicker('date')}
+						onOpenProjectPicker={() => onOpenPicker('project')}
+						onOpenRecurrencePicker={() => onOpenPicker('recurrence')}
+						onTogglePriority={togglePriority}
+					/>
 				</div>
 			</form>
 		</div>

@@ -1,0 +1,107 @@
+@mixin styles {
+.reminder-modal-header {
+  --reminder-modal-header-control-size: var(--crate-icon-button-size);
+
+  display: grid;
+  grid-template-columns: var(--reminder-modal-header-control-size) minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 6px;
+  min-height: 44px;
+  padding: 4px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--crate-divider) 65%, transparent);
+}
+
+.reminder-modal-header-close {
+  justify-self: start;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-faint);
+
+  &:hover,
+  &:focus-visible {
+    border-color: color-mix(in srgb, var(--crate-divider) 65%, transparent) !important;
+    background: var(--crate-control-hover-bg) !important;
+    color: var(--text-normal);
+  }
+}
+
+.reminder-modal-header-copy {
+  min-width: 0;
+  text-align: left;
+}
+
+.reminder-modal-header-title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-normal);
+  font-size: var(--reminder-font-base);
+  font-weight: var(--reminder-font-weight-medium);
+  line-height: 1.2;
+  letter-spacing: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reminder-modal-header-side {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+
+  &.is-right {
+    width: auto;
+    gap: var(--size-4-2, 8px);
+    justify-content: flex-end;
+  }
+}
+
+.reminder-modal-header-icon {
+  --crate-icon-button-control-size: var(--reminder-modal-header-control-size);
+}
+
+.reminder-modal-header-action {
+  min-width: 0;
+  height: var(--reminder-modal-header-control-size);
+  padding: 0 7px;
+  border: 0 !important;
+  border-radius: var(--radius-s, 4px);
+  background: transparent;
+  box-shadow: none !important;
+  color: var(--text-faint);
+  font-size: var(--reminder-font-base);
+  font-weight: var(--reminder-font-weight-medium);
+  cursor: default;
+  opacity: 1;
+  transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
+
+  &:disabled {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--crate-focus-ring);
+    outline-offset: 1px;
+  }
+
+  &.is-enabled {
+    color: var(--crate-accent-text);
+    cursor: pointer;
+
+    &:hover {
+      background: color-mix(in srgb, var(--crate-accent-text) 9%, transparent);
+    }
+
+    &:active {
+      background: color-mix(in srgb, var(--crate-accent-text) 14%, transparent);
+    }
+  }
+}
+
+.reminder-modal-header-action[data-tone="danger"].is-enabled {
+  color: var(--crate-danger);
+}
+}

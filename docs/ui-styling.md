@@ -1,7 +1,7 @@
 # Shared plugin and PWA UI
 
 The plugin and PWA compile the same reminder components and Sass. Keep changes to
-card structure, typography, badges, and states in the shared files so they reach
+card structure, editor fields, controls, typography, badges, and states in the shared files so they reach
 both hosts together.
 
 ## Ownership
@@ -21,9 +21,16 @@ both hosts together.
   checkboxes, metadata badges, and their states. `_primary-screen.scss` owns
   list-screen density and hierarchy. The plugin's `_card-presentation.scss`
   only handles embedded-list spacing and keyboard focus.
-- Each host retains its own layout, sheet, keyboard, navigation, and persistence
-  behavior. Editors and pickers still have host-specific presentation; sharing
-  their content is a separate migration.
+- `src/ui/shared/` owns buttons, icon buttons, and modal headers. Icons use the
+  existing `ThemeIcon` provider; the plugin adapters supply Obsidian icons.
+- `ReminderEditorFields` and `ReminderActionChips` are shared editor content.
+  Their styles live in `src/reminders/ui/shared/styles/_editor-*.scss`; header
+  and control styles live in `src/ui/shared/styles/`. The plugin field adapter
+  supplies the theme's project icon mask.
+- Each host retains its own sheet, keyboard, navigation, and persistence
+  behavior. The PWA editor layout sets browser sheet height, safe areas, and
+  touch target sizes. Its focus/keyboard-save hook remains in the PWA adapter.
+  Picker content remains host-specific for a later migration.
 
 ## Making a visual change
 
