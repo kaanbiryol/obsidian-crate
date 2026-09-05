@@ -19,6 +19,7 @@
 	],
 	"ignoreDependencies": [
 		"cloudflare",
-		"preact"
+		"preact",
+		"tailwindcss"
 	]
 }

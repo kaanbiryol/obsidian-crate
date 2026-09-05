@@ -78,3 +78,7 @@ The CSS cleanup reduced the plugin stylesheet from approximately 146 KB to
 138 KB by limiting Tailwind scanning to application source, shortening repeated
 primary-screen selectors, and removing obsolete picker/footer rules. The raw
 budget is now 140,000 bytes; the existing 20,000-byte gzip limit is unchanged.
+
+Knip ignores the `tailwindcss` dependency because its direct import is the Sass
+`@use "tailwindcss/theme.css"` in `src/styles/main.scss`, which Knip does not scan.
+Keep that dependency while the stylesheet imports its theme.
