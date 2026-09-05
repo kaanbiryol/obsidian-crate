@@ -152,6 +152,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                         >
                             <PickerTimeCard
                                 label={REMINDER_PICKER_COPY.repeat.reminderTime}
+                                controlIcon="clock"
                                 hour={hour}
                                 minute={minute}
                                 onChange={(h, m) => { setHour(h); setMinute(m); }}

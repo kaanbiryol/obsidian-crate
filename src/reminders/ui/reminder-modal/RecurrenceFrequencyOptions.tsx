@@ -50,7 +50,7 @@ function StepperControl({
 		<PickerFieldRow
 			label={label}
 			detail={detail}
-			detailPlacement="stacked"
+			detailPlacement="inline"
 			className="recurrence-option-row"
 		>
 			<div className="recurrence-stepper">

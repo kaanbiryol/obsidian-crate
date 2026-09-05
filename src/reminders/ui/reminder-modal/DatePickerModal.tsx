@@ -8,7 +8,7 @@ import { getPickerModalProps } from '../glassStyles';
 import { DateQuickButtons } from './DateQuickButtons';
 import { EditableDateControl } from './EditableDateControl';
 import { PickerTimeCard } from './PickerTimeCard';
-import { PickerDoneButton } from './PickerDoneButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import { PickerContent } from './PickerContent';
 import { PickerFieldRow } from './PickerFieldRow';
 import { PickerSection } from './PickerSection';
@@ -88,8 +88,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
 
     const handleRemoveSchedule = useCallback(() => {
         onDateTimeChange(null, false);
-        onClose();
-    }, [onClose, onDateTimeChange]);
+    }, [onDateTimeChange]);
 
     return (
         <BaseModal
@@ -127,6 +126,15 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                         <PickerSection
                             headingId="plugin-custom-schedule-title"
                             title={REMINDER_PICKER_COPY.schedule.custom}
+                            className="picker-custom-schedule"
+                            action={currentDate ? (
+                                <ShadowDOMNativeButton
+                                    className="picker-schedule-remove"
+                                    onClick={handleRemoveSchedule}
+                                >
+                                    {REMINDER_PICKER_COPY.schedule.remove}
+                                </ShadowDOMNativeButton>
+                            ) : undefined}
                         >
                             <div className="picker-schedule-fields">
                                 <PickerFieldRow
@@ -154,14 +162,6 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                             </div>
                         </PickerSection>
                     </PickerContent>
-
-                    <PickerDoneButton
-                        showPrimary={false}
-                        removeAction={currentDate ? {
-                            label: REMINDER_PICKER_COPY.schedule.remove,
-                            onClick: handleRemoveSchedule,
-                        } : undefined}
-                    />
                 </div>
             </div>
         </BaseModal>

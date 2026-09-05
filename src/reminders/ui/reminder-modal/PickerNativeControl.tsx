@@ -15,11 +15,11 @@ export function PickerNativeControl({ icon, hasValue, emptyLabel, invalid = fals
 		if (!(event.target instanceof Element)
 			|| !event.target.closest('.picker-native-control-affordance')) return;
 
-		const input = event.currentTarget.querySelector<HTMLInputElement>('input[data-picker-proxy]')
-			?? event.currentTarget.querySelector<HTMLInputElement>('input');
+		const input = event.currentTarget.querySelector<HTMLInputElement>('input');
 		if (!input) return;
 
 		event.preventDefault();
+		input.focus();
 		try {
 			input.showPicker();
 		} catch {

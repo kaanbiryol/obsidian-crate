@@ -9,15 +9,17 @@ type PickerSectionMotionProps = Pick<
 interface PickerSectionProps {
 	headingId: string;
 	title: string;
+	action?: ReactNode;
 	children: ReactNode;
 	className?: string;
 	motionProps?: PickerSectionMotionProps;
 }
 
-function SectionHeading({ headingId, title }: Pick<PickerSectionProps, 'headingId' | 'title'>) {
+function SectionHeading({ headingId, title, action }: Pick<PickerSectionProps, 'headingId' | 'title' | 'action'>) {
 	return (
 		<div className="picker-section-heading">
 			<h4 id={headingId}>{title}</h4>
+			{action}
 		</div>
 	);
 }
@@ -25,6 +27,7 @@ function SectionHeading({ headingId, title }: Pick<PickerSectionProps, 'headingI
 export function PickerSection({
 	headingId,
 	title,
+	action,
 	children,
 	className,
 	motionProps,
@@ -38,7 +41,7 @@ export function PickerSection({
 				className={classes}
 				aria-labelledby={headingId}
 			>
-				<SectionHeading headingId={headingId} title={title} />
+				<SectionHeading headingId={headingId} title={title} action={action} />
 				{children}
 			</motion.section>
 		);
@@ -46,7 +49,7 @@ export function PickerSection({
 
 	return (
 		<section className={classes} aria-labelledby={headingId}>
-			<SectionHeading headingId={headingId} title={title} />
+			<SectionHeading headingId={headingId} title={title} action={action} />
 			{children}
 		</section>
 	);

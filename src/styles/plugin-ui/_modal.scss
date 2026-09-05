@@ -28,10 +28,15 @@
 }
 
 .crate-reminder-editor-surface,
-.crate-reminder-picker-surface.is-project-picker,
-.crate-reminder-picker-surface.is-recurrence-picker {
+.crate-reminder-picker-surface.is-project-picker {
   width: min(560px, calc(100vw - 40px));
   max-width: 560px;
+  border-radius: var(--crate-radius-sheet);
+}
+
+.crate-reminder-picker-surface.is-recurrence-picker {
+  width: min(440px, calc(100vw - 40px));
+  max-width: 440px;
   border-radius: var(--crate-radius-sheet);
 }
 
@@ -56,6 +61,10 @@
   border-bottom: 0;
   border-left: 0;
   border-radius: var(--crate-radius-sheet);
+}
+
+.crate-reminder-picker-surface.is-date-picker.is-bottom-sheet {
+  padding-bottom: max(env(safe-area-inset-bottom), 8px);
 }
 
 .crate-reminder-picker-surface {
@@ -120,6 +129,10 @@
 
   .crate-reminder-picker-surface.is-bottom-sheet {
     min-height: min(520px, 90dvh);
+  }
+
+  .crate-reminder-picker-surface.is-date-picker.is-bottom-sheet {
+    min-height: 0;
   }
 }
 
