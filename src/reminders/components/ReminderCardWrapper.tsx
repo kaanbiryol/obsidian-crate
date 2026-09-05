@@ -6,7 +6,7 @@
  * - Integrates with the reminder repository and modal system
  */
 import { Notice } from 'obsidian';
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
 import { useReminderCardInteractions } from '@/reminders/components/useReminderCardInteractions';
 import { createLogger } from '@/reminders/utils/logger';
@@ -44,6 +44,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
 }) => {
   const plugin = PluginContext.use();
   const isTogglingRef = useRef(false);
+  const [completionPreview, setCompletionPreview] = useState<{ source: Reminder; completed: boolean }>();
 
   /**
    * Handle reminder completion toggle
@@ -52,12 +53,18 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
   const handleToggle = useCallback(async () => {
     if (isTogglingRef.current) return;
     isTogglingRef.current = true;
+    // The exiting row keeps its old props. Give it immediate checkbox feedback,
+    // and let the next repository snapshot take over without a timer or delay.
+    setCompletionPreview({ source: reminder, completed: !reminder.completed });
 
     if (onToggleCompleteOverride) {
       try {
         await onToggleCompleteOverride();
         onUpdate?.();
         return;
+      } catch (error) {
+        setCompletionPreview(undefined);
+        throw error;
       } finally {
         isTogglingRef.current = false;
       }
@@ -70,12 +77,13 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
         await plugin.reminderRepository.complete(reminder.id);
       }
     } catch (error) {
+      setCompletionPreview(undefined);
       log.error('Failed to toggle reminder', error);
       new Notice('Failed to update reminder');
     } finally {
       isTogglingRef.current = false;
     }
-  }, [onToggleCompleteOverride, onUpdate, plugin, reminder.completed, reminder.id]);
+  }, [onToggleCompleteOverride, onUpdate, plugin, reminder]);
 
   /**
    * Handle reminder edit
@@ -107,7 +115,7 @@ export const ReminderCardWrapper: React.FC<ReminderCardWrapperProps> = ({
           id: reminder.id,
           content: reminder.content,
           description: reminder.description,
-          completed: reminder.completed,
+          completed: completionPreview?.source === reminder ? completionPreview.completed : reminder.completed,
           dueDatetime: reminder.dueDatetime,
           dueDate: reminder.dueDate,
           priority: reminder.priority,

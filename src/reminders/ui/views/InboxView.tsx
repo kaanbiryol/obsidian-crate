@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect, memo } from 'react';
+import React, { useMemo, useState, useId, memo } from 'react';
 import { motion, LayoutGroup } from 'framer-motion';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
@@ -8,6 +8,7 @@ import { ReorderableReminderList } from '../../components/ReorderableReminderLis
 import { EmptyState } from '../../components/EmptyState';
 import { buildInboxViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../../utils/projectColors';
+import { useReminderOrder } from '../hooks/useReminderOrder';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 import {
   CompletedReminderSection,
@@ -26,7 +27,7 @@ export interface InboxViewProps {
   /** Custom render function for the completed section toggle button (for Shadow DOM compatibility) */
   renderToggleButton?: (props: CompletedSectionToggleProps) => React.ReactNode;
   /** Callback when reminders are reordered via drag */
-  onReorder?: (orderedIds: string[]) => void;
+  onReorder?: (orderedIds: string[]) => Promise<void> | void;
   onReorderDragActiveChange?: (active: boolean) => void;
   reorderInteraction?: 'handle' | 'long-press';
   colorScheme?: ProjectColorScheme;
@@ -49,31 +50,11 @@ export const InboxView = memo(function InboxView({
   colorScheme = 'dark',
 }: InboxViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
-  const [isReordering, setIsReordering] = useState(false);
-  const scrollRef = useStableReminderScroll(isReordering);
+  const layoutGroupId = useId();
 
   const { active, completed } = useMemo(() => buildInboxViewModel(reminders), [reminders]);
-  // Local state for optimistic reorder (visual only during drag)
-  const [localOrder, setLocalOrder] = useState<Reminder[]>(active);
-
-  useEffect(() => {
-    if (!isReordering) setLocalOrder(active);
-  }, [active, isReordering]);
-
-  // Outside a drag, render the latest view-model order immediately. Waiting for
-  // the synchronization effect adds an intermediate frame where a reminder has
-  // left Completed but has not entered the active list yet, which breaks the
-  // shared-layout measurement and makes neighboring cards jump.
-  const displayedOrder = isReordering ? localOrder : active;
-
-  const handleReorderCommit = useCallback((orderedIds: string[]) => {
-    onReorder?.(orderedIds);
-  }, [onReorder]);
-
-  const handleDragActiveChange = useCallback((active: boolean) => {
-    setIsReordering(active);
-    onReorderDragActiveChange?.(active);
-  }, [onReorderDragActiveChange]);
+  const order = useReminderOrder(active, onReorder, onReorderDragActiveChange);
+  const scrollRef = useStableReminderScroll(order.isDragging);
 
   const hasContent = active.length > 0 || completed.length > 0;
 
@@ -110,14 +91,15 @@ export const InboxView = memo(function InboxView({
         layoutScroll
         className={`flex-1 overflow-y-auto space-y-2 ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
       >
-        <LayoutGroup id="inbox-reminder-sections">
+        <LayoutGroup id={layoutGroupId}>
           <ReorderableReminderList
-            reminders={displayedOrder}
-            onReorder={setLocalOrder}
-            onReorderCommit={handleReorderCommit}
-            onDragActiveChange={handleDragActiveChange}
+            reminders={order.displayedOrder}
+            onReorder={order.onReorder}
+            onReorderCommit={order.onCommit}
+            onDragActiveChange={order.onDragChange}
             renderCard={cardRenderer}
             interaction={reorderInteraction}
+            animationsEnabled={animationConfig.enabled}
           />
 
           <CompletedReminderSection

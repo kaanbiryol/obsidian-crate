@@ -23,26 +23,15 @@ export function calculateStableScrollAdjustment(
 ): number | null {
   if (suspended) return null;
 
-  const currentById = new Map<string, ReminderScrollAnchor[]>();
-  for (const anchor of current) {
-    const matches = currentById.get(anchor.id) ?? [];
-    matches.push(anchor);
-    currentById.set(anchor.id, matches);
-  }
-
-  for (const anchor of previous) {
-    const movedMatch = currentById.get(anchor.id)
-      ?.find((match) => match.section !== anchor.section);
-    if (movedMatch) return movedMatch.top - anchor.top;
-  }
-
   const currentByKey = new Map(
     current.map((anchor) => [`${anchor.section}\u0000${anchor.id}`, anchor]),
   );
 
   for (const anchor of previous) {
     const match = currentByKey.get(`${anchor.section}\u0000${anchor.id}`);
-    if (match) return match.top - anchor.top;
+    if (match && anchor.top < 0 && anchor.section !== 'section') {
+      return match.top - anchor.top;
+    }
   }
 
   return null;
@@ -70,8 +59,8 @@ function captureVisibleAnchors(container: HTMLElement): ReminderScrollAnchor[] {
 }
 
 /**
- * Keeps a visible moving reminder, or the first unchanged fallback, at the
- * same screen position while cards change sections.
+ * Preserve a partially clipped row when content above the viewport changes.
+ * In-viewport mutations keep scrollTop steady so layout motion can do its job.
  */
 export function useStableReminderScroll(suspended = false): RefObject<HTMLDivElement | null> {
   const containerRef = useRef<HTMLDivElement | null>(null);

@@ -1,7 +1,7 @@
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
-import { STAGGERED_CARD_ANIMATION } from "@/reminders/ui/layoutConstants";
+import { LayoutGroup } from "framer-motion";
+import { ReminderMotionRow } from "@/reminders/components/ReminderMotionRow";
 
 import type { Reminder } from "@/reminders/types/plugin-reminder";
 import { PluginContext } from "@/reminders/ui/reminders-context";
@@ -9,6 +9,8 @@ import { useIndexRefresh } from "@/reminders/ui/hooks/useIndexRefresh";
 import { useObsidianDarkMode } from "@/reminders/ui/hooks/useObsidianDarkMode";
 import { useObsidianReducedMotion } from "@/reminders/ui/useObsidianReducedMotion";
 import { ReminderCardWrapper } from "@/reminders/components/ReminderCardWrapper";
+import { ReminderListPresence } from "@/reminders/components/ReminderListPresence";
+import { useReminderOrder } from "@/reminders/ui/hooks/useReminderOrder";
 import { ReorderableReminderList } from "@/reminders/components/ReorderableReminderList";
 import { ShadowDOMButton } from "@/reminders/components/ShadowDOMButton";
 import { ObsidianIcon } from "@/reminders/components/obsidian-icon";
@@ -79,19 +81,18 @@ export const RemindersList: React.FC<Props> = ({
     setShowCompletedState(showCompleted);
   }, [showCompleted]);
 
-  // Local reorder state
-  const [localOrder, setLocalOrder] = useState<Reminder[]>(presentation.activeReminders);
-
-  useEffect(() => {
-    setLocalOrder(presentation.activeReminders);
-  }, [presentation.activeReminders]);
-
-  const handleReorderCommit = useCallback((orderedIds: string[]) => {
-    void persistReminderOrder(plugin.reminderRepository, presentation.effectiveProject, orderedIds, () => {
-      setLocalOrder(presentation.activeReminders);
-      triggerRefresh();
+  const handleReorderCommit = useCallback(async (orderedIds: string[]) => {
+    await persistReminderOrder(plugin.reminderRepository, presentation.effectiveProject, orderedIds, triggerRefresh);
+    const loaded = await loadRemindersListData({
+      repository: plugin.reminderRepository,
+      showToday,
+      showUpcoming,
+      showCompleted: showCompletedState,
+      effectiveDays,
     });
-  }, [plugin, presentation.activeReminders, presentation.effectiveProject, triggerRefresh]);
+    setRawReminders(loaded);
+  }, [plugin, presentation.effectiveProject, triggerRefresh, showToday, showUpcoming, showCompletedState, effectiveDays]);
+  const order = useReminderOrder(presentation.activeReminders, handleReorderCommit);
 
   const renderCard = useCallback((reminder: Reminder, _index: number) => (
     <ReminderCardWrapper
@@ -169,24 +170,22 @@ export const RemindersList: React.FC<Props> = ({
               <div key={group.date.toISOString()} className="reminders-date-group">
                 {groupIndex > 0 && <div className="reminders-date-divider" />}
                 <h3 className="reminders-date-header">{formatDateHeader(group.date)}</h3>
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {group.reminders.map((reminder, index) => (
-                    <motion.div
-                      key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
-                      layout={reduceMotion ? false : 'position'}
-                      initial={reduceMotion ? false : STAGGERED_CARD_ANIMATION.initial}
-                      animate={reduceMotion ? { opacity: 1 } : STAGGERED_CARD_ANIMATION.animate(index)}
-                      exit={reduceMotion ? undefined : STAGGERED_CARD_ANIMATION.exit}
-                      className="mb-2"
+                <ReminderListPresence>
+                  {group.reminders.map((reminder) => (
+                    <ReminderMotionRow
+                      key={reminder.id}
+                      id={reminder.id}
+                      section="active"
+                      animationsEnabled={!reduceMotion}
                     >
                       <ReminderCardWrapper
                         reminder={reminder}
                         onUpdate={triggerRefresh}
                         colorScheme={colorScheme}
                       />
-                    </motion.div>
+                    </ReminderMotionRow>
                   ))}
-                </AnimatePresence>
+                </ReminderListPresence>
               </div>
             ))}
           </div>
@@ -196,9 +195,10 @@ export const RemindersList: React.FC<Props> = ({
           {presentation.supportsReorder ? (
             <>
               <ReorderableReminderList
-                reminders={localOrder}
-                onReorder={setLocalOrder}
-                onReorderCommit={handleReorderCommit}
+                reminders={order.displayedOrder}
+                onReorder={order.onReorder}
+                onReorderCommit={order.onCommit}
+                onDragActiveChange={order.onDragChange}
                 renderCard={renderCard}
               />
               {showCompletedState && presentation.reminders.filter(r => r.completed).map((reminder) => (

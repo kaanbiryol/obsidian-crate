@@ -1,13 +1,14 @@
-import React, { useMemo, useState, memo } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import React, { useMemo, useState, useId, memo } from 'react';
+import { motion, LayoutGroup } from 'framer-motion';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
+import { ReminderListPresence } from '../../components/ReminderListPresence';
 import { ReminderCard } from '../../components/ReminderCard';
 import { EmptyState } from '../../components/EmptyState';
 import { CompletedReminderSection } from './CompletedReminderSection';
 import { buildTodayViewModel } from './viewModels';
-import { CARD_ANIMATION } from '../layoutConstants';
+import { ReminderMotionRow } from '../../components/ReminderMotionRow';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
@@ -36,11 +37,12 @@ export const TodayView = memo(function TodayView({
   className = '',
   colorScheme = 'dark',
 }: TodayViewProps) {
+  const layoutGroupId = useId();
   const reduceMotion = useObsidianReducedMotion();
   const [showCompleted, setShowCompleted] = useState(false);
   const scrollRef = useStableReminderScroll();
   const { active, completed } = useMemo(() => buildTodayViewModel(reminders), [reminders]);
-	const enableListAnimations = animationConfig.enabled && !reduceMotion && active.length <= 80;
+  const enableListAnimations = animationConfig.enabled && !reduceMotion && active.length <= 80;
   const hasContent = active.length > 0 || completed.length > 0;
 
   // Default card renderer
@@ -74,29 +76,24 @@ export const TodayView = memo(function TodayView({
 
   return (
     <div className={`flex flex-col h-full relative ${className}`}>
-      <div
+      <motion.div
+        layoutScroll
         ref={scrollRef}
         className={`flex-1 overflow-y-auto space-y-2 ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
       >
-        <LayoutGroup id="today-reminder-sections">
-          <AnimatePresence mode="popLayout" initial={false}>
+        <LayoutGroup id={layoutGroupId}>
+          <ReminderListPresence>
             {active.map((reminder, index) => (
-              <motion.div
+              <ReminderMotionRow
                 key={reminder.id}
-                layoutId={`reminder-card-${reminder.id}`}
-				layout={enableListAnimations ? 'position' : false}
-				initial={enableListAnimations ? CARD_ANIMATION.initial : false}
-				animate={enableListAnimations ? CARD_ANIMATION.animate : { opacity: 1 }}
-				exit={enableListAnimations ? CARD_ANIMATION.exit : undefined}
-				className="mb-2 reminder-render-item"
-                data-reminder-scroll-anchor="true"
-                data-reminder-id={reminder.id}
-                data-reminder-section="active"
+                id={reminder.id}
+                section="active"
+                animationsEnabled={enableListAnimations}
               >
                 {cardRenderer(reminder, index)}
-              </motion.div>
+              </ReminderMotionRow>
             ))}
-          </AnimatePresence>
+          </ReminderListPresence>
 
           <CompletedReminderSection
             reminders={completed}
@@ -106,7 +103,7 @@ export const TodayView = memo(function TodayView({
             animationConfig={animationConfig}
           />
         </LayoutGroup>
-      </div>
+      </motion.div>
     </div>
   );
 });
