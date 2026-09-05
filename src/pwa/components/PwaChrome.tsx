@@ -66,6 +66,7 @@ export function PwaTopNotices({
 	statusText,
 	statusKind,
 	updateAvailable,
+	updating,
 	showNotificationPrompt,
 	onReload,
 	onEnableNotifications,
@@ -73,6 +74,7 @@ export function PwaTopNotices({
 	statusText: string | null;
 	statusKind: DataMode | 'offline';
 	updateAvailable: boolean;
+	updating: boolean;
 	showNotificationPrompt: boolean;
 	onReload: () => void;
 	onEnableNotifications: () => void;
@@ -86,8 +88,8 @@ export function PwaTopNotices({
 			{updateAvailable && (
 				<div className="pwa-update-banner" role="status">
 					<span className="pwa-update-banner__text">Update available</span>
-					<button className="pwa-update-button" type="button" onClick={onReload} aria-label="Update to the latest version">
-						Update
+					<button className="pwa-update-button" type="button" onClick={onReload} disabled={updating} aria-busy={updating} aria-label="Update to the latest version">
+						{updating ? 'Updating…' : 'Update'}
 					</button>
 				</div>
 			)}

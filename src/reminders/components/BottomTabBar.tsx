@@ -58,7 +58,8 @@ export const BottomTabBar = memo(function BottomTabBar({
   className = '',
   animateActiveIndicator = true,
 }: BottomTabBarProps) {
-  const shouldAnimateIndicator = animateActiveIndicator && !useObsidianReducedMotion();
+  const reduceMotion = useObsidianReducedMotion();
+  const shouldAnimateIndicator = animateActiveIndicator && !reduceMotion;
   const activeIndex = Math.max(0, TABS.findIndex((tab) => tab.id === activeTab));
 
   return (

@@ -69,10 +69,12 @@
         box-shadow: var(--crate-reminder-card-shadow, none);
     }
 
-    .premium-reminder-card:hover .premium-reminder-content {
-        background: var(--crate-reminder-card-hover-bg, var(--crate-surface-hover-bg));
-        border-color: var(--crate-reminder-card-hover-border, var(--crate-surface-border-hover));
-        box-shadow: var(--crate-reminder-card-hover-shadow, var(--crate-reminder-card-shadow, none));
+    @media (hover: hover) and (pointer: fine) {
+        .premium-reminder-card:hover .premium-reminder-content {
+            background: var(--crate-reminder-card-hover-bg, var(--crate-surface-hover-bg));
+            border-color: var(--crate-reminder-card-hover-border, var(--crate-surface-border-hover));
+            box-shadow: var(--crate-reminder-card-hover-shadow, var(--crate-reminder-card-shadow, none));
+        }
     }
 
     .premium-reminder-card:active .premium-reminder-content {

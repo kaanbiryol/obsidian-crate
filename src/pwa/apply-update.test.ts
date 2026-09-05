@@ -1,0 +1,82 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fetchPwaAssetVersion } from './api';
+import { applyPwaUpdate, waitForWorkerActivation } from './apply-update';
+
+vi.mock('./api', () => ({ fetchPwaAssetVersion: vi.fn() }));
+
+class UpdateWorker extends EventTarget {
+	state: ServiceWorkerState = 'installing';
+	scriptURL = 'https://crate.test/notifications/sw.js?v=new';
+	transition(state: ServiceWorkerState) {
+		this.state = state;
+		this.dispatchEvent(new Event('statechange'));
+	}
+}
+
+describe('reliable PWA updates', () => {
+	const reload = vi.fn();
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.mocked(fetchPwaAssetVersion).mockResolvedValue('new');
+		vi.stubGlobal('window', { location: { reload } });
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.useRealTimers();
+	});
+
+	it('waits for the latest worker to activate before reloading', async () => {
+		const worker = new UpdateWorker();
+		const register = vi.fn().mockResolvedValue({ installing: worker });
+		vi.stubGlobal('navigator', { serviceWorker: { register } });
+		const update = applyPwaUpdate();
+		await vi.waitFor(() => expect(register).toHaveBeenCalled());
+		expect(register).toHaveBeenCalledWith('/notifications/sw.js?v=new', {
+			scope: '/notifications', updateViaCache: 'none',
+		});
+		worker.transition('installed');
+		expect(reload).not.toHaveBeenCalled();
+		worker.transition('activated');
+		await update;
+		expect(reload).toHaveBeenCalledOnce();
+	});
+
+	it('does not reload an outdated worker or failed registration', async () => {
+		const worker = new UpdateWorker();
+		worker.scriptURL = 'https://crate.test/notifications/sw.js?v=old';
+		worker.state = 'activated';
+		const register = vi.fn().mockResolvedValue({ active: worker });
+		vi.stubGlobal('navigator', { serviceWorker: { register } });
+		await expect(applyPwaUpdate()).rejects.toThrow('not ready');
+		register.mockRejectedValueOnce(new Error('Offline'));
+		await expect(applyPwaUpdate()).rejects.toThrow('Offline');
+		expect(reload).not.toHaveBeenCalled();
+	});
+
+	it('reports installation failure and removes its event listener', async () => {
+		const worker = new UpdateWorker();
+		const remove = vi.spyOn(worker, 'removeEventListener');
+		const activation = waitForWorkerActivation(worker as unknown as ServiceWorker);
+		worker.transition('redundant');
+		await expect(activation).rejects.toThrow('could not be installed');
+		expect(remove).toHaveBeenCalledWith('statechange', expect.any(Function));
+	});
+
+	it('reports an activation timeout', async () => {
+		vi.useFakeTimers();
+		const worker = new UpdateWorker();
+		const activation = waitForWorkerActivation(worker as unknown as ServiceWorker);
+		const rejected = expect(activation).rejects.toThrow('timed out');
+		await vi.advanceTimersByTimeAsync(20_000);
+		await rejected;
+	});
+
+	it('requires a successful version check even without service worker support', async () => {
+		vi.stubGlobal('navigator', {});
+		vi.mocked(fetchPwaAssetVersion).mockResolvedValueOnce(null);
+		await expect(applyPwaUpdate()).rejects.toThrow('Could not check');
+		expect(reload).not.toHaveBeenCalled();
+		await applyPwaUpdate();
+		expect(reload).toHaveBeenCalledOnce();
+	});
+});

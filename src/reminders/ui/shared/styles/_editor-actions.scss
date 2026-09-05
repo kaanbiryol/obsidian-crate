@@ -17,6 +17,7 @@
   );
 
   display: inline-flex;
+  flex: 0 0 auto;
   width: auto;
   min-width: var(--reminder-action-chip-height);
   max-width: 100%;
@@ -64,9 +65,8 @@
 
   .reminder-action-label {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
 }

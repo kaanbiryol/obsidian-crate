@@ -38,6 +38,7 @@ interface RemindersViewPanelsProps {
   colorScheme: ProjectColorScheme;
   reorderInteraction?: 'drag' | 'long-press';
   animationsEnabled?: boolean;
+  pageTransitionsEnabled?: boolean;
 }
 
 export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
@@ -58,13 +59,14 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
   colorScheme,
   reorderInteraction = 'drag',
   animationsEnabled = true,
+  pageTransitionsEnabled = animationsEnabled,
 }) => {
   const pageTransition = {
-    initial: animationsEnabled ? { opacity: 0 } : false,
+    initial: pageTransitionsEnabled ? { opacity: 0 } : false,
     animate: { opacity: 1 },
-    exit: animationsEnabled ? { opacity: 0 } : undefined,
+    exit: pageTransitionsEnabled ? { opacity: 0 } : undefined,
     transition: {
-      duration: animationsEnabled ? PAGE_TRANSITION_DURATION : 0,
+      duration: pageTransitionsEnabled ? PAGE_TRANSITION_DURATION : 0,
       ease: EASE_EXPO_OUT,
     },
   };

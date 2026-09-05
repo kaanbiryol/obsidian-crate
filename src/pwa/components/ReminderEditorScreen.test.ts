@@ -68,4 +68,22 @@ describe('PWA shared editor integration', () => {
 		expect(markup).toContain('inert=""');
 		expect(markup).toContain('contentEditable="false"');
 	});
+
+	it('shows a separate delete alert while keeping the editor header and disabling save', () => {
+		const markup = renderEditor({
+			modal: {
+				mode: 'edit', reminderId: 'preview-reminder',
+				draft: {
+					content: 'Buy milk', description: '', project: 'Inbox', defaultProject: 'Inbox',
+					priority: 4, dueDate: '', dueTime: '', activePicker: null, deleteConfirm: true,
+				},
+			},
+		});
+		expect(markup).toContain('role="alertdialog"');
+		expect(markup).toContain('Delete &quot;Buy milk&quot;? This can&#x27;t be undone.');
+		expect(markup).toContain('>Cancel</button>');
+		expect(markup).toContain('>Delete</button>');
+		expect(markup).toContain('>Edit reminder</h2>');
+		expect(button(markup, 'save-reminder')).toContain('disabled=""');
+	});
 });
