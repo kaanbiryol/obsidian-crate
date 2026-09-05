@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ReminderEditorScreen } from './ReminderEditorScreen';
 import type { ModalState } from '../types';
+import { ModalHeader } from '@/ui/shared/ModalHeader';
 
 function renderEditor(overrides: Partial<React.ComponentProps<typeof ReminderEditorScreen>> = {}) {
 	const modal: ModalState = {
@@ -30,6 +31,18 @@ function button(markup: string, action: string) {
 }
 
 describe('PWA shared editor integration', () => {
+	it('uses the same close icon as the plugin header', () => {
+		const editor = renderEditor();
+		expect(editor).toContain('aria-label="Close reminder editor"');
+		expect(editor).toContain('title="Close"');
+		expect(editor).not.toContain('>Cancel</button>');
+		const pluginHeader = renderToStaticMarkup(React.createElement(ModalHeader, {
+			title: 'Edit reminder', closeLabel: 'Close reminder editor', onClose: vi.fn(),
+		}));
+		expect(pluginHeader).toContain('title="Close"');
+		expect(pluginHeader).not.toContain('>Cancel</button>');
+	});
+
 	it('keeps save as the only form submit action', () => {
 		const markup = renderEditor();
 		expect(button(markup, 'save-reminder')).toContain('type="submit"');

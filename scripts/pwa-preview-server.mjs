@@ -61,7 +61,16 @@ export function createPwaPreviewServer({ assets, origin }) {
 			forcePreviewUpdate = action === 'update' || url.searchParams.get('previewUpdate') === '1';
 			if (action === 'loading') previewLoadingUntil = Date.now() + 5_000;
 			else if (action) previewLoadingUntil = 0;
-			sendText(res, 200, withPreviewAction(createPwaHtml(url.toString()), action, project), 'text/html; charset=utf-8');
+			// Home Screen apps have their own storage and may launch without the
+			// enrollment query that Safari already removed. Seed only this local
+			// fixture session before the real client bootstraps.
+			const html = createPwaHtml(url.toString()).replace('</head>', '<script src="/notifications/preview-session.js"></script></head>');
+			sendText(res, 200, withPreviewAction(html, action, project), 'text/html; charset=utf-8');
+			return;
+		}
+
+		if (method === 'GET' && path === '/notifications/preview-session.js') {
+			sendText(res, 200, `localStorage.setItem('crate-reminders-auth-token', ${JSON.stringify(previewAuthToken)});`, 'application/javascript; charset=utf-8');
 			return;
 		}
 
@@ -87,7 +96,9 @@ export function createPwaPreviewServer({ assets, origin }) {
 		}
 
 		if (method === 'GET' && path === '/notifications/sw.js') {
-			sendText(res, 200, SERVICE_WORKER_JS, 'application/javascript; charset=utf-8', {
+			// Refresh existing preview installations to include the fixture bootstrap.
+			const previewWorker = SERVICE_WORKER_JS.replaceAll('crate-reminders-shell-', 'crate-reminders-shell-preview-session-v1-');
+			sendText(res, 200, previewWorker, 'application/javascript; charset=utf-8', {
 				'Service-Worker-Allowed': '/notifications',
 			});
 			return;

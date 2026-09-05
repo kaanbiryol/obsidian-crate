@@ -1,0 +1,100 @@
+// Touch density belongs to the standalone host, not the shared plugin UI.
+@mixin styles {
+  @media (max-width: 759px) {
+    .pwa-reminders-view.is-primary {
+      --reminder-font-base: 16px;
+      --reminder-font-sm: 14px;
+      --reminder-font-xs: 13px;
+      --reminder-font-xxs: 12px;
+      --reminder-font-title: 32px;
+      --crate-radius-card: 16px;
+      --checkbox-size: 22px;
+      --icon-l: 24px;
+      --crate-tab-active-color: var(--interactive-accent);
+      --crate-tab-active-bg: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+
+      .view-header-title {
+        font-size: 32px;
+        font-weight: 700;
+        letter-spacing: -.035em;
+      }
+
+      .view-header-meta {
+        margin-top: 6px;
+      }
+
+      .reminders-view-scroll {
+        padding-top: 16px;
+        padding-right: 16px;
+        padding-left: 16px;
+      }
+
+      .premium-reminder-content,
+      .premium-project-content {
+        padding: 15px 16px;
+        gap: 12px;
+      }
+
+      .reorderable-reminder-item,
+      .reminder-render-item {
+        margin-bottom: 10px;
+      }
+
+      .premium-projects-list {
+        gap: 10px;
+      }
+
+      .premium-reminder-description {
+        margin-top: 3px;
+      }
+
+      .premium-pill {
+        border-radius: 6px;
+      }
+
+      .pwa-header-settings-button,
+      .pwa-header-sync-button {
+        color: var(--text-muted);
+
+        svg {
+          width: 20px;
+          height: 20px;
+        }
+      }
+
+      .bottom-tab-icon,
+      .bottom-tab-icon svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      .bottom-tab-label {
+        font-size: 11px;
+        line-height: 14px;
+      }
+
+      .bottom-tab-slider {
+        border: 0;
+        border-radius: 14px;
+      }
+
+      .reminders-fab {
+        right: 18px;
+        width: 56px;
+        height: 56px;
+        min-width: 56px;
+        box-shadow: 0 6px 18px color-mix(in srgb, var(--interactive-accent) 24%, transparent);
+
+        svg {
+          width: 26px;
+          height: 26px;
+        }
+      }
+    }
+
+    // Keep the final row clear of the larger floating action button.
+    &.pwa-shadow-root .pwa-reminders-view.is-primary {
+      --reminders-fab-size: 56px;
+    }
+  }
+}

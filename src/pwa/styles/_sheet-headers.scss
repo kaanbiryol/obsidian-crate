@@ -1,0 +1,46 @@
+@mixin styles {
+  .pwa-modal-sheet .reminder-modal-header {
+    // Matching side tracks center the title on the sheet, regardless of actions.
+    grid-template-columns:
+      minmax(var(--pwa-header-side-width, 64px), 1fr)
+      minmax(0, auto)
+      minmax(var(--pwa-header-side-width, 64px), 1fr);
+
+    .reminder-modal-header-copy {
+      text-align: center;
+    }
+
+    .reminder-modal-header-close > * {
+      translate: -4px 0;
+    }
+
+    .reminder-modal-header-title {
+      font-size: 17px;
+      font-weight: 600;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .reminder-modal-header-side.is-right {
+      justify-self: end;
+    }
+  }
+
+  .pwa-modal-sheet .settings-sheet__header {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+
+    h2 {
+      grid-column: 2;
+      grid-row: 1;
+      text-align: center;
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .settings-sheet__close {
+      grid-column: 3;
+      grid-row: 1;
+    }
+  }
+}
