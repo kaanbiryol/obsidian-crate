@@ -2,14 +2,14 @@
 html[data-host="plugin"] {
   --font-interface: Arial, sans-serif; --font-ui-small: 12px; --font-ui-medium: 14px; --font-ui-large: 20px;
   --background-primary: #1e1e1e; --background-secondary: #262626; --modal-background: #222;
-  --background-modifier-border: #404040; --background-modifier-form-field: #282828;
+  --background-modifier-border: #404040; --background-modifier-border-hover: #666; --background-modifier-form-field: #282828;
   --text-normal: #ddd; --text-muted: #aaa; --text-faint: #888; --text-accent: #b39afa;
-  --interactive-accent: #8b5cf6; --text-error: #fb7777; --text-warning: #e9b949; --text-success: #72c997;
+  --interactive-accent: #8b5cf6; --text-on-accent: #fff; --text-error: #fb7777; --text-warning: #e9b949; --text-success: #72c997;
   --radius-s: 4px; --radius-m: 8px; --modal-radius: 12px; --button-radius: 5px;
 }
 html[data-host="plugin"][data-theme="light"] {
   --background-primary: #fff; --background-secondary: #f6f6f6; --modal-background: #fff;
-  --background-modifier-border: #ddd; --background-modifier-form-field: #f4f4f4;
+  --background-modifier-border: #ddd; --background-modifier-border-hover: #999; --background-modifier-form-field: #f4f4f4;
   --text-normal: #222; --text-muted: #555; --text-faint: #666; --text-accent: #6d28d9;
 }
 html, body { margin: 0; min-height: 100%; font-family: Arial, sans-serif; }
