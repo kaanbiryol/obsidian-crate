@@ -573,14 +573,7 @@ describe('plugin reminder layout styles', () => {
     expect(interactionStyles).toContain(
       'box-shadow: inset 0 0 0 1px var(--crate-focus-ring)',
     );
-    expect(interactionStyles).toContain(
-      '.reminders-view.light:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail)',
-    );
-    expect(interactionStyles).toContain('--crate-reminder-card-bg: var(--background-primary)');
-    expect(interactionStyles).toContain(
-      '--crate-reminder-card-border: color-mix(in srgb, var(--text-normal) 9%, transparent)',
-    );
-    expect(interactionStyles).toContain('color: var(--text-muted)');
+    expect(interactionStyles).not.toContain('.reminders-view.light');
     expect(interactionStyles).toContain('--crate-card-press-duration: 45ms');
     expect(interactionStyles).toContain(
       'transition-duration: var(--crate-card-press-duration)',

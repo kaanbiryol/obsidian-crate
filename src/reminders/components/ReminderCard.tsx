@@ -182,7 +182,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                                     {reminder.recurrence ? (
                                         <ThemeIcon size="xs" id="repeat" />
                                     ) : (
-                                        <ThemeIcon size="xs" id="clock" />
+                                        <ThemeIcon size="xs" id="calendar" />
                                     )}
                                     <span>{dueDate ? formatDueDate(dueDate) : null}</span>
                                 </span>
@@ -193,14 +193,14 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                                 <span
                                     className="premium-pill premium-pill-project"
                                     style={{
-                                        backgroundColor: projectThemeColors.background,
-                                        color: projectThemeColors.text,
-                                        borderColor: `color-mix(in srgb, ${projectThemeColors.accent} 20%, transparent)`,
+                                        backgroundColor: `var(--crate-card-project-bg, ${projectThemeColors.background})`,
+                                        color: `var(--crate-card-project-text, ${projectThemeColors.text})`,
+                                        borderColor: `var(--crate-card-project-border, color-mix(in srgb, ${projectThemeColors.accent} 20%, transparent))`,
                                     }}
                                 >
                                     <ThemeIcon
                                         size="xs"
-                                        id="hash"
+                                        id="folder"
                                         style={{ color: projectThemeColors.accent, flexShrink: 0 }}
                                     />
                                     <span>{reminder.project}</span>
