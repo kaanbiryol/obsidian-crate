@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react';
 import type { RecurrenceRule } from '../../types';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
+import { Button } from '../../../ui/shared/Button';
 import {
 	RECURRENCE_FREQUENCIES,
 	RECURRENCE_FREQUENCY_LABELS,
@@ -41,7 +41,7 @@ export function RecurrenceFrequencyTabs({
 			{RECURRENCE_FREQUENCIES.map((freq, index) => {
 				const isSelected = frequency === freq;
 				return (
-					<ShadowDOMNativeButton
+					<Button
 						key={freq}
 						ref={(element) => {
 							if (element) tabRefs.current.set(freq, element);
@@ -57,7 +57,7 @@ export function RecurrenceFrequencyTabs({
 						className={`recurrence-frequency-button${isSelected ? ' is-selected' : ''}`}
 					>
 						{RECURRENCE_FREQUENCY_LABELS[freq]}
-					</ShadowDOMNativeButton>
+					</Button>
 				);
 			})}
 		</div>

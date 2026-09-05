@@ -11,8 +11,9 @@ const budgetGroups = {
 	},
 	{
 		path: 'dist/styles.css',
-		// Owned selector prefixes and shared cross-host UI rules add raw bytes without materially affecting transfer size.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '125000', 10),
+		// Shared editor and picker rules currently use about 138 KB raw. Keep a tight
+		// raw ceiling and the existing 20 KB compressed limit after removing stale CSS.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '140000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '20000', 10),
 	}],
 	worker: [{

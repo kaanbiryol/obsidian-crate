@@ -21,18 +21,12 @@
 @media (max-width: 640px){
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{width:100vw!important;border-right:0;border-left:0}
 	.pwa-modal-sheet__container--reminder,.pwa-modal-sheet__container--settings{max-height:90dvh!important}
-	.pwa-picker-sheet{padding:16px 24px calc(24px + env(safe-area-inset-bottom))}
+	.pwa-picker-sheet{padding:0 0 calc(16px + env(safe-area-inset-bottom))}
 }
 @media (max-width: 420px){
 	.settings-sheet__header{padding-right:16px;padding-left:16px}
 	.settings-panel{padding-right:14px;padding-left:14px}
 	.settings-row{padding-right:13px;padding-left:13px}
-	.pwa-project-picker-header{padding-right:16px;padding-left:16px}
-	.pwa-project-picker-sheet .pwa-picker-content{padding-right:14px;padding-left:14px}
-	.pwa-schedule-header{padding-right:16px;padding-left:16px}
-	.pwa-schedule-content{padding-right:14px;padding-left:14px}
-	.pwa-repeat-header{padding-right:16px;padding-left:16px}
-	.pwa-repeat-content{padding-right:14px;padding-left:14px}
 }
 @media (max-width: 392px){
 	:root{--tabbar-h:64px}

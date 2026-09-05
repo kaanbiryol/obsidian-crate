@@ -3,7 +3,7 @@
 
 @mixin styles {
 
-.reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail) {
+.reminders-view.is-primary {
     --reminders-fab-size: 44px;
     --crate-project-progress-width: 42px;
 

@@ -1,20 +1,15 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { RecurrencePickerContent } from './RecurrencePickerContent';
+import { ThemeIconProvider } from '../../components/theme-icon';
+import { ObsidianIcon } from '../../components/obsidian-icon';
+import React, { useEffect, useState } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
-import { ModalHeader } from '../../components/ModalHeader';
 import type { AnimationConfig } from '../animations';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { RecurrenceRule } from '../../types';
 import { getPickerModalProps } from '../glassStyles';
-import { PickerTimeCard } from './PickerTimeCard';
-import { PickerContent } from './PickerContent';
-import { PickerCurrentSummary } from './PickerCurrentSummary';
-import { RecurrenceFrequencyOptions } from './RecurrenceFrequencyOptions';
-import { RecurrenceFrequencyTabs } from './RecurrenceFrequencyTabs';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import {
 	recurrenceRuleFromPickerState,
-	summarizeRecurrencePickerState,
 } from './recurrencePickerShared';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
 
@@ -58,17 +53,6 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
         setMinute(recurrence?.minute ?? 0);
     }, [isOpen, recurrence]);
 
-    const summaryText = useMemo(() => {
-        return summarizeRecurrencePickerState({
-            frequency,
-            interval,
-            daysOfWeek: selectedDays,
-            dayOfMonth,
-            hour,
-            minute,
-        });
-    }, [frequency, interval, selectedDays, dayOfMonth, hour, minute]);
-
     const handleDone = () => {
         onApply(recurrenceRuleFromPickerState({
             frequency,
@@ -86,14 +70,6 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
         onClose();
     };
 
-    const toggleDay = (dayIndex: number) => {
-        setSelectedDays(prev =>
-            prev.includes(dayIndex)
-                ? prev.filter(d => d !== dayIndex)
-                : [...prev, dayIndex].sort((a, b) => a - b)
-        );
-    };
-
     return (
         <BaseModal
             isOpen={isOpen}
@@ -103,62 +79,21 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
             ariaLabel={REMINDER_PICKER_COPY.repeat.dialogLabel}
             {...modalProps}
         >
-            <div className={`reminder-picker reminder-recurrence-picker${isDark ? ' dark' : ''}`}>
-                <ModalHeader
-                    onClose={onClose}
-                    closeLabel={REMINDER_PICKER_COPY.repeat.closeLabel}
-                    title={REMINDER_PICKER_COPY.repeat.title}
-                    action={{
-                        label: REMINDER_PICKER_COPY.repeat.done,
-                        onClick: handleDone,
+            <ThemeIconProvider renderer={ObsidianIcon}>
+                <RecurrencePickerContent
+                    state={{ frequency, interval, daysOfWeek: selectedDays, dayOfMonth, hour, minute }}
+                    onChange={(patch) => {
+                        if (patch.frequency !== undefined) setFrequency(patch.frequency);
+                        if (patch.interval !== undefined) setInterval(patch.interval);
+                        if (patch.daysOfWeek !== undefined) setSelectedDays(patch.daysOfWeek);
+                        if (patch.dayOfMonth !== undefined) setDayOfMonth(patch.dayOfMonth);
+                        if (patch.hour !== undefined) setHour(patch.hour);
+                        if (patch.minute !== undefined) setMinute(patch.minute);
                     }}
+                    isDark={isDark} animationsEnabled={animationsEnabled} canRemove={Boolean(recurrence)}
+                    onClose={onClose} onDone={handleDone} onRemove={handleRemoveRepeat}
                 />
-
-                <div className="reminder-picker-scroll">
-                    <PickerContent>
-                        <RecurrenceFrequencyTabs
-                            frequency={frequency}
-                            onChange={setFrequency}
-                        />
-
-                        <RecurrenceFrequencyOptions
-                            frequency={frequency}
-                            animationsEnabled={animationsEnabled}
-                            interval={interval}
-                            selectedDays={selectedDays}
-                            dayOfMonth={dayOfMonth}
-                            timeControl={
-                                <PickerTimeCard
-                                    label={REMINDER_PICKER_COPY.repeat.reminderTime}
-                                    controlIcon="clock"
-                                    hour={hour}
-                                    minute={minute}
-                                    onChange={(h, m) => { setHour(h); setMinute(m); }}
-                                />
-                            }
-                            onIntervalChange={setInterval}
-                            onToggleDay={toggleDay}
-                            onDayOfMonthChange={setDayOfMonth}
-                        />
-
-                        <div className="recurrence-summary-row">
-                            <PickerCurrentSummary
-                                label={REMINDER_PICKER_COPY.repeat.current}
-                                value={summaryText}
-                                icon="repeat"
-                            />
-                            {recurrence && (
-                                <ShadowDOMNativeButton
-                                    className="picker-repeat-remove"
-                                    onClick={handleRemoveRepeat}
-                                >
-                                    {REMINDER_PICKER_COPY.repeat.remove}
-                                </ShadowDOMNativeButton>
-                            )}
-                        </div>
-                    </PickerContent>
-                </div>
-            </div>
+            </ThemeIconProvider>
         </BaseModal>
     );
 };

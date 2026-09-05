@@ -12,7 +12,6 @@ const watchedPaths = [
 		'manifest.json',
 		'package.json',
 		'postcss.config.js',
-		'tailwind.config.js',
 		'tsconfig.json',
 		'vite.config.mts',
 	].map(fileName => path.join(rootDir, fileName)),

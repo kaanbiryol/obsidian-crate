@@ -71,16 +71,13 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .pwa-modal-sheet__backdrop{background:rgba(24,24,27,.42)}
 .pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage{border-color:var(--pwa-light-border);box-shadow:0 -1px 0 rgba(255,255,255,.72),0 -24px 70px rgba(24,24,27,.16)}
 .pwa-picker-sheet.pwa-project-picker-sheet,.pwa-picker-sheet.pwa-date-picker-sheet,.pwa-picker-sheet.pwa-repeat-picker-sheet{background:var(--pwa-sheet-surface)}
-.secondary-button.is-danger,.pwa-schedule-clear,.pwa-repeat-remove,.settings-logout-button{color:var(--pwa-light-danger-text)}
-.pwa-project-picker-header,.pwa-schedule-header,.pwa-repeat-header,.settings-sheet__header{border-color:var(--pwa-light-border)}
-.pwa-picker-icon-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
-.pwa-schedule-done,.pwa-schedule-current strong,.pwa-repeat-apply,.pwa-repeat-summary strong,.pwa-repeat-frequency.is-active,.pwa-repeat-day.is-active,.settings-action-button,.pwa-project-picker-sheet .pwa-project-option svg{color:var(--pwa-light-accent-text)}
-.pwa-project-picker-close:hover,.pwa-schedule-done:hover,.pwa-schedule-header .pwa-picker-icon-button:hover,.pwa-repeat-apply:hover,.pwa-repeat-header .pwa-picker-icon-button:hover,.settings-sheet__close:hover{background:var(--pwa-light-surface-hover)}
-.pwa-schedule-clear:hover,.pwa-repeat-remove:hover,.settings-logout-button:hover{background:rgba(180,35,24,.07);color:var(--pwa-light-danger-text)}
-.pwa-project-option,.pwa-project-picker-sheet .pwa-project-list,.pwa-schedule-preset-grid,.pwa-schedule-fields,.pwa-repeat-frequency-grid,.pwa-repeat-control-card,.pwa-repeat-time-card,.pwa-repeat-days,.settings-group{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}
-.pwa-project-picker-sheet .pwa-project-option+.pwa-project-option,.pwa-schedule-preset:nth-child(even),.pwa-schedule-preset:nth-child(n+3),.pwa-schedule-field+.pwa-schedule-field,.pwa-repeat-frequency+.pwa-repeat-frequency,.settings-row+.settings-row{border-color:var(--pwa-light-border)}
-.pwa-schedule-field input,.pwa-repeat-time-card input,.pwa-repeat-stepper__button{background:var(--pwa-light-surface);border-color:var(--pwa-light-border);color:var(--text-normal)}
-.pwa-schedule-field input,.pwa-repeat-time-card input{color-scheme:light}
+.secondary-button.is-danger,.settings-logout-button{color:var(--pwa-light-danger-text)}
+.settings-sheet__header{border-color:var(--pwa-light-border)}
+.settings-action-button{color:var(--pwa-light-accent-text)}
+.settings-sheet__close:hover{background:var(--pwa-light-surface-hover)}
+.settings-logout-button:hover{background:rgba(180,35,24,.07);color:var(--pwa-light-danger-text)}
+.settings-group{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}
+.settings-row+.settings-row{border-color:var(--pwa-light-border)}
 .crate-progress-meter{background:var(--background-modifier-border)}
 .premium-project-chevron{opacity:.65}
 .premium-project-stat-done,.premium-project-stat-complete,.project-detail-stat-done,.settings-status.is-success{color:var(--pwa-light-success-text)}

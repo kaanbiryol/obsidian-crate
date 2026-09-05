@@ -1,6 +1,6 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
-import { ObsidianIcon } from '../../components/obsidian-icon';
+import { ThemeIcon } from '../../components/theme-icon';
 
 interface PickerNativeControlProps {
 	icon: string;
@@ -33,7 +33,7 @@ export function PickerNativeControl({ icon, hasValue, emptyLabel, invalid = fals
 			onPointerDown={handleAffordancePointerDown}
 		>
 			<span className="picker-native-control-affordance is-leading" aria-hidden="true">
-				<ObsidianIcon size="xs" id={icon} />
+				<ThemeIcon size="xs" id={icon} />
 			</span>
 			<span className="picker-native-control-value">
 				{!hasValue && <span className="picker-native-control-empty">{emptyLabel}</span>}

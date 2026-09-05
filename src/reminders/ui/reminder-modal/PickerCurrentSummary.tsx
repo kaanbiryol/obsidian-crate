@@ -1,4 +1,4 @@
-import { ObsidianIcon } from '../../components/obsidian-icon';
+import { ThemeIcon } from '../../components/theme-icon';
 
 interface PickerCurrentSummaryProps {
     label: string;
@@ -15,7 +15,7 @@ export function PickerCurrentSummary({
         <div className="picker-current-summary" aria-live="polite">
             <span className="picker-current-label">{label}</span>
             <span className="picker-current-value">
-                <ObsidianIcon size="s" id={icon} aria-hidden="true" />
+                <ThemeIcon size="s" id={icon} aria-hidden="true" />
                 <strong>{value}</strong>
             </span>
         </div>

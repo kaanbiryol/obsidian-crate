@@ -225,6 +225,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
         <div
         className={[
           "reminders-view",
+          "is-primary",
           isDarkMode ? "dark" : "light",
           isFullScreen ? "is-fullscreen" : "",
           isModal ? "is-modal" : "",

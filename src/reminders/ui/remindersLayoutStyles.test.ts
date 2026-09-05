@@ -13,6 +13,7 @@ async function readEditorStyles() {
     '../../styles/plugin-ui/_reminder-editor.scss',
     './shared/styles/_editor-fields.scss',
     './shared/styles/_editor-actions.scss',
+    './shared/styles/_pickers.scss',
   ];
   return (await Promise.all(paths.map(path => readFile(new URL(path, import.meta.url), 'utf8')))).join('\n');
 }
@@ -61,7 +62,7 @@ describe('plugin reminder layout styles', () => {
       'utf8',
     );
     const editorHost = dialogStyles.match(
-      /\.modal\.crate-reminder-editor-modal \{([\s\S]*?)\n\}/,
+      /\.modal\.crate-reminder-editor-modal,\s*\.modal\.crate-reminders-compact-modal \{([\s\S]*?)\n\}/,
     )?.[1];
 
     expect(editorHost).toBeDefined();
@@ -81,7 +82,6 @@ describe('plugin reminder layout styles', () => {
     const headerIcon = styles.match(/\.reminder-modal-header-icon \{([\s\S]*?)\n\}/)?.[1];
     const iconButton = themeStyles.match(/\.crate-icon-button \{([\s\S]*?)\n\s{2}\}/)?.[1];
     const headerAction = styles.match(/\.reminder-modal-header-action \{([\s\S]*?)\n\}/)?.[1];
-    const removeButton = styles.match(/^\.picker-remove-button \{([\s\S]*?)^\}/m)?.[1];
 
     expect(editorHeader).toContain('--reminder-modal-header-control-size: var(--crate-icon-button-size)');
     expect(editorHeader).toContain('grid-template-columns: var(--reminder-modal-header-control-size) minmax(0, 1fr) auto');
@@ -99,8 +99,6 @@ describe('plugin reminder layout styles', () => {
     expect(headerAction).toContain('border: 0 !important');
     expect(headerAction).toContain('box-shadow: none !important');
     expect(styles).toContain('@container (max-width: 420px)');
-    expect(removeButton).toContain('width: fit-content');
-    expect(removeButton).toContain('align-self: flex-start');
   });
 
   it('keeps the reminder delete icon quiet until its destructive hover state', async () => {
@@ -151,176 +149,35 @@ describe('plugin reminder layout styles', () => {
     expect(description).toContain('font-size: var(--reminder-font-sm)');
   });
 
-  it('uses compact, restrained styling for the schedule picker', async () => {
+  it('uses one compact picker layout with native date and time inputs', async () => {
     const styles = await readEditorStyles();
-    const modalStyles = await readFile(
-      new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
-      'utf8',
-    );
-
-    expect(styles).toContain('.reminder-modal-header');
-    expect(styles).not.toContain('.reminder-date-picker .reminder-modal-header');
-    expect(styles).toContain('min-height: 44px');
-    expect(styles).toContain('.picker-content');
-    expect(styles).toContain('.picker-current-value');
-    expect(styles).toContain('background: color-mix(in srgb, var(--crate-semantic-color) 6%, transparent)');
-    expect(styles).toContain('border: 0');
-    expect(styles).toContain('.reminder-date-picker .date-quick-button');
-    expect(styles).toContain('grid-template-columns: 16px minmax(0, 1fr)');
-    expect(styles).toContain('--schedule-row-inline: 10px');
-    expect(styles).toContain('height: 32px');
-    expect(styles).toContain('min-height: 32px');
-    expect(styles).toContain('.reminder-date-picker .date-quick-button-icon');
-    expect(styles).toContain('flex-direction: row');
-    const scheduleFields = styles.match(
-      /\.reminder-date-picker \.picker-schedule-fields \{([\s\S]*?)\n\}/,
-    )?.[1];
-    const scheduleRows = styles.match(
-      /\.reminder-date-picker \.picker-schedule-fields \.picker-control-row \{([\s\S]*?)\n\}/,
-    )?.[1];
-    const nativeControl = styles.match(
-      /^\.picker-native-control \{([\s\S]*?)^\}/m,
-    )?.[1];
-
-    expect(scheduleFields).toContain('gap: 0');
-    expect(scheduleFields).toContain('overflow: hidden');
-    expect(scheduleFields).toContain('border: 1px solid');
-    expect(scheduleFields).toContain('background: color-mix');
-    expect(scheduleRows).toContain('display: grid');
-    expect(scheduleRows).toContain('min-height: 36px');
-    expect(scheduleFields).toContain('grid-template-columns: minmax(0, 1fr) max-content');
-    expect(scheduleRows).toContain('grid-template-columns: subgrid');
-    expect(scheduleRows).toContain('border: 0');
-    expect(scheduleRows).toContain('border-top: 1px solid');
-    expect(scheduleRows).toContain('&:hover');
-    expect(styles).toContain('.picker-control-row');
-    expect(styles).toContain('min-height: var(--crate-picker-row-height)');
-    expect(styles).toContain('height: var(--crate-picker-input-height)');
-    expect(styles).toContain('.picker-native-control');
-    expect(nativeControl).toContain('width: max-content');
-    expect(nativeControl).toContain('max-width: none');
-    expect(nativeControl).not.toContain('max-width: 70%');
-    expect(styles).toContain('grid-template-columns: 16px max-content');
-    expect(styles).toContain('justify-self: end');
-    expect(styles).toContain('.picker-native-control-affordance');
-    expect(styles).toContain('&.is-invalid');
-    expect(styles).toContain('.picker-native-control-value');
-    expect(styles).toContain('justify-items: start');
-    const scheduleControl = styles.match(
-      /\.reminder-date-picker \.picker-native-control \{([\s\S]*?)\n\}/,
-    )?.[1];
-    expect(scheduleControl).toContain('width: max-content');
-    expect(scheduleControl).toContain('justify-self: end');
-    expect(scheduleControl).toContain('grid-template-columns: 16px max-content');
-    expect(styles).toContain('color: color-mix(in srgb, var(--text-muted) 88%, var(--text-normal))');
-    expect(styles).toContain('.picker-native-control-empty');
-    expect(styles).toContain('display: none');
-    expect(styles).toContain('width: 0');
-    expect(styles).toContain('.picker-date-display');
-    expect(styles).not.toContain('margin-right: -8px');
-    expect(styles).toContain('.picker-native-control .picker-date-input');
-    const nativeDateReset = styles.match(
-      /\.reminder-date-picker \.picker-native-control input\.picker-date-input\[type="date"\]:not\(\[disabled="true"\]\) \{([\s\S]*?)\n\}/,
-    )?.[1];
-    expect(nativeDateReset).toContain('padding: 0');
-    expect(styles).toContain('width: 5.5ch');
-    expect(styles).toContain('max-width: 5.5ch');
-    expect(styles).toContain('justify-self: end');
-    expect(styles).toContain('.reminder-date-picker .picker-native-control .picker-time-input');
-    expect(styles).not.toContain('.picker-date-field .picker-native-control:focus-within .picker-native-control-affordance');
-    expect(styles).toContain('justify-content: flex-end');
-    expect(styles).not.toContain('.reminder-date-picker .picker-footer {');
-    const scheduleRemove = styles.match(
-      /\.picker-schedule-remove \{([\s\S]*?)\n\}/,
-    )?.[1];
-    expect(scheduleRemove).toContain('min-height: 32px');
-    expect(scheduleRemove).toContain('background: transparent');
-    expect(scheduleRemove).toContain('&:focus-visible');
-    expect(styles).toContain('@media (pointer: coarse)');
-    expect(styles).not.toContain('border-top: 1px solid color-mix(in srgb, var(--crate-divider) 32%, transparent)');
-    expect(styles).toContain('&:focus-within');
-    expect(styles).toContain('field-sizing: content');
-    expect(styles).toContain('display: none');
-    expect(styles).toContain('&::-webkit-calendar-picker-indicator');
-    expect(styles).toContain('.picker-custom-schedule .picker-section-heading');
-    expect(styles).toContain('min-height: 32px');
-    expect(modalStyles).toContain('.crate-reminder-picker-surface.is-date-picker {');
+    const modalStyles = await readFile(new URL('../../styles/plugin-ui/_modal.scss', import.meta.url), 'utf8');
+    expect(modalStyles).toContain('.crate-reminder-picker-surface {');
     expect(modalStyles).toContain('width: min(380px, calc(100vw - 40px))');
-    expect(modalStyles).toContain('max-width: 380px');
-    expect(modalStyles).toContain('.crate-reminder-picker-surface.is-date-picker.is-bottom-sheet {');
-    expect(modalStyles).toContain('min-height: 0');
-    expect(modalStyles).toContain('.crate-reminder-editor-surface.is-centered,\n.crate-reminder-picker-surface.is-date-picker.is-centered');
+    expect(modalStyles).toContain('max-height: min(720px, calc(100dvh - 48px))');
+    expect(modalStyles).toContain('.reminder-picker-scroll');
+    expect(modalStyles).toContain('overflow: hidden auto');
+    expect(styles).toContain('--picker-row-inline: 10px');
+    expect(styles).toContain('padding: var(--crate-picker-space-section) var(--crate-picker-space-inline) 2px');
+    expect(styles).toContain('.picker-native-control');
+    expect(styles).toContain('field-sizing: content');
+    expect(styles).toContain('.picker-schedule-remove');
+    expect(styles).toContain('.picker-repeat-remove');
+    expect(styles).not.toContain('.picker-footer');
   });
 
-  it('aligns the project picker shell and rows with the reminder editor', async () => {
+  it('uses the same restrained selected and focus states across pickers', async () => {
     const styles = await readEditorStyles();
-    const modalStyles = await readFile(
-      new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
-      'utf8',
-    );
-    const projectRow = styles.match(
-      /^\.project-picker-row \{([\s\S]*?)^\}/m,
-    )?.[1];
-
-    expect(modalStyles).toContain('.crate-reminder-picker-surface.is-project-picker');
-    expect(modalStyles).toContain('width: min(560px, calc(100vw - 40px))');
-    expect(projectRow).toContain('min-height: 40px');
-    expect(projectRow).toContain('border: 1px solid transparent');
-    expect(projectRow).toContain('border-radius: var(--crate-radius-control)');
-    expect(projectRow).toContain('var(--project-picker-row-accent) 16%');
-    expect(projectRow).toContain('var(--project-picker-row-accent) 7%');
-    expect(styles).toContain('color: var(--project-picker-row-accent)');
+    for (const name of ['project-picker-row', 'recurrence-frequency-button', 'recurrence-day-button']) {
+      const rule = styles.match(new RegExp(`^\\.${name} \\{([\\s\\S]*?)^\\}`, 'm'))?.[1];
+      expect(rule).toContain('background: var(--picker-selected-bg)');
+      expect(rule).not.toContain('box-shadow: 0');
+    }
+    expect(styles).toContain('outline: 2px solid var(--crate-focus-ring)');
+    expect(styles).toContain('outline-offset: -2px');
+    expect(styles).toContain('background: var(--crate-control-hover-bg)');
+    expect(styles).toContain('background: var(--crate-control-active-bg)');
     expect(styles).toContain('scroll-padding: 8px');
-  });
-
-  it('uses compact, semantic controls for the recurrence picker', async () => {
-    const styles = await readEditorStyles();
-    const modalStyles = await readFile(
-      new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
-      'utf8',
-    );
-    const themeStyles = await readPluginThemeStyles();
-    const content = styles.match(/^\.picker-content \{([\s\S]*?)^\}/m)?.[1];
-    const sectionHeading = styles.match(/^\.picker-section-heading \{([\s\S]*?)^\}/m)?.[1];
-    const controlRow = styles.match(/^\.picker-control-row \{([\s\S]*?)^\}/m)?.[1];
-    const tabs = styles.match(/^\.recurrence-frequency-tabs \{([\s\S]*?)^\}/m)?.[1];
-    const frequencyButton = styles.match(/^\.recurrence-frequency-button \{([\s\S]*?)^\}/m)?.[1];
-    const optionRow = styles.match(/^\.recurrence-option-row \{([\s\S]*?)^\}/m)?.[1];
-    const stepperButton = styles.match(/^\.recurrence-stepper-button \{([\s\S]*?)^\}/m)?.[1];
-    const dayButton = styles.match(/^\.recurrence-day-button \{([\s\S]*?)^\}/m)?.[1];
-
-    expect(modalStyles).toContain('.crate-reminder-picker-surface.is-recurrence-picker');
-    expect(modalStyles).toContain('width: min(440px, calc(100vw - 40px))');
-    expect(modalStyles).toContain('max-width: 440px');
-    expect(content).toContain('gap: var(--crate-picker-space-section)');
-    expect(content).toContain('padding: var(--crate-picker-space-section) var(--crate-picker-space-inline) 2px');
-    expect(sectionHeading).toContain('font-size: var(--reminder-font-xxs)');
-    expect(sectionHeading).toContain('font-weight: var(--reminder-font-weight-medium)');
-    expect(controlRow).toContain('min-height: var(--crate-picker-row-height)');
-    expect(controlRow).toContain('gap: var(--crate-picker-space-control)');
-    expect(tabs).toContain('gap: 3px');
-    expect(tabs).toContain('border-radius: var(--crate-radius-control)');
-    expect(frequencyButton).toContain('min-height: 34px');
-    expect(frequencyButton).toContain('var(--crate-warning) 9%');
-    expect(optionRow).toContain('flex: 0 0 auto');
-    expect(stepperButton).toContain('--crate-icon-button-control-size: 28px');
-    expect(themeStyles).toContain('&[data-size="small"]');
-    expect(dayButton).toContain('height: 32px');
-    expect(dayButton).toContain('var(--crate-warning) 8%');
-    expect(styles).toContain('.reminder-recurrence-picker .picker-native-control.has-value');
-    expect(styles).toContain('.reminder-recurrence-picker .picker-remove-button');
-  });
-
-  it('uses one spacing and typography contract across reminder picker screens', async () => {
-    const styles = await readEditorStyles();
-
-    expect(styles).not.toContain('.recurrence-picker-content');
-    expect(styles).not.toContain('.reminder-date-picker .picker-section-heading');
-    expect(styles).not.toContain('.reminder-recurrence-picker .picker-section-heading');
-    expect(styles).not.toContain('.reminder-date-picker .picker-field-copy strong');
-    expect(styles).not.toContain('.reminder-recurrence-picker .picker-field-copy strong');
-    expect(styles).toContain('margin: 8px var(--crate-picker-space-inline) 10px');
-    expect(styles).toContain('padding: 0 var(--crate-picker-space-inline)');
   });
 
   it('keeps the dialog title and editable reminder text one typography step apart', async () => {
@@ -568,6 +425,7 @@ describe('plugin reminder layout styles', () => {
       '../../ui/shared/styles/_modal-header.scss',
       './shared/styles/_editor-fields.scss',
       './shared/styles/_editor-actions.scss',
+    './shared/styles/_pickers.scss',
       './shared/styles/_shell.scss',
       './shared/styles/_projects.scss',
       './shared/styles/_project-detail.scss',

@@ -27,13 +27,6 @@ export const SPRING_CONFIG = {
   mass: 0.8
 } as const;
 
-// Slightly bouncier spring for expand/collapse transitions
-export const SPRING_CONFIG_BOUNCY = {
-  stiffness: 500,
-  damping: 28,
-  mass: 0.8
-} as const;
-
 // Position belongs to the row; the separate drag surface owns the subtle lift.
 export const REMINDER_LIST_LAYOUT_TRANSITION = {
   type: 'spring' as const,
@@ -47,40 +40,6 @@ export const REMINDER_LIST_LAYOUT_TRANSITION = {
 export const REMINDER_LIST_FADE_TRANSITION = { duration: 0.12, ease: 'easeOut' } as const;
 export const REMINDER_SECTION_TRANSITION = { duration: 0.2, ease: EASE_STANDARD } as const;
 export const REMINDER_DRAG_SCALE = 1.02;
-
-// Default card enter/exit animation
-export const CARD_ANIMATION = {
-  initial: { opacity: 0, y: 8 },
-  animate: {
-    opacity: 1,
-    y: 0,
-    transition: { type: 'spring', ...SPRING_CONFIG }
-  },
-  exit: {
-    opacity: 0,
-    y: -6,
-    transition: { duration: 0.15, ease: 'easeOut' }
-  }
-} as const;
-
-// Staggered card animation for lists (delays each item by index)
-export const STAGGERED_CARD_ANIMATION = {
-  initial: { opacity: 0, y: 12 },
-  animate: (index: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      type: 'spring' as const,
-      ...SPRING_CONFIG,
-      delay: index * 0.05, // 50ms stagger between items
-    }
-  }),
-  exit: {
-    opacity: 0,
-    y: -6,
-    transition: { duration: 0.15, ease: 'easeOut' as const }
-  }
-};
 
 // ============================================
 // Tab definitions

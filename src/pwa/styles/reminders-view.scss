@@ -3,6 +3,8 @@
 @use "../../reminders/ui/shared/styles/editor-fields";
 @use "../../reminders/ui/shared/styles/editor-actions";
 @use "./editor-layout";
+@use "./picker-layout";
+@use "../../reminders/ui/shared/styles/pickers";
 @use "../../ui/shared/styles/tokens";
 @use '../../reminders/ui/shared/styles/shell';
 @use '../../reminders/ui/shared/styles/projects';
@@ -18,6 +20,8 @@
 	@include editor-fields.styles;
 	@include editor-actions.styles;
 	@include editor-layout.styles;
+	@include pickers.styles;
+	@include picker-layout.styles;
 	@include shell.styles;
 	@include projects.styles;
 	@include project-detail.styles;

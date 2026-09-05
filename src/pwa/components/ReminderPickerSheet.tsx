@@ -1,7 +1,5 @@
 import React from 'react';
-import { PwaButton as Button } from './PwaButton';
-import { Check, X } from 'lucide-react';
-import { getProjectColor } from '@/reminders/utils/projectColors';
+import { ProjectPickerContent } from '@/reminders/ui/reminder-modal/ProjectPickerContent';
 import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
 import {
 	applyReminderTextUpdate,
@@ -11,6 +9,7 @@ import { ReminderDatePicker } from './ReminderDatePicker';
 import { ReminderRecurrencePicker } from './ReminderRecurrencePicker';
 
 interface ReminderPickerSheetProps {
+	isDark: boolean;
 	draft: ModalDraft;
 	dialogRef: (element: HTMLElement | null) => void;
 	projectOptions: string[];
@@ -20,6 +19,7 @@ interface ReminderPickerSheetProps {
 }
 
 export function ReminderPickerSheet({
+	isDark,
 	draft,
 	dialogRef,
 	projectOptions,
@@ -32,6 +32,7 @@ export function ReminderPickerSheet({
 	if (draft.activePicker === 'date') {
 		return (
 			<ReminderDatePicker
+				isDark={isDark}
 				draft={draft}
 				dialogRef={dialogRef}
 				projectOptions={projectOptions}
@@ -45,46 +46,14 @@ export function ReminderPickerSheet({
 	if (draft.activePicker === 'project') {
 		return (
 			<section ref={dialogRef} className="pwa-picker-sheet pwa-project-picker-sheet" role="dialog" aria-modal="true" aria-label={REMINDER_PICKER_COPY.project.dialogLabel} tabIndex={-1}>
-				<div className="pwa-picker-header pwa-project-picker-header">
-					<Button isIconOnly className="pwa-picker-icon-button pwa-project-picker-close" type="button" aria-label={REMINDER_PICKER_COPY.project.closeLabel} onClick={onClose}>
-						<X size={18} />
-					</Button>
-					<h3>{REMINDER_PICKER_COPY.project.title}</h3>
-					<span className="pwa-project-picker-header__spacer" aria-hidden="true" />
-				</div>
-				<div className="pwa-picker-content">
-					<div className="pwa-project-list ios-scroll" role="listbox" aria-label={REMINDER_PICKER_COPY.project.listLabel}>
-						{projectOptions.map((project) => {
-							const colors = getProjectColor(project);
-							const selected = draft.project === project;
-							return (
-								<Button
-									key={project}
-									className={`pwa-project-option${selected ? ' is-active' : ''}`}
-									type="button"
-									role="option"
-									aria-selected={selected}
-									data-action="select-project"
-									data-project={project}
-									onClick={() => onSelect(applyReminderTextUpdate(draft, projectOptions, { project }))}
-								>
-									<span className="pwa-project-option__label">
-										<span
-											className="pwa-project-dot"
-											style={{ '--project-color': colors.dark.accent } as React.CSSProperties}
-											aria-hidden="true"
-										/>
-										<span className="pwa-project-option__name">{project}</span>
-									</span>
-									{selected ? <Check size={18} /> : null}
-								</Button>
-							);
-						})}
-					</div>
-				</div>
+                <ProjectPickerContent
+                    isOpen projects={projectOptions} project={draft.project} defaultProject={draft.defaultProject}
+                    isDark={isDark} onClose={onClose}
+                    onSelectProject={(project) => onSelect(applyReminderTextUpdate(draft, projectOptions, { project }))}
+                />
 			</section>
 		);
 	}
 
-	return <ReminderRecurrencePicker draft={draft} dialogRef={dialogRef} projectOptions={projectOptions} onSelect={onSelect} onClose={onClose} />;
+	return <ReminderRecurrencePicker isDark={isDark} draft={draft} dialogRef={dialogRef} projectOptions={projectOptions} onSelect={onSelect} onClose={onClose} />;
 }

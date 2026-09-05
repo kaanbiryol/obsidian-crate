@@ -1,18 +1,13 @@
+import { DatePickerContent } from './DatePickerContent';
+import { ThemeIconProvider } from '../../components/theme-icon';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 import React, { useCallback } from 'react';
 
 import { BaseModal } from '../../components/BaseModal';
-import { ModalHeader } from '../../components/ModalHeader';
 import type { AnimationConfig } from '../animations';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { getPickerModalProps } from '../glassStyles';
-import { DateQuickButtons } from './DateQuickButtons';
-import { EditableDateControl } from './EditableDateControl';
-import { PickerTimeCard } from './PickerTimeCard';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
-import { PickerContent } from './PickerContent';
-import { PickerFieldRow } from './PickerFieldRow';
-import { PickerSection } from './PickerSection';
-import { formatLocalDateKey, parseLocalDateKey, parseReminderDateValue } from '../../utils/reminderDate';
+import { parseLocalDateKey, parseReminderDateValue } from '../../utils/reminderDate';
 import { buildDatePickerDateSelection, buildDatePickerTimeSelection } from './datePickerSelection';
 import { getReminderDateForPreset, type ReminderDatePreset } from './datePresets';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
@@ -99,73 +94,13 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
             ariaLabel={REMINDER_PICKER_COPY.schedule.dialogLabel}
             {...modalProps}
         >
-            <div className={`reminder-picker reminder-date-picker${isDark ? ' dark' : ''}`}>
-                <ModalHeader
-                    onClose={onClose}
-                    closeLabel={REMINDER_PICKER_COPY.schedule.closeLabel}
-                    title={REMINDER_PICKER_COPY.schedule.title}
-                    action={{
-                        label: REMINDER_PICKER_COPY.schedule.done,
-                        disabled: !currentDate,
-                        onClick: onClose,
-                    }}
+            <ThemeIconProvider renderer={ObsidianIcon}>
+                <DatePickerContent
+                    currentDate={currentDate} hasTime={hasTime ?? false} isDark={isDark}
+                    onClose={onClose} onSelectPreset={handleQuickDate} onDateChange={handleDateChange}
+                    onTimeChange={handleTimeChange} onTimeClear={handleTimeClear} onRemove={handleRemoveSchedule}
                 />
-
-                <div className="reminder-picker-scroll">
-                    <PickerContent>
-                        <PickerSection
-                            headingId="plugin-quick-schedule-title"
-                            title={REMINDER_PICKER_COPY.schedule.quickOptions}
-                        >
-                            <DateQuickButtons
-                                currentDate={currentDate}
-                                hasTime={hasTime ?? false}
-                                onSelectPreset={handleQuickDate}
-                            />
-                        </PickerSection>
-
-                        <PickerSection
-                            headingId="plugin-custom-schedule-title"
-                            title={REMINDER_PICKER_COPY.schedule.custom}
-                            className="picker-custom-schedule"
-                            action={currentDate ? (
-                                <ShadowDOMNativeButton
-                                    className="picker-schedule-remove"
-                                    onClick={handleRemoveSchedule}
-                                >
-                                    {REMINDER_PICKER_COPY.schedule.remove}
-                                </ShadowDOMNativeButton>
-                            ) : undefined}
-                        >
-                            <div className="picker-schedule-fields">
-                                <PickerFieldRow
-                                    label={REMINDER_PICKER_COPY.schedule.date}
-                                    className="picker-date-field"
-                                    asLabel
-                                >
-                                    <EditableDateControl
-                                        label={REMINDER_PICKER_COPY.schedule.date}
-                                        emptyLabel={REMINDER_PICKER_COPY.schedule.addDate}
-                                        invalidMessage={REMINDER_PICKER_COPY.schedule.invalidDate}
-                                        value={currentDate ? formatLocalDateKey(currentDate) : ''}
-                                        onChange={handleDateChange}
-                                    />
-                                </PickerFieldRow>
-                                <PickerTimeCard
-                                    label={REMINDER_PICKER_COPY.schedule.time}
-                                    detail={REMINDER_PICKER_COPY.schedule.optional}
-                                    controlIcon="clock"
-                                    controlEmptyLabel={REMINDER_PICKER_COPY.schedule.addTime}
-                                    hour={currentDate && hasTime ? currentDate.getHours() : undefined}
-                                    minute={currentDate && hasTime ? currentDate.getMinutes() : undefined}
-                                    onChange={handleTimeChange}
-                                    onClear={handleTimeClear}
-                                />
-                            </div>
-                        </PickerSection>
-                    </PickerContent>
-                </div>
-            </div>
+            </ThemeIconProvider>
         </BaseModal>
     );
 };

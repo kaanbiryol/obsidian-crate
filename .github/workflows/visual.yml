@@ -1,0 +1,49 @@
+name: Shared UI visual checks
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      update_baselines:
+        description: Generate candidate baselines for review
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run typecheck:visual
+      - name: Compare shared UI screenshots
+        if: inputs.update_baselines != true
+        run: npm run test:visual
+      - name: Generate candidate baselines
+        if: inputs.update_baselines == true
+        run: npm run test:visual -- --update-snapshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shared-ui-visual-review
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: inputs.update_baselines == true
+        with:
+          name: shared-ui-candidate-baselines
+          path: tests/visual/baselines/
+          retention-days: 7
