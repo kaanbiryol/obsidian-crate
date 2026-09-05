@@ -12,6 +12,8 @@
 @use '../../reminders/ui/shared/styles/reminder-cards';
 @use '../../reminders/ui/shared/styles/primary-screen';
 @use './layout-modes';
+@use './mobile-layout';
+@use './sheet-headers';
 
 .crate-reminders-ui {
 	@include tokens.styles;
@@ -28,4 +30,6 @@
 	@include reminder-cards.styles;
 	@include layout-modes.styles;
 	@include primary-screen.styles;
+	@include mobile-layout.styles;
+	@include sheet-headers.styles;
 }

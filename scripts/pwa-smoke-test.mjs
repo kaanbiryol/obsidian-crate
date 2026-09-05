@@ -38,6 +38,17 @@ try {
 	if (!pageHtml.includes('/notifications/app.js?v=')) throw new Error('PWA page is missing the versioned app script');
 	if (!pageHtml.includes('/notifications/theme-bootstrap.js?v=')) throw new Error('PWA page is missing the theme bootstrap script');
 	if (pageHtml.includes('<script>')) throw new Error('PWA page contains an inline script');
+	const homeScreenHtml = await (await fetchOk(`${origin}/notifications?folder=Reminders`)).text();
+	const sessionScriptIndex = homeScreenHtml.indexOf('<script src="/notifications/preview-session.js"></script>');
+	if (sessionScriptIndex < 0 || sessionScriptIndex > homeScreenHtml.indexOf('</head>')) {
+		throw new Error('Tokenless Home Screen preview is missing its early fixture session bootstrap');
+	}
+	const sessionScript = await (await fetchOk(`${origin}/notifications/preview-session.js`)).text();
+	const previewStorage = new Map();
+	new Script(sessionScript).runInNewContext({ localStorage: { setItem: (key, value) => previewStorage.set(key, value) } });
+	if (previewStorage.get('crate-reminders-auth-token') !== 'preview-auth-token') {
+		throw new Error('Home Screen preview did not initialize its fixture session');
+	}
 	if (pageHtml.includes('apple-touch-startup-image')) throw new Error('PWA page still includes device-specific startup images');
 
 	const manifestResponse = await fetchOk(`${origin}/notifications/manifest.json?token=preview-install-token&folder=Reminders&upcomingDays=7`);

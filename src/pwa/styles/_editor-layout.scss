@@ -19,6 +19,39 @@
     box-shadow: none;
     animation: none;
 
+    .reminder-modal-header {
+      flex-shrink: 0;
+      --pwa-header-side-width: 96px;
+      min-height: 56px;
+      padding: 6px 12px;
+      column-gap: 8px;
+      border-bottom-color: color-mix(in srgb, var(--crate-divider) 55%, transparent);
+    }
+
+    .reminder-modal-header-title,
+    .reminder-modal-header-action {
+      font-size: 17px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .reminder-modal-header-close {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      color: var(--text-muted);
+    }
+
+    .reminder-modal-header-action {
+      min-width: 44px;
+      min-height: 44px;
+      padding-inline: 4px;
+    }
+
+    .reminder-modal-header-side.is-right {
+      gap: 4px;
+    }
+
     .modal-form {
       gap: 0;
       display: flex;
@@ -34,15 +67,28 @@
       overflow-y: auto;
       overscroll-behavior: contain;
     }
+
+    // These rows must keep their natural height even when the body scrolls.
+    // The shared compact layout permits shrinking, which can overlap text/chips.
+    .reminder-editor-fields,
+    .reminder-action-chips,
+    .reminder-description-wrap,
+    .rich-text-input-shell {
+      flex: none;
+    }
+
+    .reminder-editor-fields {
+      max-height: none;
+    }
   }
 
   .pwa-modal-sheet--reminder.is-editor-screen:not(.is-keyboard-open) .pwa-modal-sheet__container--reminder {
-    height: min(calc(326px + env(safe-area-inset-bottom)), 90dvh) !important;
+    height: min(calc(var(--pwa-editor-content-height, 224px) + env(safe-area-inset-bottom)), 90dvh) !important;
     max-height: 90dvh !important;
   }
 
   .pwa-modal-sheet--reminder.is-editor-screen.is-keyboard-open .pwa-modal-sheet__container--reminder {
-    height: min(calc(320px + var(--pwa-keyboard-inset, 0px)), 90dvh) !important;
+    height: min(calc(var(--pwa-editor-content-height, 224px) + 16px + var(--pwa-keyboard-inset, 0px)), 90dvh) !important;
     max-height: 90dvh !important;
   }
 

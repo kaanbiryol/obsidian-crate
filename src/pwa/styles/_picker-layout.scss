@@ -25,6 +25,40 @@
     }
 
     .recurrence-stepper-button { --crate-icon-button-control-size: 44px; }
-    .picker-native-control input { min-height: 44px; font-size: 16px; }
+    .reminder-picker .picker-native-control {
+      .picker-native-control-value {
+        justify-items: end;
+        text-align: right;
+      }
+
+      .picker-date-display,
+      .picker-native-control-empty,
+      input {
+        font-family: var(--font-interface);
+        font-size: 16px;
+        font-weight: 400;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.4;
+        text-align: right;
+      }
+
+      input {
+        min-height: 44px;
+
+        // Safari renders native date/time values inside its own control box.
+        &::-webkit-date-and-time-value {
+          margin: 0;
+          font: inherit;
+          text-align: right;
+        }
+
+        &::-webkit-datetime-edit,
+        &::-webkit-datetime-edit-fields-wrapper {
+          justify-content: flex-end;
+          font: inherit;
+          padding: 0;
+        }
+      }
+    }
   }
 }

@@ -12,6 +12,7 @@ import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
 import { ReminderEditorFields } from '@/reminders/ui/reminder-modal/ReminderEditorFields';
 import { ReminderActionChips } from '@/reminders/ui/reminder-modal/ReminderActionChips';
 import { useKeyboardDoneSave } from '../hooks/useKeyboardDoneSave';
+import { useEditorSheetHeight } from '../hooks/useEditorSheetHeight';
 import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
@@ -58,6 +59,12 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	onDelete,
 }, ref) {
 	const contentRef = useRef<HTMLDivElement | null>(null);
+	const editorRef = useRef<HTMLDivElement | null>(null);
+	useEditorSheetHeight(editorRef, isActive);
+	const setEditorRef = useCallback((element: HTMLDivElement | null) => {
+		editorRef.current = element;
+		if (isActive) dialogRef(element);
+	}, [dialogRef, isActive]);
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 	const draft = modal.draft;
@@ -118,7 +125,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 
 	return (
 		<div
-			ref={isActive ? dialogRef : undefined}
+			ref={setEditorRef}
 			className={`pwa-reminder-sheet-screen pwa-reminder-sheet-screen--editor modal-card pwa-reminder-editor${isActive ? ' is-active' : ''}${isReturningToEditor ? ' is-focus-target' : ''}`}
 			role="dialog"
 			aria-modal="true"

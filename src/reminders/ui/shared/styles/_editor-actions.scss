@@ -4,9 +4,9 @@
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: 4px;
+  gap: 8px;
   margin-top: 0;
-  padding: 8px 12px 12px;
+  padding: 12px 16px 16px;
   border-top: 0;
 }
 
@@ -73,9 +73,9 @@
 
 @container (max-width: 420px) {
   .reminder-action-chips {
-    gap: 4px;
+    gap: 8px;
     margin-top: 0;
-    padding: 8px 12px 12px;
+    padding: 12px 18px 16px;
     border: 0;
     border-top: 0;
     border-radius: 0;
