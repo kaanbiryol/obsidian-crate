@@ -3,12 +3,12 @@ import { buildHTML, buildRichTextSegments, getPlainText, getRichTextChipParts } 
 import { getLogicalTextLength, saveCursorPosition, restoreCursorPosition } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
 import {
-    clearActiveProjectChip,
+    clearActiveRichTextChip,
     focusRichTextElement,
     isRichTextRenderingCurrent,
     renderRichText,
     selectElementContents,
-    syncActiveProjectChip,
+    syncActiveRichTextChip,
 } from './richTextInputDom';
 import {
     RichTextInputHistory,
@@ -207,8 +207,8 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         if (!element) return;
 
         const ownerDocument = element.ownerDocument;
-        const syncCursorChip = () => syncActiveProjectChip(element);
-        const clearCursorChip = () => clearActiveProjectChip(element);
+        const syncCursorChip = () => syncActiveRichTextChip(element);
+        const clearCursorChip = () => clearActiveRichTextChip(element);
 
         ownerDocument.addEventListener('selectionchange', syncCursorChip);
         element.addEventListener('focus', syncCursorChip);
@@ -230,7 +230,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             }
 
             restoreCursorPosition(actualRef.current, position);
-            syncActiveProjectChip(actualRef.current);
+            syncActiveRichTextChip(actualRef.current);
             afterRestore?.();
         });
     }, [actualRef]);
@@ -280,7 +280,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         restoreRequestIdRef.current += 1;
         renderRichText(actualRef.current, snapshot.value, knownProjects);
         restoreCursorPosition(actualRef.current, snapshot.cursor);
-        syncActiveProjectChip(actualRef.current);
+        syncActiveRichTextChip(actualRef.current);
         onChange(snapshot.value);
         updateAutocompleteQuery(snapshot.value, snapshot.cursor);
         return true;
@@ -306,7 +306,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             // Keep selection valid before another keyboard event can arrive. Waiting for
             // animationFrame here leaves fast typing vulnerable to a reset caret.
             restoreCursorPosition(actualRef.current, cursorPos);
-            syncActiveProjectChip(actualRef.current);
+            syncActiveRichTextChip(actualRef.current);
         }
 
         // Call onChange with plain text

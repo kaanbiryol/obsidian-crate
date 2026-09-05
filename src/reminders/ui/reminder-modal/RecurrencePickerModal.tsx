@@ -9,10 +9,9 @@ import { getPickerModalProps } from '../glassStyles';
 import { PickerTimeCard } from './PickerTimeCard';
 import { PickerContent } from './PickerContent';
 import { PickerCurrentSummary } from './PickerCurrentSummary';
-import { PickerSection } from './PickerSection';
 import { RecurrenceFrequencyOptions } from './RecurrenceFrequencyOptions';
 import { RecurrenceFrequencyTabs } from './RecurrenceFrequencyTabs';
-import { PickerDoneButton } from './PickerDoneButton';
+import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
 import {
 	recurrenceRuleFromPickerState,
 	summarizeRecurrencePickerState,
@@ -117,21 +116,10 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
 
                 <div className="reminder-picker-scroll">
                     <PickerContent>
-                        <PickerCurrentSummary
-                            label={REMINDER_PICKER_COPY.repeat.current}
-                            value={summaryText}
-                            icon="repeat"
+                        <RecurrenceFrequencyTabs
+                            frequency={frequency}
+                            onChange={setFrequency}
                         />
-
-                        <PickerSection
-                            headingId="plugin-repeat-frequency-title"
-                            title={REMINDER_PICKER_COPY.repeat.frequency}
-                        >
-                            <RecurrenceFrequencyTabs
-                                frequency={frequency}
-                                onChange={setFrequency}
-                            />
-                        </PickerSection>
 
                         <RecurrenceFrequencyOptions
                             frequency={frequency}
@@ -139,33 +127,36 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                             interval={interval}
                             selectedDays={selectedDays}
                             dayOfMonth={dayOfMonth}
+                            timeControl={
+                                <PickerTimeCard
+                                    label={REMINDER_PICKER_COPY.repeat.reminderTime}
+                                    controlIcon="clock"
+                                    hour={hour}
+                                    minute={minute}
+                                    onChange={(h, m) => { setHour(h); setMinute(m); }}
+                                />
+                            }
                             onIntervalChange={setInterval}
                             onToggleDay={toggleDay}
                             onDayOfMonthChange={setDayOfMonth}
                         />
 
-                        <PickerSection
-                            headingId="plugin-repeat-time-title"
-                            title={REMINDER_PICKER_COPY.repeat.time}
-                            className="recurrence-picker-time"
-                        >
-                            <PickerTimeCard
-                                label={REMINDER_PICKER_COPY.repeat.reminderTime}
-                                controlIcon="clock"
-                                hour={hour}
-                                minute={minute}
-                                onChange={(h, m) => { setHour(h); setMinute(m); }}
+                        <div className="recurrence-summary-row">
+                            <PickerCurrentSummary
+                                label={REMINDER_PICKER_COPY.repeat.current}
+                                value={summaryText}
+                                icon="repeat"
                             />
-                        </PickerSection>
+                            {recurrence && (
+                                <ShadowDOMNativeButton
+                                    className="picker-repeat-remove"
+                                    onClick={handleRemoveRepeat}
+                                >
+                                    {REMINDER_PICKER_COPY.repeat.remove}
+                                </ShadowDOMNativeButton>
+                            )}
+                        </div>
                     </PickerContent>
-
-                    {recurrence && <PickerDoneButton
-                        showPrimary={false}
-                        removeAction={recurrence ? {
-                            label: REMINDER_PICKER_COPY.repeat.remove,
-                            onClick: handleRemoveRepeat,
-                        } : undefined}
-                    />}
                 </div>
             </div>
         </BaseModal>

@@ -62,11 +62,11 @@ export function renderRichText(
 	element.replaceChildren(fragment);
 }
 
-const ACTIVE_PROJECT_CHIP_CLASS = "is-cursor-active";
+const ACTIVE_CHIP_CLASS = "is-cursor-active";
 
-export function clearActiveProjectChip(element: HTMLDivElement): void {
-	element.querySelectorAll(`.rich-text-chip-project.${ACTIVE_PROJECT_CHIP_CLASS}`).forEach((chip) => {
-		chip.classList.remove(ACTIVE_PROJECT_CHIP_CLASS);
+export function clearActiveRichTextChip(element: HTMLDivElement): void {
+	element.querySelectorAll(`.rich-text-chip.${ACTIVE_CHIP_CLASS}`).forEach((chip) => {
+		chip.classList.remove(ACTIVE_CHIP_CLASS);
 	});
 }
 
@@ -79,7 +79,7 @@ export function isRichTextRenderingCurrent(
 	}
 
 	const activeChips = Array.from(
-		element.querySelectorAll(`.rich-text-chip-project.${ACTIVE_PROJECT_CHIP_CLASS}`),
+		element.querySelectorAll(`.rich-text-chip.${ACTIVE_CHIP_CLASS}`),
 	);
 	if (!activeChips.length) {
 		return false;
@@ -87,14 +87,14 @@ export function isRichTextRenderingCurrent(
 
 	// Cursor-only presentation must not make the editor rebuild its content.
 	// Removing and restoring the class synchronously avoids a visible style change.
-	activeChips.forEach((chip) => chip.classList.remove(ACTIVE_PROJECT_CHIP_CLASS));
+	activeChips.forEach((chip) => chip.classList.remove(ACTIVE_CHIP_CLASS));
 	const isCurrent = element.innerHTML === expectedHtml;
-	activeChips.forEach((chip) => chip.classList.add(ACTIVE_PROJECT_CHIP_CLASS));
+	activeChips.forEach((chip) => chip.classList.add(ACTIVE_CHIP_CLASS));
 	return isCurrent;
 }
 
-export function syncActiveProjectChip(element: HTMLDivElement): void {
-	clearActiveProjectChip(element);
+export function syncActiveRichTextChip(element: HTMLDivElement): void {
+	clearActiveRichTextChip(element);
 
 	const root = element.getRootNode() as Document | ShadowRoot;
 	if (root.activeElement !== element) {
@@ -109,9 +109,9 @@ export function syncActiveProjectChip(element: HTMLDivElement): void {
 	const focusElement = focusNode.nodeType === ELEMENT_NODE_TYPE
 		? focusNode as Element
 		: focusNode.parentElement;
-	const activeChip = focusElement?.closest(".rich-text-chip-project") ?? null;
+	const activeChip = focusElement?.closest(".rich-text-chip-project, .rich-text-chip-priority") ?? null;
 	if (activeChip && element.contains(activeChip)) {
-		activeChip.classList.add(ACTIVE_PROJECT_CHIP_CLASS);
+		activeChip.classList.add(ACTIVE_CHIP_CLASS);
 	}
 }
 

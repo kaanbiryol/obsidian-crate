@@ -106,6 +106,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                     title={REMINDER_PICKER_COPY.schedule.title}
                     action={{
                         label: REMINDER_PICKER_COPY.schedule.done,
+                        disabled: !currentDate,
                         onClick: onClose,
                     }}
                 />
@@ -152,6 +153,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
                                 </PickerFieldRow>
                                 <PickerTimeCard
                                     label={REMINDER_PICKER_COPY.schedule.time}
+                                    detail={REMINDER_PICKER_COPY.schedule.optional}
                                     controlIcon="clock"
                                     controlEmptyLabel={REMINDER_PICKER_COPY.schedule.addTime}
                                     hour={currentDate && hasTime ? currentDate.getHours() : undefined}

@@ -150,7 +150,7 @@ describe('reminder editor chrome', () => {
         expect(dateMarkup).toContain('data-icon="clock"');
         expect(dateMarkup).not.toContain('data-icon="chevron-down"');
         expect(dateMarkup).toContain('Add time');
-        expect(dateMarkup).not.toContain('>Optional<');
+        expect(dateMarkup).toContain('<small>Optional</small>');
         expect(dateMarkup).not.toContain('Add date');
         expect(dateMarkup).not.toContain('type="text"');
         expect(dateMarkup).toContain('type="date"');
@@ -167,22 +167,22 @@ describe('reminder editor chrome', () => {
         expect(recurrenceMarkup).not.toContain('tone-warning');
         expect(recurrenceMarkup).toContain('class="picker-content"');
         expect(recurrenceMarkup).toContain('data-icon="repeat"');
-        expect(recurrenceMarkup).toContain('>Frequency<');
-        expect(recurrenceMarkup).toContain('>Interval<');
+        expect(recurrenceMarkup).not.toContain('>Frequency<');
+        expect(recurrenceMarkup).not.toContain('>Interval<');
         expect(recurrenceMarkup).toContain('>Reminder time<');
         expect(recurrenceMarkup).toContain('data-icon="minus"');
         expect(recurrenceMarkup).toContain('data-icon="plus"');
         expect(recurrenceMarkup).toContain('picker-native-control has-value');
         expect(recurrenceMarkup).toContain('data-icon="clock"');
         expect(recurrenceMarkup).toContain('class="picker-time-input"');
-        expect(recurrenceMarkup).toContain('<small>day</small>');
+        expect(recurrenceMarkup).toContain('<small> day</small>');
         expect(recurrenceMarkup.match(/picker-control-row/g)).toHaveLength(2);
         expect(recurrenceMarkup).toContain('role="tabpanel"');
         expect(recurrenceMarkup).toContain('tabindex="-1"');
         expect(recurrenceMarkup).toContain('>Done<');
     });
 
-    it('keeps interval separate from weekly and monthly repeat options', () => {
+    it('keeps time before compact frequency-specific controls and the summary last', () => {
         const weeklyMarkup = renderToStaticMarkup(React.createElement(RecurrencePickerModal, {
             isOpen: true,
             onClose: vi.fn(),
@@ -202,12 +202,17 @@ describe('reminder editor chrome', () => {
             onApply: vi.fn(),
         }));
 
-        expect(weeklyMarkup).toContain('>Interval<');
-        expect(weeklyMarkup).toContain('>Days<');
-        expect(weeklyMarkup).toContain('>weeks<');
-        expect(monthlyMarkup).toContain('>Interval<');
-        expect(monthlyMarkup).toContain('>Month day<');
-        expect(monthlyMarkup).toContain('>months<');
+        expect(weeklyMarkup).toContain('recurrence-frequency-detail');
+        expect(weeklyMarkup).toContain('aria-label="Repeat days"');
+        expect(weeklyMarkup).toContain('<small> weeks</small>');
+        expect(monthlyMarkup).toContain('recurrence-frequency-detail');
+        expect(monthlyMarkup).toContain('>Day of month<');
+        expect(monthlyMarkup).toContain('class="recurrence-stepper-value" aria-live="polite">15</strong>');
+        for (const markup of [weeklyMarkup, monthlyMarkup]) {
+            expect(markup.indexOf('picker-time-card')).toBeLessThan(markup.indexOf('recurrence-frequency-detail'));
+            expect(markup.indexOf('recurrence-frequency-detail')).toBeLessThan(markup.indexOf('picker-current-summary'));
+        }
+        expect(monthlyMarkup).toContain('<small> months</small>');
     });
 
     it('keeps removal actions hidden for new date and recurrence selections', () => {
@@ -231,6 +236,7 @@ describe('reminder editor chrome', () => {
 
         expect(dateMarkup).toContain('>Schedule<');
         expect(dateMarkup).not.toContain('Remove schedule');
+        expect(dateMarkup).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Done"/);
         expect(recurrenceMarkup).not.toContain('Remove repeat');
     });
 
