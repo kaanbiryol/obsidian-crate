@@ -101,6 +101,20 @@ describe('RemindersViewPanels', () => {
 		expect(projectDetailViewProps).not.toHaveBeenCalled();
 	});
 
+	it.each([true, false])('passes the animation preference %s to every reminder screen', async (enabled) => {
+		const { RemindersViewPanels } = await loadPanelsModule();
+		for (const viewMode of ['inbox', 'today', 'upcoming', 'browse']) {
+			renderToStaticMarkup(React.createElement(RemindersViewPanels, makeProps({
+				viewMode, selectedProject: 'Work', animationsEnabled: enabled,
+			}) as never));
+		}
+		for (const capture of [inboxViewProps, todayViewProps, upcomingViewProps, projectDetailViewProps]) {
+			expect(capture.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+				animationConfig: { enabled },
+			}));
+		}
+	});
+
 	it('suppresses the project detail panel until the initial load completes', async () => {
 		const { RemindersViewPanels } = await loadPanelsModule();
 		const props = makeProps({
@@ -139,7 +153,7 @@ describe('RemindersViewPanels', () => {
 			onBack: sharedProps.onBackToProjects,
 			onReorder: sharedProps.onReorder,
 			hasFab: true,
-			animationConfig: { enabled: false },
+			animationConfig: { enabled: true },
 			renderCard: sharedProps.renderCard,
 		}));
 

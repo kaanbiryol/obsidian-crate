@@ -3,7 +3,7 @@ import React, { memo, useMemo } from 'react';
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
 import { EmptyState } from '../../components/EmptyState';
-import { BrowseProjectCard } from './BrowseProjectCard';
+import { buildProjectTree, ProjectTree } from './ProjectTree';
 import { buildBrowseProjectCardsViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
@@ -43,6 +43,8 @@ export const BrowseView = memo(function BrowseView({
     [colorScheme, projects, reminders],
   );
 
+  const tree = useMemo(() => buildProjectTree(cards), [cards]);
+
   // Empty state
   if (projects.length === 0) {
     return (
@@ -70,13 +72,7 @@ export const BrowseView = memo(function BrowseView({
       >
         {/* Projects list */}
         <div className="premium-projects-list">
-          {cards.map((card) => (
-            <BrowseProjectCard
-              key={card.project}
-              card={card}
-              onClick={() => onProjectSelect(card.project)}
-            />
-          ))}
+          <ProjectTree nodes={tree} onProjectSelect={onProjectSelect} />
         </div>
       </div>
     </div>

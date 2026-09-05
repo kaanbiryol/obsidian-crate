@@ -528,7 +528,8 @@ describe('plugin reminder layout styles', () => {
     expect(priorityFlagBlock).toContain('background: transparent');
     expect(priorityFlagBlock).toContain('fill: currentColor');
     expect(cardStyles).not.toContain('&:has(.premium-priority-flag)');
-    expect(cardStyles).toContain('right: -38px');
+    expect(cardStyles).not.toContain('.reorder-drag-handle');
+    expect(cardStyles).not.toContain('padding-right: 56px');
     expect(cardStyles).not.toContain('min-height: 80px');
   });
 
@@ -549,7 +550,7 @@ describe('plugin reminder layout styles', () => {
     expect(row).not.toContain('scale:');
     expect(reorderableComponent).not.toContain('layoutId=');
     expect(primaryStyles).toContain(
-      '.reorderable-reminder-item[data-reorder-interaction="handle"]',
+      '.reorderable-reminder-item[data-reorder-interaction="drag"]',
     );
     expect(primaryStyles).toContain(
       '.premium-reminder-card:active .premium-reminder-content {\n        transform: none;',

@@ -3,6 +3,7 @@ import React, { memo } from 'react';
 interface ViewHeaderProps {
   title: string;
   count: number;
+  countUnit?: 'reminder' | 'project';
   overdueCount?: number;
   className?: string;
   /** Optional right-side action content (e.g., settings button) */
@@ -22,6 +23,7 @@ interface ViewHeaderProps {
 export const ViewHeader = memo(function ViewHeader({
   title,
   count,
+  countUnit = 'reminder',
   overdueCount = 0,
   className = '',
   rightContent,
@@ -43,7 +45,7 @@ export const ViewHeader = memo(function ViewHeader({
             aria-hidden={!showMeta}
           >
             <span className="view-header-count">
-              {count} {count === 1 ? 'reminder' : 'reminders'}
+              {count} {countUnit}{count === 1 ? '' : 's'}
             </span>
 
             {overdueCount > 0 && (

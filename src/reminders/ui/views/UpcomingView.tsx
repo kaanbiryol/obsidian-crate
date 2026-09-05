@@ -1,5 +1,7 @@
 import React, { useMemo, memo } from 'react';
-import { motion, LayoutGroup } from 'framer-motion';
+import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
+
+import { ReminderListLayout } from './ReminderListLayout';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
@@ -10,7 +12,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { buildUpcomingViewModel } from './viewModels';
 import { ReminderMotionRow } from '../../components/ReminderMotionRow';
 import type { ProjectColorScheme } from '../../utils/projectColors';
-import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
+import { reminderRowMotion } from '../reminderRowMotion';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 
 export interface UpcomingViewProps {
@@ -41,7 +43,6 @@ export const UpcomingView = memo(function UpcomingView({
   colorScheme = 'dark',
 }: UpcomingViewProps) {
   const reduceMotion = useObsidianReducedMotion();
-  const scrollRef = useStableReminderScroll();
   const { upcomingReminders, dateGroups } = useMemo(() => {
     return buildUpcomingViewModel(reminders, days);
   }, [reminders, days]);
@@ -59,10 +60,14 @@ export const UpcomingView = memo(function UpcomingView({
 
   const cardRenderer = renderCard || defaultRenderCard;
 
-  // When empty, show centered EmptyState
-  if (upcomingReminders.length === 0) {
-    return (
-      <div className={`flex items-center justify-center h-full ${className}`}>
+  return (
+    <ReminderListLayout
+      className={className}
+      hasFab={hasFab}
+      hasContent={upcomingReminders.length > 0}
+      renderCard={cardRenderer}
+      animationConfig={animationConfig}
+      emptyState={
         <EmptyState
           icon="calendar-range"
           title="No upcoming reminders"
@@ -70,20 +75,12 @@ export const UpcomingView = memo(function UpcomingView({
           iconColor="secondary"
           animationConfig={animationConfig}
         />
-      </div>
-    );
-  }
-
-  return (
-    <div className={`flex flex-col h-full relative ${className}`}>
-      <motion.div
-        layoutScroll
-        ref={scrollRef}
-        className={`flex-1 overflow-y-auto ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
-      >
-        <div className="space-y-6">
+      }
+    >
+      <div className="space-y-6">
+        <AnimatePresence initial={false}>
           {dateGroups.map((group, groupIndex) => (
-            <div key={group.date.toISOString()}>
+            <motion.div key={group.date.toISOString()} {...reminderRowMotion(enableListAnimations)}>
               {groupIndex > 0 && <div className="my-4 premium-divider" role="separator" />}
               <h2
                 className="upcoming-date-header"
@@ -104,10 +101,10 @@ export const UpcomingView = memo(function UpcomingView({
                   ))}
                 </ReminderListPresence>
               </LayoutGroup>
-            </div>
+            </motion.div>
           ))}
-        </div>
-      </motion.div>
-    </div>
+        </AnimatePresence>
+      </div>
+    </ReminderListLayout>
   );
 });

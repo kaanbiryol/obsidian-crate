@@ -57,7 +57,7 @@ export const CompletedReminderSection = memo(function CompletedReminderSection({
             style={{ display: 'flow-root' }}
         >
         <div
-      className="mt-6 pb-4"
+      className="completed-reminder-section"
       data-reminder-scroll-anchor="true"
       data-reminder-id="completed-section"
       data-reminder-section="section"

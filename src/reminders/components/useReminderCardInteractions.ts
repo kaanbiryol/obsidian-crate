@@ -42,11 +42,6 @@ export function useReminderCardInteractions({
         return;
       }
 
-      if (target.closest('.reorder-drag-handle')) {
-        event.stopPropagation();
-        return;
-      }
-
       if (target.closest(CHECKBOX_SELECTOR)) {
         event.stopPropagation();
         void options.onToggleComplete();
