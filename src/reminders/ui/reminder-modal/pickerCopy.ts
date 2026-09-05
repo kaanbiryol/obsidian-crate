@@ -17,6 +17,7 @@ export const REMINDER_PICKER_COPY = {
 	},
 	project: {
 		title: 'Project',
+		done: 'Done',
 		dialogLabel: 'Select project',
 		closeLabel: 'Close project selection',
 		listLabel: 'Project selection',

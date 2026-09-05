@@ -121,7 +121,6 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                             label={REMINDER_PICKER_COPY.repeat.current}
                             value={summaryText}
                             icon="repeat"
-                            tone="warning"
                         />
 
                         <PickerSection
@@ -160,13 +159,13 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
                         </PickerSection>
                     </PickerContent>
 
-                    <PickerDoneButton
+                    {recurrence && <PickerDoneButton
                         showPrimary={false}
                         removeAction={recurrence ? {
                             label: REMINDER_PICKER_COPY.repeat.remove,
                             onClick: handleRemoveRepeat,
                         } : undefined}
-                    />
+                    />}
                 </div>
             </div>
         </BaseModal>

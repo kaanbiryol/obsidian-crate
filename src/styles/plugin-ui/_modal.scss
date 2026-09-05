@@ -27,29 +27,14 @@
   }
 }
 
-.crate-reminder-editor-surface,
-.crate-reminder-picker-surface.is-project-picker {
+.crate-reminder-editor-surface {
   width: min(560px, calc(100vw - 40px));
   max-width: 560px;
   border-radius: var(--crate-radius-sheet);
 }
 
-.crate-reminder-picker-surface.is-recurrence-picker {
-  width: min(440px, calc(100vw - 40px));
-  max-width: 440px;
-  border-radius: var(--crate-radius-sheet);
-}
-
-.crate-reminder-picker-surface.is-date-picker {
-  width: min(380px, calc(100vw - 40px));
-  max-width: 380px;
-  border-radius: var(--crate-radius-sheet);
-}
-
 .crate-reminder-editor-surface.is-centered,
-.crate-reminder-picker-surface.is-date-picker.is-centered,
-.crate-reminder-picker-surface.is-project-picker.is-centered,
-.crate-reminder-picker-surface.is-recurrence-picker.is-centered {
+.crate-reminder-picker-surface.is-centered {
   padding-bottom: 8px;
 }
 
@@ -63,25 +48,17 @@
   border-radius: var(--crate-radius-sheet);
 }
 
-.crate-reminder-picker-surface.is-date-picker.is-bottom-sheet {
+.crate-reminder-picker-surface.is-bottom-sheet {
   padding-bottom: max(env(safe-area-inset-bottom), 8px);
 }
 
 .crate-reminder-picker-surface {
+  border-radius: var(--crate-radius-sheet);
   display: flex;
-  width: min(520px, calc(100vw - 40px));
-  max-width: 520px;
+  width: min(380px, calc(100vw - 40px));
+  max-width: 380px;
   max-height: min(720px, calc(100dvh - 48px));
   flex-direction: column;
-}
-
-.crate-reminder-picker-surface.is-project-picker {
-  max-height: min(560px, calc(100dvh - 48px));
-}
-
-.crate-reminder-picker-surface.is-project-picker.is-bottom-sheet {
-  width: 100%;
-  max-width: none;
 }
 
 .reminder-picker {
@@ -128,10 +105,6 @@
   }
 
   .crate-reminder-picker-surface.is-bottom-sheet {
-    min-height: min(520px, 90dvh);
-  }
-
-  .crate-reminder-picker-surface.is-date-picker.is-bottom-sheet {
     min-height: 0;
   }
 }

@@ -163,7 +163,8 @@ describe('reminder editor chrome', () => {
         expect(recurrenceMarkup).toContain('crate-reminder-picker-surface is-recurrence-picker');
         expect(recurrenceMarkup).toContain('>Repeat<');
         expect(recurrenceMarkup).toContain('>Repeats<');
-        expect(recurrenceMarkup).toContain('picker-current-value crate-semantic-token tone-warning');
+        expect(recurrenceMarkup).toContain('class="picker-current-value"');
+        expect(recurrenceMarkup).not.toContain('tone-warning');
         expect(recurrenceMarkup).toContain('class="picker-content"');
         expect(recurrenceMarkup).toContain('data-icon="repeat"');
         expect(recurrenceMarkup).toContain('>Frequency<');
@@ -260,7 +261,8 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('project-picker-dot');
         expect(markup).toContain('project-picker-row-check');
         expect(markup).toContain('--project-picker-dot-accent');
-        expect(markup).toContain('--project-picker-row-accent');
+        expect(markup).not.toContain('--project-picker-row-accent');
+        expect(markup).toContain('>Done<');
         expect(markup).not.toContain('Select Project');
     });
 
