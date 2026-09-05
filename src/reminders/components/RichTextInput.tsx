@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useLayoutEffect, useImperativeHandle, forward
 import { buildHTML, buildRichTextSegments, getPlainText, getRichTextChipParts } from '../utils/richTextParsing';
 import { getLogicalTextLength, saveCursorPosition, restoreCursorPosition } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
+import { commitReminderMarkers, toReminderTextOffset, toReminderCursorOffset } from '../utils/reminderEditorEdits';
 import {
     clearActiveRichTextChip,
     focusRichTextElement,
@@ -140,6 +141,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const initialContentRef = useRef<{ text: string; knownProjects?: string[] } | null>(null);
     const lastFocusRequestRef = useRef(focusRequestKey);
     const historyRef = useRef<RichTextInputHistory | null>(null);
+    const committedContentRef = useRef(value);
 
     if (!historyRef.current) {
         historyRef.current = new RichTextInputHistory({
@@ -248,7 +250,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             return;
         }
 
-        const hashInfo = extractHashtagQuery(plainText, cursorPos);
+        const hashInfo = extractHashtagQuery(plainText, toReminderTextOffset(plainText, cursorPos));
         if (hashInfo) {
             const sel = window.getSelection();
             const rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
@@ -281,20 +283,29 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         renderRichText(actualRef.current, snapshot.value, knownProjects);
         restoreCursorPosition(actualRef.current, snapshot.cursor);
         syncActiveRichTextChip(actualRef.current);
+        committedContentRef.current = snapshot.value;
         onChange(snapshot.value);
         updateAutocompleteQuery(snapshot.value, snapshot.cursor);
         return true;
     }, [actualRef, getCurrentHistorySnapshot, knownProjects, onChange, updateAutocompleteQuery]);
 
     // Handle input changes
-    const handleInput = () => {
+    const handleInput = (paste = false) => {
         if (readOnly || !actualRef.current) return;
 
         // A native edit supersedes any caret restoration queued for an older DOM state.
         restoreRequestIdRef.current += 1;
 
-        const cursorPos = saveCursorPosition(actualRef.current);
-        const plainText = getPlainText(actualRef.current);
+        let cursorPos = saveCursorPosition(actualRef.current);
+        let plainText = getPlainText(actualRef.current);
+        if (cursorPos !== null) {
+            const committed = commitReminderMarkers(plainText, toReminderTextOffset(plainText, cursorPos), knownProjects, paste, committedContentRef.current);
+            if (paste || /\s/.test(plainText[toReminderTextOffset(plainText, cursorPos) - 1] ?? '')) {
+                committedContentRef.current = committed.text;
+            }
+            plainText = committed.text;
+            cursorPos = toReminderCursorOffset(plainText, committed.cursor);
+        }
         historyRef.current?.record({ value: plainText, cursor: cursorPos });
 
         // Build and render HTML with chips
@@ -344,6 +355,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
         if (currentPlainText !== value) {
             historyRef.current?.reset({ value, cursor: value.length });
+            committedContentRef.current = value;
         }
 
         if (pendingCursorRef.current !== null) {
@@ -423,7 +435,10 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 autoCorrect={autoCorrect}
                 spellCheck={spellCheck}
                 onBeforeInput={captureHistorySnapshot}
-                onInput={handleInput}
+                onInput={(event) => {
+                    if (!event.nativeEvent.isComposing) handleInput();
+                }}
+                onCompositionEnd={() => handleInput()}
                 onClick={handleClick}
                 onKeyDown={handleKeyDownInternal}
                 onPaste={handlePaste}

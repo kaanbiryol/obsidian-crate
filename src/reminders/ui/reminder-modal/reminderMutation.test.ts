@@ -14,6 +14,17 @@ function makeReminder(overrides: Partial<Reminder> = {}): Reminder {
 }
 
 describe('buildReminderSubmission', () => {
+    it('saves the active chips and clears a stale recurrence when a date replaces it', () => {
+        const submission = buildReminderSubmission({
+            content: 'Task #Personal #Work ! ! weekly 2026-04-03',
+            projects: ['Personal', 'Work'], priority: 4, project: 'Personal', dueDate: null,
+            recurrence: { frequency: 'weekly' },
+        });
+        expect(submission).toMatchObject({
+            content: 'Task', project: 'Work', priority: 1, dueDate: '2026-04-03', recurrence: undefined,
+        });
+    });
+
 	it('keeps ISO date-only reminders as date-only values', () => {
 		const submission = buildReminderSubmission({
 			content: 'Task 2026-04-03',

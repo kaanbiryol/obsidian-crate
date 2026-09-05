@@ -2,6 +2,9 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import type React from 'react';
 
 import { filterProjects, extractHashtagQuery } from '../../utils/projectSearch';
+import { getPlainText } from '../../utils/richTextPlainText';
+import { saveCursorPosition } from '../../utils/cursorPosition';
+import { replaceReminderProject, toReminderTextOffset, toReminderCursorOffset } from '../../utils/reminderEditorEdits';
 import type { RichTextInputHandle } from '../../components/RichTextInput';
 
 const MAX_RESULTS = 10;
@@ -14,7 +17,6 @@ interface UseProjectAutocompleteOptions {
 }
 
 export function useProjectAutocomplete({
-    content,
     projects,
     onContentChange,
     richTextInputRef,
@@ -53,29 +55,13 @@ export function useProjectAutocomplete({
             return;
         }
 
-        // Save current cursor position to find the hashtag
-        const sel = window.getSelection();
-        if (!sel || !sel.rangeCount) {
+        const plainText = getPlainText(el);
+        const cursor = saveCursorPosition(el);
+        if (cursor === null) {
             dismiss();
             return;
         }
-
-        // Get plain text and cursor offset
-        const range = sel.getRangeAt(0);
-        const preCaretRange = range.cloneRange();
-        preCaretRange.selectNodeContents(el);
-        preCaretRange.setEnd(range.endContainer, range.endOffset);
-        const offset = preCaretRange.toString().length;
-
-        // Extract plain text
-        const getText = (node: Node): string => {
-            if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
-            if (node.nodeName === 'BR') return '\n';
-            let text = '';
-            node.childNodes.forEach(child => { text += getText(child); });
-            return text;
-        };
-        const plainText = getText(el);
+        const offset = toReminderTextOffset(plainText, cursor);
 
         const hashInfo = extractHashtagQuery(plainText, offset);
         if (!hashInfo) {
@@ -83,17 +69,13 @@ export function useProjectAutocomplete({
             return;
         }
 
-        const before = content.substring(0, hashInfo.startIndex);
-        const after = content.substring(hashInfo.startIndex + 1 + (query?.length ?? 0));
-        const replacement = `#${project} `;
-        const newContent = before + replacement + after;
-        const newCursorOffset = hashInfo.startIndex + replacement.length;
-
-        // Set pending cursor position before updating content
-        richTextInputRef.current?.setCursorPosition(newCursorOffset);
-        onContentChange(newContent);
+        const next = replaceReminderProject(
+            plainText, hashInfo.startIndex, offset - hashInfo.startIndex, project, projects,
+        );
+        richTextInputRef.current?.setCursorPosition(toReminderCursorOffset(next.text, next.cursor));
+        onContentChange(next.text);
         dismiss();
-    }, [content, query, richTextInputRef, onContentChange, dismiss]);
+    }, [projects, richTextInputRef, onContentChange, dismiss]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent): boolean => {
         if (!isOpen) return false;

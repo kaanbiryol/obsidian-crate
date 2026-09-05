@@ -5,7 +5,6 @@ import {
 	buildInitialReminderContent,
 	deriveReminderDraftContentMetadata,
 	getDefaultProject,
-	rebuildReminderContent,
 	type ReminderDraftContentPatch,
 	type ReminderDraftContentState,
 } from '../../core/reminderDraft';
@@ -44,7 +43,6 @@ export function useReminderDraft({
 	const [hasTime, setHasTime] = useState(initialHasTime);
 	const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(initialRecurrence);
 
-	const recurrenceSetFromText = useRef(false);
 	const dueDateSetFromText = useRef(false);
 	const draftRef = useRef<ReminderDraftContentState>({
 		content: initialContent,
@@ -108,29 +106,12 @@ export function useReminderDraft({
 		if (detectedRecurrence) {
 			const currentJson = recurrence ? JSON.stringify(recurrence) : null;
 			const detectedJson = JSON.stringify(detectedRecurrence);
-			if (currentJson !== detectedJson) {
-				recurrenceSetFromText.current = true;
-				setRecurrence(detectedRecurrence);
-				if (dueDate || metadata.hasDate) {
-					setDueDate(null);
-					setHasTime(false);
-					dueDateSetFromText.current = false;
-					setContentIfChanged(
-						rebuildReminderContent(
-							metadata.cleanContent,
-							null,
-							detectedRecurrence,
-							project,
-							priority,
-							resolvedDefaultProject,
-							false,
-						),
-					);
-				}
-			}
-		} else if (recurrence && recurrenceSetFromText.current) {
+			if (currentJson !== detectedJson) setRecurrence(detectedRecurrence);
+			if (dueDate) setDueDate(null);
+			if (hasTime) setHasTime(false);
+			dueDateSetFromText.current = false;
+		} else if (recurrence) {
 			setRecurrence(undefined);
-			recurrenceSetFromText.current = false;
 		}
 
 		const detectedDueDate = metadata.dueDate;
@@ -156,7 +137,6 @@ export function useReminderDraft({
 
 	const applyDateSelection = useCallback((nextDate: string | null, nextHasTime?: boolean) => {
 		dueDateSetFromText.current = false;
-		recurrenceSetFromText.current = false;
 		applyContentUpdate({
 			dueDate: nextDate,
 			recurrence: null,
@@ -169,7 +149,6 @@ export function useReminderDraft({
 	}, [applyContentUpdate]);
 
 	const applyRecurrenceSelection = useCallback((rule: RecurrenceRule | null) => {
-		recurrenceSetFromText.current = false;
 		if (!rule) {
 			applyContentUpdate({ recurrence: null });
 			return;

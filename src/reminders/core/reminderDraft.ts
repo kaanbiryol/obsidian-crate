@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import type { Priority, Reminder, RecurrenceRule } from '../types';
 import { recurrenceToText } from '../utils/rruleConverter';
 import { parseReminderDateValue, serializeReminderDateValue } from '../utils/reminderDate';
-import { parseReminderContent } from '../utils/reminderParser';
+import { parseReminderEditorContent } from '../utils/reminderEditorParsing';
 
 export interface ReminderDraftContentState {
 	content: string;
@@ -42,7 +42,7 @@ export function deriveReminderDraftContentMetadata(
 	projects: string[],
 	defaultProject: string,
 ): ReminderDraftContentMetadata {
-	const parsed = parseReminderContent(content, projects);
+	const parsed = parseReminderEditorContent(content, projects);
 	const recurrence = parsed.recurrence;
 	const hasTime = !recurrence && Boolean(parsed.dueDate && parsed.hasTime);
 	const dueDate = !recurrence && parsed.dueDate

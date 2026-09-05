@@ -2,6 +2,8 @@ import * as chrono from 'chrono-node';
 import { parseMarkdownLinks, isSafeUrl } from './markdownLinks';
 import { findStandalonePriorityMarkerIndexes } from './priorityMarker';
 import type { TextMatch } from './richTextTypes';
+import { parseRecurrenceFromContent } from './recurrenceParser';
+import { parseLocalDateKey } from './reminderDate';
 
 /**
  * Find all important marker matches in text (! with space before, or standalone)
@@ -108,132 +110,39 @@ export const findProjectMatches = (text: string, knownProjects?: string[]): Text
     return matches;
 };
 
-/**
- * Recurrence prefix patterns that should be highlighted along with the date
- * These patterns match text like "every", "daily", "weekly", "every 2 weeks", etc.
- */
-const RECURRENCE_PREFIX_PATTERNS = [
-    // "every day", "every week", "every month", "every year"
-    /every\s+(?:\d+\s+)?(?:day|week|month|year)s?\s+/i,
-    // "every Fri, ", "every Mon, Wed, " (weekday patterns before dates)
-    /every\s+(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)(?:\s*,\s*)?)+\s*/i,
-    // "every Monday", "every Mon and Wed", "every weekday"
-    /every\s+/i,
-    // "monthly on the 1st ", "monthly on 15th " (monthly with day ordinal before time)
-    /monthly(?:\s+on\s+(?:the\s+)?\d{1,2}(?:st|nd|rd|th))?\s+/i,
-    // "daily", "weekly", "yearly"
-    /(?:daily|weekly|yearly)\s+/i,
-];
-
-/**
- * Standalone recurrence patterns (when no chrono date follows)
- * e.g., "every day", "daily", "weekly", "every 2 weeks", "monthly on the 15th"
- */
-const STANDALONE_RECURRENCE_PATTERNS = [
-    // "every day", "every week", "every month", "every year", "every 2 weeks" with optional time
-    /every\s+(?:\d+\s+)?(?:day|week|month|year)s?(?:\s+\d{1,2}:\d{2})?(?:\s|$)/gi,
-    // "monthly on the 14th", "monthly on 15th", etc. with optional time
-    /monthly(?:\s+on\s+(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?)?(?:\s+\d{1,2}:\d{2})?(?:\s|$)/gi,
-    // "daily", "weekly", "yearly" with optional time (monthly handled above with optional suffix)
-    /(?:daily|weekly|yearly)(?:\s+\d{1,2}:\d{2})?(?:\s|$)/gi,
-    // "every Monday", "every Mon, Wed, Fri" (specific weekdays) with optional time
-    /every\s+(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)(?:\s*,\s*)?)+(?:\s+\d{1,2}:\d{2})?(?:\s|$)/gi,
-];
-
-/**
- * Find standalone recurrence matches (not followed by a chrono date)
- */
-const findRecurrenceMatches = (text: string, chronoMatches: TextMatch[]): TextMatch[] => {
-    const matches: TextMatch[] = [];
-
-    for (const pattern of STANDALONE_RECURRENCE_PATTERNS) {
-        // Reset regex state
-        pattern.lastIndex = 0;
-        let match;
-        while ((match = pattern.exec(text)) !== null) {
-            const matchText = match[0].trimEnd();
-            const index = match.index;
-
-            // Check if this position overlaps with any chrono match
-            const overlapsWithChrono = chronoMatches.some(cm =>
-                (index >= cm.index && index < cm.index + cm.length) ||
-                (cm.index >= index && cm.index < index + matchText.length)
-            );
-
-            if (!overlapsWithChrono) {
-                matches.push({
-                    text: matchText,
-                    index: index,
-                    length: matchText.length,
-                    type: 'date'
-                });
-            }
-        }
-    }
-
-    return matches;
-};
-
-/**
- * Find all date matches in text using chrono
- * Also extends matches to include recurrence prefixes like "every"
- */
+/** Find complete schedules with the same recurrence grammar used when saving. */
 const findDateMatches = (text: string): TextMatch[] => {
     const matches: TextMatch[] = [];
-    const chronoResults = chrono.parse(text);
-    let lastSearchIndex = 0;
+    let remaining = text;
+    const mask = (index: number, length: number) => {
+        remaining = remaining.slice(0, index) + ' '.repeat(length) + remaining.slice(index + length);
+    };
 
-    chronoResults.forEach((result) => {
-        if (result.start && result.text) {
-            const matchedText = result.text;
-            let index = text.indexOf(matchedText, lastSearchIndex);
+    // Protect entire links and project names, including names such as #Tomorrow.
+    for (const link of parseMarkdownLinks(text)) mask(link.index, link.fullMatch.length);
+    for (const url of remaining.matchAll(/\bhttps?:\/\/[^\s)]+/gi)) mask(url.index, url[0].length);
 
-            if (index !== -1) {
-                // Check if there's a recurrence prefix before this match
-                let extendedIndex = index;
-                let extendedText = matchedText;
+    let recurrence = parseRecurrenceFromContent(remaining);
+    while (recurrence) {
+        const index = remaining.indexOf(recurrence.matched);
+        matches.push({ text: recurrence.matched, index, length: recurrence.matched.length, type: 'date' });
+        mask(index, recurrence.matched.length);
+        recurrence = parseRecurrenceFromContent(remaining);
+    }
 
-                // Look for recurrence prefixes before the chrono match
-                const textBefore = text.substring(0, index);
-
-                for (const pattern of RECURRENCE_PREFIX_PATTERNS) {
-                    // Check if the text before ends with a recurrence pattern
-                    const prefixMatch = textBefore.match(new RegExp(pattern.source + '$', 'i'));
-                    if (prefixMatch) {
-                        const prefix = prefixMatch[0];
-                        extendedIndex = index - prefix.length;
-                        extendedText = prefix + matchedText;
-                        break;
-                    }
-                }
-
-                // Check if this extended match overlaps with a previous match
-                // This happens when chrono parses "every Fri, Sat 09:00" as two separate results
-                // We want to merge them into a single match
-                const lastMatch = matches[matches.length - 1];
-                if (lastMatch && extendedIndex <= lastMatch.index + lastMatch.length) {
-                    // This match overlaps with or is adjacent to the previous one
-                    // Extend the previous match to include this one
-                    const newEnd = index + matchedText.length;
-                    lastMatch.text = text.substring(lastMatch.index, newEnd);
-                    lastMatch.length = newEnd - lastMatch.index;
-                } else {
-                    matches.push({
-                        text: extendedText,
-                        index: extendedIndex,
-                        length: extendedText.length,
-                        type: 'date'
-                    });
-                }
-                lastSearchIndex = index + matchedText.length;
-            }
+    // Chrono does not reliably cover the whole ISO timestamp, especially its timezone.
+    for (const iso of remaining.matchAll(/@?(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?(?:Z|[+-]\d{2}:\d{2})?)?)/g)) {
+        const dateText = iso[1]!;
+        const date = dateText.includes('T') ? new Date(dateText) : parseLocalDateKey(dateText);
+        if (!Number.isNaN(date.getTime())) {
+            matches.push({ text: iso[0], index: iso.index, length: iso[0].length, type: 'date' });
         }
-    });
+        mask(iso.index, iso[0].length);
+    }
 
-    // Also find standalone recurrence patterns not captured by chrono
-    const standaloneRecurrenceMatches = findRecurrenceMatches(text, matches);
-    matches.push(...standaloneRecurrenceMatches);
-
+    for (const result of chrono.parse(remaining, new Date(), { forwardDate: true })) {
+        matches.push({ text: result.text, index: result.index, length: result.text.length, type: 'date' });
+    }
     return matches;
 };
 
@@ -260,11 +169,16 @@ export const findLinkMatches = (text: string): TextMatch[] => {
  * @param knownProjects Optional array of known project names for multi-word matching
  */
 export const findAllMatches = (text: string, knownProjects?: string[]): TextMatch[] => {
+    const projects = findProjectMatches(text, knownProjects);
+    let dateText = text;
+    for (const project of projects) {
+        dateText = dateText.slice(0, project.index) + ' '.repeat(project.length) + dateText.slice(project.index + project.length);
+    }
     const allMatches = [
         ...findLinkMatches(text),
         ...findPriorityMatches(text),
-        ...findProjectMatches(text, knownProjects),
-        ...findDateMatches(text)
+        ...projects,
+        ...findDateMatches(dateText)
     ];
 
     // Sort by position and remove overlapping matches

@@ -1,4 +1,8 @@
-import { Modal, setIcon, type App } from 'obsidian';
+import { Modal, Platform, setIcon, type App } from 'obsidian';
+import { createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { ActivitySheet } from './activity/ActivitySheet';
+import { hideNativeModalCloseButton } from '../reminders/ui/adapters/modalShell';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncState } from '../sync/types';
 import { renderHistoryPanel } from './activity/history';
@@ -13,7 +17,14 @@ export interface ActivityModalDeps {
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
 }
 
+let nextActivityId = 0;
+
 export class ActivityModal extends Modal {
+    // Obsidian's native Modal.open() otherwise focuses the first control after
+    // onOpen(). The shared sheet owns initial focus instead (Obsidian 1.13+).
+    hasInitialInputFocus = false;
+	private readonly tabIdPrefix = `crate-activity-${++nextActivityId}`;
+	private root: Root | undefined;
 	private readonly settings: CrateSettings;
 	private readonly deps: ActivityModalDeps;
 	private tabIndicator!: HTMLDivElement;
@@ -39,15 +50,20 @@ export class ActivityModal extends Modal {
 	}
 
 	onOpen(): void {
-		const { containerEl, contentEl, modalEl } = this;
-		containerEl.addClass('crate-activity-modal-container');
-		modalEl.addClass('crate-activity-modal');
-		const nativeHeaderButtons: NodeListOf<HTMLElement> = containerEl.querySelectorAll(
-			'.modal-close-button, .modal-header-button',
-		);
-		nativeHeaderButtons.forEach((nativeHeaderButton) => {
-			nativeHeaderButton.remove();
-		});
+		this.modalEl.addClass('crate-reminder-editor-modal');
+		this.modalEl.toggleClass('is-mobile', Platform.isMobile);
+		hideNativeModalCloseButton(this.modalEl);
+		this.contentEl.addClasses(['crate-reminder-editor-modal__content', 'crate-reminders-ui']);
+		this.root = createRoot(this.contentEl);
+		this.root.render(createElement(ActivitySheet, {
+			isMobile: Platform.isMobile,
+			onClose: () => this.close(),
+			onMount: (container, close) => this.renderActivity(container, close),
+		}));
+	}
+
+	private renderActivity(contentEl: HTMLDivElement, close: () => void): void {
+		this.currentTabIndex = 0;
 
 		// Header
 		const header = contentEl.createDiv({ cls: 'crate-activity-header' });
@@ -56,7 +72,7 @@ export class ActivityModal extends Modal {
 			attr: { type: 'button', 'aria-label': 'Close sync activity', title: 'Close' },
 		});
 		setIcon(closeButton, 'x');
-		closeButton.addEventListener('click', () => this.close());
+		closeButton.addEventListener('click', close);
 
 		const headerText = header.createDiv({ cls: 'crate-activity-header-text' });
 		headerText.createEl('h2', { text: 'Sync activity', cls: 'crate-activity-title' });
@@ -87,7 +103,7 @@ export class ActivityModal extends Modal {
 
 		// Tab bar
 		const tabBar = contentEl.createDiv({ cls: 'crate-activity-tab-bar' });
-		const tabs = tabBar.createDiv({ cls: 'crate-activity-tabs' });
+		const tabs = tabBar.createDiv({ cls: 'crate-activity-tabs', attr: { role: 'tablist', 'aria-label': 'Sync activity' } });
 
 		const pendingTab = tabs.createEl('button', {
 			cls: 'crate-activity-tab crate-activity-tab-active',
@@ -130,7 +146,28 @@ export class ActivityModal extends Modal {
 		for (let i = 0; i < this.allTabs.length; i++) {
 			const tab = this.allTabs[i];
 			if (!tab) continue;
+			tab.tabIndex = i === 0 ? 0 : -1;
+			tab.id = `${this.tabIdPrefix}-tab-${i}`;
+			const panel = this.allPanels[i];
+			if (panel) {
+				panel.id = `${this.tabIdPrefix}-panel-${i}`;
+				panel.setAttribute('role', 'tabpanel');
+				panel.setAttribute('aria-labelledby', tab.id);
+				panel.tabIndex = 0;
+				tab.setAttribute('aria-controls', panel.id);
+			}
 			tab.addEventListener('click', () => this.switchTab(i));
+			tab.addEventListener('keydown', (event) => {
+				let next = i;
+				if (event.key === 'ArrowRight') next = (i + 1) % this.allTabs.length;
+				else if (event.key === 'ArrowLeft') next = (i + this.allTabs.length - 1) % this.allTabs.length;
+				else if (event.key === 'Home') next = 0;
+				else if (event.key === 'End') next = this.allTabs.length - 1;
+				else return;
+				event.preventDefault();
+				this.switchTab(next);
+				this.allTabs[next]?.focus();
+			});
 		}
 
 		this.deps.addStateChangeListener(this.onStateChange);
@@ -148,10 +185,12 @@ export class ActivityModal extends Modal {
 			if (i === index) {
 				tab.addClass('crate-activity-tab-active');
 				tab.setAttribute('aria-selected', 'true');
+				tab.tabIndex = 0;
 				panel.show();
 			} else {
 				tab.removeClass('crate-activity-tab-active');
 				tab.setAttribute('aria-selected', 'false');
+				tab.tabIndex = -1;
 				panel.hide();
 			}
 		}
@@ -213,8 +252,15 @@ export class ActivityModal extends Modal {
 		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths());
 		this.conflictsPanel.empty();
 		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts());
+		const expanded = new Set(Array.from(this.historyPanel.querySelectorAll('details[open]'))
+			.map((entry) => entry.getAttribute('data-history-key')));
+		const scrollTop = this.historyPanel.scrollTop;
 		this.historyPanel.empty();
 		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? []);
+		this.historyPanel.querySelectorAll('details').forEach((entry) => {
+			entry.open = expanded.has(entry.getAttribute('data-history-key'));
+		});
+		this.historyPanel.scrollTop = scrollTop;
 		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
 	}
 
@@ -232,6 +278,9 @@ export class ActivityModal extends Modal {
 
 	onClose(): void {
 		this.deps.removeStateChangeListener(this.onStateChange);
+		this.root?.unmount();
+		this.root = undefined;
 		this.contentEl.empty();
+		this.contentEl.removeClasses(['crate-reminder-editor-modal__content', 'crate-reminders-ui']);
 	}
 }

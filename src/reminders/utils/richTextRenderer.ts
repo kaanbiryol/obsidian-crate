@@ -1,4 +1,4 @@
-import { findAllMatches } from './richTextMatchers';
+import { findActiveReminderMatches } from './reminderEditorParsing';
 
 type RichTextSegment =
     | { kind: 'text'; text: string }
@@ -53,7 +53,7 @@ export const buildRichTextSegments = (text: string, knownProjects?: string[]): R
     const segments: RichTextSegment[] = [];
     let lastIndex = 0;
 
-    for (const match of findAllMatches(text, knownProjects)) {
+    for (const match of findActiveReminderMatches(text, knownProjects)) {
         if (match.index > lastIndex) {
             segments.push({ kind: 'text', text: text.slice(lastIndex, match.index) });
         }

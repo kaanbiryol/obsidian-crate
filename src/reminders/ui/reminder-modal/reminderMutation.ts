@@ -1,5 +1,5 @@
 import type { Priority, Reminder, RecurrenceRule } from '../../types';
-import { parseReminderContent } from '../../utils/reminderParser';
+import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
 import {
 	buildStoredReminderDates,
 	parseReminderDateValue,
@@ -60,7 +60,7 @@ export function buildReminderSubmission({
 		return null;
 	}
 
-	const parsed = parseReminderContent(content, projects);
+	const parsed = parseReminderEditorContent(content, projects);
 	const finalContent = parsed.cleanContent?.trim() || content.trim();
 	if (!finalContent) {
 		return null;
@@ -68,11 +68,11 @@ export function buildReminderSubmission({
 
 	const finalPriority = parsed.priorityPart ? parsed.priority : priority;
 	const finalProject = parsed.project || project;
-	const finalDueDate = parsed.dueDate
+	const finalRecurrence = normalizeRecurrenceRule(parsed.recurrence || (parsed.dueDate ? undefined : recurrence));
+	const finalDueDate = finalRecurrence ? undefined : parsed.dueDate
 		? serializeReminderDateValue(parsed.dueDate, parsed.hasTime)
 		: dueDate ?? undefined;
-	const finalHasTime = parsed.dueDate ? (parsed.hasTime ?? false) : (hasTime ?? false);
-	const finalRecurrence = normalizeRecurrenceRule(parsed.recurrence || recurrence);
+	const finalHasTime = finalRecurrence ? false : parsed.dueDate ? (parsed.hasTime ?? false) : (hasTime ?? false);
 	const storedDates = buildStoredReminderDates(
 		parseReminderDateValue(finalDueDate, finalHasTime),
 		finalHasTime,

@@ -1,5 +1,5 @@
 import { buildStoredReminderDates } from '@/reminders/utils/reminderDate';
-import { parseReminderContent } from '@/reminders/utils/reminderParser';
+import { parseReminderEditorContent } from '@/reminders/utils/reminderEditorParsing';
 import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import type { ModalDraft, ModalMode, ReminderMutationBody, StoredConfig } from './types';
 
@@ -19,11 +19,11 @@ export function buildReminderMutationBody({
 	const createDefaultProject = selectedProject ?? 'Inbox';
 	const projectOptions = ['Inbox', ...projects.filter((project) => project !== 'Inbox')];
 	const rawContent = draft.content.replace(/\s+/g, ' ').trim();
-	const parsed = parseReminderContent(rawContent, projectOptions);
+	const parsed = parseReminderEditorContent(rawContent, projectOptions);
 	const project = parsed.project || draft.project.trim() || createDefaultProject;
 	const priority: 1 | 4 = parsed.priorityPart ? parsed.priority : draft.priority === 1 ? 1 : 4;
 	const content = (parsed.cleanContent || rawContent).replace(/\s+/g, ' ').trim();
-	const recurrence = normalizeRecurrenceRule(parsed.recurrence || draft.recurrence);
+	const recurrence = normalizeRecurrenceRule(parsed.recurrence || (parsed.dueDate ? undefined : draft.recurrence));
 	let dueDate: string | null = null;
 	let dueDatetime: string | null = null;
 

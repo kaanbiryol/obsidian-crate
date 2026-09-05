@@ -89,25 +89,6 @@
 	box-shadow: var(--shadow-l);
 }
 
-.crate-activity-modal {
-	width: min(560px, calc(100vw - 40px));
-	max-width: 560px;
-	padding: 0;
-	overflow: hidden;
-
-	.modal-close-button {
-		display: none !important;
-	}
-
-	.modal-content {
-		padding: 0;
-	}
-}
-
-.crate-activity-modal-container .modal-close-button {
-	display: none !important;
-}
-
 .crate-confirmation-modal {
 	max-width: 520px;
 }
