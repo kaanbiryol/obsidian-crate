@@ -1,12 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
+async function readPluginThemeStyles() {
+  const paths = ['../../styles/plugin-ui/_theme.scss', '../../ui/shared/styles/_tokens.scss'];
+  return (await Promise.all(paths.map(path => readFile(new URL(path, import.meta.url), 'utf8')))).join('\n');
+}
+
 describe('plugin reminder layout styles', () => {
   it('maps custom surfaces and geometry to Obsidian theme tokens', async () => {
-    const themeStyles = await readFile(
-      new URL('../../styles/plugin-ui/_theme.scss', import.meta.url),
-      'utf8',
-    );
+    const themeStyles = await readPluginThemeStyles();
     const modalStyles = await readFile(
       new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
       'utf8',
@@ -66,10 +68,7 @@ describe('plugin reminder layout styles', () => {
       new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
       'utf8',
     );
-    const themeStyles = await readFile(
-      new URL('../../styles/plugin-ui/_theme.scss', import.meta.url),
-      'utf8',
-    );
+    const themeStyles = await readPluginThemeStyles();
     const editorHeader = styles.match(/\.reminder-modal-header \{([\s\S]*?)\n\}/)?.[1];
     const headerSide = styles.match(/\.reminder-modal-header-side \{([\s\S]*?)\n\}/)?.[1];
     const headerCopy = styles.match(/\.reminder-modal-header-copy \{([\s\S]*?)\n\}/)?.[1];
@@ -104,10 +103,7 @@ describe('plugin reminder layout styles', () => {
       new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
       'utf8',
     );
-    const themeStyles = await readFile(
-      new URL('../../styles/plugin-ui/_theme.scss', import.meta.url),
-      'utf8',
-    );
+    const themeStyles = await readPluginThemeStyles();
     const deleteButton = styles.match(
       /\.reminder-header-delete \{([\s\S]*?)\n\}/,
     )?.[1];
@@ -296,10 +292,7 @@ describe('plugin reminder layout styles', () => {
       new URL('../../styles/plugin-ui/_modal.scss', import.meta.url),
       'utf8',
     );
-    const themeStyles = await readFile(
-      new URL('../../styles/plugin-ui/_theme.scss', import.meta.url),
-      'utf8',
-    );
+    const themeStyles = await readPluginThemeStyles();
     const content = styles.match(/^\.picker-content \{([\s\S]*?)^\}/m)?.[1];
     const sectionHeading = styles.match(/^\.picker-section-heading \{([\s\S]*?)^\}/m)?.[1];
     const controlRow = styles.match(/^\.picker-control-row \{([\s\S]*?)^\}/m)?.[1];
@@ -435,10 +428,7 @@ describe('plugin reminder layout styles', () => {
       new URL('../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
       'utf8',
     );
-    const themeStyles = await readFile(
-      new URL('../../styles/plugin-ui/_theme.scss', import.meta.url),
-      'utf8',
-    );
+    const themeStyles = await readPluginThemeStyles();
     const actionChips = styles.match(
       /^\.reminder-action-chips \{([\s\S]*?)^\}/m,
     )?.[1];

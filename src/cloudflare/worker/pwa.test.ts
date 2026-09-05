@@ -99,7 +99,7 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('height=device-height');
 	});
 
-	it('uses a restrained violet for every PWA interaction accent', () => {
+	it('uses shared selection tokens and a violet action accent', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('--interactive-accent:#8b5cf6;');
@@ -109,7 +109,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--accent-strong:#8b5cf6;');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-button {');
 		expect(html).toContain('color: var(--crate-tab-active-color, var(--interactive-accent));');
-		expect(html).toContain('--crate-tab-active-color:#bda7ff;');
+		expect(html).toContain('--crate-tab-active-color: var(--crate-selection-color);');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-content{width:100%;height:100%;justify-content:center}');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-icon {');
 		expect(html).toContain('contain: paint;');
@@ -117,7 +117,7 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('.pwa-reminders-view .bottom-tab-button.is-active svg{');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-label {');
 		expect(html).toContain('.crate-reminders-ui .reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail) .reminders-fab {');
-		expect(html).toContain('--crate-fab-bg:#8057e6;');
+		expect(html).toContain('--crate-fab-bg: var(--crate-accent);');
 		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;border-radius:50%;');
 		expect(html).toContain('.pwa-editor-icon-button{width:44px;height:44px;min-width:44px;border-radius:50%;');
 		expect(html).toContain('.pwa-picker-icon-button{width:44px;height:44px;min-width:44px;border-radius:50%;');
@@ -218,13 +218,13 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--text-warning:#92400e;');
 		expect(html).toContain('--text-success:#166534;');
 		expect(html).toContain('--interactive-accent:#6d28d9;');
-		expect(html).toContain('--crate-tab-active-color:var(--pwa-light-accent-text);');
+		expect(html).toContain('--crate-reminder-card-bg: var(--crate-panel-bg);');
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar,.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:var(--pwa-tabbar-surface);');
 		expect(html).toContain('.pwa-modal-sheet{color:var(--text-normal);color-scheme:light}');
 		expect(html).toContain('.pwa-editor-card{background:var(--pwa-light-surface-soft);border-color:var(--pwa-light-border)}');
 		expect(html).toContain('.pwa-project-option,.pwa-project-picker-sheet .pwa-project-list,.pwa-schedule-preset-grid,.pwa-schedule-fields,.pwa-repeat-frequency-grid,.pwa-repeat-control-card,.pwa-repeat-time-card,.pwa-repeat-days,.settings-group{background:var(--pwa-light-surface-soft);');
 		expect(html).toContain('.pwa-schedule-field input,.pwa-repeat-time-card input{color-scheme:light}');
-		expect(html).toContain('.premium-reminder-card.is-completed .premium-reminder-content{opacity:.74}');
+		expect(html).toContain('.crate-reminders-ui .premium-reminder-card.is-completed .premium-reminder-content {\n  opacity: 0.6;');
 		expect(html).toContain('.settings-theme-option.is-active{background:var(--pwa-light-surface);color:var(--pwa-light-accent-text);');
 	});
 
@@ -296,10 +296,10 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui .reorderable-reminder-item[data-reorder-interaction=long-press] {');
 		expect(html).toContain('.crate-reminders-ui .reorderable-reminder-item[data-reorder-interaction=long-press].is-reordering .premium-reminder-content');
 		expect(html).toContain('.crate-reminders-ui .reminders-view:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail) [data-reminder-section=completed] {');
-		expect(html).toContain('--crate-reminder-card-hover-shadow:none;');
+		expect(html).toContain('--crate-reminder-card-hover-shadow: none;');
 		expect(html).not.toContain('transform:scale(1.025)');
 		expect(html).toContain('.crate-reminders-ui .premium-checkbox {');
-		expect(html).toContain('--crate-checkbox-checked-shadow:0 0 6px rgba(34,197,94,.35);');
+		expect(html).toContain('box-shadow: var(--crate-checkbox-checked-shadow, none);');
 		expect(html).toContain('.pwa-reminders-view .premium-checkbox.is-completing .premium-checkbox-visual{animation:pwa-completion-check 360ms cubic-bezier(.16,1,.3,1)}');
 		expect(html).toContain('@keyframes pwa-completion-check{0%{transform:scale(.92)}55%{transform:scale(1.14)}100%{transform:scale(1)}}');
 		expect(html).toContain('--reminders-fab-gap:16px;--reminders-fab-size:44px;');

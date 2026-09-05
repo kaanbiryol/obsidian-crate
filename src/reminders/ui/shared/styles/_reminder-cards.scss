@@ -5,6 +5,10 @@
 @mixin styles {
 
 .premium-reminder-card {
+    --crate-card-project-bg: var(--tag-background, var(--background-primary-alt));
+    --crate-card-project-text: var(--text-muted);
+    --crate-card-project-border: var(--background-modifier-border);
+
     position: relative;
     margin-bottom: 10px;
 }
@@ -18,21 +22,25 @@
     border-radius: var(--crate-radius-card);
     cursor: pointer;
 
-    background: var(--crate-surface-bg);
-    border: 1px solid var(--crate-surface-border);
-    box-shadow: var(--crate-elevation-card);
+    background: var(--crate-reminder-card-bg);
+    border: 1px solid var(--crate-reminder-card-border);
+    box-shadow: var(--crate-reminder-card-shadow);
 
     transition: background var(--crate-motion-duration-moderate) var(--crate-motion-easing), border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .premium-reminder-card:hover .premium-reminder-content {
-    background: var(--crate-surface-hover-bg);
-    border-color: var(--crate-surface-border-hover);
+    background: var(--crate-reminder-card-hover-bg);
+    border-color: var(--crate-reminder-card-hover-border);
+}
+
+.premium-reminder-card:active .premium-reminder-content {
+    background: var(--crate-reminder-card-active-bg);
+    border-color: var(--crate-reminder-card-active-border);
 }
 
 .premium-reminder-card.is-completed .premium-reminder-content {
     opacity: 0.6;
-    background: var(--crate-surface-bg);
 }
 
 .reorderable-reminder-list {
@@ -127,7 +135,11 @@
     }
 
     &.is-important:not(.is-checked) .premium-checkbox-visual {
-        border-color: var(--text-error);
+        border-color: var(--checkbox-border-color, var(--background-modifier-border-hover));
+    }
+
+    &.is-important:not(.is-checked):hover .premium-checkbox-visual {
+        border-color: var(--checkbox-border-color-hover, var(--text-muted));
     }
 }
 
@@ -135,7 +147,7 @@
     flex: 0 0 var(--premium-checkbox-size);
     width: var(--premium-checkbox-size);
     height: var(--premium-checkbox-size);
-    border-radius: var(--checkbox-radius, var(--radius-s));
+    border-radius: 50%;
     border: var(--premium-checkbox-border-width) solid var(--checkbox-border-color, var(--background-modifier-border-hover));
     display: flex;
     align-items: center;
@@ -171,7 +183,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .premium-reminder-title-row {
@@ -187,7 +199,7 @@
     display: -webkit-box;
     font-size: var(--reminder-font-base);
     font-weight: var(--reminder-font-weight-medium);
-    line-height: 1.5;
+    line-height: 1.4;
     color: var(--text-normal);
     position: relative;
     transition: color var(--crate-motion-duration-moderate) var(--crate-motion-easing);
@@ -208,7 +220,7 @@
 .premium-reminder-description {
     font-size: var(--reminder-font-xs);
     color: var(--text-muted);
-    margin-top: 2px;
+    margin-top: 0;
     line-height: 1.4;
     overflow: hidden;
     display: -webkit-box;
@@ -268,24 +280,32 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 10px 4px 8px;
+    max-width: 100%;
+    min-height: 20px;
+    padding: 2px 6px;
     border-radius: var(--tag-radius, var(--radius-s));
     font-size: var(--reminder-font-xxs);
-    font-weight: var(--reminder-font-weight-medium);
-    line-height: 1;
+    font-weight: var(--reminder-font-weight-normal);
+    line-height: 1.3;
 
-    // Default glass pill style
-    background: var(--crate-surface-bg);
-    border: 1px solid var(--crate-surface-border);
+    // Neutral metadata; project identity is carried by its icon.
+    background: var(--tag-background, var(--background-primary-alt));
+    border: 1px solid var(--background-modifier-border);
     color: var(--text-muted);
 
     svg {
+        flex-shrink: 0;
         opacity: 0.7;
     }
 
+    > span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
     &.is-overdue {
-        border-color: color-mix(in srgb, var(--text-error) 20%, transparent);
-        background: color-mix(in srgb, var(--text-error) 12%, transparent);
+        border-color: color-mix(in srgb, var(--text-error) 12%, transparent);
+        background: color-mix(in srgb, var(--text-error) 5%, transparent);
         color: var(--text-error);
 
         svg {
@@ -295,7 +315,6 @@
 }
 
 .premium-pill-project {
-    padding-left: 5px;
     gap: 3px;
 
     svg {

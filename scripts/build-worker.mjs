@@ -1,9 +1,9 @@
 import { build } from 'esbuild';
-import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { basename, resolve, dirname, relative } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { basename, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rawTextPlugin } from './raw-text-plugin.mjs';
+import { createPwaAssetVersion } from './pwa-asset-version.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
@@ -13,29 +13,6 @@ const generatedDir = resolve(root, '.generated/cloudflare');
 // changing the Worker bundle and prompting users to redeploy their server.
 const serverVersion = 'crate';
 const PWA_VERSION_PLACEHOLDER = 'crate-pwa-version-placeholder';
-
-function listFiles(directory) {
-	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-		const path = resolve(directory, entry.name);
-		return entry.isDirectory() ? listFiles(path) : [path];
-	});
-}
-
-function createPwaAssetVersion(clientAssets) {
-	const hash = createHash('sha256');
-	for (const [name, source] of Object.entries(clientAssets).sort(([left], [right]) => left.localeCompare(right))) {
-		hash.update(name);
-		hash.update(source);
-	}
-	const pwaSourceRoot = resolve(root, 'src/cloudflare/worker/pwa');
-
-	for (const path of listFiles(pwaSourceRoot).sort()) {
-		hash.update(relative(root, path));
-		hash.update(readFileSync(path));
-	}
-
-	return hash.digest('hex').slice(0, 16);
-}
 
 function writeGeneratedJson(fileName, payload) {
 	mkdirSync(generatedDir, { recursive: true });
@@ -105,7 +82,7 @@ async function bundlePwaClient(assetVersion) {
 
 async function buildPwaClientBundle() {
 	const versionTemplate = await bundlePwaClient(PWA_VERSION_PLACEHOLDER);
-	const version = createPwaAssetVersion(versionTemplate);
+	const version = createPwaAssetVersion(versionTemplate, root);
 	const assets = await bundlePwaClient(version);
 	const script = assets['app.js'];
 	if (!script) throw new Error('PWA client build did not emit app.js');
