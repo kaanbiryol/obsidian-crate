@@ -19,6 +19,7 @@ import type { ProjectColorScheme } from "@/reminders/utils/projectColors";
 interface RemindersViewPanelsProps {
   viewMode: ViewMode;
   selectedProject: string | null;
+  hideProjectTitle?: boolean;
   isInitialLoadComplete: boolean;
   reminders: Reminder[];
   projects: string[];
@@ -42,6 +43,7 @@ interface RemindersViewPanelsProps {
 export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
   viewMode,
   selectedProject,
+  hideProjectTitle = false,
   isInitialLoadComplete,
   reminders,
   projects,
@@ -126,6 +128,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
         <motion.div key={`project-${selectedProject}`} className="reminders-view-panel" {...pageTransition}>
           <ProjectDetailView
             project={selectedProject}
+            hideTitle={hideProjectTitle}
             reminders={reminders}
             onBack={onBackToProjects}
             animationConfig={{ enabled: animationsEnabled }}

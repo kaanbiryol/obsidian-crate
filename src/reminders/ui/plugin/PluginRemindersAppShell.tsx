@@ -45,6 +45,7 @@ interface PluginRemindersAppShellProps {
   loadingContent?: React.ReactNode;
   loadingTransition?: boolean;
   headerRightContent?: React.ReactNode;
+  renderHeader?: (title: string) => React.ReactNode;
   belowHeaderContent?: React.ReactNode;
   topOverlay?: React.ReactNode;
   children?: React.ReactNode;
@@ -73,6 +74,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
   loadingContent,
   loadingTransition = false,
   headerRightContent,
+  renderHeader,
   belowHeaderContent,
   topOverlay,
   children,
@@ -194,6 +196,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
       <RemindersViewPanels
         viewMode={viewMode}
         selectedProject={selectedProject}
+        hideProjectTitle={Boolean(renderHeader)}
         isInitialLoadComplete={isInitialLoadComplete}
         reminders={reminders}
         projects={projects}
@@ -231,10 +234,11 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
           className,
         ].filter(Boolean).join(" ")}
       >
+        {renderHeader?.(selectedProject ?? currentHeader.title)}
         {topOverlay}
 
         <AnimatePresence initial={false}>
-          {!(viewMode === "browse" && selectedProject) && (
+          {!renderHeader && !(viewMode === "browse" && selectedProject) && (
             <motion.div
               key="view-header"
               initial={prefersReducedMotion ? false : { opacity: 0, height: 0 }}

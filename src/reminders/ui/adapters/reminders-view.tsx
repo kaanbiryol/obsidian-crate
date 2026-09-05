@@ -99,17 +99,19 @@ interface RemindersViewContentProps {
     plugin: CratePlugin;
     shadowRoot: ShadowRoot;
     isFullScreen?: boolean;
+    isModal?: boolean;
     onClose?: () => void;
     initialTab?: TabId;
     initialProject?: string;
     hideTabBar?: boolean;
+    renderHeader?: (title: string) => React.ReactNode;
 }
 
-export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, shadowRoot, isFullScreen = false, onClose, initialTab, initialProject, hideTabBar = false }) => {
+export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, shadowRoot, isFullScreen = false, onClose, isModal = Boolean(onClose), initialTab, initialProject, hideTabBar = false, renderHeader }) => {
     const isDarkMode = useObsidianDarkMode();
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
-    useObsidianStatusBarInset(shadowRoot, !onClose);
+    useObsidianStatusBarInset(shadowRoot, !isModal);
 
     // Subscribe to index changes for automatic refresh (replaces 5-second polling)
     const { refreshToken, triggerRefresh } = useIndexRefresh();
@@ -157,11 +159,12 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
             isInitialLoadComplete={isInitialLoadComplete}
             isDarkMode={isDarkMode}
             isFullScreen={isFullScreen}
-            isModal={Boolean(onClose)}
+            isModal={isModal}
             isCompact={hideTabBar}
             initialTab={initialTab}
             initialProject={initialProject}
             hideTabBar={hideTabBar}
+            renderHeader={renderHeader}
             upcomingDays={plugin.remindersSettings.upcomingDaysDefault ?? 7}
             renderCard={renderCard}
             onAdd={handleAdd}

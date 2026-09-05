@@ -2,6 +2,7 @@ import { Modal } from "obsidian";
 import type CratePlugin from "@/main";
 import { PluginContext } from "../reminders-context";
 import { RemindersViewContent } from "./reminders-view";
+import { ProjectSheet } from "./ProjectSheet";
 import { hideNativeModalCloseButton } from "./modalShell";
 import { createShadowReactMount, type ShadowReactMount } from "./shadowReactMount";
 
@@ -88,14 +89,11 @@ class CompactReminderModal extends Modal {
     const close = () => this.close();
     shadowMount.render(
       <PluginContext.Provider value={this.plugin}>
-        <RemindersViewContent
+        <ProjectSheet
           plugin={this.plugin}
           shadowRoot={shadowMount.shadowRoot}
-          isFullScreen={true}
           onClose={close}
-          initialTab="browse"
           initialProject={this.initialProject}
-          hideTabBar
         />
       </PluginContext.Provider>,
     );

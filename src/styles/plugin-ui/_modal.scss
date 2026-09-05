@@ -27,6 +27,27 @@
   }
 }
 
+// Project content shares the sheet surface and header with reminder dialogs.
+.crate-project-sheet {
+  display: flex;
+  flex-direction: column;
+  height: min(700px, 85dvh);
+  min-height: 0;
+
+  &.is-centered {
+    width: min(500px, calc(100vw - 40px));
+    padding-bottom: 0;
+  }
+
+  .reminder-modal-header {
+    flex-shrink: 0;
+  }
+
+  .premium-back-button {
+    margin-top: 0;
+  }
+}
+
 .crate-reminder-editor-surface {
   width: min(560px, calc(100vw - 40px));
   max-width: 560px;
