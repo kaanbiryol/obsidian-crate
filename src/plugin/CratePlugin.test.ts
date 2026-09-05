@@ -25,6 +25,46 @@ describe('CratePlugin settings persistence', () => {
 		useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS }, true);
 	});
 
+	it.each([[true, false], [false, true], [false, false]])('unifies legacy debug settings (%s, %s) on load', async (syncDebugLogging, debugLogging) => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		Object.assign(plugin, {
+			app: { vault: { configDir: '.obsidian' } },
+			loadData: vi.fn(async () => ({ syncDebugLogging, reminders: { debugLogging } })),
+		});
+		await plugin.loadSettings();
+		expect(plugin.settings.syncDebugLogging).toBe(syncDebugLogging || debugLogging);
+		expect(plugin.remindersSettings.debugLogging).toBe(syncDebugLogging || debugLogging);
+	});
+
+	it.each([true, false])('saves both debug settings atomically when logging is %s', async enabled => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const saveData = vi.fn(async (_data: unknown) => {});
+		Object.assign(plugin, {
+			settings: normalizeCrateSettings({ syncDebugLogging: !enabled }, '.obsidian'),
+			saveData,
+		});
+		useRemindersSettingsStore.setState({ debugLogging: !enabled });
+		await plugin.setDebugLogging(enabled);
+		expect(saveData).toHaveBeenCalledTimes(1);
+		expect(saveData).toHaveBeenCalledWith(expect.objectContaining({
+			syncDebugLogging: enabled,
+			reminders: { ...DEFAULT_REMINDERS_SETTINGS, debugLogging: enabled },
+		}));
+		expect(plugin.settings.syncDebugLogging).toBe(enabled);
+		expect(plugin.remindersSettings.debugLogging).toBe(enabled);
+	});
+
+	it('leaves both debug settings unchanged if saving fails', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		Object.assign(plugin, {
+			settings: normalizeCrateSettings({}, '.obsidian'),
+			saveData: vi.fn().mockRejectedValue(new Error('disk full')),
+		});
+		await expect(plugin.setDebugLogging(true)).rejects.toThrow('disk full');
+		expect(plugin.settings.syncDebugLogging).toBe(false);
+		expect(plugin.remindersSettings.debugLogging).toBe(false);
+	});
+
 	it('loads core and reminder settings from one plugin data record', async () => {
 		const plugin = new CratePlugin({} as never, {} as never);
 		Object.assign(plugin, {

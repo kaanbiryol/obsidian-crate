@@ -41,13 +41,6 @@ export class CrateSettingTab extends PluginSettingTab {
 			rerender: () => this.update(),
 		});
 
-		if (isConfigured) {
-			this.cleanupFns.push(renderDevicesSection({
-				containerEl,
-				plugin: this.plugin,
-			}));
-		}
-
 		if (sections.showSync) {
 			const syncCleanup = renderSyncSection({
 				containerEl,
@@ -71,6 +64,13 @@ export class CrateSettingTab extends PluginSettingTab {
 				plugin: this.plugin,
 				rerender: () => this.update(),
 			});
+		}
+
+		if (isConfigured) {
+			this.cleanupFns.push(renderDevicesSection({
+				containerEl,
+				plugin: this.plugin,
+			}));
 		}
 
 		if (sections.showInfrastructure) {

@@ -23,13 +23,6 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 	}
 
 	if (isConfigured) {
-		new Setting(containerEl)
-			.setName('Server address')
-			.setDesc('The Cloudflare address this vault uses for sync.')
-			.addText(text => text
-				.setValue(plugin.settings.workerUrl)
-				.setDisabled(true));
-
 		const diagnosticsSetting = new Setting(containerEl)
 			.setName('Run diagnostics')
 			.setDesc('Check server compatibility, sign-in, health, and access to the synced file list.')
@@ -62,6 +55,13 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 						},
 					});
 				}));
+
+		new Setting(containerEl)
+			.setName('Server address')
+			.setDesc('The Cloudflare address this vault uses for sync.')
+			.addText(text => text
+				.setValue(plugin.settings.workerUrl)
+				.setDisabled(true));
 
 		new Setting(containerEl)
 			.setName('Manage server')

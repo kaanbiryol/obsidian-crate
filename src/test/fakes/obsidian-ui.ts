@@ -219,6 +219,8 @@ export class MockTextComponent {
 }
 
 export class MockToggleComponent {
+	disabled = false;
+	setDisabled(value: boolean): this { this.disabled = value; return this; }
 	private changeHandler?: (value: boolean) => unknown;
 	value = false;
 

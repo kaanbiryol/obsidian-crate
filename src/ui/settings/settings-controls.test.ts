@@ -19,6 +19,25 @@ afterEach(() => {
 });
 
 describe('settings controls', () => {
+	it('provides one debug toggle for both logging systems', async () => {
+		const { renderTroubleshootingSettings } = await import('./troubleshooting-section');
+		const plugin = {
+			settings: { deviceId: 'device-test', syncDebugLogging: false },
+			setDebugLogging: vi.fn(async (enabled: boolean) => { plugin.settings.syncDebugLogging = enabled; }),
+		};
+		renderTroubleshootingSettings(new FakeElement('div') as never, plugin as never);
+		const loggingSettings = MockSetting.instances.filter(setting => setting.toggles.length);
+		expect(loggingSettings).toHaveLength(1);
+		expect(loggingSettings[0]!.nameEl.textContent).toBe('Debug logging');
+		const toggle = loggingSettings[0]!.toggles[0]!;
+		toggle.change(true);
+		expect(toggle.disabled).toBe(true);
+		await flush();
+		expect(plugin.setDebugLogging).toHaveBeenCalledWith(true);
+		expect(toggle.value).toBe(true);
+		expect(toggle.disabled).toBe(false);
+	});
+
 	it('keeps custom intervals and does not save when Custom is selected', async () => {
 		const { renderSyncInterval } = await import('./sync-interval');
 		let interval = 120;
