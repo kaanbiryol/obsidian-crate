@@ -4,7 +4,6 @@
 .pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.66);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .pwa-modal-sheet__container{right:0;margin:0 auto;overflow:hidden;background:var(--pwa-sheet-surface);border:1px solid rgba(255,255,255,.07);border-bottom:0;border-radius:20px 20px 0 0;box-shadow:0 -1px 0 rgba(255,255,255,.025),0 -24px 70px rgba(0,0,0,.28);backface-visibility:hidden;will-change:transform}
 .pwa-modal-sheet__container--reminder{width:min(1120px,calc(100vw - 36px))!important;height:calc(100% - env(safe-area-inset-top) - 28px)!important;max-height:calc(100% - env(safe-area-inset-top) - 28px)!important;background:transparent;border:0;box-shadow:none}
-.pwa-modal-sheet.is-keyboard-open .pwa-modal-sheet__container--reminder::after{content:"";position:absolute;right:0;bottom:0;left:0;height:var(--pwa-keyboard-inset,0px);background:var(--pwa-sheet-surface);pointer-events:none}
 .pwa-modal-sheet__container--settings{width:min(520px,calc(100vw - 36px))!important;max-height:calc(100% - env(safe-area-inset-top) - 28px)!important}
 .pwa-modal-sheet__content,.pwa-modal-sheet__scroller{height:100%;min-height:0;overflow:hidden!important}
 .pwa-modal-sheet__scroller{display:flex;flex-direction:column}
