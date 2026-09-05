@@ -123,6 +123,18 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 				await persistSettings({ syncOnResume: value });
 			}));
 
+	new Setting(containerEl)
+		.setName('Sync delay after editing (seconds)')
+		.setDesc('Wait this many seconds after a file changes before syncing. Set to 0 to sync immediately.')
+		.addText(text => {
+			text.setValue(String(plugin.settings.debounceDelay));
+			const maximum = Math.floor(2_147_483_647 / 1000);
+			configureIntegerInput(text, 0, maximum);
+			bindCommittedText(text, () => String(plugin.settings.debounceDelay), async value => {
+				if (await persistSettings({ debounceDelay: Number(value) })) plugin.syncRuntime.updateSyncSettings();
+			}, value => parseSettingInteger(value, 0, maximum) !== null);
+		});
+
 	renderSyncInterval(containerEl, () => plugin.settings.syncInterval, async syncInterval => {
 		if (await persistSettings({ syncInterval })) plugin.syncRuntime.updateSyncSettings();
 	});
@@ -141,18 +153,6 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 					plugin.syncRuntime.updateStatusBar(value);
 				}
 			}));
-
-	new Setting(containerEl)
-		.setName('Sync delay after editing (seconds)')
-		.setDesc('Wait this many seconds after a file changes before syncing. Set to 0 to sync immediately.')
-		.addText(text => {
-			text.setValue(String(plugin.settings.debounceDelay));
-			const maximum = Math.floor(2_147_483_647 / 1000);
-			configureIntegerInput(text, 0, maximum);
-			bindCommittedText(text, () => String(plugin.settings.debounceDelay), async value => {
-				if (await persistSettings({ debounceDelay: Number(value) })) plugin.syncRuntime.updateSyncSettings();
-			}, value => parseSettingInteger(value, 0, maximum) !== null);
-		});
 
 	return cleanup;
 }

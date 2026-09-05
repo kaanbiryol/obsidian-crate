@@ -113,7 +113,7 @@ function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, api
 	let listContainer: HTMLElement | null = null;
 
 	new Setting(devicesContainer)
-		.setName('Enabled devices')
+		.setName('Notification devices')
 		.setDesc('Phones and browsers set up to receive reminder push notifications.')
 		.addButton(button => {
 			button.setButtonText('Refresh');

@@ -31,7 +31,6 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 	};
 
 	createSettingsSectionHeading(containerEl, 'Reminders');
-	renderRemindersWebApp(containerEl, plugin);
 	let folderSuggest: RemindersFolderSuggest;
 
 	new Setting(containerEl)
@@ -91,6 +90,7 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 						}
 					});
 			});
+		renderRemindersWebApp(containerEl, plugin);
 		return () => folderSuggest.close();
 	}
 
@@ -107,6 +107,17 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 						taskCreationDefaultDueDate: value as DueDateDefaultSetting,
 					});
 				});
+		});
+
+	new Setting(containerEl)
+		.setName('Upcoming range (days)')
+		.setDesc('How many days ahead to show in the upcoming view.')
+		.addText(text => {
+			text.setValue(String(settings.upcomingDaysDefault));
+			configureIntegerInput(text, 1);
+			bindCommittedText(text, () => String(plugin.remindersSettings.upcomingDaysDefault),
+				value => persistSettings({ upcomingDaysDefault: Number(value) }),
+				value => parseSettingInteger(value, 1) !== null);
 		});
 
 	new Setting(containerEl)
@@ -134,16 +145,6 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 				});
 		});
 
-	new Setting(containerEl)
-		.setName('Upcoming range (days)')
-		.setDesc('How many days ahead to show in the upcoming view.')
-		.addText(text => {
-			text.setValue(String(settings.upcomingDaysDefault));
-			configureIntegerInput(text, 1);
-			bindCommittedText(text, () => String(plugin.remindersSettings.upcomingDaysDefault),
-				value => persistSettings({ upcomingDaysDefault: Number(value) }),
-				value => parseSettingInteger(value, 1) !== null);
-		});
-
+	renderRemindersWebApp(containerEl, plugin);
 	return () => folderSuggest.close();
 }

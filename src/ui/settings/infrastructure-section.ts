@@ -8,7 +8,7 @@ import { Setting } from 'obsidian';
 
 export function renderInfrastructureSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin } = context;
-	createSettingsSectionHeading(containerEl, 'Advanced');
+	createSettingsSectionHeading(containerEl, 'Recovery and troubleshooting');
 	new Setting(containerEl)
 		.setName('Restore remote file')
 		.setDesc('Restore a server copy of a file replaced or deleted in the last 30 days.')
@@ -16,10 +16,10 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 			.setButtonText('View retained files')
 			.onClick(() => openRemoteRecoveryModal(plugin.app, plugin.syncRuntime)));
 
-	const troubleshootingEl = createSettingsDisclosure(containerEl, 'Troubleshooting');
-	renderTroubleshootingSettings(troubleshootingEl, plugin);
-	renderInfrastructureManagementSection({ ...context, containerEl: troubleshootingEl });
 	const recoveryEl = createSettingsDisclosure(containerEl, 'Recovery tools');
 	renderInfrastructureSyncActions({ ...context, containerEl: recoveryEl });
+	const troubleshootingEl = createSettingsDisclosure(containerEl, 'Troubleshooting');
+	renderInfrastructureManagementSection({ ...context, containerEl: troubleshootingEl });
+	renderTroubleshootingSettings(troubleshootingEl, plugin);
 }
 export type { InfrastructureSectionContext } from './infrastructure-types';

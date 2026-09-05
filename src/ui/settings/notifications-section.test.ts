@@ -87,7 +87,7 @@ describe('renderNotificationsSection', () => {
 
 		expect(getSettingByName('Enable push notifications')).toBeTruthy();
 		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Reminders web app')).toBe(false);
-		expect(getSettingByName('Enabled devices').descEl.textContent).toContain('receive reminder push notifications');
+		expect(getSettingByName('Notification devices').descEl.textContent).toContain('receive reminder push notifications');
 		expect(getSettingByName('iPhone').descEl.textContent).toContain('Subscribed');
 		expect(getSettingByName('Test notification').descEl.textContent).toBe('Send a test notification to all enabled devices.');
 	});
