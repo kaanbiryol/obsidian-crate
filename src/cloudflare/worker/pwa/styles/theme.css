@@ -1,34 +1,32 @@
 :root{
+	/* Standalone host defaults for the shared UI token contract. */
+	--font-ui-medium:14px;
+	--font-ui-small:13px;
+	--font-ui-smaller:12px;
+	--font-smallest:11px;
+	--font-ui-large:20px;
+	--font-text:var(--font-interface);
+	--radius-s:4px;
+	--radius-m:10px;
+	--radius-l:12px;
+	--input-radius:4px;
+	--input-height:36px;
+	--font-semibold:600;
+	--tag-background:var(--background-primary-alt);
+	--checkbox-size:18px;
+	--checkbox-border-color:var(--background-modifier-border-hover);
+	--checkbox-border-color-hover:var(--text-muted);
+	--checkbox-color:var(--interactive-accent);
+	--checkbox-color-hover:var(--interactive-accent-hover);
+	--checkbox-marker-color:var(--text-on-accent);
 	--pwa-launch-bg:#0b0b0d;
 	--pwa-tabbar-surface:rgba(13,13,15,.9);
-	--reminder-font-weight-normal:400;
-	--reminder-font-weight-medium:500;
-	--reminder-font-weight-semibold:600;
 	--pwa-safe-area-top-floor:0px;
 	--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px));
 	--pwa-safe-area-bottom-floor:0px;
 	--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px));
 	--crate-primary-header-padding:calc(var(--pwa-safe-area-top) + 14px) 16px 10px;
-	--crate-reminder-card-bg:rgba(255,255,255,.018);
-	--crate-reminder-card-border:rgba(255,255,255,.055);
-	--crate-reminder-card-shadow:none;
-	--crate-reminder-card-hover-bg:rgba(255,255,255,.035);
-	--crate-reminder-card-hover-border:rgba(255,255,255,.085);
-	--crate-reminder-card-hover-shadow:none;
-	--crate-reminder-card-active-bg:rgba(255,255,255,.04);
-	--crate-reminder-card-active-border:rgba(255,255,255,.095);
-	--crate-reminder-card-active-transform:scale(.99);
-	--crate-checkbox-checked-shadow:0 0 6px rgba(34,197,94,.35);
-	--crate-project-card-bg:var(--crate-reminder-card-bg);
-	--crate-project-card-border:var(--crate-reminder-card-border);
-	--crate-project-card-shadow:none;
-	--crate-project-card-hover-bg:var(--crate-reminder-card-hover-bg);
-	--crate-project-card-hover-border:var(--crate-reminder-card-hover-border);
 	--crate-project-accent-hover-shadow:none;
-	--crate-tab-active-color:#bda7ff;
-	--crate-fab-bg:#8057e6;
-	--crate-fab-border:rgba(255,255,255,.1);
-	--crate-fab-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 10px 24px rgba(var(--accent-rgb),.2);
 	color-scheme:dark;
 }
 @media (display-mode:standalone) and (orientation:portrait) and (max-width:600px){:root{--pwa-safe-area-top-floor:59px;--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px),var(--pwa-safe-area-top-floor));--pwa-safe-area-bottom-floor:34px;--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px),var(--pwa-safe-area-bottom-floor))}}

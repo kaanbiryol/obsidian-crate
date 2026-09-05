@@ -25,6 +25,7 @@
 	--background-modifier-cover:rgba(24,24,27,.28);
 	--background-modifier-box-shadow:rgba(24,24,27,.12);
 	--text-normal:#18181b;
+	--checkbox-border-color:rgba(24,24,27,.28);
 	--text-error:#b42318;
 	--text-warning:#92400e;
 	--text-success:#166534;
@@ -46,22 +47,6 @@
 	--pwa-light-success-text:#166534;
 	--pwa-light-placeholder:#6c6c75;
 	--pwa-tabbar-surface:rgba(247,247,248,.92);
-	--crate-reminder-card-bg:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.62));
-	--crate-reminder-card-border:var(--background-modifier-border);
-	--crate-reminder-card-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 8px 24px rgba(24,24,27,.045);
-	--crate-reminder-card-hover-bg:rgba(255,255,255,.96);
-	--crate-reminder-card-hover-border:var(--background-modifier-border-hover);
-	--crate-reminder-card-active-bg:#fff;
-	--crate-reminder-card-active-border:var(--background-modifier-border-hover);
-	--crate-project-card-bg:var(--crate-reminder-card-bg);
-	--crate-project-card-border:var(--crate-reminder-card-border);
-	--crate-project-card-shadow:var(--crate-reminder-card-shadow);
-	--crate-project-card-hover-bg:var(--crate-reminder-card-hover-bg);
-	--crate-project-card-hover-border:var(--crate-reminder-card-hover-border);
-	--crate-tab-active-color:var(--pwa-light-accent-text);
-	--crate-fab-bg:#6d28d9;
-	--crate-fab-border:rgba(255,255,255,.45);
-	--crate-fab-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 10px 24px rgba(var(--accent-rgb),.22);
 	--shadow:0 18px 48px rgba(24,24,27,.12);
 	--shadow-s:0 2px 8px rgba(24,24,27,.08);
 	--shadow-l:0 25px 50px -12px rgba(24,24,27,.18);
@@ -71,7 +56,6 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 #app{background:radial-gradient(circle at 84% -10%,rgba(var(--accent-rgb),.055),transparent 33%),var(--background-primary)}
 .reminders-shadow-root{background:var(--background-primary);color:var(--text-normal)}
 .pwa-reminders-view .bottom-tab-bar,.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:var(--pwa-tabbar-surface);border-color:var(--background-modifier-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
-.crate-reminders-ui .pwa-reminders-view .premium-checkbox-visual{background:transparent;border-color:rgba(24,24,27,.28);color:white}
 .secondary-button,.pwa-header-settings-button,.pwa-header-sync-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
 .pwa-header-settings-button:hover,.pwa-header-settings-button.is-active,.pwa-header-sync-button:hover{background:var(--pwa-light-surface-hover);border-color:var(--pwa-light-border-strong);color:var(--text-normal)}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-sync-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
@@ -106,9 +90,6 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .pwa-project-picker-sheet .pwa-project-option+.pwa-project-option,.pwa-schedule-preset:nth-child(even),.pwa-schedule-preset:nth-child(n+3),.pwa-schedule-field+.pwa-schedule-field,.pwa-repeat-frequency+.pwa-repeat-frequency,.settings-row+.settings-row{border-color:var(--pwa-light-border)}
 .pwa-schedule-field input,.pwa-repeat-time-card input,.pwa-repeat-stepper__button{background:var(--pwa-light-surface);border-color:var(--pwa-light-border);color:var(--text-normal)}
 .pwa-schedule-field input,.pwa-repeat-time-card input{color-scheme:light}
-.premium-project-content,.premium-back-button{background:var(--crate-project-card-bg);border-color:var(--crate-project-card-border);box-shadow:var(--crate-project-card-shadow)}
-.premium-project-card:hover .premium-project-content,.premium-back-button:hover{background:var(--crate-project-card-hover-bg);border-color:var(--crate-project-card-hover-border)}
-.premium-reminder-card.is-completed .premium-reminder-content{opacity:.74}
 .crate-progress-meter{background:var(--background-modifier-border)}
 .premium-project-chevron{opacity:.65}
 .premium-project-stat-done,.premium-project-stat-complete,.project-detail-stat-done,.settings-status.is-success{color:var(--pwa-light-success-text)}
