@@ -361,7 +361,7 @@ describe('plugin reminder layout styles', () => {
     expect(headerTitle).toContain('font-size: var(--reminder-font-base)');
     expect(headerTitle).toContain('font-weight: var(--reminder-font-weight-medium)');
     expect(titleInput).toContain('font-size: var(--reminder-font-editor-title)');
-    expect(titleInput).toContain('font-weight: var(--reminder-font-weight-semibold)');
+    expect(titleInput).toContain('font-weight: var(--reminder-font-weight-medium)');
   });
 
   it('shows the reminder title placeholder when the rich text field is empty', async () => {
@@ -420,11 +420,13 @@ describe('plugin reminder layout styles', () => {
     expect(projectChip).toContain(
       'color: var(--reminder-project-color, var(--crate-accent-text))',
     );
-    expect(priorityChip).toContain('width: 1.2em');
-    expect(priorityChip).toContain('display: inline-block');
-    expect(priorityChip).toContain('border: 0');
+    expect(priorityChip).toContain('padding: 0.05em 0.4em');
+    expect(priorityChip).not.toMatch(/(?:display|width|font-size|font-weight):/);
     expect(priorityChip).toContain(
-      'background: color-mix(in srgb, var(--crate-danger) 7%, transparent)',
+      'border: 1px solid color-mix(in srgb, var(--crate-danger) 10%, transparent)',
+    );
+    expect(priorityChip).toContain(
+      'background: color-mix(in srgb, var(--crate-danger) 5%, transparent)',
     );
   });
 

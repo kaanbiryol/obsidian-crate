@@ -68,6 +68,10 @@
   flex-direction: column;
 }
 
+.reminder-picker > .reminder-modal-header {
+  flex-shrink: 0;
+}
+
 .reminder-picker-scroll {
   min-height: 0;
   flex: 1;

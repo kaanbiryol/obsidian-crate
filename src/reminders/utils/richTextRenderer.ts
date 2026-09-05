@@ -11,6 +11,10 @@ export interface RichTextChipParts {
 }
 
 export function getRichTextChipParts(type: string, text: string): RichTextChipParts {
+    if (type === 'priority') {
+        return { marker: text, label: '' };
+    }
+
     if (type === 'project' && text.startsWith('#')) {
         return { marker: '#', label: text.slice(1) };
     }

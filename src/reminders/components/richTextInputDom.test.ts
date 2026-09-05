@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   focusRichTextElement,
   isRichTextRenderingCurrent,
-  syncActiveProjectChip,
+  syncActiveRichTextChip,
 } from './richTextInputDom';
 
 function createClassList(initialClasses: string[] = []) {
@@ -62,11 +62,13 @@ describe('focusRichTextElement', () => {
   });
 });
 
-describe('syncActiveProjectChip', () => {
-  it('marks only the project chip containing the caret', () => {
+describe('syncActiveRichTextChip', () => {
+  it.each(['project', 'priority'])('marks only the %s chip containing the caret', (type) => {
     const chipClassList = createClassList();
     const projectChip = { classList: chipClassList };
-    const focusElement = { closest: () => projectChip };
+    const focusElement = {
+      closest: (selector: string) => selector.split(', ').includes(`.rich-text-chip-${type}`) ? projectChip : null,
+    };
     const projectTextNode = { nodeType: 3, parentElement: focusElement };
     let focusNode: object | null = projectTextNode;
     const editor = {
@@ -78,20 +80,20 @@ describe('syncActiveProjectChip', () => {
       querySelectorAll: () => [projectChip],
     } as unknown as HTMLDivElement;
 
-    syncActiveProjectChip(editor);
+    syncActiveRichTextChip(editor);
     expect(chipClassList.contains('is-cursor-active')).toBe(true);
 
     focusNode = null;
-    syncActiveProjectChip(editor);
+    syncActiveRichTextChip(editor);
     expect(chipClassList.contains('is-cursor-active')).toBe(false);
   });
 });
 
 describe('isRichTextRenderingCurrent', () => {
-  it('ignores the cursor-only class when comparing rendered content', () => {
+  it.each(['project', 'priority'])('ignores the %s cursor-only class when comparing rendered content', (type) => {
     const chipClassList = createClassList([
       'rich-text-chip',
-      'rich-text-chip-project',
+      `rich-text-chip-${type}`,
       'is-cursor-active',
     ]);
     const projectChip = { classList: chipClassList };
@@ -100,14 +102,14 @@ describe('isRichTextRenderingCurrent', () => {
         const activeClass = chipClassList.contains('is-cursor-active')
           ? ' is-cursor-active'
           : '';
-        return `<span class="rich-text-chip rich-text-chip-project${activeClass}">#Work</span>`;
+        return `<span class="rich-text-chip rich-text-chip-${type}${activeClass}">#Work</span>`;
       },
       querySelectorAll: () => [projectChip],
     } as unknown as HTMLDivElement;
 
     expect(isRichTextRenderingCurrent(
       editor,
-      '<span class="rich-text-chip rich-text-chip-project">#Work</span>',
+      `<span class="rich-text-chip rich-text-chip-${type}">#Work</span>`,
     )).toBe(true);
     expect(chipClassList.contains('is-cursor-active')).toBe(true);
   });

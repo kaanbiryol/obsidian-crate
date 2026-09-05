@@ -2,6 +2,7 @@ import { PickerNativeControl } from './PickerNativeControl';
 
 interface PickerTimeCardProps {
 	label: string;
+	detail?: string;
 	controlIcon?: string;
 	controlEmptyLabel?: string;
 	hour?: number;
@@ -10,7 +11,7 @@ interface PickerTimeCardProps {
 	onClear?: () => void;
 }
 
-export function PickerTimeCard({ label, controlIcon, controlEmptyLabel, hour, minute, onChange, onClear }: PickerTimeCardProps) {
+export function PickerTimeCard({ label, detail, controlIcon, controlEmptyLabel, hour, minute, onChange, onClear }: PickerTimeCardProps) {
 	const value = hour === undefined || minute === undefined
 		? ''
 		: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
@@ -39,6 +40,7 @@ export function PickerTimeCard({ label, controlIcon, controlEmptyLabel, hour, mi
 	return (
 		<PickerFieldRow
 			label={label}
+			detail={detail}
 			className="picker-time-card"
 			asLabel
 		>

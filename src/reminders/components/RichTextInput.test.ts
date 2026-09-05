@@ -2,8 +2,21 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { RichTextInput } from './RichTextInput';
+import { buildHTML } from '../utils/richTextRenderer';
 
 describe('RichTextInput', () => {
+    it('keeps priority as editable text with matching initial and update markup', () => {
+        const markup = renderToStaticMarkup(React.createElement(RichTextInput, {
+            value: 'Review !',
+            onChange: vi.fn(),
+            syncContentBeforePaint: true,
+        }));
+
+        expect(markup).toContain(buildHTML('Review !'));
+        expect(markup).toContain('<span class="rich-text-chip-marker">!</span>');
+        expect(markup).not.toContain('contenteditable="false"');
+    });
+
     it('keeps synchronous initial content opt-in for PWA callers', () => {
         const markup = renderToStaticMarkup(React.createElement(RichTextInput, {
             value: 'Plugin reminder',
