@@ -149,6 +149,13 @@ export default tseslint.config(
 		},
 	},
 	{
+		// Shared textarea sizing must work without Obsidian's DOM extensions.
+		files: ['src/reminders/ui/reminder-modal/useAutosizeTextarea.ts'],
+		rules: {
+			'obsidianmd/no-static-styles-assignment': 'off',
+		},
+	},
+	{
 		// Sync timers also run in Node-based unit tests.
 		files: ['src/sync/**/*.{ts,tsx}'],
 		rules: {

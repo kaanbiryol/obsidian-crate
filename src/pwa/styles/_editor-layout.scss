@@ -1,0 +1,53 @@
+// Browser sheet geometry and touch targets. Editor presentation is shared.
+@mixin styles {
+  .modal-card.pwa-reminder-editor {
+    --crate-icon-button-size: 44px;
+    --input-height: 50px;
+    --reminder-font-base: 16px;
+
+    position: relative;
+    z-index: 1;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    overflow: hidden;
+    flex-direction: column;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0 0 env(safe-area-inset-bottom);
+    box-shadow: none;
+    animation: none;
+
+    .modal-form {
+      gap: 0;
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .reminder-modal-body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+  }
+
+  .pwa-modal-sheet--reminder.is-editor-screen:not(.is-keyboard-open) .pwa-modal-sheet__container--reminder {
+    height: min(calc(326px + env(safe-area-inset-bottom)), 90dvh) !important;
+    max-height: 90dvh !important;
+  }
+
+  .pwa-modal-sheet--reminder.is-editor-screen.is-keyboard-open .pwa-modal-sheet__container--reminder {
+    height: min(calc(320px + var(--pwa-keyboard-inset, 0px)), 90dvh) !important;
+    max-height: 90dvh !important;
+  }
+
+  .pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor {
+    padding-bottom: 16px;
+  }
+}

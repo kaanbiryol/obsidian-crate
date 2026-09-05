@@ -3,7 +3,9 @@ import type { RichTextInputHandle } from '../../components/RichTextInput';
 import type { RecurrenceRule } from '../../types';
 import { getProjectColor } from '../../utils/projectColors';
 import { ReminderActionChips } from './ReminderActionChips';
-import { ReminderEditorFields } from './ReminderEditorFields';
+import { PluginReminderEditorFields as ReminderEditorFields } from './PluginReminderEditorFields';
+import { ThemeIconProvider } from '../../components/theme-icon';
+import { ObsidianIcon } from '../../components/obsidian-icon';
 
 interface AddReminderModalBodyProps {
     isDark: boolean;
@@ -53,34 +55,36 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
     const projectColor = getProjectColor(project || defaultProject)[isDark ? 'dark' : 'light'].accent;
 
     return (
-        <div
-            className="reminder-modal-body"
-            style={{ '--reminder-project-color': projectColor } as React.CSSProperties}
-        >
-            <ReminderEditorFields
-                content={content}
-                onContentChange={onContentChange}
-                description={description}
-                onDescriptionChange={onDescriptionChange}
-                onKeyDown={onKeyDown}
-                allowAutoFocus={allowAutoFocus}
-                projects={projects}
-                textareaRef={textareaRef}
-                richTextInputRef={richTextInputRef}
-            />
+        <ThemeIconProvider renderer={ObsidianIcon}>
+            <div
+                className="reminder-modal-body"
+                style={{ '--reminder-project-color': projectColor } as React.CSSProperties}
+            >
+                <ReminderEditorFields
+                    content={content}
+                    onContentChange={onContentChange}
+                    description={description}
+                    onDescriptionChange={onDescriptionChange}
+                    onKeyDown={onKeyDown}
+                    allowAutoFocus={allowAutoFocus}
+                    projects={projects}
+                    textareaRef={textareaRef}
+                    richTextInputRef={richTextInputRef}
+                />
 
-            <ReminderActionChips
-                dueDate={dueDate}
-                hasTime={hasTime}
-                project={project}
-                defaultProject={defaultProject}
-                priority={priority}
-                recurrence={recurrence}
-                onOpenDatePicker={onOpenDatePicker}
-                onOpenProjectPicker={onOpenProjectPicker}
-                onOpenRecurrencePicker={onOpenRecurrencePicker}
-                onTogglePriority={onTogglePriority}
-            />
-        </div>
+                <ReminderActionChips
+                    dueDate={dueDate}
+                    hasTime={hasTime}
+                    project={project}
+                    defaultProject={defaultProject}
+                    priority={priority}
+                    recurrence={recurrence}
+                    onOpenDatePicker={onOpenDatePicker}
+                    onOpenProjectPicker={onOpenProjectPicker}
+                    onOpenRecurrencePicker={onOpenRecurrencePicker}
+                    onTogglePriority={onTogglePriority}
+                />
+            </div>
+        </ThemeIconProvider>
     );
 };

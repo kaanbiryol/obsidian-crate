@@ -17,6 +17,7 @@ import { ReminderPickerSheet } from './ReminderPickerSheet';
 export function ReminderSheet({
 	modal,
 	projects,
+	colorScheme,
 	saving,
 	isClosing,
 	onChange,
@@ -27,6 +28,7 @@ export function ReminderSheet({
 }: {
 	modal: ModalState;
 	projects: string[];
+	colorScheme: 'dark' | 'light';
 	saving: boolean;
 	isClosing: boolean;
 	onChange: React.Dispatch<React.SetStateAction<ModalState | null>>;
@@ -124,6 +126,7 @@ export function ReminderSheet({
 				onAnimationComplete={handleReminderStageAnimationComplete}
 			>
 				<ReminderEditorScreen
+					colorScheme={colorScheme}
 					ref={editorScreenRef}
 					modal={modal}
 					projectOptions={projectOptions}

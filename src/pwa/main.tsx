@@ -324,6 +324,7 @@ function App() {
 				)}
 				{modal && (
 					<Suspense fallback={null}><ReminderSheet
+						colorScheme={colorScheme}
 						modal={modal}
 						projects={projects}
 						saving={saving}

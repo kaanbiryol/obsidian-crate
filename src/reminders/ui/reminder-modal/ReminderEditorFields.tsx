@@ -1,5 +1,4 @@
-import React, { useCallback, useLayoutEffect, useRef } from 'react';
-import { getIcon } from 'obsidian';
+import React, { useCallback, useRef } from 'react';
 import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
 import { RichTextInput, type RichTextInputHandle } from '../../components/RichTextInput';
 import { useProjectAutocomplete } from './useProjectAutocomplete';
@@ -11,11 +10,19 @@ interface ReminderEditorFieldsProps {
     onContentChange: (value: string) => void;
     description: string;
     onDescriptionChange: (value: string) => void;
-    onKeyDown: (event: React.KeyboardEvent) => void;
+    onKeyDown?: (event: React.KeyboardEvent) => void;
     allowAutoFocus: boolean;
     projects: string[];
     textareaRef: React.RefObject<HTMLDivElement | null>;
     richTextInputRef: React.RefObject<RichTextInputHandle | null>;
+    containerRef?: React.RefObject<HTMLDivElement | null>;
+    descriptionRef?: React.RefObject<HTMLTextAreaElement | null>;
+    disabled?: boolean;
+    titleInputProps?: Pick<React.ComponentProps<typeof RichTextInput>,
+        'onFocus' | 'onBlur' | 'focusRequestKey' | 'preserveSelection' | 'externalChangeCursor'
+        | 'syncContentBeforePaint' | 'autoComplete' | 'autoCorrect' | 'spellCheck' | 'className'>;
+    descriptionInputProps?: Pick<React.TextareaHTMLAttributes<HTMLTextAreaElement>,
+        'onFocus' | 'onBlur' | 'maxLength' | 'autoComplete' | 'autoCorrect' | 'spellCheck' | 'className'>;
 }
 
 export function ReminderEditorFields({
@@ -28,31 +35,20 @@ export function ReminderEditorFields({
     projects,
     textareaRef,
     richTextInputRef,
+    containerRef: externalContainerRef,
+    descriptionRef: externalDescriptionRef,
+    disabled = false,
+    titleInputProps,
+    descriptionInputProps,
 }: ReminderEditorFieldsProps) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const descriptionRef = useRef<HTMLTextAreaElement>(null);
+    const localContainerRef = useRef<HTMLDivElement>(null);
+    const localDescriptionRef = useRef<HTMLTextAreaElement>(null);
+    const containerRef = externalContainerRef ?? localContainerRef;
+    const descriptionRef = externalDescriptionRef ?? localDescriptionRef;
     const titleFade = useBottomFade(textareaRef);
     const descFade = useBottomFade(descriptionRef);
 
     useAutosizeTextarea(descriptionRef, Boolean(description));
-
-    useLayoutEffect(() => {
-        const container = containerRef.current;
-        const icon = getIcon('folder');
-        if (!container || !icon) return;
-
-        // Use the same Obsidian icon registry as the project picker button.
-        // A mask preserves the chip's theme color without adding editable DOM.
-        icon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        icon.setAttribute('stroke', 'black');
-        container.style.setProperty(
-            '--crate-project-icon-mask',
-            `url("data:image/svg+xml,${encodeURIComponent(icon.outerHTML)}")`,
-        );
-        return () => {
-            container.style.removeProperty('--crate-project-icon-mask');
-        };
-    }, []);
 
     const autocomplete = useProjectAutocomplete({
         content,
@@ -71,6 +67,9 @@ export function ReminderEditorFields({
             className="reminder-editor-fields relative"
         >
             <RichTextInput
+                {...titleInputProps}
+                readOnly={disabled}
+                ariaLabel="Reminder title"
                 ref={richTextInputRef}
                 value={content}
                 onChange={onContentChange}
@@ -86,9 +85,9 @@ export function ReminderEditorFields({
                     ? `project-autocomplete-option-${autocomplete.highlightedIndex}`
                     : undefined}
                 ariaExpanded={autocomplete.isOpen}
-                className={`reminder-title-input ios-scroll${titleFade ? ' has-bottom-fade' : ''}`}
+                className={`reminder-title-input ios-scroll${titleFade ? ' has-bottom-fade' : ''} ${titleInputProps?.className ?? ''}`}
             />
-            {autocomplete.isOpen && (
+            {!disabled && autocomplete.isOpen && (
                 <ProjectAutocompleteDropdown
                     filteredProjects={autocomplete.filteredProjects}
                     highlightedIndex={autocomplete.highlightedIndex}
@@ -100,12 +99,15 @@ export function ReminderEditorFields({
 
             <div className="reminder-description-wrap">
                 <textarea
+                    {...descriptionInputProps}
+                    disabled={disabled}
+                    aria-label="Reminder description"
                     ref={descriptionRef}
                     value={description}
                     onChange={(event) => onDescriptionChange(event.target.value)}
                     placeholder="Description"
                     rows={1}
-                    className={`reminder-description-input ios-scroll${descFade ? ' has-bottom-fade' : ''}`}
+                    className={`reminder-description-input ios-scroll${descFade ? ' has-bottom-fade' : ''} ${descriptionInputProps?.className ?? ''}`}
                     onInput={(event) => autosizeTextarea(event.currentTarget)}
                 />
             </div>

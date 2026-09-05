@@ -11,7 +11,10 @@ import {
   Eye,
   EyeOff,
   Flag,
+  Folder,
   FolderOpen,
+  Trash2,
+  X,
   GripVertical,
   Hash,
   Inbox,
@@ -24,6 +27,9 @@ import {
 import type { ThemeIconProps, ThemeIconSize } from '@/reminders/components/theme-icon';
 
 const ICONS: Record<string, LucideIcon> = {
+  folder: Folder,
+  'trash-2': Trash2,
+  x: X,
   calendar: Calendar,
   'calendar-check': CalendarCheck,
   'calendar-range': CalendarRange,

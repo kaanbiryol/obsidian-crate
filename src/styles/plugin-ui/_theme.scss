@@ -1,3 +1,4 @@
+@use "../../ui/shared/styles/controls";
 @use "../../ui/shared/styles/tokens";
 
 @mixin styles {
@@ -56,71 +57,7 @@
     justify-content: space-between;
   }
 
-  .crate-icon-button {
-    --crate-icon-button-control-size: var(--crate-icon-button-size);
-
-    display: inline-flex;
-    width: var(--crate-icon-button-control-size);
-    height: var(--crate-icon-button-control-size);
-    min-width: var(--crate-icon-button-control-size);
-    padding: 0;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid transparent;
-    border-radius: var(--crate-radius-icon);
-    background: transparent;
-    box-shadow: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: background-color var(--crate-motion-duration-fast) var(--crate-motion-easing), border-color var(--crate-motion-duration-fast) var(--crate-motion-easing), color var(--crate-motion-duration-fast) var(--crate-motion-easing);
-
-    &[data-size="small"] {
-      --crate-icon-button-control-size: 28px;
-    }
-
-    &[data-variant="surface"] {
-      border-color: var(--crate-glass-back-border);
-      background: var(--crate-glass-back-bg);
-      box-shadow: var(--crate-glass-back-shadow);
-    }
-
-    &:hover:not(:disabled) {
-      border-color: color-mix(in srgb, var(--crate-divider) 65%, transparent);
-      background: var(--crate-control-hover-bg);
-      color: var(--text-normal);
-    }
-
-    &[data-tone="danger"]:hover:not(:disabled) {
-      color: var(--crate-danger);
-    }
-
-    &[data-tone="accent"] {
-      color: var(--crate-accent-text);
-    }
-
-    &:disabled {
-      cursor: default;
-      opacity: 0.3;
-    }
-  }
-
-  .crate-semantic-token {
-    --crate-semantic-color: var(--crate-accent-text);
-    --crate-semantic-border: color-mix(in srgb, var(--crate-semantic-color) 20%, transparent);
-    --crate-semantic-bg: color-mix(in srgb, var(--crate-semantic-color) 8%, transparent);
-
-    &.tone-secondary {
-      --crate-semantic-color: var(--reminder-project-color, var(--crate-accent-text));
-    }
-
-    &.tone-danger {
-      --crate-semantic-color: var(--crate-danger);
-    }
-
-    &.tone-warning {
-      --crate-semantic-color: var(--crate-warning);
-    }
-  }
+  @include controls.styles;
 
   .shadow-dom-button__spinner {
     width: 1em;

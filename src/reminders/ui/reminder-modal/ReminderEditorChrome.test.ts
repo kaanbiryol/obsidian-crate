@@ -88,7 +88,7 @@ describe('reminder editor chrome', () => {
             'utf8',
         );
         const styles = await readFile(
-            new URL('../../../styles/plugin-ui/_reminder-editor.scss', import.meta.url),
+            new URL('../shared/styles/_editor-actions.scss', import.meta.url),
             'utf8',
         );
         const actionChipStyles = styles.match(
