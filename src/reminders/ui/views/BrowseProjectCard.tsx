@@ -8,8 +8,12 @@ import { ThemeIcon } from '../../components/theme-icon';
 export const BrowseProjectCard = memo(function BrowseProjectCard({
   card,
   onClick,
+  label,
+  hideChevron = false,
 }: {
   card: BrowseProjectCardViewModel;
+  label?: string;
+  hideChevron?: boolean;
   onClick: () => void;
 }) {
   const { project, stats, accentColor, isComplete } = card;
@@ -20,6 +24,7 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
       className="premium-project-card"
       data-action="open-project"
       data-project={project}
+      aria-label={`Open ${project}`}
       initial={false}
       animate={{ opacity: 1 }}
       transition={{ duration: 0 }}
@@ -36,7 +41,7 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
           </div>
 
           <div className="premium-project-info">
-            <div className="premium-project-name">{project}</div>
+            <div className="premium-project-name">{label ?? project}</div>
 
             <div className="premium-project-stats">
               {stats.total === 0 ? (
@@ -50,12 +55,12 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
                 <>
                   <span className="premium-project-stat">
                     <ThemeIcon size="xs" id="circle" />
-                    {stats.active}
+                    {stats.active} active
                   </span>
                   {stats.completed > 0 && (
                     <span className="premium-project-stat premium-project-stat-done">
                       <ThemeIcon size="xs" id="circle-check" />
-                      {stats.completed}
+                      {stats.completed} done
                     </span>
                   )}
                 </>
@@ -78,11 +83,11 @@ export const BrowseProjectCard = memo(function BrowseProjectCard({
             </div>
           )}
 
-          <ThemeIcon
+          {!hideChevron && <ThemeIcon
             size="s"
             id="chevron-right"
             className="premium-project-chevron"
-          />
+          />}
         </div>
       </div>
     </ShadowDOMNativeMotionButton>

@@ -51,7 +51,7 @@
     }
 
     .reorderable-reminder-item,
-    [data-reminder-section="completed"] {
+    .reminder-render-item {
         margin-bottom: 8px;
     }
 
@@ -69,10 +69,6 @@
         box-shadow: var(--crate-reminder-card-shadow, none);
     }
 
-    .reorderable-reminder-item[data-reorder-interaction="handle"] .premium-reminder-content {
-        padding-right: 56px;
-    }
-
     .premium-reminder-card:hover .premium-reminder-content {
         background: var(--crate-reminder-card-hover-bg, var(--crate-surface-hover-bg));
         border-color: var(--crate-reminder-card-hover-border, var(--crate-surface-border-hover));
@@ -85,8 +81,8 @@
         border-color: var(--crate-reminder-card-active-border, var(--crate-surface-border-hover));
     }
 
-    // The reorder wrapper scales the card and its trailing handle together.
-    .reorderable-reminder-item[data-reorder-interaction="handle"]
+    // The reorder wrapper scales the entire card.
+    .reorderable-reminder-item[data-reorder-interaction="drag"]
         .premium-reminder-card:active .premium-reminder-content {
         transform: none;
     }
@@ -155,10 +151,6 @@
 }
 
 .reminders-view.is-upcoming {
-    [data-reminder-section="active"] {
-        margin-bottom: 8px;
-    }
-
     .space-y-6 > :not([hidden]) ~ :not([hidden]) {
         margin-top: 18px;
     }
@@ -228,7 +220,7 @@
 
     .premium-project-progress {
         min-width: var(--crate-project-progress-width);
-        gap: 3px;
+        gap: 8px;
     }
 
     .premium-project-percentage {

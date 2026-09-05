@@ -283,7 +283,7 @@
     scrollbar-gutter: stable;
 
     &.has-fab {
-        padding-bottom: calc(var(--reminders-tabbar-overlay, 0px) + var(--reminders-fab-gap, 24px) + var(--reminders-fab-size, 56px) + var(--reminders-safe-area, env(safe-area-inset-bottom)));
+        padding-bottom: calc(var(--reminders-tabbar-overlay, 0px) + var(--reminders-fab-gap, 24px) + var(--reminders-fab-size, 56px) + var(--reminders-safe-area, env(safe-area-inset-bottom)) + 24px);
     }
 
     &.is-tab-aware {

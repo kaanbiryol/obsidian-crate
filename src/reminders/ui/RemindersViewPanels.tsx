@@ -35,7 +35,7 @@ interface RemindersViewPanelsProps {
   onReorder: (orderedIds: string[]) => Promise<void> | void;
   onReorderDragActiveChange?: (active: boolean) => void;
   colorScheme: ProjectColorScheme;
-  reorderInteraction?: 'handle' | 'long-press';
+  reorderInteraction?: 'drag' | 'long-press';
   animationsEnabled?: boolean;
 }
 
@@ -54,7 +54,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
   onReorder,
   onReorderDragActiveChange,
   colorScheme,
-  reorderInteraction = 'handle',
+  reorderInteraction = 'drag',
   animationsEnabled = true,
 }) => {
   const pageTransition = {
@@ -128,7 +128,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
             project={selectedProject}
             reminders={reminders}
             onBack={onBackToProjects}
-            animationConfig={{ enabled: false }}
+            animationConfig={{ enabled: animationsEnabled }}
             renderCard={renderCard}
             hasFab={showFab}
             onReorder={onReorder}

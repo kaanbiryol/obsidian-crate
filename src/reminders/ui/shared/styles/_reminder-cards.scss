@@ -43,32 +43,11 @@
     position: relative;
     touch-action: pan-y;
 
-    &[data-reorder-interaction="handle"] {
-        .premium-reminder-content,
-        .reminder-card__main {
-            padding-right: 56px;
-        }
-
-        // Keep the shared flag treatment, but place it in the trailing control
-        // rail so reserving room for the drag handle does not pull it left.
-        .premium-priority-flag {
-            position: absolute;
-            top: 50%;
-            right: -38px;
-            transform: translateY(-50%);
-        }
-    }
-
-    &[data-reorder-interaction="long-press"] {
+    &[data-reorder-interaction] {
         -webkit-touch-callout: none;
         user-select: none;
         transform-origin: center;
         will-change: transform;
-
-        .premium-reminder-content,
-        .reminder-card__main {
-            padding-right: 16px;
-        }
 
         &.is-long-press-armed {
             z-index: 45;
@@ -95,35 +74,6 @@
 .pwa-shadow-root .reminder-render-item {
     content-visibility: auto;
     contain-intrinsic-block-size: auto 88px;
-}
-
-.reorder-drag-handle {
-    position: absolute;
-    top: 50%;
-    right: 8px;
-    z-index: 2;
-    width: 40px;
-    height: 44px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: none;
-    border-radius: var(--clickable-icon-radius, var(--crate-radius-control));
-    color: var(--text-faint);
-    background: transparent;
-    cursor: grab;
-    touch-action: none;
-    transform: translateY(-50%);
-
-    &:active {
-        cursor: grabbing;
-        color: var(--text-muted);
-        background: var(--crate-surface-hover-bg);
-    }
-
-    svg {
-        display: block;
-    }
 }
 
 // Custom checkbox

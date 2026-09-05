@@ -4,20 +4,21 @@ import { ThemeIcon } from './theme-icon';
 import { getProjectColor, type ProjectColorScheme } from '../utils/projectColors';
 import { formatDueDate, isReminderOverdue } from '../utils/dateFormatting';
 import { parseMarkdownLinks, isSafeUrl } from '../utils/markdownLinks';
+import { readableWikiLinks } from '../utils/readableWikiLinks';
 import type { AnimationConfig } from '../types/componentAdapter';
 import type { RecurrenceRule } from '../types/reminder';
 import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 
 function renderContentWithLinks(content: string): React.ReactNode[] {
     const links = parseMarkdownLinks(content);
-    if (links.length === 0) return [content];
+    if (links.length === 0) return [readableWikiLinks(content)];
 
     const elements: React.ReactNode[] = [];
     let lastIndex = 0;
 
     for (const link of links) {
         if (link.index > lastIndex) {
-            elements.push(content.slice(lastIndex, link.index));
+            elements.push(readableWikiLinks(content.slice(lastIndex, link.index)));
         }
         if (isSafeUrl(link.url)) {
             elements.push(
@@ -39,7 +40,7 @@ function renderContentWithLinks(content: string): React.ReactNode[] {
     }
 
     if (lastIndex < content.length) {
-        elements.push(content.slice(lastIndex));
+        elements.push(readableWikiLinks(content.slice(lastIndex)));
     }
 
     return elements;

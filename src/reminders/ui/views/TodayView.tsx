@@ -1,16 +1,15 @@
-import React, { useMemo, useState, useId, memo } from 'react';
-import { motion, LayoutGroup } from 'framer-motion';
+import React, { useMemo, memo } from 'react';
+
+import { ReminderListLayout } from './ReminderListLayout';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
 import { ReminderListPresence } from '../../components/ReminderListPresence';
 import { ReminderCard } from '../../components/ReminderCard';
 import { EmptyState } from '../../components/EmptyState';
-import { CompletedReminderSection } from './CompletedReminderSection';
 import { buildTodayViewModel } from './viewModels';
 import { ReminderMotionRow } from '../../components/ReminderMotionRow';
 import type { ProjectColorScheme } from '../../utils/projectColors';
-import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 
 export interface TodayViewProps {
@@ -37,10 +36,7 @@ export const TodayView = memo(function TodayView({
   className = '',
   colorScheme = 'dark',
 }: TodayViewProps) {
-  const layoutGroupId = useId();
   const reduceMotion = useObsidianReducedMotion();
-  const [showCompleted, setShowCompleted] = useState(false);
-  const scrollRef = useStableReminderScroll();
   const { active, completed } = useMemo(() => buildTodayViewModel(reminders), [reminders]);
   const enableListAnimations = animationConfig.enabled && !reduceMotion && active.length <= 80;
   const hasContent = active.length > 0 || completed.length > 0;
@@ -57,53 +53,36 @@ export const TodayView = memo(function TodayView({
 
   const cardRenderer = renderCard || defaultRenderCard;
 
-  // When empty, show centered EmptyState
-  if (!hasContent) {
-    return (
-      <div className={`flex flex-col h-full relative ${className}`}>
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState
+  return (
+    <ReminderListLayout
+      className={className}
+      hasFab={hasFab}
+      hasContent={hasContent}
+      renderCard={cardRenderer}
+      animationConfig={animationConfig}
+      completed={completed}
+      emptyState={
+        <EmptyState
             icon="calendar"
             title="Nothing due today"
             description="Enjoy your free time!"
             iconColor="warning"
             animationConfig={animationConfig}
           />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`flex flex-col h-full relative ${className}`}>
-      <motion.div
-        layoutScroll
-        ref={scrollRef}
-        className={`flex-1 overflow-y-auto space-y-2 ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
-      >
-        <LayoutGroup id={layoutGroupId}>
-          <ReminderListPresence>
-            {active.map((reminder, index) => (
-              <ReminderMotionRow
-                key={reminder.id}
-                id={reminder.id}
-                section="active"
-                animationsEnabled={enableListAnimations}
-              >
-                {cardRenderer(reminder, index)}
-              </ReminderMotionRow>
-            ))}
-          </ReminderListPresence>
-
-          <CompletedReminderSection
-            reminders={completed}
-            showCompleted={showCompleted}
-            onToggle={() => setShowCompleted((previous) => !previous)}
-            renderCard={cardRenderer}
-            animationConfig={animationConfig}
-          />
-        </LayoutGroup>
-      </motion.div>
-    </div>
+      }
+    >
+      <ReminderListPresence>
+        {active.map((reminder, index) => (
+          <ReminderMotionRow
+            key={reminder.id}
+            id={reminder.id}
+            section="active"
+            animationsEnabled={enableListAnimations}
+          >
+            {cardRenderer(reminder, index)}
+          </ReminderMotionRow>
+        ))}
+      </ReminderListPresence>
+    </ReminderListLayout>
   );
 });

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, forwardRef } from 'react';
 import { motion, Reorder, useDragControls, useIsPresent } from 'framer-motion';
-import { ThemeIcon } from './theme-icon';
 import type { Reminder } from '../types/reminder';
 import { ReminderListPresence } from './ReminderListPresence';
 import { REMINDER_DRAG_SCALE, REMINDER_LIST_LAYOUT_TRANSITION, REMINDER_SECTION_TRANSITION } from '../ui/layoutConstants';
@@ -13,7 +12,7 @@ interface ReorderableReminderListProps {
   onReorderCommit: (orderedIds: string[]) => void;
   onDragActiveChange?: (active: boolean) => void;
   renderCard: (reminder: Reminder, index: number) => React.ReactNode;
-  interaction?: 'handle' | 'long-press';
+  interaction?: 'drag' | 'long-press';
   animationsEnabled?: boolean;
 }
 
@@ -23,7 +22,7 @@ interface ReorderableItemProps {
   renderCard: (reminder: Reminder, index: number) => React.ReactNode;
   onDragStart: () => void;
   onDragEnd: () => void;
-  interaction: 'handle' | 'long-press';
+  interaction: 'drag' | 'long-press';
   enableLayoutAnimations: boolean;
 }
 
@@ -36,7 +35,7 @@ const LARGE_LIST_ANIMATION_LIMIT = 80;
 const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction, enableLayoutAnimations }: ReorderableItemProps, ref) {
   const isPresent = useIsPresent();
   const rowMotion = reminderRowMotion(enableLayoutAnimations);
-  const [isHandlePressed, setIsHandlePressed] = useState(false);
+  const [isDragPressed, setIsDragPressed] = useState(false);
   const didDragRef = useRef(false);
   const dragControls = useDragControls();
   const longPressTimerRef = useRef<number | null>(null);
@@ -51,13 +50,13 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
     }
     pressStartRef.current = null;
     setIsLongPressArmed(false);
-    setIsHandlePressed(false);
+    setIsDragPressed(false);
   }, []);
 
   useEffect(() => cancelLongPress, [cancelLongPress]);
 
   useEffect(() => {
-    if (!isHandlePressed && !isLongPressArmed) return;
+    if (!isDragPressed && !isLongPressArmed) return;
     // A drag may be released outside the row, where its pointer-up won't bubble.
     window.addEventListener('pointerup', cancelLongPress);
     window.addEventListener('pointercancel', cancelLongPress);
@@ -65,7 +64,7 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
       window.removeEventListener('pointerup', cancelLongPress);
       window.removeEventListener('pointercancel', cancelLongPress);
     };
-  }, [cancelLongPress, isHandlePressed, isLongPressArmed]);
+  }, [cancelLongPress, isDragPressed, isLongPressArmed]);
 
   const handleDragStart = useCallback(() => {
     cancelLongPress();
@@ -92,18 +91,17 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
     }
   }, []);
 
-  const handleDragHandlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    setIsHandlePressed(true);
-    dragControls.start(e);
-  }, [dragControls]);
-
   const handleItemPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (interaction !== 'long-press' || !event.isPrimary || event.button !== 0) return;
+    if (!event.isPrimary || event.button !== 0) return;
     const target = event.target as Element;
     if (target.closest(LONG_PRESS_INTERACTIVE_SELECTOR)) return;
 
     cancelLongPress();
+    if (interaction === 'drag' && event.pointerType === 'mouse') {
+      setIsDragPressed(true);
+      dragControls.start(event);
+      return;
+    }
     pressStartRef.current = { x: event.clientX, y: event.clientY };
     longPressTimerRef.current = window.setTimeout(() => {
       longPressTimerRef.current = null;
@@ -163,25 +161,11 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
       <motion.div
         className="reminder-drag-surface"
         initial={false}
-        animate={{ scale: enableLayoutAnimations && (isHandlePressed || isLongPressArmed || isReordering) ? REMINDER_DRAG_SCALE : 1 }}
+        animate={{ scale: enableLayoutAnimations && (isDragPressed || isLongPressArmed || isReordering) ? REMINDER_DRAG_SCALE : 1 }}
         transition={enableLayoutAnimations ? REMINDER_SECTION_TRANSITION : { duration: 0 }}
         style={{ position: 'relative', display: 'flow-root' }}
       >
         {renderCard(reminder, index)}
-      {interaction === 'handle' && (
-        <button
-          className="reorder-drag-handle"
-          type="button"
-          aria-label="Reorder reminder"
-          onPointerDown={handleDragHandlePointerDown}
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-          }}
-        >
-          <ThemeIcon size="xs" id="grip-vertical" aria-hidden="true" />
-        </button>
-      )}
       </motion.div>
     </Reorder.Item>
   );
@@ -193,7 +177,7 @@ export function ReorderableReminderList({
   onReorderCommit,
   onDragActiveChange,
   renderCard,
-  interaction = 'handle',
+  interaction = 'drag',
   animationsEnabled = true,
 }: ReorderableReminderListProps) {
   const reduceMotion = useObsidianReducedMotion();

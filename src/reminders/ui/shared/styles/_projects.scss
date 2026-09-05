@@ -11,6 +11,94 @@
     gap: 10px;
 }
 
+.premium-project-tree {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.premium-project-tree-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    .premium-project-card { min-width: 0; flex: 1; }
+}
+
+.premium-project-expand {
+    position: absolute;
+    inset-inline-end: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+}
+
+.premium-project-group-name {
+    flex: 1;
+    padding: 12px;
+    font-weight: var(--reminder-font-weight-medium);
+}
+
+.premium-project-children {
+    margin: 0;
+    padding: 0 12px 0 16px;
+
+    > .premium-project-tree {
+        gap: 0;
+    }
+}
+
+// A parent and its children share one surface; the disclosure stays inside it.
+.reminders-view.is-browse .premium-project-group {
+    border: 1px solid var(--crate-project-card-border, var(--crate-surface-border));
+    border-radius: var(--crate-radius-card);
+    background: var(--crate-project-card-bg, var(--crate-surface-bg));
+
+    > .premium-project-tree-row {
+        .premium-project-content {
+            padding-inline-end: 44px;
+        }
+    }
+
+    .premium-project-content {
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .premium-project-children > .premium-project-tree > li {
+        border-top: 1px solid var(--crate-surface-border);
+    }
+
+    .premium-project-group-name {
+        padding-inline-end: 44px;
+    }
+
+    .premium-project-expand {
+        border-radius: var(--crate-radius-button);
+        cursor: pointer;
+
+        &:hover { background: var(--crate-surface-hover-bg); }
+        &:focus-visible {
+            outline: 2px solid var(--crate-focus-ring);
+            outline-offset: -3px;
+        }
+    }
+}
+
 // Premium Project Card
 .premium-project-card {
     position: relative;
@@ -108,6 +196,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .premium-project-stat {
@@ -155,9 +244,10 @@
 
 .premium-project-progress {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 8px;
     min-width: var(--crate-project-progress-width, 48px);
 }
 

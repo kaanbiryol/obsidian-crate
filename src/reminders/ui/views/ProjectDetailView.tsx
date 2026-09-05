@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useId, memo } from 'react';
-import { LayoutGroup, motion } from 'framer-motion';
+import React, { useMemo, memo } from 'react';
+
+import { ReminderListLayout } from './ReminderListLayout';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
@@ -7,12 +8,10 @@ import type { Reminder } from '../../types/reminder';
 import { ReminderCard } from '../../components/ReminderCard';
 import { ReorderableReminderList } from '../../components/ReorderableReminderList';
 import { EmptyState } from '../../components/EmptyState';
-import { CompletedReminderSection } from './CompletedReminderSection';
 import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useReminderOrder } from '../hooks/useReminderOrder';
-import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 import { ThemeIcon } from '../../components/theme-icon';
 
 
@@ -30,7 +29,7 @@ export interface ProjectDetailViewProps {
   /** Callback when reminders are reordered via drag */
   onReorder?: (orderedIds: string[]) => Promise<void> | void;
   onReorderDragActiveChange?: (active: boolean) => void;
-  reorderInteraction?: 'handle' | 'long-press';
+  reorderInteraction?: 'drag' | 'long-press';
   colorScheme?: ProjectColorScheme;
 }
 
@@ -50,12 +49,9 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   className = '',
   onReorder,
   onReorderDragActiveChange,
-  reorderInteraction = 'handle',
+  reorderInteraction = 'drag',
   colorScheme = 'dark',
 }: ProjectDetailViewProps) {
-  const [showCompleted, setShowCompleted] = useState(false);
-  const layoutGroupId = useId();
-
   const detail = useMemo(() => {
     return buildProjectDetailViewModel(reminders, project, colorScheme);
   }, [colorScheme, reminders, project]);
@@ -66,7 +62,6 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   const { active, completed } = detail;
 
   const order = useReminderOrder(active, onReorder, onReorderDragActiveChange);
-  const scrollRef = useStableReminderScroll(order.isDragging);
 
   const hasContent = active.length > 0 || completed.length > 0;
 
@@ -84,59 +79,44 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   const cardRenderer = renderCard || defaultRenderCard;
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
-      {/* Ghost back button */}
-      <div>
-        <ShadowDOMNativeButton
-          onClick={onBack}
-          className="premium-back-button"
-        >
-          <ThemeIcon size="xs" id="chevron-left" />
-          <span>Projects</span>
-        </ShadowDOMNativeButton>
-      </div>
-
-      <ProjectDetailHeader project={project} header={header} />
-
-      {/* Content */}
-      {!hasContent ? (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState
-            icon="folder-open"
-            title="No reminders"
-            description="Add a reminder to this project"
-            iconColor="primary"
-            animationConfig={animationConfig}
-          />
-        </div>
-      ) : (
-        <motion.div
-          ref={scrollRef}
-          layoutScroll
-          className={`flex-1 overflow-y-scroll ios-scroll reminders-view-scroll will-change-transform${hasFab ? ' has-fab' : ''}`}
-        >
-          <LayoutGroup id={layoutGroupId}>
-            {/* Active reminders */}
-            <ReorderableReminderList
-              reminders={order.displayedOrder}
-              onReorder={order.onReorder}
-              onReorderCommit={order.onCommit}
-              onDragActiveChange={order.onDragChange}
-              renderCard={cardRenderer}
-              interaction={reorderInteraction}
-              animationsEnabled={animationConfig.enabled}
-            />
-
-            <CompletedReminderSection
-              reminders={completed}
-              showCompleted={showCompleted}
-              onToggle={() => setShowCompleted((prev) => !prev)}
-              renderCard={cardRenderer}
-              animationConfig={animationConfig}
-            />
-          </LayoutGroup>
-        </motion.div>
-      )}
-    </div>
+    <ReminderListLayout
+      className={className}
+      hasFab={hasFab}
+      hasContent={hasContent}
+      renderCard={cardRenderer}
+      animationConfig={animationConfig}
+      completed={completed}
+      isDragging={order.isDragging}
+      header={
+        <>
+          <div>
+            <ShadowDOMNativeButton onClick={onBack} className="premium-back-button">
+              <ThemeIcon size="xs" id="chevron-left" />
+              <span>Projects</span>
+            </ShadowDOMNativeButton>
+          </div>
+          <ProjectDetailHeader project={project} header={header} />
+        </>
+      }
+      emptyState={
+        <EmptyState
+          icon="folder-open"
+          title="No reminders"
+          description="Add a reminder to this project"
+          iconColor="primary"
+          animationConfig={animationConfig}
+        />
+      }
+    >
+      <ReorderableReminderList
+        reminders={order.displayedOrder}
+        onReorder={order.onReorder}
+        onReorderCommit={order.onCommit}
+        onDragActiveChange={order.onDragChange}
+        renderCard={cardRenderer}
+        interaction={reorderInteraction}
+        animationsEnabled={animationConfig.enabled}
+      />
+    </ReminderListLayout>
   );
 });

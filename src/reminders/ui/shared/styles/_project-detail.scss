@@ -10,8 +10,8 @@
     align-items: center;
     gap: 6px;
     min-height: 44px;
-    padding: 0 12px 0 8px;
-    margin: 10px 16px 4px;
+    padding: 0 12px 0 0;
+    margin: 10px 14px 0;
     width: fit-content;
     flex-shrink: 0;
     font-size: var(--reminder-font-sm);
@@ -20,11 +20,11 @@
     cursor: pointer;
 
     // Theme-aware surface styling
-    background: var(--crate-surface-bg);
-    border: 1px solid var(--crate-surface-border);
+    background: transparent;
+    border: 0;
     border-radius: var(--crate-radius-button);
 
-    box-shadow: var(--crate-elevation-card);
+    box-shadow: none;
 
     transition:
         color var(--crate-motion-duration-moderate) var(--crate-motion-easing),
@@ -50,7 +50,7 @@
         color: var(--text-normal);
         background: var(--crate-surface-hover-bg);
         border-color: var(--crate-surface-border-hover);
-        box-shadow: var(--shadow-s);
+        box-shadow: none;
 
         svg {
             transform: translateX(-2px);
@@ -59,7 +59,7 @@
 
     &:active {
         transform: scale(0.96);
-        box-shadow: var(--crate-elevation-card);
+        box-shadow: none;
     }
 
     &:focus {
@@ -81,16 +81,16 @@
 // ============================================
 
 .project-detail-header {
-    margin: 8px 20px 16px;
+    margin: 0 14px 4px;
 
     .is-modal & {
-        margin-top: 12px;
+        margin-top: 0;
     }
 }
 
 .project-detail-header-top {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
 }
@@ -109,14 +109,6 @@
     text-overflow: ellipsis;
 }
 
-.project-detail-percentage {
-    font-size: var(--reminder-font-base);
-    font-weight: var(--reminder-font-weight-semibold);
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
-    line-height: 1.2;
-}
-
 .project-detail-header-bottom {
     display: flex;
     align-items: center;
@@ -129,6 +121,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-wrap: wrap;
 }
 
 .project-detail-stat {
@@ -167,6 +160,11 @@
 // ============================================
 // Completed section
 // ============================================
+
+.completed-reminder-section {
+    margin-top: 12px;
+    padding-bottom: 16px;
+}
 
 .completed-section-toggle {
     display: flex;

@@ -203,6 +203,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					<div className="overflow-hidden">
 						<ViewHeader
 							{...currentHeader}
+							countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
 							large
 							showMeta
 							rightContent={headerRightContent}

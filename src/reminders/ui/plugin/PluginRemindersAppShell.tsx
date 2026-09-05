@@ -54,7 +54,7 @@ interface PluginRemindersAppShellProps {
   onAdd: (defaultProject: string) => void;
   onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
   onReorderDragActiveChange?: (active: boolean) => void;
-  reorderInteraction?: 'handle' | 'long-press';
+  reorderInteraction?: 'drag' | 'long-press';
 }
 
 /** Obsidian-owned reminders chrome. Shared reminder content lives below this shell. */
@@ -82,7 +82,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
   onAdd,
   onReorder,
   onReorderDragActiveChange,
-  reorderInteraction = 'handle',
+  reorderInteraction = 'drag',
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>(initialProject ? "browse" : (initialTab ?? "inbox"));
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -248,6 +248,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
             >
               <ViewHeader
                 {...currentHeader}
+                countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
                 large={isFullScreen}
                 showMeta={isInitialLoadComplete && !loadingContent}
                 rightContent={headerRightContent}
