@@ -94,14 +94,15 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
         if (isOpen) setActiveIndex(selectedIndex);
     }, [isOpen, selectedIndex]);
 
-    // Scroll selected item into view when modal opens
+    // Center the selection on open, not on row focus: pointer focus happens
+    // before click, so moving the row at that point can cancel selection.
     useLayoutEffect(() => {
         const container = scrollContainerRef.current;
-        const activeRow = rowRefs.current.get(activeIndex);
-        if (!isOpen || !container || !activeRow) return;
+        const selectedRow = rowRefs.current.get(selectedIndex);
+        if (!isOpen || !container || !selectedRow) return;
 
         const containerRect = container.getBoundingClientRect();
-        const rowRect = activeRow.getBoundingClientRect();
+        const rowRect = selectedRow.getBoundingClientRect();
         container.scrollTop = Math.max(
             0,
             container.scrollTop
@@ -109,7 +110,7 @@ export const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({
                 - containerRect.top
                 - ((container.clientHeight - rowRect.height) / 2),
         );
-    }, [activeIndex, isOpen, projects]);
+    }, [selectedIndex, isOpen, projects]);
 
     const focusIndex = useCallback((index: number) => {
         if (projects.length === 0) return;

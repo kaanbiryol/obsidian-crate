@@ -126,6 +126,8 @@ describe('reminder editor chrome', () => {
         }));
 
         expect(dateMarkup).toContain('Remove schedule');
+        expect(dateMarkup).toMatch(/picker-section-heading[^]*?<h4 id="plugin-custom-schedule-title">Custom<\/h4><button[^>]*class="picker-schedule-remove"[^>]*>Remove schedule<\/button><\/div>/);
+        expect(dateMarkup).not.toContain('picker-footer');
         expect(dateMarkup).toContain('>Schedule<');
         expect(dateMarkup).toContain('Quick options');
         expect(dateMarkup).toContain('This evening');
@@ -150,9 +152,9 @@ describe('reminder editor chrome', () => {
         expect(dateMarkup).toContain('Add time');
         expect(dateMarkup).not.toContain('>Optional<');
         expect(dateMarkup).not.toContain('Add date');
-        expect(dateMarkup).toContain('type="text"');
+        expect(dateMarkup).not.toContain('type="text"');
         expect(dateMarkup).toContain('type="date"');
-        expect(dateMarkup).toContain('data-picker-proxy="true"');
+        expect(dateMarkup).not.toContain('data-picker-proxy');
         expect(dateMarkup).toContain('type="time"');
         expect(dateMarkup.match(/has-value/g)).toHaveLength(1);
         expect(dateMarkup).not.toContain('date-calendar-grid');
@@ -169,7 +171,10 @@ describe('reminder editor chrome', () => {
         expect(recurrenceMarkup).toContain('>Reminder time<');
         expect(recurrenceMarkup).toContain('data-icon="minus"');
         expect(recurrenceMarkup).toContain('data-icon="plus"');
-        expect(recurrenceMarkup).toContain('picker-time-input has-value');
+        expect(recurrenceMarkup).toContain('picker-native-control has-value');
+        expect(recurrenceMarkup).toContain('data-icon="clock"');
+        expect(recurrenceMarkup).toContain('class="picker-time-input"');
+        expect(recurrenceMarkup).toContain('<small>day</small>');
         expect(recurrenceMarkup.match(/picker-control-row/g)).toHaveLength(2);
         expect(recurrenceMarkup).toContain('role="tabpanel"');
         expect(recurrenceMarkup).toContain('tabindex="-1"');
