@@ -1,0 +1,82 @@
+// Plugin-only presentation for embedded lists and the reminder sidebar.
+// Use host component tokens; project colors remain small identification cues.
+@mixin styles {
+    .premium-reminder-card,
+    .reminders-view .premium-reminder-card {
+        --crate-card-project-bg: var(--tag-background, var(--background-primary-alt));
+        --crate-card-project-text: var(--text-muted);
+        --crate-card-project-border: var(--background-modifier-border);
+
+        .premium-reminder-content {
+            background: var(--crate-reminder-card-bg);
+            border-color: var(--crate-reminder-card-border);
+            box-shadow: none;
+        }
+
+        &:hover .premium-reminder-content {
+            background: var(--crate-reminder-card-hover-bg);
+            border-color: var(--crate-reminder-card-hover-border);
+        }
+
+        &:active .premium-reminder-content {
+            background: var(--crate-reminder-card-active-bg);
+            border-color: var(--crate-reminder-card-active-border);
+        }
+
+        .premium-reminder-body {
+            gap: 6px;
+        }
+
+        .premium-reminder-title {
+            line-height: 1.4;
+        }
+
+        .premium-reminder-description {
+            margin-top: 0;
+            color: var(--text-muted);
+        }
+
+        .premium-pill {
+            max-width: 100%;
+            min-height: 20px;
+            padding: 2px 6px;
+            font-weight: var(--reminder-font-weight-normal);
+            line-height: 1.3;
+            background: var(--tag-background, var(--background-primary-alt));
+            border-color: var(--background-modifier-border);
+
+            svg {
+                flex-shrink: 0;
+            }
+
+            > span {
+                min-width: 0;
+                overflow-wrap: anywhere;
+            }
+
+            &.is-overdue {
+                background: color-mix(in srgb, var(--text-error) 5%, transparent);
+                border-color: color-mix(in srgb, var(--text-error) 12%, transparent);
+                color: var(--text-error);
+            }
+        }
+
+        .premium-checkbox.is-important:not(.is-checked) .premium-checkbox-visual {
+            border-color: var(--checkbox-border-color, var(--background-modifier-border-hover));
+        }
+
+        .premium-checkbox.is-important:not(.is-checked):hover .premium-checkbox-visual {
+            border-color: var(--checkbox-border-color-hover, var(--text-muted));
+        }
+    }
+
+    .reminders-list .premium-reminder-card {
+        margin-bottom: 0;
+    }
+
+    .sidebar-reminder-card-wrapper:focus-visible .premium-reminder-card .premium-reminder-content {
+        border-color: var(--crate-focus-ring);
+        outline: 2px solid var(--crate-focus-ring);
+        outline-offset: 2px;
+    }
+}

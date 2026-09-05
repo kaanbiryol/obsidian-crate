@@ -53,21 +53,6 @@
     }
 }
 
-.reminders-view.light:is(.is-inbox, .is-today, .is-upcoming, .is-browse, .is-project-detail) {
-    --crate-reminder-card-bg: var(--background-primary);
-    --crate-reminder-card-border: color-mix(in srgb, var(--text-normal) 9%, transparent);
-    --crate-reminder-card-shadow: none;
-    --crate-reminder-card-hover-bg: color-mix(in srgb, var(--text-normal) 4%, var(--background-primary));
-    --crate-reminder-card-hover-border: color-mix(in srgb, var(--text-normal) 13%, transparent);
-    --crate-reminder-card-hover-shadow: none;
-    --crate-reminder-card-active-bg: color-mix(in srgb, var(--text-normal) 7%, var(--background-primary));
-    --crate-reminder-card-active-border: color-mix(in srgb, var(--text-normal) 17%, transparent);
-
-    .premium-reminder-description {
-        color: var(--text-muted);
-    }
-}
-
 .reminders-view.is-reduced-motion {
     --crate-card-highlight-duration: 0ms;
     --crate-card-press-duration: 0ms;

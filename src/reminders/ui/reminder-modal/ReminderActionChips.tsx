@@ -52,7 +52,7 @@ export function ReminderActionChips({
                 aria-haspopup="dialog"
                 className={`reminder-action-chip crate-semantic-token tone-secondary${project !== defaultProject ? ' is-active' : ''}`}
             >
-                <ObsidianIcon size="xs" id="hash" />
+                <ObsidianIcon size="xs" id="folder" />
                 <span className="reminder-action-label">
                     {project || defaultProject || REMINDER_PICKER_COPY.editor.defaultProject}
                 </span>

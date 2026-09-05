@@ -1,4 +1,5 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useLayoutEffect, useRef } from 'react';
+import { getIcon } from 'obsidian';
 import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
 import { RichTextInput, type RichTextInputHandle } from '../../components/RichTextInput';
 import { useProjectAutocomplete } from './useProjectAutocomplete';
@@ -34,6 +35,24 @@ export function ReminderEditorFields({
     const descFade = useBottomFade(descriptionRef);
 
     useAutosizeTextarea(descriptionRef, Boolean(description));
+
+    useLayoutEffect(() => {
+        const container = containerRef.current;
+        const icon = getIcon('folder');
+        if (!container || !icon) return;
+
+        // Use the same Obsidian icon registry as the project picker button.
+        // A mask preserves the chip's theme color without adding editable DOM.
+        icon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        icon.setAttribute('stroke', 'black');
+        container.style.setProperty(
+            '--crate-project-icon-mask',
+            `url("data:image/svg+xml,${encodeURIComponent(icon.outerHTML)}")`,
+        );
+        return () => {
+            container.style.removeProperty('--crate-project-icon-mask');
+        };
+    }, []);
 
     const autocomplete = useProjectAutocomplete({
         content,

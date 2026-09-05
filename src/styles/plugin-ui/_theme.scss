@@ -186,10 +186,10 @@
   /* Shared reminder chrome mirrors the PWA while retaining theme colors. */
   --crate-reminder-card-bg: var(--crate-panel-bg);
   --crate-reminder-card-border: var(--crate-divider);
-  --crate-reminder-card-shadow: var(--crate-elevation-card);
+  --crate-reminder-card-shadow: none;
   --crate-reminder-card-hover-bg: var(--crate-control-hover-bg);
   --crate-reminder-card-hover-border: var(--crate-divider-strong);
-  --crate-reminder-card-hover-shadow: var(--crate-elevation-card);
+  --crate-reminder-card-hover-shadow: none;
   --crate-reminder-card-active-bg: var(--crate-control-active-bg);
   --crate-reminder-card-active-border: var(--crate-divider-strong);
   --crate-reminder-card-active-transform: scale(0.99);
