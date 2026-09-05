@@ -7,17 +7,19 @@ import { ThemeIcon } from '../../components/theme-icon';
 export const ProjectDetailHeader = memo(function ProjectDetailHeader({
   project,
   header,
+  hideTitle = false,
 }: {
   project: string;
+  hideTitle?: boolean;
   header: ProjectDetailHeaderViewModel;
 }) {
   const progressColor = header.isComplete ? 'var(--text-success)' : header.accentColor;
 
   return (
     <div className="project-detail-header">
-      <div className="project-detail-header-top">
+      {!hideTitle && <div className="project-detail-header-top">
         <h1 className="project-detail-title">{project}</h1>
-      </div>
+      </div>}
       {header.total > 0 && (
         <div className="project-detail-header-bottom">
           <div className="project-detail-stats-text">

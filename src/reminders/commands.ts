@@ -45,19 +45,4 @@ export function registerReminderCommands(plugin: CratePlugin) {
       new ProjectSuggestModal(plugin).open();
     },
   });
-
-  plugin.addCommand({
-    id: "show-storage-stats",
-    name: "Show storage statistics",
-    callback: () => {
-      const stats = plugin.reminderRepository.getStats();
-      new Notice(
-        `Storage Stats:\n` +
-        `Active: ${stats.activeCount}\n` +
-        `Completed: ${stats.completedCount}\n` +
-        `Total: ${stats.totalCount}`,
-        5000
-      );
-    },
-  });
 }

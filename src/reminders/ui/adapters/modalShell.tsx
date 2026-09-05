@@ -1,6 +1,4 @@
 export function hideNativeModalCloseButton(modalEl: HTMLElement): void {
-  const closeButton = modalEl.querySelector(".modal-close-button");
-  if (closeButton instanceof HTMLElement) {
-    closeButton.addClass("crate-native-modal-close-hidden");
-  }
+  // Scope native close-control styles to modal shells with a Crate replacement.
+  modalEl.addClass("crate-custom-modal-close");
 }

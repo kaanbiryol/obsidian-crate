@@ -245,7 +245,7 @@ describe('reminderRepository.update and today view', () => {
 		vi.useRealTimers();
 	});
 
-	it('routes delete, toggle, reorder, and stats to the underlying services', async () => {
+	it('routes delete, toggle, and reorder to the underlying services', async () => {
 		let indexedReminder: IndexedReminder = {
 			id: 'r1',
 			content: 'Task A',
@@ -259,8 +259,6 @@ describe('reminderRepository.update and today view', () => {
 		};
 		const index = createIndex({
 			getById: (id: string) => id === 'r1' ? indexedReminder : undefined,
-			getActive: () => [indexedReminder],
-			getCompleted: () => [{ ...indexedReminder, id: 'done', completed: true }],
 		});
 		const { writer, spies } = createWriter();
 		const repository = createReminderRepository(index, writer);
@@ -279,12 +277,6 @@ describe('reminderRepository.update and today view', () => {
 
 		await repository.reorder('Work', ['r1', 'done']);
 		expect(spies.reorderReminders).toHaveBeenCalledWith('Reminders/Work.md', ['r1', 'done']);
-
-		expect(repository.getStats()).toEqual({
-			activeCount: 1,
-			completedCount: 1,
-			totalCount: 2,
-		});
 	});
 
 	it('does not toggle reminders that are already in the requested completion state', async () => {

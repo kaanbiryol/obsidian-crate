@@ -24,15 +24,5 @@ export function createReminderRepositoryQueries({ index }: ReminderRepositoryCon
     getProjects() {
       return index.getProjects();
     },
-
-    getStats() {
-      const active = index.getActive();
-      const completed = index.getCompleted();
-      return {
-        activeCount: active.length,
-        completedCount: completed.length,
-        totalCount: active.length + completed.length,
-      };
-    },
   };
 }

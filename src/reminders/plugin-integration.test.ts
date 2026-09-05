@@ -258,9 +258,8 @@ describe('initializeReminders', () => {
 			id: 'open-reminders-view',
 			name: 'Open reminders sidebar',
 		}));
-		expect(plugin.addCommand).toHaveBeenCalledWith(expect.objectContaining({
+		expect(plugin.addCommand).not.toHaveBeenCalledWith(expect.objectContaining({
 			id: 'open-reminders-fullscreen',
-			name: 'Open reminders full screen',
 		}));
 
 		const layoutReadyHandler = plugin.getLayoutReadyHandler();
@@ -288,7 +287,7 @@ describe('initializeReminders', () => {
 		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(4);
 		expect(plugin.registerView).toHaveBeenCalledTimes(1);
 		expect(plugin.addRibbonIcon).toHaveBeenCalledTimes(1);
-		expect(plugin.addCommand).toHaveBeenCalledTimes(2);
+		expect(plugin.addCommand).toHaveBeenCalledTimes(1);
 		expect(registerReminderCommands).toHaveBeenCalledTimes(1);
 		expect(reminderIndexFactory).toHaveBeenCalledTimes(2);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(2);

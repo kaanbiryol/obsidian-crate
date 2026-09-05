@@ -34,7 +34,6 @@ function createRepository(overrides: Partial<ReminderRepository> = {}): Reminder
     complete: async () => undefined,
     uncomplete: async () => undefined,
     reorder: async () => {},
-    getStats: () => ({ activeCount: 0, completedCount: 0, totalCount: 0 }),
     ...overrides,
   };
 }

@@ -1,6 +1,8 @@
-/* Activity modal */
-.crate-native-modal-close-hidden {
-	display: none;
+/* Crate supplies its own accessible close control in these modal shells. */
+.crate-custom-modal-close > .modal-close-button,
+.crate-custom-modal-close > .modal-header-button {
+	/* Keep host and community theme rules from restoring the duplicate control. */
+	display: none !important;
 }
 
 .crate-reminder-editor-modal,
@@ -13,7 +15,8 @@
 	display: flex;
 }
 
-.crate-reminder-editor-modal {
+.crate-reminder-editor-modal,
+.crate-reminders-compact-modal {
 	align-items: center;
 	justify-content: center;
 	pointer-events: none;
@@ -29,7 +32,8 @@
  * turns the native, intrinsically empty element into a zero-width containing
  * block for that overlay.
  */
-.modal.crate-reminder-editor-modal {
+.modal.crate-reminder-editor-modal,
+.modal.crate-reminders-compact-modal {
 	position: fixed !important;
 	inset: 0 !important;
 	width: auto !important;
@@ -44,7 +48,8 @@
 	scale: none !important;
 }
 
-.crate-reminder-editor-modal__content {
+.crate-reminder-editor-modal__content,
+.crate-reminders-compact-modal__content {
 	all: unset;
 	position: relative;
 	z-index: 10000;
@@ -64,29 +69,6 @@
 	flex-direction: column;
 	height: 100%;
 	overflow: hidden;
-}
-
-.crate-reminders-compact-modal {
-	align-items: center;
-	justify-content: center;
-	background: var(--background-modifier-cover);
-}
-
-.crate-reminders-compact-modal__content {
-	all: unset;
-	display: flex;
-	flex-direction: column;
-	width: 90vw;
-	max-width: 500px;
-	height: 85vh;
-	max-height: 700px;
-	overflow: hidden;
-	border: var(--modal-border-width, 1px) solid var(--modal-border-color, var(--background-modifier-border));
-	border-radius: var(--modal-radius, var(--radius-l, 12px));
-	background: var(--modal-background, var(--background-primary));
-	backdrop-filter: var(--blur-l, none);
-	-webkit-backdrop-filter: var(--blur-l, none);
-	box-shadow: var(--shadow-l);
 }
 
 .crate-confirmation-modal {

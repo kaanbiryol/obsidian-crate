@@ -54,11 +54,6 @@ export function registerReminderIntegrations(plugin: CratePlugin): void {
 		name: 'Open reminders sidebar',
 		callback: () => plugin.activateRemindersView(),
 	});
-	plugin.addCommand({
-		id: 'open-reminders-fullscreen',
-		name: 'Open reminders full screen',
-		callback: () => openFullScreenReminderModal(plugin),
-	});
 
 	if (plugin.remindersSettings.autoOpenView !== 'none') {
 		plugin.app.workspace.onLayoutReady(() => {

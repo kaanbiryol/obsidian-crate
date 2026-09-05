@@ -14,8 +14,6 @@ export interface ReminderRepository {
   complete(id: string): Promise<Reminder | undefined>;
   uncomplete(id: string): Promise<Reminder | undefined>;
   reorder(project: string, orderedIds: string[]): Promise<void>;
-
-  getStats(): { activeCount: number; completedCount: number; totalCount: number };
 }
 
 export interface ReminderRepositoryContext {
