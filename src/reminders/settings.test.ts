@@ -21,7 +21,6 @@ describe('normalizeRemindersSettings', () => {
 			upcomingDaysDefault: 14,
 			autoOpenView: 'fullscreen',
 			sidebarDefaultTab: 'today',
-			fullscreenDefaultTab: 'browse',
 			allDayNotificationTime: '09:00',
 		});
 
@@ -34,9 +33,8 @@ describe('normalizeRemindersSettings', () => {
 				today: { showCompleted: true },
 			},
 			upcomingDaysDefault: 14,
-			autoOpenView: 'fullscreen',
+			autoOpenView: 'sidebar',
 			sidebarDefaultTab: 'today',
-			fullscreenDefaultTab: 'browse',
 			allDayNotificationTime: '09:00',
 		});
 	});
@@ -50,13 +48,24 @@ describe('normalizeRemindersSettings', () => {
 			upcomingDaysDefault: 0,
 			autoOpenView: 'modal' as never,
 			sidebarDefaultTab: 'other' as never,
-			fullscreenDefaultTab: 'other' as never,
 		});
 
 		expect(settings).toEqual({
 			...DEFAULT_REMINDERS_SETTINGS,
 			enabled: true,
 		});
+	});
+
+	it('migrates full-screen startup preferences and drops the obsolete default tab', () => {
+		const saved = {
+			autoOpenView: 'fullscreen' as const,
+			sidebarDefaultTab: 'today' as const,
+			fullscreenDefaultTab: 'browse',
+		};
+		const settings = normalizeRemindersSettings(saved);
+		expect(settings.autoOpenView).toBe('sidebar');
+		expect(settings.sidebarDefaultTab).toBe('today');
+		expect(settings).not.toHaveProperty('fullscreenDefaultTab');
 	});
 
 	it('keeps reminders disabled for a new install until the user opts in', () => {

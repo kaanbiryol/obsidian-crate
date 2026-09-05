@@ -1,4 +1,4 @@
-import { Notice, Setting } from 'obsidian';
+import { Notice, Setting, type TextComponent } from 'obsidian';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
 import {
@@ -8,7 +8,6 @@ import {
 } from '../../reminders/plugin-integration';
 import { normalizeTimeString } from '../../reminders/settings';
 import type { SyncApiClient } from '../../sync/api';
-import { QRModal } from '../qr-modal';
 import { createSettingsSectionHeading } from './section-helpers';
 
 export interface NotificationsSectionContext {
@@ -24,7 +23,7 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 
 	new Setting(containerEl)
 		.setName('Enable push notifications')
-		.setDesc('Send push notifications for reminders')
+		.setDesc('Send reminder notifications to subscribed phones and browsers. Applies to all devices.')
 		.addToggle(toggle => {
 			toggle.setValue(plugin.settings.pushEnabled)
 				.onChange(async (value) => {
@@ -51,10 +50,13 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 
 	if (!plugin.settings.pushEnabled) return;
 
+	let timeInput: TextComponent;
 	new Setting(containerEl)
-		.setName('All-day reminder notification time')
-		.setDesc('Send notifications for date-only reminders at this time (24h format, e.g. 09:00)')
+		.setName('All-day notification time')
+		.setDesc('Choose a time for reminders with a date but no time. An empty time means off.')
 		.addText(text => {
+			timeInput = text;
+			text.inputEl.type = 'time';
 			text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '')
 				.setPlaceholder('09:00');
 			text.inputEl.maxLength = 5;
@@ -88,68 +90,22 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 					text.inputEl.blur();
 				}
 			});
-		});
+		})
+		.addButton(button => button.setButtonText('Turn off').onClick(async () => {
+			button.setDisabled(true);
+			try {
+				await plugin.writeRemindersSettings({ allDayNotificationTime: null });
+				timeInput.setValue('');
+				void reconcileReminderNotifications(plugin);
+			} catch (error) {
+				new Notice(`Failed to save notification time: ${errorMessage(error)}`);
+			} finally {
+				button.setDisabled(false);
+			}
+		}));
 
-	// Subscribe link + QR code
 	const apiClient = plugin.syncRuntime.getApiClient();
-	if (apiClient) {
-		new Setting(containerEl)
-			.setName('Reminders web app')
-			.setDesc('Create a short-lived link for opening reminders on another device. The web app can enable push notifications from that device after it opens.')
-			.addButton(button => {
-				button.setButtonText('Copy app link');
-				button.onClick(async () => {
-					button.setDisabled(true);
-					button.setButtonText('Creating...');
-					try {
-						const url = await buildEnrollmentUrl(plugin);
-						await navigator.clipboard.writeText(url);
-						new Notice('App link copied to clipboard');
-					} catch (error) {
-						new Notice(`Could not create app link: ${errorMessage(error)}`, 10000);
-					} finally {
-						button.setButtonText('Copy app link');
-						button.setDisabled(false);
-					}
-				});
-			})
-			.addButton(button => {
-				button.setButtonText('Show code');
-				button.onClick(async () => {
-					button.setDisabled(true);
-					button.setButtonText('Creating...');
-					try {
-						const url = await buildEnrollmentUrl(plugin);
-						new QRModal(plugin.app, url).open();
-					} catch (error) {
-						new Notice(`Could not create app code: ${errorMessage(error)}`, 10000);
-					} finally {
-						button.setButtonText('Show code');
-						button.setDisabled(false);
-					}
-				});
-			});
-
-		renderEnabledDevices(containerEl, plugin, apiClient);
-	}
-}
-
-async function buildEnrollmentUrl(plugin: CratePlugin): Promise<string> {
-	const apiClient = plugin.syncRuntime.getApiClient();
-	if (!apiClient) {
-		throw new Error('Sync API is unavailable');
-	}
-
-	const { token, browserToken } = await apiClient.createRemindersEnrollmentToken();
-	const subscribeUrl = new URL('notifications', `${apiClient.getWorkerUrl()}/`);
-	subscribeUrl.searchParams.set('token', token);
-	if (browserToken) subscribeUrl.searchParams.set('browserToken', browserToken);
-	subscribeUrl.searchParams.set('folder', plugin.remindersSettings.remindersFolderPath);
-	subscribeUrl.searchParams.set('upcomingDays', String(plugin.remindersSettings.upcomingDaysDefault ?? 7));
-	if (plugin.remindersSettings.allDayNotificationTime) {
-		subscribeUrl.searchParams.set('allDayTime', plugin.remindersSettings.allDayNotificationTime);
-	}
-	return subscribeUrl.toString();
+	if (apiClient) renderEnabledDevices(containerEl, plugin, apiClient);
 }
 
 function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, apiClient: SyncApiClient): void {
@@ -158,7 +114,7 @@ function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, api
 
 	new Setting(devicesContainer)
 		.setName('Enabled devices')
-		.setDesc('Phones and browsers currently registered to receive reminder push notifications.')
+		.setDesc('Phones and browsers set up to receive reminder push notifications.')
 		.addButton(button => {
 			button.setButtonText('Refresh');
 			button.onClick(async () => {
@@ -173,7 +129,7 @@ function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, api
 
 	new Setting(devicesContainer)
 		.setName('Test notification')
-		.setDesc('Send a test push to all enabled devices')
+		.setDesc('Send a test notification to all enabled devices.')
 		.addButton(button => {
 			button.setButtonText('Send test');
 			button.onClick(async () => {

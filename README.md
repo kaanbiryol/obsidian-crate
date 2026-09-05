@@ -138,7 +138,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 
 ## Reminders
 
-Crate stores reminders as Markdown in a configurable vault folder. Reminders are disabled on new installs until you explicitly adopt a folder in **Settings → Crate → Reminders**. Adoption scans that folder and adds stable `<!-- crate-id:... -->` comments to checkbox lines so reminders can be updated safely. The plugin then provides sidebar and full-screen reminder views and registers commands for creating reminders and opening projects.
+Crate stores reminders as Markdown in a configurable vault folder. Reminders are disabled on new installs until you explicitly adopt a folder in **Settings → Crate → Reminders**. Adoption scans that folder and adds stable `<!-- crate-id:... -->` comments to checkbox lines so reminders can be updated safely. The plugin then provides a reminders workspace view and registers commands for creating reminders and opening projects.
 
 Reminder code blocks can be embedded in notes:
 

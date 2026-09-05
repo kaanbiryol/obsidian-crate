@@ -1,4 +1,5 @@
-import { Notice, Setting } from 'obsidian';
+import { Notice, Setting, type ButtonComponent } from 'obsidian';
+import type { CachedDevicesState } from '../../plugin/settings-ui-state';
 import type CratePlugin from '../../main';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import { openConfirmationModal } from '../confirmation-modal';
@@ -9,64 +10,49 @@ export interface DevicesSectionContext {
 	plugin: CratePlugin;
 }
 
-export function renderDevicesSection(context: DevicesSectionContext): void {
+export function renderDevicesSection(context: DevicesSectionContext): () => void {
 	const { containerEl, plugin } = context;
 	const apiClient = plugin.syncRuntime.getApiClient();
+	if (!apiClient) return () => {};
 
-	if (!apiClient) {
-		return;
+	if (plugin.settingsUiState.devices?.client !== apiClient) {
+		plugin.settingsUiState.devices = { client: apiClient, tokens: null, pending: null };
 	}
+	const cache = plugin.settingsUiState.devices;
+	let disposed = false;
+	const isActive = () => !disposed && plugin.settingsUiState.devices === cache;
+	let refreshButton: ButtonComponent;
 
 	createSettingsSectionHeading(containerEl, 'Devices');
 	new Setting(containerEl)
 		.setName('Connected devices')
 		.setDesc('Remove sync access for devices you no longer use.')
-		.addButton((button) => {
-			button.setButtonText('Refresh');
-			button.onClick(async () => {
-				await loadDevices(listContainer, plugin);
-			});
+		.addButton(button => {
+			refreshButton = button.setButtonText('Refresh');
+			button.onClick(() => { void refresh(); });
 		});
 
 	const listContainer = containerEl.createDiv({ cls: 'crate-connected-devices' });
-	void loadDevices(listContainer, plugin);
-}
+	const statusEl = containerEl.createEl('p', { cls: 'setting-item-description' });
+	statusEl.setAttribute('role', 'status');
 
-async function loadDevices(container: HTMLElement, plugin: CratePlugin): Promise<void> {
-	container.empty();
-	const apiClient = plugin.syncRuntime.getApiClient();
-	if (!apiClient) {
-		container.createEl('p', {
-			text: 'Sync API is unavailable.',
-			cls: 'setting-item-description',
-		});
-		return;
-	}
-
-	try {
-		const { tokens } = await apiClient.listTokens();
-		const visibleTokens = orderDevices(tokens);
-		if (visibleTokens.length === 0) {
-			container.createEl('p', {
+	const renderList = () => {
+		listContainer.empty();
+		if (cache.tokens === null) return;
+		if (cache.tokens.length === 0) {
+			listContainer.createEl('p', {
 				text: 'No connected devices found yet.',
 				cls: 'setting-item-description',
 			});
-			return;
 		}
-
-		for (const token of visibleTokens) {
+		for (const token of orderDevices(cache.tokens)) {
 			const label = formatDeviceLabel(token);
-			const setting = new Setting(container)
+			const setting = new Setting(listContainer)
 				.setName(label)
 				.setDesc(formatDeviceDescription(token));
-
-			if (token.is_current) {
-				continue;
-			}
-
-			setting.addButton((button) => {
-				button.setButtonText('Remove');
-				button.setDestructive();
+			if (token.is_current) continue;
+			setting.addButton(button => {
+				button.setButtonText('Remove').setDestructive();
 				button.onClick(async () => {
 					const confirmed = await openConfirmationModal(plugin.app, {
 						title: 'Remove device',
@@ -75,26 +61,60 @@ async function loadDevices(container: HTMLElement, plugin: CratePlugin): Promise
 						confirmText: 'Remove device',
 						warning: true,
 					});
-					if (!confirmed) {
-						return;
-					}
-
+					if (!confirmed || !isActive()) return;
+					button.setDisabled(true);
 					try {
+						// Finish any earlier listing before invalidating this device.
+						await cache.pending?.catch(() => {});
+						if (!isActive()) return;
 						await apiClient.revokeToken(token.id);
+						cache.tokens = cache.tokens?.filter(device => device.id !== token.id) ?? null;
+						if (!isActive()) return;
+						renderList();
 						new Notice(`Removed ${label}`);
-						await loadDevices(container, plugin);
+						await refresh();
 					} catch {
-						new Notice('Failed to remove device');
+						if (isActive()) {
+							new Notice('Failed to remove device');
+							button.setDisabled(false);
+						}
 					}
 				});
 			});
 		}
-	} catch {
-		container.createEl('p', {
-			text: 'Failed to load connected devices.',
-			cls: 'setting-item-description',
-		});
+	};
+
+	async function refresh(): Promise<void> {
+		if (!isActive()) return;
+		refreshButton.setDisabled(true);
+		statusEl.setText(cache.tokens === null ? 'Loading devices…' : 'Refreshing devices…');
+		try {
+			await refreshDeviceCache(cache);
+			if (!isActive()) return;
+			renderList();
+			statusEl.setText('');
+		} catch {
+			if (!isActive()) return;
+			statusEl.setText(cache.tokens === null
+				? 'Failed to load connected devices.'
+				: 'Could not refresh devices. Showing the last loaded list.');
+		} finally {
+			if (isActive()) refreshButton.setDisabled(false);
+		}
 	}
+
+	renderList();
+	void refresh();
+	return () => { disposed = true; };
+}
+
+function refreshDeviceCache(cache: CachedDevicesState): Promise<void> {
+	if (!cache.pending) {
+		cache.pending = cache.client.listTokens()
+			.then(({ tokens }) => { cache.tokens = tokens; })
+			.finally(() => { cache.pending = null; });
+	}
+	return cache.pending;
 }
 
 function orderDevices(tokens: RegisteredDevice[]): RegisteredDevice[] {

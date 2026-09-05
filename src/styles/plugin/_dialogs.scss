@@ -6,7 +6,6 @@
 }
 
 .crate-reminder-editor-modal,
-.crate-reminders-fullscreen-modal,
 .crate-reminders-compact-modal {
 	all: unset;
 	position: fixed;
@@ -55,20 +54,6 @@
 	z-index: 10000;
 	display: block;
 	pointer-events: auto;
-}
-
-.crate-reminders-fullscreen-modal {
-	flex-direction: column;
-	background: var(--background-primary);
-}
-
-.crate-reminders-fullscreen-modal__content {
-	all: unset;
-	display: flex;
-	flex: 1;
-	flex-direction: column;
-	height: 100%;
-	overflow: hidden;
 }
 
 .crate-confirmation-modal {

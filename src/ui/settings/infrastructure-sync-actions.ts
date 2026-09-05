@@ -1,7 +1,5 @@
 import { Notice, Setting } from 'obsidian';
-import { setPluginDeviceId } from '../../plugin/deviceId';
 import { openConfirmationModal } from '../confirmation-modal';
-import { openRemoteRecoveryModal } from '../remote-recovery-modal';
 import {
 	createFileSyncProgress,
 	hideFileSyncProgress,
@@ -18,42 +16,9 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 		return;
 	}
 
-	new Setting(containerEl)
-		.setName('Test connection')
-		.setDesc('Verify that the plugin can connect to your sync server')
-		.addButton(button => button
-			.setButtonText('Test')
-			.onClick(async () => {
-				await runButtonTask({
-					button,
-					idleText: 'Test',
-					runningText: 'Testing...',
-					task: async () => plugin.syncRuntime.testConnection(),
-					onSuccess: (result) => {
-						if (result.success) {
-							new Notice('Connection successful');
-						} else {
-							new Notice(`Connection failed: ${result.error}`);
-						}
-					},
-					onError: () => {
-						new Notice('Connection test failed');
-					},
-				});
-			}));
-
-	new Setting(containerEl)
-		.setName('Device ID')
-		.setDesc('Unique identifier for this device. Stored locally and not shared through vault sync.')
-		.addText(text => text
-			.setValue(plugin.settings.deviceId)
-			.onChange((value) => {
-				setPluginDeviceId(plugin, value);
-			}));
-
 	const initialSyncSetting = new Setting(containerEl)
 		.setName('Initial sync')
-		.setDesc('Upload all local files to the server (use for first-time setup)')
+		.setDesc('Upload all local files included in sync. Use this when setting up a new server.')
 		.addButton(button => button
 			.setButtonText('Upload all')
 			.setDestructive()
@@ -100,7 +65,7 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 
 	const forceSyncSetting = new Setting(containerEl)
 		.setName('Force full sync')
-		.setDesc('Overwrite all remote files with local vault and remove remote-only files')
+		.setDesc('Replace the server copy of your vault with local files. Files found only on the server will be deleted.')
 		.addButton(button => button
 			.setButtonText('Force full update')
 			.setDestructive()
@@ -149,15 +114,8 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 	const forceProgress = createFileSyncProgress(forceSyncSetting);
 
 	new Setting(containerEl)
-		.setName('Restore remote file')
-		.setDesc('Restore a file that was replaced or deleted during the last 30 days')
-		.addButton(button => button
-			.setButtonText('View retained files')
-			.onClick(() => openRemoteRecoveryModal(plugin.app, plugin.syncRuntime)));
-
-	new Setting(containerEl)
 		.setName('Remove ignored remote files')
-		.setDesc('Delete remote copies that now match an ignore pattern; local files are not changed')
+		.setDesc('Review and delete server copies matching your exclusions. Local files are kept.')
 		.addButton(button => button
 			.setButtonText('Review and remove')
 			.setDestructive()

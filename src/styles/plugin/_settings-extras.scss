@@ -93,3 +93,33 @@ body.reduce-motion .crate-action-progress {
 .crate-diagnostic-fail {
 	color: var(--text-error);
 }
+
+.crate-settings .crate-settings-disclosure {
+	margin: 16px 0;
+}
+
+.crate-settings .crate-settings-disclosure > summary {
+	padding: 8px 0;
+	font-weight: var(--font-semibold);
+	cursor: pointer;
+}
+
+.crate-settings .crate-settings-disclosure > summary:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.crate-settings .crate-exclusions-preview {
+	max-height: 240px;
+	overflow: auto;
+	overflow-wrap: anywhere;
+	font-size: var(--font-ui-small);
+}
+
+.crate-settings .crate-sync-interval .setting-item-control {
+	flex-wrap: wrap;
+}
+
+.crate-settings input[type='number'] {
+	width: 100px;
+}

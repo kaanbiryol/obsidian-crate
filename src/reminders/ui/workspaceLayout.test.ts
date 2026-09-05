@@ -42,7 +42,23 @@ describe('activateOrRevealRemindersLeaf', () => {
 		expect(workspace.revealLeaf).toHaveBeenCalledWith(newLeaf);
 	});
 
-	it('leaves fullscreen/mobile flows untouched when no workspace leaf can be created', async () => {
+	it.each([true, false])('opens a linked project when an existing view is %s', async exists => {
+		const leaf = createLeaf();
+		const workspace = {
+			getLeavesOfType: vi.fn(() => exists ? [leaf] : []),
+			getRightLeaf: vi.fn(() => leaf),
+			revealLeaf: vi.fn(),
+		};
+		await activateOrRevealRemindersLeaf(workspace, 'reminders-view', 'Work');
+		expect(leaf.setViewState).toHaveBeenCalledExactlyOnceWith({
+			type: 'reminders-view',
+			active: true,
+			state: { project: 'Work' },
+		});
+		expect(workspace.revealLeaf).toHaveBeenCalledWith(leaf);
+	});
+
+	it('does not reveal a view when no workspace leaf can be created', async () => {
 		const workspace = {
 			getLeavesOfType: vi.fn(() => []),
 			getRightLeaf: vi.fn(() => null),

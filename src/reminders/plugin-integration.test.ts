@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 type RemindersSettingsStub = {
 	debugLogging: boolean;
 	remindersFolderPath: string;
-	autoOpenView: 'sidebar' | 'fullscreen' | 'none';
+	autoOpenView: 'sidebar' | 'none';
 };
 
 type FileWrittenCallback = (file: unknown) => Promise<void>;
@@ -62,7 +62,6 @@ const notificationCancelAll = vi.fn(async () => {});
 const notificationOnReminderChange = vi.fn<(...args: unknown[]) => Promise<{ success: boolean; error?: string }>>(
 	async () => ({ success: true }),
 );
-const openFullScreenReminderModal = vi.fn();
 
 let latestWriter: MockWriter;
 let latestWatcher: {
@@ -121,9 +120,6 @@ async function loadPluginIntegrationModule() {
 			unregister = latestWatcher.unregister;
 			constructor(public readonly plugin: unknown, public readonly reminderIndex: unknown) {}
 		},
-	}));
-	vi.doMock('./ui/adapters/modals', () => ({
-		openFullScreenReminderModal,
 	}));
 	vi.doMock('./ui/adapters/reminders-view', () => ({
 		RemindersView: class RemindersView {
@@ -192,7 +188,6 @@ beforeEach(() => {
 	notificationReconcile.mockReset();
 	notificationCancelAll.mockReset();
 	notificationOnReminderChange.mockReset();
-	openFullScreenReminderModal.mockReset();
 
 	latestWriter = {
 		setOnFileWritten: vi.fn((callback: FileWrittenCallback) => {
@@ -231,7 +226,6 @@ afterEach(() => {
 	vi.doUnmock('./commands');
 	vi.doUnmock('./services/notificationService');
 	vi.doUnmock('./services/vaultWatcher');
-	vi.doUnmock('./ui/adapters/modals');
 	vi.doUnmock('./ui/adapters/reminders-view');
 	vi.doUnmock('./utils/logger');
 });

@@ -10,8 +10,7 @@ import {
 const openConfirmationModal = vi.fn();
 
 async function flushMicrotasks(): Promise<void> {
-	await Promise.resolve();
-	await Promise.resolve();
+	for (let i = 0; i < 12; i++) await Promise.resolve();
 }
 
 async function loadDevicesSectionModule() {
@@ -79,6 +78,7 @@ describe('renderDevicesSection', () => {
 			containerEl: new FakeElement('div') as never,
 			plugin: {
 				app: {},
+				settingsUiState: { devices: null },
 				syncRuntime: {
 					getApiClient: () => ({
 						listTokens,
@@ -115,6 +115,7 @@ describe('renderDevicesSection', () => {
 			containerEl: containerEl as never,
 			plugin: {
 				app: {},
+				settingsUiState: { devices: null },
 				syncRuntime: {
 					getApiClient: () => ({
 						listTokens: vi.fn(async () => {
@@ -128,5 +129,76 @@ describe('renderDevicesSection', () => {
 		await flushMicrotasks();
 
 		expect(containerEl.collectText()).toContain('Failed to load connected devices.');
+	});
+});
+
+describe('device list caching', () => {
+	beforeEach(() => { resetObsidianUiMocks(); });
+	afterEach(() => {
+		vi.resetModules();
+		vi.doUnmock('obsidian');
+		vi.doUnmock('../confirmation-modal');
+		vi.doUnmock('./section-helpers');
+	});
+
+	const device = {
+		id: 'mac', device_id: 'device-mac', device_name: 'My Mac', platform: 'macos',
+		created_at: '2026-09-05 10:00:00', last_seen_at: null, is_current: true,
+	};
+
+	it('shows loading initially, then cached devices immediately while refreshing', async () => {
+		const { renderDevicesSection } = await loadDevicesSectionModule();
+		const listTokens = vi.fn<() => Promise<{ tokens: typeof device[] }>>();
+		let resolve!: (value: { tokens: typeof device[] }) => void;
+		listTokens.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+		const client = { listTokens };
+		const plugin = { settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => client } };
+		const first = new FakeElement('div');
+		const cleanup = renderDevicesSection({ containerEl: first as never, plugin: plugin as never });
+		expect(first.collectText()).toContain('Loading devices…');
+		resolve({ tokens: [device] });
+		await flushMicrotasks();
+		expect(first.collectText()).toContain('My Mac');
+		cleanup();
+
+		listTokens.mockReturnValueOnce(new Promise(() => {}));
+		const second = new FakeElement('div');
+		renderDevicesSection({ containerEl: second as never, plugin: plugin as never });
+		expect(second.collectText()).toContain('My Mac');
+		expect(second.collectText()).toContain('Refreshing devices…');
+		expect(listTokens).toHaveBeenCalledTimes(2);
+
+		const third = new FakeElement('div');
+		renderDevicesSection({ containerEl: third as never, plugin: plugin as never });
+		expect(third.collectText()).toContain('My Mac');
+		expect(listTokens).toHaveBeenCalledTimes(2);
+	});
+
+	it('retains the list when refreshing fails', async () => {
+		const { renderDevicesSection } = await loadDevicesSectionModule();
+		const listTokens = vi.fn().mockResolvedValueOnce({ tokens: [device] }).mockRejectedValueOnce(new Error('offline'));
+		const client = { listTokens };
+		const plugin = { settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => client } };
+		const container = new FakeElement('div');
+		renderDevicesSection({ containerEl: container as never, plugin: plugin as never });
+		await flushMicrotasks();
+		getSettingByName('Connected devices').buttons[0]?.click();
+		expect(container.collectText()).toContain('My Mac');
+		await flushMicrotasks();
+		expect(container.collectText()).toContain('My Mac');
+		expect(container.collectText()).toContain('Showing the last loaded list.');
+	});
+
+	it('does not show cached devices from a previous connection', async () => {
+		const { renderDevicesSection } = await loadDevicesSectionModule();
+		const client = { listTokens: vi.fn(() => new Promise(() => {})) };
+		const plugin = {
+			settingsUiState: { devices: { client: {}, tokens: [device], pending: null } },
+			syncRuntime: { getApiClient: () => client },
+		};
+		const container = new FakeElement('div');
+		renderDevicesSection({ containerEl: container as never, plugin: plugin as never });
+		expect(container.collectText()).not.toContain('My Mac');
+		expect(container.collectText()).toContain('Loading devices…');
 	});
 });

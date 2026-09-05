@@ -4,7 +4,7 @@
 
 import { App, PluginSettingTab } from 'obsidian';
 import type CratePlugin from '../main';
-import { renderConfigSection } from './settings/config-section';
+import { renderConfigSection, renderDisconnectSetting } from './settings/config-section';
 import { renderDevicesSection } from './settings/devices-section';
 import { renderInfrastructureSection } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
@@ -25,6 +25,8 @@ export class CrateSettingTab extends PluginSettingTab {
 		this.cleanup();
 
 		const { containerEl } = this;
+		const openSections = new Set(Array.from(containerEl.querySelectorAll<HTMLDetailsElement>('details[open]'))
+			.map(details => details.querySelector('summary')?.textContent));
 		containerEl.empty();
 		containerEl.addClass('crate-settings');
 
@@ -40,10 +42,10 @@ export class CrateSettingTab extends PluginSettingTab {
 		});
 
 		if (isConfigured) {
-			renderDevicesSection({
+			this.cleanupFns.push(renderDevicesSection({
 				containerEl,
 				plugin: this.plugin,
-			});
+			}));
 		}
 
 		if (sections.showSync) {
@@ -56,11 +58,11 @@ export class CrateSettingTab extends PluginSettingTab {
 		}
 
 		if (sections.showReminders) {
-			renderRemindersSection({
+			this.cleanupFns.push(renderRemindersSection({
 				containerEl,
 				plugin: this.plugin,
 				rerender: () => this.update(),
-			});
+			}));
 		}
 
 		if (sections.showNotifications) {
@@ -79,6 +81,11 @@ export class CrateSettingTab extends PluginSettingTab {
 				rerender: () => this.update(),
 			});
 		}
+		if (isConfigured) renderDisconnectSetting({ containerEl, plugin: this.plugin, rerender: () => this.update() });
+		for (const details of Array.from(containerEl.querySelectorAll<HTMLDetailsElement>('details'))) {
+			details.open = openSections.has(details.querySelector('summary')?.textContent);
+		}
+
 	}
 
 	hide(): void {

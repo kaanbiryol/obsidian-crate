@@ -5,12 +5,12 @@ import type { TabId } from './ui/layoutConstants';
 
 export type DueDateDefaultSetting = 'none' | 'today' | 'tomorrow';
 
-export type AutoOpenSetting = 'none' | 'sidebar' | 'fullscreen';
+export type AutoOpenSetting = 'none' | 'sidebar';
 
 export const DEFAULT_REMINDERS_FOLDER_PATH = 'Reminders';
 
 const VALID_DUE_DATE_DEFAULTS = new Set<string>(['none', 'today', 'tomorrow']);
-const VALID_AUTO_OPEN_SETTINGS = new Set<string>(['none', 'sidebar', 'fullscreen']);
+const VALID_AUTO_OPEN_SETTINGS = new Set<string>(['none', 'sidebar']);
 const VALID_TAB_IDS = new Set<string>(['inbox', 'today', 'upcoming', 'browse']);
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -27,7 +27,6 @@ export type RemindersSettings = {
 	upcomingDaysDefault: number;
 	autoOpenView: AutoOpenSetting;
 	sidebarDefaultTab: TabId;
-	fullscreenDefaultTab: TabId;
 	allDayNotificationTime: string | null;
 };
 
@@ -40,7 +39,6 @@ export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
 	upcomingDaysDefault: 7,
 	autoOpenView: 'none',
 	sidebarDefaultTab: 'inbox',
-	fullscreenDefaultTab: 'inbox',
 	allDayNotificationTime: null,
 };
 
@@ -140,7 +138,7 @@ export function normalizeRemindersFolderPath(rawPath: string | null | undefined)
 }
 
 export function normalizeRemindersSettings(
-	value: Partial<RemindersSettings> | null | undefined,
+	value: (Omit<Partial<RemindersSettings>, 'autoOpenView'> & { autoOpenView?: AutoOpenSetting | 'fullscreen' }) | null | undefined,
 ): RemindersSettings {
 	return {
 		// Settings saved by prerelease builds predate the explicit adoption flag.
@@ -161,16 +159,12 @@ export function normalizeRemindersSettings(
 			value?.upcomingDaysDefault,
 			DEFAULT_REMINDERS_SETTINGS.upcomingDaysDefault,
 		),
-		autoOpenView: isAutoOpenSetting(value?.autoOpenView)
+		autoOpenView: value?.autoOpenView === 'fullscreen' ? 'sidebar' : isAutoOpenSetting(value?.autoOpenView)
 			? value.autoOpenView
 			: DEFAULT_REMINDERS_SETTINGS.autoOpenView,
 		sidebarDefaultTab: normalizeTabId(
 			value?.sidebarDefaultTab,
 			DEFAULT_REMINDERS_SETTINGS.sidebarDefaultTab,
-		),
-		fullscreenDefaultTab: normalizeTabId(
-			value?.fullscreenDefaultTab,
-			DEFAULT_REMINDERS_SETTINGS.fullscreenDefaultTab,
 		),
 		allDayNotificationTime: normalizeTimeString(value?.allDayNotificationTime),
 	};

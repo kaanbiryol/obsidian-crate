@@ -2,7 +2,6 @@ import { Notice } from "obsidian";
 import { SecretStorageService } from "./secret-storage";
 import { createLogger, errorMessage } from "./logger";
 import { CrateSettingTab } from "../ui/settings-tab";
-import { openFullScreenReminderModal } from "../reminders/ui/adapters/modals";
 import { initializeReminders, reconcileReminderNotifications } from "../reminders/plugin-integration";
 import {
   initializeSyncManagers,
@@ -127,7 +126,10 @@ function registerPluginProtocols(plugin: CratePlugin): void {
       plugin.openSettingsTab();
       return;
     }
-    openFullScreenReminderModal(plugin, params.project || undefined);
+    void plugin.activateRemindersView(params.project || undefined).catch((error: unknown) => {
+      logger.error("Failed to open reminders:", errorMessage(error));
+      new Notice("Could not open reminders. Please try again.");
+    });
   });
 }
 

@@ -154,6 +154,15 @@ export class MockButtonComponent {
 }
 
 class FakeTextInput {
+	tagName = 'INPUT';
+	hidden = false;
+	min = '';
+	max = '';
+	step = '';
+	required = false;
+	readOnly = false;
+	setAttribute(_name: string, _value: string): void {}
+	focus(): void {}
 	value = '';
 	maxLength = 0;
 	placeholder = '';
@@ -229,6 +238,18 @@ export class MockToggleComponent {
 	}
 }
 
+export class MockDropdownComponent {
+	value = '';
+	disabled = false;
+	readonly options = new Map<string, string>();
+	private handler?: (value: string) => unknown;
+	addOption(value: string, label: string): this { this.options.set(value, label); return this; }
+	setValue(value: string): this { this.value = value; return this; }
+	setDisabled(value: boolean): this { this.disabled = value; return this; }
+	onChange(handler: (value: string) => unknown): this { this.handler = handler; return this; }
+	async change(value: string): Promise<void> { this.value = value; await this.handler?.(value); }
+}
+
 export class MockSetting {
 	static instances: MockSetting[] = [];
 
@@ -239,6 +260,7 @@ export class MockSetting {
 	readonly controlEl: FakeElement;
 	readonly buttons: MockButtonComponent[] = [];
 	readonly texts: MockTextComponent[] = [];
+	readonly dropdowns: MockDropdownComponent[] = [];
 	readonly toggles: MockToggleComponent[] = [];
 
 	constructor(containerEl: FakeElement) {
@@ -281,6 +303,21 @@ export class MockSetting {
 		const text = new MockTextComponent();
 		this.texts.push(text);
 		callback(text);
+		return this;
+	}
+
+	addTextArea(callback: (text: MockTextComponent) => unknown): this {
+		const text = new MockTextComponent();
+		text.inputEl.tagName = 'TEXTAREA';
+		this.texts.push(text);
+		callback(text);
+		return this;
+	}
+
+	addDropdown(callback: (dropdown: MockDropdownComponent) => unknown): this {
+		const dropdown = new MockDropdownComponent();
+		this.dropdowns.push(dropdown);
+		callback(dropdown);
 		return this;
 	}
 

@@ -33,7 +33,7 @@ async function loadNotificationsSectionModule() {
 		},
 	}));
 
-	return import('./notifications-section');
+	return { ...await import('./notifications-section'), ...await import('./reminders-web-app') };
 }
 
 function getSettingByName(name: string): MockSetting {
@@ -86,10 +86,29 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 
 		expect(getSettingByName('Enable push notifications')).toBeTruthy();
-		expect(getSettingByName('Reminders web app').descEl.textContent).toContain('short-lived link');
+		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Reminders web app')).toBe(false);
 		expect(getSettingByName('Enabled devices').descEl.textContent).toContain('receive reminder push notifications');
 		expect(getSettingByName('iPhone').descEl.textContent).toContain('Subscribed');
-		expect(getSettingByName('Test notification').descEl.textContent).toBe('Send a test push to all enabled devices');
+		expect(getSettingByName('Test notification').descEl.textContent).toBe('Send a test notification to all enabled devices.');
+	});
+
+	it('provides a time picker and an explicit way to turn all-day notifications off', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const plugin = createPlugin({
+			getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
+		}) as unknown as { writeRemindersSettings: ReturnType<typeof vi.fn> };
+		renderNotificationsSection({
+			containerEl: new FakeElement('div') as never,
+			plugin: plugin as never,
+			rerender: vi.fn(),
+		});
+		const setting = getSettingByName('All-day notification time');
+		expect(setting.texts[0]?.inputEl.type).toBe('time');
+		setting.buttons[0]?.click();
+		await flushMicrotasks();
+		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ allDayNotificationTime: null });
+		expect(setting.texts[0]?.inputEl.value).toBe('');
+		expect(reconcileReminderNotifications).toHaveBeenCalled();
 	});
 
 	it('cancels existing schedules before disabling push notifications', async () => {
@@ -198,19 +217,15 @@ describe('renderNotificationsSection', () => {
 	});
 
 	it('shows the Worker error when an app code cannot be created', async () => {
-		const { renderNotificationsSection } = await loadNotificationsSectionModule();
-		renderNotificationsSection({
-			containerEl: new FakeElement('div') as never,
-			plugin: createPlugin({
+		const { renderRemindersWebApp } = await loadNotificationsSectionModule();
+		renderRemindersWebApp(new FakeElement('div') as never, createPlugin({
 				createRemindersEnrollmentToken: vi.fn(async () => {
 					throw new Error('Invalid token');
 				}),
 				getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
 				deletePushSubscription: vi.fn(),
 				testPush: vi.fn(async () => ({ sent: 0, failed: 0, pruned: 0, errors: [] })),
-			}),
-			rerender: vi.fn(),
-		});
+			}));
 		await flushMicrotasks();
 
 		const showCodeButton = getSettingByName('Reminders web app').buttons[1];
@@ -223,20 +238,17 @@ describe('renderNotificationsSection', () => {
 	});
 
 	it('builds the app code from the active API endpoint when persisted settings are stale', async () => {
-		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		const { renderRemindersWebApp } = await loadNotificationsSectionModule();
 		const plugin = createPlugin({
 			getWorkerUrl: vi.fn(() => 'https://active-worker.example.com'),
 			getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
 			deletePushSubscription: vi.fn(),
 			testPush: vi.fn(async () => ({ sent: 0, failed: 0, pruned: 0, errors: [] })),
-		}) as unknown as { settings: { workerUrl: string } };
+		}) as unknown as { settings: { workerUrl: string; pushEnabled: boolean } };
 		plugin.settings.workerUrl = '';
+		plugin.settings.pushEnabled = false;
 
-		renderNotificationsSection({
-			containerEl: new FakeElement('div') as never,
-			plugin: plugin as never,
-			rerender: vi.fn(),
-		});
+		renderRemindersWebApp(new FakeElement('div') as never, plugin as never);
 		await flushMicrotasks();
 
 		getSettingByName('Reminders web app').buttons[1]?.click();

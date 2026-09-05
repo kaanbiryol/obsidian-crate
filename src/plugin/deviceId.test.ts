@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ensurePluginDeviceId, setPluginDeviceId } from './deviceId';
+import { ensurePluginDeviceId } from './deviceId';
 import { SECRET_KEYS } from './settings-types';
 
 function createPlugin(options?: {
@@ -67,29 +67,5 @@ describe('ensurePluginDeviceId', () => {
 
 		expect(plugin.settings.deviceId).toBe('device-abcdefgh');
 		expect(plugin.secretStorage.set).toHaveBeenCalledWith(SECRET_KEYS.DEVICE_ID, 'device-abcdefgh');
-	});
-});
-
-describe('setPluginDeviceId', () => {
-	it('writes the edited deviceId into local secret storage', () => {
-		const plugin = createPlugin();
-
-		setPluginDeviceId(plugin as never, '  device-manual  ');
-
-		expect(plugin.secretStorage.set).toHaveBeenCalledWith(SECRET_KEYS.DEVICE_ID, 'device-manual');
-		expect(plugin.settings.deviceId).toBe('device-manual');
-	});
-
-	it('removes the local secret when the deviceId field is cleared', () => {
-		const plugin = createPlugin({
-			secrets: {
-				[SECRET_KEYS.DEVICE_ID]: 'device-existing',
-			},
-		});
-
-		setPluginDeviceId(plugin as never, '   ');
-
-		expect(plugin.secretStorage.delete).toHaveBeenCalledWith(SECRET_KEYS.DEVICE_ID);
-		expect(plugin.settings.deviceId).toBe('');
 	});
 });
