@@ -141,13 +141,14 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
         />
     ), [isDarkMode, triggerRefresh]);
 
-    const handleReorder = useCallback((project: string, orderedIds: string[]) => {
-        void persistReminderOrder(
+    const handleReorder = useCallback(async (project: string, orderedIds: string[]) => {
+        await persistReminderOrder(
             plugin.reminderRepository,
             project,
             orderedIds,
             updateReminders,
         );
+        updateReminders();
     }, [plugin, updateReminders]);
 
     return (

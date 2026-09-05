@@ -92,8 +92,7 @@
     }
 }
 
-.pwa-shadow-root .reminder-render-item,
-.pwa-shadow-root .reorderable-reminder-item:not(.is-reordering):not(.is-long-press-armed) {
+.pwa-shadow-root .reminder-render-item {
     content-visibility: auto;
     contain-intrinsic-block-size: auto 88px;
 }

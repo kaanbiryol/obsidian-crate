@@ -532,7 +532,7 @@ describe('plugin reminder layout styles', () => {
     expect(cardStyles).not.toContain('min-height: 80px');
   });
 
-  it('scales the reminder card and its reorder handle as one pressed item', async () => {
+  it('isolates drag lift from row layout and completion motion', async () => {
     const primaryStyles = await readFile(
       new URL('./shared/styles/_primary-screen.scss', import.meta.url),
       'utf8',
@@ -542,9 +542,12 @@ describe('plugin reminder layout styles', () => {
       'utf8',
     );
 
-    expect(reorderableComponent).toContain(
-      'whileTap={usesLongPress || reduceMotion ? undefined : { scale: 0.99 }}',
-    );
+    expect(reorderableComponent).toContain('dragMomentum={false}');
+    expect(reorderableComponent).toContain('className="reminder-drag-surface"');
+    expect(reorderableComponent).toContain('REMINDER_DRAG_SCALE');
+    const row = reorderableComponent.match(/<Reorder.Item([\s\S]*?)>/)?.[1];
+    expect(row).not.toContain('scale:');
+    expect(reorderableComponent).not.toContain('layoutId=');
     expect(primaryStyles).toContain(
       '.reorderable-reminder-item[data-reorder-interaction="handle"]',
     );

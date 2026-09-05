@@ -162,7 +162,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 
 	const handleReorder = useCallback((orderedIds: string[]) => {
 		if (!currentProject) return;
-		void onReorder(currentProject, orderedIds);
+		return onReorder(currentProject, orderedIds);
 	}, [currentProject, onReorder]);
 
 	const viewPanels = (

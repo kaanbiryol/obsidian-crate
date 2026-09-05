@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect, useRef, memo } from 'react';
+import React, { useMemo, useState, useId, memo } from 'react';
 import { LayoutGroup, motion } from 'framer-motion';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
@@ -11,6 +11,7 @@ import { CompletedReminderSection } from './CompletedReminderSection';
 import { ProjectDetailHeader } from './ProjectDetailHeader';
 import { buildProjectDetailHeaderViewModel, buildProjectDetailViewModel } from './viewModels';
 import type { ProjectColorScheme } from '../../utils/projectColors';
+import { useReminderOrder } from '../hooks/useReminderOrder';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 import { ThemeIcon } from '../../components/theme-icon';
 
@@ -27,7 +28,7 @@ export interface ProjectDetailViewProps {
   /** Custom class name for the container */
   className?: string;
   /** Callback when reminders are reordered via drag */
-  onReorder?: (orderedIds: string[]) => void;
+  onReorder?: (orderedIds: string[]) => Promise<void> | void;
   onReorderDragActiveChange?: (active: boolean) => void;
   reorderInteraction?: 'handle' | 'long-press';
   colorScheme?: ProjectColorScheme;
@@ -53,8 +54,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   colorScheme = 'dark',
 }: ProjectDetailViewProps) {
   const [showCompleted, setShowCompleted] = useState(false);
-  const [isReordering, setIsReordering] = useState(false);
-  const scrollRef = useStableReminderScroll(isReordering);
+  const layoutGroupId = useId();
 
   const detail = useMemo(() => {
     return buildProjectDetailViewModel(reminders, project, colorScheme);
@@ -65,25 +65,8 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   );
   const { active, completed } = detail;
 
-  // Local state for optimistic reorder (visual only during drag)
-  const [localOrder, setLocalOrder] = useState<Reminder[]>(active);
-  const isDraggingRef = useRef(false);
-
-  useEffect(() => {
-    if (!isDraggingRef.current) {
-      setLocalOrder(active);
-    }
-  }, [active]);
-
-  const handleDragActiveChange = useCallback((active: boolean) => {
-    isDraggingRef.current = active;
-    setIsReordering(active);
-    onReorderDragActiveChange?.(active);
-  }, [onReorderDragActiveChange]);
-
-  const handleReorderCommit = useCallback((orderedIds: string[]) => {
-    onReorder?.(orderedIds);
-  }, [onReorder]);
+  const order = useReminderOrder(active, onReorder, onReorderDragActiveChange);
+  const scrollRef = useStableReminderScroll(order.isDragging);
 
   const hasContent = active.length > 0 || completed.length > 0;
 
@@ -132,15 +115,16 @@ export const ProjectDetailView = memo(function ProjectDetailView({
           layoutScroll
           className={`flex-1 overflow-y-scroll ios-scroll reminders-view-scroll will-change-transform${hasFab ? ' has-fab' : ''}`}
         >
-          <LayoutGroup id={`project-${project}-reminder-sections`}>
+          <LayoutGroup id={layoutGroupId}>
             {/* Active reminders */}
             <ReorderableReminderList
-              reminders={localOrder}
-              onReorder={setLocalOrder}
-              onReorderCommit={handleReorderCommit}
-              onDragActiveChange={handleDragActiveChange}
+              reminders={order.displayedOrder}
+              onReorder={order.onReorder}
+              onReorderCommit={order.onCommit}
+              onDragActiveChange={order.onDragChange}
               renderCard={cardRenderer}
               interaction={reorderInteraction}
+              animationsEnabled={animationConfig.enabled}
             />
 
             <CompletedReminderSection

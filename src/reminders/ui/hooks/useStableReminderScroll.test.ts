@@ -8,37 +8,37 @@ const anchor = (id: string, section: string, top: number): ReminderScrollAnchor 
 });
 
 describe('calculateStableScrollAdjustment', () => {
-  it('keeps the moving reminder on screen when its destination is visible', () => {
+  it('does not chase a completed reminder into another section', () => {
     const adjustment = calculateStableScrollAdjustment(
       [anchor('moving', 'active', 20), anchor('stable', 'active', 104)],
       [anchor('stable', 'active', 20), anchor('moving', 'completed', 320)],
     );
 
-    expect(adjustment).toBe(300);
+    expect(adjustment).toBeNull();
   });
 
-  it('follows a reminder returning to the active section', () => {
+  it('does not scroll to follow a reminder returning to active', () => {
     const adjustment = calculateStableScrollAdjustment(
       [anchor('moving', 'completed', 160)],
       [anchor('moving', 'active', 24)],
     );
 
-    expect(adjustment).toBe(-136);
+    expect(adjustment).toBeNull();
   });
 
-  it('falls back to an unchanged reminder when the destination is collapsed', () => {
+  it('lets visible neighbors animate when the destination is collapsed', () => {
     const adjustment = calculateStableScrollAdjustment(
       [anchor('moving', 'active', 20), anchor('stable', 'active', 104)],
       [anchor('stable', 'active', 20)],
     );
 
-    expect(adjustment).toBe(-84);
+    expect(adjustment).toBeNull();
   });
 
   it('compensates when a reminder is inserted above the viewport', () => {
     const adjustment = calculateStableScrollAdjustment(
-      [anchor('stable', 'active', 18)],
-      [anchor('new', 'active', 18), anchor('stable', 'active', 102)],
+      [anchor('stable', 'active', -18)],
+      [anchor('stable', 'active', 66)],
     );
 
     expect(adjustment).toBe(84);

@@ -1,13 +1,14 @@
 import React, { useMemo, memo } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, LayoutGroup } from 'framer-motion';
 
 import type { AnimationConfig } from '../../types/componentAdapter';
 import type { Reminder } from '../../types/reminder';
 import { formatDateHeader } from '../../utils/dateFormatting';
+import { ReminderListPresence } from '../../components/ReminderListPresence';
 import { ReminderCard } from '../../components/ReminderCard';
 import { EmptyState } from '../../components/EmptyState';
 import { buildUpcomingViewModel } from './viewModels';
-import { STAGGERED_CARD_ANIMATION } from '../layoutConstants';
+import { ReminderMotionRow } from '../../components/ReminderMotionRow';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useStableReminderScroll } from '../hooks/useStableReminderScroll';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
@@ -44,7 +45,7 @@ export const UpcomingView = memo(function UpcomingView({
   const { upcomingReminders, dateGroups } = useMemo(() => {
     return buildUpcomingViewModel(reminders, days);
   }, [reminders, days]);
-	const enableListAnimations = animationConfig.enabled && !reduceMotion && upcomingReminders.length <= 80;
+  const enableListAnimations = animationConfig.enabled && !reduceMotion && upcomingReminders.length <= 80;
 
   // Default card renderer
   const defaultRenderCard = (reminder: Reminder, index: number) => (
@@ -75,7 +76,8 @@ export const UpcomingView = memo(function UpcomingView({
 
   return (
     <div className={`flex flex-col h-full relative ${className}`}>
-      <div
+      <motion.div
+        layoutScroll
         ref={scrollRef}
         className={`flex-1 overflow-y-auto ios-scroll reminders-view-scroll${hasFab ? ' has-fab' : ''}`}
       >
@@ -89,29 +91,23 @@ export const UpcomingView = memo(function UpcomingView({
                 {formatDateHeader(group.date)}
               </h2>
               <LayoutGroup>
-                <AnimatePresence mode="popLayout" initial={false}>
+                <ReminderListPresence>
                   {group.reminders.map((reminder, index) => (
-                    <motion.div
+                    <ReminderMotionRow
                       key={reminder.id}
-					  layout={enableListAnimations ? 'position' : false}
-                      custom={index}
-					  initial={enableListAnimations ? STAGGERED_CARD_ANIMATION.initial : false}
-					  animate={enableListAnimations ? STAGGERED_CARD_ANIMATION.animate(index) : { opacity: 1 }}
-					  exit={enableListAnimations ? STAGGERED_CARD_ANIMATION.exit : undefined}
-					  className="mb-2 reminder-render-item"
-                      data-reminder-scroll-anchor="true"
-                      data-reminder-id={reminder.id}
-                      data-reminder-section="active"
+                      id={reminder.id}
+                      section="active"
+                      animationsEnabled={enableListAnimations}
                     >
                       {cardRenderer(reminder, index)}
-                    </motion.div>
+                    </ReminderMotionRow>
                   ))}
-                </AnimatePresence>
+                </ReminderListPresence>
               </LayoutGroup>
             </div>
           ))}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 });

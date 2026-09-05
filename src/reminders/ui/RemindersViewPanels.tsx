@@ -32,7 +32,7 @@ interface RemindersViewPanelsProps {
   }) => React.ReactNode;
   onProjectSelect: (project: string) => void;
   onBackToProjects: () => void;
-  onReorder: (orderedIds: string[]) => void;
+  onReorder: (orderedIds: string[]) => Promise<void> | void;
   onReorderDragActiveChange?: (active: boolean) => void;
   colorScheme: ProjectColorScheme;
   reorderInteraction?: 'handle' | 'long-press';

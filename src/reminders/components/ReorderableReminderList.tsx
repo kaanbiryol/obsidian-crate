@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, Reorder, useDragControls } from 'framer-motion';
+import React, { useCallback, useEffect, useRef, useState, forwardRef } from 'react';
+import { motion, Reorder, useDragControls, useIsPresent } from 'framer-motion';
 import { ThemeIcon } from './theme-icon';
 import type { Reminder } from '../types/reminder';
-import { REMINDER_LIST_LAYOUT_TRANSITION } from '../ui/layoutConstants';
+import { ReminderListPresence } from './ReminderListPresence';
+import { REMINDER_DRAG_SCALE, REMINDER_LIST_LAYOUT_TRANSITION, REMINDER_SECTION_TRANSITION } from '../ui/layoutConstants';
+import { reminderRowMotion } from '../ui/reminderRowMotion';
 import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 
 interface ReorderableReminderListProps {
@@ -12,6 +14,7 @@ interface ReorderableReminderListProps {
   onDragActiveChange?: (active: boolean) => void;
   renderCard: (reminder: Reminder, index: number) => React.ReactNode;
   interaction?: 'handle' | 'long-press';
+  animationsEnabled?: boolean;
 }
 
 interface ReorderableItemProps {
@@ -21,8 +24,7 @@ interface ReorderableItemProps {
   onDragStart: () => void;
   onDragEnd: () => void;
   interaction: 'handle' | 'long-press';
-	enableLayoutAnimations: boolean;
-  reduceMotion: boolean;
+  enableLayoutAnimations: boolean;
 }
 
 const LONG_PRESS_DELAY_MS = 380;
@@ -31,15 +33,16 @@ const LONG_PRESS_INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, [co
 
 const LARGE_LIST_ANIMATION_LIMIT = 80;
 
-function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction, enableLayoutAnimations, reduceMotion }: ReorderableItemProps) {
+const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction, enableLayoutAnimations }: ReorderableItemProps, ref) {
+  const isPresent = useIsPresent();
+  const rowMotion = reminderRowMotion(enableLayoutAnimations);
+  const [isHandlePressed, setIsHandlePressed] = useState(false);
   const didDragRef = useRef(false);
   const dragControls = useDragControls();
   const longPressTimerRef = useRef<number | null>(null);
   const pressStartRef = useRef<{ x: number; y: number } | null>(null);
   const [isLongPressArmed, setIsLongPressArmed] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
-  const isLifted = isLongPressArmed || isReordering;
-  const usesLongPress = interaction === 'long-press';
 
   const cancelLongPress = useCallback(() => {
     if (longPressTimerRef.current !== null) {
@@ -48,9 +51,21 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
     }
     pressStartRef.current = null;
     setIsLongPressArmed(false);
+    setIsHandlePressed(false);
   }, []);
 
   useEffect(() => cancelLongPress, [cancelLongPress]);
+
+  useEffect(() => {
+    if (!isHandlePressed && !isLongPressArmed) return;
+    // A drag may be released outside the row, where its pointer-up won't bubble.
+    window.addEventListener('pointerup', cancelLongPress);
+    window.addEventListener('pointercancel', cancelLongPress);
+    return () => {
+      window.removeEventListener('pointerup', cancelLongPress);
+      window.removeEventListener('pointercancel', cancelLongPress);
+    };
+  }, [cancelLongPress, isHandlePressed, isLongPressArmed]);
 
   const handleDragStart = useCallback(() => {
     cancelLongPress();
@@ -60,6 +75,7 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
   }, [cancelLongPress, onDragStart]);
 
   const handleDragEnd = useCallback(() => {
+    cancelLongPress();
     setIsReordering(false);
     onDragEnd();
     // Suppress the click event that fires after drag release
@@ -67,7 +83,7 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
     window.requestAnimationFrame(() => {
       didDragRef.current = false;
     });
-  }, [onDragEnd]);
+  }, [cancelLongPress, onDragEnd]);
 
   const handleClickCapture = useCallback((e: React.MouseEvent) => {
     if (didDragRef.current) {
@@ -78,6 +94,7 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
 
   const handleDragHandlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
+    setIsHandlePressed(true);
     dragControls.start(e);
   }, [dragControls]);
 
@@ -109,7 +126,14 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
 
   return (
     <Reorder.Item
+      {...rowMotion}
+      ref={ref}
       as="div"
+      dragMomentum={false}
+      dragTransition={{
+        bounceStiffness: REMINDER_LIST_LAYOUT_TRANSITION.stiffness,
+        bounceDamping: REMINDER_LIST_LAYOUT_TRANSITION.damping,
+      }}
       value={reminder}
       dragListener={false}
       dragControls={dragControls}
@@ -121,34 +145,29 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
       onPointerUp={cancelLongPress}
       onPointerCancel={cancelLongPress}
       onContextMenu={interaction === 'long-press' ? (event) => event.preventDefault() : undefined}
-	  layout={enableLayoutAnimations ? 'position' : undefined}
+      layout="position"
       layoutDependency={index}
-      data-reminder-scroll-anchor="true"
+      data-reminder-scroll-anchor={isPresent ? 'true' : undefined}
+      aria-hidden={!isPresent || undefined}
+      inert={!isPresent}
       data-reminder-id={reminder.id}
       data-reminder-section="active"
       data-reorder-interaction={interaction}
       className={`reorderable-reminder-item mb-2${isLongPressArmed ? ' is-long-press-armed' : ''}${isReordering ? ' is-reordering' : ''}`}
-      animate={usesLongPress && !reduceMotion ? { scale: isLifted ? 1.02 : 1 } : undefined}
-      whileTap={usesLongPress || reduceMotion ? undefined : { scale: 0.99 }}
-      whileDrag={usesLongPress || reduceMotion ? { zIndex: 50 } : { scale: 1.02, zIndex: 50 }}
-      transition={usesLongPress
-        ? {
-            layout: REMINDER_LIST_LAYOUT_TRANSITION,
-            scale: { type: 'spring', stiffness: 420, damping: 31, mass: 0.68 },
-          }
-        : {
-            layout: REMINDER_LIST_LAYOUT_TRANSITION,
-          }}
+      whileDrag={{ zIndex: 50 }}
+      transition={{
+        layout: enableLayoutAnimations ? REMINDER_LIST_LAYOUT_TRANSITION : { duration: 0 },
+        ...rowMotion.transition,
+      }}
     >
       <motion.div
-        layoutId={`reminder-card-${reminder.id}`}
-        layoutCrossfade={false}
-		layout={enableLayoutAnimations ? 'position' : false}
-        layoutDependency={reminder.id}
-        transition={{ layout: REMINDER_LIST_LAYOUT_TRANSITION }}
+        className="reminder-drag-surface"
+        initial={false}
+        animate={{ scale: enableLayoutAnimations && (isHandlePressed || isLongPressArmed || isReordering) ? REMINDER_DRAG_SCALE : 1 }}
+        transition={enableLayoutAnimations ? REMINDER_SECTION_TRANSITION : { duration: 0 }}
+        style={{ position: 'relative', display: 'flow-root' }}
       >
         {renderCard(reminder, index)}
-      </motion.div>
       {interaction === 'handle' && (
         <button
           className="reorder-drag-handle"
@@ -163,9 +182,10 @@ function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, 
           <ThemeIcon size="xs" id="grip-vertical" aria-hidden="true" />
         </button>
       )}
+      </motion.div>
     </Reorder.Item>
   );
-}
+});
 
 export function ReorderableReminderList({
   reminders,
@@ -174,9 +194,10 @@ export function ReorderableReminderList({
   onDragActiveChange,
   renderCard,
   interaction = 'handle',
+  animationsEnabled = true,
 }: ReorderableReminderListProps) {
   const reduceMotion = useObsidianReducedMotion();
-	const enableLayoutAnimations = !reduceMotion && reminders.length <= LARGE_LIST_ANIMATION_LIMIT;
+  const enableLayoutAnimations = animationsEnabled && !reduceMotion && reminders.length <= LARGE_LIST_ANIMATION_LIMIT;
   const latestOrderRef = useRef(reminders);
   latestOrderRef.current = reminders;
   const orderBeforeDragRef = useRef<string[]>([]);
@@ -204,19 +225,20 @@ export function ReorderableReminderList({
       values={reminders}
       onReorder={onReorder}
     >
-      {reminders.map((reminder, index) => (
-        <ReorderableItem
-          key={reminder.id}
-          reminder={reminder}
-          index={index}
-          renderCard={renderCard}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          interaction={interaction}
-		  enableLayoutAnimations={enableLayoutAnimations}
-          reduceMotion={reduceMotion}
-        />
-      ))}
+      <ReminderListPresence>
+        {reminders.map((reminder, index) => (
+          <ReorderableItem
+            key={reminder.id}
+            reminder={reminder}
+            index={index}
+            renderCard={renderCard}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            interaction={interaction}
+            enableLayoutAnimations={enableLayoutAnimations}
+          />
+        ))}
+      </ReminderListPresence>
     </Reorder.Group>
   );
 }

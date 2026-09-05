@@ -52,7 +52,7 @@ interface PluginRemindersAppShellProps {
   suppressFab?: boolean;
   renderCard: PluginReminderCardRenderer;
   onAdd: (defaultProject: string) => void;
-  onReorder: (project: string, orderedIds: string[]) => void;
+  onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
   onReorderDragActiveChange?: (active: boolean) => void;
   reorderInteraction?: 'handle' | 'long-press';
 }
@@ -186,7 +186,7 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
 
   const handleReorder = useCallback((orderedIds: string[]) => {
     if (!currentProject) return;
-    onReorder(currentProject, orderedIds);
+    return onReorder(currentProject, orderedIds);
   }, [currentProject, onReorder]);
 
   const viewPanels = (
