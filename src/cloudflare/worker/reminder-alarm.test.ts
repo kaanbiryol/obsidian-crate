@@ -50,7 +50,10 @@ function createHarness() {
 	};
 	const first = vi.fn(async (): Promise<typeof scheduledReminder | null> => scheduledReminder);
 	const db = {
-		prepare: vi.fn(() => ({ bind: vi.fn(() => ({ run, first })) })),
+		prepare: vi.fn((sql: string) => ({ bind: vi.fn(() => ({ run, first: sql.includes('LEFT JOIN reminder_projections')
+            ? async () => ({ file_revision: 'source', storage_key: 'source', pending_path: null, enabled: 1,
+                notification_token: scheduledReminder.schedule_token, policy_revision: 'policy', current_policy_revision: 'policy' })
+            : first })) })),
 	} as unknown as D1Database;
 	return {
 		alarm: new ReminderAlarm(state, { DB: db }),
@@ -76,7 +79,7 @@ describe('reminder alarm delivery', () => {
 		expect(response.status).toBe(200);
 		expect(harness.run).toHaveBeenCalledOnce();
 		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
-		expect(harness.deleteAll).toHaveBeenCalledOnce();
+		expect(harness.storedValues.has('reminder')).toBe(false);
 	});
 
 	it('retries only subscriptions whose push delivery failed', async () => {
@@ -105,7 +108,7 @@ describe('reminder alarm delivery', () => {
 		expect(harness.storedValues.get('retryAttempt')).toBe(1);
 		expect(harness.setAlarm).toHaveBeenCalledOnce();
 		expect(harness.run).not.toHaveBeenCalled();
-		expect(harness.deleteAll).not.toHaveBeenCalled();
+		expect(harness.storedValues.has('reminder')).toBe(true);
 
 		await harness.alarm.alarm();
 
@@ -117,7 +120,7 @@ describe('reminder alarm delivery', () => {
 			subscriptionIds: ['subscription-2'],
 		});
 		expect(harness.run).toHaveBeenCalledOnce();
-		expect(harness.deleteAll).toHaveBeenCalledOnce();
+		expect(harness.storedValues.has('reminder')).toBe(false);
 	});
 
 	it('keeps alarm state when every push delivery fails', async () => {
@@ -136,7 +139,7 @@ describe('reminder alarm delivery', () => {
 		expect(harness.storedValues.get('retryAttempt')).toBe(1);
 		expect(harness.setAlarm).toHaveBeenCalledOnce();
 		expect(harness.run).not.toHaveBeenCalled();
-		expect(harness.deleteAll).not.toHaveBeenCalled();
+		expect(harness.storedValues.has('reminder')).toBe(true);
 	});
 
 	it('records a terminal delivery failure after the retry budget is exhausted', async () => {
@@ -177,7 +180,7 @@ describe('reminder alarm delivery', () => {
 
 		await harness.alarm.alarm();
 		expect(harness.run).toHaveBeenCalledTimes(1);
-		expect(harness.deleteAll).toHaveBeenCalledTimes(1);
+		expect(harness.storedValues.has('reminder')).toBe(false);
 	});
 
 	it('retries D1 cleanup without sending a duplicate push', async () => {
@@ -198,13 +201,13 @@ describe('reminder alarm delivery', () => {
 		expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
 		expect(harness.storedValues.get('deliveryComplete')).toBe(true);
 		expect(harness.setAlarm).toHaveBeenCalledOnce();
-		expect(harness.deleteAll).not.toHaveBeenCalled();
+		expect(harness.storedValues.has('reminder')).toBe(true);
 
 		await harness.alarm.alarm();
 
 		expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
 		expect(harness.run).toHaveBeenCalledTimes(2);
-		expect(harness.deleteAll).toHaveBeenCalledOnce();
+		expect(harness.storedValues.has('reminder')).toBe(false);
 	});
 
 	it('keeps explicitly rescheduling transient D1 failures with bounded backoff', async () => {
@@ -215,7 +218,7 @@ describe('reminder alarm delivery', () => {
 
 		expect(harness.storedValues.get('retryAttempt')).toBe(1);
 		expect(harness.setAlarm).toHaveBeenCalledOnce();
-		expect(harness.deleteAll).not.toHaveBeenCalled();
+		expect(harness.storedValues.has('reminder')).toBe(true);
 
 		harness.first.mockRejectedValueOnce(new Error('D1 still unavailable'));
 		await harness.alarm.alarm();
@@ -251,7 +254,7 @@ describe('reminder alarm delivery', () => {
 
 		await harness.alarm.alarm();
 
-		expect(harness.deleteAll).not.toHaveBeenCalled();
+		expect(harness.storedValues.has('reminder')).toBe(true);
 		expect(harness.storedValues.get('reminder')).toEqual(newerReminder);
 	});
 
@@ -262,7 +265,7 @@ describe('reminder alarm delivery', () => {
 		await harness.alarm.alarm();
 
 		expect(sendToAllSubscriptions).not.toHaveBeenCalled();
-		expect(harness.deleteAll).toHaveBeenCalledOnce();
+		expect(harness.storedValues.has('reminder')).toBe(false);
 	});
 
 	it('discards stale alarm state when its schedule token no longer matches D1', async () => {
@@ -277,7 +280,7 @@ describe('reminder alarm delivery', () => {
 		await harness.alarm.alarm();
 
 		expect(sendToAllSubscriptions).not.toHaveBeenCalled();
-		expect(harness.deleteAll).toHaveBeenCalledOnce();
+		expect(harness.storedValues.has('reminder')).toBe(false);
 	});
 
 	it('rolls back alarm state when D1 cannot persist a schedule', async () => {

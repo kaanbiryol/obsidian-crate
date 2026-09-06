@@ -2,6 +2,7 @@
 import hashlib
 import json
 import sqlite3
+import time
 from pathlib import Path
 
 
@@ -76,7 +77,7 @@ def verify(directory):
         raise
 
 
-def prepare_restore_sql(directory):
+def prepare_restore_sql(directory, restored_at=None):
     """Rebuild derived schedules and require fresh device enrollment in a new deployment."""
     _manifest, db = verify(directory)
     try:
@@ -87,9 +88,10 @@ def prepare_restore_sql(directory):
             if table in tables:
                 db.execute(f'DELETE FROM "{table}"')
         # Restored retained content gets a fresh recovery window before collection.
-        db.execute("UPDATE file_versions SET expires_at = CAST(strftime('%s','now') AS INTEGER) * 1000 + 2592000000")
+        restored_at = int(time.time() * 1000) if restored_at is None else restored_at
+        db.execute('UPDATE file_versions SET expires_at = ?', (restored_at + 2592000000,))
         if 'notification_projection_jobs' in tables:
-            db.execute("INSERT INTO notification_projection_jobs (path, job_token) SELECT path, storage_key FROM files WHERE lower(path) LIKE '%.md'")
+            db.execute("INSERT INTO notification_projection_jobs (path, job_token, updated_at) SELECT path, storage_key, datetime(? / 1000, 'unixepoch') FROM files WHERE lower(path) LIKE '%.md'", (restored_at,))
         db.commit()
         return '\n'.join(db.iterdump()).encode('utf-8')
     finally:

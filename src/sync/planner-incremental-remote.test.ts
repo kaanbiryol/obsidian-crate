@@ -115,7 +115,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
 
 		expect(result?.deleted).toBe(1);
-		expect(harness.fileManager.trashFile).toHaveBeenCalledWith(note);
+		expect(harness.vault.trash).toHaveBeenCalledWith(note, false);
 		expect(harness.vault.delete).not.toHaveBeenCalled();
 		expect(harness.vault.adapter.remove).not.toHaveBeenCalled();
 		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/old.md');

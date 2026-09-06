@@ -81,14 +81,11 @@ export function usePushNotifications({
 		const subscription = await pushManager?.getSubscription();
 		if (!subscription) return;
 
-		const response = await apiFetch('/notifications/subscribe', {
-			method: 'DELETE',
-			body: JSON.stringify({ endpoint: subscription.endpoint }),
-		});
-		if (!response.ok) throw new Error(await response.text());
-		await subscription.unsubscribe();
+		// Logout revokes the session and its owned server subscriptions together.
+		// This cleanup is browser-local and remains valid after session clearing.
+		if (!await subscription.unsubscribe()) throw new Error('Browser push cleanup failed');
 		setPush({ supported: true, subscribed: false, status: null });
-	}, [apiFetch]);
+	}, []);
 
 	return { push, refreshPushState, enablePushNotifications, disablePushNotifications };
 }

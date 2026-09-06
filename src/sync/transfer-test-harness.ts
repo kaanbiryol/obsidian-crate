@@ -14,6 +14,7 @@ export function createTransferHarness() {
 		writeBinary: vi.fn(),
 	};
 	const vault = {
+		trash: vi.fn(async () => {}),
 		adapter,
 		getAbstractFileByPath: vi.fn(),
 		createFolder: vi.fn(),

@@ -63,10 +63,11 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
           SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.operation'), json_extract(value, '$.payload'), 0, 0
           FROM json_each(?) WHERE ${guard} ${upsertJob}`).bind(token, json, ...args),
         env.DB.prepare(`DELETE FROM reminder_projections WHERE file_path = ? AND ${guard}`).bind(job.path, ...args),
-        env.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, file_revision)
-          SELECT json_extract(value, '$.id'), ?, ? FROM json_each(?) WHERE ${guard}
-          ON CONFLICT(reminder_id) DO UPDATE SET file_path = excluded.file_path, file_revision = excluded.file_revision`)
-          .bind(job.path, file?.storageKey ?? '', json, ...args),
+        env.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, file_revision, notification_token, policy_revision)
+          SELECT json_extract(value, '$.id'), ?, ?, ?, ? FROM json_each(?) WHERE ${guard}
+          ON CONFLICT(reminder_id) DO UPDATE SET file_path = excluded.file_path, file_revision = excluded.file_revision,
+          notification_token = excluded.notification_token, policy_revision = excluded.policy_revision`)
+          .bind(job.path, file?.storageKey ?? '', token, policy.revision, json, ...args),
         env.DB.prepare(`DELETE FROM notification_projection_jobs WHERE path = ? AND ${guard}`).bind(job.path, ...args),
       ]);
     } catch (error) {

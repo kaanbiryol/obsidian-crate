@@ -49,6 +49,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - Remote code is not fetched or evaluated at runtime.
 - Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker can access the synced data.
 - Sync is not a backup. Keep an independent backup of any vault you use with Crate. The [paired D1/R2 recovery CLI](docs/recovery.md) creates verified remote archives and restores them into isolated resources.
+- Remote deletions always move local files into the vault's `.trash` folder, even if Obsidian is set to delete permanently. Check that folder when recovering an edit made during sync. Crate never syncs `.trash`.
 
 Read the full [privacy policy](https://crate.kaanbiryol.com/privacy/).
 
@@ -150,7 +151,9 @@ Reminder code blocks can be embedded in notes:
 ```
 ````
 
-The Worker schedules notifications from committed Markdown using a shared folder, timezone, all-day time, and enabled setting. Another device's startup does not replace that policy. **Settings → Crate → Push notifications** shows the server's folder and timezone; explicit changes apply to all devices. The web app session is restricted to its enrolled reminders folder. Signing out clears its offline data and drafts across tabs and revokes the session's subscriptions.
+The Worker schedules notifications from committed Markdown using a shared folder, timezone, all-day time, and enabled setting. Another device's startup does not replace that policy. **Settings → Crate → Push notifications** shows the server's folder and timezone; explicit changes apply to all devices. The web app session is restricted to its enrolled reminders folder. Signing out clears its offline data and drafts across tabs and revokes the session's subscriptions. If remote revocation fails, the signed-out screen explains how to remove the session through connected devices in Obsidian.
+
+Update the server to apply migration `0009_delivery_integrity.sql` before using these notification fixes. Older subscriptions with no recorded owner are disabled. In **Settings → Crate → Push notifications → Notification devices**, remove each paused device, sign out in its web app, then open a fresh Crate link and enable notifications again. Diagnostics flag exhausted delivery attempts. Repair enrollment or provider access, then reschedule a missed reminder to a future time.
 
 Crate accepts push endpoints from [Apple](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/), [Mozilla](https://mozilla-services.github.io/autopush-rs/http.html), [Google FCM](https://firebase.google.com/docs/reference/fcm/rest), and [Microsoft WNS](https://learn.microsoft.com/en-us/windows/apps/develop/notifications/push-notifications/wns-overview). The server allows up to 20 subscriptions, with at most five per session, and limits test/enrollment requests. Other push providers need explicit support before they can subscribe.
 
@@ -160,7 +163,7 @@ Vault files larger than 25 MiB produce a visible sync error and are left on the 
 
 Existing binary files are never overwritten by an unsafe asynchronous write. Incoming binary changes are saved as review copies and shown in conflicts; review both versions and replace the original when ready. UTF-8 text supported by Obsidian's atomic writer applies automatically when its precondition still matches.
 
-Both clients and the Worker require protocol 3 for writes. Update the plugin/server and reload older web tabs before editing. Failed web edits retain a local draft; retry a lost acknowledgement with the same open draft so the server can replay its operation receipt.
+Both clients and the Worker require protocol 3 for writes. Update the plugin/server and reload older web tabs before editing. Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
 
 ## Development
 

@@ -49,6 +49,12 @@ export interface ModalState {
 	reminderId?: string;
 	expectedRevision?: string;
 	operationId?: string;
+	pendingSave?: {
+		path: string;
+		body: string;
+		input: ReminderMutationBody;
+		draftKey: string;
+	};
 	filePath?: string;
 	draft: ModalDraft;
 }

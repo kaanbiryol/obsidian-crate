@@ -163,6 +163,12 @@ export default tseslint.config(
 		rules: { 'obsidianmd/no-forbidden-elements': 'off' },
 	},
 	{
+		// Remote deletions must remain recoverable even when the user's host
+		// preference is permanent deletion. Vault.trash(file, false) forces .trash.
+		files: ['src/sync/planner-helpers.ts'],
+		rules: { 'obsidianmd/prefer-file-manager-trash-file': 'off' },
+	},
+	{
 		// Sync timers also run in Node-based unit tests.
 		files: ['src/sync/**/*.{ts,tsx}'],
 		rules: {

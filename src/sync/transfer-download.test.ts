@@ -157,7 +157,7 @@ describe('transfer download/process helpers', () => {
 			result,
 		);
 
-		expect(harness.fileManager.trashFile).toHaveBeenCalledWith(file);
+		expect(harness.vault.trash).toHaveBeenCalledWith(file, false);
 		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('notes/a.md');
 		expect(result.deletedPaths).toEqual(['notes/a.md']);
 		expect(localFiles).not.toHaveProperty('notes/a.md');

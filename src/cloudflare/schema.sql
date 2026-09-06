@@ -45,6 +45,9 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
 CREATE INDEX IF NOT EXISTS auth_tokens_expires_at_idx ON auth_tokens(expires_at);
 
 CREATE TABLE IF NOT EXISTS scheduled_reminders (
+	delivery_failed_at TEXT,
+	delivery_error TEXT,
+	delivery_attempts INTEGER,
 	reminder_id TEXT PRIMARY KEY,
 	schedule_token TEXT NOT NULL,
 	content TEXT NOT NULL,
@@ -159,6 +162,7 @@ CREATE TABLE IF NOT EXISTS notification_projection_jobs (
  last_error TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS reminder_projections (
+ notification_token TEXT, policy_revision TEXT,
  reminder_id TEXT PRIMARY KEY, file_path TEXT NOT NULL, file_revision TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS reminder_projections_path_idx ON reminder_projections(file_path);

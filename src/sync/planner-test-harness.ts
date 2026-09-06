@@ -41,6 +41,7 @@ export function createIncrementalHarness(overrides: Partial<{
 		getManifest: vi.fn(() => ({ version: 1, files: {} })),
 	};
 	const vault = {
+		trash: vi.fn(async () => {}),
 		getAbstractFileByPath: vi.fn(),
 		delete: vi.fn(),
 		adapter: {
