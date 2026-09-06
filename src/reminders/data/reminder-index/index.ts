@@ -65,7 +65,7 @@ export interface ReminderIndex {
   clearOptimistic(id: string): void;
 }
 
-export function createReminderIndex(app: App, remindersFolderPath: string): ReminderIndex {
+export function createReminderIndex(app: App, remindersFolderPath: string, signal?: AbortSignal): ReminderIndex {
   let reminders: IndexedReminder[] = [];
   let isLoaded = false;
   let lastScanTime: Date | undefined;
@@ -158,7 +158,8 @@ export function createReminderIndex(app: App, remindersFolderPath: string): Remi
 
     async load() {
       log.info(` Starting scan of ${remindersFolderPath}/...`);
-      const result = await scanVault(app, remindersFolderPath);
+      const result = await scanVault(app, remindersFolderPath, signal);
+      if (signal?.aborted) return result;
 
       reminders = result.reminders;
       isLoaded = true;
@@ -174,6 +175,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string): Remi
     },
 
     async rescanFile(file: TFile, force = false) {
+      if (signal?.aborted) return;
       const filePath = file.path;
       if (!isInRemindersFolder(filePath, remindersFolderPath)) {
         return;
@@ -194,7 +196,8 @@ export function createReminderIndex(app: App, remindersFolderPath: string): Remi
           .filter((reminder) => reminder.filePath !== filePath)
           .map((reminder) => reminder.id),
       );
-      const result = await scanFile(app, file, remindersFolderPath, reservedIds);
+      const result = await scanFile(app, file, remindersFolderPath, reservedIds, signal);
+      if (signal?.aborted) return;
       if (result.error) {
         log.error(` Keeping the previous reminder index for ${filePath}: ${result.error}`);
         return;

@@ -144,15 +144,20 @@ export async function scanFile(
   file: TFile,
   remindersFolderPath: string,
   reservedIds: ReadonlySet<string> = new Set(),
+  signal?: AbortSignal,
 ): Promise<FileScanResult> {
   const filePath = file.path;
+  const cancelled = { filePath, reminders: [], lineCount: 0 };
+  if (signal?.aborted) return cancelled;
 
   try {
     const originalContent = await app.vault.cachedRead(file);
+    if (signal?.aborted) return cancelled;
     let normalized = normalizeReminderIds(originalContent, reservedIds);
     if (normalized.remindersUpdated > 0) {
       let remindersUpdated = 0;
       const content = await app.vault.process(file, (currentContent) => {
+        if (signal?.aborted) return currentContent;
         const currentNormalization = normalizeReminderIds(currentContent, reservedIds);
         remindersUpdated = currentNormalization.remindersUpdated;
         return currentNormalization.content;
@@ -162,6 +167,7 @@ export async function scanFile(
         log.info(` Added ${remindersUpdated} reminder identifiers to ${filePath}`);
       }
     }
+    if (signal?.aborted) return cancelled;
     const result = scanReminderMarkdownContent(filePath, normalized.content, remindersFolderPath);
 
     return {
@@ -170,6 +176,7 @@ export async function scanFile(
       lineCount: result.lineCount,
     };
   } catch (error) {
+    if (signal?.aborted) return cancelled;
     log.error(` Error scanning file ${filePath}:`, error);
     return {
       filePath,
@@ -187,7 +194,8 @@ export async function scanFile(
  */
 export async function scanVault(
   app: App,
-  remindersFolderPath: string
+  remindersFolderPath: string,
+  signal?: AbortSignal,
 ): Promise<ScanResult> {
   const startTime = Date.now();
   const allReminders: IndexedReminder[] = [];
@@ -212,7 +220,8 @@ export async function scanVault(
   reminderFiles.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
   const usedReminderIds = new Set<string>();
   for (const file of reminderFiles) {
-    const result = await scanFile(app, file, remindersFolderPath, usedReminderIds);
+    if (signal?.aborted) break;
+    const result = await scanFile(app, file, remindersFolderPath, usedReminderIds, signal);
     if (result.error) continue;
     allReminders.push(...result.reminders);
     totalLines += result.lineCount;

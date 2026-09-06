@@ -95,6 +95,22 @@ describe('CratePlugin settings persistence', () => {
 		expect(plugin.remindersSettings.enabled).toBe(false);
 	});
 
+	it('does not publish settings from an unloaded instance after a newer instance loads', async () => {
+		const { endPluginLifecycle } = await import('./lifecycle-state');
+		const old = new CratePlugin({} as never, {} as never);
+		let finish!: (value: unknown) => void;
+		Object.assign(old, { app: { vault: { configDir: '.obsidian' } }, loadData: () => new Promise(resolve => { finish = resolve; }) });
+		const loading = old.loadSettings();
+		endPluginLifecycle(old);
+		const current = new CratePlugin({} as never, {} as never);
+		Object.assign(current, { app: { vault: { configDir: '.obsidian' } }, loadData: async () => ({ reminders: { enabled: false, remindersFolderPath: 'Current' } }) });
+		await current.loadSettings();
+		finish({ reminders: { enabled: true, remindersFolderPath: 'Stale' } });
+		await loading;
+		expect(current.remindersSettings).toMatchObject({ enabled: false, remindersFolderPath: 'Current' });
+		expect(old.settings).toBeUndefined();
+	});
+
 	it('persists consent before scanning reminder files', async () => {
 		const plugin = new CratePlugin({} as never, {} as never);
 		const saveData = vi.fn<(data: unknown) => Promise<void>>(async () => undefined);
