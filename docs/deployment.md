@@ -110,9 +110,9 @@ Install Crate on the other device, open **Settings → Crate → Configuration**
 
 ## Supported protocol and schema
 
-Protocol 4 is required for writes. Both clients verify the server before mutations; the Worker rejects missing or incompatible protocol headers with 428. Only the current prerelease formats are supported.
+Protocol 5 is required for writes. Both clients verify the server before mutations; the Worker rejects missing or incompatible protocol headers with 428. Only the current prerelease formats are supported.
 
-Provisioning initializes an empty database from the bundled, hash-verified `src/cloudflare/schema.sql`. Existing databases must contain `crate_schema` with version 1. Any other schema is rejected before Worker upload, without changing its data. An interrupted current-schema initialization can be retried idempotently. There are no SQL upgrade scripts or portable-path backfills.
+Provisioning initializes an empty database from the bundled, hash-verified `src/cloudflare/schema.sql`. Existing databases must contain `crate_schema` with version 2. Any other schema is rejected before Worker upload, without changing its data. An interrupted current-schema initialization can be retried idempotently. There are no SQL upgrade scripts or portable-path backfills.
 
 An explicit update of a current-schema deployment preserves resource IDs and data. Downgrade checks use the current remote deployment metadata. Older prerelease deployments require separate current resources; keep their original deployment and paired backup intact for recovery. Do not point the new Worker at an unsupported database.
 

@@ -79,6 +79,7 @@ export async function handleRestoreFileVersion(
 			hash: version.hash,
 			size: content.byteLength,
 			objectKey,
+			content,
 			expectedHash,
 			previousFile: previous,
 		});

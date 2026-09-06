@@ -48,6 +48,7 @@ export async function commitStagedFile(
 		hash: string;
 		size: number;
 		objectKey: string;
+		content: string | ArrayBuffer;
 		effects?: CommitEffects;
 		expectedHash: ExpectedFileHash;
 		expectedRevision?: string;
@@ -83,7 +84,7 @@ export async function commitStagedFile(
 			params.path,
 			params.objectKey,
 		)),
-		...enqueueFileProjection(db, params.path, params.objectKey),
+		...enqueueFileProjection(db, params.path, params.objectKey, params.content),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
 	]);
 
@@ -129,9 +130,7 @@ export async function commitFileDelete(
 			SELECT storage_key, path, hash, size, 'deleted', ? FROM files WHERE ${expectedPredicate}`)
 			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...predicateArgs),
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
-		...(params.path.toLowerCase().endsWith('.md') ? [db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
-			SELECT ?, ? WHERE changes() = 1
-			ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL, updated_at = datetime('now')`).bind(params.path, crypto.randomUUID())] : []),
+		...enqueueFileProjection(db, params.path, null, null),
 	]);
 
 	if (changedRows(results[2]) !== 1) {

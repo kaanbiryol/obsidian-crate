@@ -120,7 +120,7 @@ function App() {
 		bootstrapped,
 		loading,
 	});
-	const { loggingOut, logOut } = usePwaSessionLifecycle({
+	const { loggingOut, logOut, clearLocalSession } = usePwaSessionLifecycle({
 		apiFetch,
 		cancelModalClose: modalTransition.cancelClose,
 		cancelSettingsClose: settingsTransition.cancelClose,
@@ -128,6 +128,7 @@ function App() {
 		handleUnauthorizedRef,
 		resetReminderState,
 		setAuthToken,
+		setConfig,
 		setError,
 		setModal,
 		setSettingsOpen,
@@ -136,6 +137,7 @@ function App() {
 
 	usePwaBootstrap({
 		authToken,
+		clearLocalSession,
 		hydrateCachedSnapshot,
 		hydratedCacheRef,
 		setAuthToken,

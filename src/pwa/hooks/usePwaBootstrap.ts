@@ -12,6 +12,7 @@ import type { CachedReminderSnapshot, StartTab, StoredConfig } from '../types';
 
 export function usePwaBootstrap({
 	authToken,
+	clearLocalSession,
 	hydrateCachedSnapshot,
 	hydratedCacheRef,
 	setAuthToken,
@@ -24,6 +25,7 @@ export function usePwaBootstrap({
 	setStartTab,
 }: {
 	authToken: string | null;
+	clearLocalSession: () => Promise<void>;
 	hydrateCachedSnapshot: (snapshot: CachedReminderSnapshot) => void;
 	hydratedCacheRef: MutableRefObject<boolean>;
 	setAuthToken: Dispatch<SetStateAction<string | null>>;
@@ -57,8 +59,12 @@ export function usePwaBootstrap({
 				}
 
 				let nextToken = initialAuthTokenRef.current;
-				if (!nextToken && applied.token) {
-					nextToken = await exchangeEnrollmentToken(applied.token);
+				if (applied.token) {
+					nextToken = await exchangeEnrollmentToken(applied.token, nextToken);
+					if (cancelled || !sessionCurrent()) return;
+					const clearing = clearLocalSession();
+					sessionCurrent = capturePwaSession();
+					await clearing;
 					if (cancelled || !sessionCurrent()) return;
 					localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
 					sessionCurrent = capturePwaSession();
@@ -79,8 +85,10 @@ export function usePwaBootstrap({
 				}
 			} catch (bootstrapError) {
 				if (!cancelled && sessionCurrent()) {
-					localStorage.removeItem(AUTH_TOKEN_KEY);
-					setAuthToken(null);
+					const clearing = clearLocalSession();
+					sessionCurrent = capturePwaSession();
+					await clearing;
+					if (cancelled || !sessionCurrent()) return;
 					setError(bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError));
 					setLoading(false);
 				}

@@ -18,13 +18,13 @@ async function token(id: string, scope = 'reminders', folder: string | null = 'R
   await env.DB.prepare('INSERT INTO auth_tokens (id, token_hash, scope, expires_at, folder_path) VALUES (?, ?, ?, ?, ?)')
     .bind(id, await sha256Hex(id), scope, Date.now() + 60_000, folder).run();
 }
-const request = (path: string, id: string, body?: unknown, method = 'POST', protocol = '4') => new Request(`https://test${path}`, {
+const request = (path: string, id: string, body?: unknown, method = 'POST', protocol = '5') => new Request(`https://test${path}`, {
   method, headers: { Authorization: `Bearer ${id}`, 'X-Crate-Protocol': protocol, 'Content-Type': 'application/json' },
   ...(body === undefined ? {} : { body: JSON.stringify(body) }),
 });
 const subscription = (suffix: string) => ({ endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}`, keys: { p256dh: 'key', auth: 'auth' } });
 
-it.each(['', '2', '3', '5'])('rejects protocol %s before committing a mutation', async protocol => {
+it.each(['', '2', '3', '4', '6'])('rejects protocol %s before committing a mutation', async protocol => {
   await token('vault-token', 'vault', null);
   expect((await worker.fetch(request('/sync/upload?path=a.md', 'vault-token', {}, 'PUT', protocol), env)).status).toBe(428);
   expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first<{ count: number }>())?.count).toBe(0);

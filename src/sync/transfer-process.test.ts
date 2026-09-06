@@ -243,7 +243,7 @@ describe('processDiff conflict handling', () => {
 		expect(harness.localManifest.setEntry).toHaveBeenCalledWith(path, {
 			hash: await computeHash(toArrayBuffer(local)),
 			size: toArrayBuffer(local).byteLength,
-			modified: '2026-02-14T00:00:00.000Z',
+			modified: 'unverified',
 		});
 		expect(harness.markdownBaseCache.putBase).toHaveBeenCalledWith(
 			path,

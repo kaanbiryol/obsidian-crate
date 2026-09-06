@@ -2,7 +2,7 @@
 
 Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment.
 
-Every mutation requires `X-Crate-Protocol: 4`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics.
+Every mutation requires `X-Crate-Protocol: 5`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics.
 
 ## Authentication
 
@@ -23,9 +23,9 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB) |
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
 | `POST` | `/sync/delete` | Delete single file with expected hash and revision |
-| `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 5 files, 10 MiB total) |
+| `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 3 files, 10 MiB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
-| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 6 files) |
+| `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 4 files) |
 | `GET` | `/sync/versions?path=<path>` | List unexpired recoverable file versions |
 | `POST` | `/sync/restore-version` | Restore a retained version with expected-hash compare-and-swap |
 | `GET` | `/diagnostics` | Backend counts, delivery failures, queue pressure, and scheduled-maintenance state |
@@ -96,7 +96,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 }
 ```
 
-Worker validates: max 5 files, total decoded content <= 10 MiB. Mutation batches are deliberately smaller than download batches to stay within Workers Free D1 query limits even on stale-write cleanup paths.
+Worker validates: max 3 files, total decoded content <= 10 MiB. Mutation batches are deliberately smaller than download batches to stay within Workers Free D1 query limits even on stale-write cleanup paths.
 
 Response: `{ success, results: [{ path, success, hash?, revision?, error?, code?, status?, currentHash? }] }`. A stale per-file write uses `code: "version_conflict"`, `status: 409`, and the current remote hash; storage failures use `code: "storage"` and `status: 503`.
 
@@ -112,7 +112,7 @@ Content is base64-encoded. The Worker rejects a batch before reading R2 if D1 me
 
 Single: `{ path: "notes/file.md", expectedHash: "sha256...", expectedRevision: "opaque-key" }` -> `{ success, path }`
 
-Batch: `{ files: [{ path, expectedHash, expectedRevision }, ...] }` (max 6) -> `{ success, deleted: [...], errors?: [{ path, error, code?, status?, currentHash? }] }`
+Batch: `{ files: [{ path, expectedHash, expectedRevision }, ...] }` (max 4) -> `{ success, deleted: [...], errors?: [{ path, error, code?, status?, currentHash? }] }`
 
 Uploads compare the observed D1 content hash. Deletes also compare the original opaque revision, rejecting same-content recreations. Reminder edits compare a semantic revision captured by the client, then apply file-level preconditions. D1 commits the file row, changelog, retention, operation receipt, and notification projection intent atomically; stale writers receive `409`.
 
@@ -262,7 +262,9 @@ Response: `{ publicKey: "base64url-encoded-key" }`
 
 Consumes a one-time web enrollment token and creates a per-device PWA auth token in `auth_tokens`.
 
-Request: `{ token, deviceName? }`
+Request: `{ token, deviceName?, previousAuthToken? }`
+
+When replacing a browser session, the optional previous reminder credential revokes that session and its push subscriptions in the transaction that creates the replacement. Expired reminder credentials can be replaced; vault credentials cannot be revoked through this endpoint.
 
 Response: `{ authToken }`
 
@@ -308,7 +310,7 @@ Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarat
 
 ## D1 database schema
 
-The complete current schema is [src/cloudflare/schema.sql](../src/cloudflare/schema.sql). It is hash-verified before provisioning. An empty database is initialized with `crate_schema` version 1; existing databases must already carry that marker. Unsupported schemas are rejected without modifying data. Worker requests never execute DDL.
+The complete current schema is [src/cloudflare/schema.sql](../src/cloudflare/schema.sql). It is hash-verified before provisioning. An empty database is initialized with `crate_schema` version 2; existing databases must already carry that marker. Unsupported schemas are rejected without modifying data. Worker requests never execute DDL.
 
 The schema stores file metadata, changelog entries, retained versions and cleanup work; device credentials and folder-bound web enrollment tokens; reminder receipts and identity reservations; shared notification policy, projections, and delivery jobs; authenticated push subscriptions and request limits. Derived schedules are rebuilt from committed Markdown during an isolated restore.
 

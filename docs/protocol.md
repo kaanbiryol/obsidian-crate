@@ -1,6 +1,6 @@
-# Protocol 4 contract
+# Protocol 5 contract
 
-`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. Every mutation must send `X-Crate-Protocol: 4`; missing or incompatible clients receive 428 before changing state. POST metadata and batch-download endpoints are reads.
+`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. Every mutation must send `X-Crate-Protocol: 5`; missing or incompatible clients receive 428 before changing state. POST metadata and batch-download endpoints are reads.
 
 ## Files
 
@@ -8,7 +8,7 @@ R2 stores immutable bytes under opaque object keys. D1 commits `files`, changelo
 
 Manifest and metadata entries, changelog puts, upload acknowledgements, and batch downloads include `revision`; individual downloads expose `X-Crate-Revision`. The revision identifies a file incarnation independently of its hash. Deletes require `expectedHash` and `expectedRevision`, captured from the acknowledged baseline. Missing revisions require reconciliation; a same-content recreation rejects an older delete. Uploads retain content-hash preconditions. Retrying identical bytes is only acknowledged when the current referenced R2 object verifies.
 
-Batch uploads accept five files; batch deletes accept six. Both bound D1 work below the Free-plan 50-query limit with headroom for authentication and failure cleanup. The per-file byte limit is 25 MiB. Clients report skipped oversized files as errors.
+Batch uploads accept three files; batch deletes accept four. Both bound D1 work below the Free-plan 50-query limit with headroom for authentication and failure cleanup. The per-file byte limit is 25 MiB. Clients report skipped oversized files as errors.
 
 Remote deletion on the plugin uses the vault's local trash regardless of the user's permanent-delete preference. The host moves the bytes present at removal, preserving an edit that arrives after the preflight hash check. Trash failures fail the operation without falling back to permanent deletion. `.trash` is always excluded from sync.
 
@@ -44,4 +44,14 @@ Limits are application guardrails, not a promise that every workload fits a free
 
 ## Supported storage formats
 
-Only the current formats are supported: D1 `crate_schema` version 1, IndexedDB version 2, generation-bearing local file checkpoints, and URI-encoded `crate-desc:v1:` description comments. Unknown database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache. No format conversion or SQL upgrade path is bundled.
+Only the current formats are supported: D1 `crate_schema` version 2, IndexedDB version 2, generation-bearing local file checkpoints, and URI-encoded `crate-desc:v1:` description comments. Unknown database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache. No format conversion or SQL upgrade path is bundled.
+
+## Source and occurrence integrity
+
+A local download or merge is marked clean only after its current bytes and captured modification time verify together. A valid remote baseline with unverified local metadata remains detectable after restart.
+
+Every committed Markdown file records its reminder identities and each dated occurrence’s first observation in the file transaction. Observations survive title edits, renames and project moves. A reminder first observed before its deadline remains eligible when projection runs late. Delivery is attempted for up to 24 hours after its deadline; older eligible occurrences retain a failed-delivery diagnostic. Newly imported historical occurrences are not scheduled. Completed-occurrence receipts still suppress replay.
+
+Duplicate identities within the configured reminders folder quarantine projection and are omitted from the web list with per-file issues. Editing an ambiguous identity returns 409. Committing a repair or deletion queues all affected source files again.
+
+An explicit fresh enrollment link replaces a stored browser session, including an expired one. The exchange can accept the previous reminder credential solely to revoke that credential and its subscriptions; it cannot revoke a vault credential. Local cache and drafts are cleared before the new authority is installed, and other tabs adopt its folder.

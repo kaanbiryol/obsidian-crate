@@ -1,4 +1,5 @@
 import { ReminderFileSizeError } from './reminders-web/limits';
+import { ReminderIdentityConflictError } from './reminder-source-identity';
 import { logMutation } from './request-diagnostics';
 import { limitNotificationRequest } from './rate-limit';
 import { wakeNotificationCoordinator } from './notification-coordinator';
@@ -59,6 +60,7 @@ export default {
 			if (response.ok && isCrateMutation(path, method) && context) context.waitUntil(wakeNotificationCoordinator(env).catch(() => undefined));
 			return withRequestId(response, requestId);
 		} catch (error) {
+      if (error instanceof ReminderIdentityConflictError) return withRequestId(corsResponse({ error: error.message, code: 'duplicate_reminder_identity' }, 409), requestId);
       if (error instanceof ReminderFileSizeError) return withRequestId(corsResponse({ error: error.message }, 413), requestId);
 			if (error instanceof FileVersionConflictError) {
 				return withRequestId(corsResponse({

@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  id INTEGER PRIMARY KEY CHECK (id = 1),
  version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 1);
+INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 2);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -156,6 +156,17 @@ CREATE TABLE IF NOT EXISTS reminder_projections (
  reminder_id TEXT PRIMARY KEY, file_path TEXT NOT NULL, file_revision TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS reminder_projections_path_idx ON reminder_projections(file_path);
+
+CREATE TABLE IF NOT EXISTS reminder_sources (
+ file_path TEXT NOT NULL, reminder_id TEXT NOT NULL, due_key TEXT NOT NULL,
+ occurrences INTEGER NOT NULL,
+ PRIMARY KEY (file_path, reminder_id)
+);
+CREATE INDEX IF NOT EXISTS reminder_sources_id_idx ON reminder_sources(reminder_id);
+CREATE TABLE IF NOT EXISTS reminder_occurrences (
+ reminder_id TEXT NOT NULL, due_key TEXT NOT NULL, first_seen_at INTEGER NOT NULL,
+ PRIMARY KEY (reminder_id, due_key)
+);
 
 CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_idx ON push_subscriptions(endpoint);
 CREATE TABLE IF NOT EXISTS request_rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);

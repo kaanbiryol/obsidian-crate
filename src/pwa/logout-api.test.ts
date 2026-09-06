@@ -14,7 +14,7 @@ it('dispatches the captured revocation after local logout while fencing ordinary
 			expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer old-token');
 			return new Response(null, { status: 204 });
 		}
-		return new Response(JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: { current: 4, oldestCompatible: 4 }, capabilities: [] }));
+		return new Response(JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: { current: 5, oldestCompatible: 5 }, capabilities: [] }));
 	});
 	vi.stubGlobal('fetch', network);
 	const apiFetch = makeApiFetch('old-token', vi.fn());

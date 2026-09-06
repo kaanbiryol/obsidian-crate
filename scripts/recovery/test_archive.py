@@ -50,6 +50,8 @@ class ArchiveTests(unittest.TestCase):
                    ('Reminders/Inbox.md', 'reminders/inbox.md', digest(data), len(data), key))
         db.execute("INSERT INTO auth_tokens (id, token_hash) VALUES ('old-device', 'hash')")
         db.execute("INSERT INTO reminder_operations (operation_id, request_hash, response_json) VALUES ('retry-me', 'hash', '{}')")
+        db.execute("INSERT INTO reminder_sources (file_path, reminder_id, due_key, occurrences) VALUES ('Reminders/Inbox.md', 'reminder', '2026-09-07', 1)")
+        db.execute("INSERT INTO reminder_occurrences (reminder_id, due_key, first_seen_at) VALUES ('reminder', '2026-09-07', 123)")
         db.commit()
         self.remote = Remote('\n'.join(db.iterdump()).encode(), {key: data})
         db.close()
@@ -68,6 +70,8 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(self.remote.objects, target.objects)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM auth_tokens').fetchone()[0], 0)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_operations').fetchone()[0], 1)
+        for table in ('reminder_sources', 'reminder_occurrences'):
+            self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), original.execute(f'SELECT * FROM {table}').fetchall())
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM notification_projection_jobs').fetchone()[0], 1)
         self.assertEqual(len(manifest['objects']), 1)
     def test_unsupported_schema_stops_restore_before_remote_mutation(self):

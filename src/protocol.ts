@@ -17,8 +17,8 @@ export interface CrateServerInfo {
  * when support for an older protocol is intentionally removed.
  */
 export const CRATE_PLUGIN_PROTOCOL: CrateProtocolRange = Object.freeze({
-	current: 4,
-	oldestCompatible: 4,
+	current: 5,
+	oldestCompatible: 5,
 });
 
 function isPositiveInteger(value: unknown): value is number {

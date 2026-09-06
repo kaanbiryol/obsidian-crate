@@ -163,6 +163,7 @@ export async function handleBatchUpload(
 				hash: file.hash,
 				size: file.size,
 				objectKey: file.objectKey,
+				content: file.bytes,
 				expectedHash: file.expectedHash,
 				previousFile: previousFiles.get(file.safePath) ?? null,
 			});

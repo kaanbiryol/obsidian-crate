@@ -1,4 +1,5 @@
 import { computeHash } from "./hasher";
+import { recordAppliedContent, UNVERIFIED_MODIFIED } from './applied-content';
 import { applyRemoteContentIfUnchanged, preserveLocalVersionsAndApplyRemote } from "./local-apply";
 import { isMarkdownPath } from "./markdown-base-cache";
 import { mergeMarkdownContent } from "./markdown-merge";
@@ -137,18 +138,7 @@ export async function processDiff(
       );
       if (applyOutcome.status === "deferred") return applyOutcome;
 
-      const hash = await computeHash(remoteContent);
-      const entry: FileEntry = {
-        hash,
-        revision: response.revision,
-        size: remoteContent.byteLength,
-        modified: await context.getModifiedIso(diff.path),
-      };
-      localFiles[diff.path] = entry;
-      context.localManifest.setEntry(diff.path, entry);
-      if (isMarkdownPath(diff.path)) {
-        await context.markdownBaseCache?.putBase(diff.path, hash, remoteContent);
-      }
+      localFiles[diff.path] = await recordAppliedContent(context, diff.path, remoteContent, response.revision);
       return { status: "applied" };
     }
 
@@ -241,11 +231,10 @@ async function tryAutoMergeMarkdownConflict(
     // snapshot as a virtual common ancestor so the next reconciliation can
     // merge only the newer local edits into the remote merge without
     // duplicating the local changes that were just uploaded.
-    const previousEntry = context.localManifest.getEntry?.(diff.path);
     const localBaseEntry: FileEntry = {
       hash: plannedLocalHash,
       size: localContent.byteLength,
-      modified: previousEntry?.modified ?? await context.getModifiedIso(diff.path),
+      modified: UNVERIFIED_MODIFIED,
     };
     context.localManifest.setEntry(diff.path, localBaseEntry);
     await context.markdownBaseCache.putBase(diff.path, plannedLocalHash, localContent);
@@ -255,15 +244,7 @@ async function tryAutoMergeMarkdownConflict(
     };
   }
 
-  const entry: FileEntry = {
-    hash: mergedHash,
-    revision: uploadResult.revision,
-    size: mergedContent.byteLength,
-    modified: await context.getModifiedIso(diff.path),
-  };
-  localFiles[diff.path] = entry;
-  context.localManifest.setEntry(diff.path, entry);
-  await context.markdownBaseCache.putBase(diff.path, mergedHash, mergedContent);
+  localFiles[diff.path] = await recordAppliedContent(context, diff.path, mergedContent, uploadResult.revision);
   result.merged++;
   result.mergedPaths.push(diff.path);
   return { status: "applied" };

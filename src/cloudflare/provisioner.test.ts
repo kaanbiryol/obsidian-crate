@@ -93,10 +93,14 @@ describe('provisionCloudflareDeployment', () => {
 		expect(workerUrl).toBe('https://crate-0123456789abcdef.personal-crate.workers.dev');
 	});
 
-	it.each([['files'], ['crate_schema']])('rejects an unsupported existing database before uploading: %j', async (...tables: string[]) => {
+	it.each([
+		{ tables: ['files'], version: 999 },
+		{ tables: ['crate_schema'], version: 999 },
+		{ tables: ['crate_schema'], version: 1 },
+	])('rejects an unsupported existing database before uploading: %j', async ({ tables, version }) => {
 		const api = createApi();
 		api.queryD1.mockResolvedValueOnce([{ results: tables.map(name => ({ name })) }]);
-		api.queryD1.mockResolvedValueOnce([{ results: [{ version: 999 }] }]);
+		api.queryD1.mockResolvedValueOnce([{ results: [{ version }] }]);
 		const metadata = createMetadata();
 		await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
 			.rejects.toThrow('Unsupported database schema');
@@ -107,7 +111,7 @@ describe('provisionCloudflareDeployment', () => {
 	it('reapplies only the current schema when initialization is retried', async () => {
 		const api = createApi();
 		api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
-		api.queryD1.mockResolvedValueOnce([{ results: [{ version: 1 }] }]);
+		api.queryD1.mockResolvedValueOnce([{ results: [{ version: 2 }] }]);
 		const metadata = createMetadata();
 		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
 		expect(api.queryD1).toHaveBeenLastCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);

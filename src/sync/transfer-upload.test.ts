@@ -62,7 +62,7 @@ describe('transfer upload helpers', () => {
 			batchConcurrency: 3,
 		});
 
-		expect(harness.api.batchUpload).toHaveBeenCalledTimes(3); // 15 files / 5 per batch = 3 batches
+		expect(harness.api.batchUpload).toHaveBeenCalledTimes(5); // 15 files, at most 3 per batch
 		expect(maxConcurrentCalls).toBeGreaterThan(1);
 	});
 
