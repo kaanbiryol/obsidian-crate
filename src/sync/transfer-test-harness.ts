@@ -17,6 +17,12 @@ export function createTransferHarness() {
 		adapter,
 		getAbstractFileByPath: vi.fn(),
 		createFolder: vi.fn(),
+		process: vi.fn(async (file: { path: string }, update: (current: string) => string) => {
+			const current = await adapter.readBinary(file.path) as ArrayBuffer;
+			const text = update(new TextDecoder('utf-8', { ignoreBOM: true }).decode(current));
+			await vault.modifyBinary(file, new TextEncoder().encode(text).buffer);
+			return text;
+		}),
 		modifyBinary: vi.fn(),
 		createBinary: vi.fn(),
 	};

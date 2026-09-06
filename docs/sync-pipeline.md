@@ -87,9 +87,24 @@ Delete/edit races use an edit-wins rule:
 When both sides changed with different content, Markdown files first attempt a
 three-way line merge using the cached common base. Independent edits and
 same-point insertions merge deterministically, so devices that see the two sides
-in opposite order still produce identical bytes. The remote compare-and-swap is
+in opposite order still produce identical bytes. When both sides replace the
+same aligned prose lines, a bounded word-level merge also combines edits to
+different words within a paragraph. Competing changes to the same word or
+different insertions at the same word boundary remain conflicts. Frontmatter,
+fenced code, and indented code retain the line-level policy. Inline refinement
+is limited to 16,000 combined characters per line and 128,000 per merge.
+
+Cached common bases are hash-verified before use. A corrupt base is treated as
+missing; background seeding can repair it only when the local file still matches
+the manifest hash. Non-Markdown files retain whole-file conflict handling.
+
+The remote compare-and-swap is
 committed before the local file is replaced, and the local hash is checked again
 after the request so an edit made in flight is retained for the next pass.
+Existing UTF-8 Markdown files are then compared and replaced inside Obsidian's
+atomic `process()` callback (using the adapter for hidden files). An edit between
+the hash check and that callback defers the write instead of being overwritten.
+Other files retain the binary write path.
 
 If the merge overlaps, the conflict remains unresolved:
 

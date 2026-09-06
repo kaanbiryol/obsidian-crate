@@ -46,7 +46,12 @@ export class MarkdownBaseCache {
 			if (!await this.app.vault.adapter.exists(cachePath)) {
 				return null;
 			}
-			return await this.app.vault.adapter.readBinary(cachePath);
+			const content = await this.app.vault.adapter.readBinary(cachePath);
+			if (content.byteLength > MAX_FILE_SIZE_BYTES || await computeHash(content) !== hash) {
+				logger.warn(`Ignoring corrupt Markdown base cache for ${path}`);
+				return null;
+			}
+			return content;
 		} catch (error) {
 			logger.warn(`Failed to read Markdown base cache for ${path}:`, errorMessage(error));
 			return null;
@@ -90,7 +95,7 @@ export class MarkdownBaseCache {
 			}
 
 			try {
-				if (await this.app.vault.adapter.exists(this.getCachePath(entry.hash))) {
+				if (await this.readBase(path, entry.hash)) {
 					return;
 				}
 				const content = await this.app.vault.adapter.readBinary(path);
