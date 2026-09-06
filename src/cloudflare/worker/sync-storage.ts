@@ -1,4 +1,5 @@
 import { queryRows } from './db';
+import { findReferencedStorageKeys } from './storage-references';
 export {
 	BATCH_DELETE_MAX_FILES as MAX_BATCH_DELETE_FILES,
 	BATCH_DOWNLOAD_MAX_BYTES as MAX_BATCH_DOWNLOAD_BYTES,
@@ -8,7 +9,7 @@ export {
 	MAX_FILE_SIZE_BYTES as MAX_FILE_BYTES,
 } from '../../protocol/sync-limits';
 const MANAGED_FILES_PREFIX = '__crate__/files/';
-const CLEANUP_BATCH_LIMIT = 25;
+const CLEANUP_BATCH_LIMIT = 1000;
 const MAX_D1_BOUND_PARAMETERS = 100;
 export const FILE_VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -109,7 +110,11 @@ async function deleteQueuedBucketObjects(
 	if (uniqueKeys.length === 0) return;
 
 	try {
-		await bucket.delete(uniqueKeys.length === 1 ? uniqueKeys[0]! : uniqueKeys);
+		const referenced = await findReferencedStorageKeys(db, uniqueKeys);
+		const unused = uniqueKeys.filter(key => !referenced.has(key));
+		if (unused.length > 0) await bucket.delete(unused.length === 1 ? unused[0]! : unused);
+		// Referenced keys must leave this queue as well; their eventual expiry
+		// creates a new cleanup intent after the reference is removed.
 		await removeQueuedObjectCleanup(db, uniqueKeys);
 	} catch {
 		// The keys remain queued for the scheduled maintenance pass.
@@ -156,7 +161,7 @@ export function storedObjectMatchesMetadata(
 }
 
 export function formatMetadataCommitFailure(actionLabel: 'Upload' | 'Delete', metadataMessage: string): string {
-	return `${actionLabel} not committed because sync metadata update failed: ${metadataMessage}`;
+	return `${actionLabel} outcome is unknown because the metadata response failed; reconcile before retrying: ${metadataMessage}`;
 }
 
 export async function getStoredFileRow(db: D1Database, path: string): Promise<FileStorageRow | null> {

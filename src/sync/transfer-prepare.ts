@@ -20,7 +20,7 @@ export async function prepareUploadFromVaultFile(
 ): Promise<PreparedUpload | null> {
   if (file.size > MAX_FILE_SIZE_BYTES) {
     logger.warn("Skipping large file:", file.path);
-    return null;
+    throw new Error("Skipped local file larger than 25MB; this file is not synced");
   }
 
   let source = file;
@@ -28,7 +28,7 @@ export async function prepareUploadFromVaultFile(
   for (let attempt = 0; attempt < 2; attempt++) {
     if (content.byteLength > MAX_FILE_SIZE_BYTES) {
       logger.warn("Skipping large file:", file.path);
-      return null;
+      throw new Error("Skipped local file larger than 25MB; this file is not synced");
     }
 
     const stat = await context.vault.adapter.stat(file.path);

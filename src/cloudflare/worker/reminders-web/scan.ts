@@ -3,6 +3,7 @@ import {
 	scanReminderMarkdownContent,
 } from '@/reminders/core/markdownScan';
 import type { RemoteReminderRecord } from './types';
+import { reminderRevision } from '@/reminders/core/reminderRevision';
 
 export { getProjectFromPath };
 
@@ -10,8 +11,9 @@ export function scanReminderMarkdownFile(filePath: string, content: string, remi
 	return scanReminderMarkdownContent(filePath, content, remindersFolderPath).reminders;
 }
 
-export function toReminderPayload(reminder: RemoteReminderRecord): Record<string, unknown> {
+export async function toReminderPayload(reminder: RemoteReminderRecord): Promise<Record<string, unknown>> {
 	return {
+		revision: await reminderRevision(reminder),
 		id: reminder.id,
 		content: reminder.content,
 		description: reminder.description,

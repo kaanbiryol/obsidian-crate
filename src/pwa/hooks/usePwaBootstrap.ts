@@ -1,3 +1,4 @@
+import { capturePwaSession } from '../session-generation';
 import { useEffect, useRef } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import {
@@ -38,6 +39,7 @@ export function usePwaBootstrap({
 
 	useEffect(() => {
 		let cancelled = false;
+		let sessionCurrent = capturePwaSession();
 
 		async function bootstrap() {
 			try {
@@ -57,8 +59,9 @@ export function usePwaBootstrap({
 				let nextToken = initialAuthTokenRef.current;
 				if (!nextToken && applied.token) {
 					nextToken = await exchangeEnrollmentToken(applied.token);
+					if (cancelled || !sessionCurrent()) return;
 					localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
-					if (cancelled) return;
+					sessionCurrent = capturePwaSession();
 					setAuthToken(nextToken);
 				}
 
@@ -68,20 +71,21 @@ export function usePwaBootstrap({
 				}
 
 				const cached = await loadCachedReminderSnapshot(applied.config.folderPath);
+				if (cancelled || !sessionCurrent()) return;
 				hydratedCacheRef.current = Boolean(cached);
 				if (cached) {
 					hydrateCachedSnapshot(cached);
 					setLoading(false);
 				}
 			} catch (bootstrapError) {
-				if (!cancelled) {
+				if (!cancelled && sessionCurrent()) {
 					localStorage.removeItem(AUTH_TOKEN_KEY);
 					setAuthToken(null);
 					setError(bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError));
 					setLoading(false);
 				}
 			} finally {
-				if (!cancelled) {
+				if (!cancelled && sessionCurrent()) {
 					setBootstrapped(true);
 				}
 			}

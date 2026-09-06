@@ -171,8 +171,8 @@ export class SyncEngineContexts {
 			uploadPreparedFiles: dependencies.uploadPreparedFiles,
 			createVaultFileChunks: dependencies.createVaultFileChunks,
 			throwIfDestroyed: dependencies.throwIfDestroyed,
-			deleteRemoteFile: async (path: string, expectedHash: string) => {
-				await dependencies.api.deleteFile(path, expectedHash);
+			deleteRemoteFile: async (path: string, expectedHash: string, expectedRevision?: string) => {
+				await dependencies.api.deleteFile(path, expectedHash, expectedRevision);
 			},
 			removeLocalManifestEntry: (path: string) => dependencies.getLocalManifest().removeEntry(path),
 			saveLocalManifest: () => dependencies.getLocalManifest().save(),

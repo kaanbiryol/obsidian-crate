@@ -2,8 +2,8 @@ export function corsHeaders(): Record<string, string> {
 	return {
 		'Access-Control-Allow-Origin': '*',
 		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-		'Access-Control-Allow-Headers': 'Content-Type, Authorization, If-None-Match, X-File-Hash, X-File-Size, X-Crate-Expected-Hash, X-Crate-Enrollment-Token',
-		'Access-Control-Expose-Headers': 'ETag, X-File-Hash, X-File-Size, X-Crate-Request-Id, Content-Type, Content-Length',
+		'Access-Control-Allow-Headers': 'Content-Type, Authorization, If-None-Match, X-File-Hash, X-File-Size, X-Crate-Expected-Hash, X-Crate-Enrollment-Token, X-Crate-Protocol, X-Crate-Operation-Id, X-Crate-Client-Session',
+		'Access-Control-Expose-Headers': 'ETag, X-Crate-Revision, X-File-Hash, X-File-Size, X-Crate-Request-Id, Content-Type, Content-Length',
 	};
 }
 

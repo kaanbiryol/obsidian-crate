@@ -16,6 +16,7 @@ interface ConflictStoreData {
 }
 
 export interface RecordConflictInput {
+	copySide?: 'local' | 'remote';
 	originalPath: string;
 	conflictPath: string;
 	cause: Exclude<ConflictRecord['cause'], 'unknown'>;
@@ -105,6 +106,7 @@ export class ConflictStore {
 						conflictPath,
 						createdAt: new Date().toISOString(),
 						cause: 'unknown',
+						...(conflictPath.includes('(conflict remote ') ? { copySide: 'remote' as const } : {}),
 						status: 'active',
 					});
 					this.dirty = true;
@@ -271,6 +273,7 @@ function normalizeConflictRecord(value: unknown): ConflictRecord | null {
 		cause: value.cause,
 		status: value.status,
 		...(typeof value.localHash === 'string' ? { localHash: value.localHash } : {}),
+		...(value.copySide === 'remote' ? { copySide: 'remote' as const } : {}),
 		...(typeof value.remoteHash === 'string' ? { remoteHash: value.remoteHash } : {}),
 		...(typeof value.baseHash === 'string' ? { baseHash: value.baseHash } : {}),
 	};

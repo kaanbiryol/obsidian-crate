@@ -153,7 +153,7 @@ export async function runIncrementalSync(
       try {
         const deleteFiles = localOnlyDeletes.flatMap((path) => {
           const expectedHash = context.localManifest.getEntry(path)?.hash;
-          return expectedHash ? [{ path, expectedHash }] : [];
+          return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry(path)?.revision }] : [];
         });
         const missingExpectedPaths = localOnlyDeletes.filter(
           (path) => !context.localManifest.getEntry(path)?.hash,

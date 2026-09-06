@@ -67,6 +67,9 @@ export function useLaunchReminderModal({
 		setModal({
 			mode: 'edit',
 			reminderId: reminder.id,
+			expectedRevision: reminder.revision,
+			filePath: reminder.filePath,
+			operationId: crypto.randomUUID(),
 			draft: buildModalDraft(reminder, reminder.project || selectedProject),
 		});
 		setLaunchReminderId(null);

@@ -267,7 +267,7 @@ describe('plugin reminder layout styles', () => {
 
     expect(actionChips).toBeDefined();
     expect(actionChips).not.toContain('&::before');
-    expect(actionChips).toContain('gap: 4px');
+    expect(actionChips).toContain('gap: 8px');
     expect(actionChip).toContain('margin: 0 !important');
     expect(actionChip).toContain('--reminder-action-chip-height: max(');
     expect(actionChip).toContain('min-height: var(--reminder-action-chip-height)');
@@ -301,7 +301,7 @@ describe('plugin reminder layout styles', () => {
     );
 
     expect(editorStyles).toContain('min-height: 32px');
-    expect(editorStyles).toContain('padding: 8px 12px 12px');
+    expect(editorStyles).toContain('padding: 12px 16px 16px');
     expect(editorStyles).toContain('min-height: var(--reminder-action-chip-height)');
     expect(editorStyles).toContain('height: 40px');
     expect(editorStyles).toContain('vertical-align: baseline');

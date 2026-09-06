@@ -13,6 +13,7 @@ import {
 function makeRecord(overrides: Partial<ReminderLineRecord>): ReminderLineRecord {
 	return {
 		id: overrides.id ?? 'r1',
+		description: overrides.description,
 		content: overrides.content ?? 'Task',
 		dueDate: overrides.dueDate,
 		dueDatetime: overrides.dueDatetime,
@@ -65,6 +66,7 @@ describe('markdownReminderFile', () => {
 			id: 'r1',
 			content: 'Task',
 			dueDate: '2026-01-01',
+			description: 'old details',
 			lineNumber: 2,
 			rawLine: '- [ ] Task Jan 1, 2026 <!-- crate-id:r1 -->',
 		});
@@ -82,6 +84,7 @@ describe('markdownReminderFile', () => {
 		const deletion = deleteReminderBlockFromContent(replacement.content, {
 			...reminder,
 			content: 'Updated',
+			description: 'new details',
 			dueDate: '2026-01-03',
 			rawLine: '- [ ] Updated Jan 3, 2026 <!-- crate-id:r1 -->',
 		});

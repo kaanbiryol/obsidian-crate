@@ -17,7 +17,7 @@ export interface ReminderFileCacheWriteResult {
 }
 
 function serializeCacheEntry(entry: ReminderFileCacheEntry): SerializedReminderFileCacheEntry | null {
-	const remindersJson = JSON.stringify(entry.reminders);
+	const remindersJson = JSON.stringify(entry.issue ? { issue: entry.issue } : entry.reminders);
 	if (new TextEncoder().encode(remindersJson).byteLength > REMINDER_CACHE_MAX_VALUE_BYTES) {
 		return null;
 	}
@@ -66,6 +66,9 @@ export async function writeReminderFileCacheEntries(
 			serializedEntries.push(serialized);
 		} else {
 			oversizedPaths.push(entry.filePath);
+			entry.reminders = [];
+			entry.issue = 'Split this note into smaller files to index its reminders. The vault file remains synced.';
+			serializedEntries.push({ entry, remindersJson: JSON.stringify({ issue: entry.issue }) });
 		}
 	}
 

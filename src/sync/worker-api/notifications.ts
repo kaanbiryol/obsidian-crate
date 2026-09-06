@@ -67,10 +67,10 @@ export class NotificationsWorkerApi {
 		});
 	}
 
-	async createRemindersEnrollmentToken(): Promise<{ token: string; browserToken?: string; expiresAt: string }> {
+	async createRemindersEnrollmentToken(folderPath: string): Promise<{ token: string; browserToken?: string; expiresAt: string }> {
 		return this.http.requestJson('/notifications/reminders-enrollment-token', {
 			method: 'POST',
-			body: '{}',
+			body: JSON.stringify({ folderPath }),
 		});
 	}
 

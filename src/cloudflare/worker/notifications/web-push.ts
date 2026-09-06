@@ -1,3 +1,4 @@
+import { isValidPushEndpoint } from './push-endpoint';
 import { fromBase64Url, toBase64Url } from 'web-push-browser';
 
 const PUSH_RECORD_SIZE = 4096;
@@ -40,6 +41,7 @@ export async function sendPushNotificationWithoutContact(
 	subscription: WebPushSubscription,
 	payload: string,
 ): Promise<Response> {
+	if (!isValidPushEndpoint(subscription.endpoint)) throw new Error('Push service is not supported');
 	const [jwt, encryptedPayload, exportedPublicKey] = await Promise.all([
 		createVapidAuthorizationToken(vapidKeys.privateKey, new URL(subscription.endpoint)),
 		encryptPayload(payload, subscription.keys),
@@ -55,6 +57,8 @@ export async function sendPushNotificationWithoutContact(
 
 	return fetch(new Request(subscription.endpoint, {
 		method: 'POST',
+		redirect: 'error',
+		signal: AbortSignal.timeout(10_000),
 		headers,
 		body: encryptedPayload,
 	}));

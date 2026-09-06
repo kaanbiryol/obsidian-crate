@@ -1,0 +1,34 @@
+import { sha256HexBytes } from '../auth';
+import { corsResponse } from '../cors';
+import type { CommitEffects } from '../commit-effects';
+
+export interface ReminderOperation { id: string; requestHash: string }
+function canonical(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map(canonical);
+	if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)]));
+	return value;
+}
+export async function beginReminderOperation(db: D1Database, body: Record<string, unknown>, action: string): Promise<ReminderOperation | Response> {
+	if (typeof body.operationId !== 'string' || !/^[a-zA-Z0-9_-]{16,128}$/.test(body.operationId)) return corsResponse({ error: 'A stable operationId is required. Reload Crate before saving.' }, 428);
+	const requestHash = await sha256HexBytes(new TextEncoder().encode(JSON.stringify(canonical({ action, body }))));
+	const operation = { id: body.operationId, requestHash };
+	return await readReminderReceipt(db, operation) ?? operation;
+}
+async function readReminderReceipt(db: D1Database, operation: ReminderOperation): Promise<Response | null> {
+	const row = await db.prepare('SELECT request_hash, response_json FROM reminder_operations WHERE operation_id = ?').bind(operation.id).first<{ request_hash: string; response_json: string }>();
+	if (!row) return null;
+	if (row.request_hash !== operation.requestHash) return corsResponse({ error: 'This operationId was already used for different changes. Reload before saving again.' }, 409);
+	return corsResponse(JSON.parse(row.response_json));
+}
+export function reminderOperationEffects(db: D1Database, operation: ReminderOperation, response: Record<string, unknown>, createdId?: string): CommitEffects {
+	return files => {
+		const predicate = files.map(() => 'EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)').join(' AND ');
+		const bindings = files.flatMap(file => [file.path, file.storageKey]);
+		return [
+			db.prepare(`INSERT INTO reminder_operations (operation_id, request_hash, response_json) SELECT ?, ?, ? WHERE ${predicate}`)
+				.bind(operation.id, operation.requestHash, JSON.stringify(response), ...bindings),
+			...(createdId ? [db.prepare(`INSERT INTO reminder_identities (reminder_id, created_operation_id) SELECT ?, ? WHERE ${predicate}`)
+				.bind(createdId, operation.id, ...bindings)] : []),
+		];
+	};
+}

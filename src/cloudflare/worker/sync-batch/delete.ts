@@ -1,6 +1,6 @@
 import { corsResponse } from '../cors';
 import { commitFileDelete } from '../sync-mutations';
-import { parseJsonObject, sanitizePath } from '../utils';
+import { parseJsonObject, parseOptionalString, sanitizePath } from '../utils';
 import {
 	formatMetadataCommitFailure,
 	formatMutationError,
@@ -28,7 +28,7 @@ export async function handleBatchDelete(
 
 	const deleted: string[] = [];
 	const errors: MutationFailure[] = [];
-	const validFiles: Array<{ path: string; expectedHash: string }> = [];
+	const validFiles: Array<{ path: string; expectedHash: string; expectedRevision: string }> = [];
 	const seenPaths = new Set<string>();
 
 	for (const rawFile of rawFiles as BatchDeleteFile[]) {
@@ -49,7 +49,12 @@ export async function handleBatchDelete(
 			continue;
 		}
 
-		validFiles.push({ path: safePath, expectedHash });
+		const expectedRevision = parseOptionalString(rawFile.expectedRevision, 1024);
+		if (!expectedRevision) {
+			errors.push(validationFailure(safePath, 'expectedRevision required; refresh before deleting'));
+			continue;
+		}
+		validFiles.push({ path: safePath, expectedHash, expectedRevision });
 	}
 
 	let previousFiles = new Map<string, FileStorageRow>();
@@ -76,6 +81,7 @@ export async function handleBatchDelete(
 			const commit = await commitFileDelete(bucket, db, {
 				path: file.path,
 				expectedHash: file.expectedHash,
+				expectedRevision: file.expectedRevision,
 				previousFile: previousFiles.get(file.path) ?? null,
 			});
 			if (!commit.committed) {

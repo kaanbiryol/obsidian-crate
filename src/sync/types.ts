@@ -36,6 +36,7 @@ export interface ConflictRecord {
 	createdAt: string;
 	cause: 'concurrent-create' | 'concurrent-edit' | 'unknown';
 	status: 'active' | 'resolved';
+	copySide?: 'local' | 'remote';
 	localHash?: string;
 	remoteHash?: string;
 	baseHash?: string;
@@ -67,6 +68,7 @@ export interface SyncHistoryEntry {
 
 interface ReconcileDecisionBase {
 	path: string;
+	remoteRevision?: string;
 }
 
 export type FileDiff =

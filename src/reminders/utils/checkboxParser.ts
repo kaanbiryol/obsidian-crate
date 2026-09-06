@@ -14,6 +14,7 @@ import type { Priority, RecurrenceRule } from '../types';
 import { format } from 'date-fns';
 import { recurrenceToText } from './rruleConverter';
 import { extractReminderId, setReminderIdMarker, stripReminderIdMarker } from '../core/reminderIdentity';
+import { appendRecurrenceMetadata, readRecurrenceMetadata } from '../core/recurrenceMetadata';
 
 interface ParsedCheckbox {
   /** Original line content */
@@ -57,8 +58,10 @@ export function parseCheckboxLine(line: string): ParsedCheckbox | null {
   }
   const isCompleted = state.toLowerCase() === 'x';
   const reminderId = extractReminderId(rawContentWithMetadata);
-  const rawContent = stripReminderIdMarker(rawContentWithMetadata);
+  const metadata = readRecurrenceMetadata(stripReminderIdMarker(rawContentWithMetadata));
+  const rawContent = metadata.content;
   const parsed = parseReminderContent(rawContent);
+  if (metadata.recurrence && parsed.recurrencePart?.toLowerCase() === recurrenceToText(metadata.recurrence).toLowerCase()) parsed.recurrence = metadata.recurrence;
 
   return {
     original: line,
@@ -105,11 +108,9 @@ export function rebuildCheckboxLine(
 
   // Add date if present (even with recurrence, to show next occurrence)
   if (dueDate) {
-    // When recurrence has time, only show date (avoid duplicating time)
-    const recurrenceHasTime = recurrence?.hour !== undefined;
-    const showTime = !recurrenceHasTime && (hasTime ?? (dueDate.getHours() !== 0 || dueDate.getMinutes() !== 0));
+    const showTime = hasTime ?? (recurrence?.hour !== undefined || dueDate.getHours() !== 0 || dueDate.getMinutes() !== 0);
     const formatted = showTime
-      ? format(dueDate, "MMM d, yyyy HH:mm")   // "Jan 13, 2026 12:00"
+      ? dueDate.toISOString()
       : format(dueDate, "MMM d, yyyy");        // "Jan 13, 2026"
     content += ` ${formatted}`;
   }
@@ -121,7 +122,7 @@ export function rebuildCheckboxLine(
     content += ' !';
   }
 
-  const line = `${indentation}- ${checkbox} ${content}`;
+  const line = appendRecurrenceMetadata(`${indentation}- ${checkbox} ${content}`, recurrence);
   return reminderId ? setReminderIdMarker(line, reminderId) : line;
 }
 

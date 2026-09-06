@@ -129,7 +129,7 @@ describe('Cloudflare runtime integration', () => {
 			runtimeEnv,
 		);
 		expect(firstResponse.status).toBe(202);
-		expect(await firstResponse.json()).toEqual({ warming: true, remainingFiles: 5 });
+		expect(await firstResponse.json()).toEqual({ warming: true, remainingFiles: 5, totalFiles: 25 });
 		const firstCacheCount = await runtimeEnv.DB.prepare(
 			'SELECT COUNT(*) AS count FROM reminder_file_cache',
 		).first<{ count: number }>();
@@ -193,7 +193,7 @@ describe('Cloudflare runtime integration', () => {
 		expect(retained.results).toEqual([{ seq: latestBeforePrune?.seq, path: 'latest.md' }]);
 	});
 
-	it('runs a registered reminder alarm against real Durable Object storage', async () => {
+	it('fences an unprojected legacy alarm in real Durable Object storage', async () => {
 		const reminderId = 'runtime-reminder';
 		await scheduleScheduledReminder(runtimeEnv, {
 			reminderId,
@@ -207,9 +207,9 @@ describe('Cloudflare runtime integration', () => {
 		const scheduled = await runtimeEnv.DB.prepare(
 			'SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = ?',
 		).bind(reminderId).first();
-		expect(scheduled).toBeNull();
+		expect(scheduled).toEqual({ reminder_id: reminderId });
 		const stateResponse = await stub.fetch('https://do/state');
 		const state = await stateResponse.json() as { reminder?: unknown };
-		expect(state.reminder).toBeUndefined();
+		expect(state.reminder).toMatchObject({ reminderId });
 	});
 });

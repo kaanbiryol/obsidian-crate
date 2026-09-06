@@ -21,6 +21,15 @@ function compareVersionCore(left: [number, number, number], right: [number, numb
 	return 0;
 }
 
+export function assertDeploymentIsNotDowngrade(deployed: string | null, embedded: string): void {
+	if (!deployed) return;
+	const from = semanticVersionCore(deployed);
+	const to = semanticVersionCore(embedded);
+	if (!from || !to || compareVersionCore(to, from) < 0) {
+		throw new Error(`This server runs Crate ${deployed}. Update this plugin before deploying; server downgrades are not supported`);
+	}
+}
+
 export function isCloudflareServerUpdateAvailable(
 	deployment: CloudflareDeploymentMetadata,
 	embedded: CloudflareArtifactIdentity,

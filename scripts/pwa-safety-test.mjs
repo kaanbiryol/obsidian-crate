@@ -1,0 +1,38 @@
+import { chromium, webkit, expect } from '@playwright/test';
+import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
+const assets = await buildPwaPreviewAssets();
+const { server } = await listenPwaPreviewServer({ port: 0, assets, failMutationPaths: ['/reminders/update'] });
+const origin = `http://127.0.0.1:${server.address().port}`;
+try {
+	for (const browserType of [chromium, webkit]) {
+		const browser = await browserType.launch();
+		try {
+			const context = await browser.newContext();
+			const one = await context.newPage(); const two = await context.newPage();
+			one.setDefaultTimeout(15_000); two.setDefaultTimeout(15_000);
+			await one.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+			await two.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+			const cardName = 'Check this article. Press Enter to edit reminder.';
+			await one.getByRole('group', { name: cardName, exact: true }).waitFor();
+			await two.getByRole('group', { name: cardName, exact: true }).waitFor();
+			await one.getByRole('group', { name: cardName, exact: true }).click();
+			const title = one.getByRole('textbox', { name: 'Reminder title', exact: true });
+			await title.fill('Keep this unsaved draft');
+			await one.getByRole('button', { name: 'Save reminder', exact: true }).click();
+			await expect(one.getByRole('button', { name: 'Save reminder', exact: true })).toBeEnabled();
+			await expect(title).toHaveText('Keep this unsaved draft');
+			await one.reload();
+			await one.getByRole('group', { name: cardName, exact: true }).click();
+			await expect(title).toHaveText('Keep this unsaved draft');
+			await one.getByRole('button', { name: 'Close reminder editor', exact: true }).click();
+			await one.getByRole('dialog', { name: 'Edit reminder', exact: true }).waitFor({ state: 'detached' });
+			await one.getByRole('button', { name: 'Open settings', exact: true }).click();
+			await one.getByRole('button', { name: 'Log out', exact: true }).click();
+			await expect.poll(() => one.evaluate(() => localStorage.getItem('crate-reminders-auth-token'))).toBe(null);
+			await expect(two.getByRole('group', { name: cardName, exact: true })).toHaveCount(0);
+			await expect.poll(() => two.evaluate(() => Object.keys(sessionStorage).filter(key => key.startsWith('crate-reminder-draft:')).length)).toBe(0);
+			console.log(`${browserType.name()}: failed saves retain drafts across reload and logout clears open tabs`);
+		} finally { await browser.close(); }
+	}
+} finally { await new Promise(resolve => server.close(resolve)); }

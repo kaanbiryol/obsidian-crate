@@ -27,7 +27,7 @@ interface AddReminderModalProps {
     animationConfig?: AnimationConfig;
     variant?: 'bottom-sheet' | 'centered';
     showBackdrop?: boolean;
-    optimistic?: boolean; // If true, close modal immediately and handle errors via onError callback
+    optimistic?: boolean; // Retained for source compatibility; dismissal always awaits success.
     /**
      * Controls how picker modals (date, project, recurrence) are displayed:
      * - 'replace' (default): Main modal is hidden when picker opens
@@ -87,7 +87,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         isClosing,
         showModal,
         allowAutoFocus,
-        handleClose,
+        handleClose: closePresentation,
         handleModalExitComplete,
         transitionToView,
         closePickerModal,
@@ -100,6 +100,8 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     const {
         showDeleteConfirm,
         isDeleting,
+        isSaving,
+        isPending,
         deleteMessage,
         handleSubmit,
         handleDeleteClick,
@@ -116,12 +118,14 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         recurrence,
         reminder,
         optimistic,
-        onClose: handleClose,
+        onClose: closePresentation,
         onAdd,
         onSave,
         onDelete,
         onError,
     });
+
+    const handleClose = () => { if (!isPending()) closePresentation(); };
 
     // Keep project accents and picker chrome in sync when the active theme changes.
     const isDark = useObsidianDarkMode();
@@ -169,7 +173,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
             className={`crate-reminder-editor-surface${reduceMotion ? ' is-reduced-motion' : ''}`}
             ariaLabel={isEditing ? 'Edit reminder' : 'New reminder'}
             showBackdrop={false}
-            disableSwipeToDismiss={currentView !== 'main'}
+            disableSwipeToDismiss={isSaving || isDeleting || currentView !== 'main'}
             style={{
                 // Subtle dim effect when picker is open in overlay mode
                 ...(pickerMode === 'overlay' && currentView !== 'main' ? {
@@ -192,13 +196,15 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         >
             <AddReminderModalHeader
                 isEditing={isEditing}
-                canSubmit={!!content.trim()}
+                canSubmit={!!content.trim() && !isSaving && !isDeleting}
+                busy={isSaving || isDeleting}
                 onDelete={handleDeleteClick}
                 onClose={handleClose}
                 onSubmit={() => {
                     void handleSubmit();
                 }}
             />
+            <div inert={isSaving || isDeleting}>
             <AddReminderModalBody
                 isDark={isDark}
                 content={content}
@@ -221,6 +227,7 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
                 onOpenRecurrencePicker={() => transitionToView('recurrence')}
                 onTogglePriority={handlePriorityToggle}
             />
+            </div>
         </BaseModal>
 
         <AddReminderModalOverlays

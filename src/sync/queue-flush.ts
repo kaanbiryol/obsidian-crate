@@ -99,7 +99,7 @@ export async function processPendingChanges(
 		const deletes = paths.filter(path => path.startsWith('delete:')).flatMap(key => {
 			const path = key.substring(7);
 			const expectedHash = context.localManifest.getEntry?.(path)?.hash;
-			return expectedHash ? [{ path, expectedHash }] : [];
+			return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry?.(path)?.revision }] : [];
 		});
 		const chunks = prepareUploadChunks(paths.filter(path => !path.startsWith('delete:')), async path => {
 			if (context.isDestroyed()) throw createAbortError('Queue preparation aborted');

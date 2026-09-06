@@ -1,8 +1,8 @@
 import type { ApiFetch } from './types';
 
-const MAX_REMINDER_INDEX_WARMUP_REQUESTS = 100;
+const MAX_REMINDER_INDEX_WARMUP_REQUESTS = 1000;
 const MAX_REMINDER_INDEX_RETRY_DELAY_MS = 5_000;
-const MAX_REMINDER_INDEX_TOTAL_WAIT_MS = 15_000;
+const MAX_REMINDER_INDEX_TOTAL_WAIT_MS = 10 * 60_000;
 
 function retryDelayMs(response: Response): number {
 	const retryAfter = response.headers.get('Retry-After');
@@ -20,11 +20,14 @@ export async function fetchReadyReminderList(
 	apiFetch: ApiFetch,
 	path: string,
 	headers: Headers,
+	onProgress?: (remaining: number, total: number) => void,
 ): Promise<Response> {
 	let totalWaitMs = 0;
 	for (let attempt = 0; attempt < MAX_REMINDER_INDEX_WARMUP_REQUESTS; attempt += 1) {
 		const response = await apiFetch(path, { headers });
 		if (response.status !== 202) return response;
+		const progress = await response.json() as { remainingFiles?: number; totalFiles?: number };
+		onProgress?.(progress.remainingFiles ?? 0, progress.totalFiles ?? 0);
 		const waitMs = retryDelayMs(response);
 		if (waitMs > 0) {
 			if (totalWaitMs + waitMs > MAX_REMINDER_INDEX_TOTAL_WAIT_MS) break;

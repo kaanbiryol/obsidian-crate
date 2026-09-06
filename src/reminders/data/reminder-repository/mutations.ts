@@ -1,3 +1,4 @@
+import { reminderRevision } from '../../core/reminderRevision';
 import { createReminderId } from "../../core/reminderIdentity";
 import { buildCreatedReminderFallback, buildCreateReminderArgs, buildReminderUpdate } from "./shared";
 import type { ReminderRepositoryContext } from "./types";
@@ -42,14 +43,16 @@ export function createReminderRepositoryMutations({ index, writer }: ReminderRep
       const indexed = index.getById(id);
       if (!indexed) return undefined;
 
+      if (params.expectedRevision && params.expectedRevision !== await reminderRevision(toReminder(indexed))) throw new Error('Reminder changed while editing. Your draft was not saved.');
       const update = buildReminderUpdate(params);
       await writer.updateReminder(indexed, update.updates);
 
+      const { expectedRevision: _expectedRevision, ...values } = params;
       const updated: Omit<Reminder, "recurrence"> & {
         recurrence?: Reminder["recurrence"] | null;
       } = {
         ...toReminder(indexed),
-        ...params,
+        ...values,
         ...(update.hasRecurrenceUpdate ? { recurrence: update.recurrenceUpdate } : {}),
         ...update.storedDates,
       };
@@ -61,10 +64,11 @@ export function createReminderRepositoryMutations({ index, writer }: ReminderRep
       return updated as Reminder;
     },
 
-    async delete(id: string) {
+    async delete(id: string, expectedRevision?: string) {
       const indexed = index.getById(id);
       if (!indexed) return false;
 
+      if (expectedRevision && expectedRevision !== await reminderRevision(toReminder(indexed))) throw new Error('Reminder changed while editing. Nothing was deleted.');
       await writer.deleteReminder(indexed);
       return true;
     },

@@ -1,3 +1,4 @@
+import { beginReminderOperation, reminderOperationEffects } from '../operations';
 import { createReminderId } from '@/reminders/core/reminderIdentity';
 import { buildCreateReminderArgs } from '@/reminders/data/reminder-repository/shared';
 import { corsResponse } from '../../cors';
@@ -24,6 +25,9 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 	if (!parsedBody.ok) {
 		return parsedBody.response;
 	}
+
+	const operation = await beginReminderOperation(env.DB, parsedBody.value, 'create');
+	if (operation instanceof Response) return operation;
 
 	const workspaceResult = parseReminderMutationWorkspace(parsedBody.value);
 	if (workspaceResult instanceof Response) {
@@ -60,6 +64,10 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 	const filePath = getProjectFilePath(workspaceResult.folderPath, project);
 	const existingFile = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, filePath);
 	const existingContent = existingFile?.content ?? getInitialProjectFileContent(project);
+	if (scanReminderMarkdownFile(filePath, existingContent, workspaceResult.folderPath).some(reminder => reminder.id === reminderId)
+		|| await env.DB.prepare('SELECT reminder_id FROM reminder_identities WHERE reminder_id = ?').bind(reminderId).first()) {
+		return corsResponse({ error: 'This reminder already exists. Reload to see its committed state.' }, 409);
+	}
 	const nextContent = createReminderInFileContent(existingContent, {
 		content,
 		description,
@@ -69,18 +77,19 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 		hasTime: createArgs.hasTime,
 		reminderId,
 	});
-	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, existingFile?.hash ?? null);
-
 	const reminders = scanReminderMarkdownFile(filePath, nextContent, workspaceResult.folderPath);
+	const reminder = reminders.find(candidate => candidate.id === reminderId);
+	const response = { success: true, reminder: reminder ? await toReminderPayload(reminder) : undefined };
+	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, existingFile?.hash ?? null,
+		reminderOperationEffects(env.DB, operation, response, reminderId));
 	await saveReminderFileCache(env.DB, workspaceResult.folderPath, filePath, write.hash, reminders);
-	const reminder = reminders
-		.find(candidate => candidate.id === reminderId);
+
 	const notificationWarning = reminder
 		? await syncReminderNotification(env, reminder, workspaceResult.allDayNotificationTime)
 		: undefined;
 	return corsResponse({
 		success: true,
-		reminder: reminder ? toReminderPayload(reminder) : undefined,
+		reminder: reminder ? await toReminderPayload(reminder) : undefined,
 		notificationWarning,
 	});
 }

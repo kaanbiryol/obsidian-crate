@@ -1,3 +1,4 @@
+import { recurrenceToText } from './rruleConverter';
 import type { RecurrenceRule } from '../types/reminder';
 import { timezone as getLocalTimeZone } from './time';
 
@@ -25,4 +26,9 @@ export function normalizeRecurrenceRule(
     ...rule,
     timezone: getRecurrenceTimeZone(rule),
   };
+}
+
+/** NLP describes visible recurrence fields; keep non-visible metadata on title edits. */
+export function preserveRecurrenceMetadata(parsed: RecurrenceRule | undefined, previous: RecurrenceRule | undefined): RecurrenceRule | undefined {
+  return parsed && previous && recurrenceToText(parsed) === recurrenceToText(previous) ? previous : parsed;
 }

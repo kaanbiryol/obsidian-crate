@@ -67,8 +67,8 @@ export function classifyPath(
 		if (!base) {
 			return { path, action: 'download', remoteHash: remote.hash, cause: 'remote-created' };
 		}
-		if (remote.hash === base.hash) {
-			return { path, action: 'delete', remoteHash: remote.hash, cause: 'local-deleted' };
+		if (remote.hash === base.hash && base.revision && remote.revision === base.revision) {
+			return { path, action: 'delete', remoteHash: remote.hash, remoteRevision: remote.revision, cause: 'local-deleted' };
 		}
 		return { path, action: 'download', remoteHash: remote.hash, cause: 'local-deleted' };
 	}

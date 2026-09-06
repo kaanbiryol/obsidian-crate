@@ -1,5 +1,5 @@
 # vscode
-.vscode 
+.vscode
 
 # Intellij
 *.iml
@@ -39,3 +39,14 @@ site/website-options/crate-ui/crate-ui.generated.css
 # Visual regression reports (approved baselines live in tests/visual/baselines)
 test-results/
 playwright-report/
+
+# Local credentials
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+
+# Local recovery and Python test output
+__pycache__/
+*.pyc

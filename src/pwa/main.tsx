@@ -1,3 +1,4 @@
+import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
@@ -68,10 +69,17 @@ function App() {
 	const settingsTransition = useSheetTransition(finalizeSettingsClose);
 
 	useEffect(() => {
-		void registerPwaServiceWorker().catch((error: unknown) => {
+		const reportVersion = () => navigator.serviceWorker?.controller?.postMessage({ type: 'CRATE_CLIENT_VERSION', version: PWA_ASSET_VERSION });
+		navigator.serviceWorker?.addEventListener('controllerchange', reportVersion);
+		document.addEventListener('visibilitychange', reportVersion);
+		void registerPwaServiceWorker().then(reportVersion).catch((error: unknown) => {
 			const message = error instanceof Error ? error.message : String(error);
 			showToast('error', `Offline support could not start: ${message}`);
 		});
+		return () => {
+			navigator.serviceWorker?.removeEventListener('controllerchange', reportVersion);
+			document.removeEventListener('visibilitychange', reportVersion);
+		};
 	}, [showToast]);
 
 	const apiFetch = useMemo(
@@ -200,7 +208,7 @@ function App() {
 		setSettingsOpen(false);
 		setSaving(false);
 		flushSync(() => {
-			setModal({ mode, reminderId, draft: buildModalDraft(reminder, defaultProject ?? selectedProject) });
+			setModal({ mode, reminderId, expectedRevision: reminder?.revision, filePath: reminder?.filePath, operationId: crypto.randomUUID(), draft: buildModalDraft(reminder, defaultProject ?? selectedProject) });
 		});
 	}, [ensureCanMutate, modalTransition.cancelClose, reminders, selectedProject, settingsTransition.cancelClose]);
 

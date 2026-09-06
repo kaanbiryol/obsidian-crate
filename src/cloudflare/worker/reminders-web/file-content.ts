@@ -1,3 +1,4 @@
+import { validateReminderFileContent } from './limits';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
 import type { buildReminderUpdate } from '@/reminders/data/reminder-repository/shared';
 import { getReminderProjectFilePath } from '@/reminders/core/reminderProjectPath';
@@ -33,7 +34,7 @@ export function createReminderInFileContent(
 		reminderId: string;
 	},
 ): string {
-	return appendCreatedReminderBlock(fileContent, buildCreatedReminderBlock(params));
+	return validateReminderFileContent(appendCreatedReminderBlock(fileContent, buildCreatedReminderBlock(params)));
 }
 
 export function deleteReminderFromFileContent(fileContent: string, reminder: RemoteReminderRecord): string {
@@ -46,7 +47,7 @@ export function updateReminderInFileContent(
 	update: ReturnType<typeof buildReminderUpdate>,
 ): string {
 	const mutation = buildUpdatedReminderBlock(reminder, update.updates);
-	return replaceUpdatedReminderBlock(fileContent, reminder, mutation).content;
+	return validateReminderFileContent(replaceUpdatedReminderBlock(fileContent, reminder, mutation).content);
 }
 
 export function setReminderCompletedInFileContent(
@@ -55,7 +56,7 @@ export function setReminderCompletedInFileContent(
 	completed: boolean,
 ): string {
 	if (reminder.completed === completed) return fileContent;
-	return setReminderCompletionInContent(fileContent, reminder, completed).content;
+	return validateReminderFileContent(setReminderCompletionInContent(fileContent, reminder, completed).content);
 }
 
 export function reorderReminderBlocksInFileContent(fileContent: string, orderedIds: string[]): string {

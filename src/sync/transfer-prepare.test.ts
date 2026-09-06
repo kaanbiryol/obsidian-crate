@@ -4,17 +4,15 @@ import { prepareUploadFromPath, prepareUploadFromVaultFile } from './transfer';
 import { HIDDEN_CONFIG_PATH, createTransferHarness } from './transfer-test-harness';
 
 describe('transfer prepare helpers', () => {
-	it('skips oversized files', async () => {
+	it('reports oversized files without reading them', async () => {
 		const harness = createTransferHarness();
 
-		const result = await prepareUploadFromVaultFile(harness.context, {
+		await expect(prepareUploadFromVaultFile(harness.context, {
 			path: 'big.bin',
 			size: MAX_FILE_SIZE_BYTES + 1,
 			mtime: Date.now(),
 			extension: 'bin',
-		});
-
-		expect(result).toBeNull();
+		})).rejects.toThrow('this file is not synced');
 		expect(harness.adapter.readBinary).not.toHaveBeenCalled();
 	});
 

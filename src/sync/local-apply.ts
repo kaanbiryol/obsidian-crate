@@ -2,7 +2,8 @@ import type { TFile, Vault } from 'obsidian';
 import { createConflictCopy } from './conflict';
 import { isHiddenPath } from './file-discovery';
 import { computeHash } from './hasher';
-import { isMarkdownPath } from './markdown-base-cache';
+import { IncomingFileReviewError, preserveIncomingForReview } from './incoming-file-review';
+import type { RecordConflictInput } from './conflict-store';
 import { isVaultTFileLike } from './planner-helpers';
 import type { DiffApplyOutcome } from './transfer-types';
 
@@ -24,7 +25,10 @@ interface LocalSnapshot {
 
 interface LocalApplyContext {
 	vault: Vault;
+	conflictStore?: { record(input: RecordConflictInput): Promise<void> };
 }
+
+const TEXT_PATH = /\.(?:md|txt|canvas|json|jsonc|css|scss|js|mjs|cjs|ts|tsx|jsx|svg|xml|html|csv|tsv|yaml|yml|toml|ini|excalidraw)$/i;
 
 interface CreatedConflictCopy {
 	path: string;
@@ -49,7 +53,7 @@ export async function applyRemoteContentIfUnchanged(
 		};
 	}
 
-	return applySnapshot(context.vault, path, content, snapshot);
+	return applySnapshot(context, path, content, snapshot);
 }
 
 export async function preserveLocalVersionsAndApplyRemote(
@@ -60,6 +64,9 @@ export async function preserveLocalVersionsAndApplyRemote(
 	onConflictCopy?: (copy: CreatedConflictCopy) => Promise<void>,
 ): Promise<DiffApplyOutcome> {
 	await ensureParentFolder(context.vault, path);
+	if (!TEXT_PATH.test(path)) {
+		return applySnapshot(context, path, remoteContent, await readLocalSnapshot(context.vault, path));
+	}
 	let localContent = initialLocalContent;
 	let localHash = await computeHash(localContent);
 
@@ -68,7 +75,7 @@ export async function preserveLocalVersionsAndApplyRemote(
 		await onConflictCopy?.({ path: conflictPath, hash: localHash });
 		const latest = await readLocalSnapshot(context.vault, path);
 		if (!latest.exists || latest.hash === localHash) {
-			return applySnapshot(context.vault, path, remoteContent, latest);
+			return applySnapshot(context, path, remoteContent, latest);
 		}
 
 		if (!latest.content || !latest.hash) {
@@ -91,7 +98,7 @@ export async function writeRemoteContent(
 ): Promise<void> {
 	await ensureParentFolder(context.vault, path);
 	const snapshot = await readLocalSnapshot(context.vault, path);
-	await writeLocalContent(context.vault, path, content, snapshot);
+	await writeLocalContent(context, path, content, snapshot);
 }
 
 async function readLocalSnapshot(vault: Vault, path: string): Promise<LocalSnapshot> {
@@ -135,20 +142,20 @@ async function ensureParentFolder(vault: Vault, path: string): Promise<void> {
 }
 
 async function writeLocalContent(
-	vault: Vault,
+	context: LocalApplyContext,
 	path: string,
 	content: ArrayBuffer,
 	snapshot: LocalSnapshot,
 ): Promise<void> {
-	if (isMarkdownPath(path) && snapshot.content) {
+	const { vault } = context;
+	if (TEXT_PATH.test(path) && snapshot.content) {
 		let expectedText: string;
 		let replacement: string;
 		try {
 			expectedText = textDecoder.decode(snapshot.content);
 			replacement = textDecoder.decode(content);
 		} catch {
-			// Non-UTF-8 files still transfer byte-for-byte through the binary path.
-			return writeBinaryContent(vault, path, content, snapshot);
+			return preserveIncomingForReview(context, path, content, snapshot.hash ?? '');
 		}
 		const update = (current: string): string => {
 			if (current !== expectedText) throw new LocalFileChangedError();
@@ -163,27 +170,20 @@ async function writeLocalContent(
 		}
 		return;
 	}
-	await writeBinaryContent(vault, path, content, snapshot);
+	if (snapshot.exists || isHiddenPath(path)) {
+		return preserveIncomingForReview(context, path, content, snapshot.hash ?? '');
+	}
+	// Vault.createBinary refuses an existing visible path, including a create
+	// that races our earlier snapshot. Never fall back to an overwriting write.
+	await vault.createBinary(path, content);
 }
 
-async function applySnapshot(vault: Vault, path: string, content: ArrayBuffer, snapshot: LocalSnapshot): Promise<DiffApplyOutcome> {
+async function applySnapshot(context: LocalApplyContext, path: string, content: ArrayBuffer, snapshot: LocalSnapshot): Promise<DiffApplyOutcome> {
 	try {
-		await writeLocalContent(vault, path, content, snapshot);
+		await writeLocalContent(context, path, content, snapshot);
 		return { status: 'applied' };
 	} catch (error) {
-		if (error instanceof LocalFileChangedError) return { status: 'deferred', reason: error.message };
+		if (error instanceof LocalFileChangedError || error instanceof IncomingFileReviewError) return { status: 'deferred', reason: error.message };
 		throw error;
 	}
-}
-
-async function writeBinaryContent(vault: Vault, path: string, content: ArrayBuffer, snapshot: LocalSnapshot): Promise<void> {
-	if (isHiddenPath(path) || (snapshot.exists && !snapshot.visibleFile)) {
-		await vault.adapter.writeBinary(path, content);
-		return;
-	}
-	if (snapshot.visibleFile) {
-		await vault.modifyBinary(snapshot.visibleFile, content);
-		return;
-	}
-	await vault.createBinary(path, content);
 }

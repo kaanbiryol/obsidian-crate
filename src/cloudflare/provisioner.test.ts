@@ -30,6 +30,7 @@ const artifacts = {
 
 function createApi() {
 	return {
+		getWorkerSettings: vi.fn(async () => ({ annotations: { 'workers/message': 'Crate 0.1.0' } })),
 		getD1Database: vi.fn(async (_accountId: string, databaseId: string) => ({ uuid: databaseId })),
 		findD1Database: vi.fn(),
 		createD1Database: vi.fn(),
@@ -45,6 +46,15 @@ function createApi() {
 }
 
 describe('provisionCloudflareDeployment', () => {
+	it('rejects a newer remote Worker before changing schema or uploading code', async () => {
+		const api = createApi();
+		api.getWorkerSettings.mockResolvedValue({ annotations: { 'workers/message': 'Crate 9.0.0' } });
+		const metadata = createMetadata();
+		await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
+			.rejects.toThrow('downgrades are not supported');
+		expect(api.queryD1).not.toHaveBeenCalled();
+		expect(api.uploadWorker).not.toHaveBeenCalled();
+	});
 	it('reuses persisted resources and initializes the idempotent schema before upload', async () => {
 		const api = createApi();
 		const metadata = createMetadata();
@@ -61,7 +71,7 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.createD1Database).not.toHaveBeenCalled();
 		expect(api.createR2Bucket).not.toHaveBeenCalled();
 		expect(api.createWorkersSubdomain).not.toHaveBeenCalled();
-		expect(api.queryD1).toHaveBeenCalledTimes(3);
+		expect(api.queryD1).toHaveBeenCalledTimes(7);
 		expect(api.queryD1).toHaveBeenNthCalledWith(
 			3,
 			metadata.accountId,
@@ -120,7 +130,7 @@ describe('provisionCloudflareDeployment', () => {
 			artifacts.d1Schema,
 		);
 		expect(api.uploadWorker).toHaveBeenCalledOnce();
-		expect(api.queryD1).toHaveBeenCalledTimes(7);
+		expect(api.queryD1).toHaveBeenCalledTimes(11);
 	});
 
 	it('records launch hardening without rerunning it when the schema is already current', async () => {

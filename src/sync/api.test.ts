@@ -1,10 +1,16 @@
+import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpError, SyncApiClient } from './api';
 import type { ApiHttpResponse, ApiHttpTransport } from './worker-api/http';
 
 function mockTransport(...responses: Response[]) {
+  const explicitMetadata = responses.some(response => response.headers.get('X-Test-Metadata') === 'true');
 	let responseIndex = 0;
-	return vi.fn<ApiHttpTransport>(async () => {
+	return vi.fn<ApiHttpTransport>(async request => {
+    if (request.url.endsWith('/.well-known/crate') && !explicitMetadata) {
+      const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] });
+      return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer };
+    }
 		const response = responses[responseIndex++];
 		if (!response) throw new Error('No mock response available');
 		const arrayBuffer = await response.arrayBuffer();
@@ -32,7 +38,8 @@ describe('SyncApiClient', () => {
 			return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer };
 		};
 		const transport: ApiHttpTransport = async request => {
-			if (request.url.includes('/sync/upload')) {
+			if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] });
+      if (request.url.includes('/sync/upload')) {
 				return new Promise(resolve => {
 					commit = () => {
 						remoteFiles = { 'note.md': { hash, size: 1, modified: '2026-01-01' } };
@@ -49,7 +56,8 @@ describe('SyncApiClient', () => {
 		const upload = client.uploadFile('note.md', new ArrayBuffer(1), hash, 1, 'text/markdown', null);
 		void upload.then(() => { accepted = true; }, () => {});
 		const assertion = expect(upload).rejects.toThrow(reason === 'abort' ? 'Sync request aborted' : 'Request timed out');
-		if (reason === 'abort') controller.abort();
+		await vi.waitFor(() => expect(commit).toBeTypeOf('function'));
+    if (reason === 'abort') controller.abort();
 		else await vi.advanceTimersByTimeAsync(120_000);
 		await assertion;
 		commit();
@@ -107,7 +115,7 @@ describe('SyncApiClient', () => {
 		}), { status: 409 }));
 		const client = new SyncApiClient('https://worker.example', 'token', transport);
 
-		await expect(client.deleteFile('notes/a.md', 'base-hash')).rejects.toMatchObject({
+		await expect(client.deleteFile('notes/a.md', 'base-hash', 'base-revision')).rejects.toMatchObject({
 			status: 409,
 			code: 'version_conflict',
 			currentHash: 'remote-hash',
@@ -255,13 +263,13 @@ describe('SyncApiClient', () => {
 		await expect(client.putSharedSettings(settings)).rejects.toMatchObject({ status: 409 });
 		await expect(client.putSharedSettings(settings)).resolves.toMatchObject({ settingsVersion: 'version-3' });
 
-		expect(transport.mock.calls.map(call => call[0].url)).toEqual([
+		expect(transport.mock.calls.filter(call => call[0].url.endsWith('/settings')).map(call => call[0].url)).toEqual([
 			'https://worker.example/settings',
 			'https://worker.example/settings',
 			'https://worker.example/settings',
 			'https://worker.example/settings',
 		]);
-		const lastPut = transport.mock.calls[3]?.[0];
+		const lastPut = transport.mock.calls.at(-1)?.[0];
 		if (typeof lastPut?.body !== 'string') throw new Error('Expected a JSON request body');
 		expect(JSON.parse(lastPut.body) as unknown).toMatchObject({ expectedVersion: 'version-2' });
 	});
@@ -307,7 +315,7 @@ describe('SyncApiClient', () => {
 			serverVersion: '9.0.0',
 			protocol: { current: 9, oldestCompatible: 9 },
 			capabilities: ['sync-v1'],
-		})));
+		}), { headers: { 'X-Test-Metadata': 'true' } }));
 		const client = new SyncApiClient('https://worker.example', 'token', transport);
 		await expect(client.testConnection()).resolves.toEqual({
 			success: false,

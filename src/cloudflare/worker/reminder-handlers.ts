@@ -9,6 +9,7 @@ interface ReminderSchedulePayload {
 	project?: string | null;
 	dueDatetime: string;
 	priority?: number;
+	jobToken?: string;
 }
 
 function validateDueDatetime(dueDatetime: string): string | null {
@@ -24,9 +25,9 @@ function validateDueDatetime(dueDatetime: string): string | null {
 
 export async function scheduleScheduledReminder(
 	env: Env,
-	{ reminderId, content, project, dueDatetime, priority }: ReminderSchedulePayload,
+	{ reminderId, content, project, dueDatetime, priority, jobToken }: ReminderSchedulePayload,
 ): Promise<void> {
-	const dueDatetimeError = validateDueDatetime(dueDatetime);
+	const dueDatetimeError = jobToken ? (Number.isFinite(Date.parse(dueDatetime)) ? null : 'Invalid dueDatetime') : validateDueDatetime(dueDatetime);
 	if (dueDatetimeError) {
 		throw new Error(dueDatetimeError);
 	}
@@ -37,6 +38,7 @@ export async function scheduleScheduledReminder(
 		method: 'PUT',
 		body: JSON.stringify({
 			reminderId,
+			jobToken,
 			content,
 			project: project || undefined,
 			dueDatetime,
@@ -49,13 +51,13 @@ export async function scheduleScheduledReminder(
 	}
 }
 
-export async function cancelScheduledReminder(env: Env, reminderId: string): Promise<void> {
+export async function cancelScheduledReminder(env: Env, reminderId: string, jobToken?: string): Promise<void> {
 	const id = env.REMINDER_ALARMS.idFromName(reminderId);
 	const stub = env.REMINDER_ALARMS.get(id);
 	let response: Response;
 	try {
 		response = await stub.fetch(
-			`https://do/cancel?reminderId=${encodeURIComponent(reminderId)}`,
+			`https://do/cancel?reminderId=${encodeURIComponent(reminderId)}${jobToken ? `&jobToken=${encodeURIComponent(jobToken)}` : ''}`,
 			{ method: 'DELETE' },
 		);
 	} catch {

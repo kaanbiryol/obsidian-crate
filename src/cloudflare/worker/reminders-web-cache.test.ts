@@ -44,7 +44,7 @@ it('lists reminders from markdown files in the configured folder', async () => {
 			workspace.env as never,
 		);
 		expect(warmingResponse.status).toBe(202);
-		expect(await warmingResponse.json()).toEqual({ warming: true, remainingFiles: 5 });
+		expect(await warmingResponse.json()).toEqual({ warming: true, remainingFiles: 5, totalFiles: 25 });
 		expect(warmingResponse.headers.get('Retry-After')).toBe('1');
 		expect(bucketGet).toHaveBeenCalledTimes(20);
 
@@ -59,7 +59,7 @@ it('lists reminders from markdown files in the configured folder', async () => {
 		expect(Math.max(...dbBatch.mock.calls.map(call => (call[0] as unknown[]).length))).toBeLessThanOrEqual(20);
 	});
 
-	it('rejects an uncacheable parsed reminder file instead of repeating warm-up forever', async () => {
+	it('keeps healthy files available and reports uncacheable parsed reminder data', async () => {
 		const oversizedContent = Array.from(
 			{ length: 12_000 },
 			(_, index) => `- [ ] Task ${index} <!-- crate-id:r-${index} -->`,
@@ -81,11 +81,15 @@ it('lists reminders from markdown files in the configured folder', async () => {
 			workspace.env as never,
 		);
 
-		expect(response.status).toBe(413);
-		expect(await response.json()).toEqual({
-			error: 'Parsed reminder data for this Markdown file is too large to cache',
-			path: 'Reminders/00-Oversized.md',
-		});
+    expect(response.status).toBe(202);
+    const ready = await handleListReminders(new Request('https://worker.test/reminders/list?folderPath=Reminders'), workspace.env as never);
+    expect(ready.status).toBe(200);
+    const data = await ready.json() as { reminders: unknown[]; issues: Array<{ path: string }> };
+    expect(data.reminders).toHaveLength(20);
+    expect(data.issues).toMatchObject([{ path: 'Reminders/00-Oversized.md' }]);
+    const reads = (workspace.env.BUCKET.get as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect((await handleListReminders(new Request('https://worker.test/reminders/list?folderPath=Reminders'), workspace.env as never)).status).toBe(200);
+    expect(workspace.env.BUCKET.get).toHaveBeenCalledTimes(reads);
 	});
 
 	it('returns 304 from file metadata without reading markdown objects again', async () => {

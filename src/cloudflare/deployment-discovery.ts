@@ -22,7 +22,7 @@ function findBinding(
 	return settings.bindings?.find(binding => binding.type === type && binding.name === name) ?? null;
 }
 
-function deployedArtifact(settings: CloudflareWorkerSettings): {
+export function deployedArtifact(settings: CloudflareWorkerSettings): {
 	version: string | null;
 	fingerprint: string | null;
 } {

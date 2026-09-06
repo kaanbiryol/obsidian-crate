@@ -1,3 +1,4 @@
+import type { NotificationPolicy } from '../protocol/notification-policy';
 /**
  * Worker API client facade for sync, setup, and reminder endpoints.
  */
@@ -100,12 +101,12 @@ export class SyncApiClient {
 		return this.syncApi.uploadFile(path, content, hash, size, contentType, expectedHash);
 	}
 
-	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string }> {
+	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }> {
 		return this.syncApi.downloadFile(path);
 	}
 
-	async deleteFile(path: string, expectedHash: string): Promise<{ success: boolean; path: string }> {
-		return this.syncApi.deleteFile(path, expectedHash);
+	async deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }> {
+		return this.syncApi.deleteFile(path, expectedHash, expectedRevision);
 	}
 
 	async checkForChanges(since: number): Promise<CheckResponse> {
@@ -127,8 +128,9 @@ export class SyncApiClient {
 	async batchDelete(
 		paths: string[],
 		expectedHashes?: Record<string, string>,
+		expectedRevisions?: Record<string, string>,
 	): Promise<BatchDeleteResponse> {
-		return this.syncApi.batchDelete(paths, expectedHashes);
+		return this.syncApi.batchDelete(paths, expectedHashes, expectedRevisions);
 	}
 
 	async listFileVersions(path?: string): Promise<{ versions: RemoteFileVersion[] }> {
@@ -162,6 +164,15 @@ export class SyncApiClient {
 		return this.sharedSettingsApi.putSharedSettings(settings);
 	}
 
+	async ensureNotificationPolicy(policy: Omit<NotificationPolicy, 'revision'>): Promise<{ policy: NotificationPolicy }> {
+		return this.http.requestJson('/reminders/notification-policy', { method: 'POST', body: JSON.stringify(policy) });
+	}
+	async getNotificationPolicy(): Promise<{ policy: NotificationPolicy | null }> {
+		return this.http.requestJson('/reminders/notification-policy');
+	}
+	async updateNotificationPolicy(policy: NotificationPolicy): Promise<{ policy: NotificationPolicy }> {
+		return this.http.requestJson('/reminders/notification-policy', { method: 'PUT', body: JSON.stringify({ ...policy, expectedRevision: policy.revision }) });
+	}
 	async scheduleReminder(data: ReminderScheduleRequest): Promise<{ success: boolean }> {
 		return this.notificationsApi.scheduleReminder(data);
 	}
@@ -182,8 +193,8 @@ export class SyncApiClient {
 		return this.notificationsApi.createPushEnrollmentToken();
 	}
 
-	async createRemindersEnrollmentToken(): Promise<{ token: string; browserToken?: string; expiresAt: string }> {
-		return this.notificationsApi.createRemindersEnrollmentToken();
+	async createRemindersEnrollmentToken(folderPath: string): Promise<{ token: string; browserToken?: string; expiresAt: string }> {
+		return this.notificationsApi.createRemindersEnrollmentToken(folderPath);
 	}
 
 	async deletePushSubscription(id: string): Promise<{ success: boolean }> {

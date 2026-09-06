@@ -1,3 +1,4 @@
+import { preserveRecurrenceMetadata } from '../../utils/recurrenceRule';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Reminder, RecurrenceRule } from '../../types';
 import {
@@ -28,9 +29,7 @@ export function useReminderDraft({
 		[reminder, resolvedDefaultProject, initialDueDate],
 	);
 	const initialProject = (reminder?.project && String(reminder.project).trim()) || resolvedDefaultProject;
-	const initialDueDateValue = reminder?.recurrence
-		? null
-		: (reminder?.dueDatetime || reminder?.dueDate || initialDueDate || null);
+	const initialDueDateValue = reminder?.dueDatetime || reminder?.dueDate || initialDueDate || null;
 	const initialHasTime = reminder ? !!reminder.dueDatetime : false;
 	const initialPriority = reminder?.priority || 4;
 	const initialRecurrence = reminder?.recurrence;
@@ -102,13 +101,15 @@ export function useReminderDraft({
 			setProject(metadata.project);
 		}
 
-		const detectedRecurrence = metadata.recurrence;
+		const detectedRecurrence = preserveRecurrenceMetadata(metadata.recurrence, recurrence);
 		if (detectedRecurrence) {
 			const currentJson = recurrence ? JSON.stringify(recurrence) : null;
 			const detectedJson = JSON.stringify(detectedRecurrence);
 			if (currentJson !== detectedJson) setRecurrence(detectedRecurrence);
-			if (dueDate) setDueDate(null);
-			if (hasTime) setHasTime(false);
+			if (detectedRecurrence !== recurrence) {
+				if (dueDate) setDueDate(null);
+				if (hasTime) setHasTime(false);
+			}
 			dueDateSetFromText.current = false;
 		} else if (recurrence) {
 			setRecurrence(undefined);

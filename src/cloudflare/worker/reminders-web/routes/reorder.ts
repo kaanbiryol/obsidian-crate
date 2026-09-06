@@ -1,3 +1,4 @@
+import { beginReminderOperation, reminderOperationEffects } from '../operations';
 import { corsResponse } from '../../cors';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../../storage';
 import type { Env } from '../../types';
@@ -11,6 +12,9 @@ export async function handleReorderReminders(request: Request, env: Env): Promis
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) return parsedBody.response;
 
+	const operation = await beginReminderOperation(env.DB, parsedBody.value, 'reorder');
+	if (operation instanceof Response) return operation;
+
 	const folderPath = parseFolderPath(parsedBody.value.folderPath);
 	const project = parseProjectPath(parsedBody.value.project);
 	const orderedIds = parseStringArray(parsedBody.value.orderedIds, 500, 128);
@@ -22,8 +26,13 @@ export async function handleReorderReminders(request: Request, env: Env): Promis
 	const file = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, filePath);
 	if (!file) return corsResponse({ error: 'Project file not found' }, 404);
 
+	const currentOrder = scanReminderMarkdownFile(filePath, file.content, folderPath).map(reminder => reminder.id);
+	if (!Array.isArray(parsedBody.value.expectedOrder)) return corsResponse({ error: 'Expected project order required. Reload before reordering.' }, 428);
+	if (JSON.stringify(currentOrder) !== JSON.stringify(parsedBody.value.expectedOrder)) return corsResponse({ error: 'Project order changed. Reload before reordering.' }, 409);
+
 	const nextContent = reorderReminderBlocksInFileContent(file.content, orderedIds);
-	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, file.hash);
+	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, file.hash,
+		reminderOperationEffects(env.DB, operation, { success: true }));
 	await saveReminderFileCache(
 		env.DB,
 		folderPath,

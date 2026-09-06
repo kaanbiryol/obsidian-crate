@@ -30,7 +30,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 							content: btoa('after'),
 							size: 5,
 							contentType: 'text/plain',
-							expectedHash: 'a'.repeat(64),
+							expectedHash: 'a'.repeat(64), expectedRevision: 'files/notes/test.md',
 						},
 					],
 				}),
@@ -47,7 +47,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 				{
 					path: 'notes/test.md',
 					success: false,
-					error: 'Upload not committed because sync metadata update failed: D1 unavailable',
+					error: 'Upload outcome is unknown because the metadata response failed; reconcile before retrying: D1 unavailable',
 					code: 'storage',
 					status: 503,
 				},
@@ -66,7 +66,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 			new Request('https://worker.test/sync/batch-delete', {
 				method: 'POST',
 				body: JSON.stringify({
-					files: [{ path: 'notes/test.md', expectedHash: 'a'.repeat(64) }],
+					files: [{ path: 'notes/test.md', expectedHash: 'a'.repeat(64), expectedRevision: 'files/notes/test.md' }],
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),
@@ -81,7 +81,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 			errors: [
 				{
 					path: 'notes/test.md',
-					error: 'Delete not committed because sync metadata update failed: D1 unavailable',
+					error: 'Delete outcome is unknown because the metadata response failed; reconcile before retrying: D1 unavailable',
 					code: 'storage',
 					status: 503,
 				},
@@ -141,6 +141,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 				{
 					path: 'notes/test.md',
 					content: btoa('hello'),
+          revision: managedKey,
 					hash: '',
 					size: 5,
 					contentType: 'application/octet-stream',

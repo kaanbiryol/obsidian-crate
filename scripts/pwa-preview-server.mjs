@@ -16,7 +16,7 @@ function isAuthorized(req) {
 	return req.headers.authorization === `Bearer ${previewAuthToken}`;
 }
 
-export function createPwaPreviewServer({ assets, origin }) {
+export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] }) {
 	let state = createInitialState();
 	let forcePreviewUpdate = false;
 	let previewLoadingUntil = 0;
@@ -42,6 +42,10 @@ export function createPwaPreviewServer({ assets, origin }) {
 		const url = new URL(req.url || '/', origin);
 		const path = url.pathname;
 		const method = req.method || 'GET';
+		if (method !== 'GET' && failMutationPaths.includes(path)) {
+			sendJson(res, 503, { error: 'Temporarily unavailable' });
+			return;
+		}
 
 		if (method === 'GET' && path === '/') {
 			const location = `/notifications?token=${previewEnrollmentToken}&folder=Reminders&upcomingDays=7`;
@@ -119,6 +123,10 @@ export function createPwaPreviewServer({ assets, origin }) {
 			return;
 		}
 
+		if (method === 'GET' && path === '/.well-known/crate') {
+      sendJson(res, 200, { service: 'crate', serverVersion: '0.1.0', protocol: { current: 3, oldestCompatible: 3 }, capabilities: [] });
+      return;
+    }
 		if (method === 'GET' && path === '/notifications/version.json') {
 			const version = JSON.parse(createPwaVersionJson()).assetVersion;
 			const body = forcePreviewUpdate
@@ -288,9 +296,9 @@ export function createPwaPreviewServer({ assets, origin }) {
 	});
 }
 
-export async function listenPwaPreviewServer({ port, assets }) {
+export async function listenPwaPreviewServer({ port, assets, failMutationPaths = [] }) {
 	const origin = `http://127.0.0.1:${port}`;
-	const server = createPwaPreviewServer({ assets, origin });
+	const server = createPwaPreviewServer({ assets, origin, failMutationPaths });
 	await new Promise((resolve, reject) => {
 		server.once('error', reject);
 		server.listen(port, '127.0.0.1', resolve);

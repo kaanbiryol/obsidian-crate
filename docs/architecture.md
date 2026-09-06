@@ -74,7 +74,7 @@ CratePlugin (src/plugin/CratePlugin.ts)
 1. The plugin creates a cryptographically random OAuth `state` and a fresh PKCE S256 verifier/challenge in memory.
 2. Cloudflare redirects to `https://crate.kaanbiryol.com/oauth/callback/`. The static page immediately clears its query string and opens the `crate-cloudflare-oauth` Obsidian protocol.
 3. The plugin verifies `state` before exchanging the authorization code. The access token is held only in a local stack frame.
-4. The plugin discovers Crate Workers in the selected account. It reuses the saved or selected deployment, or creates new D1 and R2 resources when none exists. The complete D1 schema and any unapplied ordered upgrades are applied before the new Worker bundle is uploaded; request cold starts never mutate the schema.
+4. The plugin discovers Crate Workers in the selected account. Joining a saved or discovered deployment registers this device without uploading code or changing schema. Creating a deployment or explicitly authorizing an update applies ordered schema migrations, installs the protocol gate, and finishes Unicode path backfill before enabling writes; request cold starts never mutate the schema. Updates reject an authoritative remote version newer than the installed artifact.
 5. The plugin generates a permanent device secret locally and writes only its hash and device metadata to the deployment's D1 database using the temporary Cloudflare authorization.
 6. The OAuth token is revoked and discarded. Only non-secret resource identifiers remain in plugin settings for reconnects and updates.
 
@@ -90,7 +90,7 @@ Authenticated requests carry a Bearer token in the `Authorization` header. The W
 
 Push-notification device enrollment is intentionally narrower: the plugin mints a short-lived, one-time push enrollment token from the worker and the notification PWA uses that scoped token only for `POST /notifications/subscribe`.
 
-The reminders web app uses a separate short-lived web enrollment token in the `/notifications?token=...` link. The PWA exchanges it once at `POST /notifications/reminders-exchange` for a 90-day, reminder-only bearer token stored locally by the browser. Route authorization prevents that token from reading or mutating the vault sync API, shared settings, device list, push administration, or enrollment-token API, so it cannot renew itself. Open a fresh link from the plugin after the session expires.
+The reminders web app uses a separate short-lived web enrollment token in the `/notifications?token=...` link. The PWA exchanges it once at `POST /notifications/reminders-exchange` for a 90-day, reminder-only bearer token stored locally by the browser. The token is bound to the exact enrolled reminders folder. Route and folder authorization prevent that token from reading or mutating the vault sync API, shared settings, device list, push administration, or enrollment-token API, so it cannot renew itself. Open a fresh link from the plugin after the session expires.
 
 ## Secret Storage
 
@@ -111,7 +111,7 @@ The browser-facing PWA source lives in `src/pwa/`, while its Worker-served HTML,
 
 The Obsidian plugin and PWA own separate application shells so viewport, navigation, safe-area, and modal behavior can follow each host. They share reminder panels, cards, and view-model logic rather than sharing host chrome. Both hosts compile the same semantic theme tokens and reminder-card styles; see [Shared plugin and PWA UI](ui-styling.md) for ownership and validation.
 
-The Worker remains an independently deployable build product, but the production plugin also includes a gzip-compressed copy of `.generated/cloudflare/worker.mjs`, `src/cloudflare/schema.sql`, and ordered SQL files from `src/cloudflare/migrations/`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. New databases record the `0001_initial.sql` baseline in Cloudflare's standard `d1_migrations` table, and later files are applied once in filename order.
+The Worker is a separate build product, and the production plugin also includes a gzip-compressed copy of `.generated/cloudflare/worker.mjs`, `src/cloudflare/schema.sql`, and ordered SQL files from `src/cloudflare/migrations/`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. New databases record the `0001_initial.sql` baseline in Cloudflare's standard `d1_migrations` table, and later files are applied once in filename order.
 
 `npm run release:check` enforces Worker and combined-plugin size budgets and checks that the OAuth entry point remains present.
 
@@ -130,12 +130,17 @@ Styling driven by `data-status` attribute on the status bar element, which CSS s
 
 ## Reminders and Notifications
 
-The plugin scans vault files for reminder metadata, maintains an in-memory index, and syncs due dates to the worker. Notifications are delivered via Web Push:
+The plugin scans local Markdown for its UI. The server derives notification schedules from committed Markdown, using one shared folder, timezone, all-day time, and enabled flag in `notification_policy`. Startup only initializes an absent policy. Explicit settings edits compare the captured policy revision before updating it.
 
-1. Plugin schedules a reminder by POSTing due date to the worker
-2. Worker creates a Durable Object alarm (`ReminderAlarm`) set to fire at the due time
-3. When the alarm fires, the DO sends Web Push notifications to all subscribed devices (using `web-push-browser` library)
-4. Cancelled or updated reminders delete the existing DO alarm and reschedule if needed
-5. Users open a short-lived `{workerUrl}/notifications?token=...` reminders app link generated by the authenticated plugin
-6. The PWA exchanges that web enrollment token for a per-device bearer token, then requests a separate one-time push enrollment token when it subscribes for push
-7. Push subscriptions are stored in D1; expired subscriptions (404/410) are pruned automatically
+1. Every Markdown commit and deletion records a projection job in the same D1 transaction as the file metadata and changelog.
+2. A reserved coordinator Durable Object wakes after successful mutations. Scheduled maintenance recovers missed wakeups. Each alarm processes at most three source files and five notification jobs, then rearms while work remains.
+3. Projection reads and verifies the current immutable R2 object. A conditional D1 batch replaces reminder projections and outbox jobs only while the file revision, policy revision, and projection job token still match.
+4. Outbox commands carry job tokens. The reminder Durable Object rejects superseded work and records a new schedule token. Delivery waits while the source file or policy awaits projection; completion and retry writes are fenced by that schedule token.
+5. Web app enrollment produces a folder-bound 90-day session. The authenticated session owns its push subscriptions. Logout and token expiry remove those subscriptions; another session cannot replace or remove them.
+6. Push delivery allows known browser push provider hosts, rejects redirects, and has a ten-second network deadline. Expired subscriptions are pruned and permanent failures quarantined.
+
+Reminder editing uses semantic revisions captured when the form opens, plus file compare-and-swap at commit. Web mutations require an operation UUID; the transaction persists a request hash and response receipt alongside the file update. Retrying a committed request replays its result. Creation IDs remain reserved after deletion. Timed reminders persist UTC instants; recurrence metadata retains timezone, count, end date, and completion progress in a Markdown comment tied to the visible rule.
+
+Sync deletes require both the acknowledged content hash and opaque file revision. Recreating the same bytes produces a new revision, so an old delete cannot remove the new file. Missing legacy revisions require reconciliation. Supported text updates use Obsidian's atomic process API. Existing binary files are preserved and incoming bytes saved as conflict copies for explicit review because Obsidian exposes no atomic binary compare-and-swap.
+
+See [the protocol contract](protocol.md) and [backup and recovery](recovery.md).

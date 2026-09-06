@@ -1,3 +1,4 @@
+import { beginReminderOperation, reminderOperationEffects } from '../operations';
 import { buildReminderUpdate } from '@/reminders/data/reminder-repository/shared';
 import type { UpdateReminderParams } from '@/reminders/types/plugin-reminder';
 import { parseStoredReminderDate, reminderHasTime } from '@/reminders/utils/reminderDate';
@@ -28,6 +29,7 @@ import {
 import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
 import { loadReminderSource } from '../workspace';
+import { checkReminderRevision } from '../revision';
 
 function parseUpdateParams(body: Record<string, unknown>): UpdateReminderParams | Response {
 	const updateParams: UpdateReminderParams = {};
@@ -74,6 +76,9 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		return parsedBody.response;
 	}
 
+	const operation = await beginReminderOperation(env.DB, parsedBody.value, 'update');
+	if (operation instanceof Response) return operation;
+
 	const workspaceResult = parseReminderMutationWorkspace(parsedBody.value);
 	if (workspaceResult instanceof Response) {
 		return workspaceResult;
@@ -93,6 +98,8 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		return corsResponse({ error: 'Reminder not found' }, 404);
 	}
 	const { file: oldFile, reminder } = source;
+	const revisionError = await checkReminderRevision(parsedBody.value, reminder);
+	if (revisionError) return revisionError;
 
 	const updateParams = parseUpdateParams(parsedBody.value);
 	if (updateParams instanceof Response) {
@@ -123,10 +130,14 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 			reminderId: reminder.id,
 		});
 		const oldContent = deleteReminderFromFileContent(oldFile.content, reminder);
+		const movedReminders = scanReminderMarkdownFile(newFilePath, movedContent, workspaceResult.folderPath);
+		updatedReminder = movedReminders.find(candidate => candidate.id === id);
+		const response = { success: true, reminder: updatedReminder ? await toReminderPayload(updatedReminder) : undefined };
 		const writes = await writeCommittedMarkdownFilePair(
 			env.BUCKET,
 			env.DB,
 			{
+				effects: reminderOperationEffects(env.DB, operation, response),
 				source: {
 					path: reminder.filePath,
 					content: oldContent,
@@ -139,7 +150,7 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 				},
 			},
 		);
-		const movedReminders = scanReminderMarkdownFile(newFilePath, movedContent, workspaceResult.folderPath);
+
 		const oldReminders = scanReminderMarkdownFile(reminder.filePath, oldContent, workspaceResult.folderPath);
 		await Promise.all([
 			saveReminderFileCache(env.DB, workspaceResult.folderPath, newFilePath, writes.destination.hash, movedReminders),
@@ -149,8 +160,11 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 			.find(candidate => candidate.id === id);
 	} else {
 		const nextContent = updateReminderInFileContent(oldFile.content, reminder, update);
-		const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, oldFile.hash);
 		const reminders = scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath);
+		updatedReminder = reminders.find(candidate => candidate.id === id);
+		const response = { success: true, reminder: updatedReminder ? await toReminderPayload(updatedReminder) : undefined };
+		const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, reminder.filePath, nextContent, oldFile.hash,
+			reminderOperationEffects(env.DB, operation, response));
 		await saveReminderFileCache(env.DB, workspaceResult.folderPath, reminder.filePath, write.hash, reminders);
 		updatedReminder = reminders
 			.find(candidate => candidate.id === id);
@@ -161,7 +175,7 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 		: await cancelReminderNotification(env, id);
 	return corsResponse({
 		success: true,
-		reminder: updatedReminder ? toReminderPayload(updatedReminder) : undefined,
+		reminder: updatedReminder ? await toReminderPayload(updatedReminder) : undefined,
 		notificationWarning,
 	});
 }

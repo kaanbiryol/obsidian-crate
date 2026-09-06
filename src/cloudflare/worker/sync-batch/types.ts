@@ -8,6 +8,7 @@ export interface BatchFile {
 }
 
 export interface BatchDeleteFile {
+	expectedRevision?: unknown;
 	path?: unknown;
 	expectedHash?: unknown;
 }

@@ -58,7 +58,11 @@ export async function createFullSyncPlan(
     }
   }
 
-  const errors: string[] = [];
+  for (const [path, local] of Object.entries(localFiles)) {
+    if (local.hash === remoteFiles[path]?.hash) context.localManifest.setEntry(path, { ...local, revision: remoteFiles[path]?.revision });
+  }
+
+  const errors: string[] = [...largeLocalPaths].map(path => `${path}: Skipped local file larger than 25MB`);
   for (const [path, diff] of [...diffMap.entries()]) {
     const remoteEntry = remoteFiles[path];
     if (context.shouldIgnore(path)) {
@@ -66,7 +70,6 @@ export async function createFullSyncPlan(
       continue;
     }
     if (largeLocalPaths.has(path)) {
-      errors.push(`${path}: Skipped local file larger than 25MB`);
       diffMap.delete(path);
       continue;
     }

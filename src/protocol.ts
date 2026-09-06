@@ -17,8 +17,8 @@ export interface CrateServerInfo {
  * when support for an older protocol is intentionally removed.
  */
 export const CRATE_PLUGIN_PROTOCOL: CrateProtocolRange = Object.freeze({
-	current: 2,
-	oldestCompatible: 2,
+	current: 3,
+	oldestCompatible: 3,
 });
 
 function isPositiveInteger(value: unknown): value is number {
@@ -72,4 +72,10 @@ export function parseCrateServerInfo(value: unknown): CrateServerInfo | null {
 
 export function isCompatibleCrateServer(info: CrateServerInfo): boolean {
 	return areProtocolRangesCompatible(CRATE_PLUGIN_PROTOCOL, info.protocol);
+}
+
+export const CRATE_PROTOCOL_HEADER = 'X-Crate-Protocol';
+export function isCrateMutation(path: string, method = 'GET'): boolean {
+  return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())
+    && !['/sync/metadata', '/sync/batch-download'].includes(path.split('?')[0] ?? path);
 }

@@ -10,7 +10,6 @@ import {
 } from '../utils';
 import {
 	createManagedObjectKey,
-	deleteBucketObjectsOrQueue,
 	formatMetadataCommitFailure,
 	formatMutationError,
 	loadStoredFileRows,
@@ -179,10 +178,10 @@ export async function handleBatchUpload(
 				return;
 			}
 
-			results.push({ path: file.safePath, success: true, hash: file.hash });
+			results.push({ path: file.safePath, success: true, hash: file.hash, revision: commit.revision });
 		} catch (error: unknown) {
 			metadataFailure = true;
-			await deleteBucketObjectsOrQueue(bucket, db, [file.objectKey]);
+			// An uncertain commit does not establish that this object is unused.
 			results.push({
 				path: file.safePath,
 				success: false,

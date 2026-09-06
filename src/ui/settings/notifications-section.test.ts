@@ -13,8 +13,7 @@ const enableReminderNotifications = vi.fn();
 const reconcileReminderNotifications = vi.fn();
 
 async function flushMicrotasks(): Promise<void> {
-	await Promise.resolve();
-	await Promise.resolve();
+	for (let i = 0; i < 20; i++) await Promise.resolve();
 }
 
 async function loadNotificationsSectionModule() {
@@ -48,6 +47,7 @@ describe('renderNotificationsSection', () => {
 	beforeEach(() => {
 		resetObsidianUiMocks();
 		lastQrCodeData = null;
+    updateNotificationPolicy.mockClear();
 		disableReminderNotifications.mockReset();
 		enableReminderNotifications.mockReset();
 		reconcileReminderNotifications.mockReset();
@@ -111,7 +111,7 @@ describe('renderNotificationsSection', () => {
 		expect(reconcileReminderNotifications).toHaveBeenCalled();
 	});
 
-	it('cancels existing schedules before disabling push notifications', async () => {
+	it('updates the shared policy before saving the local notification preference', async () => {
 		disableReminderNotifications.mockResolvedValue(undefined);
 		const { renderNotificationsSection } = await loadNotificationsSectionModule();
 		const plugin = createPlugin({
@@ -130,14 +130,14 @@ describe('renderNotificationsSection', () => {
 		getSettingByName('Enable push notifications').toggles[0]?.change(false);
 		await flushMicrotasks();
 
-		expect(disableReminderNotifications).toHaveBeenCalledWith(plugin);
+		expect(updateNotificationPolicy).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, revision: 'policy-1' }));
 		expect(plugin.writeSettings).toHaveBeenCalledWith({ pushEnabled: false });
-		expect(disableReminderNotifications.mock.invocationCallOrder[0]).toBeLessThan(
+		expect(updateNotificationPolicy.mock.invocationCallOrder[0]).toBeLessThan(
 			plugin.writeSettings.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
 		);
 	});
 
-	it('restores schedules when disabling persistence fails after cancellation', async () => {
+	it('retains the shared server choice when saving the local preference fails', async () => {
 		disableReminderNotifications.mockResolvedValue(undefined);
 		const { renderNotificationsSection } = await loadNotificationsSectionModule();
 		const plugin = createPlugin({
@@ -159,7 +159,9 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 
 		expect(plugin.settings.pushEnabled).toBe(true);
-		expect(enableReminderNotifications).toHaveBeenCalledWith(plugin);
+		expect(enableReminderNotifications).not.toHaveBeenCalled();
+    expect(getSettingByName('Enable push notifications').toggles[0]?.value).toBe(false);
+    expect(noticeMessages.some(message => message.includes('disk full'))).toBe(true);
 	});
 
 	it('removes enabled notification devices through the push subscription API', async () => {
@@ -260,6 +262,8 @@ describe('renderNotificationsSection', () => {
 	});
 });
 
+const updateNotificationPolicy = vi.fn(async (policy: Record<string, unknown>) => ({ policy: { ...policy, revision: 'policy-2' } }));
+
 function createPlugin(apiClient: Record<string, unknown>): never {
 	return {
 		app: {},
@@ -279,7 +283,10 @@ function createPlugin(apiClient: Record<string, unknown>): never {
 		writeRemindersSettings: vi.fn(),
 		syncRuntime: {
 			getApiClient: () => ({
-				getWorkerUrl: vi.fn(() => 'https://worker.example.com'),
+				getNotificationPolicy: vi.fn(async () => ({ policy: { folderPath: 'Reminders', timezone: 'America/New_York', allDayTime: '09:00', revision: 'policy-1', enabled: true } })),
+        ensureNotificationPolicy: vi.fn(async (policy: unknown) => ({ policy })),
+        updateNotificationPolicy,
+        getWorkerUrl: vi.fn(() => 'https://worker.example.com'),
 				createRemindersEnrollmentToken: vi.fn(async () => ({
 					token: 'install-token',
 					browserToken: 'browser-token',

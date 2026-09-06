@@ -18,7 +18,7 @@ it('moves completed reminders by committing both files atomically', async () => 
 			new Request('https://worker.test/reminders/update', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					id: 'r-done',
 					filePath: 'Reminders/Inbox.md',
@@ -50,7 +50,7 @@ it('moves completed reminders by committing both files atomically', async () => 
 			new Request('https://worker.test/reminders/update', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					id: 'r-keep',
 					filePath: 'Reminders/Inbox.md',
@@ -80,7 +80,7 @@ it('moves completed reminders by committing both files atomically', async () => 
 			new Request('https://worker.test/reminders/update', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					id: 'r-keep',
 					filePath: 'Reminders/Inbox.md',
@@ -109,7 +109,7 @@ it('moves completed reminders by committing both files atomically', async () => 
 			new Request('https://worker.test/reminders/reorder', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					project: 'Inbox',
 					orderedIds: ['r2', 'r1'],

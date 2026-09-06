@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import { capturePwaSession } from '../session-generation';
 import { fetchReadyReminderList } from '../reminder-api';
 import { loadCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
@@ -91,6 +92,7 @@ export function useReminderSync({
 		if (activeReadRef.current?.key === requestKey) return activeReadRef.current.promise;
 
 		const promise = (async () => {
+			const sessionCurrent = capturePwaSession();
 			const readToken = requestCoordinatorRef.current.beginRead();
 			if (options.silent) setRefreshing(true);
 			else setLoading(true);
@@ -102,9 +104,10 @@ export function useReminderSync({
 					apiFetch,
 					`/reminders/list?folderPath=${encodeURIComponent(config.folderPath)}`,
 					headers,
+					(remaining, total) => { if (sessionCurrent() && requestCoordinatorRef.current.shouldApplyRead(readToken)) setError(`Preparing reminders: ${Math.max(0, total - remaining)} of ${total} files indexed…`); },
 				);
 				if (response.status === 304) {
-					if (!requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+					if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 					const savedAt = Date.now();
 					lastCheckedAtRef.current = savedAt;
 					setLastUpdatedAt(savedAt);
@@ -118,10 +121,11 @@ export function useReminderSync({
 					return;
 				}
 				if (!response.ok) throw new Error(await response.text());
-				const result = await response.json() as { reminders?: ReminderRecord[]; projects?: string[] };
+				const result = await response.json() as { reminders?: ReminderRecord[]; projects?: string[]; issues?: Array<{ path: string; reason: string }> };
 				const nextReminders = Array.isArray(result.reminders) ? result.reminders : [];
 				const nextProjects = Array.isArray(result.projects) ? result.projects : [];
-				if (!requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+				setError(result.issues?.length ? result.issues.map(issue => `${issue.path}: ${issue.reason}`).join("\n") : null);
 				const savedAt = Date.now();
 				const etag = response.headers.get('ETag') ?? undefined;
 				remindersRef.current = nextReminders;
@@ -136,9 +140,10 @@ export function useReminderSync({
 				setIsOffline(false);
 				void saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, etag);
 			} catch (loadError) {
-				if (!requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
+				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				const message = loadError instanceof Error ? loadError.message : String(loadError);
 				const cached = await loadCachedReminderSnapshot(config.folderPath);
+				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				if (cached) {
 					hydrateCachedSnapshot(cached);
 					setError(message);
@@ -199,6 +204,13 @@ export function useReminderSync({
 
 	const resetReminderState = useCallback(() => {
 		requestCoordinatorRef.current.invalidateReads();
+		remindersRef.current = [];
+		projectsRef.current = [];
+		hydratedCacheRef.current = false;
+		activeReadRef.current = null;
+		setLoading(false);
+		setRefreshing(false);
+		setLastUpdatedAt(null);
 		setReminders([]);
 		setProjects([]);
 		setSelectedProject(null);

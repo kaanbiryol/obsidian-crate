@@ -11,7 +11,7 @@ describe('Crate protocol contract', () => {
 		const info = parseCrateServerInfo({
 			service: 'crate',
 			serverVersion: '1.2.3',
-			protocol: { current: 2, oldestCompatible: 1 },
+			protocol: { ...CRATE_PLUGIN_PROTOCOL },
 			capabilities: ['sync-v1'],
 		});
 

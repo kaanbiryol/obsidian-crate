@@ -15,9 +15,9 @@ describe('batch upload chunking', () => {
 		const chunks = createBatchUploadChunks(prepared);
 
 		expect(chunks).toHaveLength(3);
-		expect(chunks[0]).toHaveLength(6);
-		expect(chunks[1]).toHaveLength(6);
-		expect(chunks[2]).toHaveLength(2);
+		expect(chunks[0]).toHaveLength(5);
+		expect(chunks[1]).toHaveLength(5);
+		expect(chunks[2]).toHaveLength(4);
 	});
 
 	it('respects byte size limit', () => {

@@ -1,8 +1,11 @@
+import { normalizeDeployedPortablePaths } from './portable-path-migration';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import { randomHex } from './pkce';
 import { CLOUDFLARE_MAINTENANCE_CRON } from './maintenance-schedule';
+import { deployedArtifact } from './deployment-discovery';
+import { assertDeploymentIsNotDowngrade } from './deployment-update';
 
 const INITIAL_MIGRATION_NAME = '0001_initial.sql';
 const LAUNCH_HARDENING_MIGRATION_NAME = '0002_launch_hardening.sql';
@@ -183,6 +186,13 @@ export async function provisionCloudflareDeployment(input: {
 	artifacts: CloudflareDeploymentArtifacts;
 	onMetadataChanged: () => Promise<void>;
 }): Promise<string> {
+	// Read remote identity, never rely on another device's saved metadata.
+	try {
+		const remote = deployedArtifact(await input.api.getWorkerSettings(input.accountId, input.metadata.workerName));
+		assertDeploymentIsNotDowngrade(remote.version, input.artifacts.version);
+	} catch (error) {
+		if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
+	}
 	const databaseId = await ensureD1Database(input.api, input.accountId, input.metadata);
 	if (input.metadata.d1DatabaseId !== databaseId) {
 		input.metadata.d1DatabaseId = databaseId;
@@ -203,6 +213,7 @@ export async function provisionCloudflareDeployment(input: {
 		d1DatabaseId: databaseId,
 		r2BucketName: input.metadata.r2BucketName,
 	});
+	await normalizeDeployedPortablePaths(input.api, input.accountId, databaseId);
 	await input.api.updateWorkerSchedules(
 		input.accountId,
 		input.metadata.workerName,

@@ -1,3 +1,4 @@
+import { parseFolderPath } from './reminders-web/requests';
 import { createRandomHexToken, sha256Hex } from './auth';
 import { corsResponse } from './cors';
 import { getOrCreateVapidKeys } from './push';
@@ -20,9 +21,13 @@ export async function handleCreateEnrollmentToken(db: D1Database): Promise<Respo
 	});
 }
 
-export async function handleCreateRemindersEnrollmentToken(db: D1Database): Promise<Response> {
-	const installEnrollment = await issueWebEnrollmentToken(db);
-	const browserEnrollment = await issueWebEnrollmentToken(db);
+export async function handleCreateRemindersEnrollmentToken(db: D1Database, request?: Request): Promise<Response> {
+	const parsed = request ? await parseJsonObject(request) : null;
+	if (parsed && !parsed.ok) return parsed.response;
+	const folderPath = parseFolderPath(parsed?.ok ? parsed.value.folderPath : null);
+	if (!folderPath) return corsResponse({ error: 'folderPath required' }, 400);
+	const installEnrollment = await issueWebEnrollmentToken(db, folderPath);
+	const browserEnrollment = await issueWebEnrollmentToken(db, folderPath);
 	return corsResponse({
 		token: installEnrollment.token,
 		browserToken: browserEnrollment.token,
@@ -56,9 +61,9 @@ export async function handleExchangeRemindersEnrollmentToken(
 	const expiresAt = Date.now() + REMINDERS_AUTH_TOKEN_TTL_MS;
 
 	await db.prepare(`INSERT INTO auth_tokens
-		(id, token_hash, device_id, device_name, platform, last_seen_at, scope, expires_at)
-		VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?)`)
-		.bind(id, tokenHash, null, deviceName, 'pwa', 'reminders', expiresAt)
+		(id, token_hash, device_id, device_name, platform, last_seen_at, scope, expires_at, folder_path)
+		VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?)`)
+		.bind(id, tokenHash, null, deviceName, 'pwa', 'reminders', expiresAt, consumed)
 		.run();
 
 	return corsResponse({ authToken, expiresAt: new Date(expiresAt).toISOString() });

@@ -215,9 +215,9 @@ export class SyncEngine {
 		const paths = Object.keys(manifest.files).filter(path => this.shouldIgnore(path)).sort();
 		this.lifecycle.throwIfDestroyed();
 		const result = await deleteFilesInBatches({
-			batchDelete: (batchPaths, expectedHashes) =>
-				this.retryWithBackoff(() => this.api.batchDelete(batchPaths, expectedHashes)),
-		}, paths.map(path => ({ path, expectedHash: manifest.files[path]!.hash })));
+			batchDelete: (batchPaths, expectedHashes, expectedRevisions) =>
+				this.retryWithBackoff(() => this.api.batchDelete(batchPaths, expectedHashes, expectedRevisions)),
+		}, paths.map(path => ({ path, expectedHash: manifest.files[path]!.hash, expectedRevision: manifest.files[path]!.revision })));
 		for (const path of result.deleted) this.localManifest.removeEntry(path);
 		await this.localManifest.save();
 		return {

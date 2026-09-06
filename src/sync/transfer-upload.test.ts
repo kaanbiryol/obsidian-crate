@@ -46,8 +46,8 @@ describe('transfer upload helpers', () => {
 			return { success: true, results };
 		});
 
-		// Create 3 batches of small files (3 files, each in its own batch of 1 via count limit)
-		const prepared: PreparedUpload[] = Array.from({ length: 18 }, (_, i) => ({
+		// Create three batches of five small files.
+		const prepared: PreparedUpload[] = Array.from({ length: 15 }, (_, i) => ({
 			path: `file-${i}.md`,
 			content: new TextEncoder().encode('x').buffer as ArrayBuffer,
 			hash: `hash-${i}`,
@@ -62,7 +62,7 @@ describe('transfer upload helpers', () => {
 			batchConcurrency: 3,
 		});
 
-		expect(harness.api.batchUpload).toHaveBeenCalledTimes(3); // 18 files / 6 per batch = 3 batches
+		expect(harness.api.batchUpload).toHaveBeenCalledTimes(3); // 15 files / 5 per batch = 3 batches
 		expect(maxConcurrentCalls).toBeGreaterThan(1);
 	});
 

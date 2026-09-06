@@ -33,6 +33,7 @@ interface PendingOAuthSession {
 	createdAt: number;
 	metadata: CloudflareDeploymentMetadata;
 	discoverExisting: boolean;
+	intent: 'connect' | 'update';
 }
 
 export interface CloudflareDeploymentResult {
@@ -98,7 +99,7 @@ export class CloudflareDeploymentService {
 		this.now = options.now ?? Date.now;
 	}
 
-	async startDeployment(): Promise<void> {
+	async startDeployment(intent: 'connect' | 'update' = 'connect'): Promise<void> {
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
 		const metadata = existingMetadata
 			? { ...existingMetadata }
@@ -112,6 +113,7 @@ export class CloudflareDeploymentService {
 			createdAt: this.now(),
 			metadata,
 			discoverExisting: existingMetadata === null,
+			intent,
 		};
 
 		const authorizationUrl = new URL(CLOUDFLARE_OAUTH_AUTHORIZE_URL);
@@ -156,29 +158,42 @@ export class CloudflareDeploymentService {
 		try {
 			const api = new CloudflareApiClient(accessToken, this.options.transport);
 			let metadata = pending.metadata;
+			let discoveredExisting = false;
 			const account = selectAccount(await api.listAuthorizedAccounts(), metadata);
 			if (pending.discoverExisting) {
 				const deployments = await discoverCloudflareDeployments(api, account);
 				const [onlyDeployment] = deployments;
 				if (deployments.length === 1 && onlyDeployment) {
 					metadata = onlyDeployment.metadata;
+					discoveredExisting = true;
 				} else if (deployments.length > 1) {
 					const selected = await this.options.selectDeployment(deployments);
 					if (!selected) throw new Error('No Cloudflare server was selected');
 					metadata = selected.metadata;
+					discoveredExisting = true;
 				}
 			}
 			metadata.accountId = account.id;
 			metadata.accountName = account.name;
 			await this.persistMetadata(metadata);
 
-			const workerUrl = await provisionCloudflareDeployment({
-				api,
-				accountId: account.id,
-				metadata,
-				artifacts: await this.options.loadArtifacts(),
-				onMetadataChanged: () => this.persistMetadata(metadata),
-			});
+			let workerUrl: string;
+			if (pending.intent === 'connect' && metadata.d1DatabaseId && (discoveredExisting || metadata.lastDeployedVersion)) {
+				// Registering a replica must never replace shared Worker/PWA code.
+				const subdomain = await api.getWorkersSubdomain(account.id);
+				if (!subdomain) throw new Error('Existing Cloudflare server has no workers.dev subdomain');
+				metadata.workersSubdomain = subdomain;
+				await this.persistMetadata(metadata);
+				workerUrl = `https://${metadata.workerName}.${subdomain}.workers.dev`;
+			} else {
+				workerUrl = await provisionCloudflareDeployment({
+					api,
+					accountId: account.id,
+					metadata,
+					artifacts: await this.options.loadArtifacts(),
+					onMetadataChanged: () => this.persistMetadata(metadata),
+				});
+			}
 			if (device) {
 				if (!metadata.d1DatabaseId) throw new Error('Cloudflare deployment database is missing');
 				await registerCloudflareAuthorizedDevice({

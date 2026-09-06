@@ -1,3 +1,4 @@
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo } from '../../protocol';
 import { requestUrl } from 'obsidian';
 import { createLogger, errorMessage } from '../../plugin/logger';
 import { createAbortError } from '../abort';
@@ -51,6 +52,7 @@ export class HttpError extends Error {
 		readonly retryAfter: number | null = null,
 		readonly code?: string,
 		readonly currentHash?: string | null,
+		readonly requestId?: string,
 	) {
 		super(message);
 		this.name = 'HttpError';
@@ -117,6 +119,7 @@ function parseJsonResponse<T>(responseText: string, path: string): T {
 }
 
 export class WorkerApiHttpClient {
+	private readonly clientSession = crypto.randomUUID();
 	private workerUrl: string;
 	private authToken: string;
 	private externalSignal: AbortSignal | undefined;
@@ -152,6 +155,11 @@ export class WorkerApiHttpClient {
 		options: ApiRequestOptions,
 		timeout: number,
 	): Promise<ApiHttpResponse> {
+		if (isCrateMutation(path, options.method)) {
+			const response = await this.runRequest('/.well-known/crate', {}, Math.min(timeout, 30_000));
+			const info = response.status === 200 ? parseCrateServerInfo(parseJsonResponse<unknown>(response.text, '/.well-known/crate')) : null;
+			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
+		}
 		const externalSignal = this.externalSignal;
 		if (externalSignal?.aborted) throw createAbortError('Sync request aborted');
 
@@ -197,6 +205,9 @@ export class WorkerApiHttpClient {
 				contentType: resolvedContentType,
 				headers: {
 					Authorization: `Bearer ${this.authToken}`,
+					'X-Crate-Client-Session': this.clientSession,
+					'X-Crate-Operation-Id': crypto.randomUUID(),
+					[CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current),
 					...headersWithoutContentType,
 				},
 			}).then(resolveOnce, error => {
@@ -229,10 +240,11 @@ export class WorkerApiHttpClient {
 				parseRetryAfter(response.headers),
 				details.code,
 				details.currentHash,
+				getHeader(response.headers, 'X-Crate-Request-Id') ?? undefined,
 			);
 		}
 
-		logger.info(`${options.method ?? 'GET'} ${path} -> ${response.status}`);
+		logger.info(`${options.method ?? 'GET'} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, 'X-Crate-Request-Id') ?? 'unavailable'}]`);
 		return parseJsonResponse<T>(response.text, path);
 	}
 
@@ -253,10 +265,11 @@ export class WorkerApiHttpClient {
 				parseRetryAfter(response.headers),
 				details.code,
 				details.currentHash,
+				getHeader(response.headers, 'X-Crate-Request-Id') ?? undefined,
 			);
 		}
 
-		logger.info(`${options.method ?? 'GET'} ${path} -> ${response.status} (binary)`);
+		logger.info(`${options.method ?? 'GET'} ${path.split('?')[0]} -> ${response.status} [request ${getHeader(response.headers, 'X-Crate-Request-Id') ?? 'unavailable'}] (binary)`);
 		return { body: response.arrayBuffer, headers: response.headers };
 	}
 }

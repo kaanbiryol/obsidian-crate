@@ -9,8 +9,8 @@ interface QueueApi {
 		size: number,
 		contentType: string,
 		expectedHash: string | null,
-	): Promise<{ success: boolean; path: string; hash?: string; error?: string }>;
-	batchDelete(paths: string[], expectedHashes?: Record<string, string>): Promise<{
+	): Promise<{ success: boolean; path: string; hash?: string; revision?: string; error?: string }>;
+	batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>): Promise<{
 		success: boolean;
 		deleted: string[];
 		errors?: QueueDeleteFailure[];
@@ -18,8 +18,8 @@ interface QueueApi {
 }
 
 interface QueueManifest {
-	getEntry?(path: string): { hash: string; size: number; modified: string } | undefined;
-	setEntry(path: string, entry: { hash: string; size: number; modified: string }): void;
+	getEntry?(path: string): { hash: string; size: number; modified: string; revision?: string } | undefined;
+	setEntry(path: string, entry: { hash: string; size: number; modified: string; revision?: string }): void;
 	removeEntry(path: string): void;
 	save(): Promise<void>;
 }
@@ -31,6 +31,7 @@ interface QueueMarkdownBaseCache {
 export interface QueueDeleteCandidate {
 	path: string;
 	expectedHash: string;
+	expectedRevision?: string;
 }
 
 export interface QueueDeleteFailure {

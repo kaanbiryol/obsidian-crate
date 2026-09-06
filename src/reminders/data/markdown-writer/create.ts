@@ -27,6 +27,7 @@ export async function createReminderInMarkdown(
 ): Promise<void> {
   const normalizedProject = requireReminderProjectPath(project);
   const stableReminderId = reminderId ?? createReminderId();
+  if (context.index.getById(stableReminderId)) throw new Error('This reminder already exists. Close the draft and refresh to see its saved state.');
   const file = await context.getOrCreateProjectFile(normalizedProject);
   const mutation = buildCreatedReminderBlock({
     content,
@@ -58,9 +59,13 @@ export async function createReminderInMarkdown(
   context.index.applyOptimisticCreate(optimisticReminder);
 
   try {
-    await context.app.vault.process(file, (fileContent) =>
-      appendCreatedReminderBlock(fileContent, mutation)
-    );
+    await context.app.vault.process(file, (fileContent) => {
+      // A lost local write acknowledgement must not append the same identity twice.
+      if (fileContent.includes(`<!-- crate-id:${stableReminderId} -->`)) {
+        throw new Error('This reminder already exists. Close the draft and refresh to see its saved state.');
+      }
+      return appendCreatedReminderBlock(fileContent, mutation);
+    });
     markdownWriterLog.info(`Created reminder in ${file.path}`);
     await notifyFileWritten(context, file);
 

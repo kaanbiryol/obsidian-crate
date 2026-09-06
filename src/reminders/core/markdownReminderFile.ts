@@ -14,6 +14,7 @@ export interface ReminderLineRecord {
 	recurrence?: RecurrenceRule;
 	lineNumber: number;
 	rawLine: string;
+	description?: string;
 }
 
 export interface FileContentMutationResult {
@@ -123,6 +124,18 @@ function countDescriptionBlockLines(
 	return 0;
 }
 
+export function assertReminderBlockUnchanged(lines: string[], reminder: ReminderLineRecord, lineNumber: number): void {
+	const line = lines[lineNumber];
+	const count = countDescriptionBlockLines(lines, lineNumber);
+	const block = lines.slice(lineNumber + 1, lineNumber + 1 + count).join('\n');
+	const description = block
+		? decodeDescriptionFromMarkdown(block.slice('<!-- crate-desc:'.length, block.indexOf('-->')))
+		: '';
+	if (!line || (line !== reminder.rawLine && !lineMatchesReminder(line, reminder)) || description !== (reminder.description?.trim() ?? '')) {
+		throw new Error('Reminder changed while it was being edited. Reload it before saving; your changes were not applied');
+	}
+}
+
 export function appendReminderBlockToContent(
 	fileContent: string,
 	checkboxLine: string,
@@ -147,6 +160,7 @@ export function replaceReminderBlockInContent(
 	if (lineNumber === -1) {
 		return { content: fileContent, lineNumber, found: false };
 	}
+	assertReminderBlockUnchanged(lines, reminder, lineNumber);
 
 	const oldDescCount = countDescriptionBlockLines(lines, lineNumber);
 	lines.splice(lineNumber, 1 + oldDescCount, ...replacementLines);
@@ -166,6 +180,7 @@ export function deleteReminderBlockFromContent(
 	if (lineNumber === -1) {
 		return { content: fileContent, lineNumber, found: false };
 	}
+	assertReminderBlockUnchanged(lines, reminder, lineNumber);
 
 	const descCount = countDescriptionBlockLines(lines, lineNumber);
 	lines.splice(lineNumber, 1 + descCount);

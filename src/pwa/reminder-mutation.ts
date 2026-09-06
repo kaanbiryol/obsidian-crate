@@ -1,6 +1,7 @@
+import { preserveReminderInstant } from '@/reminders/utils/preserveReminderInstant';
 import { buildStoredReminderDates } from '@/reminders/utils/reminderDate';
 import { parseReminderEditorContent } from '@/reminders/utils/reminderEditorParsing';
-import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
+import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '@/reminders/utils/recurrenceRule';
 import type { ModalDraft, ModalMode, ReminderMutationBody, StoredConfig } from './types';
 
 export function buildReminderMutationBody({
@@ -23,7 +24,8 @@ export function buildReminderMutationBody({
 	const project = parsed.project || draft.project.trim() || createDefaultProject;
 	const priority: 1 | 4 = parsed.priorityPart ? parsed.priority : draft.priority === 1 ? 1 : 4;
 	const content = (parsed.cleanContent || rawContent).replace(/\s+/g, ' ').trim();
-	const recurrence = normalizeRecurrenceRule(parsed.recurrence || (parsed.dueDate ? undefined : draft.recurrence));
+	const parsedRule = preserveRecurrenceMetadata(parsed.recurrence, draft.recurrence);
+	const recurrence = normalizeRecurrenceRule(parsedRule || (parsed.dueDate ? undefined : draft.recurrence));
 	let dueDate: string | null = null;
 	let dueDatetime: string | null = null;
 
@@ -31,13 +33,14 @@ export function buildReminderMutationBody({
 		const parsedDates = buildStoredReminderDates(parsed.dueDate, parsed.hasTime);
 		dueDate = parsedDates.dueDate ?? null;
 		dueDatetime = parsedDates.dueDatetime ?? null;
-	} else if (!recurrence) {
+	} else if (!recurrence || mode === 'edit') {
 		const rawDate = draft.dueDate.trim();
 		const rawTime = draft.dueTime.trim();
 		if (rawDate && rawTime) dueDatetime = new Date(`${rawDate}T${rawTime}`).toISOString();
 		else if (rawDate) dueDate = rawDate;
 	}
 
+  if (mode === 'edit') dueDatetime = preserveReminderInstant(dueDatetime, draft.originalDueDatetime) ?? null;
 	return {
 		folderPath: config.folderPath,
 		allDayNotificationTime: config.allDayNotificationTime,

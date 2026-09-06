@@ -6,6 +6,7 @@ import {
 	getReminderSheetClosedOffset,
 	useReminderSheetNavigation,
 } from '../hooks/useReminderSheetNavigation';
+import { discardReminderDraft, restoreReminderDraft, saveReminderDraft } from '../reminder-drafts';
 import type { ModalDraft, ModalState } from '../types';
 import {
 	ReminderEditorScreen,
@@ -21,7 +22,7 @@ export function ReminderSheet({
 	colorScheme,
 	saving,
 	isClosing,
-	onClose,
+	onClose: dismissModal,
 	onClosed,
 	onSave,
 	onDelete,
@@ -34,10 +35,11 @@ export function ReminderSheet({
 	onClose: () => void;
 	onClosed: () => void;
 	onSave: (modal: ModalState) => void;
-	onDelete: (id: string) => void;
+	onDelete: (id: string, expectedRevision?: string, filePath?: string) => void;
 }) {
 	// Keep keystrokes local so the reminder list does not render behind the sheet.
-	const [modal, setModal] = useState(initialModal);
+	const [modal, setModal] = useState(() => restoreReminderDraft(initialModal));
+	const onClose = () => { discardReminderDraft(modal); dismissModal(); };
 	const editorScreenRef = useRef<ReminderEditorScreenHandle | null>(null);
 	const pickerTransitionClosedOffsetRef = useRef('100%');
 	const pickerTransitionKeyboardInsetRef = useRef(0);
@@ -49,7 +51,11 @@ export function ReminderSheet({
 		[projects],
 	);
 	const patchDraft = useCallback((patch: Partial<ModalDraft>) => {
-		setModal((current) => ({ ...current, draft: { ...current.draft, ...patch } }));
+		setModal((current) => {
+			const next = { ...current, draft: { ...current.draft, ...patch } };
+			saveReminderDraft(next);
+			return next;
+		});
 	}, []);
 	const dismissEditorKeyboard = useCallback(() => {
 		pickerTransitionClosedOffsetRef.current = getReminderSheetClosedOffset(
@@ -145,7 +151,7 @@ export function ReminderSheet({
 					onOpenPicker={openPicker}
 					onClose={onClose}
 					onSave={onSave}
-					onDelete={onDelete}
+					onDelete={(id) => onDelete(id, modal.expectedRevision, modal.filePath)}
 				/>
 				{activeScreen !== 'editor' && (
 					<div className="pwa-reminder-sheet-screen pwa-reminder-sheet-screen--picker is-active">

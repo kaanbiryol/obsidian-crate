@@ -163,8 +163,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--pwa-launch-bg:#f7f7f8;');
 		expect(html).toContain('<meta name="format-detection" content="telephone=no,date=no,email=no,address=no">');
 		expect(html).toContain('height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
-		expect(html).toContain('body{min-height:100%;min-height:100dvh;overflow:hidden;touch-action:manipulation}');
-		expect(html).toContain('button{cursor:pointer;border:none;background:transparent;color:inherit;touch-action:manipulation;user-select:none;-webkit-user-select:none}');
+		expect(html).toContain('body{min-height:100%;min-height:100dvh;overflow:hidden}');
+		expect(html).toContain('button{cursor:pointer;border:none;background:transparent;color:inherit;user-select:none;-webkit-user-select:none}');
 		expect(html).toContain('#app,#app *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}');
 		expect(html).toContain('#app input,#app textarea,#app [contenteditable="true"],#app [contenteditable="true"] *{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}');
 		expect(html).toContain('#app{height:100%;height:100dvh;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden}');
@@ -305,7 +305,7 @@ describe('PWA activation metadata', () => {
 		expect(SERVICE_WORKER_JS).not.toContain('apple-startup');
 		expect(SERVICE_WORKER_JS).toContain("url.pathname === PWA_SHELL_URL");
 		expect(SERVICE_WORKER_JS).toContain("return cache.match(PWA_SHELL_URL)");
-		expect(SERVICE_WORKER_JS).toContain('previousShellCaches.slice(0, -1)');
+		expect(SERVICE_WORKER_JS).toContain('collectUnusedShellCaches');
 		expect(SERVICE_WORKER_JS.indexOf("cache.match(PWA_SHELL_URL)")).toBeLessThan(
 			SERVICE_WORKER_JS.indexOf('return fetch(event.request)'),
 		);

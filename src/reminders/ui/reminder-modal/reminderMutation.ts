@@ -1,3 +1,4 @@
+import { preserveReminderInstant } from '../../utils/preserveReminderInstant';
 import type { Priority, Reminder, RecurrenceRule } from '../../types';
 import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
 import {
@@ -5,7 +6,7 @@ import {
 	parseReminderDateValue,
 	serializeReminderDateValue,
 } from '../../utils/reminderDate';
-import { normalizeRecurrenceRule } from '../../utils/recurrenceRule';
+import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '../../utils/recurrenceRule';
 
 export interface ReminderSubmissionInput {
 	content: string;
@@ -68,11 +69,12 @@ export function buildReminderSubmission({
 
 	const finalPriority = parsed.priorityPart ? parsed.priority : priority;
 	const finalProject = parsed.project || project;
-	const finalRecurrence = normalizeRecurrenceRule(parsed.recurrence || (parsed.dueDate ? undefined : recurrence));
-	const finalDueDate = finalRecurrence ? undefined : parsed.dueDate
+	const chosenRecurrence = preserveRecurrenceMetadata(parsed.recurrence, recurrence) || (parsed.dueDate ? undefined : recurrence);
+  const finalRecurrence = normalizeRecurrenceRule(chosenRecurrence);
+	const finalDueDate = finalRecurrence ? (reminder && chosenRecurrence === recurrence ? reminder.dueDatetime || reminder.dueDate : undefined) : parsed.dueDate
 		? serializeReminderDateValue(parsed.dueDate, parsed.hasTime)
 		: dueDate ?? undefined;
-	const finalHasTime = finalRecurrence ? false : parsed.dueDate ? (parsed.hasTime ?? false) : (hasTime ?? false);
+	const finalHasTime = finalRecurrence ? Boolean(finalDueDate && reminder?.dueDatetime) : parsed.dueDate ? (parsed.hasTime ?? false) : (hasTime ?? false);
 	const storedDates = buildStoredReminderDates(
 		parseReminderDateValue(finalDueDate, finalHasTime),
 		finalHasTime,
@@ -97,7 +99,7 @@ export function buildReminderSubmission({
 			description: finalDescription,
 			project: finalProject,
 			priority: finalPriority,
-			dueDatetime: storedDates.dueDatetime,
+			dueDatetime: preserveReminderInstant(storedDates.dueDatetime, reminder.dueDatetime),
 			dueDate: storedDates.dueDate,
 			recurrence: finalRecurrence,
 		};
@@ -121,15 +123,9 @@ export async function executeReminderAction(options: ExecuteReminderActionOption
 		}
 	};
 
-	if (options.optimistic) {
-		options.beforeClose?.();
-		void run();
-		options.close();
-		return;
-	}
-
 	const succeeded = await run();
 	if (succeeded) {
+		options.beforeClose?.();
 		options.close();
 	}
 }

@@ -1,3 +1,6 @@
+import { runNotificationCoordinator } from '../notification-coordinator';
+import type { Env } from '../types';
+import { changedRows } from '../db';
 import { parseJsonObject, parseNonNegativeInteger, parseOptionalString } from '../utils';
 import { listPushSubscriptionIds, sendToAllSubscriptions } from './push';
 
@@ -39,13 +42,39 @@ function retryDelayMs(attempt: number): number {
 }
 
 export class ReminderAlarm implements DurableObject {
+	private stateWrites: Promise<void> = Promise.resolve();
+
+	// Serialize short state transitions, but allow a new schedule to arrive while
+	// a push request is in flight. Every delivery write checks its schedule token.
+	private withStateLock<T>(action: () => Promise<T>): Promise<T> {
+		const result = this.stateWrites.then(action);
+		this.stateWrites = result.then(() => undefined, () => undefined);
+		return result;
+	}
+
+	private writeIfCurrent(token: string, action: () => Promise<unknown>): Promise<boolean> {
+		return this.withStateLock(async () => {
+			if ((await this.state.storage.get<ReminderData>('reminder'))?.scheduleToken !== token) return false;
+			await action();
+			return true;
+		});
+	}
 	constructor(
 		private state: DurableObjectState,
-		private env: { DB: D1Database },
+		private env: Pick<Env, 'DB'> & Partial<Env>,
 	) {}
 
-	async fetch(request: Request): Promise<Response> {
+	fetch(request: Request): Promise<Response> {
+		return this.withStateLock(() => this.handleFetch(request));
+	}
+
+	private async handleFetch(request: Request): Promise<Response> {
 		const method = request.method;
+		if (new URL(request.url).pathname === '/project' && method === 'POST') {
+			await this.state.storage.put('projectionCoordinator', true);
+			if (await this.state.storage.getAlarm() === null) await this.state.storage.setAlarm(Date.now() + 1);
+			return new Response(JSON.stringify({ success: true }));
+		}
 
 		if (method === 'PUT') {
 			const parsedBody = await parseJsonObject(request);
@@ -68,10 +97,15 @@ export class ReminderAlarm implements DurableObject {
 			if (Number.isNaN(alarmTime.getTime())) {
 				return new Response(JSON.stringify({ error: 'Invalid dueDatetime' }), { status: 400 });
 			}
-			if (alarmTime.getTime() <= Date.now()) {
+			const jobToken = parseOptionalString(parsedBody.value.jobToken, 128);
+			if (alarmTime.getTime() <= Date.now() && !jobToken) {
 				return new Response(JSON.stringify({ error: 'dueDatetime must be in the future' }), { status: 400 });
 			}
 
+			if (jobToken) {
+				const current = await this.env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'schedule'").bind(reminderId).first<{ job_token: string }>();
+				if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
+			}
 			const snapshot = await this.readSnapshot();
 			const body: ReminderData = {
 				reminderId,
@@ -86,14 +120,19 @@ export class ReminderAlarm implements DurableObject {
 					this.state.storage.delete(PENDING_SUBSCRIPTION_IDS_KEY),
 					this.state.storage.delete(DELIVERY_COMPLETE_KEY),
 					this.state.storage.delete(RETRY_ATTEMPT_KEY),
+					this.state.storage.delete(DELIVERY_FAILURE_KEY),
 				]);
 				await this.state.storage.put('reminder', body);
 				await this.state.storage.setAlarm(alarmTime);
-				await this.env.DB.prepare(
+				const saved = await this.env.DB.prepare(
 					`INSERT OR REPLACE INTO scheduled_reminders
 						(reminder_id, schedule_token, content, project, due_datetime)
-					VALUES (?, ?, ?, ?, ?)`,
-				).bind(reminderId, body.scheduleToken, content, project ?? null, dueDatetime).run();
+					SELECT ?, ?, ?, ?, ? ${jobToken ? "WHERE EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'schedule')" : ''}`,
+				).bind(reminderId, body.scheduleToken, content, project ?? null, dueDatetime, ...(jobToken ? [reminderId, jobToken] : [])).run();
+				if (jobToken && changedRows(saved) !== 1) {
+					await this.restoreSnapshot(snapshot);
+					return new Response(JSON.stringify({ success: true, superseded: true }));
+				}
 			} catch {
 				await this.restoreSnapshot(snapshot);
 				return new Response(JSON.stringify({ error: 'Failed to persist reminder schedule' }), { status: 500 });
@@ -106,9 +145,18 @@ export class ReminderAlarm implements DurableObject {
 			if (!reminderId) {
 				return new Response(JSON.stringify({ error: 'reminderId required' }), { status: 400 });
 			}
+			const jobToken = new URL(request.url).searchParams.get('jobToken');
 			try {
-				await this.env.DB.prepare('DELETE FROM scheduled_reminders WHERE reminder_id = ?')
-					.bind(reminderId).run();
+				if (jobToken) {
+					const current = await this.env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'cancel'").bind(reminderId).first<{ job_token: string }>();
+					if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
+				}
+				const deleted = await this.env.DB.prepare(`DELETE FROM scheduled_reminders WHERE reminder_id = ? ${jobToken ? "AND EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'cancel')" : ''}`)
+					.bind(reminderId, ...(jobToken ? [reminderId, jobToken] : [])).run();
+				if (jobToken && changedRows(deleted) === 0) {
+					const current = await this.env.DB.prepare('SELECT job_token FROM notification_jobs WHERE reminder_id = ?').bind(reminderId).first<{ job_token: string }>();
+					if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
+				}
 				await this.state.storage.deleteAlarm();
 				await this.state.storage.deleteAll();
 			} catch {
@@ -127,6 +175,11 @@ export class ReminderAlarm implements DurableObject {
 	}
 
 	async alarm(): Promise<void> {
+		if (await this.state.storage.get<boolean>('projectionCoordinator')) {
+			if (!this.env.BUCKET || !this.env.REMINDER_ALARMS) throw new Error('Projection bindings unavailable');
+			await runNotificationCoordinator(this.state, this.env as Env);
+			return;
+		}
 		const reminder = await this.state.storage.get<ReminderData>('reminder');
 		if (!reminder) return;
 
@@ -152,13 +205,29 @@ export class ReminderAlarm implements DurableObject {
 			return;
 		}
 
+        // The file commit and its projection job are atomic. Do not send from a
+        // schedule whose source has changed while projection is still catching up.
+        const projection = await db.prepare(`SELECT p.file_revision, f.storage_key,
+          j.path AS pending_path, policy.enabled FROM scheduled_reminders s
+          LEFT JOIN reminder_projections p ON p.reminder_id = s.reminder_id
+          LEFT JOIN files f ON f.path = p.file_path
+          LEFT JOIN notification_projection_jobs j ON j.path = p.file_path
+          LEFT JOIN notification_policy policy ON policy.id = 1
+          WHERE s.reminder_id = ?`).bind(reminder.reminderId)
+          .first<{ file_revision: string | null; storage_key: string | null; pending_path: string | null; enabled: number }>();
+        if (projection && (projection.file_revision === null || projection.pending_path || projection.file_revision !== projection.storage_key || projection.enabled === 0)) {
+          await this.writeIfCurrent(reminder.scheduleToken, () => this.state.storage.setAlarm(Date.now() + 60_000));
+          return;
+        }
+
 		const deliveryComplete = await this.state.storage.get<boolean>(DELIVERY_COMPLETE_KEY) === true;
 		if (!deliveryComplete) {
 			let pendingSubscriptionIds = await this.state.storage.get<string[]>(PENDING_SUBSCRIPTION_IDS_KEY);
 			if (!pendingSubscriptionIds) {
 				pendingSubscriptionIds = await listPushSubscriptionIds(db);
-				await this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, pendingSubscriptionIds);
+				if (!await this.writeIfCurrent(reminder.scheduleToken, () => this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, pendingSubscriptionIds))) return;
 			}
+			if (!await this.writeIfCurrent(reminder.scheduleToken, async () => {})) return;
 			const delivery = await sendToAllSubscriptions(db, {
 				title: scheduled.content,
 				body: scheduled.project || '',
@@ -167,10 +236,10 @@ export class ReminderAlarm implements DurableObject {
 				reminderId: reminder.reminderId,
 			}, { subscriptionIds: pendingSubscriptionIds });
 			if (delivery.failed > 0) {
-				await this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, delivery.failedSubscriptionIds);
+				if (!await this.writeIfCurrent(reminder.scheduleToken, () => this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, delivery.failedSubscriptionIds))) return;
 				throw new Error(`Push delivery failed for ${delivery.failed} subscription(s)`);
 			}
-			await this.state.storage.put(DELIVERY_COMPLETE_KEY, true);
+			if (!await this.writeIfCurrent(reminder.scheduleToken, () => this.state.storage.put(DELIVERY_COMPLETE_KEY, true))) return;
 		}
 
 		await db.prepare(
@@ -180,6 +249,10 @@ export class ReminderAlarm implements DurableObject {
 	}
 
 	private async scheduleRetryIfCurrent(reminder: ReminderData, error: unknown): Promise<void> {
+		await this.writeIfCurrent(reminder.scheduleToken, () => this.scheduleRetry(reminder, error));
+	}
+
+	private async scheduleRetry(reminder: ReminderData, error: unknown): Promise<void> {
 		const current = await this.state.storage.get<ReminderData>('reminder');
 		if (current?.scheduleToken !== reminder.scheduleToken) return;
 
@@ -209,8 +282,10 @@ export class ReminderAlarm implements DurableObject {
 	}
 
 	private async clearStateIfCurrent(scheduleToken: string): Promise<void> {
-		const current = await this.state.storage.get<ReminderData>('reminder');
-		if (current?.scheduleToken === scheduleToken) await this.state.storage.deleteAll();
+		await this.writeIfCurrent(scheduleToken, async () => {
+			await this.state.storage.deleteAlarm();
+			await this.state.storage.deleteAll();
+		});
 	}
 
 	private async readSnapshot(): Promise<ReminderAlarmSnapshot> {

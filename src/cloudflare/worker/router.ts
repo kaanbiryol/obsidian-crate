@@ -1,3 +1,4 @@
+import { parseJsonObject } from './utils';
 import { handleAuthRoute } from './routes/auth';
 import { handleNotificationsRoute } from './routes/notifications';
 import { handlePublicRoute } from './routes/public';
@@ -42,10 +43,19 @@ export async function handleAuthenticatedRoute(
 		return corsResponse({ error: 'Token is not authorized for this operation' }, 403);
 	}
 
+	if (principal.scope === 'reminders' && path.startsWith('/reminders/')) {
+		let folder: unknown = new URL(request.url).searchParams.get('folderPath');
+		if (method !== 'GET') {
+			const parsed = await parseJsonObject(request.clone());
+			if (!parsed.ok) return parsed.response;
+			folder = parsed.value.folderPath;
+		}
+		if (!principal.folderPath || folder !== principal.folderPath) return corsResponse({ error: 'This session is limited to its enrolled reminders folder' }, 403);
+	}
 	const db = env.DB;
 
 	return await handleSyncRoute(request, env, path, method)
 		?? await handleAuthRoute(request, env, path, method)
 		?? await handleRemindersRoute(request, env, path, method)
-		?? await handleNotificationsRoute(request, db, path, method);
+		?? await handleNotificationsRoute(request, db, path, method, principal);
 }

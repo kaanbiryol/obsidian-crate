@@ -21,5 +21,8 @@
 		"cloudflare",
 		"preact",
 		"tailwindcss"
+	],
+	"ignoreBinaries": [
+		"tar", "python3"
 	]
 }

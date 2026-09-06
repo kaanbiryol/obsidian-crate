@@ -1,4 +1,7 @@
+import { enqueueFileProjection } from './notification-projection-queue';
+import type { CommitEffects } from './commit-effects';
 import { changedRows } from './db';
+import { sha256HexBytes } from './auth';
 import { portablePathKey } from '../../protocol/portable-path';
 import {
 	collectCleanupKeys,
@@ -33,6 +36,7 @@ function uploadMutation(
 export interface CommitResult {
 	committed: boolean;
 	currentHash: string | null;
+	revision?: string;
 	idempotent?: boolean;
 }
 
@@ -44,7 +48,9 @@ export async function commitStagedFile(
 		hash: string;
 		size: number;
 		objectKey: string;
+		effects?: CommitEffects;
 		expectedHash: ExpectedFileHash;
+		expectedRevision?: string;
 		previousFile: FileStorageRow | null;
 	},
 ): Promise<CommitResult> {
@@ -59,11 +65,11 @@ export async function commitStagedFile(
 	);
 	const results: unknown[] = await db.batch([
 		mutation,
-		db.prepare(`INSERT INTO changelog (path, action, hash, size)
-			SELECT ?, 'put', ?, ?
+		db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
+			SELECT ?, 'put', ?, ?, ?
 			WHERE EXISTS (
 				SELECT 1 FROM files WHERE path = ? AND storage_key = ?
-			)`).bind(params.path, params.hash, params.size, params.path, params.objectKey),
+			)`).bind(params.path, params.hash, params.size, params.objectKey, params.path, params.objectKey),
 		...cleanupKeys.map((key) => db.prepare(`INSERT OR IGNORE INTO file_versions
 			(storage_key, path, hash, size, reason, expires_at)
 			SELECT ?, ?, ?, ?, 'replaced', ? WHERE EXISTS (
@@ -77,18 +83,25 @@ export async function commitStagedFile(
 			params.path,
 			params.objectKey,
 		)),
+		...enqueueFileProjection(db, params.path, params.objectKey),
+		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
 	]);
 
 	if (changedRows(results[0]) !== 1) {
 		const current = await getStoredFileRow(db, params.path);
-		await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
-		if (current?.hash === params.hash) {
-			return { committed: true, currentHash: current.hash, idempotent: true };
+		if (!params.effects && current?.hash === params.hash) {
+			const object = await bucket.get(current.storageKey);
+			if (!object || object.size !== current.size || await sha256HexBytes(await object.arrayBuffer()) !== current.hash) {
+				throw new Error('Committed file content is unavailable; restore a verified version before retrying');
+			}
+			await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
+			return { committed: true, currentHash: current.hash, revision: current.storageKey, idempotent: true };
 		}
+		await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
 		return { committed: false, currentHash: current?.hash ?? null };
 	}
 
-	return { committed: true, currentHash: params.hash };
+	return { committed: true, currentHash: params.hash, revision: params.objectKey };
 }
 
 export async function commitFileDelete(
@@ -97,15 +110,16 @@ export async function commitFileDelete(
 	params: {
 		path: string;
 		expectedHash: ExpectedFileHash;
+		expectedRevision?: string;
 		previousFile: FileStorageRow | null;
 	},
 ): Promise<CommitResult> {
 	const expectedPredicate = params.expectedHash === null
 			? 'path = ? AND 0'
-			: 'path = ? AND hash = ?';
+			: 'path = ? AND hash = ? AND storage_key = ?';
 	const predicateArgs = params.expectedHash === null
 		? [params.path]
-		: [params.path, params.expectedHash];
+		: [params.path, params.expectedHash, params.expectedRevision ?? ''];
 	const results: unknown[] = await db.batch([
 		db.prepare(`INSERT INTO changelog (path, action, hash, size)
 			SELECT path, 'delete', '', 0 FROM files WHERE ${expectedPredicate}`)
@@ -115,6 +129,9 @@ export async function commitFileDelete(
 			SELECT storage_key, path, hash, size, 'deleted', ? FROM files WHERE ${expectedPredicate}`)
 			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...predicateArgs),
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
+		...(params.path.toLowerCase().endsWith('.md') ? [db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
+			SELECT ?, ? WHERE changes() = 1
+			ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL, updated_at = datetime('now')`).bind(params.path, crypto.randomUUID())] : []),
 	]);
 
 	if (changedRows(results[2]) !== 1) {

@@ -68,8 +68,12 @@ The plugin fixture supplies deterministic Obsidian-style variables; it does not
 replace testing actual community themes or native modal/keyboard integration.
 
 `npm run test:visual` compares 48 screenshots at 390px and 1280px widths and
-checks project/repeat keyboard navigation. CI pins browser dependencies, locale,
-timezone, and clock. Failures upload screenshots, diffs, and traces. To propose
+checks project/repeat keyboard navigation. The canonical snapshot platform is
+macOS 26 on Apple silicon, matching the `macos-26` CI runner. Use that platform
+when comparing or updating these images: system fonts and native controls can
+render differently on Linux or Windows. Chromium comes from the lockfile; CI
+also fixes locale, timezone, and clock. Functional Chromium/WebKit release tests
+continue to run on Linux. Failures upload screenshots, diffs, and traces. To propose
 new baselines, dispatch **Shared UI visual checks** with **Generate candidate
 baselines for review**, inspect its artifact, and commit only approved images
 from `tests/visual/baselines`. Normal CI never updates baselines automatically.

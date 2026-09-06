@@ -259,7 +259,7 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 					const path = getBoundString(statement._args, 0);
 					const current = files.get(path);
 					const expectedHash = statement._args[1];
-					if (current && (expectedHash === undefined || current.hash === expectedHash)) {
+					if (current && current.hash === expectedHash && current.storageKey === statement._args[2]) {
 						files.delete(path);
 						changes = 1;
 					}

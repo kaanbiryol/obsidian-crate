@@ -122,7 +122,7 @@ function createFlushHarness(overrides: Partial<{
 			},
 			localManifest: {
 				getEntry: vi.fn(() => ({
-					hash: 'd'.repeat(64),
+					hash: 'd'.repeat(64), revision: 'version-1',
 					size: 1,
 					modified: '2026-02-15T00:00:00.000Z',
 				})),
@@ -416,6 +416,7 @@ describe('processPendingChanges', () => {
 		expect(harness.batchDelete).toHaveBeenCalledWith(
 			['notes/old.md'],
 			{ 'notes/old.md': 'd'.repeat(64) },
+      { 'notes/old.md': 'version-1' },
 		);
 		expect(harness.setEntry).toHaveBeenCalledWith(
 			'notes/a.md',

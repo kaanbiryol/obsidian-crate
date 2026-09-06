@@ -37,7 +37,7 @@ function createDb(initialTokens?: Record<string, number>) {
 						const expiresAt = tokens.get(tokenHash);
 						if (expiresAt === undefined || expiresAt <= now) return null;
 						tokens.delete(tokenHash);
-						return { expires_at: expiresAt };
+						return { expires_at: expiresAt, folder_path: 'Reminders' };
 					}
 					return null;
 				}),
@@ -60,8 +60,8 @@ describe('web enrollment tokens', () => {
 
 		expect(issued.token).toHaveLength(64);
 		expect(tokens.size).toBe(1);
-		await expect(consumeWebEnrollmentToken(db as never, issued.token)).resolves.toBe(true);
-		await expect(consumeWebEnrollmentToken(db as never, issued.token)).resolves.toBe(false);
+		await expect(consumeWebEnrollmentToken(db as never, issued.token)).resolves.toBe('Reminders');
+		await expect(consumeWebEnrollmentToken(db as never, issued.token)).resolves.toBeNull();
 		expect(tokens.size).toBe(0);
 	});
 
@@ -88,7 +88,7 @@ describe('web enrollment tokens', () => {
 			[expiredHash]: Date.now() - 1000,
 		});
 
-		await expect(consumeWebEnrollmentToken(db as never, expiredToken)).resolves.toBe(false);
+		await expect(consumeWebEnrollmentToken(db as never, expiredToken)).resolves.toBeNull();
 		expect(tokens.size).toBe(0);
 	});
 });

@@ -1,3 +1,4 @@
+import { recurrenceCalendarDate, recurrenceCalendarInstant } from './recurrenceCalendar';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
 import { rebuildCheckboxLine } from '@/reminders/utils/checkboxParser';
 import { calculateFirstOccurrence, calculateNextOccurrence } from '@/reminders/utils/recurrenceCalculator';
@@ -11,6 +12,7 @@ import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
 import { setReminderIdMarker } from './reminderIdentity';
 import {
 	appendReminderBlockToContent,
+	assertReminderBlockUnchanged,
 	buildDescriptionBlock,
 	findReminderLineNumber,
 	replaceReminderBlockInContent,
@@ -55,10 +57,11 @@ export function buildCreatedReminderBlock(params: {
 	reminderId: string;
 }): ReminderBlockMutation {
 	const recurrence = normalizeRecurrenceRule(params.recurrence);
-	const dueDate = recurrence && !params.dueDate
+	let dueDate = recurrence && !params.dueDate
 		? calculateFirstOccurrence(recurrence)
 		: params.dueDate;
-	const hasTime = params.hasTime ?? inferHasTimeFromDate(dueDate);
+	const hasTime = params.hasTime ?? (recurrence && !params.dueDate ? recurrence.hour !== undefined : inferHasTimeFromDate(dueDate));
+	if (recurrence && !params.dueDate && dueDate && !hasTime) dueDate = recurrenceCalendarDate(dueDate, recurrence);
 	const storedDates = buildStoredReminderDates(dueDate, hasTime);
 	return {
 		checkboxLine: rebuildCheckboxLine(
@@ -180,7 +183,7 @@ export function buildReminderCompletionPlan(
 	currentDue = parseStoredReminderDate(reminder) ?? new Date(),
 ): ReminderCompletionPlan {
 	const currentHasTime = reminderHasTime(reminder) ?? false;
-	const recurrence = normalizeRecurrenceRule(reminder.recurrence);
+	let recurrence = normalizeRecurrenceRule(reminder.recurrence);
 	let nextCompleted = completed;
 	let dueDate = reminder.dueDate;
 	let dueDatetime = reminder.dueDatetime;
@@ -189,8 +192,11 @@ export function buildReminderCompletionPlan(
 
 	if (!completed) {
 		nextLine = sourceLine.replace(/\[x\]/i, '[ ]');
-	} else if (recurrence) {
-		const nextDue = calculateNextOccurrence(currentDue, recurrence);
+	} else if (recurrence && !reminder.completed) {
+		const completedCount = recurrence.completedCount ?? 0;
+		const nextInstant = calculateNextOccurrence(currentHasTime ? currentDue : recurrenceCalendarInstant(currentDue, recurrence), recurrence, completedCount);
+		const nextDue = nextInstant && !currentHasTime ? recurrenceCalendarDate(nextInstant, recurrence) : nextInstant;
+		recurrence = { ...recurrence, completedCount: completedCount + 1 };
 		if (nextDue) {
 			nextCompleted = false;
 			const storedDates = buildStoredReminderDates(nextDue, currentHasTime);
@@ -212,7 +218,7 @@ export function buildReminderCompletionPlan(
 				nextDate: nextDue.toISOString(),
 			};
 		} else {
-			nextLine = sourceLine.replace(/\[ \]/, '[x]');
+			nextLine = rebuildCheckboxLine(sourceLine.match(/^(\s*)/)?.[1] ?? '', true, reminder.content, currentDue, reminder.priority, undefined, recurrence, currentHasTime, reminder.id);
 		}
 	} else {
 		nextLine = sourceLine.replace(/\[ \]/, '[x]');
@@ -239,6 +245,7 @@ export function setReminderCompletionInContent(
 	if (lineNumber === -1) {
 		throw new Error(`Cannot safely locate reminder line in ${reminder.filePath}`);
 	}
+	assertReminderBlockUnchanged(lines, reminder, lineNumber);
 	const line = lines[lineNumber];
 	if (line === undefined) {
 		throw new Error(`Cannot read reminder line in ${reminder.filePath}`);

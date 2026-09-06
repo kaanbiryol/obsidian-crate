@@ -11,7 +11,7 @@ try {
 		const browser = await browserType.launch();
 		try {
 			const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
-			await page.goto(`${origin}/notifications?folder=Reminders`);
+			await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
 			const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
 			await card.waitFor();
 			// Observe focus before the card click finishes, not after an async load.

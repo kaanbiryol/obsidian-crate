@@ -97,7 +97,7 @@ export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVa
 }
 
 export async function listPushSubscriptionIds(db: D1Database): Promise<string[]> {
-	const rows = await queryRows<{ id: string }>(db.prepare('SELECT id FROM push_subscriptions WHERE disabled_at IS NULL'));
+	const rows = await queryRows<{ id: string }>(db.prepare('SELECT id FROM push_subscriptions WHERE disabled_at IS NULL AND (folder_path IS NULL OR folder_path = (SELECT folder_path FROM notification_policy WHERE id = 1))'));
 	return rows.map((row) => row.id);
 }
 
@@ -131,7 +131,7 @@ export async function sendToAllSubscriptions(
 	options: { subscriptionIds?: readonly string[] } = {},
 ): Promise<PushDeliveryResult> {
 	const allSubscriptions = await queryRows<PushSubscriptionRow>(
-		db.prepare('SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE disabled_at IS NULL'),
+		db.prepare('SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE disabled_at IS NULL AND (folder_path IS NULL OR folder_path = (SELECT folder_path FROM notification_policy WHERE id = 1))'),
 	);
 	const requestedIds = options.subscriptionIds ? new Set(options.subscriptionIds) : null;
 	const subscriptions = requestedIds
@@ -176,15 +176,15 @@ export async function sendToAllSubscriptions(
 			} else if (response.ok) {
 				sent += 1;
 			} else if (isRetryablePushStatus(response.status)) {
-				const body = await response.text().catch(() => '');
-				const message = `${subscription.id}: ${response.status} ${body}`;
+				await response.body?.cancel();
+				const message = `${subscription.id}: push service returned ${response.status}`;
 				console.error('Push failed:', message);
 				errors.push(message);
 				failed += 1;
 				failedSubscriptionIds.push(subscription.id);
 			} else {
-				const body = await response.text().catch(() => '');
-				const message = `${subscription.id}: ${response.status} ${body}`;
+				await response.body?.cancel();
+				const message = `${subscription.id}: push service returned ${response.status}`;
 				await db.prepare(`UPDATE push_subscriptions
 					SET disabled_at = datetime('now'), last_error = ? WHERE id = ?`)
 					.bind(message.slice(0, 1024), subscription.id)
