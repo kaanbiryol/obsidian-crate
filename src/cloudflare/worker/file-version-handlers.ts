@@ -1,9 +1,10 @@
-import { portablePathKey } from '../../protocol/portable-path';
 import { sha256HexBytes } from './auth';
 import { corsResponse } from './cors';
-import { changedRows, queryRows } from './db';
+import { queryRows } from './db';
+import { commitStagedFile } from './sync-mutations';
 import {
-	FILE_VERSION_RETENTION_MS,
+	createManagedObjectKey,
+	MAX_FILE_BYTES,
 	getStoredFileRow,
 	storedObjectMatchesMetadata,
 } from './sync-storage';
@@ -53,61 +54,44 @@ export async function handleRestoreFileVersion(
 	if (!path) return corsResponse({ error: 'Stored file version has an invalid path' }, 409);
 
 	const object = await bucket.get(version.storage_key);
-	if (!object || !storedObjectMatchesMetadata(object, {
+	if (!object || object.size > MAX_FILE_BYTES || !storedObjectMatchesMetadata(object, {
 		hash: version.hash,
 		size: version.size,
 		storageKey: version.storage_key,
 	})) {
 		return corsResponse({ error: 'Stored file version content is unavailable' }, 503);
 	}
-	if (await sha256HexBytes(await object.arrayBuffer()) !== version.hash) {
+	const content = await object.arrayBuffer();
+	if (content.byteLength !== version.size || await sha256HexBytes(content) !== version.hash) {
 		return corsResponse({ error: 'Stored file version content failed integrity validation' }, 503);
 	}
 
 	const previous = await getStoredFileRow(db, path);
-	const mutation = expectedHash === null
-		? db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
-			VALUES (?, ?, ?, ?, datetime('now'), ?) ON CONFLICT(path) DO NOTHING`)
-			.bind(path, portablePathKey(path), version.hash, version.size, version.storage_key)
-		: db.prepare(`UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
-			WHERE path = ? AND hash = ?`)
-			.bind(portablePathKey(path), version.hash, version.size, version.storage_key, path, expectedHash);
-	const statements = [
-		mutation,
-		db.prepare(`INSERT INTO changelog (path, action, hash, size)
-			SELECT ?, 'put', ?, ? WHERE EXISTS
-			(SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
-			.bind(path, version.hash, version.size, path, version.storage_key),
-		db.prepare(`DELETE FROM file_versions WHERE storage_key = ? AND EXISTS
-			(SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
-			.bind(version.storage_key, path, version.storage_key),
-	];
-	if (previous && previous.storageKey !== version.storage_key) {
-		statements.push(db.prepare(`INSERT OR IGNORE INTO file_versions
-			(storage_key, path, hash, size, reason, expires_at)
-			SELECT ?, ?, ?, ?, 'replaced', ? WHERE EXISTS
-			(SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
-			.bind(
-				previous.storageKey,
-				path,
-				previous.hash,
-				previous.size,
-				Date.now() + FILE_VERSION_RETENTION_MS,
-				path,
-				version.storage_key,
-			));
-	}
-
-	const results: unknown[] = await db.batch(statements);
-	if (changedRows(results[0]) !== 1) {
-		const current = await getStoredFileRow(db, path);
-		if (current?.hash === version.hash && current.storageKey === version.storage_key) {
-			return corsResponse({ success: true, path, hash: version.hash, size: version.size });
+	// Expiry cleanup may already own the retained key. Never make it live again.
+	const objectKey = createManagedObjectKey(version.hash);
+	try {
+		await bucket.put(objectKey, content, {
+			httpMetadata: object.httpMetadata,
+			customMetadata: { hash: version.hash },
+		});
+		const result = await commitStagedFile(bucket, db, {
+			path,
+			hash: version.hash,
+			size: content.byteLength,
+			objectKey,
+			expectedHash,
+			previousFile: previous,
+		});
+		if (!result.committed) {
+			return corsResponse({
+				error: 'Remote file changed before the version could be restored',
+				currentHash: result.currentHash,
+			}, 409);
 		}
-		return corsResponse({
-			error: 'Remote file changed before the version could be restored',
-			currentHash: current?.hash ?? null,
-		}, 409);
+	} catch {
+		// A failed response may follow a successful commit. Leave the fresh key
+		// for reference-aware orphan cleanup rather than risking live content.
+		return corsResponse({ error: 'Unable to restore file version; retry the request' }, 503);
 	}
-	return corsResponse({ success: true, path, hash: version.hash, size: version.size });
+	return corsResponse({ success: true, path, hash: version.hash, size: content.byteLength });
 }

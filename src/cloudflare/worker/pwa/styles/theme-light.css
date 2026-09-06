@@ -65,7 +65,7 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .pwa-status-line.is-live{background:var(--pwa-light-surface-soft)}
 .pwa-status-line.is-offline,.pwa-status-line.is-cached,.pwa-status-line.is-error{background:rgba(146,64,14,.08);border-color:rgba(146,64,14,.2);color:var(--pwa-light-warning-text)}
 .pwa-update-banner__text{color:var(--text-muted)}
-.pwa-update-button,.pwa-pull-refresh.is-ready .pwa-pull-refresh__inner{color:var(--pwa-light-accent-text)}
+.pwa-update-button{color:var(--pwa-light-accent-text)}
 .pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage,.modal-card,.settings-sheet{background:var(--pwa-sheet-surface);border-color:var(--background-modifier-border)}
 .pwa-modal-sheet{color:var(--text-normal);color-scheme:light}
 .pwa-modal-sheet__backdrop{background:rgba(24,24,27,.42)}
