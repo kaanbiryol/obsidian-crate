@@ -42,7 +42,7 @@ describe('runSyncDiagnostics', () => {
 		expect(getManifest).not.toHaveBeenCalled();
 	});
 
-	it('surfaces backend queue pressure and maintenance state', async () => {
+	it.each([0, 1])('surfaces queue pressure and terminal delivery failures: %i', async failedNotificationDeliveries => {
 		const client = {
 			testConnection: vi.fn(async () => ({ success: true })),
 			getManifest: vi.fn(async () => ({ version: 1, files: {} })),
@@ -54,6 +54,7 @@ describe('runSyncDiagnostics', () => {
 					retainedVersions: 2,
 					pendingObjectCleanup: 1,
 					pendingNotificationJobs: 2,
+					failedNotificationDeliveries,
 					scheduledReminders: 0,
 					activeAuthTokens: 1,
 					activePushSubscriptions: 0,
@@ -67,7 +68,8 @@ describe('runSyncDiagnostics', () => {
 		const results = await runSyncDiagnostics(client);
 
 		const backendQueues = results.find(result => result.name === 'Backend queues');
-		expect(backendQueues).toMatchObject({ status: 'warn' });
+		expect(backendQueues).toMatchObject({ status: failedNotificationDeliveries ? 'fail' : 'warn' });
+		if (failedNotificationDeliveries) expect(backendQueues?.message).toContain('reschedule missed reminders');
 		expect(backendQueues?.message).toContain('3');
 		expect(results.find(result => result.name === 'Worker maintenance')).toMatchObject({ status: 'warn' });
 	});

@@ -3,9 +3,12 @@ import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 const assets = await buildPwaPreviewAssets();
 const { server } = await listenPwaPreviewServer({ port: 0, assets, failMutationPaths: ['/reminders/update'] });
+let revocations = 0;
+server.on('request', req => { if (req.method === 'DELETE' && req.url === '/auth/session') revocations += 1; });
 const origin = `http://127.0.0.1:${server.address().port}`;
 try {
 	for (const browserType of [chromium, webkit]) {
+		revocations = 0;
 		const browser = await browserType.launch();
 		try {
 			const context = await browser.newContext();
@@ -30,6 +33,7 @@ try {
 			await one.getByRole('button', { name: 'Open settings', exact: true }).click();
 			await one.getByRole('button', { name: 'Log out', exact: true }).click();
 			await expect.poll(() => one.evaluate(() => localStorage.getItem('crate-reminders-auth-token'))).toBe(null);
+			await expect.poll(() => revocations).toBe(1);
 			await expect(two.getByRole('group', { name: cardName, exact: true })).toHaveCount(0);
 			await expect.poll(() => two.evaluate(() => Object.keys(sessionStorage).filter(key => key.startsWith('crate-reminder-draft:')).length)).toBe(0);
 			console.log(`${browserType.name()}: failed saves retain drafts across reload and logout clears open tabs`);

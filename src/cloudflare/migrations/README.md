@@ -15,3 +15,5 @@ The plugin embeds these files, verifies their hashes, and applies unapplied
 migrations in filename order before uploading the Worker.
 
 The complete schema is only for new databases. Migrations 0003–0008 add reminder receipts/identities, file revisions, a portable-path migration fence, notification projections/policy, folder-scoped credentials and subscription ownership, request rates, and the shared enabled setting. The provisioner installs the new protocol gate before running `portable-path-migration.ts`; that NFC/Unicode backfill cannot be replaced by SQLite `lower()`. Failed or colliding backfills leave writes fenced and can be retried. See `docs/deployment.md` for the upgrade procedure.
+
+Migration 0009 records expected notification/policy identities on projections and terminal delivery failures on schedules. It queues existing Markdown files for reprojection before old schedules may deliver and disables push subscriptions whose owner cannot be identified. Those devices must explicitly enroll again. Apply this migration through the server update flow before uploading the matching Worker; retry interrupted updates through that same flow.

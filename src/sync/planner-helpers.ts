@@ -14,7 +14,6 @@ export function isVaultTFileLike(file: TAbstractFile | null): file is TFile {
 
 interface LocalDeleteContext {
   vault: Vault;
-  fileManager: { trashFile(file: TAbstractFile): Promise<void> };
 }
 
 export type LocalDeleteOutcome =
@@ -53,7 +52,10 @@ async function deletePathLocally(
 
   const file = context.vault.getAbstractFileByPath(path);
   if (file) {
-    await context.fileManager.trashFile(file);
+    // The host moves the bytes present at removal into .trash, including an
+    // edit after our hash check. Never honor a permanent-delete preference for
+    // remote sync: a never-uploaded edit must remain recoverable after restart.
+    await context.vault.trash(file, false);
     return true;
   }
 

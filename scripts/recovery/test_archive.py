@@ -28,7 +28,12 @@ class Remote:
     def require_empty(self):
         if self.sql or self.objects:
             raise RuntimeError('Target not empty')
-    def import_sql(self, sql):
+    def database_is_empty(self):
+        return not self.sql
+    def list_object_keys(self):
+        return set(self.objects)
+    def import_sql(self, sql, before_ingest=lambda: None, record_bookmark=lambda _bookmark: None):
+        before_ingest()
         self.sql, self.imported = sql, True
 
 

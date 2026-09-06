@@ -5,7 +5,7 @@ import {
 	reorderProjectReminders,
 } from '../reminder-list-state';
 import { capturePwaSession } from '../session-generation';
-import { discardReminderDraft, saveReminderDraft } from '../reminder-drafts';
+import { discardReminderDraft } from '../reminder-drafts';
 import type { ApiFetch, ModalState, ReminderMutationBody, ReminderRecord, ShowToast, StoredConfig } from '../types';
 
 export function useReminderMutations({
@@ -86,17 +86,9 @@ export function useReminderMutations({
 			const body: ReminderMutationBody = await buildMutationBody(currentModal.draft, currentModal.mode);
 			if (!sessionCurrent()) return;
 			if (!body.content.trim()) throw new Error('Reminder title required');
-			currentModal.operationId ??= crypto.randomUUID();
-			saveReminderDraft(currentModal);
-			const isEdit = currentModal.mode === 'edit';
-			const response = await apiFetch(isEdit ? '/reminders/update' : '/reminders/create', {
-				method: 'POST',
-				body: JSON.stringify({ ...body, id: currentModal.reminderId ?? currentModal.operationId,
-					operationId: currentModal.operationId, filePath: currentModal.filePath,
-					expectedRevision: currentModal.expectedRevision }),
-			});
-			if (!response.ok) throw new Error(await response.text());
-			const result = await response.json() as { reminder?: ReminderRecord; notificationWarning?: string };
+			const { saveReminderCommand } = await import('../save-reminder-command');
+			if (!sessionCurrent()) return;
+			const result = await saveReminderCommand(currentModal, body, apiFetch, sessionCurrent);
 			if (!sessionCurrent()) return;
 			if (!result.reminder) throw new Error('The server did not confirm this reminder. Reload before retrying.');
 			merge(result.reminder);

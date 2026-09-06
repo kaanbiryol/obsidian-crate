@@ -28,10 +28,10 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 6 files) |
 | `GET` | `/sync/versions?path=<path>` | List unexpired recoverable file versions |
 | `POST` | `/sync/restore-version` | Restore a retained version with expected-hash compare-and-swap |
-| `GET` | `/diagnostics` | Backend counts, queue pressure, and scheduled-maintenance state |
+| `GET` | `/diagnostics` | Backend counts, delivery failures, queue pressure, and scheduled-maintenance state |
 | `DELETE` | `/auth/tokens` | Revoke an auth token `{ id }` |
 | `GET` | `/auth/tokens` | List all registered auth tokens |
-| `DELETE` | `/auth/session` | Revoke the current bearer token when disconnecting this device |
+| `DELETE` | `/auth/session` | Atomically revoke the current bearer token and its owned push subscriptions |
 | `GET` | `/settings` | Get shared settings from R2 |
 | `PUT` | `/settings` | Store shared settings to R2 |
 | `GET` | `/reminders/list?folderPath=<path>` | List reminders and projects from synced Markdown files |

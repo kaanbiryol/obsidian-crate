@@ -12,12 +12,19 @@ export async function beginReminderOperation(db: D1Database, body: Record<string
 	if (typeof body.operationId !== 'string' || !/^[a-zA-Z0-9_-]{16,128}$/.test(body.operationId)) return corsResponse({ error: 'A stable operationId is required. Reload Crate before saving.' }, 428);
 	const requestHash = await sha256HexBytes(new TextEncoder().encode(JSON.stringify(canonical({ action, body }))));
 	const operation = { id: body.operationId, requestHash };
-	return await readReminderReceipt(db, operation) ?? operation;
+	return await readReminderReceipt(db, operation, body.folderPath) ?? operation;
 }
-async function readReminderReceipt(db: D1Database, operation: ReminderOperation): Promise<Response | null> {
+async function readReminderReceipt(db: D1Database, operation: ReminderOperation, folderPath: unknown): Promise<Response | null> {
 	const row = await db.prepare('SELECT request_hash, response_json FROM reminder_operations WHERE operation_id = ?').bind(operation.id).first<{ request_hash: string; response_json: string }>();
 	if (!row) return null;
-	if (row.request_hash !== operation.requestHash) return corsResponse({ error: 'This operationId was already used for different changes. Reload before saving again.' }, 409);
+	if (row.request_hash !== operation.requestHash) {
+		const result = JSON.parse(row.response_json) as { reminder?: { filePath?: string } };
+		// A legacy draft may lack the immutable request. Return its receipt only
+		// inside the already-authorized folder so the client can reconcile it.
+		const committedReminder = typeof folderPath === 'string' && result.reminder?.filePath?.startsWith(`${folderPath}/`)
+			? result.reminder : undefined;
+		return corsResponse({ error: 'The earlier save committed different changes. Reconcile it before saving this draft.', code: 'operation_mismatch', committedReminder }, 409);
+	}
 	return corsResponse(JSON.parse(row.response_json));
 }
 export function reminderOperationEffects(db: D1Database, operation: ReminderOperation, response: Record<string, unknown>, createdId?: string): CommitEffects {

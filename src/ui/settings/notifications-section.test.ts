@@ -61,7 +61,7 @@ describe('renderNotificationsSection', () => {
 		vi.doUnmock('../qr-modal');
 	});
 
-	it('groups push subscriptions under enabled devices', async () => {
+	it.each([null, '2026-09-06'])('shows notification enrollment and paused recovery state: %s', async disabled_at => {
 		const { renderNotificationsSection } = await loadNotificationsSectionModule();
 		const getPushSubscriptions = vi.fn(async () => ({
 			subscriptions: [
@@ -69,6 +69,7 @@ describe('renderNotificationsSection', () => {
 					id: 'sub-1',
 					device_name: 'iPhone',
 					created_at: '2026-06-04 12:00:00',
+					disabled_at,
 				},
 			],
 		}));
@@ -88,7 +89,7 @@ describe('renderNotificationsSection', () => {
 		expect(getSettingByName('Enable push notifications')).toBeTruthy();
 		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Reminders web app')).toBe(false);
 		expect(getSettingByName('Notification devices').descEl.textContent).toContain('receive reminder push notifications');
-		expect(getSettingByName('iPhone').descEl.textContent).toContain('Subscribed');
+		expect(getSettingByName('iPhone').descEl.textContent).toContain(disabled_at ? 'Notifications paused. Remove this device' : 'Subscribed');
 		expect(getSettingByName('Test notification').descEl.textContent).toBe('Send a test notification to all enabled devices.');
 	});
 

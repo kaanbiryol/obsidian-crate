@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schema from '../schema.sql?raw';
@@ -9,9 +9,12 @@ import { handleSubscribe, handleUnsubscribe } from './notification-subscription-
 import { normalizeDeployedPortablePaths } from '../portable-path-migration';
 import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { writeCommittedMarkdownFile } from './storage';
+import { makeApiFetch } from '@/pwa/api';
+import { performPwaLogout } from '@/pwa/hooks/usePwaSessionLifecycle';
+import { invalidatePwaSession } from '@/pwa/session-generation';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
-afterEach(async () => { await reset(); });
+afterEach(async () => { vi.unstubAllGlobals(); await reset(); });
 async function token(id: string, scope = 'reminders', folder: string | null = 'Reminders') {
   await env.DB.prepare('INSERT INTO auth_tokens (id, token_hash, scope, expires_at, folder_path) VALUES (?, ?, ?, ?, ?)')
     .bind(id, await sha256Hex(id), scope, Date.now() + 60_000, folder).run();
@@ -52,6 +55,22 @@ it('enforces the per-owner cap during concurrent subscriptions', async () => {
   const results = await Promise.all(Array.from({ length: 12 }, (_, i) => handleSubscribe(request('/notifications/subscribe', 'browser', subscription(String(i))), env.DB, 'browser')));
   expect(results.filter(response => response.status === 200)).toHaveLength(5);
   expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM push_subscriptions').first<{ count: number }>())?.count).toBe(5);
+});
+it('composes browser logout with the real API wrapper and Worker revocation', async () => {
+  await token('browser-logout');
+  await handleSubscribe(request('/notifications/subscribe', 'browser-logout', subscription('logout')), env.DB, 'browser-logout');
+  let localToken: string | null = 'browser-logout';
+  vi.stubGlobal('localStorage', { getItem: () => localToken });
+  const network = vi.fn(async (path: string, init?: RequestInit) => worker.fetch(new Request(`https://test${path}`, init), env));
+  vi.stubGlobal('fetch', network);
+  expect(await performPwaLogout({
+    apiFetch: makeApiFetch(localToken, () => { throw new Error('Unexpected unauthorized callback'); }),
+    disablePushNotifications: async () => {},
+    clearLocalSession: () => { invalidatePwaSession(); localToken = null; },
+  })).toBe(false);
+  expect(network.mock.calls.filter(([path]) => path === '/auth/session')).toHaveLength(1);
+  expect(await env.DB.prepare("SELECT id FROM push_subscriptions WHERE owner_token_id = 'browser-logout'").first()).toBeNull();
+  expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser-logout', undefined, 'GET'), env)).status).toBe(401);
 });
 it('rejects internal, arbitrary and malformed push destinations', () => {
   for (const endpoint of ['http://fcm.googleapis.com/x', 'https://127.0.0.1/x', 'https://api.cloudflare.com/x', 'https://fcm.googleapis.com.evil.test/x', 'https://user@fcm.googleapis.com/x', 'https://fcm.googleapis.com:444/x']) expect(isValidPushEndpoint(endpoint)).toBe(false);

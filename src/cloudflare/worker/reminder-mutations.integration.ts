@@ -38,6 +38,19 @@ describe('transactional reminder retries and revisions', () => {
 		expect(response.status).toBe(409);
 		expect((await records())[0]?.content).toBe('Changed in Obsidian');
 	});
+	it('returns a mismatched operation receipt only within its authorized folder', async () => {
+		const body = createBody();
+		const { reminder } = await payload(await handleCreateReminder(request(body), env));
+		const retry = await handleCreateReminder(request({ ...body, content: 'Edited after an uncertain save' }), env);
+		expect(retry.status).toBe(409);
+		expect(await retry.json()).toMatchObject({ code: 'operation_mismatch', committedReminder: reminder });
+		for (const folderPath of ['Private', 'Reminder', 'Reminders/Nested']) {
+			const outside = await handleCreateReminder(request({ ...body, folderPath }), env);
+			expect(outside.status).toBe(409);
+			expect(await outside.json()).not.toHaveProperty('committedReminder');
+		}
+		expect(await records()).toHaveLength(1);
+	});
 	it('replays recurring completion without advancing a second occurrence, including after a move', async () => {
 		const { reminder } = await payload(await handleCreateReminder(request({ ...createBody(), dueDatetime: '2099-01-01T09:00:00Z', recurrence: { frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0 } }), env));
 		const body = { id: reminder.id, filePath: path, expectedRevision: reminder.revision, operationId: crypto.randomUUID(), completed: true };

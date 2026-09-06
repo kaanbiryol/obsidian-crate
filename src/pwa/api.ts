@@ -29,6 +29,9 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 	return async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
 		if (!sessionCurrent()) throw new Error('Session changed. Open a fresh link from Crate.');
 		if (!authToken) throw new Error('Not authenticated');
+		// Capture authority at invocation. Only revocation may finish dispatching
+		// after logout clears local state; it can only revoke this captured token.
+		const revokingSession = init.method === 'DELETE' && path === '/auth/session';
 		const headers = new Headers(init.headers ?? {});
 		headers.set('X-Crate-Client-Session', clientSession);
 		if (typeof init.body === 'string') {
@@ -39,12 +42,12 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		}
 		headers.set(CRATE_PROTOCOL_HEADER, String(CRATE_PLUGIN_PROTOCOL.current));
 		if (isCrateMutation(path, init.method)) await requireCompatibleServer();
-		if (!sessionCurrent()) throw new Error('Session changed. Open a fresh link from Crate.');
+		if (!sessionCurrent() && !revokingSession) throw new Error('Session changed. Open a fresh link from Crate.');
 		headers.set('Authorization', `Bearer ${authToken}`);
 		if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
 
 		const response = await fetch(path, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(30_000) });
-		if (!sessionCurrent() && !(init.method === 'DELETE' && path === '/auth/session')) {
+		if (!sessionCurrent() && !revokingSession) {
 			throw new Error('Session changed. Open a fresh link from Crate.');
 		}
 		if (response.status === 401 && sessionCurrent()) {

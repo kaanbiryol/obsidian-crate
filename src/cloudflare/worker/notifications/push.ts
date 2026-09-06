@@ -5,6 +5,7 @@ import {
 } from 'web-push-browser';
 import { queryRows } from '../db';
 import { sendPushNotificationWithoutContact } from './web-push';
+import { PUSH_RECIPIENT_AUTHORITY } from './recipient-authority';
 
 interface SerializedVapidKeys {
 	publicKey: string;
@@ -97,7 +98,7 @@ export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVa
 }
 
 export async function listPushSubscriptionIds(db: D1Database): Promise<string[]> {
-	const rows = await queryRows<{ id: string }>(db.prepare('SELECT id FROM push_subscriptions WHERE disabled_at IS NULL AND (folder_path IS NULL OR folder_path = (SELECT folder_path FROM notification_policy WHERE id = 1))'));
+	const rows = await queryRows<{ id: string }>(db.prepare(`SELECT id FROM push_subscriptions WHERE ${PUSH_RECIPIENT_AUTHORITY}`).bind(Date.now()));
 	return rows.map((row) => row.id);
 }
 
@@ -131,7 +132,7 @@ export async function sendToAllSubscriptions(
 	options: { subscriptionIds?: readonly string[] } = {},
 ): Promise<PushDeliveryResult> {
 	const allSubscriptions = await queryRows<PushSubscriptionRow>(
-		db.prepare('SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE disabled_at IS NULL AND (folder_path IS NULL OR folder_path = (SELECT folder_path FROM notification_policy WHERE id = 1))'),
+		db.prepare(`SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE ${PUSH_RECIPIENT_AUTHORITY}`).bind(Date.now()),
 	);
 	const requestedIds = options.subscriptionIds ? new Set(options.subscriptionIds) : null;
 	const subscriptions = requestedIds

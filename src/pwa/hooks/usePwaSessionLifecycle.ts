@@ -104,7 +104,7 @@ export function usePwaSessionLifecycle({
 				clearLocalSession,
 				disablePushNotifications,
 			});
-			setError(null);
+			setError(remoteCleanupFailed ? 'Logged out locally. Remote cleanup could not finish. Remove this browser session from Crate’s connected devices in Obsidian.' : null);
 			showToast(
 				'info',
 				remoteCleanupFailed

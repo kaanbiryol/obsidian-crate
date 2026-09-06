@@ -21,7 +21,10 @@ afterEach(() => vi.resetAllMocks());
       getAlarm: async () => Date.parse(old.dueDatetime), setAlarm: async () => {}, deleteAlarm: async () => {},
     }};
     const db = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({
-      first: async () => schedule,
+      first: async () => sql.includes('LEFT JOIN reminder_projections')
+        ? { file_revision: 'source', storage_key: 'source', pending_path: null, enabled: 1,
+            notification_token: schedule.schedule_token, policy_revision: 'policy', current_policy_revision: 'policy' }
+        : schedule,
       run: async () => { if (sql.includes('INSERT OR REPLACE')) schedule = { schedule_token: String(args[1]), content: String(args[2]), due_datetime: String(args[4]), project: null }; },
     }) }) };
     const alarm = new ReminderAlarm(state as never, { DB: db as never });

@@ -134,10 +134,13 @@ export interface BackendDiagnostics {
 		pendingNotificationProjections?: number;
 		failedNotificationProjections?: number;
 		failedNotificationJobs?: number;
+		failedNotificationDeliveries?: number;
 		reminderOperationReceipts?: number;
 	};
 	lastMaintenanceAt: string | null;
 	lastMaintenanceError: string | null;
+	oldestNotificationFailureAt?: string | null;
+	oldestOverdueNotificationAt?: string | null;
 }
 
 export interface RegisteredDevice {

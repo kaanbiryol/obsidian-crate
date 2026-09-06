@@ -201,7 +201,9 @@ async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin): P
 		for (const sub of subscriptions) {
 			new Setting(container)
 				.setName(sub.device_name || 'Unknown device')
-				.setDesc(`Subscribed ${new Date(sub.created_at).toLocaleDateString()}`)
+				.setDesc(sub.disabled_at
+					? 'Notifications paused. Remove this device, sign out in its web app, then open a fresh Crate link to enable notifications again.'
+					: `Subscribed ${new Date(sub.created_at).toLocaleDateString()}`)
 				.addButton(button => {
 					button.setButtonText('Remove');
 					button.setDestructive();
