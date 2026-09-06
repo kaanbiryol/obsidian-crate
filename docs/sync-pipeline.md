@@ -19,10 +19,10 @@ Entry point: `runtime.ts:triggerForegroundSync()`
 Primary sync mode. Fetches only changelog entries since `lastSeq`:
 
 1. Paginate `GET /sync/changes?since=<seq>` (5000 entries per page)
-2. Deduplicate by path - only the latest entry per file matters
+2. Deduplicate each page into a path map as it arrives - only the latest entry per file is retained
 3. Detect local changes (hash comparison) and local deletes (missing manifest paths)
 4. Classify each affected path with the shared three-way reconciliation policy
-5. Execute all operations
+5. Execute operations, preparing and uploading local files in bounded chunks
 6. Update local manifest and `lastSeq`
 
 Returns `null` to signal fallback to full sync (on error or cursor expiry).
@@ -95,8 +95,12 @@ fenced code, and indented code retain the line-level policy. Inline refinement
 is limited to 16,000 combined characters per line and 128,000 per merge.
 
 Cached common bases are hash-verified before use. A corrupt base is treated as
-missing; background seeding can repair it only when the local file still matches
-the manifest hash. Non-Markdown files retain whole-file conflict handling.
+missing and marked for repair; background seeding can repair it only when the
+local file still matches the manifest hash. Existing cache files are not read or
+hashed by the seed pass. Missing/known-corrupt entries are seeded in groups of up
+to 32 files or 8 MiB of declared content (one larger eligible file may occupy a
+group), yielding and checking cancellation between groups. Non-Markdown files
+retain whole-file conflict handling.
 
 The remote compare-and-swap is
 committed before the local file is replaced, and the local hash is checked again
@@ -208,7 +212,12 @@ Stored as `file-manifest.json` in the plugin directory, separate from settings t
 }
 ```
 
-**Crash safety:** write to `.tmp` file first, then to main file. On load, if main file is corrupt, recover from `.tmp`. Dirty flag skips unnecessary writes.
+**Crash safety:** serialized saves write a monotonically increasing `generation`
+to `.tmp` first, then to the main file. Startup selects the newest valid
+generation, including a newer temporary checkpoint alongside a valid older main
+file. Legacy files default to generation zero. Failed promotion keeps the
+temporary checkpoint. A mutation revision ensures edits made during a save are
+included in a follow-up checkpoint before that save finishes.
 
 **Optimization:** during full sync, files whose size and mtime match the manifest entry skip re-hashing.
 
@@ -217,7 +226,9 @@ Implementation: `manifest.ts:LocalManifest`
 ## Error Recovery
 
 - **Retry:** failed uploads retry up to 3 times with exponential backoff (1s base delay)
-- **Cancellation:** in-flight HTTP transfers use `AbortController`; stopping or unloading sync aborts the underlying request, not only the caller's wait
+- **Cancellation:** abort and timeout stop the caller's wait and ignore late responses. Obsidian's HTTP transport may still finish and commit a mutation remotely. Uncertain queued paths remain pending; retries use expected-hash writes and reconciliation, and cancelled incremental runs do not advance the changelog cursor. Concurrent workers are drained before a failed operation unwinds.
+- **Local deletion recovery:** visible files use Obsidian's configured trash action; hidden/unindexed files use the adapter's local trash. The vault's `.trash/` directory is always excluded from sync. A trash failure never falls back to permanent removal. The hash check and deletion are not atomic: an edit arriving between them remains recoverable in trash.
+- **Upload memory:** incremental and queued uploads reserve room for the next maximum-size file before preparation, using the 48 MiB mobile / 128 MiB desktop budget and a 128-file cap. Chunks finish uploading before further contents are prepared; history retains paths rather than file buffers. These budgets cover prepared binary contents, not total process memory or request encoding overhead.
 - **Incremental-to-full fallback:** if incremental sync returns `null` (error/cursor expiry), engine runs full sync
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file
 - **Startup event recovery:** event capture resumes before a post-startup metadata probe; if the startup sync missed a local edit, one recovery sync runs without opening another event blind window

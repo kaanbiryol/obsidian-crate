@@ -18,21 +18,29 @@ export async function runConcurrentTasks<T>(
 ): Promise<T[]> {
 	const results: T[] = [];
 	let index = 0;
+	let failed = false;
 
 	async function next(): Promise<void> {
 		while (index < tasks.length) {
-			if (isDestroyed()) break;
+			if (isDestroyed() || failed) break;
 			const currentIndex = index++;
 			const task = tasks[currentIndex];
 			if (!task) break;
-			results[currentIndex] = await task();
+			try {
+				results[currentIndex] = await task();
+			} catch (error) {
+				failed = true;
+				throw error;
+			}
 		}
 	}
 
-	await Promise.all(Array.from(
+	const workers = await Promise.allSettled(Array.from(
 		{ length: Math.min(concurrency, tasks.length) },
 		() => next(),
 	));
+	const failure = workers.find(worker => worker.status === 'rejected');
+	if (failure?.status === 'rejected') throw failure.reason;
 	return results;
 }
 

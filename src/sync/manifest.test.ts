@@ -42,6 +42,60 @@ describe('LocalManifest', () => {
 		manifest = createLocalManifest(adapter);
 	});
 
+	it('persists mutations made while an earlier checkpoint is being written', async () => {
+		const entry = { hash: 'first', size: 5, modified: '2026-01-01T00:00:00Z' };
+		manifest.setEntry('a.md', entry);
+		adapter.write.mockImplementationOnce(async () => {
+			manifest.setEntry('b.md', { ...entry, hash: 'second' });
+		});
+		await manifest.save();
+		const mainWrites = adapter.write.mock.calls.filter(([path]) => path.endsWith('.json'));
+		expect(mainWrites).toHaveLength(2);
+		expect(JSON.parse(mainWrites[1]![1])).toMatchObject({ generation: 2, files: { 'b.md': { hash: 'second' } } });
+	});
+
+	it('serializes overlapping saves', async () => {
+		let active = 0;
+		let peak = 0;
+		adapter.write.mockImplementation(async () => {
+			peak = Math.max(peak, ++active);
+			await Promise.resolve();
+			await Promise.resolve();
+			active--;
+		});
+		manifest.setEntry('a.md', { hash: 'first', size: 5, modified: '2026-01-01T00:00:00Z' });
+		await Promise.all([manifest.save(), manifest.save(), manifest.save()]);
+		expect(peak).toBe(1);
+		expect(adapter.write).toHaveBeenCalledTimes(2);
+	});
+
+	it.each([[1, 2, 'new'], [2, 1, 'old']])('selects the newest valid checkpoint (%i, %i)', async (mainGeneration, tmpGeneration, expected) => {
+		adapter.exists.mockResolvedValue(true);
+		adapter.read.mockImplementation(async path => JSON.stringify({
+			version: 1,
+			generation: path.endsWith('.tmp') ? tmpGeneration : mainGeneration,
+			files: { 'a.md': { hash: path.endsWith('.tmp') ? 'new' : 'old', size: 5, modified: '2026-01-01T00:00:00Z' } },
+		}));
+		await manifest.load();
+		expect(manifest.getEntry('a.md')?.hash).toBe(expected);
+	});
+
+	it('retains a newer checkpoint if recovery promotion fails', async () => {
+		adapter.exists.mockResolvedValue(true);
+		adapter.read.mockImplementation(async path => JSON.stringify({ version: 1, generation: path.endsWith('.tmp') ? 2 : 1, files: {} }));
+		adapter.write.mockRejectedValueOnce(new Error('Disk full'));
+		await expect(manifest.load()).rejects.toThrow('Disk full');
+		expect(adapter.remove).not.toHaveBeenCalled();
+	});
+
+	it('retries a failed checkpoint without losing its dirty state', async () => {
+		manifest.setEntry('a.md', { hash: 'first', size: 5, modified: '2026-01-01T00:00:00Z' });
+		adapter.write.mockRejectedValueOnce(new Error('Disk full'));
+		await expect(manifest.save()).rejects.toThrow('Disk full');
+		await manifest.save();
+		expect(adapter.write).toHaveBeenCalledTimes(3);
+	});
+
 	it('loads persisted manifest data when file exists', async () => {
 		adapter.exists.mockImplementation((path: string) =>
 			Promise.resolve(path.endsWith('file-manifest.json') && !path.endsWith('.tmp')),
@@ -189,6 +243,7 @@ describe('LocalManifest', () => {
 		expect(lastWrite).toBeDefined();
 		const [, lastPayload] = lastWrite!;
 		expect(JSON.parse(lastPayload)).toEqual({
+			generation: 2,
 			version: 1,
 			files: {},
 		});

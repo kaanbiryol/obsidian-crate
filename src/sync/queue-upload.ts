@@ -1,35 +1,9 @@
 import { isMarkdownPath } from './markdown-base-cache';
 import type { PreparedUpload } from './types';
-import type { QueueFlushContext, QueueOperations, QueueUploadFailure } from './queue-flush-types';
+import type { QueueFlushContext, QueueUploadFailure } from './queue-flush-types';
 import { HttpError } from './api';
 import { errorMessage } from '../plugin/logger';
 import { isAbortError } from './abort';
-
-export async function prepareQueueOperations(
-	context: QueueFlushContext,
-	paths: string[],
-): Promise<QueueOperations> {
-	const uploads: PreparedUpload[] = [];
-	const deletes: QueueOperations['deletes'] = [];
-
-	for (const path of paths) {
-		if (path.startsWith('delete:')) {
-			const deletedPath = path.substring(7);
-			const expectedHash = context.localManifest.getEntry?.(deletedPath)?.hash;
-			if (expectedHash) {
-				deletes.push({ path: deletedPath, expectedHash });
-			}
-			continue;
-		}
-
-		const upload = await context.prepareUploadFromPath(path);
-		if (upload) {
-			uploads.push(upload);
-		}
-	}
-
-	return { uploads, deletes };
-}
 
 export async function uploadPendingFiles(
 	context: QueueFlushContext,

@@ -39,6 +39,7 @@ export interface LocalDiffPlannerContext {
 }
 
 export interface IncrementalSyncPlannerContext {
+  throwIfDestroyed?(): void;
   settings: CrateSettings;
   vault: Vault;
   fileManager: {

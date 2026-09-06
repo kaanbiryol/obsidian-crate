@@ -45,11 +45,6 @@ export interface QueueUploadFailure {
 	status?: number;
 }
 
-export interface QueueOperations {
-	uploads: PreparedUpload[];
-	deletes: QueueDeleteCandidate[];
-}
-
 export interface QueueFlushContext {
 	pendingPaths: Set<string>;
 	inFlightPaths: Set<string>;

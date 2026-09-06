@@ -3,6 +3,27 @@ import { HttpError } from './api';
 import { retryWithBackoff, runConcurrentTasks } from './engine-utils';
 
 describe('runConcurrentTasks', () => {
+	it('drains started workers before rejecting and launches no further work after failure', async () => {
+		let release!: () => void;
+		const blocked = new Promise<void>(resolve => { release = resolve; });
+		const lateWrite = vi.fn();
+		const neverStarted = vi.fn(async () => {});
+		let settled = false;
+		const run = runConcurrentTasks([
+			async () => { throw new Error('Request aborted'); },
+			async () => { await blocked; lateWrite(); },
+			neverStarted,
+		], 2, () => false);
+		const assertion = expect(run).rejects.toThrow('Request aborted');
+		void run.then(() => { settled = true; }, () => { settled = true; });
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(settled).toBe(false);
+		release();
+		await assertion;
+		expect(lateWrite).toHaveBeenCalledOnce();
+		expect(neverStarted).not.toHaveBeenCalled();
+	});
 	it('stops launching new tasks when destroyed', async () => {
 		let destroyed = false;
 		const callOrder: number[] = [];

@@ -22,6 +22,42 @@ function mockTransport(...responses: Response[]) {
 }
 
 describe('SyncApiClient', () => {
+	it.each(['abort', 'timeout'])('discovers a remotely committed upload after %s without accepting its late response', async reason => {
+		vi.useFakeTimers();
+		let commit!: () => void;
+		const hash = 'a'.repeat(64);
+		let remoteFiles: Record<string, { hash: string; size: number; modified: string }> = {};
+		const response = (data: unknown): ApiHttpResponse => {
+			const text = JSON.stringify(data);
+			return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer };
+		};
+		const transport: ApiHttpTransport = async request => {
+			if (request.url.includes('/sync/upload')) {
+				return new Promise(resolve => {
+					commit = () => {
+						remoteFiles = { 'note.md': { hash, size: 1, modified: '2026-01-01' } };
+						resolve(response({ success: true, path: 'note.md', hash }));
+					};
+				});
+			}
+			return response({ files: remoteFiles });
+		};
+		const client = new SyncApiClient('https://worker.example', 'token', transport);
+		const controller = new AbortController();
+		client.setAbortSignal(controller.signal);
+		let accepted = false;
+		const upload = client.uploadFile('note.md', new ArrayBuffer(1), hash, 1, 'text/markdown', null);
+		void upload.then(() => { accepted = true; }, () => {});
+		const assertion = expect(upload).rejects.toThrow(reason === 'abort' ? 'Sync request aborted' : 'Request timed out');
+		if (reason === 'abort') controller.abort();
+		else await vi.advanceTimersByTimeAsync(120_000);
+		await assertion;
+		commit();
+		client.setAbortSignal(new AbortController().signal);
+		const metadata = await client.getFileMetadata(['note.md']);
+		expect(metadata.files['note.md']?.hash).toBe(hash);
+		expect(accepted).toBe(false);
+	});
 	beforeEach(() => {
 		vi.stubGlobal('window', {
 			clearTimeout: (timeoutId: number) => clearTimeout(timeoutId),

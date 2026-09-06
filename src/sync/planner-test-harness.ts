@@ -46,6 +46,7 @@ export function createIncrementalHarness(overrides: Partial<{
 		adapter: {
 			exists: vi.fn(async () => false),
 			remove: vi.fn(async () => {}),
+			trashLocal: vi.fn(async () => {}),
 			stat: vi.fn(),
 			readBinary: vi.fn(),
 		},

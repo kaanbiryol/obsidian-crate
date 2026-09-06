@@ -32,8 +32,8 @@ export function DateQuickButtons({
 		day: 'numeric',
 	});
 	const timeFormatter = new Intl.DateTimeFormat(undefined, {
-		hour: 'numeric',
-		minute: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit', hourCycle: 'h23',
 	});
 	const weekdayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
 

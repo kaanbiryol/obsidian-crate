@@ -28,6 +28,7 @@ import { useReminderSync } from './hooks/useReminderSync';
 import { useReminderMutations } from './hooks/useReminderMutations';
 import { useSheetTransition } from './hooks/useSheetTransition';
 import { useToast } from './hooks/useToast';
+import { loadPwaPreferences, savePwaPreferences, type PwaPreferences } from './preferences';
 import { isInitialPwaContentReady } from './initial-content-readiness';
 import { toSharedReminder } from './reminder-list-state';
 import { buildModalDraft } from './reminder-modal-draft';
@@ -48,9 +49,11 @@ function App() {
 	const isDarkMode = colorScheme === 'dark';
 	const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_KEY));
 	const [bootstrapped, setBootstrapped] = useState(false);
-	const [config, setConfig] = useState<StoredConfig>(() => loadStoredConfig());
+	const [storedConfig, setConfig] = useState<StoredConfig>(() => loadStoredConfig());
+	const [preferences, setPreferences] = useState(loadPwaPreferences);
+	const config = useMemo(() => ({ ...storedConfig, upcomingDays: preferences.upcomingDays ?? storedConfig.upcomingDays }), [storedConfig, preferences.upcomingDays]);
 	const [selectedProject, setSelectedProject] = useState<string | null>(null);
-	const [startTab, setStartTab] = useState<StartTab>('inbox');
+	const [startTab, setStartTab] = useState<StartTab>(() => preferences.defaultScreen);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [launchReminderId, setLaunchReminderId] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
@@ -238,6 +241,16 @@ function App() {
 		showToast,
 	});
 
+	const updatePreferences = (patch: Partial<PwaPreferences>) => {
+		const next = { ...preferences, ...patch };
+		try {
+			savePwaPreferences(next);
+			setPreferences(next);
+		} catch {
+			showToast('error', 'Could not save settings on this device.');
+		}
+	};
+
 	const sharedReminders = useMemo(() => reminders.map(toSharedReminder), [reminders]);
 	const editReminder = useCallback((id: string) => openModal('edit', id), [openModal]);
 	const renderSharedCard = useCallback<PwaReminderCardRenderer>(({ reminder, index, hideProject }) => (
@@ -315,6 +328,8 @@ function App() {
 				{settingsOpen && (
 					<Suspense fallback={null}><SettingsSheet
 						config={config}
+						defaultScreen={preferences.defaultScreen}
+						onPreferencesChange={updatePreferences}
 						push={push}
 						themePreference={themePreference}
 						loggingOut={loggingOut}

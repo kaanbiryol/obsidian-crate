@@ -43,6 +43,12 @@ describe('matchIgnorePattern', () => {
 });
 
 describe('shouldIgnoreSyncPath', () => {
+	it('keeps local trash excluded even without user ignore patterns', () => {
+		const context = createIgnoreContext();
+		expect(shouldIgnoreSyncPath('.trash/settings.json', context)).toBe(true);
+		expect(shouldIgnoreConfiguredPath('.trash', context)).toBe(true);
+		expect(shouldIgnoreSyncPath('.trash-notes.md', context)).toBe(false);
+	});
 	it('always ignores executable plugin directories', () => {
 		const context = createIgnoreContext();
 

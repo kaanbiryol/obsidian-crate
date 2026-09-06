@@ -79,6 +79,7 @@ export class SyncEngineContexts {
 		const dependencies = this.dependencies;
 		return {
 			settings: dependencies.getSettings(),
+			throwIfDestroyed: dependencies.throwIfDestroyed,
 			vault: dependencies.vault,
 			fileManager: dependencies.fileManager,
 			api: dependencies.api,

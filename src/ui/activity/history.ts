@@ -33,7 +33,7 @@ function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expa
     }
 	const timestamp = meta.createSpan({ text: formatTimestamp(entry.timestamp), cls: 'crate-history-time' });
     timestamp.setAttribute('title', new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'long', timeStyle: 'long',
+        dateStyle: 'long', timeStyle: 'long', hourCycle: 'h23',
     }).format(new Date(entry.timestamp)));
 	header.createSpan({
 		text: formatSummary(entry),
@@ -82,7 +82,7 @@ function hasFilePaths(entry: SyncHistoryEntry): boolean {
 function formatTimestamp(iso: string): string {
 	const date = new Date(iso);
 	return new Intl.DateTimeFormat(undefined, {
-        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
     }).format(date);
 }
 

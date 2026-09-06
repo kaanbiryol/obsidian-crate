@@ -41,7 +41,7 @@ export function formatDueDate(
   if (dateString.includes('T')) {
     const timeText = new Intl.DateTimeFormat(locale, {
       hour: '2-digit',
-      minute: '2-digit',
+      minute: '2-digit', hourCycle: 'h23',
     }).format(date);
     dateText += `, ${timeText}`;
   }

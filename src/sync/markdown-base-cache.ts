@@ -8,6 +8,8 @@ const logger = createLogger('MarkdownBaseCache');
 const CACHE_DIRNAME = 'markdown-base-cache';
 const HASH_RE = /^[a-f0-9]{64}$/;
 const SEED_CONCURRENCY = 2;
+const SEED_BATCH_FILES = 32;
+const SEED_BATCH_BYTES = 8 * 1024 * 1024;
 
 export interface MarkdownBaseCacheManifest {
 	getAllPaths(): string[];
@@ -26,6 +28,7 @@ export function isMarkdownPath(path: string): boolean {
 export class MarkdownBaseCache {
 	private readonly app: App;
 	private readonly cacheDir: string;
+	private readonly invalidHashes = new Set<string>();
 
 	constructor(app: App, pluginManifest: PluginManifest) {
 		this.app = app;
@@ -48,6 +51,7 @@ export class MarkdownBaseCache {
 			}
 			const content = await this.app.vault.adapter.readBinary(cachePath);
 			if (content.byteLength > MAX_FILE_SIZE_BYTES || await computeHash(content) !== hash) {
+				this.invalidHashes.add(hash);
 				logger.warn(`Ignoring corrupt Markdown base cache for ${path}`);
 				return null;
 			}
@@ -66,6 +70,7 @@ export class MarkdownBaseCache {
 		try {
 			await this.ensureCacheDir();
 			await this.app.vault.adapter.writeBinary(this.getCachePath(hash), content);
+			this.invalidHashes.delete(hash);
 		} catch (error) {
 			logger.warn(`Failed to write Markdown base cache for ${path}:`, errorMessage(error));
 		}
@@ -84,7 +89,7 @@ export class MarkdownBaseCache {
 					&& entry.size <= MAX_FILE_SIZE_BYTES;
 			});
 
-		const tasks = paths.map((path) => async () => {
+		const seed = (path: string) => async () => {
 			if (options.isDestroyed()) {
 				return;
 			}
@@ -95,7 +100,7 @@ export class MarkdownBaseCache {
 			}
 
 			try {
-				if (await this.readBase(path, entry.hash)) {
+				if (!this.invalidHashes.has(entry.hash) && await this.app.vault.adapter.exists(this.getCachePath(entry.hash))) {
 					return;
 				}
 				const content = await this.app.vault.adapter.readBinary(path);
@@ -109,10 +114,25 @@ export class MarkdownBaseCache {
 			} catch (error) {
 				logger.debug(`Skipped Markdown base cache seed for ${path}:`, errorMessage(error));
 			}
-		});
+		};
 
-		await options.runConcurrent(tasks, SEED_CONCURRENCY);
-		await this.pruneReferencedHashes(getReferencedMarkdownHashes(manifest));
+		let batch: Array<() => Promise<void>> = [];
+		let bytes = 0;
+		for (const path of paths) {
+			if (options.isDestroyed()) return;
+			const size = manifest.getEntry(path)?.size ?? 0;
+			if (batch.length && (batch.length >= SEED_BATCH_FILES || bytes + size > SEED_BATCH_BYTES)) {
+				await options.runConcurrent(batch, SEED_CONCURRENCY);
+				batch = [];
+				bytes = 0;
+				await new Promise<void>(resolve => setTimeout(resolve, 0));
+				if (options.isDestroyed()) return;
+			}
+			batch.push(seed(path));
+			bytes += size;
+		}
+		await options.runConcurrent(batch, SEED_CONCURRENCY);
+		if (!options.isDestroyed()) await this.pruneReferencedHashes(getReferencedMarkdownHashes(manifest));
 	}
 
 	async pruneReferencedHashes(referencedHashes: Set<string>): Promise<void> {
