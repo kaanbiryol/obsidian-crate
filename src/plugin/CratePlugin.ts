@@ -60,13 +60,9 @@ export default class CratePlugin extends Plugin {
 		const data = await this.loadData() as PluginData | null;
 		this.settings = normalizeCrateSettings(data, this.app.vault.configDir);
 		const remindersSettings = normalizeRemindersSettings(data?.reminders);
-		// Preserve logging if either of the former switches was enabled.
-		const debugLogging = this.settings.syncDebugLogging || remindersSettings.debugLogging;
-		this.settings.syncDebugLogging = debugLogging;
-		remindersSettings.debugLogging = debugLogging;
 		useRemindersSettingsStore.setState(remindersSettings, true);
-		configureSyncLogger({ enabled: this.settings.syncDebugLogging });
-		configureRemindersLogger({ prefix: 'Crate', enabled: remindersSettings.debugLogging });
+		configureSyncLogger({ enabled: this.settings.debugLogging });
+		configureRemindersLogger({ prefix: 'Crate', enabled: this.settings.debugLogging });
 	}
 
 	async saveSettings(): Promise<void> {
@@ -105,20 +101,17 @@ export default class CratePlugin extends Plugin {
 				reminders: nextSettings,
 			});
 			useRemindersSettingsStore.setState(nextSettings, true);
-			configureRemindersLogger({ prefix: 'Crate', enabled: nextSettings.debugLogging });
 		});
 	}
 
 	async setDebugLogging(enabled: boolean): Promise<void> {
 		await this.enqueueSettingsWrite(async () => {
-			const nextSettings = { ...this.settings, syncDebugLogging: enabled };
-			const nextRemindersSettings = { ...this.remindersSettings, debugLogging: enabled };
+			const nextSettings = { ...this.settings, debugLogging: enabled };
 			await this.saveData({
 				...buildPersistedCrateSettings(nextSettings),
-				reminders: nextRemindersSettings,
+				reminders: this.remindersSettings,
 			});
 			Object.assign(this.settings, nextSettings);
-			useRemindersSettingsStore.setState(nextRemindersSettings, true);
 			configureSyncLogger({ enabled });
 			configureRemindersLogger({ prefix: 'Crate', enabled });
 		});

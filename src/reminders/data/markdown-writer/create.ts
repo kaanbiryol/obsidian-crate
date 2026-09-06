@@ -1,4 +1,4 @@
-import type { Priority, Reminder, RecurrenceRule } from "@/reminders/types/reminder";
+import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
 import { generateContentHash } from "@/reminders/utils/checkboxParser";
 import { createReminderId } from "../../core/reminderIdentity";
 import type { IndexedReminder } from "../reminder-index";
@@ -11,7 +11,6 @@ import type { MarkdownWriterContext } from "./types";
 import {
   markdownWriterLog,
   notifyFileWritten,
-  triggerReminderChange,
 } from "./operation-shared";
 
 export async function createReminderInMarkdown(
@@ -69,18 +68,6 @@ export async function createReminderInMarkdown(
     markdownWriterLog.info(`Created reminder in ${file.path}`);
     await notifyFileWritten(context, file);
 
-    const reminder: Reminder & { contentHash: string } = {
-      id: stableReminderId,
-      content,
-      dueDate: mutation.dueDateKey,
-      dueDatetime: mutation.dueDatetime,
-      priority,
-      completed: false,
-      project: normalizedProject,
-      recurrence: mutation.recurrence,
-      contentHash,
-    };
-    triggerReminderChange(context, reminder, "create");
   } catch (error) {
     context.index.clearOptimistic(stableReminderId);
     throw error;

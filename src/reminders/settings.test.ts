@@ -11,7 +11,6 @@ describe('normalizeRemindersSettings', () => {
 	it('normalizes persisted reminders settings defensively', () => {
 		const settings = normalizeRemindersSettings({
 			enabled: true,
-			debugLogging: false,
 			taskCreationDefaultDueDate: 'tomorrow',
 			remindersFolderPath: ' /Reminders/Work/ ',
 			queryViewPreferences: {
@@ -19,14 +18,13 @@ describe('normalizeRemindersSettings', () => {
 				broken: { showCompleted: 'yes' },
 			} as never,
 			upcomingDaysDefault: 14,
-			autoOpenView: 'fullscreen',
+			autoOpenView: 'sidebar',
 			sidebarDefaultTab: 'today',
 			allDayNotificationTime: '09:00',
 		});
 
 		expect(settings).toEqual({
 			enabled: true,
-			debugLogging: false,
 			taskCreationDefaultDueDate: 'tomorrow',
 			remindersFolderPath: 'Reminders/Work',
 			queryViewPreferences: {
@@ -39,9 +37,8 @@ describe('normalizeRemindersSettings', () => {
 		});
 	});
 
-	it('keeps prerelease reminder users enabled while normalizing malformed settings', () => {
+	it('uses current defaults when settings are malformed', () => {
 		const settings = normalizeRemindersSettings({
-			debugLogging: 'nope' as never,
 			taskCreationDefaultDueDate: 'later' as never,
 			remindersFolderPath: '   ',
 			queryViewPreferences: 'broken' as never,
@@ -52,20 +49,7 @@ describe('normalizeRemindersSettings', () => {
 
 		expect(settings).toEqual({
 			...DEFAULT_REMINDERS_SETTINGS,
-			enabled: true,
 		});
-	});
-
-	it('migrates full-screen startup preferences and drops the obsolete default tab', () => {
-		const saved = {
-			autoOpenView: 'fullscreen' as const,
-			sidebarDefaultTab: 'today' as const,
-			fullscreenDefaultTab: 'browse',
-		};
-		const settings = normalizeRemindersSettings(saved);
-		expect(settings.autoOpenView).toBe('sidebar');
-		expect(settings.sidebarDefaultTab).toBe('today');
-		expect(settings).not.toHaveProperty('fullscreenDefaultTab');
 	});
 
 	it('keeps reminders disabled for a new install until the user opts in', () => {

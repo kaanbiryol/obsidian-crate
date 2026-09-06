@@ -27,7 +27,6 @@ interface AddReminderModalProps {
     animationConfig?: AnimationConfig;
     variant?: 'bottom-sheet' | 'centered';
     showBackdrop?: boolean;
-    optimistic?: boolean; // Retained for source compatibility; dismissal always awaits success.
     /**
      * Controls how picker modals (date, project, recurrence) are displayed:
      * - 'replace' (default): Main modal is hidden when picker opens
@@ -54,7 +53,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
     animationConfig = { enabled: true },
     variant = 'bottom-sheet',
     showBackdrop = true,
-    optimistic = true,
     pickerMode = 'replace',
     keyboardOffset = 0,
 }) => {
@@ -117,7 +115,6 @@ export const AddReminderModal: React.FC<AddReminderModalProps> = ({
         hasTime,
         recurrence,
         reminder,
-        optimistic,
         onClose: closePresentation,
         onAdd,
         onSave,

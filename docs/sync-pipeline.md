@@ -205,6 +205,7 @@ Stored as `file-manifest.json` in the plugin directory, separate from settings t
 ```json
 {
   "version": 1,
+  "generation": 1,
   "files": {
     "path": { "hash": "sha256...", "size": 1024, "modified": "ISO8601" }
   },
@@ -215,7 +216,7 @@ Stored as `file-manifest.json` in the plugin directory, separate from settings t
 **Crash safety:** serialized saves write a monotonically increasing `generation`
 to `.tmp` first, then to the main file. Startup selects the newest valid
 generation, including a newer temporary checkpoint alongside a valid older main
-file. Legacy files default to generation zero. Failed promotion keeps the
+file. Unsupported checkpoints are rejected and preserved. Failed promotion keeps the
 temporary checkpoint. A mutation revision ensures edits made during a save are
 included in a follow-up checkpoint before that save finishes.
 

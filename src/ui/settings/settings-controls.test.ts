@@ -22,8 +22,8 @@ describe('settings controls', () => {
 	it('provides one debug toggle for both logging systems', async () => {
 		const { renderTroubleshootingSettings } = await import('./troubleshooting-section');
 		const plugin = {
-			settings: { deviceId: 'device-test', syncDebugLogging: false },
-			setDebugLogging: vi.fn(async (enabled: boolean) => { plugin.settings.syncDebugLogging = enabled; }),
+			settings: { deviceId: 'device-test', debugLogging: false },
+			setDebugLogging: vi.fn(async (enabled: boolean) => { plugin.settings.debugLogging = enabled; }),
 		};
 		renderTroubleshootingSettings(new FakeElement('div') as never, plugin as never);
 		const loggingSettings = MockSetting.instances.filter(setting => setting.toggles.length);

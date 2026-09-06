@@ -1,6 +1,6 @@
-# Protocol 3 contract
+# Protocol 4 contract
 
-`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. Every mutation must send `X-Crate-Protocol: 3`; missing or incompatible clients receive 428 before changing state. POST metadata and batch-download endpoints are reads. A failed portable-path migration returns 503 for authenticated writes until provisioning finishes.
+`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. Every mutation must send `X-Crate-Protocol: 4`; missing or incompatible clients receive 428 before changing state. POST metadata and batch-download endpoints are reads.
 
 ## Files
 
@@ -16,7 +16,7 @@ Remote deletion on the plugin uses the vault's local trash regardless of the use
 
 All mutation requests carry a UUID `operationId`. The server hashes the canonical request and stores its response in the file transaction. A matching retry returns the recorded response; reusing an operation ID for a different request returns 409. Create IDs are permanently reserved after a committed web creation.
 
-The PWA stores the exact attempted request separately from its editable draft. An uncertain result retries that request first, then submits later edits under a new operation ID against the acknowledged revision. Definite validation rejections permit correcting the request. A 409 `operation_mismatch` may include `committedReminder` only when its recorded path is inside the authorized request folder; this allows older drafts without a stored request to reconcile safely. It does not authorize overwriting a newer reminder revision.
+The PWA stores the exact attempted request separately from its editable draft. An uncertain result retries that request first, then submits later edits under a new operation ID against the acknowledged revision. Definite validation rejections permit correcting the request. A 409 `operation_mismatch` rejects reuse of an operation ID without returning a receipt for different changes.
 
 Update, completion, and delete require `expectedRevision`, a semantic digest captured when the editor or action begins, and the original source `filePath`. Moving a line or editing another reminder does not invalidate the semantic digest. Changes to the target reminder do. The server also applies file preconditions at commit. A cross-project move publishes both file updates and the receipt atomically.
 
@@ -26,7 +26,7 @@ The web index reads at most 20 files and 2 MiB in aggregate per warming request,
 
 ## Notification authority
 
-`GET /reminders/notification-policy` reads the shared policy. POST initializes only an absent policy. PUT requires `expectedRevision` and explicitly updates folder, timezone, all-day time, or enabled state. These routes require a vault credential. Legacy direct schedule/cancel APIs return 410.
+`GET /reminders/notification-policy` reads the shared policy. POST initializes only an absent policy. PUT requires `expectedRevision` and explicitly updates folder, timezone, all-day time, or enabled state. These routes require a vault credential.
 
 D1 projection jobs are created in the file transaction. A reserved Durable Object processes at most three files and five outbox jobs per alarm. Projection commits check the current file, policy, and job revisions and publish the expected notification token with each projection. That token is also the outbox command and alarm schedule identity. Delivery requires matching source, policy, and notification revisions, including after projection finishes but before the new outbox command arrives. Missed wakeups are recovered by scheduled maintenance.
 
@@ -34,10 +34,14 @@ The reminder Durable Object keeps the last completed due-time occurrence across 
 
 Web sessions are limited to their enrolled folder, expire after 90 days, and cannot mint new sessions. A subscription belongs to its session; logout and expiry remove it. The deployment permits 20 subscriptions and five per owner. Notification writes are limited per network address/route to 30 per minute, enrollment to ten, and test pushes to three. Push requests accept only supported provider hosts, reject redirects, and have ten-second deadlines.
 
-Recipient selection checks session existence, expiry, and folder authority at send time without waiting for maintenance. Explicit push-only enrollment remains supported; an unknown legacy owner is never treated as a wildcard. Migration 0009 disables unowned subscriptions and queues Markdown reprojection. Logout revocation captures its credential before clearing local state and may finish dispatching afterward; ordinary old-session writes remain fenced.
+Recipient selection checks session existence, expiry, and folder authority at send time without waiting for maintenance. Every subscription requires a recorded authenticated owner. Logout revocation captures its credential before clearing local state and may finish dispatching afterward; ordinary old-session writes remain fenced.
 
 ## Diagnostics and recovery
 
 Responses expose `X-Crate-Request-Id`; mutation logs correlate client session, operation, device, and opaque file revisions without note content or filenames. Diagnostics report queues, failed projections, terminal delivery failures, oldest failure/overdue timestamps, receipts, retained versions, and maintenance state. Terminal delivery failures persist in D1 before their alarm stops; the plugin reports them as a failed diagnostic with repair/rescheduling guidance. See [backup and recovery](recovery.md) for paired snapshots and isolated restore. Restoring only D1 cannot recover R2 bytes.
 
 Limits are application guardrails, not a promise that every workload fits a free account. Measure CPU and account quotas with representative vaults before release; consult [D1 limits](https://developers.cloudflare.com/d1/platform/limits/) and [Worker limits](https://developers.cloudflare.com/workers/platform/limits/).
+
+## Supported storage formats
+
+Only the current formats are supported: D1 `crate_schema` version 1, IndexedDB version 2, generation-bearing local file checkpoints, and URI-encoded `crate-desc:v1:` description comments. Unknown database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache. No format conversion or SQL upgrade path is bundled.

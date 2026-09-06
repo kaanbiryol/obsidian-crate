@@ -1,4 +1,3 @@
-import { normalizeDeployedPortablePaths } from './portable-path-migration';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
@@ -6,20 +5,6 @@ import { randomHex } from './pkce';
 import { CLOUDFLARE_MAINTENANCE_CRON } from './maintenance-schedule';
 import { deployedArtifact } from './deployment-discovery';
 import { assertDeploymentIsNotDowngrade } from './deployment-update';
-
-const INITIAL_MIGRATION_NAME = '0001_initial.sql';
-const LAUNCH_HARDENING_MIGRATION_NAME = '0002_launch_hardening.sql';
-const CREATE_MIGRATIONS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS d1_migrations (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	name TEXT NOT NULL UNIQUE,
-	applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-);`;
-const FIND_FILES_TABLE_SQL = "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'files';";
-const INSPECT_LAUNCH_HARDENING_SQL = `PRAGMA table_info(files);
-PRAGMA table_info(push_subscriptions);
-SELECT name FROM sqlite_master
-	WHERE type = 'table'
-		AND name IN ('notification_jobs', 'file_versions', 'maintenance_state');`;
 
 async function ensureD1Database(
 	api: CloudflareApiClient,
@@ -62,96 +47,16 @@ async function initializeD1Schema(input: {
 	databaseId: string;
 	artifacts: CloudflareDeploymentArtifacts;
 }): Promise<void> {
-	await input.api.queryD1(
-		input.accountId,
-		input.databaseId,
-		CREATE_MIGRATIONS_TABLE_SQL,
-	);
-
-	const filesTableResults = await input.api.queryD1(
-		input.accountId,
-		input.databaseId,
-		FIND_FILES_TABLE_SQL,
-	);
-	const hasFilesTable = filesTableResults.some(result =>
-		(result.results ?? []).some(row => row.name === 'files'),
-	);
-
-	if (!hasFilesTable) {
-		await input.api.queryD1(
-			input.accountId,
-			input.databaseId,
-			input.artifacts.d1Schema,
-		);
-		if (input.artifacts.d1Migrations.length > 0) {
-			const statements = input.artifacts.d1Migrations
-				.map(migration => `INSERT OR IGNORE INTO d1_migrations (name) VALUES ('${migration.name}');`)
-				.join('\n');
-			await input.api.queryD1(input.accountId, input.databaseId, statements);
-		}
-		return;
+	const query = (sql: string) => input.api.queryD1(input.accountId, input.databaseId, sql);
+	const tables = (await query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';"))
+		.flatMap(result => result.results ?? []).map(row => row.name);
+	if (tables.length > 0) {
+		if (!tables.includes('crate_schema')) throw new Error('Unsupported database schema. Use an empty database or a current Crate deployment.');
+		const versions = (await query('SELECT version FROM crate_schema WHERE id = 1;')).flatMap(result => result.results ?? []);
+		if (versions.length !== 1 || versions[0]?.version !== 1) throw new Error('Unsupported database schema. Use a matching Crate build.');
 	}
-
-	await input.api.queryD1(
-		input.accountId,
-		input.databaseId,
-		`INSERT OR IGNORE INTO d1_migrations (name) VALUES ('${INITIAL_MIGRATION_NAME}');`,
-	);
-	const appliedResults = await input.api.queryD1(
-		input.accountId,
-		input.databaseId,
-		'SELECT name FROM d1_migrations ORDER BY id;',
-	);
-	const appliedNames = new Set(
-		appliedResults
-			.flatMap(result => result.results ?? [])
-			.map(row => row.name)
-			.filter((name): name is string => typeof name === 'string'),
-	);
-
-	for (const migration of input.artifacts.d1Migrations) {
-		if (appliedNames.has(migration.name)) continue;
-		if (migration.name === LAUNCH_HARDENING_MIGRATION_NAME) {
-			const schemaResults = await input.api.queryD1(
-				input.accountId,
-				input.databaseId,
-				INSPECT_LAUNCH_HARDENING_SQL,
-			);
-			const schemaNames = new Set(
-				schemaResults
-					.flatMap(result => result.results ?? [])
-					.map(row => row.name)
-					.filter((name): name is string => typeof name === 'string'),
-			);
-			const launchHardeningAlreadyApplied = [
-				'portable_path',
-				'disabled_at',
-				'last_error',
-				'notification_jobs',
-				'file_versions',
-				'maintenance_state',
-			].every(name => schemaNames.has(name));
-			if (launchHardeningAlreadyApplied) {
-				await input.api.queryD1(
-					input.accountId,
-					input.databaseId,
-					`INSERT INTO d1_migrations (name) VALUES ('${migration.name}');`,
-				);
-				continue;
-			}
-		}
-		await input.api.queryD1(
-			input.accountId,
-			input.databaseId,
-			`${migration.sql.trim()}\nINSERT INTO d1_migrations (name) VALUES ('${migration.name}');`,
-		);
-	}
-
-	await input.api.queryD1(
-		input.accountId,
-		input.databaseId,
-		input.artifacts.d1Schema,
-	);
+	// The current schema is idempotent so an interrupted initialization can retry.
+	await query(input.artifacts.d1Schema);
 }
 
 async function ensureWorkersSubdomain(
@@ -213,7 +118,6 @@ export async function provisionCloudflareDeployment(input: {
 		d1DatabaseId: databaseId,
 		r2BucketName: input.metadata.r2BucketName,
 	});
-	await normalizeDeployedPortablePaths(input.api, input.accountId, databaseId);
 	await input.api.updateWorkerSchedules(
 		input.accountId,
 		input.metadata.workerName,

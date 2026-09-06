@@ -153,7 +153,7 @@ Reminder code blocks can be embedded in notes:
 
 The Worker schedules notifications from committed Markdown using a shared folder, timezone, all-day time, and enabled setting. Another device's startup does not replace that policy. **Settings → Crate → Push notifications** shows the server's folder and timezone; explicit changes apply to all devices. The web app session is restricted to its enrolled reminders folder. Signing out clears its offline data and drafts across tabs and revokes the session's subscriptions. If remote revocation fails, the signed-out screen explains how to remove the session through connected devices in Obsidian.
 
-Update the server to apply migration `0009_delivery_integrity.sql` before using these notification fixes. Older subscriptions with no recorded owner are disabled. In **Settings → Crate → Push notifications → Notification devices**, remove each paused device, sign out in its web app, then open a fresh Crate link and enable notifications again. Diagnostics flag exhausted delivery attempts. Repair enrollment or provider access, then reschedule a missed reminder to a future time.
+Diagnostics flag exhausted delivery attempts. Repair session enrollment or provider access, then reschedule a missed reminder to a future time.
 
 Crate accepts push endpoints from [Apple](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/), [Mozilla](https://mozilla-services.github.io/autopush-rs/http.html), [Google FCM](https://firebase.google.com/docs/reference/fcm/rest), and [Microsoft WNS](https://learn.microsoft.com/en-us/windows/apps/develop/notifications/push-notifications/wns-overview). The server allows up to 20 subscriptions, with at most five per session, and limits test/enrollment requests. Other push providers need explicit support before they can subscribe.
 
@@ -163,7 +163,9 @@ Vault files larger than 25 MiB produce a visible sync error and are left on the 
 
 Existing binary files are never overwritten by an unsafe asynchronous write. Incoming binary changes are saved as review copies and shown in conflicts; review both versions and replace the original when ready. UTF-8 text supported by Obsidian's atomic writer applies automatically when its precondition still matches.
 
-Both clients and the Worker require protocol 3 for writes. Update the plugin/server and reload older web tabs before editing. Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
+Both clients and the Worker require protocol 4 for writes. Update the plugin/server and reload older web tabs before editing. Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
+
+Crate supports only the current prerelease formats. Provisioning accepts an empty database or a database with the current schema marker; it rejects older schemas without modifying their data. There are no SQL upgrade scripts or old-format adapters.
 
 ## Development
 

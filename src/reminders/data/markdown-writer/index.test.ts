@@ -1,11 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createMarkdownWriter } from '@/reminders/data/markdown-writer';
-import type { MarkdownWriter } from '@/reminders/data/markdown-writer';
 import type { ReminderIndex, IndexedReminder } from '@/reminders/data/reminder-index';
-import { timezone as getLocalTimeZone } from '@/reminders/utils/time';
 import { createMockAppWithVault } from '@/test/factories/obsidian';
-
-type ReminderChangeCallback = Parameters<MarkdownWriter['setOnReminderChange']>[0];
 
 function createMockIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
   return {
@@ -43,9 +39,6 @@ describe('markdownWriter', () => {
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
-    const onChange = vi.fn<ReminderChangeCallback>(async () => ({ success: true }));
-    writer.setOnReminderChange(onChange);
-
     const dueDate = new Date(2026, 0, 13, 12, 0);
     await writer.createReminder('Work', 'Task A', dueDate, 1);
 
@@ -55,7 +48,6 @@ describe('markdownWriter', () => {
     expect(content).toContain('- [ ] Task A');
     expect(content).toContain(dueDate.toISOString());
     expect(content).toContain('!');
-    expect(onChange).toHaveBeenCalledTimes(1);
   });
 
   it('serializes concurrent reminder creation without losing either reminder', async () => {
@@ -215,9 +207,6 @@ describe('markdownWriter', () => {
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
-    const onChange = vi.fn<ReminderChangeCallback>(async () => ({ success: true }));
-    writer.setOnReminderChange(onChange);
-
     const reminder = makeIndexedReminder({
       id: 'r3',
       content: 'Task C',
@@ -236,13 +225,6 @@ describe('markdownWriter', () => {
     const content = files.get('Reminders/Work.md') || '';
     expect(content).toContain('- [ ] Task C');
     expect(content).toContain('2026-01-02T10:00:00.000Z');
-
-    expect(onChange).toHaveBeenCalledTimes(1);
-	const updated = onChange.mock.calls[0]?.[0];
-	expect(updated).toBeDefined();
-	if (!updated) throw new Error('Expected reminder change callback');
-	expect(updated.completed).toBe(false);
-    expect(updated.dueDate).toBe('2026-01-02');
   });
 
   it('creates a recurring reminder without dueDate using first occurrence', async () => {
@@ -252,9 +234,6 @@ describe('markdownWriter', () => {
     const { app, files } = createMockAppWithVault();
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
-
-    const onChange = vi.fn<ReminderChangeCallback>(async () => ({ success: true }));
-    writer.setOnReminderChange(onChange);
 
     await writer.createReminder('Work', 'Task D', undefined, 4, {
       frequency: 'daily',
@@ -276,9 +255,6 @@ describe('markdownWriter', () => {
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
 
-    const onChange = vi.fn<ReminderChangeCallback>(async () => ({ success: true }));
-    writer.setOnReminderChange(onChange);
-
     await writer.createReminder('Work', 'Task all day', undefined, 4, {
       frequency: 'daily',
     });
@@ -288,11 +264,6 @@ describe('markdownWriter', () => {
     expect(content).toContain('daily');
     expect(content).toContain('Jan 10, 2026');
     expect(content).not.toContain('10:00');
-
-    const updated = onChange.mock.calls[0]?.[0];
-    expect(updated?.dueDate).toBe('2026-01-10');
-    expect(updated?.dueDatetime).toBeUndefined();
-    expect(updated?.recurrence?.timezone).toBe(getLocalTimeZone());
 
     vi.useRealTimers();
   });
@@ -332,7 +303,7 @@ describe('markdownWriter', () => {
       '# Work',
       '',
       '- [x] Task Done Jan 1, 2026 <!-- crate-id:r-done -->',
-      '<!-- crate-desc:done details -->',
+      '<!-- crate-desc:v1:done%20details -->',
       '',
     ].join('\n');
     const { app, files, folders, vault } = createMockAppWithVault({ 'Reminders/Work.md': initial });
@@ -340,8 +311,6 @@ describe('markdownWriter', () => {
 
     const index = createMockIndex();
     const writer = createMarkdownWriter(app, index);
-    const onChange = vi.fn<ReminderChangeCallback>(async () => ({ success: true }));
-    writer.setOnReminderChange(onChange);
 
     const reminder = makeIndexedReminder({
       id: 'r-done',
@@ -366,15 +335,6 @@ describe('markdownWriter', () => {
     expect(files.get('Reminders/Work.md') || '').not.toContain('Task Done');
     expect(files.get('Reminders/Personal.md') || '').toContain('- [x] Task Done Jan 1, 2026 <!-- crate-id:r-done -->');
     expect(files.get('Reminders/Personal.md') || '').toContain('crate-desc:');
-    expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: 'r-done',
-        completed: true,
-        project: 'Personal',
-      }),
-      'update',
-      undefined,
-    );
   });
 
   it('leaves the source reminder intact when the destination move write fails', async () => {
@@ -463,7 +423,7 @@ describe('markdownWriter', () => {
       '# Work',
       '',
       '- [ ] Task A Jan 1, 2026 <!-- crate-id:r-delete -->',
-      '<!-- crate-desc:extra details -->',
+      '<!-- crate-desc:v1:extra%20details -->',
       '- [ ] Task B Jan 2, 2026 <!-- crate-id:r-keep -->',
       '',
     ].join('\n');
@@ -487,7 +447,7 @@ describe('markdownWriter', () => {
 
     const content = files.get('Reminders/Work.md') || '';
     expect(content).not.toContain('Task A');
-    expect(content).not.toContain('crate-desc:extra details');
+    expect(content).not.toContain('crate-desc:v1:extra%20details');
     expect(content).toContain('Task B');
   });
 
@@ -496,7 +456,7 @@ describe('markdownWriter', () => {
       '# Work',
       '',
       '- [ ] First Jan 1, 2026 <!-- crate-id:r1 -->',
-      '<!-- crate-desc:first note -->',
+      '<!-- crate-desc:v1:first%20note -->',
       '- [ ] Second Jan 2, 2026 <!-- crate-id:r2 -->',
       '- [x] Done Jan 3, 2026 <!-- crate-id:r3 -->',
       '',
@@ -516,7 +476,7 @@ describe('markdownWriter', () => {
     const lines = (files.get('Reminders/Work.md') || '').split('\n');
     const secondIndex = lines.findIndex((line) => line.includes('Second Jan 2, 2026'));
     const firstIndex = lines.findIndex((line) => line.includes('First Jan 1, 2026'));
-    const descIndex = lines.findIndex((line) => line.includes('crate-desc:first note'));
+    const descIndex = lines.findIndex((line) => line.includes('crate-desc:v1:first%20note'));
     const doneIndex = lines.findIndex((line) => line.includes('Done Jan 3, 2026'));
     const footerIndex = lines.findIndex((line) => line === 'Footer');
 

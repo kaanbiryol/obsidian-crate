@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ReminderAlarm } from './reminder-alarm';
+import { ReminderAlarm } from './notifications/reminder-alarm';
 import { listPushSubscriptionIds, sendToAllSubscriptions } from './notifications/push';
 
 vi.mock('./notifications/push', () => ({
@@ -30,7 +30,7 @@ function createHarness() {
 	const put = vi.fn(async (key: string, value: unknown) => {
 		storedValues.set(key, value);
 	});
-	const run = vi.fn(async () => ({}));
+	const run = vi.fn(async () => ({ meta: { changes: 1 } }));
 	const state = {
 		storage: {
 			get: vi.fn(async (key: string) => storedValues.get(key)),
@@ -50,7 +50,7 @@ function createHarness() {
 	};
 	const first = vi.fn(async (): Promise<typeof scheduledReminder | null> => scheduledReminder);
 	const db = {
-		prepare: vi.fn((sql: string) => ({ bind: vi.fn(() => ({ run, first: sql.includes('LEFT JOIN reminder_projections')
+		prepare: vi.fn((sql: string) => ({ bind: vi.fn(() => ({ run, first: sql.includes('SELECT job_token') ? async () => ({ job_token: 'current-job' }) : sql.includes('LEFT JOIN reminder_projections')
             ? async () => ({ file_revision: 'source', storage_key: 'source', pending_path: null, enabled: 1,
                 notification_token: scheduledReminder.schedule_token, policy_revision: 'policy', current_policy_revision: 'policy' })
             : first })) })),
@@ -72,7 +72,7 @@ describe('reminder alarm delivery', () => {
 		const harness = createHarness();
 
 		const response = await harness.alarm.fetch(new Request(
-			'https://do/cancel?reminderId=reminder-1',
+			'https://do/cancel?reminderId=reminder-1&jobToken=current-job',
 			{ method: 'DELETE' },
 		));
 
@@ -249,7 +249,7 @@ describe('reminder alarm delivery', () => {
 		};
 		harness.run.mockImplementationOnce(async () => {
 			harness.storedValues.set('reminder', newerReminder);
-			return {};
+			return { meta: { changes: 1 } };
 		});
 
 		await harness.alarm.alarm();
@@ -292,6 +292,7 @@ describe('reminder alarm delivery', () => {
 			body: JSON.stringify({
 				reminderId: 'reminder-1',
 				content: 'Updated reminder',
+				jobToken: 'current-job',
 				dueDatetime: '2099-02-01T00:00:00.000Z',
 			}),
 		}));

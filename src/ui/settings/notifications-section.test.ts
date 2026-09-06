@@ -8,9 +8,6 @@ import {
 } from '../../test/fakes/obsidian-ui';
 
 let lastQrCodeData: string | null = null;
-const disableReminderNotifications = vi.fn();
-const enableReminderNotifications = vi.fn();
-const reconcileReminderNotifications = vi.fn();
 
 async function flushMicrotasks(): Promise<void> {
 	for (let i = 0; i < 20; i++) await Promise.resolve();
@@ -18,11 +15,6 @@ async function flushMicrotasks(): Promise<void> {
 
 async function loadNotificationsSectionModule() {
 	vi.doMock('obsidian', () => createObsidianUiModule());
-	vi.doMock('../../reminders/plugin-integration', () => ({
-		disableReminderNotifications,
-		enableReminderNotifications,
-		reconcileReminderNotifications,
-	}));
 	vi.doMock('../qr-modal', () => ({
 		QRModal: class QRModal {
 			constructor(_app: unknown, data: string) {
@@ -48,17 +40,13 @@ describe('renderNotificationsSection', () => {
 		resetObsidianUiMocks();
 		lastQrCodeData = null;
     updateNotificationPolicy.mockClear();
-		disableReminderNotifications.mockReset();
-		enableReminderNotifications.mockReset();
-		reconcileReminderNotifications.mockReset();
 	});
 
 	afterEach(() => {
 		vi.resetModules();
 		vi.clearAllMocks();
 		vi.doUnmock('obsidian');
-		vi.doUnmock('../../reminders/plugin-integration');
-		vi.doUnmock('../qr-modal');
+			vi.doUnmock('../qr-modal');
 	});
 
 	it.each([null, '2026-09-06'])('shows notification enrollment and paused recovery state: %s', async disabled_at => {
@@ -109,11 +97,9 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 		expect(plugin.writeRemindersSettings).toHaveBeenCalledWith({ allDayNotificationTime: null });
 		expect(setting.texts[0]?.inputEl.value).toBe('');
-		expect(reconcileReminderNotifications).toHaveBeenCalled();
 	});
 
 	it('updates the shared policy before saving the local notification preference', async () => {
-		disableReminderNotifications.mockResolvedValue(undefined);
 		const { renderNotificationsSection } = await loadNotificationsSectionModule();
 		const plugin = createPlugin({
 			getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
@@ -139,7 +125,6 @@ describe('renderNotificationsSection', () => {
 	});
 
 	it('retains the shared server choice when saving the local preference fails', async () => {
-		disableReminderNotifications.mockResolvedValue(undefined);
 		const { renderNotificationsSection } = await loadNotificationsSectionModule();
 		const plugin = createPlugin({
 			getPushSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
@@ -160,7 +145,6 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 
 		expect(plugin.settings.pushEnabled).toBe(true);
-		expect(enableReminderNotifications).not.toHaveBeenCalled();
     expect(getSettingByName('Enable push notifications').toggles[0]?.value).toBe(false);
     expect(noticeMessages.some(message => message.includes('disk full'))).toBe(true);
 	});

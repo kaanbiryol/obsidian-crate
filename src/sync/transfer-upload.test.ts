@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload } from './types';
 import { HttpError } from './api';
-import { createVaultFileChunks, uploadPreparedFiles } from './transfer';
+import { uploadPreparedFiles } from './transfer';
 import { createTransferHarness, emptyResult } from './transfer-test-harness';
 
 describe('transfer upload helpers', () => {
@@ -149,17 +149,4 @@ describe('transfer upload helpers', () => {
 		expect(result.errors).toEqual([]);
 	});
 
-	it('chunks files for initial sync pipelining', () => {
-		const files = [
-			{ path: 'a.md', size: 1, mtime: 1, extension: 'md' },
-			{ path: 'b.md', size: 1, mtime: 1, extension: 'md' },
-			{ path: 'c.md', size: 1, mtime: 1, extension: 'md' },
-		];
-
-		const chunks = createVaultFileChunks(files, 2);
-
-		expect(chunks).toHaveLength(2);
-		expect(chunks[0]).toHaveLength(2);
-		expect(chunks[1]).toHaveLength(1);
-	});
 });

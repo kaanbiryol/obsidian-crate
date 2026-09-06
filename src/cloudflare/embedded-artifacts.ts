@@ -1,7 +1,6 @@
 import {
 	artifactFingerprint,
 	artifactVersion,
-	d1Migrations,
 	d1Schema,
 	d1SchemaSha256,
 	workerBundleGzipBase64,
@@ -24,7 +23,6 @@ export function loadEmbeddedCloudflareArtifacts(): Promise<CloudflareDeploymentA
 		workerBundleSha256,
 		d1Schema,
 		d1SchemaSha256,
-		d1Migrations,
 	});
 	return decodedArtifacts;
 }

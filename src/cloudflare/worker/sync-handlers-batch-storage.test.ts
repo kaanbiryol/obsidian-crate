@@ -172,16 +172,9 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 				showStatusBar: true,
 			})).buffer,
 		);
-		const legacyGetResponse = await handleGetSettings(bucket);
-		expect(await responseJson(legacyGetResponse)).toEqual({
-			settings: {
-				ignorePatterns: ['.git/'],
-				syncOnStartup: true,
-				syncOnResume: true,
-				syncInterval: 30,
-				showStatusBar: true,
-				pushEnabled: false,
-			},
+		const incompleteGetResponse = await handleGetSettings(bucket);
+		expect(await responseJson(incompleteGetResponse)).toEqual({
+			settings: null,
 			settingsVersion: 'etag-1',
 		});
 		const currentVersion = (await bucket.head('__crate__/settings.json'))?.etag ?? null;

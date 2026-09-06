@@ -31,15 +31,8 @@ export function encodeDescriptionForMarkdown(description: string): string {
 
 export function decodeDescriptionFromMarkdown(description: string): string {
 	const trimmed = description.trim();
-	if (!trimmed.startsWith(DESCRIPTION_ENCODING_PREFIX)) {
-		return trimmed;
-	}
-
-	try {
-		return decodeURIComponent(trimmed.slice(DESCRIPTION_ENCODING_PREFIX.length));
-	} catch {
-		return trimmed;
-	}
+	if (!trimmed.startsWith(DESCRIPTION_ENCODING_PREFIX)) throw new Error('Unsupported reminder description encoding');
+	return decodeURIComponent(trimmed.slice(DESCRIPTION_ENCODING_PREFIX.length));
 }
 
 function recurrenceKey(value: RecurrenceRule | undefined): string {
@@ -117,11 +110,9 @@ function countDescriptionBlockLines(
 	const nextLine = lines[nextIndex];
 	if (!nextLine?.startsWith("<!-- crate-desc:")) return 0;
 
-	for (let index = nextIndex; index < lines.length; index++) {
-		if (lines[index]?.includes("-->")) return index - nextIndex + 1;
-	}
-
-	return 0;
+	if (!nextLine.endsWith(' -->')) throw new Error('Invalid reminder description block');
+	decodeDescriptionFromMarkdown(nextLine.slice('<!-- crate-desc:'.length, -4));
+	return 1;
 }
 
 export function assertReminderBlockUnchanged(lines: string[], reminder: ReminderLineRecord, lineNumber: number): void {

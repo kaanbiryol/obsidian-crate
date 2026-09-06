@@ -26,8 +26,6 @@ import type { ApiHttpTransport } from './worker-api/http';
 import type {
 	PushSubscriptionsResponse,
 	PushTestResponse,
-	ReminderScheduleRequest,
-	ScheduledReminderResponse,
 } from './worker-api/notifications';
 import { NotificationsWorkerApi } from './worker-api/notifications';
 import { SharedSettingsWorkerApi } from './worker-api/shared-settings';
@@ -173,27 +171,15 @@ export class SyncApiClient {
 	async updateNotificationPolicy(policy: NotificationPolicy): Promise<{ policy: NotificationPolicy }> {
 		return this.http.requestJson('/reminders/notification-policy', { method: 'PUT', body: JSON.stringify({ ...policy, expectedRevision: policy.revision }) });
 	}
-	async scheduleReminder(data: ReminderScheduleRequest): Promise<{ success: boolean }> {
-		return this.notificationsApi.scheduleReminder(data);
-	}
 
-	async cancelReminder(reminderId: string): Promise<{ success: boolean }> {
-		return this.notificationsApi.cancelReminder(reminderId);
-	}
 
-	async getScheduledReminders(): Promise<ScheduledReminderResponse> {
-		return this.notificationsApi.getScheduledReminders();
-	}
 
 	async getPushSubscriptions(): Promise<PushSubscriptionsResponse> {
 		return this.notificationsApi.getPushSubscriptions();
 	}
 
-	async createPushEnrollmentToken(): Promise<{ token: string; expiresAt: string }> {
-		return this.notificationsApi.createPushEnrollmentToken();
-	}
 
-	async createRemindersEnrollmentToken(folderPath: string): Promise<{ token: string; browserToken?: string; expiresAt: string }> {
+	async createRemindersEnrollmentToken(folderPath: string): Promise<{ token: string; browserToken: string; expiresAt: string }> {
 		return this.notificationsApi.createRemindersEnrollmentToken(folderPath);
 	}
 

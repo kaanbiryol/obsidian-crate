@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { createChipHTML, buildHTML, findProjectMatches, findPriorityMatches, findLinkMatches, findAllMatches, getPlainText } from './richTextParsing';
+import { buildHTML, getPlainText } from './richTextParsing';
+import { createChipHTML } from './richTextRenderer';
+import { findProjectMatches, findPriorityMatches, findLinkMatches, findAllMatches } from './richTextMatchers';
 
 describe('createChipHTML', () => {
     it('wraps text in a rich-text-chip span', () => {

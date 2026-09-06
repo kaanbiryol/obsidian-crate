@@ -4,7 +4,7 @@ import { sha256Hex } from './auth';
 type AuthScope = 'vault' | 'reminders';
 
 export interface AuthPrincipal {
-	tokenId: string | null;
+	tokenId: string;
 	scope: AuthScope;
 	folderPath?: string;
 }

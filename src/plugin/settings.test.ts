@@ -93,29 +93,29 @@ describe('normalizeCrateSettings', () => {
 			},
 		]);
 		expect(settings.pushEnabled).toBe(true);
-		expect(settings.syncDebugLogging).toBe(DEFAULT_SETTINGS.syncDebugLogging);
+		expect(settings.debugLogging).toBe(DEFAULT_SETTINGS.debugLogging);
 		expect(settings.debounceDelay).toBe(DEFAULT_SETTINGS.debounceDelay);
 	});
 
-	it('preserves valid syncOnResume, syncDebugLogging, and debounceDelay values', () => {
+	it('preserves valid syncOnResume, debugLogging, and debounceDelay values', () => {
 		const settings = normalizeCrateSettings({
 			syncOnResume: false,
-			syncDebugLogging: true,
+			debugLogging: true,
 			debounceDelay: 10,
 		}, 'vault-config');
 
 		expect(settings.syncOnResume).toBe(false);
-		expect(settings.syncDebugLogging).toBe(true);
+		expect(settings.debugLogging).toBe(true);
 		expect(settings.debounceDelay).toBe(10);
 	});
 
-	it('rejects invalid syncDebugLogging and debounceDelay values', () => {
+	it('rejects invalid debugLogging and debounceDelay values', () => {
 		const settings = normalizeCrateSettings({
-			syncDebugLogging: 'yes' as never,
+			debugLogging: 'yes' as never,
 			debounceDelay: -3,
 		}, 'vault-config');
 
-		expect(settings.syncDebugLogging).toBe(DEFAULT_SETTINGS.syncDebugLogging);
+		expect(settings.debugLogging).toBe(DEFAULT_SETTINGS.debugLogging);
 		expect(settings.debounceDelay).toBe(DEFAULT_SETTINGS.debounceDelay);
 	});
 

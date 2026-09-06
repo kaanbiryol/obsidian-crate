@@ -63,27 +63,9 @@ export function scanReminderMarkdownContent(
     const nextIndex = lineNumber + 1;
     const nextLine = lines[nextIndex];
     if (nextLine?.startsWith("<!-- crate-desc:")) {
-      let descContent = nextLine.slice("<!-- crate-desc:".length);
-      let endIndex = nextIndex;
-      while (endIndex < lines.length) {
-        const source = endIndex === nextIndex ? descContent : lines[endIndex];
-        if (source === undefined) break;
-        const closingPos = source.indexOf("-->");
-        if (closingPos !== -1) {
-          if (endIndex === nextIndex) {
-            descContent = descContent.slice(0, closingPos).trimEnd();
-          } else {
-            descContent += "\n" + source.slice(0, closingPos).trimEnd();
-          }
-          descBlockLineCount = endIndex - nextIndex + 1;
-          break;
-        }
-        if (endIndex > nextIndex) {
-          descContent += "\n" + source;
-        }
-        endIndex++;
-      }
-      description = decodeDescriptionFromMarkdown(descContent) || undefined;
+      if (!nextLine.endsWith(' -->')) throw new Error('Invalid reminder description block');
+      description = decodeDescriptionFromMarkdown(nextLine.slice('<!-- crate-desc:'.length, -4)) || undefined;
+      descBlockLineCount = 1;
     }
 
     reminders.push({

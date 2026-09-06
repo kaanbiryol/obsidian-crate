@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import worker from './index';
-import { sha256Hex } from './auth';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import { CRATE_SERVER_INFO } from './server-info';
 import type { Env } from './types';
@@ -11,58 +10,19 @@ interface SubscriptionRecord {
 }
 
 function createDb(
-	initialTokens: Record<string, number>,
 	options?: { failSubscriptionInsert?: boolean; authenticatedScope?: 'vault' | 'reminders' },
 ) {
-	let tokens = new Map<string, number>(Object.entries(initialTokens));
 	let subscriptions = new Map<string, SubscriptionRecord>();
 	let failSubscriptionInsert = options?.failSubscriptionInsert ?? false;
 
-	const applyMutation = (state: { tokens: Map<string, number>; subscriptions: Map<string, SubscriptionRecord> }, sql: string, args: unknown[]) => {
+	const applyMutation = (state: { subscriptions: Map<string, SubscriptionRecord> }, sql: string, args: unknown[]) => {
 		if (sql.startsWith('CREATE TABLE')) {
 			return { meta: { changes: 0 } };
 		}
-
-		if (sql.includes('DELETE FROM push_enrollment_tokens WHERE expires_at <= ?')) {
-			const cutoff = Number(args[0]);
-			let changes = 0;
-			for (const [tokenHash, expiresAt] of state.tokens.entries()) {
-				if (expiresAt <= cutoff) {
-					state.tokens.delete(tokenHash);
-					changes += 1;
-				}
-			}
-			return { meta: { changes } };
-		}
-
-		if (sql.includes('DELETE FROM push_subscriptions WHERE endpoint = ? AND EXISTS')) {
-			const endpoint = String(args[0]);
-			const tokenHash = String(args[1]);
-			const now = Number(args[2]);
-			const expiresAt = state.tokens.get(tokenHash);
-			if (typeof expiresAt !== 'number' || expiresAt <= now) {
-				return { meta: { changes: 0 } };
-			}
-
-			let changes = 0;
-			for (const [id, subscription] of state.subscriptions.entries()) {
-				if (subscription.endpoint === endpoint) {
-					state.subscriptions.delete(id);
-					changes += 1;
-				}
-			}
-			return { meta: { changes } };
-		}
-
     if (sql.includes('INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name, owner_token_id, folder_path)')) {
       if (failSubscriptionInsert) throw new Error('subscription insert failed');
-      const tokenHash = typeof args[12] === 'string' ? args[12] : '';
-      if (tokenHash && (state.tokens.get(String(tokenHash)) ?? 0) <= Number(args[13])) return { meta: { changes: 0 } };
       state.subscriptions.set(String(args[0]), { id: String(args[0]), endpoint: String(args[1]) });
       return { meta: { changes: 1 } };
-    }
-    if (sql.includes('DELETE FROM push_enrollment_tokens WHERE token_hash = ? AND changes() = 1')) {
-      return { meta: { changes: state.tokens.delete(String(args[0])) ? 1 : 0 } };
     }
 
 		if (sql.includes('DELETE FROM push_subscriptions WHERE endpoint = ?')) {
@@ -75,17 +35,6 @@ function createDb(
 				}
 			}
 			return { meta: { changes } };
-		}
-
-		if (sql.includes('INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name) VALUES')) {
-			if (failSubscriptionInsert) {
-				throw new Error('subscription insert failed');
-			}
-
-			const id = String(args[0]);
-			const endpoint = String(args[1]);
-			state.subscriptions.set(id, { id, endpoint });
-			return { meta: { changes: 1 } };
 		}
 
 		return { meta: { changes: 0 } };
@@ -103,16 +52,14 @@ function createDb(
 				first: vi.fn(async () => sql.includes('SELECT id, scope, folder_path FROM auth_tokens')
 					? { id: 'authenticated-token', scope: options?.authenticatedScope ?? 'vault', folder_path: 'Reminders' }
 					: null),
-				run: vi.fn(async () => applyMutation({ tokens, subscriptions }, sql, statement._args)),
+				run: vi.fn(async () => applyMutation({ subscriptions }, sql, statement._args)),
 				all: vi.fn(async () => ({ results: [] })),
 			};
 			return statement;
 		}),
 		batch: vi.fn(async (statements: Array<{ _sql: string; _args: unknown[] }>) => {
-			const nextTokens = new Map(tokens);
 			const nextSubscriptions = new Map(subscriptions);
 			const nextState = {
-				tokens: nextTokens,
 				subscriptions: nextSubscriptions,
 			};
 			const results: Array<{ meta: { changes: number } }> = [];
@@ -121,7 +68,6 @@ function createDb(
 				results.push(applyMutation(nextState, statement._sql, statement._args));
 			}
 
-			tokens = nextTokens;
 			subscriptions = nextSubscriptions;
 			return results;
 		}),
@@ -130,9 +76,6 @@ function createDb(
 
 	return {
 		db,
-		get tokens() {
-			return tokens;
-		},
 		get subscriptions() {
 			return subscriptions;
 		},
@@ -152,7 +95,7 @@ function createEnv(overrides?: Partial<Env>): Env {
 function createEnvDefaults(): Env {
 	return {
 		BUCKET: {} as R2Bucket,
-		DB: createDb({}).db as unknown as D1Database,
+		DB: createDb().db as unknown as D1Database,
 		REMINDER_ALARMS: {
 			idFromName: vi.fn(),
 			get: vi.fn(),
@@ -160,12 +103,12 @@ function createEnvDefaults(): Env {
 	};
 }
 
-function createSubscriptionRequest(token: string): Request {
+function createSubscriptionRequest(): Request {
 	return new Request('https://worker.test/notifications/subscribe', {
 		method: 'POST',
-		headers: { 'X-Crate-Protocol': '3',
+		headers: { 'X-Crate-Protocol': '4',
 			'Content-Type': 'application/json',
-			'X-Crate-Enrollment-Token': token,
+			Authorization: 'Bearer device-token',
 		},
 		body: JSON.stringify({
 			endpoint: 'https://fcm.googleapis.com/subscription',
@@ -189,10 +132,10 @@ describe('worker entrypoint', () => {
 		expect(await response.json()).toEqual(CRATE_SERVER_INFO);
 	});
 
-	it('does not expose the legacy public device enrollment routes', async () => {
+	it('does not expose the public device enrollment routes', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/setup/status', {
-				headers: { 'X-Crate-Protocol': '3', Authorization: 'Bearer secret-token' },
+				headers: { 'X-Crate-Protocol': '4', Authorization: 'Bearer secret-token' },
 			}) as never,
 			createEnv() as never,
 		);
@@ -205,7 +148,7 @@ describe('worker entrypoint', () => {
 		const enrollmentResponse = await worker.fetch(
 			new Request('https://worker.test/auth/enrollment', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '3',
+				headers: { 'X-Crate-Protocol': '4',
 					Authorization: 'Bearer secret-token',
 					'Content-Type': 'application/json',
 				},
@@ -216,7 +159,7 @@ describe('worker entrypoint', () => {
 		const tokenResponse = await worker.fetch(
 			new Request('https://worker.test/auth/tokens', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '3',
+				headers: { 'X-Crate-Protocol': '4',
 					Authorization: 'Bearer secret-token',
 					'Content-Type': 'application/json',
 				},
@@ -232,11 +175,11 @@ describe('worker entrypoint', () => {
 	});
 
 	it('lets an authenticated device create a reminders web app enrollment token', async () => {
-		const db = createDb({});
+		const db = createDb();
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/reminders-enrollment-token', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '3', Authorization: 'Bearer secret-token' },
+				headers: { 'X-Crate-Protocol': '4', Authorization: 'Bearer secret-token' },
         body: JSON.stringify({ folderPath: 'Reminders' }),
 			}),
 			createEnv({ DB: db.db as unknown as D1Database }) as never,
@@ -255,11 +198,11 @@ describe('worker entrypoint', () => {
 	});
 
 	it('prevents a reminders session from minting a replacement session', async () => {
-		const db = createDb({}, { authenticatedScope: 'reminders' });
+		const db = createDb({ authenticatedScope: 'reminders' });
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/reminders-enrollment-token', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '3', Authorization: 'Bearer reminders-token' },
+				headers: { 'X-Crate-Protocol': '4', Authorization: 'Bearer reminders-token' },
 			}),
 			createEnv({ DB: db.db as unknown as D1Database }) as never,
 		);
@@ -373,7 +316,7 @@ describe('worker entrypoint', () => {
 	it('rejects blank bearer tokens', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/health', {
-				headers: { 'X-Crate-Protocol': '3', Authorization: 'Bearer ' },
+				headers: { 'X-Crate-Protocol': '4', Authorization: 'Bearer ' },
 			}),
 			createEnv() as never,
 		);
@@ -386,7 +329,7 @@ describe('worker entrypoint', () => {
 	it('returns a controlled 503 when authentication cannot reach D1', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/sync/manifest', {
-				headers: { 'X-Crate-Protocol': '3', Authorization: 'Bearer secret-token' },
+				headers: { 'X-Crate-Protocol': '4', Authorization: 'Bearer secret-token' },
 			}),
 			createEnv({ DB: null as never }) as never,
 		);
@@ -415,7 +358,7 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/sync/upload?path=notes/a.md', {
 				method: 'PUT',
-				headers: { 'X-Crate-Protocol': '3',
+				headers: { 'X-Crate-Protocol': '4',
 					Authorization: 'Bearer secret-token',
 					'X-Crate-Expected-Hash': 'absent',
 				},
@@ -428,59 +371,32 @@ describe('worker entrypoint', () => {
 		expect(await response.json()).toEqual({ error: 'Authentication service unavailable' });
 	});
 
-	it('accepts push subscription requests with a valid one-time enrollment token', async () => {
-		const tokenHash = await sha256Hex('setup-token');
-		const db = createDb({ [tokenHash]: Date.now() + 60_000 });
-		const response = await worker.fetch(
-			createSubscriptionRequest('setup-token'),
-			createEnv({ DB: db.db as unknown as D1Database }) as never,
-		);
+	it('requires an authenticated session to subscribe', async () => {
+		const request = createSubscriptionRequest();
+		request.headers.delete('Authorization');
+		const response = await worker.fetch(request, createEnv() as never);
+		expect(response.status).toBe(401);
+	});
 
+	it('registers a push subscription owned by the authenticated session', async () => {
+		const db = createDb({ authenticatedScope: 'reminders' });
+		const response = await worker.fetch(createSubscriptionRequest(), createEnv({ DB: db.db as unknown as D1Database }) as never);
 		expect(response.status).toBe(200);
-		expect(db.db.batch).toHaveBeenCalledTimes(1);
-		expect(db.tokens.size).toBe(0);
 		expect(db.subscriptions.size).toBe(1);
 	});
 
-	it('rejects expired enrollment tokens before subscribing devices', async () => {
-		const tokenHash = await sha256Hex('expired-token');
-		const db = createDb({ [tokenHash]: Date.now() - 1000 });
-		const response = await worker.fetch(
-			createSubscriptionRequest('expired-token'),
-			createEnv({ DB: db.db as unknown as D1Database }) as never,
-		);
-
-		expect(response.status).toBe(429);
-		expect(await response.json()).toEqual({ error: 'Subscription limit reached, endpoint already enrolled, or enrollment expired. Remove an old device or open a fresh link.' });
+	it('allows retrying a failed authenticated subscription insert', async () => {
+		const db = createDb({ failSubscriptionInsert: true });
+		const env = createEnv({ DB: db.db as unknown as D1Database });
+		expect((await worker.fetch(createSubscriptionRequest(), env as never)).status).toBe(500);
 		expect(db.subscriptions.size).toBe(0);
-	});
-
-	it('keeps the enrollment token available when the subscription insert fails', async () => {
-		const tokenHash = await sha256Hex('setup-token');
-		const db = createDb({ [tokenHash]: Date.now() + 60_000 }, { failSubscriptionInsert: true });
-
-		const firstResponse = await worker.fetch(
-			createSubscriptionRequest('setup-token'),
-			createEnv({ DB: db.db as unknown as D1Database }) as never,
-		);
-
-		expect(firstResponse.status).toBe(500);
-		expect(db.tokens.size).toBe(1);
-		expect(db.subscriptions.size).toBe(0);
-
 		db.setFailSubscriptionInsert(false);
-		const retryResponse = await worker.fetch(
-			createSubscriptionRequest('setup-token'),
-			createEnv({ DB: db.db as unknown as D1Database }) as never,
-		);
-
-		expect(retryResponse.status).toBe(200);
-		expect(db.tokens.size).toBe(0);
+		expect((await worker.fetch(createSubscriptionRequest(), env as never)).status).toBe(200);
 		expect(db.subscriptions.size).toBe(1);
 	});
 
 	it('removes a push subscription by endpoint during authenticated logout', async () => {
-		const db = createDb({});
+		const db = createDb();
 		db.subscriptions.set('subscription-id', {
 			id: 'subscription-id',
 			endpoint: 'https://fcm.googleapis.com/subscription',
@@ -489,7 +405,7 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/subscribe', {
 				method: 'DELETE',
-				headers: { 'X-Crate-Protocol': '3',
+				headers: { 'X-Crate-Protocol': '4',
 					Authorization: 'Bearer secret-token',
 					'Content-Type': 'application/json',
 				},

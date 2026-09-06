@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -69,6 +70,21 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_operations').fetchone()[0], 1)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM notification_projection_jobs').fetchone()[0], 1)
         self.assertEqual(len(manifest['objects']), 1)
+    def test_unsupported_schema_stops_restore_before_remote_mutation(self):
+        recovery.backup(self.remote, self.directory)
+        sql_path = self.directory / 'database.sql'
+        sql = sql_path.read_bytes() + b"\nUPDATE crate_schema SET version = 999;"
+        sql_path.write_bytes(sql)
+        manifest_path = self.directory / 'archive.json'
+        manifest = json.loads(manifest_path.read_text())
+        manifest['databaseSha256'] = digest(sql)
+        manifest_path.write_text(json.dumps(manifest))
+        target = Remote(b'', {})
+        target.database, target.bucket = 'restore', 'restore'
+        with self.assertRaisesRegex(ValueError, 'Unsupported Crate database schema'):
+            recovery.restore(target, self.directory)
+        self.assertEqual(target.objects, {})
+        self.assertFalse(target.imported)
     def test_corrupt_object_stops_restore_before_remote_mutation(self):
         recovery.backup(self.remote, self.directory)
         key = next(iter(self.remote.objects))

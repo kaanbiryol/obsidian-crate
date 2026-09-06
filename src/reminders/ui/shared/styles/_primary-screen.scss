@@ -64,23 +64,23 @@
         gap: 10px;
         padding: 11px 12px;
         border-radius: var(--crate-radius-card);
-        background: var(--crate-reminder-card-bg, var(--crate-surface-bg));
-        border-color: var(--crate-reminder-card-border, var(--crate-surface-border));
+        background: var(--crate-reminder-card-bg, var(--crate-panel-bg));
+        border-color: var(--crate-reminder-card-border, var(--crate-divider));
         box-shadow: var(--crate-reminder-card-shadow, none);
     }
 
     @media (hover: hover) and (pointer: fine) {
         .premium-reminder-card:hover .premium-reminder-content {
-            background: var(--crate-reminder-card-hover-bg, var(--crate-surface-hover-bg));
-            border-color: var(--crate-reminder-card-hover-border, var(--crate-surface-border-hover));
+            background: var(--crate-reminder-card-hover-bg, var(--crate-control-hover-bg));
+            border-color: var(--crate-reminder-card-hover-border, var(--crate-divider-strong));
             box-shadow: var(--crate-reminder-card-hover-shadow, var(--crate-reminder-card-shadow, none));
         }
     }
 
     .premium-reminder-card:active .premium-reminder-content {
         transform: var(--crate-reminder-card-active-transform, none);
-        background: var(--crate-reminder-card-active-bg, var(--crate-surface-active-bg));
-        border-color: var(--crate-reminder-card-active-border, var(--crate-surface-border-hover));
+        background: var(--crate-reminder-card-active-bg, var(--crate-control-active-bg));
+        border-color: var(--crate-reminder-card-active-border, var(--crate-divider-strong));
     }
 
     // The reorder wrapper scales the entire card.
@@ -169,14 +169,14 @@
         gap: 10px;
         padding: 11px 12px;
         border-radius: var(--crate-radius-card);
-        background: var(--crate-project-card-bg, var(--crate-reminder-card-bg, var(--crate-surface-bg)));
-        border-color: var(--crate-project-card-border, var(--crate-reminder-card-border, var(--crate-surface-border)));
+        background: var(--crate-project-card-bg, var(--crate-reminder-card-bg, var(--crate-panel-bg)));
+        border-color: var(--crate-project-card-border, var(--crate-reminder-card-border, var(--crate-divider)));
         box-shadow: var(--crate-project-card-shadow, var(--crate-reminder-card-shadow, none));
     }
 
     .premium-project-card:hover .premium-project-content {
-        background: var(--crate-project-card-hover-bg, var(--crate-reminder-card-hover-bg, var(--crate-surface-hover-bg)));
-        border-color: var(--crate-project-card-hover-border, var(--crate-reminder-card-hover-border, var(--crate-surface-border-hover)));
+        background: var(--crate-project-card-hover-bg, var(--crate-reminder-card-hover-bg, var(--crate-control-hover-bg)));
+        border-color: var(--crate-project-card-hover-border, var(--crate-reminder-card-hover-border, var(--crate-divider-strong)));
     }
 
     .premium-project-left {
@@ -229,7 +229,7 @@
 }
 
 .bottom-tab-slider {
-    border: 1px solid var(--crate-surface-border);
+    border: 1px solid var(--crate-divider);
     border-radius: var(--nav-item-radius, var(--radius-m, 11px));
     background: var(--crate-tab-active-bg);
     box-shadow: none;

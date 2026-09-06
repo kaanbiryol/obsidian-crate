@@ -34,7 +34,7 @@ function normalizeFileEntry(value: unknown): FileEntry | null {
 }
 
 function normalizeFileManifest(value: unknown): FileManifest | null {
-	if (!isRecord(value) || !isRecord(value.files)) {
+	if (!isRecord(value) || value.version !== 1 || !isRecord(value.files)) {
 		return null;
 	}
 
@@ -50,11 +50,10 @@ function normalizeFileManifest(value: unknown): FileManifest | null {
 		}
 	}
 
-	const version = normalizeNonNegativeInteger(value.version) ?? 1;
 	const lastSeq = normalizeNonNegativeInteger(value.lastSeq);
 	const truncated = typeof value.truncated === 'boolean' ? value.truncated : undefined;
 	return {
-		version: version > 0 ? version : 1,
+		version: 1,
 		files,
 		...(lastSeq !== null ? { lastSeq } : {}),
 		...(truncated !== undefined ? { truncated } : {}),
@@ -82,7 +81,6 @@ export class LocalManifest {
 	/**
 	 * Load manifest from its dedicated file.
 	 * Select the newest valid main or temporary generation after a crash.
-	 * Legacy manifests without a generation are treated as generation zero.
 	 */
 	async load(): Promise<void> {
 		const adapter = this.app.vault.adapter;
@@ -92,7 +90,8 @@ export class LocalManifest {
 				const parsed: unknown = JSON.parse(await adapter.read(path));
 				const manifest = normalizeFileManifest(parsed);
 				if (!manifest) return null;
-				const generation = isRecord(parsed) ? normalizeNonNegativeInteger(parsed.generation) ?? 0 : 0;
+				const generation = isRecord(parsed) ? normalizeNonNegativeInteger(parsed.generation) : null;
+				if (generation === null) return null;
 				return { manifest, generation };
 			} catch {
 				logger.warn(`Could not read manifest checkpoint: ${path}`);
@@ -103,6 +102,9 @@ export class LocalManifest {
 		const tmp = await read(this.tmpPath);
 		const recoverTmp = tmp && (!main || tmp.generation > main.generation);
 		const selected = recoverTmp ? tmp : main;
+		if (!selected && (await adapter.exists(this.manifestPath) || await adapter.exists(this.tmpPath))) {
+			throw new Error('Invalid manifest checkpoint. Preserve this vault and its metadata before resetting sync.');
+		}
 		if (selected) {
 			this.manifest = selected.manifest;
 			this.generation = selected.generation;

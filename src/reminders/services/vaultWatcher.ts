@@ -19,7 +19,6 @@ export class VaultWatcher {
   private plugin: CratePlugin;
   private index: ReminderIndex;
   private eventRefs: EventRef[] = [];
-  private pendingIndexChangedNotification: number | null = null;
 
   // Debounce file modifications to avoid excessive rescans
   private pendingScans: Map<string, number> = new Map();
@@ -28,7 +27,6 @@ export class VaultWatcher {
   constructor(
     plugin: CratePlugin,
     index: ReminderIndex,
-    private onIndexChanged?: () => Promise<void> | void,
   ) {
     this.plugin = plugin;
     this.index = index;
@@ -83,10 +81,6 @@ export class VaultWatcher {
       window.clearTimeout(timeout);
     }
     this.pendingScans.clear();
-    if (this.pendingIndexChangedNotification !== null) {
-      window.clearTimeout(this.pendingIndexChangedNotification);
-      this.pendingIndexChangedNotification = null;
-    }
 
     log.info(" Unregistered vault event listeners");
   }
@@ -109,7 +103,7 @@ export class VaultWatcher {
     // Schedule a debounced scan
     const timeout = window.setTimeout(() => {
       this.pendingScans.delete(filePath);
-      void this.rescanAndNotify(file);
+      void this.index.rescanFile(file);
     }, VaultWatcher.DEBOUNCE_MS);
 
     this.pendingScans.set(filePath, timeout);
@@ -123,7 +117,7 @@ export class VaultWatcher {
     if (!this.index.isReminderFile(file.path)) return; // Only watch reminders folder
 
     log.info(` New reminder file created: ${file.path}`);
-    await this.rescanAndNotify(file);
+    await this.index.rescanFile(file);
   }
 
   /**
@@ -143,7 +137,6 @@ export class VaultWatcher {
     }
 
     this.index.removeFile(file.path);
-    this.scheduleIndexChangedNotification();
   }
 
   /**
@@ -166,16 +159,14 @@ export class VaultWatcher {
       // Moved within reminders folder - update path
       log.info(` Reminder file renamed: ${oldPath} -> ${file.path}`);
       this.index.renameFile(oldPath, file.path);
-      this.scheduleIndexChangedNotification();
     } else if (wasInFolder && !nowInFolder) {
       // Moved out of reminders folder - remove
       log.info(` File moved out of reminders folder: ${oldPath}`);
       this.index.removeFile(oldPath);
-      this.scheduleIndexChangedNotification();
     } else if (!wasInFolder && nowInFolder) {
       // Moved into reminders folder - scan
       log.info(` File moved into reminders folder: ${file.path}`);
-      await this.rescanAndNotify(file);
+      await this.index.rescanFile(file);
     }
     // If neither was in folder, ignore
   }
@@ -187,21 +178,4 @@ export class VaultWatcher {
     return file instanceof TFile && file.extension === "md";
   }
 
-  private async rescanAndNotify(file: TFile): Promise<void> {
-    await this.index.rescanFile(file);
-    this.scheduleIndexChangedNotification();
-  }
-
-  private scheduleIndexChangedNotification(): void {
-    if (!this.onIndexChanged) return;
-    if (this.pendingIndexChangedNotification !== null) {
-      window.clearTimeout(this.pendingIndexChangedNotification);
-    }
-    this.pendingIndexChangedNotification = window.setTimeout(() => {
-      this.pendingIndexChangedNotification = null;
-      void Promise.resolve(this.onIndexChanged?.()).catch((error: unknown) => {
-        log.warn('Failed to reconcile reminder notifications after a vault change:', error);
-      });
-    }, 0);
-  }
 }

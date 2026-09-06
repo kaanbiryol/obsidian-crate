@@ -44,7 +44,7 @@
 		"deploy:plugin:configure": "node scripts/deploy.mjs --configure",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "eslint .",
-		"deadcode": "knip",
+		"deadcode": "knip && knip --production --include files,dependencies",
 		"test": "vitest run",
 		"test:worker-runtime": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts",
 		"check": "npm run lint && npm run typecheck && npm run typecheck:worker && npm run deadcode && npm run notices:check && npm run test:recovery && npm test && npm run test:worker-runtime",

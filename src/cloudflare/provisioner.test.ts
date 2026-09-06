@@ -25,7 +25,6 @@ const artifacts = {
 	workerBundleSha256: 'worker-hash',
 	d1Schema: 'CREATE TABLE IF NOT EXISTS example (id TEXT);',
 	d1SchemaSha256: 'schema-hash',
-	d1Migrations: [],
 };
 
 function createApi() {
@@ -71,9 +70,9 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.createD1Database).not.toHaveBeenCalled();
 		expect(api.createR2Bucket).not.toHaveBeenCalled();
 		expect(api.createWorkersSubdomain).not.toHaveBeenCalled();
-		expect(api.queryD1).toHaveBeenCalledTimes(7);
+		expect(api.queryD1).toHaveBeenCalledTimes(2);
 		expect(api.queryD1).toHaveBeenNthCalledWith(
-			3,
+			2,
 			metadata.accountId,
 			metadata.d1DatabaseId,
 			artifacts.d1Schema,
@@ -94,115 +93,25 @@ describe('provisionCloudflareDeployment', () => {
 		expect(workerUrl).toBe('https://crate-0123456789abcdef.personal-crate.workers.dev');
 	});
 
-	it('applies a pending migration before reconciling an existing schema', async () => {
+	it.each([['files'], ['crate_schema']])('rejects an unsupported existing database before uploading: %j', async (...tables: string[]) => {
 		const api = createApi();
-		api.queryD1
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([{ results: [{ name: 'files' }] }])
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([{ results: [{ name: '0001_initial.sql' }] }])
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([]);
+		api.queryD1.mockResolvedValueOnce([{ results: tables.map(name => ({ name })) }]);
+		api.queryD1.mockResolvedValueOnce([{ results: [{ version: 999 }] }]);
 		const metadata = createMetadata();
-		const migrations = [
-			{ name: '0002_launch_hardening.sql', sql: 'ALTER TABLE files ADD COLUMN portable_path TEXT;', sha256: 'hash' },
-		];
+		await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
+			.rejects.toThrow('Unsupported database schema');
+		expect(api.uploadWorker).not.toHaveBeenCalled();
+		expect(api.queryD1).not.toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
+	});
 
-		await provisionCloudflareDeployment({
-			api: api as never,
-			accountId: metadata.accountId!,
-			metadata,
-			artifacts: { ...artifacts, d1Migrations: migrations },
-			onMetadataChanged: vi.fn(async () => {}),
-		});
-
-		expect(api.queryD1).toHaveBeenNthCalledWith(
-			6,
-			metadata.accountId,
-			metadata.d1DatabaseId,
-			"ALTER TABLE files ADD COLUMN portable_path TEXT;\nINSERT INTO d1_migrations (name) VALUES ('0002_launch_hardening.sql');",
-		);
-		expect(api.queryD1).toHaveBeenNthCalledWith(
-			7,
-			metadata.accountId,
-			metadata.d1DatabaseId,
-			artifacts.d1Schema,
-		);
+	it('reapplies only the current schema when initialization is retried', async () => {
+		const api = createApi();
+		api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
+		api.queryD1.mockResolvedValueOnce([{ results: [{ version: 1 }] }]);
+		const metadata = createMetadata();
+		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
+		expect(api.queryD1).toHaveBeenLastCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
 		expect(api.uploadWorker).toHaveBeenCalledOnce();
-		expect(api.queryD1).toHaveBeenCalledTimes(11);
-	});
-
-	it('records launch hardening without rerunning it when the schema is already current', async () => {
-		const api = createApi();
-		api.queryD1
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([{ results: [{ name: 'files' }] }])
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([{ results: [{ name: '0001_initial.sql' }] }])
-			.mockResolvedValueOnce([{ results: [
-				{ name: 'portable_path' },
-				{ name: 'disabled_at' },
-				{ name: 'last_error' },
-				{ name: 'notification_jobs' },
-				{ name: 'file_versions' },
-				{ name: 'maintenance_state' },
-			] }])
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([]);
-		const metadata = createMetadata();
-		const migrations = [
-			{ name: '0002_launch_hardening.sql', sql: 'ALTER TABLE files ADD COLUMN portable_path TEXT;', sha256: 'hash' },
-		];
-
-		await provisionCloudflareDeployment({
-			api: api as never,
-			accountId: metadata.accountId!,
-			metadata,
-			artifacts: { ...artifacts, d1Migrations: migrations },
-			onMetadataChanged: vi.fn(async () => {}),
-		});
-
-		expect(api.queryD1).toHaveBeenNthCalledWith(
-			6,
-			metadata.accountId,
-			metadata.d1DatabaseId,
-			"INSERT INTO d1_migrations (name) VALUES ('0002_launch_hardening.sql');",
-		);
-		expect(api.queryD1).not.toHaveBeenCalledWith(
-			metadata.accountId,
-			metadata.d1DatabaseId,
-			expect.stringContaining('ALTER TABLE files'),
-		);
-	});
-
-	it('records embedded migrations after creating the complete schema for a fresh database', async () => {
-		const api = createApi();
-		const metadata = createMetadata();
-		const migrations = [
-			{ name: '0002_launch_hardening.sql', sql: 'ALTER TABLE files ADD COLUMN portable_path TEXT;', sha256: 'hash' },
-		];
-
-		await provisionCloudflareDeployment({
-			api: api as never,
-			accountId: metadata.accountId!,
-			metadata,
-			artifacts: { ...artifacts, d1Migrations: migrations },
-			onMetadataChanged: vi.fn(async () => {}),
-		});
-
-		expect(api.queryD1).toHaveBeenNthCalledWith(
-			3,
-			metadata.accountId,
-			metadata.d1DatabaseId,
-			artifacts.d1Schema,
-		);
-		expect(api.queryD1).toHaveBeenNthCalledWith(
-			4,
-			metadata.accountId,
-			metadata.d1DatabaseId,
-			"INSERT OR IGNORE INTO d1_migrations (name) VALUES ('0002_launch_hardening.sql');",
-		);
 	});
 
 	it('explains how to activate R2 when the account is not entitled', async () => {

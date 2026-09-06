@@ -2,7 +2,7 @@ import { Notice } from "obsidian";
 import { SecretStorageService } from "./secret-storage";
 import { createLogger, errorMessage } from "./logger";
 import { CrateSettingTab } from "../ui/settings-tab";
-import { initializeReminders, reconcileReminderNotifications } from "../reminders/plugin-integration";
+import { initializeReminders, ensureReminderNotificationPolicy } from "../reminders/plugin-integration";
 import {
   initializeSyncManagers,
   registerSyncCommands,
@@ -106,7 +106,7 @@ async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin): Prom
       await plugin.reminderIndex.load();
     }
     if (!activePlugins.has(plugin)) return;
-    await reconcileReminderNotifications(plugin);
+    await ensureReminderNotificationPolicy(plugin);
   } catch (error) {
     logger.warn("Failed to refresh reminders after startup sync:", errorMessage(error));
   }

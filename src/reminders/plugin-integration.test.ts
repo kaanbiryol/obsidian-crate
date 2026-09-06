@@ -1,18 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type RemindersSettingsStub = {
-	debugLogging: boolean;
 	remindersFolderPath: string;
 	autoOpenView: 'sidebar' | 'none';
 };
 
 type FileWrittenCallback = (file: unknown) => Promise<void>;
-type ReminderChangeCallback = (reminder: unknown, operation: unknown) => Promise<unknown>;
 type MockWriter = {
 	setOnFileWritten: ReturnType<typeof vi.fn<(callback: FileWrittenCallback) => void>>;
-	setOnReminderChange: ReturnType<typeof vi.fn<(callback: ReminderChangeCallback) => void>>;
 	onFileWritten?: FileWrittenCallback;
-	onReminderChange?: ReminderChangeCallback;
 };
 
 type MockPlugin = {
@@ -45,7 +41,6 @@ type MockPlugin = {
 	getLayoutReadyHandler: () => (() => void) | undefined;
 };
 
-const noticeMessages: string[] = [];
 const reminderIndexLoad = vi.fn(async () => {});
 const reminderIndexGetAll = vi.fn(() => [{ id: 'r1' }]);
 const reminderIndexRescanFile = vi.fn(async () => {});
@@ -57,11 +52,6 @@ const reminderQueryOnTodayBlock = vi.fn();
 const reminderQueryOnUpcomingBlock = vi.fn();
 const createRemindersBlockExtension = vi.fn(() => 'extension');
 const registerReminderCommands = vi.fn();
-const notificationReconcile = vi.fn(async () => {});
-const notificationCancelAll = vi.fn(async () => {});
-const notificationOnReminderChange = vi.fn<(...args: unknown[]) => Promise<{ success: boolean; error?: string }>>(
-	async () => ({ success: true }),
-);
 
 let latestWriter: MockWriter;
 let latestWatcher: {
@@ -77,13 +67,7 @@ async function flushMicrotasks(): Promise<void> {
 async function loadPluginIntegrationModule() {
 	vi.doMock('obsidian', () => ({
 		normalizePath: (path: string) => path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''),
-		Notice: class Notice {
-			constructor(message?: string) {
-				if (message) {
-					noticeMessages.push(message);
-				}
-			}
-		},
+
 	}));
 	vi.doMock('./data/reminder-index', () => ({
 		createReminderIndex: reminderIndexFactory,
@@ -106,13 +90,6 @@ async function loadPluginIntegrationModule() {
 	}));
 	vi.doMock('./commands', () => ({
 		registerReminderCommands,
-	}));
-	vi.doMock('./services/notificationService', () => ({
-		ReminderNotificationService: class ReminderNotificationService {
-			reconcile = notificationReconcile;
-			cancelAll = notificationCancelAll;
-			onReminderChange = notificationOnReminderChange;
-		},
 	}));
 	vi.doMock('./services/vaultWatcher', () => ({
 		VaultWatcher: class VaultWatcher {
@@ -154,7 +131,6 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 			workerUrl: 'https://worker.example',
 		},
 		remindersSettings: {
-			debugLogging: false,
 			remindersFolderPath: 'Reminders',
 			autoOpenView: 'sidebar',
 		},
@@ -173,7 +149,6 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 }
 
 beforeEach(() => {
-	noticeMessages.length = 0;
 	reminderIndexLoad.mockReset();
 	reminderIndexGetAll.mockReset();
 	reminderIndexRescanFile.mockReset();
@@ -185,16 +160,10 @@ beforeEach(() => {
 	reminderQueryOnUpcomingBlock.mockReset();
 	createRemindersBlockExtension.mockReset();
 	registerReminderCommands.mockReset();
-	notificationReconcile.mockReset();
-	notificationCancelAll.mockReset();
-	notificationOnReminderChange.mockReset();
 
 	latestWriter = {
 		setOnFileWritten: vi.fn((callback: FileWrittenCallback) => {
 			latestWriter.onFileWritten = callback;
-		}),
-		setOnReminderChange: vi.fn((callback: ReminderChangeCallback) => {
-			latestWriter.onReminderChange = callback;
 		}),
 	};
 	latestWatcher = {
@@ -224,7 +193,6 @@ afterEach(() => {
 	vi.doUnmock('./query/injector');
 	vi.doUnmock('./query/remindersBlockLivePreview');
 	vi.doUnmock('./commands');
-	vi.doUnmock('./services/notificationService');
 	vi.doUnmock('./services/vaultWatcher');
 	vi.doUnmock('./ui/adapters/reminders-view');
 	vi.doUnmock('./utils/logger');
@@ -241,7 +209,6 @@ describe('initializeReminders', () => {
 		expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
 		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex);
 		expect(createReminderRepository).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
-		expect(notificationReconcile).not.toHaveBeenCalled();
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
 		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(4);
 		expect(plugin.registerEditorExtension).toHaveBeenCalledWith('extension');
@@ -264,11 +231,6 @@ describe('initializeReminders', () => {
 
 		await latestWriter.onFileWritten?.({ path: 'Reminders/Work.md' });
 		expect(reminderIndexRescanFile).toHaveBeenCalledWith({ path: 'Reminders/Work.md' }, true);
-
-		notificationOnReminderChange.mockResolvedValueOnce({ success: false, error: 'push failed' });
-		const changeResult = await latestWriter.onReminderChange?.({ id: 'r1' }, 'update');
-		expect(changeResult).toEqual({ success: false, error: 'push failed' });
-		expect(noticeMessages).toContain('Reminder saved but notification sync failed:\npush failed');
 	});
 
 	it('does not duplicate UI registration when reminders are initialized twice for the same plugin', async () => {
@@ -300,42 +262,6 @@ describe('reinitializeReminders', () => {
 
 		expect(oldWatcher.unregister).toHaveBeenCalledTimes(1);
 		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders/Work');
-		expect(notificationReconcile).toHaveBeenCalledWith([{ id: 'r1' }]);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
-	});
-});
-
-describe('notification lifecycle', () => {
-	it('cancels after in-flight reconciliation and suppresses new reconciliation until enabled', async () => {
-		const {
-			disableReminderNotifications,
-			enableReminderNotifications,
-			reconcileReminderNotifications,
-		} = await loadPluginIntegrationModule();
-		let finishReconcile!: () => void;
-		const inFlightReconcile = new Promise<void>((resolve) => {
-			finishReconcile = resolve;
-		});
-		notificationReconcile.mockImplementationOnce(() => inFlightReconcile);
-		const plugin = createPlugin({
-			reminderIndex: { getAll: vi.fn(() => []) },
-		});
-
-		const initialReconcile = reconcileReminderNotifications(plugin as never);
-		await vi.waitFor(() => {
-			expect(notificationReconcile).toHaveBeenCalledTimes(1);
-		});
-		const disable = disableReminderNotifications(plugin as never);
-		const suppressedReconcile = reconcileReminderNotifications(plugin as never);
-
-		expect(notificationCancelAll).not.toHaveBeenCalled();
-		finishReconcile();
-		await Promise.all([initialReconcile, disable, suppressedReconcile]);
-
-		expect(notificationCancelAll).toHaveBeenCalledTimes(1);
-		expect(notificationReconcile).toHaveBeenCalledTimes(1);
-
-		await enableReminderNotifications(plugin as never);
-		expect(notificationReconcile).toHaveBeenCalledTimes(2);
 	});
 });

@@ -21,16 +21,16 @@ afterEach(() => vi.resetAllMocks());
       getAlarm: async () => Date.parse(old.dueDatetime), setAlarm: async () => {}, deleteAlarm: async () => {},
     }};
     const db = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({
-      first: async () => sql.includes('LEFT JOIN reminder_projections')
+      first: async () => sql.includes('SELECT job_token') ? { job_token: 'new-job' } : sql.includes('LEFT JOIN reminder_projections')
         ? { file_revision: 'source', storage_key: 'source', pending_path: null, enabled: 1,
             notification_token: schedule.schedule_token, policy_revision: 'policy', current_policy_revision: 'policy' }
         : schedule,
-      run: async () => { if (sql.includes('INSERT OR REPLACE')) schedule = { schedule_token: String(args[1]), content: String(args[2]), due_datetime: String(args[4]), project: null }; },
+      run: async () => { if (sql.includes('INSERT OR REPLACE')) schedule = { schedule_token: String(args[1]), content: String(args[2]), due_datetime: String(args[4]), project: null }; return { meta: { changes: 1 } }; },
     }) }) };
     const alarm = new ReminderAlarm(state as never, { DB: db as never });
     const oldDelivery = alarm.alarm();
     await sending;
-    expect((await alarm.fetch(new Request('https://do/schedule', { method: 'PUT', body: JSON.stringify({ reminderId: 'audit-id', content: 'new title', dueDatetime: '2099-02-01T00:00:00.000Z' }) }))).status).toBe(200);
+    expect((await alarm.fetch(new Request('https://do/schedule', { method: 'PUT', body: JSON.stringify({ reminderId: 'audit-id', jobToken: 'new-job', content: 'new title', dueDatetime: '2099-02-01T00:00:00.000Z' }) }))).status).toBe(200);
     resolveDelivery({ sent: failed ? 0 : 1, failed: failed ? 1 : 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] });
     await oldDelivery;
     expect(values.get('reminder')).toMatchObject({ content: 'new title' });

@@ -53,10 +53,6 @@ export default {
 				return withRequestId(authResult.response, requestId);
 			}
 
-			if (isCrateMutation(path, method)) {
-				const migration = await db.prepare("SELECT value FROM maintenance_state WHERE key = 'portable_paths_ready'").first<{ value: string }>();
-				if (migration?.value === 'false') return withRequestId(corsResponse({ error: 'Server migration is incomplete. Finish the Crate server update before making changes.' }, 503), requestId);
-			}
 			const response = await handleAuthenticatedRoute(request, env, path, method, authResult.principal)
 				?? corsResponse({ error: 'Not found' }, 404);
 			if (isCrateMutation(path, method)) await logMutation(request, response, requestId, authResult.principal);

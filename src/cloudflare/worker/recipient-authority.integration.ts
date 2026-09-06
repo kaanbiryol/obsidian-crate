@@ -21,23 +21,9 @@ it('authorizes live scoped recipients at send selection without waiting for cron
 		await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope, folder_path, expires_at) VALUES (?, ?, 'reminders', ?, ?)").bind(id, id, folder, expiry).run();
 		await subscribe(id, id, folder);
 	}
-	await subscribe('legacy', null, null);
+	await expect(subscribe('unowned', null, null)).rejects.toThrow('NOT NULL');
 	await subscribe('forged-folder', 'other', 'Private');
-	await subscribe('explicit-push-only', `enrollment:${'a'.repeat(64)}`, null);
-	expect((await listPushSubscriptionIds(env.DB)).sort()).toEqual(['explicit-push-only', 'live']);
+	expect((await listPushSubscriptionIds(env.DB)).sort()).toEqual(['live']);
 	await pruneExpiredTokens(env.DB);
-	expect((await listPushSubscriptionIds(env.DB)).sort()).toEqual(['explicit-push-only', 'live']);
-});
-
-it('quarantines unowned subscriptions when upgrading the previous delivery schema', async () => {
-    await execute(schema);
-    for (const [table, columns] of [
-        ['reminder_projections', ['notification_token', 'policy_revision']],
-        ['scheduled_reminders', ['delivery_failed_at', 'delivery_error', 'delivery_attempts']],
-    ] as const) for (const column of columns) await env.DB.prepare(`ALTER TABLE ${table} DROP COLUMN ${column}`).run();
-    await subscribe('legacy', null, null);
-    const { default: migration } = await import('../migrations/0009_delivery_integrity.sql?raw');
-    await execute(migration);
-    expect(await env.DB.prepare("SELECT disabled_at FROM push_subscriptions WHERE id = 'legacy'").first()).toMatchObject({ disabled_at: expect.any(String) as string });
-    expect(await listPushSubscriptionIds(env.DB)).toEqual([]);
+	expect((await listPushSubscriptionIds(env.DB)).sort()).toEqual(['live']);
 });

@@ -1,8 +1,3 @@
-export {
-	handleCancelReminder,
-	handleListScheduled,
-	handleScheduleReminder,
-} from '../reminder-handlers';
 export { handleSetReminderCompleted } from '../reminders-web/routes/complete';
 export { handleCreateReminder } from '../reminders-web/routes/create';
 export { handleDeleteReminder } from '../reminders-web/routes/delete';

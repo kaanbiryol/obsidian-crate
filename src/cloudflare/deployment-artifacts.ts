@@ -1,9 +1,3 @@
-export interface D1MigrationArtifact {
-	name: string;
-	sql: string;
-	sha256: string;
-}
-
 export interface CloudflareDeploymentArtifacts {
 	version: string;
 	fingerprint: string;
@@ -11,7 +5,6 @@ export interface CloudflareDeploymentArtifacts {
 	workerBundleSha256: string;
 	d1Schema: string;
 	d1SchemaSha256: string;
-	d1Migrations: D1MigrationArtifact[];
 }
 
 function decodeBase64(value: string): Uint8Array {
@@ -37,7 +30,6 @@ export async function decodeAndVerifyArtifacts(input: {
 	workerBundleSha256: string;
 	d1Schema: string;
 	d1SchemaSha256: string;
-	d1Migrations: D1MigrationArtifact[];
 }): Promise<CloudflareDeploymentArtifacts> {
 	if (typeof DecompressionStream === 'undefined') {
 		throw new Error('This Obsidian version cannot unpack the embedded Cloudflare deployment');
@@ -56,23 +48,6 @@ export async function decodeAndVerifyArtifacts(input: {
 		throw new Error('The embedded D1 schema failed its integrity check');
 	}
 
-	const migrationNames = new Set<string>();
-	let previousMigrationName = '';
-	for (const migration of input.d1Migrations) {
-		if (
-			!/^\d{4}_[a-z0-9_-]+\.sql$/.test(migration.name)
-			|| migrationNames.has(migration.name)
-			|| migration.name.localeCompare(previousMigrationName) <= 0
-		) {
-			throw new Error('The embedded D1 migration list is invalid');
-		}
-		migrationNames.add(migration.name);
-		previousMigrationName = migration.name;
-		if (await sha256Hex(migration.sql) !== migration.sha256) {
-			throw new Error(`The embedded D1 migration ${migration.name} failed its integrity check`);
-		}
-	}
-
 	return {
 		version: input.version,
 		fingerprint: input.fingerprint,
@@ -80,6 +55,5 @@ export async function decodeAndVerifyArtifacts(input: {
 		workerBundleSha256: input.workerBundleSha256,
 		d1Schema: input.d1Schema,
 		d1SchemaSha256: input.d1SchemaSha256,
-		d1Migrations: input.d1Migrations,
 	};
 }

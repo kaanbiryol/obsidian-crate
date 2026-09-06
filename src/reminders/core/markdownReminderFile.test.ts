@@ -50,7 +50,7 @@ describe('markdownReminderFile', () => {
 		expect(encoded).not.toContain('\n');
 		expect(encoded).not.toContain('>');
 		expect(decodeDescriptionFromMarkdown(encoded)).toBe(description);
-		expect(decodeDescriptionFromMarkdown('legacy plain text')).toBe('legacy plain text');
+		expect(() => decodeDescriptionFromMarkdown('plain text')).toThrow('Unsupported reminder description encoding');
 	});
 
 	it('replaces and deletes reminder blocks together with description lines', () => {
@@ -58,7 +58,7 @@ describe('markdownReminderFile', () => {
 			'# Work',
 			'',
 			'- [ ] Task Jan 1, 2026 <!-- crate-id:r1 -->',
-			'<!-- crate-desc:old details -->',
+			'<!-- crate-desc:v1:old%20details -->',
 			'- [ ] Keep Jan 2, 2026 <!-- crate-id:r2 -->',
 			'',
 		].join('\n');
@@ -122,7 +122,7 @@ describe('markdownReminderFile', () => {
 			'# Work',
 			'',
 			'- [ ] First Jan 1, 2026 <!-- crate-id:r1 -->',
-			'<!-- crate-desc:first note -->',
+			'<!-- crate-desc:v1:first%20note -->',
 			'- [ ] Second Jan 2, 2026 <!-- crate-id:r2 -->',
 			'- [x] Done Jan 3, 2026 <!-- crate-id:r3 -->',
 			'',
@@ -133,7 +133,7 @@ describe('markdownReminderFile', () => {
 		const lines = reorderReminderBlocksInContent(initial, ['r2', 'r1']).split('\n');
 		const secondIndex = lines.findIndex((line) => line.includes('Second Jan 2, 2026'));
 		const firstIndex = lines.findIndex((line) => line.includes('First Jan 1, 2026'));
-		const descIndex = lines.findIndex((line) => line.includes('crate-desc:first note'));
+		const descIndex = lines.findIndex((line) => line.includes('crate-desc:v1:first%20note'));
 		const doneIndex = lines.findIndex((line) => line.includes('Done Jan 3, 2026'));
 		const footerIndex = lines.findIndex((line) => line === 'Footer');
 

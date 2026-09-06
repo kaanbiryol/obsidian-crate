@@ -2,7 +2,6 @@ import { parseFolderPath } from './reminders-web/requests';
 import { createRandomHexToken, sha256Hex } from './auth';
 import { corsResponse } from './cors';
 import { getOrCreateVapidKeys } from './push';
-import { issuePushEnrollmentToken } from './push-enrollment';
 import { parseJsonObject, parseOptionalString } from './utils';
 import { consumeWebEnrollmentToken, issueWebEnrollmentToken } from './web-enrollment';
 
@@ -13,18 +12,10 @@ export async function handleVapidPublicKey(db: D1Database): Promise<Response> {
 	return corsResponse({ publicKey: keys.publicKey });
 }
 
-export async function handleCreateEnrollmentToken(db: D1Database): Promise<Response> {
-	const { token, expiresAt } = await issuePushEnrollmentToken(db);
-	return corsResponse({
-		token,
-		expiresAt: new Date(expiresAt).toISOString(),
-	});
-}
-
-export async function handleCreateRemindersEnrollmentToken(db: D1Database, request?: Request): Promise<Response> {
-	const parsed = request ? await parseJsonObject(request) : null;
-	if (parsed && !parsed.ok) return parsed.response;
-	const folderPath = parseFolderPath(parsed?.ok ? parsed.value.folderPath : null);
+export async function handleCreateRemindersEnrollmentToken(db: D1Database, request: Request): Promise<Response> {
+	const parsed = await parseJsonObject(request);
+	if (!parsed.ok) return parsed.response;
+	const folderPath = parseFolderPath(parsed.value.folderPath);
 	if (!folderPath) return corsResponse({ error: 'folderPath required' }, 400);
 	const installEnrollment = await issueWebEnrollmentToken(db, folderPath);
 	const browserEnrollment = await issueWebEnrollmentToken(db, folderPath);

@@ -5,7 +5,7 @@ import type { TabId } from './ui/layoutConstants';
 
 export type DueDateDefaultSetting = 'none' | 'today' | 'tomorrow';
 
-export type AutoOpenSetting = 'none' | 'sidebar';
+type AutoOpenSetting = 'none' | 'sidebar';
 
 export const DEFAULT_REMINDERS_FOLDER_PATH = 'Reminders';
 
@@ -20,7 +20,6 @@ type QueryViewPreference = {
 
 export type RemindersSettings = {
 	enabled: boolean;
-	debugLogging: boolean;
 	taskCreationDefaultDueDate: DueDateDefaultSetting;
 	remindersFolderPath: string;
 	queryViewPreferences: Record<string, QueryViewPreference>;
@@ -32,7 +31,6 @@ export type RemindersSettings = {
 
 export const DEFAULT_REMINDERS_SETTINGS: RemindersSettings = {
 	enabled: false,
-	debugLogging: false,
 	taskCreationDefaultDueDate: 'none',
 	remindersFolderPath: DEFAULT_REMINDERS_FOLDER_PATH,
 	queryViewPreferences: {},
@@ -138,18 +136,13 @@ export function normalizeRemindersFolderPath(rawPath: string | null | undefined)
 }
 
 export function normalizeRemindersSettings(
-	value: (Omit<Partial<RemindersSettings>, 'autoOpenView'> & { autoOpenView?: AutoOpenSetting | 'fullscreen' }) | null | undefined,
+	value: Partial<RemindersSettings> | null | undefined,
 ): RemindersSettings {
 	return {
-		// Settings saved by prerelease builds predate the explicit adoption flag.
-		// Preserve those users' existing reminders behavior while keeping new
-		// installs read-only until they opt in.
 		enabled: typeof value?.enabled === 'boolean'
 			? value.enabled
-			: value !== null && value !== undefined,
-		debugLogging: typeof value?.debugLogging === 'boolean'
-			? value.debugLogging
-			: DEFAULT_REMINDERS_SETTINGS.debugLogging,
+			: DEFAULT_REMINDERS_SETTINGS.enabled,
+
 		taskCreationDefaultDueDate: isDueDateDefaultSetting(value?.taskCreationDefaultDueDate)
 			? value.taskCreationDefaultDueDate
 			: DEFAULT_REMINDERS_SETTINGS.taskCreationDefaultDueDate,
@@ -159,7 +152,7 @@ export function normalizeRemindersSettings(
 			value?.upcomingDaysDefault,
 			DEFAULT_REMINDERS_SETTINGS.upcomingDaysDefault,
 		),
-		autoOpenView: value?.autoOpenView === 'fullscreen' ? 'sidebar' : isAutoOpenSetting(value?.autoOpenView)
+		autoOpenView: isAutoOpenSetting(value?.autoOpenView)
 			? value.autoOpenView
 			: DEFAULT_REMINDERS_SETTINGS.autoOpenView,
 		sidebarDefaultTab: normalizeTabId(

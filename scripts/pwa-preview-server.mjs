@@ -128,7 +128,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 			return;
 		}
 		if (method === 'GET' && path === '/.well-known/crate') {
-      sendJson(res, 200, { service: 'crate', serverVersion: '0.1.0', protocol: { current: 3, oldestCompatible: 3 }, capabilities: [] });
+      sendJson(res, 200, { service: 'crate', serverVersion: '0.1.0', protocol: { current: 4, oldestCompatible: 4 }, capabilities: [] });
       return;
     }
 		if (method === 'GET' && path === '/notifications/version.json') {

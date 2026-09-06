@@ -1,50 +1,12 @@
-import { Notice } from 'obsidian';
 import type CratePlugin from '../main';
 import { createReminderIndex } from './data/reminder-index';
 import { createMarkdownWriter } from './data/markdown-writer';
 import { createReminderRepository } from './data/reminder-repository';
-import { ReminderNotificationService } from './services/notificationService';
 import { VaultWatcher } from './services/vaultWatcher';
 import { createLogger } from './utils/logger';
 
 const remindersLogger = createLogger('Reminders');
 const notificationTasks = new WeakMap<CratePlugin, Promise<void>>();
-const notificationReconciliationSuspended = new WeakSet<CratePlugin>();
-
-function enqueueNotificationWork(plugin: CratePlugin, work: () => Promise<void>): Promise<void> {
-	const previousTask = notificationTasks.get(plugin) ?? Promise.resolve();
-	const currentTask = previousTask.catch(() => undefined).then(work);
-	notificationTasks.set(plugin, currentTask);
-	void currentTask.finally(() => {
-		if (notificationTasks.get(plugin) === currentTask) {
-			notificationTasks.delete(plugin);
-		}
-	}).catch(() => undefined);
-	return currentTask;
-}
-
-function createNotificationService(plugin: CratePlugin): ReminderNotificationService {
-	return new ReminderNotificationService(
-		() => plugin.settings,
-		() => plugin.remindersSettings,
-		() => plugin.syncRuntime.getApiClient(),
-	);
-}
-
-function configureReminderWriterCallbacks(plugin: CratePlugin): void {
-	plugin.markdownWriter.setOnFileWritten(async (file) => {
-		await plugin.reminderIndex.rescanFile(file, true);
-	});
-
-	const notificationService = createNotificationService(plugin);
-	plugin.markdownWriter.setOnReminderChange(async (reminder, operation) => {
-		const result = await notificationService.onReminderChange(reminder, operation);
-		if (!result.success) {
-			new Notice(`Reminder saved but notification sync failed:\n${result.error}`, 5000);
-		}
-		return result;
-	});
-}
 
 export async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Promise<void> {
 	plugin.remindersVaultWatcher?.unregister();
@@ -53,42 +15,34 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	await plugin.reminderIndex.load();
 	plugin.markdownWriter = createMarkdownWriter(plugin.app, plugin.reminderIndex);
 	plugin.reminderRepository = createReminderRepository(plugin.reminderIndex, plugin.markdownWriter);
-	configureReminderWriterCallbacks(plugin);
+	plugin.markdownWriter.setOnFileWritten(async (file) => {
+		await plugin.reminderIndex.rescanFile(file, true);
+	});
 
 	plugin.remindersVaultWatcher = new VaultWatcher(
 		plugin,
 		plugin.reminderIndex,
-		() => reconcileReminderNotifications(plugin),
 	);
 	plugin.remindersVaultWatcher.register();
 }
 
-export async function reconcileReminderNotifications(plugin: CratePlugin): Promise<void> {
-	if (notificationReconciliationSuspended.has(plugin)) return;
-  const active = notificationTasks.get(plugin);
-  if (active) return active;
-	await enqueueNotificationWork(plugin, async () => {
-		if (notificationReconciliationSuspended.has(plugin)) return;
-		try {
-			await createNotificationService(plugin).reconcile(plugin.reminderIndex.getAll());
-		} catch (error) {
-			remindersLogger.warn('Failed to reconcile reminder notifications:', error);
-		}
+export async function ensureReminderNotificationPolicy(plugin: CratePlugin): Promise<void> {
+	const api = plugin.syncRuntime.getApiClient();
+	if (!plugin.settings.pushEnabled || !api) return;
+	const active = notificationTasks.get(plugin);
+	if (active) return active;
+	const settings = plugin.remindersSettings;
+	const task = api.ensureNotificationPolicy({
+		folderPath: settings.remindersFolderPath,
+		timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+		allDayTime: settings.allDayNotificationTime,
+	}).then(() => undefined).catch((error: unknown) => {
+		remindersLogger.warn('Failed to initialize reminder notification policy:', error);
 	});
-}
-
-export async function disableReminderNotifications(plugin: CratePlugin): Promise<void> {
-	notificationReconciliationSuspended.add(plugin);
+	notificationTasks.set(plugin, task);
 	try {
-		await enqueueNotificationWork(plugin, () => createNotificationService(plugin).cancelAll());
-	} catch (error) {
-		notificationReconciliationSuspended.delete(plugin);
-		await reconcileReminderNotifications(plugin);
-		throw error;
+		await task;
+	} finally {
+		if (notificationTasks.get(plugin) === task) notificationTasks.delete(plugin);
 	}
-}
-
-export async function enableReminderNotifications(plugin: CratePlugin): Promise<void> {
-	notificationReconciliationSuspended.delete(plugin);
-	await reconcileReminderNotifications(plugin);
 }

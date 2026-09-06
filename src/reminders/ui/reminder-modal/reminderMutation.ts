@@ -32,7 +32,6 @@ export interface ReminderSubmission {
 }
 
 interface ExecuteReminderActionOptions {
-	optimistic: boolean;
 	close: () => void;
 	action: () => Promise<void>;
 	onError?: (error: Error) => void;

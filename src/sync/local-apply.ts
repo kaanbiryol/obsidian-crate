@@ -91,16 +91,6 @@ export async function preserveLocalVersionsAndApplyRemote(
 	};
 }
 
-export async function writeRemoteContent(
-	context: LocalApplyContext,
-	path: string,
-	content: ArrayBuffer,
-): Promise<void> {
-	await ensureParentFolder(context.vault, path);
-	const snapshot = await readLocalSnapshot(context.vault, path);
-	await writeLocalContent(context, path, content, snapshot);
-}
-
 async function readLocalSnapshot(vault: Vault, path: string): Promise<LocalSnapshot> {
 	const abstractFile = vault.getAbstractFileByPath(path);
 	const visibleFile = isVaultTFileLike(abstractFile) ? abstractFile : undefined;

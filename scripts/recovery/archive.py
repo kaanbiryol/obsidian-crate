@@ -59,6 +59,9 @@ def verify(directory):
         raise ValueError('Database export checksum mismatch')
     db = load_database(sql)
     try:
+        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        if 'crate_schema' not in tables or [tuple(row) for row in db.execute('SELECT id, version FROM crate_schema')] != [(1, 1)]:
+            raise ValueError('Unsupported Crate database schema')
         expected = references(db)
         objects = {item['key']: item for item in manifest['objects']}
         if len(objects) != len(manifest['objects']) or set(objects) != set(expected) | ({'__crate__/settings.json'} if '__crate__/settings.json' in objects else set()):
@@ -81,17 +84,14 @@ def prepare_restore_sql(directory, restored_at=None):
     """Rebuild derived schedules and require fresh device enrollment in a new deployment."""
     _manifest, db = verify(directory)
     try:
-        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-        for table in ('auth_tokens', 'push_subscriptions', 'push_enrollment_tokens', 'web_enrollment_tokens',
+        for table in ('auth_tokens', 'push_subscriptions', 'web_enrollment_tokens',
                       'scheduled_reminders', 'notification_jobs', 'reminder_projections', 'reminder_file_cache',
                       'object_cleanup_queue', 'request_rate_limits', 'notification_projection_jobs'):
-            if table in tables:
-                db.execute(f'DELETE FROM "{table}"')
+            db.execute(f'DELETE FROM "{table}"')
         # Restored retained content gets a fresh recovery window before collection.
         restored_at = int(time.time() * 1000) if restored_at is None else restored_at
         db.execute('UPDATE file_versions SET expires_at = ?', (restored_at + 2592000000,))
-        if 'notification_projection_jobs' in tables:
-            db.execute("INSERT INTO notification_projection_jobs (path, job_token, updated_at) SELECT path, storage_key, datetime(? / 1000, 'unixepoch') FROM files WHERE lower(path) LIKE '%.md'", (restored_at,))
+        db.execute("INSERT INTO notification_projection_jobs (path, job_token, updated_at) SELECT path, storage_key, datetime(? / 1000, 'unixepoch') FROM files WHERE lower(path) LIKE '%.md'", (restored_at,))
         db.commit()
         return '\n'.join(db.iterdump()).encode('utf-8')
     finally:

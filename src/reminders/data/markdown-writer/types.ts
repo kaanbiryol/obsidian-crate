@@ -1,24 +1,9 @@
 import type { App, TFile } from "obsidian";
 import type {
   Priority,
-  Reminder,
   RecurrenceRule,
 } from "@/reminders/types/reminder";
 import type { IndexedReminder, ReminderIndex } from "../reminder-index";
-
-type ReminderOperation = "create" | "update" | "delete";
-
-export interface ReminderChangeContext {
-  recurringInstanceCompleted?: {
-    completedDate: string;
-    nextDate: string;
-  };
-}
-
-interface SyncResult {
-  success: boolean;
-  error?: string;
-}
 
 export interface UpdateReminderInput {
   content?: string;
@@ -30,12 +15,6 @@ export interface UpdateReminderInput {
   hasTime?: boolean;
 }
 
-export type OnReminderChangeCallback = (
-  reminder: Reminder,
-  operation: ReminderOperation,
-  context?: ReminderChangeContext
-) => Promise<SyncResult>;
-
 export type OnFileWrittenCallback = (file: TFile) => Promise<void>;
 
 export interface MarkdownWriterContext {
@@ -43,7 +22,6 @@ export interface MarkdownWriterContext {
   index: ReminderIndex;
   getFile(filePath: string): Promise<TFile | null>;
   getOrCreateProjectFile(project: string): Promise<TFile>;
-  getOnReminderChange(): OnReminderChangeCallback | undefined;
   getOnFileWritten(): OnFileWrittenCallback | undefined;
 }
 
@@ -69,8 +47,6 @@ export interface MarkdownWriter {
   toggleComplete(reminder: IndexedReminder): Promise<void>;
 
   reorderReminders(filePath: string, orderedIds: string[]): Promise<void>;
-
-  setOnReminderChange(callback: OnReminderChangeCallback): void;
 
   setOnFileWritten(callback: OnFileWrittenCallback): void;
 }

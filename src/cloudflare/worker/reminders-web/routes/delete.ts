@@ -4,7 +4,7 @@ import { writeCommittedMarkdownFile } from '../../storage';
 import type { Env } from '../../types';
 import { parseJsonObject, parseOptionalString } from '../../utils';
 import { deleteReminderFromFileContent } from '../file-content';
-import { cancelReminderNotification } from '../notifications';
+import { projectReminderNotifications } from '../notifications';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile } from '../scan';
@@ -44,6 +44,6 @@ export async function handleDeleteReminder(request: Request, env: Env): Promise<
 		write.hash,
 		scanReminderMarkdownFile(reminder.filePath, nextContent, workspaceResult.folderPath),
 	);
-	const notificationWarning = await cancelReminderNotification(env, id);
+	const notificationWarning = await projectReminderNotifications(env);
 	return corsResponse({ success: true, id, notificationWarning });
 }

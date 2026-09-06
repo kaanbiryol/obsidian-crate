@@ -56,7 +56,7 @@ assert(
 	'Plugin bundle is missing the initial D1 schema artifact',
 );
 assert(
-	pluginBundle.includes('CREATE TABLE IF NOT EXISTS d1_migrations'),
+	pluginBundle.includes('CREATE TABLE IF NOT EXISTS crate_schema'),
 	'Plugin bundle is missing the D1 schema-version baseline',
 );
 assert(pluginBundle.includes('https://dash.cloudflare.com/oauth2/auth'), 'Plugin bundle is missing the Cloudflare OAuth entry point');

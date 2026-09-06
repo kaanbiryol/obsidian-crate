@@ -187,21 +187,6 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 		expect(await unsafeProjectResponse.json()).toEqual({ error: 'Invalid project' });
 		expect(workspace.files.has('Reminders/../Secrets.md')).toBe(false);
 
-		const invalidTimeResponse = await handleCreateReminder(
-			new Request('https://worker.test/reminders/create', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: await workspace.mutationBody({
-					folderPath: 'Reminders',
-					content: 'Bad notification time',
-					allDayNotificationTime: '25:00',
-				}),
-			}),
-			workspace.env as never,
-		);
-
-		expect(invalidTimeResponse.status).toBe(400);
-		expect(await invalidTimeResponse.json()).toEqual({ error: 'Invalid allDayNotificationTime' });
 	});
 
 	it('persists recurrence from create and update payloads', async () => {

@@ -2,7 +2,6 @@ import {
 	handleExchangeRemindersEnrollmentToken,
 	handleVapidPublicKey,
 } from '../notifications';
-import { handleSubscribe } from '../notifications';
 import {
 	handleAppleTouchIcon,
 	handleCrateIcon192,
@@ -52,14 +51,6 @@ export async function handlePublicRoute(
 	if (path === '/notifications/vapid-public-key' && method === 'GET') return await handleVapidPublicKey(db);
 	if (path === '/notifications/reminders-exchange' && method === 'POST') {
 		return await withDatabase(db, requiredDb => handleExchangeRemindersEnrollmentToken(request, requiredDb));
-	}
-
-	if (
-		path === '/notifications/subscribe'
-		&& method === 'POST'
-		&& request.headers.get('X-Crate-Enrollment-Token')?.trim()
-	) {
-		return await withDatabase(db, requiredDb => handleSubscribe(request, requiredDb));
 	}
 
 	return null;

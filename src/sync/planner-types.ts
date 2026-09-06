@@ -50,7 +50,7 @@ export interface IncrementalSyncPlannerContext {
   shouldIgnore(path: string): boolean;
   getLocalChanges(): Promise<{ path: string; hash: string }[]>;
   getLocalDeletes(): Promise<string[]>;
-  parallelDownloadAndSaveFiles(requests: string[] | DownloadRequest[], result: SyncResult): Promise<void>;
+  parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult): Promise<void>;
   processDiff(
     diff: FileDiff,
     localFiles: Record<string, FileEntry>,

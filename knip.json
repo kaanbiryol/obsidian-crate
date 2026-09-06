@@ -1,15 +1,17 @@
 {
 	"$schema": "./node_modules/knip/schema.json",
 	"entry": [
-		"src/main.ts",
-		"src/cloudflare/worker/index.ts",
-		"src/pwa/main.tsx",
+		"src/main.ts!",
+		"src/cloudflare/worker/index.ts!",
+		"src/pwa/main.tsx!",
 		"scripts/*.mjs"
 	],
 	"project": [
-		"src/**/*.{ts,tsx}",
+		"src/**/*.{ts,tsx}!",
 		"scripts/*.mjs",
-		"*.{js,mjs,mts,ts}"
+		"*.{js,mjs,mts,ts}",
+		"!src/**/*-test-harness.ts!",
+		"!src/test/**!"
 	],
 	"ignoreFiles": [
 		"src/cloudflare/worker/cloudflare-env.d.ts",
@@ -23,6 +25,7 @@
 		"tailwindcss"
 	],
 	"ignoreBinaries": [
-		"tar", "python3"
+		"tar",
+		"python3"
 	]
 }

@@ -202,32 +202,3 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
     recurrence,
   };
 }
-
-/**
- * Rebuild content string with new date and priority
- */
-export function rebuildReminderContent(cleanContent: string, dueDate: Date | undefined, priority: Priority, hasTime?: boolean): string {
-  let newContent = cleanContent;
-
-  // Add date if present (without @ prefix)
-  if (dueDate) {
-    const year = dueDate.getFullYear();
-    const month = (dueDate.getMonth() + 1).toString().padStart(2, '0');
-    const day = dueDate.getDate().toString().padStart(2, '0');
-
-    if (hasTime) {
-      const hours = dueDate.getHours().toString().padStart(2, '0');
-      const minutes = dueDate.getMinutes().toString().padStart(2, '0');
-      newContent += ` ${year}-${month}-${day}T${hours}:${minutes}`;
-    } else {
-      newContent += ` ${year}-${month}-${day}`;
-    }
-  }
-
-  // Add important marker if priority is 1
-  if (priority === 1) {
-    newContent += ' !';
-  }
-
-  return newContent;
-}

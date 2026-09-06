@@ -72,7 +72,7 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 		showStatusBar: false,
 		syncHistory: [],
 		pushEnabled: false,
-		syncDebugLogging: false,
+		debugLogging: false,
 		debounceDelay: 5,
 		...overrides,
 	};

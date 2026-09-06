@@ -48,7 +48,6 @@ describe('executeReminderAction', () => {
 		const events: string[] = [];
 
 		await executeReminderAction({
-			optimistic: true,
 			close: () => events.push('close'),
 			action: async () => {
 				events.push('action');
@@ -63,7 +62,6 @@ describe('executeReminderAction', () => {
 		const onError = vi.fn();
 
 		await executeReminderAction({
-			optimistic: false,
 			close,
 			action: async () => undefined,
 			onError,
@@ -79,7 +77,6 @@ describe('executeReminderAction', () => {
 		const error = new Error('save failed');
 
 		await executeReminderAction({
-			optimistic: false,
 			close,
 			action: async () => {
 				throw error;

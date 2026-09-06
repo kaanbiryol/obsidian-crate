@@ -17,27 +17,11 @@ for (const browserType of [chromium, webkit]) {
 		const page = await browser.newPage();
 		await page.route('**/*', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Cache test</title>' }));
 		await page.goto('http://pwa-cache.test');
-		// Seed the old schema to verify that upgrading preserves an existing offline snapshot.
-		await page.evaluate(async () => {
-			await new Promise((resolve, reject) => {
-				const request = indexedDB.open('crate-reminders', 1);
-				request.onupgradeneeded = () => request.result.createObjectStore('snapshots', { keyPath: 'folderPath' });
-				request.onerror = () => reject(request.error);
-				request.onsuccess = () => {
-					const db = request.result;
-					const tx = db.transaction('snapshots', 'readwrite');
-					tx.objectStore('snapshots').put({
-						folderPath: 'Reminders', reminders: [{ id: 'original' }], projects: ['Inbox'], savedAt: 100, etag: 'old',
-					});
-					tx.oncomplete = () => { db.close(); resolve(); };
-					tx.onerror = () => reject(tx.error);
-				};
-			});
-		});
 		await page.addScriptTag({ content: outputFiles[0].text });
 		const result = await page.evaluate(async () => {
 			const cache = reminderCache;
-			const migrated = await cache.loadCachedReminderSnapshot('Reminders');
+			await cache.saveCachedReminderSnapshot('Reminders', [{ id: 'original' }], ['Inbox'], 100, 'old');
+			const initial = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.refreshCachedReminderSnapshot('Reminders', 200, 'old');
 			const refreshed = await cache.loadCachedReminderSnapshot('Reminders');
 			const stored = await new Promise((resolve, reject) => {
@@ -61,18 +45,37 @@ for (const browserType of [chromium, webkit]) {
 			const afterClear = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.refreshCachedReminderSnapshot('Missing', 500, 'missing');
 			const missing = await cache.loadCachedReminderSnapshot('Missing');
-			return { migrated, refreshed, stored, afterStaleRefresh, afterOldTimestamp, cleared, afterClear, missing };
+            await cache.clearCachedReminderSnapshots();
+            await new Promise((resolve, reject) => {
+                const request = indexedDB.open('crate-reminders', 1);
+                request.onupgradeneeded = () => request.result.createObjectStore('unsupported');
+                request.onsuccess = () => { request.result.close(); resolve(); };
+                request.onerror = () => reject(request.error);
+            });
+            const unsupported = await cache.loadCachedReminderSnapshot('Reminders');
+            const preservedVersion = await new Promise((resolve, reject) => {
+                const request = indexedDB.open('crate-reminders');
+                request.onsuccess = () => { const version = request.result.version; request.result.close(); resolve(version); };
+                request.onerror = () => reject(request.error);
+            });
+            await cache.clearCachedReminderSnapshots();
+            await cache.saveCachedReminderSnapshot('Reminders', [{ id: 'fresh' }], ['Inbox'], 600, 'fresh');
+            const fresh = await cache.loadCachedReminderSnapshot('Reminders');
+            return { initial, refreshed, stored, afterStaleRefresh, afterOldTimestamp, cleared, afterClear, missing, unsupported, preservedVersion, fresh };
 		});
-		assert.equal(result.migrated.reminders[0].id, 'original');
+		assert.equal(result.initial.reminders[0].id, 'original');
 		assert.equal(result.refreshed.savedAt, 200);
-		assert.deepEqual(result.stored, result.migrated, '304 must not rewrite the snapshot');
+		assert.deepEqual(result.stored, result.initial, '304 must not rewrite the snapshot');
 		assert.equal(result.afterStaleRefresh.savedAt, 300);
 		assert.equal(result.afterStaleRefresh.reminders[0].id, 'new');
 		assert.equal(result.afterOldTimestamp.savedAt, 300);
 		assert.equal(result.cleared, null);
 		assert.equal(result.afterClear.savedAt, 50);
 		assert.equal(result.missing, null);
-		console.log(`${browserType.name()}: cache migration, metadata-only refresh, revision guards and clearing passed`);
+		assert.equal(result.unsupported, null);
+		assert.equal(result.preservedVersion, 1, 'Unsupported cache must remain untouched');
+		assert.equal(result.fresh.reminders[0].id, 'fresh');
+		console.log(`${browserType.name()}: cache creation, metadata-only refresh, revision guards and clearing passed`);
 	} finally {
 		await browser.close();
 	}

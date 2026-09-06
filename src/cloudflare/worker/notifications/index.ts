@@ -1,5 +1,4 @@
 export {
-	handleCreateEnrollmentToken,
 	handleCreateRemindersEnrollmentToken,
 	handleExchangeRemindersEnrollmentToken,
 	handleVapidPublicKey,

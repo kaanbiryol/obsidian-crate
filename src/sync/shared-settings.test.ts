@@ -1,22 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, type SharedSettings } from '../plugin/settings-types';
 import { applySharedSettings, normalizeSharedSettingsValue } from './shared-settings';
 
 describe('shared-settings helpers', () => {
-	it('normalizes stored shared settings and defaults missing optional flags', () => {
+	it('rejects shared settings missing required flags', () => {
 		expect(normalizeSharedSettingsValue({
 			ignorePatterns: ['.git/'],
 			syncOnStartup: true,
 			syncInterval: 30,
 			showStatusBar: true,
-		})).toEqual({
-			ignorePatterns: ['.git/'],
-			syncOnStartup: true,
-			syncOnResume: DEFAULT_SETTINGS.syncOnResume,
-			syncInterval: 30,
-			showStatusBar: true,
-			pushEnabled: false,
-		} satisfies SharedSettings);
+		})).toBeNull();
 	});
 
 	it('applies all shared settings to local plugin settings', () => {

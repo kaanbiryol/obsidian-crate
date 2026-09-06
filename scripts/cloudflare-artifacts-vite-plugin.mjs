@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const VIRTUAL_ID = 'virtual:crate-cloudflare-artifacts';
@@ -24,22 +24,7 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
 			const workerBundleSha256 = sha256(workerBundle);
 			const d1Schema = readFileSync(resolve(rootDir, 'src/cloudflare/schema.sql'), 'utf8');
 			const d1SchemaSha256 = sha256(d1Schema);
-			const migrationsDir = resolve(rootDir, 'src/cloudflare/migrations');
-			const d1Migrations = readdirSync(migrationsDir, { withFileTypes: true })
-				.filter(entry => entry.isFile() && /^\d{4}_[a-z0-9_-]+\.sql$/.test(entry.name))
-				.map(entry => {
-					const sql = readFileSync(resolve(migrationsDir, entry.name), 'utf8');
-					return { name: entry.name, sql, sha256: sha256(sql) };
-				})
-				.sort((left, right) => left.name.localeCompare(right.name));
-			const artifactFingerprint = sha256(JSON.stringify({
-				workerBundleSha256,
-				d1SchemaSha256,
-				d1Migrations: d1Migrations.map(({ name, sha256: migrationSha256 }) => ({
-					name,
-					sha256: migrationSha256,
-				})),
-			}));
+			const artifactFingerprint = sha256(JSON.stringify({ workerBundleSha256, d1SchemaSha256 }));
 
 			return [
 				`export const artifactVersion = ${JSON.stringify(packageJson.version)};`,
@@ -48,7 +33,6 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
 				`export const artifactFingerprint = ${JSON.stringify(artifactFingerprint)};`,
 				`export const d1Schema = ${JSON.stringify(d1Schema)};`,
 				`export const d1SchemaSha256 = ${JSON.stringify(d1SchemaSha256)};`,
-				`export const d1Migrations = ${JSON.stringify(d1Migrations)};`,
 			].join('\n');
 		},
 	};

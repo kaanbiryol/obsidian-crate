@@ -6,7 +6,7 @@ import {
 	getOriginalPathFromConflictFile,
 	isConflictFile,
 } from './conflict';
-import { detectConflicts } from './reconciliation';
+import { classifyPaths } from './reconciliation';
 
 const CONFIG_DIR = '.vault-config';
 
@@ -18,9 +18,9 @@ function entry(hash: string, modified: string) {
 	};
 }
 
-describe('detectConflicts (3-way hash)', () => {
+describe('classifyPaths (3-way hash)', () => {
 	it('skips files with matching hashes', () => {
-		const diffs = detectConflicts(
+		const diffs = classifyPaths(
 			{ 'note.md': entry('same', '2026-02-06T12:00:00.000Z') },
 			{ 'note.md': entry('same', '2026-02-06T12:01:00.000Z') },
 			{},
@@ -30,7 +30,7 @@ describe('detectConflicts (3-way hash)', () => {
 	});
 
 	it('returns conflict when both sides changed since manifest', () => {
-		const diffs = detectConflicts(
+		const diffs = classifyPaths(
 			{ 'note.md': entry('local-v2', '2026-02-06T12:00:00.000Z') },
 			{ 'note.md': entry('remote-v2', '2026-02-06T12:01:00.000Z') },
 			{ 'note.md': entry('base-v1', '2026-02-06T10:00:00.000Z') },
@@ -46,7 +46,7 @@ describe('detectConflicts (3-way hash)', () => {
 	});
 
 	it('returns conflict when new file on both sides with different content', () => {
-		const diffs = detectConflicts(
+		const diffs = classifyPaths(
 			{ 'new.md': entry('local', '2026-02-06T12:00:00.000Z') },
 			{ 'new.md': entry('remote', '2026-02-06T12:01:00.000Z') },
 			{}, // no manifest entry
@@ -62,7 +62,7 @@ describe('detectConflicts (3-way hash)', () => {
 	});
 
 	it('returns upload when only local changed since manifest', () => {
-		const diffs = detectConflicts(
+		const diffs = classifyPaths(
 			{ 'note.md': entry('local-v2', '2026-02-06T12:00:00.000Z') },
 			{ 'note.md': entry('base-v1', '2026-02-06T10:00:00.000Z') },
 			{ 'note.md': entry('base-v1', '2026-02-06T10:00:00.000Z') },
@@ -78,7 +78,7 @@ describe('detectConflicts (3-way hash)', () => {
 	});
 
 	it('returns download when only remote changed since manifest', () => {
-		const diffs = detectConflicts(
+		const diffs = classifyPaths(
 			{ 'note.md': entry('base-v1', '2026-02-06T10:00:00.000Z') },
 			{ 'note.md': entry('remote-v2', '2026-02-06T12:00:00.000Z') },
 			{ 'note.md': entry('base-v1', '2026-02-06T10:00:00.000Z') },
@@ -94,7 +94,7 @@ describe('detectConflicts (3-way hash)', () => {
 	});
 
 	it('returns download when local matches manifest but remote differs', () => {
-		const diffs = detectConflicts(
+		const diffs = classifyPaths(
 			{ 'note.md': entry('base', '2026-02-06T10:00:00.000Z') },
 			{ 'note.md': entry('remote', '2026-02-06T12:00:00.000Z') },
 			{ 'note.md': entry('base', '2026-02-06T10:00:00.000Z') },
@@ -110,7 +110,7 @@ describe('detectConflicts (3-way hash)', () => {
 	});
 
 	it('returns upload for local-only files', () => {
-		const diffs = detectConflicts(
+		const diffs = classifyPaths(
 			{ 'local.md': entry('abc', '2026-02-06T12:00:00.000Z') },
 			{},
 			{},
@@ -125,7 +125,7 @@ describe('detectConflicts (3-way hash)', () => {
 	});
 
 	it('returns download for remote-only files', () => {
-		const diffs = detectConflicts(
+		const diffs = classifyPaths(
 			{},
 			{ 'remote.md': entry('xyz', '2026-02-06T12:00:00.000Z') },
 			{},
@@ -141,7 +141,7 @@ describe('detectConflicts (3-way hash)', () => {
 
 	it('deletes an unchanged local file when the remote side deleted it', () => {
 		const base = entry('base', '2026-02-06T10:00:00.000Z');
-		const diffs = detectConflicts({ 'note.md': base }, {}, { 'note.md': base });
+		const diffs = classifyPaths({ 'note.md': base }, {}, { 'note.md': base });
 
 		expect(diffs).toEqual([{
 			path: 'note.md',
@@ -152,7 +152,7 @@ describe('detectConflicts (3-way hash)', () => {
 	});
 
 	it('re-uploads an edited local file after a concurrent remote delete', () => {
-		const diffs = detectConflicts(
+		const diffs = classifyPaths(
 			{ 'note.md': entry('local-edit', '2026-02-06T12:00:00.000Z') },
 			{},
 			{ 'note.md': entry('base', '2026-02-06T10:00:00.000Z') },
@@ -168,7 +168,7 @@ describe('detectConflicts (3-way hash)', () => {
 
 	it('deletes an unchanged remote file when the local side deleted it', () => {
 		const base = { ...entry('base', '2026-02-06T10:00:00.000Z'), revision: 'version-1' };
-		const diffs = detectConflicts({}, { 'note.md': base }, { 'note.md': base });
+		const diffs = classifyPaths({}, { 'note.md': base }, { 'note.md': base });
 
 		expect(diffs).toEqual([{
 			path: 'note.md',
@@ -180,7 +180,7 @@ describe('detectConflicts (3-way hash)', () => {
 	});
 
 	it('restores a remotely edited file after a concurrent local delete', () => {
-		const diffs = detectConflicts(
+		const diffs = classifyPaths(
 			{},
 			{ 'note.md': entry('remote-edit', '2026-02-06T12:00:00.000Z') },
 			{ 'note.md': entry('base', '2026-02-06T10:00:00.000Z') },
