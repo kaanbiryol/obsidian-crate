@@ -29,6 +29,7 @@ export async function reinitializeReminders(
 	const normalizedFolderPath = normalizeRemindersFolderPath(newFolderPath);
 	remindersLogger.info(`Reinitializing with new folder: ${normalizedFolderPath}`);
 	if (!await setupReminderBackend(plugin, normalizedFolderPath) || signal.aborted) return;
+	registerReminderIntegrations(plugin);
 	await ensureReminderNotificationPolicy(plugin);
 	remindersLogger.info('Reinitialization complete');
 }

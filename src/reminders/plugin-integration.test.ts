@@ -294,6 +294,8 @@ it('keeps the newer folder backend when an older scan finishes last', async () =
   await first;
   expect(plugin.reminderIndex).toBe(current);
   expect(latestWatcher.register).toHaveBeenCalledOnce();
+  expect(plugin.registerView).toHaveBeenCalledOnce();
+  expect(registerReminderCommands).toHaveBeenCalledOnce();
   expect((reminderIndexFactory.mock.calls[0]?.[2] as AbortSignal).aborted).toBe(true);
 });
 
