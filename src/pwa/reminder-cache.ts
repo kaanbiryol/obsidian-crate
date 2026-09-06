@@ -1,8 +1,15 @@
 import type { CachedReminderSnapshot, ReminderRecord } from './types';
 
 const CACHE_DATABASE_NAME = 'crate-reminders';
-const CACHE_DATABASE_VERSION = 1;
+const CACHE_DATABASE_VERSION = 2;
 const CACHE_STORE_NAME = 'snapshots';
+const FRESHNESS_STORE_NAME = 'freshness';
+
+interface CacheFreshness {
+	folderPath: string;
+	savedAt: number;
+	etag: string;
+}
 
 function normalizeSnapshot(value: unknown, folderPath: string): CachedReminderSnapshot | null {
 	if (!value || typeof value !== 'object') return null;
@@ -37,6 +44,9 @@ function openCacheDatabase(): Promise<IDBDatabase> {
 			if (!request.result.objectStoreNames.contains(CACHE_STORE_NAME)) {
 				request.result.createObjectStore(CACHE_STORE_NAME, { keyPath: 'folderPath' });
 			}
+			if (!request.result.objectStoreNames.contains(FRESHNESS_STORE_NAME)) {
+				request.result.createObjectStore(FRESHNESS_STORE_NAME, { keyPath: 'folderPath' });
+			}
 		};
 		request.onsuccess = () => resolve(request.result);
 		request.onerror = () => reject(request.error ?? new Error('Could not open reminder cache'));
@@ -47,10 +57,20 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 	const database = await openCacheDatabase();
 	try {
 		return await new Promise((resolve, reject) => {
-			const transaction = database.transaction(CACHE_STORE_NAME, 'readonly');
+			const transaction = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME], 'readonly');
 			const request = transaction.objectStore(CACHE_STORE_NAME).get(folderPath);
-			request.onsuccess = () => resolve(normalizeSnapshot(request.result, folderPath));
-			request.onerror = () => reject(request.error ?? new Error('Could not read reminder cache'));
+			const freshnessRequest = transaction.objectStore(FRESHNESS_STORE_NAME).get(folderPath);
+			transaction.oncomplete = () => {
+				const snapshot = normalizeSnapshot(request.result, folderPath);
+				const freshness = freshnessRequest.result as CacheFreshness | undefined;
+				// A late revalidation must never update the timestamp of a different revision.
+				if (snapshot?.etag && freshness?.etag === snapshot.etag && Number.isFinite(freshness.savedAt)) {
+					snapshot.savedAt = Math.max(snapshot.savedAt, freshness.savedAt);
+				}
+				resolve(snapshot);
+			};
+			transaction.onerror = () => reject(transaction.error ?? new Error('Could not read reminder cache'));
+			transaction.onabort = () => reject(transaction.error ?? new Error('Reminder cache read was aborted'));
 		});
 	} finally {
 		database.close();
@@ -61,8 +81,9 @@ async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise
 	const database = await openCacheDatabase();
 	try {
 		await new Promise<void>((resolve, reject) => {
-			const transaction = database.transaction(CACHE_STORE_NAME, 'readwrite');
+			const transaction = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME], 'readwrite');
 			transaction.objectStore(CACHE_STORE_NAME).put(snapshot);
+			transaction.objectStore(FRESHNESS_STORE_NAME).delete(snapshot.folderPath);
 			transaction.oncomplete = () => resolve();
 			transaction.onerror = () => reject(transaction.error ?? new Error('Could not write reminder cache'));
 			transaction.onabort = () => reject(transaction.error ?? new Error('Reminder cache write was aborted'));
@@ -100,10 +121,32 @@ export async function clearCachedReminderSnapshots(): Promise<void> {
 		const database = await openCacheDatabase();
 		try {
 			await new Promise<void>((resolve, reject) => {
-				const transaction = database.transaction(CACHE_STORE_NAME, 'readwrite');
+				const transaction = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME], 'readwrite');
 				transaction.objectStore(CACHE_STORE_NAME).clear();
+				transaction.objectStore(FRESHNESS_STORE_NAME).clear();
 				transaction.oncomplete = () => resolve();
 				transaction.onerror = () => reject(transaction.error ?? new Error('Could not clear reminder cache'));
+			});
+		} finally {
+			database.close();
+		}
+	} catch {
+		// Offline caching is best effort.
+	}
+}
+
+/** Persist a successful revalidation without cloning or rewriting reminder contents. */
+export async function refreshCachedReminderSnapshot(folderPath: string, savedAt: number, etag?: string): Promise<void> {
+	if (!etag) return;
+	try {
+		const database = await openCacheDatabase();
+		try {
+			await new Promise<void>((resolve, reject) => {
+				const transaction = database.transaction(FRESHNESS_STORE_NAME, 'readwrite');
+				transaction.objectStore(FRESHNESS_STORE_NAME).put({ folderPath, savedAt, etag } satisfies CacheFreshness);
+				transaction.oncomplete = () => resolve();
+				transaction.onerror = () => reject(transaction.error ?? new Error('Could not refresh reminder cache'));
+				transaction.onabort = () => reject(transaction.error ?? new Error('Reminder cache refresh was aborted'));
 			});
 		} finally {
 			database.close();

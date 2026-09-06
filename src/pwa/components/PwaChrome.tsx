@@ -121,7 +121,7 @@ export function PwaPullRefreshIndicator({
 }) {
 	const pullRefresh = usePullToRefresh(enabled, onRefresh);
 	const visible = pullRefresh.distance > 0 || pullRefresh.refreshing;
-	const height = visible ? Math.min(56, Math.max(0, pullRefresh.distance)) : 0;
+	const offset = Math.min(56, Math.max(0, pullRefresh.distance));
 	const label = pullRefresh.refreshing
 		? 'Refreshing'
 		: pullRefresh.ready
@@ -136,12 +136,11 @@ export function PwaPullRefreshIndicator({
 	return (
 		<div
 			className={`pwa-pull-refresh${visible ? ' is-visible' : ''}${pullRefresh.ready ? ' is-ready' : ''}${pullRefresh.refreshing ? ' is-refreshing' : ''}`}
-			style={{ height: `${height}px` }}
 			role="status"
 			aria-label={visible ? label : undefined}
 			aria-hidden={!visible}
 		>
-			<div className="pwa-pull-refresh__inner">
+			<div className="pwa-pull-refresh__inner" style={{ transform: `translateY(${offset - 56}px)` }}>
 				<div className="pwa-pull-refresh__glyph" style={iconStyle}>
 					{pullRefresh.refreshing ? <RefreshCw size={16} /> : <ArrowDown size={16} />}
 				</div>

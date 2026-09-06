@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as matchers from './richTextMatchers';
 import { buildRichTextSegments } from './richTextRenderer';
 import { parseReminderEditorContent } from './reminderEditorParsing';
 import { parseCheckboxLine, rebuildCheckboxLine } from './checkboxParser';
 
 describe('reminder editor metadata', () => {
+    it('scans the full title once when deriving metadata and cleaned content', () => {
+        const scan = vi.spyOn(matchers, 'findAllMatches');
+        try {
+            expect(parseReminderEditorContent('Task #Work ! Friday')).toMatchObject({ cleanContent: 'Task', project: 'Work', priority: 1 });
+            expect(scan.mock.calls.filter(([text]) => text === 'Task #Work ! Friday')).toHaveLength(1);
+        } finally {
+            scan.mockRestore();
+        }
+    });
     it('renders one chip per category and saves those same values', () => {
         const text = 'Task #Personal/Health #pomla Tuesday weekly #Personal/Health ! ! every week';
         const chips = buildRichTextSegments(text).filter(segment => segment.kind === 'chip');

@@ -261,8 +261,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui .modal-card.pwa-reminder-editor .reminder-modal-body {');
 		expect(html).toContain('overflow-y: auto;');
 		expect(html).toContain('overscroll-behavior: contain;');
-		expect(html).toContain('height: min(326px + env(safe-area-inset-bottom), 90dvh) !important;');
-		expect(html).toContain('height: min(320px + var(--pwa-keyboard-inset, 0px), 90dvh) !important;');
+		expect(html).toContain('height: min(var(--pwa-editor-content-height, 224px) + env(safe-area-inset-bottom), 100%);');
+		expect(html).toContain('height: min(var(--pwa-editor-content-height, 224px) + 16px + var(--pwa-keyboard-inset, 0px), 100%);');
 		expect(html).toContain('--reminder-font-base: 16px;');
 		expect(html).toContain('.crate-reminders-ui .reminder-description-input {');
 		expect(html).toContain('max-height: 108px;');

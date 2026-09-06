@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useMemo, useRef } from 'react';
+import React, { Suspense, lazy, useCallback, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -16,12 +16,11 @@ const ReminderPickerSheet = lazy(() => import('./ReminderPickerSheet')
 	.then(module => ({ default: module.ReminderPickerSheet })));
 
 export function ReminderSheet({
-	modal,
+	modal: initialModal,
 	projects,
 	colorScheme,
 	saving,
 	isClosing,
-	onChange,
 	onClose,
 	onClosed,
 	onSave,
@@ -32,12 +31,13 @@ export function ReminderSheet({
 	colorScheme: 'dark' | 'light';
 	saving: boolean;
 	isClosing: boolean;
-	onChange: React.Dispatch<React.SetStateAction<ModalState | null>>;
 	onClose: () => void;
 	onClosed: () => void;
 	onSave: (modal: ModalState) => void;
 	onDelete: (id: string) => void;
 }) {
+	// Keep keystrokes local so the reminder list does not render behind the sheet.
+	const [modal, setModal] = useState(initialModal);
 	const editorScreenRef = useRef<ReminderEditorScreenHandle | null>(null);
 	const pickerTransitionClosedOffsetRef = useRef('100%');
 	const pickerTransitionKeyboardInsetRef = useRef(0);
@@ -49,8 +49,8 @@ export function ReminderSheet({
 		[projects],
 	);
 	const patchDraft = useCallback((patch: Partial<ModalDraft>) => {
-		onChange((current) => current ? ({ ...current, draft: { ...current.draft, ...patch } }) : current);
-	}, [onChange]);
+		setModal((current) => ({ ...current, draft: { ...current.draft, ...patch } }));
+	}, []);
 	const dismissEditorKeyboard = useCallback(() => {
 		pickerTransitionClosedOffsetRef.current = getReminderSheetClosedOffset(
 			reminderStageRef.current?.getBoundingClientRect().height ?? 0,
@@ -74,13 +74,16 @@ export function ReminderSheet({
 		reminderId: modal.reminderId,
 		isClosing,
 		onBeforeOpenPicker: dismissEditorKeyboard,
+		onFocusEditor: () => editorScreenRef.current?.focusTitle(),
 		onPatchDraft: patchDraft,
 		onClosed,
 	});
 	const pickerTransitionKeyboardInset = isStageClosing
 		? pickerTransitionKeyboardInsetRef.current
 		: 0;
-	const renderedKeyboardInset = pickerTransitionKeyboardInset || keyboardInset;
+	const renderedKeyboardInset = activeScreen === 'editor'
+		? pickerTransitionKeyboardInset || keyboardInset
+		: 0;
 	const stageClosedOffset = isStageClosing
 		? pickerTransitionClosedOffsetRef.current
 		: '100%';

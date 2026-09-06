@@ -75,14 +75,30 @@
     }
   }
 
-  .pwa-modal-sheet--reminder.is-editor-screen:not(.is-keyboard-open) .pwa-modal-sheet__container--reminder {
-    height: min(calc(var(--pwa-editor-content-height, 224px) + env(safe-area-inset-bottom)), 90dvh) !important;
-    max-height: 90dvh !important;
+  // Keep the outer sheet's travel distance fixed while iOS animates its keyboard.
+  .pwa-modal-sheet--reminder .pwa-modal-sheet__scroller {
+    justify-content: flex-end;
   }
 
-  .pwa-modal-sheet--reminder.is-editor-screen.is-keyboard-open .pwa-modal-sheet__container--reminder {
-    height: min(calc(var(--pwa-editor-content-height, 224px) + 16px + var(--pwa-keyboard-inset, 0px)), 90dvh) !important;
-    max-height: 90dvh !important;
+  .pwa-modal-sheet--reminder .pwa-modal-sheet__container--reminder {
+    pointer-events: none;
+  }
+
+  .pwa-modal-sheet--reminder .pwa-reminder-sheet-stage {
+    pointer-events: auto;
+  }
+
+  .pwa-modal-sheet--reminder.is-editor-screen .pwa-reminder-sheet-stage {
+    height: min(calc(var(--pwa-editor-content-height, 224px) + env(safe-area-inset-bottom)), 100%);
+    flex: none;
+  }
+
+  .pwa-modal-sheet--reminder.is-editor-screen.is-keyboard-open .pwa-reminder-sheet-stage {
+    // Paint behind the keyboard while its native animation catches up with the
+    // viewport inset. A transparent margin exposes the backdrop during opening.
+    box-sizing: border-box;
+    height: min(calc(var(--pwa-editor-content-height, 224px) + 16px + var(--pwa-keyboard-inset, 0px)), 100%);
+    padding-bottom: var(--pwa-keyboard-inset, 0px);
   }
 
   .pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor {

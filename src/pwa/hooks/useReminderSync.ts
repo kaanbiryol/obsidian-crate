@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { fetchReadyReminderList } from '../reminder-api';
-import { loadCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
+import { loadCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
 import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, StoredConfig } from '../types';
 
@@ -110,10 +110,8 @@ export function useReminderSync({
 					setLastUpdatedAt(savedAt);
 					setDataMode('live');
 					setIsOffline(false);
-					void saveCachedReminderSnapshot(
+					void refreshCachedReminderSnapshot(
 						config.folderPath,
-						remindersRef.current,
-						projectsRef.current,
 						savedAt,
 						etagRef.current,
 					);

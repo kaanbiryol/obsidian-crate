@@ -1,4 +1,5 @@
 import { PWA_ASSET_VERSION } from '../pwa-version';
+import { PWA_STARTUP_ASSETS } from '../pwa-client-bundle';
 import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
 import { PWA_LIGHT_THEME_STYLES, PWA_STYLES } from './styles';
 import {
@@ -33,6 +34,7 @@ html,body,#app{background-color:${PWA_CHROME_COLOR};color-scheme:dark}
 <link rel="icon" type="image/png" sizes="192x192" href="/notifications/crate-icon-192.png?v=${PWA_ASSET_VERSION}">
 <link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=${PWA_ASSET_VERSION}">
 <title>Crate Reminders</title>
+${PWA_STARTUP_ASSETS.filter(name => name !== 'app.js').map(name => `<link rel="modulepreload" href="/notifications/assets/${name}">`).join('\n')}
 <style>
 ${PWA_STYLES}
 </style>

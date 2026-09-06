@@ -1,6 +1,6 @@
 import { findActiveReminderMatches } from './reminderEditorParsing';
 
-type RichTextSegment =
+export type RichTextSegment =
     | { kind: 'text'; text: string }
     | { kind: 'chip'; text: string; type: 'priority' | 'date' | 'project' }
     | { kind: 'link'; text: string; url: string };
@@ -79,8 +79,8 @@ export const buildRichTextSegments = (text: string, knownProjects?: string[]): R
  * @param text The text to render
  * @param knownProjects Optional array of known project names for multi-word matching
  */
-export const buildHTML = (text: string, knownProjects?: string[]): string => {
-    return buildRichTextSegments(text, knownProjects).map((segment) => {
+export const buildHTML = (text: string, knownProjects?: string[], segments = buildRichTextSegments(text, knownProjects)): string => {
+    return segments.map((segment) => {
         if (segment.kind === 'text') return escapeHTML(segment.text);
         if (segment.kind === 'chip') return createChipHTML(segment.type, segment.text);
         return `<a href="${escapeHTML(segment.url)}" class="reminder-markdown-link" data-markdown-link="true" target="_blank" rel="noopener noreferrer">${escapeHTML(segment.text)}</a>`;

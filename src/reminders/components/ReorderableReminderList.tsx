@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, forwardRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState, forwardRef, memo } from 'react';
 import { motion, Reorder, useDragControls, useIsPresent } from 'framer-motion';
 import type { Reminder } from '../types/reminder';
 import { ReminderListPresence } from './ReminderListPresence';
@@ -33,7 +33,7 @@ const LONG_PRESS_INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, [co
 
 const LARGE_LIST_ANIMATION_LIMIT = 80;
 
-const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction, enableLayoutAnimations }: ReorderableItemProps, ref) {
+const ReorderableItem = memo(forwardRef<HTMLDivElement, ReorderableItemProps>(function ReorderableItem({ reminder, index, renderCard, onDragStart, onDragEnd, interaction, enableLayoutAnimations }: ReorderableItemProps, ref) {
   const isPresent = useIsPresent();
   const rowMotion = reminderRowMotion(enableLayoutAnimations);
   const [isDragPressed, setIsDragPressed] = useState(false);
@@ -191,7 +191,7 @@ const ReorderableItem = forwardRef<HTMLDivElement, ReorderableItemProps>(functio
       </motion.div>
     </Reorder.Item>
   );
-});
+}));
 
 export function ReorderableReminderList({
   reminders,

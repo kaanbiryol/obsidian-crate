@@ -1,4 +1,5 @@
 import net from 'node:net';
+import { readFile } from 'node:fs/promises';
 import { Script } from 'node:vm';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
@@ -34,6 +35,13 @@ const { server, origin } = await listenPwaPreviewServer({ port, assets });
 try {
 	const pageResponse = await fetchOk(`${origin}/notifications?token=preview-install-token&folder=Reminders&upcomingDays=7`);
 	const pageHtml = await pageResponse.text();
+	const { startupAssets, assets: clientAssets } = JSON.parse(await readFile('.generated/cloudflare/pwa-client.json', 'utf-8'));
+	for (const name of Object.keys(clientAssets).filter(name => name !== 'app.js')) {
+		const preload = `<link rel="modulepreload" href="/notifications/assets/${name}">`;
+		if (pageHtml.includes(preload) !== startupAssets.includes(name)) {
+			throw new Error(`Incorrect startup preload for ${name}`);
+		}
+	}
 	if (!pageHtml.includes('<div id="app"><div class="pwa-launch-splash"')) throw new Error('PWA page is missing the launch splash');
 	if (!pageHtml.includes('/notifications/app.js?v=')) throw new Error('PWA page is missing the versioned app script');
 	if (!pageHtml.includes('/notifications/theme-bootstrap.js?v=')) throw new Error('PWA page is missing the theme bootstrap script');
