@@ -38,6 +38,8 @@ vi.mock('./cloudflare-api', () => ({
 			return apiMocks.workers;
 		}
 
+		async getWorkersSubdomain() { return 'example'; }
+
 		async getWorkerSettings(_accountId: string, workerName: string) {
 			return apiMocks.workerSettings.get(workerName) ?? { bindings: [] };
 		}
@@ -206,7 +208,7 @@ describe('CloudflareDeploymentService', () => {
 			modified_on: '2026-08-23T09:00:00.000Z',
 		}];
 		apiMocks.workerSettings.set('crate-fedcba9876543210', {
-			annotations: { 'workers/message': 'Crate 0.1.0' },
+			annotations: { 'workers/message': 'Crate 9.0.0' },
 			bindings: [
 				{ type: 'd1', name: 'DB', id: 'existing-database-id' },
 				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-fedcba9876543210' },
@@ -238,6 +240,8 @@ describe('CloudflareDeploymentService', () => {
 			'macos',
 		]);
 		expect(harness.persisted.join('\n')).not.toContain('device-token-hash');
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+		expect(harness.settings.cloudflareDeployment?.lastDeployedVersion).toBe('9.0.0');
 	});
 
 	it('requires a single newly authorized account and still revokes the token', async () => {

@@ -10,6 +10,7 @@ type ReminderChangeCallback = Parameters<MarkdownWriter['setOnReminderChange']>[
 function createMockIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
   return {
     remindersFolderPath: 'Reminders',
+    getById: vi.fn(() => undefined),
     applyOptimisticCreate: vi.fn(),
     applyOptimisticUpdate: vi.fn(),
     applyOptimisticDelete: vi.fn(),
@@ -52,7 +53,7 @@ describe('markdownWriter', () => {
     const content = files.get('Reminders/Work.md') || '';
     expect(content).toContain('# Work');
     expect(content).toContain('- [ ] Task A');
-    expect(content).toContain('Jan 13, 2026 12:00');
+    expect(content).toContain(dueDate.toISOString());
     expect(content).toContain('!');
     expect(onChange).toHaveBeenCalledTimes(1);
   });
@@ -234,7 +235,7 @@ describe('markdownWriter', () => {
 
     const content = files.get('Reminders/Work.md') || '';
     expect(content).toContain('- [ ] Task C');
-    expect(content).toContain('Jan 2, 2026');
+    expect(content).toContain('2026-01-02T10:00:00.000Z');
 
     expect(onChange).toHaveBeenCalledTimes(1);
 	const updated = onChange.mock.calls[0]?.[0];
@@ -264,7 +265,7 @@ describe('markdownWriter', () => {
     const content = files.get('Reminders/Work.md') || '';
     expect(content).toContain('Task D');
     expect(content).toContain('daily 14:30');
-    expect(content).toContain('Jan 10, 2026');
+    expect(content).toContain(new Date(2026, 0, 10, 14, 30).toISOString());
   });
 
   it('creates an all-day recurring reminder without leaking the current clock time', async () => {
@@ -555,7 +556,7 @@ describe('markdownWriter', () => {
 
     const content = files.get('Reminders/Work.md') || '';
     expect(content).toContain('Task Repeat');
-    expect(content).toContain('Jan 1, 2026 09:00');
+    expect(content).toContain(dueDate.toISOString());
     expect(content).not.toContain('every day');
   });
 
@@ -588,4 +589,14 @@ describe('markdownWriter', () => {
     expect(newContent).toContain('Task Move');
     expect(newContent).toContain('daily');
   });
+});
+
+it('does not duplicate a local create after a lost disk acknowledgement', async () => {
+  const { app, files } = createMockAppWithVault({ 'Reminders/Inbox.md': '# Inbox\n' });
+  const writer = createMarkdownWriter(app, createMockIndex());
+  const process = app.vault.process.bind(app.vault);
+  vi.spyOn(app.vault, 'process').mockImplementationOnce(async (file, callback) => { await process(file, callback); throw new Error('Lost disk reply'); });
+  await expect(writer.createReminder('Inbox', 'Task', undefined, 4, undefined, false, 'retry-id')).rejects.toThrow('Lost disk reply');
+  await expect(writer.createReminder('Inbox', 'Task', undefined, 4, undefined, false, 'retry-id')).rejects.toThrow('already exists');
+  expect(files.get('Reminders/Inbox.md')?.match(/crate-id:retry-id/g)).toHaveLength(1);
 });

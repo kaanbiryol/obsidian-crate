@@ -1,12 +1,12 @@
-import { Notice, Setting, type TextComponent } from 'obsidian';
+import { Notice, Setting, type TextComponent, type ToggleComponent } from 'obsidian';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
 import {
-	disableReminderNotifications,
 	enableReminderNotifications,
 	reconcileReminderNotifications,
 } from '../../reminders/plugin-integration';
 import { normalizeTimeString } from '../../reminders/settings';
+import type { NotificationPolicy } from '../../protocol/notification-policy';
 import type { SyncApiClient } from '../../sync/api';
 import { createSettingsSectionHeading } from './section-helpers';
 
@@ -21,39 +21,51 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 
 	createSettingsSectionHeading(containerEl, 'Push notifications');
 
-	new Setting(containerEl)
-		.setName('Enable push notifications')
-		.setDesc('Send reminder notifications to subscribed phones and browsers. Applies to all devices.')
-		.addToggle(toggle => {
-			toggle.setValue(plugin.settings.pushEnabled)
-				.onChange(async (value) => {
-					let cancelledExistingSchedules = false;
-					try {
-						if (!value && plugin.settings.pushEnabled) {
-							await disableReminderNotifications(plugin);
-							cancelledExistingSchedules = true;
-						}
-						await plugin.writeSettings({ pushEnabled: value });
-						if (value) {
-							await enableReminderNotifications(plugin);
-						}
-						context.rerender();
-					} catch (error) {
-						new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
-						toggle.setValue(plugin.settings.pushEnabled);
-						if (cancelledExistingSchedules && plugin.settings.pushEnabled) {
-							void enableReminderNotifications(plugin);
-						}
-					}
-				});
-		});
+  const policyApi = plugin.syncRuntime.getApiClient();
+  let policy: NotificationPolicy | null = null;
+  let loadError: unknown;
+  const openedPolicy = policyApi ? policyApi.getNotificationPolicy().then(result => { policy = result.policy; }).catch(error => { loadError = error; }) : Promise.resolve();
+  const savePolicy = async (patch: Partial<NotificationPolicy>) => {
+    await openedPolicy;
+    if (loadError) throw new Error(errorMessage(loadError));
+    if (!policyApi) throw new Error('Connect to the sync server before changing notifications');
+    const initial = { folderPath: plugin.remindersSettings.remindersFolderPath,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      allDayTime: plugin.remindersSettings.allDayNotificationTime, enabled: plugin.settings.pushEnabled };
+    if (!policy) policy = (await policyApi.ensureNotificationPolicy(initial)).policy;
+    // Even initialization can race another device. Apply explicit changes using
+    // the server's returned revision and retain its timezone and folder.
+    policy = (await policyApi.updateNotificationPolicy({ ...policy, ...patch })).policy;
+  };
+  let enabledToggle: ToggleComponent;
+  new Setting(containerEl)
+    .setName('Enable push notifications')
+    .setDesc('Send reminder notifications to subscribed phones and browsers. Applies to all devices.')
+    .addToggle(toggle => {
+      enabledToggle = toggle;
+      toggle.setValue(plugin.settings.pushEnabled).onChange(async value => {
+        toggle.setDisabled(true);
+        try {
+          await savePolicy({ enabled: value });
+          await plugin.writeSettings({ pushEnabled: value });
+          if (value) await enableReminderNotifications(plugin);
+          context.rerender();
+        } catch (error) {
+          new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
+          toggle.setValue(policy?.enabled ?? plugin.settings.pushEnabled);
+        } finally { toggle.setDisabled(false); }
+      });
+    });
+  void openedPolicy.then(() => { if (policy) enabledToggle.setValue(policy.enabled !== false); });
 
-	if (!plugin.settings.pushEnabled) return;
-
+  const saveAllDayTime = async (time: string | null) => {
+    await savePolicy({ allDayTime: time });
+    await plugin.writeRemindersSettings({ allDayNotificationTime: time });
+  };
 	let timeInput: TextComponent;
 	new Setting(containerEl)
 		.setName('All-day notification time')
-		.setDesc('Choose a time for reminders with a date but no time. An empty time means off.')
+		.setDesc('Shared across devices in the server’s saved timezone. An empty time means off.')
 		.addText(text => {
 			timeInput = text;
 			text.inputEl.type = 'time';
@@ -64,14 +76,14 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 			const commit = async (): Promise<void> => {
 				const trimmed = text.inputEl.value.trim();
 				if (trimmed === '') {
-					await plugin.writeRemindersSettings({ allDayNotificationTime: null });
+					await saveAllDayTime(null);
 					void reconcileReminderNotifications(plugin);
 					return;
 				}
 				const normalized = normalizeTimeString(trimmed);
 				if (normalized) {
 					text.setValue(normalized);
-					await plugin.writeRemindersSettings({ allDayNotificationTime: normalized });
+					await saveAllDayTime(normalized);
 					void reconcileReminderNotifications(plugin);
 				} else {
 					text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
@@ -94,7 +106,7 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 		.addButton(button => button.setButtonText('Turn off').onClick(async () => {
 			button.setDisabled(true);
 			try {
-				await plugin.writeRemindersSettings({ allDayNotificationTime: null });
+				await saveAllDayTime(null);
 				timeInput.setValue('');
 				void reconcileReminderNotifications(plugin);
 			} catch (error) {
@@ -104,6 +116,22 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 			}
 		}));
 
+  void openedPolicy.then(() => { if (policy) timeInput.setValue(policy.allDayTime ?? ''); });
+  const policyDescription = containerEl.createEl('p', { cls: 'setting-item-description' });
+  void openedPolicy.then(() => {
+    policyDescription.textContent = loadError ? 'Shared settings could not be loaded. Reopen settings to retry.'
+      : policy ? `Server notifications: ${policy.folderPath} · ${policy.timezone}` : 'The first enabled device saves the shared folder and timezone.';
+  });
+  new Setting(containerEl).setName('Notification folder and timezone')
+    .setDesc('Use this device’s reminders folder and timezone for notifications on all devices.')
+    .addButton(button => button.setButtonText('Use this device’s settings').onClick(async () => {
+      button.setDisabled(true);
+      try {
+        await savePolicy({ folderPath: plugin.remindersSettings.remindersFolderPath, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+        context.rerender();
+      } catch (error) { new Notice(`Failed to save shared settings: ${errorMessage(error)}`); }
+      finally { button.setDisabled(false); }
+    }));
 	const apiClient = plugin.syncRuntime.getApiClient();
 	if (apiClient) renderEnabledDevices(containerEl, plugin, apiClient);
 }

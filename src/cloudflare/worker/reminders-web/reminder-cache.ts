@@ -50,13 +50,6 @@ export async function loadIncrementalReminderIndex(
 	let persistedFileCount = 0;
 	try {
 		const writeResult = await writeReminderFileCacheEntries(env.DB, folderPath, freshEntries);
-		if (writeResult.oversizedPaths.length > 0) {
-			return {
-				ready: false,
-				reason: 'cache-entry-too-large',
-				path: writeResult.oversizedPaths[0] ?? '',
-			};
-		}
 		persistedFileCount = writeResult.persistedPaths.length;
 		await pruneReminderFileCache(env.DB, folderPath);
 	} catch {
@@ -85,6 +78,7 @@ export async function loadIncrementalReminderIndex(
 
 	return {
 		ready: true,
+		issues: [...resolvedFiles.values()].flatMap(file => file.issue ? [{ path: file.filePath, reason: file.issue }] : []),
 		reminders,
 		projects: Array.from(projects).sort((left, right) => left.localeCompare(right)),
 	};

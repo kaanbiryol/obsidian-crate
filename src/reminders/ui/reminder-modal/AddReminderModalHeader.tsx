@@ -6,6 +6,7 @@ import { ModalHeader } from '../../components/ModalHeader';
 interface AddReminderModalHeaderProps {
     isEditing: boolean;
     canSubmit: boolean;
+    busy?: boolean;
     onDelete: () => void;
     onClose: () => void;
     onSubmit: () => void;
@@ -14,6 +15,7 @@ interface AddReminderModalHeaderProps {
 export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
     isEditing,
     canSubmit,
+    busy,
     onDelete,
     onClose,
     onSubmit
@@ -22,8 +24,10 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
         title={isEditing ? 'Edit reminder' : 'New reminder'}
         closeLabel="Close reminder editor"
         onClose={onClose}
+        closeDisabled={busy}
         secondaryActions={isEditing ? (
             <IconButton
+                disabled={busy}
                 icon="trash-2"
                 iconSize="m"
                 onClick={onDelete}
@@ -37,6 +41,7 @@ export const AddReminderModalHeader: React.FC<AddReminderModalHeaderProps> = ({
             ariaLabel: isEditing ? 'Save reminder' : 'Add reminder',
             onClick: onSubmit,
             disabled: !canSubmit,
+            busy,
         }}
     />
 );

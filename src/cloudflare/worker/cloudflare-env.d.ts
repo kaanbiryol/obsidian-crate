@@ -110,3 +110,5 @@ interface ScheduledController {
 	readonly scheduledTime: number;
 	noRetry(): void;
 }
+
+interface ExecutionContext { waitUntil(promise: Promise<unknown>): void; }

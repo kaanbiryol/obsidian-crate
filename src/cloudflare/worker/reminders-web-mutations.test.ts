@@ -19,7 +19,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 			new Request('https://worker.test/reminders/update', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					id: 'r-existing',
 					filePath: 'Reminders/Inbox.md',
@@ -59,7 +59,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 			new Request('https://worker.test/reminders/update', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					id: 'r-existing',
 					filePath: 'Reminders/Inbox.md',
@@ -92,7 +92,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 			new Request('https://worker.test/reminders/update', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					id: 'r-existing',
 					content: 'Updated task',
@@ -120,7 +120,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 			new Request('https://worker.test/reminders/create', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					content: 'Check article',
 					project: 'Inbox',
@@ -132,7 +132,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 
 		expect(createResponse.status).toBe(200);
 		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('Check article');
-		expect(workspace.scheduled.size).toBe(1);
+		expect(workspace.env.REMINDER_ALARMS.idFromName).toHaveBeenCalledWith('__crate__/projection');
 
 		const listResponse = await handleListReminders(
 			new Request('https://worker.test/reminders/list?folderPath=Reminders'),
@@ -146,7 +146,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 			new Request('https://worker.test/reminders/delete', {
 				method: 'DELETE',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					id: createdId,
 					filePath: 'Reminders/Inbox.md',
@@ -174,7 +174,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 			new Request('https://worker.test/reminders/create', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					content: 'Escape folder',
 					project: '../Secrets',
@@ -191,7 +191,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 			new Request('https://worker.test/reminders/create', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					content: 'Bad notification time',
 					allDayNotificationTime: '25:00',
@@ -218,7 +218,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 			new Request('https://worker.test/reminders/create', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					content: 'Recurring create',
 					project: 'Inbox',
@@ -235,7 +235,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 			new Request('https://worker.test/reminders/update', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					id: 'r-existing',
 					filePath: 'Reminders/Inbox.md',
@@ -252,7 +252,7 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 			new Request('https://worker.test/reminders/update', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
+				body: await workspace.mutationBody({
 					folderPath: 'Reminders',
 					id: 'r-existing',
 					filePath: 'Reminders/Inbox.md',

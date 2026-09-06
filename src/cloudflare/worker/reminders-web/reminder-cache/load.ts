@@ -36,12 +36,18 @@ export async function loadReminderFileCache(
 	const entries = new Map<string, ReminderFileCacheEntry>();
 	for (const row of rows) {
 		if (row.parser_version !== REMINDER_CACHE_PARSER_VERSION) continue;
-		const reminders = parseCachedReminders(row.reminders_json);
+		let issue: string | undefined;
+		try {
+			const value = JSON.parse(row.reminders_json) as { issue?: unknown };
+			if (typeof value?.issue === 'string') issue = value.issue;
+		} catch { /* Invalid cache is rebuilt below. */ }
+		const reminders = issue ? [] : parseCachedReminders(row.reminders_json);
 		if (!reminders) continue;
 		entries.set(row.file_path, {
 			filePath: row.file_path,
 			fileHash: row.file_hash,
 			reminders,
+			issue,
 		});
 	}
 	return entries;

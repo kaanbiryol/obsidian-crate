@@ -1,4 +1,4 @@
-import { queryRows } from '../db';
+import { findReferencedStorageKeys } from '../storage-references';
 
 const MANAGED_FILES_PREFIX = '__crate__/files/';
 const ORPHAN_MINIMUM_AGE_MS = 24 * 60 * 60 * 1000;
@@ -39,17 +39,7 @@ export async function sweepOrphanedManagedObjects(
 		.map(object => object.key);
 	let deleted = 0;
 	if (candidates.length > 0) {
-		const referencedKeys = new Set<string>();
-		// Each key is bound twice; D1 allows at most 100 bindings per query.
-		for (let offset = 0; offset < candidates.length; offset += 50) {
-			const chunk = candidates.slice(offset, offset + 50);
-			const placeholders = chunk.map(() => '?').join(', ');
-			const referenced = await queryRows<{ storage_key: string }>(db.prepare(`
-				SELECT storage_key FROM files WHERE storage_key IN (${placeholders})
-				UNION SELECT storage_key FROM file_versions WHERE storage_key IN (${placeholders})
-			`).bind(...chunk, ...chunk));
-			for (const row of referenced) referencedKeys.add(row.storage_key);
-		}
+		const referencedKeys = await findReferencedStorageKeys(db, candidates);
 		const orphaned = candidates.filter(key => !referencedKeys.has(key));
 		if (orphaned.length > 0) {
 			await bucket.delete(orphaned.length === 1 ? orphaned[0]! : orphaned);

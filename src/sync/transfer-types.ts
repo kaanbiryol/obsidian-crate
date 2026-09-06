@@ -27,8 +27,8 @@ interface TransferApi {
     contentType: string,
 	expectedHash: string | null,
   ): Promise<UploadResult>;
-  downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string }>;
-  deleteFile(path: string, expectedHash: string): Promise<{ success: boolean; path: string }>;
+  downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }>;
+  deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }>;
   batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse>;
   batchDownload(paths: string[]): Promise<BatchDownloadResponse>;
 }

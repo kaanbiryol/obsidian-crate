@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import { invalidatePwaSession } from '../session-generation';
+import { clearReminderDrafts } from '../reminder-drafts';
 import { AUTH_TOKEN_KEY } from '../config';
 import { clearCachedReminderSnapshots } from '../reminder-cache';
 import type { ApiFetch, ModalState, ShowToast } from '../types';
@@ -15,24 +17,16 @@ export async function performPwaLogout({
 	clearLocalSession,
 	disablePushNotifications,
 }: PwaLogoutOperations): Promise<boolean> {
-	let remoteCleanupFailed = false;
-
-	try {
-		await disablePushNotifications();
-	} catch {
-		remoteCleanupFailed = true;
-	}
-
-	try {
-		const response = await apiFetch('/auth/session', { method: 'DELETE' });
-		if (!response.ok) remoteCleanupFailed = true;
-	} catch {
-		remoteCleanupFailed = true;
-	} finally {
-		await clearLocalSession();
-	}
-
-	return remoteCleanupFailed;
+	// Start remote cleanup while credentials are valid, then clear local state
+	// immediately even if either network operation hangs or fails.
+	const cleanup = Promise.allSettled([
+		disablePushNotifications(),
+		apiFetch('/auth/session', { method: 'DELETE' }).then(response => {
+			if (!response.ok) throw new Error('Session revocation failed');
+		}),
+	]);
+	await clearLocalSession();
+	return (await cleanup).some(result => result.status === 'rejected');
 }
 
 export function usePwaSessionLifecycle({
@@ -65,9 +59,11 @@ export function usePwaSessionLifecycle({
 } {
 	const [loggingOut, setLoggingOut] = useState(false);
 
-	const clearLocalSession = useCallback(async () => {
-		localStorage.removeItem(AUTH_TOKEN_KEY);
-		setAuthToken(null);
+	const clearLocalSession = useCallback(async (nextToken: string | null = null) => {
+		invalidatePwaSession();
+		if (nextToken === null) localStorage.removeItem(AUTH_TOKEN_KEY);
+		clearReminderDrafts();
+		setAuthToken(nextToken);
 		resetReminderState();
 		cancelSettingsClose();
 		cancelModalClose();
@@ -88,6 +84,16 @@ export function usePwaSessionLifecycle({
 			void clearLocalSession();
 		};
 	}, [clearLocalSession, handleUnauthorizedRef]);
+
+	useEffect(() => {
+		const onStorage = (event: StorageEvent) => {
+			if ((event.key === AUTH_TOKEN_KEY && event.newValue !== event.oldValue) || event.key === null) {
+				void clearLocalSession(event.newValue);
+			}
+		};
+		window.addEventListener('storage', onStorage);
+		return () => window.removeEventListener('storage', onStorage);
+	}, [clearLocalSession]);
 
 	const logOut = useCallback(async () => {
 		if (loggingOut) return;

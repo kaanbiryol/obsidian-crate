@@ -1,5 +1,6 @@
 export async function pruneExpiredTokens(db: D1Database, now = Date.now()): Promise<void> {
 	await db.batch([
+        db.prepare('DELETE FROM push_subscriptions WHERE owner_token_id IN (SELECT id FROM auth_tokens WHERE expires_at IS NOT NULL AND expires_at <= ?)').bind(now),
 		db.prepare('DELETE FROM auth_tokens WHERE expires_at IS NOT NULL AND expires_at <= ?').bind(now),
 		db.prepare('DELETE FROM push_enrollment_tokens WHERE expires_at <= ?').bind(now),
 		db.prepare('DELETE FROM web_enrollment_tokens WHERE expires_at <= ?').bind(now),

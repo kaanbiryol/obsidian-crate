@@ -1,0 +1,10 @@
+title = "Crate secret scanning"
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Published Crate OAuth client ID used with PKCE"
+condition = "AND"
+paths = ['''(?:^|/)vite\.config\.mts$''']
+regexTarget = "secret"
+regexes = ['''^9c474af284e49ff0201106f3b42cca05$''']

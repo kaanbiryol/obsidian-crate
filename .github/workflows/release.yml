@@ -6,23 +6,26 @@ on:
       - "*.*.*"
 
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Use Node.js 20
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 20.19.0
           cache: npm
 
       - run: npm ci
+
+      - name: Install browser test runtimes
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Verify tag version
         run: node -e "const manifest=require('./manifest.json'); if (manifest.version !== process.env.GITHUB_REF_NAME) throw new Error('Tag must exactly match manifest.json version')"
@@ -34,7 +37,7 @@ jobs:
         run: sha256sum dist/main.js dist/styles.css > /tmp/crate-release-artifacts.sha256
 
       - name: Use Node.js 22
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22.12.0
           cache: npm
@@ -48,7 +51,7 @@ jobs:
         run: sha256sum --check /tmp/crate-release-artifacts.sha256
 
       - name: Use Node.js 24
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24.0.0
           cache: npm
@@ -69,14 +72,35 @@ jobs:
           cp manifest.json release/manifest.json
           cp THIRD_PARTY_NOTICES.md release/THIRD_PARTY_NOTICES.md
 
+      - name: Upload verified release assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: release/
+          retention-days: 7
+
+  publish:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download verified release assets
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: release-assets
+          path: release
       - name: Attest release assets
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-path: release/*
 
       - name: Attach verified assets to a draft or create a release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           if gh release view "$GITHUB_REF_NAME" --json isDraft --jq '.isDraft' > /tmp/crate-release-is-draft; then
             test "$(cat /tmp/crate-release-is-draft)" = "true" || { echo "Refusing to replace an already published release"; exit 1; }

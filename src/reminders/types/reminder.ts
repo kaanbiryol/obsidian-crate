@@ -10,6 +10,7 @@ export interface RecurrenceRule {
   dayOfMonth?: number;         // 1-31 (for monthly)
   endDate?: string;            // optional end date (ISO string)
   count?: number;              // optional max occurrences
+  completedCount?: number;     // persisted completed occurrences within this rule
   hour?: number;               // 0-23, time of day for recurring reminder
   minute?: number;             // 0-59, time of day for recurring reminder
   timezone?: string;           // IANA timezone for local wall-clock recurrence semantics
@@ -42,6 +43,7 @@ export interface CreateReminderParams {
 }
 
 export interface UpdateReminderParams {
+  expectedRevision?: string;
   content?: string;
   description?: string;
   dueDate?: string;

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Priority, Reminder, RecurrenceRule } from '../../types';
 import { createLogger } from '../../utils/logger';
 import { buildDeleteConfirmationMessage } from './deleteConfirmation';
@@ -46,9 +46,12 @@ export function useReminderModalActions({
 }: UseReminderModalActionsOptions) {
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [isSaving, setIsSaving] = useState(false);
+	const pending = useRef(false);
 	const isEditing = !!reminder;
 
 	const handleSubmit = useCallback(async () => {
+		if (pending.current) return;
 		const submission = buildReminderSubmission({
 			content,
 			description,
@@ -61,10 +64,13 @@ export function useReminderModalActions({
 			reminder,
 		});
 		if (!submission) return;
+		pending.current = true;
 
 		await executeReminderAction({
 			optimistic,
 			close: onClose,
+			beforeRun: () => setIsSaving(true),
+			afterSettled: () => { pending.current = false; setIsSaving(false); },
 			action: async () => {
 				if (submission.updatedReminder && onSave) {
 					await onSave(submission.updatedReminder);
@@ -104,19 +110,19 @@ export function useReminderModalActions({
 	]);
 
 	const handleDeleteClick = useCallback(() => {
-		setShowDeleteConfirm(true);
+		if (!pending.current) setShowDeleteConfirm(true);
 	}, []);
 
 	const handleDeleteConfirm = useCallback(async () => {
-		if (!onDelete || !reminder) return;
+		if (!onDelete || !reminder || pending.current) return;
+		pending.current = true;
 
 		await executeReminderAction({
 			optimistic,
 			close: onClose,
-			beforeClose: optimistic ? () => setShowDeleteConfirm(false) : undefined,
-			beforeRun: optimistic ? undefined : () => setIsDeleting(true),
-			afterSuccess: optimistic ? undefined : () => setShowDeleteConfirm(false),
-			afterSettled: optimistic ? undefined : () => setIsDeleting(false),
+			beforeClose: () => setShowDeleteConfirm(false),
+			beforeRun: () => setIsDeleting(true),
+			afterSettled: () => { pending.current = false; setIsDeleting(false); },
 			action: async () => {
 				await onDelete(reminder);
 			},
@@ -135,10 +141,12 @@ export function useReminderModalActions({
 	return {
 		showDeleteConfirm,
 		isDeleting,
+		isSaving,
+		isPending: () => pending.current,
 		deleteMessage,
 		handleSubmit,
 		handleDeleteClick,
 		handleDeleteConfirm,
-		closeDeleteConfirm: () => setShowDeleteConfirm(false),
+		closeDeleteConfirm: () => { if (!pending.current) setShowDeleteConfirm(false); },
 	};
 }

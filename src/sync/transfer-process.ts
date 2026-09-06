@@ -50,6 +50,7 @@ export async function processDiff(
       const modified = await context.getModifiedIso(uploadFile.path, uploadFile.mtime);
       const entry: FileEntry = {
         hash: uploadFile.hash,
+        revision: uploadResult.revision,
         size: uploadFile.size,
         modified,
       };
@@ -139,6 +140,7 @@ export async function processDiff(
       const hash = await computeHash(remoteContent);
       const entry: FileEntry = {
         hash,
+        revision: response.revision,
         size: remoteContent.byteLength,
         modified: await context.getModifiedIso(diff.path),
       };
@@ -152,7 +154,7 @@ export async function processDiff(
 
     case "delete": {
       if (!diff.remoteHash) throw new Error("Missing remote hash for delete");
-      await context.api.deleteFile(diff.path, diff.remoteHash);
+      await context.api.deleteFile(diff.path, diff.remoteHash, diff.remoteRevision);
       delete localFiles[diff.path];
       context.localManifest.removeEntry(diff.path);
       result.deleted++;
@@ -255,6 +257,7 @@ async function tryAutoMergeMarkdownConflict(
 
   const entry: FileEntry = {
     hash: mergedHash,
+    revision: uploadResult.revision,
     size: mergedContent.byteLength,
     modified: await context.getModifiedIso(diff.path),
   };

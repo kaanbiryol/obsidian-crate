@@ -92,6 +92,7 @@ export async function uploadPreparedFiles(
             result.uploadedPaths.push(upload.path);
             context.localManifest.setEntry(upload.path, {
               hash: upload.hash,
+              revision: fileResult.revision,
               size: upload.size,
               modified: await context.getModifiedIso(upload.path, upload.mtime),
             });
@@ -178,6 +179,7 @@ async function uploadPreparedFilesIndividually(
         result.uploadedPaths.push(upload.path);
         context.localManifest.setEntry(upload.path, {
           hash: upload.hash,
+          revision: uploadResult.revision,
           size: upload.size,
           modified: await context.getModifiedIso(upload.path, upload.mtime),
         });

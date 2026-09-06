@@ -53,11 +53,12 @@ export async function runSyncDiagnostics(client: DiagnosticClient | null): Promi
 	if (client.getDiagnostics) {
 		try {
 			const backend = await client.getDiagnostics();
-			const pending = backend.counts.pendingObjectCleanup + backend.counts.pendingNotificationJobs;
+			const pending = backend.counts.pendingObjectCleanup + backend.counts.pendingNotificationJobs + (backend.counts.pendingNotificationProjections ?? 0);
+      const failed = (backend.counts.failedNotificationJobs ?? 0) + (backend.counts.failedNotificationProjections ?? 0);
 			results.push({
 				name: 'Backend queues',
-				status: pending === 0 ? 'pass' : 'warn',
-				message: pending === 0
+				status: failed ? 'fail' : pending === 0 ? 'pass' : 'warn',
+				message: failed ? `${failed} notification jobs or file projections failed; ${pending} background jobs are pending. Split oversized reminder notes and check server diagnostics.` : pending === 0
 					? `Storage metadata is healthy (${backend.counts.retainedVersions} recoverable versions).`
 					: `${pending} background cleanup or notification jobs are waiting to run.`,
 			});

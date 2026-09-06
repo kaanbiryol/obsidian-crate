@@ -1,3 +1,4 @@
+import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { sha256Hex } from './auth';
 import { corsResponse } from './cors';
 import { changedRows, queryRows } from './db';
@@ -5,15 +6,7 @@ import { sendToAllSubscriptions } from './push';
 import { purgeExpiredPushEnrollmentTokens } from './push-enrollment';
 import { parseJsonObject, parseOptionalString } from './utils';
 
-function isValidPushEndpoint(endpoint: string): boolean {
-	try {
-		return new URL(endpoint).protocol === 'https:';
-	} catch {
-		return false;
-	}
-}
-
-export async function handleSubscribe(request: Request, db: D1Database): Promise<Response> {
+export async function handleSubscribe(request: Request, db: D1Database, ownerTokenId?: string): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -43,39 +36,25 @@ export async function handleSubscribe(request: Request, db: D1Database): Promise
 
 	const id = crypto.randomUUID();
 	const enrollmentToken = request.headers.get('X-Crate-Enrollment-Token')?.trim() || '';
-	if (enrollmentToken) {
-		await purgeExpiredPushEnrollmentTokens(db);
-		const now = Date.now();
-		const tokenHash = await sha256Hex(enrollmentToken);
-		const results: unknown[] = await db.batch([
-			db.prepare(
-				'DELETE FROM push_subscriptions WHERE endpoint = ? AND EXISTS (SELECT 1 FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?)'
-			).bind(endpoint, tokenHash, now),
-			db.prepare(
-				'INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?)'
-			).bind(id, endpoint, p256dh, auth, deviceName, tokenHash, now),
-			db.prepare('DELETE FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?')
-				.bind(tokenHash, now),
-		]);
-
-		if (changedRows(results[1]) !== 1 || changedRows(results[2]) !== 1) {
-			return corsResponse({ error: 'Invalid or expired enrollment token' }, 401);
-		}
-
-		return corsResponse({ id });
-	}
-
-	await db.batch([
-		db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint),
-		db.prepare(
-			'INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name) VALUES (?, ?, ?, ?, ?)'
-		).bind(id, endpoint, p256dh, auth, deviceName),
-	]);
-
+	const tokenHash = enrollmentToken ? await sha256Hex(enrollmentToken) : null;
+	const owner = ownerTokenId ?? (tokenHash ? `enrollment:${tokenHash}` : null);
+	if (!owner) return corsResponse({ error: 'Authenticated subscription owner required' }, 401);
+	if (tokenHash) await purgeExpiredPushEnrollmentTokens(db);
+	const gate = tokenHash ? 'AND EXISTS (SELECT 1 FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?)' : '';
+	const insert = db.prepare(`INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name, owner_token_id, folder_path)
+		SELECT ?, ?, ?, ?, ?, ?, (SELECT folder_path FROM auth_tokens WHERE id = ?)
+		WHERE ((SELECT COUNT(*) FROM push_subscriptions) < 20 OR EXISTS (SELECT 1 FROM push_subscriptions WHERE endpoint = ? AND owner_token_id = ?))
+		AND ((SELECT COUNT(*) FROM push_subscriptions WHERE owner_token_id = ?) < 5 OR EXISTS (SELECT 1 FROM push_subscriptions WHERE endpoint = ? AND owner_token_id = ?)) ${gate}
+		ON CONFLICT(endpoint) DO UPDATE SET id = excluded.id, p256dh = excluded.p256dh, auth = excluded.auth,
+		device_name = excluded.device_name, disabled_at = NULL, last_error = NULL
+		WHERE push_subscriptions.owner_token_id = excluded.owner_token_id`)
+		.bind(id, endpoint, p256dh, auth, deviceName, owner, owner, endpoint, owner, owner, endpoint, owner, ...(tokenHash ? [tokenHash, Date.now()] : []));
+	const results = await db.batch([insert, ...(tokenHash ? [db.prepare('DELETE FROM push_enrollment_tokens WHERE token_hash = ? AND changes() = 1').bind(tokenHash)] : [])]);
+	if (changedRows(results[0]) !== 1) return corsResponse({ error: 'Subscription limit reached, endpoint already enrolled, or enrollment expired. Remove an old device or open a fresh link.' }, 429);
 	return corsResponse({ id });
 }
 
-export async function handleUnsubscribe(request: Request, db: D1Database): Promise<Response> {
+export async function handleUnsubscribe(request: Request, db: D1Database, ownerTokenId?: string): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -89,8 +68,8 @@ export async function handleUnsubscribe(request: Request, db: D1Database): Promi
 	}
 
 	const statement = id
-		? db.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(id)
-		: db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(endpoint);
+		? db.prepare(`DELETE FROM push_subscriptions WHERE id = ? ${ownerTokenId ? 'AND owner_token_id = ?' : ''}`).bind(id, ...(ownerTokenId ? [ownerTokenId] : []))
+		: db.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ? ${ownerTokenId ? 'AND owner_token_id = ?' : ''}`).bind(endpoint, ...(ownerTokenId ? [ownerTokenId] : []));
 	await statement.run();
 	return corsResponse({ success: true });
 }

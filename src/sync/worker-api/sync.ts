@@ -98,6 +98,7 @@ export class SyncWorkerApi {
 				} else {
 					files[change.path] = {
 						hash: change.hash,
+						revision: change.revision,
 						size: change.size,
 						modified: change.created_at,
 					};
@@ -161,7 +162,7 @@ export class SyncWorkerApi {
 		}, TRANSFER_TIMEOUT_MS);
 	}
 
-	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string }> {
+	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }> {
 		const encodedPath = encodeURIComponent(path);
 		const { body, headers } = await this.http.requestBinary(`/sync/download?path=${encodedPath}`, {}, TRANSFER_TIMEOUT_MS);
 		const contentLengthHeader = getHeader(headers, 'Content-Length');
@@ -173,13 +174,15 @@ export class SyncWorkerApi {
 			contentType: getHeader(headers, 'Content-Type') || 'application/octet-stream',
 			size: Number.isSafeInteger(contentLength) ? contentLength : body.byteLength,
 			hash: getHeader(headers, 'X-File-Hash') || '',
+			revision: getHeader(headers, 'X-Crate-Revision') || undefined,
 		};
 	}
 
-	async deleteFile(path: string, expectedHash: string): Promise<{ success: boolean; path: string }> {
+	async deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }> {
+		if (!expectedRevision) throw new HttpError('Missing remote revision; reconcile before deleting', 409, null, 'version_conflict');
 		return this.http.requestJson<{ success: boolean; path: string }>('/sync/delete', {
 			method: 'POST',
-			body: JSON.stringify({ path, expectedHash }),
+			body: JSON.stringify({ path, expectedHash, expectedRevision }),
 		});
 	}
 
@@ -210,13 +213,16 @@ export class SyncWorkerApi {
 	async batchDelete(
 		paths: string[],
 		expectedHashes: Record<string, string> = {},
+		expectedRevisions: Record<string, string> = {},
 	): Promise<BatchDeleteResponse> {
 		const files: BatchDeleteFile[] = paths.map((path) => {
 			const expectedHash = expectedHashes[path];
 			if (!expectedHash) {
 				throw new Error(`Missing expected remote hash for delete: ${path}`);
 			}
-			return { path, expectedHash };
+			const expectedRevision = expectedRevisions[path];
+			if (!expectedRevision) throw new HttpError('Missing remote revision; reconcile before deleting', 409, null, 'version_conflict');
+			return { path, expectedHash, expectedRevision };
 		});
 		return this.http.requestJson<BatchDeleteResponse>('/sync/batch-delete', {
 			method: 'POST',

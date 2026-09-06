@@ -31,7 +31,7 @@ it('chunks more than one server batch of local deletes', async () => {
 			localDeletes: paths,
 		});
 		harness.localManifest.getEntry.mockReturnValue({
-			hash: 'a'.repeat(64),
+			hash: 'a'.repeat(64), revision: 'version-1',
 			size: 1,
 			modified: '2026-02-06T10:00:00.000Z',
 		});
@@ -50,7 +50,7 @@ it('chunks more than one server batch of local deletes', async () => {
 			setEntry: vi.fn(),
 			removeEntry: vi.fn(),
 			getEntry: vi.fn((path: string) => path === 'notes/local-delete.md'
-				? { hash: 'a'.repeat(64), size: 1, modified: '2026-02-15T00:00:00.000Z' }
+				? { hash: 'a'.repeat(64), revision: 'version-1', size: 1, modified: '2026-02-15T00:00:00.000Z' }
 				: undefined),
 			getAllPaths: vi.fn(() => []),
 			getManifest: vi.fn(() => ({ version: 1, files: {} })),
@@ -113,6 +113,7 @@ it('chunks more than one server batch of local deletes', async () => {
 		expect(batchDelete).toHaveBeenCalledWith(
 			['notes/local-delete.md'],
 			{ 'notes/local-delete.md': 'a'.repeat(64) },
+      { 'notes/local-delete.md': 'version-1' },
 		);
 		expect(localManifest.removeEntry).toHaveBeenCalledWith('notes/local-delete.md');
 		expect(result?.success).toBe(true);

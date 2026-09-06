@@ -1,3 +1,4 @@
+import type { AuthPrincipal } from '../authenticate';
 import {
 	handleCreateEnrollmentToken,
 	handleCreateRemindersEnrollmentToken,
@@ -16,12 +17,13 @@ export async function handleNotificationsRoute(
 	db: D1Database,
 	path: string,
 	method: RouteMethod,
+	principal?: AuthPrincipal,
 ): Promise<Response | null> {
 	if (path === '/notifications/subscribe' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleSubscribe(request, requiredDb));
+		return await withDatabase(db, requiredDb => handleSubscribe(request, requiredDb, principal?.tokenId ?? undefined));
 	}
 	if (path === '/notifications/subscribe' && method === 'DELETE') {
-		return await withDatabase(db, requiredDb => handleUnsubscribe(request, requiredDb));
+		return await withDatabase(db, requiredDb => handleUnsubscribe(request, requiredDb, principal?.scope === 'reminders' ? principal.tokenId ?? undefined : undefined));
 	}
 	if (path === '/notifications/subscriptions' && method === 'GET') {
 		return await withDatabase(db, requiredDb => handleListSubscriptions(requiredDb));
@@ -30,7 +32,7 @@ export async function handleNotificationsRoute(
 		return await withDatabase(db, requiredDb => handleCreateEnrollmentToken(requiredDb));
 	}
 	if (path === '/notifications/reminders-enrollment-token' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleCreateRemindersEnrollmentToken(requiredDb));
+		return await withDatabase(db, requiredDb => handleCreateRemindersEnrollmentToken(requiredDb, request));
 	}
 	if (path === '/notifications/test' && method === 'POST') {
 		return await withDatabase(db, requiredDb => handleTestPush(requiredDb));

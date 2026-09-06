@@ -167,13 +167,14 @@ describe('detectConflicts (3-way hash)', () => {
 	});
 
 	it('deletes an unchanged remote file when the local side deleted it', () => {
-		const base = entry('base', '2026-02-06T10:00:00.000Z');
+		const base = { ...entry('base', '2026-02-06T10:00:00.000Z'), revision: 'version-1' };
 		const diffs = detectConflicts({}, { 'note.md': base }, { 'note.md': base });
 
 		expect(diffs).toEqual([{
 			path: 'note.md',
 			action: 'delete',
 			remoteHash: 'base',
+      remoteRevision: 'version-1',
 			cause: 'local-deleted',
 		}]);
 	});

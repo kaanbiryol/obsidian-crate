@@ -96,7 +96,7 @@ Official references:
 4. In Cloudflare, select exactly one account, review the four permissions, and authorize Crate.
 5. Cloudflare returns to the static callback page. It removes the OAuth query from the browser URL immediately and opens `obsidian://crate-cloudflare-oauth`.
 6. Crate verifies the random OAuth state before exchanging the code with its in-memory PKCE verifier.
-7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, and workers.dev endpoint when none exists. The complete D1 schema and any unapplied, hash-verified upgrades are applied before the Worker bundle is uploaded, keeping schema work out of request cold starts.
+7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, and workers.dev endpoint when none exists. Joining an existing deployment does not upload code or change schema. Creation and explicitly authorized updates apply hash-verified migrations, install the new Worker, and normalize portable paths while writes are fenced. A newer remote Worker is never downgraded.
 8. Crate registers this device's hashed credential through the Cloudflare D1 API, then revokes and discards the access token.
 9. Connection does not transfer vault files. For a new server, run **Initial sync → Upload all** when ready. When joining an existing server, run **Sync now** instead.
 
@@ -108,6 +108,14 @@ Cloudflare account access is the source of truth for vault devices. The plugin n
 
 Install Crate on the other device, open **Settings → Crate → Configuration**, and select **Connect with Cloudflare**. Authorize the account that owns the vault's Crate server. When that account has multiple Crate servers, choose the matching Worker in Obsidian.
 
+## Protocol and migration upgrades
+
+Protocol 3 is required for writes. Both clients verify server compatibility before mutations; the Worker rejects missing or incompatible protocol headers with 428. Reload an old web app and update old plugins before editing. Read endpoints remain available for recovery. An explicit Worker update preserves resource IDs and data; downgrade checks use the current remote deployment metadata.
+
+Existing path keys are normalized with JavaScript NFC normalization and Unicode lowercase after the protocol gate is installed. A migration marker keeps authenticated writes and maintenance fenced until this completes. Colliding legacy names or invalid Windows names stop backfill before it changes names or file content. Take a paired archive, resolve the conflicting legacy filenames and metadata with an operator-reviewed migration, then retry **Authorize update**. Do not clear the marker manually or deploy an older Worker to bypass it. A failed backfill can be retried safely.
+
+Production schema changes use the plugin's provisioning flow. The former `npm run deploy` and `db:init:remote` shortcuts were removed because replaying only the complete schema cannot migrate existing tables safely. Wrangler remains available for local runtime tests and deliberate operator recovery against isolated resources.
+
 ## Recovery and deletion
 
 - If the browser handoff fails, select **Open Obsidian** on the callback page.
@@ -116,3 +124,5 @@ Install Crate on the other device, open **Settings → Crate → Configuration**
 - Replaced and deleted sync objects remain recoverable for 30 days under **Settings → Crate → Infrastructure → Restore remote file**. Recovery verifies the retained bytes and refuses to overwrite a remote path that changed after the recovery screen was opened.
 - **Run diagnostics** reports manifest access, pending backend queues, and the last scheduled-maintenance result. Use it after a server upgrade and before relying on a newly seeded vault.
 - To destroy the server and synced data, explicitly delete its Worker, R2 bucket, D1 database, and Durable Object resources in the Cloudflare dashboard.
+
+For paired D1/R2 backup verification and isolated restore commands, use [Backup and recovery](recovery.md).

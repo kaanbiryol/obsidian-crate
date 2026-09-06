@@ -10,7 +10,7 @@ export interface ReminderRepository {
 
   create(params: CreateReminderParams): Promise<Reminder>;
   update(id: string, params: UpdateReminderParams): Promise<Reminder | undefined>;
-  delete(id: string): Promise<boolean>;
+  delete(id: string, expectedRevision?: string): Promise<boolean>;
   complete(id: string): Promise<Reminder | undefined>;
   uncomplete(id: string): Promise<Reminder | undefined>;
   reorder(project: string, orderedIds: string[]): Promise<void>;

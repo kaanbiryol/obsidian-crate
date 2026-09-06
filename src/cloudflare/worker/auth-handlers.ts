@@ -13,7 +13,7 @@ export async function handleRevokeToken(request: Request, db: D1Database): Promi
 	if (!id) {
 		return corsResponse({ error: 'id required' }, 400);
 	}
-	await db.prepare('DELETE FROM auth_tokens WHERE id = ?').bind(id).run();
+	await db.batch([db.prepare('DELETE FROM push_subscriptions WHERE owner_token_id = ?').bind(id), db.prepare('DELETE FROM auth_tokens WHERE id = ?').bind(id)]);
 	return corsResponse({ success: true });
 }
 
@@ -25,7 +25,7 @@ export async function handleRevokeCurrentToken(request: Request, db: D1Database)
 	}
 
 	const tokenHash = await sha256Hex(token);
-	await db.prepare('DELETE FROM auth_tokens WHERE token_hash = ?').bind(tokenHash).run();
+	await db.batch([db.prepare('DELETE FROM push_subscriptions WHERE owner_token_id IN (SELECT id FROM auth_tokens WHERE token_hash = ?)').bind(tokenHash), db.prepare('DELETE FROM auth_tokens WHERE token_hash = ?').bind(tokenHash)]);
 	return corsResponse({ success: true });
 }
 

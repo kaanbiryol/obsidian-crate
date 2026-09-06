@@ -9,8 +9,9 @@ function createStatement(sql: string) {
 			statement.args = args;
 			return statement;
 		}),
-		all: vi.fn(async () => ({
-			results: sql.startsWith('SELECT storage_key')
+		first: vi.fn(async () => null),
+    all: vi.fn(async () => ({
+			results: sql.startsWith('SELECT storage_key') && !sql.includes('UNION')
 				? [{ storage_key: 'queued-object' }]
 				: [],
 		})),

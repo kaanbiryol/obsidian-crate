@@ -27,6 +27,10 @@ export async function getLocalChanges(
   const changes: Array<{ path: string; hash: string }> = [];
   const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context));
 
+  for (const file of allFiles) {
+    if (file.size > MAX_FILE_SIZE_BYTES) changes.push({ path: file.path, hash: context.localManifest.getEntry(file.path)?.hash ?? "" });
+  }
+
   const candidates = allFiles.filter((file) => {
     if (file.size > MAX_FILE_SIZE_BYTES) return false;
 

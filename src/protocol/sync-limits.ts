@@ -4,7 +4,7 @@
  * Mutation batches stay deliberately small so a worst-case stale write remains
  * below D1's 50-query Workers Free limit after authentication and cleanup.
  */
-export const BATCH_UPLOAD_MAX_FILES = 6;
+export const BATCH_UPLOAD_MAX_FILES = 5;
 export const BATCH_DELETE_MAX_FILES = 6;
 export const BATCH_DOWNLOAD_MAX_FILES = 50;
 

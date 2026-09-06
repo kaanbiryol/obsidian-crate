@@ -1,3 +1,8 @@
+import { ReminderFileSizeError } from './reminders-web/limits';
+import { logMutation } from './request-diagnostics';
+import { limitNotificationRequest } from './rate-limit';
+import { wakeNotificationCoordinator } from './notification-coordinator';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '../../protocol';
 import { corsHeaders, corsResponse } from './cors';
 import { authenticateWorkerRequest } from './auth/index';
 import { handleAuthenticatedRoute, handlePublicRoute } from './router';
@@ -18,7 +23,7 @@ function withRequestId(response: Response, requestId: string): Response {
 }
 
 export default {
-	async fetch(request: Request, env: Env): Promise<Response> {
+	async fetch(request: Request, env: Env, context?: ExecutionContext): Promise<Response> {
 		const requestId = crypto.randomUUID();
 		if (request.method === 'OPTIONS') {
 			return withRequestId(new Response(null, { status: 204, headers: corsHeaders() }), requestId);
@@ -30,6 +35,14 @@ export default {
 		const db = env.DB;
 
 		try {
+			if (isCrateMutation(path, method)) {
+				const protocol = Number(request.headers.get(CRATE_PROTOCOL_HEADER));
+				if (!Number.isInteger(protocol) || protocol < CRATE_PLUGIN_PROTOCOL.oldestCompatible || protocol > CRATE_PLUGIN_PROTOCOL.current) {
+					return withRequestId(corsResponse({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible', protocol: CRATE_PLUGIN_PROTOCOL }, 428), requestId);
+				}
+			}
+			const rateLimited = await limitNotificationRequest(request, db);
+			if (rateLimited) return withRequestId(rateLimited, requestId);
 			const publicResponse = await handlePublicRoute(request, env, path, method);
 			if (publicResponse) {
 				return withRequestId(publicResponse, requestId);
@@ -40,10 +53,17 @@ export default {
 				return withRequestId(authResult.response, requestId);
 			}
 
+			if (isCrateMutation(path, method)) {
+				const migration = await db.prepare("SELECT value FROM maintenance_state WHERE key = 'portable_paths_ready'").first<{ value: string }>();
+				if (migration?.value === 'false') return withRequestId(corsResponse({ error: 'Server migration is incomplete. Finish the Crate server update before making changes.' }, 503), requestId);
+			}
 			const response = await handleAuthenticatedRoute(request, env, path, method, authResult.principal)
 				?? corsResponse({ error: 'Not found' }, 404);
+			if (isCrateMutation(path, method)) await logMutation(request, response, requestId, authResult.principal);
+			if (response.ok && isCrateMutation(path, method) && context) context.waitUntil(wakeNotificationCoordinator(env).catch(() => undefined));
 			return withRequestId(response, requestId);
 		} catch (error) {
+      if (error instanceof ReminderFileSizeError) return withRequestId(corsResponse({ error: error.message }, 413), requestId);
 			if (error instanceof FileVersionConflictError) {
 				return withRequestId(corsResponse({
 					error: 'The reminder file changed. Refresh and retry your edit.',
@@ -55,7 +75,7 @@ export default {
 				method,
 				path,
 				requestId,
-				error: error instanceof Error ? error.message : String(error),
+				errorClass: error instanceof Error ? error.name : 'UnknownError',
 			});
 			return withRequestId(corsResponse({ error: 'Internal server error' }, 500), requestId);
 		}

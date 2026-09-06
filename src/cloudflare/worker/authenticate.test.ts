@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { sha256Hex } from './auth';
 import { authenticateWorkerRequest } from './authenticate';
 
-function createDb(tokenHash: string, row: { id: string; scope: string } | null) {
+function createDb(tokenHash: string, row: { id: string; scope: string; folder_path?: string } | null) {
 	return {
 		prepare: vi.fn((sql: string) => {
 			const statement = {
@@ -11,7 +11,7 @@ function createDb(tokenHash: string, row: { id: string; scope: string } | null) 
 					statement.args = args;
 					return statement;
 				}),
-				first: vi.fn(async () => sql.includes('SELECT id, scope FROM auth_tokens')
+				first: vi.fn(async () => sql.includes('SELECT id, scope, folder_path FROM auth_tokens')
 					&& statement.args[0] === tokenHash
 					? row
 					: null),
@@ -25,7 +25,7 @@ function createDb(tokenHash: string, row: { id: string; scope: string } | null) 
 describe('worker authentication principals', () => {
 	it('returns the stored scope for a non-expired database token', async () => {
 		const token = 'pwa-session-token';
-		const db = createDb(await sha256Hex(token), { id: 'pwa-id', scope: 'reminders' });
+		const db = createDb(await sha256Hex(token), { id: 'pwa-id', scope: 'reminders', folder_path: 'Reminders' });
 
 		const result = await authenticateWorkerRequest(
 			new Request('https://worker.test/reminders/list', {
@@ -34,7 +34,7 @@ describe('worker authentication principals', () => {
 			db as never,
 		);
 
-		expect(result).toEqual({ principal: { tokenId: 'pwa-id', scope: 'reminders' } });
+		expect(result).toEqual({ principal: { tokenId: 'pwa-id', scope: 'reminders', folderPath: 'Reminders' } });
 		expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('expires_at > ?'));
 	});
 

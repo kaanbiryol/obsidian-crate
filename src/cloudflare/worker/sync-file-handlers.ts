@@ -5,7 +5,6 @@ import { isSha256Hex, parseJsonObject, parseOptionalString, sanitizePath } from 
 import { commitFileDelete, commitStagedFile } from './sync-mutations';
 import {
 	createManagedObjectKey,
-	deleteBucketObjectsOrQueue,
 	formatMetadataCommitFailure,
 	formatMutationError,
 	getStoredFileRow,
@@ -85,6 +84,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 			customMetadata: { hash },
 		});
 
+		let revision: string | undefined;
 		try {
 			const commit = await commitStagedFile(bucket, db, {
 				path: safePath,
@@ -94,6 +94,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 				expectedHash: expectedRemoteHash,
 				previousFile,
 			});
+			revision = commit.revision;
 			if (!commit.committed) {
 				return corsResponse({
 					success: false,
@@ -104,7 +105,8 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 				}, 409);
 			}
 		} catch (error: unknown) {
-			await deleteBucketObjectsOrQueue(bucket, db, [objectKey]);
+			// The transaction may have committed before its response was lost.
+			// Only the age-delayed, reference-aware orphan sweep may reclaim it.
 			return corsResponse({
 				success: false,
 				path: safePath,
@@ -112,7 +114,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 			}, 503);
 		}
 
-		return corsResponse({ success: true, path: safePath, hash });
+		return corsResponse({ success: true, path: safePath, hash, revision });
 	} catch (err: unknown) {
 		const message = formatMutationError(err);
 		return corsResponse({ success: false, path: safePath, error: message }, 500);
@@ -157,6 +159,7 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 			'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
 			'Content-Length': String(obj.size),
 			'Cache-Control': 'private, no-store',
+			'X-Crate-Revision': storedFile?.storageKey ?? '',
 			'X-File-Hash': storedFile?.hash || obj.customMetadata?.hash || '',
 			...corsHeaders(),
 		},
@@ -179,12 +182,15 @@ export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Dat
 		return corsResponse({ error: 'Valid expectedHash required' }, 400);
 	}
 
+	const expectedRevision = parseOptionalString(parsedBody.value.expectedRevision, 1024);
+	if (!expectedRevision) return corsResponse({ error: 'expectedRevision required; refresh before deleting' }, 428);
 	let previousFile: FileStorageRow | null = null;
 	try {
 		previousFile = await getStoredFileRow(db, safePath);
 		const commit = await commitFileDelete(bucket, db, {
 			path: safePath,
 			expectedHash,
+			expectedRevision,
 			previousFile,
 		});
 		if (!commit.committed) {

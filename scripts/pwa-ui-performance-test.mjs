@@ -118,13 +118,18 @@ for (const browserType of [chromium, webkit]) {
 				target.dispatchEvent(event);
 			};
 			dispatch('touchstart', 0);
-			dispatch('touchmove', 85);
+			dispatch('touchmove', 200);
 		});
 		await expect(page.locator('.pwa-pull-refresh')).toHaveClass(/is-ready/);
-		assert.deepEqual(await page.locator('#scroll').boundingBox(), before, 'pull must not move or resize the list');
+		const pulled = await page.locator('#scroll').boundingBox();
+		const indicator = await page.locator('.pwa-pull-refresh').boundingBox();
+		assert.equal(pulled.width, before.width, 'pull must retain list width');
+		assert.equal(pulled.height, before.height, 'pull must retain list height');
+		assert.ok(Math.abs(pulled.y - before.y - indicator.height) < 1, 'pull should reveal the indicator above the list');
 		await page.evaluate(() => document.getElementById('scroll').dispatchEvent(new Event('touchend', { bubbles: true })));
 		await expect(page.locator('#refreshes')).toHaveText('1');
 		await expect(page.locator('.pwa-pull-refresh')).not.toHaveClass(/is-visible/);
+		await expect.poll(async () => (await page.locator('#scroll').boundingBox()).y).toBe(before.y);
 
 		await page.evaluate(() => {
 			window.viewportReads = 0;

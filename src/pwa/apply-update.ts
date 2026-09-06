@@ -2,6 +2,7 @@ import { fetchPwaAssetVersion } from './api';
 
 export function waitForWorkerActivation(worker: ServiceWorker): Promise<void> {
 	return new Promise((resolve, reject) => {
+		let requestedActivation = false;
 		const finish = (error?: Error) => {
 			clearTimeout(timeout);
 			worker.removeEventListener('statechange', check);
@@ -9,6 +10,10 @@ export function waitForWorkerActivation(worker: ServiceWorker): Promise<void> {
 			else resolve();
 		};
 		const check = () => {
+			if (worker.state === 'installed' && !requestedActivation) {
+				requestedActivation = true;
+				worker.postMessage({ type: 'CRATE_ACTIVATE_UPDATE' });
+			}
 			if (worker.state === 'activated') finish();
 			else if (worker.state === 'redundant') finish(new Error('The update could not be installed. Please try again.'));
 		};

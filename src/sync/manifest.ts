@@ -30,7 +30,7 @@ function normalizeFileEntry(value: unknown): FileEntry | null {
 		return null;
 	}
 
-	return { hash, size, modified };
+	return { hash, size, modified, ...(typeof value.revision === 'string' ? { revision: value.revision } : {}) };
 }
 
 function normalizeFileManifest(value: unknown): FileManifest | null {
@@ -148,7 +148,8 @@ export class LocalManifest {
 	 * Set file entry
 	 */
 	setEntry(path: string, entry: FileEntry): void {
-		this.manifest.files[path] = entry;
+		const previous = this.manifest.files[path];
+		this.manifest.files[path] = { ...entry, revision: entry.revision ?? (previous?.hash === entry.hash ? previous.revision : undefined) };
 		this.revision++;
 		this.dirty = true;
 	}

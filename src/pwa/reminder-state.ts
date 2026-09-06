@@ -6,7 +6,7 @@ import {
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
 import { formatDueDate } from '@/reminders/utils/dateFormatting';
 import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/utils/reminderDate';
-import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
+import { normalizeRecurrenceRule, preserveRecurrenceMetadata } from '@/reminders/utils/recurrenceRule';
 import {
 	getReminderDateForPreset,
 	type ReminderDatePreset,
@@ -120,11 +120,11 @@ export function deriveDraftPatchFromContent(
 	}
 
 	if (metadata.recurrence) {
-		const nextRecurrence = normalizeRecurrenceRule(metadata.recurrence);
+		const nextRecurrence = normalizeRecurrenceRule(preserveRecurrenceMetadata(metadata.recurrence, draft.recurrence));
 		if (JSON.stringify(nextRecurrence) !== JSON.stringify(draft.recurrence)) {
 			patch.recurrence = nextRecurrence;
 		}
-		if (draft.dueDate || draft.dueTime) {
+		if (nextRecurrence !== draft.recurrence && (draft.dueDate || draft.dueTime)) {
 			patch.dueDate = '';
 			patch.dueTime = '';
 		}

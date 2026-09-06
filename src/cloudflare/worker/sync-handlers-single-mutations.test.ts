@@ -81,6 +81,7 @@ it('rejects traversal-style upload paths', async () => {
 			success: true,
 			path: 'notes/test.md',
 			hash: expectedHash,
+      revision: files.get('notes/test.md')?.storageKey,
 		});
 		expect(files.get('notes/test.md')?.hash).toBe(expectedHash);
 		expect(Array.from(store.values()).some(object => object.customMetadata?.hash === expectedHash)).toBe(true);
@@ -109,12 +110,12 @@ it('rejects traversal-style upload paths', async () => {
 		expect(await responseJson(response)).toEqual({
 			success: false,
 			path: 'notes/test.md',
-			error: 'Upload not committed because sync metadata update failed: D1 unavailable',
+			error: 'Upload outcome is unknown because the metadata response failed; reconcile before retrying: D1 unavailable',
 		});
 		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
 	});
 
-	it('still returns 503 when upload cleanup after a failed D1 commit also fails', async () => {
+	it('leaves staged bytes untouched after an uncertain commit even when cleanup is unavailable', async () => {
 		const { bucket } = createMockR2Bucket();
 		bucket.delete = vi.fn(async () => {
 			throw new Error('cleanup unavailable');
@@ -138,9 +139,9 @@ it('rejects traversal-style upload paths', async () => {
 		expect(await responseJson(response)).toEqual({
 			success: false,
 			path: 'notes/test.md',
-			error: 'Upload not committed because sync metadata update failed: D1 unavailable',
+			error: 'Upload outcome is unknown because the metadata response failed; reconcile before retrying: D1 unavailable',
 		});
-		expect(bucket.delete).toHaveBeenCalledTimes(1);
+		expect(bucket.delete).not.toHaveBeenCalled();
 	});
 
 	it('returns 400 for invalid JSON delete requests instead of throwing 500', async () => {
@@ -170,7 +171,7 @@ it('rejects traversal-style upload paths', async () => {
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
 				method: 'POST',
-				body: JSON.stringify({ path: 'notes/test.md', expectedHash: 'a'.repeat(64) }),
+				body: JSON.stringify({ path: 'notes/test.md', expectedHash: 'a'.repeat(64), expectedRevision: 'files/notes/test.md' }),
 				headers: { 'Content-Type': 'application/json' },
 			}),
 			bucket,
@@ -181,7 +182,7 @@ it('rejects traversal-style upload paths', async () => {
 		expect(await responseJson(response)).toEqual({
 			success: false,
 			path: 'notes/test.md',
-			error: 'Delete not committed because sync metadata update failed: D1 unavailable',
+			error: 'Delete outcome is unknown because the metadata response failed; reconcile before retrying: D1 unavailable',
 		});
 		expect(new TextDecoder().decode(store.get('files/notes/test.md')?.body)).toBe('before');
 	});
@@ -200,7 +201,7 @@ it('rejects traversal-style upload paths', async () => {
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
 				method: 'POST',
-				body: JSON.stringify({ path: 'notes/test.md', expectedHash: 'a'.repeat(64) }),
+				body: JSON.stringify({ path: 'notes/test.md', expectedHash: 'a'.repeat(64), expectedRevision: managedKey }),
 				headers: { 'Content-Type': 'application/json' },
 			}),
 			bucket,

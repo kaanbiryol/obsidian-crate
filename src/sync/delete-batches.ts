@@ -6,10 +6,11 @@ import type { MutationFailure } from '../protocol/sync-types';
 export interface ConditionalDeleteCandidate {
 	path: string;
 	expectedHash: string;
+	expectedRevision?: string;
 }
 
 interface ConditionalDeleteApi {
-	batchDelete(paths: string[], expectedHashes?: Record<string, string>): Promise<{
+	batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>): Promise<{
 		success: boolean;
 		deleted: string[];
 		errors?: MutationFailure[];
@@ -35,6 +36,7 @@ export async function deleteFilesInBatches(
 			const response = await api.batchDelete(
 				chunk.map((file) => file.path),
 				Object.fromEntries(chunk.map((file) => [file.path, file.expectedHash])),
+				Object.fromEntries(chunk.flatMap((file) => file.expectedRevision ? [[file.path, file.expectedRevision]] : [])),
 			);
 			const expectedPaths = new Set(chunk.map((file) => file.path));
 			const deletedPaths = new Set(response.deleted);

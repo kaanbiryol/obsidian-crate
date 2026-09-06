@@ -17,6 +17,10 @@ export async function handleDiagnostics(db: D1Database): Promise<Response> {
 		db.prepare('SELECT COUNT(*) AS count FROM auth_tokens WHERE expires_at IS NULL OR expires_at > ?').bind(Date.now()),
 		db.prepare('SELECT COUNT(*) AS count FROM push_subscriptions WHERE disabled_at IS NULL'),
 		db.prepare('SELECT COUNT(*) AS count FROM push_subscriptions WHERE disabled_at IS NOT NULL'),
+		db.prepare('SELECT COUNT(*) AS count FROM notification_projection_jobs'),
+		db.prepare('SELECT COUNT(*) AS count FROM notification_projection_jobs WHERE last_error IS NOT NULL'),
+		db.prepare('SELECT COUNT(*) AS count FROM notification_jobs WHERE last_error IS NOT NULL'),
+		db.prepare('SELECT COUNT(*) AS count FROM reminder_operations'),
 	]);
 	const [lastRun, lastError] = await Promise.all([
 		db.prepare("SELECT value FROM maintenance_state WHERE key = 'last_run'").first<{ value: string }>(),
@@ -34,6 +38,10 @@ export async function handleDiagnostics(db: D1Database): Promise<Response> {
 			activeAuthTokens: firstCount(results[6]),
 			activePushSubscriptions: firstCount(results[7]),
 			disabledPushSubscriptions: firstCount(results[8]),
+			pendingNotificationProjections: firstCount(results[9]),
+			failedNotificationProjections: firstCount(results[10]),
+			failedNotificationJobs: firstCount(results[11]),
+			reminderOperationReceipts: firstCount(results[12]),
 		},
 		lastMaintenanceAt: lastRun?.value ?? null,
 		lastMaintenanceError: lastError?.value ?? null,

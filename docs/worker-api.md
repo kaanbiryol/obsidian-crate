@@ -2,11 +2,13 @@
 
 Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment.
 
+Every mutation requires `X-Crate-Protocol: 3`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, migration, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics.
+
 ## Authentication
 
 All non-public API endpoints require an `Authorization: Bearer <token>` header. Tokens have either `vault` or `reminders` scope, and may have an expiry. The Worker hashes the bearer token with SHA-256 and looks up the hash in the `auth_tokens` D1 table. Authentication fails closed with `503` when D1 is unavailable.
 
-Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens that cannot call sync, settings, device-management, scheduled-reminder, or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
+Vault device tokens are registered only through a temporary Cloudflare OAuth authorization; the Worker exposes no public or device-authorized vault-enrollment endpoint. PWA exchanges create 90-day `reminders` tokens bound to the enrolled folder. Unbound legacy sessions must enroll again. These tokens cannot call sync, settings, device-management, scheduled-reminder, or push-administration routes. Public compatibility, PWA assets, and reminder-enrollment endpoints are listed separately below. CORS headers are included on all JSON/API responses.
 
 ## Endpoints
 
@@ -20,8 +22,8 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `POST` | `/sync/metadata` | Fetch current metadata for up to 50 selected paths |
 | `PUT` | `/sync/upload?path=<path>` | Upload one conditionally-versioned file (binary body, max 25 MB) |
 | `GET` | `/sync/download?path=<path>` | Download single file (streaming from R2) |
-| `POST` | `/sync/delete` | Delete single file `{ path }` |
-| `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 6 files, 10 MB total) |
+| `POST` | `/sync/delete` | Delete single file with expected hash and revision |
+| `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 5 files, 10 MiB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
 | `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 6 files) |
 | `GET` | `/sync/versions?path=<path>` | List unexpired recoverable file versions |
@@ -38,8 +40,9 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `POST` | `/reminders/set-completed` | Toggle reminder completion |
 | `DELETE` | `/reminders/delete` | Delete a reminder from Markdown |
 | `POST` | `/reminders/reorder` | Reorder reminders inside a project file |
-| `POST` | `/reminders/schedule` | Schedule a DO alarm for a reminder |
-| `DELETE` | `/reminders/cancel` | Cancel a DO alarm |
+| `GET`, `POST`, `PUT` | `/reminders/notification-policy` | Read, initialize, or explicitly update shared notification policy (vault scope) |
+| `POST` | `/reminders/schedule` | Retired; returns 410 |
+| `DELETE` | `/reminders/cancel` | Retired; returns 410 |
 | `GET` | `/reminders/scheduled` | List scheduled reminders from D1 |
 | `POST` | `/notifications/enrollment-token` | Create a one-time push subscription token |
 | `POST` | `/notifications/reminders-enrollment-token` | Create one-time browser and install tokens for a reminders web app link (vault tokens only) |
@@ -72,13 +75,13 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 - Headers: `X-File-Hash`, `X-File-Size`, `X-Crate-Expected-Hash`, `Content-Type`
 - `X-Crate-Expected-Hash` is the 64-character remote hash observed while planning, or `absent` for a new path
 - Body: raw binary, consumed incrementally with a hard 25 MB cap; oversized declared or chunked requests stop before the remainder is buffered
-- Response: `{ success, path, hash }`
+- Response: `{ success, path, hash, revision }`
 - A stale expected hash returns `409` with `{ success: false, path, error, code: "version_conflict", currentHash }` and does not replace the committed object
 
 ### GET /sync/download
 
 - Query: `?path=<url-encoded-path>`
-- Response headers: `Content-Type`, `Content-Length`, `X-File-Hash`
+- Response headers: `Content-Type`, `Content-Length`, `X-File-Hash`, `X-Crate-Revision`
 - Body: raw binary (streamed from R2)
 
 ### POST /sync/batch-upload
@@ -98,25 +101,25 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 }
 ```
 
-Worker validates: max 6 files, total decoded content <= 10 MB. Mutation batches are deliberately smaller than download batches to stay within Workers Free D1 query limits even on stale-write cleanup paths.
+Worker validates: max 5 files, total decoded content <= 10 MiB. Mutation batches are deliberately smaller than download batches to stay within Workers Free D1 query limits even on stale-write cleanup paths.
 
-Response: `{ success, results: [{ path, success, hash?, error?, code?, status?, currentHash? }] }`. A stale per-file write uses `code: "version_conflict"`, `status: 409`, and the current remote hash; storage failures use `code: "storage"` and `status: 503`.
+Response: `{ success, results: [{ path, success, hash?, revision?, error?, code?, status?, currentHash? }] }`. A stale per-file write uses `code: "version_conflict"`, `status: 409`, and the current remote hash; storage failures use `code: "storage"` and `status: 503`.
 
 ### POST /sync/batch-download
 
 Request: `{ paths: ["notes/file.md", ...] }` (max 50, no duplicates)
 
-Response: `{ files: [{ path, content, hash, size, contentType, error? }] }`
+Response: `{ files: [{ path, content, hash, size, contentType, revision, error? }] }`
 
 Content is base64-encoded. The Worker rejects a batch before reading R2 if D1 metadata shows that it exceeds 8 MB. The client batches only files smaller than 1 MB, validates the exact response path set, size, and SHA-256 hash, and falls back to individual streaming downloads when a batch is too large or unavailable.
 
 ### POST /sync/delete / batch-delete
 
-Single: `{ path: "notes/file.md", expectedHash: "sha256..." }` -> `{ success, path }`
+Single: `{ path: "notes/file.md", expectedHash: "sha256...", expectedRevision: "opaque-key" }` -> `{ success, path }`
 
-Batch: `{ files: [{ path, expectedHash }, ...] }` (max 6) -> `{ success, deleted: [...], errors?: [{ path, error, code?, status?, currentHash? }] }`
+Batch: `{ files: [{ path, expectedHash, expectedRevision }, ...] }` (max 6) -> `{ success, deleted: [...], errors?: [{ path, error, code?, status?, currentHash? }] }`
 
-Uploads, deletes, and PWA reminder edits compare the D1 hash they originally read. D1 applies the file-row mutation and changelog append atomically; stale writers receive `409` instead of silently overwriting a newer version.
+Uploads compare the observed D1 content hash. Deletes also compare the original opaque revision, rejecting same-content recreations. Reminder edits compare a semantic revision captured by the client, then apply file-level preconditions. D1 commits the file row, changelog, retention, operation receipt, and notification projection intent atomically; stale writers receive `409`.
 
 ### GET /sync/check
 
@@ -143,7 +146,7 @@ Response:
 {
   "version": 1,
   "files": {
-    "path": { "hash": "...", "size": 1024, "modified": "datetime" }
+    "path": { "hash": "...", "size": 1024, "modified": "datetime", "revision": "opaque-key" }
   },
   "lastSeq": 42,
   "snapshotSeq": 42,
@@ -200,19 +203,19 @@ Reads synced Markdown reminder files from the configured folder and returns web-
 
 Cold indexes are warmed in batches of at most 20 files and 2 MiB per request. While more files remain, the endpoint responds with `202` and `{ warming: true, remainingFiles }`; clients should repeat the request until it returns `200`. Individual reminder Markdown files must be no larger than 1 MiB.
 
-Response: `{ reminders: [...], projects: [...] }`
+Response: `{ reminders: [...], projects: [...], issues: [...] }`. Each reminder includes its semantic `revision`. Oversized notes or cache records yield per-file issues while healthy reminders remain usable; responses with issues omit ETag. Warming responses include `totalFiles` and `Retry-After: 1`.
 
 ### POST /reminders/create
 
 Creates a reminder in the selected project Markdown file, creating that file if needed.
 
-Request includes `folderPath`, `content`, optional `project`, `description`, `priority`, `dueDate`, `dueDatetime`, `recurrence`, `allDayNotificationTime`, and optional client-provided `id`.
+Request includes a UUID `operationId`, `folderPath`, `content`, optional `project`, `description`, `priority`, `dueDate`, `dueDatetime`, `recurrence`, `allDayNotificationTime`, and optional client-provided `id`.
 
 Response: `{ success: true, notificationWarning? }`
 
 ### POST /reminders/update
 
-Updates an existing reminder by `id`. The request requires `folderPath` and the reminder's `filePath`, plus any mutable reminder fields: `content`, `description`, `priority`, `project`, `dueDate`, `dueDatetime`, `recurrence`, and `allDayNotificationTime`.
+Updates an existing reminder by `id`. The request requires a UUID `operationId`, `expectedRevision`, `folderPath`, and the reminder's original `filePath`, plus any mutable reminder fields: `content`, `description`, `priority`, `project`, `dueDate`, `dueDatetime`, `recurrence`, and `allDayNotificationTime`.
 
 If `project` changes, the worker commits the source and destination Markdown files atomically with hash-based compare-and-swap checks.
 
@@ -220,48 +223,29 @@ Response: `{ success: true, notificationWarning? }`
 
 ### POST /reminders/set-completed
 
-Request: `{ folderPath, filePath, id, completed, allDayNotificationTime? }`
+Request: `{ operationId, expectedRevision, folderPath, filePath, id, completed }`
 
 Response: `{ success: true, notificationWarning? }`
 
 ### DELETE /reminders/delete
 
-Request: `{ folderPath, filePath, id, allDayNotificationTime? }`
+Request: `{ operationId, expectedRevision, folderPath, filePath, id }`
 
 Response: `{ success: true, notificationWarning? }`
 
 ### POST /reminders/reorder
 
-Request: `{ folderPath, project, orderedIds }`
+Request: `{ operationId, folderPath, project, orderedIds, expectedOrder }`. `expectedOrder` is the previously observed complete project order; a concurrent reorder or changed membership returns 409.
 
 Response: `{ success: true }`
 
-### POST /reminders/schedule
+### GET / POST / PUT /reminders/notification-policy
 
-Schedule a Durable Object alarm for a reminder. Creates or updates the alarm and stores metadata in D1.
+Vault credentials only. GET reads the shared folder, IANA timezone, all-day time, enabled state, and revision. POST initializes only an absent policy. PUT changes it explicitly with `expectedRevision`; stale changes receive 409. Starting a client never overwrites another device's policy.
 
-Request:
-```json
-{
-  "reminderId": "unique-id",
-  "content": "Reminder text",
-  "project": "optional project name",
-  "dueDatetime": "2026-03-22T14:00:00Z",
-  "priority": 3
-}
-```
+### POST /reminders/schedule and DELETE /reminders/cancel
 
-`project` and `priority` are optional.
-
-Response: `{ success: true }`
-
-### DELETE /reminders/cancel
-
-Cancel a scheduled reminder's DO alarm and remove from D1.
-
-Request: `{ "reminderId": "unique-id" }`
-
-Response: `{ success: true }`
+Both return 410. Schedules derive from committed Markdown and the shared notification policy. File commits enqueue projection intent in the same D1 transaction. The Durable Object coordinator drains at most three files and five outbox jobs per alarm, fences stale work with file/policy/job revisions, and rearms while work remains. Maintenance recovers missed wakeups.
 
 ### GET /reminders/scheduled
 
@@ -434,7 +418,7 @@ CREATE TABLE IF NOT EXISTS scheduled_reminders (
 );
 ```
 
-Stores metadata for scheduled reminder alarms. Rows are inserted on `POST /reminders/schedule` and deleted when the DO alarm fires or `DELETE /reminders/cancel` is called.
+Stores derived alarm metadata. The server projection/outbox updates these rows using schedule-token preconditions. Delivery waits until the source projection is current; clients cannot schedule alarms directly.
 
 ### vapid_keys
 
@@ -503,7 +487,21 @@ Retry queue for R2 objects whose best-effort deletion failed after their D1 meta
 
 ### file_versions, notification_jobs, and maintenance_state
 
-`file_versions` retains replaced and deleted objects for 30 days and supports integrity-checked recovery. `notification_jobs` is a durable schedule/cancel outbox so a committed PWA reminder edit is retried when its Durable Object call fails. `maintenance_state` stores the R2 sweep cursor plus the last maintenance run and error for diagnostics.
+`file_versions` retains replaced and deleted objects for 30 days and supports integrity-checked recovery. `notification_jobs` is a durable schedule/cancel outbox generated from committed Markdown, including vault sync writes. Failed Durable Object calls retry with a token identifying the intended schedule. `maintenance_state` stores the R2 sweep cursor plus the last maintenance run and error for diagnostics.
+
+### Protocol 3 schema additions
+
+The SQL excerpts above describe the main tables; the complete schema and ordered migrations in `src/cloudflare/` are authoritative. Protocol 3 adds:
+
+- `reminder_operations` and `reminder_identities` for transactional retry receipts and permanently reserved creation IDs.
+- `changelog.revision` for opaque file incarnations.
+- `notification_policy`, `notification_projection_jobs`, and `reminder_projections` for server-owned schedules and commit fencing.
+- Folder bindings in `auth_tokens` and `web_enrollment_tokens`; owner/folder fields and unique endpoints in `push_subscriptions`.
+- `request_rate_limits` for atomic per-address/route budgets.
+
+Reminder mutations replay a matching operation receipt before rereading a moved or deleted source; a different payload under the same operation ID returns 409. Notification time comes from the saved server policy; the legacy `allDayNotificationTime` mutation field cannot replace it. Successful create/update/completion responses include the acknowledged `reminder` and its new revision.
+
+Subscriptions are limited to 20 total and five per owner. Logout/expiry removes owned subscriptions. Endpoint hosts must match supported push providers, redirects are rejected, and network calls have ten-second deadlines. Notification writes return 429 with `Retry-After` when their per-address/route budget is exhausted.
 
 ## R2 Key Convention
 

@@ -29,7 +29,7 @@ export async function handleGetChanges(request: Request, db: D1Database): Promis
 	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
 
 	const [changesResult, boundsResult] = await db.batch([
-		db.prepare('SELECT seq, path, action, hash, size, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since),
+		db.prepare('SELECT seq, path, action, hash, size, revision, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since),
 		db.prepare('SELECT MAX(seq) as lastSeq, MIN(seq) as minSeq FROM changelog'),
 	]);
 	const changeRows = batchRows(changesResult);
@@ -60,21 +60,21 @@ export async function handleGetManifest(request: Request, db: D1Database): Promi
 		return corsResponse({ error: 'Invalid manifest snapshot cursor' }, 400);
 	}
 	const filesStatement = after
-		? db.prepare(`SELECT path, hash, size, modified FROM files
+		? db.prepare(`SELECT path, hash, size, modified, storage_key AS revision FROM files
 			WHERE path > ? ORDER BY path ASC LIMIT ?`).bind(after, requestedLimit + 1)
-		: db.prepare('SELECT path, hash, size, modified FROM files ORDER BY path ASC LIMIT ?')
+		: db.prepare('SELECT path, hash, size, modified, storage_key AS revision FROM files ORDER BY path ASC LIMIT ?')
 			.bind(requestedLimit + 1);
 	const [filesResult, seqResult] = await db.batch([
 		filesStatement,
 		db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'),
 	]);
-	const filesRows = batchRows<{ path: string; hash: string; size: number; modified: string }>(filesResult);
+	const filesRows = batchRows<{ path: string; hash: string; size: number; modified: string; revision?: string }>(filesResult);
 	const seqRows = batchRows<{ lastSeq: number | null }>(seqResult);
 	const hasMore = filesRows.length > requestedLimit;
 	const rows = hasMore ? filesRows.slice(0, requestedLimit) : filesRows;
-	const files: Record<string, { hash: string; size: number; modified: string }> = {};
+	const files: Record<string, { hash: string; size: number; modified: string; revision?: string }> = {};
 	for (const row of rows) {
-		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified };
+		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified, revision: row.revision };
 	}
 	const lastSeq = seqRows[0]?.lastSeq ?? 0;
 	const snapshotSeq = requestedSnapshotSeq ?? lastSeq;
@@ -115,14 +115,14 @@ export async function handleGetFileMetadata(request: Request, db: D1Database): P
 
 	const placeholders = paths.map(() => '?').join(', ');
 	const result = await db.prepare(
-		`SELECT path, hash, size, modified FROM files WHERE path IN (${placeholders})`,
+		`SELECT path, hash, size, modified, storage_key AS revision FROM files WHERE path IN (${placeholders})`,
 	).bind(...paths).all();
 	const rows = Array.isArray(result.results)
-		? result.results as Array<{ path: string; hash: string; size: number; modified: string }>
+		? result.results as Array<{ path: string; hash: string; size: number; modified: string; revision?: string }>
 		: [];
-	const files: Record<string, { hash: string; size: number; modified: string }> = {};
+	const files: Record<string, { hash: string; size: number; modified: string; revision?: string }> = {};
 	for (const row of rows) {
-		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified };
+		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified, revision: row.revision };
 	}
 	return corsResponse({ files });
 }

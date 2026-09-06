@@ -47,6 +47,7 @@ export async function handleBatchDownload(
 		hash: string;
 		size: number;
 		contentType: string;
+		revision?: string;
 		error?: string;
 	}> = [];
 	let totalBytes = 0;
@@ -106,6 +107,7 @@ export async function handleBatchDownload(
 			files.push({
 				path: safePath,
 				content: btoa(binary),
+				revision: storedFile?.storageKey,
 				hash: storedFile?.hash || object.customMetadata?.hash || '',
 				size: object.size,
 				contentType: object.httpMetadata?.contentType || 'application/octet-stream',

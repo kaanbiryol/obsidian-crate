@@ -397,7 +397,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 				seq: 11,
 				path,
 				action: 'put',
-				hash: 'base',
+				hash: 'base', revision: 'version-1',
 				size: 8,
 				created_at: '2026-02-06T12:00:00.000Z',
 			}],
@@ -405,14 +405,14 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 			localDeletes: [path],
 		});
 		harness.localManifest.getEntry.mockReturnValue({
-			hash: 'base',
+			hash: 'base', revision: 'version-1',
 			size: 8,
 			modified: '2026-02-06T10:00:00.000Z',
 		});
 
 		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
 
-		expect(harness.api.batchDelete).toHaveBeenCalledWith([path], { [path]: 'base' });
+		expect(harness.api.batchDelete).toHaveBeenCalledWith([path], { [path]: 'base' }, { [path]: 'version-1' });
 		expect(result?.deletedPaths).toContain(path);
 	});
 });

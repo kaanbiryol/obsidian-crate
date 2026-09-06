@@ -32,7 +32,7 @@ export async function startCloudflareDeployment(plugin: CratePlugin): Promise<vo
 		return;
 	}
 	try {
-		await plugin.cloudflareDeploymentService.startDeployment();
+		await plugin.cloudflareDeploymentService.startDeployment(plugin.syncRuntime.isConfigured() ? 'update' : 'connect');
 	} catch (error) {
 		new Notice(`Could not start Cloudflare deployment: ${deploymentErrorMessage(error)}`);
 	}

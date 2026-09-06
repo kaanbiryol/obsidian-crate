@@ -1,3 +1,5 @@
+import { reminderRevision } from '../../core/reminderRevision';
+import { toReminder } from '../toReminder';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReminderIndex, IndexedReminder } from '../reminder-index';
 import type { MarkdownWriter } from '../markdown-writer';
@@ -307,4 +309,16 @@ describe('reminderRepository.update and today view', () => {
 		expect(uncompleted?.completed).toBe(false);
 		expect(spies.toggleComplete).not.toHaveBeenCalled();
 	});
+});
+
+it('rejects a stale modal update and delete even when the current index is fresh', async () => {
+  const original = { id: 'one', content: 'Original', priority: 4, completed: false, project: 'Inbox', filePath: 'Reminders/Inbox.md', lineNumber: 1, rawLine: '- [ ] Original', contentHash: 'hash' } as IndexedReminder;
+  const expectedRevision = await reminderRevision(toReminder(original));
+  const index = createIndex({ getById: () => ({ ...original, content: 'Changed on another device' }) });
+  const { writer, spies } = createWriter();
+  const repository = createReminderRepository(index, writer);
+  await expect(repository.update('one', { content: 'Stale draft', expectedRevision })).rejects.toThrow('changed');
+  await expect(repository.delete('one', expectedRevision)).rejects.toThrow('changed');
+  expect(spies.updateReminder).not.toHaveBeenCalled();
+  expect(spies.deleteReminder).not.toHaveBeenCalled();
 });

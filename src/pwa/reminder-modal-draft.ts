@@ -36,13 +36,14 @@ export function buildModalDraft(reminder: ReminderRecord | null, selectedProject
 	const defaultProject = selectedProject ?? 'Inbox';
 
 	return {
+    originalDueDatetime: reminder?.dueDatetime,
 		content: buildInitialModalContent(reminder, defaultProject),
 		description: reminder?.description ?? '',
 		project: reminder?.project ?? defaultProject,
 		defaultProject,
 		priority: reminder?.priority ?? 4,
-		dueDate: parsedDate && !reminder?.recurrence ? formatLocalDateKey(parsedDate) : '',
-		dueTime: reminder?.dueDatetime && !reminder?.recurrence
+		dueDate: parsedDate ? formatLocalDateKey(parsedDate) : '',
+		dueTime: reminder?.dueDatetime
 			? `${String(parsedDate?.getHours() ?? 0).padStart(2, '0')}:${String(parsedDate?.getMinutes() ?? 0).padStart(2, '0')}`
 			: '',
 		recurrence: reminder?.recurrence,

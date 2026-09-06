@@ -20,6 +20,7 @@ function createDb() {
 	const tokens = new Map<string, TokenRecord>();
 
 	const db = {
+    batch: vi.fn(async (statements: Array<{ run(): Promise<unknown> }>) => Promise.all(statements.map(s => s.run()))),
 		prepare: vi.fn((sql: string) => {
 			const statement = {
 				_sql: sql,

@@ -1,9 +1,9 @@
+import type { CommitEffects } from './commit-effects';
 import { sha256HexBytes } from './auth';
 import { queryRows } from './db';
 import { stageMarkdownFile } from './markdown-file-staging';
 import { commitStagedFile } from './sync-mutations';
 import {
-	deleteBucketObjectsOrQueue,
 	getStoredFileRow,
 	MAX_FILE_BYTES,
 } from './sync-storage';
@@ -107,27 +107,23 @@ export async function writeCommittedMarkdownFile(
 	path: string,
 	content: string,
 	expectedHash: string | null,
+	effects?: CommitEffects,
 ): Promise<{ hash: string; size: number }> {
 	const previousFile = await getStoredFileRow(db, path);
 	const staged = await stageMarkdownFile(bucket, path, content, expectedHash);
 
-	try {
-		const commit = await commitStagedFile(bucket, db, {
+	// Leave staged bytes for orphan cleanup if the transaction outcome is unknown.
+	const commit = await commitStagedFile(bucket, db, {
 			path,
 			hash: staged.hash,
 			size: staged.size,
 			objectKey: staged.objectKey,
 			expectedHash,
 			previousFile,
-		});
-		if (!commit.committed) {
-			throw new FileVersionConflictError(path, commit.currentHash);
-		}
-	} catch (error) {
-		if (!(error instanceof FileVersionConflictError)) {
-			await deleteBucketObjectsOrQueue(bucket, db, [staged.objectKey]);
-		}
-		throw error;
+			effects,
+	});
+	if (!commit.committed) {
+		throw new FileVersionConflictError(path, commit.currentHash);
 	}
 
 	return { hash: staged.hash, size: staged.size };

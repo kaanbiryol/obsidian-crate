@@ -65,6 +65,8 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 
 export async function reconcileReminderNotifications(plugin: CratePlugin): Promise<void> {
 	if (notificationReconciliationSuspended.has(plugin)) return;
+  const active = notificationTasks.get(plugin);
+  if (active) return active;
 	await enqueueNotificationWork(plugin, async () => {
 		if (notificationReconciliationSuspended.has(plugin)) return;
 		try {

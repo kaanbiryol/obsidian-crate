@@ -6,6 +6,7 @@ vi.mock('./api', () => ({ fetchPwaAssetVersion: vi.fn() }));
 
 class UpdateWorker extends EventTarget {
 	state: ServiceWorkerState = 'installing';
+	postMessage = vi.fn();
 	scriptURL = 'https://crate.test/notifications/sw.js?v=new';
 	transition(state: ServiceWorkerState) {
 		this.state = state;
@@ -35,6 +36,7 @@ describe('reliable PWA updates', () => {
 			scope: '/notifications', updateViaCache: 'none',
 		});
 		worker.transition('installed');
+		expect(worker.postMessage).toHaveBeenCalledWith({ type: 'CRATE_ACTIVATE_UPDATE' });
 		expect(reload).not.toHaveBeenCalled();
 		worker.transition('activated');
 		await update;

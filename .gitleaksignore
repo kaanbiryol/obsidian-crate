@@ -1,0 +1,3 @@
+# Public OAuth client identifier used with PKCE, not a client secret. Scope the
+# exception to this historical line; keep all other credential rules enabled.
+765ff1ea7bb2a93ebe6f92a654f1d9e802a4a574:vite.config.mts:generic-api-key:21

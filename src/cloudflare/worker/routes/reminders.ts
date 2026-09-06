@@ -1,3 +1,5 @@
+import { handleNotificationPolicy } from '../notification-policy';
+import { corsResponse } from '../cors';
 import {
 	handleCancelReminder,
 	handleListScheduled,
@@ -22,6 +24,8 @@ export async function handleRemindersRoute(
 	method: RouteMethod,
 ): Promise<Response | null> {
 	const db = env.DB;
+	if (path === '/reminders/notification-policy' && ['GET', 'POST', 'PUT'].includes(method)) return handleNotificationPolicy(request, db);
+	if (['/reminders/schedule', '/reminders/cancel'].includes(path)) return corsResponse({ error: 'Schedules are derived from synced Markdown. Sync the file to update notifications.' }, 410);
 
 	if (path === '/reminders/list' && method === 'GET') {
 		return await withDatabase(db, () => handleListReminders(request, env));

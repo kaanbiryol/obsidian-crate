@@ -10,6 +10,7 @@ export interface FileManifest {
 
 export interface FileEntry {
 	hash: string;
+	revision?: string;
 	size: number;
 	modified: string;
 }
@@ -23,6 +24,7 @@ export interface ChangelogEntry {
 	path: string;
 	action: 'put' | 'delete';
 	hash: string;
+	revision?: string;
 	size: number;
 	created_at: string;
 }
@@ -46,6 +48,7 @@ export interface UploadResult {
 	success: boolean;
 	path: string;
 	hash?: string;
+	revision?: string;
 	error?: string;
 	code?: MutationFailureCode;
 	status?: number;
@@ -70,6 +73,7 @@ export interface BatchUploadFile {
 	path: string;
 	content: string;
 	hash: string;
+	revision?: string;
 	size: number;
 	contentType: string;
 	expectedHash: string | null;
@@ -78,6 +82,7 @@ export interface BatchUploadFile {
 export interface BatchDeleteFile {
 	path: string;
 	expectedHash: string;
+	expectedRevision?: string;
 }
 
 export interface BatchUploadResponse {
@@ -86,6 +91,7 @@ export interface BatchUploadResponse {
 		path: string;
 		success: boolean;
 		hash?: string;
+	revision?: string;
 		error?: string;
 		code?: MutationFailureCode;
 		status?: number;
@@ -97,6 +103,7 @@ interface BatchDownloadFile {
 	path: string;
 	content: string;
 	hash: string;
+	revision?: string;
 	size: number;
 	contentType: string;
 	error?: string;
@@ -124,6 +131,10 @@ export interface BackendDiagnostics {
 		activeAuthTokens: number;
 		activePushSubscriptions: number;
 		disabledPushSubscriptions: number;
+		pendingNotificationProjections?: number;
+		failedNotificationProjections?: number;
+		failedNotificationJobs?: number;
+		reminderOperationReceipts?: number;
 	};
 	lastMaintenanceAt: string | null;
 	lastMaintenanceError: string | null;
@@ -143,6 +154,7 @@ export interface RemoteFileVersion {
 	storage_key: string;
 	path: string;
 	hash: string;
+	revision?: string;
 	size: number;
 	reason: 'replaced' | 'deleted';
 	created_at: string;

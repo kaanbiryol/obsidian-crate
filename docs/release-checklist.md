@@ -14,7 +14,8 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 ## Automated gates
 
 - [ ] `npm ci` completed with the release Node version from `.nvmrc`.
-- [ ] `npm run release:check` passed on the release commit.
+- [ ] `npm run release:check` passed on the release commit, including Chromium/WebKit safety tests and local recovery tests.
+- [ ] `npm audit` and `npm run security:secrets` passed.
 - [ ] GitHub Actions passed on Node 20.19.0, 22.12.0, and 24.0.0.
 - [ ] Builds from all three Node versions produced identical release artifact hashes.
 - [ ] Obsidian's community-directory **Review branch** scan has no unresolved errors or warnings.
@@ -28,6 +29,9 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 - [ ] Completed an explicit initial upload using non-critical test data.
 - [ ] Restarted Obsidian and completed a normal sync.
 - [ ] Disconnected and reconnected the device without creating duplicate Cloudflare resources.
+- [ ] Joining from an older plugin did not upload or downgrade the Worker.
+- [ ] An old PWA/plugin could read but could not mutate the protocol-3 deployment.
+- [ ] An interrupted Unicode backfill resumed safely; a collision left writes fenced.
 - [ ] Authorized a server update and confirmed the existing Worker, D1 database, R2 bucket, and Durable Objects were reused.
 - [ ] Confirmed the inactive-R2 error gives actionable setup guidance.
 
@@ -55,7 +59,10 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 - [ ] Enabled push and received a test notification.
 - [ ] Received a scheduled reminder notification.
 - [ ] Confirmed sign-out clears the local session and offline reminder cache.
-- [ ] Confirmed the previous browser session cannot access the API after sign-out.
+- [ ] Confirmed the previous browser session cannot access the API after sign-out, including a second open tab and a request already in flight.
+- [ ] A failed edit retained its draft through reload; retrying a recurring completion advanced once.
+- [ ] Devices in different timezones shared the same saved notification policy and all-day delivery instant.
+- [ ] A title-only edit retained a timed reminder’s exact instant and recurrence progress.
 
 ## Disclosure and operations
 
@@ -65,3 +72,10 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 - [ ] Private vulnerability reporting is enabled and the link in `SECURITY.md` works.
 - [ ] **Disconnect this device** removes only the local credential.
 - [ ] Explicit Cloudflare resource deletion removes the remote copy as documented.
+
+## Recovery rehearsal
+
+- [ ] Created and verified a paired D1/R2 archive from the candidate deployment.
+- [ ] Restored it to new empty resources in an independent Cloudflare account.
+- [ ] Confirmed file hashes, retained versions, operation receipts, policy, and re-enrollment behavior.
+- [ ] Verified original resources and device vaults remained available throughout the rehearsal.

@@ -82,7 +82,7 @@ export async function planIncrementalRemoteChanges(
 				const decision = classifyPath(
 					path,
 					undefined,
-					{ hash: entry.hash, size: entry.size, modified: entry.created_at },
+					{ hash: entry.hash, size: entry.size, modified: entry.created_at, revision: entry.revision },
 					context.localManifest.getEntry(path),
 				);
 				if (decision?.action === 'delete') {
@@ -115,12 +115,12 @@ export async function planIncrementalRemoteChanges(
 			const decision = classifyPath(
 				path,
 				localEntry,
-				{ hash: entry.hash, size: entry.size, modified: entry.created_at },
+				{ hash: entry.hash, size: entry.size, modified: entry.created_at, revision: entry.revision },
 				context.localManifest.getEntry(path),
 			);
 
 			if (!decision) {
-				context.localManifest.setEntry(path, localEntry);
+				context.localManifest.setEntry(path, { ...localEntry, revision: entry.revision });
 			} else if (decision.action === 'upload') {
 				if (!localChangedPaths.has(path)) {
 					localChangedPaths.add(path);

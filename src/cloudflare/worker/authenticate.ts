@@ -6,6 +6,7 @@ type AuthScope = 'vault' | 'reminders';
 export interface AuthPrincipal {
 	tokenId: string | null;
 	scope: AuthScope;
+	folderPath?: string;
 }
 
 export type AuthenticationResult =
@@ -28,10 +29,10 @@ export async function authenticateWorkerRequest(
 
 	try {
 		const tokenHash = await sha256Hex(token);
-		const row = await db.prepare(`SELECT id, scope FROM auth_tokens
+		const row = await db.prepare(`SELECT id, scope, folder_path FROM auth_tokens
 			WHERE token_hash = ? AND (expires_at IS NULL OR expires_at > ?)`)
 			.bind(tokenHash, Date.now())
-			.first<{ id: string; scope?: string | null }>();
+			.first<{ id: string; scope?: string | null; folder_path?: string | null }>();
 		if (!row?.id) {
 			return { response: corsResponse({ error: 'Invalid token' }, 401) };
 		}
@@ -39,6 +40,7 @@ export async function authenticateWorkerRequest(
 			return { response: corsResponse({ error: 'Invalid token' }, 401) };
 		}
 
+		if (row.scope === 'reminders' && !row.folder_path) return { response: corsResponse({ error: 'Open a fresh Crate web app link to renew this session' }, 401) };
 		await db.prepare(`UPDATE auth_tokens
 			SET last_seen_at = datetime('now')
 			WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at < datetime('now', '-6 hours'))`)
@@ -48,6 +50,7 @@ export async function authenticateWorkerRequest(
 			principal: {
 				tokenId: row.id,
 				scope: row.scope,
+				...(row.folder_path ? { folderPath: row.folder_path } : {}),
 			},
 		};
 	} catch (error) {

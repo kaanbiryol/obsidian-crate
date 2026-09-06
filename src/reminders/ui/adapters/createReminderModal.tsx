@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+import { reminderRevision } from '../../core/reminderRevision';
+import React, { useMemo, useRef } from "react";
 import { Notice } from "obsidian";
 import { AddReminderModal as SharedAddReminderModal } from "@/reminders/ui/reminder-modal/AddReminderModal";
 import type { RecurrenceRule } from "@/reminders/types/reminder";
@@ -38,6 +39,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
   onDelete,
 }) => {
   const plugin = PluginContext.use();
+  const createId = useRef(crypto.randomUUID());
   const settings = useRemindersSettingsStore();
   const modal = ModalContext.use();
   const { isMobile } = modal;
@@ -61,6 +63,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
     try {
       await plugin.reminderRepository.create({
+        id: createId.current,
         content: content.trim(),
         project,
         priority: priority as 1 | 4,
@@ -76,15 +79,16 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
       new Notice("Reminder created!");
       if (onSave) onSave(null); // Trigger refresh
     } catch (err) {
-      new Notice("Failed to create reminder");
+      new Notice(err instanceof Error ? err.message : "Failed to create reminder");
       log.error("Failed to create reminder", err);
-      if (onSave) onSave(null);
+      throw err;
     }
   };
 
   const handleSave = async (updatedReminder: Reminder) => {
     try {
       const saved = await plugin.reminderRepository.update(updatedReminder.id, {
+        expectedRevision: reminder ? await reminderRevision(reminder) : undefined,
         content: updatedReminder.content,
         description: updatedReminder.description,
         priority: updatedReminder.priority,
@@ -102,6 +106,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     } catch (err) {
       new Notice("Failed to update reminder");
       log.error("Failed to update reminder", err);
+      throw err;
     }
   };
 
@@ -110,11 +115,11 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     log.info(" Deleting reminder:", reminderToDelete?.id);
 
     try {
-      const deleted = await plugin.reminderRepository.delete(reminderToDelete.id);
+      const deleted = await plugin.reminderRepository.delete(reminderToDelete.id, await reminderRevision(reminderToDelete));
       if (!deleted) {
         new Notice("Reminder not found");
         log.warn(" Reminder not found:", reminderToDelete.id);
-        return;
+        throw new Error("Reminder no longer exists. Refresh to continue.");
       }
 
       new Notice("Reminder deleted");
@@ -122,6 +127,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
     } catch (err) {
       new Notice("Failed to delete reminder");
       log.error("Failed to delete reminder", err);
+      throw err;
     }
   };
 

@@ -1,18 +1,21 @@
+import { wakeNotificationCoordinator } from './notification-coordinator';
 import { pruneChangelog } from './db';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './storage/index';
 import type { Env } from './types';
-import { drainNotificationJobs } from './notification-outbox';
 import { pruneExpiredTokens, recordMaintenanceRun } from './maintenance/database';
 import { sweepOrphanedManagedObjects } from './maintenance/orphan-sweep';
 
 export async function runScheduledMaintenance(env: Env): Promise<void> {
+	const migration = await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'portable_paths_ready'").first<{ value: string }>();
+	if (migration?.value === 'false') return;
 	const errors: string[] = [];
 	const tasks: Array<[string, () => Promise<unknown>]> = [
 		['expire file versions', () => enqueueExpiredFileVersions(env.DB)],
 		['drain object cleanup', () => drainObjectCleanupQueue(env.BUCKET, env.DB)],
 		['prune changelog', () => pruneChangelog(env.DB)],
+		['prune request limits', () => env.DB.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
 		['prune tokens', () => pruneExpiredTokens(env.DB)],
-		['drain notification outbox', () => drainNotificationJobs(env)],
+		['wake notification projections', () => wakeNotificationCoordinator(env)],
 		['sweep orphaned objects', () => sweepOrphanedManagedObjects(env.BUCKET, env.DB)],
 	];
 	for (const [name, task] of tasks) {

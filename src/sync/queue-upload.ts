@@ -30,6 +30,7 @@ export async function uploadPendingFiles(
 
 			context.localManifest.setEntry(upload.path, {
 				hash: upload.hash,
+				revision: result.revision,
 				size: upload.size,
 				modified: await context.getModifiedIso(upload.path, upload.mtime),
 			});

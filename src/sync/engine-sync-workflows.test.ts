@@ -159,6 +159,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 			files: {
 				'notes/remote-only.md': {
 					hash: 'remote-hash',
+          revision: 'version-1',
 					size: 3,
 					modified: '2026-02-06T12:00:00.000Z',
 				},
@@ -190,6 +191,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 				},
 				'notes/remote-only.md': {
 					hash: 'remote-hash',
+          revision: 'version-1',
 					size: 3,
 					modified: '2026-02-06T12:00:00.000Z',
 				},
@@ -204,7 +206,7 @@ describe('SyncEngine slice 5 safeguards', () => {
 		expect(result.success).toBe(true);
 		expect(result.deleted).toBe(1);
 		expect(harness.api.deleteFile).toHaveBeenCalledTimes(1);
-		expect(harness.api.deleteFile).toHaveBeenCalledWith('notes/remote-only.md', 'remote-hash');
+		expect(harness.api.deleteFile).toHaveBeenCalledWith('notes/remote-only.md', 'remote-hash', 'version-1');
 		expect(harness.api.deleteFile).not.toHaveBeenCalledWith('.trash/old.md');
 	});
 

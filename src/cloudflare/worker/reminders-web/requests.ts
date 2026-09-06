@@ -1,6 +1,6 @@
 import type { RecurrenceRule } from '@/reminders/types/reminder';
 import { normalizeReminderProjectPath } from '@/reminders/core/reminderProjectPath';
-import { normalizeRecurrenceRule } from '@/reminders/utils/recurrenceRule';
+import { validateRecurrence } from '@/reminders/core/validateRecurrence';
 import { corsResponse } from '../cors';
 import { parseOptionalString, sanitizePath } from '../utils';
 import type { ReminderMutationWorkspace } from './types';
@@ -63,54 +63,9 @@ export function parseRecurrenceMutationValue(value: unknown): RecurrenceMutation
 		return { ok: true, value: null };
 	}
 
-	if (typeof value !== 'object' || Array.isArray(value)) {
-		return { ok: false, response: corsResponse({ error: 'Invalid recurrence' }, 400) };
-	}
-
-	const raw = value as Partial<RecurrenceRule>;
-	if (raw.frequency !== 'daily' && raw.frequency !== 'weekly' && raw.frequency !== 'monthly') {
-		return { ok: false, response: corsResponse({ error: 'Invalid recurrence frequency' }, 400) };
-	}
-
-	const rule: RecurrenceRule = { frequency: raw.frequency };
-	if (raw.interval !== undefined) {
-		if (!Number.isInteger(raw.interval) || raw.interval < 1 || raw.interval > 365) {
-			return { ok: false, response: corsResponse({ error: 'Invalid recurrence interval' }, 400) };
-		}
-		rule.interval = raw.interval;
-	}
-	if (raw.daysOfWeek !== undefined) {
-		if (
-			!Array.isArray(raw.daysOfWeek)
-			|| raw.daysOfWeek.some((day) => !Number.isInteger(day) || day < 0 || day > 6)
-		) {
-			return { ok: false, response: corsResponse({ error: 'Invalid recurrence daysOfWeek' }, 400) };
-		}
-		rule.daysOfWeek = Array.from(new Set(raw.daysOfWeek)).sort((a, b) => a - b);
-	}
-	if (raw.dayOfMonth !== undefined) {
-		if (!Number.isInteger(raw.dayOfMonth) || raw.dayOfMonth < 1 || raw.dayOfMonth > 31) {
-			return { ok: false, response: corsResponse({ error: 'Invalid recurrence dayOfMonth' }, 400) };
-		}
-		rule.dayOfMonth = raw.dayOfMonth;
-	}
-	if (raw.hour !== undefined) {
-		if (!Number.isInteger(raw.hour) || raw.hour < 0 || raw.hour > 23) {
-			return { ok: false, response: corsResponse({ error: 'Invalid recurrence hour' }, 400) };
-		}
-		rule.hour = raw.hour;
-	}
-	if (raw.minute !== undefined) {
-		if (!Number.isInteger(raw.minute) || raw.minute < 0 || raw.minute > 59) {
-			return { ok: false, response: corsResponse({ error: 'Invalid recurrence minute' }, 400) };
-		}
-		rule.minute = raw.minute;
-	}
-	if (typeof raw.timezone === 'string' && raw.timezone.trim()) {
-		rule.timezone = raw.timezone.trim();
-	}
-
-	return { ok: true, value: normalizeRecurrenceRule(rule) };
+	const result = validateRecurrence(value);
+	return 'rule' in result ? { ok: true, value: result.rule }
+		: { ok: false, response: corsResponse({ error: result.error }, 400) };
 }
 
 export function parseReminderMutationWorkspace(

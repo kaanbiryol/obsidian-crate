@@ -1,9 +1,11 @@
+import { capturePwaSession } from './session-generation';
 import type { CachedReminderSnapshot, ReminderRecord } from './types';
 
 const CACHE_DATABASE_NAME = 'crate-reminders';
 const CACHE_DATABASE_VERSION = 2;
 const CACHE_STORE_NAME = 'snapshots';
 const FRESHNESS_STORE_NAME = 'freshness';
+let cacheGeneration = 0;
 
 interface CacheFreshness {
 	folderPath: string;
@@ -78,8 +80,11 @@ async function readIndexedDbSnapshot(folderPath: string): Promise<CachedReminder
 }
 
 async function writeIndexedDbSnapshot(snapshot: CachedReminderSnapshot): Promise<void> {
+	const sessionCurrent = capturePwaSession();
+	const generation = cacheGeneration;
 	const database = await openCacheDatabase();
 	try {
+		if (!sessionCurrent() || generation !== cacheGeneration) return;
 		await new Promise<void>((resolve, reject) => {
 			const transaction = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME], 'readwrite');
 			transaction.objectStore(CACHE_STORE_NAME).put(snapshot);
@@ -117,6 +122,7 @@ export async function saveCachedReminderSnapshot(
 }
 
 export async function clearCachedReminderSnapshots(): Promise<void> {
+	cacheGeneration += 1;
 	try {
 		const database = await openCacheDatabase();
 		try {
@@ -138,9 +144,12 @@ export async function clearCachedReminderSnapshots(): Promise<void> {
 /** Persist a successful revalidation without cloning or rewriting reminder contents. */
 export async function refreshCachedReminderSnapshot(folderPath: string, savedAt: number, etag?: string): Promise<void> {
 	if (!etag) return;
+	const sessionCurrent = capturePwaSession();
+	const generation = cacheGeneration;
 	try {
 		const database = await openCacheDatabase();
 		try {
+			if (!sessionCurrent() || generation !== cacheGeneration) return;
 			await new Promise<void>((resolve, reject) => {
 				const transaction = database.transaction(FRESHNESS_STORE_NAME, 'readwrite');
 				transaction.objectStore(FRESHNESS_STORE_NAME).put({ folderPath, savedAt, etag } satisfies CacheFreshness);

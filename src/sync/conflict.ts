@@ -7,7 +7,13 @@ import { createLogger } from '../plugin/logger';
 import { isHiddenPath } from './file-discovery';
 
 const logger = createLogger('Conflict');
-const CONFLICT_TAG_PATTERN = / \(conflict \d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} [a-z0-9]{4}\)(?=\.[^/]+$|$)/;
+const CONFLICT_TAG_PATTERN = / \(conflict (?:\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} [a-z0-9]{4}|remote [a-f0-9]{64}(?:-\d+)?)\)(?=\.[^/]+$|$)/;
+
+export function getIncomingConflictFileName(path: string, hash: string, variant = 0): string {
+	const dot = path.lastIndexOf('.');
+	const extension = dot > path.lastIndexOf('/') ? dot : path.length;
+	return `${path.slice(0, extension)} (conflict remote ${hash}${variant ? `-${variant}` : ''})${path.slice(extension)}`;
+}
 
 /**
  * Generate conflict file name

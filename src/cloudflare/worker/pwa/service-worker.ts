@@ -25,27 +25,30 @@ self.addEventListener('install', function(event) {
 			.then(function(cache) {
 				return cache.addAll(PWA_PRECACHE_URLS);
 			})
-			.then(function() {
-				return self.skipWaiting();
-			})
 	);
 });
 
+// Keep lazy chunks used by every open app version, including older clients
+// that cannot yet report their version. Unknown clients prevent collection.
+const clientVersions = new Map();
+async function collectUnusedShellCaches() {
+	const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+	if (clients.some(client => !clientVersions.has(client.id))) return;
+	const active = new Set([PWA_SHELL_CACHE]);
+	clients.forEach(client => active.add('crate-reminders-shell-' + clientVersions.get(client.id)));
+	const names = await caches.keys();
+	await Promise.all(names.filter(name => name.indexOf('crate-reminders-shell-') === 0 && !active.has(name)).map(name => caches.delete(name)));
+}
+self.addEventListener('message', function(event) {
+	if (event.data && event.data.type === 'CRATE_ACTIVATE_UPDATE') {
+		event.waitUntil(self.skipWaiting());
+	} else if (event.data && event.data.type === 'CRATE_CLIENT_VERSION' && event.source && typeof event.data.version === 'string') {
+		clientVersions.set(event.source.id, event.data.version);
+		event.waitUntil(collectUnusedShellCaches());
+	}
+});
 self.addEventListener('activate', function(event) {
-	event.waitUntil(
-		caches.keys()
-			.then(function(cacheNames) {
-				var previousShellCaches = cacheNames.filter(function(cacheName) {
-					return cacheName !== PWA_SHELL_CACHE && cacheName.indexOf('crate-reminders-shell-') === 0;
-				});
-				return Promise.all(previousShellCaches.slice(0, -1).map(function(cacheName) {
-					return caches.delete(cacheName);
-				}));
-			})
-			.then(function() {
-				return self.clients.claim();
-			})
-	);
+	event.waitUntil(self.clients.claim().then(collectUnusedShellCaches));
 });
 
 self.addEventListener('fetch', function(event) {

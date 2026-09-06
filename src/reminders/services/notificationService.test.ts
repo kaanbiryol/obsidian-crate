@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReminderNotificationService } from './notificationService';
 import type { CrateSettings } from '../../plugin/settings-types';
-import type { SyncApiClient } from '../../sync/api';
 import { DEFAULT_REMINDERS_SETTINGS, type RemindersSettings } from '../settings';
 import type { Reminder } from '../types/reminder';
 
-type ScheduleReminderPayload = Parameters<SyncApiClient['scheduleReminder']>[0];
 
 function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 	return {
@@ -45,192 +43,51 @@ function createReminder(overrides: Partial<Reminder> = {}): Reminder {
 }
 
 describe('ReminderNotificationService', () => {
-	const scheduleReminder = vi.fn();
-	const cancelReminder = vi.fn();
-	const getScheduledReminders = vi.fn();
-
-	const apiClient = {
-		scheduleReminder,
-		cancelReminder,
-		getScheduledReminders,
-	};
-
-	beforeEach(() => {
-		scheduleReminder.mockReset();
-		cancelReminder.mockReset();
-		getScheduledReminders.mockReset();
-	});
-
-	it('returns a failure result when scheduling throws', async () => {
-		scheduleReminder.mockRejectedValueOnce(new Error('network down'));
-
-		const service = new ReminderNotificationService(
-			() => createSettings(),
-			() => createRemindersSettings(),
-			() => apiClient as never,
-		);
-
-		const result = await service.onReminderChange(createReminder(), 'create');
-
-		expect(result).toEqual({ success: false, error: 'network down' });
-		expect(scheduleReminder).toHaveBeenCalledTimes(1);
-	});
-
-	it('treats unsuccessful schedule responses as failures', async () => {
-		scheduleReminder.mockResolvedValueOnce({ success: false, error: 'worker rejected schedule' });
-
-		const service = new ReminderNotificationService(
-			() => createSettings(),
-			() => createRemindersSettings(),
-			() => apiClient as never,
-		);
-
-		const result = await service.onReminderChange(createReminder(), 'create');
-
-		expect(result).toEqual({ success: false, error: 'worker rejected schedule' });
-	});
-
-	it('skips invalid due dates instead of scheduling them', async () => {
-		const service = new ReminderNotificationService(
-			() => createSettings(),
-			() => createRemindersSettings(),
-			() => apiClient as never,
-		);
-
-		await service.onReminderCreated(createReminder({ dueDatetime: 'not-a-date' }));
-
-		expect(scheduleReminder).not.toHaveBeenCalled();
-	});
-
-	it('cancels and schedules reminders during reconciliation before resolving', async () => {
-		getScheduledReminders.mockResolvedValueOnce({
-			scheduled: [
-				{
-					reminder_id: 'stale-reminder',
-					content: 'Old reminder',
-					project: 'Inbox',
-					due_datetime: '2026-01-01T10:00:00.000Z',
-				},
-			],
-		});
-		cancelReminder.mockResolvedValue({ success: true });
-		scheduleReminder.mockResolvedValue({ success: true });
-
-		const service = new ReminderNotificationService(
-			() => createSettings(),
-			() => createRemindersSettings(),
-			() => apiClient as never,
-		);
-
-		await service.reconcile([
-			createReminder({ id: 'fresh-reminder' }),
-			createReminder({ id: 'completed-reminder', completed: true }),
-		]);
-
-		expect(cancelReminder).toHaveBeenCalledWith('stale-reminder');
-		expect(scheduleReminder).toHaveBeenCalledWith({
-			reminderId: 'fresh-reminder',
-			content: 'Test reminder',
-			project: 'Inbox',
-			dueDatetime: '2027-01-10T10:00:00.000Z',
-			priority: 4,
-		});
-	});
-
-	it('cancels every existing schedule even after push is disabled locally', async () => {
-		getScheduledReminders.mockResolvedValueOnce({
-			scheduled: [
-				{ reminder_id: 'rem-1' },
-				{ reminder_id: 'rem-2' },
-			],
-		});
-		cancelReminder.mockResolvedValue({ success: true });
-		const service = new ReminderNotificationService(
-			() => createSettings({ pushEnabled: false }),
-			() => createRemindersSettings(),
-			() => apiClient as never,
-		);
-
-		await service.cancelAll();
-
-		expect(cancelReminder).toHaveBeenCalledTimes(2);
-		expect(cancelReminder).toHaveBeenCalledWith('rem-1');
-		expect(cancelReminder).toHaveBeenCalledWith('rem-2');
-	});
-
-	it('schedules date-only reminders at the configured all-day notification time', async () => {
-		scheduleReminder.mockResolvedValueOnce({ success: true });
-
-		const service = new ReminderNotificationService(
-			() => createSettings(),
-			() => createRemindersSettings({ allDayNotificationTime: '09:00' }),
-			() => apiClient as never,
-		);
-
-		await service.onReminderCreated(createReminder({ dueDatetime: undefined, dueDate: '2027-06-15' }));
-
-		expect(scheduleReminder).toHaveBeenCalledTimes(1);
-		const call = scheduleReminder.mock.calls[0]?.[0] as ScheduleReminderPayload | undefined;
-		expect(call?.dueDatetime).toContain('2027-06-15');
-	});
-
-	it('skips date-only reminders when allDayNotificationTime is null', async () => {
-		const service = new ReminderNotificationService(
-			() => createSettings(),
-			() => createRemindersSettings({ allDayNotificationTime: null }),
-			() => apiClient as never,
-		);
-
-		await service.onReminderCreated(createReminder({ dueDatetime: undefined, dueDate: '2027-06-15' }));
-
-		expect(scheduleReminder).not.toHaveBeenCalled();
-	});
-
-	it('uses explicit dueDatetime over allDayNotificationTime', async () => {
-		scheduleReminder.mockResolvedValueOnce({ success: true });
-
-		const service = new ReminderNotificationService(
-			() => createSettings(),
-			() => createRemindersSettings({ allDayNotificationTime: '09:00' }),
-			() => apiClient as never,
-		);
-
-		await service.onReminderCreated(createReminder());
-
-		expect(scheduleReminder).toHaveBeenCalledWith(
-			expect.objectContaining({ dueDatetime: '2027-01-10T10:00:00.000Z' }),
-		);
-	});
-
-	it('reschedules reminders when the remote schedule drifted from the current reminder state', async () => {
-		getScheduledReminders.mockResolvedValueOnce({
-			scheduled: [
-				{
-					reminder_id: 'rem-1',
-					content: 'Old reminder',
-					project: 'Old project',
-					due_datetime: '2027-01-09T10:00:00.000Z',
-				},
-			],
-		});
-		scheduleReminder.mockResolvedValue({ success: true });
-
-		const service = new ReminderNotificationService(
-			() => createSettings(),
-			() => createRemindersSettings(),
-			() => apiClient as never,
-		);
-
-		await service.reconcile([createReminder()]);
-
-		expect(cancelReminder).not.toHaveBeenCalled();
-		expect(scheduleReminder).toHaveBeenCalledTimes(1);
-		expect(scheduleReminder).toHaveBeenCalledWith({
-			reminderId: 'rem-1',
-			content: 'Test reminder',
-			project: 'Inbox',
-			dueDatetime: '2027-01-10T10:00:00.000Z',
-			priority: 4,
-		});
-	});
+  const ensureNotificationPolicy = vi.fn();
+  const scheduleReminder = vi.fn();
+  const cancelReminder = vi.fn();
+  const getScheduledReminders = vi.fn();
+  const apiClient = { ensureNotificationPolicy, scheduleReminder, cancelReminder, getScheduledReminders };
+  const service = (enabled = true) => new ReminderNotificationService(() => createSettings({ pushEnabled: enabled }), () => createRemindersSettings(), () => apiClient as never);
+  beforeEach(() => { vi.resetAllMocks(); ensureNotificationPolicy.mockResolvedValue({ policy: {} }); });
+  it('reports failures to reach the policy server', async () => {
+    ensureNotificationPolicy.mockRejectedValueOnce(new Error('network down'));
+    expect(await service().onReminderChange(createReminder(), 'create')).toEqual({ success: false, error: 'network down' });
+  });
+  it('coalesces overlapping refreshes without transmitting local reminder snapshots', async () => {
+    let resolve!: (value: unknown) => void;
+    ensureNotificationPolicy.mockImplementationOnce(() => new Promise<unknown>(r => { resolve = r; }));
+    const client = service();
+    const first = client.reconcile(Array.from({ length: 1000 }, (_, i) => createReminder({ id: String(i) })));
+    const second = client.onReminderDeleted('deleted-locally');
+    expect(ensureNotificationPolicy).toHaveBeenCalledTimes(1);
+    const payload = ensureNotificationPolicy.mock.calls[0]?.[0] as { folderPath: string; timezone: string };
+    expect(payload.folderPath).toBe('Reminders');
+    expect(typeof payload.timezone).toBe('string');
+    resolve({ policy: {} });
+    await Promise.all([first, second]);
+    expect(scheduleReminder).not.toHaveBeenCalled();
+    expect(cancelReminder).not.toHaveBeenCalled();
+    expect(getScheduledReminders).not.toHaveBeenCalled();
+  });
+  it.each(['create', 'update', 'delete'] as const)('only hints at server projection for a local %s', async operation => {
+    await service().onReminderChange(createReminder({ dueDatetime: 'not-a-date' }), operation);
+    expect(ensureNotificationPolicy).toHaveBeenCalledTimes(1);
+    expect(scheduleReminder).not.toHaveBeenCalled();
+    expect(cancelReminder).not.toHaveBeenCalled();
+  });
+  it('does not change shared schedules when a device disables local integration', async () => {
+    const client = service(false);
+    await client.reconcile([createReminder()]);
+    await client.cancelAll();
+    expect(ensureNotificationPolicy).not.toHaveBeenCalled();
+    expect(cancelReminder).not.toHaveBeenCalled();
+  });
+  it('allows a later refresh after an earlier failure', async () => {
+    ensureNotificationPolicy.mockRejectedValueOnce(new Error('offline'));
+    const client = service();
+    await expect(client.onReminderCreated(createReminder())).rejects.toThrow('offline');
+    await client.onReminderUpdated(createReminder());
+    expect(ensureNotificationPolicy).toHaveBeenCalledTimes(2);
+  });
 });

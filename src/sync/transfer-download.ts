@@ -59,7 +59,7 @@ export async function downloadAndSaveFile(
   const outcome = await applyRemoteContentIfUnchanged(context, path, content, request.expectedLocalHash);
   if (outcome.status === "deferred") return outcome;
 
-  await recordDownloadedContent(context, path, content);
+  await recordDownloadedContent(context, path, content, response.revision);
   result.downloaded++;
   result.downloadedPaths.push(path);
   return { status: "applied" };
@@ -82,10 +82,12 @@ async function recordDownloadedContent(
   context: TransferContext,
   path: string,
   content: ArrayBuffer,
+  revision?: string,
 ): Promise<FileEntry> {
   const hash = await computeHash(content);
   const entry: FileEntry = {
     hash,
+    revision,
     size: content.byteLength,
     modified: await context.getModifiedIso(path),
   };
@@ -174,7 +176,7 @@ export async function parallelDownloadAndSaveFiles(
               result.errors.push(`${file.path}: ${outcome.reason}`);
               continue;
             }
-            await recordDownloadedContent(context, file.path, content);
+            await recordDownloadedContent(context, file.path, content, file.revision);
             result.downloaded++;
             result.downloadedPaths.push(file.path);
           } catch (error) {

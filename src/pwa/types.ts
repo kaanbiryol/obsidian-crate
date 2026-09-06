@@ -11,6 +11,7 @@ export type ShowToast = (kind: ToastKind, message: string) => void;
 
 export interface ReminderRecord {
 	id: string;
+	revision?: string;
 	content: string;
 	description?: string;
 	dueDate?: string;
@@ -30,6 +31,7 @@ export interface StoredConfig {
 }
 
 export interface ModalDraft {
+  originalDueDatetime?: string;
 	content: string;
 	description: string;
 	project: string;
@@ -45,6 +47,9 @@ export interface ModalDraft {
 export interface ModalState {
 	mode: ModalMode;
 	reminderId?: string;
+	expectedRevision?: string;
+	operationId?: string;
+	filePath?: string;
 	draft: ModalDraft;
 }
 

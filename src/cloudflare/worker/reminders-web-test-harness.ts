@@ -1,3 +1,5 @@
+import { scanReminderMarkdownFile } from './reminders-web/scan';
+import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { vi } from 'vitest';
 import { sha256HexBytes } from './auth';
 
@@ -354,6 +356,15 @@ export async function createEnv(input: {
 		files,
 		scheduled,
 		committedPaths,
+		async mutationBody(body: Record<string, unknown>) {
+			const path = typeof body.filePath === 'string' ? body.filePath : `Reminders/${typeof body.project === 'string' ? body.project : 'Inbox'}.md`;
+			const stored = store.get(files.get(path) ?? '');
+			const reminders = scanReminderMarkdownFile(path, stored ? new TextDecoder().decode(stored.body) : '', 'Reminders');
+			const reminder = reminders.find(item => item.id === body.id);
+			return JSON.stringify({ operationId: crypto.randomUUID(),
+				expectedRevision: reminder ? await reminderRevision(reminder) : undefined,
+				expectedOrder: reminders.map(item => item.id), ...body });
+		},
 		getCurrentHash(path: string) {
 			return hashes.get(path) ?? null;
 		},

@@ -1,3 +1,5 @@
+import { enqueueFileProjection } from './notification-projection-queue';
+import type { CommitEffects } from './commit-effects';
 import { changedRows } from './db';
 import { portablePathKey } from '../../protocol/portable-path';
 import { stageMarkdownFile, type StagedMarkdownFile } from './markdown-file-staging';
@@ -71,10 +73,10 @@ function sourceMutation(
 }
 
 function changelogStatement(db: D1Database, staged: StagedMarkdownFile): D1PreparedStatement {
-	return db.prepare(`INSERT INTO changelog (path, action, hash, size)
-		SELECT ?, 'put', ?, ?
+	return db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
+		SELECT ?, 'put', ?, ?, ?
 		WHERE EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
-		.bind(staged.path, staged.hash, staged.size, staged.path, staged.objectKey);
+		.bind(staged.path, staged.hash, staged.size, staged.objectKey, staged.path, staged.objectKey);
 }
 
 function retainVersionStatement(
@@ -106,6 +108,7 @@ export async function writeCommittedMarkdownFilePair(
 	db: D1Database,
 	params: {
 		source: { path: string; content: string; expectedHash: string };
+		effects?: CommitEffects;
 		destination: { path: string; content: string; expectedHash: string | null };
 	},
 ): Promise<{
@@ -149,19 +152,18 @@ export async function writeCommittedMarkdownFilePair(
 			: []),
 	];
 
-	let results: unknown[];
-	try {
-		results = await db.batch([
+	// An exception may follow a committed transaction. Never reclaim those keys
+	// here; the orphan sweep checks references after the uncertainty window.
+	const results: unknown[] = await db.batch([
 			destinationMutation(db, destination, source),
 			sourceMutation(db, source, destination),
 			changelogStatement(db, destination),
 			changelogStatement(db, source),
 			...previousVersions.map(previous => retainVersionStatement(db, previous, source, destination)),
-		]);
-	} catch (error) {
-		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => file.objectKey));
-		throw error;
-	}
+			...enqueueFileProjection(db, source.path, source.objectKey),
+			...enqueueFileProjection(db, destination.path, destination.objectKey),
+			...(params.effects?.([source, destination].map(file => ({ path: file.path, storageKey: file.objectKey }))) ?? []),
+	]);
 
 	const destinationCommitted = changedRows(results[0]) === 1;
 	const sourceCommitted = changedRows(results[1]) === 1;
