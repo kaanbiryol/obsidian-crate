@@ -8,12 +8,11 @@ function findPullScrollTarget(target: EventTarget | null): HTMLElement | null {
 	if (!(target instanceof Element)) return null;
 	const targetScroll = target.closest<HTMLElement>('.pwa-reminders-view .ios-scroll');
 	if (targetScroll) return targetScroll;
-	return document.querySelector<HTMLElement>('.pwa-reminders-view .ios-scroll');
+	return null;
 }
 
 function dampenPullDistance(distance: number): number {
-	const ratio = Math.min(distance / PULL_REFRESH_MAX_DISTANCE, 1);
-	return PULL_REFRESH_MAX_DISTANCE * (1 - Math.pow(1 - ratio, 2));
+	return PULL_REFRESH_MAX_DISTANCE * distance / (distance + PULL_REFRESH_MAX_DISTANCE);
 }
 
 export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void>): PullRefreshState {
@@ -31,6 +30,9 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 		}
 
 		let startY = 0;
+		let startX = 0;
+		let refreshing = false;
+		let disposed = false;
 		let active = false;
 		let pulling = false;
 		let currentDistance = 0;
@@ -59,7 +61,7 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 		}
 
 		function handleTouchStart(event: TouchEvent) {
-			if (event.touches.length !== 1) return;
+			if (refreshing || active || event.touches.length !== 1) return;
 			if ((event.target as Element | null)?.closest('.react-modal-sheet-root')) return;
 			const nextScrollTarget = findPullScrollTarget(event.target);
 			if (!nextScrollTarget || nextScrollTarget.scrollTop > 0) return;
@@ -67,6 +69,7 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 			const touch = event.touches.item(0);
 			if (!touch) return;
 			startY = touch.clientY;
+			startX = touch.clientX;
 			active = true;
 			pulling = false;
 			currentDistance = 0;
@@ -86,7 +89,7 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 			const touch = event.touches.item(0);
 			if (!touch) return;
 			const delta = touch.clientY - startY;
-			if (delta <= 0) {
+			if (delta <= 0 || (!pulling && Math.abs(touch.clientX - startX) > delta)) {
 				reset();
 				return;
 			}
@@ -127,9 +130,14 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 			pulling = false;
 			currentDistance = 0;
 			detachGestureListeners();
+			refreshing = true;
 			setState({ distance: PULL_REFRESH_SNAP_DISTANCE, progress: 1, ready: true, refreshing: true });
-			void refreshRef.current().finally(() => {
+			void Promise.resolve().then(() => refreshRef.current()).catch(() => {
+				// The refresh callback owns the user-facing error state.
+			}).finally(() => {
+				if (disposed) return;
 				settleTimeout = window.setTimeout(() => {
+					refreshing = false;
 					setState({ distance: 0, progress: 0, ready: false, refreshing: false });
 				}, 360);
 			});
@@ -137,6 +145,7 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 
 		document.addEventListener('touchstart', handleTouchStart, { passive: true });
 		return () => {
+			disposed = true;
 			document.removeEventListener('touchstart', handleTouchStart);
 			detachGestureListeners();
 			if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);

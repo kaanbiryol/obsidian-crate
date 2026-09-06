@@ -1,7 +1,6 @@
 import React from 'react';
 import { PwaButton as Button } from './PwaButton';
 import {
-	ArrowDown,
 	Bell,
 	RefreshCw,
 	Settings,
@@ -121,30 +120,32 @@ export function PwaPullRefreshIndicator({
 }) {
 	const pullRefresh = usePullToRefresh(enabled, onRefresh);
 	const visible = pullRefresh.distance > 0 || pullRefresh.refreshing;
-	const offset = Math.min(56, Math.max(0, pullRefresh.distance));
 	const label = pullRefresh.refreshing
 		? 'Refreshing'
 		: pullRefresh.ready
 			? 'Release to refresh'
 			: 'Pull to refresh';
-	const iconStyle: React.CSSProperties = pullRefresh.refreshing
-		? {}
-		: {
-			transform: `rotate(${Math.round(pullRefresh.progress * 180)}deg)`,
-		};
 
 	return (
 		<div
-			className={`pwa-pull-refresh${visible ? ' is-visible' : ''}${pullRefresh.ready ? ' is-ready' : ''}${pullRefresh.refreshing ? ' is-refreshing' : ''}`}
+			className={`pwa-pull-refresh${visible ? ' is-visible' : ''}${pullRefresh.ready ? ' is-ready' : ''}${pullRefresh.refreshing ? ' is-refreshing' : ''}${visible && !pullRefresh.refreshing ? ' is-pulling' : ''}`}
+			style={{ height: pullRefresh.distance }}
 			role="status"
 			aria-label={visible ? label : undefined}
 			aria-hidden={!visible}
 		>
-			<div className="pwa-pull-refresh__inner" style={{ transform: `translateY(${offset - 56}px)` }}>
-				<div className="pwa-pull-refresh__glyph" style={iconStyle}>
-					{pullRefresh.refreshing ? <RefreshCw size={16} /> : <ArrowDown size={16} />}
-				</div>
-				<div className="pwa-pull-refresh__label">{label}</div>
+			<div className="pwa-pull-refresh__inner" aria-hidden="true">
+				<svg className="pwa-pull-refresh__glyph" viewBox="0 0 24 24" fill="none">
+					{Array.from({ length: 12 }, (_, index) => (
+						<rect
+							key={index}
+							x="11" y="2" width="2" height="5" rx="1"
+							fill="currentColor"
+							transform={`rotate(${index * 30} 12 12)`}
+							opacity={pullRefresh.refreshing ? (index + 1) / 12 : Math.max(0, Math.min(1, pullRefresh.progress * 12 - index))}
+						/>
+					))}
+				</svg>
 			</div>
 		</div>
 	);
