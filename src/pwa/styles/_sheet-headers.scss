@@ -22,10 +22,6 @@
       &:focus-visible {
         color: var(--text-normal);
       }
-
-      > * {
-        translate: -4px 0;
-      }
     }
 
     .reminder-modal-header-title {

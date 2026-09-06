@@ -51,6 +51,28 @@ function createManifest(entries: Record<string, FileEntry>) {
 }
 
 describe('MarkdownBaseCache', () => {
+	it('rejects readable but truncated cache contents', async () => {
+		const { cache, files } = createCacheHarness();
+		const hash = await computeHash(toArrayBuffer('the complete common base'));
+		files.set(`${PLUGIN_DIR}/markdown-base-cache/${hash}.md`, toArrayBuffer('the complete'));
+		expect(await cache.readBase('notes/a.md', hash)).toBeNull();
+	});
+
+	it('repairs a corrupt cache from an unchanged local file during seeding', async () => {
+		const { cache, files } = createCacheHarness();
+		const content = toArrayBuffer('the complete common base');
+		const hash = await computeHash(content);
+		files.set('notes/a.md', content);
+		files.set(`${PLUGIN_DIR}/markdown-base-cache/${hash}.md`, toArrayBuffer('truncated'));
+		await cache.seedFromManifest(createManifest({
+			'notes/a.md': { hash, size: content.byteLength, modified: '2026-01-01T00:00:00.000Z' },
+		}), {
+			isDestroyed: () => false,
+			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map((task) => task())),
+		});
+		expect(await cache.readBase('notes/a.md', hash)).toEqual(content);
+	});
+
 	it('writes and reads markdown content by hash', async () => {
 		const { cache } = createCacheHarness();
 		const content = toArrayBuffer('hello\n');

@@ -25,6 +25,12 @@ function createProcessHarness() {
 		adapter,
 		getAbstractFileByPath: vi.fn(),
 		createFolder: vi.fn(),
+		process: vi.fn(async (file: { path: string }, update: (current: string) => string) => {
+			const current = await adapter.readBinary(file.path) as ArrayBuffer;
+			const text = update(new TextDecoder('utf-8', { ignoreBOM: true }).decode(current));
+			await vault.modifyBinary(file, new TextEncoder().encode(text).buffer);
+			return text;
+		}),
 		modifyBinary: vi.fn(),
 		createBinary: vi.fn(),
 	};
@@ -181,7 +187,7 @@ describe('processDiff conflict handling', () => {
 		);
 	});
 
-	it('rebases a deferred merge when the local file changes after the remote compare-and-swap', async () => {
+	it.each(['snapshot', 'atomic-write'])('rebases a deferred merge when the local file changes at %s after the remote compare-and-swap', async (racePoint) => {
 		const harness = createProcessHarness();
 		const path = 'notes/merge.md';
 		const base = 'title\nbase local\nbase remote\n';
@@ -199,7 +205,8 @@ describe('processDiff conflict handling', () => {
 		harness.vault.getAbstractFileByPath.mockReturnValue(localFile);
 		harness.adapter.readBinary
 			.mockResolvedValueOnce(toArrayBuffer(local))
-			.mockResolvedValueOnce(toArrayBuffer(lateLocal));
+			.mockResolvedValueOnce(toArrayBuffer(racePoint === 'snapshot' ? lateLocal : local))
+			.mockResolvedValue(toArrayBuffer(lateLocal));
 		harness.api.downloadFile.mockResolvedValue({
 			content: toArrayBuffer(remote),
 			contentType: 'text/markdown',
@@ -227,6 +234,7 @@ describe('processDiff conflict handling', () => {
 		);
 
 		expect(harness.api.uploadFile).toHaveBeenCalledTimes(1);
+		expect(harness.vault.process).toHaveBeenCalledTimes(racePoint === 'atomic-write' ? 1 : 0);
 		expect(harness.vault.modifyBinary).not.toHaveBeenCalled();
 		expect(harness.vault.createBinary).not.toHaveBeenCalled();
 		expect(result.conflicts).toEqual([]);
@@ -261,7 +269,7 @@ describe('processDiff conflict handling', () => {
 		harness.adapter.readBinary
 			.mockResolvedValueOnce(firstLocal)
 			.mockResolvedValueOnce(latestLocal)
-			.mockResolvedValueOnce(latestLocal);
+			.mockResolvedValue(latestLocal);
 		harness.api.downloadFile.mockResolvedValue({
 			content: remote,
 			contentType: 'text/markdown',

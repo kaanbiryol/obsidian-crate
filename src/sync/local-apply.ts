@@ -2,10 +2,18 @@ import type { TFile, Vault } from 'obsidian';
 import { createConflictCopy } from './conflict';
 import { isHiddenPath } from './file-discovery';
 import { computeHash } from './hasher';
+import { isMarkdownPath } from './markdown-base-cache';
 import { isVaultTFileLike } from './planner-helpers';
 import type { DiffApplyOutcome } from './transfer-types';
 
 const MAX_CONFLICT_COPY_ATTEMPTS = 3;
+const textDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+
+class LocalFileChangedError extends Error {
+	constructor() {
+		super('Local file changed before the remote version could be written');
+	}
+}
 
 interface LocalSnapshot {
 	exists: boolean;
@@ -41,8 +49,7 @@ export async function applyRemoteContentIfUnchanged(
 		};
 	}
 
-	await writeLocalContent(context.vault, path, content, snapshot);
-	return { status: 'applied' };
+	return applySnapshot(context.vault, path, content, snapshot);
 }
 
 export async function preserveLocalVersionsAndApplyRemote(
@@ -61,8 +68,7 @@ export async function preserveLocalVersionsAndApplyRemote(
 		await onConflictCopy?.({ path: conflictPath, hash: localHash });
 		const latest = await readLocalSnapshot(context.vault, path);
 		if (!latest.exists || latest.hash === localHash) {
-			await writeLocalContent(context.vault, path, remoteContent, latest);
-			return { status: 'applied' };
+			return applySnapshot(context.vault, path, remoteContent, latest);
 		}
 
 		if (!latest.content || !latest.hash) {
@@ -134,6 +140,43 @@ async function writeLocalContent(
 	content: ArrayBuffer,
 	snapshot: LocalSnapshot,
 ): Promise<void> {
+	if (isMarkdownPath(path) && snapshot.content) {
+		let expectedText: string;
+		let replacement: string;
+		try {
+			expectedText = textDecoder.decode(snapshot.content);
+			replacement = textDecoder.decode(content);
+		} catch {
+			// Non-UTF-8 files still transfer byte-for-byte through the binary path.
+			return writeBinaryContent(vault, path, content, snapshot);
+		}
+		const update = (current: string): string => {
+			if (current !== expectedText) throw new LocalFileChangedError();
+			return replacement;
+		};
+		// Compare within the atomic callback, after all asynchronous hashing and
+		// network work. Throwing also prevents an unchanged write on a mismatch.
+		if (snapshot.visibleFile && !isHiddenPath(path)) {
+			await vault.process(snapshot.visibleFile, update);
+		} else {
+			await vault.adapter.process(path, update);
+		}
+		return;
+	}
+	await writeBinaryContent(vault, path, content, snapshot);
+}
+
+async function applySnapshot(vault: Vault, path: string, content: ArrayBuffer, snapshot: LocalSnapshot): Promise<DiffApplyOutcome> {
+	try {
+		await writeLocalContent(vault, path, content, snapshot);
+		return { status: 'applied' };
+	} catch (error) {
+		if (error instanceof LocalFileChangedError) return { status: 'deferred', reason: error.message };
+		throw error;
+	}
+}
+
+async function writeBinaryContent(vault: Vault, path: string, content: ArrayBuffer, snapshot: LocalSnapshot): Promise<void> {
 	if (isHiddenPath(path) || (snapshot.exists && !snapshot.visibleFile)) {
 		await vault.adapter.writeBinary(path, content);
 		return;
