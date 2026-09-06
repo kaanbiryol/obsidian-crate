@@ -1,5 +1,5 @@
 import { isRecord } from '../plugin/settings';
-import { DEFAULT_SETTINGS, type CrateSettings, type SharedSettings } from '../plugin/settings-types';
+import { type CrateSettings, type SharedSettings } from '../plugin/settings-types';
 
 function normalizeStringArray(value: unknown): string[] | null {
 	if (!Array.isArray(value)) {
@@ -44,13 +44,11 @@ export function normalizeSharedSettingsValue(value: unknown): SharedSettings | n
 	const syncInterval = typeof value.syncInterval === 'number' && Number.isInteger(value.syncInterval) && value.syncInterval >= 0
 		? value.syncInterval
 		: null;
-	const syncOnResume = typeof value.syncOnResume === 'boolean'
-		? value.syncOnResume
-		: DEFAULT_SETTINGS.syncOnResume;
-	const pushEnabled = typeof value.pushEnabled === 'boolean' ? value.pushEnabled : false;
 	if (
 		ignorePatterns === null ||
 		typeof value.syncOnStartup !== 'boolean' ||
+		typeof value.syncOnResume !== 'boolean' ||
+		typeof value.pushEnabled !== 'boolean' ||
 		syncInterval === null ||
 		typeof value.showStatusBar !== 'boolean'
 	) {
@@ -60,9 +58,9 @@ export function normalizeSharedSettingsValue(value: unknown): SharedSettings | n
 	return {
 		ignorePatterns,
 		syncOnStartup: value.syncOnStartup,
-		syncOnResume,
+		syncOnResume: value.syncOnResume,
 		syncInterval,
 		showStatusBar: value.showStatusBar,
-		pushEnabled,
+		pushEnabled: value.pushEnabled,
 	};
 }

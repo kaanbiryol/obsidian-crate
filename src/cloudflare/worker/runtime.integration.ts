@@ -6,7 +6,7 @@ import { reset, runDurableObjectAlarm } from 'cloudflare:test';
 import schemaSql from '../schema.sql?raw';
 import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
 import { pruneChangelog } from './db';
-import { scheduleScheduledReminder } from './reminder-handlers';
+import { drainNotificationJobs } from './notification-outbox';
 import type { Env } from './types';
 import { handleListReminders } from './reminders-web/routes/list';
 import {
@@ -193,14 +193,11 @@ describe('Cloudflare runtime integration', () => {
 		expect(retained.results).toEqual([{ seq: latestBeforePrune?.seq, path: 'latest.md' }]);
 	});
 
-	it('fences an unprojected legacy alarm in real Durable Object storage', async () => {
+	it('fences an unprojected alarm in real Durable Object storage', async () => {
 		const reminderId = 'runtime-reminder';
-		await scheduleScheduledReminder(runtimeEnv, {
-			reminderId,
-			content: 'Runtime alarm',
-			project: 'Work',
-			dueDatetime: '2099-01-01T00:00:00.000Z',
-		});
+		await runtimeEnv.DB.prepare("INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, available_at) VALUES (?, ?, 'schedule', ?, 0)")
+			.bind(reminderId, 'runtime-job', JSON.stringify({ reminderId, content: 'Runtime alarm', project: 'Work', dueDatetime: '2099-01-01T00:00:00.000Z' })).run();
+		await drainNotificationJobs(runtimeEnv);
 		const stub = runtimeEnv.REMINDER_ALARMS.get(runtimeEnv.REMINDER_ALARMS.idFromName(reminderId));
 
 		expect(await runDurableObjectAlarm(stub as never)).toBe(true);
@@ -208,8 +205,6 @@ describe('Cloudflare runtime integration', () => {
 			'SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = ?',
 		).bind(reminderId).first();
 		expect(scheduled).toEqual({ reminder_id: reminderId });
-		const stateResponse = await stub.fetch('https://do/state');
-		const state = await stateResponse.json() as { reminder?: unknown };
-		expect(state.reminder).toMatchObject({ reminderId });
+
 	});
 });

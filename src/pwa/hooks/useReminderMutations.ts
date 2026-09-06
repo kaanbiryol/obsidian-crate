@@ -47,7 +47,6 @@ export function useReminderMutations({
 		const { buildReminderMutationBody } = await import('../reminder-mutation');
 		return buildReminderMutationBody({
 			config: {
-				allDayNotificationTime: config.allDayNotificationTime,
 				folderPath: config.folderPath,
 			},
 			draft,
@@ -55,7 +54,7 @@ export function useReminderMutations({
 			projects,
 			selectedProject,
 		});
-	}, [config.allDayNotificationTime, config.folderPath, projects, selectedProject]);
+	}, [config.folderPath, projects, selectedProject]);
 
 	// Different records may save together; the same record and project ordering
 	// cannot overtake themselves. Only acknowledged state enters the list/cache.
@@ -112,7 +111,7 @@ export function useReminderMutations({
 		try {
 			const response = await apiFetch('/reminders/set-completed', {
 				method: 'POST',
-				body: JSON.stringify({ folderPath: config.folderPath, allDayNotificationTime: config.allDayNotificationTime,
+				body: JSON.stringify({ folderPath: config.folderPath,
 					id, filePath: reminder?.filePath, expectedRevision: reminder?.revision,
 					operationId: crypto.randomUUID(), completed: !completed }),
 			});

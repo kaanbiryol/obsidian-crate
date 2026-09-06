@@ -103,6 +103,7 @@ describe('LocalManifest', () => {
 		adapter.read.mockResolvedValue(
 			JSON.stringify({
 				version: 1,
+				generation: 1,
 				lastSeq: 12,
 				files: {
 					'note.md': {
@@ -124,13 +125,15 @@ describe('LocalManifest', () => {
 		expect(manifest.getManifest().lastSeq).toBe(12);
 	});
 
-	it('ignores malformed persisted shape and keeps defaults', async () => {
+	it('rejects and preserves an unsupported checkpoint', async () => {
 		adapter.exists.mockImplementation((path: string) =>
 			Promise.resolve(path.endsWith('file-manifest.json') && !path.endsWith('.tmp')),
 		);
 		adapter.read.mockResolvedValue(JSON.stringify({ invalid: true }));
 
-		await manifest.load();
+		await expect(manifest.load()).rejects.toThrow();
+		expect(adapter.remove).not.toHaveBeenCalled();
+		expect(adapter.write).not.toHaveBeenCalled();
 
 		expect(manifest.getManifest()).toEqual({ version: 1, files: {} });
 	});
@@ -141,6 +144,7 @@ describe('LocalManifest', () => {
 		);
 		adapter.read.mockResolvedValue(JSON.stringify({
 			version: 1,
+			generation: 1,
 			lastSeq: 42,
 			files: {
 				'good.md': {
@@ -179,6 +183,7 @@ describe('LocalManifest', () => {
 	it('recovers from tmp file when main file is corrupt', async () => {
 		const validManifest = JSON.stringify({
 			version: 1,
+			generation: 1,
 			files: { 'a.md': { hash: 'h', size: 5, modified: '2026-01-01T00:00:00.000Z' } },
 		});
 		adapter.exists.mockImplementation((path: string) => Promise.resolve(true));

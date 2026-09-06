@@ -12,7 +12,7 @@ import { scanReminderMarkdownFile } from './reminders-web/scan';
 import type { ReminderRecord } from '@/pwa/types';
 
 const path = 'Reminders/Inbox.md';
-const request = (body: Record<string, unknown>) => new Request('https://test/reminders', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', allDayNotificationTime: null, ...body }) });
+const request = (body: Record<string, unknown>) => new Request('https://test/reminders', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', ...body }) });
 const createBody = () => ({ id: crypto.randomUUID(), operationId: crypto.randomUUID(), content: 'Task', project: 'Inbox' });
 const { DB: db, BUCKET: bucket } = env;
 beforeEach(async () => { for (const sql of schemaSql.split(';').map(sql => sql.trim()).filter(Boolean)) await db.prepare(sql).run(); });
@@ -38,12 +38,12 @@ describe('transactional reminder retries and revisions', () => {
 		expect(response.status).toBe(409);
 		expect((await records())[0]?.content).toBe('Changed in Obsidian');
 	});
-	it('returns a mismatched operation receipt only within its authorized folder', async () => {
+	it('rejects mismatched operation IDs without returning a receipt', async () => {
 		const body = createBody();
-		const { reminder } = await payload(await handleCreateReminder(request(body), env));
+		await payload(await handleCreateReminder(request(body), env));
 		const retry = await handleCreateReminder(request({ ...body, content: 'Edited after an uncertain save' }), env);
 		expect(retry.status).toBe(409);
-		expect(await retry.json()).toMatchObject({ code: 'operation_mismatch', committedReminder: reminder });
+		expect(await retry.json()).toEqual({ code: 'operation_mismatch', error: 'An operation ID cannot be reused for different changes.' });
 		for (const folderPath of ['Private', 'Reminder', 'Reminders/Nested']) {
 			const outside = await handleCreateReminder(request({ ...body, folderPath }), env);
 			expect(outside.status).toBe(409);

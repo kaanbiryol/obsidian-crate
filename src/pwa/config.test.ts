@@ -37,17 +37,10 @@ describe('PWA enrollment token selection', () => {
 		expect(enrollmentTokenFromParams(params, true)).toBe('install-token');
 	});
 
-	it('keeps older single-token app links compatible', () => {
-		const params = new URLSearchParams('token=legacy-token');
-
-		expect(enrollmentTokenFromParams(params, false)).toBe('legacy-token');
-		expect(enrollmentTokenFromParams(params, true)).toBe('legacy-token');
-	});
-
-	it('ignores a blank browser token and falls back to the install token in a browser', () => {
-		const params = new URLSearchParams('token=install-token&browserToken=%20');
-
-		expect(enrollmentTokenFromParams(params, false)).toBe('install-token');
+	it.each(['token=install-token', 'token=install-token&browserToken=%20'])('requires a browser token without consuming the install token: %s', query => {
+		const params = new URLSearchParams(query);
+		expect(enrollmentTokenFromParams(params, false)).toBeNull();
+		expect(enrollmentTokenFromParams(params, true)).toBe('install-token');
 	});
 });
 

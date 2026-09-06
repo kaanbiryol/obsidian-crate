@@ -18,7 +18,7 @@ import {
 	getProjectFilePath,
 	updateReminderInFileContent,
 } from '../file-content';
-import { cancelReminderNotification, syncReminderNotification } from '../notifications';
+import { projectReminderNotifications } from '../notifications';
 import {
 	hasNonEmptyStringValue,
 	parseProjectPath,
@@ -170,9 +170,7 @@ export async function handleUpdateReminder(request: Request, env: Env): Promise<
 			.find(candidate => candidate.id === id);
 	}
 
-	const notificationWarning = updatedReminder
-		? await syncReminderNotification(env, updatedReminder, workspaceResult.allDayNotificationTime)
-		: await cancelReminderNotification(env, id);
+	const notificationWarning = await projectReminderNotifications(env);
 	return corsResponse({
 		success: true,
 		reminder: updatedReminder ? await toReminderPayload(updatedReminder) : undefined,

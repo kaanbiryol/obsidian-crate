@@ -1,22 +1,5 @@
 import type { WorkerApiHttpClient } from './http';
 
-export interface ReminderScheduleRequest {
-	reminderId: string;
-	content: string;
-	project?: string;
-	dueDatetime: string;
-	priority?: number;
-}
-
-export interface ScheduledReminderResponse {
-	scheduled: Array<{
-		reminder_id: string;
-		content: string;
-		project: string | null;
-		due_datetime: string;
-	}>;
-}
-
 export interface PushSubscriptionsResponse {
 	subscriptions: Array<{
 		id: string;
@@ -38,36 +21,15 @@ export interface PushTestResponse {
 export class NotificationsWorkerApi {
 	constructor(private readonly http: WorkerApiHttpClient) {}
 
-	async scheduleReminder(data: ReminderScheduleRequest): Promise<{ success: boolean }> {
-		return this.http.requestJson<{ success: boolean }>('/reminders/schedule', {
-			method: 'POST',
-			body: JSON.stringify(data),
-		});
-	}
 
-	async cancelReminder(reminderId: string): Promise<{ success: boolean }> {
-		return this.http.requestJson<{ success: boolean }>('/reminders/cancel', {
-			method: 'DELETE',
-			body: JSON.stringify({ reminderId }),
-		});
-	}
 
-	async getScheduledReminders(): Promise<ScheduledReminderResponse> {
-		return this.http.requestJson<ScheduledReminderResponse>('/reminders/scheduled');
-	}
 
 	async getPushSubscriptions(): Promise<PushSubscriptionsResponse> {
 		return this.http.requestJson<PushSubscriptionsResponse>('/notifications/subscriptions');
 	}
 
-	async createPushEnrollmentToken(): Promise<{ token: string; expiresAt: string }> {
-		return this.http.requestJson('/notifications/enrollment-token', {
-			method: 'POST',
-			body: '{}',
-		});
-	}
 
-	async createRemindersEnrollmentToken(folderPath: string): Promise<{ token: string; browserToken?: string; expiresAt: string }> {
+	async createRemindersEnrollmentToken(folderPath: string): Promise<{ token: string; browserToken: string; expiresAt: string }> {
 		return this.http.requestJson('/notifications/reminders-enrollment-token', {
 			method: 'POST',
 			body: JSON.stringify({ folderPath }),

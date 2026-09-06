@@ -18,5 +18,4 @@ export interface RemoteReminderRecord {
 
 export interface ReminderMutationWorkspace {
 	folderPath: string;
-	allDayNotificationTime?: string | null;
 }

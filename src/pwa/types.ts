@@ -80,7 +80,6 @@ export interface CachedReminderSnapshot {
 
 export interface ReminderMutationBody {
 	folderPath: string;
-	allDayNotificationTime: string | null;
 	content: string;
 	description: string | null;
 	project: string;

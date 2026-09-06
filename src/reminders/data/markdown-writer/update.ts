@@ -1,4 +1,3 @@
-import type { Reminder } from "@/reminders/types/reminder";
 import { generateContentHash } from "@/reminders/utils/checkboxParser";
 import type { IndexedReminder } from "../reminder-index";
 import { findReminderLineNumber } from "./helpers";
@@ -19,7 +18,6 @@ import type {
 import {
   markdownWriterLog,
   notifyFileWritten,
-  triggerReminderChange,
 } from "./operation-shared";
 
 function errorMessage(error: unknown): string {
@@ -138,19 +136,6 @@ export async function updateReminderInMarkdown(
         notifyFileWritten(context, oldFile),
       ]);
 
-      const updatedReminder: Reminder & { contentHash: string } = {
-        id: reminder.id,
-        content: movedMutation.content,
-        description: movedMutation.description,
-        dueDate: movedMutation.dueDateKey,
-        dueDatetime: movedMutation.dueDatetime,
-        priority: movedMutation.priority,
-        completed: reminder.completed,
-        project: newProject,
-        recurrence: movedMutation.recurrence,
-        contentHash: movedReminder.contentHash,
-      };
-      triggerReminderChange(context, updatedReminder, "update");
     } catch (error) {
       context.index.clearOptimistic(reminder.id);
       throw error;
@@ -182,19 +167,6 @@ export async function updateReminderInMarkdown(
     markdownWriterLog.info(`Updated reminder in ${reminder.filePath} at line ${replacementLineNumber}`);
     await notifyFileWritten(context, file);
 
-    const contentHash = generateContentHash(mutation.content);
-    const updatedReminder: Reminder & { contentHash: string } = {
-      id: reminder.id,
-      content: mutation.content,
-      dueDate: mutation.dueDateKey,
-      dueDatetime: mutation.dueDatetime,
-      priority: mutation.priority,
-      completed: reminder.completed,
-      project: newProject || "Inbox",
-      recurrence: mutation.recurrence,
-      contentHash,
-    };
-    triggerReminderChange(context, updatedReminder, "update");
   } catch (error) {
     context.index.clearOptimistic(reminder.id);
     throw error;

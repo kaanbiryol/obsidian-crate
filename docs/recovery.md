@@ -35,7 +35,7 @@ If the import acknowledgement was lost before a bookmark was received and the da
 
 Before connecting production devices:
 
-1. Deploy the matching Worker version against the restored resources in a new Worker/DO namespace. Finish all schema migrations before enabling clients.
+1. Deploy the matching Worker version against the restored resources in a new Worker/DO namespace. The archive and target must use the current schema; unsupported archives are rejected before restore.
 2. Compare the verified file count and hashes with the archive. Test a small disposable vault first, including a reminder edit and a binary file download.
 3. Re-enroll a notification device and confirm the saved folder, timezone, and all-day time. Derived schedules are rebuilt from committed Markdown.
 4. Back up every existing device vault, then connect one at a time. Local changes made after the archive bookmark need explicit review. Keep the old deployment available for comparison.

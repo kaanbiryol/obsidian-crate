@@ -1,10 +1,6 @@
 import { Notice, Setting, type TextComponent, type ToggleComponent } from 'obsidian';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
-import {
-	enableReminderNotifications,
-	reconcileReminderNotifications,
-} from '../../reminders/plugin-integration';
 import { normalizeTimeString } from '../../reminders/settings';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import type { SyncApiClient } from '../../sync/api';
@@ -48,7 +44,6 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
         try {
           await savePolicy({ enabled: value });
           await plugin.writeSettings({ pushEnabled: value });
-          if (value) await enableReminderNotifications(plugin);
           context.rerender();
         } catch (error) {
           new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
@@ -77,14 +72,12 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 				const trimmed = text.inputEl.value.trim();
 				if (trimmed === '') {
 					await saveAllDayTime(null);
-					void reconcileReminderNotifications(plugin);
 					return;
 				}
 				const normalized = normalizeTimeString(trimmed);
 				if (normalized) {
 					text.setValue(normalized);
 					await saveAllDayTime(normalized);
-					void reconcileReminderNotifications(plugin);
 				} else {
 					text.setValue(plugin.remindersSettings.allDayNotificationTime ?? '');
 				}
@@ -108,7 +101,6 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 			try {
 				await saveAllDayTime(null);
 				timeInput.setValue('');
-				void reconcileReminderNotifications(plugin);
 			} catch (error) {
 				new Notice(`Failed to save notification time: ${errorMessage(error)}`);
 			} finally {

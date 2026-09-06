@@ -73,8 +73,8 @@
             .premium-reminder-content,
             .reminder-card__main {
                 transform: scale(1);
-                background: var(--crate-reminder-card-bg, var(--crate-surface-bg));
-                border-color: var(--crate-reminder-card-border, var(--crate-surface-border));
+                background: var(--crate-reminder-card-bg, var(--crate-panel-bg));
+                border-color: var(--crate-reminder-card-border, var(--crate-divider));
                 box-shadow: var(--crate-reminder-card-shadow, none);
             }
         }

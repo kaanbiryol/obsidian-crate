@@ -18,15 +18,14 @@ describe('markdownScan', () => {
 				'# Work',
 				'',
 				'- [ ] File taxes 2026-01-02 ! <!-- crate-id:r1 -->',
-				'<!-- crate-desc:collect receipts',
-				'and confirm deductions -->',
+				'<!-- crate-desc:v1:collect%20receipts%0Aand%20confirm%20deductions -->',
 				'- [x] Done task <!-- crate-id:r2 -->',
 				'- [ ] missing id',
 			].join('\n'),
 			'Reminders',
 		);
 
-		expect(result.lineCount).toBe(7);
+		expect(result.lineCount).toBe(6);
 		expect(result.reminders).toHaveLength(2);
 		expect(result.reminders[0]).toMatchObject({
 			id: 'r1',
@@ -43,24 +42,21 @@ describe('markdownScan', () => {
 			content: 'Done task',
 			completed: true,
 			project: 'Work',
-			lineNumber: 5,
+			lineNumber: 4,
 		});
 	});
 
-	it('decodes encoded description blocks while preserving legacy plain blocks', () => {
+	it('decodes comment-safe description blocks', () => {
 		const result = scanReminderMarkdownContent(
 			'Reminders/Work.md',
 			[
 				'- [ ] Encoded <!-- crate-id:r1 -->',
 				'<!-- crate-desc:v1:line%20one%0Aline%20two%20%2D%2D%3E%20safe -->',
-				'- [ ] Legacy <!-- crate-id:r2 -->',
-				'<!-- crate-desc:plain legacy -->',
 			].join('\n'),
 			'Reminders',
 		);
 
-		expect(result.reminders).toHaveLength(2);
+		expect(result.reminders).toHaveLength(1);
 		expect(result.reminders[0]?.description).toBe('line one\nline two --> safe');
-		expect(result.reminders[1]?.description).toBe('plain legacy');
 	});
 });

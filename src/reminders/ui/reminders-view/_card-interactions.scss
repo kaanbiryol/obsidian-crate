@@ -25,14 +25,14 @@
 
     .sidebar-reminder-card-wrapper:focus-visible .premium-reminder-content {
         outline: none;
-        background: var(--crate-reminder-card-active-bg, var(--crate-surface-active-bg));
+        background: var(--crate-reminder-card-active-bg, var(--crate-control-active-bg));
         border-color: var(--crate-focus-ring);
         box-shadow: inset 0 0 0 1px var(--crate-focus-ring);
     }
 
     .premium-project-card:focus-visible .premium-project-content {
         outline: none;
-        background: var(--crate-reminder-card-active-bg, var(--crate-surface-active-bg));
+        background: var(--crate-reminder-card-active-bg, var(--crate-control-active-bg));
         border-color: var(--crate-focus-ring);
         box-shadow: inset 0 0 0 1px var(--crate-focus-ring);
     }
@@ -46,8 +46,8 @@
     .premium-reminder-card:active .premium-reminder-content,
     .premium-project-card:active .premium-project-content {
         transform: none;
-        background: var(--crate-reminder-card-active-bg, var(--crate-surface-active-bg));
-        border-color: var(--crate-reminder-card-active-border, var(--crate-surface-border-hover));
+        background: var(--crate-reminder-card-active-bg, var(--crate-control-active-bg));
+        border-color: var(--crate-reminder-card-active-border, var(--crate-divider-strong));
         box-shadow: none;
         transition-duration: var(--crate-card-press-duration);
     }

@@ -56,7 +56,6 @@ function createWriter(): {
 			deleteReminder,
 			toggleComplete,
 			reorderReminders,
-			setOnReminderChange: vi.fn(),
 			setOnFileWritten: vi.fn(),
 		},
 		spies: {

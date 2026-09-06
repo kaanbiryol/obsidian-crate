@@ -6,7 +6,6 @@ import schema from '../schema.sql?raw';
 import worker from './index';
 import { sha256Hex } from './auth';
 import { handleSubscribe, handleUnsubscribe } from './notification-subscription-handlers';
-import { normalizeDeployedPortablePaths } from '../portable-path-migration';
 import { isValidPushEndpoint } from './notifications/push-endpoint';
 import { writeCommittedMarkdownFile } from './storage';
 import { makeApiFetch } from '@/pwa/api';
@@ -19,13 +18,13 @@ async function token(id: string, scope = 'reminders', folder: string | null = 'R
   await env.DB.prepare('INSERT INTO auth_tokens (id, token_hash, scope, expires_at, folder_path) VALUES (?, ?, ?, ?, ?)')
     .bind(id, await sha256Hex(id), scope, Date.now() + 60_000, folder).run();
 }
-const request = (path: string, id: string, body?: unknown, method = 'POST', protocol = '3') => new Request(`https://test${path}`, {
+const request = (path: string, id: string, body?: unknown, method = 'POST', protocol = '4') => new Request(`https://test${path}`, {
   method, headers: { Authorization: `Bearer ${id}`, 'X-Crate-Protocol': protocol, 'Content-Type': 'application/json' },
   ...(body === undefined ? {} : { body: JSON.stringify(body) }),
 });
 const subscription = (suffix: string) => ({ endpoint: `https://fcm.googleapis.com/fcm/send/${suffix}`, keys: { p256dh: 'key', auth: 'auth' } });
 
-it.each(['', '2', '4'])('rejects protocol %s before committing a mutation', async protocol => {
+it.each(['', '2', '3', '5'])('rejects protocol %s before committing a mutation', async protocol => {
   await token('vault-token', 'vault', null);
   expect((await worker.fetch(request('/sync/upload?path=a.md', 'vault-token', {}, 'PUT', protocol), env)).status).toBe(428);
   expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first<{ count: number }>())?.count).toBe(0);
@@ -36,8 +35,8 @@ it('binds reads, source edits, and enrollment permissions to the original folder
   expect((await worker.fetch(request('/reminders/create', 'browser', { folderPath: 'Private', content: 'No', project: 'Inbox', operationId: crypto.randomUUID() }), env)).status).toBe(403);
   expect((await worker.fetch(request('/notifications/reminders-enrollment-token', 'browser', { folderPath: 'Private' }), env)).status).toBe(403);
   expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'browser', undefined, 'GET'), env)).status).toBe(200);
-  await token('legacy', 'reminders', null);
-  expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'legacy', undefined, 'GET'), env)).status).toBe(401);
+  await token('unbound', 'reminders', null);
+  expect((await worker.fetch(request('/reminders/list?folderPath=Reminders', 'unbound', undefined, 'GET'), env)).status).toBe(401);
 });
 it('cannot replace or unsubscribe another session’s endpoint and revokes owned push on logout', async () => {
   await token('one'); await token('two');
@@ -90,33 +89,6 @@ it('keeps healthy reminders available alongside oversized notes without download
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ reminders: [{ content: 'Healthy' }], issues: [{ path: 'Reminders/Large.md' }] });
 });
-const api = { queryD1: async (_account: string, _id: string, sql: string, params: string[] = []) => {
-  let offset = 0;
-  return await env.DB.batch(sql.split(';').map(s => s.trim()).filter(Boolean).map(s => {
-    const count = (s.match(/\?/g) ?? []).length;
-    const statement = env.DB.prepare(s).bind(...params.slice(offset, offset + count)); offset += count; return statement;
-  }));
-} };
-it('backfills NFC and Unicode case keys after fencing writes', async () => {
-  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'ÉTUDE.md', 'text', null);
-  await env.DB.prepare("UPDATE files SET portable_path = 'ÉTUDE.md'").run();
-  await env.DB.prepare("INSERT INTO maintenance_state (key, value) VALUES ('portable_paths_ready', 'false')").run();
-  await token('vault-token', 'vault', null);
-  expect((await worker.fetch(request('/sync/upload?path=new.md', 'vault-token', {}, 'PUT'), env)).status).toBe(503);
-  await normalizeDeployedPortablePaths(api as never, 'account', 'db');
-  expect(await env.DB.prepare('SELECT portable_path FROM files').first()).toMatchObject({ portable_path: 'étude.md' });
-  expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'portable_paths_ready'").first()).toMatchObject({ value: 'true' });
-});
-it('leaves Unicode collisions and their bytes intact with the write gate closed', async () => {
-  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'É.md', 'keep', null);
-  await env.DB.prepare("UPDATE files SET portable_path = 'É.md'").run();
-  await env.DB.prepare("INSERT INTO files (path, portable_path, hash, size, storage_key) SELECT 'é.md', 'é.md', hash, size, storage_key FROM files").run();
-  await env.DB.prepare("INSERT INTO maintenance_state (key, value) VALUES ('portable_paths_ready', 'false')").run();
-  await expect(normalizeDeployedPortablePaths(api as never, 'account', 'db')).rejects.toThrow('collide');
-  expect((await env.DB.prepare('SELECT path FROM files').all()).results).toHaveLength(2);
-  expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'portable_paths_ready'").first()).toMatchObject({ value: 'false' });
-});
-
 it('cannot bypass public request limits by varying an unverified bearer header', async () => {
   const responses = [];
   for (let i = 0; i < 31; i++) responses.push(await worker.fetch(request('/notifications/reminders-exchange', `unverified-${i}`, { token: 'invalid' }), env));

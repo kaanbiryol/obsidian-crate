@@ -19,7 +19,6 @@ interface UseReminderModalActionsOptions {
 	hasTime?: boolean;
 	recurrence?: RecurrenceRule;
 	reminder?: Reminder;
-	optimistic: boolean;
 	onClose: () => void;
 	onAdd?: (content: string, project: string, priority: number, dueDate?: string, recurrence?: RecurrenceRule, hasTime?: boolean, description?: string) => Promise<void>;
 	onSave?: (reminder: Reminder) => Promise<void>;
@@ -37,7 +36,6 @@ export function useReminderModalActions({
 	hasTime,
 	recurrence,
 	reminder,
-	optimistic,
 	onClose,
 	onAdd,
 	onSave,
@@ -67,7 +65,6 @@ export function useReminderModalActions({
 		pending.current = true;
 
 		await executeReminderAction({
-			optimistic,
 			close: onClose,
 			beforeRun: () => setIsSaving(true),
 			afterSettled: () => { pending.current = false; setIsSaving(false); },
@@ -101,7 +98,6 @@ export function useReminderModalActions({
 		onClose,
 		onError,
 		onSave,
-		optimistic,
 		priority,
 		project,
 		projects,
@@ -118,7 +114,6 @@ export function useReminderModalActions({
 		pending.current = true;
 
 		await executeReminderAction({
-			optimistic,
 			close: onClose,
 			beforeClose: () => setShowDeleteConfirm(false),
 			beforeRun: () => setIsDeleting(true),
@@ -131,7 +126,7 @@ export function useReminderModalActions({
 				onError?.(error);
 			},
 		});
-	}, [onClose, onDelete, onError, optimistic, reminder]);
+	}, [onClose, onDelete, onError, reminder]);
 
 	const deleteMessage = useMemo(
 		() => buildDeleteConfirmationMessage(reminder),

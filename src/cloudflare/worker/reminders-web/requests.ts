@@ -5,8 +5,6 @@ import { corsResponse } from '../cors';
 import { parseOptionalString, sanitizePath } from '../utils';
 import type { ReminderMutationWorkspace } from './types';
 
-const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
 export type RecurrenceMutationResult =
 	| { ok: true; value: RecurrenceRule | null | undefined }
 	| { ok: false; response: Response };
@@ -36,24 +34,6 @@ export function hasNonEmptyStringValue(value: unknown): boolean {
 	return typeof value === 'string' && value.trim().length > 0;
 }
 
-function parseOptionalAllDayNotificationTime(value: unknown): string | null | undefined {
-	if (value === undefined) {
-		return undefined;
-	}
-
-	if (value === null) {
-		return null;
-	}
-
-	const parsed = parseOptionalString(value, 5);
-	if (!parsed) {
-		return null;
-	}
-
-	const match = TIME_PATTERN.exec(parsed);
-	return match ? `${match[1]}:${match[2]}` : null;
-}
-
 export function parseRecurrenceMutationValue(value: unknown): RecurrenceMutationResult {
 	if (value === undefined) {
 		return { ok: true, value: undefined };
@@ -76,10 +56,5 @@ export function parseReminderMutationWorkspace(
 		return corsResponse({ error: 'folderPath required' }, 400);
 	}
 
-	const allDayNotificationTime = parseOptionalAllDayNotificationTime(value.allDayNotificationTime);
-	if (value.allDayNotificationTime !== undefined && allDayNotificationTime === null && value.allDayNotificationTime !== null) {
-		return corsResponse({ error: 'Invalid allDayNotificationTime' }, 400);
-	}
-
-	return { folderPath, allDayNotificationTime };
+	return { folderPath };
 }

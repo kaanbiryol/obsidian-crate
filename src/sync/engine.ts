@@ -363,7 +363,7 @@ export class SyncEngine {
 		return planLocalChanges(this.contexts.localDiffPlanner(), PREPARE_CONCURRENCY);
 	}
 
-	private async parallelDownloadAndSaveFiles(requests: string[] | DownloadRequest[], result: SyncResult): Promise<void> {
+	private async parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult): Promise<void> {
 		await transferParallelDownloadAndSaveFiles(
 			this.contexts.transfer(),
 			requests,

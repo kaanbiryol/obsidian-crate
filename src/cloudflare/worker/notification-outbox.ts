@@ -1,5 +1,4 @@
 import { queryRows } from './db';
-import { cancelScheduledReminder, scheduleScheduledReminder } from './reminder-handlers';
 import type { Env } from './types';
 
 interface SchedulePayload {
@@ -7,7 +6,6 @@ interface SchedulePayload {
 	content: string;
 	project?: string | null;
 	dueDatetime: string;
-	priority?: number;
 }
 
 interface NotificationJobRow {
@@ -26,27 +24,31 @@ function retryDelayMs(attempt: number): number {
 }
 
 async function runJob(env: Env, job: NotificationJobRow): Promise<void> {
+	const alarm = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName(job.reminder_id));
 	if (job.operation === 'cancel') {
-		await cancelScheduledReminder(env, job.reminder_id, job.job_token);
+		const response = await alarm.fetch(`https://do/cancel?reminderId=${encodeURIComponent(job.reminder_id)}&jobToken=${encodeURIComponent(job.job_token)}`, { method: 'DELETE' });
+		if (!response.ok) throw new Error('Failed to cancel alarm');
 		return;
 	}
-
 	if (!job.payload_json) throw new Error('Notification schedule payload is missing');
 	const payload = JSON.parse(job.payload_json) as SchedulePayload;
-	if (payload.reminderId !== job.reminder_id) throw new Error('Notification schedule payload is invalid');
-	await scheduleScheduledReminder(env, { ...payload, jobToken: job.job_token });
+	if (payload.reminderId !== job.reminder_id || !Number.isFinite(Date.parse(payload.dueDatetime))) throw new Error('Notification schedule payload is invalid');
+	const response = await alarm.fetch('https://do/schedule', {
+		method: 'PUT', body: JSON.stringify({ ...payload, jobToken: job.job_token }),
+	});
+	if (!response.ok) throw new Error('Failed to schedule alarm');
 }
 
 async function processNotificationJob(
 	env: Env,
 	reminderId: string,
-	jobToken?: string,
+	jobToken: string,
 ): Promise<string | undefined> {
 	const job = await env.DB.prepare(`SELECT reminder_id, job_token, operation, payload_json, attempts
 		FROM notification_jobs WHERE reminder_id = ?`)
 		.bind(reminderId)
 		.first<NotificationJobRow>();
-	if (!job || (jobToken && job.job_token !== jobToken)) return undefined;
+	if (!job || job.job_token !== jobToken) return undefined;
 
 	try {
 		await runJob(env, job);

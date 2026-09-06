@@ -1,7 +1,7 @@
 import { isAbortError } from "./abort";
 import { base64ToArrayBuffer } from "./encoding";
 import { computeHash } from "./hasher";
-import { applyRemoteContentIfUnchanged, writeRemoteContent } from "./local-apply";
+import { applyRemoteContentIfUnchanged } from "./local-apply";
 import { isMarkdownPath } from "./markdown-base-cache";
 import type { DiffApplyOutcome, TransferContext } from "./transfer-types";
 import { createLogger, errorMessage } from "../plugin/logger";
@@ -65,19 +65,6 @@ export async function downloadAndSaveFile(
   return { status: "applied" };
 }
 
-export async function saveDownloadedContent(
-  context: TransferContext,
-  path: string,
-  content: ArrayBuffer,
-): Promise<FileEntry> {
-  if (content.byteLength > MAX_FILE_SIZE_BYTES) {
-    throw new Error("Skipped remote file larger than 25MB");
-  }
-
-  await writeRemoteContent(context, path, content);
-  return recordDownloadedContent(context, path, content);
-}
-
 async function recordDownloadedContent(
   context: TransferContext,
   path: string,
@@ -101,13 +88,10 @@ async function recordDownloadedContent(
 
 export async function parallelDownloadAndSaveFiles(
   context: TransferContext,
-  requestsOrPaths: Array<DownloadRequest | string>,
+  requests: DownloadRequest[],
   result: SyncResult,
   concurrency: number,
 ): Promise<void> {
-  const requests = requestsOrPaths.map((request): DownloadRequest => typeof request === "string"
-    ? { path: request, expectedLocalHash: null, expectedRemoteHash: "", remoteSize: 0 }
-    : request);
   const batchable: DownloadRequest[] = [];
   const individual: DownloadRequest[] = [];
 

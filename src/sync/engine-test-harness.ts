@@ -157,7 +157,7 @@ function createSettings(): CrateSettings {
 		showStatusBar: true,
 		syncHistory: [],
 		pushEnabled: false,
-		syncDebugLogging: false,
+		debugLogging: false,
 		debounceDelay: 5,
 	};
 }

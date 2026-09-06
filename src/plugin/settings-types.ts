@@ -14,7 +14,7 @@ export interface CrateSettings {
 	showStatusBar: boolean;
 	syncHistory: SyncHistoryEntry[];
 	pushEnabled: boolean;
-	syncDebugLogging: boolean;
+	debugLogging: boolean;
 	debounceDelay: number;
 }
 
@@ -40,7 +40,7 @@ export const DEFAULT_SETTINGS: CrateSettings = {
 	showStatusBar: true,
 	syncHistory: [],
 	pushEnabled: false,
-	syncDebugLogging: false,
+	debugLogging: false,
 	debounceDelay: 5,
 };
 

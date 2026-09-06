@@ -114,7 +114,7 @@ export function enrollmentTokenFromParams(
 	const browserToken = params.get('browserToken')?.trim() || null;
 	return standalone
 		? installToken
-		: browserToken ?? installToken;
+		: browserToken;
 }
 
 export function applyConfigFromUrl(config: StoredConfig): {

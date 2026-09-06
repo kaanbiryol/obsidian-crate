@@ -26,7 +26,7 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
     : db.prepare('UPDATE notification_policy SET folder_path = ?, timezone = ?, all_day_time = ?, revision = ?, enabled = ? WHERE id = 1 AND revision = ?').bind(folder, timezone, allDayTime, revision, enabled ? 1 : 0, typeof expectedRevision === 'string' ? expectedRevision : '');
   const results = await db.batch([mutation,
     // Schedules from older builds have no verified source mapping. Replace them
-    // through projection instead of allowing legacy client snapshots to deliver.
+    // through projection instead of allowing client snapshots to deliver.
     db.prepare(`INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, attempts, available_at)
       SELECT reminder_id, ?, 'cancel', NULL, 0, 0 FROM scheduled_reminders s
       WHERE NOT EXISTS (SELECT 1 FROM reminder_projections p WHERE p.reminder_id = s.reminder_id)

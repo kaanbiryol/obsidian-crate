@@ -1,6 +1,6 @@
 import { getLocalTimeZone } from '@internationalized/date';
 import { describe, it, expect } from 'vitest';
-import { parseReminderContent, rebuildReminderContent } from './reminderParser';
+import { parseReminderContent } from './reminderParser';
 
 describe('parseReminderContent hasTime', () => {
   it('returns hasTime false for "today" without explicit time', () => {
@@ -73,31 +73,5 @@ describe('parseReminderContent hasTime', () => {
     expect(result.dueDate).toBeUndefined();
     expect(result.hasTime).toBeUndefined();
     expect(result.cleanContent).toContain('task');
-  });
-});
-
-describe('rebuildReminderContent', () => {
-  it('includes time when hasTime is true even at midnight', () => {
-    const midnight = new Date(2026, 3, 3, 0, 0);
-    const result = rebuildReminderContent('task', midnight, 4, true);
-    expect(result).toBe('task 2026-04-03T00:00');
-  });
-
-  it('omits time when hasTime is false', () => {
-    const noon = new Date(2026, 3, 3, 12, 30);
-    const result = rebuildReminderContent('task', noon, 4, false);
-    expect(result).toBe('task 2026-04-03');
-  });
-
-  it('omits time when hasTime is not provided (backward compat)', () => {
-    const midnight = new Date(2026, 3, 3, 0, 0);
-    const result = rebuildReminderContent('task', midnight, 4);
-    expect(result).toBe('task 2026-04-03');
-  });
-
-  it('appends important marker when priority is 1', () => {
-    const date = new Date(2026, 3, 3, 14, 0);
-    const result = rebuildReminderContent('task', date, 1, true);
-    expect(result).toBe('task 2026-04-03T14:00 !');
   });
 });

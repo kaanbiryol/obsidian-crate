@@ -11,7 +11,7 @@ export function buildReminderMutationBody({
 	projects,
 	selectedProject,
 }: {
-	config: Pick<StoredConfig, 'folderPath' | 'allDayNotificationTime'>;
+	config: Pick<StoredConfig, 'folderPath'>;
 	draft: ModalDraft;
 	mode: ModalMode;
 	projects: string[];
@@ -43,7 +43,6 @@ export function buildReminderMutationBody({
   if (mode === 'edit') dueDatetime = preserveReminderInstant(dueDatetime, draft.originalDueDatetime) ?? null;
 	return {
 		folderPath: config.folderPath,
-		allDayNotificationTime: config.allDayNotificationTime,
 		content,
 		description: draft.description.trim() || null,
 		project,

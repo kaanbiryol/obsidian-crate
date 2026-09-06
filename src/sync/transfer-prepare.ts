@@ -125,19 +125,6 @@ export function createBatchUploadChunks(prepared: PreparedUpload[]): PreparedUpl
   return chunks;
 }
 
-export function createVaultFileChunks(files: VaultFile[], chunkSize: number): VaultFile[][] {
-  if (files.length === 0) {
-    return [];
-  }
-
-  const chunks: VaultFile[][] = [];
-  for (let index = 0; index < files.length; index += chunkSize) {
-    chunks.push(files.slice(index, index + chunkSize));
-  }
-
-  return chunks;
-}
-
 function getContentType(extension: string): string {
   const types: Record<string, string> = {
     md: "text/markdown",

@@ -1,5 +1,3 @@
-import { generateContentHash } from '@/reminders/utils/checkboxParser';
-import type { Reminder } from '@/reminders/types/reminder';
 import { parseStoredReminderDate } from '@/reminders/utils/reminderDate';
 import {
 	buildReminderCompletionPlan,
@@ -7,11 +5,10 @@ import {
 	type ReminderCompletionMutation,
 } from '../../core/markdownReminderMutation';
 import type { IndexedReminder } from '../reminder-index';
-import type { MarkdownWriterContext, ReminderChangeContext } from './types';
+import type { MarkdownWriterContext } from './types';
 import {
 	markdownWriterLog,
 	notifyFileWritten,
-	triggerReminderChange,
 } from './operation-shared';
 
 export async function toggleReminderCompletionInMarkdown(
@@ -55,21 +52,6 @@ export async function toggleReminderCompletionInMarkdown(
 			`Toggled completion for reminder in ${reminder.filePath} at line ${result.lineNumber}`,
 		);
 
-		const changeContext: ReminderChangeContext | undefined = result.recurringInstanceCompleted
-			? { recurringInstanceCompleted: result.recurringInstanceCompleted }
-			: undefined;
-		const updatedReminder: Reminder & { contentHash: string } = {
-			id: reminder.id,
-			content: reminder.content,
-			completed: result.completed,
-			priority: reminder.priority,
-			project: reminder.project || 'Inbox',
-			dueDate: result.dueDate,
-			dueDatetime: result.dueDatetime,
-			recurrence: result.recurrence,
-			contentHash: generateContentHash(reminder.content),
-		};
-		triggerReminderChange(context, updatedReminder, 'update', changeContext);
 	} catch (error) {
 		context.index.clearOptimistic(reminder.id);
 		throw error;

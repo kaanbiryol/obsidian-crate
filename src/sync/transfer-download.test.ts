@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeHash } from './hasher';
-import { parallelDownloadAndSaveFiles, processDiff, saveDownloadedContent } from './transfer';
+import { downloadAndSaveFile } from './transfer-download';
+import { parallelDownloadAndSaveFiles, processDiff } from './transfer';
 import { createNamedAbortError, createTransferHarness, emptyResult } from './transfer-test-harness';
 
 const conflictMocks = vi.hoisted(() => ({
@@ -21,7 +22,9 @@ describe('transfer download/process helpers', () => {
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		const content = new TextEncoder().encode('hello').buffer as ArrayBuffer;
 
-		await saveDownloadedContent(harness.context, 'notes/a.md', content);
+		const hash = await computeHash(content);
+		harness.api.downloadFile.mockResolvedValue({ content, size: 5, hash, revision: 'revision-1' });
+		await downloadAndSaveFile(harness.context, { path: 'notes/a.md', expectedLocalHash: null, expectedRemoteHash: hash, remoteSize: 5 }, emptyResult());
 
 		expect(harness.vault.createFolder).toHaveBeenCalledWith('notes');
 		expect(harness.vault.createBinary).toHaveBeenCalledWith('notes/a.md', content);
@@ -224,7 +227,7 @@ describe('transfer download/process helpers', () => {
 		});
 
 		const result = emptyResult();
-		await parallelDownloadAndSaveFiles(harness.context, ['good.md', 'bad.md'], result, 5);
+		await parallelDownloadAndSaveFiles(harness.context, [{ path: 'good.md', expectedLocalHash: null, expectedRemoteHash: await computeHash(okContent.buffer), remoteSize: 2 }, { path: 'bad.md', expectedLocalHash: null, expectedRemoteHash: 'missing', remoteSize: 2 }], result, 5);
 
 		expect(result.downloaded).toBe(1);
 		expect(result.errors).toContain('bad.md: File not found');
@@ -312,7 +315,7 @@ describe('transfer download/process helpers', () => {
 		});
 
 		const result = emptyResult();
-		await parallelDownloadAndSaveFiles(harness.context, ['fallback.md'], result, 5);
+		await parallelDownloadAndSaveFiles(harness.context, [{ path: 'fallback.md', expectedLocalHash: null, expectedRemoteHash: await computeHash(new TextEncoder().encode('ok').buffer), remoteSize: 2 }], result, 5);
 
 		expect(harness.api.downloadFile).toHaveBeenCalledWith('fallback.md');
 		expect(result.downloaded).toBe(1);
@@ -324,7 +327,7 @@ describe('transfer download/process helpers', () => {
 
 		const result = emptyResult();
 		await expect(
-			parallelDownloadAndSaveFiles(harness.context, ['aborted.md'], result, 5),
+			parallelDownloadAndSaveFiles(harness.context, [{ path: 'aborted.md', expectedLocalHash: null, expectedRemoteHash: 'remote', remoteSize: 2 }], result, 5),
 		).rejects.toMatchObject({ name: 'AbortError' });
 
 		expect(harness.api.downloadFile).not.toHaveBeenCalled();

@@ -1,3 +1,4 @@
+import type { DownloadRequest } from './transfer-download';
 import { describe, expect, it, vi } from 'vitest';
 import type { PreparedUpload, SyncResult } from './types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
@@ -56,8 +57,8 @@ it('chunks more than one server batch of local deletes', async () => {
 			getManifest: vi.fn(() => ({ version: 1, files: {} })),
 		};
 		const batchDelete = vi.fn(async (paths: string[]) => ({ success: true, deleted: paths }));
-		const parallelDownloadAndSaveFiles = vi.fn(async (paths: string[], result: SyncResult) => {
-			result.downloaded += paths.length;
+		const parallelDownloadAndSaveFiles = vi.fn(async (requests: DownloadRequest[], result: SyncResult) => {
+			result.downloaded += requests.length;
 		});
 		const uploadPreparedFiles = vi.fn(async (prepared: PreparedUpload[], _result: SyncResult) => {
 			expect(prepared).toEqual([]);

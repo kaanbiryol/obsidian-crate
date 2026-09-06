@@ -1,7 +1,7 @@
 import { runNotificationCoordinator } from '../notification-coordinator';
 import type { Env } from '../types';
 import { changedRows } from '../db';
-import { parseJsonObject, parseNonNegativeInteger, parseOptionalString } from '../utils';
+import { parseJsonObject, parseOptionalString } from '../utils';
 import { listPushSubscriptionIds, sendToAllSubscriptions } from './push';
 
 interface ReminderData {
@@ -10,7 +10,6 @@ interface ReminderData {
 	content: string;
 	project?: string;
 	dueDatetime: string;
-	priority?: number;
 }
 
 interface ScheduledReminderRow {
@@ -98,9 +97,6 @@ export class ReminderAlarm implements DurableObject {
 			const project = parsedBody.value.project === undefined
 				? undefined
 				: parseOptionalString(parsedBody.value.project, 256) || undefined;
-			const priority = parsedBody.value.priority === undefined
-				? undefined
-				: parseNonNegativeInteger(parsedBody.value.priority) ?? undefined;
 			if (!reminderId || !content || !dueDatetime) {
 				return new Response(JSON.stringify({ error: 'Invalid reminder payload' }), { status: 400 });
 			}
@@ -110,14 +106,9 @@ export class ReminderAlarm implements DurableObject {
 				return new Response(JSON.stringify({ error: 'Invalid dueDatetime' }), { status: 400 });
 			}
 			const jobToken = parseOptionalString(parsedBody.value.jobToken, 128);
-			if (alarmTime.getTime() <= Date.now() && !jobToken) {
-				return new Response(JSON.stringify({ error: 'dueDatetime must be in the future' }), { status: 400 });
-			}
-
-			if (jobToken) {
-				const current = await this.env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'schedule'").bind(reminderId).first<{ job_token: string }>();
-				if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
-			}
+			if (!jobToken) return new Response(JSON.stringify({ error: 'jobToken required' }), { status: 400 });
+			const current = await this.env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'schedule'").bind(reminderId).first<{ job_token: string }>();
+			if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
 			// A completed occurrence survives transient schedule cleanup. Replaying
 			// an accepted job (or reprojecting the same due time) cannot notify twice.
 			if (await this.state.storage.get<string>(COMPLETED_OCCURRENCE_KEY) === dueDatetime) {
@@ -130,11 +121,10 @@ export class ReminderAlarm implements DurableObject {
 			const sameOccurrence = snapshot.reminder?.dueDatetime === dueDatetime;
 			const body: ReminderData = {
 				reminderId,
-				scheduleToken: jobToken ?? crypto.randomUUID(),
+				scheduleToken: jobToken,
 				content,
 				dueDatetime,
 				project,
-				priority,
 			};
 			try {
 				if (!sameOccurrence) await Promise.all([
@@ -153,9 +143,9 @@ export class ReminderAlarm implements DurableObject {
 				const saved = await this.env.DB.prepare(
 					`INSERT OR REPLACE INTO scheduled_reminders
 						(reminder_id, schedule_token, content, project, due_datetime, delivery_failed_at, delivery_error, delivery_attempts)
-						SELECT ?, ?, ?, ?, ?, ?, ?, ? ${jobToken ? "WHERE EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'schedule')" : ''}`,
-				).bind(reminderId, body.scheduleToken, content, project ?? null, dueDatetime, failure?.failedAt ?? null, failure?.error ?? null, failure?.attempts ?? null, ...(jobToken ? [reminderId, jobToken] : [])).run();
-				if (jobToken && changedRows(saved) !== 1) {
+						SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'schedule')`,
+				).bind(reminderId, body.scheduleToken, content, project ?? null, dueDatetime, failure?.failedAt ?? null, failure?.error ?? null, failure?.attempts ?? null, reminderId, jobToken).run();
+				if (changedRows(saved) !== 1) {
 					await this.restoreSnapshot(snapshot);
 					return new Response(JSON.stringify({ success: true, superseded: true }));
 				}
@@ -171,17 +161,16 @@ export class ReminderAlarm implements DurableObject {
 			if (!reminderId) {
 				return new Response(JSON.stringify({ error: 'reminderId required' }), { status: 400 });
 			}
-			const jobToken = new URL(request.url).searchParams.get('jobToken');
+			const jobToken = parseOptionalString(new URL(request.url).searchParams.get('jobToken'), 128);
+			if (!jobToken) return new Response(JSON.stringify({ error: 'jobToken required' }), { status: 400 });
 			try {
-				if (jobToken) {
-					const current = await this.env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'cancel'").bind(reminderId).first<{ job_token: string }>();
-					if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
-				}
-				const deleted = await this.env.DB.prepare(`DELETE FROM scheduled_reminders WHERE reminder_id = ? ${jobToken ? "AND EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'cancel')" : ''}`)
-					.bind(reminderId, ...(jobToken ? [reminderId, jobToken] : [])).run();
-				if (jobToken && changedRows(deleted) === 0) {
+				const current = await this.env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'cancel'").bind(reminderId).first<{ job_token: string }>();
+				if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
+				const deleted = await this.env.DB.prepare(`DELETE FROM scheduled_reminders WHERE reminder_id = ? AND EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'cancel')`)
+					.bind(reminderId, reminderId, jobToken).run();
+				if (changedRows(deleted) === 0) {
 					const current = await this.env.DB.prepare('SELECT job_token FROM notification_jobs WHERE reminder_id = ?').bind(reminderId).first<{ job_token: string }>();
-					if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
+				if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
 				}
 				await this.state.storage.deleteAlarm();
 				await this.clearScheduleState();
@@ -189,12 +178,6 @@ export class ReminderAlarm implements DurableObject {
 				return new Response(JSON.stringify({ error: 'Failed to cancel reminder schedule' }), { status: 500 });
 			}
 			return new Response(JSON.stringify({ success: true }));
-		}
-
-		if (method === 'GET') {
-			const reminder = await this.state.storage.get<ReminderData>('reminder');
-			const alarm = await this.state.storage.getAlarm();
-			return new Response(JSON.stringify({ reminder, alarmTime: alarm }));
 		}
 
 		return new Response('Method not allowed', { status: 405 });

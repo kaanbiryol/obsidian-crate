@@ -111,18 +111,4 @@ describe('PWA acknowledgement and concurrency', () => {
 		await retry;
 		expect(closeModal).toHaveBeenCalledOnce();
 	});
-	it('reconciles an older stored draft whose original command was not retained', async () => {
-		const { hook, requests, closeModal } = harness();
-		const modal: ModalState = { mode: 'create', operationId: crypto.randomUUID(), draft: { content: 'Later correction', description: '', project: 'Inbox', defaultProject: 'Inbox', priority: 4, dueDate: '', dueTime: '', activePicker: null, deleteConfirm: false } };
-		const save = hook.saveReminder(modal);
-		await vi.waitFor(() => expect(requests).toHaveLength(1));
-		const committedReminder = { id: modal.operationId, content: 'Earlier commit', project: 'Inbox', revision: 'base', filePath: 'Reminders/Inbox.md' };
-		requests[0]!.resolve(new Response(JSON.stringify({ code: 'operation_mismatch', committedReminder }), { status: 409 }));
-		await vi.waitFor(() => expect(requests).toHaveLength(2));
-		expect(requests[1]!.body).toMatchObject({ id: committedReminder.id, expectedRevision: 'base', content: 'Later correction' });
-		expect(requests[1]!.body.operationId).not.toBe(requests[0]!.body.operationId);
-		requests[1]!.resolve(new Response(JSON.stringify({ reminder: { ...committedReminder, content: 'Later correction' } })));
-		await save;
-		expect(closeModal).toHaveBeenCalledOnce();
-	});
 });

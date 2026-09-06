@@ -42,15 +42,15 @@ function openCacheDatabase(): Promise<IDBDatabase> {
 		}
 
 		const request = indexedDB.open(CACHE_DATABASE_NAME, CACHE_DATABASE_VERSION);
-		request.onupgradeneeded = () => {
-			if (!request.result.objectStoreNames.contains(CACHE_STORE_NAME)) {
-				request.result.createObjectStore(CACHE_STORE_NAME, { keyPath: 'folderPath' });
-			}
-			if (!request.result.objectStoreNames.contains(FRESHNESS_STORE_NAME)) {
-				request.result.createObjectStore(FRESHNESS_STORE_NAME, { keyPath: 'folderPath' });
-			}
+		request.onupgradeneeded = event => {
+			if (event.oldVersion !== 0) { request.transaction?.abort(); return; }
+			request.result.createObjectStore(CACHE_STORE_NAME, { keyPath: 'folderPath' });
+			request.result.createObjectStore(FRESHNESS_STORE_NAME, { keyPath: 'folderPath' });
 		};
-		request.onsuccess = () => resolve(request.result);
+		request.onsuccess = () => {
+			request.result.onversionchange = () => request.result.close();
+			resolve(request.result);
+		};
 		request.onerror = () => reject(request.error ?? new Error('Could not open reminder cache'));
 	});
 }
@@ -124,18 +124,11 @@ export async function saveCachedReminderSnapshot(
 export async function clearCachedReminderSnapshots(): Promise<void> {
 	cacheGeneration += 1;
 	try {
-		const database = await openCacheDatabase();
-		try {
-			await new Promise<void>((resolve, reject) => {
-				const transaction = database.transaction([CACHE_STORE_NAME, FRESHNESS_STORE_NAME], 'readwrite');
-				transaction.objectStore(CACHE_STORE_NAME).clear();
-				transaction.objectStore(FRESHNESS_STORE_NAME).clear();
-				transaction.oncomplete = () => resolve();
-				transaction.onerror = () => reject(transaction.error ?? new Error('Could not clear reminder cache'));
-			});
-		} finally {
-			database.close();
-		}
+		await new Promise<void>((resolve, reject) => {
+			const request = indexedDB.deleteDatabase(CACHE_DATABASE_NAME);
+			request.onsuccess = () => resolve();
+			request.onerror = () => reject(request.error ?? new Error('Could not clear reminder cache'));
+		});
 	} catch {
 		// Offline caching is best effort.
 	}

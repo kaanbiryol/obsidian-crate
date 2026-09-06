@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
-import { prepareUploadFromPath, prepareUploadFromVaultFile } from './transfer';
+import { prepareUploadFromPath, prepareUploadFromVaultFile } from './transfer-prepare';
 import { HIDDEN_CONFIG_PATH, createTransferHarness } from './transfer-test-harness';
 
 describe('transfer prepare helpers', () => {

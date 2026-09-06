@@ -28,17 +28,15 @@ function createHarness() {
 		removeFile: vi.fn(),
 		renameFile: vi.fn(),
 	};
-	const onIndexChanged = vi.fn(async () => undefined);
 	const watcher = new VaultWatcher(
 		{ app: { vault } } as never,
 		index as never,
-		onIndexChanged,
 	);
 	watcher.register();
-	return { handlers, index, onIndexChanged, vault, watcher };
+	return { handlers, index, vault, watcher };
 }
 
-describe('VaultWatcher notification reconciliation', () => {
+describe('VaultWatcher', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		vi.stubGlobal('window', { clearTimeout, setTimeout });
@@ -49,8 +47,8 @@ describe('VaultWatcher notification reconciliation', () => {
 		vi.unstubAllGlobals();
 	});
 
-	it('reconciles notifications after a reminder file is rescanned', async () => {
-		const { handlers, index, onIndexChanged } = createHarness();
+	it('rescans a modified reminder file', async () => {
+		const { handlers, index } = createHarness();
 		const file = createMarkdownFile('Reminders/Work.md');
 
 		handlers.get('modify')?.(file as never);
@@ -58,17 +56,16 @@ describe('VaultWatcher notification reconciliation', () => {
 		await vi.runAllTimersAsync();
 
 		expect(index.rescanFile).toHaveBeenCalledWith(file);
-		expect(onIndexChanged).toHaveBeenCalledTimes(1);
 	});
 
 	it('cancels queued work when unregistered', async () => {
-		const { handlers, onIndexChanged, vault, watcher } = createHarness();
+		const { handlers, index, vault, watcher } = createHarness();
 
 		handlers.get('modify')?.(createMarkdownFile('Reminders/Work.md') as never);
 		watcher.unregister();
 		await vi.runAllTimersAsync();
 
 		expect(vault.offref).toHaveBeenCalledTimes(4);
-		expect(onIndexChanged).not.toHaveBeenCalled();
+		expect(index.rescanFile).not.toHaveBeenCalled();
 	});
 });

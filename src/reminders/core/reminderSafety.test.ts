@@ -16,9 +16,9 @@ const rule = { frequency: 'daily' as const, timezone: 'America/New_York', hour: 
 
 describe('reminder editing boundaries', () => {
 	it.each(['title', 'description'])('rejects stale plugin update, completion, and delete after a %s edit', field => {
-		const old = '- [ ] Task <!-- crate-id:one -->\n<!-- crate-desc:old -->\n';
+		const old = '- [ ] Task <!-- crate-id:one -->\n<!-- crate-desc:v1:old -->\n';
 		const stale = record(old);
-		const current = field === 'title' ? old.replace('Task', 'New title') : old.replace('crate-desc:old', 'crate-desc:new');
+		const current = field === 'title' ? old.replace('Task', 'New title') : old.replace('crate-desc:v1:old', 'crate-desc:v1:new');
 		expect(() => replaceUpdatedReminderBlock(current, stale, buildUpdatedReminderBlock(stale, { priority: 1 }))).toThrow('changed');
 		expect(() => setReminderCompletionInContent(current, stale, true)).toThrow('changed');
 		expect(() => deleteReminderBlockFromContent(current, stale)).toThrow('changed');
@@ -67,7 +67,7 @@ describe('canonical reminder dates', () => {
 		const draft = buildModalDraft(reminder, null);
 		draft.content = draft.content.replace('Task', 'Edited');
     Object.assign(draft, deriveDraftPatchFromContent(draft, ['Inbox']));
-		const body = buildReminderMutationBody({ config: { folderPath: 'Reminders', allDayNotificationTime: null }, draft, mode: 'edit', projects: ['Inbox'], selectedProject: null });
+		const body = buildReminderMutationBody({ config: { folderPath: 'Reminders' }, draft, mode: 'edit', projects: ['Inbox'], selectedProject: null });
 		expect(body.recurrence).toEqual(rule);
 		expect(body.dueDatetime).toBe('2099-03-01T14:00:00.000Z');
 	});
@@ -83,7 +83,7 @@ it.each(['2099-03-01T14:00:37.123Z', '2026-11-01T06:30:37.123Z'])('preserves exa
   const draft = buildModalDraft(reminder, null);
   draft.content = draft.content.replace('Task', 'Edited');
   Object.assign(draft, deriveDraftPatchFromContent(draft, ['Inbox']));
-  const body = buildReminderMutationBody({ config: { folderPath: 'Reminders', allDayNotificationTime: null }, draft, mode: 'edit', projects: ['Inbox'], selectedProject: null });
+  const body = buildReminderMutationBody({ config: { folderPath: 'Reminders' }, draft, mode: 'edit', projects: ['Inbox'], selectedProject: null });
   expect(body.dueDatetime).toBe(instant);
   const submission = buildReminderSubmission({ content: draft.content, description: '', projects: ['Inbox'], priority: 4, project: 'Inbox', dueDate: instant, hasTime: true, reminder });
   expect(submission?.updatedReminder?.dueDatetime).toBe(instant);

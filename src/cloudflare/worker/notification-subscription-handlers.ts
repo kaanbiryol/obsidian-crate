@@ -1,12 +1,10 @@
 import { isValidPushEndpoint } from './notifications/push-endpoint';
-import { sha256Hex } from './auth';
 import { corsResponse } from './cors';
 import { changedRows, queryRows } from './db';
 import { sendToAllSubscriptions } from './push';
-import { purgeExpiredPushEnrollmentTokens } from './push-enrollment';
 import { parseJsonObject, parseOptionalString } from './utils';
 
-export async function handleSubscribe(request: Request, db: D1Database, ownerTokenId?: string): Promise<Response> {
+export async function handleSubscribe(request: Request, db: D1Database, ownerTokenId: string): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -35,22 +33,16 @@ export async function handleSubscribe(request: Request, db: D1Database, ownerTok
 	}
 
 	const id = crypto.randomUUID();
-	const enrollmentToken = request.headers.get('X-Crate-Enrollment-Token')?.trim() || '';
-	const tokenHash = enrollmentToken ? await sha256Hex(enrollmentToken) : null;
-	const owner = ownerTokenId ?? (tokenHash ? `enrollment:${tokenHash}` : null);
-	if (!owner) return corsResponse({ error: 'Authenticated subscription owner required' }, 401);
-	if (tokenHash) await purgeExpiredPushEnrollmentTokens(db);
-	const gate = tokenHash ? 'AND EXISTS (SELECT 1 FROM push_enrollment_tokens WHERE token_hash = ? AND expires_at > ?)' : '';
 	const insert = db.prepare(`INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name, owner_token_id, folder_path)
 		SELECT ?, ?, ?, ?, ?, ?, (SELECT folder_path FROM auth_tokens WHERE id = ?)
 		WHERE ((SELECT COUNT(*) FROM push_subscriptions) < 20 OR EXISTS (SELECT 1 FROM push_subscriptions WHERE endpoint = ? AND owner_token_id = ?))
-		AND ((SELECT COUNT(*) FROM push_subscriptions WHERE owner_token_id = ?) < 5 OR EXISTS (SELECT 1 FROM push_subscriptions WHERE endpoint = ? AND owner_token_id = ?)) ${gate}
+		AND ((SELECT COUNT(*) FROM push_subscriptions WHERE owner_token_id = ?) < 5 OR EXISTS (SELECT 1 FROM push_subscriptions WHERE endpoint = ? AND owner_token_id = ?))
 		ON CONFLICT(endpoint) DO UPDATE SET id = excluded.id, p256dh = excluded.p256dh, auth = excluded.auth,
 		device_name = excluded.device_name, disabled_at = NULL, last_error = NULL
 		WHERE push_subscriptions.owner_token_id = excluded.owner_token_id`)
-		.bind(id, endpoint, p256dh, auth, deviceName, owner, owner, endpoint, owner, owner, endpoint, owner, ...(tokenHash ? [tokenHash, Date.now()] : []));
-	const results = await db.batch([insert, ...(tokenHash ? [db.prepare('DELETE FROM push_enrollment_tokens WHERE token_hash = ? AND changes() = 1').bind(tokenHash)] : [])]);
-	if (changedRows(results[0]) !== 1) return corsResponse({ error: 'Subscription limit reached, endpoint already enrolled, or enrollment expired. Remove an old device or open a fresh link.' }, 429);
+		.bind(id, endpoint, p256dh, auth, deviceName, ownerTokenId, ownerTokenId, endpoint, ownerTokenId, ownerTokenId, endpoint, ownerTokenId);
+	const result = await insert.run();
+	if (changedRows(result) !== 1) return corsResponse({ error: 'Subscription limit reached or endpoint already enrolled. Remove an old device before trying again.' }, 429);
 	return corsResponse({ id });
 }
 

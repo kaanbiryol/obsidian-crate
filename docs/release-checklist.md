@@ -30,8 +30,8 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 - [ ] Restarted Obsidian and completed a normal sync.
 - [ ] Disconnected and reconnected the device without creating duplicate Cloudflare resources.
 - [ ] Joining from an older plugin did not upload or downgrade the Worker.
-- [ ] An old PWA/plugin could read but could not mutate the protocol-3 deployment.
-- [ ] An interrupted Unicode backfill resumed safely; a collision left writes fenced.
+- [ ] An old PWA/plugin could read but could not mutate the protocol-4 deployment.
+- [ ] An unsupported database was rejected without modification; interrupted current-schema initialization retried safely.
 - [ ] Authorized a server update and confirmed the existing Worker, D1 database, R2 bucket, and Durable Objects were reused.
 - [ ] Confirmed the inactive-R2 error gives actionable setup guidance.
 

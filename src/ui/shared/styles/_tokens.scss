@@ -48,12 +48,6 @@
   --crate-picker-primary-bg: var(--interactive-accent);
   --crate-picker-primary-color: var(--text-on-accent);
 
-  /* Compatibility aliases for existing shared components. */
-  --crate-surface-bg: var(--crate-panel-bg);
-  --crate-surface-hover-bg: var(--crate-control-hover-bg);
-  --crate-surface-active-bg: var(--crate-control-active-bg);
-  --crate-surface-border: var(--crate-divider);
-  --crate-surface-border-hover: var(--crate-divider-strong);
 
   /* Shared reminder chrome uses host surfaces with consistent states. */
   --crate-reminder-card-bg: var(--crate-panel-bg);
@@ -110,19 +104,19 @@
   --reminder-p3-border: var(--crate-accent);
   --reminder-p3-border-hover: color-mix(in srgb, var(--crate-accent) 50%, transparent);
   --reminder-p3-background: color-mix(in srgb, var(--crate-accent) 10%, transparent);
-  --reminder-p4-border: var(--crate-surface-border);
-  --reminder-p4-border-hover: var(--crate-surface-border-hover);
+  --reminder-p4-border: var(--crate-divider);
+  --reminder-p4-border-hover: var(--crate-divider-strong);
   --reminder-p4-background: unset;
   --reminder-red: var(--crate-danger);
-  --reminder-task-separator-color: var(--crate-surface-border);
+  --reminder-task-separator-color: var(--crate-divider);
   --color-p1-bg: color-mix(in srgb, var(--crate-danger) 10%, transparent);
   --color-p1-border: var(--crate-danger);
   --color-p2-bg: color-mix(in srgb, var(--crate-warning) 10%, transparent);
   --color-p2-border: var(--crate-warning);
   --color-p3-bg: color-mix(in srgb, var(--crate-accent) 10%, transparent);
   --color-p3-border: var(--crate-accent);
-  --color-p4-bg: var(--crate-surface-bg);
-  --color-p4-border: var(--crate-surface-border);
+  --color-p4-bg: var(--crate-panel-bg);
+  --color-p4-border: var(--crate-divider);
   --color-primary: var(--crate-accent);
   --color-primary-hover: var(--crate-accent-hover);
   --color-reminder-red: var(--crate-danger);

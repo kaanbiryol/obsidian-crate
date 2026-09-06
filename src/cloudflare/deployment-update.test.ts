@@ -49,7 +49,7 @@ describe('isCloudflareServerUpdateAvailable', () => {
 		}), embedded)).toBe(false);
 	});
 
-	it('does not offer to downgrade a newer legacy server without a fingerprint', () => {
+	it('does not offer to downgrade a newer server without a fingerprint', () => {
 		expect(isCloudflareServerUpdateAvailable(createDeployment({
 			lastDeployedVersion: '0.2.0',
 			lastDeployedFingerprint: null,

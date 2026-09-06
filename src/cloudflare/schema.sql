@@ -1,10 +1,8 @@
-CREATE TABLE IF NOT EXISTS d1_migrations (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	name TEXT NOT NULL UNIQUE,
-	applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+CREATE TABLE IF NOT EXISTS crate_schema (
+ id INTEGER PRIMARY KEY CHECK (id = 1),
+ version INTEGER NOT NULL
 );
-
-INSERT OR IGNORE INTO d1_migrations (name) VALUES ('0001_initial.sql');
+INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 1);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,7 +76,7 @@ CREATE TABLE IF NOT EXISTS vapid_keys (
 );
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
-	owner_token_id TEXT,
+	owner_token_id TEXT NOT NULL,
 	folder_path TEXT,
 	id TEXT PRIMARY KEY,
 	endpoint TEXT NOT NULL,
@@ -89,14 +87,6 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 	disabled_at TEXT,
 	last_error TEXT
 );
-
-CREATE TABLE IF NOT EXISTS push_enrollment_tokens (
-	token_hash TEXT PRIMARY KEY,
-	expires_at INTEGER NOT NULL,
-	created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE INDEX IF NOT EXISTS push_enrollment_tokens_expires_at_idx ON push_enrollment_tokens(expires_at);
 
 CREATE TABLE IF NOT EXISTS web_enrollment_tokens (
 	folder_path TEXT,

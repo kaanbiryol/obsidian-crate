@@ -10,7 +10,7 @@ import {
 	getInitialProjectFileContent,
 	getProjectFilePath,
 } from '../file-content';
-import { syncReminderNotification } from '../notifications';
+import { projectReminderNotifications } from '../notifications';
 import {
 	hasNonEmptyStringValue,
 	parseProjectPath,
@@ -84,9 +84,7 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 		reminderOperationEffects(env.DB, operation, response, reminderId));
 	await saveReminderFileCache(env.DB, workspaceResult.folderPath, filePath, write.hash, reminders);
 
-	const notificationWarning = reminder
-		? await syncReminderNotification(env, reminder, workspaceResult.allDayNotificationTime)
-		: undefined;
+	const notificationWarning = await projectReminderNotifications(env);
 	return corsResponse({
 		success: true,
 		reminder: reminder ? await toReminderPayload(reminder) : undefined,

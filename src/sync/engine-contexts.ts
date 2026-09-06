@@ -28,7 +28,7 @@ interface SyncEngineContextDependencies {
 	getLocalChanges: () => Promise<{ path: string; hash: string }[]>;
 	getLocalDeletes: () => Promise<string[]>;
 	incrementalSync: (progressCallback?: (current: number, total: number) => void) => Promise<SyncResult | null>;
-	parallelDownloadAndSaveFiles: (requests: string[] | DownloadRequest[], result: SyncResult) => Promise<void>;
+	parallelDownloadAndSaveFiles: (requests: DownloadRequest[], result: SyncResult) => Promise<void>;
 	processDiff: (diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult) => Promise<DiffApplyOutcome>;
 	prepareUploadFromPath: (path: string) => Promise<PreparedUpload | null>;
 	uploadPreparedFiles: (

@@ -1,7 +1,7 @@
 import { discardReminderDraft, saveReminderDraft } from './reminder-drafts';
 import type { ApiFetch, ModalState, ReminderMutationBody, ReminderRecord } from './types';
 
-interface SaveResult { reminder: ReminderRecord; notificationWarning?: string; differentRequest?: boolean }
+interface SaveResult { reminder: ReminderRecord; notificationWarning?: string }
 class RejectedSave extends Error {}
 
 function draftKey({ draft }: ModalState): string {
@@ -13,11 +13,8 @@ async function submit(apiFetch: ApiFetch, pending: NonNullable<ModalState['pendi
 	const response = await apiFetch(pending.path, { method: 'POST', body: pending.body });
 	if (!response.ok) {
 		const text = await response.text();
-		let error: { code?: string; error?: string; committedReminder?: ReminderRecord } = {};
+		let error: { code?: string; error?: string } = {};
 		try { error = JSON.parse(text) as typeof error; } catch { /* A proxy may return plain text. */ }
-		if (response.status === 409 && error.code === 'operation_mismatch' && error.committedReminder) {
-			return { reminder: error.committedReminder, differentRequest: true };
-		}
 		// A definite rejection did not commit. Let corrected input retry with the
 		// same operation/create identity; ambiguous transport failures stay pinned.
 		if ([400, 403, 404, 409, 413, 428].includes(response.status) && error.code !== 'operation_mismatch') throw new RejectedSave(error.error ?? text);
@@ -46,7 +43,7 @@ export async function saveReminderCommand(modal: ModalState, input: ReminderMuta
 	try {
 		const pending = modal.pendingSave ?? prepare(modal, input);
 		const result = await submit(apiFetch, pending);
-		if (!sessionCurrent() || !result.differentRequest && pending.draftKey === draftKey(modal)) return result;
+		if (!sessionCurrent() || pending.draftKey === draftKey(modal)) return result;
 
 		// Acknowledge the original before expressing later edits as a new command.
 		// A stale receipt base still conflicts with intervening third-party edits.
@@ -57,10 +54,10 @@ export async function saveReminderCommand(modal: ModalState, input: ReminderMuta
 		modal.expectedRevision = result.reminder.revision;
 		modal.operationId = crypto.randomUUID();
 		delete modal.pendingSave;
-		if (!result.differentRequest && input.dueDatetime === pending.input.dueDatetime && input.dueDate === pending.input.dueDate) {
+		if (input.dueDatetime === pending.input.dueDatetime && input.dueDate === pending.input.dueDate) {
 			input = { ...input, dueDatetime: result.reminder.dueDatetime ?? null, dueDate: result.reminder.dueDate ?? null };
 		}
-		if (!result.differentRequest && JSON.stringify(input.recurrence ?? null) === JSON.stringify(pending.input.recurrence ?? null)) {
+		if (JSON.stringify(input.recurrence ?? null) === JSON.stringify(pending.input.recurrence ?? null)) {
 			input = { ...input, recurrence: result.reminder.recurrence ?? null };
 		}
 		return await submit(apiFetch, prepare(modal, input));

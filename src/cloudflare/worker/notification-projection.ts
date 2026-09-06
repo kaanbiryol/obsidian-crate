@@ -42,7 +42,7 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
         const schedule = policy.enabled !== false && !reminder.completed && dueDatetime && (Date.parse(dueDatetime) > Date.now()
           || scheduled.get(reminder.id) === dueDatetime && Date.parse(dueDatetime) > Date.now() - 86_400_000);
         return { id: reminder.id, operation: schedule ? 'schedule' : 'cancel', payload: schedule ? {
-          reminderId: reminder.id, content: reminder.content, project: reminder.project, dueDatetime, priority: reminder.priority,
+          reminderId: reminder.id, content: reminder.content, project: reminder.project, dueDatetime,
         } : null };
       });
       const json = JSON.stringify(operations);

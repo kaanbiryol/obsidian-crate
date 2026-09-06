@@ -12,7 +12,7 @@ type SyncRuntimeTarget = {
 };
 
 const initializeReminders = vi.fn();
-const reconcileReminderNotifications = vi.fn();
+const ensureReminderNotificationPolicy = vi.fn();
 const initializeSyncManagers = vi.fn<(target: SyncRuntimeTarget) => void>();
 const registerSyncCommands = vi.fn();
 const registerVaultSyncEventHandlers = vi.fn();
@@ -75,7 +75,7 @@ async function loadLifecycleModule() {
 	}));
 	vi.doMock('../reminders/plugin-integration', () => ({
 		initializeReminders,
-		reconcileReminderNotifications,
+		ensureReminderNotificationPolicy,
 	}));
 	vi.doMock('../sync/plugin-integration', () => ({
 		initializeSyncManagers,
@@ -122,7 +122,7 @@ beforeEach(() => {
 	}) => {
 		target.reminderIndex ??= { load: vi.fn(async () => undefined) };
 	});
-	reconcileReminderNotifications.mockReset();
+	ensureReminderNotificationPolicy.mockReset();
 	initializeSyncManagers.mockReset();
 	registerSyncCommands.mockReset();
 	registerVaultSyncEventHandlers.mockReset();
@@ -174,7 +174,7 @@ describe('bootstrapPlugin', () => {
 		expect(registerSyncCommands).toHaveBeenCalledWith(plugin);
 		expect(initializeReminders).toHaveBeenCalledWith(plugin);
 		await vi.waitFor(() => {
-			expect(reconcileReminderNotifications).toHaveBeenCalledWith(plugin);
+			expect(ensureReminderNotificationPolicy).toHaveBeenCalledWith(plugin);
 		});
 		expect(createCloudflareDeploymentService).toHaveBeenCalledWith(plugin);
 		expect(showCloudflareServerUpdateNotice).toHaveBeenCalledWith(plugin);
@@ -239,7 +239,7 @@ describe('bootstrapPlugin', () => {
 		await Promise.resolve();
 
 		expect(initializeReminders).not.toHaveBeenCalled();
-		expect(reconcileReminderNotifications).not.toHaveBeenCalled();
+		expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
 
 		const remindersHandler = plugin.registerObsidianProtocolHandler.mock.calls.find(
 			([name]) => name === 'crate-reminders',
@@ -253,7 +253,7 @@ describe('bootstrapPlugin', () => {
 		);
 	});
 
-	it('reloads the reminder index and reconciles only after startup sync finishes', async () => {
+	it('reloads the reminder index and initializes policy only after startup sync finishes', async () => {
 		const { bootstrapPlugin } = await loadLifecycleModule();
 		let finishStartupSync!: (ran: boolean) => void;
 		const startupSync = new Promise<boolean>((resolve) => {
@@ -275,15 +275,15 @@ describe('bootstrapPlugin', () => {
 		await bootstrapPlugin(plugin as never);
 
 		expect(reminderIndexLoad).not.toHaveBeenCalled();
-		expect(reconcileReminderNotifications).not.toHaveBeenCalled();
+		expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
 
 		finishStartupSync(true);
 		await vi.waitFor(() => {
 			expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
-			expect(reconcileReminderNotifications).toHaveBeenCalledWith(plugin);
+			expect(ensureReminderNotificationPolicy).toHaveBeenCalledWith(plugin);
 		});
 		expect(reminderIndexLoad.mock.invocationCallOrder[0]).toBeLessThan(
-			reconcileReminderNotifications.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+			ensureReminderNotificationPolicy.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
 		);
 	});
 
@@ -316,7 +316,7 @@ describe('bootstrapPlugin', () => {
 
 		expect(syncDestroy).toHaveBeenCalledTimes(1);
 		expect(reminderIndexLoad).not.toHaveBeenCalled();
-		expect(reconcileReminderNotifications).not.toHaveBeenCalled();
+		expect(ensureReminderNotificationPolicy).not.toHaveBeenCalled();
 	});
 
 	it('restores a managed Worker URL when an earlier save kept only the scoped credential', async () => {

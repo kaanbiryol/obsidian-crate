@@ -48,8 +48,8 @@
 
     &:hover {
         color: var(--text-normal);
-        background: var(--crate-surface-hover-bg);
-        border-color: var(--crate-surface-border-hover);
+        background: var(--crate-control-hover-bg);
+        border-color: var(--crate-divider-strong);
         box-shadow: none;
 
         svg {

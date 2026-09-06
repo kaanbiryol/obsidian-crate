@@ -63,9 +63,9 @@
 
 // A parent and its children share one surface; the disclosure stays inside it.
 .reminders-view.is-browse .premium-project-group {
-    border: 1px solid var(--crate-project-card-border, var(--crate-surface-border));
+    border: 1px solid var(--crate-project-card-border, var(--crate-divider));
     border-radius: var(--crate-radius-card);
-    background: var(--crate-project-card-bg, var(--crate-surface-bg));
+    background: var(--crate-project-card-bg, var(--crate-panel-bg));
 
     > .premium-project-tree-row {
         .premium-project-content {
@@ -80,7 +80,7 @@
     }
 
     .premium-project-children > .premium-project-tree > li {
-        border-top: 1px solid var(--crate-surface-border);
+        border-top: 1px solid var(--crate-divider);
     }
 
     .premium-project-group-name {
@@ -91,7 +91,7 @@
         border-radius: var(--crate-radius-button);
         cursor: pointer;
 
-        &:hover { background: var(--crate-surface-hover-bg); }
+        &:hover { background: var(--crate-control-hover-bg); }
         &:focus-visible {
             outline: 2px solid var(--crate-focus-ring);
             outline-offset: -3px;
@@ -135,16 +135,16 @@
     padding: 14px 16px;
     border-radius: var(--crate-radius-card);
 
-    background: var(--crate-surface-bg);
-    border: 1px solid var(--crate-surface-border);
+    background: var(--crate-panel-bg);
+    border: 1px solid var(--crate-divider);
     box-shadow: var(--crate-elevation-card);
 
     transition: background var(--crate-motion-duration-moderate) var(--crate-motion-easing), border-color var(--crate-motion-duration-moderate) var(--crate-motion-easing), transform var(--crate-motion-duration-moderate) var(--crate-motion-easing);
 }
 
 .premium-project-card:hover .premium-project-content {
-    background: var(--crate-surface-hover-bg);
-    border-color: var(--crate-surface-border-hover);
+    background: var(--crate-control-hover-bg);
+    border-color: var(--crate-divider-strong);
 }
 
 .premium-project-card:active .premium-project-content {

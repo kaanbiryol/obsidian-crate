@@ -1,11 +1,9 @@
 import { deleteReminderBlockFromContent } from "../../core/markdownReminderFile";
 import type { IndexedReminder } from "../reminder-index";
-import { toReminder } from "../toReminder";
 import type { MarkdownWriterContext } from "./types";
 import {
   markdownWriterLog,
   notifyFileWritten,
-  triggerReminderChange,
 } from "./operation-shared";
 
 export async function deleteReminderInMarkdown(
@@ -35,7 +33,6 @@ export async function deleteReminderInMarkdown(
 
     markdownWriterLog.info(`Deleted reminder from ${reminder.filePath} at line ${deletedLineNumber}`);
     await notifyFileWritten(context, file);
-    triggerReminderChange(context, toReminder(reminder), "delete");
   } catch (error) {
     context.index.clearOptimistic(reminder.id);
     throw error;

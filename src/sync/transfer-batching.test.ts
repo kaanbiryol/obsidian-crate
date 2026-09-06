@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PreparedUpload } from './types';
-import { createBatchUploadChunks } from './transfer';
+import { createBatchUploadChunks } from './transfer-prepare';
 
 describe('batch upload chunking', () => {
 	it('respects file count limit', () => {

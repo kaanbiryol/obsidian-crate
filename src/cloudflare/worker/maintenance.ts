@@ -6,8 +6,6 @@ import { pruneExpiredTokens, recordMaintenanceRun } from './maintenance/database
 import { sweepOrphanedManagedObjects } from './maintenance/orphan-sweep';
 
 export async function runScheduledMaintenance(env: Env): Promise<void> {
-	const migration = await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'portable_paths_ready'").first<{ value: string }>();
-	if (migration?.value === 'false') return;
 	const errors: string[] = [];
 	const tasks: Array<[string, () => Promise<unknown>]> = [
 		['expire file versions', () => enqueueExpiredFileVersions(env.DB)],
