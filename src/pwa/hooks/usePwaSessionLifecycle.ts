@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { invalidatePwaSession } from '../session-generation';
 import { clearReminderDrafts } from '../reminder-drafts';
-import { AUTH_TOKEN_KEY } from '../config';
+import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
 import { clearCachedReminderSnapshots } from '../reminder-cache';
-import type { ApiFetch, ModalState, ShowToast } from '../types';
+import type { ApiFetch, ModalState, ShowToast, StoredConfig } from '../types';
 
 interface PwaLogoutOperations {
 	apiFetch: ApiFetch;
@@ -37,6 +37,7 @@ export function usePwaSessionLifecycle({
 	handleUnauthorizedRef,
 	resetReminderState,
 	setAuthToken,
+	setConfig,
 	setError,
 	setModal,
 	setSettingsOpen,
@@ -49,6 +50,7 @@ export function usePwaSessionLifecycle({
 	handleUnauthorizedRef: MutableRefObject<() => void>;
 	resetReminderState: () => void;
 	setAuthToken: Dispatch<SetStateAction<string | null>>;
+	setConfig: Dispatch<SetStateAction<StoredConfig>>;
 	setError: Dispatch<SetStateAction<string | null>>;
 	setModal: Dispatch<SetStateAction<ModalState | null>>;
 	setSettingsOpen: Dispatch<SetStateAction<boolean>>;
@@ -56,6 +58,7 @@ export function usePwaSessionLifecycle({
 }): {
 	loggingOut: boolean;
 	logOut: () => Promise<void>;
+	clearLocalSession: () => Promise<void>;
 } {
 	const [loggingOut, setLoggingOut] = useState(false);
 
@@ -88,12 +91,14 @@ export function usePwaSessionLifecycle({
 	useEffect(() => {
 		const onStorage = (event: StorageEvent) => {
 			if ((event.key === AUTH_TOKEN_KEY && event.newValue !== event.oldValue) || event.key === null) {
+				if (event.key !== null && event.newValue !== localStorage.getItem(AUTH_TOKEN_KEY)) return;
+				setConfig(loadStoredConfig());
 				void clearLocalSession(event.newValue);
 			}
 		};
 		window.addEventListener('storage', onStorage);
 		return () => window.removeEventListener('storage', onStorage);
-	}, [clearLocalSession]);
+	}, [clearLocalSession, setConfig]);
 
 	const logOut = useCallback(async () => {
 		if (loggingOut) return;
@@ -116,5 +121,5 @@ export function usePwaSessionLifecycle({
 		}
 	}, [apiFetch, clearLocalSession, disablePushNotifications, loggingOut, setError, showToast]);
 
-	return { loggingOut, logOut };
+	return { loggingOut, logOut, clearLocalSession };
 }

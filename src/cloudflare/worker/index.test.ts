@@ -106,7 +106,7 @@ function createEnvDefaults(): Env {
 function createSubscriptionRequest(): Request {
 	return new Request('https://worker.test/notifications/subscribe', {
 		method: 'POST',
-		headers: { 'X-Crate-Protocol': '4',
+		headers: { 'X-Crate-Protocol': '5',
 			'Content-Type': 'application/json',
 			Authorization: 'Bearer device-token',
 		},
@@ -135,7 +135,7 @@ describe('worker entrypoint', () => {
 	it('does not expose the public device enrollment routes', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/setup/status', {
-				headers: { 'X-Crate-Protocol': '4', Authorization: 'Bearer secret-token' },
+				headers: { 'X-Crate-Protocol': '5', Authorization: 'Bearer secret-token' },
 			}) as never,
 			createEnv() as never,
 		);
@@ -148,7 +148,7 @@ describe('worker entrypoint', () => {
 		const enrollmentResponse = await worker.fetch(
 			new Request('https://worker.test/auth/enrollment', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '4',
+				headers: { 'X-Crate-Protocol': '5',
 					Authorization: 'Bearer secret-token',
 					'Content-Type': 'application/json',
 				},
@@ -159,7 +159,7 @@ describe('worker entrypoint', () => {
 		const tokenResponse = await worker.fetch(
 			new Request('https://worker.test/auth/tokens', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '4',
+				headers: { 'X-Crate-Protocol': '5',
 					Authorization: 'Bearer secret-token',
 					'Content-Type': 'application/json',
 				},
@@ -179,7 +179,7 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/reminders-enrollment-token', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '4', Authorization: 'Bearer secret-token' },
+				headers: { 'X-Crate-Protocol': '5', Authorization: 'Bearer secret-token' },
         body: JSON.stringify({ folderPath: 'Reminders' }),
 			}),
 			createEnv({ DB: db.db as unknown as D1Database }) as never,
@@ -202,7 +202,7 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/reminders-enrollment-token', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '4', Authorization: 'Bearer reminders-token' },
+				headers: { 'X-Crate-Protocol': '5', Authorization: 'Bearer reminders-token' },
 			}),
 			createEnv({ DB: db.db as unknown as D1Database }) as never,
 		);
@@ -316,7 +316,7 @@ describe('worker entrypoint', () => {
 	it('rejects blank bearer tokens', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/health', {
-				headers: { 'X-Crate-Protocol': '4', Authorization: 'Bearer ' },
+				headers: { 'X-Crate-Protocol': '5', Authorization: 'Bearer ' },
 			}),
 			createEnv() as never,
 		);
@@ -329,7 +329,7 @@ describe('worker entrypoint', () => {
 	it('returns a controlled 503 when authentication cannot reach D1', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/sync/manifest', {
-				headers: { 'X-Crate-Protocol': '4', Authorization: 'Bearer secret-token' },
+				headers: { 'X-Crate-Protocol': '5', Authorization: 'Bearer secret-token' },
 			}),
 			createEnv({ DB: null as never }) as never,
 		);
@@ -358,7 +358,7 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/sync/upload?path=notes/a.md', {
 				method: 'PUT',
-				headers: { 'X-Crate-Protocol': '4',
+				headers: { 'X-Crate-Protocol': '5',
 					Authorization: 'Bearer secret-token',
 					'X-Crate-Expected-Hash': 'absent',
 				},
@@ -405,7 +405,7 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/subscribe', {
 				method: 'DELETE',
-				headers: { 'X-Crate-Protocol': '4',
+				headers: { 'X-Crate-Protocol': '5',
 					Authorization: 'Bearer secret-token',
 					'Content-Type': 'application/json',
 				},

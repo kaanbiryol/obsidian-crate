@@ -5,12 +5,13 @@ import {
 	detectDeviceName,
 } from './config';
 
-export async function exchangeEnrollmentToken(token: string): Promise<string> {
+export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
 	await requireCompatibleServer();
 	const response = await fetch('/notifications/reminders-exchange', {
+		signal: AbortSignal.timeout(30_000),
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) },
-		body: JSON.stringify({ token, deviceName: detectDeviceName() }),
+		body: JSON.stringify({ token, deviceName: detectDeviceName(), ...(previousAuthToken ? { previousAuthToken } : {}) }),
 	});
 
 	if (!response.ok) {

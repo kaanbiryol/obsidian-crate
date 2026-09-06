@@ -77,7 +77,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 	it('keeps a worst-case stale upload batch within the Free-plan D1 query budget', async () => {
 		const currentHash = 'a'.repeat(64);
 		const staleHash = 'b'.repeat(64);
-		const paths = Array.from({ length: 5 }, (_, index) => `notes/${index}.md`);
+		const paths = Array.from({ length: 3 }, (_, index) => `notes/${index}.md`);
 		const { bucket } = createMockR2Bucket();
 		const { db } = createMockD1Database({
 			files: Object.fromEntries(paths.map((path, index) => [path, {

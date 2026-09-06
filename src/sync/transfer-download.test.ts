@@ -22,6 +22,7 @@ describe('transfer download/process helpers', () => {
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		const content = new TextEncoder().encode('hello').buffer as ArrayBuffer;
 
+		harness.vault.createBinary.mockImplementation(async () => { harness.adapter.readBinary.mockResolvedValue(content); });
 		const hash = await computeHash(content);
 		harness.api.downloadFile.mockResolvedValue({ content, size: 5, hash, revision: 'revision-1' });
 		await downloadAndSaveFile(harness.context, { path: 'notes/a.md', expectedLocalHash: null, expectedRemoteHash: hash, remoteSize: 5 }, emptyResult());

@@ -7,6 +7,7 @@ import { getProjectFilePath, reorderReminderBlocksInFileContent } from '../file-
 import { parseFolderPath, parseProjectPath } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile } from '../scan';
+import { assertUniqueReminderSources } from '../../reminder-source-identity';
 
 export async function handleReorderReminders(request: Request, env: Env): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
@@ -27,6 +28,7 @@ export async function handleReorderReminders(request: Request, env: Env): Promis
 	if (!file) return corsResponse({ error: 'Project file not found' }, 404);
 
 	const currentOrder = scanReminderMarkdownFile(filePath, file.content, folderPath).map(reminder => reminder.id);
+	await assertUniqueReminderSources(env.DB, folderPath, currentOrder);
 	if (!Array.isArray(parsedBody.value.expectedOrder)) return corsResponse({ error: 'Expected project order required. Reload before reordering.' }, 428);
 	if (JSON.stringify(currentOrder) !== JSON.stringify(parsedBody.value.expectedOrder)) return corsResponse({ error: 'Project order changed. Reload before reordering.' }, 409);
 

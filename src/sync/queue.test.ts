@@ -546,7 +546,7 @@ describe('processPendingChanges', () => {
 
 		await processPendingChanges(harness.context, 4);
 
-		expect(harness.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([6, 6, 2]);
+		expect(harness.batchDelete.mock.calls.map(([paths]) => paths.length)).toEqual([4, 4, 4, 2]);
 		expect(harness.removeEntry).toHaveBeenCalledTimes(14);
 		expect(harness.pendingPaths.size).toBe(0);
 		expect(harness.requestReconciliation).not.toHaveBeenCalled();

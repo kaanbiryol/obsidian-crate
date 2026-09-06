@@ -1,5 +1,6 @@
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { queryRows } from './db';
+import { assertUniqueReminderSources } from './reminder-source-identity';
 import { getStoredFileRow } from './sync-storage';
 import { readStoredMarkdownFiles } from './storage';
 import { getNotificationPolicy } from './notification-policy';
@@ -31,16 +32,20 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
         if (!text) throw new Error('Committed reminder content could not be verified');
         reminders = scanReminderMarkdownFile(job.path, text.content, policy.folderPath);
       }
-      const prior = await queryRows<{ reminder_id: string; due_datetime: string }>(env.DB.prepare(
-        'SELECT reminder_id, due_datetime FROM scheduled_reminders WHERE reminder_id IN (SELECT reminder_id FROM reminder_projections WHERE file_path = ?)').bind(job.path));
-      const scheduled = new Map(prior.map(row => [row.reminder_id, row.due_datetime]));
+      await assertUniqueReminderSources(env.DB, policy.folderPath, reminders.map(reminder => reminder.id));
+      const sources = await queryRows<{ reminder_id: string; due_key: string; first_seen_at: number | null }>(env.DB.prepare(
+        `SELECT s.reminder_id, s.due_key, o.first_seen_at FROM reminder_sources s
+        LEFT JOIN reminder_occurrences o ON o.reminder_id = s.reminder_id AND o.due_key = s.due_key WHERE s.file_path = ?`).bind(job.path));
+      const observed = new Map(sources.map(row => [row.reminder_id, row]));
       const ids = new Set<string>();
       const operations = reminders.map(reminder => {
         if (ids.has(reminder.id)) throw new Error('Duplicate reminder identity in committed file');
         ids.add(reminder.id);
         const dueDatetime = notificationDatetime(reminder, policy);
-        const schedule = policy.enabled !== false && !reminder.completed && dueDatetime && (Date.parse(dueDatetime) > Date.now()
-          || scheduled.get(reminder.id) === dueDatetime && Date.parse(dueDatetime) > Date.now() - 86_400_000);
+        const source = observed.get(reminder.id);
+        if (!source || source.due_key !== (reminder.dueDatetime ?? reminder.dueDate ?? '')) throw new Error('Reminder source changed before projection');
+        const schedule = policy.enabled !== false && !reminder.completed && dueDatetime
+          && source.first_seen_at !== null && source.first_seen_at <= Date.parse(dueDatetime);
         return { id: reminder.id, operation: schedule ? 'schedule' : 'cancel', payload: schedule ? {
           reminderId: reminder.id, content: reminder.content, project: reminder.project, dueDatetime,
         } : null };

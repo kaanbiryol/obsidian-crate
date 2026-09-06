@@ -39,7 +39,7 @@ it('chunks more than one server batch of local deletes', async () => {
 
 		const result = await runIncrementalSync(harness.context, { uploadConcurrency: 5 });
 
-		expect(harness.api.batchDelete.mock.calls.map(([chunk]) => chunk.length)).toEqual([6, 6, 2]);
+		expect(harness.api.batchDelete.mock.calls.map(([chunk]) => chunk.length)).toEqual([4, 4, 4, 2]);
 		expect(result?.deletedPaths).toEqual(paths);
 		expect(result?.success).toBe(true);
 	});

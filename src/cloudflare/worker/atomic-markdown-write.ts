@@ -160,8 +160,8 @@ export async function writeCommittedMarkdownFilePair(
 			changelogStatement(db, destination),
 			changelogStatement(db, source),
 			...previousVersions.map(previous => retainVersionStatement(db, previous, source, destination)),
-			...enqueueFileProjection(db, source.path, source.objectKey),
-			...enqueueFileProjection(db, destination.path, destination.objectKey),
+			...enqueueFileProjection(db, source.path, source.objectKey, params.source.content),
+			...enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content),
 			...(params.effects?.([source, destination].map(file => ({ path: file.path, storageKey: file.objectKey }))) ?? []),
 	]);
 

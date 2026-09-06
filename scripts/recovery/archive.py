@@ -60,7 +60,7 @@ def verify(directory):
     db = load_database(sql)
     try:
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-        if 'crate_schema' not in tables or [tuple(row) for row in db.execute('SELECT id, version FROM crate_schema')] != [(1, 1)]:
+        if 'crate_schema' not in tables or [tuple(row) for row in db.execute('SELECT id, version FROM crate_schema')] != [(1, 2)]:
             raise ValueError('Unsupported Crate database schema')
         expected = references(db)
         objects = {item['key']: item for item in manifest['objects']}

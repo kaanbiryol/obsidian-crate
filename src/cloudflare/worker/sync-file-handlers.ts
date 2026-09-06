@@ -91,6 +91,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 				hash,
 				size,
 				objectKey,
+				content: body,
 				expectedHash: expectedRemoteHash,
 				previousFile,
 			});

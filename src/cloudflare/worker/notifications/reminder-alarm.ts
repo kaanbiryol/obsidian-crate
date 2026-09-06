@@ -241,6 +241,9 @@ export class ReminderAlarm implements DurableObject {
 
 		const deliveryComplete = await this.state.storage.get<boolean>(DELIVERY_COMPLETE_KEY) === true;
 		if (!deliveryComplete) {
+			if (Date.now() - Date.parse(reminder.dueDatetime) >= MAX_DELIVERY_RETRY_AGE_MS) {
+				throw new Error('Notification missed its 24-hour delivery window');
+			}
 			let pendingSubscriptionIds = await this.state.storage.get<string[]>(PENDING_SUBSCRIPTION_IDS_KEY);
 			if (!pendingSubscriptionIds) {
 				pendingSubscriptionIds = await listPushSubscriptionIds(db);
