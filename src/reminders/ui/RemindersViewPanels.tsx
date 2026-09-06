@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { motion } from "framer-motion";
 import {
   BrowseView,
@@ -41,7 +41,7 @@ interface RemindersViewPanelsProps {
   pageTransitionsEnabled?: boolean;
 }
 
-export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
+export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
   viewMode,
   selectedProject,
   hideProjectTitle = false,
@@ -144,4 +144,4 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = ({
         </motion.div>
       );
   }
-};
+});

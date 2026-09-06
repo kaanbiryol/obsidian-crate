@@ -62,6 +62,14 @@ describe('PWA shared editor integration', () => {
 		expect(markup).toContain('aria-label="Saving reminder"');
 	});
 
+	it('blocks chip interaction without dimming chips during navigation', () => {
+		const markup = renderEditor({ canInteract: false });
+		expect(markup).toContain('class="reminder-action-chips" inert=""');
+		for (const action of ['toggle-picker', 'toggle-priority']) {
+			expect(button(markup, action)).not.toContain('disabled=""');
+		}
+	});
+
 	it('keeps the hidden editor inert while a picker is active', () => {
 		const markup = renderEditor({ isActive: false, canInteract: false });
 		expect(markup).toContain('aria-hidden="true"');

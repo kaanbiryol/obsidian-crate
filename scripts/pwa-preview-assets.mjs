@@ -44,6 +44,7 @@ export async function buildPwaPreviewAssets() {
 		define: {
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(pwaClient.version),
 			__CRATE_PWA_CLIENT_ASSETS__: JSON.stringify(pwaClient.assets),
+			__CRATE_PWA_STARTUP_ASSETS__: JSON.stringify(pwaClient.startupAssets),
 		},
 		loader: { '.png': 'binary' },
 		plugins: [rawTextPlugin()],

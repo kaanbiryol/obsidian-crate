@@ -30,6 +30,11 @@ const budgetGroups = {
 		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '36000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
+		startupAssets: true,
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '400000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '133000', 10),
+	}, {
+		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '465000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '145000', 10),
@@ -50,11 +55,15 @@ function formatBytes(value) {
 
 async function getFileSizes(budget) {
 	const { path } = budget;
-	if (budget.assetName || budget.allAssets) {
+	if (budget.assetName || budget.allAssets || budget.startupAssets) {
 		const payload = JSON.parse(await readFile(path, 'utf-8'));
 		const assets = payload?.assets;
 		if (!assets || typeof assets !== 'object') throw new Error(`Missing PWA assets in ${path}`);
-		const sources = budget.allAssets ? Object.values(assets) : [assets[budget.assetName]];
+		if (budget.startupAssets && (!Array.isArray(payload.startupAssets) || !payload.startupAssets.includes('app.js'))) {
+			throw new Error(`Missing PWA startup dependency graph in ${path}`);
+		}
+		const sources = budget.allAssets ? Object.values(assets)
+			: budget.startupAssets ? payload.startupAssets.map(name => assets[name]) : [assets[budget.assetName]];
 		if (sources.some(source => typeof source !== 'string')) throw new Error(`Missing PWA asset in ${path}`);
 		return sources.reduce((sizes, source) => ({
 			rawBytes: sizes.rawBytes + Buffer.byteLength(source),
@@ -74,6 +83,7 @@ for (const budget of budgets) {
 	const { rawBytes, gzipBytes } = await getFileSizes(budget);
 	const label = budget.allAssets
 		? `${budget.path}#all-assets`
+		: budget.startupAssets ? `${budget.path}#startup-assets`
 		: budget.assetName ? `${budget.path}#${budget.assetName}` : budget.path;
 	console.log(
 		`${label}: raw ${formatBytes(rawBytes)} / budget ${formatBytes(budget.maxBytes)}, gzip ${formatBytes(gzipBytes)} / budget ${formatBytes(budget.maxGzipBytes)}`,

@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { ReminderCard as SharedReminderCard } from '@/reminders/components/ReminderCard';
 import { useReminderCardInteractions } from '@/reminders/components/useReminderCardInteractions';
 import type { Reminder as SharedReminder } from '@/reminders/types/reminder';
 
-export function WebReminderCard({
+export const WebReminderCard = memo(function WebReminderCard({
 	reminder,
 	index,
 	hideProject,
@@ -68,4 +68,4 @@ export function WebReminderCard({
 			/>
 		</div>
 	);
-}
+});

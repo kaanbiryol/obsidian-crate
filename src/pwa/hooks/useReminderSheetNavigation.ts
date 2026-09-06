@@ -77,6 +77,7 @@ export function useReminderSheetNavigation({
 	reminderId,
 	isClosing,
 	onBeforeOpenPicker,
+	onFocusEditor,
 	onPatchDraft,
 	onClosed,
 }: {
@@ -84,6 +85,7 @@ export function useReminderSheetNavigation({
 	reminderId?: string;
 	isClosing: boolean;
 	onBeforeOpenPicker: () => void;
+	onFocusEditor: () => void;
 	onPatchDraft: (patch: Partial<ModalDraft>) => void;
 	onClosed: () => void;
 }) {
@@ -120,16 +122,20 @@ export function useReminderSheetNavigation({
 		const activeScreen = navigationRef.current.activeScreen;
 		if (activeScreen === 'editor') return;
 
+		let accepted = false;
 		flushSync(() => {
 			if (!applyAction({
 				type: 'request-transition',
 				transition: { screen: 'editor', patch },
 				isClosing: isClosingRef.current,
 			})) return;
+			accepted = true;
 			onPatchDraft(getImmediateEditorTransitionPatch(activeScreen, patch));
 			setEditorFocusRequest((request) => request + 1);
 		});
-	}, [applyAction, onPatchDraft]);
+		// iOS requires focus inside the user gesture, after the editor is focusable.
+		if (accepted) onFocusEditor();
+	}, [applyAction, onFocusEditor, onPatchDraft]);
 
 	const handleStageAnimationComplete = useCallback(() => {
 		if (isClosingRef.current) return;

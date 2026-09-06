@@ -239,16 +239,17 @@ function App() {
 	});
 
 	const sharedReminders = useMemo(() => reminders.map(toSharedReminder), [reminders]);
+	const editReminder = useCallback((id: string) => openModal('edit', id), [openModal]);
 	const renderSharedCard = useCallback<PwaReminderCardRenderer>(({ reminder, index, hideProject }) => (
 		<WebReminderCard
 			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
 			reminder={reminder}
 			index={index}
 			hideProject={hideProject}
-			onEdit={(id) => openModal('edit', id)}
-			onToggleComplete={(id, completed) => toggleReminderCompleted(id, completed)}
+			onEdit={editReminder}
+			onToggleComplete={toggleReminderCompleted}
 		/>
-	), [openModal, toggleReminderCompleted]);
+	), [editReminder, toggleReminderCompleted]);
 
 	if (!initialContentReady) {
 		return <PwaLaunchSplash />;
@@ -327,12 +328,12 @@ function App() {
 				)}
 				{modal && (
 					<ReminderSheet
+						key={`${modal.mode}-${modal.reminderId ?? 'new'}`}
 						colorScheme={colorScheme}
 						modal={modal}
 						projects={projects}
 						saving={saving}
 						isClosing={modalTransition.isClosing}
-						onChange={setModal}
 						onClose={closeModal}
 						onClosed={modalTransition.finishClose}
 						onSave={saveReminder}

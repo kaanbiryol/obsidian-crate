@@ -14,6 +14,7 @@ interface ReminderActionChipsProps {
     priority: number;
     recurrence?: RecurrenceRule;
     disabled?: boolean;
+    inert?: boolean;
     preventFocusOnPress?: boolean;
     dueDateLabel?: string;
     onOpenDatePicker: () => void;
@@ -29,6 +30,7 @@ export function ReminderActionChips({
     priority,
     recurrence,
     disabled,
+    inert = false,
     preventFocusOnPress,
     dueDateLabel,
     onOpenDatePicker,
@@ -39,7 +41,7 @@ export function ReminderActionChips({
     const dueDateDisplay = dueDateLabel ?? formatDueDate(dueDate ?? undefined);
 
     return (
-        <div className="reminder-action-chips">
+        <div className="reminder-action-chips" inert={inert}>
             <Button
                 disabled={disabled}
                 preventFocusOnPress={preventFocusOnPress}

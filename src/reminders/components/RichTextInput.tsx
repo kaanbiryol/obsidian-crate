@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, useCallback, useMemo } from 'react';
 import { buildHTML, buildRichTextSegments, getPlainText, getRichTextChipParts } from '../utils/richTextParsing';
 import { getLogicalTextLength, saveCursorPosition, restoreCursorPosition } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
@@ -289,6 +289,12 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         return true;
     }, [actualRef, getCurrentHistorySnapshot, knownProjects, onChange, updateAutocompleteQuery]);
 
+    // Native editing owns these nodes after mount. Reusing the initial VNodes
+    // prevents the framework from resetting text nodes retained by reconciliation.
+    const initialContent = useMemo(() => initialContentRef.current
+        ? renderInitialRichText(initialContentRef.current.text, initialContentRef.current.knownProjects)
+        : undefined, []);
+
     // Handle input changes
     const handleInput = (paste = false) => {
         if (readOnly || !actualRef.current) return;
@@ -309,11 +315,12 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         historyRef.current?.record({ value: plainText, cursor: cursorPos });
 
         // Build and render HTML with chips
-        const html = buildHTML(plainText, knownProjects);
+        const segments = buildRichTextSegments(plainText, knownProjects);
+        const html = buildHTML(plainText, knownProjects, segments);
         const normalizedHtml = html || '';
         const shouldRerender = !isRichTextRenderingCurrent(actualRef.current, normalizedHtml);
         if (shouldRerender) {
-            renderRichText(actualRef.current, plainText, knownProjects);
+            renderRichText(actualRef.current, plainText, knownProjects, segments);
             // Keep selection valid before another keyboard event can arrive. Waiting for
             // animationFrame here leaves fast typing vulnerable to a reset caret.
             restoreCursorPosition(actualRef.current, cursorPos);
@@ -338,7 +345,8 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
             return;
         }
 
-        const html = buildHTML(value, knownProjects);
+        const segments = buildRichTextSegments(value, knownProjects);
+        const html = buildHTML(value, knownProjects, segments);
         const normalizedHtml = html || '';
 
         if (isRichTextRenderingCurrent(actualRef.current, normalizedHtml)) {
@@ -351,7 +359,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         const shouldPreserveCursor = preserveSelection && isFocused;
         const cursorPos = shouldPreserveCursor ? saveCursorPosition(actualRef.current) : null;
 
-        renderRichText(actualRef.current, value, knownProjects);
+        renderRichText(actualRef.current, value, knownProjects, segments);
 
         if (currentPlainText !== value) {
             historyRef.current?.reset({ value, cursor: value.length });
@@ -450,9 +458,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
                 suppressContentEditableWarning
                 style={style}
             >
-                {initialContentRef.current
-                    ? renderInitialRichText(initialContentRef.current.text, initialContentRef.current.knownProjects)
-                    : undefined}
+                {initialContent}
             </div>
         </div>
     );

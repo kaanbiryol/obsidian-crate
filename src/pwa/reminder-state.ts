@@ -1,6 +1,7 @@
 import {
 	applyReminderDraftContentUpdate,
 	deriveReminderDraftContentMetadata,
+	type ReminderDraftContentMetadata,
 } from '@/reminders/core/reminderDraft';
 import type { Priority, RecurrenceRule } from '@/reminders/types/reminder';
 import { formatDueDate } from '@/reminders/utils/dateFormatting';
@@ -101,12 +102,11 @@ export function applyReminderTextUpdate(
 	};
 }
 
-export function deriveDraftPatchFromContent(draft: ModalDraft, projectOptions: string[]): Partial<ModalDraft> {
-	const metadata = deriveReminderDraftContentMetadata(
-		draft.content,
-		projectOptions,
-		draft.defaultProject,
-	);
+export function deriveDraftPatchFromContent(
+	draft: ModalDraft,
+	projectOptions: string[],
+	metadata: ReminderDraftContentMetadata = deriveReminderDraftContentMetadata(draft.content, projectOptions, draft.defaultProject),
+): Partial<ModalDraft> {
 	const patch: Partial<ModalDraft> = {};
 	const nextProject = metadata.project;
 

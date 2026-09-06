@@ -4,7 +4,9 @@ import React, {
 	useEffect,
 	useImperativeHandle,
 	useRef,
+	useMemo,
 } from 'react';
+import { deriveReminderDraftContentMetadata } from '@/reminders/core/reminderDraft';
 import { getProjectColor } from '@/reminders/utils/projectColors';
 import { IconButton } from '@/ui/shared/IconButton';
 import { DeleteConfirmationModal } from '@/reminders/components/DeleteConfirmationModal';
@@ -19,12 +21,12 @@ import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
 	formatModalDueSummary,
-	hasReminderDraftTitle,
 } from '../reminder-state';
 import type { ModalDraft, ModalPickerId, ModalState } from '../types';
 
 export interface ReminderEditorScreenHandle {
 	dismissKeyboard(): void;
+	focusTitle(): void;
 }
 
 export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
@@ -70,13 +72,17 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 	const draft = modal.draft;
+	const contentMetadata = useMemo(
+		() => deriveReminderDraftContentMetadata(draft.content, projectOptions, draft.defaultProject),
+		[draft.content, draft.defaultProject, projectOptions],
+	);
 	const isEditing = modal.mode === 'edit';
 	const title = isEditing ? 'Edit reminder' : 'New reminder';
 	const editorInteractive = isActive || isReturningToEditor;
 	const canSubmit = !draft.deleteConfirm
 		&& !saving
 		&& !isClosing
-		&& hasReminderDraftTitle(draft.content, projectOptions, draft.defaultProject);
+		&& Boolean(contentMetadata.cleanContent.trim());
 	const performSave = useCallback(() => {
 		if (!canSubmit) return;
 		onSave(modal);
@@ -104,15 +110,16 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 
 	useImperativeHandle(ref, () => ({
 		dismissKeyboard: dismissEditorKeyboard,
+		focusTitle: () => richTextInputRef.current?.focus(),
 	}), [dismissEditorKeyboard]);
 
 	useEffect(() => {
 		if (!isActive || !canInteract) return;
-		const patch = deriveDraftPatchFromContent(draft, projectOptions);
+		const patch = deriveDraftPatchFromContent(draft, projectOptions, contentMetadata);
 		if (Object.keys(patch).length > 0) {
 			onPatchDraft(patch);
 		}
-	}, [canInteract, draft, isActive, onPatchDraft, projectOptions]);
+	}, [canInteract, contentMetadata, draft, isActive, onPatchDraft, projectOptions]);
 
 	const togglePriority = useCallback(() => {
 		const patch = applyReminderTextUpdate(draft, projectOptions, {
@@ -208,7 +215,8 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 						defaultProject={draft.defaultProject || 'Inbox'}
 						priority={draft.priority}
 						recurrence={draft.recurrence}
-						disabled={saving || !canInteract}
+						disabled={saving}
+						inert={!canInteract || isClosing}
 						preventFocusOnPress
 						onOpenDatePicker={() => onOpenPicker('date')}
 						onOpenProjectPicker={() => onOpenPicker('project')}

@@ -86,6 +86,15 @@ export function useKeyboardHeight(enabled: boolean = true): number {
       }));
     };
 
+    let animationFrame: number | null = null;
+    const scheduleMeasure = () => {
+      if (animationFrame !== null) return;
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = null;
+        measure();
+      });
+    };
+
     const handleFocusIn = (event: FocusEvent) => {
       if (!getEditableEventTarget(event)) return;
       hasEditableFocusRef.current = true;
@@ -104,16 +113,17 @@ export function useKeyboardHeight(enabled: boolean = true): number {
 
     document.addEventListener('focusin', handleFocusIn);
     document.addEventListener('focusout', handleFocusOut);
-    window.addEventListener('resize', measure);
-    window.visualViewport?.addEventListener('resize', measure);
-    window.visualViewport?.addEventListener('scroll', measure);
+    window.addEventListener('resize', scheduleMeasure);
+    window.visualViewport?.addEventListener('resize', scheduleMeasure);
+    window.visualViewport?.addEventListener('scroll', scheduleMeasure);
 
     return () => {
       document.removeEventListener('focusin', handleFocusIn);
       document.removeEventListener('focusout', handleFocusOut);
-      window.removeEventListener('resize', measure);
-      window.visualViewport?.removeEventListener('resize', measure);
-      window.visualViewport?.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', scheduleMeasure);
+      window.visualViewport?.removeEventListener('resize', scheduleMeasure);
+      window.visualViewport?.removeEventListener('scroll', scheduleMeasure);
+      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
     };
   }, [enabled]);
 

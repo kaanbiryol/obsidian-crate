@@ -1,5 +1,6 @@
+import { reconcileRichTextChildren } from './richTextReconciliation';
 import { moveCursorToEnd } from "../utils/cursorPosition";
-import { buildRichTextSegments, getRichTextChipParts } from "../utils/richTextRenderer";
+import { buildRichTextSegments, getRichTextChipParts, type RichTextSegment } from "../utils/richTextRenderer";
 
 const ELEMENT_NODE_TYPE = typeof Node !== "undefined" ? Node.ELEMENT_NODE : 1;
 
@@ -24,6 +25,7 @@ export function renderRichText(
 	element: HTMLDivElement,
 	text: string,
 	knownProjects?: string[],
+	segments: RichTextSegment[] = buildRichTextSegments(text, knownProjects),
 ): void {
 	if (!text) {
 		element.replaceChildren();
@@ -32,7 +34,7 @@ export function renderRichText(
 
 	const ownerDocument = element.ownerDocument;
 	const fragment = ownerDocument.createDocumentFragment();
-	for (const segment of buildRichTextSegments(text, knownProjects)) {
+	for (const segment of segments) {
 		if (segment.kind === "text") {
 			appendTextWithLineBreaks(fragment, segment.text, ownerDocument);
 		} else if (segment.kind === "link") {
@@ -59,7 +61,7 @@ export function renderRichText(
 		}
 	}
 
-	element.replaceChildren(fragment);
+	reconcileRichTextChildren(element, fragment);
 }
 
 const ACTIVE_CHIP_CLASS = "is-cursor-active";

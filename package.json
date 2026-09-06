@@ -26,6 +26,7 @@
 		"build:plugin:dev": "vite build --mode development",
 		"preview:pwa": "node scripts/pwa-preview.mjs",
 		"test:pwa-preview": "node scripts/pwa-smoke-test.mjs",
+		"test:pwa-browser": "node scripts/pwa-cache-test.mjs && node scripts/pwa-focus-test.mjs && node scripts/pwa-ui-performance-test.mjs",
 		"dev": "node scripts/dev.mjs",
 		"typecheck": "tsc -noEmit -skipLibCheck",
 		"typecheck:worker": "tsc -p src/cloudflare/worker/tsconfig.json --noEmit -skipLibCheck",

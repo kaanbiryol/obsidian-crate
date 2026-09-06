@@ -11,9 +11,12 @@ export function useEditorSheetHeight(ref: RefObject<HTMLDivElement | null>, acti
 			editor.querySelector<HTMLElement>('.reminder-editor-fields'),
 			editor.querySelector<HTMLElement>('.reminder-action-chips'),
 		].filter((row): row is HTMLElement => row !== null);
+		let lastHeight = -1;
 		const measure = () => {
 			// Offset sizes exclude the sheet's animated transform. Include its borders.
 			const height = rows.reduce((total, row) => total + row.offsetHeight, 2);
+			if (height === lastHeight) return;
+			lastHeight = height;
 			container.style.setProperty('--pwa-editor-content-height', `${height}px`);
 		};
 		measure();

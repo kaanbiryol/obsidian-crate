@@ -1,4 +1,8 @@
 declare const __CRATE_PWA_CLIENT_ASSETS__: Record<string, string> | undefined;
+declare const __CRATE_PWA_STARTUP_ASSETS__: string[] | undefined;
+
+export const PWA_STARTUP_ASSETS: readonly string[] =
+	typeof __CRATE_PWA_STARTUP_ASSETS__ !== 'undefined' ? __CRATE_PWA_STARTUP_ASSETS__ : [];
 
 const fallbackClient = 'console.error("Crate PWA client bundle was not generated before build.");';
 
