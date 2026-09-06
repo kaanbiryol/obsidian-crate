@@ -1,3 +1,4 @@
+import { isAbortError } from './abort';
 import { arrayBufferToBase64 } from "./encoding";
 import { createBatchUploadChunks, prepareUploadFromVaultFile } from "./transfer-prepare";
 import { isMarkdownPath } from "./markdown-base-cache";
@@ -104,6 +105,7 @@ export async function uploadPreparedFiles(
           }
         }
       } catch (error) {
+        if (isAbortError(error)) throw error;
         const uploadError = error instanceof Error ? error.message : "Batch upload failed";
         for (const upload of chunk) {
           result.errors.push(`${upload.path}: ${uploadError}`);
@@ -125,6 +127,7 @@ export async function uploadPreparedFiles(
       try {
         await options.onVersionConflicts(paths, result);
       } catch (error) {
+        if (isAbortError(error)) throw error;
         const message = error instanceof Error ? error.message : 'Version-conflict reconciliation failed';
         for (const path of paths) result.errors.push(`${path}: ${message}`);
       }
@@ -189,6 +192,7 @@ async function uploadPreparedFilesIndividually(
       }
       result.errors.push(`${upload.path}: ${uploadResult.error || "Upload failed"}`);
     } catch (error) {
+      if (isAbortError(error)) throw error;
       if (error instanceof HttpError && (error.code === 'version_conflict' || error.status === 409)) {
         return upload.path;
       }

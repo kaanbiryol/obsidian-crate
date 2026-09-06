@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
+import type { PwaPreferences } from '../preferences';
 import { PwaButton as Button } from './PwaButton';
 import {
 	Check,
+	ChevronDown,
 	LogOut,
 	Monitor,
 	Moon,
@@ -15,6 +17,8 @@ import { PwaModalSheet } from './PwaModalSheet';
 
 export function SettingsSheet({
 	config,
+	defaultScreen,
+	onPreferencesChange,
 	push,
 	themePreference,
 	loggingOut,
@@ -26,6 +30,8 @@ export function SettingsSheet({
 	onLogout,
 }: {
 	config: StoredConfig;
+	defaultScreen: PwaPreferences['defaultScreen'];
+	onPreferencesChange: (patch: Partial<PwaPreferences>) => void;
 	push: PushState;
 	themePreference: PwaThemePreference;
 	loggingOut: boolean;
@@ -36,7 +42,7 @@ export function SettingsSheet({
 	onThemePreferenceChange: (preference: PwaThemePreference) => void;
 	onLogout: () => void;
 }) {
-	const upcomingDays = `${config.upcomingDays} ${config.upcomingDays === 1 ? 'day' : 'days'}`;
+	const [upcomingDraft, setUpcomingDraft] = useState(String(config.upcomingDays));
 	const notificationDescription = push.status
 		?? (push.subscribed ? 'Reminders are enabled on this device.' : 'Get alerts when Crate is closed.');
 	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
@@ -97,6 +103,41 @@ export function SettingsSheet({
 						</div>
 					</section>
 
+					<section className="settings-panel__section" aria-labelledby="settings-reminders-title">
+						<h3 id="settings-reminders-title" className="settings-panel__title">Reminders</h3>
+						<div className="settings-group">
+							<label className="settings-row settings-row--preference">
+								<span className="settings-row__copy"><strong>Default screen</strong><span>Shown when Crate opens.</span></span>
+								<span className="settings-preference-control settings-preference-control--select">
+								<select className="settings-preference-input" value={defaultScreen} onChange={(event) => onPreferencesChange({ defaultScreen: event.currentTarget.value as PwaPreferences['defaultScreen'] })}>
+									<option value="today">Today</option>
+									<option value="inbox">Inbox</option>
+									<option value="upcoming">Upcoming</option>
+									<option value="browse">Browse</option>
+								</select>
+								<ChevronDown size={14} aria-hidden="true" />
+								</span>
+							</label>
+							<label className="settings-row settings-row--preference">
+								<span className="settings-row__copy"><strong>Upcoming range</strong><span>Days ahead to show.</span></span>
+								<span className="settings-preference-control settings-preference-control--days">
+								<input aria-label="Upcoming range (days)" className="settings-preference-input" type="number" inputMode="numeric" min={1} step={1} value={upcomingDraft}
+									onChange={(event) => setUpcomingDraft(event.currentTarget.value)}
+									onBlur={() => {
+										const days = Number(upcomingDraft);
+										if (Number.isSafeInteger(days) && days >= 1) {
+											onPreferencesChange({ upcomingDays: days });
+											setUpcomingDraft(String(days));
+										} else setUpcomingDraft(String(config.upcomingDays));
+									}}
+									onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+								/>
+								<span className="settings-preference-unit" aria-hidden="true">days</span>
+								</span>
+							</label>
+						</div>
+					</section>
+
 					<section className="settings-panel__section" aria-labelledby="settings-notifications-title">
 						<h3 id="settings-notifications-title" className="settings-panel__title">Notifications</h3>
 						<div className="settings-group">
@@ -124,10 +165,6 @@ export function SettingsSheet({
 							<div className="settings-row settings-row--value">
 								<span>Folder</span>
 								<strong title={config.folderPath}>{config.folderPath}</strong>
-							</div>
-							<div className="settings-row settings-row--value">
-								<span>Upcoming window</span>
-								<strong>{upcomingDays}</strong>
 							</div>
 							<div className="settings-row settings-row--value">
 								<span>All-day alert</span>

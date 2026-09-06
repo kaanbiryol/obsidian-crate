@@ -181,6 +181,8 @@ export class WorkerApiHttpClient {
 				cleanup();
 				reject(error instanceof Error ? error : new Error(errorMessage(error)));
 			};
+			// The Obsidian transport cannot be cancelled. A rejected mutation may
+			// still commit remotely; ignore its late response and reconcile on resume.
 			const onAbort = () => rejectOnce(createAbortError('Sync request aborted'));
 
 			externalSignal?.addEventListener('abort', onAbort, { once: true });

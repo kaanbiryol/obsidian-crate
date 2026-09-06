@@ -23,9 +23,11 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:radial-gradient(circle at 82% -12%,rgba(var(--accent-rgb),.09),transparent 34%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;width:100%;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}
-body{min-height:100%;min-height:100dvh;overflow:hidden;touch-action:manipulation}
+/* Cover nested scrollers and portal sheets while preserving single-finger scrolling. */
+html,body,body *{touch-action:pan-x pan-y}
+body{min-height:100%;min-height:100dvh;overflow:hidden}
 button,input,textarea,select{font:inherit}
-button{cursor:pointer;border:none;background:transparent;color:inherit;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+button{cursor:pointer;border:none;background:transparent;color:inherit;user-select:none;-webkit-user-select:none}
 button:disabled{cursor:not-allowed;opacity:.55}
 #app,#app *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 #app input,#app textarea,#app [contenteditable="true"],#app [contenteditable="true"] *{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
@@ -75,3 +77,14 @@ button:disabled{cursor:not-allowed;opacity:.55}
 .settings-logout-button{align-self:flex-start;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:7px;margin-top:-2px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:#db7c7c;font-size:12.5px;font-weight:560;transition:transform .16s ease,background .16s ease,color .16s ease}
 .settings-logout-button:hover{background:rgba(248,113,113,.07);color:#f39797}
 .settings-logout-button:active{transform:scale(.97)}
+/* Keep preference controls consistent across native browser form styles. */
+.settings-row--preference{gap:12px;min-height:72px;box-sizing:border-box}
+.settings-preference-control{display:flex;position:relative;align-items:center;box-sizing:border-box;flex:0 0 120px;width:120px;height:44px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--text);transition:border-color .15s ease,background .15s ease}
+.settings-preference-control:focus-within{border-color:var(--accent);outline:2px solid rgba(var(--accent-rgb),.18);outline-offset:2px}
+.settings-preference-control .settings-preference-input{appearance:none;-webkit-appearance:none;box-sizing:border-box;width:100%;min-width:0;height:100%;margin:0;padding:0 12px;border:0;border-radius:inherit;outline:none;background:transparent;box-shadow:none;color:inherit;font:inherit;font-size:16px;font-weight:500;line-height:normal}
+.settings-preference-control--select .settings-preference-input{padding-right:28px;cursor:pointer}
+.settings-preference-control--select svg{position:absolute;right:10px;pointer-events:none;color:var(--text-faint)}
+.settings-preference-control--days .settings-preference-input{padding-right:5px;text-align:right;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield}
+.settings-preference-input::-webkit-inner-spin-button,.settings-preference-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.settings-preference-unit{padding-right:12px;color:var(--text-faint);font-size:12px;pointer-events:none}
+@media(max-width:360px){.settings-row--preference{gap:8px}.settings-preference-control{flex-basis:108px;width:108px}}

@@ -47,7 +47,7 @@ async function deletePathLocally(
       return false;
     }
 
-    await context.vault.adapter.remove(path);
+    await context.vault.adapter.trashLocal(path);
     return true;
   }
 
@@ -61,7 +61,7 @@ async function deletePathLocally(
     return false;
   }
 
-  await context.vault.adapter.remove(path);
+  await context.vault.adapter.trashLocal(path);
   return true;
 }
 

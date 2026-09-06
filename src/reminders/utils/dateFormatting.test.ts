@@ -12,10 +12,12 @@ describe('localized reminder date formatting', () => {
 		expect(formatDateHeader(new Date(2026, 8, 2), 'de-DE')).toBe('Morgen');
 	});
 
-	it('keeps locale-specific clock output for English users', () => {
+	it('uses a 24-hour clock for English users', () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date(2026, 8, 1, 10, 0));
 
-		expect(formatDueDate('2026-09-01T08:15:00', 'en-US')).toBe('Today, 08:15 AM');
+		expect(formatDueDate('2026-09-01T08:15:00', 'en-US')).toBe('Today, 08:15');
+		expect(formatDueDate('2026-09-01T18:15:00', 'en-US')).toBe('Today, 18:15');
+		expect(formatDueDate('2026-09-01T00:00:00', 'en-US')).toBe('Today, 00:00');
 	});
 });

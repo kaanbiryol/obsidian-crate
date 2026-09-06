@@ -51,6 +51,38 @@ function createManifest(entries: Record<string, FileEntry>) {
 }
 
 describe('MarkdownBaseCache', () => {
+	it('does not read or hash existing cache contents during background seeding', async () => {
+		const { cache, files, adapter } = createCacheHarness();
+		const content = toArrayBuffer('unchanged');
+		const hash = await computeHash(content);
+		files.set(`${PLUGIN_DIR}/markdown-base-cache/${hash}.md`, content);
+		await cache.seedFromManifest(createManifest({ 'a.md': { hash, size: content.byteLength, modified: '2026-01-01' } }), {
+			isDestroyed: () => false,
+			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
+		});
+		expect(adapter.readBinary).not.toHaveBeenCalled();
+		expect(await cache.readBase('a.md', hash)).toEqual(content);
+		expect(adapter.readBinary).toHaveBeenCalledOnce();
+	});
+
+	it('stops seeding between bounded batches when destroyed', async () => {
+		const { cache, adapter } = createCacheHarness();
+		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-01-01' };
+		const entries = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`${i}.md`, entry]));
+		let destroyed = false;
+		const runConcurrent = vi.fn(async <T>(tasks: Array<() => Promise<T>>) => {
+			expect(tasks.length).toBeLessThanOrEqual(32);
+			destroyed = true;
+			return [] as T[];
+		});
+		await cache.seedFromManifest(createManifest(entries), {
+			isDestroyed: () => destroyed,
+			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => { await runConcurrent(tasks); return [] as T[]; },
+		});
+		expect(runConcurrent).toHaveBeenCalledOnce();
+		expect(adapter.readBinary).not.toHaveBeenCalled();
+		expect(adapter.remove).not.toHaveBeenCalled();
+	});
 	it('rejects readable but truncated cache contents', async () => {
 		const { cache, files } = createCacheHarness();
 		const hash = await computeHash(toArrayBuffer('the complete common base'));
@@ -64,6 +96,7 @@ describe('MarkdownBaseCache', () => {
 		const hash = await computeHash(content);
 		files.set('notes/a.md', content);
 		files.set(`${PLUGIN_DIR}/markdown-base-cache/${hash}.md`, toArrayBuffer('truncated'));
+		expect(await cache.readBase('notes/a.md', hash)).toBeNull();
 		await cache.seedFromManifest(createManifest({
 			'notes/a.md': { hash, size: content.byteLength, modified: '2026-01-01T00:00:00.000Z' },
 		}), {

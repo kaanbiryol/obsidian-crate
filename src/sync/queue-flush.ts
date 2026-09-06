@@ -1,13 +1,15 @@
+import { prepareUploadChunks } from './transfer-budget';
+import { createAbortError } from './abort';
 import { createLogger, errorMessage } from '../plugin/logger';
 import { isAbortError } from './abort';
 import { isRetryableSyncError } from './engine-utils';
 import { deletePendingFiles } from './queue-delete';
 import type { QueueFlushContext } from './queue-flush-types';
-import { prepareQueueOperations, uploadPendingFiles } from './queue-upload';
+import { uploadPendingFiles } from './queue-upload';
 import { isQueueTerminalFailure, isQueueVersionConflict } from './queue-failure';
 import { HttpError } from './api';
 import { createEmptySyncResult } from './sync-result';
-import type { PreparedUpload, SyncResult } from './types';
+import type { SyncResult } from './types';
 
 export type { QueueFlushContext } from './queue-flush-types';
 
@@ -30,7 +32,7 @@ function clearCompletedRevisions(
 }
 
 function buildQueueSyncResult(
-	uploads: PreparedUpload[],
+	uploads: Array<{ path: string }>,
 	deletes: Array<{ path: string }>,
 	completedQueueKeys: Set<string>,
 	errors: string[] = [],
@@ -93,10 +95,20 @@ export async function processPendingChanges(
 	context.updateState({ status: 'syncing', pendingChanges: context.pendingPaths.size });
 
 	try {
-		const { uploads, deletes } = await prepareQueueOperations(context, paths);
+		const uploads: Array<{ path: string }> = [];
+		const deletes = paths.filter(path => path.startsWith('delete:')).flatMap(key => {
+			const path = key.substring(7);
+			const expectedHash = context.localManifest.getEntry?.(path)?.hash;
+			return expectedHash ? [{ path, expectedHash }] : [];
+		});
+		const chunks = prepareUploadChunks(paths.filter(path => !path.startsWith('delete:')), async path => {
+			if (context.isDestroyed()) throw createAbortError('Queue preparation aborted');
+			return context.prepareUploadFromPath(path);
+		});
 		const failures: Array<{ path: string; error: string; status?: number }> = [];
-		if (uploads.length > 0) {
-			const uploadFailures = await uploadPendingFiles(context, uploads, completedQueueKeys, uploadConcurrency);
+		for await (const chunk of chunks) {
+			uploads.push(...chunk.map(upload => ({ path: upload.path })));
+			const uploadFailures = await uploadPendingFiles(context, chunk, completedQueueKeys, uploadConcurrency);
 			for (const failure of uploadFailures) {
 				context.pendingPaths.add(failure.path);
 				if (isQueueVersionConflict(failure.status)) reconciliationPaths.add(failure.path);
@@ -144,6 +156,10 @@ export async function processPendingChanges(
 		}
 	} catch (error) {
 		if (isAbortError(error)) {
+			for (const path of paths) {
+				if (!completedQueueKeys.has(path)) context.pendingPaths.add(path);
+			}
+			if (!context.isDestroyed()) context.updateState({ status: 'idle', pendingChanges: context.pendingPaths.size });
 			logger.info('Queue processing aborted');
 		} else {
 			const retryable = isRetryableSyncError(error);

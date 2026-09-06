@@ -35,7 +35,7 @@ export function getRecurrenceDayNames(
 function formatRecurrenceTime(hour: number, minute: number, locale = getUiLocale()): string {
 	return new Intl.DateTimeFormat(locale, {
 		hour: '2-digit',
-		minute: '2-digit',
+		minute: '2-digit', hourCycle: 'h23',
 	}).format(new Date(2021, 7, 1, hour, minute));
 }
 

@@ -1,9 +1,10 @@
+import { prepareUploadChunks } from './transfer-budget';
 import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
 import { createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "./sync-result";
 import { createLogger, errorMessage } from "../plugin/logger";
 import type { ChangelogEntry, FileEntry, MutationFailure } from '../protocol/sync-types';
-import type { PreparedUpload, SyncResult } from './types';
+import type { SyncResult } from './types';
 import { deleteFilesInBatches } from './delete-batches';
 import { planIncrementalRemoteChanges } from './planner-incremental-remote-plan';
 
@@ -21,11 +22,13 @@ export async function runIncrementalSync(
   }
 
   try {
-    const allChanges: ChangelogEntry[] = [];
+    const changesByPath = new Map<string, ChangelogEntry>();
+    let changeCount = 0;
     let since = context.settings.lastSeq;
     let latestSeq = since;
 
     while (true) {
+      context.throwIfDestroyed?.();
       const response = await context.api.getChanges(since);
 
       if (response.cursorExpired) {
@@ -33,7 +36,8 @@ export async function runIncrementalSync(
         return null;
       }
 
-      allChanges.push(...response.changes);
+      for (const entry of response.changes) changesByPath.set(entry.path, entry);
+      changeCount += response.changes.length;
       latestSeq = response.lastSeq;
 
       if (!response.hasMore || response.changes.length === 0) {
@@ -45,25 +49,22 @@ export async function runIncrementalSync(
         break;
       }
 
+      if (lastChange.seq <= since) throw new Error('Changelog cursor did not advance');
       since = lastChange.seq;
     }
 
-    logger.info(`Incremental sync: ${allChanges.length} remote changes since seq ${context.settings.lastSeq}`);
+    logger.info(`Incremental sync: ${changeCount} remote changes since seq ${context.settings.lastSeq}`);
 
     const localChanges = await context.getLocalChanges();
     const localDeletes = await context.getLocalDeletes();
     logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
     logger.info(`Incremental sync: ${localDeletes.length} local deletes detected`);
 
-    if (allChanges.length === 0 && localChanges.length === 0 && localDeletes.length === 0) {
+    if (changeCount === 0 && localChanges.length === 0 && localDeletes.length === 0) {
       context.settings.lastSeq = latestSeq;
       return createEmptySyncResult();
     }
 
-    const changesByPath = new Map<string, ChangelogEntry>();
-    for (const entry of allChanges) {
-      changesByPath.set(entry.path, entry);
-    }
 
     const result = createEmptySyncResult();
     const {
@@ -106,35 +107,42 @@ export async function runIncrementalSync(
           result.errors.push(`${diff.path}: ${outcome.reason}`);
         }
       } catch (error) {
+        if (isAbortError(error)) throw error;
         result.errors.push(`${diff.path}: ${errorMessage(error)}`);
       }
     }
 
-    const localOnlyUploads: PreparedUpload[] = [];
-    for (const file of localOnlyChanges) {
+    const preparedChunks = prepareUploadChunks(localOnlyChanges, async (file) => {
+      context.throwIfDestroyed?.();
       try {
         const uploadFile = await context.prepareUploadFromPath(file.path);
         if (uploadFile) {
           if (resurrectPaths.has(file.path)) {
             uploadFile.expectedHash = null;
           }
-          localOnlyUploads.push(uploadFile);
+          return uploadFile;
         }
       } catch (error) {
+        if (isAbortError(error)) throw error;
         result.errors.push(`${file.path}: ${errorMessage(error)}`);
+      } finally {
+        current++;
+        options.progressCallback?.(current, total);
       }
-      current++;
-      options.progressCallback?.(current, total);
-    }
-
-    await context.uploadPreparedFiles(localOnlyUploads, result, {
-      concurrency: options.uploadConcurrency,
-      retry: true,
-      ...(context.reconcileVersionConflicts ? {
-        onVersionConflicts: (paths: string[], syncResult: SyncResult) =>
-          context.reconcileVersionConflicts!(paths, syncResult),
-      } : {}),
+      return null;
     });
+
+    for await (const chunk of preparedChunks) {
+      context.throwIfDestroyed?.();
+      await context.uploadPreparedFiles(chunk, result, {
+        concurrency: options.uploadConcurrency,
+        retry: true,
+        ...(context.reconcileVersionConflicts ? {
+          onVersionConflicts: (paths: string[], syncResult: SyncResult) =>
+            context.reconcileVersionConflicts!(paths, syncResult),
+        } : {}),
+      });
+    }
     for (const path of resurrectPaths) {
       if (result.uploadedPaths.includes(path)) {
         recordResolvedRace(result, path, "kept-local-edit");

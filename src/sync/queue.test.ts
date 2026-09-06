@@ -385,6 +385,17 @@ describe('clearSyncedPendingPaths', () => {
 });
 
 describe('processPendingChanges', () => {
+	it('uploads bounded chunks before preparing the entire queue', async () => {
+		const harness = createFlushHarness({ prepareUploadFromPath: async path => ({
+			path, content: new ArrayBuffer(1), size: 1, hash: 'hash', mtime: 1,
+		}) });
+		for (let i = 0; i < 300; i++) harness.pendingPaths.add(`image-${i}.png`);
+		await processPendingChanges(harness.context, 2);
+		expect(harness.uploadFile).toHaveBeenCalledTimes(300);
+		expect(harness.uploadFile.mock.invocationCallOrder[0])
+			.toBeLessThan(harness.prepareUploadFromPath.mock.invocationCallOrder[299]!);
+		expect(harness.pendingPaths.size).toBe(0);
+	});
 	it('flushes uploads/deletes and updates manifest/state on success', async () => {
 		const harness = createFlushHarness({
 			prepareUploadFromPath: async path => ({
@@ -565,7 +576,7 @@ describe('processPendingChanges', () => {
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not requeue or mark error when an in-flight queue upload aborts', async () => {
+	it('requeues uncertain uploads after abort without marking an error', async () => {
 		const harness = createFlushHarness({
 			prepareUploadFromPath: async path => ({
 				path,
@@ -584,8 +595,9 @@ describe('processPendingChanges', () => {
 		await processPendingChanges(harness.context, 4);
 
 		expect(harness.state.status).not.toBe('error');
-		expect(harness.pendingPaths.has('notes/a.md')).toBe(false);
-		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
+		expect(harness.pendingPaths.has('notes/a.md')).toBe(true);
+		expect(harness.state.status).toBe('idle');
+		expect(harness.triggerDebouncedSync).toHaveBeenCalled();
 	});
 
 	it('keeps successful deletes committed and requeues only failed remote deletes', async () => {

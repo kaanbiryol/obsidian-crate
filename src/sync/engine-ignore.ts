@@ -57,6 +57,8 @@ export function shouldIgnoreConfiguredPath(
 	path: string,
 	context: IgnoreMatcherContext,
 ): boolean {
+	// Recovery copies created by local trash must never re-enter sync.
+	if (path === '.trash' || path.startsWith('.trash/')) return true;
 	for (const prefix of context.ignoredDirPrefixes) {
 		if (path.startsWith(prefix) || path === prefix.slice(0, -1)) {
 			return true;

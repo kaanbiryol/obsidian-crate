@@ -67,6 +67,9 @@ export class LocalManifest {
 	private tmpPath: string;
 	private manifest: FileManifest;
 	private dirty: boolean;
+	private revision = 0;
+	private generation = 0;
+	private saveChain: Promise<void> = Promise.resolve();
 
 	constructor(app: App, pluginManifest: PluginManifest) {
 		this.app = app;
@@ -78,71 +81,60 @@ export class LocalManifest {
 
 	/**
 	 * Load manifest from its dedicated file.
-	 * If the main file is corrupt/missing but a .tmp file exists,
-	 * recover from the temp file (crash during previous save).
+	 * Select the newest valid main or temporary generation after a crash.
+	 * Legacy manifests without a generation are treated as generation zero.
 	 */
 	async load(): Promise<void> {
 		const adapter = this.app.vault.adapter;
-
-		let loaded = false;
-
-		if (await adapter.exists(this.manifestPath)) {
+		const read = async (path: string) => {
 			try {
-				const raw = await adapter.read(this.manifestPath);
-				const parsed = normalizeFileManifest(JSON.parse(raw));
-				if (parsed) {
-					this.manifest = parsed;
-					loaded = true;
-				}
+				if (!await adapter.exists(path)) return null;
+				const parsed: unknown = JSON.parse(await adapter.read(path));
+				const manifest = normalizeFileManifest(parsed);
+				if (!manifest) return null;
+				const generation = isRecord(parsed) ? normalizeNonNegativeInteger(parsed.generation) ?? 0 : 0;
+				return { manifest, generation };
 			} catch {
-				logger.warn('Main manifest corrupt, attempting recovery from tmp');
+				logger.warn(`Could not read manifest checkpoint: ${path}`);
+				return null;
+			}
+		};
+		const main = await read(this.manifestPath);
+		const tmp = await read(this.tmpPath);
+		const recoverTmp = tmp && (!main || tmp.generation > main.generation);
+		const selected = recoverTmp ? tmp : main;
+		if (selected) {
+			this.manifest = selected.manifest;
+			this.generation = selected.generation;
+			if (recoverTmp) {
+				// Leave tmp intact if promotion fails, so the next load can retry.
+				await adapter.write(this.manifestPath, JSON.stringify({ ...this.manifest, generation: this.generation }));
+				logger.info('Recovered newer manifest checkpoint');
 			}
 		}
-
-		if (!loaded && await adapter.exists(this.tmpPath)) {
-			try {
-				const raw = await adapter.read(this.tmpPath);
-				const parsed = normalizeFileManifest(JSON.parse(raw));
-				if (parsed) {
-					this.manifest = parsed;
-					// Promote recovered tmp to main file
-					await adapter.write(this.manifestPath, JSON.stringify(this.manifest));
-					loaded = true;
-					logger.info('Recovered manifest from tmp file');
-				}
-			} catch {
-				logger.warn('Tmp manifest also corrupt, starting fresh');
-			}
-		}
-
-		// Clean up leftover tmp file
 		if (await adapter.exists(this.tmpPath)) {
-			try {
-				await adapter.remove(this.tmpPath);
-			} catch { /* best effort */ }
+			try { await adapter.remove(this.tmpPath); } catch { /* best effort */ }
 		}
-
 		logger.info(`Manifest loaded with ${this.getFileCount()} files`);
 	}
 
-	/**
-	 * Save manifest to its dedicated file. Skips write if nothing changed.
-	 * Writes to a .tmp file first for crash safety — if the process dies
-	 * mid-write, the next load() recovers from the tmp file.
-	 */
-	async save(): Promise<void> {
-		if (!this.dirty) return;
-		const data = JSON.stringify(this.manifest);
+	/** Serialize checkpoints and include changes made while disk writes await. */
+	save(): Promise<void> {
+		const save = this.saveChain.catch(() => {}).then(() => this.persist());
+		this.saveChain = save;
+		return save;
+	}
+
+	private async persist(): Promise<void> {
 		const adapter = this.app.vault.adapter;
-		// Write to tmp first
-		await adapter.write(this.tmpPath, data);
-		// Write to main
-		await adapter.write(this.manifestPath, data);
-		// Clean up tmp
-		try {
-			await adapter.remove(this.tmpPath);
-		} catch { /* best effort */ }
-		this.dirty = false;
+		while (this.dirty) {
+			const revision = this.revision;
+			const data = JSON.stringify({ ...this.manifest, generation: ++this.generation });
+			await adapter.write(this.tmpPath, data);
+			await adapter.write(this.manifestPath, data);
+			try { await adapter.remove(this.tmpPath); } catch { /* best effort */ }
+			this.dirty = revision !== this.revision;
+		}
 	}
 
 	/**
@@ -157,6 +149,7 @@ export class LocalManifest {
 	 */
 	setEntry(path: string, entry: FileEntry): void {
 		this.manifest.files[path] = entry;
+		this.revision++;
 		this.dirty = true;
 	}
 
@@ -165,6 +158,7 @@ export class LocalManifest {
 	 */
 	removeEntry(path: string): void {
 		delete this.manifest.files[path];
+		this.revision++;
 		this.dirty = true;
 	}
 
@@ -187,6 +181,7 @@ export class LocalManifest {
 	 */
 	replaceManifest(manifest: FileManifest): void {
 		this.manifest = normalizeFileManifest(manifest) ?? { version: 1, files: {} };
+		this.revision++;
 		this.dirty = true;
 	}
 
@@ -217,6 +212,7 @@ export class LocalManifest {
 	 */
 	clear(): void {
 		this.manifest = { version: 1, files: {} };
+		this.revision++;
 		this.dirty = true;
 	}
 }

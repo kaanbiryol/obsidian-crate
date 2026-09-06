@@ -122,7 +122,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 		expect(harness.settings.lastSeq).toBe(6);
 	});
 
-	it('hard deletes hidden files for remote delete changes', async () => {
+	it('trashes hidden files for remote delete changes', async () => {
 		const content = new TextEncoder().encode('hidden base').buffer as ArrayBuffer;
 		const hash = await computeHash(content);
 		const harness = createIncrementalHarness({
@@ -153,7 +153,8 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 		expect(result?.deleted).toBe(1);
 		expect(harness.fileManager.trashFile).not.toHaveBeenCalled();
 		expect(harness.vault.delete).not.toHaveBeenCalled();
-		expect(harness.vault.adapter.remove).toHaveBeenCalledWith('.vault-config/workspace.json');
+		expect(harness.vault.adapter.trashLocal).toHaveBeenCalledWith('.vault-config/workspace.json');
+		expect(harness.vault.adapter.remove).not.toHaveBeenCalled();
 		expect(harness.localManifest.removeEntry).toHaveBeenCalledWith('.vault-config/workspace.json');
 		expect(harness.settings.lastSeq).toBe(6);
 	});
