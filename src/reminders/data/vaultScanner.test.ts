@@ -18,6 +18,25 @@ function makeMockFile(path: string): TFile {
   return file;
 }
 
+it.each(['read', 'atomic callback'])('stops ID normalization if shutdown happens during %s', async boundary => {
+  const controller = new AbortController();
+  const original = '- [ ] Keep this note unchanged';
+  let persisted = original;
+  const process = vi.fn(async (_file: TFile, update: (content: string) => string) => {
+    controller.abort();
+    persisted = update(persisted);
+    return persisted;
+  });
+  const app = { vault: { cachedRead: async () => {
+    if (boundary === 'read') controller.abort();
+    return original;
+  }, process } } as unknown as App;
+  const result = await scanFile(app, makeMockFile('Reminders/Inbox.md'), 'Reminders', new Set(), controller.signal);
+  expect(persisted).toBe(original);
+  expect(result.reminders).toEqual([]);
+  expect(process).toHaveBeenCalledTimes(boundary === 'read' ? 0 : 1);
+});
+
 describe('vaultScanner', () => {
   it('derives project from paths using case-sensitive vault semantics', () => {
     expect(getProjectFromPath('Reminders/Work.md', 'Reminders')).toBe('Work');

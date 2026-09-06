@@ -205,7 +205,7 @@ describe('initializeReminders', () => {
 
 		await initializeReminders(plugin as never);
 
-		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders');
+		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders', expect.any(AbortSignal));
 		expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
 		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex);
 		expect(createReminderRepository).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
@@ -261,7 +261,48 @@ describe('reinitializeReminders', () => {
 		await reinitializeReminders(plugin as never, ' Reminders/Work/ ');
 
 		expect(oldWatcher.unregister).toHaveBeenCalledTimes(1);
-		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders/Work');
+		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders/Work', expect.any(AbortSignal));
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
 	});
+});
+
+it('does not publish a reminder backend or register UI after shutdown during index load', async () => {
+  const { initializeReminders } = await loadPluginIntegrationModule();
+  let finish!: () => void;
+  reminderIndexLoad.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+  const plugin = createPlugin();
+  const starting = initializeReminders(plugin as never);
+  const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+  endPluginLifecycle(plugin as never);
+  finish();
+  await starting;
+  expect(plugin.reminderIndex).toBeUndefined();
+  expect(latestWatcher.register).not.toHaveBeenCalled();
+  expect(createMarkdownWriter).not.toHaveBeenCalled();
+  expect(plugin.registerView).not.toHaveBeenCalled();
+});
+
+it('keeps the newer folder backend when an older scan finishes last', async () => {
+  const { initializeReminders, reinitializeReminders } = await loadPluginIntegrationModule();
+  let finish!: () => void;
+  reminderIndexLoad.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+  const plugin = createPlugin();
+  const first = initializeReminders(plugin as never);
+  await reinitializeReminders(plugin as never, 'NewFolder');
+  const current = plugin.reminderIndex;
+  finish();
+  await first;
+  expect(plugin.reminderIndex).toBe(current);
+  expect(latestWatcher.register).toHaveBeenCalledOnce();
+  expect((reminderIndexFactory.mock.calls[0]?.[2] as AbortSignal).aborted).toBe(true);
+});
+
+it('does not auto-open the view after unloading before layout is ready', async () => {
+  const { initializeReminders } = await loadPluginIntegrationModule();
+  const plugin = createPlugin();
+  await initializeReminders(plugin as never);
+  const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+  endPluginLifecycle(plugin as never);
+  plugin.getLayoutReadyHandler()?.();
+  expect(plugin.activateRemindersView).not.toHaveBeenCalled();
 });

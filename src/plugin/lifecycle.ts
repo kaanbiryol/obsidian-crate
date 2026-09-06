@@ -16,51 +16,57 @@ import {
   handleCloudflareOAuthProtocol,
 } from "../cloudflare/plugin-integration";
 import { showCloudflareServerUpdateNotice } from "../cloudflare/update-notice";
+import { beginPluginLifecycle, endPluginLifecycle } from './lifecycle-state';
 
 const logger = createLogger("Plugin");
-const activePlugins = new WeakSet<CratePlugin>();
 
 export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
+  const signal = beginPluginLifecycle(plugin);
   logger.info("Plugin loaded");
 
-  const coreInitialized = await initializePluginCore(plugin);
-  if (!coreInitialized) {
+  const coreInitialized = await initializePluginCore(plugin, signal);
+  if (!coreInitialized || signal.aborted) {
     return;
   }
-  activePlugins.add(plugin);
 
   plugin.registerSettingsTab(new CrateSettingTab(plugin.app, plugin));
   registerVaultSyncEventHandlers(plugin);
   if (plugin.remindersSettings.enabled) {
-    await initializePluginReminders(plugin);
+    await initializePluginReminders(plugin, signal);
   }
-  await initializePluginSync(plugin);
+  if (signal.aborted) return;
+  await initializePluginSync(plugin, signal);
+  if (signal.aborted) return;
   showCloudflareServerUpdateNotice(plugin);
   registerPluginCommands(plugin);
   registerPluginProtocols(plugin);
-  void reconcileNotificationsAfterStartupSync(plugin);
+  void reconcileNotificationsAfterStartupSync(plugin, signal);
 }
 
 export function shutdownPlugin(plugin: CratePlugin): void {
-  activePlugins.delete(plugin);
+  endPluginLifecycle(plugin);
   plugin.syncRuntime?.destroy();
   plugin.cloudflareDeploymentService?.destroy();
   plugin.remindersVaultWatcher?.unregister();
 }
 
-async function initializePluginCore(plugin: CratePlugin): Promise<boolean> {
+async function initializePluginCore(plugin: CratePlugin, signal: AbortSignal): Promise<boolean> {
   try {
     plugin.secretStorage = new SecretStorageService(
       plugin.app,
       () => plugin.settings?.cloudflareDeployment?.deploymentId ?? plugin.settings?.workerUrl ?? null,
     );
     await plugin.loadSettings();
+    if (signal.aborted) return false;
     await restoreManagedWorkerConnection(plugin);
+    if (signal.aborted) return false;
     plugin.cloudflareDeploymentService = createCloudflareDeploymentService(plugin);
     initializeSyncManagers(plugin);
     ensurePluginDeviceId(plugin);
     return true;
   } catch (error) {
+    if (signal.aborted) return false;
+    shutdownPlugin(plugin);
     const message = errorMessage(error);
     logger.error("Plugin initialization failed:", message);
     new Notice(`Crate failed to initialize: ${message}`);
@@ -83,7 +89,7 @@ async function restoreManagedWorkerConnection(plugin: CratePlugin): Promise<void
   });
 }
 
-async function initializePluginSync(plugin: CratePlugin): Promise<void> {
+async function initializePluginSync(plugin: CratePlugin, signal: AbortSignal): Promise<void> {
   try {
     if (plugin.syncRuntime.isConfigured()) {
       await plugin.syncRuntime.initialize();
@@ -91,23 +97,25 @@ async function initializePluginSync(plugin: CratePlugin): Promise<void> {
       showSetupNotice(plugin);
     }
   } catch (error) {
+    if (signal.aborted) return;
     const message = errorMessage(error);
     logger.error("Sync initialization failed:", message);
     new Notice(`Crate sync failed to start: ${message}`);
   }
 }
 
-async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin): Promise<void> {
+async function reconcileNotificationsAfterStartupSync(plugin: CratePlugin, signal: AbortSignal): Promise<void> {
   try {
     const startupSyncRan = await plugin.syncRuntime.waitForStartupSync();
-    if (!activePlugins.has(plugin)) return;
+    if (signal.aborted) return;
     if (!plugin.remindersSettings.enabled || !plugin.reminderIndex) return;
     if (startupSyncRan) {
       await plugin.reminderIndex.load();
     }
-    if (!activePlugins.has(plugin)) return;
+    if (signal.aborted) return;
     await ensureReminderNotificationPolicy(plugin);
   } catch (error) {
+    if (signal.aborted) return;
     logger.warn("Failed to refresh reminders after startup sync:", errorMessage(error));
   }
 }
@@ -133,10 +141,11 @@ function registerPluginProtocols(plugin: CratePlugin): void {
   });
 }
 
-async function initializePluginReminders(plugin: CratePlugin): Promise<void> {
+async function initializePluginReminders(plugin: CratePlugin, signal: AbortSignal): Promise<void> {
   try {
     await initializeReminders(plugin);
   } catch (error) {
+    if (signal.aborted) return;
     const message = errorMessage(error);
     logger.error("Reminders initialization failed:", message);
     new Notice(`Reminders failed to initialize: ${message}`);

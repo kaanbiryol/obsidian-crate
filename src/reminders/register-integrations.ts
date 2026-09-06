@@ -5,11 +5,14 @@ import { ReminderQueryInjector } from './query/injector';
 import { createRemindersBlockExtension } from './query/remindersBlockLivePreview';
 import { RemindersView, VIEW_TYPE_REMINDERS } from './ui/adapters/reminders-view';
 import { createLogger } from './utils/logger';
+import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 
 const remindersLogger = createLogger('Reminders');
 const registeredReminderUi = new WeakSet<CratePlugin>();
 
 export function registerReminderIntegrations(plugin: CratePlugin): void {
+	const signal = getPluginLifecycleSignal(plugin);
+	if (signal.aborted) return;
 	if (registeredReminderUi.has(plugin)) {
 		return;
 	}
@@ -56,6 +59,7 @@ export function registerReminderIntegrations(plugin: CratePlugin): void {
 
 	if (plugin.remindersSettings.autoOpenView !== 'none') {
 		plugin.app.workspace.onLayoutReady(() => {
+			if (signal.aborted) return;
 			if (plugin.remindersSettings.autoOpenView === 'sidebar') {
 				void plugin.activateRemindersView();
 			}

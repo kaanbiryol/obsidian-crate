@@ -260,7 +260,7 @@ Response: `{ publicKey: "base64url-encoded-key" }`
 
 ### POST /notifications/reminders-exchange (public)
 
-Consumes a one-time web enrollment token and creates a per-device PWA auth token in `auth_tokens`.
+Consumes a one-time web enrollment token and creates a per-device PWA auth token in `auth_tokens` in one transaction. A failed transaction preserves the enrollment token. Concurrent exchanges can create only one session. A successful transaction whose response is lost still consumes the token; recovery requires a new enrollment link.
 
 Request: `{ token, deviceName?, previousAuthToken? }`
 

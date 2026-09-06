@@ -20,6 +20,7 @@ import { SyncRuntime } from '../sync/runtime';
 import type { CrateSettingTab } from '../ui/settings-tab';
 import { configureSyncLogger } from './logger';
 import { bootstrapPlugin, shutdownPlugin } from './lifecycle';
+import { getPluginLifecycleSignal } from './lifecycle-state';
 import { createSettingsUiState, type SettingsUiState } from './settings-ui-state';
 import { SecretStorageService } from './secret-storage';
 import { buildPersistedCrateSettings, normalizeCrateSettings, type CrateSettings } from './settings';
@@ -57,7 +58,9 @@ export default class CratePlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
+		const signal = getPluginLifecycleSignal(this);
 		const data = await this.loadData() as PluginData | null;
+		if (signal.aborted) return;
 		this.settings = normalizeCrateSettings(data, this.app.vault.configDir);
 		const remindersSettings = normalizeRemindersSettings(data?.reminders);
 		useRemindersSettingsStore.setState(remindersSettings, true);
@@ -118,14 +121,18 @@ export default class CratePlugin extends Plugin {
 	}
 
 	async enableReminders(): Promise<void> {
+		const signal = getPluginLifecycleSignal(this);
+		if (signal.aborted) return;
 		if (this.remindersSettings.enabled && this.reminderIndex) {
 			return;
 		}
 
 		await this.writeRemindersSettings({ enabled: true });
+		if (signal.aborted) return;
 		try {
 			await initializeReminders(this);
 		} catch (error) {
+			if (signal.aborted) return;
 			this.remindersVaultWatcher?.unregister();
 			await this.writeRemindersSettings({ enabled: false });
 			throw error;

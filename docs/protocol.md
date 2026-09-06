@@ -55,3 +55,5 @@ Every committed Markdown file records its reminder identities and each dated occ
 Duplicate identities within the configured reminders folder quarantine projection and are omitted from the web list with per-file issues. Editing an ambiguous identity returns 409. Committing a repair or deletion queues all affected source files again.
 
 An explicit fresh enrollment link replaces a stored browser session, including an expired one. The exchange can accept the previous reminder credential solely to revoke that credential and its subscriptions; it cannot revoke a vault credential. Local cache and drafts are cleared before the new authority is installed, and other tabs adopt its folder.
+
+Enrollment consumption, replacement-session creation and previous-session revocation commit atomically. A rolled-back exchange leaves the link usable. A response lost after a successful commit does not make that link reusable; open a new link from Crate to enroll again.

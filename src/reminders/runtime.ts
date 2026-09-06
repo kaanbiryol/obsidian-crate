@@ -4,19 +4,38 @@ import { createMarkdownWriter } from './data/markdown-writer';
 import { createReminderRepository } from './data/reminder-repository';
 import { VaultWatcher } from './services/vaultWatcher';
 import { createLogger } from './utils/logger';
+import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 
 const remindersLogger = createLogger('Reminders');
 const notificationTasks = new WeakMap<CratePlugin, Promise<void>>();
+const backends = new WeakMap<CratePlugin, AbortController>();
 
-export async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Promise<void> {
+export async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Promise<boolean> {
+	const lifetime = getPluginLifecycleSignal(plugin);
+	if (lifetime.aborted) return false;
+	backends.get(plugin)?.abort();
+	const controller = new AbortController();
+	backends.set(plugin, controller);
+	const abort = () => controller.abort();
+	lifetime.addEventListener('abort', abort, { once: true });
+	controller.signal.addEventListener('abort', () => lifetime.removeEventListener('abort', abort), { once: true });
 	plugin.remindersVaultWatcher?.unregister();
 
-	plugin.reminderIndex = createReminderIndex(plugin.app, folderPath);
-	await plugin.reminderIndex.load();
-	plugin.markdownWriter = createMarkdownWriter(plugin.app, plugin.reminderIndex);
-	plugin.reminderRepository = createReminderRepository(plugin.reminderIndex, plugin.markdownWriter);
+	const index = createReminderIndex(plugin.app, folderPath, controller.signal);
+	try {
+		await index.load();
+	} catch (error) {
+		const cancelled = controller.signal.aborted;
+		controller.abort();
+		if (cancelled) return false;
+		throw error;
+	}
+	if (controller.signal.aborted) return false;
+	plugin.reminderIndex = index;
+	plugin.markdownWriter = createMarkdownWriter(plugin.app, index);
+	plugin.reminderRepository = createReminderRepository(index, plugin.markdownWriter);
 	plugin.markdownWriter.setOnFileWritten(async (file) => {
-		await plugin.reminderIndex.rescanFile(file, true);
+		await index.rescanFile(file, true);
 	});
 
 	plugin.remindersVaultWatcher = new VaultWatcher(
@@ -24,6 +43,7 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 		plugin.reminderIndex,
 	);
 	plugin.remindersVaultWatcher.register();
+	return true;
 }
 
 export async function ensureReminderNotificationPolicy(plugin: CratePlugin): Promise<void> {
