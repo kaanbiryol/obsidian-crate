@@ -1,0 +1,67 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import schema from '../schema.sql?raw';
+import { handleExchangeRemindersEnrollmentToken } from './notification-enrollment-handlers';
+import { issueWebEnrollmentToken } from './web-enrollment';
+import { handleListReminders } from './reminders-web/routes/list';
+import { scanReminderMarkdownFile } from './reminders-web/scan';
+import { REMINDER_CACHE_PARSER_VERSION } from './reminders-web/reminder-cache';
+import { sha256Hex } from './auth';
+
+beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+afterEach(async () => { vi.restoreAllMocks(); await reset(); });
+
+it('preserves a fresh enrollment token when session creation fails before commit', async () => {
+  const enrollment = await issueWebEnrollmentToken(env.DB, 'Reminders');
+  const request = () => new Request('https://test/exchange', { method: 'POST', body: JSON.stringify({ token: enrollment.token }) });
+  const db = { prepare: env.DB.prepare.bind(env.DB), batch: async () => { throw new Error('Injected database outage before session commit'); } } as unknown as D1Database;
+  await expect(handleExchangeRemindersEnrollmentToken(request(), db)).rejects.toThrow('Injected');
+  const tokens = await env.DB.prepare('SELECT COUNT(*) AS count FROM web_enrollment_tokens').first<{ count: number }>();
+  const sessions = await env.DB.prepare('SELECT COUNT(*) AS count FROM auth_tokens').first<{ count: number }>();
+  const retry = await handleExchangeRemindersEnrollmentToken(request(), env.DB);
+  console.log(JSON.stringify({ probe: 'enrollment-commit-failure', remainingTokens: tokens?.count, sessions: sessions?.count, retryStatus: retry.status }));
+  expect(retry.status).toBe(200);
+});
+
+it.each([1000, 10000])('measures a warm list of %i one-reminder files', async count => {
+  // Synthetic warm cache benchmark: no R2 transfer, browser rendering, hosted
+  // CPU or network latency is included. Cache rows use the production parser.
+  for (let offset = 0; offset < count; offset += 500) {
+    const rows = await Promise.all(Array.from({ length: Math.min(500, count - offset) }, async (_, index) => {
+      const n = offset + index;
+      const path = `Reminders/Note-${String(n).padStart(5, '0')}.md`;
+      const content = `- [ ] Task ${n} @2099-01-02 <!-- crate-id:${crypto.randomUUID()} -->`;
+      return { path, hash: await sha256Hex(content), size: new TextEncoder().encode(content).byteLength, reminders: scanReminderMarkdownFile(path, content, 'Reminders') };
+    }));
+    const json = JSON.stringify(rows);
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO files (path, portable_path, hash, size, storage_key)
+        SELECT json_extract(value, '$.path'), lower(json_extract(value, '$.path')), json_extract(value, '$.hash'), json_extract(value, '$.size'), json_extract(value, '$.path') FROM json_each(?)`).bind(json),
+      env.DB.prepare(`INSERT INTO reminder_file_cache (folder_path, file_path, file_hash, parser_version, reminders_json)
+        SELECT 'Reminders', json_extract(value, '$.path'), json_extract(value, '$.hash'), ?, json_extract(value, '$.reminders') FROM json_each(?)`).bind(REMINDER_CACHE_PARSER_VERSION, json),
+    ]);
+  }
+  const query = vi.spyOn(env.DB, 'prepare');
+  const samples = [];
+  for (let sample = 0; sample < 5; sample++) {
+    query.mockClear();
+    const start = performance.now();
+    const response = await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders'), env);
+    const body = await response.text();
+    const elapsed = performance.now() - start;
+    const parsed = JSON.parse(body) as { reminders: Array<{ id: string }>; issues: unknown[] };
+    expect(response.status).toBe(200);
+    expect(parsed.reminders).toHaveLength(count);
+    expect(new Set(parsed.reminders.map(reminder => reminder.id)).size).toBe(count);
+    expect(parsed.issues).toEqual([]);
+    const queries = query.mock.calls.length;
+    query.mockClear();
+    const unchangedStart = performance.now();
+    const unchanged = await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders', { headers: { 'If-None-Match': response.headers.get('ETag')! } }), env);
+    expect(unchanged.status).toBe(304);
+    samples.push({ wallMs: +elapsed.toFixed(2), bytes: new TextEncoder().encode(body).byteLength, queries, unchangedWallMs: +(performance.now() - unchangedStart).toFixed(2), unchangedQueries: query.mock.calls.length });
+  }
+  throw new Error('AUDIT_MEASUREMENT ' + JSON.stringify({ probe: 'warm-list-local-only', count, samples }));
+}, 120_000);

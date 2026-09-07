@@ -1,0 +1,21 @@
+
+> obsidian-crate@0.1.0 test:pwa-browser
+> node scripts/pwa-cache-test.mjs && node scripts/pwa-focus-test.mjs && node scripts/pwa-ui-performance-test.mjs
+
+chromium: cache migration, metadata-only refresh, revision guards and clearing passed
+webkit: cache migration, metadata-only refresh, revision guards and clearing passed
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+locator.waitFor: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }) to be visible[22m
+
+    at /Users/kaanbiryol/Documents/Projects/obsidian-crate/scripts/pwa-focus-test.mjs:16:15 {
+  name: 'TimeoutError'
+}
+
+Node.js v24.19.0

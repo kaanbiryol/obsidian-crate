@@ -1,0 +1,29 @@
+
+> obsidian-crate@0.1.0 build
+> npm run build:worker && npm run typecheck && npm run build:plugin
+
+
+> obsidian-crate@0.1.0 build:worker
+> node scripts/build-worker.mjs
+
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+
+> obsidian-crate@0.1.0 typecheck
+> tsc -noEmit -skipLibCheck
+
+
+> obsidian-crate@0.1.0 build:plugin
+> vite build
+
+vite v8.0.16 building client environment for production...
+[2Ktransforming...Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 1235 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/styles.css    139.01 kB │ gzip:  18.64 kB
+dist/main.js     1,347.63 kB │ gzip: 745.77 kB
+
+✓ built in 1.06s

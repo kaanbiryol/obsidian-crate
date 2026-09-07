@@ -15,12 +15,12 @@ describe('sync activity modal styles', () => {
 		expect(styles).toContain('--crate-activity-header-control-size: var(--clickable-icon-size');
 		expect(styles).toContain('--crate-activity-space-inline: var(--size-4-4, 16px)');
 		expect(header).toContain('min-height: 44px');
-		expect(header).toContain('padding: 4px 10px');
+		expect(header).toContain('padding: 12px var(--crate-activity-space-inline)');
 		expect(title).toContain('font-size: var(--font-ui-medium, var(--font-text-size))');
 		expect(title).toContain('font-weight: var(--font-medium)');
 		expect(closeButton).toContain('width: var(--crate-activity-header-control-size)');
 		expect(syncButton).toContain('width: var(--crate-activity-header-control-size)');
-		expect(styles).toContain('margin: 0 var(--crate-activity-space-inline) 10px');
-		expect(styles).toContain('padding: 4px var(--crate-activity-space-inline) 14px');
+		expect(styles).toContain('margin: 0 var(--crate-activity-space-inline) 16px');
+		expect(styles).toContain('padding: 0 var(--crate-activity-space-inline) 20px');
 	});
 });

@@ -80,6 +80,14 @@ function normalizeCloudflareDeployment(value: unknown): CloudflareDeploymentMeta
 		workersSubdomain,
 		lastDeployedVersion: normalizeNullableString(value.lastDeployedVersion),
 		lastDeployedFingerprint,
+		...(isRecord(value.reset) && typeof value.reset.id === 'string' && /^[a-f0-9]{32}$/.test(value.reset.id)
+			&& (value.reset.phase === 'clearing' || value.reset.phase === 'rebuilding')
+			&& typeof value.reset.databaseId === 'string' && /^[a-f0-9-]{36}$/i.test(value.reset.databaseId)
+			&& typeof value.reset.bucketCreatedAt === 'string' && value.reset.bucketCreatedAt.length > 0
+			&& typeof value.reset.namespaceId === 'string' && /^[a-f0-9]{32}$/i.test(value.reset.namespaceId)
+			? { reset: { id: value.reset.id, phase: value.reset.phase, databaseId: value.reset.databaseId,
+				bucketCreatedAt: value.reset.bucketCreatedAt, namespaceId: value.reset.namespaceId,
+				...(value.reset.deleteOnly === true ? { deleteOnly: true as const } : {}) } } : {}),
 	};
 }
 
@@ -127,6 +135,9 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 		merged: normalizeNonNegativeInteger(value.merged, 0),
 		deleted: normalizeNonNegativeInteger(value.deleted, 0),
 		errorCount: normalizeNonNegativeInteger(value.errorCount, 0),
+		...(Array.isArray(value.errors) ? {
+			errors: value.errors.filter((error): error is string => typeof error === 'string').slice(0, MAX_SYNC_HISTORY_PATHS),
+		} : {}),
 		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
 		...(typeof value.resolvedRaceCount === 'number' ? {
 			resolvedRaceCount: normalizeNonNegativeInteger(value.resolvedRaceCount, 0),

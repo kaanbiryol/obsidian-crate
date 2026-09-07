@@ -1,0 +1,7 @@
+
+> obsidian-crate@0.1.0 test:pwa-preview
+> node scripts/pwa-smoke-test.mjs
+
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+PWA preview smoke test passed on http://127.0.0.1:50593

@@ -1,0 +1,36 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/Documents/Projects/obsidian-crate
+
+stdout | src/cloudflare/worker/audit-candidate.integration.ts > preserves a fresh enrollment token when session creation fails before commit
+{"probe":"enrollment-commit-failure","remainingTokens":0,"sessions":0,"retryStatus":401}
+
+ ❯ src/cloudflare/worker/audit-candidate.integration.ts (3 tests | 1 failed) 1397ms
+   × preserves a fresh enrollment token when session creation fails before commit 34ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cloudflare/worker/audit-candidate.integration.ts > preserves a fresh enrollment token when session creation fails before commit
+AssertionError: expected 401 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 401
+
+ ❯ src/cloudflare/worker/audit-candidate.integration.ts:25:24
+     23|   const retry = await handleExchangeRemindersEnrollmentToken(request()…
+     24|   console.log(JSON.stringify({ probe: 'enrollment-commit-failure', rem…
+     25|   expect(retry.status).toBe(200);
+       |                        ^
+     26| });
+     27|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  19:36:04
+   Duration  5.30s (transform 1.40s, setup 0ms, import 2.92s, tests 1.40s, environment 0ms)
+

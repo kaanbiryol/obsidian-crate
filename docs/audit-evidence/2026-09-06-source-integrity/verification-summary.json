@@ -1,0 +1,24 @@
+{
+  "commit": "d66e0fa2059b0b439f7455bb57fe47f1ba64575f",
+  "releaseCheckNode24_19_0": 0,
+  "cleanReleaseCheckNode24_0_0": 0,
+  "unitTests": 1003,
+  "workerIntegrationTests": 63,
+  "recoveryTests": 17,
+  "visualTests": 48,
+  "visualTypecheckExit": 0,
+  "secretScanExit": 0,
+  "secretHistoryCommits": 437,
+  "npmVulnerabilities": 0,
+  "releaseMatrixBuildsIdentical": true,
+  "newConfirmedDefects": {
+    "medium": 2
+  },
+  "unverified": [
+    "hosted independent-account OAuth and paired restore",
+    "physical iOS/Android installed push and sync",
+    "minimum Obsidian 1.13.0 host behavior",
+    "hosted cold/warm capacity"
+  ],
+  "temporaryExecutableProbesRemoved": true
+}

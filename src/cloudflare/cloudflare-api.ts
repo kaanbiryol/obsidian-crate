@@ -38,6 +38,9 @@ export interface CloudflareWorkerBinding {
 	id?: string;
 	bucket_name?: string;
 	class_name?: string;
+	namespace_id?: string;
+	script_name?: string;
+	service?: string;
 }
 
 export interface CloudflareWorkerSettings {
@@ -48,8 +51,15 @@ export interface CloudflareWorkerSettings {
 	bindings?: CloudflareWorkerBinding[];
 }
 
+export interface DurableObjectNamespace {
+	id?: string;
+	class?: string;
+	script?: string;
+}
+
 interface R2Bucket {
 	name?: string;
+	creation_date?: string;
 }
 
 interface D1QueryResult {
@@ -97,8 +107,6 @@ export function buildWorkerMultipartBody(input: {
 	d1DatabaseId: string;
 	r2BucketName: string;
 }): { body: ArrayBuffer; contentType: string } {
-	const boundary = `crate-${randomBase64Url(18)}`;
-	const encoder = new TextEncoder();
 	const metadata = {
 		main_module: 'worker.mjs',
 		compatibility_date: '2026-08-18',
@@ -115,10 +123,25 @@ export function buildWorkerMultipartBody(input: {
 			ReminderAlarm: { type: 'durable-object', storage: 'sqlite', state: 'created' },
 		},
 	};
+	return buildWorkerModule(metadata, input.artifacts.workerBundle);
+}
+
+export function buildResetWorkerMultipartBody(resetId: string, databaseId: string, bucketName: string): { body: ArrayBuffer; contentType: string } {
+	return buildWorkerModule({
+		main_module: 'worker.mjs', compatibility_date: '2026-08-18',
+		annotations: { 'workers/message': `Crate reset ${resetId}`, 'workers/tag': 'crate' },
+		bindings: [{ type: 'd1', name: 'DB', id: databaseId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName }],
+		exports: { ReminderAlarm: { type: 'durable-object', state: 'deleted' } },
+	}, 'export default { fetch() { return new Response("Crate server reset in progress", { status: 503 }); }, scheduled() {} };');
+}
+
+function buildWorkerModule(metadata: Record<string, unknown>, workerBundle: string): { body: ArrayBuffer; contentType: string } {
+	const boundary = `crate-${randomBase64Url(18)}`;
+	const encoder = new TextEncoder();
 	const parts = [
 		encoder.encode(`--${boundary}\r\nContent-Disposition: form-data; name="metadata"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(metadata)}\r\n`),
 		encoder.encode(`--${boundary}\r\nContent-Disposition: form-data; name="worker.mjs"; filename="worker.mjs"\r\nContent-Type: application/javascript+module\r\n\r\n`),
-		encoder.encode(input.artifacts.workerBundle),
+		encoder.encode(workerBundle),
 		encoder.encode(`\r\n--${boundary}--\r\n`),
 	];
 	return {
@@ -166,6 +189,10 @@ export class CloudflareApiClient {
 		}
 	}
 
+	async deleteD1Database(accountId: string, databaseId: string): Promise<void> {
+		await this.request(`/accounts/${encodeURIComponent(accountId)}/d1/database/${encodeURIComponent(databaseId)}`, { method: 'DELETE' });
+	}
+
 	async findD1Database(accountId: string, name: string): Promise<D1Database | null> {
 		const result = await this.request<D1Database[]>(
 			`/accounts/${accountId}/d1/database?name=${encodeURIComponent(name)}&per_page=100`,
@@ -195,6 +222,89 @@ export class CloudflareApiClient {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ name }),
+		});
+	}
+
+	async listDurableObjectNamespaces(accountId: string): Promise<DurableObjectNamespace[]> {
+		const namespaces: DurableObjectNamespace[] = [];
+		const seen = new Set<string>();
+		const invalid = () => new Error('Could not verify the complete Durable Object namespace listing.');
+		for (let page = 1; page <= 10000; page++) {
+			const response = await this.requestEnvelope<DurableObjectNamespace[]>(`/accounts/${accountId}/workers/durable_objects/namespaces?page=${page}&per_page=100`);
+			const pages = response.result_info?.total_pages;
+			const reportedPage = response.result_info?.page;
+			if (!Array.isArray(response.result)
+				|| (reportedPage !== undefined && reportedPage !== page)
+				|| (pages !== undefined && (typeof pages !== 'number' || !Number.isSafeInteger(pages) || pages < 0))) {
+				throw invalid();
+			}
+			for (const namespace of response.result) {
+				if (!namespace || typeof namespace.id !== 'string' || !namespace.id || seen.has(namespace.id)) throw invalid();
+				seen.add(namespace.id);
+			}
+			namespaces.push(...response.result);
+			if (typeof pages === 'number') {
+				if ((pages === 0 && namespaces.length > 0) || (pages > page && response.result.length === 0)) throw invalid();
+				if (page >= pages) return namespaces;
+			} else if (response.result.length === 0) {
+				return namespaces;
+			}
+			// Pagination metadata is optional. Without a total, require an empty page,
+			// rather than treating a short page as proof that the inventory is complete.
+		}
+		throw invalid();
+	}
+
+	async listR2Objects(accountId: string, bucketName: string, cursor?: string): Promise<{ keys: string[]; cursor?: string }> {
+		const params = new URLSearchParams({ per_page: '1000' });
+		if (cursor) params.set('cursor', cursor);
+		const response = await this.requestEnvelope<Array<{ key?: string }>>(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects?${params}`);
+		const info = response.result_info;
+		const invalid = (reason: string) => new Error(`Could not verify the complete R2 object listing. ${reason}`);
+		if (!Array.isArray(response.result) || response.result.some(object => !object || typeof object.key !== 'string' || !object.key)) {
+			throw invalid('Cloudflare returned an invalid object list.');
+		}
+		if (info !== undefined && (!info || typeof info !== 'object' || Array.isArray(info))) {
+			throw invalid('Cloudflare returned invalid pagination metadata.');
+		}
+		const next = info?.cursor;
+		const truncated = info?.is_truncated;
+		if ((next != null && typeof next !== 'string')
+			|| (truncated !== undefined && typeof truncated !== 'boolean')) {
+			throw invalid('Cloudflare returned invalid cursor or truncation metadata.');
+		}
+		if (truncated === true && !next) throw invalid('The page is truncated but has no continuation cursor.');
+		if (truncated === false && next) throw invalid('The final page unexpectedly has a continuation cursor.');
+		if (next && next === cursor) throw invalid('The continuation cursor did not advance.');
+		// The REST API uses CursorPagination in Cloudflare's SDK: is_truncated
+		// is optional; an absent/empty cursor ends the listing.
+		return { keys: response.result.map(object => object.key!), ...(next ? { cursor: next } : {}) };
+	}
+
+	async deleteR2Object(accountId: string, bucketName: string, key: string): Promise<void> {
+		if (key.split('/').some(segment => segment === '.' || segment === '..')) throw new Error('Unsafe R2 object key.');
+		const objectPath = key.split('/').map(segment => encodeURIComponent(segment)).join('/');
+		await this.request(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${objectPath}`, { method: 'DELETE' });
+	}
+
+	async deleteR2Bucket(accountId: string, bucketName: string): Promise<void> {
+		await this.request(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}`, { method: 'DELETE' });
+	}
+
+	async deleteWorker(accountId: string, workerName: string): Promise<void> {
+		const response = await this.transport(`${API_BASE_URL}/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
+			method: 'DELETE', headers: { Authorization: `Bearer ${this.accessToken}` },
+		});
+		const envelope = asEnvelope<unknown>(parseJson(response.text));
+		if (response.status < 200 || response.status >= 300 || (response.text.trim() && !envelope?.success)) {
+			throw new CloudflareApiError(envelope?.errors?.[0]?.message || `Worker deletion failed with HTTP ${response.status}`, response.status, null);
+		}
+	}
+
+	async retireCrateWorker(accountId: string, workerName: string, resetId: string, databaseId: string, bucketName: string): Promise<void> {
+		const multipart = buildResetWorkerMultipartBody(resetId, databaseId, bucketName);
+		await this.request(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
+			method: 'PUT', headers: { 'Content-Type': multipart.contentType }, body: multipart.body,
 		});
 	}
 
@@ -271,6 +381,10 @@ export class CloudflareApiClient {
 	}
 
 	private async request<T>(path: string, request: HttpRequest = { method: 'GET' }): Promise<T> {
+		return (await this.requestEnvelope<T>(path, request)).result;
+	}
+
+	private async requestEnvelope<T>(path: string, request: HttpRequest = { method: 'GET' }): Promise<CloudflareEnvelope<T>> {
 		const response = await this.transport(`${API_BASE_URL}${path}`, {
 			...request,
 			headers: {
@@ -288,6 +402,6 @@ export class CloudflareApiClient {
 				typeof firstError?.code === 'number' ? firstError.code : null,
 			);
 		}
-		return envelope.result;
+		return envelope;
 	}
 }

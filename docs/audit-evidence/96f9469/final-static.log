@@ -1,0 +1,8 @@
+
+> obsidian-crate@0.1.0 lint
+> eslint .
+
+
+> obsidian-crate@0.1.0 typecheck:visual
+> tsc -p tests/visual/tsconfig.json
+

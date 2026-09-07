@@ -39,6 +39,17 @@ describe('activity history', () => {
         expect(find(container, 'crate-history-dot')).toBeUndefined();
     });
 
+    it('shows errors even when no files transferred', () => {
+        const container = render({ success: false, uploaded: 0, uploadedPaths: [], errorCount: 1, errors: ['Upload failed: Notes.md'] });
+        expect(find(container, 'crate-history-details')).toBeDefined();
+        expect(container.collectText()).toContain('Upload failed: Notes.md');
+    });
+
+    it('explains missing details in older history entries', () => {
+        const container = render({ success: false, uploadedPaths: [], errorCount: 1 });
+        expect(container.collectText()).toContain('Error details were not saved');
+    });
+
     it('spells out transfer and deletion counts', () => {
         const container = render({ downloaded: 2, deleted: 3 });
         expect(container.collectText()).toContain('1 uploaded, 2 downloaded, 3 deleted');

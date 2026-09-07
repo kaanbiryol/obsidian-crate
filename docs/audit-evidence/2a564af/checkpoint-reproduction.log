@@ -1,0 +1,51 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/Documents/Projects/obsidian-crate
+
+stdout | src/sync/reaudit-checkpoint.test.ts > detects a same-length local edit between download apply and checkpoint metadata capture after events are lost
+checkpoint race result {
+  checkpoint: {
+    hash: 'c6c1c9a9c8543f1e4cd980064cf1625eeb61a90703b2464fff039f21682508b3',
+    revision: 'remote-revision',
+    size: 4,
+    modified: '1970-01-01T00:00:03.000Z'
+  },
+  actualHash: '262121c5372be8af3ae6ff0d3d138d9e6e1249335222c7f0e02535e35073bb0b',
+  changes: [],
+  detected: false
+}
+
+ ❯ src/sync/reaudit-checkpoint.test.ts (1 test | 1 failed) 23ms
+   × detects a same-length local edit between download apply and checkpoint metadata capture after events are lost 22ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/sync/reaudit-checkpoint.test.ts > detects a same-length local edit between download apply and checkpoint metadata capture after events are lost
+AssertionError: expected [] to deeply equal [ { path: 'note.md', …(1) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "hash": "262121c5372be8af3ae6ff0d3d138d9e6e1249335222c7f0e02535e35073bb0b",
+-     "path": "note.md",
+-   },
+- ]
++ []
+
+ ❯ src/sync/reaudit-checkpoint.test.ts:36:19
+     34|   const detected = await hasLocalFileChanges(h.vault as never, h.local…
+     35|   console.log('checkpoint race result', { checkpoint, actualHash: awai…
+     36|   expect(changes).toEqual([{ path, hash: await computeHash(content) }]…
+       |                   ^
+     37|   expect(detected).toBe(true);
+     38| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  18:55:14
+   Duration  522ms (transform 156ms, setup 0ms, import 197ms, tests 23ms, environment 0ms)
+

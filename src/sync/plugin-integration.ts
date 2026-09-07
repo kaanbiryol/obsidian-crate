@@ -1,3 +1,4 @@
+import { showSyncErrorNotice } from '../ui/sync-error-notice';
 import { Notice, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../main';
 import { type ForegroundSyncReason, SyncRuntime } from './runtime';
@@ -71,6 +72,9 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 async function runSyncNow(plugin: CratePlugin): Promise<void> {
 	try {
 		const result = await plugin.syncRuntime.sync();
+		if (!result.success) {
+			showSyncErrorNotice(plugin, 'Sync completed with errors.');
+		}
 		notifyConflicts(result.conflicts);
 	} catch (error) {
 		new Notice(`Sync failed: ${errorMessage(error)}`);
@@ -109,7 +113,7 @@ async function runForceFullSync(plugin: CratePlugin): Promise<void> {
 		if (result.success) {
 			new Notice(`Force sync complete: ${result.uploaded} uploaded, ${result.deleted} deleted`);
 		} else {
-			new Notice(`Force sync completed with errors: ${result.errors.join(', ')}`);
+			showSyncErrorNotice(plugin, 'Force sync completed with errors.');
 		}
 	} catch (error) {
 		new Notice(`Force full sync failed: ${errorMessage(error)}`);

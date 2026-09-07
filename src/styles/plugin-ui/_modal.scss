@@ -1,6 +1,74 @@
 @use "../../ui/shared/styles/delete-confirmation";
 
 @mixin styles {
+.crate-modal-body {
+  padding: 20px;
+}
+
+.crate-modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.crate-status-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: var(--font-ui-medium);
+  line-height: 1.5;
+
+  p { margin: 0; min-width: 0; font-size: inherit; line-height: inherit; }
+}
+
+.crate-status-icon {
+  display: flex;
+  flex: 0 0 18px;
+  // Center the glyph in the first text line, including when the message wraps.
+  height: 1.5em;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    stroke-width: 1.75px;
+  }
+  color: var(--text-accent);
+
+  &.is-error { color: var(--text-error); }
+  &.is-success { color: var(--text-success); }
+  &.is-working svg { animation: crate-spin 1s linear infinite; }
+}
+
+.crate-status-guidance,
+.crate-status-details {
+  margin: 14px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.crate-status-details {
+  summary { cursor: pointer; }
+  p { margin: 8px 0 0; user-select: text; }
+}
+
+.crate-status-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crate-status-icon.is-working svg { animation: none; }
+}
+
+body.reduce-motion & .crate-status-icon.is-working svg { animation: none; }
+
 .base-modal-container {
   position: fixed;
 }

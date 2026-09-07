@@ -1,0 +1,9 @@
+
+> obsidian-crate@0.1.0 test:recovery
+> python3 -m unittest discover -s scripts/recovery -p "test_*.py"
+
+.................
+----------------------------------------------------------------------
+Ran 17 tests in 0.165s
+
+OK

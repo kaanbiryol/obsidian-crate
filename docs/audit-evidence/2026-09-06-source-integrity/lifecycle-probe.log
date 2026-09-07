@@ -1,0 +1,34 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/Documents/Projects/obsidian-crate
+
+stdout | src/plugin/audit-lifecycle.test.ts > audit: does not reactivate after shutdown during settings load
+{"probe":"shutdown-during-settings","managersCreated":1,"syncInitialized":1,"destroyed":0,"eventRegistration":1,"protocolRegistration":2}
+
+ ❯ src/plugin/audit-lifecycle.test.ts (9 tests | 1 failed | 8 skipped) 20ms
+   × audit: does not reactivate after shutdown during settings load 19ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/plugin/audit-lifecycle.test.ts > audit: does not reactivate after shutdown during settings load
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array []
+
+
+Number of calls: 1
+
+ ❯ src/plugin/audit-lifecycle.test.ts:417:26
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 skipped (9)
+   Start at  19:35:59
+   Duration  267ms (transform 48ms, setup 0ms, import 48ms, tests 20ms, environment 0ms)
+

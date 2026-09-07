@@ -1,0 +1,101 @@
+
+> obsidian-crate@0.1.0 test:visual
+> playwright test
+
+[2m[WebServer] [22m(node:15828) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 48 tests using 4 workers
+
+(node:15877) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15876) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15878) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15875) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15875) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15878) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15877) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15876) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m6:05:52 PM [vite] (client) Pre-transform error: ENOENT: no such file or directory, open '/Users/kaanbiryol/Documents/Projects/obsidian-crate/dist/styles.css'
+[2m[WebServer] [22m6:05:52 PM [vite] Internal server error: ENOENT: no such file or directory, open '/Users/kaanbiryol/Documents/Projects/obsidian-crate/dist/styles.css'
+[2m[WebServer] [22m      at async open (node:internal/fs/promises:697:25)
+[2m[WebServer] [22m      at async Object.readFile (node:internal/fs/promises:1348:14)
+[2m[WebServer] [22m      at async LoadPluginContext.handler (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:19155:46)
+[2m[WebServer] [22m      at async EnvironmentPluginContainer.load (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:30345:19)
+[2m[WebServer] [22m      at async loadAndTransform (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:24599:21)
+[2m[WebServer] [22m6:05:52 PM [vite] Internal server error: ENOENT: no such file or directory, open '/Users/kaanbiryol/Documents/Projects/obsidian-crate/dist/styles.css'
+[2m[WebServer] [22m      at async open (node:internal/fs/promises:697:25)
+[2m[WebServer] [22m      at async Object.readFile (node:internal/fs/promises:1348:14)
+[2m[WebServer] [22m      at async LoadPluginContext.handler (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:19155:46)
+[2m[WebServer] [22m      at async EnvironmentPluginContainer.load (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:30345:19)
+[2m[WebServer] [22m      at async loadAndTransform (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:24599:21)
+[2m[WebServer] [22m6:05:52 PM [vite] Internal server error: ENOENT: no such file or directory, open '/Users/kaanbiryol/Documents/Projects/obsidian-crate/dist/styles.css'
+[2m[WebServer] [22m      at async open (node:internal/fs/promises:697:25)
+[2m[WebServer] [22m      at async Object.readFile (node:internal/fs/promises:1348:14)
+[2m[WebServer] [22m      at async LoadPluginContext.handler (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:19155:46)
+[2m[WebServer] [22m      at async EnvironmentPluginContainer.load (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:30345:19)
+[2m[WebServer] [22m      at async loadAndTransform (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:24599:21)
+[2m[WebServer] [22m6:05:53 PM [vite] Internal server error: ENOENT: no such file or directory, open '/Users/kaanbiryol/Documents/Projects/obsidian-crate/dist/styles.css'
+[2m[WebServer] [22m      at async open (node:internal/fs/promises:697:25)
+[2m[WebServer] [22m      at async Object.readFile (node:internal/fs/promises:1348:14)
+[2m[WebServer] [22m      at async LoadPluginContext.handler (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:19155:46)
+[2m[WebServer] [22m      at async EnvironmentPluginContainer.load (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:30345:19)
+[2m[WebServer] [22m      at async loadAndTransform (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:24599:21)
+[2m[WebServer] [22m      at async viteTransformMiddleware (file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/vite/dist/node/chunks/node.js:24440:20)
+  ✓   3 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 editor (2.0s)
+  ✓   1 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 cards (2.0s)
+  ✓   4 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 date (2.1s)
+  ✓   2 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 project (2.1s)
+  ✓   5 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 weekly (758ms)
+  ✓   6 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 monthly (758ms)
+  ✓   7 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 cards (810ms)
+  ✓   8 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 editor (989ms)
+  ✓   9 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 date (665ms)
+  ✓  10 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 project (705ms)
+  ✓  11 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 weekly (821ms)
+  ✓  12 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 monthly (739ms)
+  ✓  13 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 cards (466ms)
+  ✓  14 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 editor (558ms)
+  ✓  15 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 date (524ms)
+  ✓  16 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 project (611ms)
+  ✓  17 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 weekly (587ms)
+  ✓  18 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 monthly (574ms)
+  ✓  19 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 cards (598ms)
+  ✓  20 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 editor (578ms)
+  ✓  21 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 date (624ms)
+  ✓  22 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 project (617ms)
+  ✓  23 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 weekly (609ms)
+  ✓  24 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 monthly (594ms)
+  ✓  25 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 cards (629ms)
+  ✓  26 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 editor (587ms)
+  ✓  27 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 date (588ms)
+  ✓  28 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 project (691ms)
+  ✓  29 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 weekly (721ms)
+  ✓  30 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 monthly (652ms)
+  ✓  31 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 cards (680ms)
+  ✓  32 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 editor (662ms)
+  ✓  34 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 project (477ms)
+  ✓  33 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 date (567ms)
+  ✓  35 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 weekly (716ms)
+  ✓  36 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 monthly (598ms)
+  ✓  37 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 cards (620ms)
+  ✓  38 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 editor (564ms)
+  ✓  39 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 date (627ms)
+  ✓  40 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 project (635ms)
+  ✓  41 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 weekly (670ms)
+  ✓  42 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 monthly (657ms)
+  ✓  43 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 cards (602ms)
+  ✓  44 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 editor (637ms)
+  ✓  45 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 date (613ms)
+  ✓  46 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 project (670ms)
+  ✓  47 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 weekly (519ms)
+  ✓  48 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 monthly (445ms)
+
+  48 passed (13.4s)

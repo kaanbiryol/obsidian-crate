@@ -1,0 +1,38 @@
+import { expect, it, vi } from 'vitest';
+import { createTransferHarness, emptyResult } from './transfer-test-harness';
+import { downloadAndSaveFile } from './transfer-download';
+import { computeHash } from './hasher';
+import { getLocalChanges } from './planner-local';
+import { hasLocalFileChanges } from './local-file-changes';
+
+it('detects a same-length local edit between download apply and checkpoint metadata capture after events are lost', async () => {
+  const h = createTransferHarness();
+  const path = 'note.md';
+  const bytes = (text: string) => new TextEncoder().encode(text).buffer as ArrayBuffer;
+  let content = bytes('base');
+  const file = { path, extension: 'md', stat: { size: 4, mtime: 1000 } };
+  h.vault.getAbstractFileByPath.mockReturnValue(file);
+  h.adapter.readBinary.mockImplementation(async () => content);
+  h.vault.modifyBinary.mockImplementation(async (_file, next) => { content = next; file.stat.mtime = 2000; });
+  Object.assign(h.vault, { getFiles: () => [file] });
+  Object.assign(h.adapter, { list: async () => ({ files: [], folders: [] }) });
+  const remote = bytes('next');
+  const remoteHash = await computeHash(remote);
+  h.api.downloadFile.mockResolvedValue({ content: remote, hash: remoteHash, size: 4, revision: 'remote-revision' });
+  h.getModifiedIso.mockImplementation(async () => {
+    // A real local edit lands after the atomic write; startup events are paused,
+    // or the process restarts before the volatile event queue is flushed.
+    content = bytes('edit'); file.stat.mtime = 3000;
+    return new Date(file.stat.mtime).toISOString();
+  });
+  await downloadAndSaveFile(h.context, { path, expectedLocalHash: await computeHash(content), expectedRemoteHash: remoteHash, remoteSize: 4 }, emptyResult());
+  const checkpoint = h.localManifest.setEntry.mock.calls.at(-1)![1];
+  h.localManifest.getEntry.mockReturnValue(checkpoint);
+  Object.assign(h.localManifest, { getAllPaths: () => [path] });
+  const context = { ...h.context, shouldIgnore: () => false };
+  const changes = await getLocalChanges(context as never, 1);
+  const detected = await hasLocalFileChanges(h.vault as never, h.localManifest as never, () => false);
+  console.log('checkpoint race result', { checkpoint, actualHash: await computeHash(content), changes, detected });
+  expect(changes).toEqual([{ path, hash: await computeHash(content) }]);
+  expect(detected).toBe(true);
+});

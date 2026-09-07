@@ -1,0 +1,5 @@
+
+> obsidian-crate@0.1.0 verify:release-artifacts
+> node scripts/verify-release-artifacts.mjs
+
+Release artifacts verified for Crate 0.1.0

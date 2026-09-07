@@ -1,0 +1,22 @@
+
+> obsidian-crate@0.1.0 size-check
+> npm run size-check:plugin && npm run size-check:worker && npm run size-check:pwa
+
+
+> obsidian-crate@0.1.0 size-check:plugin
+> node scripts/check-bundle-size.mjs plugin
+
+dist/main.js: raw 1318.31 KiB / budget 1416.02 KiB, gzip 728.61 KiB / budget 800.78 KiB
+dist/styles.css: raw 135.75 KiB / budget 136.72 KiB, gzip 18.34 KiB / budget 19.53 KiB
+
+> obsidian-crate@0.1.0 size-check:worker
+> node scripts/check-bundle-size.mjs worker
+
+.generated/cloudflare/worker.mjs: raw 1182.85 KiB / budget 1396.48 KiB, gzip 544.22 KiB / budget 600.59 KiB
+
+> obsidian-crate@0.1.0 size-check:pwa
+> node scripts/check-bundle-size.mjs pwa
+
+.generated/cloudflare/pwa-client.json#app.js: raw 103.95 KiB / budget 107.42 KiB, gzip 34.04 KiB / budget 35.16 KiB
+.generated/cloudflare/pwa-client.json#startup-assets: raw 385.47 KiB / budget 390.63 KiB, gzip 128.04 KiB / budget 129.88 KiB
+.generated/cloudflare/pwa-client.json#all-assets: raw 406.95 KiB / budget 454.10 KiB, gzip 135.21 KiB / budget 141.60 KiB

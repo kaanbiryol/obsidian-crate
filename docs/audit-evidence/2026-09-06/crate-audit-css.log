@@ -1,0 +1,7 @@
+
+> obsidian-crate@0.1.0 check:css-scope
+> node scripts/check-css-scope.mjs
+
+All selectors in dist/styles.css are scoped to Crate-owned classes.
+Shadow DOM mount selectors target their classes on the same element.
+Shared primary-screen styles are included in the plugin stylesheet.

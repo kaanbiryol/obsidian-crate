@@ -1,0 +1,38 @@
+[
+  {
+    "node": "20.19.0",
+    "hashes": {
+      "dist/main.js": "792e73c432bcdd7dbfa3640749f8d657c5fe67980fce5425fd6a1ad8536cfb78",
+      "manifest.json": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a",
+      "dist/styles.css": "363fa581fbe07a14c2ae31bce715b1cc92551f1c6037f85989ab79428149692f",
+      ".generated/cloudflare/worker.mjs": "cd42b517575c7552652a5820bd1e5681044d7acbcead3a1b9f104d93a460da26",
+      ".generated/cloudflare/pwa-client.json": "ca1371a4bf1fd600a6b17f79e754a424f5ef829c0cce71fb178dcbfcc6849476"
+    },
+    "matchesCandidate": false,
+    "matchesReleaseMatrix": true
+  },
+  {
+    "node": "22.12.0",
+    "hashes": {
+      "dist/main.js": "792e73c432bcdd7dbfa3640749f8d657c5fe67980fce5425fd6a1ad8536cfb78",
+      "manifest.json": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a",
+      "dist/styles.css": "363fa581fbe07a14c2ae31bce715b1cc92551f1c6037f85989ab79428149692f",
+      ".generated/cloudflare/worker.mjs": "cd42b517575c7552652a5820bd1e5681044d7acbcead3a1b9f104d93a460da26",
+      ".generated/cloudflare/pwa-client.json": "ca1371a4bf1fd600a6b17f79e754a424f5ef829c0cce71fb178dcbfcc6849476"
+    },
+    "matchesCandidate": false,
+    "matchesReleaseMatrix": true
+  },
+  {
+    "node": "24.0.0",
+    "hashes": {
+      "dist/main.js": "792e73c432bcdd7dbfa3640749f8d657c5fe67980fce5425fd6a1ad8536cfb78",
+      "manifest.json": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a",
+      "dist/styles.css": "363fa581fbe07a14c2ae31bce715b1cc92551f1c6037f85989ab79428149692f",
+      ".generated/cloudflare/worker.mjs": "cd42b517575c7552652a5820bd1e5681044d7acbcead3a1b9f104d93a460da26",
+      ".generated/cloudflare/pwa-client.json": "ca1371a4bf1fd600a6b17f79e754a424f5ef829c0cce71fb178dcbfcc6849476"
+    },
+    "matchesCandidate": false,
+    "matchesReleaseMatrix": true
+  }
+]

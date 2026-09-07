@@ -1,0 +1,52 @@
+"""Defect reproductions; passing assertions establish the audited bad behavior."""
+import io
+import os
+import sys
+import unittest
+import urllib.error
+from pathlib import Path
+from unittest.mock import patch, Mock
+sys.path.insert(0, str(Path(__file__).parent))
+from test_archive import ArchiveTests, Remote, recovery
+from cloudflare import Cloudflare
+
+
+class AuditTransport(unittest.TestCase):
+    def test_429_retry_after_is_not_retried(self):
+        error = urllib.error.HTTPError('https://api.cloudflare.com/test', 429, 'limited', {'Retry-After': '1'}, io.BytesIO(b''))
+        opener = Mock()
+        opener.open.side_effect = error
+        with patch.dict(os.environ, {'CLOUDFLARE_API_TOKEN': 'audit-fixture'}), patch('urllib.request.build_opener', return_value=opener):
+            remote = Cloudflare('account', 'db', 'bucket')
+            with self.assertRaisesRegex(RuntimeError, 'HTTP 429'):
+                remote.get_object('object')
+        self.assertEqual(opener.open.call_count, 1)
+
+
+class AuditRestore(ArchiveTests):
+    def test_upload_ack_loss_makes_the_same_restore_target_unusable(self):
+        recovery.backup(self.remote, self.directory)
+        target = Remote(b'', {})
+        target.database, target.bucket = 'restore', 'restore'
+        original = target.put_object
+        def lose_ack(key, data, content_type):
+            original(key, data, content_type)
+            raise RuntimeError('Connection closed after upload')
+        target.put_object = lose_ack
+        with self.assertRaisesRegex(RuntimeError, 'Connection closed'):
+            recovery.restore(target, self.directory)
+        self.assertTrue(target.objects)
+        self.assertFalse(target.imported)
+        target.put_object = original
+        with self.assertRaisesRegex(RuntimeError, 'Target not empty'):
+            recovery.restore(target, self.directory)
+        self.assertFalse(target.imported)
+
+
+if __name__ == '__main__':
+    suite = unittest.TestSuite([
+        AuditTransport('test_429_retry_after_is_not_retried'),
+        AuditRestore('test_upload_ack_loss_makes_the_same_restore_target_unusable'),
+    ])
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    sys.exit(not result.wasSuccessful())

@@ -1,0 +1,22 @@
+{
+  "candidate": "67cd40c1fdb6985bfccbf17e6babb8e8aa33c145",
+  "version": "0.1.0",
+  "protocol": 5,
+  "schema": 2,
+  "recorded_at": "2026-09-06T18:15:18.630912+00:00",
+  "sha256": {
+    "dist/main.js": "d350735c7cfebd7024b78486353825096fb8a2cad13090ea2eea2fced7a710d3",
+    "dist/styles.css": "363fa581fbe07a14c2ae31bce715b1cc92551f1c6037f85989ab79428149692f",
+    "manifest.json": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a",
+    ".generated/cloudflare/worker.mjs": "266644aef922e51553adbd7e6b32dfbcab90201312919c5a9f30719234e10e5f",
+    "package-lock.json": "326ff30d8473fdd11b1934c62a00f14163968610e50a11bf1b0cc48832016afe"
+  },
+  "commits": [
+    "0d9d958aeca78895571947c396a7d94e51074ca5",
+    "67cd40c1fdb6985bfccbf17e6babb8e8aa33c145"
+  ],
+  "unrelated_tracked_changes": [
+    "site/assets/site.css",
+    "site/index.html"
+  ]
+}

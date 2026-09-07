@@ -1,0 +1,139 @@
+
+> obsidian-crate@0.1.0 release:check
+> npm run check && npm run test:pwa-preview && npm run build:plugin && npm run check:css-scope && npm run size-check && npm run verify:release-artifacts && npm run test:pwa-browser
+
+
+> obsidian-crate@0.1.0 check
+> npm run lint && npm run typecheck && npm run typecheck:worker && npm run deadcode && npm run notices:check && npm run test:recovery && npm test && npm run test:worker-runtime
+
+
+> obsidian-crate@0.1.0 lint
+> eslint .
+
+
+> obsidian-crate@0.1.0 typecheck
+> tsc -noEmit -skipLibCheck
+
+
+> obsidian-crate@0.1.0 typecheck:worker
+> tsc -p src/cloudflare/worker/tsconfig.json --noEmit -skipLibCheck
+
+
+> obsidian-crate@0.1.0 deadcode
+> knip
+
+
+> obsidian-crate@0.1.0 notices:check
+> node scripts/generate-third-party-notices.mjs --check
+
+Third-party notices are up to date.
+
+> obsidian-crate@0.1.0 test:recovery
+> python3 -m unittest discover -s scripts/recovery -p "test_*.py"
+
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.034s
+
+OK
+
+> obsidian-crate@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.8 /Users/kaanbiryol/Documents/Projects/obsidian-crate
+
+
+ Test Files  177 passed (177)
+      Tests  1013 passed (1013)
+   Start at  16:51:35
+   Duration  12.56s (transform 7.66s, setup 0ms, import 49.66s, tests 7.04s, environment 13ms)
+
+
+> obsidian-crate@0.1.0 test:worker-runtime
+> npm run build:worker && vitest run --config vitest.cloudflare.config.ts
+
+
+> obsidian-crate@0.1.0 build:worker
+> node scripts/build-worker.mjs
+
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+
+ RUN  v4.1.8 /Users/kaanbiryol/Documents/Projects/obsidian-crate
+
+
+ Test Files  6 passed (6)
+      Tests  42 passed (42)
+   Start at  16:51:49
+   Duration  7.63s (transform 6.61s, setup 0ms, import 24.49s, tests 2.25s, environment 0ms)
+
+
+> obsidian-crate@0.1.0 test:pwa-preview
+> node scripts/pwa-smoke-test.mjs
+
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+PWA preview smoke test passed on http://127.0.0.1:57215
+
+> obsidian-crate@0.1.0 build:plugin
+> vite build
+
+vite v8.0.16 building client environment for production...
+[2Ktransforming...✓ 1242 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/styles.css    139.01 kB │ gzip:  18.64 kB
+dist/main.js     1,373.86 kB │ gzip: 759.04 kB
+
+✓ built in 959ms
+
+> obsidian-crate@0.1.0 check:css-scope
+> node scripts/check-css-scope.mjs
+
+All selectors in dist/styles.css are scoped to Crate-owned classes.
+Shadow DOM mount selectors target their classes on the same element.
+Shared primary-screen styles are included in the plugin stylesheet.
+
+> obsidian-crate@0.1.0 size-check
+> npm run size-check:plugin && npm run size-check:worker && npm run size-check:pwa
+
+
+> obsidian-crate@0.1.0 size-check:plugin
+> node scripts/check-bundle-size.mjs plugin
+
+dist/main.js: raw 1341.67 KiB / budget 1416.02 KiB, gzip 739.77 KiB / budget 800.78 KiB
+dist/styles.css: raw 135.75 KiB / budget 136.72 KiB, gzip 18.34 KiB / budget 19.53 KiB
+
+> obsidian-crate@0.1.0 size-check:worker
+> node scripts/check-bundle-size.mjs worker
+
+.generated/cloudflare/worker.mjs: raw 1209.42 KiB / budget 1396.48 KiB, gzip 553.28 KiB / budget 600.59 KiB
+
+> obsidian-crate@0.1.0 size-check:pwa
+> node scripts/check-bundle-size.mjs pwa
+
+.generated/cloudflare/pwa-client.json#app.js: raw 106.13 KiB / budget 107.42 KiB, gzip 34.89 KiB / budget 35.16 KiB
+.generated/cloudflare/pwa-client.json#startup-assets: raw 388.77 KiB / budget 390.63 KiB, gzip 129.49 KiB / budget 129.88 KiB
+.generated/cloudflare/pwa-client.json#all-assets: raw 410.85 KiB / budget 454.10 KiB, gzip 137.07 KiB / budget 141.60 KiB
+
+> obsidian-crate@0.1.0 verify:release-artifacts
+> node scripts/verify-release-artifacts.mjs
+
+Release artifacts verified for Crate 0.1.0
+
+> obsidian-crate@0.1.0 test:pwa-browser
+> node scripts/pwa-cache-test.mjs && node scripts/pwa-focus-test.mjs && node scripts/pwa-ui-performance-test.mjs && node scripts/pwa-safety-test.mjs
+
+chromium: cache migration, metadata-only refresh, revision guards and clearing passed
+webkit: cache migration, metadata-only refresh, revision guards and clearing passed
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+chromium: synchronous focus, discarded drafts and saving local edits passed
+webkit: synchronous focus, discarded drafts and saving local edits passed
+chromium: node reuse, typing, undo/redo, paste, composition, pull layout and viewport batching passed
+webkit: node reuse, typing, undo/redo, paste, composition, pull layout and viewport batching passed
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+chromium: failed saves retain drafts across reload and logout clears open tabs
+webkit: failed saves retain drafts across reload and logout clears open tabs

@@ -1,3 +1,4 @@
+import { renderServerResetSetting } from './server-reset-setting';
 import { Notice, Setting } from 'obsidian';
 import { runSyncDiagnostics } from '../../sync/diagnostics';
 import { getErrorMessage, runButtonTask } from './action-helpers';
@@ -14,6 +15,7 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 	const { containerEl, plugin, isConfigured } = context;
 
 	createSettingsSubsectionHeading(containerEl, 'Server management');
+	renderServerResetSetting(containerEl, plugin);
 
 	const diagnosticsContainer = containerEl.createDiv({ cls: 'crate-diagnostics' });
 	diagnosticsContainer.hide();

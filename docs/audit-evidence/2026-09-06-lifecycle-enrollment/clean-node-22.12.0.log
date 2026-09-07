@@ -1,0 +1,26 @@
+
+> obsidian-crate@0.1.0 build
+> npm run build:worker && npm run typecheck && npm run build:plugin
+
+
+> obsidian-crate@0.1.0 build:worker
+> node scripts/build-worker.mjs
+
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+
+> obsidian-crate@0.1.0 typecheck
+> tsc -noEmit -skipLibCheck
+
+
+> obsidian-crate@0.1.0 build:plugin
+> vite build
+
+vite v8.0.16 building client environment for production...
+[2Ktransforming...✓ 1242 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/styles.css    138.63 kB │ gzip:  18.58 kB
+dist/main.js     1,365.23 kB │ gzip: 757.94 kB
+
+✓ built in 1.10s

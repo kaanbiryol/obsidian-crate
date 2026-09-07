@@ -1,0 +1,15 @@
+{
+  "embeddedPayloads": [
+    1,
+    1
+  ],
+  "identicalOutsideGzip": true,
+  "decompressedSha256": [
+    [
+      "cd42b517575c7552652a5820bd1e5681044d7acbcead3a1b9f104d93a460da26"
+    ],
+    [
+      "cd42b517575c7552652a5820bd1e5681044d7acbcead3a1b9f104d93a460da26"
+    ]
+  ]
+}

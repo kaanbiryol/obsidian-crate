@@ -7,6 +7,12 @@ import {
 	CLOUDFLARE_OAUTH_SCOPES,
 } from './oauth-config';
 
+const deleteCrateServer = vi.hoisted(() => vi.fn(async (_input: unknown) => {}));
+vi.mock('./server-delete', () => ({ deleteCrateServer }));
+
+const resetCrateServer = vi.hoisted(() => vi.fn(async (_input: unknown) => {}));
+vi.mock('./server-reset', () => ({ resetCrateServer }));
+
 const apiMocks = vi.hoisted(() => ({
 	accounts: [{ id: '0123456789abcdef0123456789abcdef', name: 'Personal' }],
 	constructedWithTokens: [] as string[],
@@ -91,6 +97,7 @@ function createHarness() {
 		})),
 		openExternal: url => opened.push(url),
 		selectDeployment: vi.fn(async (deployments: DiscoveredCloudflareDeployment[]) => deployments[0] ?? null),
+		beforeServerReset: vi.fn(async () => {}),
 		now: () => 1_000,
 	});
 	return { service, settings, settingsOwner, persisted, opened, transportCalls, transport };
@@ -110,6 +117,8 @@ beforeEach(() => {
 	apiMocks.queryD1.mockReset();
 	apiMocks.queryD1.mockResolvedValue([{ results: [] }]);
 	provisionCloudflareDeployment.mockClear();
+	resetCrateServer.mockReset();
+	deleteCrateServer.mockReset();
 });
 
 describe('CloudflareDeploymentService', () => {
@@ -258,4 +267,102 @@ describe('CloudflareDeploymentService', () => {
 		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
 		expect(harness.transportCalls.at(-1)?.url).toContain('/oauth2/revoke');
 	});
+});
+
+function resetHarness() {
+	const h = createHarness();
+	h.settings.cloudflareDeployment = {
+		deploymentId: '0123456789abcdef', accountId: apiMocks.accounts[0]!.id, accountName: 'Personal',
+		workerName: 'crate-0123456789abcdef', d1DatabaseName: 'crate-0123456789abcdef',
+		d1DatabaseId: '01234567-89ab-cdef-0123-456789abcdef', r2BucketName: 'crate-0123456789abcdef',
+		workersSubdomain: 'example', lastDeployedVersion: '0.1.0', lastDeployedFingerprint: null,
+	};
+	return h;
+}
+const resetDevice = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Test', platform: 'desktop' };
+
+describe('server reset authorization', () => {
+	it('requires an existing deployment before opening authorization', async () => {
+		const h = createHarness();
+		await expect(h.service.startDeployment('reset')).rejects.toThrow('Connect to a Crate server');
+		expect(h.opened).toEqual([]);
+	});
+
+	it('resets, provisions a fresh database, registers the device, and revokes authorization', async () => {
+		const h = resetHarness();
+		await h.service.startDeployment('reset');
+		expect(h.service.pendingIntent).toBe('reset');
+		const params = { code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! };
+		await h.service.handleCallback(params, resetDevice);
+		expect(resetCrateServer).toHaveBeenCalledOnce();
+		expect(resetCrateServer.mock.invocationCallOrder[0]).toBeLessThan(provisionCloudflareDeployment.mock.invocationCallOrder[0]!);
+		expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
+		expect(apiMocks.queryD1).toHaveBeenCalled();
+		expect(h.transportCalls.some(call => call.url.endsWith('/oauth2/revoke'))).toBe(true);
+		expect(h.service.pendingIntent).toBeNull();
+		await expect(h.service.handleCallback(params, resetDevice)).rejects.toThrow('No Cloudflare deployment');
+		expect(resetCrateServer).toHaveBeenCalledOnce();
+	});
+
+	it.each(['missing credential', 'changed settings', 'denied authorization', 'wrong account', 'failed validation'])('does not provision when reset is blocked: %s', async reason => {
+		const h = resetHarness();
+		await h.service.startDeployment('reset');
+		const params: Record<string, string> = { code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! };
+		if (reason === 'changed settings') h.settings.cloudflareDeployment!.d1DatabaseId = 'changed';
+		if (reason === 'denied authorization') params.error = 'access_denied';
+		if (reason === 'wrong account') apiMocks.accounts = [{ id: 'b'.repeat(32), name: 'Other' }];
+		if (reason === 'failed validation') resetCrateServer.mockRejectedValue(new Error('Reset blocked'));
+		await expect(h.service.handleCallback(params, reason === 'missing credential' ? undefined : resetDevice)).rejects.toThrow();
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+		if (reason !== 'failed validation') expect(resetCrateServer).not.toHaveBeenCalled();
+	});
+	it.each(['connect', 'update'] as const)('blocks %s while a server reset is pending', async intent => {
+		const h = resetHarness();
+		h.settings.cloudflareDeployment!.reset = { id: 'a'.repeat(32), phase: 'clearing', databaseId: h.settings.cloudflareDeployment!.d1DatabaseId!, bucketCreatedAt: 'date', namespaceId: 'c'.repeat(32) };
+		await expect(h.service.startDeployment(intent)).rejects.toThrow('Resume the server reset');
+		expect(h.opened).toEqual([]);
+	});
+
+	it('does not allow another authorization or callback while reset is running', async () => {
+		const h = resetHarness();
+		let release!: () => void;
+		resetCrateServer.mockImplementation(() => new Promise<void>(resolve => { release = resolve; }));
+		await h.service.startDeployment('reset');
+		const params = { code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! };
+		const running = h.service.handleCallback(params, resetDevice);
+		await vi.waitFor(() => expect(resetCrateServer).toHaveBeenCalledOnce());
+		await expect(h.service.startDeployment('reset')).rejects.toThrow('Wait for the current');
+		await expect(h.service.handleCallback(params, resetDevice)).rejects.toThrow('already in progress');
+		release();
+		await running;
+	});
+
+	it('deletes without provisioning or registering a device, then clears metadata and revokes access', async () => {
+		const h = resetHarness();
+		await h.service.startDeployment('delete');
+		const result = await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+		expect(result.deleted).toBe(true);
+		expect(deleteCrateServer).toHaveBeenCalledOnce();
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+		expect(apiMocks.queryD1).not.toHaveBeenCalled();
+		expect(h.settings.cloudflareDeployment).toBeNull();
+		expect(h.transportCalls.some(call => call.url.endsWith('/oauth2/revoke'))).toBe(true);
+	});
+
+	it('keeps metadata and revokes access if deletion fails', async () => {
+		const h = resetHarness();
+		deleteCrateServer.mockRejectedValue(new Error('Interrupted'));
+		await h.service.startDeployment('delete');
+		await expect(h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! })).rejects.toThrow('Interrupted');
+		expect(h.settings.cloudflareDeployment).not.toBeNull();
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+		expect(h.transportCalls.some(call => call.url.endsWith('/oauth2/revoke'))).toBe(true);
+	});
+
+	it.each(['connect', 'update', 'reset'] as const)('blocks %s while server deletion is pending', async intent => {
+		const h = resetHarness();
+		h.settings.cloudflareDeployment!.reset = { id: 'a'.repeat(32), phase: 'clearing', deleteOnly: true, databaseId: h.settings.cloudflareDeployment!.d1DatabaseId!, bucketCreatedAt: 'date', namespaceId: 'c'.repeat(32) };
+		await expect(h.service.startDeployment(intent)).rejects.toThrow('Resume server deletion');
+	});
+
 });

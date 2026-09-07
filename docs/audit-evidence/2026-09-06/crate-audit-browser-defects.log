@@ -1,0 +1,16 @@
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+chromium: confirmed failed-save draft loss and already-open second tab retaining private reminder after logout; preview auth server, not production revocation
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+locator.waitFor: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }) to be visible[22m
+
+    at /Users/kaanbiryol/Documents/Projects/obsidian-crate/scripts/.pre-release-browser.mjs:25:66 {
+  name: 'TimeoutError'
+}
+
+Node.js v24.19.0

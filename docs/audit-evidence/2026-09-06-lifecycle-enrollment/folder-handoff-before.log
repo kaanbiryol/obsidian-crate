@@ -1,0 +1,26 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/Documents/Projects/obsidian-crate
+
+ ❯ src/reminders/plugin-integration.test.ts (6 tests | 1 failed) 85ms
+   × keeps the newer folder backend when an older scan finishes last 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/reminders/plugin-integration.test.ts > keeps the newer folder backend when an older scan finishes last
+AssertionError: expected "vi.fn()" to be called once, but got 0 times
+ ❯ src/reminders/plugin-integration.test.ts:297:31
+    295|   expect(plugin.reminderIndex).toBe(current);
+    296|   expect(latestWatcher.register).toHaveBeenCalledOnce();
+    297|   expect(plugin.registerView).toHaveBeenCalledOnce();
+       |                               ^
+    298|   expect(registerReminderCommands).toHaveBeenCalledOnce();
+    299|   expect((reminderIndexFactory.mock.calls[0]?.[2] as AbortSignal).abor…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  20:09:30
+   Duration  421ms (transform 61ms, setup 0ms, import 36ms, tests 85ms, environment 0ms)
+
