@@ -89,9 +89,9 @@ describe('renderDevicesSection', () => {
 		});
 		await flushMicrotasks();
 
-		expect(getSettingByName('Connected devices')).toBeTruthy();
+		expect(getSettingByName('Connected devices and sessions')).toBeTruthy();
 		expect(MockSetting.instances.map((setting) => setting.nameEl.textContent)).toEqual([
-			'Connected devices',
+			'Connected devices and sessions',
 			'Mac (1234) (Current device)',
 			'Android device (5678)',
 		]);
@@ -129,6 +129,36 @@ describe('renderDevicesSection', () => {
 		await flushMicrotasks();
 
 		expect(containerEl.collectText()).toContain('Failed to load connected devices.');
+	});
+
+	it('distinguishes web sessions and removes only the selected session with appropriate recovery guidance', async () => {
+		const { renderDevicesSection } = await loadDevicesSectionModule();
+		const tokens = ['Safari', 'Home Screen app'].map((client, index) => ({
+			id: `session-${index}`, device_id: null, device_name: `iPhone · ${client}`, platform: 'pwa',
+			created_at: '2026-09-07 10:00:00', last_seen_at: null, is_current: false,
+		}));
+		const revokeToken = vi.fn(async (id: string) => { tokens.splice(tokens.findIndex(token => token.id === id), 1); });
+		const client = { listTokens: vi.fn(async () => ({ tokens: [...tokens] })), revokeToken };
+		openConfirmationModal.mockResolvedValue(true);
+		renderDevicesSection({
+			containerEl: new FakeElement('div') as never,
+			plugin: { app: {}, settingsUiState: { devices: null }, syncRuntime: { getApiClient: () => client } } as never,
+		});
+		await flushMicrotasks();
+		expect(getSettingByName('Connected devices and sessions').descEl.textContent).toContain('appear separately');
+		expect(getSettingByName('iPhone · Safari').descEl.textContent).toContain('Reminders web session');
+		expect(getSettingByName('iPhone · Home Screen app')).toBeTruthy();
+		getSettingByName('iPhone · Safari').buttons[0]?.click();
+		await flushMicrotasks();
+		expect(openConfirmationModal).toHaveBeenCalledWith({}, expect.objectContaining({
+			title: 'Remove session',
+			message: 'iPhone · Safari will lose access to reminders.',
+			details: ['Open a fresh app link from Crate in Obsidian to reconnect.'],
+			confirmText: 'Remove session',
+		}));
+		expect(revokeToken).toHaveBeenCalledExactlyOnceWith('session-0');
+		expect(tokens).toHaveLength(1);
+		expect(tokens[0]?.device_name).toBe('iPhone · Home Screen app');
 	});
 });
 
@@ -182,7 +212,7 @@ describe('device list caching', () => {
 		const container = new FakeElement('div');
 		renderDevicesSection({ containerEl: container as never, plugin: plugin as never });
 		await flushMicrotasks();
-		getSettingByName('Connected devices').buttons[0]?.click();
+		getSettingByName('Connected devices and sessions').buttons[0]?.click();
 		expect(container.collectText()).toContain('My Mac');
 		await flushMicrotasks();
 		expect(container.collectText()).toContain('My Mac');
