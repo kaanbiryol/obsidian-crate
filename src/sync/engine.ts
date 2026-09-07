@@ -30,7 +30,7 @@ import type { SyncState, SyncResult, FileDiff, PreparedUpload, ConflictRecord } 
 import type { FileEntry } from '../protocol/sync-types';
 import type { CrateSettings } from '../plugin/settings-types';
 import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/settings-types';
-import { DOWNLOAD_CONCURRENCY, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
+import { AUTH_ERROR_MESSAGE, isAuthError, DOWNLOAD_CONCURRENCY, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
 import {
 	type IgnoreMatcherContext,
 	shouldIgnoreConfiguredPath,
@@ -71,6 +71,7 @@ export class SyncEngine {
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private activeWork = new Set<Promise<unknown>>();
 	private contentVerifier = new LocalContentVerifier();
+	private periodicCheckFailed = false;
 	private onQueueSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
@@ -112,6 +113,14 @@ export class SyncEngine {
 			),
 			checkForChanges: (lastSeq: number) => this.api.checkForChanges(lastSeq),
 			sync: () => this.sync(),
+			onCheckSuccess: () => {
+				if (this.periodicCheckFailed) this.updateState({ status: 'idle', lastError: null });
+			},
+			onCheckFailure: error => {
+				if (this.lifecycle.isDestroyed || this.state.status === 'syncing') return;
+				this.updateState({ status: 'error', lastError: isAuthError(error) ? AUTH_ERROR_MESSAGE : `Sync check failed: ${errorMessage(error)}` });
+				this.periodicCheckFailed = true;
+			},
 		});
 		this.api.setAbortSignal(this.lifecycle.abortSignal);
 		this.queueController = new SyncQueueController({
@@ -240,6 +249,8 @@ export class SyncEngine {
 	}
 
 	private updateState(updates: Partial<SyncState>): void {
+		if (this.lifecycle?.isDestroyed) return;
+		if ('status' in updates || 'lastError' in updates) this.periodicCheckFailed = false;
 		this.state = { ...this.state, ...updates };
 		this.onStateChange?.(this.state);
 	}

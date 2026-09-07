@@ -13,6 +13,8 @@ interface SyncEngineLifecycleDependencies {
 	hasLocalFileChanges(): Promise<boolean>;
 	checkForChanges(lastSeq: number): Promise<{ hasChanges: boolean; cursorExpired?: boolean }>;
 	sync(): Promise<SyncResult>;
+	onCheckSuccess(): void;
+	onCheckFailure(error: unknown): void;
 }
 
 export class SyncEngineLifecycle {
@@ -21,6 +23,7 @@ export class SyncEngineLifecycle {
 	private destroyed = false;
 	private consecutiveCheckFailures = 0;
 	private lastCheckAttempt = 0;
+	private checking = false;
 
 	constructor(private dependencies: SyncEngineLifecycleDependencies) {}
 
@@ -77,7 +80,9 @@ export class SyncEngineLifecycle {
 	}
 
 	async periodicCheck(): Promise<void> {
-		await runPeriodicCheckWorkflow({
+		if (this.destroyed || this.checking) return;
+		this.checking = true;
+		try { await runPeriodicCheckWorkflow({
 			...this.dependencies,
 			getConsecutiveCheckFailures: () => this.consecutiveCheckFailures,
 			setConsecutiveCheckFailures: (value: number) => {
@@ -87,7 +92,7 @@ export class SyncEngineLifecycle {
 			setLastCheckAttempt: (value: number) => {
 				this.lastCheckAttempt = value;
 			},
-		});
+		}); } finally { this.checking = false; }
 	}
 
 	private stopPeriodicSync(): void {
