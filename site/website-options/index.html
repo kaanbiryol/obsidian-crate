@@ -1,23 +1,49 @@
 <!doctype html>
 <html lang="en">
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<meta name="referrer" content="no-referrer">
-	<meta name="robots" content="noindex, nofollow">
-	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'">
-	<title>Crate website options</title>
-	<link rel="stylesheet" href="/website-options/options.css">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow"><meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="description" content="Five Crate website layouts built around the existing PWA and Obsidian plugin design language.">
+  <title>Crate — Five product-inspired layouts</title>
+  <link rel="icon" href="../assets/logo.png"><link rel="stylesheet" href="studies.css"><link rel="stylesheet" href="options.css">
+  <script src="../assets/website-studies.js" defer></script>
 </head>
 <body>
-	<header><a href="/">← Crate</a><span>Website studies</span></header>
-	<main>
-		<div class="intro"><p>TWO DIRECTIONS</p><h1>Pick the Crate<br>that feels right.</h1><span>Both pages use the same product story. The difference is the visual language.</span></div>
-		<section>
-			<a class="option option-a" href="/"><div class="preview"><div class="mini-nav"><i></i><span></span><span></span><b></b></div><h2>Your vault.<br><em>Everywhere.</em></h2><p></p><div class="dashboard"><span></span><span></span><span></span></div></div><div class="copy"><span>A</span><div><h3>Precision</h3><p>Dark, restrained, and product-led with a warm amber signal.</p></div><b>Open ↗</b></div></a>
-			<a class="option option-b" href="/website-options/crate-ui/"><div class="preview"><div class="mini-nav"><i></i><span></span><span></span><b></b></div><h2>Your vault.<br><em>Stays with you.</em></h2><p></p><div class="reminder-list"><span><i></i><b></b></span><span><i></i><b></b></span><span><i></i><b></b></span></div></div><div class="copy"><span>B</span><div><h3>Crate UI</h3><p>A sleek product site built around the real desktop and mobile experience.</p></div><b>Open ↗</b></div></a>
-		</section>
-		<footer><a href="/logo-options/">Compare logo options →</a><small>Nothing has been published.</small></footer>
-	</main>
+  <a class="skip-link" href="#directions">Skip to the designs</a>
+  <header class="studio-header wrap"><a class="wordmark" href="./"><span class="brand-tile"><img src="../assets/logo.png" width="25" height="25" alt=""></span>Crate <span class="studio-label">/ Website studies</span></a><a class="header-action" href="../">Current website ↗</a></header>
+  <main class="wrap">
+    <section class="studio-intro" aria-labelledby="studio-title"><div><p class="eyebrow">The PWA and plugin, carried through.</p><h1 id="studio-title">Five layouts.<br><span>One familiar Crate.</span></h1></div><p>Every direction uses Crate’s existing visual language. Choose how the website introduces the plugin, the companion app, and the connection between them.</p></section>
+    <div class="gallery-label"><h2 id="directions">Choose your layout</h2><span>01 — 05 · Local preview</span></div>
+    <section class="direction-grid" aria-labelledby="directions">
+      <a class="direction-card" href="native/" aria-label="Explore option 1: Native">
+        <div class="preview"><iframe src="native/?embed" title="Native preview" tabindex="-1" aria-hidden="true" inert></iframe><span class="preview-open">Open Native ↗</span></div>
+        <div class="card-description"><span class="direction-number">01</span><div><h3>Native</h3><p>Plugin + phone</p></div><span class="card-arrow" aria-hidden="true">↗</span></div>
+        <p class="card-detail">A split layout pairing the Obsidian plugin with the companion reminder app.</p>
+      </a>
+      <a class="direction-card" href="canvas/" aria-label="Explore option 2: Canvas">
+        <div class="preview"><iframe src="canvas/?embed" title="Canvas preview" tabindex="-1" aria-hidden="true" inert></iframe><span class="preview-open">Open Canvas ↗</span></div>
+        <div class="card-description"><span class="direction-number">02</span><div><h3>Canvas</h3><p>Full-width workspace</p></div><span class="card-arrow" aria-hidden="true">↗</span></div>
+        <p class="card-detail">A centered introduction opening into a wide note-and-reminder workspace.</p>
+      </a>
+      <a class="direction-card" href="workspace/" aria-label="Explore option 3: Workspace">
+        <div class="preview"><iframe src="workspace/?embed" title="Workspace preview" tabindex="-1" aria-hidden="true" inert loading="lazy"></iframe><span class="preview-open">Open Workspace ↗</span></div>
+        <div class="card-description"><span class="direction-number">03</span><div><h3>Workspace</h3><p>App-style navigation</p></div><span class="card-arrow" aria-hidden="true">↗</span></div>
+        <p class="card-detail">A compact page with familiar sidebar navigation and the reminder view up front.</p>
+      </a>
+      <a class="direction-card" href="focus/" aria-label="Explore option 4: Focus">
+        <div class="preview"><iframe src="focus/?embed" title="Focus preview" tabindex="-1" aria-hidden="true" inert loading="lazy"></iframe><span class="preview-open">Open Focus ↗</span></div>
+        <div class="card-description"><span class="direction-number">04</span><div><h3>Focus</h3><p>Reminders first</p></div><span class="card-arrow" aria-hidden="true">↗</span></div>
+        <p class="card-detail">A mobile-focused composition, with Markdown tasks and phone reminders leading the story.</p>
+      </a>
+      <a class="direction-card" href="clarity/" aria-label="Explore option 5: Clarity">
+        <div class="preview"><iframe src="clarity/?embed" title="Clarity preview" tabindex="-1" aria-hidden="true" inert loading="lazy"></iframe><span class="preview-open">Open Clarity ↗</span></div>
+        <div class="card-description"><span class="direction-number">05</span><div><h3>Clarity</h3><p>Existing light theme</p></div><span class="card-arrow" aria-hidden="true">↗</span></div>
+        <p class="card-detail">The PWA’s white and gray surfaces, dark text, and violet actions in an open layout.</p>
+      </a>
+      <aside class="choice-note"><span class="eyebrow">One product family</span><h2>Feels like Crate.<br>From the first click.</h2><p>The same system fonts, violet controls, subtle borders, reminder cards, and view navigation you already use.</p><div class="design-tokens"><span><i></i>Charcoal surfaces</span><span><i></i>Violet actions</span><span><i></i>10px reminder cards</span><span><i></i>Native light theme</span></div><p class="choice-prompt">Pick 01–05, then we’ll develop that direction.</p></aside>
+    </section>
+    <footer class="studio-footer"><span>Crate / Local design studies</span><a href="../">View the current website ↗</a><span>Plugin + PWA + website</span></footer>
+  </main>
 </body>
 </html>

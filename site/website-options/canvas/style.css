@@ -1,0 +1,68 @@
+.canvas-header { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--line); background: rgba(11,11,13,.94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.canvas-header .site-nav { min-height: 76px; }
+html { scroll-padding-top: 100px; }
+.canvas-hero { padding-top: 3.5rem; text-align: center; }
+.canvas-hero .hero-title { margin: 1.3rem auto 1.4rem; max-width: 50rem; font-size: clamp(3.2rem,6.1vw,5.6rem); }
+.canvas-hero > .body-copy { margin-inline: auto; max-width: 38rem; }
+.canvas-hero .actions { justify-content: center; }
+.canvas-stage { margin-top: 3rem; text-align: left; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px 12px 0 0; overflow: hidden; box-shadow: 0 -10px 70px rgba(var(--accent-rgb),.055); }
+.canvas-windowbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 12px 16px; font-size: 12px; color: var(--faint); background: var(--panel-2); border-bottom: 1px solid var(--line); }
+.canvas-windowbar > span { display: inline-flex; align-items: center; gap: 8px; }.canvas-windowbar .icon { width: 16px; height: 16px; }
+.canvas-workspace { display: grid; grid-template-columns: 170px 1.05fr 1fr; min-width: 0; }
+.canvas-files { position: relative; display: flex; flex-direction: column; gap: 5px; padding: 20px 10px; border-right: 1px solid var(--line); background: var(--panel-2); }
+.canvas-files > p { color: var(--faint); font-size: 12px; margin: 0 10px 16px; }.canvas-files > span { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; padding: 9px; border-radius: 4px; }.canvas-files .selected { background: rgba(var(--accent-rgb),.12); color: var(--accent-text); }.canvas-files .icon { width: 14px; height: 14px; }.canvas-files > div { position: absolute; bottom: 20px; left: 20px; display: flex; align-items: center; gap: 6px; color: var(--faint); font-size: 12px; }
+.canvas-workspace .markdown-window { border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--panel); }
+.canvas-workspace .markdown-window .window-bar { display: none; }.canvas-workspace .markdown-body { padding: 1.8rem; }
+.canvas-workspace .demo-app { border: 0; border-radius: 0; box-shadow: none; }
+.canvas-caption { display: flex; align-items: center; justify-content: space-between; gap: 1rem; text-align: left; padding: .75rem 1rem; color: var(--muted); font-size: 12px; line-height: 1.5; border-top: 1px solid var(--line); }
+.reset-demo { border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2); padding: .45rem .65rem; font-size: 12px; white-space: nowrap; }
+.reset-demo:disabled { color: var(--faint); cursor: default; opacity: .6; }
+.reset-demo:not(:disabled):hover { border-color: var(--accent); color: var(--accent-text); }
+.markdown-task { transition: opacity 150ms ease; }
+.markdown-task.is-complete { opacity: .5; text-decoration: line-through; }
+.markdown-task.is-complete > span { color: var(--accent-text); }
+.menu-toggle { display: none; }
+.nav-links a { position: relative; padding-block: 1rem; }
+.nav-links a[aria-current] { color: var(--text); }
+.nav-links a[aria-current]::after { content: ''; position: absolute; bottom: .4rem; left: 0; right: 0; height: 2px; border-radius: 2px; background: var(--accent); }
+.canvas-header { transition: box-shadow 150ms ease; }
+.canvas-header.is-scrolled { box-shadow: 0 8px 24px #0003; }
+.feature-detail.text-link { display: flex; justify-content: space-between; color: var(--accent-text); }
+.feature-card { display: flex; flex-direction: column; }
+.feature-card > p { flex: 1; }
+.footer-links a { display: inline-flex; align-items: center; gap: .4rem; }
+.footer-links .icon { width: 13px; height: 13px; }
+.canvas-hero + .highlights { border-top: 0; }.canvas-hero + .highlights > div { padding-block: 1.5rem; }
+@media(max-width:1050px) { .canvas-workspace { grid-template-columns: 1fr 1fr; }.canvas-files { display: none; } }
+@media(max-width:760px) { .canvas-hero { padding-top: 2rem; }.canvas-hero .hero-title { font-size: clamp(2.8rem,9vw,4rem); }.canvas-hero .body-copy br { display: none; }.canvas-workspace { grid-template-columns: 1fr; }.canvas-workspace .markdown-window { display: none; }.canvas-windowbar .window-connected { display: none; }.canvas-stage { margin-top: 2rem; }.canvas-caption { line-height: 1.6; } }
+@media(max-width:600px) {
+  .canvas-header .site-nav { min-height: 68px; gap: .7rem; flex-wrap: wrap; }
+  .canvas-header .wordmark { margin-right: auto; }
+  .menu-toggle { display: flex; align-items: center; gap: .35rem; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); padding: .65rem .75rem; font-size: 13px; }
+  .menu-toggle .icon { width: 14px; height: 14px; transform: rotate(90deg); transition: transform 150ms ease; }
+  .menu-toggle[aria-expanded=true] .icon { transform: rotate(-90deg); }
+  .canvas-header .nav-links { display: none; order: 4; width: 100%; padding-bottom: 1rem; gap: .35rem; }
+  .canvas-header .nav-links.is-open { display: grid; grid-template-columns: repeat(4,1fr); }
+  .canvas-header .nav-links a { padding: .75rem .4rem; text-align: center; border-radius: 6px; font-size: 13px; background: var(--panel); }
+  .canvas-header .nav-links a::after { display: none; }
+  .canvas-header .nav-links a[aria-current] { color: var(--accent-text); background: rgba(var(--accent-rgb),.12); }
+  .canvas-header .header-action { padding: .65rem .75rem; }
+  .canvas-caption { flex-direction: column; text-align: center; gap: .5rem; }
+  .reset-demo { min-height: 36px; }
+  .canvas-hero .hero-title { font-size: clamp(2.6rem,9.5vw,3.8rem); }
+  .canvas-hero .actions { gap: 1.2rem; }
+  .canvas-hero .release-note { max-width: 18rem; margin-inline: auto; }
+  .canvas-hero .body-copy { font-size: 1rem; }
+  html { scroll-padding-top: 88px; }
+}
+@media(max-width:760px) {
+  .canvas-workspace { display: flex; flex-direction: column; }
+  .canvas-workspace .markdown-window { display: block; order: 2; border-top: 1px solid var(--line); border-right: 0; }
+  .canvas-workspace .markdown-body { padding: 1rem; }
+  .canvas-workspace .markdown-body h3,.canvas-workspace .markdown-body > p:not(.note-breadcrumb) { display: none; }
+  .canvas-workspace .markdown-task { margin-top: .7rem; font-size: 12px; }
+  .canvas-workspace .markdown-task br { display: none; }
+  .canvas-workspace .markdown-task mark { margin-left: .25rem; }
+  .canvas-workspace .window-status { display: none; }
+}
+@media(max-width:360px) { .canvas-header .header-action { padding-inline: .6rem; }.canvas-header .header-action .icon { display: none; } }
