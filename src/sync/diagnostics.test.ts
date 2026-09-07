@@ -62,6 +62,7 @@ describe('runSyncDiagnostics', () => {
 				},
 				lastMaintenanceAt: null,
 				lastMaintenanceError: null,
+				notificationProjectionIssues: [{ path: 'Notes/Inbox.md', reason: 'Repair the reminder metadata in this note. The vault file remains synced.' }],
 			})),
 		};
 
@@ -72,5 +73,6 @@ describe('runSyncDiagnostics', () => {
 		if (failedNotificationDeliveries) expect(backendQueues?.message).toContain('reschedule missed reminders');
 		expect(backendQueues?.message).toContain('3');
 		expect(results.find(result => result.name === 'Worker maintenance')).toMatchObject({ status: 'warn' });
+		expect(results.find(result => result.name === 'Reminders in Notes/Inbox.md')).toMatchObject({ status: 'warn', message: expect.stringContaining('vault file remains synced') as string });
 	});
 });
