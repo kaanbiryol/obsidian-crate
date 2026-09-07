@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  id INTEGER PRIMARY KEY CHECK (id = 1),
  version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 2);
+INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 3);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,3 +170,19 @@ CREATE TABLE IF NOT EXISTS reminder_occurrences (
 
 CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_idx ON push_subscriptions(endpoint);
 CREATE TABLE IF NOT EXISTS request_rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+
+CREATE TABLE IF NOT EXISTS file_deletion_receipts (
+ consumed_revision TEXT PRIMARY KEY,
+ revision TEXT NOT NULL UNIQUE,
+ changelog_seq INTEGER NOT NULL UNIQUE,
+ path TEXT NOT NULL,
+ consumed_hash TEXT NOT NULL,
+ request_id TEXT NOT NULL,
+ device_id TEXT,
+ client_session TEXT,
+ operation_id TEXT,
+ created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS file_deletion_receipts_created_at_idx ON file_deletion_receipts(created_at);
+
+UPDATE crate_schema SET version = 3 WHERE id = 1 AND version = 2;

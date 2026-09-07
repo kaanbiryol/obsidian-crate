@@ -4,6 +4,7 @@ import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './storage/i
 import type { Env } from './types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './maintenance/database';
 import { sweepOrphanedManagedObjects } from './maintenance/orphan-sweep';
+import { pruneFileDeletionReceipts } from './file-delete-audit';
 
 export async function runScheduledMaintenance(env: Env): Promise<void> {
 	const errors: string[] = [];
@@ -11,6 +12,7 @@ export async function runScheduledMaintenance(env: Env): Promise<void> {
 		['expire file versions', () => enqueueExpiredFileVersions(env.DB)],
 		['drain object cleanup', () => drainObjectCleanupQueue(env.BUCKET, env.DB)],
 		['prune changelog', () => pruneChangelog(env.DB)],
+		['prune file deletion receipts', () => pruneFileDeletionReceipts(env.DB)],
 		['prune request limits', () => env.DB.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
 		['prune tokens', () => pruneExpiredTokens(env.DB)],
 		['wake notification projections', () => wakeNotificationCoordinator(env)],

@@ -116,6 +116,7 @@ export interface BatchDownloadResponse {
 export interface BatchDeleteResponse {
 	success: boolean;
 	deleted: string[];
+	results?: Array<{ path: string; revision?: string; consumedRevision?: string; deleteRequestId?: string }>;
 	errors?: MutationFailure[];
 }
 

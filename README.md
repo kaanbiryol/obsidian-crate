@@ -41,7 +41,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
 - OAuth state and PKCE material exist only in memory during one deployment; authorization codes and OAuth access tokens are never stored or logged.
-- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases and rejects unsupported schemas without converting them. Deployment code is never fetched at runtime.
+- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases, upgrades schema 2 to schema 3 without rewriting vault data, and rejects unsupported schemas. Deployment code is never fetched at runtime.
 - Vault devices can be authorized only through the Cloudflare account that owns the server.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - When installing the reminders web app, Safari carries a separate, single-use enrollment grant in the install URL and a ten-minute cookie copied into the Home Screen app. The app clears these after enrollment and keeps its own session; Safari's persistent login credential is not copied. Open the new app within ten minutes of creating the link.
@@ -168,7 +168,7 @@ Existing binary files are never overwritten by an unsafe asynchronous write. Inc
 
 Both clients and the Worker require protocol 5 for writes. Update the plugin/server and reload older web tabs before editing. Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
 
-Crate supports only the current prerelease formats. Provisioning accepts an empty database or a database with the current schema marker; it rejects older schemas without modifying their data. There are no SQL upgrade scripts or old-format adapters.
+Crate supports the current prerelease formats. Provisioning accepts an empty database or schema 2/3. Its additive schema 2-to-3 upgrade records deletion audit receipts without rewriting existing vault data. Other schemas are rejected without modification. Recovery archives use schema 3; preserve older archives with their matching build and recovery tools.
 
 ## Development
 

@@ -42,11 +42,13 @@ Recipient selection checks session existence, expiry, and folder authority at se
 
 Responses expose `X-Crate-Request-Id`; mutation logs correlate client session, operation, device, and opaque file revisions without note content or filenames. Diagnostics report queues, failed projections, terminal delivery failures, oldest failure/overdue timestamps, receipts, retained versions, and maintenance state. Terminal delivery failures persist in D1 before their alarm stops; the plugin reports them as a failed diagnostic with repair/rescheduling guidance. See [backup and recovery](recovery.md) for paired snapshots and isolated restore. Restoring only D1 cannot recover R2 bytes.
 
+Single and batch file deletes atomically persist a deletion receipt with the consumed file revision, a new opaque deletion revision, changelog sequence, original server request ID, authenticated device ID, and validated client session/operation IDs. The deletion revision is stored in the changelog and returned with `consumedRevision` and `deleteRequestId`; batch acknowledgements include per-file `results`. An absent-file retry returns the original matching receipt without attributing the deletion to the retrying request. A recreated file still rejects the stale delete. Receipts expire after 30 days; a later absent-file acknowledgement does not claim an expired or unknown deletion. Logs contain opaque correlation values, while the authenticated vault's database retains the path needed to investigate the event.
+
 Limits are application guardrails, not a promise that every workload fits a free account. Measure CPU and account quotas with representative vaults before release; consult [D1 limits](https://developers.cloudflare.com/d1/platform/limits/) and [Worker limits](https://developers.cloudflare.com/workers/platform/limits/).
 
 ## Supported storage formats
 
-Only the current formats are supported: D1 `crate_schema` version 2, IndexedDB version 2, generation-bearing local file checkpoints, and URI-encoded `crate-desc:v1:` description comments. Unknown database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache. No format conversion or SQL upgrade path is bundled.
+Current formats are D1 `crate_schema` version 3, IndexedDB version 2, generation-bearing local file checkpoints, and URI-encoded `crate-desc:v1:` description comments. Provisioning supports an additive D1 schema-2-to-3 upgrade; other database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache. See the deployment guide for upgrade and rollback policy.
 
 ## Source and occurrence integrity
 
