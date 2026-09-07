@@ -116,7 +116,36 @@ Provisioning initializes an empty database from the bundled, hash-verified `src/
 
 Apply the schema before installing the new Worker. The serving schema-2 Worker can continue using existing tables during this additive upgrade, but only the new Worker records deletion receipts. Take a paired D1/R2 backup before updating. Do not remove the new table or lower the marker to roll back: fixes must preserve schema 3 and its audit records. A full historical rollback requires the matching old build, its recovery tools, and its paired backup restored to isolated resources, and excludes writes made after that backup. The current recovery tools accept schema-3 archives.
 
-An explicit update of a current-schema deployment preserves resource IDs and data. Downgrade checks use the current remote deployment metadata. Older prerelease deployments require separate current resources; keep their original deployment and paired backup intact for recovery. Do not point the new Worker at an unsupported database.
+An explicit update of a current-schema deployment preserves resource IDs and data. Downgrade checks use the current remote deployment metadata and repeat after acquiring deployment ownership. Older prerelease deployments require separate current resources; keep their original deployment and paired backup intact for recovery. Do not point the new Worker at an unsupported database.
+
+## Concurrent updates, resets, and abandoned operations
+
+Current Crate builds serialize updates, resets, and deletions using the reserved `crate_deployment_fence` row in the deployment's D1 `maintenance_state` table. Each attempt receives a fresh owner ID. Crate verifies the live Worker's database and bucket bindings, acquires the row atomically, then checks the remote build again before publishing. A completed intervening update stops an older attempt even when both builds have the same version number but different artifacts. The row contains operation identity and build information; it contains no OAuth credentials or vault content.
+
+The fence covers schema changes, Worker publication, schedules, endpoint setup, and reset's destructive requests. A second operation stops before changing those resources. A new deployment first finds or creates its exact named database, saves the ID locally, and confirms that the name resolves to that single database. Initial creation relies on Cloudflare rejecting duplicate database names within the account: its [official Wrangler D1 client](https://github.com/cloudflare/workers-sdk/blob/main/packages/wrangler/src/d1/create.ts) handles provider error `7502` as an existing database name. Only that definite conflict permits lookup after a failed create; a lost create response stops the attempt before publication. Discovery does not have to be immediately consistent: no visible matching database or multiple matching IDs stops provisioning. Empty databases may contain only the fence bootstrap table before schema initialization. Competing initial attempts use the same database once discoverable. A failed first attempt can leave this owned empty database or partially provisioned resources for a later retry; Crate does not delete them as rollback.
+
+The fence has no timeout. It is released after settled successful requests or a definite provider rejection. A timeout, lost response, plugin shutdown, or other uncertain mutation outcome leaves the row held, because an already accepted Cloudflare request may still complete. Crate reports this state and directs the operator to the recovery tool below. Reset checkpoints remain saved. Once reset deletes the old database, its temporary Worker and matching reset checkpoint exclude other clients until the original reset rebuilds the server. Isolated backup restoration removes the archived fence row from the restored database.
+
+This is coordination among current Crate clients, not a Cloudflare publication precondition. The [Worker upload API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/) does not document a D1 owner token or `If-Match` publication condition. Older Crate builds and direct dashboard/API operations do not honor this fence. Before rolling out this build, stop update/reset activity on older devices, upgrade them, and allow any accepted provider requests to finish. Keep direct administration quiescent during a Crate deployment or reset. An old client or administrator with account write access can bypass this coordination.
+
+To inspect a held operation, use Python 3 and a short-lived account-scoped token with D1 read/write permission. Supply the token through `CLOUDFLARE_API_TOKEN`, not a command-line argument. Obtain the account, database, and Worker identifiers from the saved deployment metadata or the Cloudflare dashboard:
+
+```bash
+python3 scripts/crate-deployment-fence.py inspect \
+  --account <account-id> --database <database-id> --worker crate-<deployment-id>
+```
+
+If another device is still working, let it finish. For an abandoned operation, stop **every** deployment/reset client for this server and revoke the credentials they were using. Then establish that no already accepted or in-flight provider mutations can still complete: inspect the live Worker version, bindings, resource state, and provider activity; use Cloudflare support when an outstanding request's outcome cannot be established. Revoking a token or waiting a fixed interval alone does not cancel an already accepted request. Keep the fence held while that outcome is uncertain.
+
+Only after establishing quiescence, inspect again and release the exact owner shown by the tool:
+
+```bash
+python3 scripts/crate-deployment-fence.py release \
+  --account <account-id> --database <database-id> --worker crate-<deployment-id> \
+  --owner <inspected-owner-id> --confirm-quiescent
+```
+
+The conditional release cannot erase a replacement owner, but it cannot fence an old in-flight upload. The confirmation asserts that the operator resolved those requests; the script cannot prove it. Keep the original vault's reset checkpoint and select **Resume server reset** or **Resume server deletion** after release. For an interrupted update, refresh the server status and authorize the update again. If the original database was successfully deleted, there is no fence left to clear: resume the saved reset/deletion checkpoint rather than creating a replacement lock in another database.
 
 ## Recovery and deletion
 

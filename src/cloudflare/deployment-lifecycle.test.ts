@@ -3,10 +3,12 @@ import { DEFAULT_SETTINGS, type CrateSettings } from '../plugin/settings';
 import { CloudflareDeploymentService } from './deployment-service';
 import type { CloudflareWorkerSettings } from './cloudflare-api';
 import type { HttpTransport } from './http';
+import { createFenceQueryHarness } from './deployment-fence-test-harness';
 
 // Exercise the real service, API client and reset/delete implementation through
 // a local transport. Remote mutations happen before their response is released.
 function harness() {
+	const fence = createFenceQueryHarness();
 	const accountId = 'a'.repeat(32);
 	const name = 'crate-0123456789abcdef';
 	const databaseId = '01234567-89ab-cdef-0123-456789abcdef';
@@ -61,7 +63,9 @@ function harness() {
 		if (path.endsWith(`/r2/buckets/${name}`)) return remote.bucket ? json({ name, creation_date: '2026-01-01' }) : json(null, 404);
 		if (path.endsWith('/objects')) return json([...objects].map(key => ({ key })));
 		if (path.endsWith('/query') && typeof request.body === 'string') {
-			const { sql } = JSON.parse(request.body) as { sql: string };
+			const { sql, params } = JSON.parse(request.body) as { sql: string; params?: string[] };
+			const fenced = fence.query(sql, params);
+			if (fenced) return json(fenced);
 			return json([{ results: sql.startsWith('PRAGMA') ? [{ name: 'storage_key' }] : ['files', 'auth_tokens'].map(name => ({ name })) }]);
 		}
 		throw new Error(`Unexpected request: ${request.method} ${path}`);
@@ -82,7 +86,7 @@ function harness() {
 			},
 		};
 	}
-	return { settings, writeSettings, mutations, objects, remote, transport, beforeServerReset, createService };
+	return { settings, writeSettings, mutations, objects, remote, transport, beforeServerReset, createService, clearFence: fence.clear };
 }
 
 const device = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Test', platform: 'desktop' };
@@ -119,6 +123,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 		expect(vi.mocked(h.transport).mock.calls.at(-1)?.[0]).toContain('/oauth2/revoke');
 
 		if (intent === 'delete') {
+			h.clearFence(); // Operator confirmed the interrupted request has settled.
 			const retry = h.createService();
 			const result = await retry.service.handleCallback(await retry.authorize('delete'));
 			expect(result.deleted).toBe(true);

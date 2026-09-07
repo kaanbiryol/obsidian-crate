@@ -30,7 +30,7 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | ID | Concern | Status / verification |
 | --- | --- | --- |
 | S01 | Recover interrupted plugin two-file reminder moves | Pending |
-| S02 | Fence concurrent deployment publication and prevent downgrade races | Pending |
+| S02 | Fence concurrent deployment publication and prevent downgrade races | Fixed: D1 ownership serializes current update/reset/delete clients, rechecks live identity/artifacts, and holds uncertain outcomes for exact-owner recovery; initial creation relies on provider7502 uniqueness with no unknown-outcome adoption; 89 unit/13 real-D1 interleavings/20 Python tests pass; old clients/direct admin must be quiescent during rollout |
 | S03 | Define safe cache migration, blocked/failed upgrade and damaged snapshot recovery | Pending |
 | S04 | Quarantine/export damaged outbox entries without discarding healthy pending work | Pending |
 | S05 | Distinguish periodic connectivity failures from last successful sync | Fixed: failed checks show actionable errors without changing the last successful sync; recovery clears only its own error, failed syncs retain backoff, timer checks do not overlap and destruction fences late state; 19 focused tests, lint and typecheck pass |

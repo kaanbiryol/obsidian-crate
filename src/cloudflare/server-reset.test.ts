@@ -3,8 +3,10 @@ import { deleteCrateServer } from './server-delete';
 import { resetCrateServer } from './server-reset';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import type { CloudflareWorkerSettings } from './cloudflare-api';
+import { createFenceQueryHarness } from './deployment-fence-test-harness';
 
 function harness() {
+	const fence = createFenceQueryHarness();
 	const metadata: CloudflareDeploymentMetadata = {
 		deploymentId: '0123456789abcdef', accountId: 'a'.repeat(32), accountName: 'Personal',
 		workerName: 'crate-0123456789abcdef', d1DatabaseName: 'crate-0123456789abcdef',
@@ -29,7 +31,7 @@ function harness() {
 		getD1Database: vi.fn(async () => database),
 		getR2Bucket: vi.fn(async () => bucket),
 		listDurableObjectNamespaces: vi.fn(async () => worker.bindings?.some(binding => binding.type === 'durable_object_namespace') ? [{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' }] : []),
-		queryD1: vi.fn(async (_account: string, _db: string, sql: string): Promise<Array<{ results: Array<Record<string, unknown>> }>> => [{ results: sql.startsWith('PRAGMA')
+		queryD1: vi.fn(async (_account: string, _db: string, sql: string, params?: string[]): Promise<Array<{ results: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? [{ results: sql.startsWith('PRAGMA')
 			? [{ name: 'storage_key' }] : ['files', 'auth_tokens', 'd1_migrations'].map(name => ({ name })) }]),
 		listR2Objects: vi.fn(async (_account: string, _bucket: string, _cursor?: string): Promise<{ keys: string[]; cursor?: string }> => ({ keys: [...objects] })),
 		deleteR2Object: vi.fn(async (_account: string, _bucket: string, key: string) => { objects.delete(key); }),
@@ -41,7 +43,7 @@ function harness() {
 		}),
 	};
 	const input = { api, metadata, accountId: metadata.accountId!, version: '0.1.0', beforeDelete: vi.fn(async () => {}), persist: vi.fn(async () => {}) };
-	return { input, worker, api, metadata, objects };
+	return { input, worker, api, metadata, objects, clearFence: fence.clear };
 }
 
 describe('Crate server reset boundaries', () => {
@@ -135,7 +137,7 @@ describe('Crate server reset boundaries', () => {
 	});
 
 	it('resumes a partially cleared bucket without repeating Durable Object deletion', async () => {
-		const { input, api, metadata, objects } = harness();
+		const { input, api, metadata, objects, clearFence } = harness();
 		const key = `__crate__/files/${'a'.repeat(64)}/01234567-89ab-cdef-0123-456789abcdef`;
 		objects.add(key);
 		api.deleteR2Object.mockImplementationOnce(async (_account, _bucket, item) => { objects.delete(item); })
@@ -143,6 +145,7 @@ describe('Crate server reset boundaries', () => {
 		await expect(resetCrateServer(input)).rejects.toThrow('temporary network error');
 		expect(metadata.reset?.phase).toBe('clearing');
 		expect(api.deleteD1Database).not.toHaveBeenCalled();
+		clearFence(); // Explicit recovery after the abandoned request has settled.
 		await resetCrateServer(input);
 		expect(objects.size).toBe(0);
 		expect(api.retireCrateWorker).toHaveBeenCalledOnce();
@@ -250,9 +253,9 @@ it('identifies the exact unknown and missing tables before any deletion', async 
 it.each([resetCrateServer, deleteCrateServer])('recognizes the original OAuth provisioner migration table during cleanup', async cleanup => {
 	const h = harness();
 	const query = h.api.queryD1.getMockImplementation()!;
-	h.api.queryD1.mockImplementation(async (account, database, sql) => sql.includes('sqlite_master')
+	h.api.queryD1.mockImplementation(async (account, database, sql, params) => sql.includes('sqlite_master')
 		? [{ results: ['files', 'auth_tokens', '_crate_migrations'].map(name => ({ name })) }]
-		: query(account, database, sql));
+		: query(account, database, sql, params));
 	await cleanup(h.input);
 	expect(h.api.deleteD1Database).toHaveBeenCalledOnce();
 	expect(h.api.deleteR2Bucket).toHaveBeenCalledOnce();
