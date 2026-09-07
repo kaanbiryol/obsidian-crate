@@ -23,7 +23,7 @@ export function waitForWorkerActivation(worker: ServiceWorker): Promise<void> {
 	});
 }
 
-export async function applyPwaUpdate(): Promise<void> {
+export async function applyPwaUpdate(beforeReload?: () => Promise<void>): Promise<void> {
 	const version = await fetchPwaAssetVersion();
 	if (!version) throw new Error('Could not check for updates. Please try again.');
 	if ('serviceWorker' in navigator) {
@@ -40,5 +40,6 @@ export async function applyPwaUpdate(): Promise<void> {
 		// Activation follows precaching and clients.claim in our worker.
 		await waitForWorkerActivation(worker);
 	}
+	await beforeReload?.();
 	window.location.reload();
 }

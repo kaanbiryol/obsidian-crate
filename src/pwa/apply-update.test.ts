@@ -55,6 +55,30 @@ describe('reliable PWA updates', () => {
 		expect(reload).not.toHaveBeenCalled();
 	});
 
+	it('covers the reload only after activation and waits for the transition', async () => {
+		const worker = new UpdateWorker();
+		vi.stubGlobal('navigator', { serviceWorker: { register: vi.fn().mockResolvedValue({ installing: worker }) } });
+		let finishTransition!: () => void;
+		const beforeReload = vi.fn(() => new Promise<void>(resolve => { finishTransition = resolve; }));
+		const update = applyPwaUpdate(beforeReload);
+		await vi.waitFor(() => expect(worker.state).toBe('installing'));
+		expect(beforeReload).not.toHaveBeenCalled();
+		worker.transition('activated');
+		await vi.waitFor(() => expect(beforeReload).toHaveBeenCalledOnce());
+		expect(reload).not.toHaveBeenCalled();
+		finishTransition();
+		await update;
+		expect(reload).toHaveBeenCalledOnce();
+	});
+
+	it('leaves the current screen available when checking for an update fails', async () => {
+		vi.mocked(fetchPwaAssetVersion).mockRejectedValueOnce(new Error('Offline'));
+		const beforeReload = vi.fn();
+		await expect(applyPwaUpdate(beforeReload)).rejects.toThrow('Offline');
+		expect(beforeReload).not.toHaveBeenCalled();
+		expect(reload).not.toHaveBeenCalled();
+	});
+
 	it('reports installation failure and removes its event listener', async () => {
 		const worker = new UpdateWorker();
 		const remove = vi.spyOn(worker, 'removeEventListener');

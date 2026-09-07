@@ -31,3 +31,7 @@
 }
 @media (display-mode:standalone) and (orientation:portrait) and (max-width:600px){:root{--pwa-safe-area-top-floor:59px;--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px),var(--pwa-safe-area-top-floor));--pwa-safe-area-bottom-floor:34px;--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px),var(--pwa-safe-area-bottom-floor))}}
 .pwa-launch-splash{width:100%;height:100%;overflow:hidden;background:var(--pwa-launch-bg)}
+#pwa-update-transition{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;background:var(--pwa-launch-bg);color:var(--text-muted);font-size:14px;visibility:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease,visibility .18s}
+:root[data-pwa-updating] #pwa-update-transition{visibility:visible;opacity:1;pointer-events:auto}
+:root[data-pwa-updating="restore"] #pwa-update-transition{transition:none}
+@media (prefers-reduced-motion:reduce){#pwa-update-transition{transition:none}}

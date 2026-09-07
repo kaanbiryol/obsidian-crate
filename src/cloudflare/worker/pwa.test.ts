@@ -148,7 +148,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('<body>');
 		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
 		expect(html).toContain('<style id="pwa-light-theme" media="(prefers-color-scheme: light)">');
-		expect(html).toContain('<script defer src="/notifications/theme-bootstrap.js?v=');
+		expect(html).toContain('<script src="/notifications/theme-bootstrap.js?v=');
 		expect(html).not.toContain('<script>');
 		expect(PWA_THEME_BOOTSTRAP_JS).toContain('localStorage.getItem("crate-reminders-theme")');
 		expect(PWA_THEME_BOOTSTRAP_JS).toContain("lightTheme.media=preference==='light'?'all':preference==='dark'?'not all':\"(prefers-color-scheme: light)\"");
