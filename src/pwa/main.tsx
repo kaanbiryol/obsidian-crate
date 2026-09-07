@@ -97,7 +97,7 @@ function App() {
 		refreshPushState,
 		enablePushNotifications,
 		disablePushNotifications,
-	} = usePushNotifications({ apiFetch, showToast });
+	} = usePushNotifications({ authToken, apiFetch, showToast });
 	const {
 		reminders,
 		projects,

@@ -21,7 +21,9 @@ function createDb(
 		}
     if (sql.includes('INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, device_name, owner_token_id, folder_path)')) {
       if (failSubscriptionInsert) throw new Error('subscription insert failed');
-      state.subscriptions.set(String(args[0]), { id: String(args[0]), endpoint: String(args[1]) });
+      const endpoint = String(args[1]);
+      const id = [...state.subscriptions.values()].find(row => row.endpoint === endpoint)?.id ?? String(args[0]);
+      state.subscriptions.set(id, { id, endpoint });
       return { meta: { changes: 1 } };
     }
 
@@ -51,6 +53,8 @@ function createDb(
 				}),
 				first: vi.fn(async () => sql.includes('SELECT id, scope, folder_path FROM auth_tokens')
 					? { id: 'authenticated-token', scope: options?.authenticatedScope ?? 'vault', folder_path: 'Reminders' }
+					: sql.startsWith('SELECT id FROM push_subscriptions WHERE endpoint = ?')
+						? [...subscriptions.values()].find(row => row.endpoint === statement._args[0]) ?? null
 					: null),
 				run: vi.fn(async () => applyMutation({ subscriptions }, sql, statement._args)),
 				all: vi.fn(async () => ({ results: [] })),
