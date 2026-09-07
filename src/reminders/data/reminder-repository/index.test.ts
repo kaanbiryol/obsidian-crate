@@ -22,6 +22,7 @@ function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 		getProjects: () => [],
 		load: async () => ({ reminders: [], filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [] }),
 		rescanFile: async () => {},
+		flushDeferredScans: async () => {},
 		removeFile: () => {},
 		renameFile: () => {},
 		isReminderFile: () => true,

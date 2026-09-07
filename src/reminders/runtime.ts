@@ -21,7 +21,27 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	controller.signal.addEventListener('abort', () => lifetime.removeEventListener('abort', abort), { once: true });
 	plugin.remindersVaultWatcher?.unregister();
 
-	const index = createReminderIndex(plugin.app, folderPath, controller.signal);
+	let verifiedApi = plugin.syncRuntime.getApiClient();
+	let syncingApi: typeof verifiedApi = null;
+	const index = createReminderIndex(plugin.app, folderPath, controller.signal,
+		() => plugin.syncRuntime.getState().status === 'syncing',
+		() => {
+			const api = plugin.syncRuntime.getApiClient();
+			return plugin.syncRuntime.isConfigured() && (!api || api !== verifiedApi)
+				|| ['error', 'offline'].includes(plugin.syncRuntime.getState().status);
+		});
+	const onSyncStateChanged = () => {
+		const { status } = plugin.syncRuntime.getState();
+		const api = plugin.syncRuntime.getApiClient();
+		if (status === 'syncing') syncingApi = api;
+		else {
+			if (status === 'idle' && api && syncingApi === api) verifiedApi = api;
+			syncingApi = null;
+		}
+		void index.flushDeferredScans().catch((error: unknown) => remindersLogger.error('Failed to refresh reminders after sync:', error));
+	};
+	plugin.syncRuntime.addStateChangeListener(onSyncStateChanged);
+	controller.signal.addEventListener('abort', () => plugin.syncRuntime.removeStateChangeListener(onSyncStateChanged), { once: true });
 	try {
 		await index.load();
 	} catch (error) {
