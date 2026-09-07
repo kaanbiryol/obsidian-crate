@@ -1,0 +1,92 @@
+import { describe, expect, it, vi } from 'vitest';
+import type { Vault } from 'obsidian';
+import { createFullSyncPlan } from './planner-full';
+import { getLocalChanges } from './planner-local';
+import { hasLocalFileChanges } from './local-file-changes';
+import { processDiff } from './transfer-process';
+import { createEmptySyncResult } from './sync-result';
+import { computeHash } from './hasher';
+import type { TransferContext } from './transfer-types';
+import { LocalManifest } from './manifest';
+import { deleteManifestFile } from './runtime-config';
+
+// Audit-only reproductions: passing assertions document unsafe HEAD behavior.
+describe('4b6c291 audit evidence', () => {
+  it.each(['list', 'stat'])('full reconciliation deletes a real remote file after a local %s failure', async (failure) => {
+    const path = '.private/note.md';
+    const content = new TextEncoder().encode('still exists locally\n').buffer;
+    const entry = { hash: await computeHash(content), size: content.byteLength, modified: new Date(1000).toISOString(), revision: 'remote-version-1' };
+    const vault = {
+      getFiles: () => [],
+      adapter: {
+        list: async (folder: string) => {
+          if (!folder) return { files: [], folders: ['.private'] };
+          if (failure === 'list') throw new Error('temporary I/O failure');
+          return { files: [path], folders: [] };
+        },
+        stat: async () => {
+          if (failure === 'stat') throw new Error('temporary I/O failure');
+          return { type: 'file', size: content.byteLength, mtime: 1000 };
+        },
+        exists: vi.fn(async () => true),
+        readBinary: async () => content,
+      },
+    } as unknown as Vault;
+    const localManifest = {
+      getEntry: () => entry,
+      getManifest: () => ({ version: 1 as const, files: { [path]: entry } }),
+      setEntry: vi.fn(), removeEntry: vi.fn(),
+    };
+    const plan = await createFullSyncPlan({ vault, localManifest, shouldIgnore: () => false, runConcurrent: async (tasks) => Promise.all(tasks.map(task => task())) }, { [path]: entry }, 2);
+    expect(plan.errors).toEqual([]);
+    expect(plan.diffs).toEqual([{ path, action: 'delete', remoteHash: entry.hash, remoteRevision: entry.revision, cause: 'local-deleted' }]);
+    const deleteFile = vi.fn(async () => {});
+    const result = createEmptySyncResult();
+    await processDiff({ vault, localManifest, api: { deleteFile } } as unknown as TransferContext, plan.diffs[0]!, plan.localFiles, result);
+    expect(deleteFile).toHaveBeenCalledWith(path, entry.hash, entry.revision);
+    expect(result.deletedPaths).toEqual([path]);
+    expect(vault.adapter.exists).not.toHaveBeenCalled();
+    expect(await vault.adapter.exists(path)).toBe(true);
+  });
+
+  it('both periodic detection and full sync miss changed bytes with preserved size and mtime', async () => {
+    const path = 'note.md';
+    const original = new TextEncoder().encode('old\n').buffer;
+    const edited = new TextEncoder().encode('new\n').buffer;
+    const entry = { hash: await computeHash(original), size: 4, modified: new Date(1000).toISOString(), revision: 'r1' };
+    const readBinary = vi.fn(async () => edited);
+    const vault = {
+      getFiles: () => [{ path, extension: 'md', stat: { size: 4, mtime: 1000 } }],
+      adapter: { list: async () => ({ files: [path], folders: [] }), readBinary },
+    } as unknown as Vault;
+    const localManifest = {
+      getEntry: () => entry, getAllPaths: () => [path],
+      getManifest: () => ({ version: 1 as const, files: { [path]: entry } }),
+      setEntry: vi.fn(), removeEntry: vi.fn(),
+    };
+    const context = { vault, localManifest, shouldIgnore: () => false, runConcurrent: async <T>(tasks: (() => Promise<T>)[]) => Promise.all(tasks.map(task => task())) };
+    expect(await hasLocalFileChanges(vault, localManifest, () => false)).toBe(false);
+    expect(await getLocalChanges(context, 2)).toEqual([]);
+    expect((await createFullSyncPlan(context, { [path]: entry }, 2)).diffs).toEqual([]);
+    expect(readBinary).not.toHaveBeenCalled();
+  });
+
+  it('configuration reset leaves a valid temporary checkpoint that the next connection restores', async () => {
+    const dir = '.obsidian/plugins/crate';
+    const data = JSON.stringify({ version: 1, generation: 2, files: { 'note.md': { hash: 'old-server-hash', revision: 'old-server-revision', size: 4, modified: new Date(1000).toISOString() } } });
+    const disk = new Map([[`${dir}/file-manifest.json`, data], [`${dir}/file-manifest.json.tmp`, data]]);
+    const adapter = {
+      exists: async (path: string) => disk.has(path),
+      read: async (path: string) => disk.get(path)!,
+      write: async (path: string, text: string) => { disk.set(path, text); },
+      remove: async (path: string) => { disk.delete(path); },
+    };
+    const plugin = { app: { vault: { adapter } }, manifest: { dir } };
+    await deleteManifestFile(plugin as never);
+    expect(disk.has(`${dir}/file-manifest.json`)).toBe(false);
+    expect(disk.has(`${dir}/file-manifest.json.tmp`)).toBe(true);
+    const next = new LocalManifest(plugin.app as never, plugin.manifest as never);
+    await next.load();
+    expect(next.getEntry('note.md')?.revision).toBe('old-server-revision');
+  });
+});

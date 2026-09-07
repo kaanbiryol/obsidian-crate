@@ -1,0 +1,25 @@
+import { it, expect } from 'vitest';
+import { createMockAppWithVault } from '@/test/factories/obsidian';
+import { createReminderIndex } from '../data/reminder-index';
+import { createMarkdownWriter } from '../data/markdown-writer';
+
+it('confirms ordinary plugin project move rewrites its stable identity during forced index refresh', async () => {
+ const { app, files, folders } = createMockAppWithVault({
+   'Reminders/Old.md': '- [ ] Task <!-- crate-id:stable-id -->\n',
+   'Reminders/New.md': '# New\n',
+ });
+ folders.add('Reminders');
+ app.vault.cachedRead = app.vault.read;
+ const index = createReminderIndex(app, 'Reminders');
+ const file = app.vault.getFileByPath?.('Reminders/Old.md') ?? app.vault.getAbstractFileByPath('Reminders/Old.md')!;
+ await index.rescanFile(file as never, true);
+ expect(index.getById('stable-id')).toBeDefined();
+ const writer = createMarkdownWriter(app, index);
+ writer.setOnFileWritten(file => index.rescanFile(file, true));
+ await writer.updateReminder(index.getById('stable-id')!, { project: 'New' });
+ expect(files.get('Reminders/Old.md')).not.toContain('stable-id');
+ expect(files.get('Reminders/New.md')).toContain('Task');
+ expect(files.get('Reminders/New.md')).not.toContain('crate-id:stable-id');
+ expect(index.getById('stable-id')).toBeUndefined();
+ expect(index.getAll()).toHaveLength(1);
+});

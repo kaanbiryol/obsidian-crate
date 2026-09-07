@@ -1,0 +1,22 @@
+import { it, expect } from 'vitest';
+import { createMockAppWithVault } from '@/test/factories/obsidian';
+import { createReminderIndex } from '../data/reminder-index';
+import { createMarkdownWriter } from '../data/markdown-writer';
+import { createReminderRepository } from '../data/reminder-repository';
+it('confirms repository reorder loses a newly pasted copy before the debounced rescan repairs duplicate IDs', async () => {
+ const path = 'Reminders/Inbox.md';
+ const { app, files } = createMockAppWithVault({ [path]: '- [ ] Original <!-- crate-id:same -->\n- [ ] Another <!-- crate-id:another -->\n' });
+ app.vault.cachedRead = app.vault.read;
+ const index = createReminderIndex(app, 'Reminders');
+ await index.rescanFile(app.vault.getAbstractFileByPath(path) as never, true);
+ expect(index.getAll()).toHaveLength(2);
+ // A markdown editor paste occurs; the real watcher schedules a scan 1500ms later.
+ files.set(path, files.get(path)! + '- [ ] Pasted extra details <!-- crate-id:same -->\n');
+ const writer = createMarkdownWriter(app, index);
+ writer.setOnFileWritten(file => index.rescanFile(file, true));
+ const repository = createReminderRepository(index, writer);
+ await repository.reorder('Inbox', ['another', 'same']);
+ expect(files.get(path)).not.toContain('Original');
+ expect(files.get(path)).toContain('Pasted extra details');
+ expect(index.getAll()).toHaveLength(2);
+});

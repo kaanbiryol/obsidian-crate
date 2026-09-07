@@ -1,0 +1,9 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate
+
+ ✓ src/cloudflare/worker/audit-malformed-description.integration.ts > confirms invalid reminder description stops ordinary note synchronization outside reminders with push unconfigured 124ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  00:24:13
+   Duration  3.85s (transform 1.16s, setup 0ms, import 2.34s, tests 124ms, environment 0ms)

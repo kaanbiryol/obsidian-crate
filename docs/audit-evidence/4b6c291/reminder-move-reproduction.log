@@ -1,0 +1,9 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate
+
+ ✓ src/reminders/core/audit-move.test.ts > confirms ordinary plugin project move rewrites its stable identity during forced index refresh 43ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  00:16:28
+   Duration  372ms (transform 126ms, setup 0ms, import 203ms, tests 44ms, environment 0ms)

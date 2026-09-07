@@ -1,0 +1,9 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate
+
+ ✓ src/reminders/core/audit-reorder-caller.test.ts > confirms repository reorder loses a newly pasted copy before the debounced rescan repairs duplicate IDs 41ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  00:18:27
+   Duration  494ms (transform 131ms, setup 0ms, import 212ms, tests 42ms, environment 0ms)
