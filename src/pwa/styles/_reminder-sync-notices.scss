@@ -1,4 +1,10 @@
 @mixin styles {
+	.pwa-reminder-source-list {
+		max-height: min(30dvh, 240px);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+	}
+
 	.pwa-reminder-sync-notices {
 		display: flex;
 		flex-direction: column;

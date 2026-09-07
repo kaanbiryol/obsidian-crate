@@ -76,6 +76,12 @@ export interface CachedReminderSnapshot {
 	projects: string[];
 	savedAt: number;
 	etag?: string;
+	issues?: ReminderSourceIssue[];
+}
+
+export interface ReminderSourceIssue {
+	path: string;
+	reason: string;
 }
 
 export interface ReminderMutationBody {
