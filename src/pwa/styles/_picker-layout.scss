@@ -1,4 +1,4 @@
-// Browser sheets retain their viewport geometry; content and controls are shared.
+// Fit the active picker to its content, shrinking only when it needs to scroll.
 @mixin styles {
   .pwa-picker-sheet {
     --crate-icon-button-size: 44px;
@@ -8,14 +8,17 @@
 
     .reminder-picker {
       display: flex;
-      flex: 1;
+      flex: 0 1 auto;
       min-height: 0;
       flex-direction: column;
     }
 
     .reminder-modal-header { flex-shrink: 0; }
-    .reminder-picker-scroll {
+    .reminder-picker-scroll,
+    .project-picker-scroll {
+      flex: 0 1 auto;
       min-height: 0;
+      max-height: none;
       overflow-y: auto;
       overscroll-behavior: contain;
     }

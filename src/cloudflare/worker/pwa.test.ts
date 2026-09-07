@@ -118,7 +118,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-label {');
 		expect(html).toContain('.crate-reminders-ui .reminders-view.is-primary .reminders-fab {');
 		expect(html).toContain('--crate-fab-bg: var(--crate-accent);');
-		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;border-radius:50%;');
+		expect(html).toContain('.pwa-header-settings-button{position:relative;width:44px;height:44px;min-width:44px;border-radius:50%;');
 		expect(html).toContain('--crate-icon-button-size: 44px;');
 		expect(html).toContain('.crate-reminders-ui .crate-icon-button {');
 		expect(html).toContain('.pwa-modal-sheet .reminder-modal-header .reminder-modal-header-close {');
@@ -193,7 +193,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-reminders-view .bottom-tab-button:active .bottom-tab-icon{transform:scale(.88)}');
 		expect(html).toContain('@media (prefers-reduced-motion:reduce){.pwa-reminders-view .bottom-tab-icon{transition:none}');
 		expect(html).toContain('bottom:calc(var(--reminders-tabbar-height) + var(--reminders-fab-gap) - var(--pwa-tabbar-bleed))');
-		expect(html).toContain('.pwa-header-settings-button,.pwa-header-sync-button{position:relative;width:44px;height:44px;min-width:44px;');
+		expect(html).toContain('.pwa-header-settings-button{position:relative;width:44px;height:44px;min-width:44px;');
 		expect(html).toContain('.pwa-reminders-view .ios-scroll{scrollbar-width:none;overscroll-behavior-y:contain}');
 		expect(html).toContain('position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none');
 		expect(html).toContain('--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px))');
@@ -237,7 +237,7 @@ describe('PWA activation metadata', () => {
 		expect(OPEN_OBSIDIAN_JS).toContain("var project = params.get('project')");
 	});
 
-	it('keeps library-backed sheets fixed while their inner fields handle scrolling', () => {
+	it('keeps sheet containers fixed while pickers fit their content', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('.pwa-shadow-root.has-open-sheet .reminders-content,.pwa-shadow-root.has-open-sheet .reminders-view-scroll{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}');
@@ -249,7 +249,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-modal-sheet.is-keyboard-open .pwa-reminder-sheet-stage{height:calc(100% - var(--pwa-keyboard-inset,0px));flex:0 0 calc(100% - var(--pwa-keyboard-inset,0px))}');
 		expect(html).not.toContain('.pwa-modal-sheet.is-keyboard-open .pwa-modal-sheet__container--reminder{bottom:');
 		expect(html).toContain('.pwa-modal-sheet__content,.pwa-modal-sheet__scroller{height:100%;min-height:0;overflow:hidden!important}');
-		expect(html).toContain('.pwa-picker-sheet{position:relative;z-index:1;display:flex;width:100%;height:100%;');
+		expect(html).toContain('.pwa-picker-sheet{position:relative;z-index:1;display:flex;width:100%;height:auto;');
 		expect(html).toContain('.crate-reminders-ui .reminder-date-picker .picker-schedule-fields {');
 		expect(html).toContain('.crate-reminders-ui .project-picker-row {');
 		expect(html).toContain('.crate-reminders-ui .recurrence-frequency-tabs {');
