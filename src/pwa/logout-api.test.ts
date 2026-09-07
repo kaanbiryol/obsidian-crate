@@ -4,6 +4,8 @@ import { AUTH_TOKEN_KEY } from './config';
 import { invalidatePwaSession } from './session-generation';
 import { performPwaLogout } from './hooks/usePwaSessionLifecycle';
 
+vi.mock('./session-label', () => ({ detectWebSessionName: () => 'iPhone · Safari' }));
+
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it('dispatches the captured revocation after local logout while fencing ordinary writes', async () => {
