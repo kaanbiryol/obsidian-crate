@@ -2,7 +2,6 @@ import React from 'react';
 import { PwaButton as Button } from './PwaButton';
 import {
 	Bell,
-	RefreshCw,
 	Settings,
 } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
@@ -31,31 +30,13 @@ function PwaSettingsButton({
 
 export function PwaHeaderActions({
 	settingsOpen,
-	statusText,
-	statusKind,
-	refreshing,
-	onRefresh,
 	onToggleSettings,
 }: {
 	settingsOpen: boolean;
-	statusText: string | null;
-	statusKind: DataMode | 'offline';
-	refreshing: boolean;
-	onRefresh: () => void;
 	onToggleSettings: () => void;
 }) {
 	return (
 		<div className="pwa-header-actions">
-			<button
-				className={`pwa-header-sync-button is-${statusKind}${refreshing ? ' is-refreshing' : ''}`}
-				type="button"
-				data-action="refresh-header"
-				aria-label={statusText ? `Refresh reminders. ${statusText}` : 'Refresh reminders'}
-				onClick={onRefresh}
-			>
-				<RefreshCw size={22} strokeWidth={2.1} />
-				<span className="pwa-header-sync-button__dot" aria-hidden="true" />
-			</button>
 			<PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />
 		</div>
 	);

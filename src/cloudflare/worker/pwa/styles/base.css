@@ -81,6 +81,7 @@ button:disabled{cursor:not-allowed;opacity:.55}
 .settings-row--preference{gap:12px;min-height:72px;box-sizing:border-box}
 .settings-preference-control{display:flex;position:relative;align-items:center;box-sizing:border-box;flex:0 0 120px;width:120px;height:44px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--text);transition:border-color .15s ease,background .15s ease}
 .settings-preference-control:focus-within{border-color:var(--accent);outline:2px solid rgba(var(--accent-rgb),.18);outline-offset:2px}
+.settings-preference-control--select{transition:none}
 .settings-preference-control .settings-preference-input{appearance:none;-webkit-appearance:none;box-sizing:border-box;width:100%;min-width:0;height:100%;margin:0;padding:0 12px;border:0;border-radius:inherit;outline:none;background:transparent;box-shadow:none;color:inherit;font:inherit;font-size:16px;font-weight:500;line-height:normal}
 .settings-preference-control--select .settings-preference-input{padding-right:28px;cursor:pointer}
 .settings-preference-control--select svg{position:absolute;right:10px;pointer-events:none;color:var(--text-faint)}

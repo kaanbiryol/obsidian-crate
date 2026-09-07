@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { PwaPreferences } from '../preferences';
 import { PwaButton as Button } from './PwaButton';
 import {
@@ -47,6 +47,7 @@ export function SettingsSheet({
 	onLogout: () => void;
 }) {
 	const [upcomingDraft, setUpcomingDraft] = useState(String(config.upcomingDays));
+	const defaultScreenPointerSelection = useRef(false);
 	const notificationDescription = push.status
 		?? (push.subscribed ? 'Reminders are enabled on this device.' : 'Get alerts when Crate is closed.');
 	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
@@ -111,10 +112,19 @@ export function SettingsSheet({
 					<section className="settings-panel__section" aria-labelledby="settings-reminders-title">
 						<h3 id="settings-reminders-title" className="settings-panel__title">Reminders</h3>
 						<div className="settings-group">
-							<label className="settings-row settings-row--preference">
+							<label className="settings-row settings-row--preference"
+								onPointerDownCapture={() => { defaultScreenPointerSelection.current = true; }}
+							>
 								<span className="settings-row__copy"><strong>Default screen</strong><span>Shown when Crate opens.</span></span>
 								<span className="settings-preference-control settings-preference-control--select">
-								<select className="settings-preference-input" value={defaultScreen} onChange={(event) => onPreferencesChange({ defaultScreen: event.currentTarget.value as PwaPreferences['defaultScreen'] })}>
+								<select className="settings-preference-input" value={defaultScreen}
+									onKeyDown={() => { defaultScreenPointerSelection.current = false; }}
+									onChange={(event) => {
+										onPreferencesChange({ defaultScreen: event.currentTarget.value as PwaPreferences['defaultScreen'] });
+										// Native touch menus leave the select focused after a choice.
+										if (defaultScreenPointerSelection.current) event.currentTarget.blur();
+									}}
+								>
 									<option value="today">Today</option>
 									<option value="inbox">Inbox</option>
 									<option value="upcoming">Upcoming</option>

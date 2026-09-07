@@ -56,10 +56,10 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 #app{background:radial-gradient(circle at 84% -10%,rgba(var(--accent-rgb),.055),transparent 33%),var(--background-primary)}
 .reminders-shadow-root{background:var(--background-primary);color:var(--text-normal)}
 .pwa-reminders-view .bottom-tab-bar,.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:var(--pwa-tabbar-surface);border-color:var(--background-modifier-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
-.secondary-button,.pwa-header-settings-button,.pwa-header-sync-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
-.pwa-header-settings-button:hover,.pwa-header-settings-button.is-active,.pwa-header-sync-button:hover{background:var(--pwa-light-surface-hover);border-color:var(--pwa-light-border-strong);color:var(--text-normal)}
-.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-sync-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
-.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button:hover,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button.is-active,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-sync-button:hover{background:var(--pwa-light-surface-hover);border-color:var(--pwa-light-border-strong);color:var(--text-normal)}
+.secondary-button,.pwa-header-settings-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
+.pwa-header-settings-button:hover,.pwa-header-settings-button.is-active{background:var(--pwa-light-surface-hover);border-color:var(--pwa-light-border-strong);color:var(--text-normal)}
+.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
+.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button:hover,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button.is-active{background:var(--pwa-light-surface-hover);border-color:var(--pwa-light-border-strong);color:var(--text-normal)}
 .pwa-top-notices{background:var(--background-primary)}
 .pwa-status-line,.pwa-notification-prompt,.pwa-update-banner{background:rgba(255,255,255,.76);border-color:var(--background-modifier-border);color:var(--text-normal)}
 .pwa-status-line.is-live{background:var(--pwa-light-surface-soft)}

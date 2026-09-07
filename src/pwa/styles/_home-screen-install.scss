@@ -50,6 +50,7 @@
 
 		p { margin: 0; }
 		ol { margin: 12px 0; padding-left: 22px; list-style: decimal; }
+		ol:only-child { margin: 0; }
 		li { padding-left: 3px; }
 		li + li { margin-top: 10px; }
 		strong { color: var(--text-normal); font-weight: 600; }
