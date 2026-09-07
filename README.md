@@ -44,6 +44,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases and rejects unsupported schemas without converting them. Deployment code is never fetched at runtime.
 - Vault devices can be authorized only through the Cloudflare account that owns the server.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
+- When installing the reminders web app, Safari carries a separate, single-use enrollment grant in the install URL and a ten-minute cookie copied into the Home Screen app. The app clears these after enrollment and keeps its own session; Safari's persistent login credential is not copied. Open the new app within ten minutes of creating the link.
 - Push notifications are optional. When enabled, your Worker sends encrypted payloads containing reminder text and project names through the push service used by the browser or operating system. The provider can observe delivery metadata such as the subscription endpoint, timing, and payload size, but cannot read the encrypted payload.
 - The reminders web app stores its scoped session in browser local storage and caches reminder and project content in IndexedDB for offline use. Signing out clears both.
 - Remote code is not fetched or evaluated at runtime.

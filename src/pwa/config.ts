@@ -1,5 +1,6 @@
 import type { StartTab, StoredConfig } from './types';
 import { manifestHrefForUrl } from '../cloudflare/worker/pwa/pwa-params';
+import { clearInstallEnrollment, preserveInstallEnrollment, restoreInstallEnrollment } from './install-enrollment';
 
 export const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
 const CONFIG_KEY = 'crate-reminders-config';
@@ -54,22 +55,27 @@ export function urlWithoutEnrollmentTokens({
 	pathname,
 	search,
 	hash,
-}: Pick<Location, 'pathname' | 'search' | 'hash'>): string {
+}: Pick<Location, 'pathname' | 'search' | 'hash'>, preserveInstallToken = false): string {
 	const params = new URLSearchParams(search);
-	params.delete('token');
+	if (!preserveInstallToken) params.delete('token');
 	params.delete('browserToken');
 	const nextSearch = params.toString();
 	return `${pathname}${nextSearch ? `?${nextSearch}` : ''}${hash}`;
 }
 
-function clearEnrollmentTokensFromAddressBar(): void {
+export function finishEnrollment(preserveInstallToken = !isStandaloneApp()): void {
+	if (!preserveInstallToken) clearInstallEnrollment();
 	const params = currentQueryParams();
 	if (!params.has('token') && !params.has('browserToken')) return;
-	const nextUrl = urlWithoutEnrollmentTokens(window.location);
+	// Keep Safari's install grant in the document URL as well as the manifest:
+	// Add to Home Screen may use the document URL, and reloads must retain it.
+	const nextUrl = urlWithoutEnrollmentTokens(window.location, preserveInstallToken);
 	const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
 	if (nextUrl !== currentUrl) {
 		window.history.replaceState(window.history.state, '', nextUrl);
 	}
+	const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+	if (manifest) manifest.href = manifestHrefForUrl(window.location.href);
 }
 
 type DeviceNavigator = Pick<Navigator, 'maxTouchPoints' | 'userAgent'>;
@@ -125,16 +131,20 @@ export function applyConfigFromUrl(config: StoredConfig): {
 	tab: StartTab | null;
 	reminderId: string | null;
 } {
-	const params = currentQueryParams();
+	const standalone = isStandaloneApp();
+	const launchParams = currentQueryParams();
+	const params = standalone && !localStorage.getItem(AUTH_TOKEN_KEY)
+		? restoreInstallEnrollment(launchParams)
+		: launchParams;
 	const token = enrollmentTokenFromParams(params);
 	// A service-worker cache hit supplies a generic shell, so its manifest
-	// cannot carry this QR link's install token. Restore it before URL cleanup;
+	// cannot carry this QR link's install token. Restore it before installation;
 	// Safari's session storage is not the Home Screen app's enrollment channel.
-	if (!isStandaloneApp()) {
+	if (!standalone) {
+		preserveInstallEnrollment(window.location.href);
 		const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
 		if (manifest) manifest.href = manifestHrefForUrl(window.location.href);
 	}
-	clearEnrollmentTokensFromAddressBar();
 	const nextConfig = { ...config };
 	const folderPath = params.get('folder');
 	const upcomingDays = params.get('upcomingDays');
