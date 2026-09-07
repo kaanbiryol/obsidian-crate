@@ -65,7 +65,6 @@ function App() {
 	const [reorderDragging, setReorderDragging] = useState(false);
 	const { toast, showToast } = useToast();
 	const homeScreenInstall = useHomeScreenInstall();
-	const { updating, update } = usePwaUpdate(showToast);
 	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
 	const finalizeModalClose = useCallback(() => setModal(null), []);
 	const finalizeSettingsClose = useCallback(() => setSettingsOpen(false), []);
@@ -238,6 +237,9 @@ function App() {
 		setSaving,
 		showToast,
 	});
+
+	const { updating, update } = usePwaUpdate(showToast,
+		initialContentReady && (!authToken || mutationsReady || Boolean(storageError)));
 
 	const launchChange = changes.find(change => launchReminderId && (change.recordId === launchReminderId || change.optimistic?.id === launchReminderId));
 	useLaunchReminderModal({
