@@ -252,6 +252,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 	const manifestFiles: Record<string, ManifestEntry> = {};
 	const localManifest = {
 		load: vi.fn(),
+		close: vi.fn(async () => {}),
 		save: vi.fn(),
 		hashMatches: vi.fn((path: string, hash: string) => manifestFiles[path]?.hash === hash),
 		hasFile: vi.fn((path: string) => path in manifestFiles),
