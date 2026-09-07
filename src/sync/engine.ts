@@ -72,7 +72,7 @@ export class SyncEngine {
 	private activeWork = new Set<Promise<unknown>>();
 	private contentVerifier = new LocalContentVerifier();
 	private periodicCheckFailed = false;
-	private onQueueSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
+	private onAutomaticSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
 	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -112,7 +112,11 @@ export class SyncEngine {
 				files => this.verifyContent(files),
 			),
 			checkForChanges: (lastSeq: number) => this.api.checkForChanges(lastSeq),
-			sync: () => this.sync(),
+			sync: async () => {
+				const result = await this.sync();
+				if (!this.lifecycle.isDestroyed) await this.onAutomaticSyncResult?.(result);
+				return result;
+			},
 			onCheckSuccess: () => {
 				if (this.periodicCheckFailed) this.updateState({ status: 'idle', lastError: null });
 			},
@@ -139,7 +143,7 @@ export class SyncEngine {
 			uploadConcurrency: UPLOAD_CONCURRENCY,
 			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
 			reconcile: (queueKeys) => this.reconcileFromQueue(queueKeys),
-			onFlushResult: (result) => this.onQueueSyncResult?.(result),
+			onFlushResult: (result) => this.onAutomaticSyncResult?.(result),
 		});
 		this.contexts = new SyncEngineContexts({
 			vault: this.vault,
@@ -193,8 +197,8 @@ export class SyncEngine {
 		this.onStateChange = callback;
 	}
 
-	setQueueSyncResultCallback(callback: (result: SyncResult) => void | Promise<void>): void {
-		this.onQueueSyncResult = callback;
+	setAutomaticSyncResultCallback(callback: (result: SyncResult) => void | Promise<void>): void {
+		this.onAutomaticSyncResult = callback;
 	}
 
 	updateSettings(settings: CrateSettings): void {

@@ -3,6 +3,8 @@ import { requestUrl } from 'obsidian';
 import { createLogger, errorMessage } from '../../plugin/logger';
 import { createAbortError } from '../abort';
 import { normalizeWorkerUrl } from '../worker-url';
+import { diagnosticRoute, MAX_REQUEST_DIAGNOSTICS, normalizeRequestDiagnostics, type RequestDiagnostic, type RequestDiagnostics } from '../request-diagnostics';
+import { isAbortError } from '../abort';
 
 const logger = createLogger('ApiClient');
 
@@ -120,6 +122,7 @@ function parseJsonResponse<T>(responseText: string, path: string): T {
 
 export class WorkerApiHttpClient {
 	private readonly clientSession = crypto.randomUUID();
+	private requestDiagnostics: RequestDiagnostic[] = [];
 	private workerUrl: string;
 	private authToken: string;
 	private externalSignal: AbortSignal | undefined;
@@ -150,6 +153,10 @@ export class WorkerApiHttpClient {
 		return this.workerUrl;
 	}
 
+	getRequestDiagnostics(): RequestDiagnostics {
+		return normalizeRequestDiagnostics({ clientSession: this.clientSession, requests: this.requestDiagnostics })!;
+	}
+
 	private async runRequest(
 		path: string,
 		options: ApiRequestOptions,
@@ -169,6 +176,13 @@ export class WorkerApiHttpClient {
 		const resolvedContentType = options.contentType
 			?? getHeader(options.headers ?? {}, 'Content-Type')
 			?? undefined;
+		const operationId = crypto.randomUUID();
+		const record = (outcome: RequestDiagnostic['outcome'], response?: ApiHttpResponse) => {
+			this.requestDiagnostics.push({ at: new Date().toISOString(), operationId, method: options.method ?? 'GET',
+				route: diagnosticRoute(path), status: response?.status ?? 0, outcome,
+				requestId: response ? getHeader(response.headers, 'X-Crate-Request-Id') ?? undefined : undefined });
+			if (this.requestDiagnostics.length > MAX_REQUEST_DIAGNOSTICS) this.requestDiagnostics.shift();
+		};
 
 		return await new Promise<ApiHttpResponse>((resolve, reject) => {
 			let settled = false;
@@ -181,12 +195,14 @@ export class WorkerApiHttpClient {
 				if (settled) return;
 				settled = true;
 				cleanup();
+				record('response', response);
 				resolve(response);
 			};
 			const rejectOnce = (error: unknown) => {
 				if (settled) return;
 				settled = true;
 				cleanup();
+				record(isAbortError(error) ? 'aborted' : 'failed');
 				reject(error instanceof Error ? error : new Error(errorMessage(error)));
 			};
 			// The Obsidian transport cannot be cancelled. A rejected mutation may
@@ -206,7 +222,7 @@ export class WorkerApiHttpClient {
 				headers: {
 					Authorization: `Bearer ${this.authToken}`,
 					'X-Crate-Client-Session': this.clientSession,
-					'X-Crate-Operation-Id': crypto.randomUUID(),
+					'X-Crate-Operation-Id': operationId,
 					[CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current),
 					...headersWithoutContentType,
 				},

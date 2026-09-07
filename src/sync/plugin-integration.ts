@@ -4,6 +4,7 @@ import type CratePlugin from '../main';
 import { type ForegroundSyncReason, SyncRuntime } from './runtime';
 import { notifyConflicts } from './conflict';
 import { ActivityModal } from '../ui/activity-modal';
+import { SyncDiagnosticsModal } from '../ui/sync-diagnostics-modal';
 import { openConfirmationModal } from '../ui/confirmation-modal';
 import { applySharedSettings } from './shared-settings';
 import { SyncApiClient } from './api';
@@ -25,6 +26,10 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 }
 
 export function registerSyncCommands(plugin: CratePlugin): void {
+	plugin.addCommand({
+		id: 'export-sync-diagnostics', name: 'Export sync diagnostics',
+		callback: () => new SyncDiagnosticsModal(plugin.app, plugin.syncRuntime.exportDiagnostics()).open(),
+	});
 	plugin.addCommand({
 		id: 'verify-all-synced-files',
 		name: 'Verify all synced files',

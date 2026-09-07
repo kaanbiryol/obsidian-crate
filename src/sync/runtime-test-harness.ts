@@ -45,7 +45,9 @@ export function setApiClient(runtime: SyncRuntime, apiClient: {
 	putSharedSettings(shared: unknown): Promise<void>;
 	revokeCurrentToken?(): Promise<{ success: boolean }>;
 } | null): void {
-	(runtime as unknown as { apiClient: unknown }).apiClient = apiClient === null ? null : { setAbortSignal: () => {}, ...apiClient };
+	(runtime as unknown as { apiClient: unknown }).apiClient = apiClient === null ? null : {
+		setAbortSignal: () => {}, getRequestDiagnostics: () => ({ clientSession: crypto.randomUUID(), requests: [] }), ...apiClient,
+	};
 }
 
 export function createDeferred<T>(): Deferred<T> {
