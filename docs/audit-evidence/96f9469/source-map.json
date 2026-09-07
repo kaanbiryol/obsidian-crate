@@ -1,0 +1,8 @@
+{
+  "pwa-audit-96f9469.test.ts.txt": "src/pwa/audit-96f9469.test.ts",
+  "sync-audit-96f9469.test.ts.txt": "src/sync/audit-96f9469.test.ts",
+  "audit-96f9469.integration.ts.txt": "src/cloudflare/worker/audit-96f9469.integration.ts",
+  "audit-security-96f9469.integration.ts.txt": "src/cloudflare/worker/audit-security-96f9469.integration.ts",
+  "audit-logout-96f9469.mjs.txt": "scripts/audit-logout-96f9469.mjs",
+  "audit_96f9469.py.txt": "scripts/recovery/audit_96f9469.py"
+}

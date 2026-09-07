@@ -15,6 +15,7 @@ export function recordSyncHistory(
     merged: result.merged,
     deleted: result.deleted,
     errorCount: result.errors.length,
+    errors: limitHistoryPaths(result.errors),
     conflictCount: result.conflicts.length,
     resolvedRaceCount: result.resolvedRaces.length,
     conflictPaths: limitHistoryPaths(result.conflicts),

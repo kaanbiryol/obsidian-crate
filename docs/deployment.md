@@ -126,3 +126,19 @@ An explicit update of a current-schema deployment preserves resource IDs and dat
 - To destroy the server and synced data, explicitly delete its Worker, R2 bucket, D1 database, and Durable Object resources in the Cloudflare dashboard.
 
 For paired D1/R2 backup verification and isolated restore commands, use [Backup and recovery](recovery.md).
+
+## Reset a Crate server
+
+**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Reset server** erases this deployment's remote vault data and rebuilds it. The confirmation identifies the account, Worker, D1 database, and R2 bucket. Each attempt requires confirmation and fresh Cloudflare OAuth authorization. Cancelling authorization performs no remote deletion.
+
+The reset verifies exact deployment names and IDs, live Crate annotations and bindings, database tables, bucket creation identity, and ownership of the ReminderAlarm namespace. It checks other Workers for shared D1, R2, Durable Object, and service bindings. Unreadable ownership information, unexpected bindings or namespaces, newer server versions, unknown database tables, or unknown bucket objects stop the reset. It never searches by name prefix to choose resources to delete.
+
+Before deletion, the entire bucket listing is inspected, including every page. Allowed objects are Crate's generated upload keys, `__crate__/settings.json`, and legacy or retained keys explicitly referenced by Crate's database. Arbitrary files placed in the bucket block the reset. Objects are checked again during deletion.
+
+After verification, local sync disconnects and Crate saves a reset checkpoint. It deploys a temporary Worker that returns HTTP 503 and removes the ReminderAlarm namespace using Cloudflare's [deleted-class export](https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/#delete-a-durable-object-class). Cloudflare rejects this operation if another Worker binds the namespace. Once the namespace is confirmed absent, Crate empties and deletes the verified R2 bucket, deletes the exact D1 database, and recreates the server. The Worker name and server address remain the same; account settings and other deployments are not reset.
+
+Remote files, retained versions, recovery history, shared server settings, device registrations, subscriptions, and reminder state are erased. Local vault files are kept. After success, run **Initial sync → Upload all**, reconnect other devices, and enroll web push again. Crate does not upload vault files automatically as part of the reset. Independently exported backups, files cached on other devices, and Cloudflare-managed logs or retention are outside this reset.
+
+If a request or local save fails, use **Resume server reset** in the same section. The saved checkpoint identifies the original resources and distinguishes cleanup from rebuilding, so a retry does not wipe newly provisioned data. Regular connection and update actions are blocked while a reset is pending. Keep this vault's plugin settings and avoid manually changing its Cloudflare resources until the reset finishes. Do not rename unrelated resources to bypass a failed ownership check.
+
+**Delete server** in **Settings → Crate → Recovery and troubleshooting → Troubleshooting** permanently removes this vault’s verified Crate Worker/web app, database, file bucket and contents, and reminder state without rebuilding. Local vault files and other deployments are kept. It requires confirmation of the exact resources and fresh Cloudflare authorization. Shared resources or unrecognized data block deletion. After an interruption, use **Resume server deletion**; connecting, updating, and resetting remain blocked until deletion completes.

@@ -1,3 +1,5 @@
+import { deleteCrateServer } from './server-delete';
+import { resetCrateServer } from './server-reset';
 import type { CrateSettings } from '../plugin/settings';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiClient, type CloudflareAccount } from './cloudflare-api';
@@ -33,10 +35,11 @@ interface PendingOAuthSession {
 	createdAt: number;
 	metadata: CloudflareDeploymentMetadata;
 	discoverExisting: boolean;
-	intent: 'connect' | 'update';
+	intent: 'connect' | 'update' | 'reset' | 'delete';
 }
 
 export interface CloudflareDeploymentResult {
+	deleted?: true;
 	workerUrl: string;
 	accountName: string;
 }
@@ -50,6 +53,7 @@ export interface CloudflareDeploymentServiceOptions {
 	selectDeployment: (
 		deployments: DiscoveredCloudflareDeployment[],
 	) => Promise<DiscoveredCloudflareDeployment | null>;
+	beforeServerReset?: () => Promise<void>;
 	now?: () => number;
 }
 
@@ -93,14 +97,26 @@ export class CloudflareDeploymentService {
 	private readonly oauthClient: CloudflareOAuthClient;
 	private readonly now: () => number;
 	private pendingSession: PendingOAuthSession | null = null;
+	private handlingCallback = false;
 
 	constructor(private readonly options: CloudflareDeploymentServiceOptions) {
 		this.oauthClient = new CloudflareOAuthClient(options.clientId, options.transport);
 		this.now = options.now ?? Date.now;
 	}
 
-	async startDeployment(intent: 'connect' | 'update' = 'connect'): Promise<void> {
+	get pendingIntent(): PendingOAuthSession['intent'] | null {
+		return this.pendingSession?.intent ?? null;
+	}
+
+	async startDeployment(intent: 'connect' | 'update' | 'reset' | 'delete' = 'connect'): Promise<void> {
+		if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
+		if (existingMetadata?.reset?.deleteOnly && intent !== 'delete') throw new Error('Resume server deletion before connecting or updating.');
+		if (existingMetadata?.reset && !existingMetadata.reset.deleteOnly && intent === 'delete') throw new Error('Finish the server reset before deleting this server.');
+		if (existingMetadata?.reset && intent !== 'reset' && intent !== 'delete') throw new Error('Resume the server reset before connecting or updating.');
+		if ((intent === 'reset' || intent === 'delete') && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) {
+			throw new Error('Connect to a Crate server before resetting its remote data.');
+		}
 		const metadata = existingMetadata
 			? { ...existingMetadata }
 			: createCloudflareDeploymentMetadata();
@@ -129,9 +145,20 @@ export class CloudflareDeploymentService {
 		this.options.openExternal(authorizationUrl.toString());
 	}
 
-	async handleCallback(
+	async handleCallback(params: Record<string, string>, device?: CloudflareAuthorizedDevice, onProgress?: (message: string) => void): Promise<CloudflareDeploymentResult> {
+		if (this.handlingCallback) throw new Error('A Cloudflare operation is already in progress.');
+		this.handlingCallback = true;
+		try {
+			return await this.handleAuthorizedCallback(params, device, onProgress);
+		} finally {
+			this.handlingCallback = false;
+		}
+	}
+
+	private async handleAuthorizedCallback(
 		params: Record<string, string>,
 		device?: CloudflareAuthorizedDevice,
+		onProgress?: (message: string) => void,
 	): Promise<CloudflareDeploymentResult> {
 		const pending = this.pendingSession;
 		if (!pending) {
@@ -153,12 +180,18 @@ export class CloudflareDeploymentService {
 			throw new Error('Cloudflare did not return an authorization code');
 		}
 
+		onProgress?.('Completing Cloudflare authorization…');
 		const accessToken = await this.oauthClient.exchangeAuthorizationCode(params.code, pending.verifier);
 		let result: CloudflareDeploymentResult;
 		try {
 			const api = new CloudflareApiClient(accessToken, this.options.transport);
+			if (pending.intent !== 'reset' && pending.intent !== 'delete' && this.options.settingsOwner.settings.cloudflareDeployment?.reset) throw new Error('Resume the server reset before connecting or updating.');
+			if ((pending.intent === 'reset' || pending.intent === 'delete') && JSON.stringify(pending.metadata) !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) {
+				throw new Error('Server settings changed during authorization. Confirm the reset again.');
+			}
 			let metadata = pending.metadata;
 			let discoveredExisting = false;
+			onProgress?.('Checking your Cloudflare account…');
 			const account = selectAccount(await api.listAuthorizedAccounts(), metadata);
 			if (pending.discoverExisting) {
 				const deployments = await discoverCloudflareDeployments(api, account);
@@ -177,6 +210,25 @@ export class CloudflareDeploymentService {
 			metadata.accountName = account.name;
 			await this.persistMetadata(metadata);
 
+			if (pending.intent === 'delete') {
+				if (!this.options.beforeServerReset) throw new Error('Deletion requires sync shutdown.');
+				await deleteCrateServer({
+					api, accountId: account.id, metadata, version: (await this.options.loadArtifacts()).version,
+					beforeDelete: this.options.beforeServerReset, onProgress,
+					persist: () => this.persistMetadata(metadata),
+				});
+				await this.options.settingsOwner.writeSettings({ cloudflareDeployment: null });
+				return { workerUrl: '', accountName: account.name, deleted: true };
+			}
+			const artifacts = pending.intent === 'reset' ? await this.options.loadArtifacts() : null;
+			if (pending.intent === 'reset') {
+				if (!device || !artifacts || !this.options.beforeServerReset) throw new Error('Reset requires a new device credential and sync shutdown.');
+				await resetCrateServer({
+					api, accountId: account.id, metadata, version: artifacts.version,
+					beforeDelete: this.options.beforeServerReset, onProgress,
+					persist: () => this.persistMetadata(metadata),
+				});
+			}
 			let workerUrl: string;
 			if (pending.intent === 'connect' && metadata.d1DatabaseId && (discoveredExisting || metadata.lastDeployedVersion)) {
 				// Registering a replica must never replace shared Worker/PWA code.
@@ -190,11 +242,13 @@ export class CloudflareDeploymentService {
 					api,
 					accountId: account.id,
 					metadata,
-					artifacts: await this.options.loadArtifacts(),
+					artifacts: artifacts ?? await this.options.loadArtifacts(),
 					onMetadataChanged: () => this.persistMetadata(metadata),
+					onProgress,
 				});
 			}
 			if (device) {
+				onProgress?.('Registering this device with the server…');
 				if (!metadata.d1DatabaseId) throw new Error('Cloudflare deployment database is missing');
 				await registerCloudflareAuthorizedDevice({
 					api,
@@ -202,6 +256,10 @@ export class CloudflareDeploymentService {
 					databaseId: metadata.d1DatabaseId,
 					device,
 				});
+			}
+			if (metadata.reset) {
+				delete metadata.reset;
+				await this.persistMetadata(metadata);
 			}
 			result = { workerUrl, accountName: account.name };
 		} finally {

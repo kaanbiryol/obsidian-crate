@@ -1,0 +1,47 @@
+/Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/playwright/lib/matchers/expect.js:213
+        return matcher.call(target, ...args);
+                       ^
+
+A [Error]: expect(locator).toHaveClass(expected) failed
+
+Locator: locator('.pwa-pull-refresh')
+Expected pattern: /is-ready/
+Received string:  "pwa-pull-refresh is-visible is-pulling"
+Timeout: 5000ms
+
+Call log:
+  - Expect "to.have.class" with timeout 5000ms
+  - waiting for locator('.pwa-pull-refresh')
+    9 × locator resolved to <div role="status" aria-hidden="false" aria-label="Pull to refresh" class="pwa-pull-refresh is-visible is-pulling">…</div>
+      - unexpected value "pwa-pull-refresh is-visible is-pulling"
+
+    at Proxy.<anonymous> (/Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/playwright/lib/matchers/expect.js:213:24)
+    at file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/scripts/pwa-ui-performance-test.mjs:123:51 {
+  matcherResult: {
+    name: 'toHaveClass',
+    expected: /is-ready/,
+    message: 'expect(locator).toHaveClass(expected) failed\n' +
+      '\n' +
+      "Locator: locator('.pwa-pull-refresh')\n" +
+      'Expected pattern: /is-ready/\n' +
+      'Received string:  "pwa-pull-refresh is-visible is-pulling"\n' +
+      'Timeout: 5000ms\n' +
+      '\n' +
+      'Call log:\n' +
+      '  - Expect "to.have.class" with timeout 5000ms\n' +
+      "  - waiting for locator('.pwa-pull-refresh')\n" +
+      '    9 × locator resolved to <div role="status" aria-hidden="false" aria-label="Pull to refresh" class="pwa-pull-refresh is-visible is-pulling">…</div>\n' +
+      '      - unexpected value "pwa-pull-refresh is-visible is-pulling"\n',
+    pass: false,
+    actual: 'pwa-pull-refresh is-visible is-pulling',
+    log: [
+      '  - Expect "to.have.class" with timeout 5000ms',
+      "  - waiting for locator('.pwa-pull-refresh')",
+      '    9 × locator resolved to <div role="status" aria-hidden="false" aria-label="Pull to refresh" class="pwa-pull-refresh is-visible is-pulling">…</div>',
+      '      - unexpected value "pwa-pull-refresh is-visible is-pulling"'
+    ],
+    timeout: 5000
+  }
+}
+
+Node.js v24.19.0

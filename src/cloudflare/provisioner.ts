@@ -90,27 +90,35 @@ export async function provisionCloudflareDeployment(input: {
 	metadata: CloudflareDeploymentMetadata;
 	artifacts: CloudflareDeploymentArtifacts;
 	onMetadataChanged: () => Promise<void>;
+	onProgress?: (message: string) => void;
 }): Promise<string> {
 	// Read remote identity, never rely on another device's saved metadata.
 	try {
-		const remote = deployedArtifact(await input.api.getWorkerSettings(input.accountId, input.metadata.workerName));
-		assertDeploymentIsNotDowngrade(remote.version, input.artifacts.version);
+		const settings = await input.api.getWorkerSettings(input.accountId, input.metadata.workerName);
+		const remote = deployedArtifact(settings);
+		const ownResetStub = input.metadata.reset && settings.annotations?.['workers/message'] === `Crate reset ${input.metadata.reset.id}`;
+		if (!ownResetStub) assertDeploymentIsNotDowngrade(remote.version, input.artifacts.version);
 	} catch (error) {
 		if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
 	}
+	input.onProgress?.('Preparing the server database…');
 	const databaseId = await ensureD1Database(input.api, input.accountId, input.metadata);
+	if (!databaseId) throw new Error('Cloudflare did not return the new D1 database ID');
 	if (input.metadata.d1DatabaseId !== databaseId) {
 		input.metadata.d1DatabaseId = databaseId;
 		await input.onMetadataChanged();
 	}
 
+	input.onProgress?.('Preparing the remote file bucket…');
 	await ensureR2Bucket(input.api, input.accountId, input.metadata.r2BucketName);
+	input.onProgress?.('Initializing the database schema…');
 	await initializeD1Schema({
 		api: input.api,
 		accountId: input.accountId,
 		databaseId,
 		artifacts: input.artifacts,
 	});
+	input.onProgress?.('Uploading the Worker and web app to Cloudflare…');
 	await input.api.uploadWorker({
 		accountId: input.accountId,
 		workerName: input.metadata.workerName,
@@ -118,12 +126,14 @@ export async function provisionCloudflareDeployment(input: {
 		d1DatabaseId: databaseId,
 		r2BucketName: input.metadata.r2BucketName,
 	});
+	input.onProgress?.('Configuring server maintenance…');
 	await input.api.updateWorkerSchedules(
 		input.accountId,
 		input.metadata.workerName,
 		[CLOUDFLARE_MAINTENANCE_CRON],
 	);
 
+	input.onProgress?.('Enabling the server address…');
 	const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata);
 	if (input.metadata.workersSubdomain !== workersSubdomain) {
 		input.metadata.workersSubdomain = workersSubdomain;

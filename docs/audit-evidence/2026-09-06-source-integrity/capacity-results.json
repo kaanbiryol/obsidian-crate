@@ -1,0 +1,88 @@
+[
+  {
+    "probe": "warm-list-local-only",
+    "count": 1000,
+    "samples": [
+      {
+        "wallMs": 23,
+        "bytes": 286930,
+        "queries": 3,
+        "unchangedWallMs": 3,
+        "unchangedQueries": 1
+      },
+      {
+        "wallMs": 15,
+        "bytes": 286930,
+        "queries": 3,
+        "unchangedWallMs": 3,
+        "unchangedQueries": 1
+      },
+      {
+        "wallMs": 12,
+        "bytes": 286930,
+        "queries": 3,
+        "unchangedWallMs": 2,
+        "unchangedQueries": 1
+      },
+      {
+        "wallMs": 14,
+        "bytes": 286930,
+        "queries": 3,
+        "unchangedWallMs": 3,
+        "unchangedQueries": 1
+      },
+      {
+        "wallMs": 15,
+        "bytes": 286930,
+        "queries": 3,
+        "unchangedWallMs": 2,
+        "unchangedQueries": 1
+      }
+    ],
+    "medianWallMs": 15,
+    "medianUnchangedWallMs": 3
+  },
+  {
+    "probe": "warm-list-local-only",
+    "count": 10000,
+    "samples": [
+      {
+        "wallMs": 125,
+        "bytes": 2878930,
+        "queries": 3,
+        "unchangedWallMs": 19,
+        "unchangedQueries": 1
+      },
+      {
+        "wallMs": 123,
+        "bytes": 2878930,
+        "queries": 3,
+        "unchangedWallMs": 18,
+        "unchangedQueries": 1
+      },
+      {
+        "wallMs": 120,
+        "bytes": 2878930,
+        "queries": 3,
+        "unchangedWallMs": 17,
+        "unchangedQueries": 1
+      },
+      {
+        "wallMs": 123,
+        "bytes": 2878930,
+        "queries": 3,
+        "unchangedWallMs": 17,
+        "unchangedQueries": 1
+      },
+      {
+        "wallMs": 151,
+        "bytes": 2878930,
+        "queries": 3,
+        "unchangedWallMs": 19,
+        "unchangedQueries": 1
+      }
+    ],
+    "medianWallMs": 123,
+    "medianUnchangedWallMs": 18
+  }
+]

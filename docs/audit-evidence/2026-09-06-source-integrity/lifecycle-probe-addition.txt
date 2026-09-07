@@ -1,0 +1,19 @@
+
+it('audit: does not reactivate after shutdown during settings load', async () => {
+  const { bootstrapPlugin, shutdownPlugin } = await loadLifecycleModule();
+  let finishSettings!: () => void;
+  const waitingSettings = new Promise<void>(resolve => { finishSettings = resolve; });
+  const plugin = createPlugin({ loadSettings: vi.fn(() => waitingSettings) });
+  const initialize = vi.fn(async () => {});
+  const destroy = vi.fn();
+  initializeSyncManagers.mockImplementation(target => {
+    target.syncRuntime = { isConfigured: () => true, initialize, destroy, waitForStartupSync: async () => false };
+  });
+  const starting = bootstrapPlugin(plugin as never);
+  shutdownPlugin(plugin as never);
+  finishSettings();
+  await starting;
+  await Promise.resolve();
+  console.log(JSON.stringify({ probe: 'shutdown-during-settings', managersCreated: initializeSyncManagers.mock.calls.length, syncInitialized: initialize.mock.calls.length, destroyed: destroy.mock.calls.length, eventRegistration: registerVaultSyncEventHandlers.mock.calls.length, protocolRegistration: plugin.registerObsidianProtocolHandler.mock.calls.length }));
+  expect(initialize).not.toHaveBeenCalled();
+});

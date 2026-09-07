@@ -1,3 +1,5 @@
+import { showSyncErrorNotice } from '../sync-error-notice';
+import { ActivityModal } from '../activity-modal';
 import { Notice, Setting, type ButtonComponent } from 'obsidian';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
@@ -62,7 +64,7 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 						if (result.success) {
 							new Notice(`Sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded`);
 						} else {
-							new Notice(`Sync completed with errors: ${result.errors.join(', ')}`);
+							showSyncErrorNotice(plugin, 'Sync completed with errors.');
 						}
 
 						if (result.conflicts.length > 0) {
@@ -76,6 +78,13 @@ export function renderSyncSection(context: SyncSectionContext): () => void {
 			});
 		});
 	const syncProgress = createFileSyncProgress(syncSetting);
+
+	new Setting(containerEl)
+		.setName('Sync activity')
+		.setDesc('View pending files, conflicts, and sync history with error details.')
+		.addButton(button => button
+			.setButtonText('Show sync activity')
+			.onClick(() => new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open()));
 
 	// Show progress bar and subscribe to updates for any running sync
 	const onProgress = (current: number, total: number) => {

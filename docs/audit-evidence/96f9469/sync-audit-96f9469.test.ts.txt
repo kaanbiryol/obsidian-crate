@@ -1,0 +1,20 @@
+import { expect, it } from 'vitest';
+import { deletePathLocallyIfUnchanged } from './planner-helpers';
+import { computeHash } from './hasher';
+it('REPRO: an intervening local edit is deleted after the preflight hash check', async () => {
+  const encoder = new TextEncoder();
+  let content: ArrayBuffer | undefined = encoder.encode('acknowledged old contents').buffer;
+  const oldHash = await computeHash(content);
+  let removed = '';
+  const file = { path: 'note.md', extension: 'md' };
+  const context = { vault: { getAbstractFileByPath: () => file, adapter: { exists: async () => content !== undefined, readBinary: async () => content! } }, fileManager: { trashFile: async () => {
+    // The host accepts another write after Crate's read and before deletion.
+    content = encoder.encode('new local edit never uploaded').buffer;
+    removed = new TextDecoder().decode(content);
+    content = undefined; // Models Obsidian's documented permanent-delete preference.
+  } } };
+  const result = await deletePathLocallyIfUnchanged(context as never, 'note.md', oldHash);
+  expect(result).toEqual({ status: 'deleted' });
+  expect(removed).toBe('new local edit never uploaded');
+  expect(content).toBeUndefined();
+});

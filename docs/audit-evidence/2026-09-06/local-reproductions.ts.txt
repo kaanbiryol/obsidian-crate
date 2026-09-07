@@ -1,0 +1,113 @@
+// Audit reproductions assert observed defects, not intended fixed behavior.
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { applyRemoteContentIfUnchanged } from './sync/local-apply';
+import { computeHash } from './sync/hasher';
+import { buildUpdatedReminderBlock, replaceUpdatedReminderBlock } from './reminders/core/markdownReminderMutation';
+import { scanReminderMarkdownFile } from './cloudflare/worker/reminders-web/scan';
+import { rebuildCheckboxLine, parseCheckboxLine } from './reminders/utils/checkboxParser';
+import { ReminderAlarm } from './cloudflare/worker/reminder-alarm';
+import { listPushSubscriptionIds, sendToAllSubscriptions } from './cloudflare/worker/notifications/push';
+import { useReminderMutations } from './pwa/hooks/useReminderMutations';
+
+vi.mock('./cloudflare/worker/notifications/push', () => ({ listPushSubscriptionIds: vi.fn(), sendToAllSubscriptions: vi.fn() }));
+vi.mock('react', () => ({ useCallback: (callback: unknown) => callback }));
+afterEach(() => vi.restoreAllMocks());
+const bytes = (text: string) => new TextEncoder().encode(text).buffer;
+
+describe('pre-release audit: reproduced local and UI defects', () => {
+  it('overwrites an intervening binary edit without preserving a copy', async () => {
+    let current = bytes('base');
+    const file = { path: 'drawing.canvas', extension: 'canvas' };
+    const before = await computeHash(current);
+    const vault = {
+      createFolder: vi.fn(), getAbstractFileByPath: () => file,
+      adapter: { readBinary: async () => current, exists: async () => true },
+      modifyBinary: async (_file: unknown, content: ArrayBuffer) => {
+        current = bytes('new local edit after last hash check');
+        current = content;
+      },
+    };
+    expect(await applyRemoteContentIfUnchanged({ vault } as never, file.path, bytes('remote'), before)).toEqual({ status: 'applied' });
+    expect(new TextDecoder().decode(current)).toBe('remote');
+  });
+
+  it('stable-ID lookup overwrites newer reminder fields from a stale plugin record', () => {
+    const path = 'Reminders/Inbox.md';
+    const old = '- [ ] old title <!-- crate-id:audit-id -->\n';
+    const stale = scanReminderMarkdownFile(path, old, 'Reminders')[0]!;
+    const newer = '- [ ] new title <!-- crate-id:audit-id -->\n';
+    const mutation = buildUpdatedReminderBlock(stale, { priority: 1 });
+    const result = replaceUpdatedReminderBlock(newer, stale, mutation);
+    expect(result.content).toContain('old title');
+    expect(result.content).not.toContain('new title');
+  });
+
+  it('Markdown round-trip discards recurrence timezone, count, and end date', () => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const rule = { frequency: 'daily' as const, hour: 9, minute: 0, timezone: timezone === 'Pacific/Honolulu' ? 'Asia/Tokyo' : 'Pacific/Honolulu', count: 3, endDate: '2099-01-05' };
+    const line = rebuildCheckboxLine('', false, 'task', new Date('2099-01-01T09:00:00Z'), 4, undefined, rule, true, 'audit-id');
+    const parsed = parseCheckboxLine(line)!.parsed.recurrence!;
+    expect(parsed.timezone).not.toBe(rule.timezone);
+    expect(parsed.count).toBeUndefined();
+    expect(parsed.endDate).toBeUndefined();
+  });
+
+  it('an old alarm marks a new schedule delivered and suppresses its future push', async () => {
+    vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription']);
+    let resolveDelivery!: (value: unknown) => void;
+    let started!: () => void;
+    const sending = new Promise<void>(resolve => { started = resolve; });
+    vi.mocked(sendToAllSubscriptions).mockImplementationOnce(async () => {
+      started();
+      return await new Promise(resolve => { resolveDelivery = resolve; }) as never;
+    });
+    const old = { reminderId: 'audit-id', scheduleToken: 'old', content: 'old title', dueDatetime: '2099-01-01T00:00:00.000Z' };
+    const values = new Map<string, unknown>([['reminder', old]]);
+    let schedule = { schedule_token: old.scheduleToken, content: old.content, due_datetime: old.dueDatetime, project: null };
+    const state = { storage: {
+      get: async (key: string) => values.get(key), put: async (key: string, value: unknown) => { values.set(key, value); },
+      delete: async (key: string) => values.delete(key), deleteAll: async () => values.clear(),
+      getAlarm: async () => Date.parse(old.dueDatetime), setAlarm: async () => {}, deleteAlarm: async () => {},
+    }};
+    const db = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({
+      first: async () => schedule,
+      run: async () => { if (sql.includes('INSERT OR REPLACE')) schedule = { schedule_token: String(args[1]), content: String(args[2]), due_datetime: String(args[4]), project: null }; },
+    }) }) };
+    const alarm = new ReminderAlarm(state as never, { DB: db as never });
+    const oldDelivery = alarm.alarm();
+    await sending;
+    expect((await alarm.fetch(new Request('https://do/schedule', { method: 'PUT', body: JSON.stringify({ reminderId: 'audit-id', content: 'new title', dueDatetime: '2099-02-01T00:00:00.000Z' }) }))).status).toBe(200);
+    resolveDelivery({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] });
+    await oldDelivery;
+    expect(values.get('reminder')).toMatchObject({ content: 'new title' });
+    expect(values.get('deliveryComplete')).toBe(true);
+    await alarm.alarm();
+    expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
+    expect(values.has('reminder')).toBe(false);
+  });
+
+  it('two successful PWA mutations overwrite each other in the cached list', async () => {
+    const remindersRef = { current: [
+      { id: 'one', content: 'one', completed: false, filePath: 'Reminders/One.md', project: 'One' },
+      { id: 'two', content: 'two', completed: false, filePath: 'Reminders/Two.md', project: 'Two' },
+    ] };
+    const resolvers = new Map<string, (response: Response) => void>();
+    const hook = useReminderMutations({
+      apiFetch: async (_path: string, init: RequestInit) => new Promise<Response>(resolve => { resolvers.set(JSON.parse(String(init.body)).id, resolve); }),
+      beginLocalMutation: () => () => {}, ensureCanMutate: () => true,
+      commitReminderState: (value: typeof remindersRef.current) => { remindersRef.current = value; },
+      setReminders: (fn: (value: typeof remindersRef.current) => typeof remindersRef.current) => { remindersRef.current = fn(remindersRef.current); },
+      remindersRef, projectsRef: { current: ['One', 'Two'] }, config: { folderPath: 'Reminders' },
+      projects: ['One', 'Two'], selectedProject: null, closeModal: () => {}, setProjects: () => {}, setSaving: () => {}, showToast: () => {},
+    } as never);
+    const one = hook.toggleReminderCompleted('one', false);
+    const two = hook.toggleReminderCompleted('two', false);
+    resolvers.get('two')!(new Response('{}', { status: 200 }));
+    await two;
+    expect(remindersRef.current.find(r => r.id === 'two')!.completed).toBe(true);
+    resolvers.get('one')!(new Response('{}', { status: 200 }));
+    await one;
+    expect(remindersRef.current.find(r => r.id === 'one')!.completed).toBe(true);
+    expect(remindersRef.current.find(r => r.id === 'two')!.completed).toBe(false);
+  });
+});

@@ -9,15 +9,17 @@ import { Setting } from 'obsidian';
 export function renderInfrastructureSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin } = context;
 	createSettingsSectionHeading(containerEl, 'Recovery and troubleshooting');
-	new Setting(containerEl)
-		.setName('Restore remote file')
-		.setDesc('Restore a server copy of a file replaced or deleted in the last 30 days.')
-		.addButton(button => button
-			.setButtonText('View retained files')
-			.onClick(() => openRemoteRecoveryModal(plugin.app, plugin.syncRuntime)));
+	if (context.isConfigured) {
+		new Setting(containerEl)
+			.setName('Restore remote file')
+			.setDesc('Restore a server copy of a file replaced or deleted in the last 30 days.')
+			.addButton(button => button
+				.setButtonText('View retained files')
+				.onClick(() => openRemoteRecoveryModal(plugin.app, plugin.syncRuntime)));
 
-	const recoveryEl = createSettingsDisclosure(containerEl, 'Recovery tools');
-	renderInfrastructureSyncActions({ ...context, containerEl: recoveryEl });
+		const recoveryEl = createSettingsDisclosure(containerEl, 'Recovery tools');
+		renderInfrastructureSyncActions({ ...context, containerEl: recoveryEl });
+	}
 	const troubleshootingEl = createSettingsDisclosure(containerEl, 'Troubleshooting');
 	renderInfrastructureManagementSection({ ...context, containerEl: troubleshootingEl });
 	renderTroubleshootingSettings(troubleshootingEl, plugin);

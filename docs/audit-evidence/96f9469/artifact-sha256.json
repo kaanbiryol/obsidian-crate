@@ -1,0 +1,6 @@
+{
+  "dist/main.js": "64cf19f8c5f1b74ce2b6de753a97cbfd8c8190cf4d1738b94e9ee5cf03c6bd0d",
+  "dist/styles.css": "7dc75f7503e211e7699088548d09097fe1406661cbac67c5cecf015b4dcfe968",
+  "manifest.json": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a",
+  ".generated/cloudflare/worker.mjs": "16186d67f01eadd3401e0d5b6874083f4799508d8a27bab729fdf6f2d3b5f81f"
+}

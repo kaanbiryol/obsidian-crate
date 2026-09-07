@@ -1,0 +1,67 @@
+
+> obsidian-crate@0.1.0 test:visual
+> playwright test --workers=2
+
+[2m[WebServer] [22m(node:63689) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 48 tests using 2 workers
+
+(node:63691) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63690) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63690) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63691) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 cards (398ms)
+  ✓   1 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 editor (431ms)
+  ✓   3 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 date (307ms)
+  ✓   4 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 project (321ms)
+  ✓   5 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 weekly (298ms)
+  ✓   6 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 monthly (313ms)
+  ✓   7 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 cards (284ms)
+  ✓   8 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 editor (319ms)
+  ✓   9 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 date (292ms)
+  ✓  10 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 project (304ms)
+  ✓  11 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 weekly (306ms)
+  ✓  12 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 monthly (290ms)
+  ✓  13 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 cards (281ms)
+  ✓  14 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 editor (283ms)
+  ✓  15 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 date (291ms)
+  ✓  16 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 project (281ms)
+  ✓  17 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 weekly (332ms)
+  ✓  18 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 monthly (292ms)
+  ✓  19 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 cards (313ms)
+  ✓  20 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 editor (336ms)
+  ✓  21 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 date (282ms)
+  ✓  22 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 project (301ms)
+  ✓  23 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 weekly (313ms)
+  ✓  24 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 monthly (300ms)
+  ✓  25 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 cards (267ms)
+  ✓  26 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 editor (293ms)
+  ✓  27 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 date (310ms)
+  ✓  28 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 project (289ms)
+  ✓  29 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 weekly (301ms)
+  ✓  30 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 monthly (315ms)
+  ✓  31 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 cards (288ms)
+  ✓  32 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 editor (312ms)
+  ✓  33 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 date (307ms)
+  ✓  34 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 project (292ms)
+  ✓  35 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 weekly (313ms)
+  ✓  36 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 monthly (302ms)
+  ✓  37 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 cards (300ms)
+  ✓  38 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 editor (281ms)
+  ✓  39 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 date (281ms)
+  ✓  40 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 project (291ms)
+  ✓  41 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 weekly (314ms)
+  ✓  42 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 monthly (313ms)
+  ✓  43 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 cards (306ms)
+  ✓  44 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 editor (309ms)
+  ✓  45 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 date (304ms)
+  ✓  46 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 project (298ms)
+  ✓  47 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 weekly (319ms)
+  ✓  48 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 monthly (279ms)
+
+  48 passed (10.0s)

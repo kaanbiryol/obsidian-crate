@@ -1,0 +1,19 @@
+
+> obsidian-crate@0.1.0 test:worker-runtime
+> npm run build:worker && vitest run --config vitest.cloudflare.config.ts
+
+
+> obsidian-crate@0.1.0 build:worker
+> node scripts/build-worker.mjs
+
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+
+ RUN  v4.1.8 /Users/kaanbiryol/Documents/Projects/obsidian-crate
+
+
+ Test Files  2 passed (2)
+      Tests  13 passed (13)
+   Start at  11:02:19
+   Duration  4.06s (transform 1.62s, setup 0ms, import 3.27s, tests 607ms, environment 0ms)
+

@@ -1,0 +1,25 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: pull must not move or resize the list
++ actual - expected
+
+  {
+    height: 250,
+    width: 374,
+    x: 8,
++   y: 83
+-   y: 8
+  }
+
+    at file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/scripts/.pre-release-ui.mjs:124:10 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: { x: 8, y: 83, width: 374, height: 250 },
+  expected: { x: 8, y: 8, width: 374, height: 250 },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

@@ -1,0 +1,40 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import schema from '../schema.sql?raw';
+import { writeCommittedMarkdownFile } from './storage';
+import { drainNotificationProjections } from './notification-projection';
+import { handleNotificationPolicy } from './notification-policy';
+import { handleListReminders } from './reminders-web/routes/list';
+
+beforeEach(async () => {
+  for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', timezone: 'UTC', allDayTime: '09:00' }) }), env.DB);
+});
+afterEach(async () => { vi.restoreAllMocks(); await reset(); });
+const id = '11111111-1111-4111-8111-111111111111';
+const note = (title: string, due: string, done = false) => `- [${done ? 'x' : ' '}] ${title} @${due} <!-- crate-id:${id} -->`;
+
+it('retains a notification committed before its deadline when projection is delayed two minutes', async () => {
+  const now = Date.now();
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Inbox.md', note('Due', new Date(now + 60_000).toISOString()), null);
+  vi.spyOn(Date, 'now').mockReturnValue(now + 120_000);
+  await drainNotificationProjections(env);
+  const job = await env.DB.prepare('SELECT operation FROM notification_jobs WHERE reminder_id = ?').bind(id).first();
+  console.log('delayed projection result', job);
+  expect(job).toMatchObject({ operation: 'schedule' });
+});
+
+it('does not let a completed duplicate in a second file silently cancel the original notification', async () => {
+  const due = '2099-01-02T10:00:00.000Z';
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/A.md', note('Original', due), null);
+  await drainNotificationProjections(env);
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/B.md', note('Copied and completed', due, true), null);
+  await drainNotificationProjections(env);
+  const job = await env.DB.prepare('SELECT operation FROM notification_jobs WHERE reminder_id = ?').bind(id).first();
+  const projection = await env.DB.prepare('SELECT file_path FROM reminder_projections WHERE reminder_id = ?').bind(id).first();
+  const listing = await (await handleListReminders(new Request('https://test/reminders/list?folderPath=Reminders'), env)).json();
+  console.log('duplicate identity result', { job, projection, listing });
+  expect(job).toMatchObject({ operation: 'schedule' });
+});

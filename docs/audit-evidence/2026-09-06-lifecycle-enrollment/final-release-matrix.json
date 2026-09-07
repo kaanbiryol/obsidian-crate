@@ -1,0 +1,35 @@
+[
+  {
+    "candidate": "67cd40c1fdb6985bfccbf17e6babb8e8aa33c145",
+    "node": "24.0.0",
+    "command": "npm run build",
+    "exit_code": 0,
+    "sha256": {
+      "dist/main.js": "d350735c7cfebd7024b78486353825096fb8a2cad13090ea2eea2fced7a710d3",
+      "dist/styles.css": "363fa581fbe07a14c2ae31bce715b1cc92551f1c6037f85989ab79428149692f",
+      "manifest.json": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a"
+    }
+  },
+  {
+    "candidate": "67cd40c1fdb6985bfccbf17e6babb8e8aa33c145",
+    "node": "20.19.0",
+    "command": "npm run build",
+    "exit_code": 0,
+    "sha256": {
+      "dist/main.js": "d350735c7cfebd7024b78486353825096fb8a2cad13090ea2eea2fced7a710d3",
+      "dist/styles.css": "363fa581fbe07a14c2ae31bce715b1cc92551f1c6037f85989ab79428149692f",
+      "manifest.json": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a"
+    }
+  },
+  {
+    "candidate": "67cd40c1fdb6985bfccbf17e6babb8e8aa33c145",
+    "node": "22.12.0",
+    "command": "npm run build",
+    "exit_code": 0,
+    "sha256": {
+      "dist/main.js": "d350735c7cfebd7024b78486353825096fb8a2cad13090ea2eea2fced7a710d3",
+      "dist/styles.css": "363fa581fbe07a14c2ae31bce715b1cc92551f1c6037f85989ab79428149692f",
+      "manifest.json": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a"
+    }
+  }
+]

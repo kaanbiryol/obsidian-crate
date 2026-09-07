@@ -1,3 +1,4 @@
+import type { SyncActivityProgress } from './types';
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
@@ -30,6 +31,7 @@ export class SyncRuntime {
 	private apiClient: SyncApiClient | null = null;
 	private statusBar: StatusBarManager | null = null;
 	private stateChangeListeners = new Set<(state: SyncState) => void>();
+	private activityProgress: SyncActivityProgress | null = null;
 	private progressListeners = new Set<(current: number, total: number) => void>();
 	private acceptingEvents = false;
 	private initializationRevision = 0;
@@ -96,6 +98,10 @@ export class SyncRuntime {
 
 	removeStateChangeListener(listener: (state: SyncState) => void): void {
 		this.stateChangeListeners.delete(listener);
+	}
+
+	getActivityProgress(): SyncActivityProgress | null {
+		return this.activityProgress ? { ...this.activityProgress } : null;
 	}
 
 	addProgressListener(listener: (current: number, total: number) => void): void {
@@ -355,7 +361,11 @@ export class SyncRuntime {
 			logger.info(logMessage);
 		}
 
+		const active = { type, current: 0, total: 0 };
+		this.activityProgress = active;
+		emitSyncProgress(this.progressListeners, 0, 0);
 		const wrappedCallback = (current: number, total: number) => {
+			Object.assign(active, { current, total });
 			emitSyncProgress(this.progressListeners, current, total, {
 				onStatusBarProgress: (nextCurrent, nextTotal) => {
 					this.statusBar?.setSyncProgress(nextCurrent, nextTotal);
@@ -372,6 +382,8 @@ export class SyncRuntime {
 			await this.persistSettings();
 			return result;
 		} finally {
+			if (this.activityProgress === active) this.activityProgress = null;
+			emitSyncProgress(this.progressListeners, 0, 0);
 			this.statusBar?.clearSyncProgress();
 		}
 	}

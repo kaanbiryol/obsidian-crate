@@ -1,0 +1,71 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/Documents/Projects/obsidian-crate
+
+stdout | src/cloudflare/worker/reaudit-boundaries.integration.ts > retains a notification committed before its deadline when projection is delayed two minutes
+delayed projection result { operation: 'cancel' }
+
+stdout | src/cloudflare/worker/reaudit-boundaries.integration.ts > does not let a completed duplicate in a second file silently cancel the original notification
+duplicate identity result {
+  job: { operation: 'cancel' },
+  projection: { file_path: 'Reminders/B.md' },
+  listing: {
+    reminders: [ [Object], [Object] ],
+    projects: [ 'A', 'B' ],
+    issues: []
+  }
+}
+
+ ❯ src/cloudflare/worker/reaudit-boundaries.integration.ts (2 tests | 2 failed) 159ms
+   × retains a notification committed before its deadline when projection is delayed two minutes 114ms
+   × does not let a completed duplicate in a second file silently cancel the original notification 43ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cloudflare/worker/reaudit-boundaries.integration.ts > retains a notification committed before its deadline when projection is delayed two minutes
+AssertionError: expected { operation: 'cancel' } to match object { operation: 'schedule' }
+
+- Expected
++ Received
+
+  {
+-   "operation": "schedule",
++   "operation": "cancel",
+  }
+
+ ❯ src/cloudflare/worker/reaudit-boundaries.integration.ts:26:15
+     24|   const job = await env.DB.prepare('SELECT operation FROM notification…
+     25|   console.log('delayed projection result', job);
+     26|   expect(job).toMatchObject({ operation: 'schedule' });
+       |               ^
+     27| });
+     28|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/cloudflare/worker/reaudit-boundaries.integration.ts > does not let a completed duplicate in a second file silently cancel the original notification
+AssertionError: expected { operation: 'cancel' } to match object { operation: 'schedule' }
+
+- Expected
++ Received
+
+  {
+-   "operation": "schedule",
++   "operation": "cancel",
+  }
+
+ ❯ src/cloudflare/worker/reaudit-boundaries.integration.ts:39:15
+     37|   const listing = await (await handleListReminders(new Request('https:…
+     38|   console.log('duplicate identity result', { job, projection, listing …
+     39|   expect(job).toMatchObject({ operation: 'schedule' });
+       |               ^
+     40| });
+     41|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  18:55:15
+   Duration  5.09s (transform 1.64s, setup 0ms, import 3.32s, tests 159ms, environment 0ms)
+

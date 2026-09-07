@@ -1,0 +1,39 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { makeApiFetch } from './api';
+import { AUTH_TOKEN_KEY } from './config';
+import { invalidatePwaSession } from './session-generation';
+import { performPwaLogout } from './hooks/usePwaSessionLifecycle';
+import { useReminderMutations } from './hooks/useReminderMutations';
+import type { ModalState } from './types';
+vi.mock('react', () => ({ useCallback: (fn: unknown) => fn, useRef: (current: unknown) => ({ current }) }));
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+it('REPRO: the real API wrapper prevents online logout from sending revocation', async () => {
+  const values = new Map([[AUTH_TOKEN_KEY, 'test-token']]);
+  vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null });
+  const network = vi.fn(async () => new Response(JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: { current: 3, oldestCompatible: 3 }, capabilities: [] })));
+  vi.stubGlobal('fetch', network);
+  const apiFetch = makeApiFetch('test-token', () => {});
+  const failed = await performPwaLogout({ apiFetch, disablePushNotifications: async () => {}, clearLocalSession: () => { invalidatePwaSession(); values.clear(); } });
+  expect(failed).toBe(true);
+  expect(network.mock.calls.map(call => call[0])).not.toContain('/auth/session');
+  expect(network).toHaveBeenCalledWith('/.well-known/crate', expect.anything());
+});
+it('REPRO: editing a failed draft changes the request but retains its committed operation ID', async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const close = vi.fn();
+  const hook = useReminderMutations({
+    apiFetch: async (_path, init) => { bodies.push(JSON.parse(String(init?.body))); return new Response('Lost acknowledgement', { status: 503 }); },
+    beginLocalMutation: () => () => {}, ensureCanMutate: () => true, commitReminderState: () => {},
+    setReminders: () => {}, remindersRef: { current: [] }, projectsRef: { current: ['Inbox'] },
+    config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 },
+    projects: ['Inbox'], selectedProject: null, closeModal: close, setProjects: () => {}, setSaving: () => {}, showToast: () => {},
+  });
+  const modal: ModalState = { mode: 'create', operationId: crypto.randomUUID(), draft: { content: 'Original', description: '', project: 'Inbox', defaultProject: 'Inbox', priority: 4, dueDate: '', dueTime: '', activePicker: null, deleteConfirm: false } };
+  await hook.saveReminder(modal);
+  modal.draft.content = 'Edited after ambiguous save';
+  await hook.saveReminder(modal);
+  expect(bodies).toHaveLength(2);
+  expect(bodies[1]?.operationId).toBe(bodies[0]?.operationId);
+  expect(bodies[1]?.content).not.toBe(bodies[0]?.content);
+  expect(close).not.toHaveBeenCalled();
+});

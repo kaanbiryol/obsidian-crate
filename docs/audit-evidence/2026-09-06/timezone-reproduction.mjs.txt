@@ -1,0 +1,24 @@
+// Run from repository root using a supported Node version.
+// This asserts the audited defect, not the desired corrected behavior.
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const directory = await mkdtemp(join(tmpdir(), 'crate-timezone-audit-'));
+const bundle = join(directory, 'checkbox.cjs');
+try {
+  await build({ entryPoints: ['src/reminders/utils/checkboxParser.ts'], bundle: true, platform: 'node', format: 'cjs', outfile: bundle });
+  const input = '2099-07-01T07:00:00.000Z';
+  const serialize = `const {rebuildCheckboxLine}=require(process.argv[1]); process.stdout.write(rebuildCheckboxLine('',false,'Appointment',new Date(process.argv[2]),4,undefined,undefined,true,'audit-id'));`;
+  const markdown = execFileSync(process.execPath, ['-e', serialize, bundle, input], { env: { ...process.env, TZ: 'UTC' }, encoding: 'utf8' });
+  const parse = `const {parseCheckboxLine}=require(process.argv[1]); process.stdout.write(parseCheckboxLine(process.argv[2]).parsed.dueDate.toISOString());`;
+  const parsed = execFileSync(process.execPath, ['-e', parse, bundle, markdown], { env: { ...process.env, TZ: 'Europe/Berlin' }, encoding: 'utf8' });
+  assert.equal(parsed, '2099-07-01T05:00:00.000Z');
+  assert.notEqual(parsed, input);
+  console.log(JSON.stringify({ inputPwaDatetime: input, workerWrittenMarkdown: markdown, berlinPluginParsedDatetime: parsed }, null, 2));
+} finally {
+  await rm(directory, { recursive: true, force: true });
+}

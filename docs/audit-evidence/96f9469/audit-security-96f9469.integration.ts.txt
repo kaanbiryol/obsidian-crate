@@ -1,0 +1,39 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import schema from '../schema.sql?raw';
+import { listPushSubscriptionIds } from './notifications/push';
+import { authenticateWorkerRequest } from './authenticate';
+import { sha256Hex } from './auth';
+import { pruneExpiredTokens } from './maintenance/database';
+import { beginReminderOperation } from './reminders-web/operations';
+beforeEach(async () => { for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+afterEach(async () => { await reset(); });
+it('REPRO: push recipient selection includes legacy unowned and expired browser sessions', async () => {
+  await env.DB.prepare("INSERT INTO notification_policy (id, folder_path, timezone, revision) VALUES (1, 'Private', 'UTC', 'audit-policy')").run();
+  await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope, folder_path, expires_at) VALUES ('expired', ?, 'reminders', 'Private', ?)").bind(await sha256Hex('expired-token'), Date.now() - 1).run();
+  await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope) VALUES ('legacy-session', ?, 'reminders')").bind(await sha256Hex('legacy-token')).run();
+  await env.DB.prepare("INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, owner_token_id, folder_path) VALUES ('legacy', 'https://fcm.googleapis.com/legacy', 'key', 'auth', NULL, NULL), ('expired-sub', 'https://fcm.googleapis.com/expired', 'key', 'auth', 'expired', 'Private')").run();
+  for (const token of ['legacy-token', 'expired-token']) {
+    const result = await authenticateWorkerRequest(new Request('https://test', { headers: { Authorization: `Bearer ${token}` } }), env.DB);
+    expect(result.response?.status).toBe(401);
+  }
+  expect((await listPushSubscriptionIds(env.DB)).sort()).toEqual(['expired-sub', 'legacy']);
+  await pruneExpiredTokens(env.DB);
+  expect(await listPushSubscriptionIds(env.DB)).toEqual(['legacy']);
+});
+it('REPRO: an edited draft with the committed operation ID gets a repeatable conflict', async () => {
+  const body = { operationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', content: 'Original' };
+  const operation = await beginReminderOperation(env.DB, body, 'create');
+  if (operation instanceof Response) throw new Error('Unexpected initial receipt');
+  await env.DB.prepare('INSERT INTO reminder_operations (operation_id, request_hash, response_json) VALUES (?, ?, ?)').bind(operation.id, operation.requestHash, JSON.stringify({ success: true })).run();
+  const exactRetry = await beginReminderOperation(env.DB, body, 'create');
+  expect(exactRetry).toBeInstanceOf(Response);
+  expect((exactRetry as Response).status).toBe(200);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const editedRetry = await beginReminderOperation(env.DB, { ...body, content: 'Edited after ambiguous save' }, 'create');
+    expect(editedRetry).toBeInstanceOf(Response);
+    expect((editedRetry as Response).status).toBe(409);
+  }
+});

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/Documents/Projects/obsidian-crate
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 2 skipped (3)
+   Start at  19:38:10
+   Duration  5.31s (transform 1.41s, setup 0ms, import 2.99s, tests 1.29s, environment 0ms)
+

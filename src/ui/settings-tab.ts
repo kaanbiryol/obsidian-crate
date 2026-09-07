@@ -33,6 +33,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		const isConfigured = this.plugin.syncRuntime.isConfigured();
 		const sections = getSettingsTabSections({
 			isConfigured,
+			hasDeployment: Boolean(this.plugin.settings.cloudflareDeployment?.d1DatabaseId),
 		});
 
 		renderConfigSection({

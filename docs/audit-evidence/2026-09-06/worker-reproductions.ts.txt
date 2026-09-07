@@ -1,0 +1,118 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+// Audit reproductions assert the observed defect, not the desired fixed behavior.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import schemaSql from '../schema.sql?raw';
+import { handleUpload, handleDownload, handleDelete } from './sync-file-handlers';
+import { handleBatchUpload } from './sync-batch/upload';
+import { writeCommittedMarkdownFile, readCommittedMarkdownFileVersion } from './storage';
+import { writeCommittedMarkdownFilePair } from './atomic-markdown-write';
+import { handleCreateReminder } from './reminders-web/routes/create';
+import { handleUpdateReminder } from './reminders-web/routes/update';
+import { handleSetReminderCompleted } from './reminders-web/routes/complete';
+import { handleAuthenticatedRoute } from './router';
+import { scanReminderMarkdownFile } from './reminders-web/scan';
+import type { Env } from './types';
+
+const runtime: Env = env;
+const { DB: db, BUCKET: bucket } = runtime;
+const filePath = 'Reminders/Inbox.md';
+const jsonRequest = (path: string, body: unknown, method = 'POST') => new Request(`https://audit.test${path}`, { method, body: JSON.stringify(body) });
+beforeEach(async () => {
+  for (const sql of schemaSql.split(';').map(s => s.trim()).filter(Boolean)) await db.prepare(sql).run();
+});
+afterEach(async () => { vi.restoreAllMocks(); await reset(); });
+function loseNextCommitResponse() {
+  const batch = db.batch.bind(db);
+  vi.spyOn(db, 'batch').mockImplementationOnce(async statements => {
+    await batch(statements);
+    throw new Error('audit: commit succeeded but database response was lost');
+  });
+}
+
+describe('pre-release audit: reproduced backend defects', () => {
+  it('single upload deletes committed bytes after losing the D1 response', async () => {
+    loseNextCommitResponse();
+    const response = await handleUpload(new Request('https://audit.test/sync/upload?path=new.md', {
+      method: 'PUT', headers: { 'X-Crate-Expected-Hash': 'absent' }, body: 'only copy',
+    }), bucket, db);
+    expect(response.status).toBe(503);
+    const live = await db.prepare('SELECT storage_key FROM files').first<{ storage_key: string }>();
+    expect(live).not.toBeNull();
+    expect(await bucket.get(live!.storage_key)).toBeNull();
+    expect((await handleDownload(new Request('https://audit.test/sync/download?path=new.md'), bucket, db)).status).toBe(503);
+    const retry = await handleUpload(new Request('https://audit.test/sync/upload?path=new.md', {
+      method: 'PUT', headers: { 'X-Crate-Expected-Hash': 'absent' }, body: 'only copy',
+    }), bucket, db);
+    expect(retry.status).toBe(200);
+    expect((await handleDownload(new Request('https://audit.test/sync/download?path=new.md'), bucket, db)).status).toBe(503);
+  });
+  it('batch upload also deletes the object named by committed metadata', async () => {
+    loseNextCommitResponse();
+    const response = await handleBatchUpload(jsonRequest('/sync/batch-upload', { files: [{ path: 'batch.md', content: btoa('only copy'), expectedHash: null }] }), bucket, db);
+    expect(response.status).toBe(503);
+    const live = await db.prepare('SELECT storage_key FROM files').first<{ storage_key: string }>();
+    expect(live).not.toBeNull();
+    expect(await bucket.get(live!.storage_key)).toBeNull();
+  });
+  it('reminder write also deletes committed Markdown after an uncertain commit', async () => {
+    loseNextCommitResponse();
+    await expect(writeCommittedMarkdownFile(bucket, db, filePath, 'only reminder copy', null)).rejects.toThrow('response was lost');
+    const live = await db.prepare('SELECT storage_key FROM files').first<{ storage_key: string }>();
+    expect(await bucket.get(live!.storage_key)).toBeNull();
+  });
+  it('atomic reminder move deletes both newly committed objects on a lost response', async () => {
+    const source = await writeCommittedMarkdownFile(bucket, db, filePath, '- [ ] move me <!-- crate-id:audit-id -->\n', null);
+    loseNextCommitResponse();
+    await expect(writeCommittedMarkdownFilePair(bucket, db, {
+      source: { path: filePath, content: '# Inbox\n', expectedHash: source.hash },
+      destination: { path: 'Reminders/Work.md', content: '- [ ] move me <!-- crate-id:audit-id -->\n', expectedHash: null },
+    })).rejects.toThrow('response was lost');
+    const live = await db.prepare('SELECT storage_key FROM files').all<{ storage_key: string }>();
+    expect(live.results).toHaveLength(2);
+    for (const row of live.results) expect(await bucket.get(row.storage_key)).toBeNull();
+  });
+  it('accepts a stale PWA form and silently overwrites a newer plugin title', async () => {
+    const old = await writeCommittedMarkdownFile(bucket, db, filePath, '- [ ] old title <!-- crate-id:audit-id -->\n', null);
+    await writeCommittedMarkdownFile(bucket, db, filePath, '- [ ] newer plugin title <!-- crate-id:audit-id -->\n', old.hash);
+    const response = await handleUpdateReminder(jsonRequest('/reminders/update', {
+      folderPath: 'Reminders', filePath, id: 'audit-id', content: 'old title', description: 'new description', priority: 4,
+    }), runtime);
+    expect(response.status).toBe(200);
+    const current = await readCommittedMarkdownFileVersion(bucket, db, filePath);
+    expect(current!.content).toContain('old title');
+    expect(current!.content).not.toContain('newer plugin title');
+  });
+  it('duplicate create with the same client ID appends a second Markdown reminder', async () => {
+    const body = { folderPath: 'Reminders', project: 'Inbox', id: 'audit-id', content: 'created once' };
+    expect((await handleCreateReminder(jsonRequest('/reminders/create', body), runtime)).status).toBe(200);
+    expect((await handleCreateReminder(jsonRequest('/reminders/create', body), runtime)).status).toBe(200);
+    const current = await readCommittedMarkdownFileVersion(bucket, db, filePath);
+    expect(current!.content.match(/crate-id:audit-id/g)).toHaveLength(2);
+  });
+  it('replaying one recurring completion advances two occurrences', async () => {
+    await writeCommittedMarkdownFile(bucket, db, filePath, '- [ ] recurring task daily Jan 1, 2099 <!-- crate-id:audit-id -->\n', null);
+    const body = { folderPath: 'Reminders', filePath, id: 'audit-id', completed: true };
+    expect((await handleSetReminderCompleted(jsonRequest('/reminders/set-completed', body), runtime)).status).toBe(200);
+    const first = await readCommittedMarkdownFileVersion(bucket, db, filePath);
+    expect(scanReminderMarkdownFile(filePath, first!.content, 'Reminders')[0]!.dueDate).toBe('2099-01-02');
+    expect((await handleSetReminderCompleted(jsonRequest('/reminders/set-completed', body), runtime)).status).toBe(200);
+    const second = await readCommittedMarkdownFileVersion(bucket, db, filePath);
+    expect(scanReminderMarkdownFile(filePath, second!.content, 'Reminders')[0]!.dueDate).toBe('2099-01-03');
+  });
+  it('a reminders-scoped principal can read a caller-selected private folder', async () => {
+    await writeCommittedMarkdownFile(bucket, db, 'Private/Personal.md', '- [ ] confidential task <!-- crate-id:private-id -->\n', null);
+    const response = await handleAuthenticatedRoute(new Request('https://audit.test/reminders/list?folderPath=Private'), runtime, '/reminders/list', 'GET', { tokenId: 'pwa', scope: 'reminders' });
+    expect(response!.status).toBe(200);
+    expect(await response!.text()).toContain('confidential task');
+  });
+  it('a delayed delete removes a same-content recreation (hash-only ABA)', async () => {
+    const first = await writeCommittedMarkdownFile(bucket, db, 'recreated.md', 'same bytes', null);
+    const deleteRequest = () => jsonRequest('/sync/delete', { path: 'recreated.md', expectedHash: first.hash });
+    expect((await handleDelete(deleteRequest(), bucket, db)).status).toBe(200);
+    await writeCommittedMarkdownFile(bucket, db, 'recreated.md', 'same bytes', null);
+    expect((await handleDelete(deleteRequest(), bucket, db)).status).toBe(200);
+    expect(await readCommittedMarkdownFileVersion(bucket, db, 'recreated.md')).toBeNull();
+  });
+});

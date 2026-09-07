@@ -1,0 +1,27 @@
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+{"browser":"chromium","exchanges":0,"url":"http://127.0.0.1:62743/notifications?folder=Reminders","text":"Crate Reminders\n\nOpen a fresh link from Crate to activate this web app on your device.\n\nYour reminders folder setting is preserved: Reminders\n\nOpen Obsidian"}
+{"browser":"webkit","exchanges":0,"url":"http://127.0.0.1:62743/notifications?folder=Reminders","text":"\nCrate Reminders\nOpen a fresh link from Crate to activate this web app on your device.\nYour reminders folder setting is preserved: Reminders\nOpen Obsidian"}
+/Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/playwright/lib/matchers/expect.js:213
+        return matcher.call(target, ...args);
+                       ^
+
+A [Error]: expect(received).toBe(expected) // Object.is equality
+
+Expected: true
+Received: false
+    at Proxy.<anonymous> (/Users/kaanbiryol/Documents/Projects/obsidian-crate/node_modules/playwright/lib/matchers/expect.js:213:24)
+    at file:///Users/kaanbiryol/Documents/Projects/obsidian-crate/scripts/reaudit-enrollment.mjs:27:59 {
+  matcherResult: {
+    actual: false,
+    expected: true,
+    message: 'expect(received).toBe(expected) // Object.is equality\n' +
+      '\n' +
+      'Expected: true\n' +
+      'Received: false',
+    name: 'toBe',
+    pass: false
+  }
+}
+
+Node.js v24.19.0

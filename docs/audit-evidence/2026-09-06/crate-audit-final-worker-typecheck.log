@@ -1,0 +1,4 @@
+
+> obsidian-crate@0.1.0 typecheck:worker
+> tsc -p src/cloudflare/worker/tsconfig.json --noEmit -skipLibCheck
+

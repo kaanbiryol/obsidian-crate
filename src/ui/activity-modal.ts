@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { ActivitySheet } from './activity/ActivitySheet';
 import { hideNativeModalCloseButton } from '../reminders/ui/adapters/modalShell';
 import type { CrateSettings } from '../plugin/settings-types';
-import type { ConflictRecord, SyncState } from '../sync/types';
+import type { ConflictRecord, SyncState, SyncActivityProgress } from '../sync/types';
 import { renderHistoryPanel } from './activity/history';
 import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
 
@@ -12,6 +12,9 @@ export interface ActivityModalDeps {
 	getPendingPaths(): string[];
 	getActiveConflicts(): ConflictRecord[];
 	getState(): SyncState;
+	getActivityProgress?(): SyncActivityProgress | null;
+	addProgressListener?(listener: (current: number, total: number) => void): void;
+	removeProgressListener?(listener: (current: number, total: number) => void): void;
 	sync(): Promise<unknown>;
 	addStateChangeListener(listener: (state: SyncState) => void): void;
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
@@ -41,9 +44,20 @@ export class ActivityModal extends Modal {
 	private allTabs: HTMLButtonElement[] = [];
 	private allPanels: HTMLDivElement[] = [];
 	private currentTabIndex = 0;
+	private readonly onProgress = () => {
+		if (!this.pendingPanel) return;
+		this.updateSyncBtn();
+		this.subtitleEl.setText(this.formatLastSync());
+		this.pendingPanel.empty();
+		this.renderPending();
+	};
+	private renderPending(): void {
+		const state = this.deps.getState();
+		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths(), state.status === 'error', state.status === 'syncing', this.deps.getActivityProgress?.());
+	}
 	private readonly onStateChange = () => this.refresh();
 
-	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps) {
+	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly initialTab: 'pending' | 'history' = 'pending') {
 		super(app);
 		this.settings = settings;
 		this.deps = deps;
@@ -139,7 +153,7 @@ export class ActivityModal extends Modal {
 		this.allTabs = [pendingTab, conflictsTab, historyTab];
 		this.allPanels = [this.pendingPanel, this.conflictsPanel, this.historyPanel];
 
-		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths());
+		this.renderPending();
 		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts());
 		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? []);
 
@@ -170,10 +184,12 @@ export class ActivityModal extends Modal {
 			});
 		}
 
+		this.switchTab(this.initialTab === 'history' ? 2 : 0);
 		this.deps.addStateChangeListener(this.onStateChange);
+		this.deps.addProgressListener?.(this.onProgress);
 
 		// Position indicator after layout
-		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(0));
+		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
 	}
 
 	private switchTab(index: number): void {
@@ -219,7 +235,7 @@ export class ActivityModal extends Modal {
 	}
 
 	private updateSyncBtn(): void {
-		const syncing = this.deps.getState().status === 'syncing';
+		const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
 		this.syncBtn.disabled = syncing;
 		this.syncBtn.setAttribute('aria-label', syncing ? 'Syncing' : 'Sync now');
 		this.syncBtn.setAttribute('title', syncing ? 'Syncing' : 'Sync now');
@@ -249,7 +265,7 @@ export class ActivityModal extends Modal {
 		this.subtitleEl.setText(this.formatLastSync());
 		this.updateTabCounts();
 		this.pendingPanel.empty();
-		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths());
+		this.renderPending();
 		this.conflictsPanel.empty();
 		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts());
 		const expanded = new Set(Array.from(this.historyPanel.querySelectorAll('details[open]'))
@@ -265,6 +281,9 @@ export class ActivityModal extends Modal {
 	}
 
 	private formatLastSync(): string {
+		if (this.deps.getActivityProgress?.()?.type === 'initial') return 'Uploading vault…';
+		if (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress?.()) return 'Syncing…';
+		if (this.deps.getState().status === 'error') return 'Last sync had errors';
 		const lastSync = this.deps.getState().lastSync;
 		if (!lastSync) return 'Not synced yet';
 		const diffMs = Date.now() - new Date(lastSync).getTime();
@@ -278,6 +297,7 @@ export class ActivityModal extends Modal {
 
 	onClose(): void {
 		this.deps.removeStateChangeListener(this.onStateChange);
+		this.deps.removeProgressListener?.(this.onProgress);
 		this.root?.unmount();
 		this.root = undefined;
 		this.contentEl.empty();

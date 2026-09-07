@@ -235,8 +235,14 @@ Generated files under `.generated/`, `dist/`, and root-level release artifacts s
 - [Worker API](docs/worker-api.md)
 - [Testing](docs/testing.md)
 
+## Resetting a Crate server
+
+**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Reset server** erases this deployment's remote files, retained versions, database, subscriptions, and reminder state, then rebuilds the server. Local files are kept. The flow requires confirmation and fresh Cloudflare authorization, checks exact ownership, and blocks shared resources or unknown data. Use **Resume server reset** after an interruption. Afterward, upload your local vault and reconnect other devices. See [server reset and recovery](docs/deployment.md#reset-a-crate-server).
+
 ## License
 
 Crate is licensed under the [0BSD license](LICENSE).
 
 Licenses and notices for bundled dependencies are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). See [SECURITY.md](SECURITY.md) to report a vulnerability privately.
+
+**Delete server** in **Settings → Crate → Recovery and troubleshooting → Troubleshooting** permanently removes this vault’s verified Crate Worker/web app, database, file bucket and contents, and reminder state without rebuilding. Local vault files and other deployments are kept. It requires confirmation of the exact resources and fresh Cloudflare authorization. Shared resources or unrecognized data block deletion. After an interruption, use **Resume server deletion**; connecting, updating, and resetting remain blocked until deletion completes.

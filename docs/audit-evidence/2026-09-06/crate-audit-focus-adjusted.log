@@ -1,0 +1,4 @@
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+chromium: synchronous focus, discarded drafts and saving local edits passed
+webkit: synchronous focus, discarded drafts and saving local edits passed

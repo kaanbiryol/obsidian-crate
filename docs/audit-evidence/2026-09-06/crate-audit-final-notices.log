@@ -1,0 +1,5 @@
+
+> obsidian-crate@0.1.0 notices:check
+> node scripts/generate-third-party-notices.mjs --check
+
+Third-party notices are up to date.
