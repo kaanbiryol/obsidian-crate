@@ -19,6 +19,7 @@ import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotic
 import { WebReminderCard } from './components/WebReminderCard';
 import { ReminderSyncNotice } from './components/ReminderSyncNotice';
 import { ReminderRecoveryNotice } from './components/ReminderRecoveryNotice';
+import { ReminderSourceNotice } from './components/ReminderSourceNotice';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
@@ -104,6 +105,7 @@ function App() {
 		loading,
 		refreshing,
 		error,
+		issues,
 		dataMode,
 		lastUpdatedAt,
 		isOffline,
@@ -343,6 +345,7 @@ function App() {
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}
 				projects={visibleProjects}
+				incomplete={issues.length > 0}
 				isDarkMode={isDarkMode}
 				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}
@@ -369,6 +372,7 @@ function App() {
 							onReload={update}
 							onEnableNotifications={enablePushNotifications}
 						>
+							<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
 							<ReminderSyncNotice
 								changes={changes}
 								isOffline={isOffline}
