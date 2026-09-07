@@ -52,12 +52,14 @@ function getLayoutHeight(): number {
  */
 export function useKeyboardHeight(enabled: boolean = true): number {
   const [keyboardInset, setKeyboardInset] = useState(0);
+  const keyboardInsetRef = useRef(0);
   const hasEditableFocusRef = useRef(false);
   const layoutHeightRef = useRef(0);
   const layoutWidthRef = useRef(0);
 
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') {
+      keyboardInsetRef.current = 0;
       setKeyboardInset(0);
       return;
     }
@@ -73,17 +75,22 @@ export function useKeyboardHeight(enabled: boolean = true): number {
     };
 
     const measure = () => {
-      if (!hasEditableFocusRef.current || !window.visualViewport) {
+      // Blur starts the native keyboard animation. Keep following the viewport
+      // until the measured keyboard closes instead of dropping the sheet early.
+      if ((!hasEditableFocusRef.current && keyboardInsetRef.current === 0) || !window.visualViewport) {
         updateLayoutBaseline();
+        keyboardInsetRef.current = 0;
         setKeyboardInset(0);
         return;
       }
 
-      setKeyboardInset(calculateKeyboardInset({
+      const inset = calculateKeyboardInset({
         layoutHeight: Math.max(layoutHeightRef.current, getLayoutHeight()),
         visualHeight: window.visualViewport.height,
         visualOffsetTop: window.visualViewport.offsetTop,
-      }));
+      });
+      keyboardInsetRef.current = inset;
+      setKeyboardInset(inset);
     };
 
     let animationFrame: number | null = null;
@@ -104,7 +111,7 @@ export function useKeyboardHeight(enabled: boolean = true): number {
     const handleFocusOut = (event: FocusEvent) => {
       if (isEditableElement(event.relatedTarget)) return;
       hasEditableFocusRef.current = false;
-      setKeyboardInset(0);
+      scheduleMeasure();
     };
 
     updateLayoutBaseline();

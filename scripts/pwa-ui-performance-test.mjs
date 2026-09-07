@@ -133,15 +133,36 @@ for (const browserType of [chromium, webkit]) {
 
 		await page.evaluate(() => {
 			window.viewportReads = 0;
+			window.keyboardViewportHeight = 500;
 			const viewport = new EventTarget();
 			Object.defineProperties(viewport, {
-				height: { get: () => { window.viewportReads++; return 500; } },
+				height: { get: () => { window.viewportReads++; return window.keyboardViewportHeight; } },
 				offsetTop: { value: 0 },
 			});
 			Object.defineProperty(window, 'visualViewport', { value: viewport, configurable: true });
 			window.uiTest.mount('keyboard');
 		});
 		await page.waitForTimeout(150);
+		await page.getByRole('textbox', { name: 'Keyboard input' }).focus();
+		await expect(page.locator('#inset')).toHaveText('344');
+		await page.getByRole('textbox', { name: 'Keyboard input' }).evaluate(element => element.blur());
+		await page.waitForTimeout(50);
+		await expect(page.locator('#inset')).toHaveText('344');
+		for (const height of [620, 740, 844]) {
+			await page.evaluate(height => {
+				window.keyboardViewportHeight = height;
+				window.visualViewport.dispatchEvent(new Event('resize'));
+			}, height);
+			await expect(page.locator('#inset')).toHaveText(String(844 - height));
+		}
+		// Once the keyboard closes, browser chrome changes must not reopen the gap.
+		await page.evaluate(() => {
+			window.keyboardViewportHeight = 800;
+			window.visualViewport.dispatchEvent(new Event('resize'));
+		});
+		await page.waitForTimeout(50);
+		await expect(page.locator('#inset')).toHaveText('0');
+		await page.evaluate(() => { window.keyboardViewportHeight = 500; });
 		await page.getByRole('textbox', { name: 'Keyboard input' }).focus();
 		await expect(page.locator('#inset')).toHaveText('344');
 		const batching = await page.evaluate(() => {

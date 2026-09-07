@@ -24,25 +24,58 @@
     inset: 0;
   }
 
-  .delete-confirmation-surface {
-    position: relative;
-    width: 100%;
-  }
-
   .delete-confirmation-button {
     min-height: 44px;
   }
 }
 
 .base-modal-surface.delete-confirmation-surface {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(400px, calc(100vw - 32px));
   max-width: 400px;
+  max-height: calc(100dvh - 32px);
+  margin: 0;
   padding: 0;
+  overflow: hidden;
   border: var(--crate-modal-border-width) solid var(--crate-modal-border-color);
-  border-radius: var(--radius-m, var(--crate-radius-control));
+  border-radius: var(--crate-radius-sheet);
   background: var(--crate-modal-bg);
   box-shadow: var(--crate-elevation-sheet);
   color: var(--text-normal);
   font-family: var(--reminder-font-ui);
+}
+
+.delete-confirmation-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 8px 20px;
+}
+
+.delete-confirmation-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-normal);
+  font-size: max(18px, var(--reminder-font-base));
+  font-weight: var(--reminder-font-weight-semibold);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.delete-confirmation-close {
+  --crate-icon-button-control-size: 44px;
+  flex-shrink: 0;
+}
+
+.delete-confirmation-body {
+  min-height: 0;
+  padding: 0 20px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .delete-confirmation-message {
@@ -51,12 +84,15 @@
   font-size: var(--reminder-font-sm);
   line-height: var(--reminder-line-height-normal);
   text-align: start;
+  overflow-wrap: anywhere;
 }
 
 .delete-confirmation-actions {
   display: flex;
+  flex-shrink: 0;
   justify-content: flex-end;
   gap: var(--size-2-2, 8px);
+  padding: 0 20px 20px;
 }
 
 .delete-confirmation-button {
@@ -75,7 +111,7 @@
   background: var(--crate-control-bg);
   color: var(--text-normal);
 
-  &:hover {
+  &:hover:not(:disabled) {
     border-color: var(--crate-divider-strong);
     background: var(--crate-control-hover-bg);
   }
@@ -85,8 +121,36 @@
   background: var(--crate-danger);
   color: var(--crate-on-accent);
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: color-mix(in srgb, var(--crate-danger) 88%, black);
+  }
+}
+
+@media (max-width: 640px) {
+  .base-modal-surface.delete-confirmation-surface {
+    border-radius: max(16px, var(--crate-radius-sheet));
+  }
+
+  .delete-confirmation-message {
+    font-size: max(15px, var(--reminder-font-sm));
+    line-height: 1.5;
+  }
+
+  .delete-confirmation-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .delete-confirmation-actions .delete-confirmation-button {
+    min-width: 0;
+    min-height: 48px;
+    height: auto;
+    padding: 12px;
+    border-radius: max(10px, var(--crate-radius-button));
+    font-size: max(16px, var(--reminder-font-sm));
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 }
