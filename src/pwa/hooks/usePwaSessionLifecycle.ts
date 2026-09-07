@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { invalidatePwaSession } from '../session-generation';
 import { clearReminderDrafts } from '../reminder-drafts';
-import { AUTH_TOKEN_KEY, loadStoredConfig } from '../config';
+import { AUTH_TOKEN_KEY, finishEnrollment, loadStoredConfig } from '../config';
 import { clearCachedReminderSnapshots } from '../reminder-cache';
 import type { ApiFetch, ModalState, ShowToast, StoredConfig } from '../types';
 
@@ -102,6 +102,7 @@ export function usePwaSessionLifecycle({
 
 	const logOut = useCallback(async () => {
 		if (loggingOut) return;
+		finishEnrollment(false);
 		setLoggingOut(true);
 		try {
 			const remoteCleanupFailed = await performPwaLogout({

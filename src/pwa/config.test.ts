@@ -45,6 +45,14 @@ describe('PWA enrollment token selection', () => {
 });
 
 describe('PWA enrollment URL cleanup', () => {
+	it('keeps the reserved install grant in Safari while removing its browser grant', () => {
+		expect(urlWithoutEnrollmentTokens({
+			pathname: '/notifications',
+			search: '?token=install-token&browserToken=browser-token&folder=Tasks&tab=today',
+			hash: '#reminder',
+		}, true)).toBe('/notifications?token=install-token&folder=Tasks&tab=today#reminder');
+	});
+
 	it('removes enrollment secrets while preserving navigation state', () => {
 		expect(urlWithoutEnrollmentTokens({
 			pathname: '/notifications',

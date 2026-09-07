@@ -61,8 +61,8 @@ async function verifyEnrollmentRecovery(browser, browserName) {
       expect(exchanges).toHaveLength(1);
       expect(exchanges[0]).toMatchObject({ token: mode === 'standalone' ? 'install-fresh' : 'browser-fresh', previousAuthToken: 'expired-session' });
       expect(await page.evaluate(() => sessionStorage.getItem('crate-reminder-draft:old'))).toBe(null);
-      expect(new URL(page.url()).searchParams.has('browserToken')).toBe(false);
-      expect(new URL(page.url()).searchParams.has('token')).toBe(false);
+      expect(new URL(page.url()).searchParams.has('browserToken')).toBe(mode === 'failed');
+      expect(new URL(page.url()).searchParams.get('token')).toBe(mode === 'standalone' ? null : 'install-fresh');
     } finally { await context.close(); }
   }
   const context = await browser.newContext({ serviceWorkers: 'block' });
