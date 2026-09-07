@@ -66,8 +66,7 @@ export interface ToastState {
 }
 
 export interface PushState {
-	supported: boolean;
-	subscribed: boolean;
+	phase: 'checking' | 'off' | 'enabled' | 'error' | 'blocked' | 'unsupported' | 'install';
 	status: string | null;
 }
 
