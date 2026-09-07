@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearReminderOutbox, createReminderOutboxStorage } from './reminder-outbox-storage';
+import { clearReminderOutbox, createReminderOutboxStorage, createReminderRecoveryStorage } from './reminder-outbox-storage';
 import type { PendingReminderChange } from './reminder-outbox-types';
 
 let values: Map<string, string>;
@@ -172,5 +172,46 @@ describe('durable reminder outbox storage', () => {
 		values.set('unrelated-setting', 'keep');
 		clearReminderOutbox();
 		expect([...values]).toEqual([['unrelated-setting', 'keep']]);
+	});
+
+	it('requires explicit same-folder recovery after a credential rotates and preserves exact commands', async () => {
+		const original = change();
+		original.body = original.body.replace(',', ',\n  ');
+		original.ambiguous = true;
+		const old = await createReminderOutboxStorage('expired-secret', 'Reminders');
+		old.put(original);
+		const next = await createReminderOutboxStorage('renewed-secret', 'Reminders');
+		const recovery = await createReminderRecoveryStorage('renewed-secret', 'Reminders');
+		expect(next.load()).toEqual([]);
+		expect(recovery.load()).toEqual([original]);
+		expect((await createReminderRecoveryStorage('renewed-secret', 'Private')).load()).toEqual([]);
+		(await createReminderRecoveryStorage('renewed-secret', 'Private')).adopt();
+		expect(old.load()).toEqual([original]);
+		recovery.adopt();
+		expect(next.load()).toEqual([original]);
+		expect(old.load()).toEqual([]);
+		expect(recovery.load()).toEqual([]);
+		expect(JSON.stringify([...values])).not.toMatch(/expired-secret|renewed-secret/);
+	});
+
+	it('preserves old work when adoption hits quota and completes an interrupted copy without duplication', async () => {
+		const old = await createReminderOutboxStorage('old', 'Reminders');
+		const next = await createReminderOutboxStorage('next', 'Reminders');
+		const recovery = await createReminderRecoveryStorage('next', 'Reminders');
+		const original = change();
+		old.put(original);
+		const write = vi.spyOn(storage, 'setItem').mockImplementationOnce(() => { throw new DOMException('Full', 'QuotaExceededError'); });
+		expect(() => recovery.adopt()).toThrow('Free up storage');
+		expect(old.load()).toEqual([original]);
+		expect(next.load()).toEqual([]);
+		write.mockRestore();
+		// A crash after the destination copy, before deleting the source.
+		next.put(original);
+		recovery.adopt();
+		expect(next.load()).toEqual([original]);
+		expect(old.load()).toEqual([]);
+		clearReminderOutbox();
+		expect(next.load()).toEqual([]);
+		expect(recovery.load()).toEqual([]);
 	});
 });

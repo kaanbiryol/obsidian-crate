@@ -3,6 +3,7 @@ import { manifestHrefForUrl } from '../cloudflare/worker/pwa/pwa-params';
 import { clearInstallEnrollment, preserveInstallEnrollment, restoreInstallEnrollment } from './install-enrollment';
 
 export const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
+export const PWA_LOGOUT_KEY = 'crate-reminders-logout';
 const CONFIG_KEY = 'crate-reminders-config';
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 

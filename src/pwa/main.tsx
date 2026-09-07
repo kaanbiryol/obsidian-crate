@@ -18,6 +18,7 @@ import { ErrorState, EmptyAuthState } from './components/AuthStates';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
 import { WebReminderCard } from './components/WebReminderCard';
 import { ReminderSyncNotice } from './components/ReminderSyncNotice';
+import { ReminderRecoveryNotice } from './components/ReminderRecoveryNotice';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
@@ -124,7 +125,7 @@ function App() {
 		bootstrapped,
 		loading,
 	});
-	const { loggingOut, logOut, clearLocalSession } = usePwaSessionLifecycle({
+	const { loggingOut, logOut, suspendLocalSession } = usePwaSessionLifecycle({
 		apiFetch,
 		cancelModalClose: modalTransition.cancelClose,
 		cancelSettingsClose: settingsTransition.cancelClose,
@@ -141,7 +142,7 @@ function App() {
 
 	usePwaBootstrap({
 		authToken,
-		clearLocalSession,
+		suspendLocalSession,
 		hydrateCachedSnapshot,
 		hydratedCacheRef,
 		setAuthToken,
@@ -217,8 +218,11 @@ function App() {
 		prepareEdit,
 		storageError,
 		retryInitialization,
+		recoveryChanges,
+		recoverChanges,
 	} = useReminderMutations({
 		hasSnapshot: lastUpdatedAt !== null,
+		canRecover: !readOnly,
 		apiFetch,
 		authToken,
 		bootstrapped,
@@ -374,6 +378,7 @@ function App() {
 								onEdit={editFailedChange}
 								onDiscard={discardChange}
 							/>
+							<ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={recoverChanges} />
 							{homeScreenInstall.showPrompt && !isProjectDetail && (
 								<HomeScreenInstallPrompt onShowSteps={toggleSettings} onDismiss={homeScreenInstall.dismiss} />
 							)}
@@ -408,6 +413,7 @@ function App() {
 						key={`${modal.mode}-${modal.reminderId ?? 'new'}-${modal.operationId ?? ''}`}
 						colorScheme={colorScheme}
 						modal={modal}
+						folderPath={config.folderPath}
 						projects={visibleProjects}
 						saving={saving}
 						isClosing={modalTransition.isClosing}

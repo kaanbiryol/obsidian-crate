@@ -27,8 +27,9 @@ export function useReminderMutations(options: {
 	showToast: ShowToast;
 	loadReminders: LoadReminders;
 	hasSnapshot?: boolean;
+	canRecover?: boolean;
 }) {
-	const { changes, ready, outboxRef, storageError, retryInitialization } = useReminderOutbox({ ...options, folderPath: options.config.folderPath });
+	const { changes, ready, outboxRef, storageError, retryInitialization, recoveryChanges, recoverChanges } = useReminderOutbox({ ...options, folderPath: options.config.folderPath });
 	const { closeModal, config, ensureCanMutate, projects, remindersRef, selectedProject, setReminders, setSaving, showToast } = options;
 	const preparingRef = useRef(false);
 	const report = (error: unknown) => showToast('error', error instanceof Error ? error.message : String(error));
@@ -48,7 +49,7 @@ export function useReminderMutations(options: {
 			if (!sessionCurrent()) return;
 			const previous = remindersRef.current.find(item => item.id === modal.reminderId);
 			enqueue(createSaveReminderChange(modal, config, projects, selectedProject, previous));
-			discardReminderDraft(modal);
+			discardReminderDraft(modal, config.folderPath);
 			closeModal();
 		} catch (error) { if (sessionCurrent()) report(error); }
 		finally { preparingRef.current = false; if (sessionCurrent()) setSaving(false); }
@@ -119,5 +120,5 @@ export function useReminderMutations(options: {
 		return modal;
 	};
 	const visible = useMemo(() => applyReminderChanges(options.reminders, projects, changes), [options.reminders, projects, changes]);
-	return { saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, ...visible, changes, ready, retryChange, discardChange, prepareEdit, storageError, retryInitialization };
+	return { saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, ...visible, changes, ready, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges };
 }

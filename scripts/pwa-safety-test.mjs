@@ -72,7 +72,7 @@ async function verifyEnrollmentRecovery(browser, browserName) {
       else await page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }).waitFor();
       expect(exchanges).toHaveLength(1);
       expect(exchanges[0]).toMatchObject({ token: mode === 'standalone' ? 'install-fresh' : 'browser-fresh', previousAuthToken: 'expired-session' });
-      expect(await page.evaluate(() => sessionStorage.getItem('crate-reminder-draft:old'))).toBe(null);
+      expect(await page.evaluate(() => sessionStorage.getItem('crate-reminder-draft:old'))).toBe('private old draft');
       expect(new URL(page.url()).searchParams.has('browserToken')).toBe(mode === 'failed');
       expect(new URL(page.url()).searchParams.get('token')).toBe(mode === 'standalone' ? null : 'install-fresh');
     } finally { await context.close(); }
@@ -88,7 +88,7 @@ async function verifyEnrollmentRecovery(browser, browserName) {
     const fresh = await context.newPage();
     await fresh.goto(`${origin}/notifications?browserToken=replace-session&folder=NewFolder&tab=inbox`);
     await expect.poll(() => folders.includes('NewFolder')).toBe(true);
-    expect(await other.evaluate(() => sessionStorage.getItem('crate-reminder-draft:old'))).toBe(null);
+    expect(await other.evaluate(() => sessionStorage.getItem('crate-reminder-draft:old'))).toBe('private old draft');
   } finally { await context.close(); }
   console.log(`${browserName}: expired-session recovery, separate browser/install tokens, failed exchange and cross-tab folder replacement passed`);
 }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { restoreReminderDraft, saveReminderDraft } from './reminder-drafts';
+import { restoreReminderDraft, saveReminderDraft, scopeLegacyReminderDrafts } from './reminder-drafts';
 import type { ModalState } from './types';
 
 function modal(patch: Partial<ModalState> = {}): ModalState {
@@ -12,27 +12,60 @@ function modal(patch: Partial<ModalState> = {}): ModalState {
 }
 
 beforeEach(() => {
-	const values = new Map<string, string>();
-	vi.stubGlobal('sessionStorage', {
-		getItem: (key: string) => values.get(key) ?? null,
-		setItem: (key: string, value: string) => values.set(key, value),
-	});
+	const values: Record<string, string> = {};
+	vi.stubGlobal('sessionStorage', Object.defineProperties(values, {
+		getItem: { value: (key: string) => values[key] ?? null },
+		setItem: { value: (key: string, value: string) => { values[key] = value; } },
+		removeItem: { value: (key: string) => { delete values[key]; } },
+	}));
 });
 afterEach(() => vi.unstubAllGlobals());
 
 describe('recovered reminder drafts', () => {
+	it('keeps colliding legacy create drafts bound to their original folder', () => {
+		const initial = modal({ mode: 'create', reminderId: undefined, filePath: undefined, recovery: false });
+		const older = { ...initial, draft: { ...initial.draft, content: 'Older unsaved text' } };
+		sessionStorage.setItem('crate-reminder-draft:new', JSON.stringify(older));
+		saveReminderDraft(initial, 'Reminders');
+		scopeLegacyReminderDrafts('Reminders');
+		scopeLegacyReminderDrafts('Private');
+		expect(sessionStorage.getItem('crate-reminder-draft:Private:new')).toBeNull();
+		expect(restoreReminderDraft(initial, 'Reminders')).toEqual(initial);
+		const retained = JSON.parse(sessionStorage.getItem('crate-reminder-draft:new')!) as ModalState;
+		expect(retained.draft.content).toBe('Older unsaved text');
+	});
+	it('binds legacy drafts to their original folder and skips damaged command metadata', () => {
+		const initial = modal({ recovery: false });
+		sessionStorage.setItem('crate-reminder-draft:reminder', JSON.stringify(initial));
+		sessionStorage.setItem('crate-reminder-draft:damaged-command', JSON.stringify({ ...initial, reminderId: 'damaged-command', pendingSave: {} }));
+		sessionStorage.setItem('crate-reminder-draft:damaged-path', JSON.stringify({ ...initial, reminderId: 'damaged-path', filePath: 42 }));
+		expect(() => scopeLegacyReminderDrafts('Reminders')).not.toThrow();
+		expect(sessionStorage.getItem('crate-reminder-draft:reminder')).toBeNull();
+		expect(sessionStorage.getItem('crate-reminder-draft:Reminders:reminder')).toBe(JSON.stringify(initial));
+		expect(restoreReminderDraft(initial, 'Reminders')).toEqual(initial);
+		expect(sessionStorage.getItem('crate-reminder-draft:Private:reminder')).toBeNull();
+		expect(sessionStorage.getItem('crate-reminder-draft:damaged-command')).not.toBeNull();
+		expect(sessionStorage.getItem('crate-reminder-draft:damaged-path')).not.toBeNull();
+	});
+	it('retains same-folder drafts while isolating another enrolled folder', () => {
+		const initial = modal({ recovery: false });
+		const saved = modal({ recovery: false, draft: { ...initial.draft, content: 'My retained text' } });
+		saveReminderDraft(saved, 'Reminders');
+		expect(restoreReminderDraft(initial, 'Private')).toEqual(initial);
+		expect(restoreReminderDraft(initial, 'Reminders')).toEqual(saved);
+	});
 	it('does not replace a deleted reminder recovery with an unrelated new draft', () => {
 		const initial = modal({ mode: 'create', reminderId: undefined });
-		saveReminderDraft(modal({ mode: 'create', reminderId: undefined, operationId: 'unrelated-operation', draft: { ...initial.draft, content: 'Unrelated unsaved reminder' } }));
-		expect(restoreReminderDraft(initial)).toEqual(initial);
+		saveReminderDraft(modal({ mode: 'create', reminderId: undefined, operationId: 'unrelated-operation', draft: { ...initial.draft, content: 'Unrelated unsaved reminder' } }), 'Reminders');
+		expect(restoreReminderDraft(initial, 'Reminders')).toEqual(initial);
 	});
 
 	it('restores same-operation text while preserving current recovery identity and revision', () => {
 		const initial = modal();
 		const saved = modal({ expectedRevision: 'stale-revision', filePath: 'Reminders/Old.md', recovery: false,
 			draft: { ...initial.draft, content: 'My unfinished correction', description: 'More details' } });
-		saveReminderDraft(saved);
-		expect(restoreReminderDraft(initial)).toEqual({ ...initial, draft: saved.draft });
+		saveReminderDraft(saved, 'Reminders');
+		expect(restoreReminderDraft(initial, 'Reminders')).toEqual({ ...initial, draft: saved.draft });
 	});
 
 	it.each([
@@ -41,8 +74,8 @@ describe('recovered reminder drafts', () => {
 		{ draft: { content: 'Incomplete saved draft' } as ModalState['draft'] },
 	])('ignores incompatible or damaged recovery drafts: %j', patch => {
 		const initial = modal();
-		saveReminderDraft(modal(patch));
-		expect(restoreReminderDraft(initial)).toEqual(initial);
+		saveReminderDraft(modal(patch), 'Reminders');
+		expect(restoreReminderDraft(initial, 'Reminders')).toEqual(initial);
 	});
 
 	it('keeps legacy attempted commands intact when restoring an ordinary editor', () => {
@@ -50,7 +83,7 @@ describe('recovered reminder drafts', () => {
 			path: '/reminders/update', body: '{"operationId":"original-attempt"}', draftKey: 'original-draft',
 			input: { folderPath: 'Reminders', content: 'Original attempt', description: null, project: 'Inbox', priority: 4, dueDate: null, dueDatetime: null },
 		} });
-		saveReminderDraft(saved);
-		expect(restoreReminderDraft(modal({ recovery: false, operationId: 'new-opening' }))).toEqual(saved);
+		saveReminderDraft(saved, 'Reminders');
+		expect(restoreReminderDraft(modal({ recovery: false, operationId: 'new-opening' }), 'Reminders')).toEqual(saved);
 	});
 });
