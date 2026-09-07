@@ -2,6 +2,8 @@
 
 Original candidate: `4b6c2911c62df31c08e656b44af76547b990e7be`. The original assessment and reproduction evidence are preserved alongside this checklist. Each independently reviewable fix receives its own commit. A second audit and final release-readiness assessment follow implementation and the complete release gate.
 
+The [September 6 remediation record](audit-remediation-2026-09-06.md) is retained as historical evidence; its finding numbers belong to the earlier audit.
+
 ## Findings
 
 | ID | Required outcome | Status / verification |
