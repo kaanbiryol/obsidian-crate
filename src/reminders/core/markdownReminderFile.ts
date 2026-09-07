@@ -182,6 +182,8 @@ export function deleteReminderBlockFromContent(
 	};
 }
 
+export class ReminderReorderConflictError extends Error {}
+
 export function reorderReminderBlocksInContent(fileContent: string, orderedIds: string[]): string {
 	const lines = fileContent.split("\n");
 
@@ -231,28 +233,42 @@ export function reorderReminderBlocksInContent(fileContent: string, orderedIds: 
 	}
 
 	const allBlockSegments = segments.filter((segment) => segment.isBlock);
-	const activeBlocks = allBlockSegments.filter((segment) => !segment.isCompleted);
-	const completedBlocks = allBlockSegments.filter((segment) => segment.isCompleted);
+	const blocksById = new Map<string, FileSegment>();
+	for (const block of allBlockSegments) {
+		if (!block.id) continue;
+		if (blocksById.has(block.id)) {
+			throw new ReminderReorderConflictError('Duplicate reminder identifiers. Refresh the project before reordering; nothing was changed.');
+		}
+		blocksById.set(block.id, block);
+	}
 
-	const activeById = new Map(activeBlocks.map((block) => [block.id, block]));
-	const reorderedActive: FileSegment[] = [];
+	const requestedIds = new Set<string>();
+	const requestedBlocks: FileSegment[] = [];
 	for (const id of orderedIds) {
-		const block = activeById.get(id);
-		if (block) {
-			reorderedActive.push(block);
-			activeById.delete(id);
+		const block = blocksById.get(id);
+		if (requestedIds.has(id) || !block || block.isCompleted) {
+			throw new ReminderReorderConflictError('Reminder order changed. Refresh the project before reordering; nothing was changed.');
 		}
+		requestedIds.add(id);
+		requestedBlocks.push(block);
 	}
 
-	for (const block of activeBlocks) {
-		if (block.id !== null && activeById.has(block.id)) {
-			reorderedActive.push(block);
-		} else if (block.id === null) {
-			reorderedActive.push(block);
-		}
-	}
+	// Only replace slots owned by this request. Concurrently added, unindexed,
+	// and completed blocks retain their current content and position.
+	let requestedIndex = 0;
+	const reorderedBlocks = allBlockSegments.map(block => {
+		if (!block.id || !requestedIds.has(block.id)) return block;
+		const replacement = requestedBlocks[requestedIndex++];
+		if (!replacement) throw new ReminderReorderConflictError('Cannot safely reorder these reminders; nothing was changed.');
+		return replacement;
+	});
 
-	const reorderedBlocks = [...reorderedActive, ...completedBlocks];
+	// Every source block must be emitted exactly once, including blocks that
+	// were absent from the caller's index. Check before returning any new bytes.
+	if (reorderedBlocks.length !== allBlockSegments.length
+		|| new Set(reorderedBlocks).size !== allBlockSegments.length) {
+		throw new ReminderReorderConflictError('Cannot safely reorder these reminders; nothing was changed.');
+	}
 	let blockIndex = 0;
 	const result: string[] = [];
 	for (const segment of segments) {
