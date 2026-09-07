@@ -108,10 +108,10 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.queryD1).not.toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
 	});
 
-	it('reapplies only the current schema when initialization is retried', async () => {
+	it.each([2, 3])('applies the additive schema upgrade or retries initialization from schema %i', async version => {
 		const api = createApi();
 		api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
-		api.queryD1.mockResolvedValueOnce([{ results: [{ version: 2 }] }]);
+		api.queryD1.mockResolvedValueOnce([{ results: [{ version }] }]);
 		const metadata = createMetadata();
 		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
 		expect(api.queryD1).toHaveBeenLastCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);

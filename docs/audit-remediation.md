@@ -22,7 +22,7 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | F12 | Preserve omitted description fields in partial updates | Pending |
 | F13 | Converge confirmed reminder state across visible tabs | Pending |
 | F14 | Refresh time-dependent views at clock/day/timezone boundaries | Pending |
-| F15 | Persist deletion identity and revision correlation at commit time | Pending |
+| F15 | Persist deletion identity and revision correlation at commit time | Fixed: transactional deletion receipts preserve original request/actor, consumed/tombstone revisions and sequence through retries; additive schema 2→3 migration and 30-day audit retention; 60 unit, 51 Worker/D1/R2 and 17 recovery tests pass |
 | F16 | Isolate malformed reminder projection from generic file publication | Fixed: atomic parse quarantine preserves opaque bytes and prior verified state; repair resumes projection; 16 new runtime regressions and focused checks pass |
 
 ## Additional audit concerns
