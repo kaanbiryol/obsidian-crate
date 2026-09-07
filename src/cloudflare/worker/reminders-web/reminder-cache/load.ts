@@ -6,24 +6,19 @@ import {
 	type ReminderFileCacheRow,
 } from './types';
 
-function parseCachedReminders(value: string): RemoteReminderRecord[] | null {
-	try {
-		const parsed = JSON.parse(value) as unknown;
-		if (!Array.isArray(parsed)) return null;
-		if (!parsed.every((reminder) => (
-			reminder !== null
-			&& typeof reminder === 'object'
-			&& typeof (reminder as Partial<RemoteReminderRecord>).id === 'string'
-			&& typeof (reminder as Partial<RemoteReminderRecord>).content === 'string'
-			&& typeof (reminder as Partial<RemoteReminderRecord>).filePath === 'string'
-			&& typeof (reminder as Partial<RemoteReminderRecord>).lineNumber === 'number'
-		))) {
-			return null;
-		}
-		return parsed as RemoteReminderRecord[];
-	} catch {
+function parseCachedReminders(parsed: unknown): RemoteReminderRecord[] | null {
+	if (!Array.isArray(parsed)) return null;
+	if (!parsed.every((reminder) => (
+		reminder !== null
+		&& typeof reminder === 'object'
+		&& typeof (reminder as Partial<RemoteReminderRecord>).id === 'string'
+		&& typeof (reminder as Partial<RemoteReminderRecord>).content === 'string'
+		&& typeof (reminder as Partial<RemoteReminderRecord>).filePath === 'string'
+		&& typeof (reminder as Partial<RemoteReminderRecord>).lineNumber === 'number'
+	))) {
 		return null;
 	}
+	return parsed as RemoteReminderRecord[];
 }
 
 export async function loadReminderFileCache(
@@ -37,11 +32,15 @@ export async function loadReminderFileCache(
 	for (const row of rows) {
 		if (row.parser_version !== REMINDER_CACHE_PARSER_VERSION) continue;
 		let issue: string | undefined;
+		let value: unknown;
 		try {
-			const value = JSON.parse(row.reminders_json) as { issue?: unknown };
-			if (typeof value?.issue === 'string') issue = value.issue;
-		} catch { /* Invalid cache is rebuilt below. */ }
-		const reminders = issue ? [] : parseCachedReminders(row.reminders_json);
+			// A large folder can contain thousands of cache rows. Decode each once.
+			value = JSON.parse(row.reminders_json) as unknown;
+			if (value && typeof value === 'object' && 'issue' in value && typeof value.issue === 'string') {
+				issue = value.issue;
+			}
+		} catch { continue; /* Invalid cache is rebuilt from storage. */ }
+		const reminders = issue ? [] : parseCachedReminders(value);
 		if (!reminders) continue;
 		entries.set(row.file_path, {
 			filePath: row.file_path,

@@ -50,8 +50,7 @@
         padding-left: 14px;
     }
 
-    .reorderable-reminder-item,
-    .reminder-render-item {
+    :is(.reorderable-reminder-item, .reminder-render-item) {
         margin-bottom: 8px;
     }
 
@@ -202,9 +201,7 @@
         gap: 8px;
     }
 
-    .premium-project-stat,
-    .premium-project-stat-empty,
-    .premium-project-stat-complete {
+    :is(.premium-project-stat, .premium-project-stat-empty, .premium-project-stat-complete) {
         font-size: var(--reminder-font-xs);
     }
 

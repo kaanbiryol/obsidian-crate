@@ -8,6 +8,7 @@ import type { App, PluginManifest } from 'obsidian';
 import { createLogger } from '../plugin/logger';
 import { isRecord } from '../plugin/settings';
 import type { FileManifest, FileEntry } from '../protocol/sync-types';
+import { createPathRecord, getPathEntry } from '../protocol/path-record';
 
 const logger = createLogger('Manifest');
 
@@ -38,7 +39,7 @@ function normalizeFileManifest(value: unknown): FileManifest | null {
 		return null;
 	}
 
-	const files: Record<string, FileEntry> = {};
+	const files = createPathRecord<FileEntry>();
 	for (const [path, entry] of Object.entries(value.files)) {
 		if (!path.trim()) {
 			continue;
@@ -74,7 +75,7 @@ export class LocalManifest {
 		this.app = app;
 		this.manifestPath = `${pluginManifest.dir}/${MANIFEST_FILENAME}`;
 		this.tmpPath = `${pluginManifest.dir}/${MANIFEST_TMP_FILENAME}`;
-		this.manifest = { version: 1, files: {} };
+		this.manifest = { version: 1, files: createPathRecord() };
 		this.dirty = false;
 	}
 
@@ -143,14 +144,14 @@ export class LocalManifest {
 	 * Get file entry
 	 */
 	getEntry(path: string): FileEntry | undefined {
-		return this.manifest.files[path];
+		return getPathEntry(this.manifest.files, path);
 	}
 
 	/**
 	 * Set file entry
 	 */
 	setEntry(path: string, entry: FileEntry): void {
-		const previous = this.manifest.files[path];
+		const previous = this.getEntry(path);
 		this.manifest.files[path] = { ...entry, revision: entry.revision ?? (previous?.hash === entry.hash ? previous.revision : undefined) };
 		this.revision++;
 		this.dirty = true;
@@ -183,7 +184,7 @@ export class LocalManifest {
 	 * Replace entire manifest (used after remote sync)
 	 */
 	replaceManifest(manifest: FileManifest): void {
-		this.manifest = normalizeFileManifest(manifest) ?? { version: 1, files: {} };
+		this.manifest = normalizeFileManifest(manifest) ?? { version: 1, files: createPathRecord() };
 		this.revision++;
 		this.dirty = true;
 	}
@@ -192,14 +193,14 @@ export class LocalManifest {
 	 * Check if file exists in manifest
 	 */
 	hasFile(path: string): boolean {
-		return path in this.manifest.files;
+		return this.getEntry(path) !== undefined;
 	}
 
 	/**
 	 * Check if file hash matches
 	 */
 	hashMatches(path: string, hash: string): boolean {
-		const entry = this.manifest.files[path];
+		const entry = this.getEntry(path);
 		return entry?.hash === hash;
 	}
 
@@ -214,7 +215,7 @@ export class LocalManifest {
 	 * Clear manifest
 	 */
 	clear(): void {
-		this.manifest = { version: 1, files: {} };
+		this.manifest = { version: 1, files: createPathRecord() };
 		this.revision++;
 		this.dirty = true;
 	}

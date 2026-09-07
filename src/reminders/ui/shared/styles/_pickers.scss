@@ -110,10 +110,8 @@
   }
 }
 
-.dark .picker-date-input,
-.dark .picker-time-input,
-&.dark .picker-date-input,
-&.dark .picker-time-input {
+.dark :is(.picker-date-input, .picker-time-input),
+&.dark :is(.picker-date-input, .picker-time-input) {
   color-scheme: dark;
 }
 
@@ -467,8 +465,7 @@
     color var(--crate-motion-duration-fast) var(--crate-motion-easing);
 
   & + &,
-  &:nth-child(n + 3),
-  &:nth-child(3) {
+  &:nth-child(n + 3) {
     border: 0;
   }
 
@@ -669,8 +666,7 @@
   font-variant-numeric: tabular-nums;
   text-align: left;
 
-  &:hover,
-  &:focus {
+  &:is(:hover, :focus) {
     border: 0;
     background: transparent;
     box-shadow: none;

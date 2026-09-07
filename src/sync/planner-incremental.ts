@@ -7,6 +7,7 @@ import type { ChangelogEntry, FileEntry, MutationFailure } from '../protocol/syn
 import type { SyncResult } from './types';
 import { deleteFilesInBatches } from './delete-batches';
 import { planIncrementalRemoteChanges } from './planner-incremental-remote-plan';
+import { createPathRecord } from '../protocol/path-record';
 
 const logger = createLogger("SyncPlanner");
 
@@ -101,7 +102,7 @@ export async function runIncrementalSync(
 
     for (const diff of conflicts) {
       try {
-        const localFiles: Record<string, FileEntry> = {};
+        const localFiles = createPathRecord<FileEntry>();
         const outcome = await context.processDiff(diff, localFiles, result);
         if (outcome.status === "deferred") {
           result.errors.push(`${diff.path}: ${outcome.reason}`);

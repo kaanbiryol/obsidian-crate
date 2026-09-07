@@ -9,6 +9,7 @@ import type {
 	ChangesResponse,
 	CheckResponse,
 	FileManifest,
+	FileEntry,
 	FileMetadataResponse,
 	HealthResponse,
 	RemoteFileVersion,
@@ -20,6 +21,7 @@ import {
 	type CrateServerInfo,
 } from '../../protocol';
 import { assertPortablePaths } from '../../protocol/portable-path';
+import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import {
 	getHeader,
@@ -68,7 +70,7 @@ export class SyncWorkerApi {
 	}
 
 	async getManifest(): Promise<FileManifest> {
-		const files: FileManifest['files'] = {};
+		const files = createPathRecord<FileEntry>();
 		let after: string | undefined;
 		let snapshotSeq: number | undefined;
 		let lastSeq = 0;
@@ -116,7 +118,7 @@ export class SyncWorkerApi {
 	async getFileMetadata(paths: string[]): Promise<FileMetadataResponse> {
 		const uniquePaths = [...new Set(paths)];
 		assertPortablePaths(uniquePaths);
-		const files: FileMetadataResponse['files'] = {};
+		const files = createPathRecord<FileEntry>();
 
 		for (let index = 0; index < uniquePaths.length; index += BATCH_DOWNLOAD_MAX_FILES) {
 			const chunk = uniquePaths.slice(index, index + BATCH_DOWNLOAD_MAX_FILES);
@@ -129,12 +131,12 @@ export class SyncWorkerApi {
 			} catch (error) {
 				if (!(error instanceof HttpError) || error.status !== 404) throw error;
 				const manifest = await this.getManifest();
-				return {
-					files: Object.fromEntries(uniquePaths.flatMap(path => {
-						const entry = manifest.files[path];
-						return entry ? [[path, entry] as const] : [];
-					})),
-				};
+				const fallbackFiles = createPathRecord<FileEntry>();
+				for (const path of uniquePaths) {
+					const entry = getPathEntry(manifest.files, path);
+					if (entry) fallbackFiles[path] = entry;
+				}
+				return { files: fallbackFiles };
 			}
 		}
 
@@ -216,11 +218,11 @@ export class SyncWorkerApi {
 		expectedRevisions: Record<string, string> = {},
 	): Promise<BatchDeleteResponse> {
 		const files: BatchDeleteFile[] = paths.map((path) => {
-			const expectedHash = expectedHashes[path];
+			const expectedHash = getPathEntry(expectedHashes, path);
 			if (!expectedHash) {
 				throw new Error(`Missing expected remote hash for delete: ${path}`);
 			}
-			const expectedRevision = expectedRevisions[path];
+			const expectedRevision = getPathEntry(expectedRevisions, path);
 			if (!expectedRevision) throw new HttpError('Missing remote revision; reconcile before deleting', 409, null, 'version_conflict');
 			return { path, expectedHash, expectedRevision };
 		});

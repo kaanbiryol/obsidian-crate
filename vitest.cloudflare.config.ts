@@ -12,6 +12,7 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			'@': srcPath,
+			'obsidian': new URL('./src/test/mocks/obsidian.ts', import.meta.url).pathname,
 		},
 	},
 	test: {

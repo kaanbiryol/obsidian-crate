@@ -11,6 +11,7 @@ import { buildTodayViewModel } from './viewModels';
 import { ReminderMotionRow } from '../../components/ReminderMotionRow';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { ReminderPagination, useReminderPagination } from '../reminder-pagination';
 
 export interface TodayViewProps {
   reminders: Reminder[];
@@ -38,6 +39,7 @@ export const TodayView = memo(function TodayView({
 }: TodayViewProps) {
   const reduceMotion = useObsidianReducedMotion();
   const { active, completed } = useMemo(() => buildTodayViewModel(reminders), [reminders]);
+  const pagination = useReminderPagination(active);
   const enableListAnimations = animationConfig.enabled && !reduceMotion && active.length <= 80;
   const hasContent = active.length > 0 || completed.length > 0;
 
@@ -71,15 +73,16 @@ export const TodayView = memo(function TodayView({
           />
       }
     >
+      <ReminderPagination pagination={pagination} label="Active reminders" />
       <ReminderListPresence>
-        {active.map((reminder, index) => (
+        {pagination.items.map((reminder, index) => (
           <ReminderMotionRow
             key={reminder.id}
             id={reminder.id}
             section="active"
             animationsEnabled={enableListAnimations}
           >
-            {cardRenderer(reminder, index)}
+            {cardRenderer(reminder, pagination.start + index)}
           </ReminderMotionRow>
         ))}
       </ReminderListPresence>

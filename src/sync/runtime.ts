@@ -5,6 +5,7 @@ import type { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from './types';
 import type { RemoteFileVersion } from '../protocol/sync-types';
+import { getPathEntry } from '../protocol/path-record';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
@@ -48,7 +49,7 @@ export class SyncRuntime {
 		const manifest = await this.apiClient.getManifest();
 		await this.apiClient.restoreFileVersion(
 			version.storage_key,
-			manifest.files[version.path]?.hash ?? null,
+			getPathEntry(manifest.files, version.path)?.hash ?? null,
 		);
 		return this.sync();
 	}
@@ -237,22 +238,28 @@ export class SyncRuntime {
 		}, FOREGROUND_SYNC_DEBOUNCE_MS);
 	}
 
-	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput): Promise<void> {
+	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput, signal?: AbortSignal): Promise<void> {
+		signal?.throwIfAborted();
 		applyInfrastructureConfigState(this.settings, this.secretStorage, config);
-		await deleteManifestFile(this.plugin);
+		await deleteManifestFile(this.plugin, signal);
+		signal?.throwIfAborted();
 		resetStoredSyncState(this.settings);
 		await this.persistSettings();
+		signal?.throwIfAborted();
 		await this.initialize({ skipStartupSync: true });
 	}
 
-	async clearSyncConfiguration(): Promise<void> {
+	async clearSyncConfiguration(signal?: AbortSignal): Promise<void> {
+		signal?.throwIfAborted();
 		try {
 			await this.apiClient?.revokeCurrentToken();
 		} catch (error) {
 			logger.warn('Failed to revoke the current device credential:', error);
 		}
+		signal?.throwIfAborted();
 		this.destroy();
-		await deleteManifestFile(this.plugin);
+		await deleteManifestFile(this.plugin, signal);
+		signal?.throwIfAborted();
 
 		resetStoredSyncState(this.settings);
 		clearSyncConfigurationState(this.settings, this.secretStorage);

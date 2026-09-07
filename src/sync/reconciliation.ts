@@ -1,5 +1,6 @@
 import type { FileDiff } from './types';
 import type { FileEntry } from '../protocol/sync-types';
+import { getPathEntry } from '../protocol/path-record';
 
 /**
  * Classify one path using its local, remote, and last-common states.
@@ -94,7 +95,12 @@ export function classifyPaths(
 	]);
 
 	for (const path of allPaths) {
-		const decision = classifyPath(path, localFiles[path], remoteFiles[path], manifestEntries[path]);
+		const decision = classifyPath(
+			path,
+			getPathEntry(localFiles, path),
+			getPathEntry(remoteFiles, path),
+			getPathEntry(manifestEntries, path),
+		);
 		if (decision) diffs.push(decision);
 	}
 

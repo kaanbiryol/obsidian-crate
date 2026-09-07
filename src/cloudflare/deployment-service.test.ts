@@ -83,24 +83,26 @@ function createHarness() {
 		throw new Error(`Unexpected transport request: ${url}`);
 	};
 	const transport = vi.fn(transportImplementation);
+	const loadArtifacts = vi.fn(async () => ({
+		version: '0.1.0',
+		fingerprint: 'f'.repeat(64),
+		workerBundle: 'export default {};',
+		workerBundleSha256: 'worker-hash',
+		d1Schema: 'CREATE TABLE IF NOT EXISTS example (id TEXT);',
+		d1SchemaSha256: 'schema-hash',
+	}));
+	const beforeServerReset = vi.fn(async () => {});
 	const service = new CloudflareDeploymentService({
 		clientId: CLIENT_ID,
 		settingsOwner,
 		transport,
-		loadArtifacts: vi.fn(async () => ({
-			version: '0.1.0',
-			fingerprint: 'f'.repeat(64),
-			workerBundle: 'export default {};',
-			workerBundleSha256: 'worker-hash',
-			d1Schema: 'CREATE TABLE IF NOT EXISTS example (id TEXT);',
-			d1SchemaSha256: 'schema-hash',
-		})),
+		loadArtifacts,
 		openExternal: url => opened.push(url),
 		selectDeployment: vi.fn(async (deployments: DiscoveredCloudflareDeployment[]) => deployments[0] ?? null),
-		beforeServerReset: vi.fn(async () => {}),
+		beforeServerReset,
 		now: () => 1_000,
 	});
-	return { service, settings, settingsOwner, persisted, opened, transportCalls, transport };
+	return { service, settings, settingsOwner, persisted, opened, transportCalls, transport, loadArtifacts, beforeServerReset };
 }
 
 function firstOpenedUrl(opened: string[]): URL {
@@ -280,6 +282,78 @@ function resetHarness() {
 	return h;
 }
 const resetDevice = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Test', platform: 'desktop' };
+
+describe('Cloudflare deployment lifetime', () => {
+	it.each(['connect', 'update', 'reset', 'delete'] as const)('revokes a late OAuth token without starting %s after destruction', async intent => {
+		const h = intent === 'connect' ? createHarness() : resetHarness();
+		let release!: () => void;
+		h.transport.mockImplementationOnce(async () => {
+			await new Promise<void>(resolve => { release = resolve; });
+			return { status: 200, text: JSON.stringify({ access_token: 'late-token' }) };
+		});
+		await h.service.startDeployment(intent);
+		const running = h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, resetDevice);
+		const rejected = expect(running).rejects.toMatchObject({ name: 'AbortError' });
+		await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+		h.service.destroy();
+		release();
+		await rejected;
+		expect(apiMocks.constructedWithTokens).toEqual([]);
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+		expect(resetCrateServer).not.toHaveBeenCalled();
+		expect(deleteCrateServer).not.toHaveBeenCalled();
+		expect(h.settingsOwner.writeSettings).not.toHaveBeenCalled();
+		expect(h.transportCalls).toHaveLength(1);
+		expect(h.transportCalls[0]?.url).toContain('/oauth2/revoke');
+		expect(h.transportCalls[0]?.body).toContain('late-token');
+	});
+
+	it.each(['connect', 'reset', 'delete'] as const)('does not begin %s after artifacts finish loading on a destroyed service', async intent => {
+		const h = intent === 'connect' ? createHarness() : resetHarness();
+		let release!: () => void;
+		const artifacts = await h.loadArtifacts();
+		h.loadArtifacts.mockImplementationOnce(async () => {
+			await new Promise<void>(resolve => { release = resolve; });
+			return artifacts;
+		});
+		await h.service.startDeployment(intent);
+		const running = h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }, resetDevice);
+		const rejected = expect(running).rejects.toMatchObject({ name: 'AbortError' });
+		await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+		const writes = h.persisted.length;
+		h.service.destroy();
+		release();
+		await rejected;
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+		expect(resetCrateServer).not.toHaveBeenCalled();
+		expect(deleteCrateServer).not.toHaveBeenCalled();
+		expect(h.persisted).toHaveLength(writes);
+		expect(h.transportCalls.at(-1)?.url).toContain('/oauth2/revoke');
+	});
+
+	it('cannot reopen authorization after destruction, including during PKCE generation', async () => {
+		const h = createHarness();
+		const pending = h.service.startDeployment();
+		h.service.destroy();
+		await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+		await expect(h.service.startDeployment()).rejects.toMatchObject({ name: 'AbortError' });
+		expect(h.service.pendingIntent).toBeNull();
+		expect(h.opened).toEqual([]);
+	});
+
+	it('does not report success when destroyed while revoking the temporary token', async () => {
+		const h = createHarness();
+		const transport = h.transport.getMockImplementation()!;
+		h.transport.mockImplementation(async (url, request) => {
+			if (url.endsWith('/oauth2/revoke')) h.service.destroy();
+			return transport(url, request);
+		});
+		await h.service.startDeployment();
+		await expect(h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! }))
+			.rejects.toMatchObject({ name: 'AbortError' });
+		expect(h.transportCalls.at(-1)?.url).toContain('/oauth2/revoke');
+	});
+});
 
 describe('server reset authorization', () => {
 	it('requires an existing deployment before opening authorization', async () => {

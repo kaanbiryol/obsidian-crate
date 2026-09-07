@@ -96,6 +96,7 @@ function selectAccount(
 export class CloudflareDeploymentService {
 	private readonly oauthClient: CloudflareOAuthClient;
 	private readonly now: () => number;
+	private readonly lifetime = new AbortController();
 	private pendingSession: PendingOAuthSession | null = null;
 	private handlingCallback = false;
 
@@ -109,6 +110,7 @@ export class CloudflareDeploymentService {
 	}
 
 	async startDeployment(intent: 'connect' | 'update' | 'reset' | 'delete' = 'connect'): Promise<void> {
+		this.lifetime.signal.throwIfAborted();
 		if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
 		if (existingMetadata?.reset?.deleteOnly && intent !== 'delete') throw new Error('Resume server deletion before connecting or updating.');
@@ -122,6 +124,7 @@ export class CloudflareDeploymentService {
 			: createCloudflareDeploymentMetadata();
 
 		const { verifier, challenge } = await createPkcePair();
+		this.lifetime.signal.throwIfAborted();
 		const state = randomBase64Url(32);
 		this.pendingSession = {
 			verifier,
@@ -146,10 +149,14 @@ export class CloudflareDeploymentService {
 	}
 
 	async handleCallback(params: Record<string, string>, device?: CloudflareAuthorizedDevice, onProgress?: (message: string) => void): Promise<CloudflareDeploymentResult> {
+		this.lifetime.signal.throwIfAborted();
 		if (this.handlingCallback) throw new Error('A Cloudflare operation is already in progress.');
 		this.handlingCallback = true;
 		try {
-			return await this.handleAuthorizedCallback(params, device, onProgress);
+			return await this.whileActive(() => this.handleAuthorizedCallback(params, device, message => {
+				this.lifetime.signal.throwIfAborted();
+				onProgress?.(message);
+			}));
 		} finally {
 			this.handlingCallback = false;
 		}
@@ -181,10 +188,16 @@ export class CloudflareDeploymentService {
 		}
 
 		onProgress?.('Completing Cloudflare authorization…');
+		this.lifetime.signal.throwIfAborted();
 		const accessToken = await this.oauthClient.exchangeAuthorizationCode(params.code, pending.verifier);
 		let result: CloudflareDeploymentResult;
 		try {
-			const api = new CloudflareApiClient(accessToken, this.options.transport);
+			this.lifetime.signal.throwIfAborted();
+			// Obsidian's transport cannot cancel a dispatched request. Guard both
+			// sides so its late response cannot start another request or save settings.
+			// OAuth stays outside this guard: even a late exchange must be revoked.
+			const api = new CloudflareApiClient(accessToken, (url, request) =>
+				this.whileActive(() => this.options.transport(url, request)));
 			if (pending.intent !== 'reset' && pending.intent !== 'delete' && this.options.settingsOwner.settings.cloudflareDeployment?.reset) throw new Error('Resume the server reset before connecting or updating.');
 			if ((pending.intent === 'reset' || pending.intent === 'delete') && JSON.stringify(pending.metadata) !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) {
 				throw new Error('Server settings changed during authorization. Confirm the reset again.');
@@ -192,15 +205,15 @@ export class CloudflareDeploymentService {
 			let metadata = pending.metadata;
 			let discoveredExisting = false;
 			onProgress?.('Checking your Cloudflare account…');
-			const account = selectAccount(await api.listAuthorizedAccounts(), metadata);
+			const account = selectAccount(await this.whileActive(() => api.listAuthorizedAccounts()), metadata);
 			if (pending.discoverExisting) {
-				const deployments = await discoverCloudflareDeployments(api, account);
+				const deployments = await this.whileActive(() => discoverCloudflareDeployments(api, account));
 				const [onlyDeployment] = deployments;
 				if (deployments.length === 1 && onlyDeployment) {
 					metadata = onlyDeployment.metadata;
 					discoveredExisting = true;
 				} else if (deployments.length > 1) {
-					const selected = await this.options.selectDeployment(deployments);
+					const selected = await this.whileActive(() => this.options.selectDeployment(deployments));
 					if (!selected) throw new Error('No Cloudflare server was selected');
 					metadata = selected.metadata;
 					discoveredExisting = true;
@@ -212,50 +225,53 @@ export class CloudflareDeploymentService {
 
 			if (pending.intent === 'delete') {
 				if (!this.options.beforeServerReset) throw new Error('Deletion requires sync shutdown.');
-				await deleteCrateServer({
-					api, accountId: account.id, metadata, version: (await this.options.loadArtifacts()).version,
-					beforeDelete: this.options.beforeServerReset, onProgress,
+				const artifacts = await this.whileActive(this.options.loadArtifacts);
+				await this.whileActive(() => deleteCrateServer({
+					api, accountId: account.id, metadata, version: artifacts.version,
+					beforeDelete: () => this.whileActive(this.options.beforeServerReset!), onProgress,
 					persist: () => this.persistMetadata(metadata),
-				});
-				await this.options.settingsOwner.writeSettings({ cloudflareDeployment: null });
+				}));
+				await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
 				return { workerUrl: '', accountName: account.name, deleted: true };
 			}
-			const artifacts = pending.intent === 'reset' ? await this.options.loadArtifacts() : null;
+			const artifacts = pending.intent === 'reset' ? await this.whileActive(this.options.loadArtifacts) : null;
 			if (pending.intent === 'reset') {
 				if (!device || !artifacts || !this.options.beforeServerReset) throw new Error('Reset requires a new device credential and sync shutdown.');
-				await resetCrateServer({
+				await this.whileActive(() => resetCrateServer({
 					api, accountId: account.id, metadata, version: artifacts.version,
-					beforeDelete: this.options.beforeServerReset, onProgress,
+					beforeDelete: () => this.whileActive(this.options.beforeServerReset!), onProgress,
 					persist: () => this.persistMetadata(metadata),
-				});
+				}));
 			}
 			let workerUrl: string;
 			if (pending.intent === 'connect' && metadata.d1DatabaseId && (discoveredExisting || metadata.lastDeployedVersion)) {
 				// Registering a replica must never replace shared Worker/PWA code.
-				const subdomain = await api.getWorkersSubdomain(account.id);
+				const subdomain = await this.whileActive(() => api.getWorkersSubdomain(account.id));
 				if (!subdomain) throw new Error('Existing Cloudflare server has no workers.dev subdomain');
 				metadata.workersSubdomain = subdomain;
 				await this.persistMetadata(metadata);
 				workerUrl = `https://${metadata.workerName}.${subdomain}.workers.dev`;
 			} else {
-				workerUrl = await provisionCloudflareDeployment({
+				const deploymentArtifacts = artifacts ?? await this.whileActive(this.options.loadArtifacts);
+				workerUrl = await this.whileActive(() => provisionCloudflareDeployment({
 					api,
 					accountId: account.id,
 					metadata,
-					artifacts: artifacts ?? await this.options.loadArtifacts(),
+					artifacts: deploymentArtifacts,
 					onMetadataChanged: () => this.persistMetadata(metadata),
 					onProgress,
-				});
+				}));
 			}
 			if (device) {
 				onProgress?.('Registering this device with the server…');
 				if (!metadata.d1DatabaseId) throw new Error('Cloudflare deployment database is missing');
-				await registerCloudflareAuthorizedDevice({
+				const databaseId = metadata.d1DatabaseId;
+				await this.whileActive(() => registerCloudflareAuthorizedDevice({
 					api,
 					accountId: account.id,
-					databaseId: metadata.d1DatabaseId,
+					databaseId,
 					device,
-				});
+				}));
 			}
 			if (metadata.reset) {
 				delete metadata.reset;
@@ -274,12 +290,20 @@ export class CloudflareDeploymentService {
 	}
 
 	destroy(): void {
+		this.lifetime.abort();
 		this.pendingSession = null;
 	}
 
+	private async whileActive<T>(operation: () => Promise<T>): Promise<T> {
+		this.lifetime.signal.throwIfAborted();
+		const result = await operation();
+		this.lifetime.signal.throwIfAborted();
+		return result;
+	}
+
 	private async persistMetadata(metadata: CloudflareDeploymentMetadata): Promise<void> {
-		await this.options.settingsOwner.writeSettings({
+		await this.whileActive(() => this.options.settingsOwner.writeSettings({
 			cloudflareDeployment: { ...metadata },
-		});
+		}));
 	}
 }

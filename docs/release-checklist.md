@@ -20,6 +20,7 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 - [ ] Builds from all three Node versions produced identical release artifact hashes.
 - [ ] Obsidian's community-directory **Review branch** scan has no unresolved errors or warnings.
 - [ ] The scanner reproduced `main.js` and `styles.css` from source.
+- [ ] The tag workflow produced a draft release containing only the verified assets; publication waits for this acceptance record.
 
 ## Desktop and Cloudflare
 
@@ -34,6 +35,7 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 - [ ] An unsupported database was rejected without modification; interrupted current-schema initialization retried safely.
 - [ ] Authorized a server update and confirmed the existing Worker, D1 database, R2 bucket, and Durable Objects were reused.
 - [ ] Confirmed the inactive-R2 error gives actionable setup guidance.
+- [ ] Disabled the plugin while OAuth or a server reset/delete was pending; no subsequent operations started, and the saved reset/delete checkpoint resumed after re-enabling.
 
 ## iOS
 
@@ -63,6 +65,9 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 - [ ] A failed edit retained its draft through reload; retrying a recurring completion advanced once.
 - [ ] Devices in different timezones shared the same saved notification policy and all-day delivery instant.
 - [ ] A title-only edit retained a timed reminder’s exact instant and recurrence progress.
+- [ ] Renewed an installed session, then reopened its original Home Screen icon; the renewed session and folder stayed active.
+- [ ] Opened an invalid or temporarily unavailable replacement link; the current session and unsaved draft remained usable.
+- [ ] Tested the intended largest reminder folder on the hosted deployment and physical devices; recorded cold indexing, warm refresh, response size, Worker CPU/errors and UI responsiveness. Local benchmark results alone do not complete this item.
 
 ## Disclosure and operations
 

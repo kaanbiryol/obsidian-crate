@@ -305,7 +305,7 @@ describe('plugin reminder layout styles', () => {
     expect(editorStyles).toContain('min-height: var(--reminder-action-chip-height)');
     expect(editorStyles).toContain('height: 40px');
     expect(editorStyles).toContain('vertical-align: baseline');
-    expect(modalStyles).toContain('.crate-reminder-editor-surface.is-centered');
+    expect(modalStyles).toContain(':is(.crate-reminder-editor-surface, .crate-reminder-picker-surface).is-centered');
     expect(modalStyles).toContain('padding-bottom: 8px');
   });
 

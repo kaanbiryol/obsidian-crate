@@ -4,6 +4,16 @@ import { prepareUploadFromPath, prepareUploadFromVaultFile } from './transfer-pr
 import { HIDDEN_CONFIG_PATH, createTransferHarness } from './transfer-test-harness';
 
 describe('transfer prepare helpers', () => {
+	it.each(['__proto__', 'constructor', 'toString'])('uses binary content type for an unknown %s extension', async extension => {
+		const harness = createTransferHarness();
+		harness.adapter.readBinary.mockResolvedValue(new Uint8Array([1]).buffer);
+		harness.adapter.stat.mockResolvedValue({ type: 'file', size: 1, mtime: 1 });
+		const result = await prepareUploadFromVaultFile(harness.context, {
+			path: `note.${extension}`, size: 1, mtime: 1, extension,
+		});
+		expect(result?.contentType).toBe('application/octet-stream');
+	});
+
 	it('reports oversized files without reading them', async () => {
 		const harness = createTransferHarness();
 

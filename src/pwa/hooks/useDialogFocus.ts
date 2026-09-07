@@ -75,7 +75,16 @@ export function useDialogFocus({
 		previousFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
 		return () => {
 			const previousFocus = previousFocusRef.current;
-			if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+			// Wait for native dialogs and sheet portals to finish unmounting.
+			// Deleting the final row on a page may remove its original target.
+			window.requestAnimationFrame(() => {
+				if (document.activeElement !== document.body) return;
+				const target = previousFocus?.isConnected && previousFocus !== document.body ? previousFocus
+					: document.querySelector<HTMLElement>('.pwa-shadow-root .reminder-pagination select:not(:disabled)')
+						?? document.querySelector<HTMLElement>('.pwa-shadow-root .sidebar-reminder-card-wrapper')
+						?? document.querySelector<HTMLElement>('.pwa-shadow-root [data-action="switch-tab"][aria-current="page"]');
+				target?.focus({ preventScroll: true });
+			});
 		};
 	}, []);
 

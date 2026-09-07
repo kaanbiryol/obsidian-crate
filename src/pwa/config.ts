@@ -43,7 +43,7 @@ export function loadStoredConfig(): StoredConfig {
 	}
 }
 
-function saveConfig(config: StoredConfig): void {
+export function saveConfig(config: StoredConfig): void {
 	localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
 }
 
@@ -124,6 +124,7 @@ export function enrollmentTokenFromParams(
 		: browserToken;
 }
 
+/** Propose launch settings; bootstrap commits them after enrollment succeeds. */
 export function applyConfigFromUrl(config: StoredConfig): {
 	config: StoredConfig;
 	token: string | null;
@@ -162,7 +163,6 @@ export function applyConfigFromUrl(config: StoredConfig): {
 		nextConfig.allDayNotificationTime = normalizeTimeString(allDayTime);
 	}
 
-	saveConfig(nextConfig);
 	return {
 		config: nextConfig,
 		token,

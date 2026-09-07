@@ -60,7 +60,7 @@ describe("reminder view models", () => {
     expect(viewModel.completed.map((reminder) => reminder.id)).toEqual(["done-today"]);
   });
 
-  it("builds upcoming groups and project stats/details", () => {
+  it("builds the upcoming reminder order and project stats/details", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-10T09:00:00.000Z"));
 
@@ -72,7 +72,6 @@ describe("reminder view models", () => {
 
     const upcoming = buildUpcomingViewModel(reminders, 7);
     expect(upcoming.upcomingReminders.map((reminder) => reminder.id)).toEqual(["work-active", "home"]);
-    expect(upcoming.dateGroups).toHaveLength(2);
 
     const projectStats = buildProjectStatsMap(reminders);
     expect(getProjectStats(projectStats, "Work")).toEqual({

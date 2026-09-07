@@ -6,7 +6,10 @@
 @use "plugin-ui/settings-alignment";
 @source "../**/*.{ts,tsx,js,jsx}";
 @source not "../**/*.test.ts";
+@source not "../**/*.integration.ts";
 @source not "../test";
+@source not "../pwa";
+@source not "../cloudflare/worker";
 
 .crate-reminders-ui {
   @include plugin-theme.styles;
