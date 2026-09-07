@@ -36,7 +36,7 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | S05 | Distinguish periodic connectivity failures from last successful sync | Fixed: failed checks show actionable errors without changing the last successful sync; recovery clears only its own error, failed syncs retain backoff, timer checks do not overlap and destruction fences late state; 19 focused tests, lint and typecheck pass |
 | S06 | Record periodic sync results and provide safe diagnostic support | Fixed: queue/periodic results share persisted activity recording; bounded request/operation/session correlation survives settings reload; reviewable export whitelists counts/timestamps/IDs and excludes paths/content/credentials/raw errors; 409 sync/settings tests, lint and typecheck pass; [support guide](sync-diagnostics.md) |
 | S07 | Define safe receipt/occurrence retention, retry horizons and compatibility | Pending |
-| S08 | Make sync status keyboard accessible and clarify recurring completion undo | Pending |
+| S08 | Make sync status keyboard accessible and clarify recurring completion undo | Keyboard portion fixed: focusable named button, Enter/Space, visible focus and listener cleanup; actual Chromium/WebKit component checks, lint and typecheck pass. Recurring undo remains pending |
 | S09 | Align security/release checks and improve contributor/dependency maintenance setup | Pending |
 | S10 | Document and verify protocol/schema/cache upgrade and rollback policy | Pending |
 | S11 | Exercise larger sync workloads, interrupted multi-client histories and storage boundaries | Pending |
