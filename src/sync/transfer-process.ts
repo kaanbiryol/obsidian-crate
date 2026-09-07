@@ -11,6 +11,7 @@ import type { DiffApplyOutcome, TransferContext } from "./transfer-types";
 import type { ConflictDiff, FileDiff, SyncResult } from './types';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
+import { assertLocalFileAbsent, LocalFilePresentError } from './local-absence';
 
 export async function processDiff(
   context: TransferContext,
@@ -144,6 +145,12 @@ export async function processDiff(
 
     case "delete": {
       if (!diff.remoteHash) throw new Error("Missing remote hash for delete");
+      try {
+        await assertLocalFileAbsent(context.vault, diff.path);
+      } catch (error) {
+        if (error instanceof LocalFilePresentError) return { status: 'deferred', reason: error.message };
+        throw error;
+      }
       await context.api.deleteFile(diff.path, diff.remoteHash, diff.remoteRevision);
       delete localFiles[diff.path];
       context.localManifest.removeEntry(diff.path);
