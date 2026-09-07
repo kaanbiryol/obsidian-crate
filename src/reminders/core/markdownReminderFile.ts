@@ -40,7 +40,7 @@ function recurrenceKey(value: RecurrenceRule | undefined): string {
 }
 
 function lineMatchesReminder(line: string, reminder: ReminderLineRecord): boolean {
-	const parsed = parseCheckboxLine(line);
+	const parsed = parseCheckboxLine(line, { persisted: true });
 	if (!parsed) {
 		return false;
 	}

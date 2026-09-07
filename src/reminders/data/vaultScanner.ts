@@ -19,6 +19,7 @@ import { parseCheckboxLine } from "@/reminders/utils/checkboxParser";
 import { createLogger } from "@/reminders/utils/logger";
 import type { IndexedReminder } from "./reminder-index";
 import { addReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
+import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 
 const log = createLogger('VaultScanner');
 
@@ -77,15 +78,14 @@ export function normalizeReminderIds(
       continue;
     }
 
-    if (parsed.reminderId && !usedIds.has(parsed.reminderId)) {
-      usedIds.add(parsed.reminderId);
-      continue;
-    }
-
-    const reminderId = createUniqueReminderId(usedIds);
+    const reminderId = parsed.reminderId && !usedIds.has(parsed.reminderId)
+      ? parsed.reminderId : createUniqueReminderId(usedIds);
     usedIds.add(reminderId);
-    lines[index] = setReminderIdMarker(line, reminderId);
-    remindersUpdated++;
+    const normalized = setReminderIdMarker(normalizeReminderScheduleLine(line), reminderId);
+    if (normalized !== line) {
+      lines[index] = normalized;
+      remindersUpdated++;
+    }
   }
 
   return {
@@ -163,7 +163,7 @@ export async function scanFile(
     if (signal?.aborted) return cancelled;
     const deferred = (): FileScanResult => ({
       filePath,
-      ...scanReminderMarkdownContent(filePath, originalContent, remindersFolderPath),
+      ...scanReminderMarkdownContent(filePath, originalContent, remindersFolderPath, { skipUnresolvedSchedules: true }),
       deferred: true,
     });
     const ownership = identityOwners ? await resolveReminderIdentityOwners(app, filePath, originalContent, identityOwners) : undefined;

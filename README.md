@@ -142,6 +142,8 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 
 Crate stores reminders as Markdown in a configurable vault folder. Reminders are disabled on new installs until you explicitly adopt a folder in **Settings → Crate → Reminders**. Adoption scans that folder and adds stable `<!-- crate-id:... -->` comments to checkbox lines so reminders can be updated safely. The plugin then provides a reminders workspace view and registers commands for creating reminders and opening projects.
 
+When Obsidian adopts or rescans a reminder, relative dates such as `tomorrow` and times without a timezone are resolved once in that device's timezone and saved as explicit dates or UTC timestamps. Recurring reminders also save their timezone and first occurrence. Existing reminder IDs, titles, and descriptions are preserved. Editing a saved date back to natural language resolves it again on the next scan. The web app reports an unresolved schedule until Obsidian saves it; vault file sync continues. This keeps the same saved reminder date across devices, reloads, and midnight.
+
 Reminder code blocks can be embedded in notes:
 
 ````markdown
