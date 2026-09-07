@@ -18,7 +18,7 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | F08 | Enforce a representable hierarchical remote namespace transactionally | Fixed: indexed D1 publication guards and actionable namespace conflicts; 23 new runtime regressions, 71 focused unit and 34 runtime tests pass |
 | F09 | Confirm and repair server push registration before displaying enabled | Pending |
 | F10 | Persist and visibly report incomplete reminder snapshots | Pending |
-| F11 | Provide real content verification for unchanged filesystem fingerprints | Pending |
+| F11 | Provide real content verification for unchanged filesystem fingerprints | Fixed: full reconciliation hashes bytes, periodic/incremental checks rotate within file/byte budgets, detected edits survive restart, and a safe immediate verification command is available; 384 sync tests plus final 8 verification regressions pass, including 10,000 files and the real incremental handoff; [policy](content-verification.md) |
 | F12 | Preserve omitted description fields in partial updates | Pending |
 | F13 | Converge confirmed reminder state across visible tabs | Pending |
 | F14 | Refresh time-dependent views at clock/day/timezone boundaries | Pending |

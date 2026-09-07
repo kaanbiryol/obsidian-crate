@@ -52,6 +52,7 @@ import type { UploadPreparedFilesOptions } from './transfer-upload';
 import { mergeSyncResults } from './sync-result';
 import { assertLocalFileAbsent } from './local-absence';
 import { normalizeWorkerUrl } from './worker-url';
+import { LocalContentVerifier } from './content-verifier';
 
 const logger = createLogger('SyncEngine');
 
@@ -69,6 +70,7 @@ export class SyncEngine {
 	private contexts: SyncEngineContexts;
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private activeWork = new Set<Promise<unknown>>();
+	private contentVerifier = new LocalContentVerifier();
 	private onQueueSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
@@ -106,6 +108,7 @@ export class SyncEngine {
 				this.vault,
 				this.localManifest,
 				this.shouldIgnore.bind(this),
+				files => this.verifyContent(files),
 			),
 			checkForChanges: (lastSeq: number) => this.api.checkForChanges(lastSeq),
 			sync: () => this.sync(),
@@ -143,6 +146,7 @@ export class SyncEngine {
 			retryWithBackoff: this.retryWithBackoff.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
 			getLocalChanges: () => this.getLocalChanges(),
+			verifyContent: files => this.verifyContent(files),
 			getLocalDeletes: () => this.getLocalDeletes(),
 			incrementalSync: (progressCallback) => this.incrementalSync(progressCallback),
 			parallelDownloadAndSaveFiles: (requests, result) =>
@@ -208,6 +212,7 @@ export class SyncEngine {
 			this.vault,
 			this.localManifest,
 			this.shouldIgnore.bind(this),
+			files => this.verifyContent(files),
 		);
 	}
 
@@ -380,10 +385,16 @@ export class SyncEngine {
 		);
 	}
 
-	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
+	private verifyContent(files: VaultFile[]): Promise<boolean> {
+		return this.contentVerifier.verify(this.vault, this.localManifest, files, this.lifecycle.abortSignal);
+	}
+
+	async sync(progressCallback?: (current: number, total: number) => void, verifyAll = false): Promise<SyncResult> {
 		return this.trackWork(async () => {
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
-			const result = await runSyncWorkflow(this.contexts.syncWorkflow(), progressCallback);
+			const workflow = this.contexts.syncWorkflow();
+			if (verifyAll) workflow.incrementalSync = async () => null;
+			const result = await runSyncWorkflow(workflow, progressCallback);
 			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 			if (result.success) {
 				this.pruneMarkdownBaseCacheInBackground();

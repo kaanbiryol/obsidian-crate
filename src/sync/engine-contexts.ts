@@ -26,6 +26,7 @@ interface SyncEngineContextDependencies {
 	retryWithBackoff: <T>(fn: () => Promise<T>) => Promise<T>;
 	getModifiedIso: (path: string, fallbackMtime?: number) => Promise<string>;
 	getLocalChanges: () => Promise<{ path: string; hash: string }[]>;
+	verifyContent: (files: VaultFile[]) => Promise<boolean>;
 	getLocalDeletes: () => Promise<string[]>;
 	incrementalSync: (progressCallback?: (current: number, total: number) => void) => Promise<SyncResult | null>;
 	parallelDownloadAndSaveFiles: (requests: DownloadRequest[], result: SyncResult) => Promise<void>;
@@ -71,6 +72,7 @@ export class SyncEngineContexts {
 			vault: dependencies.vault,
 			localManifest: dependencies.getLocalManifest(),
 			shouldIgnore: dependencies.shouldIgnore,
+			verifyContent: dependencies.verifyContent,
 			runConcurrent: dependencies.runConcurrent,
 		};
 	}
