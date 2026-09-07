@@ -2,6 +2,7 @@ import { BATCH_DELETE_MAX_FILES } from '../protocol/sync-limits';
 import { HttpError } from './api';
 import { errorMessage } from '../plugin/logger';
 import type { MutationFailure } from '../protocol/sync-types';
+import { LocalFilePresentError } from './local-absence';
 
 export interface ConditionalDeleteCandidate {
 	path: string;
@@ -26,6 +27,7 @@ export interface ConditionalDeleteResult {
 export async function deleteFilesInBatches(
 	api: ConditionalDeleteApi,
 	files: ConditionalDeleteCandidate[],
+	assertAbsent?: (path: string) => Promise<void>,
 ): Promise<ConditionalDeleteResult> {
 	const deleted: string[] = [];
 	const errors: MutationFailure[] = [];
@@ -33,6 +35,7 @@ export async function deleteFilesInBatches(
 	for (let index = 0; index < files.length; index += BATCH_DELETE_MAX_FILES) {
 		const chunk = files.slice(index, index + BATCH_DELETE_MAX_FILES);
 		try {
+			for (const file of chunk) await assertAbsent?.(file.path);
 			const response = await api.batchDelete(
 				chunk.map((file) => file.path),
 				Object.fromEntries(chunk.map((file) => [file.path, file.expectedHash])),
@@ -59,8 +62,8 @@ export async function deleteFilesInBatches(
 				}
 			}
 		} catch (error) {
-			const status = error instanceof HttpError ? error.status : undefined;
-			const code = error instanceof HttpError && isMutationFailureCode(error.code)
+			const status = error instanceof LocalFilePresentError ? 409 : error instanceof HttpError ? error.status : undefined;
+			const code = error instanceof LocalFilePresentError ? 'version_conflict' : error instanceof HttpError && isMutationFailureCode(error.code)
 				? error.code
 				: undefined;
 			const currentHash = error instanceof HttpError ? error.currentHash : undefined;

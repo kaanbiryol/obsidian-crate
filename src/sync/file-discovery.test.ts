@@ -171,7 +171,7 @@ describe('getAllVaultFiles', () => {
 		expect(files.map(file => file.path)).toContain(hiddenFile);
 	});
 
-	it('keeps indexed files when adapter listing the root fails', async () => {
+	it('rejects an incomplete scan when adapter listing the root fails', async () => {
 		const indexedFiles = [
 			{
 				path: 'notes/a.md',
@@ -190,17 +190,10 @@ describe('getAllVaultFiles', () => {
 			},
 		} as unknown as Vault;
 
-		await expect(getAllVaultFiles(vault, () => false)).resolves.toEqual([
-			{
-				path: 'notes/a.md',
-				size: 100,
-				mtime: 11,
-				extension: 'md',
-			},
-		]);
+		await expect(getAllVaultFiles(vault, () => false)).rejects.toThrow('Vault scan incomplete: cannot list /: adapter down');
 	});
 
-	it('skips hidden files whose stat calls fail', async () => {
+	it('rejects an incomplete scan when a hidden file stat fails', async () => {
 		const list = vi.fn(async (folderPath: string) => {
 			if (folderPath === '') {
 				return {
@@ -232,7 +225,6 @@ describe('getAllVaultFiles', () => {
 			adapter: { list, stat },
 		} as unknown as Vault;
 
-		const files = await getAllVaultFiles(vault, () => false);
-		expect(files.map(f => f.path)).toEqual(['.gitignore']);
+		await expect(getAllVaultFiles(vault, () => false)).rejects.toThrow('Vault scan incomplete: cannot stat .config-hidden/config.json: permission denied');
 	});
 });

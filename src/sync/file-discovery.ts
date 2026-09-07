@@ -4,10 +4,8 @@
  */
 
 import type { Vault, TFile } from 'obsidian';
-import { createLogger } from '../plugin/logger';
+import { errorMessage } from '../plugin/logger';
 import { assertPortablePaths } from '../protocol/portable-path';
-
-const logger = createLogger('FileDiscovery');
 
 /**
  * Normalised file descriptor that works for both indexed and hidden files.
@@ -60,7 +58,8 @@ export function tfileToVaultFile(file: TFile): VaultFile {
  *
  * Hidden files are discovered by recursing into dot-prefixed folders via
  * `vault.adapter.list()` + `vault.adapter.stat()`. Non-hidden folders are
- * already fully covered by `vault.getFiles()`.
+ * walked to find hidden descendants. An incomplete scan rejects: callers must
+ * never use a partial snapshot as evidence that an undiscovered file was deleted.
  *
  * @param shouldIgnore  Predicate used to skip ignored paths early (avoids
  *                      stat-ing thousands of files in e.g. `.git/`).
@@ -198,8 +197,7 @@ async function safeList(vault: Vault, folderPath: string): Promise<AdapterListin
 	try {
 		return await vault.adapter.list(folderPath);
 	} catch (error) {
-		logger.warn(`Failed to list vault folder: ${folderPath || '/'}`, error);
-		return { files: [], folders: [] };
+		throw new Error(`Vault scan incomplete: cannot list ${folderPath || '/'}: ${errorMessage(error)}`);
 	}
 }
 
@@ -207,7 +205,6 @@ async function safeStat(vault: Vault, filePath: string): Promise<{ type: string;
 	try {
 		return await vault.adapter.stat(filePath);
 	} catch (error) {
-		logger.warn(`Failed to stat vault file: ${filePath}`, error);
-		return null;
+		throw new Error(`Vault scan incomplete: cannot stat ${filePath}: ${errorMessage(error)}`);
 	}
 }

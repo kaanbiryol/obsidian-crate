@@ -8,6 +8,7 @@ import type { SyncResult } from './types';
 import { deleteFilesInBatches } from './delete-batches';
 import { planIncrementalRemoteChanges } from './planner-incremental-remote-plan';
 import { createPathRecord } from '../protocol/path-record';
+import { assertLocalFileAbsent } from './local-absence';
 
 const logger = createLogger("SyncPlanner");
 
@@ -163,7 +164,7 @@ export async function runIncrementalSync(
           result.errors.push(`${path}: Missing remote version for delete`);
         }
         const deleteResult = deleteFiles.length > 0
-          ? await deleteFilesInBatches(context.api, deleteFiles)
+          ? await deleteFilesInBatches(context.api, deleteFiles, path => assertLocalFileAbsent(context.vault, path))
           : { success: true, deleted: [], errors: [] };
         for (const path of deleteResult.deleted) {
           context.localManifest.removeEntry(path);

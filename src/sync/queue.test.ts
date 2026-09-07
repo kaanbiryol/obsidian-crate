@@ -9,6 +9,7 @@ import {
 import { processPendingChanges } from './queue-flush';
 import type { PreparedUpload, SyncResult, SyncState } from './types';
 import { HttpError } from './api';
+import { LocalFilePresentError } from './local-absence';
 
 type QueueState = SyncState;
 type UploadArgs = {
@@ -134,6 +135,7 @@ function createFlushHarness(overrides: Partial<{
 			isDestroyed: () => false,
 			currentStatus: () => state.status,
 			prepareUploadFromPath,
+			assertLocalFileAbsent: vi.fn(async () => {}),
 			runConcurrent: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 			getModifiedIso,
 			triggerDebouncedSync,
@@ -624,5 +626,30 @@ describe('processPendingChanges', () => {
 		expect(harness.state.lastError).toContain('notes/fail.md');
 		expect(harness.save).toHaveBeenCalledTimes(1);
 		expect(harness.triggerDebouncedSync).toHaveBeenCalledTimes(1);
+	});
+});
+
+
+describe('queued deletion revalidation', () => {
+	it('keeps the checkpoint and reconciles a file recreated after its delete event', async () => {
+		const harness = createFlushHarness();
+		harness.pendingPaths.add('delete:note.md');
+		harness.context.assertLocalFileAbsent.mockRejectedValue(new LocalFilePresentError('note.md'));
+		await processPendingChanges(harness.context, 2);
+		expect(harness.batchDelete).not.toHaveBeenCalled();
+		expect(harness.removeEntry).not.toHaveBeenCalled();
+		expect(harness.pendingPaths.has('delete:note.md')).toBe(true);
+		expect(harness.requestReconciliation).toHaveBeenCalledWith(['delete:note.md']);
+	});
+
+	it('preserves pending deletion when local absence cannot be checked', async () => {
+		const harness = createFlushHarness();
+		harness.pendingPaths.add('delete:note.md');
+		harness.context.assertLocalFileAbsent.mockRejectedValue(new Error('adapter unavailable'));
+		await processPendingChanges(harness.context, 2);
+		expect(harness.batchDelete).not.toHaveBeenCalled();
+		expect(harness.removeEntry).not.toHaveBeenCalled();
+		expect(harness.pendingPaths.has('delete:note.md')).toBe(true);
+		expect(harness.state.lastError).toContain('adapter unavailable');
 	});
 });
