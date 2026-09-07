@@ -20,6 +20,7 @@ import { createLogger } from "@/reminders/utils/logger";
 import type { IndexedReminder } from "./reminder-index";
 import { addReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
+import { markdownTaskContexts } from '../core/markdownTaskContext';
 
 const log = createLogger('VaultScanner');
 
@@ -70,7 +71,7 @@ export function normalizeReminderIds(
   const usedIds = new Set(reservedIds);
   let remindersUpdated = 0;
 
-  for (let index = 0; index < lines.length; index++) {
+  for (const index of markdownTaskContexts(lines).keys()) {
     const line = lines[index];
     if (line === undefined) continue;
     const parsed = parseCheckboxLine(line);

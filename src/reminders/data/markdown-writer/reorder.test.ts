@@ -65,14 +65,14 @@ describe('repository reorder against current Markdown', () => {
 		const added = '- [ ] Added after indexing <!-- crate-id:new -->';
 		const done = '- [x] Completed after indexing <!-- crate-id:done -->';
 		const unindexed = '- [ ] Unindexed task';
-		files.set(path, `# Inbox\n\n${edited}\n${added}\n${done}\n${unindexed}\n${another}\nFooter\n`);
+		files.set(path, `# Inbox\n\n${edited}\n${added}\n${done}\n${unindexed}\n${another}\n\nFooter\n`);
 
 		await repository.reorder('Inbox', ['second', 'first']);
 
 		// Postwrite indexing adopts a new ID for the previously unindexed task.
 		const adopted = index.getAll().find(reminder => reminder.content === 'Unindexed task');
 		expect(adopted).toBeDefined();
-		expect(files.get(path)).toBe(`# Inbox\n\n${another}\n${added}\n${done}\n${unindexed} <!-- crate-id:${adopted?.id} -->\n${edited}\nFooter\n`);
+		expect(files.get(path)).toBe(`# Inbox\n\n${another}\n${added}\n${done}\n${unindexed} <!-- crate-id:${adopted?.id} -->\n${edited}\n\nFooter\n`);
 		expect(index.getById('first')?.description).toBe('Important details');
 		expect(index.getAll()).toHaveLength(5);
 	});

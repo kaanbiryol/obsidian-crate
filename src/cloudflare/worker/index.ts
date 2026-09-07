@@ -11,6 +11,7 @@ import type { Env } from './types';
 import { FileVersionConflictError } from './storage/index';
 import { runScheduledMaintenance } from './maintenance';
 import { FileNamespaceConflictError } from './file-namespace';
+import { ReminderMarkdownContextError } from '@/reminders/core/markdownTaskContext';
 
 export { ReminderAlarm } from './notifications';
 
@@ -61,6 +62,7 @@ export default {
 			if (response.ok && isCrateMutation(path, method) && context) context.waitUntil(wakeNotificationCoordinator(env).catch(() => undefined));
 			return withRequestId(response, requestId);
 		} catch (error) {
+			if (error instanceof ReminderMarkdownContextError) return withRequestId(corsResponse({ error: error.message, code: 'reminder_markdown_context' }, 409), requestId);
 			if (error instanceof FileNamespaceConflictError) return withRequestId(error.toResponse(), requestId);
       if (error instanceof ReminderIdentityConflictError) return withRequestId(corsResponse({ error: error.message, code: 'duplicate_reminder_identity' }, 409), requestId);
       if (error instanceof ReminderFileSizeError) return withRequestId(corsResponse({ error: error.message }, 413), requestId);
