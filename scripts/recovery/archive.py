@@ -91,6 +91,7 @@ def prepare_restore_sql(directory, restored_at=None):
         # Restored retained content gets a fresh recovery window before collection.
         restored_at = int(time.time() * 1000) if restored_at is None else restored_at
         db.execute('UPDATE file_versions SET expires_at = ?', (restored_at + 2592000000,))
+        db.execute("DELETE FROM maintenance_state WHERE key = 'crate_deployment_fence'")
         db.execute("INSERT INTO notification_projection_jobs (path, job_token, updated_at) SELECT path, storage_key, datetime(? / 1000, 'unixepoch') FROM files WHERE lower(path) LIKE '%.md'", (restored_at,))
         db.commit()
         return '\n'.join(db.iterdump()).encode('utf-8')

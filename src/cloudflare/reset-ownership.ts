@@ -37,7 +37,7 @@ export function assertWorkerTarget(settings: CloudflareWorkerSettings, metadata:
 
 export async function readCrateTables(api: ResetApi, accountId: string, databaseId: string): Promise<string[]> {
 	const tables = (await api.queryD1(accountId, databaseId,
-		"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT GLOB 'sqlite_*' AND name != '_cf_KV';"))
+		"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT GLOB 'sqlite_*' AND name NOT IN ('_cf_KV', '_cf_METADATA');"))
 		.flatMap(result => result.results ?? []).map(row => row.name);
 	if (tables.some(table => typeof table !== 'string')) {
 		throw new Error('Reset blocked: Cloudflare returned an invalid table listing.');
