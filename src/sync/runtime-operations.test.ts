@@ -152,7 +152,7 @@ describe('SyncRuntime operation wrappers', () => {
 		const initialize = vi.spyOn(runtime, 'initialize').mockResolvedValue(undefined);
 
 		await runtime.applyInfrastructureConfig({
-			workerUrl: 'https://worker.example',
+			workerUrl: 'https://new-worker.example',
 			authToken: ' new-auth-token ',
 		});
 

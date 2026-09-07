@@ -10,8 +10,8 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | --- | --- | --- |
 | F01 | Preserve pending PWA work through involuntary authentication changes; isolate renewed scopes | Fixed: scoped review/export/recovery with exact replay and explicit logout privacy; 204 PWA tests and Chromium/WebKit failure/renewal/isolation regressions pass |
 | F02 | Conserve current Markdown during stale/ambiguous reminder reordering | Fixed: mutation-time ownership/conservation checks; 9 plugin integration regressions and 5 Worker reorder checks pass |
-| F03 | Reject incomplete local scans and revalidate absence before remote deletion | Fixed: full/force/cursor-fallback failures stop safely; all delete send paths recheck local state; 19 new regressions, targeted lint and typecheck pass |
-| F04 | Invalidate all checkpoint generations and isolate deployment authority during reconfiguration | Pending |
+| F03 | Reject incomplete local scans and revalidate absence before remote deletion | Fixed: full/force/cursor-fallback failures stop safely; automatic delete send paths recheck local state; 19 new regressions, targeted lint and typecheck pass |
+| F04 | Invalidate all checkpoint generations and isolate deployment authority during reconfiguration | Fixed: stop and await old work, verify recovery copies, invalidate main/tmp, bind checkpoints to server authority, preserve same-server renewal baseline; 12 new regressions and all 377 sync tests pass; [recovery policy](sync-checkpoint-recovery.md) |
 | F05 | Preserve stable reminder identity during project moves | Pending |
 | F06 | Decode persisted dates deterministically across time and timezone changes | Pending |
 | F07 | Respect fenced Markdown and preserve task structure when adopting/reordering | Pending |

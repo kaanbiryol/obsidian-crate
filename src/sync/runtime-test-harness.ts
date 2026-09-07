@@ -45,7 +45,7 @@ export function setApiClient(runtime: SyncRuntime, apiClient: {
 	putSharedSettings(shared: unknown): Promise<void>;
 	revokeCurrentToken?(): Promise<{ success: boolean }>;
 } | null): void {
-	(runtime as unknown as { apiClient: typeof apiClient }).apiClient = apiClient;
+	(runtime as unknown as { apiClient: unknown }).apiClient = apiClient === null ? null : { setAbortSignal: () => {}, ...apiClient };
 }
 
 export function createDeferred<T>(): Deferred<T> {
@@ -90,6 +90,7 @@ export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> =
 					remove: vi.fn(),
 					write: vi.fn(),
 					stat: vi.fn(),
+					list: vi.fn(async () => ({ files: [], folders: [] })),
 					readBinary: vi.fn(),
 				},
 				getFiles: vi.fn(() => []),
@@ -108,6 +109,7 @@ export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> =
 	const persistSettings = vi.fn(async () => {});
 
 	return {
+		plugin,
 		runtime: new SyncRuntime(
 			plugin as never,
 			settings,
