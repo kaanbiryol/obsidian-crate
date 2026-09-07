@@ -17,7 +17,7 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | F07 | Respect fenced Markdown and preserve task structure when adopting/reordering | Pending |
 | F08 | Enforce a representable hierarchical remote namespace transactionally | Fixed: indexed D1 publication guards and actionable namespace conflicts; 23 new runtime regressions, 71 focused unit and 34 runtime tests pass |
 | F09 | Confirm and repair server push registration before displaying enabled | Fixed: authenticated confirmation plus current permission/endpoint/keys required for On; bootstrap/resume/reconnect repair and logout fencing; stable recipient IDs; Chromium/WebKit failure/race checks, 222 unit and 16 real Worker tests pass (provider delivery mocked) |
-| F10 | Persist and visibly report incomplete reminder snapshots | Pending |
+| F10 | Persist and visibly report incomplete reminder snapshots | Fixed: structured source notices survive acknowledgements, 304 and offline caches; legacy snapshots without issue metadata force fresh200; incomplete empty states stay truthful; 213 PWA/37 Worker tests and Chromium/WebKit native-cache/legacy-ETag preservation checks pass |
 | F11 | Provide real content verification for unchanged filesystem fingerprints | Fixed: full reconciliation hashes bytes, periodic/incremental checks rotate within file/byte budgets, detected edits survive restart, and a safe immediate verification command is available; 384 sync tests plus final 8 verification regressions pass, including 10,000 files and the real incremental handoff; [policy](content-verification.md) |
 | F12 | Preserve omitted description fields in partial updates | Pending |
 | F13 | Converge confirmed reminder state across visible tabs | Pending |

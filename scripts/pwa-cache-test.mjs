@@ -20,7 +20,7 @@ for (const browserType of [chromium, webkit]) {
 		await page.addScriptTag({ content: outputFiles[0].text });
 		const result = await page.evaluate(async () => {
 			const cache = reminderCache;
-			await cache.saveCachedReminderSnapshot('Reminders', [{ id: 'original' }], ['Inbox'], 100, 'old');
+			await cache.saveCachedReminderSnapshot('Reminders', [{ id: 'original' }], ['Inbox'], 100, 'old', [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }]);
 			const initial = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.refreshCachedReminderSnapshot('Reminders', 200, 'old');
 			const refreshed = await cache.loadCachedReminderSnapshot('Reminders');
@@ -65,6 +65,7 @@ for (const browserType of [chromium, webkit]) {
 		});
 		assert.equal(result.initial.reminders[0].id, 'original');
 		assert.equal(result.refreshed.savedAt, 200);
+		assert.deepEqual(result.refreshed.issues, [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }]);
 		assert.deepEqual(result.stored, result.initial, '304 must not rewrite the snapshot');
 		assert.equal(result.afterStaleRefresh.savedAt, 300);
 		assert.equal(result.afterStaleRefresh.reminders[0].id, 'new');

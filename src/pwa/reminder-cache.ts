@@ -1,5 +1,6 @@
 import { capturePwaSession } from './session-generation';
-import type { CachedReminderSnapshot, ReminderRecord } from './types';
+import type { CachedReminderSnapshot, ReminderRecord, ReminderSourceIssue } from './types';
+import { parseReminderSourceIssues } from './reminder-source-issues';
 
 const CACHE_DATABASE_NAME = 'crate-reminders';
 const CACHE_DATABASE_VERSION = 2;
@@ -16,8 +17,13 @@ interface CacheFreshness {
 function normalizeSnapshot(value: unknown, folderPath: string): CachedReminderSnapshot | null {
 	if (!value || typeof value !== 'object') return null;
 	const snapshot = value as Partial<CachedReminderSnapshot>;
+	// Older clients cached partial lists without their issue metadata. Their
+	// ETags/freshness cannot establish completeness; rebuild only this cache
+	// from a full response, leaving drafts and pending commands untouched.
+	if (snapshot.issues === undefined) return null;
+	const issues = parseReminderSourceIssues(snapshot.issues);
 	if (
-		snapshot.folderPath !== folderPath
+		issues === null || snapshot.folderPath !== folderPath
 		|| !Array.isArray(snapshot.reminders)
 		|| !Array.isArray(snapshot.projects)
 		|| typeof snapshot.savedAt !== 'number'
@@ -31,6 +37,7 @@ function normalizeSnapshot(value: unknown, folderPath: string): CachedReminderSn
 		projects: snapshot.projects.filter((project): project is string => typeof project === 'string'),
 		savedAt: snapshot.savedAt,
 		etag: typeof snapshot.etag === 'string' ? snapshot.etag : undefined,
+		issues,
 	};
 }
 
@@ -112,8 +119,9 @@ export async function saveCachedReminderSnapshot(
 	projects: string[],
 	savedAt = Date.now(),
 	etag?: string,
+	issues: ReminderSourceIssue[] = [],
 ): Promise<void> {
-	const snapshot: CachedReminderSnapshot = { folderPath, reminders, projects, savedAt, etag };
+	const snapshot: CachedReminderSnapshot = { folderPath, reminders, projects, savedAt, etag, issues };
 	try {
 		await writeIndexedDbSnapshot(snapshot);
 	} catch {

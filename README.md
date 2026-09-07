@@ -166,7 +166,7 @@ Crate accepts push endpoints from [Apple](https://webkit.org/blog/13878/web-push
 
 ## Sync and reminder limits
 
-Vault files larger than 25 MiB produce a visible sync error and are left on the device. Reminder notes larger than 1 MiB, or whose parsed reminder data exceeds the cache limit, are omitted from the web list with a per-file explanation; healthy notes stay available. Split the affected note to restore web editing and notification scheduling. Web edits cannot grow a reminder note beyond 1 MiB.
+Vault files larger than 25 MiB produce a visible sync error and are left on the device. Reminder notes larger than 1 MiB, or whose parsed reminder data exceeds the cache limit, are omitted from the web list with a per-file explanation; healthy notes stay available. These explanations remain visible with cached reminders and clear after a successful refresh of repaired sources. Split the affected note to restore web editing and notification scheduling. Web edits cannot grow a reminder note beyond 1 MiB.
 
 Existing binary files are never overwritten by an unsafe asynchronous write. Incoming binary changes are saved as review copies and shown in conflicts; review both versions and replace the original when ready. UTF-8 text supported by Obsidian's atomic writer applies automatically when its precondition still matches.
 
