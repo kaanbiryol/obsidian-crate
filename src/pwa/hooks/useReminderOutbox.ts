@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createReminderOutbox } from '../reminder-outbox';
-import { createReminderOutboxStorage } from '../reminder-outbox-storage';
+import { createReminderOutboxStorage, createReminderRecoveryStorage } from '../reminder-outbox-storage';
 import { capturePwaSession } from '../session-generation';
 import { mergeReminderRecord } from '../reminder-optimistic-state';
 import { mergeProject, reorderProjectReminders } from '../reminder-list-state';
@@ -20,8 +20,11 @@ export function useReminderOutbox(options: {
 	loadReminders: LoadReminders;
 	showToast: ShowToast;
 	hasSnapshot?: boolean;
+	canRecover?: boolean;
 }) {
 	const [changes, setChanges] = useState<PendingReminderChange[]>([]);
+	const [recoveryChanges, setRecoveryChanges] = useState<PendingReminderChange[]>([]);
+	const recoverRef = useRef<(() => Promise<void>) | null>(null);
 	const [ready, setReady] = useState(false);
 	const [storageError, setStorageError] = useState<string | null>(null);
 	const [initialization, setInitialization] = useState(0);
@@ -38,9 +41,11 @@ export function useReminderOutbox(options: {
 		setReady(false);
 		setStorageError(null);
 		setChanges([]);
+		setRecoveryChanges([]);
+		recoverRef.current = null;
 		if (!authToken || !bootstrapped) return;
 		let cleanup = () => {};
-		void createReminderOutboxStorage(authToken, folderPath).then(storage => {
+		void Promise.all([createReminderOutboxStorage(authToken, folderPath), createReminderRecoveryStorage(authToken, folderPath)]).then(([storage, recovery]) => {
 			if (!isCurrent()) return;
 			if (!navigator.locks) throw new Error('Update this browser to safely sync changes between tabs.');
 			const outbox = createReminderOutbox({
@@ -70,6 +75,7 @@ export function useReminderOutbox(options: {
 				},
 			});
 			outbox.refresh();
+			setRecoveryChanges(recovery.load());
 			outboxRef.current = outbox;
 			setReady(true);
 			const resume = () => {
@@ -82,10 +88,22 @@ export function useReminderOutbox(options: {
 					void outbox.drain();
 				} catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
 			};
+			recoverRef.current = async () => {
+				if (!isCurrent() || optionsRef.current.canRecover === false || optionsRef.current.hasSnapshot === false) return;
+				try {
+					await navigator.locks.request('crate-reminder-outbox', () => {
+						if (!isCurrent()) return;
+						recovery.adopt();
+						setRecoveryChanges(recovery.load());
+						outbox.refresh();
+					});
+					resume();
+				} catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
+			};
 			const visible = () => { if (document.visibilityState === 'visible') resume(); };
 			const storageChanged = (event: StorageEvent) => {
-				if (!storage.acceptsKey(event.key) || !isCurrent()) return;
-				try { outbox.refresh(); void outbox.drain(); }
+				if (!recovery.acceptsKey(event.key) || !isCurrent()) return;
+				try { setRecoveryChanges(recovery.load()); outbox.refresh(); void outbox.drain(); }
 				catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
 			};
 			window.addEventListener('online', resume);
@@ -100,7 +118,7 @@ export function useReminderOutbox(options: {
 		}).catch((error: unknown) => {
 			if (isCurrent()) setStorageError(`Could not load pending changes. ${error instanceof Error ? error.message : String(error)}`);
 		});
-		return () => { alive = false; outboxRef.current = null; cleanup(); };
+		return () => { alive = false; outboxRef.current = null; recoverRef.current = null; cleanup(); };
 	}, [authToken, bootstrapped, folderPath, initialization]);
 
 	useEffect(() => {
@@ -115,5 +133,7 @@ export function useReminderOutbox(options: {
 		return () => window.clearTimeout(timer);
 	}, [changes, ready]);
 
-	return { changes, ready, outboxRef, storageError, retryInitialization: () => setInitialization(value => value + 1) };
+	return { changes, ready, outboxRef, storageError, retryInitialization: () => setInitialization(value => value + 1),
+		recoveryChanges: options.canRecover === false || options.hasSnapshot === false ? [] : recoveryChanges,
+		recoverChanges: () => { void recoverRef.current?.(); } };
 }

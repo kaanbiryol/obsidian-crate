@@ -90,11 +90,15 @@ function storageKeys(storage: Storage): string[] {
 	} catch { throw new Error(STORAGE_ERROR); }
 }
 
-/** One key per command prevents another tab from replacing an unrelated command. */
-export async function createReminderOutboxStorage(authToken: string, folderPath: string): Promise<ReminderOutboxStorage> {
+async function outboxScope(authToken: string, folderPath: string): Promise<string> {
 	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(authToken));
 	const tokenHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-	const scope = `${PREFIX}v1:${tokenHash}:${encodeURIComponent(folderPath)}:`;
+	return `${PREFIX}v1:${tokenHash}:${encodeURIComponent(folderPath)}:`;
+}
+
+/** One key per command prevents another tab from replacing an unrelated command. */
+export async function createReminderOutboxStorage(authToken: string, folderPath: string): Promise<ReminderOutboxStorage> {
+	const scope = await outboxScope(authToken, folderPath);
 	const storage = browserStorage();
 	const read = (key: string) => {
 		let raw: string | null;
@@ -128,7 +132,46 @@ export async function createReminderOutboxStorage(authToken: string, folderPath:
 	};
 }
 
-/** Explicit logout/session replacement clears data belonging to every old session. */
+/** Recovery stays within this browser origin and the exact enrolled folder. */
+export async function createReminderRecoveryStorage(authToken: string, folderPath: string) {
+	const scope = await outboxScope(authToken, folderPath);
+	const storage = browserStorage();
+	const acceptsKey = (key: string | null) => {
+		if (key === null) return true;
+		const parts = key.split(':');
+		return parts.length === 5 && `${parts[0]}:` === PREFIX && parts[1] === 'v1'
+			&& /^[a-f0-9]{64}$/.test(parts[2] ?? '') && parts[3] === encodeURIComponent(folderPath);
+	};
+	const entries = () => storageKeys(storage).filter(key => acceptsKey(key) && !key.startsWith(scope)).flatMap(key => {
+		const raw = storage.getItem(key);
+		return raw === null ? [] : [{ key, stored: readStored(raw, key.split(':')[4]!, folderPath) }];
+	});
+	return {
+		acceptsKey,
+		load() {
+			return entries().sort((a, b) => a.stored.createdAt - b.stored.createdAt).map(entry => entry.stored.change);
+		},
+		// Call under the same Web Lock as sending. Each destination is durable
+		// before its source disappears; a crash can leave safe duplicate receipts.
+		adopt() {
+			for (const { key, stored } of entries()) {
+				const destination = scope + stored.change.operationId;
+				const existing = storage.getItem(destination);
+				if (existing !== null) {
+					const current = readStored(existing, stored.change.operationId, folderPath).change;
+					if (current.body !== stored.change.body || current.path !== stored.change.path || current.method !== stored.change.method) {
+						throw new Error('These saved changes have conflicting operation IDs. Export them before recovering.');
+					}
+				} else {
+					try { storage.setItem(destination, JSON.stringify(stored)); } catch { throw new Error(STORAGE_ERROR); }
+				}
+				try { storage.removeItem(key); } catch { throw new Error(STORAGE_ERROR); }
+			}
+		},
+	};
+}
+
+/** Only explicit logout clears data belonging to every old session. */
 export function clearReminderOutbox(): void {
 	const storage = browserStorage();
 	for (const key of storageKeys(storage).filter(key => key.startsWith(PREFIX))) {

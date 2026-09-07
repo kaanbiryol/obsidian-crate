@@ -18,6 +18,7 @@ const ReminderPickerSheet = lazy(() => import('./ReminderPickerSheet')
 
 export function ReminderSheet({
 	modal: initialModal,
+	folderPath,
 	projects,
 	colorScheme,
 	saving,
@@ -28,6 +29,7 @@ export function ReminderSheet({
 	onDelete,
 }: {
 	modal: ModalState;
+	folderPath: string;
 	projects: string[];
 	colorScheme: 'dark' | 'light';
 	saving: boolean;
@@ -38,8 +40,8 @@ export function ReminderSheet({
 	onDelete: (id: string, expectedRevision?: string, filePath?: string) => void;
 }) {
 	// Keep keystrokes local so the reminder list does not render behind the sheet.
-	const [modal, setModal] = useState(() => restoreReminderDraft(initialModal));
-	const onClose = () => { discardReminderDraft(modal); dismissModal(); };
+	const [modal, setModal] = useState(() => restoreReminderDraft(initialModal, folderPath));
+	const onClose = () => { discardReminderDraft(modal, folderPath); dismissModal(); };
 	const editorScreenRef = useRef<ReminderEditorScreenHandle | null>(null);
 	const pickerTransitionClosedOffsetRef = useRef('100%');
 	const pickerTransitionKeyboardInsetRef = useRef(0);
@@ -53,10 +55,10 @@ export function ReminderSheet({
 	const patchDraft = useCallback((patch: Partial<ModalDraft>) => {
 		setModal((current) => {
 			const next = { ...current, draft: { ...current.draft, ...patch } };
-			saveReminderDraft(next);
+				saveReminderDraft(next, folderPath);
 			return next;
 		});
-	}, []);
+	}, [folderPath]);
 	const dismissEditorKeyboard = useCallback(() => {
 		pickerTransitionClosedOffsetRef.current = getReminderSheetClosedOffset(
 			reminderStageRef.current?.getBoundingClientRect().height ?? 0,
