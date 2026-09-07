@@ -1,0 +1,42 @@
+import { describe, expect, it, vi } from 'vitest';
+import { scanReminderMarkdownContent } from './markdownScan';
+import { buildReminderUpdate } from '../data/reminder-repository/shared';
+import { buildUpdatedReminderBlock, replaceUpdatedReminderBlock } from './markdownReminderMutation';
+import { normalizeReminderIds } from '../data/vaultScanner';
+import { reorderReminderBlocksInContent } from './markdownReminderFile';
+
+const scan = (text: string) => scanReminderMarkdownContent('Reminders/Inbox.md', text, 'Reminders').reminders;
+describe('2026-09-08 reminder audit evidence', () => {
+ it('confirms omitted description is deleted by a partial update', () => {
+   const text = '- [ ] Task <!-- crate-id:task -->\n<!-- crate-desc:v1:Important%20details -->\n';
+   const original = scan(text)[0]!;
+   expect(original.description).toBe('Important details');
+   const update = buildReminderUpdate({ priority: 1 });
+   const rewritten = replaceUpdatedReminderBlock(text, original, buildUpdatedReminderBlock(original, update.updates)).content;
+   expect(scan(rewritten)[0]!.description).toBeUndefined();
+   expect(rewritten).not.toContain('Important');
+ });
+ it('confirms unchanged relative-date markdown drifts one day at every later scan', () => {
+   vi.useFakeTimers();
+   vi.setSystemTime(new Date('2026-09-08T10:00:00Z'));
+   const text = '- [ ] Send invoice tomorrow <!-- crate-id:invoice -->\n';
+   expect(scan(text)[0]!.dueDate).toBe('2026-09-09');
+   vi.setSystemTime(new Date('2026-09-09T10:00:00Z'));
+   expect(scan(text)[0]!.dueDate).toBe('2026-09-10');
+   vi.useRealTimers();
+ });
+ it('confirms generic normalization edits fenced-code examples and reorder moves real tasks inside fences', () => {
+   const normalized = normalizeReminderIds('```md\n- [ ] Example\n```\n- [ ] Real task <!-- crate-id:real -->\n').content;
+   const found = scan(normalized);
+   expect(found).toHaveLength(2);
+   const reordered = reorderReminderBlocksInContent(normalized, ['real', found[0]!.id]);
+   expect(reordered).toMatch(/^```md\n- \[ \] Real task/);
+   expect(reordered).toMatch(/```\n- \[ \] Example/);
+ });
+ it('confirms reordering stale duplicate IDs deletes one reminder line', () => {
+   const text = '- [ ] Original <!-- crate-id:same -->\n- [ ] Pasted extra details <!-- crate-id:same -->\n';
+   const reordered = reorderReminderBlocksInContent(text, ['same']);
+   expect(reordered).not.toContain('Original');
+   expect(reordered).toContain('Pasted extra details');
+ });
+});

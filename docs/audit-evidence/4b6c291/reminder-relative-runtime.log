@@ -1,0 +1,10 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate
+
+ ✓ src/cloudflare/worker/audit-relative-date.integration.ts > confirms unchanged relative-date note becomes uneditable from the cached PWA listing after midnight 96ms
+ ✓ src/cloudflare/worker/audit-relative-date.integration.ts > confirms delayed relative-date projection permanently mismatches its committed due key 47ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  00:22:58
+   Duration  3.09s (transform 849ms, setup 0ms, import 1.79s, tests 144ms, environment 0ms)

@@ -1,0 +1,96 @@
+import { chromium, webkit, expect } from '/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/node_modules/@playwright/test/index.mjs';
+import { buildPwaPreviewAssets } from '/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/scripts/pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from '/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/scripts/pwa-preview-server.mjs';
+const assets = await buildPwaPreviewAssets({assetVersion:'audit-pwa-repro'});
+const {server} = await listenPwaPreviewServer({port:0, assets});
+const origin = `http://127.0.0.1:${server.address().port}`;
+const name = 'Check this article. Press Enter to edit reminder.';
+const outbox = page => page.evaluate(() => Object.keys(localStorage).filter(key=>key.startsWith('crate-reminder-outbox:')).map(key=>JSON.parse(localStorage.getItem(key))));
+try {
+for (const browserType of [chromium, webkit]) {
+const browser = await browserType.launch();
+try {
+const context = await browser.newContext({serviceWorkers:'block'});
+const page = await context.newPage();
+await page.route('**/reminders/update', route=>route.fulfill({status:503, contentType:'application/json',body:JSON.stringify({error:'Injected failure before server commit'})}));
+await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+await page.getByRole('group',{name,exact:true}).click();
+await page.getByRole('textbox',{name:'Reminder title',exact:true}).fill('Unique text kept only in durable outbox');
+await page.getByRole('button',{name:'Save reminder',exact:true}).click();
+await expect.poll(async()=>(await outbox(page)).length).toBe(1);
+await expect(page.getByRole('region',{name:'Couldn’t sync: Unique text kept only in durable outbox',exact:true})).toBeVisible();
+const before = await outbox(page);
+await page.route('**/reminders/list?*', route=>route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:'Invalid token'})}));
+await page.reload();
+await page.getByRole('button',{name:'Open Obsidian',exact:true}).waitFor();
+const after = await outbox(page);
+console.log(JSON.stringify({browser:browserType.name(),scenario:'401 destroys uncommitted outbox',before:before.map(x=>({status:x.change.status,title:JSON.parse(x.change.body).content})),after,token:await page.evaluate(()=>localStorage.getItem('crate-reminders-auth-token'))}));
+expect(after).toHaveLength(0);
+await context.close();
+
+await fetch(`${origin}/preview/reset`, {method:'POST'});
+const twoContext=await browser.newContext({serviceWorkers:'block'});
+const a=await twoContext.newPage(); const b=await twoContext.newPage();
+await a.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+await b.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+await a.getByRole('group',{name,exact:true}).waitFor(); await b.getByRole('group',{name,exact:true}).waitFor();
+await a.getByRole('group',{name,exact:true}).click();
+await a.getByRole('textbox',{name:'Reminder title',exact:true}).fill('Saved from first tab');
+await a.getByRole('button',{name:'Save reminder',exact:true}).click();
+await a.getByRole('group',{name:'Saved from first tab. Press Enter to edit reminder.',exact:true}).waitFor();
+await expect.poll(async()=>(await outbox(a)).length).toBe(0);
+await b.waitForTimeout(1500);
+console.log(JSON.stringify({browser:browserType.name(),scenario:'other tab after acknowledged save',first:await a.getByRole('group',{name:'Saved from first tab. Press Enter to edit reminder.',exact:true}).count(),secondOld:await b.getByRole('group',{name,exact:true}).count(),secondNew:await b.getByRole('group',{name:'Saved from first tab. Press Enter to edit reminder.',exact:true}).count(),visibilityA:await a.evaluate(()=>document.visibilityState),visibilityB:await b.evaluate(()=>document.visibilityState)}));
+expect((await a.getByRole('group',{name,exact:true}).count())+(await b.getByRole('group',{name,exact:true}).count())).toBe(1);
+await twoContext.close();
+const pushContext=await browser.newContext({serviceWorkers:'block'});
+await pushContext.addInitScript(() => {
+  let subscription=null;
+  const value={toJSON:()=>({endpoint:'https://example.com/push',keys:{auth:'abc',p256dh:'abc'}}),unsubscribe:async()=>{subscription=null;return true;}};
+  Object.defineProperty(window,'pushManager',{value:{getSubscription:async()=>subscription,subscribe:async()=>{subscription=value;return value;}}});
+});
+const p=await pushContext.newPage(); let attachAttempts=0;
+await p.route('**/notifications/vapid-public-key',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({publicKey:'AA'})}));
+await p.route('**/notifications/subscribe',route=>{attachAttempts++;return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Injected subscription registration failure'})});});
+await p.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+await p.getByRole('button',{name:'Open settings',exact:true}).click();
+await p.locator('[data-action="enable-push"]').click();
+await expect.poll(()=>attachAttempts).toBe(1);
+await expect(p.locator('[data-action="enable-push"]')).toBeVisible();
+await p.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+await expect(p.locator('.settings-status.is-success')).toHaveText(' On');
+console.log(JSON.stringify({browser:browserType.name(),scenario:'server subscription never registered but UI claims enabled',attachAttempts,enableButtons:await p.locator('[data-action="enable-push"]').count(),notificationState:await p.locator('.settings-status.is-success').innerText()}));
+await pushContext.close();
+const issueContext=await browser.newContext({serviceWorkers:'block'});
+const issuePage=await issueContext.newPage();
+await issuePage.route('**/reminders/list?*',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({reminders:[],projects:['Inbox'],issues:[{path:'Reminders/Large.md',reason:'Reminder file exceeds 1 MiB'}]})}));
+await issuePage.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+await issuePage.getByRole('button',{name:'Open settings',exact:true}).waitFor();
+console.log(JSON.stringify({browser:browserType.name(),scenario:'partial reminder list silently hides server issues',issueVisible:await issuePage.getByText('Reminder file exceeds 1 MiB',{exact:false}).count(),statusLine:await issuePage.locator('.pwa-status-line').count(),body:await issuePage.locator('body').innerText()}));
+expect(await issuePage.getByText('Reminder file exceeds 1 MiB',{exact:false}).count()).toBe(0);
+await issueContext.close();
+
+const timeContext=await browser.newContext({serviceWorkers:'block',timezoneId:'Europe/Berlin'});
+const timePage=await timeContext.newPage();
+await timePage.clock.install({time:new Date('2026-09-08T23:59:00+02:00')});
+let lists=0;
+await timePage.route('**/reminders/list?*',route=>{
+  lists++;
+  if(route.request().headers()['if-none-match']) return route.fulfill({status:304,headers:{etag:'"unchanged"'}});
+  return route.fulfill({contentType:'application/json',headers:{etag:'"unchanged"'},body:JSON.stringify({reminders:[{id:'tomorrow',content:'New day reminder',priority:4,completed:false,project:'Inbox',filePath:'Reminders/Inbox.md',dueDate:'2026-09-09',revision:'v1'}],projects:['Inbox']})});
+});
+await timePage.goto(`${origin}/notifications?folder=Reminders&tab=today`);
+await timePage.getByRole('button',{name:'Open settings',exact:true}).waitFor();
+expect(await timePage.getByRole('group',{name:'New day reminder. Press Enter to edit reminder.',exact:true}).count()).toBe(0);
+await timePage.clock.fastForward(120000);
+if (browserType.name()==='chromium') {
+  await timePage.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+  await expect.poll(()=>lists).toBe(2);
+}
+console.log(JSON.stringify({browser:browserType.name(),scenario:browserType.name()==='chromium'?'midnight plus unchanged304 keeps yesterday Today view':'midnight keeps yesterday Today view',date:await timePage.evaluate(()=>new Date().toString()),lists,dueTodayCount:await timePage.getByRole('group',{name:'New day reminder. Press Enter to edit reminder.',exact:true}).count(),body:await timePage.locator('body').innerText()}));
+expect(await timePage.getByRole('group',{name:'New day reminder. Press Enter to edit reminder.',exact:true}).count()).toBe(0);
+await timeContext.close();
+await fetch(`${origin}/preview/reset`, {method:'POST'});
+} finally {await browser.close();}
+}
+} finally {await new Promise(resolve=>server.close(resolve));}
