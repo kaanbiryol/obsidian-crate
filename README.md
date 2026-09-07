@@ -144,6 +144,8 @@ Crate stores reminders as Markdown in a configurable vault folder. Reminders are
 
 When Obsidian adopts or rescans a reminder, relative dates such as `tomorrow` and times without a timezone are resolved once in that device's timezone and saved as explicit dates or UTC timestamps. Recurring reminders also save their timezone and first occurrence. Existing reminder IDs, titles, and descriptions are preserved. Editing a saved date back to natural language resolves it again on the next scan. The web app reports an unresolved schedule until Obsidian saves it; vault file sync continues. This keeps the same saved reminder date across devices, reloads, and midnight.
 
+Code fences, indented code, frontmatter, and hidden HTML examples are excluded from reminders and remain unchanged during adoption. Reorder supports simple task lists within the same section. Use the Markdown editor to reorder nested tasks or tasks with supporting paragraphs, or to move/delete a task together with its children. Crate rejects these structural changes in the reminder list before editing the note.
+
 Reminder code blocks can be embedded in notes:
 
 ````markdown
