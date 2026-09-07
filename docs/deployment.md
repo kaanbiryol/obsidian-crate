@@ -112,7 +112,9 @@ Install Crate on the other device, open **Settings → Crate → Configuration**
 
 Protocol 5 is required for writes. Both clients verify the server before mutations; the Worker rejects missing or incompatible protocol headers with 428. Only the current prerelease formats are supported.
 
-Provisioning initializes an empty database from the bundled, hash-verified `src/cloudflare/schema.sql`. Existing databases must contain `crate_schema` with version 2. Any other schema is rejected before Worker upload, without changing its data. An interrupted current-schema initialization can be retried idempotently. There are no SQL upgrade scripts or portable-path backfills.
+Provisioning initializes an empty database from the bundled, hash-verified `src/cloudflare/schema.sql`. Existing databases must contain `crate_schema` with version 2 or 3. Schema 2 is upgraded to 3 by adding the deletion-receipt table and its indexes before changing the schema marker. Existing vault rows are preserved. Both initialization and this additive upgrade can be retried idempotently after interruption. Other schemas are rejected before Worker upload, without changing their data; no portable-path backfill is bundled.
+
+Apply the schema before installing the new Worker. The serving schema-2 Worker can continue using existing tables during this additive upgrade, but only the new Worker records deletion receipts. Take a paired D1/R2 backup before updating. Do not remove the new table or lower the marker to roll back: fixes must preserve schema 3 and its audit records. A full historical rollback requires the matching old build, its recovery tools, and its paired backup restored to isolated resources, and excludes writes made after that backup. The current recovery tools accept schema-3 archives.
 
 An explicit update of a current-schema deployment preserves resource IDs and data. Downgrade checks use the current remote deployment metadata. Older prerelease deployments require separate current resources; keep their original deployment and paired backup intact for recovery. Do not point the new Worker at an unsupported database.
 

@@ -53,7 +53,7 @@ async function initializeD1Schema(input: {
 	if (tables.length > 0) {
 		if (!tables.includes('crate_schema')) throw new Error('Unsupported database schema. Use an empty database or a current Crate deployment.');
 		const versions = (await query('SELECT version FROM crate_schema WHERE id = 1;')).flatMap(result => result.results ?? []);
-		if (versions.length !== 1 || versions[0]?.version !== 2) throw new Error('Unsupported database schema. Use a matching Crate build.');
+		if (versions.length !== 1 || versions[0]?.version !== 2 && versions[0]?.version !== 3) throw new Error('Unsupported database schema. Use a matching Crate build.');
 	}
 	// The current schema is idempotent so an interrupted initialization can retry.
 	await query(input.artifacts.d1Schema);

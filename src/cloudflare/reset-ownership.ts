@@ -7,7 +7,7 @@ const CRATE_TABLES = new Set([
 	'crate_schema', 'd1_migrations', '_crate_migrations', 'changelog', 'files', 'auth_tokens',
 	'scheduled_reminders', 'notification_jobs', 'vapid_keys', 'push_subscriptions',
 	'push_enrollment_tokens', 'web_enrollment_tokens', 'object_cleanup_queue',
-	'file_versions', 'maintenance_state', 'reminder_file_cache', 'reminder_operations',
+	'file_versions', 'file_deletion_receipts', 'maintenance_state', 'reminder_file_cache', 'reminder_operations',
 	'reminder_identities', 'notification_policy', 'notification_projection_jobs',
 	'reminder_projections', 'reminder_sources', 'reminder_occurrences', 'request_rate_limits',
 ]);

@@ -11,11 +11,14 @@ import {
 } from '../sync-storage';
 import type { BatchDeleteFile } from './types';
 import type { MutationFailure } from '../../../protocol/sync-types';
+import { mutationAuditContext } from '../request-diagnostics';
+import type { FileDeletionReceipt } from '../file-delete-audit';
 
 export async function handleBatchDelete(
 	request: Request,
 	bucket: R2Bucket,
 	db: D1Database,
+	audit = mutationAuditContext(request),
 ): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
@@ -27,6 +30,7 @@ export async function handleBatchDelete(
 	}
 
 	const deleted: string[] = [];
+	const results: Array<{ path: string } & Partial<FileDeletionReceipt>> = [];
 	const errors: MutationFailure[] = [];
 	const validFiles: Array<{ path: string; expectedHash: string; expectedRevision: string }> = [];
 	const seenPaths = new Set<string>();
@@ -83,6 +87,7 @@ export async function handleBatchDelete(
 				expectedHash: file.expectedHash,
 				expectedRevision: file.expectedRevision,
 				previousFile: previousFiles.get(file.path) ?? null,
+				audit,
 			});
 			if (!commit.committed) {
 				errors.push({
@@ -95,6 +100,7 @@ export async function handleBatchDelete(
 				continue;
 			}
 			deleted.push(file.path);
+			results.push({ path: file.path, ...commit.deletion });
 		} catch (error: unknown) {
 			metadataFailure = true;
 			errors.push({
@@ -109,6 +115,7 @@ export async function handleBatchDelete(
 	return corsResponse({
 		success: errors.length === 0,
 		deleted,
+		...(results.length > 0 ? { results } : {}),
 		...(errors.length > 0 ? { errors } : {}),
 	}, metadataFailure ? 503 : 200);
 }

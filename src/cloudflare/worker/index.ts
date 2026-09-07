@@ -55,7 +55,7 @@ export default {
 				return withRequestId(authResult.response, requestId);
 			}
 
-			const response = await handleAuthenticatedRoute(request, env, path, method, authResult.principal)
+			const response = await handleAuthenticatedRoute(request, env, path, method, authResult.principal, requestId)
 				?? corsResponse({ error: 'Not found' }, 404);
 			if (isCrateMutation(path, method)) await logMutation(request, response, requestId, authResult.principal);
 			if (response.ok && isCrateMutation(path, method) && context) context.waitUntil(wakeNotificationCoordinator(env).catch(() => undefined));
