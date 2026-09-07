@@ -289,8 +289,9 @@ describe('reminder editor chrome', () => {
         expect(markup).not.toContain('style="opacity:0');
         expect(markup).not.toMatch(/transform:(?!none)/);
         expect(markup).toContain('base-modal-surface');
-        expect(markup).toContain('reminder-modal-header');
-        expect(markup).not.toContain('delete-confirmation-close');
+        expect(markup).toContain('delete-confirmation-header');
+        expect(markup).toContain('aria-label="Close confirmation"');
+        expect(markup).not.toContain('reminder-modal-header');
         expect(markup).not.toContain('data-icon="triangle-alert"');
     });
 });
