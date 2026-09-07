@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { BaseModal } from './BaseModal';
-import { ModalHeader } from '../../ui/shared/ModalHeader';
+import { IconButton } from '../../ui/shared/IconButton';
 import { ShadowDOMButton } from './ShadowDOMButton';
 
 interface DeleteConfirmationModalProps {
@@ -64,14 +64,23 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                 onClose();
             }}
         >
-                <ModalHeader title={title} titleId={titleId} closeLabel="Close confirmation" onClose={onClose} closeDisabled={isLoading} />
-                <div className="crate-modal-body">
+                <header className="delete-confirmation-header">
+                    <h2 id={titleId} className="delete-confirmation-title">{title}</h2>
+                    <IconButton
+                        icon="x"
+                        label="Close confirmation"
+                        onClick={onClose}
+                        disabled={isLoading}
+                        className="delete-confirmation-close"
+                    />
+                </header>
+                <div className="delete-confirmation-body">
                     <p id={messageId} className="delete-confirmation-message">
                         {message}
                     </p>
                 </div>
 
-                <div className="crate-modal-footer delete-confirmation-actions">
+                <div className="delete-confirmation-actions">
                     <ShadowDOMButton
                         size="sm"
                         variant="flat"

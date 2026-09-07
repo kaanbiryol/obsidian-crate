@@ -38,6 +38,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	isActive: boolean;
 	isReturningToEditor: boolean;
 	canInteract: boolean;
+	keyboardInset: number;
 	editorFocusRequest: number;
 	dialogRef: (element: HTMLElement | null) => void;
 	onPatchDraft: (patch: Partial<ModalDraft>) => void;
@@ -54,6 +55,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	isActive,
 	isReturningToEditor,
 	canInteract,
+	keyboardInset,
 	editorFocusRequest,
 	dialogRef,
 	onPatchDraft,
@@ -147,6 +149,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 		>
 			<form
 				className="modal-form"
+				inert={draft.deleteConfirm}
 				autoComplete="off"
 				onSubmit={(event) => {
 					event.preventDefault();
@@ -226,7 +229,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 				</div>
 			</form>
 			<DeleteConfirmationModal
-				isOpen={isEditing && draft.deleteConfirm}
+				isOpen={isEditing && draft.deleteConfirm && keyboardInset === 0}
 				useNativeDialog
 				message={buildDeleteConfirmationMessage(draft)}
 				isLoading={saving}

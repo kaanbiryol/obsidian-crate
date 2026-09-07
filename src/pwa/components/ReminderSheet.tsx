@@ -145,6 +145,7 @@ export function ReminderSheet({
 					isActive={activeScreen === 'editor'}
 					isReturningToEditor={isReturningToEditor}
 					canInteract={canInteract}
+					keyboardInset={keyboardInset}
 					editorFocusRequest={editorFocusRequest}
 					dialogRef={setDialogRef}
 					onPatchDraft={patchDraft}
