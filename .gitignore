@@ -25,7 +25,7 @@ dist
 deploy.local.json
 
 # Local test vaults
-test-vault/
+/test-vault/
 
 # Generated files
 *.gen.ts

@@ -1,7 +1,8 @@
-import { Modal, type App } from 'obsidian';
+import { type App } from 'obsidian';
+import { SharedModal } from './shared/SharedModal';
 import qrcode from 'qrcode-generator';
 
-export class QRModal extends Modal {
+export class QRModal extends SharedModal {
 	private readonly data: string;
 
 	constructor(app: App, data: string) {
@@ -10,10 +11,10 @@ export class QRModal extends Modal {
 	}
 
 	onOpen(): void {
-		const { contentEl } = this;
+		this.openLayout('Scan to set up');
+		const contentEl = this.bodyEl;
 		this.modalEl.addClass('crate-qr-modal');
 
-		contentEl.createEl('h2', { text: 'Scan to set up' });
 		contentEl.createEl('p', {
 			text: 'Scan this code with your other device to finish setup.',
 			cls: 'crate-qr-desc',
@@ -38,6 +39,6 @@ export class QRModal extends Modal {
 	}
 
 	onClose(): void {
-		this.contentEl.empty();
+		super.onClose();
 	}
 }

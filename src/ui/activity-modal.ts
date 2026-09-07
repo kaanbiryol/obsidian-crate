@@ -72,24 +72,15 @@ export class ActivityModal extends Modal {
 		this.root.render(createElement(ActivitySheet, {
 			isMobile: Platform.isMobile,
 			onClose: () => this.close(),
-			onMount: (container, close) => this.renderActivity(container, close),
+			onMount: (container, close, header) => this.renderActivity(container, close, header),
 		}));
 	}
 
-	private renderActivity(contentEl: HTMLDivElement, close: () => void): void {
+	private renderActivity(contentEl: HTMLDivElement, close: () => void, headerEl: HTMLDivElement): void {
 		this.currentTabIndex = 0;
 
-		// Header
-		const header = contentEl.createDiv({ cls: 'crate-activity-header' });
-		const closeButton = header.createEl('button', {
-			cls: 'crate-activity-close-btn',
-			attr: { type: 'button', 'aria-label': 'Close sync activity', title: 'Close' },
-		});
-		setIcon(closeButton, 'x');
-		closeButton.addEventListener('click', close);
-
-		const headerText = header.createDiv({ cls: 'crate-activity-header-text' });
-		headerText.createEl('h2', { text: 'Sync activity', cls: 'crate-activity-title' });
+		const headerText = headerEl.querySelector<HTMLElement>('.reminder-modal-header-copy')!;
+		const header = headerEl.querySelector<HTMLElement>('.reminder-modal-header-side.is-right')!;
 		this.subtitleEl = headerText.createSpan({ text: this.formatLastSync(), cls: 'crate-activity-subtitle' });
 
 		this.syncBtn = header.createEl('button', {

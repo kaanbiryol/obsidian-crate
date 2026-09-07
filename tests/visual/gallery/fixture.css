@@ -23,7 +23,6 @@ html, body { margin: 0; min-height: 100%; font-family: Arial, sans-serif; }
 .visual-surface .project-picker-scroll { max-height: none; }
 output { display: block; margin: 12px auto; max-width: 560px; color: var(--text-muted); font-size: 12px; }
 
-html[data-scene="status"] .visual-surface { max-width: 440px !important; padding-bottom: 0 !important; }
-html[data-scene="status"] .reminder-modal-header { padding: 10px 12px; }
+html:is([data-scene="status"], [data-scene="progress"]) .visual-surface { width: min(380px, 100%) !important; max-width: 380px !important; padding-bottom: 0 !important; }
 html[data-scene="status"] .crate-status-actions button { padding: 6px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--button-radius); }
 html[data-scene="status"] .crate-status-actions .mod-cta { background: var(--interactive-accent); color: var(--text-on-accent); }

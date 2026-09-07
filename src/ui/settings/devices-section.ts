@@ -56,8 +56,8 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 				button.onClick(async () => {
 					const confirmed = await openConfirmationModal(plugin.app, {
 						title: 'Remove device',
-						message: `Remove sync access for ${label}?`,
-						details: ['That device must sign in with Cloudflare before it can sync again.'],
+						message: `${label} will lose sync access.`,
+						details: ['Sign in with Cloudflare on that device to reconnect.'],
 						confirmText: 'Remove device',
 						warning: true,
 					});

@@ -165,9 +165,9 @@ describe('sendToAllSubscriptions', () => {
 		expect(maximumActiveRequests).toBe(6);
 	});
 
-	it('quarantines permanent push failures without retrying them', async () => {
+	it.each([301, 302, 303, 307, 308, 403])('quarantines push status %i without retrying it', async (status) => {
 		vi.mocked(deserializeVapidKeys).mockResolvedValue({} as never);
-		vi.mocked(sendPushNotificationWithoutContact).mockResolvedValue(new Response('forbidden', { status: 403 }));
+		vi.mocked(sendPushNotificationWithoutContact).mockResolvedValue(new Response('rejected', { status }));
 		const run = vi.fn(async () => ({}));
 		const prepare = vi.fn((sql: string) => {
 			const statement = {

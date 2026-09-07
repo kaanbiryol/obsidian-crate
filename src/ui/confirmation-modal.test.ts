@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	MockModal,
@@ -5,6 +7,13 @@ import {
 	createObsidianUiModule,
 	resetObsidianUiMocks,
 } from '../test/fakes/obsidian-ui';
+
+vi.mock('react-dom/client', () => ({
+	createRoot: (element: { textContent: string }) => ({
+		render: (node: ReactNode) => { element.textContent = renderToStaticMarkup(node); },
+		unmount: vi.fn(),
+	}),
+}));
 
 afterEach(() => {
 	resetObsidianUiMocks();
@@ -27,6 +36,7 @@ describe('openConfirmationModal', () => {
 
 		expect(MockModal.instances).toHaveLength(1);
 		expect(MockSetting.instances).toHaveLength(1);
+		expect(MockModal.instances[0]?.contentEl.collectText()).toContain('reminder-modal-header');
 		expect(MockModal.instances[0]?.titleEl.textContent).toBe('Force full sync');
 		expect(MockModal.instances[0]?.contentEl.collectText()).toContain('Overwrite the remote vault with local files?');
 		expect(MockModal.instances[0]?.contentEl.collectText()).toContain('Remote-only files will be deleted.');

@@ -1,4 +1,6 @@
 import React, { useEffect, useId, useRef } from 'react';
+import { BaseModal } from './BaseModal';
+import { ModalHeader } from '../../ui/shared/ModalHeader';
 import { ShadowDOMButton } from './ShadowDOMButton';
 
 interface DeleteConfirmationModalProps {
@@ -45,35 +47,31 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
     if (!isOpen) return null;
 
     const content = (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div
-                className="modal-backdrop is-interactive absolute inset-0"
-                onClick={onClose}
-            />
-
-            <div
-                className="delete-confirmation-surface relative w-full"
-                role="alertdialog"
-                aria-modal="true"
-                aria-labelledby={titleId}
-                aria-describedby={messageId}
-                onClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => {
-                    if (event.key !== 'Escape' || isLoading) return;
-                    event.stopPropagation();
-                    onClose();
-                }}
-            >
-                <div className="delete-confirmation-copy">
-                    <h3 id={titleId} className="delete-confirmation-title">
-                        {title}
-                    </h3>
+        <BaseModal
+            isOpen={isOpen}
+            onClose={() => { if (!isLoading) onClose(); }}
+            variant="centered"
+            animationConfig={{ enabled: false }}
+            showDragHandle={false}
+            zIndex={100}
+            className="delete-confirmation-surface"
+            role="alertdialog"
+            ariaLabelledBy={titleId}
+            ariaDescribedBy={messageId}
+            onKeyDown={(event) => {
+                if (event.key !== 'Escape' || isLoading) return;
+                event.stopPropagation();
+                onClose();
+            }}
+        >
+                <ModalHeader title={title} titleId={titleId} closeLabel="Close confirmation" onClose={onClose} closeDisabled={isLoading} />
+                <div className="crate-modal-body">
                     <p id={messageId} className="delete-confirmation-message">
                         {message}
                     </p>
                 </div>
 
-                <div className="delete-confirmation-actions">
+                <div className="crate-modal-footer delete-confirmation-actions">
                     <ShadowDOMButton
                         size="sm"
                         variant="flat"
@@ -94,8 +92,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                         {confirmLabel}
                     </ShadowDOMButton>
                 </div>
-            </div>
-        </div>
+        </BaseModal>
     );
 
     return useNativeDialog ? (

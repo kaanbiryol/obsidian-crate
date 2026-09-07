@@ -287,7 +287,9 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('aria-describedby=');
         expect(markup).toContain('autofocus=""');
         expect(markup).not.toContain('style="opacity:0');
-        expect(markup).not.toContain('transform:');
+        expect(markup).not.toMatch(/transform:(?!none)/);
+        expect(markup).toContain('base-modal-surface');
+        expect(markup).toContain('reminder-modal-header');
         expect(markup).not.toContain('delete-confirmation-close');
         expect(markup).not.toContain('data-icon="triangle-alert"');
     });
