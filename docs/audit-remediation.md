@@ -15,7 +15,7 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | F05 | Preserve stable reminder identity during project moves | Pending |
 | F06 | Decode persisted dates deterministically across time and timezone changes | Pending |
 | F07 | Respect fenced Markdown and preserve task structure when adopting/reordering | Pending |
-| F08 | Enforce a representable hierarchical remote namespace transactionally | In progress |
+| F08 | Enforce a representable hierarchical remote namespace transactionally | Fixed: indexed D1 publication guards and actionable namespace conflicts; 23 new runtime regressions, 71 focused unit and 34 runtime tests pass |
 | F09 | Confirm and repair server push registration before displaying enabled | Pending |
 | F10 | Persist and visibly report incomplete reminder snapshots | Pending |
 | F11 | Provide real content verification for unchanged filesystem fingerprints | Pending |

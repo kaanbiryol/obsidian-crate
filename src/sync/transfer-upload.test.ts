@@ -5,6 +5,21 @@ import { uploadPreparedFiles } from './transfer';
 import { createTransferHarness, emptyResult } from './transfer-test-harness';
 
 describe('transfer upload helpers', () => {
+	it.each(['batch', 'individual'] as const)('reports a %s namespace conflict without content reconciliation', async mode => {
+		const harness = createTransferHarness();
+		const message = 'Rename Projects.md because Projects.md/child.md uses it as a folder';
+		const conflict = { path: 'Projects.md', success: false, error: message, code: 'namespace_conflict', status: 409 };
+		harness.api.batchUpload.mockResolvedValue({ success: false, results: [conflict] });
+		harness.api.uploadFile.mockRejectedValue(new HttpError(message, 409, null, 'namespace_conflict'));
+		const result = emptyResult();
+		const onVersionConflicts = vi.fn();
+		await uploadPreparedFiles(harness.context, [{
+			path: 'Projects.md', content: new ArrayBuffer(1), hash: 'local', size: mode === 'batch' ? 1 : 1024 * 1024,
+		}], result, { concurrency: 1, retry: false, onVersionConflicts });
+		expect(result.errors).toEqual([`Projects.md: ${message}`]);
+		expect(harness.localManifest.setEntry).not.toHaveBeenCalled();
+		expect(onVersionConflicts).not.toHaveBeenCalled();
+	});
 	it('uses retry wrapper and records hash mismatch errors via batch upload', async () => {
 		const harness = createTransferHarness();
 		harness.api.batchUpload.mockResolvedValue({
