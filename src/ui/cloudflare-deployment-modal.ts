@@ -1,9 +1,21 @@
-import { Modal, setIcon, type App } from 'obsidian';
+import { Modal, type App } from 'obsidian';
+import { createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { ModalLayout } from './shared/ModalLayout';
+import { StatusContent } from './shared/StatusContent';
+import { Button } from './shared/Button';
+import { ThemeIconProvider } from '../reminders/components/theme-icon';
+import { ObsidianIcon } from '../reminders/components/obsidian-icon';
 
 type DeploymentProgressState = 'working' | 'success' | 'error';
 export type CloudflareDeploymentMode = 'setup' | 'update';
 
-interface DeploymentProgressContent {
+interface FailureOptions {
+	technicalDetails?: string;
+	action?: { label: string; onClick: () => void };
+}
+
+interface DeploymentProgressContent extends FailureOptions {
 	state: DeploymentProgressState;
 	title: string;
 	description: string;
@@ -18,6 +30,7 @@ interface DeploymentProgressContent {
 export class CloudflareDeploymentModal extends Modal {
 	private content: DeploymentProgressContent;
 	private closed = false;
+	private root: Root | undefined;
 
 	constructor(app: App, mode: CloudflareDeploymentMode = 'setup') {
 		super(app);
@@ -35,12 +48,18 @@ export class CloudflareDeploymentModal extends Modal {
 	}
 
 	onOpen(): void {
+		this.closed = false;
 		this.modalEl.addClass('crate-cloudflare-deployment-modal');
+		this.modalEl.addClass('crate-custom-modal-close');
+		this.contentEl.addClass('crate-reminders-ui');
+		this.root = createRoot(this.contentEl);
 		this.render();
 	}
 
 	onClose(): void {
 		this.closed = true;
+		this.root?.unmount();
+		this.root = undefined;
 		this.contentEl.empty();
 	}
 
@@ -52,8 +71,8 @@ export class CloudflareDeploymentModal extends Modal {
 		this.update({ state: 'success', title, description });
 	}
 
-	fail(title: string, description: string, details?: string[]): void {
-		this.update({ state: 'error', title, description, details });
+	fail(title: string, description: string, details?: string[], options?: FailureOptions): void {
+		this.update({ state: 'error', title, description, details, ...options });
 	}
 
 	private update(content: DeploymentProgressContent): void {
@@ -64,54 +83,28 @@ export class CloudflareDeploymentModal extends Modal {
 	}
 
 	private render(): void {
-		const { contentEl } = this;
-		contentEl.empty();
+		this.modalEl.toggleClass('is-working', this.content.state === 'working');
 		this.setTitle(this.content.title);
-
-		const body = contentEl.createDiv({ cls: 'crate-cloudflare-deployment-content' });
-		body.setAttribute('role', 'status');
-		body.setAttribute('aria-live', 'polite');
-		body.setAttribute('aria-busy', this.content.state === 'working' ? 'true' : 'false');
-
-		const status = body.createDiv({ cls: 'crate-cloudflare-deployment-status' });
-		const icon = status.createDiv({ cls: 'crate-cloudflare-deployment-icon' });
-		icon.addClass(`is-${this.content.state}`);
-		setIcon(icon, this.iconName());
-
-		const copy = status.createDiv({ cls: 'crate-cloudflare-deployment-copy' });
-		copy.createEl('p', {
-			text: this.content.description,
-			cls: 'crate-cloudflare-deployment-description',
-		});
-
-		if (this.content.details?.length) {
-			const details = copy.createEl('ul', { cls: 'crate-cloudflare-deployment-details' });
-			for (const detail of this.content.details) {
-				details.createEl('li', { text: detail });
-			}
-		}
-
-		if (this.content.state !== 'working') {
-			const actions = body.createDiv({ cls: 'crate-cloudflare-deployment-actions' });
-			const closeButton = actions.createEl('button', {
-				text: this.content.state === 'success' ? 'Done' : 'Close',
-				cls: 'mod-cta',
-			});
-			closeButton.addEventListener('click', () => this.close());
-		}
+		const action = this.content.action;
+		const footer = this.content.state === 'working' ? undefined : createElement('div', { className: 'crate-status-actions' },
+			createElement(Button, {
+				onClick: () => this.close(),
+				children: this.content.state === 'success' ? 'Done' : 'Close',
+			}),
+			action && createElement(Button, {
+				className: 'mod-cta',
+				onClick: () => { this.close(); action.onClick(); },
+				children: action.label,
+			}),
+		);
+		this.root?.render(createElement(ThemeIconProvider, { renderer: ObsidianIcon, children: createElement(ModalLayout, {
+			title: this.content.title,
+			onClose: () => this.close(),
+			footer,
+			children: createElement(StatusContent, this.content),
+		}) }));
 	}
 
-	private iconName(): string {
-		switch (this.content.state) {
-			case 'success':
-				return 'circle-check';
-			case 'error':
-				return 'triangle-alert';
-			case 'working':
-			default:
-				return 'loader-circle';
-		}
-	}
 }
 
 export function openCloudflareDeploymentModal(

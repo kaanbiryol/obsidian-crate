@@ -19,11 +19,13 @@
     // The surface receives initial focus; controls retain their own focus rings.
     outline: none;
     display: flex;
+    height: min(360px, calc(100dvh - 48px));
     max-height: calc(100dvh - 48px);
     min-height: 0;
     flex-direction: column;
 
     &.is-bottom-sheet {
+        height: min(360px, 90dvh);
         max-height: 90dvh;
         min-height: 0;
     }
@@ -31,6 +33,7 @@
 
 .crate-activity-modal {
     container-type: inline-size;
+    flex: 1;
     display: flex;
     min-height: 0;
     flex-direction: column;
@@ -47,9 +50,9 @@
 	display: grid;
 	grid-template-columns: var(--crate-activity-header-control-size) minmax(0, 1fr) var(--crate-activity-header-control-size);
 	align-items: center;
-	column-gap: 6px;
+	column-gap: 12px;
 	min-height: 44px;
-	padding: 4px 10px;
+	padding: 12px var(--crate-activity-space-inline);
 }
 
 .crate-activity-header-text {
@@ -133,8 +136,8 @@
 	display: flex;
 	align-items: flex-start;
 	gap: 10px;
-	margin: 14px var(--crate-activity-space-inline) 0;
-	padding: 10px 12px;
+	margin: 8px var(--crate-activity-space-inline) 16px;
+	padding: 14px 16px;
 	border: 1px solid color-mix(in srgb, var(--text-error) 25%, transparent);
 	border-radius: var(--radius-m);
 	background: color-mix(in srgb, var(--text-error) 8%, transparent);
@@ -157,7 +160,7 @@
 	display: flex;
 	min-width: 0;
 	flex-direction: column;
-	gap: 2px;
+	gap: 6px;
 }
 
 .crate-sync-error-title {
@@ -244,7 +247,7 @@
 .crate-activity-tab-bar {
 	position: relative;
 	display: flex;
-	margin: 0 var(--crate-activity-space-inline) 10px;
+	margin: 0 var(--crate-activity-space-inline) 16px;
 }
 
 .crate-activity-tabs {
@@ -273,7 +276,8 @@
 	justify-content: center;
 	gap: 4px;
 	margin: 0;
-	padding: 5px 10px 8px;
+	min-height: 44px;
+	padding: 10px 14px;
 	border: 0;
 	border-radius: 0;
 	appearance: none;
@@ -320,11 +324,11 @@
 
 /* Content panels */
 .crate-activity-panel {
-	min-height: min(196px, 30dvh);
-	max-height: min(420px, 52vh);
+	flex: 1;
+	min-height: 0;
 	overflow-y: auto;
     overscroll-behavior: contain;
-	padding: 4px var(--crate-activity-space-inline) 14px;
+	padding: 0 var(--crate-activity-space-inline) 20px;
 	scrollbar-width: thin;
 	scrollbar-color: var(--crate-activity-divider) transparent;
 
@@ -347,9 +351,6 @@
 	}
 }
 
-body.is-mobile .crate-activity-panel {
-	max-height: 56dvh;
-}
 
 /* File rows */
 .crate-activity-list {
@@ -424,7 +425,7 @@ body.is-mobile .crate-activity-panel {
 	justify-content: center;
 	min-height: 196px;
 	gap: 0;
-	padding: 24px 16px;
+	padding: 32px 16px;
 }
 
 .crate-empty-icon {
@@ -433,7 +434,7 @@ body.is-mobile .crate-activity-panel {
 	height: 28px;
 	align-items: center;
 	justify-content: center;
-	margin-bottom: 8px;
+	margin-bottom: 12px;
 	background: transparent;
 	color: var(--interactive-accent);
 	opacity: 1;
@@ -453,7 +454,7 @@ body.is-mobile .crate-activity-panel {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 5px;
+	gap: 8px;
 	text-align: center;
 }
 
@@ -532,6 +533,14 @@ body.is-mobile .crate-activity-panel {
     line-height: 1.4;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
+}
+
+.crate-history-files > .crate-history-summary-error {
+    padding: 10px 0;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    user-select: text;
 }
 
 .crate-history-summary-error {
@@ -620,9 +629,9 @@ body.is-mobile .crate-activity-panel {
 	.crate-activity-header {
 		grid-template-columns: var(--crate-activity-header-control-size) minmax(0, 1fr) var(--crate-activity-header-control-size);
 		min-height: 44px;
-		column-gap: 6px;
-		padding-right: 12px;
-		padding-left: 12px;
+		column-gap: 12px;
+		padding-right: var(--crate-activity-space-inline);
+		padding-left: var(--crate-activity-space-inline);
 	}
 
 	.crate-sync-now-btn {
@@ -662,4 +671,26 @@ body.reduce-motion .crate-activity-modal {
             animation: none;
         }
     }
+}
+
+.notice .crate-sync-error-link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+
+    &:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 3px;
+    }
+}
+
+.crate-activity-transfer {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+
+  p { margin: 6px 0 0; color: var(--text-muted); }
 }

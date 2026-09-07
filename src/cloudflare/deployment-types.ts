@@ -10,4 +10,12 @@ export interface CloudflareDeploymentMetadata {
 	workersSubdomain: string | null;
 	lastDeployedVersion: string | null;
 	lastDeployedFingerprint: string | null;
+	reset?: {
+		id: string;
+		phase: 'clearing' | 'rebuilding';
+		deleteOnly?: true;
+		databaseId: string;
+		bucketCreatedAt: string;
+		namespaceId: string;
+	};
 }

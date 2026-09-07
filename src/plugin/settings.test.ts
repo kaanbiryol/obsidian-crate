@@ -168,3 +168,15 @@ describe('normalizeCrateSettings', () => {
 		expect(persisted.workerUrl).toBe(DEFAULT_SETTINGS.workerUrl);
 	});
 });
+
+
+it.each([false, true])('preserves the cleanup checkpoint across a settings reload (delete-only: %s)', deleteOnly => {
+	const reset = { ...(deleteOnly ? { deleteOnly: true as const } : {}), id: 'a'.repeat(32), phase: 'clearing' as const, databaseId: '01234567-89ab-cdef-0123-456789abcdef', bucketCreatedAt: '2026-01-01T00:00:00Z', namespaceId: 'c'.repeat(32) };
+	const settings = normalizeCrateSettings({ cloudflareDeployment: {
+		deploymentId: '0123456789abcdef', accountId: 'a'.repeat(32), accountName: 'Personal',
+		workerName: 'crate-0123456789abcdef', d1DatabaseName: 'crate-0123456789abcdef',
+		d1DatabaseId: reset.databaseId, r2BucketName: 'crate-0123456789abcdef',
+		workersSubdomain: 'example', lastDeployedVersion: '0.1.0', lastDeployedFingerprint: null, reset,
+	} }, '.obsidian');
+	expect(settings.cloudflareDeployment?.reset).toEqual(reset);
+});

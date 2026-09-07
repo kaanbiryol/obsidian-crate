@@ -1,9 +1,22 @@
-import type { ConflictRecord } from '../../sync/types';
+import type { ConflictRecord, SyncActivityProgress } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard } from './rendering';
 
-export function renderPendingPanel(container: HTMLElement, paths: string[]): void {
+export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null): void {
+	if (syncing || progress) {
+		const notice = container.createDiv({ cls: 'crate-activity-transfer' });
+		notice.setAttribute('role', 'status');
+		notice.createEl('strong', { text: progress?.type === 'initial' ? 'Uploading your vault…' : 'Syncing files…' });
+		notice.createEl('p', { text: progress && progress.total > 0
+			? `${progress.current.toLocaleString()} of ${progress.total.toLocaleString()} files ${progress.type === 'initial' ? 'prepared for upload' : 'processed'}. Sync is still running.`
+			: 'Checking your vault and preparing transfers…' });
+		if (paths.length === 0) return;
+	}
 	if (paths.length === 0) {
-		renderEmptyState(container, 'check', 'All synced', 'Your vault is up to date.', 'success');
+		if (hasError) {
+			renderEmptyState(container, 'inbox', 'No pending files', 'The last sync had errors. View history for details.');
+		} else {
+			renderEmptyState(container, 'check', 'All synced', 'Your vault is up to date.', 'success');
+		}
 		return;
 	}
 

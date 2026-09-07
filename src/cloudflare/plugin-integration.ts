@@ -23,16 +23,21 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 			window.open(url, '_blank', 'noopener,noreferrer');
 		},
 		selectDeployment: deployments => selectCloudflareServer(plugin.app, deployments),
+		beforeServerReset: async () => {
+			plugin.clearSettingsUiState();
+			await plugin.syncRuntime.clearSyncConfiguration();
+			plugin.refreshSettingsTab();
+		},
 	});
 }
 
-export async function startCloudflareDeployment(plugin: CratePlugin): Promise<void> {
+export async function startCloudflareDeployment(plugin: CratePlugin, intent?: 'update' | 'reset' | 'delete'): Promise<void> {
 	if (!isCloudflareOAuthConfigured()) {
 		new Notice('This build has no Cloudflare deployment client configured');
 		return;
 	}
 	try {
-		await plugin.cloudflareDeploymentService.startDeployment(plugin.syncRuntime.isConfigured() ? 'update' : 'connect');
+		await plugin.cloudflareDeploymentService.startDeployment(intent ?? (plugin.syncRuntime.isConfigured() ? 'update' : 'connect'));
 	} catch (error) {
 		new Notice(`Could not start Cloudflare deployment: ${deploymentErrorMessage(error)}`);
 	}
@@ -43,11 +48,15 @@ export async function handleCloudflareOAuthProtocol(
 	params: Record<string, string>,
 ): Promise<void> {
 	plugin.openSettingsTab();
-	const shouldConnectDevice = !plugin.syncRuntime.isConfigured();
+	const isDelete = plugin.cloudflareDeploymentService.pendingIntent === 'delete';
+	const isReset = plugin.cloudflareDeploymentService.pendingIntent === 'reset';
+	const shouldConnectDevice = !isDelete && (isReset || !plugin.syncRuntime.isConfigured());
 	const progress = openCloudflareDeploymentModal(
 		plugin.app,
 		shouldConnectDevice ? 'setup' : 'update',
 	);
+	if (isDelete) progress.setWorking('Deleting Crate server', 'Verifying this server, then removing its remote data and Worker. Keep Obsidian open.');
+	if (isReset) progress.setWorking('Resetting Crate server', 'Verifying this deployment, then erasing its remote data and rebuilding. Keep Obsidian open.');
 	const deviceToken = shouldConnectDevice ? generateSecureToken() : null;
 	let deployment;
 	try {
@@ -59,8 +68,29 @@ export async function handleCloudflareOAuthProtocol(
 				deviceName: getCurrentDeviceName(plugin.settings.deviceId),
 				platform: getCurrentPlatformCode(),
 			} : undefined,
+			message => progress.setWorking(isReset ? 'Resetting Crate server' : isDelete ? 'Deleting Crate server' : shouldConnectDevice ? 'Setting up Crate' : 'Updating Crate server', message),
 		);
 	} catch (error) {
+		if (isDelete) {
+			plugin.refreshSettingsTab();
+			progress.fail('Server deletion failed', 'Crate couldn’t finish deleting your Cloudflare server.',
+				['Open Crate settings → Troubleshooting to review and retry server deletion.'],
+				{ technicalDetails: deploymentErrorMessage(error), action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } });
+			return;
+		}
+		if (isReset) {
+			plugin.refreshSettingsTab();
+			const resetAction = plugin.settings.cloudflareDeployment?.reset ? 'Resume server reset' : 'Reset server';
+			progress.fail(
+				'Server reset failed',
+				'Crate couldn’t finish resetting your Cloudflare server.',
+				[deploymentErrorMessage(error).startsWith('Reset blocked:')
+					? 'Review the technical details below. The reported issue must be resolved before resetting this server.'
+					: `In Crate settings → Troubleshooting, select “${resetAction}” to try again.`],
+				{ technicalDetails: deploymentErrorMessage(error), action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } },
+			);
+			return;
+		}
 		progress.fail(
 			shouldConnectDevice
 				? 'Could not prepare your Cloudflare server'
@@ -70,6 +100,12 @@ export async function handleCloudflareOAuthProtocol(
 				? 'Select “Connect with Cloudflare” in Crate settings to start again.'
 				: 'Select “Authorize update” in Crate settings to try again.'],
 		);
+		return;
+	}
+
+	if (deployment.deleted) {
+		plugin.refreshSettingsTab();
+		progress.succeed('Crate server deleted', 'This server’s Worker and remote data have been removed. Your local vault files are kept.');
 		return;
 	}
 
@@ -115,8 +151,8 @@ export async function handleCloudflareOAuthProtocol(
 	}
 
 	progress.succeed(
-		'Crate is connected',
-		'No vault files were transferred. Use Initial sync to seed a new server, or Sync now to join an existing one.',
+		isReset ? 'Crate server reset' : 'Crate is connected',
+		isReset ? 'This device is connected. Run Initial sync → Upload all to seed the server. Reconnect other devices and set up web push again.' : 'No vault files were transferred. Use Initial sync to seed a new server, or Sync now to join an existing one.',
 	);
 }
 

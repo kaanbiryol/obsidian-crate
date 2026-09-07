@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { getSettingsTabSections } from './settings-tab-model';
 
 describe('getSettingsTabSections', () => {
+	it('keeps server repair accessible after a reset disconnects this device', () => {
+		expect(getSettingsTabSections({ isConfigured: false, hasDeployment: true })).toEqual({
+			showReminders: false, showSync: false, showNotifications: false, showInfrastructure: true,
+		});
+	});
+
 	it('shows server-backed sections only when sync is configured', () => {
 		expect(getSettingsTabSections({ isConfigured: true })).toEqual({
 			showReminders: true,

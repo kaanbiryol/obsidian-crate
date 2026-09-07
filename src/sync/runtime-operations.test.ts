@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MAX_SYNC_HISTORY, MAX_SYNC_HISTORY_PATHS } from '../plugin/settings-types';
 import type { SyncResult } from './types';
 import { createEmptySyncResult } from './sync-result';
+import { normalizeCrateSettings } from '../plugin/settings';
 import { SyncRuntime } from './runtime';
 import {
 	createRuntimeHarness,
@@ -19,13 +20,16 @@ describe('SyncRuntime operation wrappers', () => {
 		const { runtime, persistSettings, settings } = createRuntimeHarness();
 		const result: SyncResult = {
 			...createEmptySyncResult(),
-			success: true,
+			success: false,
+			errors: ['Upload failed: notes/b.md'],
 			uploaded: 2,
 			uploadedPaths: ['notes/a.md'],
 			conflicts: ['notes/a (conflict 2026-01-02 03-04-05 ab12).md'],
 			resolvedRaces: [{ path: 'notes/restored.md', resolution: 'kept-remote-edit' }],
 		};
-		const progressCallback = vi.fn();
+		const progressCallback = vi.fn(() => {
+			expect(runtime.getActivityProgress()).toEqual({ type: historyType, current: 1, total: 2 });
+		});
 		const listener = vi.fn();
 		const clearSyncProgress = vi.fn();
 		const setSyncProgress = vi.fn();
@@ -53,7 +57,10 @@ describe('SyncRuntime operation wrappers', () => {
 
 		const methodResult = await method(runtime, progressCallback);
 
+		expect(settings.syncHistory[0]?.errors).toEqual(result.errors);
+		expect(normalizeCrateSettings(settings, '.obsidian').syncHistory[0]?.errors).toEqual(result.errors);
 		expect(methodResult).toBe(result);
+		expect(runtime.getActivityProgress()).toBeNull();
 		expect(progressCallback).toHaveBeenCalledWith(1, 2);
 		expect(listener).toHaveBeenCalledWith(1, 2);
 		expect(setSyncProgress).toHaveBeenCalledWith(1, 2);

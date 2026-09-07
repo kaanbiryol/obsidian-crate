@@ -77,96 +77,45 @@
 .crate-cloudflare-deployment-modal {
 	width: min(440px, calc(100vw - 32px));
 	max-width: 440px;
+	padding: 0;
+	overflow: hidden;
 
-	.modal-title {
-		padding-right: 32px;
-	}
+	// Obsidian nests the title inside .modal-header. Hide the host header too
+	// so it cannot reserve space above our shared header.
+	.modal-header,
+	.modal-title { display: none !important; }
 
 	.modal-content {
-		padding-top: 6px;
-	}
-}
-
-.crate-cloudflare-deployment-content {
-	padding: 0;
-}
-
-.crate-cloudflare-deployment-status {
-	display: flex;
-	align-items: flex-start;
-	gap: 14px;
-}
-
-.crate-cloudflare-deployment-copy {
-	min-width: 0;
-	flex: 1;
-}
-
-.crate-cloudflare-deployment-icon {
-	flex: 0 0 auto;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 38px;
-	height: 38px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: var(--radius-m, 12px);
-	background: var(--background-secondary);
-	color: var(--interactive-accent);
-
-	svg {
-		width: var(--icon-l, 20px);
-		height: var(--icon-l, 20px);
-		stroke-width: var(--icon-l-stroke-width, 1.75px);
+		margin: 0;
+		padding: 0;
+		max-height: calc(100dvh - 80px);
+		overflow-y: auto;
 	}
 
-	&.is-working svg {
-		animation: crate-spin var(--anim-duration-slow, 1s) linear infinite;
+	&.is-working .crate-modal-body {
+		box-sizing: border-box;
+		height: 190px;
+		display: flex;
+		flex-direction: column;
 	}
 
-	&.is-success {
-		color: var(--text-success);
+	&.is-working .crate-status-content {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		overflow-wrap: anywhere;
 	}
 
-	&.is-error {
-		color: var(--text-error);
+	&.is-working .crate-status-guidance {
+		flex: 0 0 auto;
+		min-height: 3em;
+		font-variant-numeric: tabular-nums;
 	}
+
+	.reminder-modal-header { padding: 10px 12px; }
+	.reminder-modal-header-title { white-space: normal; }
 }
 
-.crate-cloudflare-deployment-description {
-	margin: 1px 0 0;
-	color: var(--text-muted);
-	font-size: var(--font-ui-medium);
-	line-height: 1.5;
-}
-
-.crate-cloudflare-deployment-details {
-	margin: 12px 0 0;
-	padding: 10px 12px 10px 28px;
-	border-radius: var(--radius-s);
-	background: var(--background-secondary);
-	text-align: left;
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
-	line-height: 1.45;
-}
-
-.crate-cloudflare-deployment-actions {
-	display: flex;
-	justify-content: flex-end;
-	width: 100%;
-	margin-top: 18px;
-	padding-top: 14px;
-	border-top: 1px solid var(--background-modifier-border);
-
-	button {
-		min-width: 76px;
-	}
-}
-
-body.reduce-motion .crate-cloudflare-deployment-icon.is-working svg {
-	animation: none;
-}
 
 .crate-cloudflare-server-picker-modal {
 	max-width: 520px;

@@ -38,6 +38,7 @@ function createPlugin(configured = false) {
 		openSettingsTab: vi.fn(),
 		refreshSettingsTab: vi.fn(),
 		cloudflareDeploymentService: {
+			pendingIntent: null as null | 'reset' | 'delete',
 			handleCallback: vi.fn(async () => ({
 				accountName: 'Example account',
 				workerUrl: 'https://crate.example.workers.dev',
@@ -120,6 +121,39 @@ describe('handleCloudflareOAuthProtocol', () => {
 		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'update');
 	});
 
+	it('registers and reconnects a fresh device after resetting an already connected server', async () => {
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const plugin = createPlugin(true);
+		plugin.cloudflareDeploymentService.pendingIntent = 'reset';
+		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
+		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+		expect(plugin.cloudflareDeploymentService.handleCallback).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tokenHash: 'device-token-hash' }), expect.any(Function));
+		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledWith(plugin, 'https://crate.example.workers.dev', 'device-token');
+		const report = (plugin.cloudflareDeploymentService.handleCallback.mock.calls[0] as unknown as [unknown, unknown, (message: string) => void])[2];
+		report('Checking remote files: 10 checked…');
+		expect(progress.setWorking).toHaveBeenCalledWith('Resetting Crate server', 'Checking remote files: 10 checked…');
+		expect(progress.succeed).toHaveBeenCalledWith('Crate server reset', expect.stringContaining('Upload all'));
+		expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
+	});
+
+	it.each([false, true])('offers the saved reset recovery action (resumable: %s)', async (resumable) => {
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const plugin = createPlugin(true);
+		Object.assign(plugin.settings, { cloudflareDeployment: { reset: resumable ? {} : undefined } });
+		plugin.cloudflareDeploymentService.pendingIntent = 'reset';
+		plugin.cloudflareDeploymentService.handleCallback.mockRejectedValue(new Error('Namespace listing incomplete'));
+		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+		expect(progress.fail).toHaveBeenCalledWith(
+			'Server reset failed',
+			'Crate couldn’t finish resetting your Cloudflare server.',
+			[expect.stringContaining(resumable ? 'Resume server reset' : 'Reset server')],
+			expect.objectContaining({ technicalDetails: 'Namespace listing incomplete' }),
+		);
+		const options = progress.fail.mock.calls[0]![3] as { action: { onClick: () => void } };
+		options.action.onClick();
+		expect(plugin.openSettingsTab).toHaveBeenCalledTimes(2);
+	});
+
 	it('uses update-specific recovery copy when an existing server update fails', async () => {
 		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
 		const plugin = createPlugin(true);
@@ -137,6 +171,18 @@ describe('handleCloudflareOAuthProtocol', () => {
 			'Cloudflare upload failed',
 			['Select “Authorize update” in Crate settings to try again.'],
 		);
+	});
+
+	it('finishes deletion without connecting this device or uploading files', async () => {
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const plugin = createPlugin(true);
+		plugin.cloudflareDeploymentService.pendingIntent = 'delete';
+		plugin.cloudflareDeploymentService.handleCallback.mockResolvedValue({ workerUrl: '', accountName: 'Personal', deleted: true } as never);
+		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+		expect(generateSecureToken).not.toHaveBeenCalled();
+		expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
+		expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
+		expect(progress.succeed).toHaveBeenCalledWith('Crate server deleted', expect.stringContaining('local vault files are kept'));
 	});
 
 });

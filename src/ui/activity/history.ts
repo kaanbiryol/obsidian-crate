@@ -13,7 +13,7 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 		const entryEl = timeline.createDiv({ cls: 'crate-history-entry' });
 		if (!entry.success) entryEl.addClass('is-error');
 
-		if (hasFilePaths(entry)) {
+		if (hasFilePaths(entry) || entry.errorCount > 0) {
 			const details = entryEl.createEl('details', { cls: 'crate-history-details', attr: { 'data-history-key': `${entry.timestamp}:${entry.type}` } });
 			const summary = details.createEl('summary', { cls: 'crate-history-card' });
 			renderHistoryHeader(summary, entry, true);
@@ -48,6 +48,14 @@ function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expa
 
 function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry): void {
 	const filesEl = container.createDiv({ cls: 'crate-history-files' });
+	for (const error of entry.errors ?? []) {
+		filesEl.createDiv({ text: error, cls: 'crate-history-summary-error' });
+	}
+	if (entry.errorCount > (entry.errors?.length ?? 0)) {
+		filesEl.createDiv({ text: entry.errors?.length
+			? `Showing ${entry.errors.length} of ${entry.errorCount} errors.`
+			: 'Error details were not saved for this sync. Run sync again to record them.' });
+	}
 	const groups: Array<{ paths: string[]; type: FileCardType }> = [
 		{ paths: entry.uploadedPaths ?? [], type: 'upload' },
 		{ paths: entry.downloadedPaths ?? [], type: 'download' },

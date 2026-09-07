@@ -56,6 +56,7 @@ export interface SyncHistoryEntry {
 	merged: number;
 	deleted: number;
 	errorCount: number;
+	errors?: string[];
 	conflictCount: number;
 	resolvedRaceCount?: number;
 	conflictPaths?: string[];
@@ -113,4 +114,10 @@ export interface PreparedUpload {
 	mtime?: number;
 	contentType?: string;
 	expectedHash?: string | null;
+}
+
+export interface SyncActivityProgress {
+	type: SyncHistoryEntry['type'];
+	current: number;
+	total: number;
 }

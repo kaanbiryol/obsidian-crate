@@ -1,3 +1,4 @@
+import { showSyncErrorNotice } from '../sync-error-notice';
 import { Notice, Setting } from 'obsidian';
 import { openConfirmationModal } from '../confirmation-modal';
 import {
@@ -49,7 +50,7 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 						if (result.success) {
 							new Notice(`Initial sync complete: ${result.uploaded} files uploaded`);
 						} else {
-							new Notice('Initial sync completed with errors');
+							showSyncErrorNotice(plugin, 'Initial sync completed with errors.');
 						}
 					},
 					onError: () => {
@@ -99,7 +100,7 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 						if (result.success) {
 							new Notice(`Force sync complete: ${result.uploaded} uploaded, ${result.deleted} deleted`);
 						} else {
-							new Notice('Force sync completed with errors');
+							showSyncErrorNotice(plugin, 'Force sync completed with errors.');
 						}
 					},
 					onError: () => {
