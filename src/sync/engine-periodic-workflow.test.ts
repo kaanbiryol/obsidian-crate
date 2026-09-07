@@ -36,6 +36,8 @@ function createContext(overrides: Partial<{
 			hasLocalFileChanges: async () => overrides.localFilesChanged ?? false,
 			checkForChanges,
 			sync,
+			onCheckSuccess: vi.fn(),
+			onCheckFailure: vi.fn(),
 		},
 	};
 }
