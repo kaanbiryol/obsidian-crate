@@ -4,8 +4,10 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import {
 	AUTH_TOKEN_KEY,
 	applyConfigFromUrl,
+	finishEnrollment,
 	loadStoredConfig,
 } from '../config';
+import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from '../install-enrollment';
 import { exchangeEnrollmentToken } from '../api';
 import { loadCachedReminderSnapshot } from '../reminder-cache';
 import type { CachedReminderSnapshot, StartTab, StoredConfig } from '../types';
@@ -59,7 +61,9 @@ export function usePwaBootstrap({
 				}
 
 				let nextToken = initialAuthTokenRef.current;
-				if (applied.token) {
+				const fingerprint = applied.token ? await enrollmentFingerprint(applied.token) : null;
+				if (cancelled || !sessionCurrent()) return;
+				if (applied.token && fingerprint && !wasEnrollmentRedeemed(fingerprint)) {
 					nextToken = await exchangeEnrollmentToken(applied.token, nextToken);
 					if (cancelled || !sessionCurrent()) return;
 					const clearing = clearLocalSession();
@@ -67,9 +71,11 @@ export function usePwaBootstrap({
 					await clearing;
 					if (cancelled || !sessionCurrent()) return;
 					localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
+					rememberRedeemedEnrollment(fingerprint);
 					sessionCurrent = capturePwaSession();
 					setAuthToken(nextToken);
 				}
+				finishEnrollment();
 
 				if (!nextToken) {
 					setLoading(false);
