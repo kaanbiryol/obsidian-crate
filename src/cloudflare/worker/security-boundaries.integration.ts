@@ -60,6 +60,8 @@ it('composes browser logout with the real API wrapper and Worker revocation', as
   await handleSubscribe(request('/notifications/subscribe', 'browser-logout', subscription('logout')), env.DB, 'browser-logout');
   let localToken: string | null = 'browser-logout';
   vi.stubGlobal('localStorage', { getItem: () => localToken });
+  vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Macintosh) Version/26.0 Safari/604.1', maxTouchPoints: 0 });
+  vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
   const network = vi.fn(async (path: string, init?: RequestInit) => worker.fetch(new Request(`https://test${path}`, init), env));
   vi.stubGlobal('fetch', network);
   expect(await performPwaLogout({
