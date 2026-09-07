@@ -1,0 +1,7 @@
+# File content verification
+
+Filesystem timestamps and sizes are hints. An external editor or restore tool can change bytes while preserving both. Crate complements file events with a rotating content check during periodic checks and incremental sync. Each check reads at most 32 eligible files with an 8 MiB byte budget; one eligible file larger than that budget is checked alone. Hidden files follow the same rules. The 25 MB sync limit still applies.
+
+At the default check interval, verification progresses while Obsidian remains open and sync is enabled. A 10,000-file vault of small notes takes at most 313 successful checks for a complete rotation; large files, errors, sleep and disabled periodic sync extend that time. The cursor restarts when the plugin reloads. Changed content is recorded as requiring a fresh read, preserving the last shared hash and revision across a restart until normal conflict-aware reconciliation handles it.
+
+Run **Crate: Verify all synced files** from the command palette for an immediate full content check. This reads every eligible file and uses the normal reconciliation and conflict rules. Full reconciliation after an expired remote cursor also reads every eligible file. Verification reports read failures; unreadable files never serve as evidence of a deletion. Keep normal vault backups for restoration and review any conflicts reported by the check.

@@ -26,6 +26,16 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 
 export function registerSyncCommands(plugin: CratePlugin): void {
 	plugin.addCommand({
+		id: 'verify-all-synced-files',
+		name: 'Verify all synced files',
+		checkCallback: checking => {
+			const available = plugin.syncRuntime.isConfigured();
+			if (!checking && available) void runSyncNow(plugin, true);
+			return available;
+		},
+	});
+
+	plugin.addCommand({
 		id: 'sync-now',
 		name: 'Sync now',
 		checkCallback: (checking) => {
@@ -70,12 +80,13 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 	});
 }
 
-async function runSyncNow(plugin: CratePlugin): Promise<void> {
+async function runSyncNow(plugin: CratePlugin, verifyAll = false): Promise<void> {
 	try {
-		const result = await plugin.syncRuntime.sync();
+		if (verifyAll) new Notice('Verifying file contents...');
+		const result = await (verifyAll ? plugin.syncRuntime.verifyAllFiles() : plugin.syncRuntime.sync());
 		if (!result.success) {
 			showSyncErrorNotice(plugin, 'Sync completed with errors.');
-		}
+		} else if (verifyAll) new Notice('File verification complete.');
 		notifyConflicts(result.conflicts);
 	} catch (error) {
 		new Notice(`Sync failed: ${errorMessage(error)}`);
