@@ -24,6 +24,7 @@ export interface SyncQueueControllerContext {
 	isDestroyed(): boolean;
 	currentStatus(): SyncState['status'];
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
+	assertLocalFileAbsent(path: string): Promise<void>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	getDebounceDelayMs(): number;
@@ -128,6 +129,7 @@ export class SyncQueueController {
 			currentStatus: () => this.context.currentStatus(),
 			markdownBaseCache: this.context.markdownBaseCache,
 			prepareUploadFromPath: (path: string) => this.context.prepareUploadFromPath(path),
+			assertLocalFileAbsent: (path: string) => this.context.assertLocalFileAbsent(path),
 			runConcurrent: <T>(tasks: Array<() => Promise<T>>, concurrency: number) =>
 				this.context.runConcurrent(tasks, concurrency),
 			getModifiedIso: (path: string, fallbackMtime?: number) =>

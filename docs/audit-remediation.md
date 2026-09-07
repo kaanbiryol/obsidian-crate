@@ -10,7 +10,7 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | --- | --- | --- |
 | F01 | Preserve pending PWA work through involuntary authentication changes; isolate renewed scopes | In progress |
 | F02 | Conserve current Markdown during stale/ambiguous reminder reordering | Fixed: mutation-time ownership/conservation checks; 9 plugin integration regressions and 5 Worker reorder checks pass |
-| F03 | Reject incomplete local scans and revalidate absence before remote deletion | In progress |
+| F03 | Reject incomplete local scans and revalidate absence before remote deletion | Fixed: full/force/cursor-fallback failures stop safely; all delete send paths recheck local state; 19 new regressions, targeted lint and typecheck pass |
 | F04 | Invalidate all checkpoint generations and isolate deployment authority during reconfiguration | Pending |
 | F05 | Preserve stable reminder identity during project moves | Pending |
 | F06 | Decode persisted dates deterministically across time and timezone changes | Pending |

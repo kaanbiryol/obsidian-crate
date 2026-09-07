@@ -50,6 +50,7 @@ import { createSyncFailureResult } from './sync-result';
 import type { DiffApplyOutcome } from './transfer-types';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import { mergeSyncResults } from './sync-result';
+import { assertLocalFileAbsent } from './local-absence';
 
 const logger = createLogger('SyncEngine');
 
@@ -117,6 +118,7 @@ export class SyncEngine {
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			currentStatus: () => this.state.status,
 			prepareUploadFromPath: (path: string) => this.prepareUploadFromPath(path),
+			assertLocalFileAbsent: (path: string) => assertLocalFileAbsent(this.vault, path),
 			runConcurrent: this.runConcurrent.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
 			getDebounceDelayMs: () => (this.settings.debounceDelay ?? 5) * 1000,
