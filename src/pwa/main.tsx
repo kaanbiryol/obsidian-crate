@@ -29,6 +29,8 @@ import { useReminderSync } from './hooks/useReminderSync';
 import { useReminderMutations } from './hooks/useReminderMutations';
 import { useSheetTransition } from './hooks/useSheetTransition';
 import { useToast } from './hooks/useToast';
+import { useHomeScreenInstall } from './hooks/useHomeScreenInstall';
+import { HomeScreenInstallPrompt } from './components/HomeScreenInstall';
 import { loadPwaPreferences, savePwaPreferences, type PwaPreferences } from './preferences';
 import { isInitialPwaContentReady } from './initial-content-readiness';
 import { toSharedReminder } from './reminder-list-state';
@@ -61,6 +63,7 @@ function App() {
 	const [modal, setModal] = useState<ModalState | null>(null);
 	const [reorderDragging, setReorderDragging] = useState(false);
 	const { toast, showToast } = useToast();
+	const homeScreenInstall = useHomeScreenInstall();
 	const { updating, update } = usePwaUpdate(showToast);
 	const handleUnauthorizedRef = useRef<() => void>(() => undefined);
 	const finalizeModalClose = useCallback(() => setModal(null), []);
@@ -326,7 +329,11 @@ function App() {
 							showNotificationPrompt={canShowNotificationPrompt && !isProjectDetail}
 							onReload={update}
 							onEnableNotifications={enablePushNotifications}
-						/>
+						>
+							{homeScreenInstall.showPrompt && !isProjectDetail && (
+								<HomeScreenInstallPrompt onShowSteps={toggleSettings} onDismiss={homeScreenInstall.dismiss} />
+							)}
+						</PwaTopNotices>
 					</>
 				) : undefined}
 				suppressFab={Boolean(modal) || settingsOpen || readOnly}
@@ -338,6 +345,7 @@ function App() {
 				{settingsOpen && (
 					<Suspense fallback={null}><SettingsSheet
 						config={config}
+						homeScreenPlatform={homeScreenInstall.platform}
 						defaultScreen={preferences.defaultScreen}
 						onPreferencesChange={updatePreferences}
 						push={push}

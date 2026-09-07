@@ -1,7 +1,8 @@
-import { Modal, Setting, type App } from 'obsidian';
+import { Setting, type App } from 'obsidian';
+import { SharedModal } from './shared/SharedModal';
 import type { DiscoveredCloudflareDeployment } from '../cloudflare/deployment-discovery';
 
-class CloudflareServerPickerModal extends Modal {
+class CloudflareServerPickerModal extends SharedModal {
 	private settled = false;
 
 	constructor(
@@ -14,8 +15,8 @@ class CloudflareServerPickerModal extends Modal {
 
 	onOpen(): void {
 		this.modalEl.addClass('crate-cloudflare-server-picker-modal');
-		this.setTitle('Choose a Crate server');
-		this.contentEl.createEl('p', {
+		this.openLayout('Choose a Crate server');
+		this.bodyEl.createEl('p', {
 			text: 'This Cloudflare account has more than one Crate server. Select the one for this vault.',
 			cls: 'crate-cloudflare-server-picker-description',
 		});
@@ -24,7 +25,7 @@ class CloudflareServerPickerModal extends Modal {
 			const modified = deployment.modifiedOn
 				? `Updated ${new Date(deployment.modifiedOn).toLocaleString()}`
 				: 'Existing Cloudflare deployment';
-			new Setting(this.contentEl)
+			new Setting(this.bodyEl)
 				.setName(deployment.metadata.workerName)
 				.setDesc(modified)
 				.addButton(button => button
@@ -35,7 +36,7 @@ class CloudflareServerPickerModal extends Modal {
 	}
 
 	onClose(): void {
-		this.contentEl.empty();
+		super.onClose();
 		if (!this.settled) {
 			this.settled = true;
 			this.resolve(null);

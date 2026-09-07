@@ -1,0 +1,58 @@
+@mixin styles {
+	.pwa-home-screen-prompt {
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+		padding: 12px 8px 4px 12px;
+		border: 1px solid var(--background-modifier-border);
+		border-radius: 12px;
+		background: var(--background-secondary);
+	}
+
+	.pwa-home-screen-prompt__copy {
+		display: flex;
+		flex: 1;
+		min-width: 0;
+		flex-direction: column;
+		gap: 3px;
+		font-size: 12px;
+		line-height: 1.4;
+		color: var(--text-muted);
+
+		strong { font-size: 13px; color: var(--text-normal); }
+	}
+
+	.pwa-home-screen-prompt__action {
+		align-self: flex-start;
+		min-height: 44px;
+		padding: 0 8px;
+		margin-left: -8px;
+		color: var(--accent);
+		font-size: 13px;
+		font-weight: 600;
+	}
+
+	.pwa-home-screen-prompt__dismiss {
+		display: grid;
+		place-items: center;
+		flex: 0 0 44px;
+		width: 44px;
+		height: 44px;
+		margin-top: -8px;
+		color: var(--text-muted);
+	}
+
+	.pwa-home-screen-instructions {
+		padding: 14px;
+		font-size: 13px;
+		line-height: 1.5;
+		color: var(--text-muted);
+
+		p { margin: 0; }
+		ol { margin: 12px 0; padding-left: 22px; list-style: decimal; }
+		li { padding-left: 3px; }
+		li + li { margin-top: 10px; }
+		strong { color: var(--text-normal); font-weight: 600; }
+		.pwa-home-screen-instructions__hint { font-size: 12px; }
+	}
+}

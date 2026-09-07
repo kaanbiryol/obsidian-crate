@@ -1,5 +1,6 @@
 @use "../../ui/shared/styles/controls";
 @use "../../ui/shared/styles/modal-header";
+@use "../../ui/shared/styles/modal-layout";
 @use "../../ui/shared/styles/delete-confirmation";
 @use "../../reminders/ui/shared/styles/editor-fields";
 @use "../../reminders/ui/shared/styles/editor-actions";
@@ -16,11 +17,13 @@
 @use './mobile-layout';
 @use './sheet-headers';
 @use './navigation';
+@use './home-screen-install';
 
 .crate-reminders-ui {
 	@include tokens.styles;
 	@include controls.styles;
 	@include modal-header.styles;
+	@include modal-layout.styles;
 	@include delete-confirmation.styles;
 	@include editor-fields.styles;
 	@include editor-actions.styles;
@@ -36,4 +39,5 @@
 	@include mobile-layout.styles;
 	@include sheet-headers.styles;
 	@include navigation.styles;
+	@include home-screen-install.styles;
 }

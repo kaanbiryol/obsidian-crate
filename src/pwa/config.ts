@@ -1,4 +1,5 @@
 import type { StartTab, StoredConfig } from './types';
+import { manifestHrefForUrl } from '../cloudflare/worker/pwa/pwa-params';
 
 export const AUTH_TOKEN_KEY = 'crate-reminders-auth-token';
 const CONFIG_KEY = 'crate-reminders-config';
@@ -126,6 +127,13 @@ export function applyConfigFromUrl(config: StoredConfig): {
 } {
 	const params = currentQueryParams();
 	const token = enrollmentTokenFromParams(params);
+	// A service-worker cache hit supplies a generic shell, so its manifest
+	// cannot carry this QR link's install token. Restore it before URL cleanup;
+	// Safari's session storage is not the Home Screen app's enrollment channel.
+	if (!isStandaloneApp()) {
+		const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+		if (manifest) manifest.href = manifestHrefForUrl(window.location.href);
+	}
 	clearEnrollmentTokensFromAddressBar();
 	const nextConfig = { ...config };
 	const folderPath = params.get('folder');

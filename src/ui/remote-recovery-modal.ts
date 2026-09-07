@@ -1,4 +1,5 @@
-import { Modal, Notice, Setting, type App } from 'obsidian';
+import { Notice, Setting, type App } from 'obsidian';
+import { SharedModal } from './shared/SharedModal';
 import type { RemoteFileVersion } from '../protocol/sync-types';
 import type { SyncRuntime } from '../sync/runtime';
 import { openConfirmationModal } from './confirmation-modal';
@@ -9,46 +10,50 @@ function formatSize(bytes: number): string {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
-class RemoteRecoveryModal extends Modal {
+class RemoteRecoveryModal extends SharedModal {
+	private closed = false;
 	constructor(app: App, private readonly runtime: SyncRuntime) {
 		super(app);
 	}
 
 	onOpen(): void {
-		this.setTitle('Restore remote file');
-		this.contentEl.createEl('p', { text: 'Loading retained file versions…' });
+		this.closed = false;
+		this.openLayout('Restore remote file');
+		this.bodyEl.createEl('p', { text: 'Loading retained file versions…' });
 		void this.load();
 	}
 
 	onClose(): void {
-		this.contentEl.empty();
+		this.closed = true;
+		super.onClose();
 	}
 
 	private async load(): Promise<void> {
 		try {
 			const versions = await this.runtime.listRecentFileVersions();
-			this.renderVersions(versions);
+			if (!this.closed) this.renderVersions(versions);
 		} catch (error) {
-			this.contentEl.empty();
-			this.contentEl.createEl('p', {
+			if (this.closed) return;
+			this.bodyEl.empty();
+			this.bodyEl.createEl('p', {
 				text: `Could not load retained files: ${error instanceof Error ? error.message : String(error)}`,
 			});
 		}
 	}
 
 	private renderVersions(versions: RemoteFileVersion[]): void {
-		this.contentEl.empty();
+		this.bodyEl.empty();
 		if (versions.length === 0) {
-			this.contentEl.createEl('p', { text: 'No restorable remote files were found.' });
+			this.bodyEl.createEl('p', { text: 'No restorable remote files were found.' });
 			return;
 		}
 
-		this.contentEl.createEl('p', {
+		this.bodyEl.createEl('p', {
 			text: 'Crate retains replaced and deleted remote files for 30 days.',
 		});
 		for (const version of versions) {
 			const created = new Date(version.created_at).toLocaleString();
-			new Setting(this.contentEl)
+			new Setting(this.bodyEl)
 				.setName(version.path)
 				.setDesc(`${version.reason === 'deleted' ? 'Deleted' : 'Replaced'} ${created} · ${formatSize(version.size)}`)
 				.addButton(button => button

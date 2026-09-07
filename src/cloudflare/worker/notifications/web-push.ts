@@ -57,7 +57,9 @@ export async function sendPushNotificationWithoutContact(
 
 	return fetch(new Request(subscription.endpoint, {
 		method: 'POST',
-		redirect: 'error',
+		// Workers only support follow/manual. Return redirects to the caller's
+		// failure handling without forwarding the payload or VAPID credentials.
+		redirect: 'manual',
 		signal: AbortSignal.timeout(10_000),
 		headers,
 		body: encryptedPayload,

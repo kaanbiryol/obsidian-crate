@@ -46,12 +46,8 @@ body.reduce-motion .crate-action-progress {
 }
 
 /* QR code modal */
-.crate-qr-modal {
+.modal.crate-qr-modal {
 	max-width: 360px;
-}
-
-.crate-qr-modal .modal-content h2 {
-	margin: 0 0 4px;
 }
 
 .crate-qr-desc {
@@ -66,8 +62,8 @@ body.reduce-motion .crate-action-progress {
 }
 
 .crate-qr-wrapper svg {
-	width: 280px;
-	height: 280px;
+	width: min(280px, 100%);
+	height: auto;
 	border-radius: var(--image-radius, var(--radius-s));
 }
 

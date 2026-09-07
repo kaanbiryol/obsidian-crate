@@ -1,4 +1,4 @@
-import { TriangleAlert } from 'lucide-react';
+import { LoaderCircle, TriangleAlert } from 'lucide-react';
 import type { ThemeIconProps } from '@/reminders/components/theme-icon';
 import React, { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -14,6 +14,7 @@ import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
 import { ModalLayout } from '@/ui/shared/ModalLayout';
 import { StatusContent } from '@/ui/shared/StatusContent';
 import { Button } from '@/ui/shared/Button';
+import { DeleteConfirmationModal } from '@/reminders/components/DeleteConfirmationModal';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 import { ReminderCard } from '@/reminders/components/ReminderCard';
 import { PWA_STYLES, PWA_LIGHT_THEME_STYLES } from '@/cloudflare/worker/pwa/styles';
@@ -34,6 +35,7 @@ style.textContent = (host === 'plugin' ? pluginStyles : PWA_STYLES + (isDark ? '
 document.head.append(style);
 
 function GalleryIcon(props: ThemeIconProps) {
+  if (props.id === 'loader-circle') return <LoaderCircle size={18} aria-hidden="true" />;
   return props.id === 'triangle-alert' ? <TriangleAlert size={18} aria-hidden="true" /> : <PwaThemeIcon {...props} />;
 }
 
@@ -48,13 +50,15 @@ function Gallery() {
   const richRef = useRef<RichTextInputHandle>(null);
   const noop = () => setResult('Closed');
   let content: React.ReactNode;
-  if (scene === 'status') content = <ModalLayout title="Server reset failed" onClose={noop} footer={<div className="crate-status-actions"><Button onClick={noop}>Close</Button><Button className="mod-cta" onClick={() => setResult('Settings opened')}>Open settings</Button></div>}><StatusContent state="error" description="Crate couldn’t finish resetting your Cloudflare server." details={['In Crate settings → Troubleshooting, select “Resume server reset” to try again.']} technicalDetails="Could not verify the complete Durable Object namespace listing." /></ModalLayout>;
+  if (scene === 'delete') content = <DeleteConfirmationModal isOpen useNativeDialog onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
+  else if (scene === 'progress') content = <ModalLayout title="Updating Crate server" onClose={noop}><StatusContent state="working" description="Checking your Cloudflare account…" /></ModalLayout>;
+  else if (scene === 'status') content = <ModalLayout title="Server reset failed" onClose={noop} footer={<div className="crate-status-actions"><Button onClick={noop}>Close</Button><Button className="mod-cta" onClick={() => setResult('Settings opened')}>Open settings</Button></div>}><StatusContent state="error" description="Crate couldn’t finish resetting your Cloudflare server." details={['In Crate settings → Troubleshooting, select “Resume server reset” to try again.']} technicalDetails="Could not verify the complete Durable Object namespace listing." /></ModalLayout>;
   else if (scene === 'project') content = <ProjectPickerContent isOpen projects={projects} project={project} defaultProject="Inbox" isDark={isDark} onSelectProject={setProject} onClose={noop} />;
   else if (scene === 'weekly' || scene === 'monthly') content = <RecurrencePickerContent state={recurrence} onChange={patch => setRecurrence(current => ({ ...current, ...patch }))} isDark={isDark} animationsEnabled={false} canRemove onClose={noop} onDone={() => setResult('Applied')} onRemove={() => setResult('Removed')} />;
   else if (scene === 'editor') content = <><ModalHeader title="New reminder" closeLabel="Close reminder editor" onClose={noop} action={{ label: 'Add', onClick: () => setResult('Saved') }} /><div className="reminder-modal-body"><ReminderEditorFields content={title} onContentChange={setTitle} description={description} onDescriptionChange={setDescription} allowAutoFocus={false} projects={projects} textareaRef={titleRef} richTextInputRef={richRef} /><ReminderActionChips dueDate={null} project={project} defaultProject="Inbox" priority={1} onOpenDatePicker={noop} onOpenProjectPicker={noop} onOpenRecurrencePicker={noop} onTogglePriority={noop} /></div></>;
   else if (scene === 'cards') content = <div className="reminders-view is-primary"><ReminderCard reminder={{ id: '1', content: 'Review the shared UI', description, completed: false, project: 'Work', priority: 1, dueDate: '2026-09-04' }} colorScheme={theme} animationConfig={{ enabled: false }} /><ReminderCard reminder={{ id: '2', content: 'Completed reminder', completed: true, project: 'Inbox' }} colorScheme={theme} animationConfig={{ enabled: false }} /></div>;
   else content = <DatePickerContent currentDate={date ? new Date(`${date}T09:30:00`) : null} hasTime isDark={isDark} commitDateOnChange={host === 'pwa'} onClose={noop} onSelectPreset={preset => setResult(preset)} onDateChange={value => { setDate(value); setResult(value); }} onTimeChange={(hour, minute) => setResult(`${hour}:${minute}`)} onTimeClear={() => setResult('Cleared time')} onRemove={() => setResult('Removed')} />;
-  return <ThemeIconProvider renderer={GalleryIcon}><div className={`crate-reminders-ui reminders-shadow-root ${host === 'pwa' ? 'pwa-shadow-root' : ''}`}><main data-testid="visual-surface" className={`visual-surface ${host === 'pwa' ? scene === 'editor' ? 'modal-card pwa-reminder-editor' : 'pwa-picker-sheet' : 'base-modal-surface'} ${isDark ? 'dark' : ''}`}><div className="visual-content">{content}</div></main><output data-testid="result">{result}</output></div></ThemeIconProvider>;
+  return <ThemeIconProvider renderer={GalleryIcon}><div className={`crate-reminders-ui reminders-shadow-root ${host === 'pwa' ? 'pwa-shadow-root' : ''}`}><main data-testid="visual-surface" className={`visual-surface ${['status', 'progress'].includes(scene) ? `modal crate-cloudflare-deployment-modal ${scene === 'progress' ? 'is-working' : ''}` : ''} ${host === 'pwa' ? scene === 'editor' ? 'modal-card pwa-reminder-editor' : 'pwa-picker-sheet' : 'base-modal-surface'} ${isDark ? 'dark' : ''}`}><div className="visual-content">{content}</div></main><output data-testid="result">{result}</output></div></ThemeIconProvider>;
 }
 
 createRoot(document.getElementById('app')!).render(<Gallery />);

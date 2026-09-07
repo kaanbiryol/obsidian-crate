@@ -56,27 +56,78 @@
 	pointer-events: auto;
 }
 
-.crate-confirmation-modal {
-	max-width: 520px;
+.modal.crate-shared-modal {
+	width: min(440px, calc(100vw - 32px));
+	height: auto;
+	min-height: 0;
+	padding: 0;
+	overflow: hidden;
+	> .modal-header { display: none; }
+	.modal-content { margin: 0; padding: 0; max-height: calc(100dvh - 80px); overflow-y: auto; }
+	.crate-modal-body { padding: 16px; }
+	.reminder-modal-header-title { white-space: normal; }
+	.setting-item-control button {
+		background: var(--interactive-normal);
+		color: var(--text-normal);
+		box-shadow: var(--input-shadow);
+		&:hover { background: var(--interactive-hover); }
+		&.mod-cta { background: var(--interactive-accent); color: var(--text-on-accent); }
+		&.mod-warning { background: color-mix(in srgb, var(--text-error) 10%, transparent); color: var(--text-error); }
+	}
 }
 
-.crate-confirmation-message {
-	margin-top: 0;
-}
+.modal.crate-confirmation-modal {
+	width: min(380px, calc(100vw - 32px));
+	max-width: 380px;
+	height: auto;
+	min-height: 0;
+	padding: 0;
 
-.crate-confirmation-details {
-	margin: 0 0 16px 20px;
-	color: var(--text-muted);
-}
+	.crate-confirmation-message {
+		margin: 0;
+		font-size: var(--font-ui-medium);
+		line-height: 1.5;
+		overflow-wrap: anywhere;
+	}
 
-.crate-confirmation-actions .setting-item-control {
-	gap: 8px;
+	.crate-confirmation-details {
+		margin: 6px 0 0;
+		color: var(--text-muted);
+		font-size: var(--font-ui-small);
+		line-height: 1.5;
+		overflow-wrap: anywhere;
+	}
+
+	ul.crate-confirmation-details { padding-left: 18px; }
+
+	.crate-confirmation-actions {
+		margin-top: 20px;
+		padding: 0;
+		border: 0;
+
+		.setting-item-info { display: none; }
+		.setting-item-control {
+			width: 100%;
+			justify-content: flex-end;
+			flex-wrap: wrap;
+			gap: 8px;
+		}
+		button {
+			min-height: 32px;
+			height: auto;
+			padding: 6px 12px;
+			font-size: var(--font-ui-small);
+			white-space: normal;
+		}
+	}
 }
 
 /* Cloudflare deployment progress */
-.crate-cloudflare-deployment-modal {
-	width: min(440px, calc(100vw - 32px));
-	max-width: 440px;
+.modal.crate-cloudflare-deployment-modal {
+	width: min(380px, calc(100vw - 32px));
+	max-width: 380px;
+	height: auto;
+	min-height: 0;
 	padding: 0;
 	overflow: hidden;
 
@@ -92,27 +143,22 @@
 		overflow-y: auto;
 	}
 
-	&.is-working .crate-modal-body {
-		box-sizing: border-box;
-		height: 190px;
-		display: flex;
-		flex-direction: column;
+	.crate-modal-body {
+		padding: 16px;
 	}
 
-	&.is-working .crate-status-content {
-		flex: 1;
-		min-height: 0;
-		overflow-y: auto;
+	.crate-status-content {
 		overflow-wrap: anywhere;
 	}
 
 	&.is-working .crate-status-guidance {
-		flex: 0 0 auto;
-		min-height: 3em;
+		// Align the secondary line with the message, beside the 18px icon + 10px gap.
+		margin: 6px 0 0 28px;
 		font-variant-numeric: tabular-nums;
 	}
 
-	.reminder-modal-header { padding: 10px 12px; }
+	.crate-modal-footer { padding: 10px 16px; }
+	.reminder-modal-header { padding: 4px 8px; }
 	.reminder-modal-header-title { white-space: normal; }
 }
 

@@ -69,6 +69,7 @@ export function PwaTopNotices({
 	showNotificationPrompt,
 	onReload,
 	onEnableNotifications,
+	children,
 }: {
 	statusText: string | null;
 	statusKind: DataMode | 'offline';
@@ -77,9 +78,10 @@ export function PwaTopNotices({
 	showNotificationPrompt: boolean;
 	onReload: () => void;
 	onEnableNotifications: () => void;
+	children?: React.ReactNode;
 }) {
 	const showStatusLine = Boolean(statusText && statusKind !== 'live');
-	const showNotices = showStatusLine || updateAvailable || showNotificationPrompt;
+	const showNotices = showStatusLine || updateAvailable || showNotificationPrompt || children;
 	if (!showNotices) return null;
 
 	return (
@@ -93,6 +95,7 @@ export function PwaTopNotices({
 				</div>
 			)}
 			{showStatusLine && <div className={`pwa-status-line is-${statusKind}`} role="status">{statusText}</div>}
+			{children}
 			{showNotificationPrompt && (
 				<div className="pwa-notification-prompt">
 					<div className="pwa-notification-prompt__icon">

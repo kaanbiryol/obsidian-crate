@@ -31,11 +31,35 @@ The individual size gates are also available as `npm run size-check:plugin` and 
 npx --yes wrangler@4.123.0 deploy --dry-run
 ```
 
+## Test vault setup
+
+Run `npm run vault:setup` to copy the Markdown baseline from `fixtures/test-vault/`
+into the ignored root `test-vault/`. Existing notes are preserved, so it is safe
+to repeat setup. This command always targets the repository's `test-vault/`;
+`OBSIDIAN_TEST_VAULT` only changes the development build's install destination.
+
+To restore the baseline notes, close the test vault in Obsidian and run:
+
+```bash
+npm run vault:setup -- --reset
+```
+
+Reset overwrites the sample notes, discarding edits to those notes. It preserves
+extra files and `.obsidian/`, including installed plugins, credentials, and sync
+state. If sync is configured, the restored notes are ordinary local changes and
+may sync when the vault is reopened.
+
+Keep reusable sample changes in `fixtures/test-vault/`. Only Markdown demo notes
+belong there; do not copy `.obsidian/`, credentials, caches, or personal content
+from a working vault. Fixed dates exercise overdue reminders; relative dates
+exercise Today and Upcoming. The nested projects, recurrence, descriptions,
+completed reminders, and sync walkthroughs provide the other demo scenarios.
+
 ## Manual Obsidian Smoke Test
 
 Run this before merging changes that touch sync orchestration, reminder parsing, markdown scanning, shadow DOM rendering, or reminder view styles:
 
-- Start `npm run dev`. Successful builds are copied to `test-vault/.obsidian/plugins/crate/` automatically.
+- Run `npm run vault:setup`, then start `npm run dev`. Successful builds are copied to `test-vault/.obsidian/plugins/crate/` automatically.
 - Open `test-vault` as an Obsidian vault. Enable Crate once from **Settings → Community plugins**, then reload the plugin after each build.
 - Open the Reminders view and verify Inbox, Today, Upcoming, Browse, and a project detail view render in dark and light themes.
 - Create, edit, complete, reorder, and delete a reminder, including one with a date, priority, project, description, and recurrence.

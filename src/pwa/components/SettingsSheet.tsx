@@ -14,9 +14,12 @@ import { useDialogFocus } from '../hooks/useDialogFocus';
 import type { PwaThemePreference } from '../theme';
 import type { PushState, StoredConfig } from '../types';
 import { PwaModalSheet } from './PwaModalSheet';
+import { HomeScreenInstallInstructions } from './HomeScreenInstall';
+import type { HomeScreenPlatform } from '../hooks/useHomeScreenInstall';
 
 export function SettingsSheet({
 	config,
+	homeScreenPlatform = null,
 	defaultScreen,
 	onPreferencesChange,
 	push,
@@ -30,6 +33,7 @@ export function SettingsSheet({
 	onLogout,
 }: {
 	config: StoredConfig;
+	homeScreenPlatform?: HomeScreenPlatform | null;
 	defaultScreen: PwaPreferences['defaultScreen'];
 	onPreferencesChange: (patch: Partial<PwaPreferences>) => void;
 	push: PushState;
@@ -68,6 +72,7 @@ export function SettingsSheet({
 					onClose={onClose}
 				/>
 				<div className="settings-panel">
+					{homeScreenPlatform && <HomeScreenInstallInstructions platform={homeScreenPlatform} />}
 					<section className="settings-panel__section" aria-labelledby="settings-appearance-title">
 						<h3 id="settings-appearance-title" className="settings-panel__title">Appearance</h3>
 						<div className="settings-group">
@@ -148,6 +153,8 @@ export function SettingsSheet({
 								</div>
 								{push.subscribed ? (
 									<span className="settings-status is-success"><Check size={12} /> On</span>
+								) : homeScreenPlatform === 'ios' ? (
+									<span className="settings-status">Install first</span>
 								) : push.supported ? (
 									<Button className="settings-action-button" type="button" data-action="enable-push" onClick={onEnablePush}>
 										Enable
