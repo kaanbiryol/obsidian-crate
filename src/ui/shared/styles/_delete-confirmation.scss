@@ -34,28 +34,15 @@
   }
 }
 
-.delete-confirmation-surface {
+.base-modal-surface.delete-confirmation-surface {
   max-width: 400px;
-  padding: var(--size-4-4, 16px);
+  padding: 0;
   border: var(--crate-modal-border-width) solid var(--crate-modal-border-color);
   border-radius: var(--radius-m, var(--crate-radius-control));
   background: var(--crate-modal-bg);
   box-shadow: var(--crate-elevation-sheet);
   color: var(--text-normal);
   font-family: var(--reminder-font-ui);
-}
-
-.delete-confirmation-copy {
-  padding-bottom: var(--size-4-4, 16px);
-}
-
-.delete-confirmation-title {
-  margin: 0 0 var(--size-2-1, 4px);
-  color: var(--text-normal);
-  font-size: var(--reminder-font-base);
-  font-weight: var(--reminder-font-weight-semibold);
-  line-height: var(--reminder-line-height-normal);
-  text-align: start;
 }
 
 .delete-confirmation-message {

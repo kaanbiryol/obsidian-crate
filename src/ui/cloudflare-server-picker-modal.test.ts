@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	MockModal,
@@ -5,6 +7,13 @@ import {
 	createObsidianUiModule,
 	resetObsidianUiMocks,
 } from '../test/fakes/obsidian-ui';
+
+vi.mock('react-dom/client', () => ({
+	createRoot: (element: { textContent: string }) => ({
+		render: (node: ReactNode) => { element.textContent = renderToStaticMarkup(node); },
+		unmount: vi.fn(),
+	}),
+}));
 
 afterEach(() => {
 	resetObsidianUiMocks();
@@ -27,6 +36,7 @@ describe('selectCloudflareServer', () => {
 
 		const result = selectCloudflareServer({} as never, [first, second] as never);
 
+		expect(MockModal.instances[0]?.contentEl.collectText()).toContain('reminder-modal-header');
 		expect(MockModal.instances[0]?.titleEl.textContent).toBe('Choose a Crate server');
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
 			'crate-0123456789abcdef',

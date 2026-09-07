@@ -33,6 +33,9 @@ interface BaseModalProps {
     ariaLabel?: string;
     /** ID of an element that labels the dialog surface. */
     ariaLabelledBy?: string;
+    ariaDescribedBy?: string;
+    role?: 'dialog' | 'alertdialog';
+    onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
 }
 
 // Swipe-to-dismiss threshold constants
@@ -67,6 +70,9 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     disableSwipeToDismiss,
     ariaLabel,
     ariaLabelledBy,
+    ariaDescribedBy,
+    role = 'dialog',
+    onKeyDown,
 }) => {
     const isAnimationEnabled = animationConfig.enabled && !useObsidianReducedMotion();
     const isBottomSheet = variant === 'bottom-sheet';
@@ -211,10 +217,12 @@ export const BaseModal: React.FC<BaseModalProps> = ({
                             y: swipeEnabled ? dragY : undefined
                         }}
                         className={`${modalBaseClass} ${className}`}
-                        role="dialog"
+                        role={role}
                         aria-modal="true"
                         aria-label={ariaLabelledBy ? undefined : ariaLabel}
                         aria-labelledby={ariaLabelledBy}
+                        aria-describedby={ariaDescribedBy}
+                        onKeyDown={onKeyDown}
                         tabIndex={-1}
                         // Prevent taps on content from closing the modal
                         onTouchStart={(e) => e.stopPropagation()}

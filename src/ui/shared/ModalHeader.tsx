@@ -16,6 +16,7 @@ interface ModalHeaderAction {
 
 interface ModalHeaderProps {
     title?: string;
+    titleId?: string;
     closeLabel: string;
     onClose: () => void;
     action?: ModalHeaderAction;
@@ -33,6 +34,7 @@ interface ModalHeaderProps {
  */
 export const ModalHeader: React.FC<ModalHeaderProps> = ({
     title,
+    titleId,
     closeLabel,
     onClose,
     action,
@@ -56,7 +58,7 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
         </div>
 
         <div className="reminder-modal-header-copy">
-            {title && <h2 className="reminder-modal-header-title" aria-live={titleLive}>{title}</h2>}
+            {title && <h2 id={titleId} className="reminder-modal-header-title" aria-live={titleLive}>{title}</h2>}
         </div>
 
         <div className="reminder-modal-header-side is-right">

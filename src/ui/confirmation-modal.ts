@@ -1,4 +1,5 @@
-import { Modal, Setting, type App } from 'obsidian';
+import { Setting, type App } from 'obsidian';
+import { SharedModal } from './shared/SharedModal';
 
 export interface ConfirmationModalOptions {
 	title: string;
@@ -9,7 +10,7 @@ export interface ConfirmationModalOptions {
 	warning?: boolean;
 }
 
-class ConfirmationModal extends Modal {
+class ConfirmationModal extends SharedModal {
 	private readonly options: ConfirmationModalOptions;
 	private readonly resolve: (confirmed: boolean) => void;
 	private settled = false;
@@ -21,19 +22,22 @@ class ConfirmationModal extends Modal {
 	}
 
 	onOpen(): void {
-		const { contentEl, modalEl } = this;
+		const { modalEl } = this;
 		const { title, message, details, confirmText, cancelText = 'Cancel', warning = false } = this.options;
 
 		modalEl.addClass('crate-confirmation-modal');
+		this.openLayout(title);
+		const contentEl = this.bodyEl;
 		contentEl.addClass('crate-confirmation-body');
-		this.setTitle(title);
 
 		contentEl.createEl('p', {
 			text: message,
 			cls: 'crate-confirmation-message',
 		});
 
-		if (details && details.length > 0) {
+		if (details?.length === 1) {
+			contentEl.createEl('p', { text: details[0], cls: 'crate-confirmation-details' });
+		} else if (details && details.length > 1) {
 			const detailList = contentEl.createEl('ul', {
 				cls: 'crate-confirmation-details',
 			});
@@ -59,7 +63,7 @@ class ConfirmationModal extends Modal {
 	}
 
 	onClose(): void {
-		this.contentEl.empty();
+		super.onClose();
 		if (!this.settled) {
 			this.resolve(false);
 			this.settled = true;

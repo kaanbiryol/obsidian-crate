@@ -169,11 +169,16 @@ Crate supports only the current prerelease formats. Provisioning accepts an empt
 
 ## Development
 
-Run the dev watcher:
+Create the local test vault from the versioned sample notes, then run the dev watcher:
 
 ```bash
+npm run vault:setup
 npm run dev
 ```
+
+The baseline lives in `fixtures/test-vault/`; the working `test-vault/` stays
+ignored by Git. Setup adds missing notes and preserves existing edits. See
+[test vault setup](docs/testing.md#test-vault-setup) for restoring sample notes.
 
 Each successful development build is also installed into
 `test-vault/.obsidian/plugins/crate/`. Open `test-vault` as an Obsidian vault,

@@ -1,0 +1,10 @@
+@mixin styles {
+  .crate-modal-body {
+    padding: 20px;
+  }
+
+  .crate-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+}
