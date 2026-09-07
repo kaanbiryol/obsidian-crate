@@ -1,5 +1,6 @@
 import { TFile, type App } from 'obsidian';
 import { parseCheckboxLine } from '../utils/checkboxParser';
+import { markdownTaskContexts } from '../core/markdownTaskContext';
 
 export interface ReminderIdentityOwner { id: string; filePath: string }
 export type ReminderIdentityOwners = Map<string, Set<string>>;
@@ -14,7 +15,9 @@ export function addReminderIdentityOwners(owners: ReminderIdentityOwners, remind
 
 function contentIds(content: string): Set<string> {
 	const ids = new Set<string>();
-	for (const line of content.split('\n')) {
+	const lines = content.split('\n');
+	for (const index of markdownTaskContexts(lines).keys()) {
+		const line = lines[index]!;
 		const parsed = parseCheckboxLine(line);
 		if (parsed?.reminderId && parsed.parsed.cleanContent.trim()) ids.add(parsed.reminderId);
 	}

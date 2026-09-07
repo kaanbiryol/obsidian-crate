@@ -3,6 +3,7 @@ import { parseCheckboxLine } from "@/reminders/utils/checkboxParser";
 import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import { extractReminderId } from "./reminderIdentity";
+import { hasAttachedMarkdownContent, markdownTaskContexts, ReminderMarkdownContextError } from './markdownTaskContext';
 
 export interface ReminderLineRecord {
 	id: string;
@@ -55,22 +56,22 @@ function lineMatchesReminder(line: string, reminder: ReminderLineRecord): boolea
 }
 
 export function findReminderLineNumber(lines: string[], reminder: ReminderLineRecord): number {
+	const taskLines = markdownTaskContexts(lines);
+	const owners = [...taskLines.keys()].filter(index => extractReminderId(lines[index]!) === reminder.id);
+	if (owners.length > 1) throw new ReminderMarkdownContextError('Duplicate reminder identifiers. Refresh the note before editing; nothing was changed.');
+	if (owners.length === 1) return owners[0]!;
+	// An identity moved into an example is no longer an editable reminder.
+	if (lines.some(line => extractReminderId(line) === reminder.id)) return -1;
 	if (
-		reminder.lineNumber >= 0
+		taskLines.has(reminder.lineNumber)
 		&& reminder.lineNumber < lines.length
 		&& lines[reminder.lineNumber] === reminder.rawLine
 	) {
 		return reminder.lineNumber;
 	}
 
-	for (const [index, line] of lines.entries()) {
-		if (extractReminderId(line) === reminder.id) {
-			return index;
-		}
-	}
-
 	const exactMatches: number[] = [];
-	for (let index = 0; index < lines.length; index++) {
+	for (const index of taskLines.keys()) {
 		if (lines[index] === reminder.rawLine) {
 			exactMatches.push(index);
 		}
@@ -80,8 +81,9 @@ export function findReminderLineNumber(lines: string[], reminder: ReminderLineRe
 	}
 
 	const semanticMatches: number[] = [];
-	for (const [index, line] of lines.entries()) {
-		if (lineMatchesReminder(line, reminder)) {
+	for (const index of taskLines.keys()) {
+		const line = lines[index]!;
+		if (!extractReminderId(line) && lineMatchesReminder(line, reminder)) {
 			semanticMatches.push(index);
 		}
 	}
@@ -138,7 +140,12 @@ export function appendReminderBlockToContent(
 	const block = descriptionLines.length > 0
 		? `${checkboxLine}\n${descriptionLines.join("\n")}`
 		: checkboxLine;
-	return `${trimmed}${separator}${block}\n`;
+	const prefix = `${trimmed}${separator}`;
+	const result = `${prefix}${block}\n`;
+	if (!markdownTaskContexts(result.split('\n')).has(prefix.split('\n').length - 1)) {
+		throw new ReminderMarkdownContextError('Close the code or hidden Markdown block at the end of this note before adding a reminder; nothing was changed.');
+	}
+	return result;
 }
 
 export function replaceReminderBlockInContent(
@@ -174,6 +181,9 @@ export function deleteReminderBlockFromContent(
 	assertReminderBlockUnchanged(lines, reminder, lineNumber);
 
 	const descCount = countDescriptionBlockLines(lines, lineNumber);
+	if (hasAttachedMarkdownContent(lines, lineNumber, lineNumber + 1 + descCount)) {
+		throw new ReminderMarkdownContextError('This reminder has nested tasks or supporting text. Move or remove it in Markdown to preserve that content; nothing was changed.');
+	}
 	lines.splice(lineNumber, 1 + descCount);
 	return {
 		content: lines.join("\n"),
@@ -182,28 +192,34 @@ export function deleteReminderBlockFromContent(
 	};
 }
 
-export class ReminderReorderConflictError extends Error {}
+export class ReminderReorderConflictError extends ReminderMarkdownContextError {}
 
 export function reorderReminderBlocksInContent(fileContent: string, orderedIds: string[]): string {
 	const lines = fileContent.split("\n");
+	const taskContexts = markdownTaskContexts(lines);
 
 	interface FileSegment {
 		isBlock: boolean;
 		lines: string[];
 		id?: string | null;
 		isCompleted?: boolean;
+		group?: number;
+		movable?: boolean;
 	}
 
 	const segments: FileSegment[] = [];
 	let index = 0;
 	let nonBlockAccum: string[] = [];
+	let group = 0;
 
 	while (index < lines.length) {
 		const line = lines[index];
 		if (line === undefined) break;
-		const parsed = parseCheckboxLine(line);
+		const context = taskContexts.get(index);
+		const parsed = context ? parseCheckboxLine(line) : null;
 		if (parsed) {
 			if (nonBlockAccum.length > 0) {
+				if (nonBlockAccum.some(line => line.trim())) group++;
 				segments.push({ isBlock: false, lines: [...nonBlockAccum] });
 				nonBlockAccum = [];
 			}
@@ -220,6 +236,8 @@ export function reorderReminderBlocksInContent(fileContent: string, orderedIds: 
 				lines: blockLines,
 				id: extractReminderId(line),
 				isCompleted: parsed.isCompleted,
+				group,
+				movable: context?.indentation === 0 && !hasAttachedMarkdownContent(lines, index, index + 1 + descCount),
 			});
 			index += 1 + descCount;
 		} else {
@@ -260,6 +278,9 @@ export function reorderReminderBlocksInContent(fileContent: string, orderedIds: 
 		if (!block.id || !requestedIds.has(block.id)) return block;
 		const replacement = requestedBlocks[requestedIndex++];
 		if (!replacement) throw new ReminderReorderConflictError('Cannot safely reorder these reminders; nothing was changed.');
+		if (replacement !== block && (replacement.group !== block.group || !replacement.movable || !block.movable)) {
+			throw new ReminderReorderConflictError('Keep reminders within one simple list. Reorder nested tasks, sections, or supporting text in Markdown; nothing was changed.');
+		}
 		return replacement;
 	});
 
