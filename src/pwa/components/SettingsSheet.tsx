@@ -65,7 +65,7 @@ export function SettingsSheet({
 			closeOnBackdrop={!loggingOut && !isClosing}
 			onKeyDown={handleDialogKeyDown}
 		>
-			<aside ref={setDialogRef} className="settings-sheet" role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut || isClosing} tabIndex={-1}>
+			<aside ref={setDialogRef} className="settings-sheet outline-none" role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut || isClosing} tabIndex={-1}>
 				<ModalHeader
 					title="Settings"
 					closeLabel="Close settings"

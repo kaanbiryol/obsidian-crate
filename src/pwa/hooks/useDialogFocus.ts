@@ -23,8 +23,7 @@ function focusableElements(dialog: HTMLElement): HTMLElement[] {
 
 function focusDialog(dialog: HTMLElement): void {
 	if (dialog.contains(activeElementWithin(dialog))) return;
-	const firstControl = focusableElements(dialog)[0];
-	(firstControl ?? dialog).focus({ preventScroll: true });
+	dialog.focus({ preventScroll: true });
 }
 
 function trapDialogFocus(event: ReactKeyboardEvent<HTMLElement>, dialog: HTMLElement): void {
@@ -41,10 +40,10 @@ function trapDialogFocus(event: ReactKeyboardEvent<HTMLElement>, dialog: HTMLEle
 	const lastControl = controls.at(-1);
 	if (!firstControl || !lastControl) return;
 	const activeElement = activeElementWithin(dialog);
-	if (event.shiftKey && (activeElement === firstControl || !dialog.contains(activeElement))) {
+	if (event.shiftKey && (activeElement === dialog || activeElement === firstControl || !dialog.contains(activeElement))) {
 		event.preventDefault();
 		lastControl.focus();
-	} else if (!event.shiftKey && (activeElement === lastControl || !dialog.contains(activeElement))) {
+	} else if (!event.shiftKey && (activeElement === dialog || activeElement === lastControl || !dialog.contains(activeElement))) {
 		event.preventDefault();
 		firstControl.focus();
 	}
