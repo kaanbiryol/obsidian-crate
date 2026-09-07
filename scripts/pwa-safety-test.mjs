@@ -12,6 +12,10 @@ try {
 		const browser = await browserType.launch();
 		try {
 			const context = await browser.newContext();
+			const updateBodies = [];
+			context.on('request', request => {
+				if (request.method() === 'POST' && new URL(request.url()).pathname === '/reminders/update') updateBodies.push(request.postData());
+			});
 			const one = await context.newPage(); const two = await context.newPage();
 			one.setDefaultTimeout(15_000); two.setDefaultTimeout(15_000);
 			await one.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
@@ -23,20 +27,26 @@ try {
 			const title = one.getByRole('textbox', { name: 'Reminder title', exact: true });
 			await title.fill('Keep this unsaved draft');
 			await one.getByRole('button', { name: 'Save reminder', exact: true }).click();
-			await expect(one.getByRole('button', { name: 'Save reminder', exact: true })).toBeEnabled();
-			await expect(title).toHaveText('Keep this unsaved draft');
+			await expect(one.getByRole('dialog', { name: 'Edit reminder', exact: true })).toHaveCount(0);
+			const pendingCardName = 'Keep this unsaved draft. Press Enter to edit reminder.';
+			const pendingNotice = one.getByRole('region', { name: 'Couldn’t sync: Keep this unsaved draft', exact: true });
+			await expect(pendingNotice).toBeVisible();
+			await expect(one.getByRole('group', { name: pendingCardName, exact: true })).toBeVisible();
+			await expect(two.getByRole('group', { name: pendingCardName, exact: true })).toBeVisible();
 			await one.reload();
-			await one.getByRole('group', { name: cardName, exact: true }).click();
-			await expect(title).toHaveText('Keep this unsaved draft');
-			await one.getByRole('button', { name: 'Close reminder editor', exact: true }).click();
-			await one.getByRole('dialog', { name: 'Edit reminder', exact: true }).waitFor({ state: 'detached' });
+			await expect(pendingNotice).toBeVisible();
+			await expect(one.getByRole('group', { name: pendingCardName, exact: true })).toBeVisible();
+			await expect(pendingNotice.getByRole('button', { name: 'Retry: Keep this unsaved draft', exact: true })).toBeEnabled();
+			await expect.poll(() => updateBodies.length).toBeGreaterThanOrEqual(2);
+			expect(new Set(updateBodies).size).toBe(1);
 			await one.getByRole('button', { name: 'Open settings', exact: true }).click();
 			await one.getByRole('button', { name: 'Log out', exact: true }).click();
 			await expect.poll(() => one.evaluate(() => localStorage.getItem('crate-reminders-auth-token'))).toBe(null);
 			await expect.poll(() => revocations).toBe(1);
-			await expect(two.getByRole('group', { name: cardName, exact: true })).toHaveCount(0);
+			await expect(two.getByRole('group', { name: pendingCardName, exact: true })).toHaveCount(0);
+			await expect.poll(() => two.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('crate-reminder-outbox:')).length)).toBe(0);
 			await expect.poll(() => two.evaluate(() => Object.keys(sessionStorage).filter(key => key.startsWith('crate-reminder-draft:')).length)).toBe(0);
-			console.log(`${browserType.name()}: failed saves retain drafts across reload and logout clears open tabs`);
+			console.log(`${browserType.name()}: ambiguous saves retain optimistic state across reload, replay the same command, and logout clears open tabs`);
 			await verifyEnrollmentRecovery(browser, browserType.name());
 		} finally { await browser.close(); }
 	}

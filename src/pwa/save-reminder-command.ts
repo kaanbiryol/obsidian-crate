@@ -1,71 +1,58 @@
-import { discardReminderDraft, saveReminderDraft } from './reminder-drafts';
-import type { ApiFetch, ModalState, ReminderMutationBody, ReminderRecord } from './types';
-
-interface SaveResult { reminder: ReminderRecord; notificationWarning?: string }
-class RejectedSave extends Error {}
+import { buildReminderMutationBody } from './reminder-mutation';
+import { predictSavedReminder } from './reminder-optimistic-state';
+import type { PendingReminderChange } from './reminder-outbox-types';
+import type { ModalState, ReminderMutationBody, ReminderRecord, StoredConfig } from './types';
 
 function draftKey({ draft }: ModalState): string {
 	const { activePicker: _picker, deleteConfirm: _confirm, ...input } = draft;
 	return JSON.stringify(input);
 }
 
-async function submit(apiFetch: ApiFetch, pending: NonNullable<ModalState['pendingSave']>): Promise<SaveResult> {
-	const response = await apiFetch(pending.path, { method: 'POST', body: pending.body });
-	if (!response.ok) {
-		const text = await response.text();
-		let error: { code?: string; error?: string } = {};
-		try { error = JSON.parse(text) as typeof error; } catch { /* A proxy may return plain text. */ }
-		// A definite rejection did not commit. Let corrected input retry with the
-		// same operation/create identity; ambiguous transport failures stay pinned.
-		if ([400, 403, 404, 409, 413, 428].includes(response.status) && error.code !== 'operation_mismatch') throw new RejectedSave(error.error ?? text);
-		throw new Error(error.error ?? text);
-	}
-	const result = await response.json() as SaveResult;
-	if (!result.reminder) throw new Error('The server did not confirm this reminder. Retry to check the earlier save.');
-	return result;
-}
-
-function prepare(modal: ModalState, input: ReminderMutationBody): NonNullable<ModalState['pendingSave']> {
+function fromInput(modal: ModalState, input: ReminderMutationBody, previous?: ReminderRecord): PendingReminderChange {
 	modal.operationId ??= crypto.randomUUID();
-	modal.pendingSave = {
-		path: modal.mode === 'edit' ? '/reminders/update' : '/reminders/create',
-		body: JSON.stringify({ ...input, id: modal.reminderId ?? modal.operationId, operationId: modal.operationId,
-			filePath: modal.filePath, expectedRevision: modal.expectedRevision }),
-		input,
-		draftKey: draftKey(modal),
+	const operationId = modal.operationId;
+	const recordId = modal.reminderId ?? operationId;
+	return {
+		operationId, recordId, kind: 'save', path: modal.mode === 'edit' ? '/reminders/update' : '/reminders/create',
+		method: 'POST', body: JSON.stringify({ ...input, id: recordId, operationId, filePath: modal.filePath, expectedRevision: modal.expectedRevision }),
+		status: 'pending', attempts: 0, retryAt: 0,
+		optimistic: predictSavedReminder(recordId, input, previous), previous,
+		modal: JSON.parse(JSON.stringify(modal)) as ModalState,
 	};
-	saveReminderDraft(modal);
-	return modal.pendingSave;
 }
 
-/** Keep an immutable attempted command separate from the still-editable draft. */
-export async function saveReminderCommand(modal: ModalState, input: ReminderMutationBody, apiFetch: ApiFetch, sessionCurrent: () => boolean): Promise<SaveResult> {
-	try {
-		const pending = modal.pendingSave ?? prepare(modal, input);
-		const result = await submit(apiFetch, pending);
-		if (!sessionCurrent() || pending.draftKey === draftKey(modal)) return result;
-
-		// Acknowledge the original before expressing later edits as a new command.
-		// A stale receipt base still conflicts with intervening third-party edits.
-		discardReminderDraft(modal);
-		modal.mode = 'edit';
-		modal.reminderId = result.reminder.id;
-		modal.filePath = result.reminder.filePath;
-		modal.expectedRevision = result.reminder.revision;
-		modal.operationId = crypto.randomUUID();
-		delete modal.pendingSave;
-		if (input.dueDatetime === pending.input.dueDatetime && input.dueDate === pending.input.dueDate) {
-			input = { ...input, dueDatetime: result.reminder.dueDatetime ?? null, dueDate: result.reminder.dueDate ?? null };
+export function createSaveReminderChange(modal: ModalState, config: StoredConfig, projects: string[], selectedProject: string | null, previous?: ReminderRecord): PendingReminderChange {
+	const input = buildReminderMutationBody({ draft: modal.draft, mode: modal.mode, config, projects, selectedProject });
+	if (!input.content.trim()) throw new Error('Reminder title required');
+	const change = fromInput(modal, input, previous);
+	if (modal.pendingSave) {
+		// Migrate attempts retained by older PWA versions without changing their payload.
+		const attempted = JSON.parse(modal.pendingSave.body) as { id: string; operationId: string };
+		change.operationId = attempted.operationId;
+		change.recordId = attempted.id;
+		change.body = modal.pendingSave.body;
+		change.path = modal.pendingSave.path;
+		change.ambiguous = true;
+		change.optimistic = predictSavedReminder(attempted.id, input, previous);
+		if (modal.pendingSave.draftKey !== draftKey(modal)) {
+			change.followUp = { operationId: crypto.randomUUID(), input };
 		}
-		if (JSON.stringify(input.recurrence ?? null) === JSON.stringify(pending.input.recurrence ?? null)) {
-			input = { ...input, recurrence: result.reminder.recurrence ?? null };
-		}
-		return await submit(apiFetch, prepare(modal, input));
-	} catch (error) {
-		if (sessionCurrent() && error instanceof RejectedSave) {
-			delete modal.pendingSave;
-			saveReminderDraft(modal);
-		}
-		throw error;
 	}
+	return change;
+}
+
+/** A later edit is a separate command based on the original attempt's receipt. */
+export function followUpReminderChange(change: PendingReminderChange, confirmed: ReminderRecord): PendingReminderChange | undefined {
+	if (!change.followUp || !change.modal) return undefined;
+	const pendingInput = change.modal.pendingSave?.input;
+	const input = { ...change.followUp.input };
+	if (pendingInput && input.dueDate === pendingInput.dueDate && input.dueDatetime === pendingInput.dueDatetime) {
+		input.dueDate = confirmed.dueDate ?? null;
+		input.dueDatetime = confirmed.dueDatetime ?? null;
+	}
+	if (pendingInput && JSON.stringify(input.recurrence ?? null) === JSON.stringify(pendingInput.recurrence ?? null)) input.recurrence = confirmed.recurrence;
+	const modal: ModalState = { ...change.modal, mode: 'edit', reminderId: confirmed.id,
+		operationId: change.followUp.operationId, expectedRevision: confirmed.revision,
+		filePath: confirmed.filePath, pendingSave: undefined };
+	return fromInput(modal, input, confirmed);
 }

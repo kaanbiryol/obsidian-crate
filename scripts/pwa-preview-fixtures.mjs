@@ -79,7 +79,7 @@ export function createInitialState() {
 				project: 'Work',
 				filePath: 'Reminders/Work.md',
 			},
-		],
+		].map(reminder => ({ ...reminder, revision: randomUUID() })),
 	};
 }
 
@@ -112,6 +112,7 @@ export function parseMutationReminder(body) {
 	const project = normalizeProject(body.project);
 	return applyProjectFilePath({
 		id: body.id || randomUUID(),
+		revision: randomUUID(),
 		content: String(body.content || '').trim(),
 		description: body.description ? String(body.description) : '',
 		dueDate: body.dueDate || undefined,
