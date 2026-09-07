@@ -12,7 +12,7 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | F02 | Conserve current Markdown during stale/ambiguous reminder reordering | Fixed: mutation-time ownership/conservation checks; 9 plugin integration regressions and 5 Worker reorder checks pass |
 | F03 | Reject incomplete local scans and revalidate absence before remote deletion | Fixed: full/force/cursor-fallback failures stop safely; automatic delete send paths recheck local state; 19 new regressions, targeted lint and typecheck pass |
 | F04 | Invalidate all checkpoint generations and isolate deployment authority during reconfiguration | Fixed: stop and await old work, verify recovery copies, invalidate main/tmp, bind checkpoints to server authority, preserve same-server renewal baseline; 12 new regressions and all 377 sync tests pass; [recovery policy](sync-checkpoint-recovery.md) |
-| F05 | Preserve stable reminder identity during project moves | Pending |
+| F05 | Preserve stable reminder identity during project moves | Fixed: serialized scans verify current Markdown ownership, transfer vacated identities atomically in the index and defer ambiguous repair during incomplete sync; target/owner races and both move orders covered; 92 focused tests, lint and typecheck pass |
 | F06 | Decode persisted dates deterministically across time and timezone changes | Pending |
 | F07 | Respect fenced Markdown and preserve task structure when adopting/reordering | Pending |
 | F08 | Enforce a representable hierarchical remote namespace transactionally | Fixed: indexed D1 publication guards and actionable namespace conflicts; 23 new runtime regressions, 71 focused unit and 34 runtime tests pass |

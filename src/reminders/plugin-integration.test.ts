@@ -24,6 +24,10 @@ type MockPlugin = {
 	remindersSettings: RemindersSettingsStub;
 	syncRuntime: {
 		getApiClient: ReturnType<typeof vi.fn>;
+		isConfigured: ReturnType<typeof vi.fn>;
+		getState: ReturnType<typeof vi.fn>;
+		addStateChangeListener: ReturnType<typeof vi.fn>;
+		removeStateChangeListener: ReturnType<typeof vi.fn>;
 	};
 	activateRemindersView: ReturnType<typeof vi.fn<() => Promise<void>>>;
 	registerMarkdownCodeBlockProcessor: ReturnType<typeof vi.fn>;
@@ -44,6 +48,7 @@ type MockPlugin = {
 const reminderIndexLoad = vi.fn(async () => {});
 const reminderIndexGetAll = vi.fn(() => [{ id: 'r1' }]);
 const reminderIndexRescanFile = vi.fn(async () => {});
+const reminderIndexFlushDeferredScans = vi.fn(async () => {});
 const reminderIndexFactory = vi.fn();
 const createMarkdownWriter = vi.fn();
 const createReminderRepository = vi.fn();
@@ -136,6 +141,10 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 		},
 		syncRuntime: {
 			getApiClient: vi.fn(),
+			isConfigured: vi.fn(() => false),
+			getState: vi.fn(() => ({ status: 'idle' })),
+			addStateChangeListener: vi.fn(),
+			removeStateChangeListener: vi.fn(),
 		},
 		activateRemindersView: vi.fn(async () => {}),
 		registerMarkdownCodeBlockProcessor: vi.fn(),
@@ -175,6 +184,7 @@ beforeEach(() => {
 		load: reminderIndexLoad,
 		getAll: reminderIndexGetAll,
 		rescanFile: reminderIndexRescanFile,
+		flushDeferredScans: reminderIndexFlushDeferredScans,
 	}));
 	createMarkdownWriter.mockImplementation(() => latestWriter);
 	createReminderRepository.mockReturnValue({
@@ -205,7 +215,7 @@ describe('initializeReminders', () => {
 
 		await initializeReminders(plugin as never);
 
-		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders', expect.any(AbortSignal));
+		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders', expect.any(AbortSignal), expect.any(Function), expect.any(Function));
 		expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
 		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex);
 		expect(createReminderRepository).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
@@ -261,7 +271,7 @@ describe('reinitializeReminders', () => {
 		await reinitializeReminders(plugin as never, ' Reminders/Work/ ');
 
 		expect(oldWatcher.unregister).toHaveBeenCalledTimes(1);
-		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders/Work', expect.any(AbortSignal));
+		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders/Work', expect.any(AbortSignal), expect.any(Function), expect.any(Function));
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
 	});
 });
@@ -307,4 +317,43 @@ it('does not auto-open the view after unloading before layout is ready', async (
   endPluginLifecycle(plugin as never);
   plugin.getLayoutReadyHandler()?.();
   expect(plugin.activateRemindersView).not.toHaveBeenCalled();
+});
+
+it('flushes deferred scans on sync state changes and removes the listener on unload', async () => {
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	await initializeReminders(plugin as never);
+	const listener = plugin.syncRuntime.addStateChangeListener.mock.calls[0]?.[0] as (() => void) | undefined;
+	expect(listener).toBeDefined();
+	listener?.();
+	await flushMicrotasks();
+	expect(reminderIndexFlushDeferredScans).toHaveBeenCalledOnce();
+	const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+	endPluginLifecycle(plugin as never);
+	expect(plugin.syncRuntime.removeStateChangeListener).toHaveBeenCalledWith(listener);
+});
+
+it('defers startup collision repair until the configured connection finishes a successful sync', async () => {
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	plugin.syncRuntime.isConfigured.mockReturnValue(true);
+	await initializeReminders(plugin as never);
+	const shouldDefer = reminderIndexFactory.mock.calls[0]?.[4] as () => boolean;
+	const listener = plugin.syncRuntime.addStateChangeListener.mock.calls[0]?.[0] as () => void;
+	expect(shouldDefer()).toBe(true);
+	plugin.syncRuntime.getApiClient.mockReturnValue({});
+	listener(); // An idle initialization callback has not reconciled file ownership.
+	expect(shouldDefer()).toBe(true);
+	for (const status of ['syncing', 'error', 'idle']) {
+		plugin.syncRuntime.getState.mockReturnValue({ status });
+		listener();
+	}
+	expect(shouldDefer()).toBe(true);
+	for (const status of ['syncing', 'idle']) {
+		plugin.syncRuntime.getState.mockReturnValue({ status });
+		listener();
+	}
+	expect(shouldDefer()).toBe(false);
+	plugin.syncRuntime.getApiClient.mockReturnValue({});
+	expect(shouldDefer()).toBe(true); // A replaced connection needs its own reconciliation.
 });
