@@ -41,6 +41,7 @@ export interface QueueDeleteFailure {
 }
 
 export interface QueueUploadFailure {
+	code?: string;
 	path: string;
 	error: string;
 	status?: number;

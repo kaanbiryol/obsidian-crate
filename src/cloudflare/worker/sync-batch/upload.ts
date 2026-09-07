@@ -1,6 +1,7 @@
 import { sha256HexBytes } from '../auth';
 import { corsResponse } from '../cors';
 import { commitStagedFile } from '../sync-mutations';
+import { FileNamespaceConflictError } from '../file-namespace';
 import {
 	isSha256Hex,
 	parseJsonObject,
@@ -181,6 +182,10 @@ export async function handleBatchUpload(
 
 			results.push({ path: file.safePath, success: true, hash: file.hash, revision: commit.revision });
 		} catch (error: unknown) {
+			if (error instanceof FileNamespaceConflictError) {
+				results.push({ path: file.safePath, success: false, error: error.message, code: error.code, status: 409 });
+				return;
+			}
 			metadataFailure = true;
 			// An uncertain commit does not establish that this object is unused.
 			results.push({

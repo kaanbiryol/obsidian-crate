@@ -3,6 +3,7 @@ import type { CommitEffects } from './commit-effects';
 import { changedRows } from './db';
 import { sha256HexBytes } from './auth';
 import { portablePathKey } from '../../protocol/portable-path';
+import { assertFileNamespaceAvailable, FileNamespaceConflictError, fileNamespaceGuard } from './file-namespace';
 import {
 	collectCleanupKeys,
 	deleteBucketObjectsOrQueue,
@@ -20,17 +21,18 @@ function uploadMutation(
 	objectKey: string,
 	expectedHash: ExpectedFileHash,
 ): D1PreparedStatement {
+	const namespace = fileNamespaceGuard(path);
 	if (expectedHash === null) {
 		return db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
-			VALUES (?, ?, ?, ?, datetime('now'), ?)
+			SELECT ?, ?, ?, ?, datetime('now'), ? WHERE ${namespace.sql}
 			ON CONFLICT(path) DO NOTHING`)
-			.bind(path, portablePathKey(path), hash, size, objectKey);
+			.bind(path, portablePathKey(path), hash, size, objectKey, ...namespace.args);
 	}
 
 	return db.prepare(`UPDATE files
 		SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
-		WHERE path = ? AND hash = ?`)
-		.bind(portablePathKey(path), hash, size, objectKey, path, expectedHash);
+		WHERE path = ? AND hash = ? AND ${namespace.sql}`)
+		.bind(portablePathKey(path), hash, size, objectKey, path, expectedHash, ...namespace.args);
 }
 
 export interface CommitResult {
@@ -89,6 +91,12 @@ export async function commitStagedFile(
 	]);
 
 	if (changedRows(results[0]) !== 1) {
+		try {
+			await assertFileNamespaceAvailable(db, params.path);
+		} catch (error) {
+			if (error instanceof FileNamespaceConflictError) await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
+			throw error;
+		}
 		const current = await getStoredFileRow(db, params.path);
 		if (!params.effects && current?.hash === params.hash) {
 			const object = await bucket.get(current.storageKey);
