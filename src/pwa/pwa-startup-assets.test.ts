@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getPwaStartupAssets } from '../../scripts/pwa-startup-assets.mjs';
+import { getPwaClientAssets, getPwaStartupAssets } from '../../scripts/pwa-startup-assets.mjs';
 
 const staticImport = (path: string) => ({ path, kind: 'import-statement' });
 
@@ -15,8 +15,11 @@ describe('PWA startup assets', () => {
 			'pwa-client/runtime.js': { imports: [staticImport('pwa-client/shared.js')] },
 			'pwa-client/settings.js': { imports: [staticImport('pwa-client/settings-only.js')] },
 			'pwa-client/settings-only.js': { imports: [] },
+			// A build-only entry may force a static boundary without being served.
+			'pwa-client/editor-facade.js': { imports: [staticImport('pwa-client/shared.js')] },
 		};
 		expect(getPwaStartupAssets({ outputs })).toEqual(['app.js', 'shared.js', 'runtime.js']);
+		expect(getPwaClientAssets({ outputs })).toEqual(['app.js', 'shared.js', 'runtime.js', 'settings.js', 'settings-only.js']);
 	});
 
 	it('fails when the startup graph is incomplete instead of undercounting its size', () => {

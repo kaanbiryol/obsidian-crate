@@ -1,4 +1,5 @@
 import net from 'node:net';
+import { bundleBudgets } from './bundle-budgets.mjs';
 import { readFile } from 'node:fs/promises';
 import { Script } from 'node:vm';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
@@ -70,7 +71,9 @@ try {
 
 	const appResponse = await fetchOk(`${origin}/notifications/app.js?v=smoke`);
 	const appJs = await appResponse.text();
-	if (appJs.length < 40_000 || appJs.length > 110_000) throw new Error(`PWA app entry is outside its expected range: ${appJs.length} bytes`);
+	const appBytes = Buffer.byteLength(appJs);
+	const entryBudget = bundleBudgets.pwa.find(budget => budget.assetName === 'app.js');
+	if (appBytes < 40_000 || appBytes > entryBudget.maxBytes) throw new Error(`PWA app entry is outside its expected range: ${appBytes} bytes`);
 	for (const [fileName, source] of Object.entries(assets.PWA_CLIENT_ASSETS)) {
 		if (fileName === 'app.js') continue;
 		const chunkResponse = await fetchOk(`${origin}/notifications/assets/${fileName}`);

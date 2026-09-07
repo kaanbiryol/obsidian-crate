@@ -69,18 +69,19 @@ export default class CratePlugin extends Plugin {
 	}
 
 	async saveSettings(): Promise<void> {
-		await this.enqueueSettingsWrite(async () => {
+		await this.enqueueSettingsWrite(async signal => {
 			const normalizedSettings = normalizeCrateSettings(this.settings, this.app.vault.configDir);
 			await this.saveData({
 				...buildPersistedCrateSettings(normalizedSettings),
 				reminders: this.remindersSettings,
 			});
+			signal.throwIfAborted();
 			Object.assign(this.settings, normalizedSettings);
 		});
 	}
 
 	async writeSettings(update: Partial<CrateSettings>): Promise<void> {
-		await this.enqueueSettingsWrite(async () => {
+		await this.enqueueSettingsWrite(async signal => {
 			const nextSettings = normalizeCrateSettings(
 				{ ...this.settings, ...update },
 				this.app.vault.configDir,
@@ -89,12 +90,13 @@ export default class CratePlugin extends Plugin {
 				...buildPersistedCrateSettings(nextSettings),
 				reminders: this.remindersSettings,
 			});
+			signal.throwIfAborted();
 			Object.assign(this.settings, nextSettings);
 		});
 	}
 
 	async writeRemindersSettings(update: Partial<RemindersSettings>): Promise<void> {
-		await this.enqueueSettingsWrite(async () => {
+		await this.enqueueSettingsWrite(async signal => {
 			const nextSettings = normalizeRemindersSettings({
 				...this.remindersSettings,
 				...update,
@@ -103,17 +105,19 @@ export default class CratePlugin extends Plugin {
 				...buildPersistedCrateSettings(this.settings),
 				reminders: nextSettings,
 			});
+			signal.throwIfAborted();
 			useRemindersSettingsStore.setState(nextSettings, true);
 		});
 	}
 
 	async setDebugLogging(enabled: boolean): Promise<void> {
-		await this.enqueueSettingsWrite(async () => {
+		await this.enqueueSettingsWrite(async signal => {
 			const nextSettings = { ...this.settings, debugLogging: enabled };
 			await this.saveData({
 				...buildPersistedCrateSettings(nextSettings),
 				reminders: this.remindersSettings,
 			});
+			signal.throwIfAborted();
 			Object.assign(this.settings, nextSettings);
 			configureSyncLogger({ enabled });
 			configureRemindersLogger({ prefix: 'Crate', enabled });
@@ -185,8 +189,17 @@ export default class CratePlugin extends Plugin {
 		this.settingTab?.update();
 	}
 
-	private enqueueSettingsWrite(operation: () => Promise<void>): Promise<void> {
-		const pendingWrite = this.settingsWriteQueue.then(operation, operation);
+	private enqueueSettingsWrite(operation: (signal: AbortSignal) => Promise<void>): Promise<void> {
+		const signal = getPluginLifecycleSignal(this);
+		signal.throwIfAborted();
+		const run = () => {
+			// A queued write can outlive the instance that requested it. Once
+			// saveData is dispatched the host cannot cancel it; callers must also
+			// check this signal before publishing its result to live settings.
+			signal.throwIfAborted();
+			return operation(signal);
+		};
+		const pendingWrite = this.settingsWriteQueue.then(run, run);
 		this.settingsWriteQueue = pendingWrite.catch(() => undefined);
 		return pendingWrite;
 	}

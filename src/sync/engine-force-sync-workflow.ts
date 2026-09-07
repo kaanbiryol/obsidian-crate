@@ -7,6 +7,7 @@ import {
 import { FORCE_SYNC_CONCURRENCY } from './engine-constants';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { FileManifest } from '../protocol/sync-types';
+import { getPathEntry } from '../protocol/path-record';
 import type { PreparedUpload, SyncResult, SyncState } from './types';
 import {
 	completeWorkflowResult,
@@ -80,7 +81,7 @@ export async function runForceFullSyncWorkflow(
 				progressCallback?.(current, total);
 			});
 			for (const upload of prepared) {
-				upload.expectedHash = remoteManifest.files[upload.path]?.hash ?? null;
+				upload.expectedHash = getPathEntry(remoteManifest.files, upload.path)?.hash ?? null;
 			}
 
 			context.throwIfDestroyed();
@@ -97,9 +98,10 @@ export async function runForceFullSyncWorkflow(
 
 		for (const path of remoteOnlyPaths) {
 			try {
-				const expectedHash = remoteManifest.files[path]?.hash;
+				const remoteEntry = getPathEntry(remoteManifest.files, path);
+				const expectedHash = remoteEntry?.hash;
 				if (!expectedHash) throw new Error('Missing remote version for delete');
-				await context.deleteRemoteFile(path, expectedHash, remoteManifest.files[path]?.revision);
+				await context.deleteRemoteFile(path, expectedHash, remoteEntry?.revision);
 				context.removeLocalManifestEntry(path);
 				result.deleted++;
 				result.deletedPaths.push(path);

@@ -6,6 +6,7 @@ import { REMINDER_DRAG_SCALE, REMINDER_LIST_LAYOUT_TRANSITION, REMINDER_SECTION_
 import { reminderRowMotion } from '../ui/reminderRowMotion';
 import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 import { createReorderClickGuard } from './reorderClickGuard';
+import { mergeReorderedPage, ReminderPagination, useReminderPagination } from '../ui/reminder-pagination';
 
 interface ReorderableReminderListProps {
   reminders: Reminder[];
@@ -203,17 +204,21 @@ export function ReorderableReminderList({
   animationsEnabled = true,
 }: ReorderableReminderListProps) {
   const reduceMotion = useObsidianReducedMotion();
+  const pagination = useReminderPagination(reminders);
+  const [dragging, setDragging] = useState(false);
   const enableLayoutAnimations = animationsEnabled && !reduceMotion && reminders.length <= LARGE_LIST_ANIMATION_LIMIT;
   const latestOrderRef = useRef(reminders);
   latestOrderRef.current = reminders;
   const orderBeforeDragRef = useRef<string[]>([]);
 
   const handleDragStart = useCallback(() => {
+    setDragging(true);
     orderBeforeDragRef.current = latestOrderRef.current.map(r => r.id);
     onDragActiveChange?.(true);
   }, [onDragActiveChange]);
 
   const handleDragEnd = useCallback(() => {
+    setDragging(false);
     const newOrder = latestOrderRef.current.map(r => r.id);
     const changed = newOrder.length !== orderBeforeDragRef.current.length
       || newOrder.some((id, i) => id !== orderBeforeDragRef.current[i]);
@@ -224,19 +229,27 @@ export function ReorderableReminderList({
   }, [onReorderCommit, onDragActiveChange]);
 
   return (
+    <>
+    <ReminderPagination pagination={pagination} label="Active reminders" disabled={dragging} />
     <Reorder.Group
       as="div"
       axis="y"
       className="reorderable-reminder-list"
-      values={reminders}
-      onReorder={onReorder}
+      values={pagination.items}
+      onReorder={reordered => {
+        const merged = mergeReorderedPage(latestOrderRef.current, pagination.items, reordered);
+        if (merged) {
+          latestOrderRef.current = merged;
+          onReorder(merged);
+        }
+      }}
     >
       <ReminderListPresence>
-        {reminders.map((reminder, index) => (
+        {pagination.items.map((reminder, index) => (
           <ReorderableItem
             key={reminder.id}
             reminder={reminder}
-            index={index}
+            index={pagination.start + index}
             renderCard={renderCard}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
@@ -246,5 +259,6 @@ export function ReorderableReminderList({
         ))}
       </ReminderListPresence>
     </Reorder.Group>
+    </>
   );
 }

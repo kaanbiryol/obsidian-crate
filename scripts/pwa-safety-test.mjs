@@ -66,7 +66,9 @@ async function verifyEnrollmentRecovery(browser, browserName) {
         return mode === 'failed' ? route.fulfill({ status: 503, body: 'Enrollment temporarily unavailable' }) : route.continue();
       });
       await page.goto(`${origin}/notifications?token=install-fresh&browserToken=browser-fresh&folder=Reminders&tab=inbox`);
-      if (mode === 'failed') await expect(page.getByText('Enrollment temporarily unavailable', { exact: true })).toBeVisible();
+      // A failed replacement alone preserves a session. This fixture's old
+      // credential is actually expired, so its subsequent list 401 logs out.
+      if (mode === 'failed') await page.getByRole('button', { name: 'Open Obsidian', exact: true }).waitFor();
       else await page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }).waitFor();
       expect(exchanges).toHaveLength(1);
       expect(exchanges[0]).toMatchObject({ token: mode === 'standalone' ? 'install-fresh' : 'browser-fresh', previousAuthToken: 'expired-session' });

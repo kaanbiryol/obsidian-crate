@@ -145,5 +145,6 @@ function getContentType(extension: string): string {
     pdf: "application/pdf",
   };
 
-  return types[extension.toLowerCase()] || "application/octet-stream";
+  const key = extension.toLowerCase();
+  return Object.prototype.hasOwnProperty.call(types, key) ? types[key]! : "application/octet-stream";
 }

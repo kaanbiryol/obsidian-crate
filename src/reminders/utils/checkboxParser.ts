@@ -11,7 +11,7 @@
 
 import { parseReminderContent, type ParsedReminder } from './reminderParser';
 import type { Priority, RecurrenceRule } from '../types';
-import { format } from 'date-fns';
+import { formatReminderDateText } from './reminderDate';
 import { recurrenceToText } from './rruleConverter';
 import { extractReminderId, setReminderIdMarker, stripReminderIdMarker } from '../core/reminderIdentity';
 import { appendRecurrenceMetadata, readRecurrenceMetadata } from '../core/recurrenceMetadata';
@@ -111,7 +111,7 @@ export function rebuildCheckboxLine(
     const showTime = hasTime ?? (recurrence?.hour !== undefined || dueDate.getHours() !== 0 || dueDate.getMinutes() !== 0);
     const formatted = showTime
       ? dueDate.toISOString()
-      : format(dueDate, "MMM d, yyyy");        // "Jan 13, 2026"
+      : formatReminderDateText(dueDate);        // "Jan 13, 2026"
     content += ` ${formatted}`;
   }
 

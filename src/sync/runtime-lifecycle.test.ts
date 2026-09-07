@@ -8,6 +8,7 @@ import {
 	createRuntimeHarness,
 	flushMicrotasks,
 	isAcceptingEvents,
+	setApiClient,
 	type Deferred,
 } from './runtime-test-harness';
 
@@ -76,5 +77,42 @@ describe('SyncRuntime teardown and reinitialization', () => {
 		expect(isAcceptingEvents(runtime)).toBe(false);
 		runtime.onFileChange({ path: 'notes/after-destroy.md' } as never);
 		expect(runtime.getPendingPaths()).toEqual([]);
+	});
+
+	it('does not reinitialize infrastructure after unloading during a settings save', async () => {
+		const { runtime, persistSettings } = createRuntimeHarness();
+		const saved = createDeferred<void>();
+		const lifetime = new AbortController();
+		persistSettings.mockReturnValue(saved.promise);
+		const initialize = vi.spyOn(runtime, 'initialize');
+		const running = runtime.applyInfrastructureConfig({ workerUrl: 'https://crate.example.workers.dev', authToken: 'new-token' }, lifetime.signal);
+		const rejected = expect(running).rejects.toMatchObject({ name: 'AbortError' });
+		await vi.waitFor(() => expect(persistSettings).toHaveBeenCalledOnce());
+		lifetime.abort();
+		runtime.destroy();
+		saved.resolve();
+		await rejected;
+		expect(initialize).not.toHaveBeenCalled();
+		expect(isAcceptingEvents(runtime)).toBe(false);
+	});
+
+	it('does not clear configuration after unloading while token revocation is pending', async () => {
+		const { runtime, persistSettings, settings, secretStorage } = createRuntimeHarness();
+		const revoked = createDeferred<{ success: boolean }>();
+		const lifetime = new AbortController();
+		setApiClient(runtime, {
+			revokeCurrentToken: () => revoked.promise,
+			testConnection: async () => ({ success: true }),
+			putSharedSettings: async () => {},
+		});
+		const running = runtime.clearSyncConfiguration(lifetime.signal);
+		const rejected = expect(running).rejects.toMatchObject({ name: 'AbortError' });
+		lifetime.abort();
+		runtime.destroy();
+		revoked.resolve({ success: true });
+		await rejected;
+		expect(secretStorage.delete).not.toHaveBeenCalled();
+		expect(settings.workerUrl).toBe('https://worker.example');
+		expect(persistSettings).not.toHaveBeenCalled();
 	});
 });

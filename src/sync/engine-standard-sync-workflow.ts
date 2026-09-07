@@ -11,6 +11,7 @@ import {
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { FileDiff, SyncResult, SyncState } from './types';
 import type { FileEntry } from '../protocol/sync-types';
+import { getPathEntry } from '../protocol/path-record';
 import type { DownloadRequest } from './transfer-download';
 import type { DiffApplyOutcome } from './transfer-types';
 import {
@@ -135,7 +136,7 @@ export async function runSyncWorkflow(
 					path: diff.path,
 					expectedLocalHash: diff.localHash ?? null,
 					expectedRemoteHash: diff.remoteHash,
-					remoteSize: remoteManifest.files[diff.path]?.size ?? 0,
+					remoteSize: getPathEntry(remoteManifest.files, diff.path)?.size ?? 0,
 				});
 			}
 			await context.parallelDownloadAndSaveFiles(

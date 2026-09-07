@@ -42,6 +42,69 @@ describe('LocalManifest', () => {
 		manifest = createLocalManifest(adapter);
 	});
 
+	it.each(['__proto__', 'constructor', 'toString'])('persists, reloads and removes the literal filename %s', async path => {
+		const disk = new Map<string, string>();
+		adapter.exists.mockImplementation(async file => disk.has(file));
+		adapter.read.mockImplementation(async file => disk.get(file)!);
+		adapter.write.mockImplementation(async (file, data) => { disk.set(file, data); });
+		adapter.remove.mockImplementation(async file => { disk.delete(file); });
+		const entry = { hash: 'file-hash', size: 5, modified: '2026-01-01T00:00:00Z', revision: 'r1' };
+		expect(manifest.hasFile(path)).toBe(false);
+		expect(manifest.getEntry(path)).toBeUndefined();
+		manifest.setEntry(path, entry);
+		expect(manifest.hasFile(path)).toBe(true);
+		await manifest.save();
+
+		const reloaded = createLocalManifest(adapter);
+		await reloaded.load();
+		expect(reloaded.getAllPaths()).toEqual([path]);
+		expect(reloaded.getEntry(path)).toEqual(entry);
+		expect(reloaded.hashMatches(path, entry.hash)).toBe(true);
+		reloaded.setEntry(path, { hash: entry.hash, size: entry.size, modified: entry.modified });
+		expect(reloaded.getEntry(path)?.revision).toBe('r1');
+		reloaded.removeEntry(path);
+		await reloaded.save();
+
+		const removed = createLocalManifest(adapter);
+		await removed.load();
+		expect(removed.getFileCount()).toBe(0);
+		expect(removed.getEntry(path)).toBeUndefined();
+		expect(removed.hasFile(path)).toBe(false);
+		expect(removed.hashMatches(path, entry.hash)).toBe(false);
+	});
+
+	it('preserves literal prototype names when recovering a newer temporary checkpoint', async () => {
+		const paths = ['__proto__', 'constructor', 'toString'];
+		const files = Object.fromEntries(paths.map(path => [path, { hash: path, size: 1, modified: 'now' }]));
+		adapter.exists.mockResolvedValue(true);
+		adapter.read.mockImplementation(async path => JSON.stringify({
+			version: 1,
+			generation: path.endsWith('.tmp') ? 2 : 1,
+			files: path.endsWith('.tmp') ? files : {},
+		}));
+		await manifest.load();
+		expect(manifest.getAllPaths()).toEqual(paths);
+		const promoted = JSON.parse(adapter.write.mock.calls[0]![1]) as { files: Record<string, unknown> };
+		expect(Object.keys(promoted.files)).toEqual(paths);
+		expect(promoted.files).toEqual(files);
+	});
+
+	it('keeps replacement and cleared manifests free of inherited file entries', () => {
+		const entry = { hash: 'file-hash', size: 1, modified: 'now' };
+		const files = Object.create({ inherited: entry }) as Record<string, typeof entry>;
+		Object.defineProperty(files, '__proto__', { value: entry, enumerable: true });
+		manifest.replaceManifest({ version: 1, files });
+		expect(manifest.getAllPaths()).toEqual(['__proto__']);
+		expect(manifest.getEntry('__proto__')).toEqual(entry);
+		expect(manifest.getEntry('inherited')).toBeUndefined();
+		expect(manifest.hasFile('constructor')).toBe(false);
+		manifest.clear();
+		for (const path of ['__proto__', 'constructor', 'toString']) {
+			expect(manifest.hasFile(path)).toBe(false);
+			expect(manifest.getEntry(path)).toBeUndefined();
+		}
+	});
+
 	it('persists mutations made while an earlier checkpoint is being written', async () => {
 		const entry = { hash: 'first', size: 5, modified: '2026-01-01T00:00:00Z' };
 		manifest.setEntry('a.md', entry);

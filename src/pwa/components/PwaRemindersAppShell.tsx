@@ -21,6 +21,7 @@ import {
 	type ViewMode,
 } from '@/reminders/ui/remindersViewModel';
 import { PwaThemeIcon } from './PwaThemeIcon';
+import { ReminderPageSizeContext } from '@/reminders/ui/reminder-pagination';
 
 export type PwaReminderCardRenderer = (props: {
 	reminder: Reminder;
@@ -168,6 +169,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	);
 
 	return (
+		<ReminderPageSizeContext.Provider value={200}>
 		<ThemeIconProvider renderer={PwaThemeIcon}>
 		  <div
 				className={[
@@ -234,5 +236,6 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 				{children}
 		  </div>
 		</ThemeIconProvider>
+		</ReminderPageSizeContext.Provider>
 	);
 };

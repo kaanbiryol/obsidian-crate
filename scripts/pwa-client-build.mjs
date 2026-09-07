@@ -1,10 +1,15 @@
 import { build } from 'esbuild';
 import { basename, resolve } from 'node:path';
-import { getPwaStartupAssets } from './pwa-startup-assets.mjs';
+import { getPwaClientAssets, getPwaStartupAssets } from './pwa-startup-assets.mjs';
 
 export async function bundlePwaClient(assetVersion, root) {
 	const result = await build({
-		entryPoints: [resolve(root, 'src/pwa/main.tsx')],
+		// A second build entry gives the editor a stable chunk boundary. App still
+		// imports it statically, so first-tap keyboard activation stays synchronous.
+		entryPoints: {
+			app: resolve(root, 'src/pwa/main.tsx'),
+			'reminder-editor': resolve(root, 'src/pwa/components/ReminderSheet.tsx'),
+		},
 		bundle: true,
 		splitting: true,
 		metafile: true,
@@ -13,7 +18,7 @@ export async function bundlePwaClient(assetVersion, root) {
 		target: 'es2020',
 		write: false,
 		outdir: 'pwa-client',
-		entryNames: 'app',
+		entryNames: '[name]',
 		chunkNames: 'chunk-[hash]',
 		publicPath: '/notifications/assets',
 		minify: true,
@@ -30,8 +35,11 @@ export async function bundlePwaClient(assetVersion, root) {
 		conditions: ['browser', 'import'],
 		legalComments: 'eof',
 	});
+	const reachableAssets = new Set(getPwaClientAssets(result.metafile));
 	return {
-		assets: Object.fromEntries(result.outputFiles.map(output => [basename(output.path), output.text])),
+		assets: Object.fromEntries(result.outputFiles
+			.filter(output => reachableAssets.has(basename(output.path)))
+			.map(output => [basename(output.path), output.text])),
 		startupAssets: getPwaStartupAssets(result.metafile),
 	};
 }

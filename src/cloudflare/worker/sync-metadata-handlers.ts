@@ -3,6 +3,8 @@ import { corsResponse } from './cors';
 import { parseJsonObject, sanitizePath } from './utils';
 import { getChangelogBounds } from './sync-storage';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';
+import type { FileEntry } from '../../protocol/sync-types';
+import { createPathRecord } from '../../protocol/path-record';
 
 function batchRows<T>(result: unknown): T[] {
 	if (!result || typeof result !== 'object') return [];
@@ -72,7 +74,7 @@ export async function handleGetManifest(request: Request, db: D1Database): Promi
 	const seqRows = batchRows<{ lastSeq: number | null }>(seqResult);
 	const hasMore = filesRows.length > requestedLimit;
 	const rows = hasMore ? filesRows.slice(0, requestedLimit) : filesRows;
-	const files: Record<string, { hash: string; size: number; modified: string; revision?: string }> = {};
+	const files = createPathRecord<FileEntry>();
 	for (const row of rows) {
 		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified, revision: row.revision };
 	}
@@ -120,7 +122,7 @@ export async function handleGetFileMetadata(request: Request, db: D1Database): P
 	const rows = Array.isArray(result.results)
 		? result.results as Array<{ path: string; hash: string; size: number; modified: string; revision?: string }>
 		: [];
-	const files: Record<string, { hash: string; size: number; modified: string; revision?: string }> = {};
+	const files = createPathRecord<FileEntry>();
 	for (const row of rows) {
 		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified, revision: row.revision };
 	}

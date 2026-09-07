@@ -19,6 +19,7 @@
 @use './navigation';
 @use './home-screen-install';
 @use './reminder-sync-notices';
+@use './reminder-pagination';
 
 .crate-reminders-ui {
 	@include tokens.styles;
@@ -42,4 +43,5 @@
 	@include navigation.styles;
 	@include home-screen-install.styles;
 	@include reminder-sync-notices.styles;
+	@include reminder-pagination.styles;
 }

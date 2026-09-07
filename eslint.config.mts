@@ -192,6 +192,8 @@ export default tseslint.config(
 		".generated/**",
 		"test-vault",
 		"test-vault/**",
+		"test-results/**",
+		"playwright-report/**",
 		"esbuild.config.mjs",
 		"eslint.config.js",
 		"deploy.local.json",

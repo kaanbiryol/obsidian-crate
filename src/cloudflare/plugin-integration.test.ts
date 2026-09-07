@@ -185,4 +185,51 @@ describe('handleCloudflareOAuthProtocol', () => {
 		expect(progress.succeed).toHaveBeenCalledWith('Crate server deleted', expect.stringContaining('local vault files are kept'));
 	});
 
+	it.each(['success', 'failure'] as const)('ignores a late deployment %s after plugin unload', async outcome => {
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+		const plugin = createPlugin();
+		let release!: () => void;
+		plugin.cloudflareDeploymentService.handleCallback.mockImplementation(async () => {
+			await new Promise<void>(resolve => { release = resolve; });
+			if (outcome === 'failure') throw new Error('Interrupted');
+			return { workerUrl: 'https://crate.example.workers.dev', accountName: 'Personal' };
+		});
+		const running = handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+		await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+		endPluginLifecycle(plugin as never);
+		release();
+		await running;
+		expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
+		expect(plugin.refreshSettingsTab).not.toHaveBeenCalled();
+		expect(progress.succeed).not.toHaveBeenCalled();
+		expect(progress.fail).not.toHaveBeenCalled();
+	});
+
+	it('does not dispatch authorization after unloading during device credential hashing', async () => {
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+		const plugin = createPlugin();
+		hashToken.mockImplementationOnce(async () => {
+			endPluginLifecycle(plugin as never);
+			return 'hash';
+		});
+		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+		expect(plugin.cloudflareDeploymentService.handleCallback).not.toHaveBeenCalled();
+		expect(configureCloudflareAuthorizedDevice).not.toHaveBeenCalled();
+	});
+
+	it('ignores connection completion after plugin unload', async () => {
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+		const plugin = createPlugin();
+		configureCloudflareAuthorizedDevice.mockImplementationOnce(async () => {
+			endPluginLifecycle(plugin as never);
+			return { success: true };
+		});
+		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+		expect(plugin.refreshSettingsTab).not.toHaveBeenCalled();
+		expect(progress.succeed).not.toHaveBeenCalled();
+	});
+
 });

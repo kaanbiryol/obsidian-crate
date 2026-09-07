@@ -14,6 +14,8 @@ import { ReminderMotionRow } from '../../components/ReminderMotionRow';
 import type { ProjectColorScheme } from '../../utils/projectColors';
 import { reminderRowMotion } from '../reminderRowMotion';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { ReminderPagination, useReminderPagination } from '../reminder-pagination';
+import { groupRemindersByDate } from '../../utils/reminderSort';
 
 export interface UpcomingViewProps {
   reminders: Reminder[];
@@ -43,9 +45,11 @@ export const UpcomingView = memo(function UpcomingView({
   colorScheme = 'dark',
 }: UpcomingViewProps) {
   const reduceMotion = useObsidianReducedMotion();
-  const { upcomingReminders, dateGroups } = useMemo(() => {
+  const { upcomingReminders } = useMemo(() => {
     return buildUpcomingViewModel(reminders, days);
   }, [reminders, days]);
+  const pagination = useReminderPagination(upcomingReminders, days);
+  const dateGroups = useMemo(() => groupRemindersByDate(pagination.items), [pagination.items]);
   const enableListAnimations = animationConfig.enabled && !reduceMotion && upcomingReminders.length <= 80;
 
   // Default card renderer
@@ -78,6 +82,7 @@ export const UpcomingView = memo(function UpcomingView({
       }
     >
       <div className="space-y-6">
+        <ReminderPagination pagination={pagination} label="Upcoming reminders" />
         <AnimatePresence initial={false}>
           {dateGroups.map((group, groupIndex) => (
             <motion.div key={group.date.toISOString()} {...reminderRowMotion(enableListAnimations)}>
