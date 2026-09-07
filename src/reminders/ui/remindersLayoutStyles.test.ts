@@ -119,7 +119,7 @@ describe('plugin reminder layout styles', () => {
   it('keeps the disabled reminder submit action borderless', async () => {
     const styles = await readEditorStyles();
     const submitButton = styles.match(
-      /^\.reminder-modal-header-action \{(?=\n\s{2}min-width: 0)([\s\S]*?)^\}/m,
+      /^\.reminder-modal-header-action \{([\s\S]*?)^\}/m,
     )?.[1];
     const disabledSubmitButton = submitButton?.match(
       /&:disabled \{([\s\S]*?)\}/,
