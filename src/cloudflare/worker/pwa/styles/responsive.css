@@ -33,7 +33,7 @@
 }
 @media (max-width: 420px){
 	.pwa-reminders-view .view-header{padding:calc(var(--pwa-safe-area-top) + 17px) 18px 11px!important}
-	.pwa-header-settings-button,.pwa-header-sync-button{width:44px;height:44px;min-width:44px}
+	.pwa-header-settings-button{width:44px;height:44px;min-width:44px}
 }
 @media (max-width: 392px){
 	:root{--tabbar-h:72px}

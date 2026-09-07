@@ -308,10 +308,6 @@ function App() {
 				headerRightContent={authToken ? (
 					<PwaHeaderActions
 						settingsOpen={settingsOpen}
-						statusText={statusText}
-						statusKind={statusKind}
-						refreshing={refreshing}
-						onRefresh={() => void loadReminders({ silent: true })}
 						onToggleSettings={toggleSettings}
 					/>
 				) : undefined}
