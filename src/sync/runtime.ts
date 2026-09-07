@@ -11,6 +11,7 @@ import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
 import { SyncEngine } from './engine';
 import { normalizeWorkerUrl, requireNormalizedWorkerUrl } from './worker-url';
+import { buildDiagnosticExport } from './diagnostic-export';
 import {
 	applyInfrastructureConfigState,
 	buildSharedSettings,
@@ -83,6 +84,10 @@ export class SyncRuntime {
 		return this.syncEngine?.getPendingPaths() ?? [];
 	}
 
+	exportDiagnostics(): string {
+		return buildDiagnosticExport(this.settings, this.getState(), this.plugin.manifest.version, this.apiClient?.getRequestDiagnostics());
+	}
+
 	async previewIgnoredRemoteFiles(): Promise<string[]> {
 		if (!this.syncEngine) throw new Error('Sync is not configured');
 		return this.syncEngine.previewIgnoredRemoteFiles();
@@ -150,7 +155,7 @@ export class SyncRuntime {
 		);
 		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, this.settings);
 		const syncEngine = this.syncEngine;
-		syncEngine.setQueueSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
+		syncEngine.setAutomaticSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
 
 		if (this.settings.showStatusBar) {
 			this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
@@ -384,6 +389,8 @@ export class SyncRuntime {
 
 	private recordSyncResult(type: SyncHistoryEntry['type'], result: SyncResult): void {
 		recordSyncHistory(this.settings, type, result);
+		const latest = this.settings.syncHistory[0];
+		if (latest && this.apiClient) latest.requestDiagnostics = this.apiClient.getRequestDiagnostics();
 	}
 
 	private emitCurrentState(): void {

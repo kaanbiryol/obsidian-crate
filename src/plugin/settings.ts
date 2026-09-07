@@ -3,6 +3,7 @@
  */
 
 import { normalizeWorkerUrl } from '../sync/worker-url';
+import { normalizeRequestDiagnostics } from '../sync/request-diagnostics';
 import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment-types';
 import type { ResolvedSyncRace, SyncHistoryEntry } from '../sync/types';
 import {
@@ -125,6 +126,7 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 	if (timestamp === null || typeof value.success !== 'boolean') {
 		return null;
 	}
+	const requestDiagnostics = normalizeRequestDiagnostics(value.requestDiagnostics);
 
 	return {
 		timestamp,
@@ -139,6 +141,7 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 			errors: value.errors.filter((error): error is string => typeof error === 'string').slice(0, MAX_SYNC_HISTORY_PATHS),
 		} : {}),
 		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
+		...(requestDiagnostics ? { requestDiagnostics } : {}),
 		...(typeof value.resolvedRaceCount === 'number' ? {
 			resolvedRaceCount: normalizeNonNegativeInteger(value.resolvedRaceCount, 0),
 		} : {}),
