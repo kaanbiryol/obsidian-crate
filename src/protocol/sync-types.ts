@@ -42,7 +42,7 @@ export interface CheckResponse {
 	cursorExpired?: boolean;
 }
 
-type MutationFailureCode = 'version_conflict' | 'validation' | 'storage' | 'unknown';
+type MutationFailureCode = 'version_conflict' | 'namespace_conflict' | 'validation' | 'storage' | 'unknown';
 
 export interface UploadResult {
 	success: boolean;

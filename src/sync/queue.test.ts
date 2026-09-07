@@ -540,6 +540,19 @@ describe('processPendingChanges', () => {
 		expect(harness.state.lastError).toContain('unauthorized');
 	});
 
+	it('keeps a namespace conflict pending for explicit repair without reconciling or retrying it', async () => {
+		const harness = createFlushHarness({
+			prepareUploadFromPath: async path => ({ path, content: new ArrayBuffer(1), hash: 'local', size: 1 }),
+			uploadFile: async () => { throw new HttpError('Rename the conflicting file or parent folder', 409, null, 'namespace_conflict'); },
+		});
+		harness.pendingPaths.add('Projects.md');
+		await processPendingChanges(harness.context, 1);
+		expect(harness.pendingPaths.has('Projects.md')).toBe(true);
+		expect(harness.requestReconciliation).not.toHaveBeenCalled();
+		expect(harness.triggerDebouncedSync).not.toHaveBeenCalled();
+		expect(harness.state.lastError).toContain('Rename the conflicting file');
+	});
+
 	it('chunks mass deletes to the shared server limit', async () => {
 		const harness = createFlushHarness();
 		for (let index = 0; index < 14; index++) {

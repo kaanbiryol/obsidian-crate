@@ -3,6 +3,7 @@ import { readLimitedRequestBody } from './body-reader';
 import { corsHeaders, corsResponse } from './cors';
 import { isSha256Hex, parseJsonObject, parseOptionalString, sanitizePath } from './utils';
 import { commitFileDelete, commitStagedFile } from './sync-mutations';
+import { FileNamespaceConflictError } from './file-namespace';
 import {
 	createManagedObjectKey,
 	formatMetadataCommitFailure,
@@ -107,6 +108,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 			}
 		} catch (error: unknown) {
 			// The transaction may have committed before its response was lost.
+			if (error instanceof FileNamespaceConflictError) return error.toResponse();
 			// Only the age-delayed, reference-aware orphan sweep may reclaim it.
 			return corsResponse({
 				success: false,

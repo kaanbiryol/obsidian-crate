@@ -10,6 +10,8 @@ Manifest and metadata entries, changelog puts, upload acknowledgements, and batc
 
 Batch uploads accept three files; batch deletes accept four. Both bound D1 work below the Free-plan 50-query limit with headroom for authentication and failure cleanup. The per-file byte limit is 25 MiB. Clients report skipped oversized files as errors.
 
+Live file paths form a portable filesystem namespace: no file may also be another file's parent, including case-insensitive or Unicode-normalized aliases. Each publication checks this inside its D1 transaction. A conflicting upload, restore or reminder move returns `namespace_conflict` with HTTP 409 (or a per-file batch status); preserve the local bytes and rename the conflicting file or parent folder before retrying. Same-path edits and delete-then-create replacements remain valid. Historical changes and metadata requests may include paths that no longer coexist; clients validate the final live manifest separately. Existing invalid remote namespaces require explicit repair on an originating device and are never resolved by automatically deleting one side.
+
 Remote deletion on the plugin uses the vault's local trash regardless of the user's permanent-delete preference. The host moves the bytes present at removal, preserving an edit that arrives after the preflight hash check. Trash failures fail the operation without falling back to permanent deletion. `.trash` is always excluded from sync.
 
 ## Reminders
