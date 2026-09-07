@@ -46,7 +46,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - When installing the reminders web app, Safari carries a separate, single-use enrollment grant in the install URL and a ten-minute cookie copied into the Home Screen app. The app clears these after enrollment and keeps its own session; Safari's persistent login credential is not copied. Open the new app within ten minutes of creating the link.
 - Push notifications are optional. When enabled, your Worker sends encrypted payloads containing reminder text and project names through the push service used by the browser or operating system. The provider can observe delivery metadata such as the subscription endpoint, timing, and payload size, but cannot read the encrypted payload.
-- The reminders web app stores its scoped session in browser local storage and caches reminder and project content in IndexedDB for offline use. Signing out clears both.
+- The reminders web app stores its scoped session and pending reminder changes in browser local storage, and caches confirmed reminder and project content in IndexedDB for offline use. Signing out clears both.
 - Remote code is not fetched or evaluated at runtime.
 - Vault contents are not end-to-end encrypted by Crate. Your Cloudflare account and Worker can access the synced data.
 - Sync is not a backup. Keep an independent backup of any vault you use with Crate. The [paired D1/R2 recovery CLI](docs/recovery.md) creates verified remote archives and restores them into isolated resources.
@@ -153,6 +153,8 @@ Reminder code blocks can be embedded in notes:
 ````
 
 The Worker schedules notifications from committed Markdown using a shared folder, timezone, all-day time, and enabled setting. Another device's startup does not replace that policy. **Settings → Crate → Push notifications** shows the server's folder and timezone; explicit changes apply to all devices. The web app session is restricted to its enrolled reminders folder. Signing out clears its offline data and drafts across tabs and revokes the session's subscriptions. If remote revocation fails, the signed-out screen explains how to remove the session through connected devices in Obsidian.
+
+The reminders web app updates immediately when you save, complete, delete, or reorder a reminder. Pending changes are kept on the device and resume syncing when the app is open and connected, including after a reload. If a save is rejected, the app keeps your text with **Retry**, **Edit**, and **Discard** actions. Other rejected changes restore the confirmed state and offer **Retry** or **Dismiss**. A lost response leaves a change pending until the app can confirm the result. Browsing cached reminders while offline remains read-only; reconnect before starting a new change. Signing out clears pending changes along with the offline cache and drafts.
 
 Diagnostics flag exhausted delivery attempts. Repair session enrollment or provider access, then reschedule a missed reminder to a future time.
 

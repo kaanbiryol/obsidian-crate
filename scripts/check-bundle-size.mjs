@@ -11,9 +11,9 @@ const budgetGroups = {
 	},
 	{
 		path: 'dist/styles.css',
-		// Shared editor and picker rules currently use about 138 KB raw. Keep a tight
+		// Shared editor and picker rules currently use about 141 KB raw. Keep a tight
 		// raw ceiling and the existing 20 KB compressed limit after removing stale CSS.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '140000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '142000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '20000', 10),
 	}],
 	worker: [{
@@ -25,19 +25,20 @@ const budgetGroups = {
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
-		// The reminder editor is eager so the first tap can activate the keyboard.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '110000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '36000', 10),
+		// Eager editor focus plus durable optimistic writes and recovery controls.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '130000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '43000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '400000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '133000', 10),
+		// Includes shared calendar calculations for optimistic recurring reminders.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '450000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '150000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '465000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '145000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '158000', 10),
 	}],
 };
 

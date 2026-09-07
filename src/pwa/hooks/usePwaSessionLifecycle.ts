@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { invalidatePwaSession } from '../session-generation';
 import { clearReminderDrafts } from '../reminder-drafts';
+import { clearReminderOutbox } from '../reminder-outbox-storage';
 import { AUTH_TOKEN_KEY, finishEnrollment, loadStoredConfig } from '../config';
 import { clearCachedReminderSnapshots } from '../reminder-cache';
 import type { ApiFetch, ModalState, ShowToast, StoredConfig } from '../types';
@@ -66,6 +67,8 @@ export function usePwaSessionLifecycle({
 		invalidatePwaSession();
 		if (nextToken === null) localStorage.removeItem(AUTH_TOKEN_KEY);
 		clearReminderDrafts();
+		try { if (nextToken === null) clearReminderOutbox(); }
+		catch { showToast('error', 'Could not clear pending changes from this device. Clear this site’s data in browser settings.'); }
 		setAuthToken(nextToken);
 		resetReminderState();
 		cancelSettingsClose();
@@ -80,6 +83,7 @@ export function usePwaSessionLifecycle({
 		setAuthToken,
 		setModal,
 		setSettingsOpen,
+		showToast,
 	]);
 
 	useEffect(() => {
