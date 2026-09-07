@@ -14,6 +14,13 @@ export class StatusBarManager {
 	private iconEl: HTMLSpanElement | null = null;
 	private textEl: HTMLSpanElement | null = null;
 	private onClick: (() => void) | null;
+	private readonly activate = () => this.onClick?.();
+	private readonly onKeyDown = (event: KeyboardEvent) => {
+		if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
+			event.preventDefault();
+			this.activate();
+		}
+	};
 
 	constructor(plugin: Plugin, enabled: boolean, onClick?: () => void) {
 		this.plugin = plugin;
@@ -32,7 +39,10 @@ export class StatusBarManager {
 		this.statusBarEl = this.plugin.addStatusBarItem();
 		this.statusBarEl.addClass('crate-status-bar');
 		if (this.onClick) {
-			this.statusBarEl.addEventListener('click', this.onClick);
+			this.statusBarEl.setAttribute('role', 'button');
+			this.statusBarEl.tabIndex = 0;
+			this.plugin.registerDomEvent(this.statusBarEl, 'click', this.activate);
+			this.plugin.registerDomEvent(this.statusBarEl, 'keydown', this.onKeyDown);
 		}
 		this.update({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
 	}
@@ -80,6 +90,7 @@ export class StatusBarManager {
 			this.statusBarEl.empty();
 			this.statusBarEl.setAttribute('data-status', state.status);
 			this.iconEl = this.statusBarEl.createSpan({ cls: 'crate-status-icon' });
+			this.iconEl.setAttribute('aria-hidden', 'true');
 			if (icon) {
 				this.iconEl.textContent = icon;
 			} else {
@@ -96,10 +107,10 @@ export class StatusBarManager {
 
 		this.statusBarEl.toggleClass('crate-has-conflicts', state.conflictCount > 0);
 		if (tooltip) {
-			this.statusBarEl.setAttribute('aria-label', tooltip);
+			this.statusBarEl.setAttribute('aria-label', this.onClick ? `Open sync activity. ${text}. ${tooltip}` : tooltip);
 			this.statusBarEl.setAttribute('data-tooltip-position', 'top');
 		} else {
-			this.statusBarEl.removeAttribute('aria-label');
+			this.statusBarEl.setAttribute('aria-label', this.onClick ? `Open sync activity. ${text}.` : text);
 			this.statusBarEl.removeAttribute('data-tooltip-position');
 		}
 	}
@@ -195,6 +206,8 @@ export class StatusBarManager {
 	 */
 	destroy(): void {
 		if (this.statusBarEl) {
+			this.statusBarEl.removeEventListener('click', this.activate);
+			this.statusBarEl.removeEventListener('keydown', this.onKeyDown);
 			this.statusBarEl.remove();
 			this.statusBarEl = null;
 			this.iconEl = null;
