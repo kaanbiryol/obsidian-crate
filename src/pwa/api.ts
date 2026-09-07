@@ -1,9 +1,8 @@
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCrateMutation } from '@/protocol';
 import { capturePwaSession } from './session-generation';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
-import {
-	detectDeviceName,
-} from './config';
+import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
+import { detectWebSessionName } from './session-label';
 
 export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
 	await requireCompatibleServer();
@@ -11,7 +10,7 @@ export async function exchangeEnrollmentToken(token: string, previousAuthToken: 
 		signal: AbortSignal.timeout(30_000),
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) },
-		body: JSON.stringify({ token, deviceName: detectDeviceName(), ...(previousAuthToken ? { previousAuthToken } : {}) }),
+		body: JSON.stringify({ token, deviceName: detectWebSessionName(), ...(previousAuthToken ? { previousAuthToken } : {}) }),
 	});
 
 	if (!response.ok) {
@@ -35,6 +34,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 		const revokingSession = init.method === 'DELETE' && path === '/auth/session';
 		const headers = new Headers(init.headers ?? {});
 		headers.set('X-Crate-Client-Session', clientSession);
+		headers.set(CRATE_WEB_SESSION_NAME_HEADER, encodeURIComponent(detectWebSessionName()));
 		if (typeof init.body === 'string') {
 			try {
 				const body = JSON.parse(init.body) as { operationId?: unknown };

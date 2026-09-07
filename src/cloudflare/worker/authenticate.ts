@@ -1,5 +1,7 @@
 import { corsResponse } from './cors';
 import { sha256Hex } from './auth';
+import { parseOptionalString } from './utils';
+import { CRATE_WEB_SESSION_NAME_HEADER } from '../../protocol/web-session';
 
 type AuthScope = 'vault' | 'reminders';
 
@@ -12,6 +14,16 @@ export interface AuthPrincipal {
 export type AuthenticationResult =
 	| { principal: AuthPrincipal; response?: never }
 	| { principal?: never; response: Response };
+
+function readWebSessionName(request: Request): string | null {
+	const encoded = parseOptionalString(request.headers.get(CRATE_WEB_SESSION_NAME_HEADER), 384);
+	if (!encoded) return null;
+	try {
+		return parseOptionalString(decodeURIComponent(encoded), 128);
+	} catch {
+		return null;
+	}
+}
 
 export async function authenticateWorkerRequest(
 	request: Request,
@@ -41,10 +53,16 @@ export async function authenticateWorkerRequest(
 		}
 
 		if (row.scope === 'reminders' && !row.folder_path) return { response: corsResponse({ error: 'Open a fresh Crate web app link to renew this session' }, 401) };
+		// Refresh only this authenticated web session's display name. Older
+		// clients omit the header, and vault-device names stay user-controlled.
+		const sessionName = row.scope === 'reminders'
+			? readWebSessionName(request)
+			: null;
 		await db.prepare(`UPDATE auth_tokens
-			SET last_seen_at = datetime('now')
-			WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at < datetime('now', '-6 hours'))`)
-			.bind(row.id)
+			SET device_name = COALESCE(?, device_name), last_seen_at = datetime('now')
+			WHERE id = ? AND ((? IS NOT NULL AND (device_name IS NULL OR device_name != ?))
+				OR last_seen_at IS NULL OR last_seen_at < datetime('now', '-6 hours'))`)
+			.bind(sessionName, row.id, sessionName, sessionName)
 			.run();
 		return {
 			principal: {

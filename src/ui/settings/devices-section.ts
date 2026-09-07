@@ -23,10 +23,10 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 	const isActive = () => !disposed && plugin.settingsUiState.devices === cache;
 	let refreshButton: ButtonComponent;
 
-	createSettingsSectionHeading(containerEl, 'Devices');
+	createSettingsSectionHeading(containerEl, 'Devices and sessions');
 	new Setting(containerEl)
-		.setName('Connected devices')
-		.setDesc('Remove sync access for devices you no longer use.')
+		.setName('Connected devices and sessions')
+		.setDesc('Browsers and home screen apps appear separately, even on the same device.')
 		.addButton(button => {
 			refreshButton = button.setButtonText('Refresh');
 			button.onClick(() => { void refresh(); });
@@ -54,11 +54,14 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 			setting.addButton(button => {
 				button.setButtonText('Remove').setDestructive();
 				button.onClick(async () => {
+					const webSession = token.platform === 'pwa';
 					const confirmed = await openConfirmationModal(plugin.app, {
-						title: 'Remove device',
-						message: `${label} will lose sync access.`,
-						details: ['Sign in with Cloudflare on that device to reconnect.'],
-						confirmText: 'Remove device',
+						title: webSession ? 'Remove session' : 'Remove device',
+						message: `${label} will lose ${webSession ? 'access to reminders' : 'sync access'}.`,
+						details: [webSession
+							? 'Open a fresh app link from Crate in Obsidian to reconnect.'
+							: 'Sign in with Cloudflare on that device to reconnect.'],
+						confirmText: webSession ? 'Remove session' : 'Remove device',
 						warning: true,
 					});
 					if (!confirmed || !isActive()) return;
@@ -158,6 +161,8 @@ function formatDateTime(value: string): string {
 
 function formatPlatform(value: string): string {
 	switch (value) {
+		case 'pwa':
+			return 'Reminders web session';
 		case 'ios':
 			return 'iOS';
 		case 'android':
