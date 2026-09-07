@@ -469,6 +469,10 @@ export class SyncRuntime {
 		);
 	}
 
+	async verifyAllFiles(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
+		return this.runSyncOperation('sync', (engine, callback) => engine.sync(callback, true), progressCallback, 'Content verification triggered');
+	}
+
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		return this.runSyncOperation(
 			'force',

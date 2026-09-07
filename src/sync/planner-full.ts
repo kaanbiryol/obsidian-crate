@@ -18,26 +18,11 @@ export async function createFullSyncPlan(
   );
   const eligible = files.filter((file) => file.size <= MAX_FILE_SIZE_BYTES);
 
-  for (const file of eligible) {
-    const existing = context.localManifest.getEntry(file.path);
-    if (existing && existing.size === file.size) {
-      const manifestMtime = new Date(existing.modified).getTime();
-      if (!Number.isNaN(manifestMtime) && manifestMtime === file.mtime) {
-        localFiles[file.path] = {
-          hash: existing.hash,
-          size: file.size,
-          modified: new Date(file.mtime).toISOString(),
-        };
-      }
-    }
-  }
-
   const hashTasks = eligible
-    .filter((file) => !getPathEntry(localFiles, file.path))
     .map((file) => async () => {
       const content = await context.vault.adapter.readBinary(file.path);
       const hash = await computeHash(content);
-      return { path: file.path, hash, size: file.size, mtime: file.mtime };
+      return { path: file.path, hash, size: content.byteLength, mtime: file.mtime };
     });
   const hashed = await context.runConcurrent(hashTasks, prepareConcurrency);
   for (const entry of hashed) {

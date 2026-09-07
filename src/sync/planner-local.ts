@@ -26,6 +26,7 @@ export async function getLocalChanges(
 ): Promise<Array<{ path: string; hash: string }>> {
   const changes: Array<{ path: string; hash: string }> = [];
   const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context));
+  await context.verifyContent?.(allFiles);
 
   for (const file of allFiles) {
     if (file.size > MAX_FILE_SIZE_BYTES) changes.push({ path: file.path, hash: context.localManifest.getEntry(file.path)?.hash ?? "" });
@@ -50,6 +51,7 @@ export async function getLocalChanges(
       return { path: file.path, hash };
     }
     context.localManifest.setEntry(file.path, {
+      ...existing,
       hash,
       size: file.size,
       modified: new Date(file.mtime).toISOString(),

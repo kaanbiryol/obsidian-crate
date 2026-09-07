@@ -5,6 +5,7 @@ import type { DownloadDiff, FileDiff, PreparedUpload, SyncResult, UploadDiff } f
 import type { DownloadRequest } from './transfer-download';
 import type { DiffApplyOutcome } from './transfer-types';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
+import type { VaultFile } from './file-discovery';
 
 interface PlannerManifest {
   getEntry(path: string): FileEntry | undefined;
@@ -35,6 +36,7 @@ export interface LocalDiffPlannerContext {
   vault: Vault;
   localManifest: PlannerManifest;
   shouldIgnore(path: string): boolean;
+  verifyContent?(files: VaultFile[]): Promise<boolean>;
   runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 }
 
