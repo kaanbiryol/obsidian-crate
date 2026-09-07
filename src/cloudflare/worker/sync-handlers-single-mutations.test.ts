@@ -212,6 +212,9 @@ it('rejects traversal-style upload paths', async () => {
 		expect(await responseJson(response)).toEqual({
 			success: true,
 			path: 'notes/test.md',
+			consumedRevision: managedKey,
+			revision: expect.stringMatching(/^__crate__\/deletions\//),
+			deleteRequestId: expect.any(String),
 		});
 		expect(files.has('notes/test.md')).toBe(false);
 		expect(new TextDecoder().decode(store.get(managedKey)?.body)).toBe('before');
