@@ -49,7 +49,7 @@ export function SettingsSheet({
 	const [upcomingDraft, setUpcomingDraft] = useState(String(config.upcomingDays));
 	const defaultScreenPointerSelection = useRef(false);
 	const notificationDescription = push.status
-		?? (push.subscribed ? 'Reminders are enabled on this device.' : 'Get alerts when Crate is closed.');
+		?? (push.phase === 'enabled' ? 'Reminders are enabled on this device.' : 'Get alerts when Crate is closed.');
 	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
 		activeKey: 'settings',
 		escapeDisabled: loggingOut || isClosing,
@@ -161,13 +161,17 @@ export function SettingsSheet({
 									<strong>Push notifications</strong>
 									<span aria-live="polite">{notificationDescription}</span>
 								</div>
-								{push.subscribed ? (
+								{push.phase === 'enabled' ? (
 									<span className="settings-status is-success"><Check size={12} /> On</span>
-								) : homeScreenPlatform === 'ios' ? (
+								) : push.phase === 'checking' ? (
+									<span className="settings-status" role="status">Checking…</span>
+								) : push.phase === 'blocked' ? (
+									<span className="settings-status">Blocked</span>
+								) : homeScreenPlatform === 'ios' || push.phase === 'install' ? (
 									<span className="settings-status">Install first</span>
-								) : push.supported ? (
+								) : push.phase === 'off' || push.phase === 'error' ? (
 									<Button className="settings-action-button" type="button" data-action="enable-push" onClick={onEnablePush}>
-										Enable
+										{push.phase === 'error' ? 'Retry' : 'Enable'}
 									</Button>
 								) : (
 									<span className="settings-status">Not supported</span>
