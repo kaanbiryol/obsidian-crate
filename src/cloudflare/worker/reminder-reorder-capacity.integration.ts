@@ -46,3 +46,26 @@ it('keeps finite item and JSON byte limits for reorder requests', async () => {
 	expect((await handleReorderReminders(reorderRequest({ orderedIds: ids, expectedOrder: [] }), env)).status).toBe(400);
 	expect((await handleReorderReminders(reorderRequest({ orderedIds: [], expectedOrder: [], padding: 'x'.repeat(1024 * 1024) }), env)).status).toBe(413);
 });
+
+it.each([
+	['first', 'first'],
+	['second', 'missing'],
+	['second', 'done'],
+])('returns an actionable conflict for ambiguous requested order %j without publishing changes', async (...orderedIds) => {
+	const content = '- [ ] Original <!-- crate-id:first -->\n- [ ] Another <!-- crate-id:second -->\n- [x] Completed <!-- crate-id:done -->\n';
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+	const original = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path);
+	const operationId = crypto.randomUUID();
+	const response = await handleReorderReminders(reorderRequest({
+		orderedIds, expectedOrder: ['first', 'second', 'done'], operationId,
+	}), env);
+
+	expect(response.status).toBe(409);
+	expect(await response.json()).toEqual({
+		error: 'Reminder order changed. Refresh the project before reordering; nothing was changed.',
+		code: 'reminder_order_conflict',
+	});
+	expect(await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path)).toEqual(original);
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM changelog').first()).toEqual({ count: 1 });
+	expect(await env.DB.prepare('SELECT operation_id FROM reminder_operations WHERE operation_id = ?').bind(operationId).first()).toBeNull();
+});
