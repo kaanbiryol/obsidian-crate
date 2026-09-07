@@ -141,6 +141,7 @@ export interface BackendDiagnostics {
 	lastMaintenanceError: string | null;
 	oldestNotificationFailureAt?: string | null;
 	oldestOverdueNotificationAt?: string | null;
+	notificationProjectionIssues?: Array<{ path: string; reason: string }>;
 }
 
 export interface RegisteredDevice {

@@ -1,6 +1,6 @@
 import { readStoredMarkdownFiles, type StoredMarkdownFileMetadata } from '../../storage';
 import type { Env } from '../../types';
-import { scanReminderMarkdownFile } from '../scan';
+import { parseReminderSource } from '../../reminder-source-parse';
 import {
 	REMINDER_INDEX_WARM_MAX_BYTES,
 	REMINDER_INDEX_MAX_FILE_BYTES,
@@ -37,6 +37,6 @@ export async function parseReminderCacheEntries(
 	return skipped.concat(freshFiles.map((file): ReminderFileCacheEntry => ({
 		filePath: file.path,
 		fileHash: file.hash,
-		reminders: scanReminderMarkdownFile(file.path, file.content, folderPath),
+		...parseReminderSource(file.path, file.content, folderPath),
 	})));
 }

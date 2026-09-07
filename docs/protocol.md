@@ -24,7 +24,7 @@ Update, completion, and delete require `expectedRevision`, a semantic digest cap
 
 Timed values persist UTC ISO instants, including seconds/milliseconds. Recurrence metadata stores timezone, count, end date, and progress in `crate-rule` comments. A manual change to the visible recurrence text invalidates hidden metadata. All-day values remain calendar dates; the saved server timezone determines notification time.
 
-The web index reads at most 20 files and 2 MiB in aggregate per warming request, with a 1 MiB limit per note. Oversized notes and cache records produce persistent per-file issues, while other reminders remain available. Warming responses use 202 with progress counts and bounded retry delays. Web edits cannot grow a note beyond the 1 MiB index limit.
+The web index reads at most 20 files and 2 MiB in aggregate per warming request, with a 1 MiB limit per note. Oversized notes, malformed reminder metadata, and oversized cache records produce persistent per-file issues, while other reminders remain available. Warming responses use 202 with progress counts and bounded retry delays. Web edits cannot grow a note beyond the 1 MiB index limit.
 
 ## Notification authority
 
@@ -52,7 +52,7 @@ Only the current formats are supported: D1 `crate_schema` version 2, IndexedDB v
 
 A local download or merge is marked clean only after its current bytes and captured modification time verify together. A valid remote baseline with unverified local metadata remains detectable after restart.
 
-Every committed Markdown file records its reminder identities and each dated occurrence’s first observation in the file transaction. Observations survive title edits, renames and project moves. A reminder first observed before its deadline remains eligible when projection runs late. Delivery is attempted for up to 24 hours after its deadline; older eligible occurrences retain a failed-delivery diagnostic. Newly imported historical occurrences are not scheduled. Completed-occurrence receipts still suppress replay.
+Every successfully parsed Markdown file records its reminder identities and each dated occurrence’s first observation in the file transaction. If optional reminder parsing fails, general sync still commits the exact file bytes and a projection issue in that transaction, including without a notification policy or outside its folder. The previous verified identities, observations, and projections remain intact; uncertain parsing never authorizes cancellation. The web list and plugin diagnostics identify affected source paths. Publishing repaired content clears the issue and queues projection again; explicit file deletion remains authoritative. Observations survive title edits, renames and project moves. A reminder first observed before its deadline remains eligible when projection runs late. Delivery is attempted for up to 24 hours after its deadline; older eligible occurrences retain a failed-delivery diagnostic. Newly imported historical occurrences are not scheduled. Completed-occurrence receipts still suppress replay.
 
 Duplicate identities within the configured reminders folder quarantine projection and are omitted from the web list with per-file issues. Editing an ambiguous identity returns 409. Committing a repair or deletion queues all affected source files again.
 

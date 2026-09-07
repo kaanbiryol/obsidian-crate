@@ -1,23 +1,28 @@
-import { scanReminderMarkdownFile } from './reminders-web/scan';
-import { REMINDER_INDEX_MAX_FILE_BYTES } from './reminders-web/reminder-cache/types';
+import { parseReminderSource } from './reminder-source-parse';
 
 /** File bytes, identity ownership and first observation share one commit. */
 export function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null): D1PreparedStatement[] {
   if (!path.toLowerCase().endsWith('.md')) return [];
-  const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content;
-  const reminders = bytes && bytes.byteLength <= REMINDER_INDEX_MAX_FILE_BYTES
-    ? scanReminderMarkdownFile(path, new TextDecoder().decode(bytes), '') : [];
+  const guard = storageKey === null ? 'NOT EXISTS (SELECT 1 FROM files WHERE path = ?)'
+    : 'EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)';
+  const args = storageKey === null ? [path] : [path, storageKey];
+  const token = crypto.randomUUID();
+  const parsed = content === null ? { reminders: [], issue: undefined } : parseReminderSource(path, content);
+  if (parsed.issue) {
+    // Preserve the last verified identities and schedules. This quarantine is
+    // published only when the new file revision commits in the same D1 batch.
+    return [db.prepare(`INSERT INTO notification_projection_jobs (path, job_token, last_error)
+      SELECT ?, ?, ? WHERE ${guard}
+      ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token,
+        last_error = excluded.last_error, updated_at = datetime('now')`).bind(path, token, parsed.issue, ...args)];
+  }
   const sources = new Map<string, { id: string; due: string; count: number }>();
-  for (const reminder of reminders) {
+  for (const reminder of parsed.reminders) {
     const prior = sources.get(reminder.id);
     if (prior) prior.count++;
     else sources.set(reminder.id, { id: reminder.id, due: reminder.dueDatetime ?? reminder.dueDate ?? '', count: 1 });
   }
   const json = JSON.stringify([...sources.values()]);
-  const guard = storageKey === null ? 'NOT EXISTS (SELECT 1 FROM files WHERE path = ?)'
-    : 'EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)';
-  const args = storageKey === null ? [path] : [path, storageKey];
-  const token = crypto.randomUUID();
   return [
     // Revisit other owners on both collision and repair, including deletion.
     db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
