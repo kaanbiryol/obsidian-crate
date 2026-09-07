@@ -68,10 +68,8 @@
             cursor: grabbing;
         }
 
-        &.is-long-press-armed,
-        &.is-reordering {
-            .premium-reminder-content,
-            .reminder-card__main {
+        &:is(.is-long-press-armed, .is-reordering) {
+            :is(.premium-reminder-content, .reminder-card__main) {
                 transform: scale(1);
                 background: var(--crate-reminder-card-bg, var(--crate-panel-bg));
                 border-color: var(--crate-reminder-card-border, var(--crate-divider));

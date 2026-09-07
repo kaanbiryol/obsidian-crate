@@ -283,7 +283,7 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('pwa-sheet-grabber');
 		expect(html).not.toContain('--pwa-sheet-drag-');
 		expect(html).toContain('.crate-reminders-ui .reorderable-reminder-item[data-reorder-interaction] {');
-		expect(html).toContain('.crate-reminders-ui .reorderable-reminder-item[data-reorder-interaction].is-reordering .premium-reminder-content');
+		expect(html).toContain('.crate-reminders-ui .reorderable-reminder-item[data-reorder-interaction]:is(.is-long-press-armed, .is-reordering) :is(.premium-reminder-content, .reminder-card__main)');
 		expect(html).toContain('--crate-reminder-card-hover-shadow: none;');
 		expect(html).not.toContain('transform:scale(1.025)');
 		expect(html).toContain('.crate-reminders-ui .premium-checkbox {');

@@ -3,13 +3,15 @@ import { classifyPaths } from "./reconciliation";
 import { getAllVaultFiles } from "./file-discovery";
 import type { FullSyncPlan, FullSyncPlannerContext } from "./planner-types";
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
+import type { FileEntry } from '../protocol/sync-types';
+import { createPathRecord, getPathEntry } from '../protocol/path-record';
 
 export async function createFullSyncPlan(
   context: FullSyncPlannerContext,
-  remoteFiles: Record<string, import("../protocol/sync-types").FileEntry>,
+  remoteFiles: Record<string, FileEntry>,
   prepareConcurrency: number,
 ): Promise<FullSyncPlan> {
-  const localFiles: Record<string, import("../protocol/sync-types").FileEntry> = {};
+  const localFiles = createPathRecord<FileEntry>();
   const files = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context));
   const largeLocalPaths = new Set(
     files.filter((file) => file.size > MAX_FILE_SIZE_BYTES).map((file) => file.path),
@@ -31,7 +33,7 @@ export async function createFullSyncPlan(
   }
 
   const hashTasks = eligible
-    .filter((file) => !(file.path in localFiles))
+    .filter((file) => !getPathEntry(localFiles, file.path))
     .map((file) => async () => {
       const content = await context.vault.adapter.readBinary(file.path);
       const hash = await computeHash(content);
@@ -53,18 +55,19 @@ export async function createFullSyncPlan(
   }
 
   for (const path of Object.keys(manifestEntries)) {
-    if (!localFiles[path] && !remoteFiles[path]) {
+    if (!getPathEntry(localFiles, path) && !getPathEntry(remoteFiles, path)) {
       context.localManifest.removeEntry(path);
     }
   }
 
   for (const [path, local] of Object.entries(localFiles)) {
-    if (local.hash === remoteFiles[path]?.hash) context.localManifest.setEntry(path, { ...local, revision: remoteFiles[path]?.revision });
+    const remoteEntry = getPathEntry(remoteFiles, path);
+    if (local.hash === remoteEntry?.hash) context.localManifest.setEntry(path, { ...local, revision: remoteEntry.revision });
   }
 
   const errors: string[] = [...largeLocalPaths].map(path => `${path}: Skipped local file larger than 25MB`);
   for (const [path, diff] of [...diffMap.entries()]) {
-    const remoteEntry = remoteFiles[path];
+    const remoteEntry = getPathEntry(remoteFiles, path);
     if (context.shouldIgnore(path)) {
       diffMap.delete(path);
       continue;

@@ -1,0 +1,30 @@
+@mixin styles {
+  .reminder-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 0;
+    color: var(--text-muted);
+    font-size: 13px;
+
+    .reminder-pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button, select {
+      min-height: 44px;
+      padding: 0 8px;
+      color: var(--text-normal);
+      background: var(--background-secondary);
+      border: 1px solid var(--background-modifier-border);
+      border-radius: 8px;
+      font: inherit;
+    }
+
+    [aria-disabled="true"] { opacity: 0.45; }
+  }
+}

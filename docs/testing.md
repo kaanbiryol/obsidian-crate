@@ -15,6 +15,44 @@ npx vitest run src/sync/planner-full.test.ts   # single test file
 
 `vitest.cloudflare.config.ts` uses Cloudflare's Vitest plugin with `wrangler.jsonc`. The runtime suite applies the initial schema to an isolated D1 database and exercises real D1, R2, and Durable Object bindings locally.
 
+`sync-engine.integration.ts` runs separate real sync engines through the authenticated Worker API. Each simulated device retains its own files, settings and disk checkpoints across restarts. It checks three-device offline merging, edit/delete ordering, rename/edit races, interrupted uploads after the server commits, binary conflict preservation, and filenames such as `__proto__`. Only the Obsidian filesystem/UI surface is simulated; planning, transfer, HTTP serialization, authentication, D1 and R2 use production code.
+
+## Reminder capacity measurements
+
+```bash
+npm run benchmark:reminders
+```
+
+This repeatable local benchmark also runs as part of the Worker integration suite. Its verbose reporter emits structured measurements for 1,000 and 10,000 reminders: warm folders with one reminder per file, and cold folders with ten reminders per file. It verifies complete, unique results, cache-warming progress, and unchanged responses. It records wall time, response bytes and prepared SQL statements; it does not measure hosted CPU limits, real network latency, browser rendering or device memory.
+
+On September 7, 2026, using Node 24.0.0 and local workerd after the cache decoding improvement:
+
+| Scenario | Files | Reminders | Warm response range | Response bytes | Cold indexing requests |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| One reminder per file | 1,000 | 1,000 | 13–25 ms | 288,930 | Not measured |
+| One reminder per file | 10,000 | 10,000 | 117–133 ms | 2,898,930 | Not measured |
+| Ten reminders per file | 100 | 1,000 | 17–28 ms | 276,240 | 5 |
+| Ten reminders per file | 1,000 | 10,000 | 80–98 ms | 2,771,940 | 50 |
+
+Warm lists prepared three SQL statements; unchanged requests prepared one and took 2–21 ms across these cases. Cold indexing took 137 ms and 1,772 ms of local request time, respectively. The browser additionally honors a one-second delay between warming requests: the 50-request case therefore incurs about 49 seconds of deliberate waiting, plus request time. These are local samples, not latency guarantees or a production capacity certification.
+
+The full list still grows with folder size. Before promising support for large folders, repeat the 1,000/10,000 cases on a disposable hosted deployment and physical devices, recording Worker CPU/errors, D1 rows read, transfer size, time to first usable screen, scroll responsiveness and memory. If large folders are a release requirement, use these measurements to set the supported limit and evaluate a paginated per-reminder index; do not infer hosted support from the local pass.
+
+### Browser list capacity
+
+`npm run benchmark:pwa` measures the production PWA with a local synthetic API in Chromium and WebKit at a 390 × 844 viewport. It is also included in `test:pwa-browser`. The test checks page navigation, off-page editing, saved changes, complete reorder payloads and bounded rendered rows at 1,000 and 10,000 reminders. The fixture deliberately stresses a single Inbox; it does not claim that 10,000 reminders fit the real per-file indexing limits.
+
+The PWA now pages active, completed and date-grouped lists in batches of 200. A native page selector reaches any range. Paging affects rendered rows only: counts, cache, edits and reorder validation retain the full data. Obsidian's plugin views keep their existing behavior.
+
+| Local 10,000-reminder Inbox | Before paging | With paging |
+| --- | ---: | ---: |
+| Chromium: first usable list | 7.24 s | 0.227 s |
+| WebKit: first usable list | 23.07 s | 0.282 s |
+| Mounted cards | 10,000 | 200 |
+| DOM elements | 160,114 | 3,372 |
+
+These are unthrottled local samples from September 7, 2026, with service workers disabled, not physical-device or network guarantees. The server still returns the full folder response. Reordering now accepts up to 10,000 IDs while retaining the 1 MiB request limit, stale-order checks and idempotent receipts; a real D1/R2 regression verifies reordering inside a 1,000-reminder project without changing other rows.
+
 ## Release verification
 
 Run the release gate before publishing either deliverable:
@@ -24,6 +62,8 @@ npm run release:check
 ```
 
 It builds and checks both TypeScript targets, runs lint, dead-code analysis of both the full project and production dependency graph, the complete unit and Worker-runtime suites, and the PWA preview smoke test. It then creates production plugin and Worker artifacts, enforces raw/gzip size budgets, validates manifest/version consistency and required Wrangler bindings, and checks for the OAuth deployment entry point.
+
+Asset limits are defined once in `scripts/bundle-budgets.mjs`; the artifact checks and PWA smoke test use the same byte limits. Tagged builds attach verified assets to a draft GitHub release. Publish the draft only after completing the physical-device and hosted acceptance record below.
 
 The individual size gates are also available as `npm run size-check:plugin` and `npm run size-check:worker`. A Cloudflare configuration change should additionally pass:
 

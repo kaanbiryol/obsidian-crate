@@ -152,6 +152,7 @@ function App() {
 		setLoading,
 		setSelectedProject,
 		setStartTab,
+		showToast,
 	});
 
 	const updateAvailable = usePwaRefreshLifecycle({

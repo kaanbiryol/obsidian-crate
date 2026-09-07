@@ -8,16 +8,19 @@ interface ApplyInfrastructureConfigInput {
   authToken: string;
 }
 
-export async function deleteManifestFile(plugin: Plugin): Promise<void> {
+export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
   const path = `${plugin.manifest.dir}/file-manifest.json`;
   const adapter = plugin.app.vault.adapter;
   try {
     if (await adapter.exists(path)) {
+      signal?.throwIfAborted();
       await adapter.remove(path);
     }
   } catch {
     // best effort
   }
+  signal?.throwIfAborted();
 }
 
 export function applyInfrastructureConfigState(

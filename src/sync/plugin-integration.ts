@@ -8,6 +8,7 @@ import { openConfirmationModal } from '../ui/confirmation-modal';
 import { applySharedSettings } from './shared-settings';
 import { SyncApiClient } from './api';
 import { errorMessage } from '../plugin/logger';
+import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
 
@@ -174,18 +175,23 @@ export async function configureCloudflareAuthorizedDevice(
 	workerUrl: string,
 	authToken: string,
 ): Promise<{ success: boolean; error?: string }> {
+	const signal = getPluginLifecycleSignal(plugin);
+	signal.throwIfAborted();
 	const api = new SyncApiClient(workerUrl, authToken);
 	try {
 		const { settings } = await api.getSharedSettings();
+		signal.throwIfAborted();
 		if (settings) applySharedSettings(plugin.settings, settings);
 	} catch {
 		// Shared settings are optional during first connection.
 	}
+	signal.throwIfAborted();
 
 	await plugin.syncRuntime.applyInfrastructureConfig({
 		workerUrl,
 		authToken,
-	});
+	}, signal);
+	signal.throwIfAborted();
 
 	void plugin.syncRuntime.pushSharedSettingsBestEffort();
 	return await plugin.syncRuntime.testConnection();

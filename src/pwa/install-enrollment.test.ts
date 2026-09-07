@@ -74,3 +74,46 @@ it('recognizes a spent icon grant without storing its secret or blocking a fresh
 	expect(wasEnrollmentRedeemed(await enrollmentFingerprint('used-on-first-launch'))).toBe(true);
 	expect(wasEnrollmentRedeemed(await enrollmentFingerprint('fresh-reconnect-link'))).toBe(false);
 });
+
+it('retains the installed icon identity and recent renewals with bounded storage', async () => {
+	const fingerprints = await Promise.all(Array.from({ length: 40 }, (_, index) => enrollmentFingerprint(`grant-${index}`)));
+	for (const fingerprint of fingerprints) rememberRedeemedEnrollment(fingerprint);
+	expect(wasEnrollmentRedeemed(fingerprints[0]!)).toBe(true);
+	expect(wasEnrollmentRedeemed(fingerprints[1]!)).toBe(false);
+	expect(wasEnrollmentRedeemed(fingerprints[38]!)).toBe(true);
+	expect(wasEnrollmentRedeemed(fingerprints[39]!)).toBe(true);
+	const history: unknown = JSON.parse(localStorage.getItem('crate-reminders-redeemed-enrollment')!);
+	expect(history).toHaveLength(32);
+	rememberRedeemedEnrollment(fingerprints[0]!);
+	expect(JSON.parse(localStorage.getItem('crate-reminders-redeemed-enrollment')!)).toEqual(history);
+});
+
+it('migrates the previous single fingerprint without losing the original icon', async () => {
+	const original = await enrollmentFingerprint('original-install');
+	const renewal = await enrollmentFingerprint('renewal');
+	localStorage.setItem('crate-reminders-redeemed-enrollment', original);
+	expect(wasEnrollmentRedeemed(original)).toBe(true);
+	rememberRedeemedEnrollment(renewal);
+	expect(wasEnrollmentRedeemed(original)).toBe(true);
+	expect(wasEnrollmentRedeemed(renewal)).toBe(true);
+});
+
+it('pins the actual installed grant when browser and Home Screen share storage', async () => {
+	rememberRedeemedEnrollment(await enrollmentFingerprint('browser-before-install'));
+	const installed = await enrollmentFingerprint('original-home-screen-grant');
+	rememberRedeemedEnrollment(installed, true);
+	for (let index = 0; index < 40; index++) {
+		rememberRedeemedEnrollment(await enrollmentFingerprint(`renewal-${index}`), true);
+	}
+	clearInstallEnrollment();
+	expect(wasEnrollmentRedeemed(installed)).toBe(true);
+	expect(localStorage.getItem('crate-reminders-installed-enrollment')).toBe(installed);
+});
+
+it.each(['not json', '{}', '[null, false, "not-a-fingerprint"]'])('ignores corrupt history: %s', async raw => {
+	const fingerprint = await enrollmentFingerprint('new-install');
+	localStorage.setItem('crate-reminders-redeemed-enrollment', raw);
+	expect(wasEnrollmentRedeemed(fingerprint)).toBe(false);
+	rememberRedeemedEnrollment(fingerprint);
+	expect(wasEnrollmentRedeemed(fingerprint)).toBe(true);
+});

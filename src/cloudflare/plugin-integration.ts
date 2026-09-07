@@ -1,5 +1,6 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
+import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { CloudflareDeploymentService } from './deployment-service';
 import { loadEmbeddedCloudflareArtifacts } from './embedded-artifacts';
 import { obsidianHttpTransport } from './http';
@@ -14,6 +15,7 @@ import {
 } from './oauth-config';
 
 export function createCloudflareDeploymentService(plugin: CratePlugin): CloudflareDeploymentService {
+	const signal = getPluginLifecycleSignal(plugin);
 	return new CloudflareDeploymentService({
 		clientId: CLOUDFLARE_OAUTH_CLIENT_ID,
 		settingsOwner: plugin,
@@ -24,14 +26,18 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 		},
 		selectDeployment: deployments => selectCloudflareServer(plugin.app, deployments),
 		beforeServerReset: async () => {
+			signal.throwIfAborted();
 			plugin.clearSettingsUiState();
-			await plugin.syncRuntime.clearSyncConfiguration();
+			await plugin.syncRuntime.clearSyncConfiguration(signal);
+			signal.throwIfAborted();
 			plugin.refreshSettingsTab();
 		},
 	});
 }
 
 export async function startCloudflareDeployment(plugin: CratePlugin, intent?: 'update' | 'reset' | 'delete'): Promise<void> {
+	const signal = getPluginLifecycleSignal(plugin);
+	if (signal.aborted) return;
 	if (!isCloudflareOAuthConfigured()) {
 		new Notice('This build has no Cloudflare deployment client configured');
 		return;
@@ -39,6 +45,7 @@ export async function startCloudflareDeployment(plugin: CratePlugin, intent?: 'u
 	try {
 		await plugin.cloudflareDeploymentService.startDeployment(intent ?? (plugin.syncRuntime.isConfigured() ? 'update' : 'connect'));
 	} catch (error) {
+		if (signal.aborted) return;
 		new Notice(`Could not start Cloudflare deployment: ${deploymentErrorMessage(error)}`);
 	}
 }
@@ -47,6 +54,8 @@ export async function handleCloudflareOAuthProtocol(
 	plugin: CratePlugin,
 	params: Record<string, string>,
 ): Promise<void> {
+	const signal = getPluginLifecycleSignal(plugin);
+	if (signal.aborted) return;
 	plugin.openSettingsTab();
 	const isDelete = plugin.cloudflareDeploymentService.pendingIntent === 'delete';
 	const isReset = plugin.cloudflareDeploymentService.pendingIntent === 'reset';
@@ -60,17 +69,22 @@ export async function handleCloudflareOAuthProtocol(
 	const deviceToken = shouldConnectDevice ? generateSecureToken() : null;
 	let deployment;
 	try {
+		const device = deviceToken ? {
+			tokenHash: await hashToken(deviceToken),
+			deviceId: plugin.settings.deviceId,
+			deviceName: getCurrentDeviceName(plugin.settings.deviceId),
+			platform: getCurrentPlatformCode(),
+		} : undefined;
+		if (signal.aborted) return;
 		deployment = await plugin.cloudflareDeploymentService.handleCallback(
 			params,
-			deviceToken ? {
-				tokenHash: await hashToken(deviceToken),
-				deviceId: plugin.settings.deviceId,
-				deviceName: getCurrentDeviceName(plugin.settings.deviceId),
-				platform: getCurrentPlatformCode(),
-			} : undefined,
-			message => progress.setWorking(isReset ? 'Resetting Crate server' : isDelete ? 'Deleting Crate server' : shouldConnectDevice ? 'Setting up Crate' : 'Updating Crate server', message),
+			device,
+			message => {
+				if (!signal.aborted) progress.setWorking(isReset ? 'Resetting Crate server' : isDelete ? 'Deleting Crate server' : shouldConnectDevice ? 'Setting up Crate' : 'Updating Crate server', message);
+			},
 		);
 	} catch (error) {
+		if (signal.aborted) return;
 		if (isDelete) {
 			plugin.refreshSettingsTab();
 			progress.fail('Server deletion failed', 'Crate couldn’t finish deleting your Cloudflare server.',
@@ -102,6 +116,7 @@ export async function handleCloudflareOAuthProtocol(
 		);
 		return;
 	}
+	if (signal.aborted) return;
 
 	if (deployment.deleted) {
 		plugin.refreshSettingsTab();
@@ -131,6 +146,7 @@ export async function handleCloudflareOAuthProtocol(
 			deviceToken,
 		);
 	} catch (error) {
+		if (signal.aborted) return;
 		plugin.refreshSettingsTab();
 		progress.fail(
 			'Could not connect this device',
@@ -139,6 +155,7 @@ export async function handleCloudflareOAuthProtocol(
 		);
 		return;
 	}
+	if (signal.aborted) return;
 
 	plugin.refreshSettingsTab();
 	if (!connection.success) {

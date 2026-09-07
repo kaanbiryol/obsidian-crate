@@ -5,7 +5,6 @@ import {
   getOverdueReminders,
   getTodayReminders,
   getUpcomingReminders,
-  groupRemindersByDate,
   sortReminders,
   sortRemindersByFileOrder,
 } from "@/reminders/utils/reminderSort";
@@ -79,13 +78,9 @@ export function buildUpcomingViewModel(
   days: number,
 ): {
   upcomingReminders: Reminder[];
-  dateGroups: Array<{ date: Date; reminders: Reminder[] }>;
 } {
   const upcomingReminders = sortReminders(getUpcomingReminders(reminders, days));
-  return {
-    upcomingReminders,
-    dateGroups: groupRemindersByDate(upcomingReminders),
-  };
+  return { upcomingReminders };
 }
 
 export function buildProjectStatsMap(reminders: Reminder[]): Map<string, ProjectStats> {

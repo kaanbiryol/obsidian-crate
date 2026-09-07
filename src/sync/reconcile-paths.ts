@@ -9,6 +9,7 @@ import type { FileDiff, SyncResult } from './types';
 import type { FileEntry } from '../protocol/sync-types';
 import { errorMessage } from '../plugin/logger';
 import type { DiffApplyOutcome } from './transfer-types';
+import { createPathRecord, getPathEntry } from '../protocol/path-record';
 
 const MAX_RECONCILE_ATTEMPTS = 3;
 
@@ -40,7 +41,7 @@ export async function reconcileQueuePaths(
 	const uniqueQueueKeys = [...new Set(queueKeys)];
 	const targetPaths = [...new Set(uniqueQueueKeys.map(queueKey =>
 		queueKey.startsWith('delete:') ? queueKey.substring(7) : queueKey))];
-	const remoteEntries = await context.getRemoteEntries(targetPaths);
+	const remoteEntries = createPathRecord(await context.getRemoteEntries(targetPaths));
 
 	for (const queueKey of uniqueQueueKeys) {
 		const path = queueKey.startsWith('delete:') ? queueKey.substring(7) : queueKey;
@@ -53,10 +54,11 @@ export async function reconcileQueuePaths(
 		for (let attempt = 1; attempt <= MAX_RECONCILE_ATTEMPTS; attempt++) {
 			try {
 				const localEntry = await readLocalFileEntry(context.vault, path);
-				const remoteEntry = remoteEntries[path];
+				const remoteEntry = getPathEntry(remoteEntries, path);
 				const baseEntry = context.localManifest.getEntry(path);
 				const decision = classifyPath(path, localEntry, remoteEntry, baseEntry);
-				const localFiles = localEntry ? { [path]: localEntry } : {};
+				const localFiles = createPathRecord<FileEntry>();
+				if (localEntry) localFiles[path] = localEntry;
 
 				if (decision) {
 					const outcome = await context.processDiff(decision, localFiles, result);
@@ -107,7 +109,7 @@ async function refreshRemoteEntry(
 	path: string,
 ): Promise<void> {
 	const refreshed = await context.getRemoteEntries([path]);
-	const entry = refreshed[path];
+	const entry = getPathEntry(refreshed, path);
 	if (entry) remoteEntries[path] = entry;
 	else delete remoteEntries[path];
 }

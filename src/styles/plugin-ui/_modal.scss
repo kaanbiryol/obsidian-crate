@@ -118,13 +118,11 @@ body.reduce-motion & .crate-status-icon.is-working svg { animation: none; }
   border-radius: var(--crate-radius-sheet);
 }
 
-.crate-reminder-editor-surface.is-centered,
-.crate-reminder-picker-surface.is-centered {
+:is(.crate-reminder-editor-surface, .crate-reminder-picker-surface).is-centered {
   padding-bottom: 8px;
 }
 
-.crate-reminder-editor-surface.is-bottom-sheet,
-.crate-reminder-picker-surface.is-bottom-sheet {
+:is(.crate-reminder-editor-surface, .crate-reminder-picker-surface).is-bottom-sheet {
   width: 100%;
   max-width: none;
   border-right: 0;

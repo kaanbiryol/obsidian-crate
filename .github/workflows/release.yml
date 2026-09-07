@@ -97,7 +97,7 @@ jobs:
         with:
           subject-path: release/*
 
-      - name: Attach verified assets to a draft or create a release
+      - name: Attach verified assets to a draft or create a draft
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -106,5 +106,5 @@ jobs:
             test "$(cat /tmp/crate-release-is-draft)" = "true" || { echo "Refusing to replace an already published release"; exit 1; }
             gh release upload "$GITHUB_REF_NAME" release/main.js release/manifest.json release/styles.css release/THIRD_PARTY_NOTICES.md --clobber
           else
-            gh release create "$GITHUB_REF_NAME" release/main.js release/manifest.json release/styles.css release/THIRD_PARTY_NOTICES.md --generate-notes --verify-tag --title "$GITHUB_REF_NAME"
+            gh release create "$GITHUB_REF_NAME" release/main.js release/manifest.json release/styles.css release/THIRD_PARTY_NOTICES.md --draft --generate-notes --verify-tag --title "$GITHUB_REF_NAME"
           fi

@@ -2,7 +2,9 @@ import { pwaStartSearchFromUrl } from '../cloudflare/worker/pwa/pwa-params';
 
 const INSTALL_COOKIE = 'crate-reminders-install';
 const REDEEMED_KEY = 'crate-reminders-redeemed-enrollment';
+const INSTALLED_KEY = 'crate-reminders-installed-enrollment';
 const INSTALL_TTL_SECONDS = 10 * 60;
+const MAX_REDEEMED_ENROLLMENTS = 32;
 
 function writeInstallCookie(value: string, maxAge: number): void {
 	try {
@@ -48,11 +50,34 @@ export async function enrollmentFingerprint(token: string): Promise<string> {
 }
 
 export function wasEnrollmentRedeemed(fingerprint: string): boolean {
-	return localStorage.getItem(REDEEMED_KEY) === fingerprint;
+	return localStorage.getItem(INSTALLED_KEY) === fingerprint || redeemedEnrollments().includes(fingerprint);
 }
 
-export function rememberRedeemedEnrollment(fingerprint: string): void {
-	// The installed start URL may be opened on every cold launch. Remember a
-	// fingerprint so a spent grant cannot replace (or clear) a working session.
-	localStorage.setItem(REDEEMED_KEY, fingerprint);
+export function rememberRedeemedEnrollment(fingerprint: string, installed = false): void {
+	// Some platforms share storage with the browser that opened the QR link.
+	// Pin the first actual Home Screen grant even when a browser grant came first.
+	if (installed && !localStorage.getItem(INSTALLED_KEY)) localStorage.setItem(INSTALLED_KEY, fingerprint);
+	const previous = redeemedEnrollments();
+	if (previous.includes(fingerprint)) return;
+	// Also retain the earliest identity for upgrades from the legacy format,
+	// whose fingerprint does not distinguish a browser from an installed app.
+	const recent = previous.length >= MAX_REDEEMED_ENROLLMENTS
+		? [previous[0]!, ...previous.slice(-(MAX_REDEEMED_ENROLLMENTS - 2))]
+		: previous;
+	localStorage.setItem(REDEEMED_KEY, JSON.stringify([...recent, fingerprint]));
+}
+
+function redeemedEnrollments(): string[] {
+	const raw = localStorage.getItem(REDEEMED_KEY);
+	if (!raw) return [];
+	// Migrate the single fingerprint stored by earlier releases.
+	if (/^[a-f0-9]{64}$/.test(raw)) return [raw];
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		return Array.isArray(parsed)
+			? parsed.filter((value): value is string => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)).slice(0, MAX_REDEEMED_ENROLLMENTS)
+			: [];
+	} catch {
+		return [];
+	}
 }

@@ -5,12 +5,14 @@ import {
 	AUTH_TOKEN_KEY,
 	applyConfigFromUrl,
 	finishEnrollment,
+	isStandaloneApp,
 	loadStoredConfig,
+	saveConfig,
 } from '../config';
 import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from '../install-enrollment';
 import { exchangeEnrollmentToken } from '../api';
 import { loadCachedReminderSnapshot } from '../reminder-cache';
-import type { CachedReminderSnapshot, StartTab, StoredConfig } from '../types';
+import type { CachedReminderSnapshot, ShowToast, StartTab, StoredConfig } from '../types';
 
 export function usePwaBootstrap({
 	authToken,
@@ -25,6 +27,7 @@ export function usePwaBootstrap({
 	setLoading,
 	setSelectedProject,
 	setStartTab,
+	showToast,
 }: {
 	authToken: string | null;
 	clearLocalSession: () => Promise<void>;
@@ -38,6 +41,7 @@ export function usePwaBootstrap({
 	setLoading: Dispatch<SetStateAction<boolean>>;
 	setSelectedProject: Dispatch<SetStateAction<string | null>>;
 	setStartTab: Dispatch<SetStateAction<StartTab>>;
+	showToast: ShowToast;
 }): void {
 	const initialAuthTokenRef = useRef(authToken);
 
@@ -47,42 +51,68 @@ export function usePwaBootstrap({
 
 		async function bootstrap() {
 			try {
-				const applied = applyConfigFromUrl(loadStoredConfig());
-				if (cancelled) return;
-				setConfig(applied.config);
-				if (applied.project) {
+				if (cancelled || !sessionCurrent()) return;
+				const storedConfig = loadStoredConfig();
+				const applied = applyConfigFromUrl(storedConfig);
+				let nextToken = initialAuthTokenRef.current;
+				// Existing credentials are folder-scoped. A cleaned-up old link
+				// must not change their configuration without a new enrollment.
+				let nextConfig = nextToken && !applied.token ? storedConfig : applied.config;
+				const fingerprint = applied.token ? await enrollmentFingerprint(applied.token) : null;
+				if (cancelled || !sessionCurrent()) return;
+				let enrollmentFailed = false;
+				if (applied.token && fingerprint) {
+					if (wasEnrollmentRedeemed(fingerprint)) {
+						// Old icons also carry old folder settings. Keep the renewed
+						// session's configuration when ignoring their spent grant.
+						nextConfig = storedConfig;
+					} else {
+						try {
+							nextToken = await exchangeEnrollmentToken(applied.token, nextToken);
+						} catch (error) {
+							if (cancelled || !sessionCurrent()) return;
+							if (!nextToken) throw error;
+							// A bad or temporarily unavailable replacement link says
+							// nothing about the validity of the existing session.
+							enrollmentFailed = true;
+							nextConfig = storedConfig;
+							showToast('error', `Could not reconnect: ${error instanceof Error ? error.message : String(error)}`);
+						}
+						if (cancelled || !sessionCurrent()) return;
+						if (!enrollmentFailed) {
+							const clearing = clearLocalSession();
+							sessionCurrent = capturePwaSession();
+							await clearing;
+							if (cancelled || !sessionCurrent()) return;
+							rememberRedeemedEnrollment(fingerprint, isStandaloneApp());
+							// Other tabs read config on the auth storage event.
+							saveConfig(nextConfig);
+							localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
+							sessionCurrent = capturePwaSession();
+							setAuthToken(nextToken);
+						}
+					}
+				}
+				saveConfig(nextConfig);
+				setConfig(nextConfig);
+				const matchingLaunch = !enrollmentFailed && nextConfig.folderPath === applied.config.folderPath;
+				if (matchingLaunch && applied.project) {
 					setSelectedProject(applied.project);
 				}
 				if (applied.tab) {
 					setStartTab(applied.tab);
 				}
-				if (applied.reminderId) {
+				if (matchingLaunch && applied.reminderId) {
 					setLaunchReminderId(applied.reminderId);
 				}
-
-				let nextToken = initialAuthTokenRef.current;
-				const fingerprint = applied.token ? await enrollmentFingerprint(applied.token) : null;
-				if (cancelled || !sessionCurrent()) return;
-				if (applied.token && fingerprint && !wasEnrollmentRedeemed(fingerprint)) {
-					nextToken = await exchangeEnrollmentToken(applied.token, nextToken);
-					if (cancelled || !sessionCurrent()) return;
-					const clearing = clearLocalSession();
-					sessionCurrent = capturePwaSession();
-					await clearing;
-					if (cancelled || !sessionCurrent()) return;
-					localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
-					rememberRedeemedEnrollment(fingerprint);
-					sessionCurrent = capturePwaSession();
-					setAuthToken(nextToken);
-				}
-				finishEnrollment();
+				if (!enrollmentFailed) finishEnrollment();
 
 				if (!nextToken) {
 					setLoading(false);
 					return;
 				}
 
-				const cached = await loadCachedReminderSnapshot(applied.config.folderPath);
+				const cached = await loadCachedReminderSnapshot(nextConfig.folderPath);
 				if (cancelled || !sessionCurrent()) return;
 				hydratedCacheRef.current = Boolean(cached);
 				if (cached) {
@@ -91,6 +121,10 @@ export function usePwaBootstrap({
 				}
 			} catch (bootstrapError) {
 				if (!cancelled && sessionCurrent()) {
+					if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+						showToast('error', bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError));
+						return;
+					}
 					const clearing = clearLocalSession();
 					sessionCurrent = capturePwaSession();
 					await clearing;
@@ -99,13 +133,18 @@ export function usePwaBootstrap({
 					setLoading(false);
 				}
 			} finally {
-				if (!cancelled && sessionCurrent()) {
+				// Storage events adopt a replacement or logout from another tab.
+				// Finishing bootstrap lets that session load instead of hanging.
+				if (!cancelled) {
 					setBootstrapped(true);
 				}
 			}
 		}
 
-		void bootstrap();
+		// Serialize one-time exchanges across tabs. Session fences still protect
+		// browsers without Web Locks and logout during a pending exchange.
+		if (navigator.locks) void navigator.locks.request('crate-reminders-enrollment', bootstrap);
+		else void bootstrap();
 		return () => {
 			cancelled = true;
 		};

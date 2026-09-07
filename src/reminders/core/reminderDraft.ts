@@ -1,7 +1,6 @@
-import { format } from 'date-fns';
 import type { Priority, Reminder, RecurrenceRule } from '../types';
 import { recurrenceToText } from '../utils/rruleConverter';
-import { parseReminderDateValue, serializeReminderDateValue } from '../utils/reminderDate';
+import { formatReminderDateText, parseReminderDateValue, serializeReminderDateValue } from '../utils/reminderDate';
 import { parseReminderEditorContent } from '../utils/reminderEditorParsing';
 
 export interface ReminderDraftContentState {
@@ -78,10 +77,9 @@ export function buildInitialReminderContent(
 		const effectiveDate = reminder.dueDatetime || reminder.dueDate || initialDueDate;
 		if (effectiveDate) {
 			const isDateOnly = !reminder.dueDatetime && !!reminder.dueDate;
-			const fmt = isDateOnly ? 'MMM d, yyyy' : 'MMM d, yyyy HH:mm';
 			const parsedDate = parseReminderDateValue(effectiveDate, !isDateOnly);
 			if (parsedDate) {
-				reconstructed += ` ${format(parsedDate, fmt)}`;
+				reconstructed += ` ${formatReminderDateText(parsedDate, !isDateOnly)}`;
 			}
 		}
 	}
@@ -116,10 +114,9 @@ export function rebuildReminderContent(
 	if (recurrence) {
 		result += ` ${recurrenceToText(recurrence)}`;
 	} else if (date) {
-		const fmt = hasTime ? 'MMM d, yyyy HH:mm' : 'MMM d, yyyy';
 		const parsedDate = parseReminderDateValue(date, hasTime);
 		if (parsedDate) {
-			result += ` ${format(parsedDate, fmt)}`;
+			result += ` ${formatReminderDateText(parsedDate, hasTime)}`;
 		}
 	}
 

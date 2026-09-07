@@ -12,6 +12,7 @@ import {
   REMINDER_SECTION_TRANSITION,
 } from '../layoutConstants';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
+import { ReminderPagination, useReminderPagination } from '../reminder-pagination';
 
 export interface CompletedSectionToggleProps {
   onPress: () => void;
@@ -37,6 +38,7 @@ export const CompletedReminderSection = memo(function CompletedReminderSection({
   animationConfig = { enabled: true },
 }: CompletedReminderSectionProps) {
   const reduceMotion = useObsidianReducedMotion();
+  const pagination = useReminderPagination(reminders);
   const animationsEnabled = animationConfig.enabled && !reduceMotion;
 
   const toggleProps: CompletedSectionToggleProps = {
@@ -110,15 +112,16 @@ export const CompletedReminderSection = memo(function CompletedReminderSection({
             } : undefined}
             className="mt-3"
           >
+            <ReminderPagination pagination={pagination} label="Completed reminders" />
             <ReminderListPresence>
-              {reminders.map((reminder, index) => (
+              {pagination.items.map((reminder, index) => (
                                 <ReminderMotionRow
                                     key={reminder.id}
                                     id={reminder.id}
                                     section="completed"
                                     animationsEnabled={animationsEnabled}
                                 >
-                                    {renderCard(reminder, index)}
+                                    {renderCard(reminder, pagination.start + index)}
                 </ReminderMotionRow>
               ))}
             </ReminderListPresence>
