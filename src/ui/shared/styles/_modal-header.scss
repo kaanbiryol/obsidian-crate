@@ -33,6 +33,8 @@
 
 .reminder-modal-header-title {
   margin: 0;
+  // Keep accents and descenders inside the clipping box used for ellipsis.
+  padding-block: 0.25em;
   overflow: hidden;
   color: var(--text-normal);
   font-size: var(--reminder-font-base);
@@ -41,6 +43,14 @@
   letter-spacing: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+// Center visible text against the icon, rather than the font's extra leading.
+// Older hosts retain the existing line-box alignment when text-box is unsupported.
+.reminder-modal-header-title,
+.reminder-modal-header-action-label {
+  line-height: 1.2;
+  text-box: trim-both cap alphabetic;
 }
 
 .reminder-modal-header-side {
@@ -62,6 +72,9 @@
 }
 
 .reminder-modal-header-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
   height: var(--reminder-modal-header-control-size);
   padding: 0 7px;

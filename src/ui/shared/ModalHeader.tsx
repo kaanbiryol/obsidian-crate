@@ -73,7 +73,7 @@ export const ModalHeader: React.FC<ModalHeaderProps> = ({
                     aria-label={action.ariaLabel ?? action.label}
                     className={`reminder-modal-header-action${action.disabled ? '' : ' is-enabled'}`}
                 >
-                    {action.label}
+                    <span className="reminder-modal-header-action-label">{action.label}</span>
                 </Button>
             )}
         </div>
