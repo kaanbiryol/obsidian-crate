@@ -17,6 +17,7 @@ import {
 import { ErrorState, EmptyAuthState } from './components/AuthStates';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
 import { WebReminderCard } from './components/WebReminderCard';
+import { ReminderSyncNotice } from './components/ReminderSyncNotice';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
@@ -186,37 +187,6 @@ function App() {
 
 	const handlePullRefresh = useCallback(() => loadReminders({ silent: true }), [loadReminders]);
 
-	useLaunchReminderModal({
-		authToken,
-		bootstrapped,
-		dataMode,
-		isOffline,
-		launchReminderId,
-		loading,
-		readOnlyMessage,
-		refreshing,
-		reminders,
-		selectedProject,
-		setLaunchReminderId,
-		setModal,
-		setSaving,
-		setSelectedProject,
-		setSettingsOpen,
-		showToast,
-	});
-
-	const openModal = useCallback((mode: ModalMode, reminderId?: string, defaultProject?: string) => {
-		if (!ensureCanMutate()) return;
-		const reminder = reminderId ? reminders.find((item) => item.id === reminderId) ?? null : null;
-		settingsTransition.cancelClose();
-		modalTransition.cancelClose();
-		setSettingsOpen(false);
-		setSaving(false);
-		flushSync(() => {
-			setModal({ mode, reminderId, expectedRevision: reminder?.revision, filePath: reminder?.filePath, operationId: crypto.randomUUID(), draft: buildModalDraft(reminder, defaultProject ?? selectedProject) });
-		});
-	}, [ensureCanMutate, modalTransition.cancelClose, reminders, selectedProject, settingsTransition.cancelClose]);
-
 	const closeModal = useCallback(() => {
 		if (!modal) return;
 		setSaving(false);
@@ -237,8 +207,22 @@ function App() {
 		toggleReminderCompleted,
 		deleteReminder,
 		persistReorder,
+		visibleReminders,
+		visibleProjects,
+		changes,
+		ready: mutationsReady,
+		retryChange,
+		discardChange,
+		prepareEdit,
+		storageError,
+		retryInitialization,
 	} = useReminderMutations({
+		hasSnapshot: lastUpdatedAt !== null,
 		apiFetch,
+		authToken,
+		bootstrapped,
+		reminders,
+		loadReminders,
 		beginLocalMutation,
 		commitReminderState,
 		closeModal,
@@ -254,6 +238,55 @@ function App() {
 		showToast,
 	});
 
+	const launchChange = changes.find(change => launchReminderId && (change.recordId === launchReminderId || change.optimistic?.id === launchReminderId));
+	useLaunchReminderModal({
+		authToken,
+		bootstrapped,
+		dataMode,
+		isOffline,
+		launchReminderId,
+		loading: loading || !mutationsReady,
+		readOnlyMessage: readOnlyMessage || (launchChange
+			? 'Use the sync notice to finish this reminder’s pending change before editing.' : null),
+		refreshing,
+		reminders: visibleReminders,
+		selectedProject,
+		setLaunchReminderId,
+		setModal,
+		setSaving,
+		setSelectedProject,
+		setSettingsOpen,
+		showToast,
+	});
+
+	const openModal = useCallback((mode: ModalMode, reminderId?: string, defaultProject?: string) => {
+		if (!mutationsReady || !ensureCanMutate()) return;
+		if (reminderId && changes.some(change => change.status !== 'failed'
+			&& (change.recordId === reminderId || change.optimistic?.id === reminderId))) {
+			showToast('info', 'This reminder is still syncing. Retry its pending change first.');
+			return;
+		}
+		const reminder = reminderId ? visibleReminders.find((item) => item.id === reminderId) ?? null : null;
+		settingsTransition.cancelClose();
+		modalTransition.cancelClose();
+		setSettingsOpen(false);
+		setSaving(false);
+		flushSync(() => {
+			setModal({ mode, reminderId, expectedRevision: reminder?.revision, filePath: reminder?.filePath, operationId: crypto.randomUUID(), draft: buildModalDraft(reminder, defaultProject ?? selectedProject) });
+		});
+	}, [changes, ensureCanMutate, modalTransition.cancelClose, mutationsReady, visibleReminders, selectedProject, settingsTransition.cancelClose, showToast]);
+
+	const editFailedChange = useCallback((operationId: string) => {
+		if (!mutationsReady || !ensureCanMutate()) return;
+		const draft = prepareEdit(operationId);
+		if (!draft) return;
+		settingsTransition.cancelClose();
+		modalTransition.cancelClose();
+		setSettingsOpen(false);
+		setSaving(false);
+		flushSync(() => setModal(draft));
+	}, [ensureCanMutate, modalTransition.cancelClose, mutationsReady, prepareEdit, settingsTransition.cancelClose]);
+
 	const updatePreferences = (patch: Partial<PwaPreferences>) => {
 		const next = { ...preferences, ...patch };
 		try {
@@ -264,8 +297,13 @@ function App() {
 		}
 	};
 
-	const sharedReminders = useMemo(() => reminders.map(toSharedReminder), [reminders]);
-	const editReminder = useCallback((id: string) => openModal('edit', id), [openModal]);
+	const sharedReminders = useMemo(() => visibleReminders.map(toSharedReminder), [visibleReminders]);
+	const editReminder = useCallback((id: string) => {
+		const failedSave = changes.find(change => change.kind === 'save' && change.status === 'failed'
+			&& (change.recordId === id || change.optimistic?.id === id));
+		if (failedSave) editFailedChange(failedSave.operationId);
+		else openModal('edit', id);
+	}, [changes, editFailedChange, openModal]);
 	const renderSharedCard = useCallback<PwaReminderCardRenderer>(({ reminder, index, hideProject }) => (
 		<WebReminderCard
 			key={`${reminder.id}-${reminder.dueDate || reminder.dueDatetime || ''}`}
@@ -299,7 +337,7 @@ function App() {
 			<PwaRemindersAppShell
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}
-				projects={projects}
+				projects={visibleProjects}
 				isDarkMode={isDarkMode}
 				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}
@@ -326,13 +364,22 @@ function App() {
 							onReload={update}
 							onEnableNotifications={enablePushNotifications}
 						>
+							<ReminderSyncNotice
+								changes={changes}
+								isOffline={isOffline}
+								storageError={storageError}
+								onRetryInitialization={retryInitialization}
+								onRetry={retryChange}
+								onEdit={editFailedChange}
+								onDiscard={discardChange}
+							/>
 							{homeScreenInstall.showPrompt && !isProjectDetail && (
 								<HomeScreenInstallPrompt onShowSteps={toggleSettings} onDismiss={homeScreenInstall.dismiss} />
 							)}
 						</PwaTopNotices>
 					</>
 				) : undefined}
-				suppressFab={Boolean(modal) || settingsOpen || readOnly}
+				suppressFab={Boolean(modal) || settingsOpen || readOnly || !mutationsReady}
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
 				onReorder={persistReorder}
@@ -357,10 +404,10 @@ function App() {
 				)}
 				{modal && (
 					<ReminderSheet
-						key={`${modal.mode}-${modal.reminderId ?? 'new'}`}
+						key={`${modal.mode}-${modal.reminderId ?? 'new'}-${modal.operationId ?? ''}`}
 						colorScheme={colorScheme}
 						modal={modal}
-						projects={projects}
+						projects={visibleProjects}
 						saving={saving}
 						isClosing={modalTransition.isClosing}
 						onClose={closeModal}

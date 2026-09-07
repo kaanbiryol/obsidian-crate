@@ -46,6 +46,7 @@ export interface ModalDraft {
 
 export interface ModalState {
 	mode: ModalMode;
+	recovery?: boolean;
 	reminderId?: string;
 	expectedRevision?: string;
 	operationId?: string;

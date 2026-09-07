@@ -1,0 +1,66 @@
+@mixin styles {
+	.pwa-reminder-sync-notices {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		max-height: min(35dvh, 260px);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+	}
+
+	.pwa-reminder-sync-progress {
+		padding: 3px 0;
+		color: var(--text-muted);
+		font-size: 12px;
+		line-height: 1.4;
+	}
+
+	.pwa-reminder-sync-error {
+		padding: 12px 12px 2px;
+		border: 1px solid var(--background-modifier-border);
+		border-radius: 12px;
+		background: var(--background-secondary);
+		flex-shrink: 0;
+	}
+
+	.pwa-reminder-sync-error__copy {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 12px;
+		line-height: 1.4;
+		color: var(--text-muted);
+		overflow-wrap: anywhere;
+
+		strong { color: var(--text-normal); font-size: 13px; }
+		summary { cursor: pointer; }
+		p { margin: 6px 0; white-space: pre-wrap; }
+	}
+
+	.pwa-reminder-sync-error__title {
+		color: var(--text-normal);
+		white-space: pre-wrap;
+	}
+
+	.pwa-reminder-sync-error__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		margin-left: -8px;
+
+		button {
+			min-height: 44px;
+			padding: 0 8px;
+			font-size: 13px;
+			font-weight: 600;
+			color: var(--accent);
+			background: transparent;
+			border: 0;
+			border-radius: 6px;
+			box-shadow: none;
+		}
+
+		button:disabled { opacity: .45; }
+		button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+	}
+}

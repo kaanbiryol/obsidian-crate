@@ -18,6 +18,7 @@
 @use './sheet-headers';
 @use './navigation';
 @use './home-screen-install';
+@use './reminder-sync-notices';
 
 .crate-reminders-ui {
 	@include tokens.styles;
@@ -40,4 +41,5 @@
 	@include sheet-headers.styles;
 	@include navigation.styles;
 	@include home-screen-install.styles;
+	@include reminder-sync-notices.styles;
 }

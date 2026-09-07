@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { withPreviewAction } from './pwa-preview-action.mjs';
 import {
 	createInitialState,
@@ -18,6 +19,7 @@ function isAuthorized(req) {
 
 export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] }) {
 	let state = createInitialState();
+	const receipts = new Map();
 	let forcePreviewUpdate = false;
 	let previewLoadingUntil = 0;
 
@@ -55,6 +57,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 
 		if (method === 'POST' && path === '/preview/reset') {
 			state = createInitialState();
+			receipts.clear();
 			sendJson(res, 200, { success: true });
 			return;
 		}
@@ -225,16 +228,30 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 				return;
 			}
 
+			const mutationBody = method === 'GET' ? null : await readJson(req);
+			const operationId = mutationBody?.operationId;
+			const signature = JSON.stringify({ path, method, body: mutationBody });
+			const receipt = operationId ? receipts.get(operationId) : null;
+			if (receipt) {
+				sendJson(res, receipt.signature === signature ? 200 : 409, receipt.signature === signature
+					? receipt.result : { code: 'operation_mismatch', error: 'Operation changed' });
+				return;
+			}
+			const acknowledge = result => {
+				if (operationId) receipts.set(operationId, { signature, result: JSON.parse(JSON.stringify(result)) });
+				sendJson(res, 200, result);
+			};
+
 			if (method === 'POST' && path === '/reminders/create') {
-				const body = await readJson(req);
+				const body = mutationBody;
 				const reminder = parseMutationReminder(body);
 				state.reminders.push(reminder);
-				sendJson(res, 200, { success: true, reminder });
+				acknowledge({ success: true, reminder });
 				return;
 			}
 
 			if (method === 'POST' && path === '/reminders/update') {
-				const body = await readJson(req);
+				const body = mutationBody;
 				const current = findReminder(state, String(body.id || ''));
 				if (!current) {
 					sendJson(res, 404, { error: 'Reminder not found' });
@@ -248,12 +265,12 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 					completed: current.completed,
 				}));
 
-				sendJson(res, 200, { success: true, reminder: current });
+				acknowledge({ success: true, reminder: current });
 				return;
 			}
 
 			if (method === 'POST' && path === '/reminders/set-completed') {
-				const body = await readJson(req);
+				const body = mutationBody;
 				const current = findReminder(state, String(body.id || ''));
 				if (!current) {
 					sendJson(res, 404, { error: 'Reminder not found' });
@@ -261,19 +278,20 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 				}
 
 				current.completed = Boolean(body.completed);
-				sendJson(res, 200, { success: true, reminder: current });
+				current.revision = randomUUID();
+				acknowledge({ success: true, reminder: current });
 				return;
 			}
 
 			if (method === 'DELETE' && path === '/reminders/delete') {
-				const body = await readJson(req);
+				const body = mutationBody;
 				state.reminders = state.reminders.filter((reminder) => reminder.id !== String(body.id || ''));
-				sendJson(res, 200, { success: true });
+				acknowledge({ success: true });
 				return;
 			}
 
 			if (method === 'POST' && path === '/reminders/reorder') {
-				const body = await readJson(req);
+				const body = mutationBody;
 				const project = normalizeProject(body.project);
 				const orderedIds = Array.isArray(body.orderedIds)
 					? body.orderedIds.map((value) => String(value))
@@ -291,7 +309,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 					});
 				}
 
-				sendJson(res, 200, { success: true });
+				acknowledge({ success: true });
 				return;
 			}
 		}
