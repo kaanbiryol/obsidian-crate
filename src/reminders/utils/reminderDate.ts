@@ -113,7 +113,7 @@ export function buildStoredReminderDates(
 
   const resolvedHasTime = hasTime ?? inferHasTimeFromDate(date);
   return {
-    dueDate: formatLocalDateKey(date),
+    dueDate: resolvedHasTime ? date.toISOString().slice(0, 10) : formatLocalDateKey(date),
     dueDatetime: resolvedHasTime ? date.toISOString() : undefined,
   };
 }

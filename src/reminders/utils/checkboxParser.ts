@@ -9,14 +9,14 @@
  * - Obsidian plugin (inline todo enhancement)
  */
 
-import { parseReminderContent, type ParsedReminder } from './reminderParser';
+import { parseReminderContent, UnresolvedReminderScheduleError, type ParsedReminder } from './reminderParser';
 import type { Priority, RecurrenceRule } from '../types';
 import { formatReminderDateText } from './reminderDate';
 import { recurrenceToText } from './rruleConverter';
 import { extractReminderId, setReminderIdMarker, stripReminderIdMarker } from '../core/reminderIdentity';
 import { appendRecurrenceMetadata, readRecurrenceMetadata } from '../core/recurrenceMetadata';
 
-interface ParsedCheckbox {
+export interface ParsedCheckbox {
   /** Original line content */
   original: string;
   /** Leading whitespace (indentation) */
@@ -46,7 +46,7 @@ const CHECKBOX_REGEX = /^(\s*)-\s*\[([ xX])\]\s*(.*)$/;
  * @param line - Single line of markdown text
  * @returns ParsedCheckbox if line contains a checkbox, null otherwise
  */
-export function parseCheckboxLine(line: string): ParsedCheckbox | null {
+export function parseCheckboxLine(line: string, options: { persisted?: boolean } = {}): ParsedCheckbox | null {
   const match = line.match(CHECKBOX_REGEX);
   if (!match) {
     return null;
@@ -58,10 +58,12 @@ export function parseCheckboxLine(line: string): ParsedCheckbox | null {
   }
   const isCompleted = state.toLowerCase() === 'x';
   const reminderId = extractReminderId(rawContentWithMetadata);
-  const metadata = readRecurrenceMetadata(stripReminderIdMarker(rawContentWithMetadata));
+  const metadata = readRecurrenceMetadata(stripReminderIdMarker(rawContentWithMetadata), options);
   const rawContent = metadata.content;
-  const parsed = parseReminderContent(rawContent);
-  if (metadata.recurrence && parsed.recurrencePart?.toLowerCase() === recurrenceToText(metadata.recurrence).toLowerCase()) parsed.recurrence = metadata.recurrence;
+  const parsed = parseReminderContent(rawContent, undefined, options);
+  const matchingRecurrence = metadata.recurrence && parsed.recurrencePart?.toLowerCase() === recurrenceToText(metadata.recurrence).toLowerCase();
+  if (matchingRecurrence) parsed.recurrence = metadata.recurrence;
+  if (options.persisted && parsed.recurrence && (!matchingRecurrence || !parsed.dueDate)) throw new UnresolvedReminderScheduleError();
 
   return {
     original: line,
@@ -137,12 +139,12 @@ export function rebuildCheckboxLine(
  * Generate a deterministic content hash for tracking line identity
  * Used to detect when lines are moved vs edited
  */
-export function generateContentHash(content: string): string {
+export function generateContentHash(content: string, options: { persisted?: boolean } = {}): string {
   const withoutMetadata = stripReminderIdMarker(content);
-  const parsedCheckbox = parseCheckboxLine(withoutMetadata);
+  const parsedCheckbox = parseCheckboxLine(withoutMetadata, options);
   const hashSource = parsedCheckbox ? parsedCheckbox.rawContent : withoutMetadata;
   // Simple hash based on cleaned content (ignoring dates/priority which change)
-  const cleaned = parseReminderContent(hashSource).cleanContent.toLowerCase().trim();
+  const cleaned = parseReminderContent(hashSource, undefined, options).cleanContent.toLowerCase().trim();
   let hash = 0;
   for (let i = 0; i < cleaned.length; i++) {
     const char = cleaned.charCodeAt(i);

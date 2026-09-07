@@ -10,11 +10,12 @@ export function appendRecurrenceMetadata(content: string, recurrence?: Recurrenc
 	return `${content} <!-- crate-rule:${encodeURIComponent(JSON.stringify(normalizeRecurrenceRule(recurrence))).replace(/-/g, '%2D')} -->`;
 }
 
-export function readRecurrenceMetadata(content: string): { content: string; recurrence?: RecurrenceRule } {
+export function readRecurrenceMetadata(content: string, options: { persisted?: boolean } = {}): { content: string; recurrence?: RecurrenceRule } {
 	let recurrence: RecurrenceRule | undefined;
 	const stripped = content.replace(MARKER, (_marker, encoded: string) => {
 		try {
 			const raw: unknown = JSON.parse(decodeURIComponent(encoded));
+			if (options.persisted && (!raw || typeof raw !== 'object' || !('timezone' in raw) || typeof raw.timezone !== 'string')) return '';
 			const result = validateRecurrence(raw);
 			if ('rule' in result) recurrence = result.rule;
 		} catch { /* Invalid metadata never replaces the readable rule. */ }
