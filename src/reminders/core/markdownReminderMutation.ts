@@ -106,11 +106,16 @@ export function buildUpdatedReminderBlock(
 	const recurrence = Object.prototype.hasOwnProperty.call(updates, 'recurrence')
 		? normalizeRecurrenceRule(updates.recurrence ?? undefined)
 		: normalizeRecurrenceRule(reminder.recurrence);
-	const hasTime = Object.prototype.hasOwnProperty.call(updates, 'hasTime')
+	let hasTime = Object.prototype.hasOwnProperty.call(updates, 'hasTime')
 		? updates.hasTime
 		: ('dueDate' in updates ? inferHasTimeFromDate(updates.dueDate) : currentHasTime);
 	const content = updates.content ?? reminder.content;
-	const dueDate = 'dueDate' in updates ? updates.dueDate : currentDueDate;
+	let dueDate = 'dueDate' in updates ? updates.dueDate : currentDueDate;
+	if (recurrence && !dueDate) {
+		hasTime = recurrence.hour !== undefined;
+		dueDate = calculateFirstOccurrence(recurrence);
+		if (!hasTime) dueDate = recurrenceCalendarDate(dueDate, recurrence);
+	}
 	const priority = updates.priority ?? reminder.priority;
 	const description = 'description' in updates
 		? (updates.description?.trim() || undefined)

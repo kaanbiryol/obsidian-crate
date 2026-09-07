@@ -20,6 +20,12 @@ export interface ParsedReminder {
   recurrence?: RecurrenceRule; // Parsed recurrence rule
 }
 
+export class UnresolvedReminderScheduleError extends Error {
+  constructor() {
+    super('Open this note in Obsidian to save its reminder schedule with an explicit date and timezone.');
+  }
+}
+
 function stripUrlsForDateParsing(content: string): string {
   // Keep link text, but drop URLs so chrono doesn't parse dates from them.
   let sanitized = content.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
@@ -41,7 +47,7 @@ function stripUrlsForDateParsing(content: string): string {
  * @param content - The reminder content to parse
  * @param knownProjects - Optional list of known project names to enable matching projects with spaces
  */
-export function parseReminderContent(content: string, knownProjects?: string[]): ParsedReminder {
+export function parseReminderContent(content: string, knownProjects?: string[], options: { persisted?: boolean } = {}): ParsedReminder {
   if (!content || !content.trim()) {
     return {
       cleanContent: '',
@@ -58,6 +64,9 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
   let recurrencePart: string | undefined;
   let project: string | undefined;
   let recurrence: RecurrenceRule | undefined;
+  // Durable decoding may recognize syntax, but never infer a date from the
+  // reader's clock. Draft parsing continues to resolve natural language now.
+  const referenceDate = options.persisted ? new Date(2000, 0, 1, 12) : new Date();
 
   // IMPORTANT: Extract recurrence patterns FIRST (before date extraction)
   // This ensures "every Friday 12:00" is captured as recurrence, not just as a date
@@ -69,8 +78,8 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
 
     // If the recurrence matched a day+time (e.g., "every Friday 12:00"),
     // also extract the date for the first occurrence
-    if (!dueDate && recurrencePart) {
-      const parsed = chrono.parse(recurrencePart, new Date(), { forwardDate: true });
+    if (!options.persisted && !dueDate && recurrencePart) {
+      const parsed = chrono.parse(recurrencePart, referenceDate, { forwardDate: true });
       const firstResult = parsed[0];
       if (firstResult) {
         dueDate = firstResult.start.date();
@@ -87,7 +96,7 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
   // Also handle seconds/milliseconds + timezone suffix (e.g., 2025-11-02T14:00:00.000Z)
   // Stored reminder lines append their authoritative date after the title. Keep
   // earlier date mentions in the title when the editor saves and reloads them.
-  const dateParseContent = findAllMatches(stripUrlsForDateParsing(taskContent), knownProjects)
+  const dateParseContent = findAllMatches(stripUrlsForDateParsing(taskContent), knownProjects, referenceDate)
     .filter(match => match.type === 'date' && !parseRecurrenceFromContent(match.text))
     .at(-1)?.text ?? '';
   const isoDateMatch = dateParseContent.match(
@@ -97,6 +106,7 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
     const isoDateText = isoDateMatch[1];
     if (!isoDateText) return { cleanContent: taskContent.trim(), priority };
     hasTime = isoDateText.includes('T');
+    if (options.persisted && hasTime && !/(?:Z|[+-]\d{2}:\d{2})$/.test(isoDateText)) throw new UnresolvedReminderScheduleError();
     dueDate = hasTime ? new Date(isoDateText) : parseLocalDateKey(isoDateText);
     if (isNaN(dueDate.getTime())) {
       dueDate = undefined;
@@ -110,10 +120,13 @@ export function parseReminderContent(content: string, knownProjects?: string[]):
   } else {
     // Use chrono-node to naturally find and parse dates in the content
     // Chrono handles: tomorrow, today, next Monday, in 2 hours, Jul 25 2026, etc.
-    const parsed = chrono.parse(dateParseContent, new Date(), { forwardDate: true });
+    const parsed = chrono.parse(dateParseContent, referenceDate, { forwardDate: true });
 
     const result = parsed[0];
     if (result) {
+      if (options.persisted && (!/\b\d{4}\b/.test(result.text)
+        || !(['year', 'month', 'day'] as const).every(component => result.start.isCertain(component))
+        || result.start.isCertain('hour') && !result.start.isCertain('timezoneOffset'))) throw new UnresolvedReminderScheduleError();
       if (taskContent.includes(result.text)) {
         dueDate = result.start.date();
         hasTime = result.start.isCertain('hour');
