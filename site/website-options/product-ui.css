@@ -1,0 +1,50 @@
+/* Website examples follow Crate's reminder card, header, tab, and token geometry. */
+.demo-app { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 420px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-sheet); background: var(--bg); box-shadow: 0 16px 50px #0002; color: var(--text); }
+.app-views { flex: 1; }
+.app-view { min-height: 360px; outline-offset: -3px; }
+.app-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: 20px 20px 16px; border-bottom: 1px solid var(--line); }
+.app-heading h3 { font-size: 24px; line-height: 1.1; font-weight: 600; letter-spacing: -.025em; }
+.app-count { margin-top: 7px; font-size: 12px; color: var(--faint); }
+.app-heading-actions { display: flex; gap: 8px; }
+.app-icon { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); }
+.app-icon .icon { width: 19px; height: 19px; }
+.sync-icon i { position: absolute; width: 5px; height: 5px; background: var(--success); border-radius: 50%; top: 6px; right: 6px; box-shadow: 0 0 0 3px var(--panel-2); }
+.app-list { display: grid; gap: 8px; padding: 12px 14px 84px; }
+.reminder-card { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--panel); cursor: pointer; transition: background 160ms ease,border-color 160ms ease; }
+.reminder-card:hover { background: var(--panel-2); border-color: var(--line-strong); }
+.reminder-card input { appearance: none; width: 18px; height: 18px; flex: 0 0 18px; border: 1.5px solid var(--faint); border-radius: 50%; margin: 2px 0 0; cursor: pointer; position: relative; }
+.reminder-card input:checked { background: var(--accent); border-color: var(--accent); }
+.reminder-card input:checked::after { content: ''; position: absolute; left: 4px; top: 2px; width: 5px; height: 8px; border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.reminder-card input:checked + .reminder-body { opacity: .45; }
+.reminder-card input:checked + .reminder-body strong { text-decoration: line-through; }
+.reminder-body { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 6px; }
+.reminder-body strong { font-size: 14px; font-weight: 500; line-height: 1.4; }
+.reminder-description { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.reminder-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { display: inline-flex; align-items: center; gap: 4px; border: 1px solid rgba(var(--accent-rgb),.2); background: rgba(var(--accent-rgb),.08); border-radius: var(--radius-control); color: var(--accent-text); padding: 3px 5px; font-size: 12px; line-height: 1.2; }
+.tag .icon { width: 12px; height: 12px; }
+.tag-date { color: var(--muted); background: var(--panel-2); border-color: var(--line); }
+.tag-date.danger { color: var(--danger); background: color-mix(in srgb,var(--danger) 8%,transparent); border-color: color-mix(in srgb,var(--danger) 20%,transparent); }
+.drag-handle { color: var(--faint); font-size: 16px; align-self: center; }
+.app-tabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; padding: 7px 8px; border-top: 1px solid var(--line); background: var(--panel); }
+.app-tabs button { display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 8px 3px; border: 0; border-radius: 7px; background: transparent; color: var(--faint); font-size: 12px; line-height: 1.25; }
+.app-tabs button[aria-selected=true] { color: var(--accent-text); background: rgba(var(--accent-rgb),.12); }
+.app-tabs button:hover { background: var(--panel-3); }
+.app-tabs button .icon { width: 19px; height: 19px; }
+.app-fab { position: absolute; right: 14px; bottom: 82px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #fff; border: 1px solid var(--line); box-shadow: 0 4px 12px rgba(var(--accent-rgb),.2); }
+.app-fab .icon { width: 22px; height: 22px; }
+.app-project { display: flex; align-items: center; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.app-project > div { flex: 1; }.app-project strong { display: block; font-size: 14px; font-weight: 500; }.app-project small { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }.app-project .icon { width: 16px; height: 16px; color: var(--muted); }
+.project-color { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }.personal .project-color { background: var(--success); }
+.compact { min-height: 440px; }.compact .app-heading { padding: 16px 14px; gap: .4rem; }.compact .app-heading h3 { font-size: 22px; }.compact .app-heading-actions { gap: 5px; }.compact .app-icon { width: 29px; height: 29px; }.compact .app-icon .icon { width: 16px; height: 16px; }.compact .app-list { padding-inline: 10px; }.compact .reminder-card { padding: 10px; gap: 8px; }.compact .drag-handle { display: none; }.compact .app-tabs { gap: 1px; padding-inline: 4px; }.compact .app-tabs button { padding-inline: 0; }.compact .app-tabs button span { font-size: 12px; }
+.markdown-window { border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel); overflow: hidden; }
+.window-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel-2); color: var(--muted); font-size: 12px; }
+.window-bar > span { display: inline-flex; align-items: center; gap: 8px; }.window-bar .icon { width: 15px; height: 15px; }
+.markdown-body { padding: 2rem; }.note-breadcrumb { color: var(--faint); font-size: 12px; }.markdown-body h3 { font-size: 25px; font-weight: 600; letter-spacing: -.035em; margin-top: 2rem; }.markdown-body > p:not(.note-breadcrumb) { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: .9rem; }
+.markdown-task { font-family: "SFMono-Regular",Consolas,monospace; font-size: 13px; line-height: 1.9; margin-top: 1.5rem; }.markdown-task > span { color: var(--faint); }.markdown-task mark { display: inline-block; color: var(--accent-text); background: rgba(var(--accent-rgb),.1); padding: 0 .35rem; border-radius: 4px; margin-left: 2.6rem; margin-top: .25rem; }
+.markdown-detail { border-top: 1px solid var(--line); padding-top: 1rem; }
+.window-status { display: flex; align-items: center; gap: .5rem; border-top: 1px solid var(--line); padding: 10px 16px; font-size: 12px; color: var(--muted); }
+.product-capture { overflow: hidden; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel); }.product-capture img { width: 100%; }.product-capture figcaption { font-size: 12px; color: var(--muted); padding: .8rem 1rem; border-top: 1px solid var(--line); }
+.capture-label { display: flex; align-items: center; gap: .5rem; color: var(--faint); font-size: 12px; margin-bottom: 1rem; }.capture-label .icon { width: 15px; height: 15px; }
+.demo-note { color: var(--faint); font-size: 12px; text-align: center; margin-top: 1rem; line-height: 1.6; }
+@media(max-width:480px) { .app-heading { padding-inline: 14px; }.markdown-body { padding: 1.5rem; }.app-list { padding-inline: 10px; }.reminder-card .drag-handle { display: none; } }

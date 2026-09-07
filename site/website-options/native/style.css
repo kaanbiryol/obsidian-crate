@@ -1,0 +1,12 @@
+.native-hero { display: grid; grid-template-columns: .85fr 1.15fr; gap: 3.5rem; align-items: center; padding-block: 3.5rem 4rem; }
+.native-copy .hero-title { margin-block: 1.5rem; }
+.native-copy .body-copy { max-width: 26rem; }
+.native-product { position: relative; min-height: 600px; padding-top: 2rem; }
+.native-product > .product-capture { width: 100%; box-shadow: 0 15px 60px #0003; }
+.native-product > .product-capture figcaption { padding-right: 16rem; line-height: 1.5; }
+.native-phone { position: absolute; right: -1rem; top: 13rem; width: 268px; border: 4px solid var(--panel-2); border-radius: 16px; box-shadow: 0 20px 45px #0005; }
+.native-phone .demo-app { border-radius: 12px; }
+.native-caption { position: absolute; bottom: 1.5rem; left: 0; max-width: 13rem; }
+@media(min-width:1450px) { .native-product { min-height: 610px; } }
+@media(max-width:1050px) { .native-hero { grid-template-columns: .9fr 1.1fr; gap: 2rem; }.native-phone { right: -.4rem; top: 11rem; width: 255px; }.native-caption { max-width: 8rem; }.native-product > .product-capture figcaption { display: none; } }
+@media(max-width:760px) { .native-hero { grid-template-columns: 1fr; padding-top: 2rem; gap: 2rem; }.native-copy .body-copy { max-width: 32rem; }.native-product { min-height: 645px; max-width: 38rem; width: 100%; margin-inline: auto; }.native-phone { right: 0; top: 10rem; }.native-caption { bottom: .5rem; max-width: 100%; }.native-product > .product-capture { width: 90%; } }
