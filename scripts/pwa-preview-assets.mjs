@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { rawTextPlugin } from './raw-text-plugin.mjs';
+import { bundlePwaClient } from './pwa-client-build.mjs';
 
 async function readGeneratedPwaClient() {
 	const generatedPath = resolve(process.cwd(), '.generated/cloudflare/pwa-client.json');
@@ -21,19 +22,25 @@ async function readGeneratedPwaClient() {
 	return payload;
 }
 
-export async function buildPwaPreviewAssets() {
-	const buildResult = spawnSync(process.execPath, ['scripts/build-worker.mjs'], {
-		cwd: process.cwd(),
-		stdio: 'inherit',
-	});
+export async function buildPwaPreviewAssets({ assetVersion } = {}) {
+	let pwaClient;
+	if (assetVersion) {
+		// Build distinct, content-hashed app versions for real update tests.
+		pwaClient = { ...await bundlePwaClient(assetVersion, process.cwd()), version: assetVersion };
+	} else {
+		const buildResult = spawnSync(process.execPath, ['scripts/build-worker.mjs'], {
+			cwd: process.cwd(),
+			stdio: 'inherit',
+		});
 
-	if (buildResult.status !== 0) {
-		const error = new Error(`PWA worker build failed with status ${buildResult.status ?? 1}`);
-		error.status = buildResult.status ?? 1;
-		throw error;
+		if (buildResult.status !== 0) {
+			const error = new Error(`PWA worker build failed with status ${buildResult.status ?? 1}`);
+			error.status = buildResult.status ?? 1;
+			throw error;
+		}
+		pwaClient = await readGeneratedPwaClient();
 	}
 
-	const pwaClient = await readGeneratedPwaClient();
 	const pwaBundle = await build({
 		entryPoints: [resolve(process.cwd(), 'src/cloudflare/worker/pwa.ts')],
 		bundle: true,
