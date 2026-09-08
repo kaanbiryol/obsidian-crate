@@ -5,6 +5,7 @@ import type { Env } from './types';
 import { pruneExpiredTokens, recordMaintenanceRun } from './maintenance/database';
 import { sweepOrphanedManagedObjects } from './maintenance/orphan-sweep';
 import { pruneFileDeletionReceipts } from './file-delete-audit';
+import { pruneReminderOccurrences } from './maintenance/reminder-history';
 
 export async function runScheduledMaintenance(env: Env): Promise<void> {
 	const errors: string[] = [];
@@ -13,6 +14,7 @@ export async function runScheduledMaintenance(env: Env): Promise<void> {
 		['drain object cleanup', () => drainObjectCleanupQueue(env.BUCKET, env.DB)],
 		['prune changelog', () => pruneChangelog(env.DB)],
 		['prune file deletion receipts', () => pruneFileDeletionReceipts(env.DB)],
+		['prune obsolete reminder occurrences', () => pruneReminderOccurrences(env.DB)],
 		['prune request limits', () => env.DB.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
 		['prune tokens', () => pruneExpiredTokens(env.DB)],
 		['wake notification projections', () => wakeNotificationCoordinator(env)],
