@@ -102,7 +102,7 @@ export function useDialogFocus({
 
 	const handleDialogKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog || event.defaultPrevented || !dialog.contains(event.target as Node)) return;
 
 		if (event.key === 'Escape') {
 			if (escapeDisabledRef.current) return;

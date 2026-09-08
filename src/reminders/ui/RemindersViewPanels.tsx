@@ -20,6 +20,7 @@ interface RemindersViewPanelsProps {
   viewMode: ViewMode;
   selectedProject: string | null;
   hideProjectTitle?: boolean;
+  projectHeaderRightContent?: React.ReactNode;
   isInitialLoadComplete: boolean;
   reminders: Reminder[];
   projects: string[];
@@ -45,6 +46,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
   viewMode,
   selectedProject,
   hideProjectTitle = false,
+  projectHeaderRightContent,
   isInitialLoadComplete,
   reminders,
   projects,
@@ -131,6 +133,7 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
           <ProjectDetailView
             project={selectedProject}
             hideTitle={hideProjectTitle}
+            headerRightContent={projectHeaderRightContent}
             reminders={reminders}
             onBack={onBackToProjects}
             animationConfig={{ enabled: animationsEnabled }}

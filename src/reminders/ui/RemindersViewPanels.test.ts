@@ -130,8 +130,10 @@ describe('RemindersViewPanels', () => {
 
 	it('renders project detail and upcoming panels with the expected cross-module props', async () => {
 		const { RemindersViewPanels } = await loadPanelsModule();
+		const projectHeaderRightContent = React.createElement('span', null, 'Sync status');
 		const sharedProps = makeProps({
 			selectedProject: 'Work',
+			projectHeaderRightContent,
 		});
 
 		const projectHtml = renderToStaticMarkup(React.createElement(RemindersViewPanels, {
@@ -149,6 +151,7 @@ describe('RemindersViewPanels', () => {
 		expect(projectHtml).toContain('data-view="project-detail"');
 		expect(projectProps).toEqual(expect.objectContaining({
 			project: 'Work',
+			headerRightContent: projectHeaderRightContent,
 			reminders: expect.arrayContaining([expect.objectContaining({ id: 'r1' })]),
 			onBack: sharedProps.onBackToProjects,
 			onReorder: sharedProps.onReorder,

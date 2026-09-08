@@ -18,6 +18,7 @@ import { ThemeIcon } from '../../components/theme-icon';
 export interface ProjectDetailViewProps {
   project: string;
   hideTitle?: boolean;
+  headerRightContent?: React.ReactNode;
   reminders: Reminder[];
   onBack: () => void;
   animationConfig?: AnimationConfig;
@@ -43,6 +44,7 @@ export interface ProjectDetailViewProps {
 export const ProjectDetailView = memo(function ProjectDetailView({
   project,
   hideTitle = false,
+  headerRightContent,
   reminders,
   onBack,
   animationConfig = { enabled: true },
@@ -97,7 +99,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
               <span>Projects</span>
             </ShadowDOMNativeButton>
           </div>
-          <ProjectDetailHeader project={project} header={header} hideTitle={hideTitle} />
+          <ProjectDetailHeader project={project} header={header} hideTitle={hideTitle} rightContent={headerRightContent} />
         </>
       }
       emptyState={

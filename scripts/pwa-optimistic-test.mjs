@@ -12,6 +12,7 @@ try {
 		const browser = await browserType.launch();
 		try {
 			await scenario(browser, verifyImmediateUpdates);
+			await scenario(browser, verifyProjectSyncIndicator);
 			await scenario(browser, verifyRejectedSaveRecovery);
 			await scenario(browser, verifyRejectedDeleteRecovery);
 			await scenario(browser, verifyLostAcknowledgement);
@@ -68,6 +69,8 @@ async function expectEditorClosed(page) {
 }
 
 async function expectSynced(page) {
+	await expect(page.locator('.pwa-sync-indicator')).toHaveCount(1);
+	await expect(page.locator('.pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'synced');
 	await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
 }
 
@@ -112,6 +115,8 @@ async function verifyImmediateUpdates(page) {
 		await create.wait();
 		await expectEditorClosed(page);
 		await expect(card(page, 'Optimistic creation')).toBeVisible();
+		await expect(page.locator('.view-header .pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'syncing');
+		await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
 		create.assertHeld();
 		// A completed background request must not close an editor opened later.
 		await openReminder(page, 'Check this article');
@@ -154,6 +159,40 @@ async function verifyImmediateUpdates(page) {
 	await expectSynced(page);
 }
 
+async function verifyProjectSyncIndicator(page) {
+	await page.locator('[data-action="switch-tab"][data-tab="projects"]').click();
+	await page.locator('[data-action="open-project"][data-project="Work"]').click();
+	const indicator = page.locator('.project-detail-header .pwa-sync-indicator');
+	await expect(indicator).toBeVisible();
+	await expectSynced(page);
+	const scroll = page.locator('.reminders-view-scroll');
+	const originalTop = (await scroll.boundingBox()).y;
+	const mutation = await holdNextMutation(page, '/reminders/update');
+	try {
+		await card(page, 'Do I have this documented already?').click();
+		await expect(title(page)).toContainText('Do I have this documented already?');
+		await expect(save(page)).toBeEnabled();
+		await title(page).fill('Project sync indicator #Work');
+		await save(page).click();
+		await mutation.wait();
+		await expectEditorClosed(page);
+		await expect(indicator).toHaveAttribute('data-sync-state', 'syncing');
+		await expect(indicator).toHaveText('Syncing 1 change');
+		await expect(indicator.locator('svg')).toHaveCSS('animation-name', 'pwa-sync-spin');
+		await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
+		expect((await scroll.boundingBox()).y).toBeCloseTo(originalTop, 0);
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		await expect(indicator.locator('svg')).toHaveCSS('animation-name', 'none');
+		await expect(indicator.locator('.pwa-sync-indicator__glyph')).toHaveCSS('animation-name', 'none');
+	} finally { mutation.finish(); }
+	await expectSynced(page);
+	expect((await scroll.boundingBox()).y).toBeCloseTo(originalTop, 0);
+	await page.context().setOffline(true);
+	await expect(indicator).toHaveAttribute('data-sync-state', 'offline');
+	await page.context().setOffline(false);
+	await expectSynced(page);
+}
+
 async function verifyRejectedSaveRecovery(page) {
 	const rejected = await holdNextMutation(page, '/reminders/update');
 	try {
@@ -168,6 +207,7 @@ async function verifyRejectedSaveRecovery(page) {
 	} finally { rejected.finish({ status: 400, error: 'This draft needs a correction' }); }
 	const notice = page.getByRole('region', { name: 'Not saved: Rejected draft title', exact: true });
 	await expect(notice).toBeVisible();
+	await expect(page.locator('.pwa-sync-indicator')).toHaveAttribute('data-sync-state', 'error');
 	await expect(notice.getByRole('button', { name: 'Retry: Rejected draft title', exact: true })).toBeEnabled();
 	await expect(notice.getByRole('button', { name: 'Edit: Rejected draft title', exact: true })).toBeEnabled();
 	await page.reload();

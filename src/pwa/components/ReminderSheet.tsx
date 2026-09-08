@@ -103,7 +103,8 @@ export function ReminderSheet({
 		autoFocus: false,
 		escapeDisabled: saving,
 		onEscape: () => {
-			if (activeScreen !== 'editor') returnToEditor();
+			if (modal.draft.deleteConfirm) patchDraft({ deleteConfirm: false });
+			else if (activeScreen !== 'editor') returnToEditor();
 			else onClose();
 		},
 	});
@@ -113,7 +114,8 @@ export function ReminderSheet({
 			isOpen={!isClosing}
 			onClose={() => {
 				if (saving || isClosing || !canInteract) return;
-				if (activeScreen !== 'editor') returnToEditor();
+				if (modal.draft.deleteConfirm) patchDraft({ deleteConfirm: false });
+				else if (activeScreen !== 'editor') returnToEditor();
 				else onClose();
 			}}
 			onCloseEnd={handleCloseEnd}
