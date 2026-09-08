@@ -111,7 +111,7 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.queryD1).not.toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
 	});
 
-	it.each([2, 3])('applies the additive schema upgrade or retries initialization from schema %i', async version => {
+	it.each([2, 3, 4])('applies the additive schema upgrade or retries initialization from schema %i', async version => {
 		const api = createApi();
 		api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
 		api.queryD1.mockResolvedValueOnce([{ results: [{ version }] }]);

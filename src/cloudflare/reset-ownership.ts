@@ -9,7 +9,7 @@ const CRATE_TABLES = new Set([
 	'push_enrollment_tokens', 'web_enrollment_tokens', 'object_cleanup_queue',
 	'file_versions', 'file_deletion_receipts', 'maintenance_state', 'reminder_file_cache', 'reminder_operations',
 	'reminder_identities', 'notification_policy', 'notification_projection_jobs',
-	'reminder_projections', 'reminder_sources', 'reminder_occurrences', 'request_rate_limits',
+	'reminder_projections', 'reminder_sources', 'reminder_source_state', 'reminder_occurrences', 'request_rate_limits',
 ]);
 
 export type ResetApi = Pick<CloudflareApiClient,
