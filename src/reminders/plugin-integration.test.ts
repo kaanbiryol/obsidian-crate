@@ -272,6 +272,20 @@ describe('initializeReminders', () => {
 		expect(reminderIndexFactory).toHaveBeenCalledTimes(2);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(2);
 	});
+	it('waits for automatic sidebar activation when layout is already ready', async () => {
+		const { initializeReminders } = await loadPluginIntegrationModule();
+		const plugin = createPlugin();
+		let finish!: () => void;
+		const ready = new Promise<void>(resolve => { finish = resolve; });
+		plugin.app.workspace.onLayoutReady.mockImplementation(callback => callback());
+		plugin.activateRemindersView.mockReturnValue(ready);
+		let initialized = false;
+		const initializing = initializeReminders(plugin as never).then(() => { initialized = true; });
+		await vi.waitFor(() => expect(plugin.activateRemindersView).toHaveBeenCalledOnce());
+		expect(initialized).toBe(false);
+		finish(); await initializing;
+		expect(initialized).toBe(true);
+	});
 });
 
 describe('reinitializeReminders', () => {
