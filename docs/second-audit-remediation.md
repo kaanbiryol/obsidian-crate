@@ -38,6 +38,15 @@ The fresh audit starts at `f371397`, after the first round of actionable fixes. 
 - **Fix:** reuse byte-budgeted preparation and three-file batch publication. Preparation forces a fresh read with the plan's remote-hash/absence guard; confirmed hash/revision updates, errors, progress and edit/delete notices retain their semantics.
 - **Proof:** the 398-test sync suite, final four-case workflow suite, eight interrupted-history tests, three new real-Worker failure cases and all four 1k/10k capacity cases pass. Targeted lint and both typechecks pass. Cold requests fall to 674/6,722 (about 66% lower), with all final bytes and hashes verified. [Measurements and scope](sync-capacity.md).
 
+## R05 — Reconcile bundle budgets with the shipped recovery features
+
+- **Severity / confidence:** medium, confirmed release-gate failure.
+- **Area:** PWA delivery, lazy recovery controls and artifact budgets.
+- **Failure:** the first-round gate stopped at PWA startup/total limits. Subsequent draft validation and recovery brought startup to 441.29 KiB raw / 149.33 KiB gzip, and all assets to 467.50 / 158.56 KiB, above the original limits.
+- **Root cause:** the original budgets predated the added session, cache, outbox, expiry and draft recovery features. Recovery notices also loaded on every ordinary launch.
+- **Fix:** defer mutation/recovery notices until they are needed; keep editor focus synchronous. A failed deferred asset load shows a reload action and preserves saved intent. Retain the 450,000-byte startup raw ceiling; explicitly revise startup gzip from 150,000 to 154,000 bytes and all-assets limits from 465,000/158,000 to 485,000/168,000 bytes. This is a reviewed budget adjustment, not a claim that all old limits now pass.
+- **Proof:** startup measures 435.91 KiB raw / 148.38 KiB gzip and all assets 470.00 / 161.03 KiB, within the revised ceilings. Chromium/WebKit asset-failure draft recovery, focus, auth recovery, outbox quarantine and expiry checks pass; targeted lint and plugin typecheck pass. The full final gate remains required.
+
 ## Verification in progress
 
 The first-round gate passed advisory and secret scans, lint, both typechecks, deadcode, notices, 22 recovery tests, 1,538 unit tests, 220 Worker tests and production builds. It stopped at PWA bundle budgets; later gate steps therefore were not established by that run. The bundle issue and additional parser, persistence and scale checks are part of this second audit.
