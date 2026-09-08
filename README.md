@@ -178,7 +178,9 @@ Vault files larger than 25 MiB produce a visible sync error and are left on the 
 
 Existing binary files are never overwritten by an unsafe asynchronous write. Incoming binary changes are saved as review copies and shown in conflicts; review both versions and replace the original when ready. UTF-8 text supported by Obsidian's atomic writer applies automatically when its precondition still matches.
 
-Both clients and the Worker require protocol 5 for writes. Update the plugin/server and reload older web tabs before editing. Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
+Both clients and the Worker require protocol 6 for writes. Update the plugin/server and reload older web tabs before editing. Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
+
+New web changes use a server-issued date and can be retried through the next 179 UTC dates (a 180-date window). Retained receipts still confirm earlier commits. After expiry and receipt cleanup, the app stops the change for export and comparison with current reminders; it never silently reissues it. Uncommitted requests from older clients also require review after upgrading. See the [retry and retention policy](docs/reminder-retention.md).
 
 Crate supports the current prerelease formats. Provisioning accepts an empty database or schema 2/3/4. Its additive upgrade to schema 4 adds deletion audit receipts and reminder source verification without rewriting existing vault data. Other schemas are rejected without modification. Current recovery tools archive schema 2/3/4 and upgrade supported old archives during isolated restoration. See the [compatibility matrix and rollback policy](docs/compatibility.md).
 

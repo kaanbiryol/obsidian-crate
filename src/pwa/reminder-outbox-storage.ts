@@ -47,6 +47,8 @@ function validChange(value: unknown, operationId: string, folderPath: string): v
 		|| !Number.isSafeInteger(value.attempts) || Number(value.attempts) < 0
 		|| typeof value.retryAt !== 'number' || !Number.isFinite(value.retryAt) || value.retryAt < 0
 		|| (value.ambiguous !== undefined && typeof value.ambiguous !== 'boolean')
+		|| (value.reviewRequired !== undefined && typeof value.reviewRequired !== 'boolean')
+		|| (value.reviewRequired === true && (value.status !== 'failed' || value.ambiguous !== true))
 		|| typeof value.body !== 'string' || (value.error !== undefined && typeof value.error !== 'string')) return false;
 	let body: unknown;
 	try { body = JSON.parse(value.body); } catch { return false; }

@@ -1,3 +1,5 @@
+import { createReminderOperationId } from '@/protocol/reminder-operation';
+import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
@@ -32,7 +34,7 @@ it('excludes fenced examples from identities, list results and notification jobs
 it('returns an actionable structural reorder conflict without publishing or acknowledging an operation', async () => {
 	const content = `${first}\n## Another section\n${second}\n`;
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
-	const operationId = crypto.randomUUID();
+	const operationId = newOperationId();
 	const response = await handleReorderReminders(new Request('https://test/reminders/reorder', {
 		method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', project: 'Inbox', operationId,
 			orderedIds: ['second', 'first'], expectedOrder: ['first', 'second'] }),
@@ -48,11 +50,15 @@ it('maps a create inside an unclosed fence to a conflict through the authenticat
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope, folder_path, expires_at) VALUES (?, ?, 'reminders', ?, ?)")
 		.bind('browser', await sha256Hex('browser'), 'Reminders', Date.now() + 60_000).run();
+	const createId = newOperationId();
 	const response = await worker.fetch(new Request('https://test/reminders/create', { method: 'POST', headers: {
-		Authorization: 'Bearer browser', 'X-Crate-Protocol': '5', 'Content-Type': 'application/json',
-	}, body: JSON.stringify({ folderPath: 'Reminders', project: 'Inbox', content: 'New task', operationId: crypto.randomUUID() }) }), env);
+		Authorization: 'Bearer browser', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), 'Content-Type': 'application/json',
+	}, body: JSON.stringify({ folderPath: 'Reminders', project: 'Inbox', content: 'New task', id: createId, operationId: createId }) }), env);
 	expect(response.status).toBe(409);
 	expect(await response.json()).toMatchObject({ code: 'reminder_markdown_context' });
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))?.content).toBe(content);
 	expect(await env.DB.prepare('SELECT operation_id FROM reminder_operations').all()).toMatchObject({ results: [] });
 });
+
+const issuedDay = Math.floor(Date.now() / 86_400_000);
+function newOperationId() { return createReminderOperationId(issuedDay); }

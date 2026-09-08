@@ -1,4 +1,4 @@
-import { RejectedReminderChange, submitReminderChange } from './reminder-change-request';
+import { ExpiredReminderChange, RejectedReminderChange, submitReminderChange } from './reminder-change-request';
 import type { ReminderOutboxStorage } from './reminder-outbox-storage';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 import type { ApiFetch } from './types';
@@ -37,17 +37,22 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 
 	const retry = (operationId: string) => {
 		const change = storage.load().find(item => item.operationId === operationId);
-		if (!change || !isCurrent()) return;
+		if (!change || change.reviewRequired || !isCurrent()) return;
 		if (running && change.status === 'pending') return;
 		update({ ...change, status: 'pending', attempts: 0, retryAt: 0, error: undefined,
 			ambiguous: change.ambiguous || change.status === 'uncertain' || (change.status === 'pending' && change.attempts > 0) });
 	};
 
-	const discard = (operationId: string) => {
-		const change = storage.load().find(item => item.operationId === operationId);
-		if (!change || change.status !== 'failed' || change.ambiguous || !isCurrent()) return;
-		storage.remove(operationId);
-		refresh();
+	const discard = (operationId: string, reviewedChange?: string): void | Promise<void> => {
+		const remove = () => {
+			const change = storage.load().find(item => item.operationId === operationId);
+			if (!change || change.status !== 'failed' || !isCurrent()) return;
+			if (change.reviewRequired ? reviewedChange !== JSON.stringify(change) : change.ambiguous) return;
+			storage.remove(operationId);
+			refresh();
+		};
+		if (reviewedChange !== undefined) return withLock(async () => { remove(); });
+		remove();
 	};
 
 	const drain = async () => {
@@ -57,8 +62,8 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 		try {
 			await withLock(async () => {
 				while (isCurrent() && canSend() && (typeof navigator === 'undefined' || navigator.onLine)) {
-					const queued = storage.load().find(item => item.status === 'pending'
-						|| (item.status === 'uncertain' && item.attempts < 3 && item.retryAt <= Date.now()));
+					const queued = storage.load().find(item => !item.reviewRequired && (item.status === 'pending'
+						|| (item.status === 'uncertain' && item.attempts < 3 && item.retryAt <= Date.now())));
 					if (!queued) break;
 					const change = { ...queued, status: 'pending' as const, attempts: queued.attempts + 1,
 						ambiguous: queued.ambiguous || queued.status === 'uncertain' || (queued.status === 'pending' && queued.attempts > 0) };
@@ -77,7 +82,8 @@ export function createReminderOutbox({ storage, apiFetch, isCurrent, beginMutati
 						if (!hasCurrentAttempt(change)) continue;
 						// A prior request may still have committed even if a retry conflicts.
 						const definite = error instanceof RejectedReminderChange && !change.ambiguous;
-						update({ ...change, status: definite ? 'failed' : 'uncertain',
+						const reviewRequired = error instanceof ExpiredReminderChange;
+						update({ ...change, status: definite || reviewRequired ? 'failed' : 'uncertain', reviewRequired,
 							ambiguous: !definite,
 							error: error instanceof Error ? error.message : String(error),
 							retryAt: Date.now() + 2_000 * 2 ** (change.attempts - 1) });

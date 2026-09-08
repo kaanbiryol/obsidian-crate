@@ -29,5 +29,5 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 });
 
 export function handleServerInfo(): Response {
-	return corsResponse(CRATE_SERVER_INFO, 200, { 'Cache-Control': 'no-store' });
+	return corsResponse({ ...CRATE_SERVER_INFO, reminderOperationDay: Math.floor(Date.now() / 86_400_000) }, 200, { 'Cache-Control': 'no-store' });
 }

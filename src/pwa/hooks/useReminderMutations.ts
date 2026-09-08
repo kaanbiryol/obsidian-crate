@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
+import { newReminderOperationId } from '../reminder-operation-id';
 import { discardReminderDraft } from '../reminder-drafts';
 import { applyReminderChanges, predictReminderCompletion } from '../reminder-optimistic-state';
 import type { PendingReminderChange } from '../reminder-outbox-types';
@@ -48,17 +49,19 @@ export function useReminderMutations(options: {
 			const { createSaveReminderChange } = await import('../save-reminder-command');
 			if (!sessionCurrent()) return;
 			const previous = remindersRef.current.find(item => item.id === modal.reminderId);
-			enqueue(createSaveReminderChange(modal, config, projects, selectedProject, previous));
+			const change = await createSaveReminderChange(modal, config, projects, selectedProject, previous);
+			if (!sessionCurrent()) return;
+			enqueue(change);
 			discardReminderDraft(modal, config.folderPath);
 			closeModal();
 		} catch (error) { if (sessionCurrent()) report(error); }
 		finally { preparingRef.current = false; if (sessionCurrent()) setSaving(false); }
 	};
 
-	const recordChange = (id: string, kind: 'delete' | 'complete', extra: Record<string, unknown>, optimistic?: ReminderRecord, expectedRevision?: string, filePath?: string): PendingReminderChange => {
+	const recordChange = async (id: string, kind: 'delete' | 'complete', extra: Record<string, unknown>, optimistic?: ReminderRecord, expectedRevision?: string, filePath?: string): Promise<PendingReminderChange> => {
 		const previous = remindersRef.current.find(item => item.id === id);
 		if (!previous) throw new Error('Refresh reminders before changing this reminder.');
-		const operationId = crypto.randomUUID();
+		const operationId = await newReminderOperationId();
 		return {
 			operationId, recordId: id, kind, previous, optimistic,
 			path: kind === 'delete' ? '/reminders/delete' : '/reminders/set-completed',
@@ -70,37 +73,44 @@ export function useReminderMutations(options: {
 	};
 	const toggleReminderCompleted = async (id: string, completed: boolean) => {
 		if (!ensureCanMutate()) return;
+		const current = capturePwaSession();
 		try {
 			const previous = remindersRef.current.find(item => item.id === id);
 			if (!previous) throw new Error('Refresh reminders before changing this reminder.');
-			enqueue(recordChange(id, 'complete', { completed: !completed }, predictReminderCompletion(previous, !completed)));
-		} catch (error) { report(error); }
+			const change = await recordChange(id, 'complete', { completed: !completed }, predictReminderCompletion(previous, !completed));
+			if (current()) enqueue(change);
+		} catch (error) { if (current()) report(error); }
 	};
 	const deleteReminder = async (id: string, expectedRevision?: string, filePath?: string) => {
 		if (!ensureCanMutate()) return;
+		const current = capturePwaSession();
 		try {
-			enqueue(recordChange(id, 'delete', {}, undefined, expectedRevision, filePath));
+			const change = await recordChange(id, 'delete', {}, undefined, expectedRevision, filePath);
+			if (!current()) return;
+			enqueue(change);
 			closeModal();
-		} catch (error) { report(error); }
+		} catch (error) { if (current()) report(error); }
 	};
 	const persistReorder = async (project: string, orderedIds: string[]) => {
 		if (!ensureCanMutate()) { setReminders(current => [...current]); return; }
+		const current = capturePwaSession();
 		try {
-			const operationId = crypto.randomUUID();
+			const operationId = await newReminderOperationId();
+			if (!current()) return;
 			enqueue({
 				operationId, kind: 'reorder', project, orderedIds: [...orderedIds], path: '/reminders/reorder', method: 'POST',
 				body: JSON.stringify({ folderPath: config.folderPath, project, orderedIds,
 					expectedOrder: remindersRef.current.filter(item => item.project === project).map(item => item.id), operationId }),
 				status: 'pending', attempts: 0, retryAt: 0,
 			});
-		} catch (error) { setReminders(current => [...current]); report(error); }
+		} catch (error) { if (current()) { setReminders(reminders => [...reminders]); report(error); } }
 	};
 	const retryChange = (operationId: string) => {
 		try { outboxRef.current?.retry(operationId); void outboxRef.current?.drain(); }
 		catch (error) { report(error); }
 	};
-	const discardChange = (operationId: string) => {
-		try { outboxRef.current?.discard(operationId); }
+	const discardChange = (operationId: string, reviewedChange?: string) => {
+		try { void Promise.resolve(outboxRef.current?.discard(operationId, reviewedChange)).catch(report); }
 		catch (error) { report(error); }
 	};
 	const prepareEdit = (operationId: string): ModalState | null => {

@@ -1,3 +1,4 @@
+import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
 import { describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import { PWA_ASSET_VERSION } from './pwa-version';
@@ -110,7 +111,7 @@ function createEnvDefaults(): Env {
 function createSubscriptionRequest(): Request {
 	return new Request('https://worker.test/notifications/subscribe', {
 		method: 'POST',
-		headers: { 'X-Crate-Protocol': '5',
+		headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current),
 			'Content-Type': 'application/json',
 			Authorization: 'Bearer device-token',
 		},
@@ -133,13 +134,13 @@ describe('worker entrypoint', () => {
 
 		expect(response.status).toBe(200);
 		expect(response.headers.get('Content-Type')).toBe('application/json');
-		expect(await response.json()).toEqual(CRATE_SERVER_INFO);
+		expect(await response.json()).toEqual({ ...CRATE_SERVER_INFO, reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
 	});
 
 	it('does not expose the public device enrollment routes', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/setup/status', {
-				headers: { 'X-Crate-Protocol': '5', Authorization: 'Bearer secret-token' },
+				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer secret-token' },
 			}) as never,
 			createEnv() as never,
 		);
@@ -152,7 +153,7 @@ describe('worker entrypoint', () => {
 		const enrollmentResponse = await worker.fetch(
 			new Request('https://worker.test/auth/enrollment', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '5',
+				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current),
 					Authorization: 'Bearer secret-token',
 					'Content-Type': 'application/json',
 				},
@@ -163,7 +164,7 @@ describe('worker entrypoint', () => {
 		const tokenResponse = await worker.fetch(
 			new Request('https://worker.test/auth/tokens', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '5',
+				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current),
 					Authorization: 'Bearer secret-token',
 					'Content-Type': 'application/json',
 				},
@@ -183,7 +184,7 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/reminders-enrollment-token', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '5', Authorization: 'Bearer secret-token' },
+				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer secret-token' },
         body: JSON.stringify({ folderPath: 'Reminders' }),
 			}),
 			createEnv({ DB: db.db as unknown as D1Database }) as never,
@@ -206,7 +207,7 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/reminders-enrollment-token', {
 				method: 'POST',
-				headers: { 'X-Crate-Protocol': '5', Authorization: 'Bearer reminders-token' },
+				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer reminders-token' },
 			}),
 			createEnv({ DB: db.db as unknown as D1Database }) as never,
 		);
@@ -226,7 +227,7 @@ describe('worker entrypoint', () => {
 
 		expect(response.status).toBe(200);
 		expect(response.headers.get('Cache-Control')).toBe('no-store');
-		expect(await response.json()).toEqual(CRATE_SERVER_INFO);
+		expect(await response.json()).toEqual({ ...CRATE_SERVER_INFO, reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
 	});
 
 	it('serves PWA version metadata without authentication', async () => {
@@ -320,7 +321,7 @@ describe('worker entrypoint', () => {
 	it('rejects blank bearer tokens', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/health', {
-				headers: { 'X-Crate-Protocol': '5', Authorization: 'Bearer ' },
+				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer ' },
 			}),
 			createEnv() as never,
 		);
@@ -333,7 +334,7 @@ describe('worker entrypoint', () => {
 	it('returns a controlled 503 when authentication cannot reach D1', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/sync/manifest', {
-				headers: { 'X-Crate-Protocol': '5', Authorization: 'Bearer secret-token' },
+				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), Authorization: 'Bearer secret-token' },
 			}),
 			createEnv({ DB: null as never }) as never,
 		);
@@ -362,7 +363,7 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/sync/upload?path=notes/a.md', {
 				method: 'PUT',
-				headers: { 'X-Crate-Protocol': '5',
+				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current),
 					Authorization: 'Bearer secret-token',
 					'X-Crate-Expected-Hash': 'absent',
 				},
@@ -409,7 +410,7 @@ describe('worker entrypoint', () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/notifications/subscribe', {
 				method: 'DELETE',
-				headers: { 'X-Crate-Protocol': '5',
+				headers: { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current),
 					Authorization: 'Bearer secret-token',
 					'Content-Type': 'application/json',
 				},

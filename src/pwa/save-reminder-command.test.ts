@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createSaveReminderChange, followUpReminderChange } from './save-reminder-command';
 import { buildReminderMutationBody } from './reminder-mutation';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import type { ModalState, ReminderRecord, StoredConfig } from './types';
+
+vi.mock('./server-compatibility', () => ({ requireCompatibleServer: async () => ({ reminderOperationDay: 20_000 }) }));
 
 const config: StoredConfig = { folderPath: 'Reminders', upcomingDays: 7, allDayNotificationTime: null };
 const projects = ['Inbox', 'Work'];
@@ -42,11 +44,11 @@ function body(change: PendingReminderChange): Record<string, unknown> {
 }
 
 describe('legacy pending reminder save migration', () => {
-	it.each(['create', 'edit'] as const)('retries an ambiguous %s exactly while keeping later edits visible and durable', mode => {
+	it.each(['create', 'edit'] as const)('retries an ambiguous %s exactly while keeping later edits visible and durable', async mode => {
 		const modal = legacyModal(mode);
 		const attempted = { ...modal.pendingSave! };
 		modal.draft = { ...modal.draft, content: 'My correction', description: 'Additional notes', project: 'Work', priority: 1 };
-		const change = createSaveReminderChange(modal, config, projects, null);
+		const change = await createSaveReminderChange(modal, config, projects, null);
 
 		expect(change).toMatchObject({ body: attempted.body, path: attempted.path, ambiguous: true, status: 'pending',
 			operationId: modal.operationId, recordId: modal.reminderId ?? modal.operationId });
@@ -64,10 +66,10 @@ describe('legacy pending reminder save migration', () => {
 		expect(change.modal!.draft.content).toBe('My correction');
 	});
 
-	it('creates a distinct correction command from the original receipt after a reload', () => {
+	it('creates a distinct correction command from the original receipt after a reload', async () => {
 		const modal = legacyModal();
 		modal.draft.content = 'My correction';
-		const original = serialized(createSaveReminderChange(modal, config, projects, null));
+		const original = serialized(await createSaveReminderChange(modal, config, projects, null));
 		const confirmed = receipt(original);
 		const correction = followUpReminderChange(original, confirmed)!;
 
@@ -84,22 +86,22 @@ describe('legacy pending reminder save migration', () => {
 		expect(body(original).content).toBe('Original reminder');
 	});
 
-	it('does not create a follow-up for an unchanged draft or changes only to open editor controls', () => {
+	it('does not create a follow-up for an unchanged draft or changes only to open editor controls', async () => {
 		const modal = legacyModal();
 		modal.draft.activePicker = 'date';
 		modal.draft.deleteConfirm = true;
-		const change = createSaveReminderChange(modal, config, projects, null);
+		const change = await createSaveReminderChange(modal, config, projects, null);
 		expect(change.body).toBe(modal.pendingSave!.body);
 		expect(change.ambiguous).toBe(true);
 		expect(change.followUp).toBeUndefined();
 		expect(followUpReminderChange(change, receipt(change))).toBeUndefined();
 	});
 
-	it('keeps the confirmed recurrence schedule and completion count when correcting only text', () => {
+	it('keeps the confirmed recurrence schedule and completion count when correcting only text', async () => {
 		const modal = legacyModal('edit', { dueDate: '2099-01-01', dueTime: '09:00',
 			recurrence: { frequency: 'daily', timezone: 'UTC', count: 10, completedCount: 2, hour: 9, minute: 0 } });
 		modal.draft.content = 'Corrected recurring reminder';
-		const original = serialized(createSaveReminderChange(modal, config, projects, null));
+		const original = serialized(await createSaveReminderChange(modal, config, projects, null));
 		const confirmed = receipt(original, { dueDate: '2099-01-04', dueDatetime: '2099-01-04T09:00:00.000Z',
 			recurrence: { ...modal.draft.recurrence!, completedCount: 3 } });
 		const correction = followUpReminderChange(original, confirmed)!;
@@ -111,11 +113,11 @@ describe('legacy pending reminder save migration', () => {
 		expect(original.followUp!.input.recurrence!.completedCount).toBe(2);
 	});
 
-	it('keeps an explicit schedule correction instead of replacing it with the original receipt schedule', () => {
+	it('keeps an explicit schedule correction instead of replacing it with the original receipt schedule', async () => {
 		const modal = legacyModal('edit', { dueDate: '2099-01-01', recurrence: { frequency: 'daily', timezone: 'UTC' } });
 		modal.draft.dueDate = '2099-02-01';
 		modal.draft.recurrence = { frequency: 'weekly', timezone: 'UTC' };
-		const original = createSaveReminderChange(modal, config, projects, null);
+		const original = await createSaveReminderChange(modal, config, projects, null);
 		const confirmed = receipt(original, { dueDate: '2099-01-02', recurrence: { frequency: 'daily', timezone: 'UTC', completedCount: 1 } });
 		const correction = followUpReminderChange(original, confirmed)!;
 		expect(body(correction)).toMatchObject({ dueDate: '2099-02-01', dueDatetime: null, recurrence: { frequency: 'weekly', timezone: 'UTC' } });

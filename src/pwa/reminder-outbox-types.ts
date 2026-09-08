@@ -17,6 +17,7 @@ export interface PendingReminderChange {
 	attempts: number;
 	retryAt: number;
 	ambiguous?: boolean;
+	reviewRequired?: boolean;
 	followUp?: { operationId: string; input: ReminderMutationBody };
 }
 
