@@ -22,6 +22,7 @@ export interface RemindersListPresentationOptions {
   showToday?: boolean;
   showUpcoming?: boolean;
   effectiveDays: number;
+  now?: Date;
 }
 
 export interface RemindersListPresentation {
@@ -66,6 +67,7 @@ export function buildRemindersListPresentation(
     showToday = false,
     showUpcoming = false,
     effectiveDays,
+    now = new Date(),
   } = options;
 
   const supportsReorder = Boolean(projectFilter && !showToday && !showUpcoming);
@@ -79,7 +81,7 @@ export function buildRemindersListPresentation(
     : sortReminders(filteredReminders);
   const activeReminders = reminders.filter((reminder) => !reminder.completed);
   const completedCount = reminders.length - activeReminders.length;
-  const overdueCount = reminders.filter((reminder) => isReminderOverdue(reminder)).length;
+  const overdueCount = reminders.filter((reminder) => isReminderOverdue(reminder, now)).length;
 
   return {
     reminders,
