@@ -60,7 +60,7 @@ def verify(directory):
     db = load_database(sql)
     try:
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-        if 'crate_schema' not in tables or [tuple(row) for row in db.execute('SELECT id, version FROM crate_schema')] not in ([(1, 3)], [(1, 4)]):
+        if 'crate_schema' not in tables or [tuple(row) for row in db.execute('SELECT id, version FROM crate_schema')] not in ([(1, 2)], [(1, 3)], [(1, 4)]):
             raise ValueError('Unsupported Crate database schema')
         expected = references(db)
         objects = {item['key']: item for item in manifest['objects']}
@@ -84,9 +84,9 @@ def prepare_restore_sql(directory, restored_at=None):
     """Rebuild derived schedules and require fresh device enrollment in a new deployment."""
     _manifest, db = verify(directory)
     try:
-        # Keep pre-update schema-3 backups usable with the new server. This is
+        # Keep supported pre-update schema-2/3 backups usable with the new server. This is
         # the same additive migration used by provisioning, applied in isolation.
-        if db.execute('SELECT version FROM crate_schema WHERE id = 1').fetchone()[0] == 3:
+        if db.execute('SELECT version FROM crate_schema WHERE id = 1').fetchone()[0] in (2, 3):
             db.executescript((Path(__file__).parents[2] / 'src/cloudflare/schema.sql').read_text())
         for table in ('auth_tokens', 'push_subscriptions', 'web_enrollment_tokens',
                       'scheduled_reminders', 'notification_jobs', 'reminder_projections', 'reminder_file_cache',
