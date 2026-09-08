@@ -152,7 +152,7 @@ export async function scanFile(
   reservedIds: ReadonlySet<string> = new Set(),
   signal?: AbortSignal,
   identityOwners?: ReminderIdentityOwners,
-  shouldDeferNormalization = () => false,
+  shouldDeferNormalization: (filePath?: string) => boolean = () => false,
   shouldDeferCollisionRepair = () => false,
 ): Promise<FileScanResult> {
   const filePath = file.path;
@@ -228,7 +228,7 @@ export async function scanVault(
   app: App,
   remindersFolderPath: string,
   signal?: AbortSignal,
-  shouldDeferNormalization = () => false,
+  shouldDeferNormalization: (filePath?: string) => boolean = () => false,
   shouldDeferCollisionRepair = () => false,
 ): Promise<ScanResult> {
   const startTime = Date.now();
@@ -257,7 +257,7 @@ export async function scanVault(
   for (const file of reminderFiles) {
     if (signal?.aborted) break;
     if (shouldDeferNormalization()) { deferred = true; break; }
-    const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners, shouldDeferNormalization, shouldDeferCollisionRepair);
+    const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners, () => shouldDeferNormalization(file.path), shouldDeferCollisionRepair);
     if (result.deferred) deferred = true;
     if (result.error) continue;
     for (const released of result.releasedOwners ?? []) {

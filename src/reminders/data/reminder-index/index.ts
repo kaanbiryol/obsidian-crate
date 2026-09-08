@@ -67,7 +67,7 @@ export interface ReminderIndex {
   clearOptimistic(id: string): void;
 }
 
-export function createReminderIndex(app: App, remindersFolderPath: string, signal?: AbortSignal, shouldDeferScan = () => false, shouldDeferCollisionRepair = () => false): ReminderIndex {
+export function createReminderIndex(app: App, remindersFolderPath: string, signal?: AbortSignal, shouldDeferScan: (filePath?: string) => boolean = () => false, shouldDeferCollisionRepair = () => false): ReminderIndex {
   let reminders: IndexedReminder[] = [];
   let isLoaded = false;
   let lastScanTime: Date | undefined;
@@ -209,7 +209,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       if (!isInRemindersFolder(filePath, remindersFolderPath)) {
         return;
       }
-      if (shouldDeferScan()) {
+      if (shouldDeferScan(filePath)) {
         deferredPaths.add(filePath);
         return;
       }
@@ -227,7 +227,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       const identityOwners: ReminderIdentityOwners = new Map();
       addReminderIdentityOwners(identityOwners, reminders);
       addReminderIdentityOwners(identityOwners, ambiguousOwners);
-      const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners, shouldDeferScan, shouldDeferCollisionRepair);
+      const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners, () => shouldDeferScan(filePath), shouldDeferCollisionRepair);
       if (signal?.aborted) return;
       if (result.deferred) { deferredPaths.add(filePath); return; }
       if (result.error) {

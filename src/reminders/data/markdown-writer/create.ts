@@ -59,6 +59,7 @@ export async function createReminderInMarkdown(
 
   try {
     await context.app.vault.process(file, (fileContent) => {
+      context.moveJournal?.assertActive();
       // A lost local write acknowledgement must not append the same identity twice.
       if (fileContent.includes(`<!-- crate-id:${stableReminderId} -->`)) {
         throw new Error('This reminder already exists. Close the draft and refresh to see its saved state.');
