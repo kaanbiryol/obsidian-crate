@@ -60,7 +60,7 @@ def verify(directory):
     db = load_database(sql)
     try:
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-        if 'crate_schema' not in tables or [tuple(row) for row in db.execute('SELECT id, version FROM crate_schema')] != [(1, 3)]:
+        if 'crate_schema' not in tables or [tuple(row) for row in db.execute('SELECT id, version FROM crate_schema')] not in ([(1, 3)], [(1, 4)]):
             raise ValueError('Unsupported Crate database schema')
         expected = references(db)
         objects = {item['key']: item for item in manifest['objects']}
@@ -84,14 +84,18 @@ def prepare_restore_sql(directory, restored_at=None):
     """Rebuild derived schedules and require fresh device enrollment in a new deployment."""
     _manifest, db = verify(directory)
     try:
+        # Keep pre-update schema-3 backups usable with the new server. This is
+        # the same additive migration used by provisioning, applied in isolation.
+        if db.execute('SELECT version FROM crate_schema WHERE id = 1').fetchone()[0] == 3:
+            db.executescript((Path(__file__).parents[2] / 'src/cloudflare/schema.sql').read_text())
         for table in ('auth_tokens', 'push_subscriptions', 'web_enrollment_tokens',
                       'scheduled_reminders', 'notification_jobs', 'reminder_projections', 'reminder_file_cache',
-                      'object_cleanup_queue', 'request_rate_limits', 'notification_projection_jobs'):
+                      'object_cleanup_queue', 'request_rate_limits', 'notification_projection_jobs', 'reminder_source_state'):
             db.execute(f'DELETE FROM "{table}"')
         # Restored retained content gets a fresh recovery window before collection.
         restored_at = int(time.time() * 1000) if restored_at is None else restored_at
         db.execute('UPDATE file_versions SET expires_at = ?', (restored_at + 2592000000,))
-        db.execute("DELETE FROM maintenance_state WHERE key = 'crate_deployment_fence'")
+        db.execute("DELETE FROM maintenance_state WHERE key IN ('crate_deployment_fence', 'reminder_source_scan')")
         db.execute("INSERT INTO notification_projection_jobs (path, job_token, updated_at) SELECT path, storage_key, datetime(? / 1000, 'unixepoch') FROM files WHERE lower(path) LIKE '%.md'", (restored_at,))
         db.commit()
         return '\n'.join(db.iterdump()).encode('utf-8')

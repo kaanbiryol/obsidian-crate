@@ -127,6 +127,13 @@ export async function commitFileDelete(
 		audit?: MutationAuditContext;
 	},
 ): Promise<CommitResult> {
+	// The caller's verified absent snapshot is a valid linearization point for
+	// an idempotent retry. Avoid a no-op mutation batch, and never touch a newer
+	// recreation which can arrive after that snapshot.
+	if (!params.previousFile) {
+		const deletion = await findFileDeletionReceipt(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '');
+		return { committed: true, currentHash: null, idempotent: true, ...(deletion ? { deletion } : {}) };
+	}
 	const audit = params.audit ?? { requestId: crypto.randomUUID(), deviceId: null, clientSession: null, operationId: null };
 	const revision = `__crate__/deletions/${crypto.randomUUID()}`;
 	const expectedPredicate = params.expectedHash === null

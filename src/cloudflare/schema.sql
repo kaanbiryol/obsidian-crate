@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  id INTEGER PRIMARY KEY CHECK (id = 1),
  version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 3);
+INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 4);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS files (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS files_portable_path_idx ON files(portable_path);
+CREATE INDEX IF NOT EXISTS files_markdown_path_idx ON files(path) WHERE lower(path) LIKE '%.md';
 
 CREATE TABLE IF NOT EXISTS auth_tokens (
 	id TEXT PRIMARY KEY,
@@ -163,6 +164,13 @@ CREATE TABLE IF NOT EXISTS reminder_sources (
  PRIMARY KEY (file_path, reminder_id)
 );
 CREATE INDEX IF NOT EXISTS reminder_sources_id_idx ON reminder_sources(reminder_id);
+CREATE TABLE IF NOT EXISTS reminder_source_state (
+ file_path TEXT PRIMARY KEY, file_revision TEXT NOT NULL,
+ parser_version INTEGER NOT NULL, verified INTEGER NOT NULL CHECK (verified IN (0, 1)),
+ updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS reminder_source_state_version_idx ON reminder_source_state(parser_version, file_path);
+CREATE INDEX IF NOT EXISTS reminder_source_state_retry_idx ON reminder_source_state(updated_at, file_path) WHERE verified = 0;
 CREATE TABLE IF NOT EXISTS reminder_occurrences (
  reminder_id TEXT NOT NULL, due_key TEXT NOT NULL, first_seen_at INTEGER NOT NULL,
  PRIMARY KEY (reminder_id, due_key)
@@ -185,4 +193,4 @@ CREATE TABLE IF NOT EXISTS file_deletion_receipts (
 );
 CREATE INDEX IF NOT EXISTS file_deletion_receipts_created_at_idx ON file_deletion_receipts(created_at);
 
-UPDATE crate_schema SET version = 3 WHERE id = 1 AND version = 2;
+UPDATE crate_schema SET version = 4 WHERE id = 1 AND version IN (2, 3);
