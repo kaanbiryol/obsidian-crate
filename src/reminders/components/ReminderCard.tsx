@@ -136,8 +136,11 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                     aria-label={completionPreview
                         ? `Completing ${reminder.content}`
                         : reminder.completed
-                            ? `Mark ${reminder.content} incomplete`
-                            : `Mark ${reminder.content} complete`}
+                            ? reminder.recurrence ? `Reopen this occurrence of ${reminder.content}` : `Mark ${reminder.content} incomplete`
+                            : reminder.recurrence ? `Complete this occurrence of ${reminder.content}` : `Mark ${reminder.content} complete`}
+                    title={reminder.recurrence ? reminder.completed
+                        ? 'Reopen this occurrence. Earlier occurrences are not restored.'
+                        : 'Complete this occurrence and show the next scheduled one, if any.' : undefined}
                 >
                     <span
                         className="premium-checkbox-visual"

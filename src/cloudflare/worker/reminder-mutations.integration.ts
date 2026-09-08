@@ -73,4 +73,27 @@ describe('transactional reminder retries and revisions', () => {
 		expect(await records()).toHaveLength(1);
 		expect((await handleCreateReminder(request({ ...body, content: 'Different request' }), env)).status).toBe(409);
 	});
+	it('reopens and recompletes the final occurrence exactly once after lost commit responses', async () => {
+		let { reminder } = await payload(await handleCreateReminder(request({ ...createBody(), dueDatetime: '2099-01-01T09:00:00Z',
+			recurrence: { frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0, count: 1 } }), env));
+		const setCompleted = async (completed: boolean, loseResponse = false) => {
+			const body = { id: reminder.id, filePath: path, expectedRevision: reminder.revision, operationId: crypto.randomUUID(), completed };
+			if (loseResponse) {
+				loseCommit();
+				await expect(handleSetReminderCompleted(request(body), env)).rejects.toThrow('Lost commit response');
+			}
+			const confirmed = await payload(await handleSetReminderCompleted(request(body), env));
+			expect(await payload(await handleSetReminderCompleted(request(body), env))).toEqual(confirmed);
+			reminder = confirmed.reminder;
+			const [persisted] = await records();
+			expect(persisted).toMatchObject({ id: reminder.id, completed, dueDatetime: '2099-01-01T09:00:00.000Z',
+				recurrence: { count: 1, completedCount: completed ? 1 : 0 } });
+			expect(reminder).toMatchObject({ completed, dueDatetime: persisted!.dueDatetime, recurrence: persisted!.recurrence });
+		};
+		await setCompleted(true);
+		await setCompleted(false, true);
+		await setCompleted(true, true);
+		await setCompleted(false, true);
+		await setCompleted(true, true);
+	});
 });
