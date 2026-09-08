@@ -29,7 +29,7 @@ export function useReminderMutations(options: {
 	hasSnapshot?: boolean;
 	canRecover?: boolean;
 }) {
-	const { changes, ready, outboxRef, storageError, retryInitialization, recoveryChanges, recoverChanges } = useReminderOutbox({ ...options, folderPath: options.config.folderPath });
+	const { changes, ready, outboxRef, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges } = useReminderOutbox({ ...options, folderPath: options.config.folderPath });
 	const { closeModal, config, ensureCanMutate, projects, remindersRef, selectedProject, setReminders, setSaving, showToast } = options;
 	const preparingRef = useRef(false);
 	const report = (error: unknown) => showToast('error', error instanceof Error ? error.message : String(error));
@@ -120,5 +120,5 @@ export function useReminderMutations(options: {
 		return modal;
 	};
 	const visible = useMemo(() => applyReminderChanges(options.reminders, projects, changes), [options.reminders, projects, changes]);
-	return { saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, ...visible, changes, ready, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges };
+	return { saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, ...visible, changes, ready, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
 }

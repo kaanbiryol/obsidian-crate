@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createReminderOutbox } from '../reminder-outbox';
-import { createReminderOutboxStorage, createReminderRecoveryStorage } from '../reminder-outbox-storage';
+import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from '../reminder-outbox-storage';
 import { capturePwaSession } from '../session-generation';
 import { mergeReminderRecord } from '../reminder-optimistic-state';
 import { mergeProject, reorderProjectReminders } from '../reminder-list-state';
@@ -25,6 +25,8 @@ export function useReminderOutbox(options: {
 }) {
 	const [changes, setChanges] = useState<PendingReminderChange[]>([]);
 	const [recoveryChanges, setRecoveryChanges] = useState<PendingReminderChange[]>([]);
+	const [quarantinedChanges, setQuarantinedChanges] = useState<QuarantinedReminderEntry[]>([]);
+	const removeQuarantinedRef = useRef<((entries: QuarantinedReminderEntry[]) => Promise<boolean>) | null>(null);
 	const recoverRef = useRef<(() => Promise<void>) | null>(null);
 	const [ready, setReady] = useState(false);
 	const [storageError, setStorageError] = useState<string | null>(null);
@@ -43,18 +45,23 @@ export function useReminderOutbox(options: {
 		setStorageError(null);
 		setChanges([]);
 		setRecoveryChanges([]);
+		setQuarantinedChanges([]);
+		removeQuarantinedRef.current = null;
 		recoverRef.current = null;
 		if (!authToken || !bootstrapped) return;
 		let cleanup = () => {};
 		void Promise.all([createReminderOutboxStorage(authToken, folderPath), createReminderRecoveryStorage(authToken, folderPath), createReminderSettlementChannel(authToken, folderPath)]).then(([storage, recovery, settlement]) => {
 			if (!isCurrent()) return;
 			if (!navigator.locks) throw new Error('Update this browser to safely sync changes between tabs.');
+			const refreshQuarantine = () => {
+				if (isCurrent()) setQuarantinedChanges([...storage.quarantined(), ...recovery.quarantined()]);
+			};
 			const outbox = createReminderOutbox({
 				storage, apiFetch: optionsRef.current.apiFetch, isCurrent,
 				withLock: work => navigator.locks.request('crate-reminder-outbox', work),
 				canSend: () => optionsRef.current.hasSnapshot !== false,
 				beginMutation: () => optionsRef.current.beginLocalMutation(),
-				onChange: setChanges,
+				onChange: next => { setChanges(next); refreshQuarantine(); },
 			onError: message => { setStorageError(message); optionsRef.current.showToast('error', message); },
 				onSettled: () => { void optionsRef.current.loadReminders({ silent: true }); },
 				commit: async (change, result) => {
@@ -80,6 +87,20 @@ export function useReminderOutbox(options: {
 			setRecoveryChanges(recovery.load());
 			outboxRef.current = outbox;
 			setReady(true);
+			removeQuarantinedRef.current = async entries => {
+				try {
+					await navigator.locks.request('crate-reminder-outbox', () => {
+						if (!isCurrent()) return;
+						storage.removeQuarantined(entries);
+						recovery.removeQuarantined(entries);
+						refreshQuarantine();
+					});
+					return isCurrent();
+				} catch (error) {
+					if (isCurrent()) optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error));
+					return false;
+				}
+			};
 			const resume = () => {
 				if (!isCurrent()) return;
 				try {
@@ -142,7 +163,7 @@ export function useReminderOutbox(options: {
 		}).catch((error: unknown) => {
 			if (isCurrent()) setStorageError(`Could not load pending changes. ${error instanceof Error ? error.message : String(error)}`);
 		});
-		return () => { alive = false; outboxRef.current = null; recoverRef.current = null; cleanup(); };
+		return () => { alive = false; outboxRef.current = null; recoverRef.current = null; removeQuarantinedRef.current = null; cleanup(); };
 	}, [authToken, bootstrapped, folderPath, initialization]);
 
 	useEffect(() => {
@@ -158,6 +179,7 @@ export function useReminderOutbox(options: {
 	}, [changes, ready]);
 
 	return { changes, ready, outboxRef, storageError, retryInitialization: () => setInitialization(value => value + 1),
+		quarantinedChanges, removeQuarantinedChanges: (entries: QuarantinedReminderEntry[]) => removeQuarantinedRef.current?.(entries) ?? Promise.resolve(false),
 		recoveryChanges: options.canRecover === false || options.hasSnapshot === false ? [] : recoveryChanges,
 		recoverChanges: () => { void recoverRef.current?.(); } };
 }

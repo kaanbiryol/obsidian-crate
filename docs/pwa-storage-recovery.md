@@ -14,8 +14,20 @@ Each snapshot includes a SHA-256 digest of the session credential. The credentia
 
 Explicit logout still deletes the whole private cache and clears pending commands/drafts. A blocked delete remains queued by the browser; the app promptly reports that it could not confirm erasure and directs the user to close other tabs and clear site data. It does not report a blocked deletion as successful. Session and cache generations prevent delayed writes from recreating the signed-out snapshot.
 
+## Damaged pending commands
+
+A damaged or unsupported pending-command entry is quarantined in its original local-storage key. Reading the queue neither rewrites nor deletes it, and needs no additional storage space. Valid commands remain available and can sync with their original operation IDs and request bodies. Valid commands from an earlier session still require the existing same-folder review and resume action. A damaged destination never overwrites a valid earlier-session recovery source.
+
+**Damaged pending changes** shows the number of affected entries and a text preview. **Export damaged entries** downloads a JSON file containing the exact original strings and their storage keys for the current origin and enrolled folder, including earlier sessions in that folder. Other folders and healthy commands are excluded. The preview renders text, limits each entry to 20,000 characters, and scrolls within the mobile viewport; the export contains every byte represented by the stored strings.
+
+Compare the export with current reminders before restoring missing text in Obsidian. An uncertain request may already have committed. Damaged requests are never automatically repaired, replayed, or assigned replacement operation IDs. Exported files contain private reminder text and should be kept locally or redacted before sharing.
+
+After confirming **I saved and reviewed the export**, **Remove exported copies from device** removes only still-damaged entries whose current key and string exactly match that export. Changed, repaired, unexported, or differently scoped entries survive. The operation uses the same cross-tab lock as sending. Explicit logout clears quarantined entries along with other pending commands. Storage-access failures still block queue initialization with an actionable error; an unreadable storage API is never treated as an empty queue.
+
 ## Verification
 
 `pwa-cache-test.mjs` covers creation, metadata-only 304 refresh, stale revision guards and clearing. `pwa-cache-recovery-test.mjs` runs native IndexedDB in Chromium and WebKit: additive migration, aborted migration/retry, an old connection blocking upgrade, abandoned-request fencing, damaged rows, quota and denied-storage failures, folder-only rebuild, session isolation, future-format preservation, and blocked deletion. It checks that pending-command and editor-draft bytes survive.
 
 `pwa-cache-recovery-ui-test.mjs` exercises the built PWA against native IndexedDB: blocked startup retains the live reminder UI, the keyboard recovery action rebuilds the cache, damaged cached rows stay unrendered during network failure, and reconnection replaces them without using their ETag or losing drafts and pending commands. Cloudflare responses use the local preview server; these tests do not establish physical-device or hosted acceptance.
+
+`pwa-outbox-recovery-test.mjs` exercises two built-PWA tabs in Chromium and WebKit at a mobile viewport. Healthy current and earlier-session commands sync despite damaged neighbors; only valid operation bodies reach the preview server. Downloads preserve exact Unicode and malformed JSON strings, markup stays inert, and removal after a concurrent edit preserves changed and unexported entries. Unit tests also cover quota-free quarantine, invalid reminder presentation fields, conflicting recovery destinations and explicit logout cleanup.
