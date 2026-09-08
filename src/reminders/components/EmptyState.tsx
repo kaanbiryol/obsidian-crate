@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import { motion } from 'framer-motion';
 import type { AnimationConfig } from '../types/componentAdapter';
 import { EASE_EXPO_OUT, EASE_STANDARD, CONTENT_TRANSITION_DURATION } from '../ui/layoutConstants';
@@ -15,6 +15,9 @@ interface EmptyStateProps {
     compact?: boolean;
 }
 
+/** Hosts with incomplete data can replace conclusive empty-state messages. */
+export const EmptyStateMessageContext = createContext<{ title: string; description: string } | null>(null);
+
 /**
  * Reusable empty state component with icon, title, and description.
  */
@@ -26,6 +29,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     animationConfig = { enabled: true },
     compact = false
 }) => {
+	const message = useContext(EmptyStateMessageContext);
     const reduceMotion = useObsidianReducedMotion();
     const animationsEnabled = animationConfig.enabled && !reduceMotion;
     const duration = animationConfig.duration ?? CONTENT_TRANSITION_DURATION;
@@ -69,10 +73,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
                 <ThemeIcon size={compact ? "l" : "xl"} id={icon} className="reminders-empty-state-glyph" />
             </IconWrapper>
             <h3 className="reminders-empty-state-title">
-                {title}
+                {message?.title ?? title}
             </h3>
             <p className="reminders-empty-state-description">
-                {description}
+                {message?.description ?? description}
             </p>
         </Wrapper>
     );

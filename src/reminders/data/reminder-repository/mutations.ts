@@ -2,11 +2,15 @@ import { reminderRevision } from '../../core/reminderRevision';
 import { createReminderId } from "../../core/reminderIdentity";
 import { buildCreatedReminderFallback, buildCreateReminderArgs, buildReminderUpdate } from "./shared";
 import type { ReminderRepositoryContext } from "./types";
-import type { CreateReminderParams, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
+import type { CreateReminderParams, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
 import { getReminderProjectFilePath } from "@/reminders/core/reminderProjectPath";
 import { toReminder } from "../toReminder";
 
 export function createReminderRepositoryMutations({ index, writer }: ReminderRepositoryContext) {
+  const currentReminder = (id: string) => {
+    const current = index.getById(id);
+    return current ? toReminder(current) : undefined;
+  };
   return {
     async create(params: CreateReminderParams) {
       const createArgs = buildCreateReminderArgs(params);
@@ -47,21 +51,7 @@ export function createReminderRepositoryMutations({ index, writer }: ReminderRep
       const update = buildReminderUpdate(params);
       await writer.updateReminder(indexed, update.updates);
 
-      const { expectedRevision: _expectedRevision, ...values } = params;
-      const updated: Omit<Reminder, "recurrence"> & {
-        recurrence?: Reminder["recurrence"] | null;
-      } = {
-        ...toReminder(indexed),
-        ...values,
-        ...(update.hasRecurrenceUpdate ? { recurrence: update.recurrenceUpdate } : {}),
-        ...update.storedDates,
-      };
-
-      if (updated.recurrence === null) {
-        updated.recurrence = undefined;
-      }
-
-      return updated as Reminder;
+      return currentReminder(id);
     },
 
     async delete(id: string, expectedRevision?: string) {
@@ -81,10 +71,7 @@ export function createReminderRepositoryMutations({ index, writer }: ReminderRep
         await writer.toggleComplete(indexed);
       }
 
-      return {
-        ...toReminder(indexed),
-        completed: true,
-      };
+      return currentReminder(id);
     },
 
     async uncomplete(id: string) {
@@ -95,10 +82,7 @@ export function createReminderRepositoryMutations({ index, writer }: ReminderRep
         await writer.toggleComplete(indexed);
       }
 
-      return {
-        ...toReminder(indexed),
-        completed: false,
-      };
+      return currentReminder(id);
     },
 
     async reorder(project: string, orderedIds: string[]) {

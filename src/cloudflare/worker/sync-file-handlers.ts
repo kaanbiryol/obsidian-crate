@@ -3,6 +3,9 @@ import { readLimitedRequestBody } from './body-reader';
 import { corsHeaders, corsResponse } from './cors';
 import { isSha256Hex, parseJsonObject, parseOptionalString, sanitizePath } from './utils';
 import { commitFileDelete, commitStagedFile } from './sync-mutations';
+import { FileNamespaceConflictError } from './file-namespace';
+import { mutationAuditContext } from './request-diagnostics';
+import type { FileDeletionReceipt } from './file-delete-audit';
 import {
 	createManagedObjectKey,
 	formatMetadataCommitFailure,
@@ -107,6 +110,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 			}
 		} catch (error: unknown) {
 			// The transaction may have committed before its response was lost.
+			if (error instanceof FileNamespaceConflictError) return error.toResponse();
 			// Only the age-delayed, reference-aware orphan sweep may reclaim it.
 			return corsResponse({
 				success: false,
@@ -167,7 +171,7 @@ export async function handleDownload(request: Request, bucket: R2Bucket, db: D1D
 	});
 }
 
-export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
+export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Database, audit = mutationAuditContext(request)): Promise<Response> {
 	const parsedBody = await parseJsonObject(request);
 	if (!parsedBody.ok) {
 		return parsedBody.response;
@@ -186,6 +190,7 @@ export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Dat
 	const expectedRevision = parseOptionalString(parsedBody.value.expectedRevision, 1024);
 	if (!expectedRevision) return corsResponse({ error: 'expectedRevision required; refresh before deleting' }, 428);
 	let previousFile: FileStorageRow | null = null;
+	let deletion: FileDeletionReceipt | undefined;
 	try {
 		previousFile = await getStoredFileRow(db, safePath);
 		const commit = await commitFileDelete(bucket, db, {
@@ -193,7 +198,9 @@ export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Dat
 			expectedHash,
 			expectedRevision,
 			previousFile,
+			audit,
 		});
+		deletion = commit.deletion;
 		if (!commit.committed) {
 			return corsResponse({
 				success: false,
@@ -211,5 +218,5 @@ export async function handleDelete(request: Request, bucket: R2Bucket, db: D1Dat
 		}, 503);
 	}
 
-	return corsResponse({ success: true, path: safePath });
+	return corsResponse({ success: true, path: safePath, ...deletion });
 }

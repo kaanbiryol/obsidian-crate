@@ -42,7 +42,7 @@ export interface CheckResponse {
 	cursorExpired?: boolean;
 }
 
-type MutationFailureCode = 'version_conflict' | 'validation' | 'storage' | 'unknown';
+type MutationFailureCode = 'version_conflict' | 'namespace_conflict' | 'validation' | 'storage' | 'unknown';
 
 export interface UploadResult {
 	success: boolean;
@@ -116,6 +116,7 @@ export interface BatchDownloadResponse {
 export interface BatchDeleteResponse {
 	success: boolean;
 	deleted: string[];
+	results?: Array<{ path: string; revision?: string; consumedRevision?: string; deleteRequestId?: string }>;
 	errors?: MutationFailure[];
 }
 
@@ -141,6 +142,7 @@ export interface BackendDiagnostics {
 	lastMaintenanceError: string | null;
 	oldestNotificationFailureAt?: string | null;
 	oldestOverdueNotificationAt?: string | null;
+	notificationProjectionIssues?: Array<{ path: string; reason: string }>;
 }
 
 export interface RegisteredDevice {

@@ -8,6 +8,7 @@ import { readableWikiLinks } from '../utils/readableWikiLinks';
 import type { AnimationConfig } from '../types/componentAdapter';
 import type { RecurrenceRule } from '../types/reminder';
 import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
+import { useReminderClock } from '../ui/useReminderClock';
 
 function renderContentWithLinks(content: string): React.ReactNode[] {
     const links = parseMarkdownLinks(content);
@@ -83,8 +84,10 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     completionPreview = false,
 }) => {
     const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
+    const trackedReminders = React.useMemo(() => [reminder], [reminder]);
+    const clock = useReminderClock(trackedReminders);
     const dueDate = reminder.dueDatetime || reminder.dueDate;
-    const isOverdue = isReminderOverdue(reminder);
+    const isOverdue = isReminderOverdue(reminder, clock.now);
     const isImportant = reminder.priority === 1;
     const isCheckboxChecked = reminder.completed || completionPreview;
     const showPriority = isImportant && !reminder.completed;
@@ -133,8 +136,11 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                     aria-label={completionPreview
                         ? `Completing ${reminder.content}`
                         : reminder.completed
-                            ? `Mark ${reminder.content} incomplete`
-                            : `Mark ${reminder.content} complete`}
+                            ? reminder.recurrence ? `Reopen this occurrence of ${reminder.content}` : `Mark ${reminder.content} incomplete`
+                            : reminder.recurrence ? `Complete this occurrence of ${reminder.content}` : `Mark ${reminder.content} complete`}
+                    title={reminder.recurrence ? reminder.completed
+                        ? 'Reopen this occurrence. Earlier occurrences are not restored.'
+                        : 'Complete this occurrence and show the next scheduled one, if any.' : undefined}
                 >
                     <span
                         className="premium-checkbox-visual"
@@ -185,7 +191,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                                     ) : (
                                         <ThemeIcon size="xs" id="calendar" />
                                     )}
-                                    <span>{dueDate ? formatDueDate(dueDate) : null}</span>
+                                    <span>{dueDate ? formatDueDate(dueDate, undefined, clock.now) : null}</span>
                                 </span>
                             )}
 

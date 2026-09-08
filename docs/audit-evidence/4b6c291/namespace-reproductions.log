@@ -1,0 +1,8 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  00:16:19
+   Duration  3.74s (transform 1.19s, setup 0ms, import 2.45s, tests 121ms, environment 0ms)

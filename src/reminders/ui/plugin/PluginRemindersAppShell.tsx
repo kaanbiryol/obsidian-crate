@@ -14,6 +14,7 @@ import {
 } from "@/reminders/ui/layoutConstants";
 import { RemindersViewPanels } from "@/reminders/ui/RemindersViewPanels";
 import { useObsidianReducedMotion } from "@/reminders/ui/useObsidianReducedMotion";
+import { useReminderClock } from '../useReminderClock';
 import {
   getCurrentHeaderData,
   getReminderCreateProject,
@@ -137,9 +138,10 @@ export const PluginRemindersAppShell: React.FC<PluginRemindersAppShellProps> = (
     setSelectedProject(null);
   }, [startTransition]);
 
+  const clock = useReminderClock(reminders);
   const headerData = useMemo(() => {
-    return getRemindersHeaderData(reminders, projects, upcomingDays);
-  }, [reminders, projects, upcomingDays]);
+    return getRemindersHeaderData(reminders, projects, upcomingDays, clock.now);
+  }, [reminders, projects, upcomingDays, clock]);
 
   const currentHeader = useMemo(() => {
     return getCurrentHeaderData(viewMode, headerData);

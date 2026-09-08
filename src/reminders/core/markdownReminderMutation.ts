@@ -106,11 +106,16 @@ export function buildUpdatedReminderBlock(
 	const recurrence = Object.prototype.hasOwnProperty.call(updates, 'recurrence')
 		? normalizeRecurrenceRule(updates.recurrence ?? undefined)
 		: normalizeRecurrenceRule(reminder.recurrence);
-	const hasTime = Object.prototype.hasOwnProperty.call(updates, 'hasTime')
+	let hasTime = Object.prototype.hasOwnProperty.call(updates, 'hasTime')
 		? updates.hasTime
 		: ('dueDate' in updates ? inferHasTimeFromDate(updates.dueDate) : currentHasTime);
 	const content = updates.content ?? reminder.content;
-	const dueDate = 'dueDate' in updates ? updates.dueDate : currentDueDate;
+	let dueDate = 'dueDate' in updates ? updates.dueDate : currentDueDate;
+	if (recurrence && !dueDate) {
+		hasTime = recurrence.hour !== undefined;
+		dueDate = calculateFirstOccurrence(recurrence);
+		if (!hasTime) dueDate = recurrenceCalendarDate(dueDate, recurrence);
+	}
 	const priority = updates.priority ?? reminder.priority;
 	const description = 'description' in updates
 		? (updates.description?.trim() || undefined)
@@ -191,7 +196,14 @@ export function buildReminderCompletionPlan(
 	let recurringInstanceCompleted: ReminderCompletionPlan['recurringInstanceCompleted'];
 
 	if (!completed) {
-		nextLine = sourceLine.replace(/\[x\]/i, '[ ]');
+		const completedCount = recurrence?.completedCount ?? 0;
+		if (reminder.completed && recurrence && completedCount > 0) {
+			// Reopen the displayed occurrence without moving its date backwards.
+			// Completing it again must restore the count, rather than double count it.
+			recurrence = { ...recurrence, completedCount: completedCount - 1 };
+			nextLine = rebuildCheckboxLine(sourceLine.match(/^(\s*)/)?.[1] ?? '', false, reminder.content,
+				currentDue, reminder.priority, undefined, recurrence, currentHasTime, reminder.id);
+		} else nextLine = sourceLine.replace(/\[x\]/i, '[ ]');
 	} else if (recurrence && !reminder.completed) {
 		const completedCount = recurrence.completedCount ?? 0;
 		const nextInstant = calculateNextOccurrence(currentHasTime ? currentDue : recurrenceCalendarInstant(currentDue, recurrence), recurrence, completedCount);

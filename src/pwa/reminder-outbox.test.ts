@@ -84,6 +84,32 @@ beforeEach(() => vi.stubGlobal('navigator', { onLine: true }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('optimistic reminder outbox', () => {
+	it('stops expired ambiguous commands for review while healthy work continues and requires the exact exported change to remove them', async () => {
+		const locks = vi.fn(async (work: () => Promise<void>) => work());
+		const state = harness(memoryStorage(), locks);
+		const expired = { ...completion(), status: 'uncertain' as const, ambiguous: true };
+		const healthy = completion('two');
+		state.storage.put(expired); state.storage.put(healthy);
+		const draining = state.drain();
+		state.requests[0]!.resolve(new Response(JSON.stringify({ code: 'operation_expired', error: 'Export and compare current reminders.' }), { status: 410 }));
+		await vi.waitFor(() => expect(state.requests).toHaveLength(2));
+		state.requests[1]!.resolve(confirmed('two'));
+		await draining;
+		const retained = state.storage.load()[0]!;
+		expect(retained).toMatchObject({ body: expired.body, operationId: expired.operationId, status: 'failed', ambiguous: true, reviewRequired: true });
+		state.retry(expired.operationId); await state.drain();
+		expect(state.requests).toHaveLength(2);
+		await state.discard(expired.operationId);
+		await state.discard(expired.operationId, expired.body);
+		expect(state.storage.load()).toHaveLength(1);
+		const exported = JSON.stringify(retained);
+		state.storage.put({ ...retained, error: 'Another tab changed the saved entry' });
+		await state.discard(expired.operationId, exported);
+		expect(state.storage.load()).toHaveLength(1);
+		await state.discard(expired.operationId, JSON.stringify(state.storage.load()[0]));
+		expect(state.storage.load()).toEqual([]);
+		expect(locks).toHaveBeenCalled();
+	});
 	it('persists before exposing the optimistic change and waits for confirmation before committing', async () => {
 		const state = harness();
 		const change = completion();
@@ -116,6 +142,23 @@ describe('optimistic reminder outbox', () => {
 		expect(state.storage.load()).toHaveLength(1);
 		commitFinished.resolve();
 		await draining;
+		expect(state.storage.load()).toEqual([]);
+	});
+
+	it('retains the exact idempotent command when publishing confirmation fails', async () => {
+		const state = harness();
+		const original = completion();
+		state.commit.mockRejectedValueOnce(new Error('Could not share the confirmed change'));
+		state.enqueue(original);
+		const first = state.drain();
+		state.requests[0]!.resolve(confirmed());
+		await first;
+		expect(state.storage.load()).toMatchObject([{ operationId: original.operationId, body: original.body, status: 'uncertain', ambiguous: true }]);
+		state.retry(original.operationId);
+		const retry = state.drain();
+		expect(state.requests[1]?.init).toEqual(state.requests[0]?.init);
+		state.requests[1]!.resolve(confirmed());
+		await retry;
 		expect(state.storage.load()).toEqual([]);
 	});
 
@@ -255,7 +298,7 @@ describe('optimistic reminder outbox', () => {
 		state.requests[1]!.resolve(new Response(JSON.stringify({ code: 'version_conflict', error: 'Changed elsewhere' }), { status: 409 }));
 		await retry;
 		expect(state.storage.load()).toMatchObject([{ status: 'uncertain', ambiguous: true, body: change.body }]);
-		state.discard(change.operationId);
+		await state.discard(change.operationId);
 		expect(() => state.enqueue({ ...change, body: change.body.replace('true', 'false') })).toThrow('still syncing');
 		expect(state.storage.load()).toHaveLength(1);
 		expect(state.requests[1]?.init).toEqual(state.requests[0]?.init);
@@ -271,7 +314,7 @@ describe('optimistic reminder outbox', () => {
 		state.requests[0]!.resolve(new Response(JSON.stringify({ code: 'version_conflict', error: 'Changed elsewhere' }), { status: 409 }));
 		await draining;
 		expect(storage.load()).toMatchObject([{ status: 'uncertain', ambiguous: true, body: change.body }]);
-		state.discard(change.operationId);
+		await state.discard(change.operationId);
 		expect(storage.load()).toHaveLength(1);
 	});
 
@@ -322,7 +365,7 @@ describe('optimistic reminder outbox', () => {
 		const draining = state.drain();
 		state.requests[0]!.reject(new Error('Connection lost'));
 		await draining;
-		state.discard(change.operationId);
+		await state.discard(change.operationId);
 		expect(state.storage.load()).toHaveLength(1);
 		expect(() => state.enqueue({ ...change, body: change.body.replace('true', 'false') })).toThrow('still syncing');
 		expect(() => state.enqueue(completion())).toThrow('pending change');

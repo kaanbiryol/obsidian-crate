@@ -8,6 +8,7 @@ import type { RouteMethod } from './routes/shared';
 import type { Env } from './types';
 import type { AuthPrincipal } from './auth/index';
 import { corsResponse } from './cors';
+import { mutationAuditContext } from './request-diagnostics';
 
 export { handlePublicRoute };
 
@@ -38,6 +39,7 @@ export async function handleAuthenticatedRoute(
 	path: string,
 	method: RouteMethod,
 	principal: AuthPrincipal,
+	requestId?: string,
 ): Promise<Response | null> {
 	if (!isAuthenticatedRouteAllowed(principal, path, method)) {
 		return corsResponse({ error: 'Token is not authorized for this operation' }, 403);
@@ -54,7 +56,7 @@ export async function handleAuthenticatedRoute(
 	}
 	const db = env.DB;
 
-	return await handleSyncRoute(request, env, path, method)
+	return await handleSyncRoute(request, env, path, method, mutationAuditContext(request, principal, requestId))
 		?? await handleAuthRoute(request, env, path, method)
 		?? await handleRemindersRoute(request, env, path, method)
 		?? await handleNotificationsRoute(request, db, path, method, principal);

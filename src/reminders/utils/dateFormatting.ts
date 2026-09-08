@@ -1,4 +1,3 @@
-import { isToday, isTomorrow, isPast } from 'date-fns';
 import type { Reminder } from '../types/reminder';
 import { formatLocalDateKey, parseReminderDateValue } from './reminderDate';
 import { getUiLocale, sentenceCaseLocalized } from './uiLocale';
@@ -17,6 +16,7 @@ function formatRelativeDay(offset: number, locale = getUiLocale()): string {
 export function formatDueDate(
   dateString: string | undefined,
   locale = getUiLocale(),
+  now = new Date(),
 ): string | null {
   if (!dateString) return null;
   const hasTime = dateString.includes('T');
@@ -24,9 +24,11 @@ export function formatDueDate(
   if (!date) return null;
 
   let dateText = '';
-  if (isToday(date)) {
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (formatLocalDateKey(date) === formatLocalDateKey(now)) {
     dateText = formatRelativeDay(0, locale);
-  } else if (isTomorrow(date)) {
+  } else if (formatLocalDateKey(date) === formatLocalDateKey(tomorrow)) {
     dateText = formatRelativeDay(1, locale);
   } else {
     dateText = new Intl.DateTimeFormat(locale, {
@@ -54,9 +56,11 @@ export function formatDueDate(
  * @param date - Date to format
  * @returns Formatted date header
  */
-export function formatDateHeader(date: Date, locale = getUiLocale()): string {
-  if (isToday(date)) return formatRelativeDay(0, locale);
-  if (isTomorrow(date)) return formatRelativeDay(1, locale);
+export function formatDateHeader(date: Date, locale = getUiLocale(), now = new Date()): string {
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (formatLocalDateKey(date) === formatLocalDateKey(now)) return formatRelativeDay(0, locale);
+  if (formatLocalDateKey(date) === formatLocalDateKey(tomorrow)) return formatRelativeDay(1, locale);
   return new Intl.DateTimeFormat(locale, {
     weekday: 'long',
     month: 'short',
@@ -69,13 +73,13 @@ export function formatDateHeader(date: Date, locale = getUiLocale()): string {
  * @param reminder - Reminder to check
  * @returns True if reminder is overdue
  */
-export function isReminderOverdue(reminder: Pick<Reminder, 'dueDate' | 'dueDatetime' | 'completed'>): boolean {
+export function isReminderOverdue(reminder: Pick<Reminder, 'dueDate' | 'dueDatetime' | 'completed'>, now = new Date()): boolean {
   if (reminder.completed) return false;
   if (reminder.dueDatetime) {
-    return isPast(new Date(reminder.dueDatetime));
+    return new Date(reminder.dueDatetime) < now;
   }
   if (reminder.dueDate) {
-    return reminder.dueDate < formatLocalDateKey(new Date());
+    return reminder.dueDate < formatLocalDateKey(now);
   }
   return false;
 }

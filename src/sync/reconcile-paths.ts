@@ -83,7 +83,7 @@ export async function reconcileQueuePaths(
 				break;
 			} catch (error) {
 				const remoteVersionChanged = error instanceof RemoteVersionChangedError
-					|| (error instanceof HttpError && isQueueVersionConflict(error.status));
+					|| (error instanceof HttpError && isQueueVersionConflict(error.status, error.code));
 				if (remoteVersionChanged && attempt < MAX_RECONCILE_ATTEMPTS) {
 					await refreshRemoteEntry(context, remoteEntries, path);
 					continue;

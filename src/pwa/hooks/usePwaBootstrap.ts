@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import {
 	AUTH_TOKEN_KEY,
+	PWA_LOGOUT_KEY,
 	applyConfigFromUrl,
 	finishEnrollment,
 	isStandaloneApp,
@@ -12,11 +13,12 @@ import {
 import { enrollmentFingerprint, rememberRedeemedEnrollment, wasEnrollmentRedeemed } from '../install-enrollment';
 import { exchangeEnrollmentToken } from '../api';
 import { loadCachedReminderSnapshot } from '../reminder-cache';
+import { scopeLegacyReminderDrafts } from '../reminder-drafts';
 import type { CachedReminderSnapshot, ShowToast, StartTab, StoredConfig } from '../types';
 
 export function usePwaBootstrap({
 	authToken,
-	clearLocalSession,
+	suspendLocalSession,
 	hydrateCachedSnapshot,
 	hydratedCacheRef,
 	setAuthToken,
@@ -30,7 +32,7 @@ export function usePwaBootstrap({
 	showToast,
 }: {
 	authToken: string | null;
-	clearLocalSession: () => Promise<void>;
+	suspendLocalSession: () => Promise<void>;
 	hydrateCachedSnapshot: (snapshot: CachedReminderSnapshot) => void;
 	hydratedCacheRef: MutableRefObject<boolean>;
 	setAuthToken: Dispatch<SetStateAction<string | null>>;
@@ -53,6 +55,7 @@ export function usePwaBootstrap({
 			try {
 				if (cancelled || !sessionCurrent()) return;
 				const storedConfig = loadStoredConfig();
+				scopeLegacyReminderDrafts(storedConfig.folderPath);
 				const applied = applyConfigFromUrl(storedConfig);
 				let nextToken = initialAuthTokenRef.current;
 				// Existing credentials are folder-scoped. A cleaned-up old link
@@ -68,7 +71,14 @@ export function usePwaBootstrap({
 						nextConfig = storedConfig;
 					} else {
 						try {
+							const previousLogout = localStorage.getItem(PWA_LOGOUT_KEY);
 							nextToken = await exchangeEnrollmentToken(applied.token, nextToken);
+							// Revoking the replaced credential can cause an older tab's
+							// in-flight read to suspend it before this response arrives.
+							// Adopt this explicit enrollment only if no user logout or
+							// another authenticated replacement intervened.
+							if (!cancelled && !sessionCurrent() && !localStorage.getItem(AUTH_TOKEN_KEY)
+								&& previousLogout === localStorage.getItem(PWA_LOGOUT_KEY)) sessionCurrent = capturePwaSession();
 						} catch (error) {
 							if (cancelled || !sessionCurrent()) return;
 							if (!nextToken) throw error;
@@ -80,7 +90,7 @@ export function usePwaBootstrap({
 						}
 						if (cancelled || !sessionCurrent()) return;
 						if (!enrollmentFailed) {
-							const clearing = clearLocalSession();
+							const clearing = suspendLocalSession();
 							sessionCurrent = capturePwaSession();
 							await clearing;
 							if (cancelled || !sessionCurrent()) return;
@@ -125,7 +135,7 @@ export function usePwaBootstrap({
 						showToast('error', bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError));
 						return;
 					}
-					const clearing = clearLocalSession();
+					const clearing = suspendLocalSession();
 					sessionCurrent = capturePwaSession();
 					await clearing;
 					if (cancelled || !sessionCurrent()) return;

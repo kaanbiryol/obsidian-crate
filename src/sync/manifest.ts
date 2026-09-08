@@ -70,8 +70,10 @@ export class LocalManifest {
 	private revision = 0;
 	private generation = 0;
 	private saveChain: Promise<void> = Promise.resolve();
+	private loadTask: Promise<void> = Promise.resolve();
+	private closed = false;
 
-	constructor(app: App, pluginManifest: PluginManifest) {
+	constructor(app: App, pluginManifest: PluginManifest, private readonly authority?: string) {
 		this.app = app;
 		this.manifestPath = `${pluginManifest.dir}/${MANIFEST_FILENAME}`;
 		this.tmpPath = `${pluginManifest.dir}/${MANIFEST_TMP_FILENAME}`;
@@ -83,7 +85,13 @@ export class LocalManifest {
 	 * Load manifest from its dedicated file.
 	 * Select the newest valid main or temporary generation after a crash.
 	 */
-	async load(): Promise<void> {
+	load(): Promise<void> {
+		if (this.closed) return Promise.resolve();
+		this.loadTask = this.readCheckpoint();
+		return this.loadTask;
+	}
+
+	private async readCheckpoint(): Promise<void> {
 		const adapter = this.app.vault.adapter;
 		const read = async (path: string) => {
 			try {
@@ -93,7 +101,7 @@ export class LocalManifest {
 				if (!manifest) return null;
 				const generation = isRecord(parsed) ? normalizeNonNegativeInteger(parsed.generation) : null;
 				if (generation === null) return null;
-				return { manifest, generation };
+				return { manifest, generation, authority: isRecord(parsed) ? parsed.authority : undefined };
 			} catch {
 				logger.warn(`Could not read manifest checkpoint: ${path}`);
 				return null;
@@ -101,20 +109,25 @@ export class LocalManifest {
 		};
 		const main = await read(this.manifestPath);
 		const tmp = await read(this.tmpPath);
+		if (this.closed) return;
 		const recoverTmp = tmp && (!main || tmp.generation > main.generation);
 		const selected = recoverTmp ? tmp : main;
 		if (!selected && (await adapter.exists(this.manifestPath) || await adapter.exists(this.tmpPath))) {
 			throw new Error('Invalid manifest checkpoint. Preserve this vault and its metadata before resetting sync.');
 		}
 		if (selected) {
+			if (this.authority !== undefined && selected.authority !== this.authority) {
+				throw new Error('Sync checkpoint is not bound to this server. Disconnect and reconnect before syncing; local files and the previous checkpoint are preserved.');
+			}
 			this.manifest = selected.manifest;
 			this.generation = selected.generation;
 			if (recoverTmp) {
 				// Leave tmp intact if promotion fails, so the next load can retry.
-				await adapter.write(this.manifestPath, JSON.stringify({ ...this.manifest, generation: this.generation }));
+				await adapter.write(this.manifestPath, this.serialize());
 				logger.info('Recovered newer manifest checkpoint');
 			}
 		}
+		if (this.closed) return;
 		if (await adapter.exists(this.tmpPath)) {
 			try { await adapter.remove(this.tmpPath); } catch { /* best effort */ }
 		}
@@ -123,18 +136,32 @@ export class LocalManifest {
 
 	/** Serialize checkpoints and include changes made while disk writes await. */
 	save(): Promise<void> {
+		if (this.closed) return Promise.resolve();
 		const save = this.saveChain.catch(() => {}).then(() => this.persist());
 		this.saveChain = save;
 		return save;
 	}
 
+	/** Fence late callbacks and wait for every checkpoint I/O before reset/reuse. */
+	async close(): Promise<void> {
+		this.closed = true;
+		await Promise.allSettled([this.loadTask, this.saveChain]);
+	}
+
+	private serialize(): string {
+		return JSON.stringify({ ...this.manifest, generation: this.generation, ...(this.authority === undefined ? {} : { authority: this.authority }) });
+	}
+
 	private async persist(): Promise<void> {
 		const adapter = this.app.vault.adapter;
-		while (this.dirty) {
+		while (this.dirty && !this.closed) {
 			const revision = this.revision;
-			const data = JSON.stringify({ ...this.manifest, generation: ++this.generation });
+			this.generation++;
+			const data = this.serialize();
 			await adapter.write(this.tmpPath, data);
+			if (this.closed) return;
 			await adapter.write(this.manifestPath, data);
+			if (this.closed) return;
 			try { await adapter.remove(this.tmpPath); } catch { /* best effort */ }
 			this.dirty = revision !== this.revision;
 		}

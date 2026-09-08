@@ -1,6 +1,6 @@
 import type { SyncActivityProgress } from './types';
 import type { Plugin, TAbstractFile } from 'obsidian';
-import { createLogger } from '../plugin/logger';
+import { createLogger, errorMessage } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from './types';
@@ -10,6 +10,8 @@ import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
 import { SyncEngine } from './engine';
+import { normalizeWorkerUrl, requireNormalizedWorkerUrl } from './worker-url';
+import { buildDiagnosticExport } from './diagnostic-export';
 import {
 	applyInfrastructureConfigState,
 	buildSharedSettings,
@@ -35,7 +37,10 @@ export class SyncRuntime {
 	private activityProgress: SyncActivityProgress | null = null;
 	private progressListeners = new Set<(current: number, total: number) => void>();
 	private acceptingEvents = false;
+	private initializationError: string | null = null;
 	private initializationRevision = 0;
+	private stoppingWork: Promise<void> = Promise.resolve();
+	private configurationChain: Promise<void> = Promise.resolve();
 	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
 	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -72,11 +77,15 @@ export class SyncRuntime {
 		if (this.syncEngine) {
 			return this.syncEngine.getState();
 		}
-		return { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
+		return { status: this.initializationError ? 'error' : 'idle', lastSync: null, lastError: this.initializationError, pendingChanges: 0, conflictCount: 0 };
 	}
 
 	getPendingPaths(): string[] {
 		return this.syncEngine?.getPendingPaths() ?? [];
+	}
+
+	exportDiagnostics(): string {
+		return buildDiagnosticExport(this.settings, this.getState(), this.plugin.manifest.version, this.apiClient?.getRequestDiagnostics());
 	}
 
 	async previewIgnoredRemoteFiles(): Promise<string[]> {
@@ -129,12 +138,16 @@ export class SyncRuntime {
 		logger.info('Initializing sync engine');
 
 		const initializationRevision = ++this.initializationRevision;
+		this.initializationError = null;
 		this.acceptingEvents = false;
 		this.startupSyncTask = Promise.resolve(false);
 		this.clearForegroundSyncTimer();
 
-		this.syncEngine?.destroy();
+		this.stopEngine();
 		this.statusBar?.destroy();
+
+		await this.stoppingWork;
+		if (this.initializationRevision !== initializationRevision) return;
 
 		this.apiClient = new SyncApiClient(
 			this.settings.workerUrl,
@@ -142,19 +155,29 @@ export class SyncRuntime {
 		);
 		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, this.settings);
 		const syncEngine = this.syncEngine;
-		syncEngine.setQueueSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
+		syncEngine.setAutomaticSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
 
 		if (this.settings.showStatusBar) {
 			this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
 		}
 
 		this.syncEngine.setStateChangeCallback((state: SyncState) => {
+			if (this.syncEngine !== syncEngine || this.initializationRevision !== initializationRevision) return;
 			emitStateChange(this.stateChangeListeners, state, (nextState) => {
 				this.statusBar?.update(nextState);
 			});
 		});
 
-		await this.syncEngine.initialize();
+		try {
+			await syncEngine.initialize();
+		} catch (error) {
+			if (this.initializationRevision !== initializationRevision || this.syncEngine !== syncEngine) return;
+			this.initializationError = errorMessage(error);
+			this.stopEngine();
+			this.apiClient = null;
+			this.statusBar?.update(this.getState());
+			throw error;
+		}
 		if (this.initializationRevision !== initializationRevision || this.syncEngine !== syncEngine) {
 			return;
 		}
@@ -200,11 +223,29 @@ export class SyncRuntime {
 		this.acceptingEvents = false;
 		this.startupSyncTask = Promise.resolve(false);
 		this.clearForegroundSyncTimer();
-		this.syncEngine?.destroy();
+		this.stopEngine();
 		this.statusBar?.destroy();
 		this.syncEngine = null;
 		this.apiClient = null;
 		this.statusBar = null;
+	}
+
+	private stopEngine(): void {
+		const engine = this.syncEngine;
+		this.syncEngine = null;
+		engine?.destroy();
+		this.stoppingWork = Promise.allSettled([this.stoppingWork, engine?.waitForIdle()]).then(() => {});
+	}
+
+	private changeConfiguration(operation: () => Promise<void>): Promise<void> {
+		const task = this.configurationChain.then(operation);
+		this.configurationChain = task.catch(() => {});
+		return task;
+	}
+
+	private assertTransitionActive(revision: number, signal?: AbortSignal): void {
+		signal?.throwIfAborted();
+		if (this.initializationRevision !== revision) throw new DOMException('Sync configuration changed during reset', 'AbortError');
 	}
 
 	onFileChange(file: TAbstractFile): void {
@@ -239,32 +280,48 @@ export class SyncRuntime {
 	}
 
 	async applyInfrastructureConfig(config: ApplyInfrastructureConfigInput, signal?: AbortSignal): Promise<void> {
-		signal?.throwIfAborted();
-		applyInfrastructureConfigState(this.settings, this.secretStorage, config);
-		await deleteManifestFile(this.plugin, signal);
-		signal?.throwIfAborted();
-		resetStoredSyncState(this.settings);
-		await this.persistSettings();
-		signal?.throwIfAborted();
-		await this.initialize({ skipStartupSync: true });
+		return this.changeConfiguration(async () => {
+			signal?.throwIfAborted();
+			const workerUrl = requireNormalizedWorkerUrl(config.workerUrl);
+			if (!config.authToken.trim()) throw new Error('Auth token is required');
+			const changingServer = workerUrl !== normalizeWorkerUrl(this.settings.workerUrl);
+			this.destroy();
+			const revision = this.initializationRevision;
+			await this.stoppingWork;
+			this.assertTransitionActive(revision, signal);
+			if (changingServer) await deleteManifestFile(this.plugin, signal);
+			this.assertTransitionActive(revision, signal);
+			applyInfrastructureConfigState(this.settings, this.secretStorage, { ...config, workerUrl });
+			if (changingServer) resetStoredSyncState(this.settings);
+			await this.persistSettings();
+			this.assertTransitionActive(revision, signal);
+			await this.initialize({ skipStartupSync: true });
+		});
 	}
 
 	async clearSyncConfiguration(signal?: AbortSignal): Promise<void> {
-		signal?.throwIfAborted();
-		try {
-			await this.apiClient?.revokeCurrentToken();
-		} catch (error) {
-			logger.warn('Failed to revoke the current device credential:', error);
-		}
-		signal?.throwIfAborted();
-		this.destroy();
-		await deleteManifestFile(this.plugin, signal);
-		signal?.throwIfAborted();
-
-		resetStoredSyncState(this.settings);
-		clearSyncConfigurationState(this.settings, this.secretStorage);
-
-		await this.persistSettings();
+		return this.changeConfiguration(async () => {
+			signal?.throwIfAborted();
+			const api = this.apiClient;
+			this.destroy();
+			const revision = this.initializationRevision;
+			await this.stoppingWork;
+			this.assertTransitionActive(revision, signal);
+			try {
+				// The stopped engine aborted this client. Revocation is a separate,
+				// explicitly requested operation after all old work has settled.
+				api?.setAbortSignal(signal ?? new AbortController().signal);
+				await api?.revokeCurrentToken();
+			} catch (error) {
+				logger.warn('Failed to revoke the current device credential:', error);
+			}
+			this.assertTransitionActive(revision, signal);
+			await deleteManifestFile(this.plugin, signal);
+			this.assertTransitionActive(revision, signal);
+			resetStoredSyncState(this.settings);
+			clearSyncConfigurationState(this.settings, this.secretStorage);
+			await this.persistSettings();
+		});
 	}
 
 	updateSyncSettings(): void {
@@ -332,6 +389,8 @@ export class SyncRuntime {
 
 	private recordSyncResult(type: SyncHistoryEntry['type'], result: SyncResult): void {
 		recordSyncHistory(this.settings, type, result);
+		const latest = this.settings.syncHistory[0];
+		if (latest && this.apiClient) latest.requestDiagnostics = this.apiClient.getRequestDiagnostics();
 	}
 
 	private emitCurrentState(): void {
@@ -364,6 +423,7 @@ export class SyncRuntime {
 	): Promise<SyncResult> {
 		if (!this.syncEngine) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
 
+		const engine = this.syncEngine;
 		if (logMessage) {
 			logger.info(logMessage);
 		}
@@ -372,6 +432,7 @@ export class SyncRuntime {
 		this.activityProgress = active;
 		emitSyncProgress(this.progressListeners, 0, 0);
 		const wrappedCallback = (current: number, total: number) => {
+			if (this.syncEngine !== engine) return;
 			Object.assign(active, { current, total });
 			emitSyncProgress(this.progressListeners, current, total, {
 				onStatusBarProgress: (nextCurrent, nextTotal) => {
@@ -381,7 +442,8 @@ export class SyncRuntime {
 			});
 		};
 		try {
-			const result = await operation(this.syncEngine, wrappedCallback);
+			const result = await operation(engine, wrappedCallback);
+			if (this.syncEngine !== engine) return result;
 			if (type === 'sync') {
 				this.lastForegroundSyncAt = Date.now();
 			}
@@ -390,8 +452,10 @@ export class SyncRuntime {
 			return result;
 		} finally {
 			if (this.activityProgress === active) this.activityProgress = null;
-			emitSyncProgress(this.progressListeners, 0, 0);
-			this.statusBar?.clearSyncProgress();
+			if (this.syncEngine === engine) {
+				emitSyncProgress(this.progressListeners, 0, 0);
+				this.statusBar?.clearSyncProgress();
+			}
 		}
 	}
 
@@ -410,6 +474,10 @@ export class SyncRuntime {
 			(syncEngine, wrappedCallback) => syncEngine.initialSync(wrappedCallback),
 			progressCallback,
 		);
+	}
+
+	async verifyAllFiles(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
+		return this.runSyncOperation('sync', (engine, callback) => engine.sync(callback, true), progressCallback, 'Content verification triggered');
 	}
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {

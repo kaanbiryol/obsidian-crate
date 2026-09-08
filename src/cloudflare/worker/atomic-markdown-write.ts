@@ -4,6 +4,7 @@ import { changedRows } from './db';
 import { portablePathKey } from '../../protocol/portable-path';
 import { stageMarkdownFile, type StagedMarkdownFile } from './markdown-file-staging';
 import { FileVersionConflictError } from './storage';
+import { assertFileNamespaceAvailable, fileNamespaceGuard } from './file-namespace';
 import {
 	collectCleanupKeys,
 	deleteBucketObjectsOrQueue,
@@ -16,12 +17,17 @@ function destinationMutation(
 	destination: StagedMarkdownFile,
 	source: StagedMarkdownFile,
 ): D1PreparedStatement {
+	const destinationNamespace = fileNamespaceGuard(destination.path);
+	const sourceNamespace = fileNamespaceGuard(source.path);
+	const namespaceGuard = `${destinationNamespace.sql} AND ${sourceNamespace.sql}`;
+	const namespaceArgs = [...destinationNamespace.args, ...sourceNamespace.args];
 	if (destination.expectedHash === null) {
 		return db.prepare(`/* atomic-destination-insert */
 			INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
 			SELECT ?, ?, ?, ?, datetime('now'), ?
 			WHERE NOT EXISTS (SELECT 1 FROM files WHERE path = ?)
 			AND EXISTS (SELECT 1 FROM files WHERE path = ? AND hash = ?)
+			AND ${namespaceGuard}
 			ON CONFLICT(path) DO NOTHING`)
 			.bind(
 				destination.path,
@@ -32,13 +38,15 @@ function destinationMutation(
 				destination.path,
 				source.path,
 				source.expectedHash,
+				...namespaceArgs,
 			);
 	}
 
 	return db.prepare(`/* atomic-destination-update */
 		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
 		WHERE path = ? AND hash = ?
-		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND hash = ?)`)
+		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND hash = ?)
+		AND ${namespaceGuard}`)
 		.bind(
 			portablePathKey(destination.path),
 			destination.hash,
@@ -48,6 +56,7 @@ function destinationMutation(
 			destination.expectedHash,
 			source.path,
 			source.expectedHash,
+			...namespaceArgs,
 		);
 }
 
@@ -172,6 +181,8 @@ export async function writeCommittedMarkdownFilePair(
 			throw new Error('Atomic reminder move committed only one file');
 		}
 		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => file.objectKey));
+		await assertFileNamespaceAvailable(db, source.path);
+		await assertFileNamespaceAvailable(db, destination.path);
 		const [currentSource, currentDestination] = await Promise.all([
 			getStoredFileRow(db, source.path),
 			getStoredFileRow(db, destination.path),

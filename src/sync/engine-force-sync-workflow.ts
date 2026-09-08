@@ -1,5 +1,6 @@
 import type { Vault } from 'obsidian';
 import { getAllVaultFiles, type VaultFile } from './file-discovery';
+import { assertLocalFileAbsent } from './local-absence';
 import {
 	createEmptySyncResult,
 	finalizeSyncResult,
@@ -101,6 +102,7 @@ export async function runForceFullSyncWorkflow(
 				const remoteEntry = getPathEntry(remoteManifest.files, path);
 				const expectedHash = remoteEntry?.hash;
 				if (!expectedHash) throw new Error('Missing remote version for delete');
+				await assertLocalFileAbsent(context.vault, path);
 				await context.deleteRemoteFile(path, expectedHash, remoteEntry?.revision);
 				context.removeLocalManifestEntry(path);
 				result.deleted++;

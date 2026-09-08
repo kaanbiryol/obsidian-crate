@@ -16,11 +16,12 @@ for (const browserType of [chromium, webkit]) {
 	try {
 		const page = await browser.newPage();
 		await page.route('**/*', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Cache test</title>' }));
-		await page.goto('http://pwa-cache.test');
+		await page.goto('https://pwa-cache.test');
 		await page.addScriptTag({ content: outputFiles[0].text });
 		const result = await page.evaluate(async () => {
 			const cache = reminderCache;
-			await cache.saveCachedReminderSnapshot('Reminders', [{ id: 'original' }], ['Inbox'], 100, 'old');
+			const reminder = id => ({ id, content: 'Task', priority: 4, completed: false, project: 'Inbox', filePath: 'Reminders/Inbox.md' });
+			await cache.saveCachedReminderSnapshot('Reminders', [reminder('original')], ['Inbox'], 100, 'old', [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }]);
 			const initial = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.refreshCachedReminderSnapshot('Reminders', 200, 'old');
 			const refreshed = await cache.loadCachedReminderSnapshot('Reminders');
@@ -34,14 +35,14 @@ for (const browserType of [chromium, webkit]) {
 					tx.oncomplete = () => { db.close(); resolve(read.result); };
 				};
 			});
-			await cache.saveCachedReminderSnapshot('Reminders', [{ id: 'new' }], ['Inbox'], 300, 'new');
+			await cache.saveCachedReminderSnapshot('Reminders', [reminder('new')], ['Inbox'], 300, 'new');
 			await cache.refreshCachedReminderSnapshot('Reminders', 400, 'old');
 			const afterStaleRefresh = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.refreshCachedReminderSnapshot('Reminders', 250, 'new');
 			const afterOldTimestamp = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.clearCachedReminderSnapshots();
 			const cleared = await cache.loadCachedReminderSnapshot('Reminders');
-			await cache.saveCachedReminderSnapshot('Reminders', [{ id: 'next' }], ['Inbox'], 50, 'new');
+			await cache.saveCachedReminderSnapshot('Reminders', [reminder('next')], ['Inbox'], 50, 'new');
 			const afterClear = await cache.loadCachedReminderSnapshot('Reminders');
 			await cache.refreshCachedReminderSnapshot('Missing', 500, 'missing');
 			const missing = await cache.loadCachedReminderSnapshot('Missing');
@@ -59,13 +60,16 @@ for (const browserType of [chromium, webkit]) {
                 request.onerror = () => reject(request.error);
             });
             await cache.clearCachedReminderSnapshots();
-            await cache.saveCachedReminderSnapshot('Reminders', [{ id: 'fresh' }], ['Inbox'], 600, 'fresh');
+            await cache.saveCachedReminderSnapshot('Reminders', [reminder('fresh')], ['Inbox'], 600, 'fresh');
             const fresh = await cache.loadCachedReminderSnapshot('Reminders');
             return { initial, refreshed, stored, afterStaleRefresh, afterOldTimestamp, cleared, afterClear, missing, unsupported, preservedVersion, fresh };
 		});
 		assert.equal(result.initial.reminders[0].id, 'original');
 		assert.equal(result.refreshed.savedAt, 200);
-		assert.deepEqual(result.stored, result.initial, '304 must not rewrite the snapshot');
+		assert.deepEqual(result.refreshed.issues, [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }]);
+		const { sessionScope, ...storedContent } = result.stored;
+		assert.match(sessionScope, /^[a-f0-9]{64}$/);
+		assert.deepEqual(storedContent, result.initial, '304 must not rewrite the snapshot');
 		assert.equal(result.afterStaleRefresh.savedAt, 300);
 		assert.equal(result.afterStaleRefresh.reminders[0].id, 'new');
 		assert.equal(result.afterOldTimestamp.savedAt, 300);

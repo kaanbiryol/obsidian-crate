@@ -1,0 +1,66 @@
+[
+  {
+    "label": "before",
+    "leaves": [
+      {
+        "id": "4b59fb6ca0898a6b",
+        "deferred": false
+      },
+      {
+        "id": "cdcc1d88eb849c44",
+        "deferred": true
+      },
+      {
+        "id": "d2618bd021960150",
+        "deferred": true
+      }
+    ]
+  },
+  {
+    "label": "disabled",
+    "leaves": [
+      {
+        "id": "cdcc1d88eb849c44",
+        "deferred": true
+      },
+      {
+        "id": "d2618bd021960150",
+        "deferred": true
+      }
+    ]
+  },
+  {
+    "label": "enabled",
+    "leaves": [
+      {
+        "id": "4b59fb6ca0898a6b",
+        "deferred": true
+      },
+      {
+        "id": "cdcc1d88eb849c44",
+        "deferred": false
+      },
+      {
+        "id": "d2618bd021960150",
+        "deferred": true
+      }
+    ]
+  },
+  {
+    "label": "after explicit open",
+    "leaves": [
+      {
+        "id": "4b59fb6ca0898a6b",
+        "deferred": false
+      },
+      {
+        "id": "cdcc1d88eb849c44",
+        "deferred": false
+      },
+      {
+        "id": "d2618bd021960150",
+        "deferred": true
+      }
+    ]
+  }
+]

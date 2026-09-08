@@ -12,9 +12,10 @@ export async function reorderRemindersInMarkdown(
     throw new Error(`File not found: ${filePath}`);
   }
 
-  await context.app.vault.process(file, (fileContent) =>
-    reorderReminderBlocksInContent(fileContent, orderedIds)
-  );
+  await context.app.vault.process(file, (fileContent) => {
+    context.moveJournal?.assertActive();
+    return reorderReminderBlocksInContent(fileContent, orderedIds);
+  });
   await notifyFileWritten(context, file);
   markdownWriterLog.info(`Reordered reminders in ${filePath}`);
 }

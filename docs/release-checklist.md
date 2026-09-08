@@ -14,8 +14,8 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 ## Automated gates
 
 - [ ] `npm ci` completed with the release Node version from `.nvmrc`.
-- [ ] `npm run release:check` passed on the release commit, including Chromium/WebKit safety tests and local recovery tests.
-- [ ] `npm audit` and `npm run security:secrets` passed.
+- [ ] `npm run release:check` passed on the release commit, including `security:check`, Chromium/WebKit safety tests and local recovery tests.
+- [ ] Preserved npm advisory and Gitleaks results from that gate; the checkout contained complete fetched history.
 - [ ] GitHub Actions passed on Node 20.19.0, 22.12.0, and 24.0.0.
 - [ ] Builds from all three Node versions produced identical release artifact hashes.
 - [ ] Obsidian's community-directory **Review branch** scan has no unresolved errors or warnings.
@@ -31,7 +31,7 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 - [ ] Restarted Obsidian and completed a normal sync.
 - [ ] Disconnected and reconnected the device without creating duplicate Cloudflare resources.
 - [ ] Joining from an older plugin did not upload or downgrade the Worker.
-- [ ] An old PWA/plugin could read but could not mutate the protocol-5 deployment.
+- [ ] An old PWA/plugin could read but could not mutate the protocol-6 deployment.
 - [ ] An unsupported database was rejected without modification; interrupted current-schema initialization retried safely.
 - [ ] Authorized a server update and confirmed the existing Worker, D1 database, R2 bucket, and Durable Objects were reused.
 - [ ] Confirmed the inactive-R2 error gives actionable setup guidance.

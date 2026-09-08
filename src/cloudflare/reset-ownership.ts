@@ -7,9 +7,9 @@ const CRATE_TABLES = new Set([
 	'crate_schema', 'd1_migrations', '_crate_migrations', 'changelog', 'files', 'auth_tokens',
 	'scheduled_reminders', 'notification_jobs', 'vapid_keys', 'push_subscriptions',
 	'push_enrollment_tokens', 'web_enrollment_tokens', 'object_cleanup_queue',
-	'file_versions', 'maintenance_state', 'reminder_file_cache', 'reminder_operations',
+	'file_versions', 'file_deletion_receipts', 'maintenance_state', 'reminder_file_cache', 'reminder_operations',
 	'reminder_identities', 'notification_policy', 'notification_projection_jobs',
-	'reminder_projections', 'reminder_sources', 'reminder_occurrences', 'request_rate_limits',
+	'reminder_projections', 'reminder_sources', 'reminder_source_state', 'reminder_occurrences', 'request_rate_limits',
 ]);
 
 export type ResetApi = Pick<CloudflareApiClient,
@@ -37,7 +37,7 @@ export function assertWorkerTarget(settings: CloudflareWorkerSettings, metadata:
 
 export async function readCrateTables(api: ResetApi, accountId: string, databaseId: string): Promise<string[]> {
 	const tables = (await api.queryD1(accountId, databaseId,
-		"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT GLOB 'sqlite_*' AND name != '_cf_KV';"))
+		"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT GLOB 'sqlite_*' AND name NOT IN ('_cf_KV', '_cf_METADATA');"))
 		.flatMap(result => result.results ?? []).map(row => row.name);
 	if (tables.some(table => typeof table !== 'string')) {
 		throw new Error('Reset blocked: Cloudflare returned an invalid table listing.');

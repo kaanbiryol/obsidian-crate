@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createReminderOutbox } from '../reminder-outbox';
-import { createReminderOutboxStorage } from '../reminder-outbox-storage';
+import { createReminderOutboxStorage, createReminderRecoveryStorage, type QuarantinedReminderEntry } from '../reminder-outbox-storage';
 import { capturePwaSession } from '../session-generation';
 import { mergeReminderRecord } from '../reminder-optimistic-state';
 import { mergeProject, reorderProjectReminders } from '../reminder-list-state';
+import { applyReminderSettlement, createReminderSettlementChannel } from '../reminder-settlement';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { ApiFetch, LoadReminders, ReminderRecord, ShowToast } from '../types';
 import type { MutableRefObject } from 'react';
@@ -20,8 +21,13 @@ export function useReminderOutbox(options: {
 	loadReminders: LoadReminders;
 	showToast: ShowToast;
 	hasSnapshot?: boolean;
+	canRecover?: boolean;
 }) {
 	const [changes, setChanges] = useState<PendingReminderChange[]>([]);
+	const [recoveryChanges, setRecoveryChanges] = useState<PendingReminderChange[]>([]);
+	const [quarantinedChanges, setQuarantinedChanges] = useState<QuarantinedReminderEntry[]>([]);
+	const removeQuarantinedRef = useRef<((entries: QuarantinedReminderEntry[]) => Promise<boolean>) | null>(null);
+	const recoverRef = useRef<(() => Promise<void>) | null>(null);
 	const [ready, setReady] = useState(false);
 	const [storageError, setStorageError] = useState<string | null>(null);
 	const [initialization, setInitialization] = useState(0);
@@ -38,17 +44,24 @@ export function useReminderOutbox(options: {
 		setReady(false);
 		setStorageError(null);
 		setChanges([]);
+		setRecoveryChanges([]);
+		setQuarantinedChanges([]);
+		removeQuarantinedRef.current = null;
+		recoverRef.current = null;
 		if (!authToken || !bootstrapped) return;
 		let cleanup = () => {};
-		void createReminderOutboxStorage(authToken, folderPath).then(storage => {
+		void Promise.all([createReminderOutboxStorage(authToken, folderPath), createReminderRecoveryStorage(authToken, folderPath), createReminderSettlementChannel(authToken, folderPath)]).then(([storage, recovery, settlement]) => {
 			if (!isCurrent()) return;
 			if (!navigator.locks) throw new Error('Update this browser to safely sync changes between tabs.');
+			const refreshQuarantine = () => {
+				if (isCurrent()) setQuarantinedChanges([...storage.quarantined(), ...recovery.quarantined()]);
+			};
 			const outbox = createReminderOutbox({
 				storage, apiFetch: optionsRef.current.apiFetch, isCurrent,
 				withLock: work => navigator.locks.request('crate-reminder-outbox', work),
 				canSend: () => optionsRef.current.hasSnapshot !== false,
 				beginMutation: () => optionsRef.current.beginLocalMutation(),
-				onChange: setChanges,
+				onChange: next => { setChanges(next); refreshQuarantine(); },
 			onError: message => { setStorageError(message); optionsRef.current.showToast('error', message); },
 				onSettled: () => { void optionsRef.current.loadReminders({ silent: true }); },
 				commit: async (change, result) => {
@@ -61,6 +74,7 @@ export function useReminderOutbox(options: {
 					} else if (change.kind === 'delete') reminders = reminders.filter(item => item.id !== change.recordId);
 					else if (change.kind === 'reorder') reminders = reorderProjectReminders(reminders, change.project!, change.orderedIds!);
 					await current.commitReminderState(reminders, projects);
+					if (isCurrent()) settlement.publish(change, result);
 					if (isCurrent() && result.notificationWarning) current.showToast('info', `Saved. Notification sync failed: ${result.notificationWarning}`);
 					if (isCurrent() && result.reminder && change.followUp) {
 						const { followUpReminderChange } = await import('../save-reminder-command');
@@ -70,8 +84,23 @@ export function useReminderOutbox(options: {
 				},
 			});
 			outbox.refresh();
+			setRecoveryChanges(recovery.load());
 			outboxRef.current = outbox;
 			setReady(true);
+			removeQuarantinedRef.current = async entries => {
+				try {
+					await navigator.locks.request('crate-reminder-outbox', () => {
+						if (!isCurrent()) return;
+						storage.removeQuarantined(entries);
+						recovery.removeQuarantined(entries);
+						refreshQuarantine();
+					});
+					return isCurrent();
+				} catch (error) {
+					if (isCurrent()) optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error));
+					return false;
+				}
+			};
 			const resume = () => {
 				if (!isCurrent()) return;
 				try {
@@ -82,10 +111,44 @@ export function useReminderOutbox(options: {
 					void outbox.drain();
 				} catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
 			};
+			recoverRef.current = async () => {
+				if (!isCurrent() || optionsRef.current.canRecover === false || optionsRef.current.hasSnapshot === false) return;
+				try {
+					await navigator.locks.request('crate-reminder-outbox', () => {
+						if (!isCurrent()) return;
+						recovery.adopt();
+						setRecoveryChanges(recovery.load());
+						outbox.refresh();
+					});
+					resume();
+				} catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
+			};
 			const visible = () => { if (document.visibilityState === 'visible') resume(); };
 			const storageChanged = (event: StorageEvent) => {
-				if (!storage.acceptsKey(event.key) || !isCurrent()) return;
-				try { outbox.refresh(); void outbox.drain(); }
+				if (!isCurrent()) return;
+				if (event.key === settlement.key && event.newValue) {
+					const confirmed = settlement.read(event);
+					const current = optionsRef.current;
+					const finish = current.beginLocalMutation();
+					void (async () => {
+						try {
+							const next = confirmed && current.hasSnapshot !== false ? applyReminderSettlement(current.remindersRef.current, current.projectsRef.current, confirmed) : null;
+							if (next) await current.commitReminderState(next.reminders, next.projects);
+						} catch (error) { if (isCurrent()) current.showToast('error', error instanceof Error ? error.message : String(error)); }
+						finally { finish(); if (isCurrent()) void optionsRef.current.loadReminders({ silent: true }); }
+					})();
+					return;
+				}
+				if (!recovery.acceptsKey(event.key)) return;
+				try {
+					// Also revalidate if a confirmation was missed, or another tab discarded a rejection.
+					if (storage.acceptsKey(event.key) && event.oldValue && event.newValue === null) {
+						const finish = optionsRef.current.beginLocalMutation();
+						finish();
+						void optionsRef.current.loadReminders({ silent: true });
+					}
+					setRecoveryChanges(recovery.load()); outbox.refresh(); void outbox.drain();
+				}
 				catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
 			};
 			window.addEventListener('online', resume);
@@ -100,7 +163,7 @@ export function useReminderOutbox(options: {
 		}).catch((error: unknown) => {
 			if (isCurrent()) setStorageError(`Could not load pending changes. ${error instanceof Error ? error.message : String(error)}`);
 		});
-		return () => { alive = false; outboxRef.current = null; cleanup(); };
+		return () => { alive = false; outboxRef.current = null; recoverRef.current = null; removeQuarantinedRef.current = null; cleanup(); };
 	}, [authToken, bootstrapped, folderPath, initialization]);
 
 	useEffect(() => {
@@ -115,5 +178,8 @@ export function useReminderOutbox(options: {
 		return () => window.clearTimeout(timer);
 	}, [changes, ready]);
 
-	return { changes, ready, outboxRef, storageError, retryInitialization: () => setInitialization(value => value + 1) };
+	return { changes, ready, outboxRef, storageError, retryInitialization: () => setInitialization(value => value + 1),
+		quarantinedChanges, removeQuarantinedChanges: (entries: QuarantinedReminderEntry[]) => removeQuarantinedRef.current?.(entries) ?? Promise.resolve(false),
+		recoveryChanges: options.canRecover === false || options.hasSnapshot === false ? [] : recoveryChanges,
+		recoverChanges: () => { void recoverRef.current?.(); } };
 }

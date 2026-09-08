@@ -22,6 +22,10 @@ import {
 } from '@/reminders/ui/remindersViewModel';
 import { PwaThemeIcon } from './PwaThemeIcon';
 import { ReminderPageSizeContext } from '@/reminders/ui/reminder-pagination';
+import { EmptyStateMessageContext } from '@/reminders/components/EmptyState';
+import { useReminderClock } from '@/reminders/ui/useReminderClock';
+
+const INCOMPLETE_EMPTY_MESSAGE = { title: 'No results from available files', description: 'Some source files could not be loaded. Review the notice above for missing reminders.' };
 
 export type PwaReminderCardRenderer = (props: {
 	reminder: Reminder;
@@ -41,6 +45,7 @@ interface PwaRemindersAppShellProps {
 	children?: React.ReactNode;
 	className?: string;
 	suppressFab?: boolean;
+	incomplete?: boolean;
 	renderCard: PwaReminderCardRenderer;
 	onAdd: (defaultProject: string) => void;
 	onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
@@ -66,6 +71,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	children,
 	className = '',
 	suppressFab = false,
+	incomplete = false,
 	renderCard,
 	onAdd,
 	onReorder,
@@ -93,9 +99,10 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		setSelectedProject(null);
 	}, []);
 
+	const clock = useReminderClock(reminders);
 	const headerData = useMemo(() => {
-		return getRemindersHeaderData(reminders, projects, upcomingDays);
-	}, [reminders, projects, upcomingDays]);
+		return getRemindersHeaderData(reminders, projects, upcomingDays, clock.now);
+	}, [reminders, projects, upcomingDays, clock]);
 
 	const currentHeader = useMemo(() => {
 		return getCurrentHeaderData(viewMode, headerData);
@@ -171,6 +178,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 
 	return (
 		<ReminderPageSizeContext.Provider value={200}>
+		<EmptyStateMessageContext.Provider value={incomplete ? INCOMPLETE_EMPTY_MESSAGE : null}>
 		<ThemeIconProvider renderer={PwaThemeIcon}>
 		  <div
 				className={[
@@ -237,6 +245,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 				{children}
 		  </div>
 		</ThemeIconProvider>
+		</EmptyStateMessageContext.Provider>
 		</ReminderPageSizeContext.Provider>
 	);
 };

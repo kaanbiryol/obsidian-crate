@@ -118,7 +118,7 @@ export function buildReminderUpdate(
 
   const updates: Parameters<MarkdownWriter["updateReminder"]>[1] = {
     content: params.content,
-    description: params.description,
+    ...(Object.prototype.hasOwnProperty.call(params, 'description') ? { description: params.description } : {}),
     priority: params.priority,
     project: params.project,
     ...(hasRecurrenceUpdate ? { recurrence: recurrenceUpdate } : {}),

@@ -1,0 +1,174 @@
+
+> obsidian-crate@0.1.0 release:check
+> npm run check && npm run test:pwa-preview && npm run build:plugin && npm run check:css-scope && npm run size-check && npm run verify:release-artifacts && npm run test:pwa-browser
+
+
+> obsidian-crate@0.1.0 check
+> npm run lint && npm run typecheck && npm run typecheck:worker && npm run deadcode && npm run notices:check && npm run test:recovery && npm test && npm run test:worker-runtime
+
+
+> obsidian-crate@0.1.0 lint
+> eslint .
+
+
+> obsidian-crate@0.1.0 typecheck
+> tsc -noEmit -skipLibCheck
+
+
+> obsidian-crate@0.1.0 typecheck:worker
+> tsc -p src/cloudflare/worker/tsconfig.json --noEmit -skipLibCheck
+
+
+> obsidian-crate@0.1.0 deadcode
+> knip && knip --production --include files,dependencies
+
+
+> obsidian-crate@0.1.0 notices:check
+> node scripts/generate-third-party-notices.mjs --check
+
+Third-party notices are up to date.
+
+> obsidian-crate@0.1.0 test:recovery
+> python3 -m unittest discover -s scripts/recovery -p "test_*.py"
+
+.................
+----------------------------------------------------------------------
+Ran 17 tests in 0.159s
+
+OK
+
+> obsidian-crate@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.8 /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate
+
+
+ Test Files  196 passed (196)
+      Tests  1299 passed (1299)
+   Start at  00:14:11
+   Duration  10.03s (transform 7.73s, setup 0ms, import 31.77s, tests 8.62s, environment 18ms)
+
+
+> obsidian-crate@0.1.0 test:worker-runtime
+> npm run build:worker && vitest run --config vitest.cloudflare.config.ts
+
+
+> obsidian-crate@0.1.0 build:worker
+> node scripts/build-worker.mjs
+
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+
+ RUN  v4.1.8 /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate
+
+
+ Test Files  16 passed (16)
+      Tests  98 passed (98)
+   Start at  00:14:22
+   Duration  17.65s (transform 11.61s, setup 0ms, import 58.66s, tests 14.24s, environment 1ms)
+
+
+> obsidian-crate@0.1.0 test:pwa-preview
+> node scripts/pwa-smoke-test.mjs
+
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+PWA preview smoke test passed on http://127.0.0.1:56513
+
+> obsidian-crate@0.1.0 build:plugin
+> vite build
+
+vite v8.0.16 building client environment for production...
+[2K
+transforming...✓ 1255 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/styles.css    139.84 kB │ gzip:  18.92 kB
+dist/main.js     1,382.62 kB │ gzip: 765.88 kB
+
+✓ built in 1.10s
+
+> obsidian-crate@0.1.0 check:css-scope
+> node scripts/check-css-scope.mjs
+
+All selectors in dist/styles.css are scoped to Crate-owned classes.
+Shadow DOM mount selectors target their classes on the same element.
+Shared primary-screen styles are included in the plugin stylesheet.
+
+> obsidian-crate@0.1.0 size-check
+> npm run size-check:plugin && npm run size-check:worker && npm run size-check:pwa
+
+
+> obsidian-crate@0.1.0 size-check:plugin
+> node scripts/check-bundle-size.mjs plugin
+
+dist/main.js: raw 1350.22 KiB / budget 1416.02 KiB, gzip 746.45 KiB / budget 800.78 KiB
+dist/styles.css: raw 136.57 KiB / budget 138.67 KiB, gzip 18.61 KiB / budget 19.53 KiB
+
+> obsidian-crate@0.1.0 size-check:worker
+> node scripts/check-bundle-size.mjs worker
+
+.generated/cloudflare/worker.mjs: raw 1222.54 KiB / budget 1396.48 KiB, gzip 558.29 KiB / budget 600.59 KiB
+
+> obsidian-crate@0.1.0 size-check:pwa
+> node scripts/check-bundle-size.mjs pwa
+
+.generated/cloudflare/pwa-client.json#app.js: raw 87.21 KiB / budget 126.95 KiB, gzip 28.21 KiB / budget 41.99 KiB
+.generated/cloudflare/pwa-client.json#startup-assets: raw 414.95 KiB / budget 439.45 KiB, gzip 139.73 KiB / budget 146.48 KiB
+.generated/cloudflare/pwa-client.json#all-assets: raw 438.81 KiB / budget 454.10 KiB, gzip 147.98 KiB / budget 154.30 KiB
+
+> obsidian-crate@0.1.0 verify:release-artifacts
+> node scripts/verify-release-artifacts.mjs
+
+Release artifacts verified for Crate 0.1.0
+
+> obsidian-crate@0.1.0 test:pwa-browser
+> node scripts/pwa-cache-test.mjs && node scripts/pwa-focus-test.mjs && node scripts/pwa-ui-performance-test.mjs && node scripts/pwa-safety-test.mjs && node scripts/pwa-optimistic-test.mjs && node scripts/pwa-install-test.mjs && node scripts/pwa-update-test.mjs && node scripts/pwa-capacity-test.mjs && node scripts/pwa-pagination-test.mjs
+
+chromium: cache creation, metadata-only refresh, revision guards and clearing passed
+webkit: cache creation, metadata-only refresh, revision guards and clearing passed
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+chromium: synchronous focus, discarded drafts, saving and keyboard-aware deletion passed
+webkit: synchronous focus, discarded drafts, saving and keyboard-aware deletion passed
+chromium: node reuse, typing, undo/redo, paste, composition, pull layout and viewport batching passed
+webkit: node reuse, typing, undo/redo, paste, composition, pull layout and viewport batching passed
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+chromium: ambiguous saves retain optimistic state across reload, replay the same command, and logout clears open tabs
+chromium: expired-session recovery, separate browser/install tokens, failed exchange and cross-tab folder replacement passed
+webkit: ambiguous saves retain optimistic state across reload, replay the same command, and logout clears open tabs
+webkit: expired-session recovery, separate browser/install tokens, failed exchange and cross-tab folder replacement passed
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+chromium: optimistic mutations, retained drafts, rollback, reload recovery and idempotent retry passed
+webkit: optimistic mutations, retained drafts, rollback, reload recovery and idempotent retry passed
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+chromium: manifest enrollment survives refresh, failed renewal, A → B → A, logout and fresh enrollment
+chromium: document enrollment survives refresh, failed renewal, A → B → A, logout and fresh enrollment
+chromium: cookie enrollment survives refresh, failed renewal, A → B → A, logout and fresh enrollment
+chromium: retry enrollment survives refresh, failed renewal, A → B → A, logout and fresh enrollment
+chromium: concurrent tabs redeem once and pending renewal cannot reverse logout
+chromium: without Web Locks, late failed replacement preserves another tab's renewed session
+webkit: manifest enrollment survives refresh, failed renewal, A → B → A, logout and fresh enrollment
+webkit: document enrollment survives refresh, failed renewal, A → B → A, logout and fresh enrollment
+webkit: cookie enrollment survives refresh, failed renewal, A → B → A, logout and fresh enrollment
+webkit: retry enrollment survives refresh, failed renewal, A → B → A, logout and fresh enrollment
+webkit: concurrent tabs redeem once and pending renewal cannot reverse logout
+webkit: without Web Locks, late failed replacement preserves another tab's renewed session
+chromium: Safari update → manifest installation → repeated Home Screen launch passed
+chromium: Safari update → cookie installation → repeated Home Screen launch passed
+webkit: Safari update → manifest installation → repeated Home Screen launch passed
+webkit: Safari update → cookie installation → repeated Home Screen launch passed
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+{"browser":"chromium","reminders":1000,"payloadBytes":227712,"firstListMs":162,"openEditorMs":174,"saveMs":1275,"navigateAwayMs":31,"navigateBackMs":87,"renderedCards":200,"domElements":3328,"rowContentVisibility":"visible","rendering":"paginated","pageSize":200,"viewportVirtualized":false}
+{"browser":"chromium","reminders":10000,"payloadBytes":2306714,"firstListMs":185,"openEditorMs":162,"saveMs":1253,"navigateAwayMs":40,"navigateBackMs":86,"renderedCards":200,"domElements":3373,"rowContentVisibility":"visible","rendering":"paginated","pageSize":200,"viewportVirtualized":false}
+{"browser":"webkit","reminders":1000,"payloadBytes":227712,"firstListMs":262,"openEditorMs":176,"saveMs":1337,"navigateAwayMs":46,"navigateBackMs":104,"renderedCards":200,"domElements":3328,"rowContentVisibility":"visible","rendering":"paginated","pageSize":200,"viewportVirtualized":false}
+{"browser":"webkit","reminders":10000,"payloadBytes":2306714,"firstListMs":329,"openEditorMs":191,"saveMs":1319,"navigateAwayMs":53,"navigateBackMs":108,"renderedCards":200,"domElements":3373,"rowContentVisibility":"visible","rendering":"paginated","pageSize":200,"viewportVirtualized":false}
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+{"browser":"chromium","views":["today","upcoming","completed","project"],"reminders":401,"pageSize":200,"allRemindersReachable":true,"selectFocusPreserved":true,"lastPageDeletionClamped":true,"completeOrderPreserved":true,"reorderRuns":3,"deletionFocus":{"tag":"DIV","label":"Pagination reminder 001. Press Enter to edit reminder.","onBody":false,"inDialog":false}}
+{"browser":"webkit","views":["today","upcoming","completed","project"],"reminders":401,"pageSize":200,"allRemindersReachable":true,"selectFocusPreserved":true,"lastPageDeletionClamped":true,"completeOrderPreserved":true,"reorderRuns":3,"deletionFocus":{"tag":"DIV","label":"Pagination reminder 001. Press Enter to edit reminder.","onBody":false,"inDialog":false}}

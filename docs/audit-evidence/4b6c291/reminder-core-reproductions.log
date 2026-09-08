@@ -1,0 +1,12 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate
+
+ ✓ src/reminders/core/audit-pre-release.test.ts > 2026-09-08 reminder audit evidence > confirms omitted description is deleted by a partial update 42ms
+ ✓ src/reminders/core/audit-pre-release.test.ts > 2026-09-08 reminder audit evidence > confirms unchanged relative-date markdown drifts one day at every later scan 4ms
+ ✓ src/reminders/core/audit-pre-release.test.ts > 2026-09-08 reminder audit evidence > confirms generic normalization edits fenced-code examples and reorder moves real tasks inside fences 3ms
+ ✓ src/reminders/core/audit-pre-release.test.ts > 2026-09-08 reminder audit evidence > confirms reordering stale duplicate IDs deletes one reminder line 0ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  00:15:24
+   Duration  370ms (transform 118ms, setup 0ms, import 201ms, tests 50ms, environment 0ms)

@@ -23,6 +23,7 @@ import {
   loadRemindersListData,
 } from "./reminderListModel";
 import "./styles.scss";
+import { useReminderClock } from '../useReminderClock';
 
 type Props = {
   projectFilter?: string; // If provided, only show reminders for this project
@@ -52,9 +53,11 @@ export const RemindersList: React.FC<Props> = ({
 
   // State for reminders (needed because getAll is async when showCompleted is true)
   const [rawReminders, setRawReminders] = useState<Reminder[]>([]);
+  const clock = useReminderClock(rawReminders);
 
   // Load reminders - always use markdown index (markdown-first mode)
   useEffect(() => {
+    let active = true;
     const loadReminders = async () => {
       const loaded = await loadRemindersListData({
         repository: plugin.reminderRepository,
@@ -63,10 +66,11 @@ export const RemindersList: React.FC<Props> = ({
         showCompleted: showCompletedState,
         effectiveDays,
       });
-      setRawReminders(loaded);
+      if (active) setRawReminders(loaded);
     };
     void loadReminders();
-  }, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken]);
+    return () => { active = false; };
+  }, [plugin, showToday, showUpcoming, effectiveDays, showCompletedState, refreshToken, clock]);
 
   const presentation = useMemo(() => buildRemindersListPresentation({
     rawReminders,
@@ -74,7 +78,8 @@ export const RemindersList: React.FC<Props> = ({
     showToday,
     showUpcoming,
     effectiveDays,
-  }), [rawReminders, projectFilter, showToday, showUpcoming, effectiveDays]);
+    now: clock.now,
+  }), [rawReminders, projectFilter, showToday, showUpcoming, effectiveDays, clock]);
 
   // Sync showCompleted prop to state when it changes (e.g., from widget update)
   useEffect(() => {

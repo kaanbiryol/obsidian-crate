@@ -8,19 +8,35 @@ interface ApplyInfrastructureConfigInput {
   authToken: string;
 }
 
+/** Caller must stop the old engine and await its checkpoint I/O first. */
 export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted();
-  const path = `${plugin.manifest.dir}/file-manifest.json`;
   const adapter = plugin.app.vault.adapter;
-  try {
+  const mainPath = `${plugin.manifest.dir}/file-manifest.json`;
+  const checkpoints: Array<{ path: string; content: string }> = [];
+  for (const path of [mainPath, `${mainPath}.tmp`]) {
     if (await adapter.exists(path)) {
       signal?.throwIfAborted();
-      await adapter.remove(path);
+      checkpoints.push({ path, content: await adapter.read(path) });
     }
-  } catch {
-    // best effort
+    signal?.throwIfAborted();
   }
-  signal?.throwIfAborted();
+  // Preserve both generations for investigation/recovery before invalidating
+  // either. These copies are never candidates for normal checkpoint recovery.
+  const recoveryId = crypto.randomUUID();
+  for (const checkpoint of checkpoints) {
+    signal?.throwIfAborted();
+    const backup = `${checkpoint.path}.previous-${recoveryId}`;
+    await adapter.write(backup, checkpoint.content);
+    signal?.throwIfAborted();
+    if (await adapter.read(backup) !== checkpoint.content) throw new Error('Could not verify the previous sync checkpoint backup');
+  }
+  for (const checkpoint of checkpoints) {
+    signal?.throwIfAborted();
+    await adapter.remove(checkpoint.path);
+    signal?.throwIfAborted();
+    if (await adapter.exists(checkpoint.path)) throw new Error('Could not invalidate the previous sync checkpoint');
+  }
 }
 
 export function applyInfrastructureConfigState(

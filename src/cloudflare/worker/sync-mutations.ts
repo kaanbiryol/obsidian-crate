@@ -3,6 +3,9 @@ import type { CommitEffects } from './commit-effects';
 import { changedRows } from './db';
 import { sha256HexBytes } from './auth';
 import { portablePathKey } from '../../protocol/portable-path';
+import { assertFileNamespaceAvailable, FileNamespaceConflictError, fileNamespaceGuard } from './file-namespace';
+import { findFileDeletionReceipt, recordFileDeletion, type FileDeletionReceipt } from './file-delete-audit';
+import type { MutationAuditContext } from './request-diagnostics';
 import {
 	collectCleanupKeys,
 	deleteBucketObjectsOrQueue,
@@ -20,17 +23,18 @@ function uploadMutation(
 	objectKey: string,
 	expectedHash: ExpectedFileHash,
 ): D1PreparedStatement {
+	const namespace = fileNamespaceGuard(path);
 	if (expectedHash === null) {
 		return db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
-			VALUES (?, ?, ?, ?, datetime('now'), ?)
+			SELECT ?, ?, ?, ?, datetime('now'), ? WHERE ${namespace.sql}
 			ON CONFLICT(path) DO NOTHING`)
-			.bind(path, portablePathKey(path), hash, size, objectKey);
+			.bind(path, portablePathKey(path), hash, size, objectKey, ...namespace.args);
 	}
 
 	return db.prepare(`UPDATE files
 		SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
-		WHERE path = ? AND hash = ?`)
-		.bind(portablePathKey(path), hash, size, objectKey, path, expectedHash);
+		WHERE path = ? AND hash = ? AND ${namespace.sql}`)
+		.bind(portablePathKey(path), hash, size, objectKey, path, expectedHash, ...namespace.args);
 }
 
 export interface CommitResult {
@@ -38,6 +42,7 @@ export interface CommitResult {
 	currentHash: string | null;
 	revision?: string;
 	idempotent?: boolean;
+	deletion?: FileDeletionReceipt;
 }
 
 export async function commitStagedFile(
@@ -89,6 +94,12 @@ export async function commitStagedFile(
 	]);
 
 	if (changedRows(results[0]) !== 1) {
+		try {
+			await assertFileNamespaceAvailable(db, params.path);
+		} catch (error) {
+			if (error instanceof FileNamespaceConflictError) await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
+			throw error;
+		}
 		const current = await getStoredFileRow(db, params.path);
 		if (!params.effects && current?.hash === params.hash) {
 			const object = await bucket.get(current.storageKey);
@@ -113,8 +124,18 @@ export async function commitFileDelete(
 		expectedHash: ExpectedFileHash;
 		expectedRevision?: string;
 		previousFile: FileStorageRow | null;
+		audit?: MutationAuditContext;
 	},
 ): Promise<CommitResult> {
+	// The caller's verified absent snapshot is a valid linearization point for
+	// an idempotent retry. Avoid a no-op mutation batch, and never touch a newer
+	// recreation which can arrive after that snapshot.
+	if (!params.previousFile) {
+		const deletion = await findFileDeletionReceipt(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '');
+		return { committed: true, currentHash: null, idempotent: true, ...(deletion ? { deletion } : {}) };
+	}
+	const audit = params.audit ?? { requestId: crypto.randomUUID(), deviceId: null, clientSession: null, operationId: null };
+	const revision = `__crate__/deletions/${crypto.randomUUID()}`;
 	const expectedPredicate = params.expectedHash === null
 			? 'path = ? AND 0'
 			: 'path = ? AND hash = ? AND storage_key = ?';
@@ -122,24 +143,26 @@ export async function commitFileDelete(
 		? [params.path]
 		: [params.path, params.expectedHash, params.expectedRevision ?? ''];
 	const results: unknown[] = await db.batch([
-		db.prepare(`INSERT INTO changelog (path, action, hash, size)
-			SELECT path, 'delete', '', 0 FROM files WHERE ${expectedPredicate}`)
-			.bind(...predicateArgs),
+		db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
+			SELECT path, 'delete', '', 0, ? FROM files WHERE ${expectedPredicate}`)
+			.bind(revision, ...predicateArgs),
 		db.prepare(`INSERT OR IGNORE INTO file_versions
 			(storage_key, path, hash, size, reason, expires_at)
 			SELECT storage_key, path, hash, size, 'deleted', ? FROM files WHERE ${expectedPredicate}`)
 			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...predicateArgs),
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
+		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
 		...enqueueFileProjection(db, params.path, null, null),
 	]);
 
 	if (changedRows(results[2]) !== 1) {
 		const current = await getStoredFileRow(db, params.path);
 		if (!current) {
-			return { committed: true, currentHash: null, idempotent: true };
+			const deletion = await findFileDeletionReceipt(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '');
+			return { committed: true, currentHash: null, idempotent: true, ...(deletion ? { deletion } : {}) };
 		}
 		return { committed: false, currentHash: current.hash };
 	}
 
-	return { committed: true, currentHash: null };
+	return { committed: true, currentHash: null, deletion: { revision, consumedRevision: params.expectedRevision ?? '', deleteRequestId: audit.requestId } };
 }

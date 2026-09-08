@@ -1,0 +1,65 @@
+$ npm ci
+
+added 544 packages, and audited 545 packages in 11s
+
+192 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+$ npm run build
+
+> obsidian-crate@0.1.0 build
+> npm run build:worker && npm run typecheck && npm run build:plugin
+
+
+> obsidian-crate@0.1.0 build:worker
+> node scripts/build-worker.mjs
+
+PWA client bundle written to .generated/cloudflare/pwa-client.json
+Deployable Worker bundle written to .generated/cloudflare/worker.mjs
+
+> obsidian-crate@0.1.0 typecheck
+> tsc -noEmit -skipLibCheck
+
+
+> obsidian-crate@0.1.0 build:plugin
+> vite build
+
+vite v8.0.16 building client environment for production...
+
+transforming...✓ 1269 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/styles.css    140.11 kB │ gzip:  18.98 kB
+dist/main.js     1,438.56 kB │ gzip: 791.45 kB
+
+✓ built in 1.62s
+$ npm run size-check
+
+> obsidian-crate@0.1.0 size-check
+> npm run size-check:plugin && npm run size-check:worker && npm run size-check:pwa
+
+
+> obsidian-crate@0.1.0 size-check:plugin
+> node scripts/check-bundle-size.mjs plugin
+
+dist/main.js: raw 1404.85 KiB / budget 1416.02 KiB, gzip 771.15 KiB / budget 800.78 KiB
+dist/styles.css: raw 136.83 KiB / budget 138.67 KiB, gzip 18.66 KiB / budget 19.53 KiB
+
+> obsidian-crate@0.1.0 size-check:worker
+> node scripts/check-bundle-size.mjs worker
+
+.generated/cloudflare/worker.mjs: raw 1269.91 KiB / budget 1396.48 KiB, gzip 572.65 KiB / budget 600.59 KiB
+
+> obsidian-crate@0.1.0 size-check:pwa
+> node scripts/check-bundle-size.mjs pwa
+
+.generated/cloudflare/pwa-client.json#app.js: raw 94.90 KiB / budget 126.95 KiB, gzip 30.42 KiB / budget 41.99 KiB
+.generated/cloudflare/pwa-client.json#startup-assets: raw 435.91 KiB / budget 439.45 KiB, gzip 148.38 KiB / budget 150.39 KiB
+.generated/cloudflare/pwa-client.json#all-assets: raw 470.00 KiB / budget 473.63 KiB, gzip 161.03 KiB / budget 164.06 KiB
+$ npm run verify:release-artifacts
+
+> obsidian-crate@0.1.0 verify:release-artifacts
+> node scripts/verify-release-artifacts.mjs
+
+Release artifacts verified for Crate 0.1.0

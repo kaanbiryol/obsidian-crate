@@ -58,22 +58,21 @@ export function sortRemindersByFileOrder(reminders: Reminder[]): Reminder[] {
 /**
  * Get reminders due today
  */
-export function getTodayReminders(reminders: Reminder[]): Reminder[] {
-  return reminders.filter((reminder) => !reminder.completed && isReminderDueToday(reminder));
+export function getTodayReminders(reminders: Reminder[], now = new Date()): Reminder[] {
+  return reminders.filter((reminder) => !reminder.completed && isReminderDueToday(reminder, now));
 }
 
 /**
  * Get completed reminders due today
  */
-export function getCompletedTodayReminders(reminders: Reminder[]): Reminder[] {
-  return reminders.filter((reminder) => reminder.completed && isReminderDueToday(reminder));
+export function getCompletedTodayReminders(reminders: Reminder[], now = new Date()): Reminder[] {
+  return reminders.filter((reminder) => reminder.completed && isReminderDueToday(reminder, now));
 }
 
 /**
  * Get overdue reminders
  */
-export function getOverdueReminders(reminders: Reminder[]): Reminder[] {
-  const now = new Date();
+export function getOverdueReminders(reminders: Reminder[], now = new Date()): Reminder[] {
   const todayKey = formatLocalDateKey(now);
 
   return reminders.filter(r => {
@@ -88,8 +87,7 @@ export function getOverdueReminders(reminders: Reminder[]): Reminder[] {
 /**
  * Get upcoming reminders (next N days)
  */
-export function getUpcomingReminders(reminders: Reminder[], days: number = 7): Reminder[] {
-  const now = new Date();
+export function getUpcomingReminders(reminders: Reminder[], days: number = 7, now = new Date()): Reminder[] {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startDate = new Date(todayStart);
   startDate.setDate(startDate.getDate() + 1);

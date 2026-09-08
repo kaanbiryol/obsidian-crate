@@ -42,10 +42,46 @@ function harness() {
 	});
 	const original = reminder('one');
 	hook.hydrateCachedSnapshot({ folderPath: 'Reminders', reminders: [original], projects: ['Inbox'], savedAt: 1 });
-	return { hook, requests, original, setRefreshing: hookState.setters[3]! };
+	return { hook, requests, original, setRefreshing: hookState.setters[3]!, setIssues: hookState.setters[8]! };
 }
 
 describe('PWA reminder refresh around local writes', () => {
+	it('retains structured source issues through local acknowledgements and 304 until a complete read repairs them', async () => {
+		const { hook, requests, original, setIssues } = harness();
+		const issues = [{ path: 'Reminders/Large.md', reason: 'Source exceeds the reminder size limit' }];
+		const partial = hook.loadReminders();
+		requests[0]!.resolve(new Response(JSON.stringify({ reminders: [original], projects: ['Inbox'], issues })));
+		await partial;
+		expect(setIssues).toHaveBeenLastCalledWith(issues);
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [original], ['Inbox'], expect.any(Number), undefined, issues);
+		const corrected = { ...original, content: 'Healthy reminder stays editable' };
+		await hook.commitReminderState([corrected]);
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [corrected], ['Inbox'], expect.any(Number), undefined, issues);
+		const unchanged = hook.loadReminders();
+		requests[1]!.resolve(new Response(null, { status: 304 }));
+		await unchanged;
+		expect(setIssues).toHaveBeenLastCalledWith(issues);
+		const repaired = hook.loadReminders();
+		requests[2]!.resolve(response([corrected]));
+		await repaired;
+		expect(setIssues).toHaveBeenLastCalledWith([]);
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', [corrected], ['Inbox'], expect.any(Number), 'latest-list', []);
+	});
+
+	it('restores omitted-source explanations with a cached snapshot after a network error and clears them on logout', async () => {
+		const { hook, requests, original, setIssues } = harness();
+		const issues = [{ path: 'Reminders/Copy.md', reason: 'Duplicate reminder ID' }];
+		vi.mocked(loadCachedReminderSnapshot).mockResolvedValueOnce({ folderPath: 'Reminders', reminders: [original], projects: ['Inbox'], savedAt: 123, issues });
+		const failed = hook.loadReminders();
+		requests[0]!.resolve(new Response('Offline', { status: 503 }));
+		await failed;
+		expect(hook.remindersRef.current).toEqual([original]);
+		expect(setIssues).toHaveBeenLastCalledWith(issues);
+		expect(hookState.setters[4]).toHaveBeenLastCalledWith('Offline');
+		hook.resetReminderState();
+		expect(setIssues).toHaveBeenLastCalledWith([]);
+	});
+
 	it.each([true, false])('starts a fresh read after a write while an invalidated read is unresolved (stale first=%s)', async staleFirst => {
 		const { hook, requests, original } = harness();
 		const staleRead = hook.loadReminders({ silent: true });
@@ -79,7 +115,7 @@ describe('PWA reminder refresh around local writes', () => {
 		expect(hook.remindersRef.current).toEqual(fullList);
 		expect(hook.projectsRef.current).toEqual(['Inbox', 'Work']);
 		expect(saveCachedReminderSnapshot).toHaveBeenCalledTimes(2);
-		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', fullList, ['Inbox', 'Work'], expect.any(Number), 'latest-list');
+		expect(saveCachedReminderSnapshot).toHaveBeenLastCalledWith('Reminders', fullList, ['Inbox', 'Work'], expect.any(Number), 'latest-list', []);
 	});
 
 	it('detaches reads both when a write begins and when it finishes', async () => {

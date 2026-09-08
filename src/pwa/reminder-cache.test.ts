@@ -24,7 +24,7 @@ describe('PWA reminder cache', () => {
 		await expect(loadCachedReminderSnapshot('Reminders')).resolves.toBeNull();
 	});
 
-	it('treats clearing an unavailable cache as successful', async () => {
-		await expect(clearCachedReminderSnapshots()).resolves.toBeUndefined();
+	it('reports that an unavailable cache could not be cleared', async () => {
+		await expect(clearCachedReminderSnapshots()).resolves.toBe(false);
 	});
 });
