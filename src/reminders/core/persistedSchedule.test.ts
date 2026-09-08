@@ -5,15 +5,49 @@ import { normalizeReminderScheduleLine } from './normalizeReminderSchedule';
 import { reminderRevision } from './reminderRevision';
 import { UnresolvedReminderScheduleError } from '../utils/reminderParser';
 import { rebuildCheckboxLine } from '../utils/checkboxParser';
+import { parseReminderEditorContent } from '../utils/reminderEditorParsing';
 
 const originalZone = process.env.TZ;
-afterEach(() => { process.env.TZ = originalZone; resetLocalTimeZone(); vi.useRealTimers(); });
+afterEach(() => { if (originalZone === undefined) delete process.env.TZ; else process.env.TZ = originalZone; resetLocalTimeZone(); vi.useRealTimers(); });
 function scan(content: string) { return scanReminderMarkdownContent('Reminders/Inbox.md', content, 'Reminders').reminders[0]!; }
 function clock(zone: string, date: string) {
 	process.env.TZ = zone; resetLocalTimeZone(); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(date));
 }
 
 describe('persisted schedule decoding', () => {
+	it.each([
+		'[Weekly report](https://example.com/report)',
+		'[Tomorrow](https://example.com/report)',
+		'[Review ! #work 2099-01-01](https://example.com/report)',
+	])('preserves literal editor link text %s through save and durable reload', title => {
+		clock('UTC', '2026-09-08T10:00:00Z');
+		for (const recurring of [false, true]) {
+			const input = parseReminderEditorContent(`${title} ${recurring ? 'daily 09:00' : '2099-01-01T09:00:00Z'}`);
+			expect(input.cleanContent).toBe(title);
+			const line = rebuildCheckboxLine('', false, input.cleanContent, new Date('2099-01-01T09:00:00Z'), input.priority,
+				undefined, input.recurrence, true, 'one');
+			const saved = scan(line);
+			expect(saved.content).toBe(title);
+			expect(saved.priority).toBe(4);
+			expect(saved.dueDatetime).toBe('2099-01-01T09:00:00.000Z');
+			expect(saved.recurrence).toEqual(input.recurrence);
+		}
+	});
+
+	it.each(['Jan 1, 2099', '2099-01-01T09:00:00.000Z'])('removes the date suffix instead of an identical earlier %s prose mention', date => {
+		clock('UTC', '2026-09-08T10:00:00Z');
+		const input = parseReminderEditorContent(`Compare ${date} against the old report ${date}`);
+		expect(input.cleanContent).toBe(`Compare ${date} against the old report`);
+		const line = rebuildCheckboxLine('', false, input.cleanContent, input.dueDate, 4, undefined, undefined, input.hasTime, 'one');
+		expect(scan(line).content).toBe(input.cleanContent);
+	});
+
+	it('uses the appended recurrence and preserves earlier recurrence prose', () => {
+		const line = rebuildCheckboxLine('', false, 'Daily report', new Date('2099-01-01T09:00:00Z'), 4, undefined,
+			{ frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0 }, true, 'one');
+		expect(scan(line)).toMatchObject({ content: 'Daily report', recurrence: { frequency: 'daily', hour: 9, minute: 0 } });
+	});
+
 	it.each(['tomorrow', 'next Friday', 'Sep 9', '2026-09-10T09:00', 'daily', 'every Friday 12:00'])('does not infer a durable schedule from %s', schedule => {
 		for (const date of ['2026-09-08T10:00:00Z', '2026-09-09T10:00:00Z']) {
 			clock('UTC', date);

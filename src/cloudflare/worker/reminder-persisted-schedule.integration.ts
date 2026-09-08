@@ -11,6 +11,9 @@ import { handleNotificationPolicy } from './notification-policy';
 import { drainNotificationProjections } from './notification-projection';
 import { normalizeReminderScheduleLine } from '@/reminders/core/normalizeReminderSchedule';
 import type { ReminderRecord } from '@/pwa/types';
+import { handleCreateReminder } from './reminders-web/routes/create';
+import { revalidateReminderSources } from './reminder-source-migration';
+import { REMINDER_CACHE_PARSER_VERSION } from './reminders-web/reminder-cache/types';
 
 beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
 afterEach(async () => { vi.useRealTimers(); vi.restoreAllMocks(); await reset(); });
@@ -18,6 +21,29 @@ const path = 'Reminders/Inbox.md';
 const text = '- [ ] Send invoice tomorrow <!-- crate-id:invoice -->';
 const request = () => new Request('https://test/reminders/list?folderPath=Reminders');
 function clock(date: string) { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(date)); }
+
+it.each(['[Weekly report](https://example.com/report)', '[Review ! #work](https://example.com/report)'])('preserves %s through create, cache upgrade and source revalidation', async content => {
+	const operationId = newOperationId();
+	const dueDatetime = '2099-01-01T09:00:00.000Z';
+	const recurrence = { frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0 };
+	const created = await handleCreateReminder(new Request('https://test/create', { method: 'POST', body: JSON.stringify({
+		id: operationId, operationId, folderPath: 'Reminders', project: 'Inbox', content, priority: 4, dueDatetime, recurrence,
+	}) }), env);
+	expect(created.status).toBe(200);
+	expect(await created.json()).toMatchObject({ reminder: { id: operationId, content, priority: 4, dueDatetime, recurrence } });
+	const file = await env.DB.prepare('SELECT storage_key, hash FROM files WHERE path = ?').bind(path).first<{ storage_key: string; hash: string }>();
+	const bytes = await (await env.BUCKET.get(file!.storage_key))!.text();
+	// Parser 6 could quarantine this file or save a title/priority derived from
+	// literal link text. Neither disposable cache nor durable authority is reused.
+	await env.DB.prepare("UPDATE reminder_file_cache SET parser_version = 6, reminders_json = '[]'").run();
+	await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 6, verified = 0').run();
+	await revalidateReminderSources(env, 3);
+	expect(await (await handleListReminders(request(), env)).json()).toMatchObject({ reminders: [{ content, priority: 4, dueDatetime, recurrence }], issues: [] });
+	expect(await env.DB.prepare('SELECT verified, parser_version FROM reminder_source_state WHERE file_path = ?').bind(path).first()).toEqual({ verified: 1, parser_version: REMINDER_CACHE_PARSER_VERSION });
+	expect(await env.DB.prepare('SELECT parser_version FROM reminder_file_cache WHERE file_path = ?').bind(path).first()).toEqual({ parser_version: REMINDER_CACHE_PARSER_VERSION });
+	expect(await env.DB.prepare('SELECT due_key FROM reminder_sources WHERE reminder_id = ?').bind(operationId).first()).toEqual({ due_key: dueDatetime });
+	expect(await (await env.BUCKET.get(file!.storage_key))!.text()).toBe(bytes);
+});
 
 it('keeps cached list revisions valid for a fresh mutation after midnight', async () => {
 	clock('2026-09-08T10:00:00Z');
