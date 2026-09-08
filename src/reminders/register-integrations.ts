@@ -10,7 +10,7 @@ import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 const remindersLogger = createLogger('Reminders');
 const registeredReminderUi = new WeakSet<CratePlugin>();
 
-export function registerReminderIntegrations(plugin: CratePlugin): void {
+export async function registerReminderIntegrations(plugin: CratePlugin): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;
 	if (registeredReminderUi.has(plugin)) {
@@ -58,11 +58,16 @@ export function registerReminderIntegrations(plugin: CratePlugin): void {
 	});
 
 	if (plugin.remindersSettings.autoOpenView !== 'none') {
+		let opening: Promise<void> | undefined;
 		plugin.app.workspace.onLayoutReady(() => {
 			if (signal.aborted) return;
 			if (plugin.remindersSettings.autoOpenView === 'sidebar') {
-				void plugin.activateRemindersView();
+				opening = plugin.activateRemindersView();
+				void opening.catch(error => remindersLogger.error('Failed to open reminders:', error));
 			}
 		});
+		// When the workspace is already ready (including plugin reload), finish
+		// constructing/revealing this view before the plugin load completes.
+		await opening;
 	}
 }

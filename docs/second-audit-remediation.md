@@ -51,6 +51,15 @@ The fresh audit starts at `f371397`, after the first round of actionable fixes. 
 
 The first clean candidate gate caught an unused priority-removal helper left by R02. Its only caller had been replaced by indexed removal. The obsolete function was removed in a separate commit; this has no runtime effect. The full gate is restarted after this correction.
 
+## R06 — Reuse the reminder pane through Obsidian reload
+
+- **Severity / confidence:** medium, confirmed in Obsidian 1.13.7.
+- **Area:** plugin startup and reminder workspace activation (`workspaceLayout.ts`, `register-integrations.ts`, `plugin-integration.ts`).
+- **Failure:** repeatedly disable and enable the plugin with automatic sidebar opening. Obsidian temporarily reports the old pane as empty while restoring its deferred view, so startup creates another pane. Concurrent open commands can also create duplicates before the first view finishes opening.
+- **Root cause:** view lookup alone cannot identify a temporarily empty pane; activation did not serialize construction or await asynchronous reveal, and ready-layout startup did not await activation.
+- **Fix:** serialize opens with a bounded workspace-owned reservation that survives plugin module reload. Reuse the reserved pane only while it is still attached and represents the reminder or temporary empty view; closed and repurposed panes are left alone. Await reveal/startup and fence late reveals on unload. The reservation holds one pane and a pending promise, and the promise is cleared after completion.
+- **Proof:** the concurrency/reveal regressions failed before the fix. All 41 focused lifecycle/workspace tests, plugin typecheck and lint pass, including module replacement, closed/repurposed panes, failed activation and unload. An isolated real Obsidian vault retains the same single loaded pane through five reloads and three concurrent opens, with ten commands, stable reminder identity and no observed JavaScript errors. The installed artifact and raw acceptance results are included with the final candidate evidence.
+
 ## Verification in progress
 
 The first-round gate passed advisory and secret scans, lint, both typechecks, deadcode, notices, 22 recovery tests, 1,538 unit tests, 220 Worker tests and production builds. It stopped at PWA bundle budgets; later gate steps therefore were not established by that run. The bundle issue and additional parser, persistence and scale checks are part of this second audit.
