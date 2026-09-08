@@ -1,11 +1,13 @@
 import React from 'react';
 import type { PendingReminderChange } from '../reminder-outbox-types';
+import { ExpiredReminderChangeActions } from './ExpiredReminderChangeActions';
 
 function changeTitle(change: PendingReminderChange): string {
 	return change.optimistic?.content || change.previous?.content || change.modal?.draft.content || change.project || 'Reminder';
 }
 
 function failureLabel(change: PendingReminderChange): string {
+	if (change.reviewRequired) return 'Change needs review';
 	if (change.status === 'uncertain') return 'Couldn’t sync';
 	switch (change.kind) {
 		case 'save': return 'Not saved';
@@ -28,7 +30,7 @@ export function ReminderSyncNotice({
 	isOffline: boolean;
 	onRetry: (operationId: string) => void;
 	onEdit: (operationId: string) => void;
-	onDiscard: (operationId: string) => void;
+	onDiscard: (operationId: string, reviewedChange?: string) => void;
 	storageError?: string | null;
 	onRetryInitialization?: () => void;
 }) {
@@ -56,7 +58,7 @@ export function ReminderSyncNotice({
 			)}
 			{errors.map(change => {
 				const title = changeTitle(change);
-				const failedSave = change.status === 'failed' && change.kind === 'save';
+				const failedSave = change.status === 'failed' && !change.ambiguous && change.kind === 'save';
 				const description = failedSave ? change.modal?.draft.description ?? change.optimistic?.description : undefined;
 				return (
 					<section
@@ -74,6 +76,7 @@ export function ReminderSyncNotice({
 								: 'Your change could not be saved.')}</span>
 						</div>
 						<div className="pwa-reminder-sync-error__actions">
+							{change.reviewRequired ? <ExpiredReminderChangeActions change={change} onDiscard={onDiscard} /> : <>
 							<button type="button" onClick={() => onRetry(change.operationId)} disabled={isOffline} aria-label={`Retry: ${title}`}>Retry</button>
 							{failedSave && <button type="button" onClick={() => onEdit(change.operationId)} disabled={isOffline} aria-label={`Edit: ${title}`}>Edit</button>}
 							{change.status === 'failed' && (
@@ -81,6 +84,7 @@ export function ReminderSyncNotice({
 									{failedSave ? 'Discard' : 'Dismiss'}
 								</button>
 							)}
+							</>}
 						</div>
 					</section>
 				);

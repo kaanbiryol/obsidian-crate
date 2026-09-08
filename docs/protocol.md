@@ -1,6 +1,6 @@
-# Protocol 5 contract
+# Protocol 6 contract
 
-`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. Every mutation must send `X-Crate-Protocol: 5`; missing or incompatible clients receive 428 before changing state. POST metadata and batch-download endpoints are reads.
+`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. Every mutation must send `X-Crate-Protocol: 6`; missing or incompatible clients receive 428 before changing state. POST metadata and batch-download endpoints are reads.
 
 ## Files
 
@@ -16,7 +16,9 @@ Remote deletion on the plugin uses the vault's local trash regardless of the use
 
 ## Reminders
 
-All mutation requests carry a UUID `operationId`. The server hashes the canonical request and stores its response in the file transaction. A matching retry returns the recorded response; reusing an operation ID for a different request returns 409. Create IDs are permanently reserved after a committed web creation.
+All mutation requests carry a stable `operationId`. The server hashes the canonical request and stores its response in the file transaction. A matching retry returns the recorded response; reusing an operation ID for a different request returns 409. Create IDs are reserved after a committed web creation; expired IDs cannot be used by a new create after cleanup.
+
+Protocol 6 requires new operation IDs in `e1_<eight-digit UTC day>_<random identifier>` format; new creates use that same ID for the reminder. The PWA obtains the day from uncached server metadata, independently of the device clock. Commands remain eligible for 180 UTC dates, with a monotonic D1 floor and a commit-time expiry guard; see [retry and retention](reminder-retention.md).
 
 The PWA stores the exact attempted request separately from its editable draft. An uncertain result retries that request first, then submits later edits under a new operation ID against the acknowledged revision. Definite validation rejections permit correcting the request. A 409 `operation_mismatch` rejects reuse of an operation ID without returning a receipt for different changes.
 

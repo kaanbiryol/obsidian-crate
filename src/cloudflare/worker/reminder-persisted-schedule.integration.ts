@@ -1,3 +1,4 @@
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
@@ -31,7 +32,7 @@ it('keeps cached list revisions valid for a fresh mutation after midnight', asyn
 	expect(conditional.status).toBe(304);
 	const response = await handleUpdateReminder(new Request('https://test/reminders/update', {
 		method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', id: 'invoice', filePath: path,
-			operationId: crypto.randomUUID(), expectedRevision: initial.reminders[0]!.revision, content: 'Updated invoice' }),
+			operationId: newOperationId(), expectedRevision: initial.reminders[0]!.revision, content: 'Updated invoice' }),
 	}), env);
 	expect(response.status).toBe(200);
 	const updated = await handleListReminders(request(), env);
@@ -65,3 +66,6 @@ it('preserves raw ambiguous bytes as an issue until Obsidian saves an explicit s
 	const fixed = await handleListReminders(request(), env);
 	expect(await fixed.json()).toMatchObject({ reminders: [{ id: 'invoice', dueDate: '2026-09-10' }], issues: [] });
 });
+
+const issuedDay = Math.floor(Date.now() / 86_400_000);
+function newOperationId() { return createReminderOperationId(issuedDay); }

@@ -142,6 +142,7 @@ CREATE TABLE IF NOT EXISTS reminder_identities (
     reminder_id TEXT PRIMARY KEY,
     created_operation_id TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS reminder_operations_created_at_idx ON reminder_operations(created_at);
 
 CREATE TABLE IF NOT EXISTS notification_policy (
   enabled INTEGER NOT NULL DEFAULT 1,

@@ -94,20 +94,22 @@ async function verifyVisibleTabs(browser, winner) {
 			await source.mouse.move(x, to.y + to.height / 2 + 5, { steps: 10 });
 			await expect.poll(() => ids(source)).toEqual(['preview-inbox-2', 'preview-inbox-1']);
 			await source.mouse.up();
+			await expect.poll(() => sentBy.length).toBe(1);
 			await settled(pages);
 			for (const page of pages) await expect.poll(() => ids(page)).toEqual(['preview-inbox-2', 'preview-inbox-1']);
 
-			await create(source, 'Shared creation'); await settled(pages);
+			await create(source, 'Shared creation'); await expect.poll(() => sentBy.length).toBe(2); await settled(pages);
 			for (const page of pages) await expect(row(page, 'Shared creation')).toBeVisible();
 			await row(source, 'Check this article').click();
 			await source.getByRole('textbox', { name: 'Reminder title', exact: true }).fill('Shared edit');
-			await source.locator('[data-action="save-reminder"]').click(); await settled(pages);
+			await source.locator('[data-action="save-reminder"]').click(); await expect.poll(() => sentBy.length).toBe(3); await settled(pages);
 			for (const page of pages) { await expect(row(page, 'Shared edit')).toBeVisible(); await expect(row(page, 'Check this article')).toHaveCount(0); }
-			await row(source, 'Shared edit').getByRole('checkbox').click(); await settled(pages);
+			await row(source, 'Shared edit').getByRole('checkbox').click(); await expect.poll(() => sentBy.length).toBe(4); await settled(pages);
 			for (const page of pages) await expect(row(page, 'Shared edit')).toHaveCount(0);
 			await row(source, 'Shared creation').click();
 			await source.getByRole('button', { name: 'Delete reminder', exact: true }).click();
 			await source.getByRole('alertdialog', { name: 'Delete reminder?', exact: true }).getByRole('button', { name: 'Delete', exact: true }).click();
+			await expect.poll(() => sentBy.length).toBe(5);
 			await settled(pages);
 			for (const page of pages) await expect(row(page, 'Shared creation')).toHaveCount(0);
 			expect(sentBy).toEqual([winner, winner, winner, winner, winner]);

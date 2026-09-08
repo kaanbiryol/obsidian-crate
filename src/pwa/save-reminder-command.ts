@@ -2,6 +2,8 @@ import { buildReminderMutationBody } from './reminder-mutation';
 import { predictSavedReminder } from './reminder-optimistic-state';
 import type { PendingReminderChange } from './reminder-outbox-types';
 import type { ModalState, ReminderMutationBody, ReminderRecord, StoredConfig } from './types';
+import { reminderOperationDay } from '@/protocol/reminder-operation';
+import { newReminderOperationId } from './reminder-operation-id';
 
 function draftKey({ draft }: ModalState): string {
 	const { activePicker: _picker, deleteConfirm: _confirm, ...input } = draft;
@@ -9,8 +11,8 @@ function draftKey({ draft }: ModalState): string {
 }
 
 function fromInput(modal: ModalState, input: ReminderMutationBody, previous?: ReminderRecord): PendingReminderChange {
-	modal.operationId ??= crypto.randomUUID();
 	const operationId = modal.operationId;
+	if (!operationId) throw new Error('A reminder operation identity is required');
 	const recordId = modal.reminderId ?? operationId;
 	return {
 		operationId, recordId, kind: 'save', path: modal.mode === 'edit' ? '/reminders/update' : '/reminders/create',
@@ -21,9 +23,12 @@ function fromInput(modal: ModalState, input: ReminderMutationBody, previous?: Re
 	};
 }
 
-export function createSaveReminderChange(modal: ModalState, config: StoredConfig, projects: string[], selectedProject: string | null, previous?: ReminderRecord): PendingReminderChange {
+export async function createSaveReminderChange(modal: ModalState, config: StoredConfig, projects: string[], selectedProject: string | null, previous?: ReminderRecord): Promise<PendingReminderChange> {
 	const input = buildReminderMutationBody({ draft: modal.draft, mode: modal.mode, config, projects, selectedProject });
 	if (!input.content.trim()) throw new Error('Reminder title required');
+	// Old editor drafts may have a random ID without a dispatched request.
+	// Attempted pendingSave bodies below always retain their original identity.
+	if (!modal.operationId || !modal.pendingSave && reminderOperationDay(modal.operationId) === null) modal.operationId = await newReminderOperationId();
 	const change = fromInput(modal, input, previous);
 	if (modal.pendingSave) {
 		// Migrate attempts retained by older PWA versions without changing their payload.
@@ -35,7 +40,7 @@ export function createSaveReminderChange(modal: ModalState, config: StoredConfig
 		change.ambiguous = true;
 		change.optimistic = predictSavedReminder(attempted.id, input, previous);
 		if (modal.pendingSave.draftKey !== draftKey(modal)) {
-			change.followUp = { operationId: crypto.randomUUID(), input };
+			change.followUp = { operationId: await newReminderOperationId(), input };
 		}
 	}
 	return change;

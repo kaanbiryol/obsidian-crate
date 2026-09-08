@@ -1,3 +1,4 @@
+import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
@@ -14,7 +15,7 @@ const endpoint = 'https://fcm.googleapis.com/fcm/send/reconcile';
 const subscription = { endpoint, keys: { p256dh: 'key', auth: 'auth' }, deviceName: 'Browser' };
 function request(path: string, token: string, body: unknown, method = 'POST') {
 	return new Request(`https://test${path}`, { method, headers: {
-		Authorization: `Bearer ${token}`, 'X-Crate-Protocol': '5', 'Content-Type': 'application/json',
+		Authorization: `Bearer ${token}`, 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), 'Content-Type': 'application/json',
 	}, body: JSON.stringify(body) });
 }
 async function issueToken(id: string, folder = 'Reminders') {
