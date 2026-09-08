@@ -1,4 +1,5 @@
 import type { PendingReminderChange } from './reminder-outbox-types';
+import { isStoredReminderDraft, isStoredReminderRecord } from './reminder-storage-validation';
 
 const PREFIX = 'crate-reminder-outbox:';
 const OPERATION_ID = /^[a-zA-Z0-9_-]{16,128}$/;
@@ -10,6 +11,16 @@ export interface ReminderOutboxStorage {
 	put(change: PendingReminderChange): void;
 	remove(operationId: string): void;
 	acceptsKey(key: string | null): boolean;
+}
+
+export interface QuarantinedReminderEntry {
+	key: string;
+	raw: string;
+}
+
+interface ReminderOutboxQuarantine {
+	quarantined(): QuarantinedReminderEntry[];
+	removeQuarantined(entries: QuarantinedReminderEntry[]): void;
 }
 
 interface StoredChange {
@@ -27,10 +38,7 @@ function strings(value: unknown): value is string[] {
 }
 
 function validRecord(value: unknown, id: string, folderPath: string): boolean {
-	return object(value) && value.id === id && typeof value.content === 'string'
-		&& typeof value.project === 'string' && typeof value.filePath === 'string'
-		&& value.filePath.startsWith(`${folderPath}/`) && value.filePath.toLowerCase().endsWith('.md')
-		&& (value.priority === 1 || value.priority === 4) && typeof value.completed === 'boolean';
+	return isStoredReminderRecord(value, folderPath) && value.id === id;
 }
 
 function validChange(value: unknown, operationId: string, folderPath: string): value is PendingReminderChange {
@@ -57,8 +65,8 @@ function validChange(value: unknown, operationId: string, folderPath: string): v
 	if (typeof value.recordId !== 'string' || !value.recordId || body.id !== value.recordId) return false;
 	if (value.optimistic !== undefined && !validRecord(value.optimistic, value.recordId, folderPath)) return false;
 	if (value.previous !== undefined && !validRecord(value.previous, value.recordId, folderPath)) return false;
-	if (value.modal !== undefined && (!object(value.modal) || !object(value.modal.draft)
-		|| !['create', 'edit'].includes(String(value.modal.mode)) || typeof value.modal.draft.content !== 'string')) return false;
+	if (value.modal !== undefined && (!object(value.modal) || !isStoredReminderDraft(value.modal.draft)
+		|| !['create', 'edit'].includes(String(value.modal.mode)))) return false;
 	if (value.kind === 'save') return value.method === 'POST'
 		&& ['/reminders/create', '/reminders/update'].includes(String(value.path))
 		&& typeof body.content === 'string' && typeof body.project === 'string';
@@ -90,6 +98,37 @@ function storageKeys(storage: Storage): string[] {
 	} catch { throw new Error(STORAGE_ERROR); }
 }
 
+function recoverableEntries(storage: Storage, keys: string[], folderPath: string) {
+	const valid: { key: string; stored: StoredChange }[] = [];
+	const quarantined: QuarantinedReminderEntry[] = [];
+	for (const key of keys) {
+		let raw: string | null;
+		try { raw = storage.getItem(key); } catch { throw new Error(STORAGE_ERROR); }
+		if (raw === null) continue;
+		try { valid.push({ key, stored: readStored(raw, key.slice(key.lastIndexOf(':') + 1), folderPath) }); }
+		catch { quarantined.push({ key, raw }); }
+	}
+	return { valid, quarantined };
+}
+
+/** Quarantine in place: no copy, deletion, rewrite or extra quota is needed to preserve bytes. */
+function quarantineStorage(storage: Storage, keys: () => string[], folderPath: string): ReminderOutboxQuarantine {
+	return {
+		quarantined: () => recoverableEntries(storage, keys(), folderPath).quarantined,
+		removeQuarantined(entries) {
+			const current = new Map(recoverableEntries(storage, keys(), folderPath).quarantined.map(entry => [entry.key, entry.raw]));
+			for (const entry of entries) {
+				// The user reviewed these exact bytes. A repaired or changed entry
+				// from another tab must survive this stale removal request.
+				if (current.get(entry.key) !== entry.raw) continue;
+				try {
+					if (storage.getItem(entry.key) === entry.raw) storage.removeItem(entry.key);
+				} catch { throw new Error(STORAGE_ERROR); }
+			}
+		},
+	};
+}
+
 async function outboxScope(authToken: string, folderPath: string): Promise<string> {
 	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(authToken));
 	const tokenHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
@@ -97,18 +136,19 @@ async function outboxScope(authToken: string, folderPath: string): Promise<strin
 }
 
 /** One key per command prevents another tab from replacing an unrelated command. */
-export async function createReminderOutboxStorage(authToken: string, folderPath: string): Promise<ReminderOutboxStorage> {
+export async function createReminderOutboxStorage(authToken: string, folderPath: string): Promise<ReminderOutboxStorage & ReminderOutboxQuarantine> {
 	const scope = await outboxScope(authToken, folderPath);
 	const storage = browserStorage();
+	const keys = () => storageKeys(storage).filter(key => key.startsWith(scope));
 	const read = (key: string) => {
 		let raw: string | null;
 		try { raw = storage.getItem(key); } catch { throw new Error(STORAGE_ERROR); }
 		return raw === null ? null : readStored(raw, key.slice(scope.length), folderPath);
 	};
 	return {
+		...quarantineStorage(storage, keys, folderPath),
 		load() {
-			return storageKeys(storage).filter(key => key.startsWith(scope))
-				.map(key => read(key)).filter((entry): entry is StoredChange => entry !== null)
+			return recoverableEntries(storage, keys(), folderPath).valid.map(entry => entry.stored)
 				.sort((a, b) => a.createdAt - b.createdAt)
 				.map(entry => entry.change);
 		},
@@ -142,11 +182,10 @@ export async function createReminderRecoveryStorage(authToken: string, folderPat
 		return parts.length === 5 && `${parts[0]}:` === PREFIX && parts[1] === 'v1'
 			&& /^[a-f0-9]{64}$/.test(parts[2] ?? '') && parts[3] === encodeURIComponent(folderPath);
 	};
-	const entries = () => storageKeys(storage).filter(key => acceptsKey(key) && !key.startsWith(scope)).flatMap(key => {
-		const raw = storage.getItem(key);
-		return raw === null ? [] : [{ key, stored: readStored(raw, key.split(':')[4]!, folderPath) }];
-	});
+	const keys = () => storageKeys(storage).filter(key => acceptsKey(key) && !key.startsWith(scope));
+	const entries = () => recoverableEntries(storage, keys(), folderPath).valid;
 	return {
+		...quarantineStorage(storage, keys, folderPath),
 		acceptsKey,
 		load() {
 			return entries().sort((a, b) => a.stored.createdAt - b.stored.createdAt).map(entry => entry.stored.change);
@@ -158,7 +197,9 @@ export async function createReminderRecoveryStorage(authToken: string, folderPat
 				const destination = scope + stored.change.operationId;
 				const existing = storage.getItem(destination);
 				if (existing !== null) {
-					const current = readStored(existing, stored.change.operationId, folderPath).change;
+					let current: PendingReminderChange;
+					try { current = readStored(existing, stored.change.operationId, folderPath).change; }
+					catch { continue; } // Keep both the damaged destination and healthy recovery source.
 					if (current.body !== stored.change.body || current.path !== stored.change.path || current.method !== stored.change.method) {
 						throw new Error('These saved changes have conflicting operation IDs. Export them before recovering.');
 					}

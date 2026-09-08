@@ -21,6 +21,7 @@ import { ReminderSyncNotice } from './components/ReminderSyncNotice';
 import { ReminderRecoveryNotice } from './components/ReminderRecoveryNotice';
 import { ReminderSourceNotice } from './components/ReminderSourceNotice';
 import { ReminderCacheNotice } from './components/ReminderCacheNotice';
+import { ReminderQuarantineNotice } from './components/ReminderQuarantineNotice';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
@@ -224,6 +225,8 @@ function App() {
 		retryInitialization,
 		recoveryChanges,
 		recoverChanges,
+		quarantinedChanges,
+		removeQuarantinedChanges,
 	} = useReminderMutations({
 		hasSnapshot: lastUpdatedAt !== null,
 		canRecover: !readOnly,
@@ -386,6 +389,7 @@ function App() {
 								onDiscard={discardChange}
 							/>
 							<ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={recoverChanges} />
+							<ReminderQuarantineNotice entries={quarantinedChanges} folderPath={config.folderPath} onRemove={removeQuarantinedChanges} />
 							{homeScreenInstall.showPrompt && !isProjectDetail && (
 								<HomeScreenInstallPrompt onShowSteps={toggleSettings} onDismiss={homeScreenInstall.dismiss} />
 							)}
