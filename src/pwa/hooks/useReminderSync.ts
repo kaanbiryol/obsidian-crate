@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
 import { fetchReadyReminderList } from '../reminder-api';
-import { loadCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
+import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
 import { parseReminderSourceIssues } from '../reminder-source-issues';
 import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, ReminderSourceIssue, StoredConfig } from '../types';
@@ -22,6 +22,7 @@ export interface ReminderSyncState {
 	hydratedCacheRef: MutableRefObject<boolean>;
 	hydrateCachedSnapshot: (snapshot: CachedReminderSnapshot) => void;
 	loadReminders: LoadReminders;
+	rebuildOfflineCache: () => Promise<void>;
 	beginLocalMutation: () => () => void;
 	commitReminderState: (reminders: ReminderRecord[], projects?: string[]) => Promise<void>;
 	resetReminderState: () => void;
@@ -177,6 +178,15 @@ export function useReminderSync({
 		return promise;
 	}, [apiFetch, authToken, config.folderPath, hydrateCachedSnapshot, setSelectedProject]);
 
+	const rebuildOfflineCache = useCallback(async () => {
+		const sessionCurrent = capturePwaSession();
+		if (!await rebuildCachedReminderSnapshot(config.folderPath) || !sessionCurrent()) return;
+		etagRef.current = undefined;
+		lastCheckedAtRef.current = null;
+		activeReadRef.current = null;
+		await loadReminders({ silent: true });
+	}, [config.folderPath, loadReminders]);
+
 	const beginLocalMutation = useCallback(() => {
 		const coordinator = requestCoordinatorRef.current;
 		const finish = coordinator.beginMutation();
@@ -250,6 +260,7 @@ export function useReminderSync({
 		projectsRef,
 		hydratedCacheRef,
 		hydrateCachedSnapshot,
+		rebuildOfflineCache,
 		loadReminders,
 		beginLocalMutation,
 		commitReminderState,

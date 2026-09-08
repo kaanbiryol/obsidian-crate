@@ -78,7 +78,9 @@ export function usePwaSessionLifecycle({
 		cancelModalClose();
 		setSettingsOpen(false);
 		setModal(null);
-		await clearCachedReminderSnapshots();
+		if (!await clearCachedReminderSnapshots()) {
+			showToast('error', 'Offline data could not be cleared. Close other Crate tabs, then clear this site’s data in browser settings.');
+		}
 	}, [
 		cancelModalClose,
 		cancelSettingsClose,

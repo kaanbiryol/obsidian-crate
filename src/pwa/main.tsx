@@ -20,6 +20,7 @@ import { WebReminderCard } from './components/WebReminderCard';
 import { ReminderSyncNotice } from './components/ReminderSyncNotice';
 import { ReminderRecoveryNotice } from './components/ReminderRecoveryNotice';
 import { ReminderSourceNotice } from './components/ReminderSourceNotice';
+import { ReminderCacheNotice } from './components/ReminderCacheNotice';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
@@ -114,6 +115,7 @@ function App() {
 		hydratedCacheRef,
 		hydrateCachedSnapshot,
 		loadReminders,
+		rebuildOfflineCache,
 		beginLocalMutation,
 		commitReminderState,
 		resetReminderState,
@@ -373,6 +375,7 @@ function App() {
 							onEnableNotifications={enablePushNotifications}
 						>
 							<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
+							<ReminderCacheNotice isOffline={isOffline} onRebuild={rebuildOfflineCache} />
 							<ReminderSyncNotice
 								changes={changes}
 								isOffline={isOffline}
