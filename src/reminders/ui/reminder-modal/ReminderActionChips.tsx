@@ -5,6 +5,7 @@ import type { RecurrenceRule } from '../../types';
 import { formatRecurrence } from '../../utils/rruleConverter';
 import { formatDueDate } from '../../utils/dateFormatting';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
+import { useReminderClock } from '../useReminderClock';
 
 interface ReminderActionChipsProps {
     dueDate: string | null;
@@ -38,7 +39,8 @@ export function ReminderActionChips({
     onOpenRecurrencePicker,
     onTogglePriority,
 }: ReminderActionChipsProps) {
-    const dueDateDisplay = dueDateLabel ?? formatDueDate(dueDate ?? undefined);
+    const clock = useReminderClock();
+    const dueDateDisplay = dueDateLabel ?? formatDueDate(dueDate ?? undefined, undefined, clock.now);
 
     return (
         <div className="reminder-action-chips" inert={inert}>

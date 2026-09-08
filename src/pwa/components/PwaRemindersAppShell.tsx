@@ -23,6 +23,7 @@ import {
 import { PwaThemeIcon } from './PwaThemeIcon';
 import { ReminderPageSizeContext } from '@/reminders/ui/reminder-pagination';
 import { EmptyStateMessageContext } from '@/reminders/components/EmptyState';
+import { useReminderClock } from '@/reminders/ui/useReminderClock';
 
 const INCOMPLETE_EMPTY_MESSAGE = { title: 'No results from available files', description: 'Some source files could not be loaded. Review the notice above for missing reminders.' };
 
@@ -98,9 +99,10 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		setSelectedProject(null);
 	}, []);
 
+	const clock = useReminderClock(reminders);
 	const headerData = useMemo(() => {
-		return getRemindersHeaderData(reminders, projects, upcomingDays);
-	}, [reminders, projects, upcomingDays]);
+		return getRemindersHeaderData(reminders, projects, upcomingDays, clock.now);
+	}, [reminders, projects, upcomingDays, clock]);
 
 	const currentHeader = useMemo(() => {
 		return getCurrentHeaderData(viewMode, headerData);
