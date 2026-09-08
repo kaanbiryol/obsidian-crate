@@ -55,7 +55,8 @@
 		"test:visual": "playwright test",
 		"typecheck:visual": "tsc -p tests/visual/tsconfig.json",
 		"security:secrets": "node scripts/check-secrets.mjs",
-		"test:recovery": "python3 -m unittest discover -s scripts/recovery -p \"test_*.py\""
+		"test:recovery": "python3 -m unittest discover -s scripts/recovery -p \"test_*.py\"",
+		"benchmark:sync": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync-capacity.integration.ts --reporter=verbose"
 	},
 	"keywords": [
 		"obsidian",

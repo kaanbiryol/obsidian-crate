@@ -19,6 +19,7 @@ export class SyncTestDevice {
 	readonly disk = new PersistentTestVault();
 	readonly settings: CrateSettings;
 	readonly requests: string[] = [];
+	readonly responses: Array<{ route: string; status: number; bytes: number; wallMs: number }> = [];
 	private pause: PausedResponse | null = null;
 	api!: SyncApiClient;
 	engine!: SyncEngine;
@@ -27,9 +28,9 @@ export class SyncTestDevice {
 		this.settings = { ...structuredClone(DEFAULT_SETTINGS), deviceId: id, workerUrl: 'https://worker.test', syncInterval: 0 };
 	}
 
-	async authorize(): Promise<void> {
+	async authorize(lifetimeMs = 60_000): Promise<void> {
 		await this.runtimeEnv.DB.prepare('INSERT INTO auth_tokens (id, token_hash, scope, expires_at) VALUES (?, ?, ?, ?)')
-			.bind(this.id, await sha256Hex(this.id), 'vault', Date.now() + 60_000).run();
+			.bind(this.id, await sha256Hex(this.id), 'vault', Date.now() + lifetimeMs).run();
 	}
 
 	async open(): Promise<void> {
@@ -58,6 +59,7 @@ export class SyncTestDevice {
 
 	private readonly transport: ApiHttpTransport = async request => {
 		const path = new URL(request.url).pathname;
+		const started = performance.now();
 		this.requests.push(`${request.method ?? 'GET'} ${path}`);
 		const response = await worker.fetch(new Request(request.url, {
 			method: request.method, body: request.body,
@@ -70,6 +72,8 @@ export class SyncTestDevice {
 			await pause.released;
 		}
 		const arrayBuffer = await response.arrayBuffer();
+		this.responses.push({ route: `${request.method ?? 'GET'} ${path}`, status: response.status,
+			bytes: arrayBuffer.byteLength, wallMs: performance.now() - started });
 		const headers: Record<string, string> = {};
 		response.headers.forEach((value, key) => { headers[key] = value; });
 		return {
