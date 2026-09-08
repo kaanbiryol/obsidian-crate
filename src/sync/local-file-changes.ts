@@ -1,5 +1,5 @@
 import type { Vault } from 'obsidian';
-import { getAllVaultFiles } from './file-discovery';
+import { getAllVaultFiles, type VaultFile } from './file-discovery';
 import type { FileEntry } from '../protocol/sync-types';
 
 interface LocalFileManifest {
@@ -8,16 +8,17 @@ interface LocalFileManifest {
 }
 
 /**
- * Metadata-only safety net for local changes that did not produce a vault
- * event, such as edits made while startup synchronization had events paused.
- * Content is hashed only after a sync is actually scheduled.
+ * Detect missed events using metadata and the engine's rotating content check.
  */
 export async function hasLocalFileChanges(
 	vault: Vault,
 	manifest: LocalFileManifest,
 	shouldIgnore: (path: string) => boolean,
+	verifyContent?: (files: VaultFile[]) => Promise<boolean>,
 ): Promise<boolean> {
 	const currentFiles = await getAllVaultFiles(vault, shouldIgnore);
+	const contentChanged = await verifyContent?.(currentFiles);
+	if (contentChanged) return true;
 	const currentPaths = new Set(currentFiles.map((file) => file.path));
 
 	for (const file of currentFiles) {

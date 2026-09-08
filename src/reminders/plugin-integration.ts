@@ -18,7 +18,7 @@ export async function initializeReminders(plugin: CratePlugin): Promise<void> {
 	if (!await setupReminderBackend(plugin, plugin.remindersSettings.remindersFolderPath) || signal.aborted) return;
 	remindersLogger.info(`Index loaded: ${plugin.reminderIndex.getAll().length} reminders`);
 
-	registerReminderIntegrations(plugin);
+	await registerReminderIntegrations(plugin);
 }
 
 export async function reinitializeReminders(
@@ -29,7 +29,7 @@ export async function reinitializeReminders(
 	const normalizedFolderPath = normalizeRemindersFolderPath(newFolderPath);
 	remindersLogger.info(`Reinitializing with new folder: ${normalizedFolderPath}`);
 	if (!await setupReminderBackend(plugin, normalizedFolderPath) || signal.aborted) return;
-	registerReminderIntegrations(plugin);
+	await registerReminderIntegrations(plugin);
 	await ensureReminderNotificationPolicy(plugin);
 	remindersLogger.info('Reinitialization complete');
 }

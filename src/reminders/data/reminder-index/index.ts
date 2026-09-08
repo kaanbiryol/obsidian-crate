@@ -6,13 +6,14 @@
  * The index is rebuilt from markdown on startup and updated incrementally.
  */
 
-import type { App, TFile } from "obsidian";
+import { TFile, type App } from "obsidian";
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
 import { createLogger } from "@/reminders/utils/logger";
 import { isReminderOverdue, isReminderToday, isReminderWithinDays } from "./dates";
 import { createReminderLookupStore } from "./lookup-store";
 import { createReminderOptimisticState } from "./optimistic-state";
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";
+import { addReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from '../reminder-identity-owners';
 
 const log = createLogger("ReminderIndex");
 
@@ -53,6 +54,7 @@ export interface ReminderIndex {
 
   load(): Promise<ScanResult>;
   rescanFile(file: TFile, force?: boolean): Promise<void>;
+  flushDeferredScans(): Promise<void>;
   removeFile(filePath: string): void;
   renameFile(oldPath: string, newPath: string): void;
 
@@ -65,18 +67,28 @@ export interface ReminderIndex {
   clearOptimistic(id: string): void;
 }
 
-export function createReminderIndex(app: App, remindersFolderPath: string, signal?: AbortSignal): ReminderIndex {
+export function createReminderIndex(app: App, remindersFolderPath: string, signal?: AbortSignal, shouldDeferScan: (filePath?: string) => boolean = () => false, shouldDeferCollisionRepair = () => false): ReminderIndex {
   let reminders: IndexedReminder[] = [];
   let isLoaded = false;
   let lastScanTime: Date | undefined;
   let scanDurationMs: number | undefined;
   let discoveredProjects = new Set<string>();
+  let ambiguousOwners: ReminderIdentityOwner[] = [];
 
   const listeners = new Set<IndexChangeListener>();
   const fileRescanTimestamps = new Map<string, number>();
   const lookupStore = createReminderLookupStore();
   const optimisticState = createReminderOptimisticState();
   const RESCAN_DEBOUNCE_MS = 1500;
+  let scanQueue: Promise<unknown> = Promise.resolve();
+  let deferredLoad = false;
+  const deferredPaths = new Set<string>();
+  const enqueueScan = <T>(scan: () => Promise<T>): Promise<T> => {
+    const result = scanQueue.then(scan, scan);
+    scanQueue = result.then(() => undefined, () => undefined);
+    return result;
+  };
+  signal?.addEventListener('abort', () => { deferredPaths.clear(); deferredLoad = false; }, { once: true });
 
   function notifyListeners(): void {
     for (const listener of listeners) {
@@ -92,7 +104,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
     return optimisticState.mergeReminders(reminders);
   }
 
-  return {
+  const index: ReminderIndex = {
     get isLoaded() {
       return isLoaded;
     },
@@ -156,12 +168,29 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       return isInRemindersFolder(filePath, remindersFolderPath);
     },
 
-    async load() {
+    load: () => enqueueScan(async () => {
+      if (signal?.aborted || shouldDeferScan()) {
+        deferredLoad = !signal?.aborted;
+        return { reminders, filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [...discoveredProjects] };
+      }
       log.info(` Starting scan of ${remindersFolderPath}/...`);
-      const result = await scanVault(app, remindersFolderPath, signal);
+      const result = await scanVault(app, remindersFolderPath, signal, shouldDeferScan, shouldDeferCollisionRepair);
       if (signal?.aborted) return result;
+      if (result.deferred) {
+        deferredLoad = true;
+        ambiguousOwners = result.ambiguousOwners ?? ambiguousOwners;
+        if (!isLoaded) {
+          reminders = result.reminders;
+          discoveredProjects = new Set(result.discoveredProjects);
+          lookupStore.rebuild(reminders);
+          isLoaded = true;
+          notifyListeners();
+        }
+        return result;
+      }
 
       reminders = result.reminders;
+      ambiguousOwners = [];
       isLoaded = true;
       lastScanTime = new Date();
       scanDurationMs = result.scanDurationMs;
@@ -172,12 +201,16 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
 
       log.info(` Index loaded with ${reminders.length} reminders from ${result.filesScanned} files`);
       return result;
-    },
+    }),
 
-    async rescanFile(file: TFile, force = false) {
+    rescanFile: (file: TFile, force = false) => enqueueScan(async () => {
       if (signal?.aborted) return;
       const filePath = file.path;
       if (!isInRemindersFolder(filePath, remindersFolderPath)) {
+        return;
+      }
+      if (shouldDeferScan(filePath)) {
+        deferredPaths.add(filePath);
         return;
       }
 
@@ -191,13 +224,12 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       log.info(` Rescanning file: ${filePath}`);
       fileRescanTimestamps.set(filePath, now);
 
-      const reservedIds = new Set(
-        reminders
-          .filter((reminder) => reminder.filePath !== filePath)
-          .map((reminder) => reminder.id),
-      );
-      const result = await scanFile(app, file, remindersFolderPath, reservedIds, signal);
+      const identityOwners: ReminderIdentityOwners = new Map();
+      addReminderIdentityOwners(identityOwners, reminders);
+      addReminderIdentityOwners(identityOwners, ambiguousOwners);
+      const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners, () => shouldDeferScan(filePath), shouldDeferCollisionRepair);
       if (signal?.aborted) return;
+      if (result.deferred) { deferredPaths.add(filePath); return; }
       if (result.error) {
         log.error(` Keeping the previous reminder index for ${filePath}: ${result.error}`);
         return;
@@ -206,19 +238,48 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       discoveredProjects.add(getProjectFromPath(filePath, remindersFolderPath));
 
       const persistedReminders = lookupStore.getByFile(filePath);
-      optimisticState.clearFileState(filePath, persistedReminders);
+      optimisticState.clearFileState(filePath, [...persistedReminders, ...result.reminders]);
 
-      lookupStore.removeFile(filePath);
-      reminders = reminders.filter((reminder) => reminder.filePath !== filePath);
+      const released = new Set((result.releasedOwners ?? []).map(owner => `${owner.filePath}\0${owner.id}`));
+      ambiguousOwners = ambiguousOwners.filter(owner => owner.filePath !== filePath && !released.has(`${owner.filePath}\0${owner.id}`));
+      reminders = reminders.filter(reminder => reminder.filePath !== filePath && !released.has(`${reminder.filePath}\0${reminder.id}`));
 
       reminders.push(...result.reminders);
-      lookupStore.addReminders(result.reminders);
+      // A move can release an indexed owner that has not received its own
+      // refresh yet. Publish the ownership transfer as one index transition.
+      if (released.size) lookupStore.rebuild(reminders);
+      else {
+        lookupStore.removeFile(filePath);
+        lookupStore.addReminders(result.reminders);
+      }
       notifyListeners();
 
       log.info(` File rescanned, found ${result.reminders.length} reminders`);
+      if (deferredPaths.size) void index.flushDeferredScans().catch(error => log.error('Deferred reminder scan failed:', error));
+    }),
+
+    async flushDeferredScans() {
+      await scanQueue;
+      if (signal?.aborted || shouldDeferScan()) return;
+      if (deferredLoad) {
+        deferredLoad = false;
+        deferredPaths.clear();
+        await index.load();
+        return;
+      }
+      const paths = [...deferredPaths];
+      deferredPaths.clear();
+      for (const path of paths) {
+        if (signal?.aborted) return;
+        const file = app.vault.getAbstractFileByPath(path);
+        if (file instanceof TFile) await index.rescanFile(file, true);
+        else index.removeFile(path);
+      }
     },
 
     removeFile(filePath: string) {
+      deferredPaths.delete(filePath);
+      ambiguousOwners = ambiguousOwners.filter(owner => owner.filePath !== filePath);
       log.info(` Removing file from index: ${filePath}`);
       const before = reminders.length;
 
@@ -231,6 +292,8 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
     },
 
     renameFile(oldPath: string, newPath: string) {
+      if (deferredPaths.delete(oldPath)) deferredPaths.add(newPath);
+      ambiguousOwners = ambiguousOwners.map(owner => owner.filePath === oldPath ? { ...owner, filePath: newPath } : owner);
       log.info(` Renaming file in index: ${oldPath} -> ${newPath}`);
 
       const oldProject = getProjectFromPath(oldPath, remindersFolderPath);
@@ -269,4 +332,5 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       notifyListeners();
     },
   };
+  return index;
 }

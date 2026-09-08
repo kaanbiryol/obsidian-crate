@@ -18,3 +18,10 @@
 }
 
 @include settings-alignment.styles;
+
+.crate-sync-diagnostics-export {
+  width: 100%;
+  resize: vertical;
+  margin-bottom: var(--size-4-3);
+  font-family: var(--font-monospace);
+}

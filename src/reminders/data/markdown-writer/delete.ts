@@ -20,6 +20,7 @@ export async function deleteReminderInMarkdown(
   try {
     let deletedLineNumber = -1;
     await context.app.vault.process(file, (fileContent) => {
+      context.moveJournal?.assertActive();
       const deletion = deleteReminderBlockFromContent(fileContent, reminder);
       deletedLineNumber = deletion.lineNumber;
       return deletion.content;

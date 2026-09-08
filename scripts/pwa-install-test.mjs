@@ -136,7 +136,7 @@ async function testInstall(browser, launchMode) {
   await home.goto(`${origin}/notifications?token=renewal-${launchMode}&folder=RenewedTasks&tab=inbox`);
   await home.getByRole('group', { name: cardName, exact: true }).waitFor();
   expect(exchanges.at(-1).previousAuthToken).toBe(existingAuth);
-  expect(await home.evaluate(() => sessionStorage.getItem('crate-reminder-draft:existing'))).toBeNull();
+  expect(await home.evaluate(() => sessionStorage.getItem('crate-reminder-draft:existing'))).toBe('keep existing edit');
   await home.evaluate(() => sessionStorage.setItem('crate-reminder-draft:renewed', 'keep renewed edit'));
   const afterRenewal = exchanges.length;
   folders.length = 0;

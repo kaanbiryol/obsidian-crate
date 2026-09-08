@@ -41,6 +41,7 @@ export interface QueueDeleteFailure {
 }
 
 export interface QueueUploadFailure {
+	code?: string;
 	path: string;
 	error: string;
 	status?: number;
@@ -57,6 +58,7 @@ export interface QueueFlushContext {
 	currentStatus(): SyncState['status'];
 	markdownBaseCache?: QueueMarkdownBaseCache;
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
+	assertLocalFileAbsent(path: string): Promise<void>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	triggerDebouncedSync(): void;

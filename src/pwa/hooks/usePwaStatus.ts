@@ -66,7 +66,7 @@ export function usePwaStatus({
 		return null;
 	}, [dataMode, isOffline]);
 	const readOnly = Boolean(readOnlyMessage);
-	const canShowNotificationPrompt = Boolean(authToken && bootstrapped && push.supported && !push.subscribed && isStandaloneApp());
+	const canShowNotificationPrompt = Boolean(authToken && bootstrapped && (push.phase === 'off' || push.phase === 'error') && isStandaloneApp());
 	const statusText = useMemo(() => getPwaStatusText({
 		dataMode,
 		error,

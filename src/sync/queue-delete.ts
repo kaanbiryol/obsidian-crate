@@ -11,7 +11,7 @@ export async function deletePendingFiles(
 	deletes: QueueDeleteCandidate[],
 	completedQueueKeys: Set<string>,
 ): Promise<{ failures: QueueDeleteFailure[]; reconciliationPaths: string[]; hasTerminalFailure: boolean }> {
-	const result = await deleteFilesInBatches(context.api, deletes);
+	const result = await deleteFilesInBatches(context.api, deletes, path => context.assertLocalFileAbsent(path));
 
 	for (const path of result.deleted) {
 		context.localManifest.removeEntry(path);

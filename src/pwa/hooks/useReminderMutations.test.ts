@@ -6,6 +6,7 @@ import { restoreReminderDraft, saveReminderDraft } from '../reminder-drafts';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { ModalState, ReminderRecord } from '../types';
 
+vi.mock('../server-compatibility', () => ({ requireCompatibleServer: async () => ({ reminderOperationDay: 20_000 }) }));
 vi.mock('react', () => ({ useMemo: (factory: () => unknown) => factory(), useRef: (current: unknown) => ({ current }) }));
 vi.mock('./useReminderOutbox', () => ({ useReminderOutbox: vi.fn() }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -30,7 +31,7 @@ function harness() {
 		drain: vi.fn(() => new Promise<void>(() => {})),
 		retry: vi.fn(), discard: vi.fn(), refresh: vi.fn(() => changes),
 	};
-	const state = { changes, ready: true, outboxRef: { current: outbox }, storageError: null, retryInitialization: vi.fn() };
+	const state = { changes, ready: true, outboxRef: { current: outbox }, storageError: null, retryInitialization: vi.fn(), recoveryChanges: [], recoverChanges: vi.fn(), quarantinedChanges: [], removeQuarantinedChanges: vi.fn(async () => true) };
 	vi.mocked(useReminderOutbox).mockReturnValue(state);
 	const apiFetch = vi.fn<Parameters<typeof useReminderMutations>[0]['apiFetch']>();
 	const closeModal = vi.fn(); const showToast = vi.fn(); const setSaving = vi.fn();
@@ -56,7 +57,7 @@ describe('PWA optimistic mutations', () => {
 	it('persists a save and closes the editor without waiting for its network attempt', async () => {
 		const { hook, render, outbox, changes, closeModal, setSaving, apiFetch, commitReminderState, memory } = harness();
 		const modal = draft();
-		saveReminderDraft(modal);
+		saveReminderDraft(modal, 'Reminders');
 		await hook.saveReminder(modal);
 
 		expect(outbox.enqueue).toHaveBeenCalledOnce();
@@ -77,7 +78,7 @@ describe('PWA optimistic mutations', () => {
 	it('keeps the editor and saved draft when durable enqueue fails', async () => {
 		const { hook, outbox, closeModal, showToast, setSaving } = harness();
 		const modal = draft();
-		saveReminderDraft(modal);
+		saveReminderDraft(modal, 'Reminders');
 		outbox.enqueue.mockImplementationOnce(() => { throw new Error('Device storage is full'); });
 		await hook.saveReminder(modal);
 
@@ -85,7 +86,7 @@ describe('PWA optimistic mutations', () => {
 		expect(outbox.drain).not.toHaveBeenCalled();
 		expect(showToast).toHaveBeenCalledWith('error', 'Device storage is full');
 		expect(setSaving.mock.calls).toEqual([[true], [false]]);
-		expect(restoreReminderDraft(draft()).draft).toEqual(modal.draft);
+		expect(restoreReminderDraft(draft(), 'Reminders').draft).toEqual(modal.draft);
 	});
 
 	it('gives separate creates distinct durable identities', async () => {
@@ -100,7 +101,7 @@ describe('PWA optimistic mutations', () => {
 	it('does not enqueue a blank title or discard its draft', async () => {
 		const { hook, outbox, closeModal, showToast, memory } = harness();
 		const modal = draft(); modal.draft.content = '  \n  ';
-		saveReminderDraft(modal);
+		saveReminderDraft(modal, 'Reminders');
 		await hook.saveReminder(modal);
 		expect(outbox.enqueue).not.toHaveBeenCalled();
 		expect(closeModal).not.toHaveBeenCalled();
@@ -121,6 +122,15 @@ describe('PWA optimistic mutations', () => {
 		const saving = hook.saveReminder(draft());
 		invalidatePwaSession();
 		await saving;
+		expect(outbox.enqueue).not.toHaveBeenCalled();
+		expect(closeModal).not.toHaveBeenCalled();
+		expect(showToast).not.toHaveBeenCalled();
+	});
+	it.each(['complete', 'delete', 'reorder'] as const)('fences %s across asynchronous operation issuance and logout', async action => {
+		const { hook, outbox, closeModal, showToast } = harness();
+		const pending = action === 'complete' ? hook.toggleReminderCompleted('one', false)
+			: action === 'delete' ? hook.deleteReminder('one') : hook.persistReorder('Inbox', ['two', 'one']);
+		invalidatePwaSession(); await pending;
 		expect(outbox.enqueue).not.toHaveBeenCalled();
 		expect(closeModal).not.toHaveBeenCalled();
 		expect(showToast).not.toHaveBeenCalled();
@@ -253,7 +263,7 @@ describe('PWA optimistic mutations', () => {
 		expect(outbox.retry).toHaveBeenCalledWith('retry-id');
 		expect(outbox.drain).toHaveBeenCalledOnce();
 		hook.discardChange('discard-id');
-		expect(outbox.discard).toHaveBeenCalledWith('discard-id');
+		expect(outbox.discard).toHaveBeenCalledWith('discard-id', undefined);
 		outbox.retry.mockImplementationOnce(() => { throw new Error('Retry storage failed'); });
 		hook.retryChange('retry-id');
 		expect(showToast).toHaveBeenCalledWith('error', 'Retry storage failed');

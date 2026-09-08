@@ -4,7 +4,7 @@ import type { FileEntry } from '../protocol/sync-types';
 import { runSyncWorkflow, type SyncWorkflowContext } from './engine-standard-sync-workflow';
 
 function createContext(options: {
-	processDiff?: SyncWorkflowContext['processDiff'];
+	prepareFullSyncUpload?: SyncWorkflowContext['prepareFullSyncUpload'];
 } = {}) {
 	const localFiles: Record<string, FileEntry> = {
 		'notes/a.md': {
@@ -36,7 +36,9 @@ function createContext(options: {
 			remainingDiffs: [],
 			errors: [],
 		})),
-		processDiff: vi.fn(options.processDiff ?? (async () => ({ status: 'applied' as const }))),
+		processDiff: vi.fn(async () => ({ status: 'applied' as const })),
+		prepareFullSyncUpload: vi.fn(options.prepareFullSyncUpload ?? (async () => ({ path: 'notes/a.md', content: new ArrayBuffer(5), hash: 'local-hash', size: 5 }))),
+		uploadPreparedFiles: vi.fn<SyncWorkflowContext['uploadPreparedFiles']>(async () => {}),
 		parallelDownloadAndSaveFiles: vi.fn(async () => {}),
 		getLocalManifestEntry: vi.fn((path: string) => localFiles[path]),
 		setLocalManifestEntry: vi.fn(),
@@ -56,8 +58,8 @@ function createContext(options: {
 		createFullSyncPlan: spies.createFullSyncPlan,
 		processDiff: spies.processDiff,
 		parallelDownloadAndSaveFiles: spies.parallelDownloadAndSaveFiles,
-		runConcurrent: async <T>(tasks: Array<() => Promise<T>>, _concurrency: number): Promise<T[]> =>
-			Promise.all(tasks.map(task => task())),
+		prepareFullSyncUpload: spies.prepareFullSyncUpload,
+		uploadPreparedFiles: spies.uploadPreparedFiles,
 		getLocalManifestEntry: spies.getLocalManifestEntry,
 		setLocalManifestEntry: spies.setLocalManifestEntry,
 		saveLocalManifest: spies.saveLocalManifest,
@@ -69,9 +71,19 @@ function createContext(options: {
 }
 
 describe('runSyncWorkflow', () => {
+	it('reports a vanished upload and leaves scanned state unconfirmed', async () => {
+		const { context, spies } = createContext({ prepareFullSyncUpload: async () => null });
+		const progress = vi.fn();
+		const result = await runSyncWorkflow(context, progress);
+		expect(result.errors).toEqual(['notes/a.md: Local file changed or disappeared while preparing the upload']);
+		expect(spies.uploadPreparedFiles).not.toHaveBeenCalled();
+		expect(spies.setLocalManifestEntry).not.toHaveBeenCalled();
+		expect(spies.setLastSeq).not.toHaveBeenCalled();
+		expect(progress).toHaveBeenLastCalledWith(1, 1);
+	});
 	it('does not bulk-promote scanned local manifest entries after full-sync errors', async () => {
 		const { context, spies } = createContext({
-			processDiff: vi.fn(async () => {
+			prepareFullSyncUpload: vi.fn(async () => {
 				throw new Error('quota exceeded');
 			}),
 		});

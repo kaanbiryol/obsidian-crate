@@ -4,8 +4,9 @@ import { assertUniqueReminderSources } from './reminder-source-identity';
 import { getStoredFileRow } from './sync-storage';
 import { readStoredMarkdownFiles } from './storage';
 import { getNotificationPolicy } from './notification-policy';
-import { scanReminderMarkdownFile } from './reminders-web/scan';
+import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE } from './reminder-source-parse';
 import { REMINDER_INDEX_MAX_FILE_BYTES } from './reminders-web/reminder-cache';
+import { hasVerifiedReminderSource } from './reminder-source-state';
 import type { Env } from './types';
 import type { RemoteReminderRecord } from './reminders-web/types';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
@@ -26,11 +27,16 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
     try {
       const file = await getStoredFileRow(env.DB, job.path);
       let reminders: RemoteReminderRecord[] = [];
-      if (file && job.path.startsWith(`${policy.folderPath}/`)) {
-        if (file.size > REMINDER_INDEX_MAX_FILE_BYTES) throw new Error('Split reminder notes larger than 1 MiB to schedule their notifications');
+      if (file) {
+        if (file.size > REMINDER_INDEX_MAX_FILE_BYTES) throw new Error(REMINDER_SOURCE_SIZE_ISSUE);
         const [text] = await readStoredMarkdownFiles(env.BUCKET, [{ path: job.path, ...file }]);
         if (!text) throw new Error('Committed reminder content could not be verified');
-        reminders = scanReminderMarkdownFile(job.path, text.content, policy.folderPath);
+        // Policy changes can revisit sources outside the current folder. Their
+        // uncertain content still cannot authorize removal of prior reminders.
+        const parsed = parseReminderSource(job.path, text.content, policy.folderPath);
+        if (parsed.issue) throw new Error(parsed.issue);
+        if (!await hasVerifiedReminderSource(env.DB, job.path, file.storageKey)) throw new Error('Reminder source is awaiting verification with the current parser. Maintenance will retry. The vault file remains synced.');
+        if (job.path.startsWith(`${policy.folderPath}/`)) reminders = parsed.reminders;
       }
       await assertUniqueReminderSources(env.DB, policy.folderPath, reminders.map(reminder => reminder.id));
       const sources = await queryRows<{ reminder_id: string; due_key: string; first_seen_at: number | null }>(env.DB.prepare(

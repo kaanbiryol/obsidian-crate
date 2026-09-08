@@ -4,6 +4,7 @@ import { deployedArtifact } from './deployment-discovery';
 import { randomHex } from './pkce';
 import { assertWorkerTarget, assertUnsharedResources, assertOwnedNamespace, readCrateTables, type ResetApi } from './reset-ownership';
 import { createObjectOwnershipCheck, inspectBucketObjects, clearBucketObjects } from './reset-objects';
+import { fenceResetMutations, withDeploymentFence } from './deployment-fence';
 
 export async function resetCrateServer(input: {
 	api: ResetApi;
@@ -15,7 +16,8 @@ export async function resetCrateServer(input: {
 	persist: () => Promise<void>;
 	onProgress?: (message: string) => void;
 }): Promise<void> {
-	const { api, accountId, metadata } = input;
+	const { accountId, metadata } = input;
+	let api = input.api;
 	input.onProgress?.('Checking server identity and saved reset progress…');
 	const name = `crate-${metadata.deploymentId}`;
 	const databaseId = metadata.d1DatabaseId;
@@ -66,47 +68,59 @@ export async function resetCrateServer(input: {
 	const check = database ? await createObjectOwnershipCheck(api, accountId, databaseId, await readCrateTables(api, accountId, databaseId)) : null;
 	if (bucket && check) await inspectBucketObjects(api, accountId, name, check, input.onProgress);
 
-	input.onProgress?.('Stopping sync on this device before removing remote data…');
-	await input.beforeDelete();
-	if (!metadata.reset) {
-		metadata.reset = { id: randomHex(16), phase: 'clearing', databaseId, bucketCreatedAt: bucket!.creation_date!, namespaceId, ...(input.deleteOnly ? { deleteOnly: true as const } : {}) };
+	const removeVerifiedResources = async () => {
+		input.onProgress?.('Stopping sync on this device before removing remote data…');
+		await input.beforeDelete();
+		if (!metadata.reset) {
+			metadata.reset = { id: randomHex(16), phase: 'clearing', databaseId, bucketCreatedAt: bucket!.creation_date!, namespaceId, ...(input.deleteOnly ? { deleteOnly: true as const } : {}) };
+			await input.persist();
+		}
+		const checkpoint = metadata.reset;
+		const latestWorker = await api.getWorkerSettings(accountId, name);
+		assertWorkerTarget(latestWorker, metadata, retired);
+		if (!retired) assertDeploymentIsNotDowngrade(deployedArtifact(latestWorker).version, input.version);
+		if (!retired && latestWorker.bindings?.find(binding => binding.type === 'durable_object_namespace')?.namespace_id !== namespaceId) {
+			throw new Error('Reset blocked: the reminder namespace changed during verification.');
+		}
+		if (!retired) {
+			// Cloudflare refuses the deleted-class export if another Worker binds the
+			// namespace. The stub has no DO class and cannot serve or mutate vault data.
+			input.onProgress?.('Taking the server offline and removing reminder alarms…');
+			await api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name);
+		}
+		const verifyTarget = async () => {
+			const current = await api.getWorkerSettings(accountId, name);
+			if (current.annotations?.['workers/message'] !== `Crate reset ${checkpoint.id}`) {
+				throw new Error('Reset paused: the Worker changed during reset.');
+			}
+			assertWorkerTarget(current, metadata, true);
+			const currentBucket = await api.getR2Bucket(accountId, name);
+			if (currentBucket && (currentBucket.name !== name || currentBucket.creation_date !== checkpoint.bucketCreatedAt)) {
+				throw new Error('Reset paused: the bucket changed during reset.');
+			}
+		};
+		await verifyTarget();
+		await assertOwnedNamespace(api, accountId, name, namespaceId, true);
+		input.onProgress?.('Checking that other Workers do not share this server’s resources…');
+		await assertUnsharedResources(api, metadata, namespaceId);
+		if (bucket && check) {
+			await clearBucketObjects(api, accountId, name, check, verifyTarget, input.onProgress);
+			input.onProgress?.('Removing the empty file bucket…');
+			await api.deleteR2Bucket(accountId, name);
+		}
+		await verifyTarget();
+		input.onProgress?.('Removing the old database…');
+		if (database) await api.deleteD1Database(accountId, databaseId);
+		metadata.reset = { ...checkpoint, phase: 'rebuilding' };
 		await input.persist();
-	}
-	const checkpoint = metadata.reset;
-	const latestWorker = await api.getWorkerSettings(accountId, name);
-	assertWorkerTarget(latestWorker, metadata, retired);
-	if (!retired && latestWorker.bindings?.find(binding => binding.type === 'durable_object_namespace')?.namespace_id !== namespaceId) {
-		throw new Error('Reset blocked: the reminder namespace changed during verification.');
-	}
-	if (!retired) {
-		// Cloudflare refuses the deleted-class export if another Worker binds the
-		// namespace. The stub has no DO class and cannot serve or mutate vault data.
-		input.onProgress?.('Taking the server offline and removing reminder alarms…');
-		await api.retireCrateWorker(accountId, name, checkpoint.id, databaseId, name);
-	}
-	const verifyTarget = async () => {
-		const current = await api.getWorkerSettings(accountId, name);
-		if (current.annotations?.['workers/message'] !== `Crate reset ${checkpoint.id}`) {
-			throw new Error('Reset paused: the Worker changed during reset.');
-		}
-		assertWorkerTarget(current, metadata, true);
-		const currentBucket = await api.getR2Bucket(accountId, name);
-		if (currentBucket && (currentBucket.name !== name || currentBucket.creation_date !== checkpoint.bucketCreatedAt)) {
-			throw new Error('Reset paused: the bucket changed during reset.');
-		}
 	};
-	await verifyTarget();
-	await assertOwnedNamespace(api, accountId, name, namespaceId, true);
-	input.onProgress?.('Checking that other Workers do not share this server’s resources…');
-	await assertUnsharedResources(api, metadata, namespaceId);
-	if (bucket && check) {
-		await clearBucketObjects(api, accountId, name, check, verifyTarget, input.onProgress);
-		input.onProgress?.('Removing the empty file bucket…');
-		await api.deleteR2Bucket(accountId, name);
-	}
-	await verifyTarget();
-	input.onProgress?.('Removing the old database…');
-	if (database) await api.deleteD1Database(accountId, databaseId);
-	metadata.reset = { ...checkpoint, phase: 'rebuilding' };
-	await input.persist();
+	// Once the old database is gone, the checkpointed reset stub blocks updates
+	// from other devices; there is no remaining database fence to acquire.
+	if (!database) return removeVerifiedResources();
+	return withDeploymentFence({ api, accountId, databaseId,
+		record: { worker: name, kind: input.deleteOnly ? 'delete' : 'reset', version: input.version },
+	}, async fence => {
+		api = fenceResetMutations(api, fence);
+		await removeVerifiedResources();
+	});
 }

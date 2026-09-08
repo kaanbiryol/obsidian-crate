@@ -38,6 +38,8 @@ export function applyReminderChanges(reminders: ReminderRecord[], projects: stri
 	let visibleReminders = reminders;
 	let visibleProjects = projects;
 	for (const change of changes) {
+		// Expired attempts are compared with current confirmed data during review.
+		if (change.reviewRequired) continue;
 		if (change.status === 'failed' && change.kind !== 'save') continue;
 		if (change.kind === 'delete') visibleReminders = visibleReminders.filter(item => item.id !== change.recordId);
 		else if (change.kind === 'reorder') visibleReminders = reorderProjectReminders(visibleReminders, change.project!, change.orderedIds!);

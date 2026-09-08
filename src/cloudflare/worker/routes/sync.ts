@@ -18,12 +18,14 @@ import { handleDiagnostics } from '../maintenance/diagnostics';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';
+import type { MutationAuditContext } from '../request-diagnostics';
 
 export async function handleSyncRoute(
 	request: Request,
 	env: Env,
 	path: string,
 	method: RouteMethod,
+	audit?: MutationAuditContext,
 ): Promise<Response | null> {
 	const db = env.DB;
 	const bucket = env.BUCKET;
@@ -51,7 +53,7 @@ export async function handleSyncRoute(
 		return await withDatabase(db, requiredDb => handleDownload(request, bucket, requiredDb));
 	}
 	if (path === '/sync/delete' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleDelete(request, bucket, requiredDb));
+		return await withDatabase(db, requiredDb => handleDelete(request, bucket, requiredDb, audit));
 	}
 	if (path === '/sync/batch-upload' && method === 'POST') {
 		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb));
@@ -60,7 +62,7 @@ export async function handleSyncRoute(
 		return await withDatabase(db, requiredDb => handleBatchDownload(request, bucket, requiredDb));
 	}
 	if (path === '/sync/batch-delete' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleBatchDelete(request, bucket, requiredDb));
+		return await withDatabase(db, requiredDb => handleBatchDelete(request, bucket, requiredDb, audit));
 	}
 	if (path === '/sync/versions' && method === 'GET') {
 		return await withDatabase(db, requiredDb => handleListFileVersions(request, requiredDb));

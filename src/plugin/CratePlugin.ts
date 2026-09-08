@@ -144,7 +144,7 @@ export default class CratePlugin extends Plugin {
 	}
 
 	async activateRemindersView(project?: string): Promise<void> {
-		await activateOrRevealRemindersLeaf(this.app.workspace, 'reminders-view', project);
+		await activateOrRevealRemindersLeaf(this.app.workspace, 'reminders-view', project, getPluginLifecycleSignal(this));
 	}
 
 	async reinitializeWithFolder(newFolderPath: string): Promise<void> {

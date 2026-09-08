@@ -8,6 +8,7 @@ import { parseFolderPath, parseProjectPath } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile } from '../scan';
 import { assertUniqueReminderSources } from '../../reminder-source-identity';
+import { ReminderReorderConflictError } from '@/reminders/core/markdownReminderFile';
 
 // Paging changes only mounted rows; reorder still submits the complete project
 // order. The shared JSON reader also bounds the entire request to 1 MiB.
@@ -38,7 +39,15 @@ export async function handleReorderReminders(request: Request, env: Env): Promis
 	if (!expectedOrder) return corsResponse({ error: 'Invalid expected project order.' }, 400);
 	if (JSON.stringify(currentOrder) !== JSON.stringify(expectedOrder)) return corsResponse({ error: 'Project order changed. Reload before reordering.' }, 409);
 
-	const nextContent = reorderReminderBlocksInFileContent(file.content, orderedIds);
+	let nextContent: string;
+	try {
+		nextContent = reorderReminderBlocksInFileContent(file.content, orderedIds);
+	} catch (error) {
+		if (error instanceof ReminderReorderConflictError) {
+			return corsResponse({ error: error.message, code: 'reminder_order_conflict' }, 409);
+		}
+		throw error;
+	}
 	const write = await writeCommittedMarkdownFile(env.BUCKET, env.DB, filePath, nextContent, file.hash,
 		reminderOperationEffects(env.DB, operation, { success: true }));
 	await saveReminderFileCache(

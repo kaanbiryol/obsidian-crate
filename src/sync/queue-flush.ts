@@ -111,8 +111,8 @@ export async function processPendingChanges(
 			const uploadFailures = await uploadPendingFiles(context, chunk, completedQueueKeys, uploadConcurrency);
 			for (const failure of uploadFailures) {
 				context.pendingPaths.add(failure.path);
-				if (isQueueVersionConflict(failure.status)) reconciliationPaths.add(failure.path);
-				if (isQueueTerminalFailure(failure.status)) hasTerminalFailure = true;
+				if (isQueueVersionConflict(failure.status, failure.code)) reconciliationPaths.add(failure.path);
+				if (isQueueTerminalFailure(failure.status, failure.code)) hasTerminalFailure = true;
 			}
 			failures.push(...uploadFailures);
 		}
@@ -167,7 +167,7 @@ export async function processPendingChanges(
 				if (!completedQueueKeys.has(path)) context.pendingPaths.add(path);
 			}
 			if (!retryable) {
-				if (error instanceof HttpError && isQueueVersionConflict(error.status)) {
+				if (error instanceof HttpError && isQueueVersionConflict(error.status, error.code)) {
 					for (const path of paths) {
 						if (!completedQueueKeys.has(path)) reconciliationPaths.add(path);
 					}

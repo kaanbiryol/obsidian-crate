@@ -20,7 +20,7 @@ import {
 	parseCrateServerInfo,
 	type CrateServerInfo,
 } from '../../protocol';
-import { assertPortablePaths } from '../../protocol/portable-path';
+import { assertPortablePathNames, assertPortablePaths } from '../../protocol/portable-path';
 import { createPathRecord, getPathEntry } from '../../protocol/path-record';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import {
@@ -117,7 +117,9 @@ export class SyncWorkerApi {
 
 	async getFileMetadata(paths: string[]): Promise<FileMetadataResponse> {
 		const uniquePaths = [...new Set(paths)];
-		assertPortablePaths(uniquePaths);
+		// Requested paths may include an old file and its replacement directory;
+		// only returned live state must be a representable namespace.
+		assertPortablePathNames(uniquePaths);
 		const files = createPathRecord<FileEntry>();
 
 		for (let index = 0; index < uniquePaths.length; index += BATCH_DOWNLOAD_MAX_FILES) {
@@ -194,7 +196,7 @@ export class SyncWorkerApi {
 
 	async getChanges(since: number): Promise<ChangesResponse> {
 		const response = await this.http.requestJson<ChangesResponse>(`/sync/changes?since=${since}`);
-		assertPortablePaths(response.changes.map(change => change.path));
+		assertPortablePathNames(response.changes.map(change => change.path));
 		return response;
 	}
 

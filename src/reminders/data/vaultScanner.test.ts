@@ -27,7 +27,7 @@ it.each(['read', 'atomic callback'])('stops ID normalization if shutdown happens
     persisted = update(persisted);
     return persisted;
   });
-  const app = { vault: { cachedRead: async () => {
+  const app = { vault: { read: async () => {
     if (boundary === 'read') controller.abort();
     return original;
   }, process } } as unknown as App;
@@ -54,7 +54,7 @@ describe('vaultScanner', () => {
   it('scans a file and ignores empty checkbox content', async () => {
     const app = {
       vault: {
-        cachedRead: vi.fn().mockResolvedValue(
+        read: vi.fn().mockResolvedValue(
           '- [ ] Task A <!-- crate-id:rem-1 -->\n- [ ] \n- [x] Done task <!-- crate-id:rem-2 -->',
         ),
       },
@@ -87,7 +87,7 @@ describe('vaultScanner', () => {
           path: 'Reminders',
           children: files.slice(0, 2),
         })),
-        cachedRead: vi.fn((file: TFile) => Promise.resolve(contentByPath[file.path] || '')),
+        read: vi.fn((file: TFile) => Promise.resolve(contentByPath[file.path] || '')),
       },
     } as unknown as App;
 
@@ -114,11 +114,11 @@ describe('vaultScanner', () => {
     });
     const app = {
       vault: {
-        getAbstractFileByPath: vi.fn().mockReturnValue(Object.assign(new TFolder(), {
+        getAbstractFileByPath: vi.fn((path: string) => path === 'Reminders' ? Object.assign(new TFolder(), {
           path: 'Reminders',
           children: files,
-        })),
-        cachedRead: vi.fn((file: TFile) => Promise.resolve(contentByPath[file.path] ?? '')),
+        }) : files.find(file => file.path === path) ?? null),
+        read: vi.fn((file: TFile) => Promise.resolve(contentByPath[file.path] ?? '')),
         process,
       },
     } as unknown as App;
@@ -147,7 +147,7 @@ describe('vaultScanner', () => {
   it('preserves persisted reminder IDs from markdown metadata', async () => {
     const app = {
       vault: {
-        cachedRead: vi.fn().mockResolvedValue('- [ ] Task A <!-- crate-id:rem-123 -->'),
+        read: vi.fn().mockResolvedValue('- [ ] Task A <!-- crate-id:rem-123 -->'),
       },
     } as unknown as App;
 
@@ -165,7 +165,7 @@ describe('vaultScanner', () => {
     ));
     const app = {
       vault: {
-        cachedRead: vi.fn().mockResolvedValue('- [ ] Task A\n- [ ] Task A'),
+        read: vi.fn().mockResolvedValue('- [ ] Task A\n- [ ] Task A'),
         process,
       },
     } as unknown as App;
@@ -188,7 +188,7 @@ describe('vaultScanner', () => {
     });
     const app = {
       vault: {
-        cachedRead: vi.fn().mockResolvedValue('- [ ] Task A'),
+        read: vi.fn().mockResolvedValue('- [ ] Task A'),
         process,
       },
     } as unknown as App;
@@ -203,7 +203,7 @@ describe('vaultScanner', () => {
   it('reports file read failures explicitly', async () => {
     const app = {
       vault: {
-        cachedRead: vi.fn().mockRejectedValue(new Error('read failed')),
+        read: vi.fn().mockRejectedValue(new Error('read failed')),
       },
     } as unknown as App;
 

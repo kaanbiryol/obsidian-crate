@@ -2,8 +2,9 @@ import type { ApiFetch, ReminderRecord } from './types';
 import type { PendingReminderChange, ReminderChangeResult } from './reminder-outbox-types';
 
 export class RejectedReminderChange extends Error {}
+export class ExpiredReminderChange extends Error {}
 
-function isConfirmedReminder(value: unknown, id: string | undefined): value is ReminderRecord {
+export function isConfirmedReminder(value: unknown, id: string | undefined): value is ReminderRecord {
 	if (!value || typeof value !== 'object') return false;
 	const record = value as Partial<ReminderRecord>;
 	return record.id === id && typeof record.content === 'string' && typeof record.completed === 'boolean'
@@ -18,6 +19,7 @@ export async function submitReminderChange(apiFetch: ApiFetch, change: PendingRe
 		let details: { code?: string; error?: string } = {};
 		try { details = JSON.parse(text) as typeof details; } catch { /* Proxies may return plain text. */ }
 		const message = details.error || text || 'Could not sync this change.';
+		if (response.status === 410 && details.code === 'operation_expired') throw new ExpiredReminderChange(message);
 		if ([400, 403, 404, 409, 413, 428].includes(response.status) && details.code !== 'operation_mismatch') {
 			throw new RejectedReminderChange(message);
 		}

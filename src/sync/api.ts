@@ -64,6 +64,10 @@ export class SyncApiClient {
 		return this.http.getWorkerUrl();
 	}
 
+	getRequestDiagnostics() {
+		return this.http.getRequestDiagnostics();
+	}
+
 	async health(): Promise<HealthResponse> {
 		return this.syncApi.health();
 	}

@@ -22,6 +22,7 @@ function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 		getProjects: () => [],
 		load: async () => ({ reminders: [], filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [] }),
 		rescanFile: async () => {},
+		flushDeferredScans: async () => {},
 		removeFile: () => {},
 		renameFile: () => {},
 		isReminderFile: () => true,
@@ -267,13 +268,16 @@ describe('reminderRepository.update and today view', () => {
 		expect(await repository.delete('r1')).toBe(true);
 		expect(spies.deleteReminder).toHaveBeenCalledWith(indexedReminder);
 
+		spies.toggleComplete.mockImplementation(() => { indexedReminder = { ...indexedReminder, completed: !indexedReminder.completed }; });
+		const beforeComplete = indexedReminder;
 		const completed = await repository.complete('r1');
-		expect(spies.toggleComplete).toHaveBeenNthCalledWith(1, indexedReminder);
+		expect(spies.toggleComplete).toHaveBeenNthCalledWith(1, beforeComplete);
 		expect(completed?.completed).toBe(true);
 
 		indexedReminder = { ...indexedReminder, completed: true };
+		const beforeUncomplete = indexedReminder;
 		const uncompleted = await repository.uncomplete('r1');
-		expect(spies.toggleComplete).toHaveBeenNthCalledWith(2, indexedReminder);
+		expect(spies.toggleComplete).toHaveBeenNthCalledWith(2, beforeUncomplete);
 		expect(uncompleted?.completed).toBe(false);
 
 		await repository.reorder('Work', ['r1', 'done']);

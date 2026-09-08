@@ -25,7 +25,7 @@ type MockAdapter = {
 	remove: ReturnType<typeof vi.fn>;
 	writeBinary: ReturnType<typeof vi.fn>;
 	mkdir: ReturnType<typeof vi.fn>;
-	list: ReturnType<typeof vi.fn>;
+	list: ReturnType<typeof vi.fn<(path: string) => Promise<{ files: string[]; folders: string[] }>>>;
 };
 
 export type Harness = {
@@ -71,10 +71,10 @@ export type Harness = {
 		save: ReturnType<typeof vi.fn>;
 		hashMatches: ReturnType<typeof vi.fn>;
 		hasFile: ReturnType<typeof vi.fn>;
-		getEntry: ReturnType<typeof vi.fn>;
+		getEntry: ReturnType<typeof vi.fn<(path: string) => ManifestEntry | undefined>>;
 		getAllPaths: ReturnType<typeof vi.fn>;
 		getManifest: ReturnType<typeof vi.fn>;
-		setEntry: ReturnType<typeof vi.fn>;
+		setEntry: ReturnType<typeof vi.fn<(path: string, entry: ManifestEntry) => void>>;
 		removeEntry: ReturnType<typeof vi.fn>;
 		clear: ReturnType<typeof vi.fn>;
 	};
@@ -184,7 +184,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 		remove: vi.fn(),
 		writeBinary: vi.fn(),
 		mkdir: vi.fn(),
-		list: vi.fn(),
+		list: vi.fn<(path: string) => Promise<{ files: string[]; folders: string[] }>>(),
 	};
 
 	const vault = {
@@ -252,6 +252,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 	const manifestFiles: Record<string, ManifestEntry> = {};
 	const localManifest = {
 		load: vi.fn(),
+		close: vi.fn(async () => {}),
 		save: vi.fn(),
 		hashMatches: vi.fn((path: string, hash: string) => manifestFiles[path]?.hash === hash),
 		hasFile: vi.fn((path: string) => path in manifestFiles),

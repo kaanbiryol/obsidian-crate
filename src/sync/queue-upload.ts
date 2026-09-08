@@ -46,7 +46,7 @@ export async function uploadPendingFiles(
 			return {
 				path: upload.path,
 				error: errorMessage(error),
-				...(error instanceof HttpError ? { status: error.status } : {}),
+				...(error instanceof HttpError ? { status: error.status, code: error.code } : {}),
 			};
 		}
 	});

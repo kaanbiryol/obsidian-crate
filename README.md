@@ -41,7 +41,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
 - OAuth state and PKCE material exist only in memory during one deployment; authorization codes and OAuth access tokens are never stored or logged.
-- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases and rejects unsupported schemas without converting them. Deployment code is never fetched at runtime.
+- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases, upgrades schema 2/3 to schema 4 without rewriting vault data, and rejects unsupported schemas. Deployment code is never fetched at runtime.
 - Vault devices can be authorized only through the Cloudflare account that owns the server.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - When installing the reminders web app, Safari carries a separate, single-use enrollment grant in the install URL and a ten-minute cookie copied into the Home Screen app. The app clears these after enrollment and keeps its own session; Safari's persistent login credential is not copied. Open the new app within ten minutes of creating the link.
@@ -142,6 +142,12 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 
 Crate stores reminders as Markdown in a configurable vault folder. Reminders are disabled on new installs until you explicitly adopt a folder in **Settings → Crate → Reminders**. Adoption scans that folder and adds stable `<!-- crate-id:... -->` comments to checkbox lines so reminders can be updated safely. The plugin then provides a reminders workspace view and registers commands for creating reminders and opening projects.
 
+When Obsidian adopts or rescans a reminder, relative dates such as `tomorrow` and times without a timezone are resolved once in that device's timezone and saved as explicit dates or UTC timestamps. Recurring reminders also save their timezone and first occurrence. Existing reminder IDs, titles, and descriptions are preserved. Editing a saved date back to natural language resolves it again on the next scan. The web app reports an unresolved schedule until Obsidian saves it; vault file sync continues. This keeps the same saved reminder date across devices, reloads, and midnight.
+
+Code fences, indented code, frontmatter, and hidden HTML examples are excluded from reminders and remain unchanged during adoption. Reorder supports simple task lists within the same section. Use the Markdown editor to reorder nested tasks or tasks with supporting paragraphs, or to move/delete a task together with its children. Crate rejects these structural changes in the reminder list before editing the note.
+
+Plugin project moves save a recovery record in the plugin's private configuration directory before changing either note. After an interruption, Crate checks both notes before indexing them and completes or rolls back only a verifiable move. If both copies changed, it keeps them and pauses reminder edits and normalization for those notes. Merge or keep the wanted text in one note, remove the duplicate from the other, then run **Crate: Recover interrupted reminder moves**. The notice identifies the affected notes and recovery-record location; damaged records are retained for manual recovery. These records remain on the device and are excluded from vault sync.
+
 Reminder code blocks can be embedded in notes:
 
 ````markdown
@@ -154,7 +160,13 @@ Reminder code blocks can be embedded in notes:
 
 The Worker schedules notifications from committed Markdown using a shared folder, timezone, all-day time, and enabled setting. Another device's startup does not replace that policy. **Settings → Crate → Push notifications** shows the server's folder and timezone; explicit changes apply to all devices. The web app session is restricted to its enrolled reminders folder. Signing out clears its offline data and drafts across tabs and revokes the session's subscriptions. If remote revocation fails, the signed-out screen explains how to remove the session through connected devices in Obsidian.
 
-The reminders web app updates immediately when you save, complete, delete, or reorder a reminder. Pending changes are kept on the device and resume syncing when the app is open and connected, including after a reload. If a save is rejected, the app keeps your text with **Retry**, **Edit**, and **Discard** actions. Other rejected changes restore the confirmed state and offer **Retry** or **Dismiss**. A lost response leaves a change pending until the app can confirm the result. Browsing cached reminders while offline remains read-only; reconnect before starting a new change. Signing out clears pending changes along with the offline cache and drafts.
+The web app checks browser permission and confirms push registration with the current server session when opened, resumed, or reconnected. **On** appears after confirmation. If registration fails, **Retry** repairs the existing browser subscription; if permission is blocked, allow notifications in browser settings and reopen Crate.
+
+The reminders web app updates immediately when you save, complete, delete, or reorder a reminder. Pending changes are kept on the device and resume syncing when the app is open and connected, including after a reload. If a save is rejected, the app keeps your text with **Retry**, **Edit**, and **Discard** actions. Other rejected changes restore the confirmed state and offer **Retry** or **Dismiss**. A lost response leaves a change pending until the app can confirm the result. If your session expires or is renewed, pending changes and editor drafts remain on the device. Reconnect to the same deployment and reminders folder, review or export the saved changes, then select **Resume saved changes** to check their original receipts and retry safely. Changes from another folder are never resumed automatically. Browsing cached reminders while offline remains read-only; reconnect before starting a new change. Explicitly signing out clears pending changes along with the offline cache and drafts across tabs.
+
+If **Offline copy unavailable** appears, close older Crate tabs and select **Rebuild offline copy** while connected. This refreshes confirmed data and preserves pending changes and drafts. Unknown newer formats are left intact. Unreadable pending edits stay on the device under **Damaged pending changes**, where you can review and export their original text while healthy changes continue syncing; see [browser storage recovery](docs/pwa-storage-recovery.md).
+
+Completing a recurring reminder advances the same reminder to its next scheduled occurrence. After the final occurrence, it stays checked. **Reopen this occurrence** keeps that final occurrence's date and reduces its completion count once; completing it again restores that count. Earlier occurrences are not stored as separate tasks and cannot be restored through this action.
 
 Diagnostics flag exhausted delivery attempts. Repair session enrollment or provider access, then reschedule a missed reminder to a future time.
 
@@ -162,13 +174,15 @@ Crate accepts push endpoints from [Apple](https://webkit.org/blog/13878/web-push
 
 ## Sync and reminder limits
 
-Vault files larger than 25 MiB produce a visible sync error and are left on the device. Reminder notes larger than 1 MiB, or whose parsed reminder data exceeds the cache limit, are omitted from the web list with a per-file explanation; healthy notes stay available. Split the affected note to restore web editing and notification scheduling. Web edits cannot grow a reminder note beyond 1 MiB.
+Vault files larger than 25 MiB produce a visible sync error and are left on the device. Reminder notes larger than 1 MiB, or whose parsed reminder data exceeds the cache limit, are omitted from the web list with a per-file explanation; healthy notes stay available. These explanations remain visible with cached reminders and clear after a successful refresh of repaired sources. Split the affected note to restore web editing and notification scheduling. Web edits cannot grow a reminder note beyond 1 MiB.
 
 Existing binary files are never overwritten by an unsafe asynchronous write. Incoming binary changes are saved as review copies and shown in conflicts; review both versions and replace the original when ready. UTF-8 text supported by Obsidian's atomic writer applies automatically when its precondition still matches.
 
-Both clients and the Worker require protocol 5 for writes. Update the plugin/server and reload older web tabs before editing. Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
+Both clients and the Worker require protocol 6 for writes. Update the plugin/server and reload older web tabs before editing. Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
 
-Crate supports only the current prerelease formats. Provisioning accepts an empty database or a database with the current schema marker; it rejects older schemas without modifying their data. There are no SQL upgrade scripts or old-format adapters.
+New web changes use a server-issued date and can be retried through the next 179 UTC dates (a 180-date window). Retained receipts still confirm earlier commits. After expiry and receipt cleanup, the app stops the change for export and comparison with current reminders; it never silently reissues it. Uncommitted requests from older clients also require review after upgrading. See the [retry and retention policy](docs/reminder-retention.md).
+
+Crate supports the current prerelease formats. Provisioning accepts an empty database or schema 2/3/4. Its additive upgrade to schema 4 adds deletion audit receipts and reminder source verification without rewriting existing vault data. Other schemas are rejected without modification. Current recovery tools archive schema 2/3/4 and upgrade supported old archives during isolated restoration. See the [compatibility matrix and rollback policy](docs/compatibility.md).
 
 ## Development
 

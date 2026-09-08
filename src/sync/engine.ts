@@ -30,7 +30,7 @@ import type { SyncState, SyncResult, FileDiff, PreparedUpload, ConflictRecord } 
 import type { FileEntry } from '../protocol/sync-types';
 import type { CrateSettings } from '../plugin/settings-types';
 import { MAX_DEBOUNCE_WAIT_MS } from '../plugin/settings-types';
-import { DOWNLOAD_CONCURRENCY, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
+import { AUTH_ERROR_MESSAGE, isAuthError, DOWNLOAD_CONCURRENCY, PREPARE_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
 import {
 	type IgnoreMatcherContext,
 	shouldIgnoreConfiguredPath,
@@ -50,6 +50,9 @@ import { createSyncFailureResult } from './sync-result';
 import type { DiffApplyOutcome } from './transfer-types';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import { mergeSyncResults } from './sync-result';
+import { assertLocalFileAbsent } from './local-absence';
+import { normalizeWorkerUrl } from './worker-url';
+import { LocalContentVerifier } from './content-verifier';
 
 const logger = createLogger('SyncEngine');
 
@@ -66,7 +69,10 @@ export class SyncEngine {
 	private lifecycle: SyncEngineLifecycle;
 	private contexts: SyncEngineContexts;
 	private onStateChange: ((state: SyncState) => void) | null = null;
-	private onQueueSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
+	private activeWork = new Set<Promise<unknown>>();
+	private contentVerifier = new LocalContentVerifier();
+	private periodicCheckFailed = false;
+	private onAutomaticSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
 	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -80,7 +86,7 @@ export class SyncEngine {
 		this.vault = plugin.app.vault;
 		this.api = api;
 		this.settings = settings;
-		this.localManifest = new LocalManifest(plugin.app, plugin.manifest);
+		this.localManifest = new LocalManifest(plugin.app, plugin.manifest, normalizeWorkerUrl(settings.workerUrl) || 'unconfigured');
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
 		this.state = {
 			status: 'idle',
@@ -103,9 +109,22 @@ export class SyncEngine {
 				this.vault,
 				this.localManifest,
 				this.shouldIgnore.bind(this),
+				files => this.verifyContent(files),
 			),
 			checkForChanges: (lastSeq: number) => this.api.checkForChanges(lastSeq),
-			sync: () => this.sync(),
+			sync: async () => {
+				const result = await this.sync();
+				if (!this.lifecycle.isDestroyed) await this.onAutomaticSyncResult?.(result);
+				return result;
+			},
+			onCheckSuccess: () => {
+				if (this.periodicCheckFailed) this.updateState({ status: 'idle', lastError: null });
+			},
+			onCheckFailure: error => {
+				if (this.lifecycle.isDestroyed || this.state.status === 'syncing') return;
+				this.updateState({ status: 'error', lastError: isAuthError(error) ? AUTH_ERROR_MESSAGE : `Sync check failed: ${errorMessage(error)}` });
+				this.periodicCheckFailed = true;
+			},
 		});
 		this.api.setAbortSignal(this.lifecycle.abortSignal);
 		this.queueController = new SyncQueueController({
@@ -117,13 +136,14 @@ export class SyncEngine {
 			isDestroyed: () => this.lifecycle.isDestroyed,
 			currentStatus: () => this.state.status,
 			prepareUploadFromPath: (path: string) => this.prepareUploadFromPath(path),
+			assertLocalFileAbsent: (path: string) => assertLocalFileAbsent(this.vault, path),
 			runConcurrent: this.runConcurrent.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
 			getDebounceDelayMs: () => (this.settings.debounceDelay ?? 5) * 1000,
 			uploadConcurrency: UPLOAD_CONCURRENCY,
 			maxDebounceWaitMs: MAX_DEBOUNCE_WAIT_MS,
 			reconcile: (queueKeys) => this.reconcileFromQueue(queueKeys),
-			onFlushResult: (result) => this.onQueueSyncResult?.(result),
+			onFlushResult: (result) => this.onAutomaticSyncResult?.(result),
 		});
 		this.contexts = new SyncEngineContexts({
 			vault: this.vault,
@@ -139,6 +159,7 @@ export class SyncEngine {
 			retryWithBackoff: this.retryWithBackoff.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
 			getLocalChanges: () => this.getLocalChanges(),
+			verifyContent: files => this.verifyContent(files),
 			getLocalDeletes: () => this.getLocalDeletes(),
 			incrementalSync: (progressCallback) => this.incrementalSync(progressCallback),
 			parallelDownloadAndSaveFiles: (requests, result) =>
@@ -160,7 +181,9 @@ export class SyncEngine {
 
 	async initialize(): Promise<void> {
 		await this.localManifest.load();
+		this.lifecycle.throwIfDestroyed();
 		await this.conflictStore.load();
+		this.lifecycle.throwIfDestroyed();
 		logger.info('Engine initialized');
 		this.plugin.app.workspace.onLayoutReady(() => {
 			this.scheduleConflictRecovery();
@@ -174,8 +197,8 @@ export class SyncEngine {
 		this.onStateChange = callback;
 	}
 
-	setQueueSyncResultCallback(callback: (result: SyncResult) => void | Promise<void>): void {
-		this.onQueueSyncResult = callback;
+	setAutomaticSyncResultCallback(callback: (result: SyncResult) => void | Promise<void>): void {
+		this.onAutomaticSyncResult = callback;
 	}
 
 	updateSettings(settings: CrateSettings): void {
@@ -202,6 +225,7 @@ export class SyncEngine {
 			this.vault,
 			this.localManifest,
 			this.shouldIgnore.bind(this),
+			files => this.verifyContent(files),
 		);
 	}
 
@@ -211,22 +235,26 @@ export class SyncEngine {
 	}
 
 	async purgeIgnoredRemoteFiles(): Promise<{ deleted: string[]; errors: string[] }> {
-		const manifest = await this.api.getManifest();
-		const paths = Object.keys(manifest.files).filter(path => this.shouldIgnore(path)).sort();
-		this.lifecycle.throwIfDestroyed();
-		const result = await deleteFilesInBatches({
-			batchDelete: (batchPaths, expectedHashes, expectedRevisions) =>
-				this.retryWithBackoff(() => this.api.batchDelete(batchPaths, expectedHashes, expectedRevisions)),
-		}, paths.map(path => ({ path, expectedHash: manifest.files[path]!.hash, expectedRevision: manifest.files[path]!.revision })));
-		for (const path of result.deleted) this.localManifest.removeEntry(path);
-		await this.localManifest.save();
-		return {
-			deleted: result.deleted,
-			errors: result.errors.map(error => `${error.path}: ${error.error}`),
-		};
+		return this.trackWork(async () => {
+			const manifest = await this.api.getManifest();
+			const paths = Object.keys(manifest.files).filter(path => this.shouldIgnore(path)).sort();
+			this.lifecycle.throwIfDestroyed();
+			const result = await deleteFilesInBatches({
+				batchDelete: (batchPaths, expectedHashes, expectedRevisions) =>
+					this.retryWithBackoff(() => this.api.batchDelete(batchPaths, expectedHashes, expectedRevisions)),
+			}, paths.map(path => ({ path, expectedHash: manifest.files[path]!.hash, expectedRevision: manifest.files[path]!.revision })));
+			for (const path of result.deleted) this.localManifest.removeEntry(path);
+			await this.localManifest.save();
+			return {
+				deleted: result.deleted,
+				errors: result.errors.map(error => `${error.path}: ${error.error}`),
+			};
+		});
 	}
 
 	private updateState(updates: Partial<SyncState>): void {
+		if (this.lifecycle?.isDestroyed) return;
+		if ('status' in updates || 'lastError' in updates) this.periodicCheckFailed = false;
 		this.state = { ...this.state, ...updates };
 		this.onStateChange?.(this.state);
 	}
@@ -372,40 +400,50 @@ export class SyncEngine {
 		);
 	}
 
-	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
-		const result = await runSyncWorkflow(this.contexts.syncWorkflow(), progressCallback);
-		this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
-		if (result.success) {
-			this.pruneMarkdownBaseCacheInBackground();
-		}
-		return result;
+	private verifyContent(files: VaultFile[]): Promise<boolean> {
+		return this.contentVerifier.verify(this.vault, this.localManifest, files, this.lifecycle.abortSignal);
+	}
+
+	async sync(progressCallback?: (current: number, total: number) => void, verifyAll = false): Promise<SyncResult> {
+		return this.trackWork(async () => {
+			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
+			const workflow = this.contexts.syncWorkflow();
+			if (verifyAll) workflow.incrementalSync = async () => null;
+			const result = await runSyncWorkflow(workflow, progressCallback);
+			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+			if (result.success) {
+				this.pruneMarkdownBaseCacheInBackground();
+			}
+			return result;
+		});
 	}
 
 	private async reconcileFromQueue(queueKeys: string[]): Promise<SyncResult> {
-		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
-		this.updateState({ status: 'syncing' });
-		try {
-			const result = await this.reconcilePaths(queueKeys);
-			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
-			if (result.success) {
-				const lastSync = new Date().toISOString();
-				this.settings.lastSync = lastSync;
-				this.updateState({
-					status: 'idle',
-					lastSync,
-					lastError: null,
-				});
-				this.pruneMarkdownBaseCacheInBackground();
-			} else {
-				this.updateState({ status: 'error', lastError: result.errors[0] ?? 'Reconciliation failed' });
+		return this.trackWork(async () => {
+			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
+			this.updateState({ status: 'syncing' });
+			try {
+				const result = await this.reconcilePaths(queueKeys);
+				this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+				if (result.success) {
+					const lastSync = new Date().toISOString();
+					this.settings.lastSync = lastSync;
+					this.updateState({
+						status: 'idle',
+						lastSync,
+						lastError: null,
+					});
+					this.pruneMarkdownBaseCacheInBackground();
+				} else {
+					this.updateState({ status: 'error', lastError: result.errors[0] ?? 'Reconciliation failed' });
+				}
+				return result;
+			} catch (error) {
+				const message = errorMessage(error);
+				this.updateState({ status: 'error', lastError: message });
+				return createSyncFailureResult(message);
 			}
-			return result;
-		} catch (error) {
-			const message = errorMessage(error);
-			this.updateState({ status: 'error', lastError: message });
-			return createSyncFailureResult(message);
-		}
+		});
 	}
 
 	private async reconcileVersionConflicts(paths: string[], result: SyncResult): Promise<void> {
@@ -457,23 +495,38 @@ export class SyncEngine {
 	}
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
-		const result = await runInitialSyncWorkflow(this.contexts.initialSyncWorkflow(), progressCallback);
-		this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
-		if (result.success) {
-			this.pruneMarkdownBaseCacheInBackground();
-		}
-		return result;
+		return this.trackWork(async () => {
+			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
+			const result = await runInitialSyncWorkflow(this.contexts.initialSyncWorkflow(), progressCallback);
+			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+			if (result.success) {
+				this.pruneMarkdownBaseCacheInBackground();
+			}
+			return result;
+		});
 	}
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
-		const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
-		const result = await runForceFullSyncWorkflow(this.contexts.forceSyncWorkflow(), progressCallback);
-		this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
-		if (result.success) {
-			this.pruneMarkdownBaseCacheInBackground();
-		}
-		return result;
+		return this.trackWork(async () => {
+			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
+			const result = await runForceFullSyncWorkflow(this.contexts.forceSyncWorkflow(), progressCallback);
+			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
+			if (result.success) {
+				this.pruneMarkdownBaseCacheInBackground();
+			}
+			return result;
+		});
+	}
+
+	private async trackWork<T>(operation: () => Promise<T>): Promise<T> {
+		this.lifecycle.throwIfDestroyed();
+		const task = operation();
+		this.activeWork.add(task);
+		try { return await task; } finally { this.activeWork.delete(task); }
+	}
+
+	async waitForIdle(): Promise<void> {
+		await Promise.allSettled([...this.activeWork, this.queueController.waitForIdle(), this.localManifest.close()]);
 	}
 
 	destroy(): void {
@@ -483,5 +536,6 @@ export class SyncEngine {
 		}
 		this.lifecycle.destroy();
 		this.queueController.destroy();
+		void this.localManifest.close();
 	}
 }

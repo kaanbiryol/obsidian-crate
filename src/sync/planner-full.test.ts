@@ -103,7 +103,7 @@ describe('createFullSyncPlan', () => {
 		expect(removeEntry).toHaveBeenCalledWith('notes/orphan.md');
 	});
 
-	it('reuses manifest hash for files with matching mtime/size and only hashes changed files', async () => {
+	it('hashes every file during full reconciliation regardless of matching metadata', async () => {
 		const unchangedContent = new TextEncoder().encode('unchanged').buffer as ArrayBuffer;
 		const unchangedHash = await computeHash(unchangedContent);
 		const newContent = new TextEncoder().encode('new-file').buffer as ArrayBuffer;
@@ -146,8 +146,8 @@ describe('createFullSyncPlan', () => {
 			5,
 		);
 
-		expect(readBinary).toHaveBeenCalledTimes(3);
-		expect(readBinary).not.toHaveBeenCalledWith('notes/unchanged.md');
-		expect(plan.localFiles['notes/unchanged.md']?.hash).toBe(unchangedHash);
+		expect(readBinary).toHaveBeenCalledTimes(4);
+		expect(readBinary).toHaveBeenCalledWith('notes/unchanged.md');
+		expect(plan.localFiles['notes/unchanged.md']?.hash).toBe(await computeHash(newContent));
 	});
 });

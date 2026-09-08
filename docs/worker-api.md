@@ -2,7 +2,7 @@
 
 Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment.
 
-Every mutation requires `X-Crate-Protocol: 5`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics.
+Every mutation requires `X-Crate-Protocol: 6`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics.
 
 ## Authentication
 
@@ -204,13 +204,13 @@ Response: `{ reminders: [...], projects: [...], issues: [...] }`. Each reminder 
 
 Creates a reminder in the selected project Markdown file, creating that file if needed.
 
-Request includes a UUID `operationId`, `folderPath`, `content`, optional `project`, `description`, `priority`, `dueDate`, `dueDatetime`, `recurrence`, and optional client-provided `id`.
+Request includes a versioned `operationId`, `folderPath`, `content`, optional `project`, `description`, `priority`, `dueDate`, `dueDatetime`, `recurrence`, and required `id` equal to `operationId`. Obtain the UTC operation day from server metadata and encode it as specified in the [retry policy](reminder-retention.md).
 
 Response: `{ success: true, notificationWarning? }`
 
 ### POST /reminders/update
 
-Updates an existing reminder by `id`. The request requires a UUID `operationId`, `expectedRevision`, `folderPath`, and the reminder's original `filePath`, plus any mutable reminder fields: `content`, `description`, `priority`, `project`, `dueDate`, `dueDatetime`, `recurrence`.
+Updates an existing reminder by `id`. The request requires a versioned `operationId`, `expectedRevision`, `folderPath`, and the reminder's original `filePath`, plus any mutable reminder fields: `content`, `description`, `priority`, `project`, `dueDate`, `dueDatetime`, `recurrence`.
 
 If `project` changes, the worker commits the source and destination Markdown files atomically with hash-based compare-and-swap checks.
 

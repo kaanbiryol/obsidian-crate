@@ -10,6 +10,7 @@ export interface CrateServerInfo {
 	readonly serverVersion: string;
 	readonly protocol: CrateProtocolRange;
 	readonly capabilities: readonly string[];
+	readonly reminderOperationDay?: number;
 }
 
 /**
@@ -17,8 +18,8 @@ export interface CrateServerInfo {
  * when support for an older protocol is intentionally removed.
  */
 export const CRATE_PLUGIN_PROTOCOL: CrateProtocolRange = Object.freeze({
-	current: 5,
-	oldestCompatible: 5,
+	current: 6,
+	oldestCompatible: 6,
 });
 
 function isPositiveInteger(value: unknown): value is number {
@@ -67,6 +68,7 @@ export function parseCrateServerInfo(value: unknown): CrateServerInfo | null {
 			oldestCompatible: info.protocol.oldestCompatible,
 		},
 		capabilities: [...info.capabilities],
+		...(isPositiveInteger(info.reminderOperationDay) ? { reminderOperationDay: info.reminderOperationDay } : {}),
 	};
 }
 

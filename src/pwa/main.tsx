@@ -17,8 +17,10 @@ import {
 import { ErrorState, EmptyAuthState } from './components/AuthStates';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
 import { WebReminderCard } from './components/WebReminderCard';
-import { ReminderSyncNotice } from './components/ReminderSyncNotice';
 import { PwaSyncIndicator } from './components/PwaSyncIndicator';
+import { ReminderSourceNotice } from './components/ReminderSourceNotice';
+import { ReminderCacheNotice } from './components/ReminderCacheNotice';
+import { DeferredNotice } from './components/DeferredNotice';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
@@ -49,6 +51,12 @@ import type {
 import { ReminderSheet } from './components/ReminderSheet';
 const SettingsSheet = lazy(() => import('./components/SettingsSheet')
 	.then(module => ({ default: module.SettingsSheet })));
+const ReminderSyncNotice = lazy(() => import('./components/ReminderSyncNotice')
+	.then(module => ({ default: module.ReminderSyncNotice })));
+const ReminderRecoveryNotice = lazy(() => import('./components/ReminderRecoveryNotice')
+	.then(module => ({ default: module.ReminderRecoveryNotice })));
+const ReminderQuarantineNotice = lazy(() => import('./components/ReminderQuarantineNotice')
+	.then(module => ({ default: module.ReminderQuarantineNotice })));
 
 function App() {
 	usePwaInputModality();
@@ -98,13 +106,14 @@ function App() {
 		refreshPushState,
 		enablePushNotifications,
 		disablePushNotifications,
-	} = usePushNotifications({ apiFetch, showToast });
+	} = usePushNotifications({ authToken, apiFetch, showToast });
 	const {
 		reminders,
 		projects,
 		loading,
 		refreshing,
 		error,
+		issues,
 		dataMode,
 		lastUpdatedAt,
 		isOffline,
@@ -113,6 +122,7 @@ function App() {
 		hydratedCacheRef,
 		hydrateCachedSnapshot,
 		loadReminders,
+		rebuildOfflineCache,
 		beginLocalMutation,
 		commitReminderState,
 		resetReminderState,
@@ -126,7 +136,7 @@ function App() {
 		bootstrapped,
 		loading,
 	});
-	const { loggingOut, logOut, clearLocalSession } = usePwaSessionLifecycle({
+	const { loggingOut, logOut, suspendLocalSession } = usePwaSessionLifecycle({
 		apiFetch,
 		cancelModalClose: modalTransition.cancelClose,
 		cancelSettingsClose: settingsTransition.cancelClose,
@@ -143,7 +153,7 @@ function App() {
 
 	usePwaBootstrap({
 		authToken,
-		clearLocalSession,
+		suspendLocalSession,
 		hydrateCachedSnapshot,
 		hydratedCacheRef,
 		setAuthToken,
@@ -219,8 +229,13 @@ function App() {
 		prepareEdit,
 		storageError,
 		retryInitialization,
+		recoveryChanges,
+		recoverChanges,
+		quarantinedChanges,
+		removeQuarantinedChanges,
 	} = useReminderMutations({
 		hasSnapshot: lastUpdatedAt !== null,
+		canRecover: !readOnly,
 		apiFetch,
 		authToken,
 		bootstrapped,
@@ -267,7 +282,7 @@ function App() {
 
 	const openModal = useCallback((mode: ModalMode, reminderId?: string, defaultProject?: string) => {
 		if (!mutationsReady || !ensureCanMutate()) return;
-		if (reminderId && changes.some(change => change.status !== 'failed'
+		if (reminderId && changes.some(change => (change.status !== 'failed' || change.reviewRequired)
 			&& (change.recordId === reminderId || change.optimistic?.id === reminderId))) {
 			showToast('info', 'This reminder is still syncing. Retry its pending change first.');
 			return;
@@ -344,6 +359,7 @@ function App() {
 				key={`pwa-shell-${selectedProject ?? startTab}`}
 				reminders={sharedReminders}
 				projects={visibleProjects}
+				incomplete={issues.length > 0}
 				isDarkMode={isDarkMode}
 				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}
@@ -378,7 +394,9 @@ function App() {
 							onReload={update}
 							onEnableNotifications={enablePushNotifications}
 						>
-							<ReminderSyncNotice
+							<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
+							<ReminderCacheNotice isOffline={isOffline} onRebuild={rebuildOfflineCache} />
+							{(changes.length > 0 || storageError) && <DeferredNotice><ReminderSyncNotice
 								changes={changes}
 								isOffline={isOffline}
 								storageError={storageError}
@@ -386,7 +404,9 @@ function App() {
 								onRetry={retryChange}
 								onEdit={editFailedChange}
 								onDiscard={discardChange}
-							/>
+							/></DeferredNotice>}
+							{recoveryChanges.length > 0 && <DeferredNotice><ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={recoverChanges} /></DeferredNotice>}
+							{quarantinedChanges.length > 0 && <DeferredNotice><ReminderQuarantineNotice entries={quarantinedChanges} folderPath={config.folderPath} onRemove={removeQuarantinedChanges} /></DeferredNotice>}
 							{homeScreenInstall.showPrompt && !isProjectDetail && (
 								<HomeScreenInstallPrompt onShowSteps={toggleSettings} onDismiss={homeScreenInstall.dismiss} />
 							)}
@@ -421,6 +441,7 @@ function App() {
 						key={`${modal.mode}-${modal.reminderId ?? 'new'}-${modal.operationId ?? ''}`}
 						colorScheme={colorScheme}
 						modal={modal}
+						folderPath={config.folderPath}
 						projects={visibleProjects}
 						saving={saving}
 						isClosing={modalTransition.isClosing}

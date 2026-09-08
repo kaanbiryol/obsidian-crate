@@ -60,7 +60,9 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 		const { bucket, store } = createMockR2Bucket({
 			'files/notes/test.md': 'before',
 		});
-		const { db } = createMockD1Database({ failBatch: true });
+		const { db } = createMockD1Database({ failBatch: true,
+			files: { 'notes/test.md': { hash: 'a'.repeat(64), size: 6, storageKey: 'files/notes/test.md' } },
+		});
 
 		const response = await handleBatchDelete(
 			new Request('https://worker.test/sync/batch-delete', {

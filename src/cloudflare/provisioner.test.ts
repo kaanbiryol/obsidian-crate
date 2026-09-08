@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiError } from './cloudflare-api';
 import { provisionCloudflareDeployment } from './provisioner';
+import { createFenceQueryHarness } from './deployment-fence-test-harness';
 
 function createMetadata(): CloudflareDeploymentMetadata {
 	return {
@@ -28,14 +29,18 @@ const artifacts = {
 };
 
 function createApi() {
+	const fence = createFenceQueryHarness();
+	const metadata = createMetadata();
 	return {
-		getWorkerSettings: vi.fn(async () => ({ annotations: { 'workers/message': 'Crate 0.1.0' } })),
-		getD1Database: vi.fn(async (_accountId: string, databaseId: string) => ({ uuid: databaseId })),
-		findD1Database: vi.fn(),
+		getWorkerSettings: vi.fn(async () => ({ annotations: { 'workers/message': 'Crate 0.1.0' }, bindings: [
+			{ type: 'd1', name: 'DB', id: metadata.d1DatabaseId! }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: metadata.r2BucketName },
+		] })),
+		getD1Database: vi.fn(async (_accountId: string, databaseId: string) => ({ uuid: databaseId, name: metadata.d1DatabaseName })),
+		findD1Database: vi.fn(async () => ({ uuid: metadata.d1DatabaseId!, name: metadata.d1DatabaseName })),
 		createD1Database: vi.fn(),
 		getR2Bucket: vi.fn(async () => ({ name: 'crate-0123456789abcdef' })),
 		createR2Bucket: vi.fn(),
-		queryD1: vi.fn(async (): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => []),
+		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? []),
 		uploadWorker: vi.fn(async () => {}),
 		updateWorkerSchedules: vi.fn(async () => {}),
 		getWorkersSubdomain: vi.fn(async () => 'personal-crate'),
@@ -47,7 +52,7 @@ function createApi() {
 describe('provisionCloudflareDeployment', () => {
 	it('rejects a newer remote Worker before changing schema or uploading code', async () => {
 		const api = createApi();
-		api.getWorkerSettings.mockResolvedValue({ annotations: { 'workers/message': 'Crate 9.0.0' } });
+		api.getWorkerSettings.mockResolvedValue({ annotations: { 'workers/message': 'Crate 9.0.0' }, bindings: [] });
 		const metadata = createMetadata();
 		await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
 			.rejects.toThrow('downgrades are not supported');
@@ -70,9 +75,7 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.createD1Database).not.toHaveBeenCalled();
 		expect(api.createR2Bucket).not.toHaveBeenCalled();
 		expect(api.createWorkersSubdomain).not.toHaveBeenCalled();
-		expect(api.queryD1).toHaveBeenCalledTimes(2);
-		expect(api.queryD1).toHaveBeenNthCalledWith(
-			2,
+		expect(api.queryD1).toHaveBeenCalledWith(
 			metadata.accountId,
 			metadata.d1DatabaseId,
 			artifacts.d1Schema,
@@ -108,13 +111,13 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.queryD1).not.toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
 	});
 
-	it('reapplies only the current schema when initialization is retried', async () => {
+	it.each([2, 3, 4])('applies the additive schema upgrade or retries initialization from schema %i', async version => {
 		const api = createApi();
 		api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
-		api.queryD1.mockResolvedValueOnce([{ results: [{ version: 2 }] }]);
+		api.queryD1.mockResolvedValueOnce([{ results: [{ version }] }]);
 		const metadata = createMetadata();
 		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
-		expect(api.queryD1).toHaveBeenLastCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
+		expect(api.queryD1).toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
 		expect(api.uploadWorker).toHaveBeenCalledOnce();
 	});
 

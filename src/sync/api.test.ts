@@ -28,6 +28,29 @@ function mockTransport(...responses: Response[]) {
 }
 
 describe('SyncApiClient', () => {
+	it('accepts sequential namespace replacements in history while validating the final manifest', async () => {
+		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-09-08' };
+		const changes = [
+			{ seq: 1, path: 'Projects.md', action: 'delete', hash: '', size: 0, created_at: '2026-09-08' },
+			{ seq: 2, path: 'projects.md/child.md', action: 'put', hash: entry.hash, size: 1, created_at: '2026-09-08' },
+		];
+		const client = new SyncApiClient('https://worker.example', 'token', mockTransport(
+			Response.json({ changes, lastSeq: 2, hasMore: false }),
+			Response.json({ files: { 'Projects.md': entry }, snapshotSeq: 0, lastSeq: 0 }),
+			Response.json({ changes, lastSeq: 2, hasMore: false }),
+		));
+		expect((await client.getChanges(0)).changes).toEqual(changes);
+		expect(Object.keys((await client.getManifest()).files)).toEqual(['projects.md/child.md']);
+	});
+
+	it('refuses to apply an existing invalid ancestor/descendant manifest', async () => {
+		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-09-08' };
+		const client = new SyncApiClient('https://worker.example', 'token', mockTransport(
+			Response.json({ files: { 'Projects.md': entry, 'projects.md/child.md': entry }, lastSeq: 2 }),
+			Response.json({ changes: [], lastSeq: 2, hasMore: false }),
+		));
+		await expect(client.getManifest()).rejects.toThrow('parent folder');
+	});
 	it.each(['abort', 'timeout'])('discovers a remotely committed upload after %s without accepting its late response', async reason => {
 		vi.useFakeTimers();
 		let commit!: () => void;

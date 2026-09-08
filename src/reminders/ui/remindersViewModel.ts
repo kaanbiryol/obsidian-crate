@@ -36,22 +36,23 @@ export function getRemindersHeaderData(
   reminders: Reminder[],
   projects: string[],
   upcomingDays: number,
+  now = new Date(),
 ): RemindersHeaderData {
   const activeReminders = reminders.filter((reminder) => !reminder.completed);
   const inboxReminders = activeReminders.filter(
     (reminder) => (reminder.project || DEFAULT_PROJECT) === DEFAULT_PROJECT,
   );
-  const overdueReminders = getOverdueReminders(activeReminders);
-  const todayReminders = getTodayReminders(activeReminders);
+  const overdueReminders = getOverdueReminders(activeReminders, now);
+  const todayReminders = getTodayReminders(activeReminders, now);
   const uniqueTodayReminders = [
     ...new Map([...overdueReminders, ...todayReminders].map((reminder) => [reminder.id, reminder])).values(),
   ];
-  const upcomingReminders = getUpcomingReminders(activeReminders, upcomingDays);
+  const upcomingReminders = getUpcomingReminders(activeReminders, upcomingDays, now);
 
   return {
     inbox: {
       count: inboxReminders.length,
-      overdueCount: inboxReminders.filter((reminder) => isReminderOverdue(reminder)).length,
+      overdueCount: inboxReminders.filter((reminder) => isReminderOverdue(reminder, now)).length,
     },
     today: {
       count: uniqueTodayReminders.length,
@@ -59,7 +60,7 @@ export function getRemindersHeaderData(
     },
     upcoming: {
       count: upcomingReminders.length,
-      overdueCount: upcomingReminders.filter((reminder) => isReminderOverdue(reminder)).length,
+      overdueCount: upcomingReminders.filter((reminder) => isReminderOverdue(reminder, now)).length,
     },
     browse: {
       count: projects.length,

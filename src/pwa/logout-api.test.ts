@@ -1,3 +1,4 @@
+import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
 import { afterEach, expect, it, vi } from 'vitest';
 import { makeApiFetch } from './api';
 import { AUTH_TOKEN_KEY } from './config';
@@ -16,7 +17,7 @@ it('dispatches the captured revocation after local logout while fencing ordinary
 			expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer old-token');
 			return new Response(null, { status: 204 });
 		}
-		return new Response(JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: { current: 5, oldestCompatible: 5 }, capabilities: [] }));
+		return new Response(JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] }));
 	});
 	vi.stubGlobal('fetch', network);
 	const apiFetch = makeApiFetch('old-token', vi.fn());
