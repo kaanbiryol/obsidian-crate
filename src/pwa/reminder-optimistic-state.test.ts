@@ -14,6 +14,13 @@ function change(kind: PendingReminderChange['kind'], recordId: string, overrides
 }
 
 describe('optimistic reminder projection', () => {
+	it('shows confirmed server state while an expired save is being compared and exported', () => {
+		const confirmed = reminder('one', { content: 'Current server text' });
+		const expired = change('save', 'one', { status: 'failed', ambiguous: true, reviewRequired: true,
+			optimistic: { ...confirmed, content: 'Expired attempted text', project: 'Work' } });
+		expect(applyReminderChanges([confirmed], ['Inbox'], [expired])).toEqual({ visibleReminders: [confirmed], visibleProjects: ['Inbox'] });
+		expect(expired.optimistic!.content).toBe('Expired attempted text');
+	});
 	it('restores a failed deletion without undoing another pending edit or newer confirmed data', () => {
 		const original = reminder('one');
 		const other = reminder('two');

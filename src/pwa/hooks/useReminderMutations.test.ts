@@ -6,6 +6,7 @@ import { restoreReminderDraft, saveReminderDraft } from '../reminder-drafts';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { ModalState, ReminderRecord } from '../types';
 
+vi.mock('../server-compatibility', () => ({ requireCompatibleServer: async () => ({ reminderOperationDay: 20_000 }) }));
 vi.mock('react', () => ({ useMemo: (factory: () => unknown) => factory(), useRef: (current: unknown) => ({ current }) }));
 vi.mock('./useReminderOutbox', () => ({ useReminderOutbox: vi.fn() }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -121,6 +122,15 @@ describe('PWA optimistic mutations', () => {
 		const saving = hook.saveReminder(draft());
 		invalidatePwaSession();
 		await saving;
+		expect(outbox.enqueue).not.toHaveBeenCalled();
+		expect(closeModal).not.toHaveBeenCalled();
+		expect(showToast).not.toHaveBeenCalled();
+	});
+	it.each(['complete', 'delete', 'reorder'] as const)('fences %s across asynchronous operation issuance and logout', async action => {
+		const { hook, outbox, closeModal, showToast } = harness();
+		const pending = action === 'complete' ? hook.toggleReminderCompleted('one', false)
+			: action === 'delete' ? hook.deleteReminder('one') : hook.persistReorder('Inbox', ['two', 'one']);
+		invalidatePwaSession(); await pending;
 		expect(outbox.enqueue).not.toHaveBeenCalled();
 		expect(closeModal).not.toHaveBeenCalled();
 		expect(showToast).not.toHaveBeenCalled();
@@ -253,7 +263,7 @@ describe('PWA optimistic mutations', () => {
 		expect(outbox.retry).toHaveBeenCalledWith('retry-id');
 		expect(outbox.drain).toHaveBeenCalledOnce();
 		hook.discardChange('discard-id');
-		expect(outbox.discard).toHaveBeenCalledWith('discard-id');
+		expect(outbox.discard).toHaveBeenCalledWith('discard-id', undefined);
 		outbox.retry.mockImplementationOnce(() => { throw new Error('Retry storage failed'); });
 		hook.retryChange('retry-id');
 		expect(showToast).toHaveBeenCalledWith('error', 'Retry storage failed');

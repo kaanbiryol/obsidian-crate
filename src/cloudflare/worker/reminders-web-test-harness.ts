@@ -1,3 +1,4 @@
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { scanReminderMarkdownFile } from './reminders-web/scan';
 import { reminderRevision } from '@/reminders/core/reminderRevision';
 import { vi } from 'vitest';
@@ -147,6 +148,7 @@ function createDb(options?: {
 					return {};
 				}),
 				first: vi.fn(async () => {
+					if (sql.startsWith('SELECT 1 AS valid WHERE')) return { valid: 1 };
 					if (sql.includes('FROM notification_jobs WHERE reminder_id = ?')) {
 						return notificationJobs.get(getBoundString(statement._args, 0)) ?? null;
 					}
@@ -361,7 +363,8 @@ export async function createEnv(input: {
 			const stored = store.get(files.get(path) ?? '');
 			const reminders = scanReminderMarkdownFile(path, stored ? new TextDecoder().decode(stored.body) : '', 'Reminders');
 			const reminder = reminders.find(item => item.id === body.id);
-			return JSON.stringify({ operationId: crypto.randomUUID(),
+			const operationId = createReminderOperationId(Math.floor(Date.now() / 86_400_000));
+			return JSON.stringify({ operationId, id: body.id ?? operationId,
 				expectedRevision: reminder ? await reminderRevision(reminder) : undefined,
 				expectedOrder: reminders.map(item => item.id), ...body });
 		},

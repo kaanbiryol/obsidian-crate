@@ -273,7 +273,7 @@ function App() {
 
 	const openModal = useCallback((mode: ModalMode, reminderId?: string, defaultProject?: string) => {
 		if (!mutationsReady || !ensureCanMutate()) return;
-		if (reminderId && changes.some(change => change.status !== 'failed'
+		if (reminderId && changes.some(change => (change.status !== 'failed' || change.reviewRequired)
 			&& (change.recordId === reminderId || change.optimistic?.id === reminderId))) {
 			showToast('info', 'This reminder is still syncing. Retry its pending change first.');
 			return;

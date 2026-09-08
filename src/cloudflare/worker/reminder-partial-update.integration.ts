@@ -1,3 +1,4 @@
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
@@ -25,7 +26,7 @@ async function setup() {
 }
 function update(patch: Record<string, unknown>, expectedRevision: string) {
 	return handleUpdateReminder(new Request('https://test/reminders/update', { method: 'POST', body: JSON.stringify({
-		folderPath: 'Reminders', id: 'one', filePath: path, operationId: crypto.randomUUID(), expectedRevision, ...patch,
+		folderPath: 'Reminders', id: 'one', filePath: path, operationId: newOperationId(), expectedRevision, ...patch,
 	}) }), env);
 }
 
@@ -48,3 +49,6 @@ it.each(['', null])('honors an explicit description clear through the API: %j', 
 	expect((await reminder()).description).toBeUndefined();
 	expect((await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path))?.content).not.toContain('crate-desc:');
 });
+
+const issuedDay = Math.floor(Date.now() / 86_400_000);
+function newOperationId() { return createReminderOperationId(issuedDay); }

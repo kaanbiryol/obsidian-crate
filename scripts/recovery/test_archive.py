@@ -61,6 +61,8 @@ class ArchiveTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
     def test_paired_restore_preserves_bytes_and_receipts_and_resets_derived_state(self):
+        self.remote.sql += b"\nINSERT INTO maintenance_state (key, value) VALUES ('reminder_operation_floor', '20524');"
+        self.remote.sql += b'\nDROP INDEX reminder_operations_created_at_idx; DROP INDEX reminder_occurrences_first_seen_idx;'
         recovery.backup(self.remote, self.directory)
         manifest, original = verify(self.directory)
         self.addCleanup(original.close)
@@ -78,6 +80,9 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM notification_projection_jobs').fetchone()[0], 1)
         self.assertEqual(restored.execute("SELECT COUNT(*) FROM maintenance_state WHERE key = 'crate_deployment_fence'").fetchone()[0], 0)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_source_state').fetchone()[0], 0)
+        self.assertEqual(restored.execute("SELECT value FROM maintenance_state WHERE key = 'reminder_operation_floor'").fetchone()[0], '20524')
+        indexes = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
+        self.assertTrue({'reminder_operations_created_at_idx', 'reminder_occurrences_first_seen_idx'} <= indexes)
         self.assertEqual(len(manifest['objects']), 1)
     def test_schema_three_backup_restores_with_additive_source_verification_upgrade(self):
         self.remote.sql += b'\nDROP TABLE reminder_source_state; UPDATE crate_schema SET version = 3;'
