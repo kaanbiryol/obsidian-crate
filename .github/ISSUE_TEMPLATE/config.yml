@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/kaanbiryol/obsidian-crate/security/advisories/new
+    about: Use private reporting for suspected authentication, privacy or data-exposure vulnerabilities.

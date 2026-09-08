@@ -1,0 +1,44 @@
+name: Bug or sync failure
+description: Report incorrect behavior with a reproducible sequence and safe diagnostics.
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        For a suspected vulnerability, use the private reporting link instead.
+        Keep each device's vault and any review copies if data appears missing.
+        Do not reset the server or force an upload merely to reproduce a failure.
+        Share a minimal synthetic note, never a private vault, credential, enrollment link or unredacted log.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions and devices
+      description: Crate plugin/server versions, Obsidian version, OS, browser, and approximate vault/reminder size. Label devices A/B/C without personal device names.
+    validations:
+      required: true
+  - type: textarea
+    id: sequence
+    attributes:
+      label: Exact sequence
+      description: Include which device edited, moved, deleted or completed which synthetic item, when it was offline, and the order of sync/restart/retry actions.
+      placeholder: "A and B start with the same note. A edits offline. B renames and syncs. A reconnects…"
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and observed results
+      description: Describe where each version remains and what the sync, conflict, pending-change or offline notices show.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Reviewed diagnostics or minimal example
+      description: Use Crate’s sync activity diagnostic export, review it, and include relevant operation/request IDs. Remove private paths, note text, credentials, session links and push subscription details from any additional material.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy review
+      options:
+        - label: I checked that this public report contains no credentials or private vault data.
+          required: true
