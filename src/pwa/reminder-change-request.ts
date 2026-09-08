@@ -3,7 +3,7 @@ import type { PendingReminderChange, ReminderChangeResult } from './reminder-out
 
 export class RejectedReminderChange extends Error {}
 
-function isConfirmedReminder(value: unknown, id: string | undefined): value is ReminderRecord {
+export function isConfirmedReminder(value: unknown, id: string | undefined): value is ReminderRecord {
 	if (!value || typeof value !== 'object') return false;
 	const record = value as Partial<ReminderRecord>;
 	return record.id === id && typeof record.content === 'string' && typeof record.completed === 'boolean'
