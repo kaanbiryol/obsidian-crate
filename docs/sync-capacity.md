@@ -10,7 +10,7 @@ The benchmark explicitly clears its test database and bucket between cases: the 
 
 ## Baseline local results
 
-The record is based on `0288253` plus the S11 test additions, using Node 24.19.0. Full per-phase data, route counts, response bytes and R2 get/put counts are preserved in [the machine-readable evidence](audit-evidence/remediation/s11-sync-capacity.json).
+The record is based on `0288253` plus the S11 test additions, using Node 24.19.0.
 
 | Notes | Upload path | Upload wall time | Upload requests | Prepared SQL | Cold download / requests | Settled unchanged / requests |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -27,7 +27,7 @@ The largest-vault acceptance check must record real request latency, Worker CPU/
 
 R04 uses the existing byte-budgeted preparation generator and three-file upload protocol during cold full reconciliation. Each file retains the remote hash observed by the plan, including an explicit absence guard. Large files retain the individual route; only confirmed uploads enter the checkpoint. Preparation errors and stale members remain visible and prevent cursor advancement.
 
-The new [machine-readable measurements](audit-evidence/remediation/r04-sync-capacity.json) use Node 24.19.0 with the R04 implementation on base `93788f9`:
+The new measurements use Node 24.19.0 with the R04 implementation on base `93788f9`:
 
 | Notes | Cold upload requests, before → after | New cold upload time | New prepared SQL | Explicit initial requests |
 | --- | --- | --- | --- | --- |
