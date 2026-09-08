@@ -223,7 +223,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui .reminder-editor-fields .reminder-title-input {');
 		expect(html).toContain('color: var(--text-normal);');
 		expect(html).toContain('.crate-reminders-ui .premium-reminder-card.is-completed .premium-reminder-content {\n  opacity: 0.6;');
-		expect(html).toContain('.settings-theme-option.is-active{background:var(--pwa-light-surface);color:var(--pwa-light-accent-text);');
+		expect(html).toContain('.settings-theme-option.is-active{background:var(--pwa-light-surface);color:var(--text-normal);');
 	});
 
 	it('keeps the Obsidian handoff page readable in light mode', () => {
