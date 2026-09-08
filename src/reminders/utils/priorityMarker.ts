@@ -22,19 +22,3 @@ export function findStandalonePriorityMarkerIndexes(content: string): number[] {
 
 	return indexes;
 }
-
-export function removeStandalonePriorityMarkers(content: string): string {
-	const priorityIndexes = new Set(findStandalonePriorityMarkerIndexes(content));
-	if (priorityIndexes.size === 0) {
-		return content;
-	}
-
-	let result = '';
-	for (let index = 0; index < content.length; index++) {
-		if (!priorityIndexes.has(index)) {
-			result += content[index];
-		}
-	}
-
-	return result;
-}

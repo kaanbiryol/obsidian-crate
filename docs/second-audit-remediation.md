@@ -47,6 +47,10 @@ The fresh audit starts at `f371397`, after the first round of actionable fixes. 
 - **Fix:** defer mutation/recovery notices until they are needed; keep editor focus synchronous. A failed deferred asset load shows a reload action and preserves saved intent. Retain the 450,000-byte startup raw ceiling; explicitly revise startup gzip from 150,000 to 154,000 bytes and all-assets limits from 465,000/158,000 to 485,000/168,000 bytes. This is a reviewed budget adjustment, not a claim that all old limits now pass.
 - **Proof:** startup measures 435.91 KiB raw / 148.38 KiB gzip and all assets 470.00 / 161.03 KiB, within the revised ceilings. Chromium/WebKit asset-failure draft recovery, focus, auth recovery, outbox quarantine and expiry checks pass; targeted lint and plugin typecheck pass. The full final gate remains required.
 
+## Gate cleanup
+
+The first clean candidate gate caught an unused priority-removal helper left by R02. Its only caller had been replaced by indexed removal. The obsolete function was removed in a separate commit; this has no runtime effect. The full gate is restarted after this correction.
+
 ## Verification in progress
 
 The first-round gate passed advisory and secret scans, lint, both typechecks, deadcode, notices, 22 recovery tests, 1,538 unit tests, 220 Worker tests and production builds. It stopped at PWA bundle budgets; later gate steps therefore were not established by that run. The bundle issue and additional parser, persistence and scale checks are part of this second audit.
