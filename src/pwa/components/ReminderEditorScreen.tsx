@@ -5,11 +5,12 @@ import React, {
 	useImperativeHandle,
 	useRef,
 	useMemo,
+	useId,
 } from 'react';
 import { deriveReminderDraftContentMetadata } from '@/reminders/core/reminderDraft';
 import { getProjectColor } from '@/reminders/utils/projectColors';
 import { IconButton } from '@/ui/shared/IconButton';
-import { DeleteConfirmationModal } from '@/reminders/components/DeleteConfirmationModal';
+import { PwaDeleteConfirmation } from './PwaDeleteConfirmation';
 import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-modal/deleteConfirmation';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
 import type { RichTextInputHandle } from '@/reminders/components/RichTextInput';
@@ -64,6 +65,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	onSave,
 	onDelete,
 }, ref) {
+	const confirmationId = useId();
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const editorRef = useRef<HTMLDivElement | null>(null);
 	useEditorSheetHeight(editorRef, isActive);
@@ -140,7 +142,8 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 			ref={setEditorRef}
 			className={`pwa-reminder-sheet-screen pwa-reminder-sheet-screen--editor modal-card pwa-reminder-editor${isActive ? ' is-active' : ''}${isReturningToEditor ? ' is-focus-target' : ''}`}
 			role="dialog"
-			aria-modal="true"
+			aria-modal={!draft.deleteConfirm}
+			aria-owns={draft.deleteConfirm ? confirmationId : undefined}
 			aria-label={title}
 			aria-busy={saving || isClosing}
 			aria-hidden={!editorInteractive}
@@ -149,7 +152,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 		>
 			<form
 				className="modal-form"
-				inert={draft.deleteConfirm}
 				autoComplete="off"
 				onSubmit={(event) => {
 					event.preventDefault();
@@ -173,7 +175,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 							preventFocusOnPress
 							data-action="toggle-delete-confirm"
 							onClick={() => {
-								dismissEditorKeyboard();
 								onPatchDraft({ deleteConfirm: true, activePicker: null });
 							}}
 						/>
@@ -228,16 +229,19 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 					/>
 				</div>
 			</form>
-			<DeleteConfirmationModal
-				isOpen={isEditing && draft.deleteConfirm && keyboardInset === 0}
-				useNativeDialog
+			{isEditing && draft.deleteConfirm && <PwaDeleteConfirmation
+				id={confirmationId}
+				keyboardInset={keyboardInset}
 				message={buildDeleteConfirmationMessage(draft)}
 				isLoading={saving}
 				onClose={() => { if (!saving) onPatchDraft({ deleteConfirm: false }); }}
 				onConfirm={() => {
-					if (!saving && !isClosing && modal.reminderId) onDelete(modal.reminderId);
+					if (!saving && !isClosing && modal.reminderId) {
+						dismissEditorKeyboard();
+						onDelete(modal.reminderId);
+					}
 				}}
-			/>
+			/>}
 		</div>
 	);
 });

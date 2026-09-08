@@ -18,9 +18,11 @@ import { ErrorState, EmptyAuthState } from './components/AuthStates';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
 import { WebReminderCard } from './components/WebReminderCard';
 import { ReminderSyncNotice } from './components/ReminderSyncNotice';
+import { PwaSyncIndicator } from './components/PwaSyncIndicator';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
+import { usePwaInputModality } from './hooks/usePwaInputModality';
 import { usePwaRefreshLifecycle } from './hooks/usePwaRefreshLifecycle';
 import { usePwaUpdate } from './hooks/usePwaUpdate';
 import { usePwaSessionLifecycle } from './hooks/usePwaSessionLifecycle';
@@ -49,6 +51,7 @@ const SettingsSheet = lazy(() => import('./components/SettingsSheet')
 	.then(module => ({ default: module.SettingsSheet })));
 
 function App() {
+	usePwaInputModality();
 	const { colorScheme, themePreference, setThemePreference } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
 	const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_KEY));
@@ -350,6 +353,14 @@ function App() {
 					<PwaHeaderActions
 						settingsOpen={settingsOpen}
 						onToggleSettings={toggleSettings}
+						syncIndicator={<PwaSyncIndicator
+							changes={changes}
+							isOffline={isOffline}
+							refreshing={refreshing}
+							dataMode={dataMode}
+							error={error}
+							storageError={storageError}
+						/>}
 					/>
 				) : undefined}
 				belowHeaderContent={bootstrapped && authToken ? (isProjectDetail) => (

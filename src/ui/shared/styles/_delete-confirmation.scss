@@ -1,34 +1,4 @@
 @mixin styles {
-.delete-confirmation-dialog {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--text-normal);
-  overflow: visible;
-
-  &::backdrop {
-    background: rgba(0, 0, 0, 0.5);
-  }
-
-  > div {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-  }
-
-  .modal-backdrop {
-    position: absolute;
-    inset: 0;
-  }
-
-  .delete-confirmation-button {
-    min-height: 44px;
-  }
-}
-
 .base-modal-surface.delete-confirmation-surface {
   position: relative;
   display: flex;
@@ -53,6 +23,10 @@
   align-items: center;
   gap: 8px;
   padding: 12px 12px 8px 20px;
+
+  &.has-no-close {
+    padding: 20px 20px 8px;
+  }
 }
 
 .delete-confirmation-title {

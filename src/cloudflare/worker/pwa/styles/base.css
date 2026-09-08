@@ -70,7 +70,7 @@ button:disabled{cursor:not-allowed;opacity:.55}
 .settings-theme-option{width:100%;min-width:0;min-height:44px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;border:0;border-radius:7px;background:transparent;color:var(--text-faint);font-size:12px;font-weight:580;transition:background .16s ease,color .16s ease,box-shadow .16s ease}
 .settings-theme-option svg{flex:0 0 auto}
 .settings-theme-option:hover{background:rgba(255,255,255,.045);color:var(--text-normal)}
-.settings-theme-option.is-active{background:rgba(var(--accent-rgb),.14);color:#c9b9fa;box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.24)}
+.settings-theme-option.is-active{background:rgba(255,255,255,.08);color:var(--text-normal);box-shadow:none}
 .settings-action-button{min-width:64px;min-height:44px;padding:0 11px;border:1px solid rgba(var(--accent-rgb),.28);border-radius:8px;background:rgba(var(--accent-rgb),.12);color:#bda7ff;font-size:12px;font-weight:650;white-space:nowrap}
 .settings-status{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;color:var(--text-faint);font-size:11.5px;font-weight:560;line-height:1;white-space:nowrap}
 .settings-status.is-success{color:#70d996}
@@ -80,7 +80,6 @@ button:disabled{cursor:not-allowed;opacity:.55}
 /* Keep preference controls consistent across native browser form styles. */
 .settings-row--preference{gap:12px;min-height:72px;box-sizing:border-box}
 .settings-preference-control{display:flex;position:relative;align-items:center;box-sizing:border-box;flex:0 0 120px;width:120px;height:44px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--text);transition:border-color .15s ease,background .15s ease}
-.settings-preference-control:focus-within{border-color:var(--accent);outline:2px solid rgba(var(--accent-rgb),.18);outline-offset:2px}
 .settings-preference-control--select{transition:none}
 .settings-preference-control .settings-preference-input{appearance:none;-webkit-appearance:none;box-sizing:border-box;width:100%;min-width:0;height:100%;margin:0;padding:0 12px;border:0;border-radius:inherit;outline:none;background:transparent;box-shadow:none;color:inherit;font:inherit;font-size:16px;font-weight:500;line-height:normal}
 .settings-preference-control--select .settings-preference-input{padding-right:28px;cursor:pointer}

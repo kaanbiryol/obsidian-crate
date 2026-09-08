@@ -79,6 +79,7 @@ describe('PWA shared editor integration', () => {
 
 	it('shows a separate delete alert while keeping the editor header and disabling save', () => {
 		const markup = renderEditor({
+			keyboardInset: 334,
 			modal: {
 				mode: 'edit', reminderId: 'preview-reminder',
 				draft: {
@@ -91,6 +92,9 @@ describe('PWA shared editor integration', () => {
 		expect(markup).toContain('Delete &quot;Buy milk&quot;? This can&#x27;t be undone.');
 		expect(markup).toContain('>Cancel</button>');
 		expect(markup).toContain('>Delete</button>');
+		expect(markup).not.toContain('aria-label="Close confirmation"');
+		expect(markup).not.toContain('autofocus=""');
+		expect(markup).toContain('--pwa-confirmation-keyboard-inset:334px');
 		expect(markup).toContain('>Edit reminder</h2>');
 		expect(button(markup, 'save-reminder')).toContain('disabled=""');
 	});

@@ -32,9 +32,8 @@ export function ReminderSyncNotice({
 	storageError?: string | null;
 	onRetryInitialization?: () => void;
 }) {
-	const pendingCount = changes.filter(change => change.status === 'pending').length;
 	const errors = changes.filter(change => change.status !== 'pending');
-	if (!changes.length && !storageError) return null;
+	if (!errors.length && !storageError) return null;
 
 	return (
 		<div className="pwa-reminder-sync-notices" aria-label="Reminder sync">
@@ -48,11 +47,6 @@ export function ReminderSyncNotice({
 						<button type="button" onClick={onRetryInitialization} aria-label="Retry loading pending changes">Retry</button>
 					</div>}
 				</section>
-			)}
-			{pendingCount > 0 && (
-				<div className="pwa-reminder-sync-progress" role="status">
-					{isOffline ? 'Waiting for connection' : 'Syncing'} · {pendingCount} {pendingCount === 1 ? 'change' : 'changes'}
-				</div>
 			)}
 			{errors.map(change => {
 				const title = changeTitle(change);

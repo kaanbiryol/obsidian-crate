@@ -150,6 +150,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		<RemindersViewPanels
 			viewMode={viewMode}
 			selectedProject={selectedProject}
+			projectHeaderRightContent={headerRightContent}
 			isInitialLoadComplete
 			reminders={reminders}
 			projects={projects}
