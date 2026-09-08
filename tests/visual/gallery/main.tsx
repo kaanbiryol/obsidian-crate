@@ -50,7 +50,7 @@ function Gallery() {
   const richRef = useRef<RichTextInputHandle>(null);
   const noop = () => setResult('Closed');
   let content: React.ReactNode;
-  if (scene === 'delete') content = <DeleteConfirmationModal isOpen useNativeDialog onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
+  if (scene === 'delete') content = <DeleteConfirmationModal isOpen onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
   else if (scene === 'progress') content = <ModalLayout title="Updating Crate server" onClose={noop}><StatusContent state="working" description="Checking your Cloudflare account…" /></ModalLayout>;
   else if (scene === 'status') content = <ModalLayout title="Server reset failed" onClose={noop} footer={<div className="crate-status-actions"><Button onClick={noop}>Close</Button><Button className="mod-cta" onClick={() => setResult('Settings opened')}>Open settings</Button></div>}><StatusContent state="error" description="Crate couldn’t finish resetting your Cloudflare server." details={['In Crate settings → Troubleshooting, select “Resume server reset” to try again.']} technicalDetails="Could not verify the complete Durable Object namespace listing." /></ModalLayout>;
   else if (scene === 'project') content = <ProjectPickerContent isOpen projects={projects} project={project} defaultProject="Inbox" isDark={isDark} onSelectProject={setProject} onClose={noop} />;

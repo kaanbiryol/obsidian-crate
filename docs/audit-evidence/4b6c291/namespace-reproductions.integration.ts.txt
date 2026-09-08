@@ -1,0 +1,38 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import schema from '../schema.sql?raw';
+import worker from './index';
+import { sha256Hex } from './auth';
+import { CRATE_PLUGIN_PROTOCOL } from '../../protocol';
+import { assertPortablePaths } from '../../protocol/portable-path';
+
+beforeEach(async () => {
+  for (const sql of schema.split(';').map(s => s.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope) VALUES ('a', ?, 'vault')").bind(await sha256Hex('audit-token')).run();
+});
+afterEach(async () => { await reset(); });
+function request(route: string, init: RequestInit = {}) {
+ return worker.fetch(new Request(`https://audit.test${route}`, { ...init, headers: { Authorization: 'Bearer audit-token', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), ...init.headers } }), env);
+}
+async function upload(path: string) {
+ return request(`/sync/upload?path=${encodeURIComponent(path)}`, { method: 'PUT', body: `file at ${path}`, headers: { 'X-Crate-Expected-Hash': 'absent', 'Content-Type': 'text/plain' } });
+}
+it.each([['Projects.md', 'Projects.md/child.md'], ['Projects.md/child.md', 'Projects.md']])('accepts unrepresentable ancestor/descendant files %j', async (first, second) => {
+ expect((await upload(first)).status).toBe(200);
+ expect((await upload(second)).status).toBe(200);
+ const manifest = await (await request('/sync/manifest')).json() as { files: Record<string, unknown> };
+ expect(Object.keys(manifest.files)).toHaveLength(2);
+ expect(() => assertPortablePaths(Object.keys(manifest.files))).not.toThrow();
+ for (const path of [first, second]) {
+   const download = await request(`/sync/download?path=${encodeURIComponent(path)}`);
+   expect(download.status).toBe(200);
+   expect(await download.text()).toBe(`file at ${path}`);
+ }
+});
+it('accepts concurrent parent-file and child-file uploads from different clients', async () => {
+ const responses = await Promise.all([upload('Projects.md'), upload('Projects.md/child.md')]);
+ expect(responses.map(response => response.status)).toEqual([200,200]);
+ expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first()).toEqual({ count: 2 });
+});

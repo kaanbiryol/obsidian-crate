@@ -111,7 +111,7 @@ export const findProjectMatches = (text: string, knownProjects?: string[]): Text
 };
 
 /** Find complete schedules with the same recurrence grammar used when saving. */
-const findDateMatches = (text: string): TextMatch[] => {
+const findDateMatches = (text: string, referenceDate: Date): TextMatch[] => {
     const matches: TextMatch[] = [];
     let remaining = text;
     const mask = (index: number, length: number) => {
@@ -140,7 +140,7 @@ const findDateMatches = (text: string): TextMatch[] => {
         mask(iso.index, iso[0].length);
     }
 
-    for (const result of chrono.parse(remaining, new Date(), { forwardDate: true })) {
+    for (const result of chrono.parse(remaining, referenceDate, { forwardDate: true })) {
         matches.push({ text: result.text, index: result.index, length: result.text.length, type: 'date' });
     }
     return matches;
@@ -168,7 +168,7 @@ export const findLinkMatches = (text: string): TextMatch[] => {
  * @param text The text to search
  * @param knownProjects Optional array of known project names for multi-word matching
  */
-export const findAllMatches = (text: string, knownProjects?: string[]): TextMatch[] => {
+export const findAllMatches = (text: string, knownProjects?: string[], referenceDate = new Date()): TextMatch[] => {
     const projects = findProjectMatches(text, knownProjects);
     let dateText = text;
     for (const project of projects) {
@@ -178,7 +178,7 @@ export const findAllMatches = (text: string, knownProjects?: string[]): TextMatc
         ...findLinkMatches(text),
         ...findPriorityMatches(text),
         ...projects,
-        ...findDateMatches(dateText)
+        ...findDateMatches(dateText, referenceDate)
     ];
 
     // Sort by position and remove overlapping matches

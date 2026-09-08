@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearReminderOutbox, createReminderOutboxStorage } from './reminder-outbox-storage';
+import { clearReminderOutbox, createReminderOutboxStorage, createReminderRecoveryStorage } from './reminder-outbox-storage';
 import type { PendingReminderChange } from './reminder-outbox-types';
 
 let values: Map<string, string>;
@@ -146,7 +146,8 @@ describe('durable reminder outbox storage', () => {
 					: defect === 'wrong-endpoint' ? raw.replace('/reminders/set-completed', '/auth/session')
 						: raw.replace('"status":"uncertain"', '"status":"uncertain","ambiguous":"yes"');
 		values.set(key, modified);
-		expect(() => outbox.load()).toThrow('could not be read');
+		expect(outbox.load()).toEqual([]);
+		expect(outbox.quarantined()).toEqual([{ key, raw: modified }]);
 		expect(() => outbox.put(original)).toThrow('could not be read');
 		expect(values.get(key)).toBe(modified);
 	});
@@ -172,5 +173,108 @@ describe('durable reminder outbox storage', () => {
 		values.set('unrelated-setting', 'keep');
 		clearReminderOutbox();
 		expect([...values]).toEqual([['unrelated-setting', 'keep']]);
+	});
+
+	it('requires explicit same-folder recovery after a credential rotates and preserves exact commands', async () => {
+		const original = change();
+		original.body = original.body.replace(',', ',\n  ');
+		original.ambiguous = true;
+		const old = await createReminderOutboxStorage('expired-secret', 'Reminders');
+		old.put(original);
+		const next = await createReminderOutboxStorage('renewed-secret', 'Reminders');
+		const recovery = await createReminderRecoveryStorage('renewed-secret', 'Reminders');
+		expect(next.load()).toEqual([]);
+		expect(recovery.load()).toEqual([original]);
+		expect((await createReminderRecoveryStorage('renewed-secret', 'Private')).load()).toEqual([]);
+		(await createReminderRecoveryStorage('renewed-secret', 'Private')).adopt();
+		expect(old.load()).toEqual([original]);
+		recovery.adopt();
+		expect(next.load()).toEqual([original]);
+		expect(old.load()).toEqual([]);
+		expect(recovery.load()).toEqual([]);
+		expect(JSON.stringify([...values])).not.toMatch(/expired-secret|renewed-secret/);
+	});
+
+	it('preserves old work when adoption hits quota and completes an interrupted copy without duplication', async () => {
+		const old = await createReminderOutboxStorage('old', 'Reminders');
+		const next = await createReminderOutboxStorage('next', 'Reminders');
+		const recovery = await createReminderRecoveryStorage('next', 'Reminders');
+		const original = change();
+		old.put(original);
+		const write = vi.spyOn(storage, 'setItem').mockImplementationOnce(() => { throw new DOMException('Full', 'QuotaExceededError'); });
+		expect(() => recovery.adopt()).toThrow('Free up storage');
+		expect(old.load()).toEqual([original]);
+		expect(next.load()).toEqual([]);
+		write.mockRestore();
+		// A crash after the destination copy, before deleting the source.
+		next.put(original);
+		recovery.adopt();
+		expect(next.load()).toEqual([original]);
+		expect(old.load()).toEqual([]);
+		clearReminderOutbox();
+		expect(next.load()).toEqual([]);
+		expect(recovery.load()).toEqual([]);
+	});
+
+	it('quarantines damaged entries in place without blocking healthy commands or requiring storage writes', async () => {
+		const outbox = await createReminderOutboxStorage('one', 'Reminders');
+		const damaged = change(); const healthy = change();
+		outbox.put(damaged); outbox.put(healthy);
+		const key = [...values.keys()][0]!;
+		const raw = '{"local-only":"Keep every byte: 🗒️\n<unsafe markup>"';
+		values.set(key, raw);
+		vi.spyOn(storage, 'setItem').mockImplementation(() => { throw new DOMException('Full', 'QuotaExceededError'); });
+		expect(outbox.load()).toEqual([healthy]);
+		expect(outbox.quarantined()).toEqual([{ key, raw }]);
+		expect(values.get(key)).toBe(raw);
+		outbox.remove(healthy.operationId);
+		expect(outbox.load()).toEqual([]);
+		expect(outbox.quarantined()).toEqual([{ key, raw }]);
+	});
+
+	it('removes only exported damaged bytes still belonging to this exact session and folder', async () => {
+		const outbox = await createReminderOutboxStorage('one', 'Reminders');
+		const other = await createReminderOutboxStorage('one', 'Private');
+		outbox.put(change()); outbox.put(change()); outbox.put(change()); other.put(change(crypto.randomUUID(), 'Private'));
+		const [removed, repaired, changed, privateKey] = [...values.keys()] as [string, string, string, string];
+		const original = values.get(repaired)!;
+		for (const key of values.keys()) values.set(key, 'broken');
+		const exported = outbox.quarantined();
+		values.set(repaired, original);
+		values.set(changed, 'new damaged bytes');
+		outbox.removeQuarantined([...exported, { key: privateKey, raw: 'broken' }]);
+		expect(values.has(removed)).toBe(false);
+		expect(values.get(repaired)).toBe(original);
+		expect(values.get(changed)).toBe('new damaged bytes');
+		expect(values.get(privateKey)).toBe('broken');
+		expect(outbox.load()).toHaveLength(1);
+	});
+
+	it('recovers healthy earlier-session entries while preserving damaged entries and conflicting destinations', async () => {
+		const old = await createReminderOutboxStorage('old', 'Reminders');
+		const next = await createReminderOutboxStorage('next', 'Reminders');
+		const recovery = await createReminderRecoveryStorage('next', 'Reminders');
+		const healthy = change(); const damaged = change(); const blocked = change();
+		old.put(healthy); old.put(damaged); old.put(blocked); next.put(blocked);
+		const [, oldDamaged, , nextDamaged] = [...values.keys()] as [string, string, string, string];
+		values.set(oldDamaged, 'keep old damaged text'); values.set(nextDamaged, 'keep current damaged text');
+		recovery.adopt();
+		expect(next.load()).toEqual([healthy]);
+		expect(recovery.load()).toEqual([blocked]);
+		expect(recovery.quarantined()).toEqual([{ key: oldDamaged, raw: 'keep old damaged text' }]);
+		expect(next.quarantined()).toEqual([{ key: nextDamaged, raw: 'keep current damaged text' }]);
+		expect((await createReminderRecoveryStorage('next', 'Private')).quarantined()).toEqual([]);
+		clearReminderOutbox();
+		expect(recovery.quarantined()).toEqual([]); expect(next.quarantined()).toEqual([]);
+	});
+
+	it.each([{ recurrence: { frequency: 'daily', timezone: 'broken' } }, { dueDatetime: [] }, { description: {} }])('quarantines unsafe presentation fields without rendering them (%j)', async patch => {
+			const outbox = await createReminderOutboxStorage('one', 'Reminders');
+			const original = change(); outbox.put(original);
+			const key = [...values.keys()][0]!;
+			const stored = JSON.parse(values.get(key)!) as { change: PendingReminderChange };
+			Object.assign(stored.change, { optimistic: { id: original.recordId, content: 'Task', project: 'Inbox', priority: 4, completed: false, filePath: 'Reminders/Inbox.md', ...patch } });
+			values.set(key, JSON.stringify(stored));
+			expect(outbox.load()).toEqual([]); expect(outbox.quarantined()).toHaveLength(1);
 	});
 });

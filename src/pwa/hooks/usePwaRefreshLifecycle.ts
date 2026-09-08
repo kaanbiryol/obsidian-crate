@@ -54,9 +54,11 @@ export function usePwaRefreshLifecycle({
 		};
 
 		window.addEventListener('pageshow', resume);
+		window.addEventListener('online', resume);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 		return () => {
 			window.removeEventListener('pageshow', resume);
+			window.removeEventListener('online', resume);
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		};
 	}, [authToken, bootstrapped, checkForUpdate, loadReminders, refreshPushState]);

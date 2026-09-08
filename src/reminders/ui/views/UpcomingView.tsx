@@ -16,6 +16,7 @@ import { reminderRowMotion } from '../reminderRowMotion';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';
 import { ReminderPagination, useReminderPagination } from '../reminder-pagination';
 import { groupRemindersByDate } from '../../utils/reminderSort';
+import { useReminderClock } from '../useReminderClock';
 
 export interface UpcomingViewProps {
   reminders: Reminder[];
@@ -45,9 +46,10 @@ export const UpcomingView = memo(function UpcomingView({
   colorScheme = 'dark',
 }: UpcomingViewProps) {
   const reduceMotion = useObsidianReducedMotion();
+  const clock = useReminderClock(reminders);
   const { upcomingReminders } = useMemo(() => {
-    return buildUpcomingViewModel(reminders, days);
-  }, [reminders, days]);
+    return buildUpcomingViewModel(reminders, days, clock.now);
+  }, [reminders, days, clock]);
   const pagination = useReminderPagination(upcomingReminders, days);
   const dateGroups = useMemo(() => groupRemindersByDate(pagination.items), [pagination.items]);
   const enableListAnimations = animationConfig.enabled && !reduceMotion && upcomingReminders.length <= 80;
@@ -90,7 +92,7 @@ export const UpcomingView = memo(function UpcomingView({
               <h2
                 className="upcoming-date-header"
               >
-                {formatDateHeader(group.date)}
+                {formatDateHeader(group.date, undefined, clock.now)}
               </h2>
               <LayoutGroup>
                 <ReminderListPresence>

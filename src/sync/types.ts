@@ -48,6 +48,7 @@ export interface ResolvedSyncRace {
 }
 
 export interface SyncHistoryEntry {
+	requestDiagnostics?: import('./request-diagnostics').RequestDiagnostics;
 	timestamp: string;
 	type: 'sync' | 'initial' | 'force';
 	success: boolean;

@@ -73,7 +73,7 @@ describe('SyncEngine event queue behavior', () => {
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 		harness.api.uploadFile.mockResolvedValue({ success: true, path: 'notes/a.md' });
 		const onQueueSyncResult = vi.fn(async () => {});
-		harness.engine.setQueueSyncResultCallback(onQueueSyncResult);
+		harness.engine.setAutomaticSyncResultCallback(onQueueSyncResult);
 
 		getPendingPaths(harness.engine).add('notes/a.md');
 		await flushPendingChanges(harness.engine);

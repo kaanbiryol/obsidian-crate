@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { capturePwaSession } from '../session-generation';
 import { fetchReadyReminderList } from '../reminder-api';
-import { loadCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
+import { loadCachedReminderSnapshot, rebuildCachedReminderSnapshot, refreshCachedReminderSnapshot, saveCachedReminderSnapshot } from '../reminder-cache';
 import { createReminderRequestCoordinator } from '../reminder-request-coordinator';
-import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, StoredConfig } from '../types';
+import { parseReminderSourceIssues } from '../reminder-source-issues';
+import type { ApiFetch, CachedReminderSnapshot, DataMode, LoadReminders, ReminderRecord, ReminderSourceIssue, StoredConfig } from '../types';
 
 export interface ReminderSyncState {
 	reminders: ReminderRecord[];
@@ -12,6 +13,7 @@ export interface ReminderSyncState {
 	loading: boolean;
 	refreshing: boolean;
 	error: string | null;
+	issues: ReminderSourceIssue[];
 	dataMode: DataMode;
 	lastUpdatedAt: number | null;
 	isOffline: boolean;
@@ -20,6 +22,7 @@ export interface ReminderSyncState {
 	hydratedCacheRef: MutableRefObject<boolean>;
 	hydrateCachedSnapshot: (snapshot: CachedReminderSnapshot) => void;
 	loadReminders: LoadReminders;
+	rebuildOfflineCache: () => Promise<void>;
 	beginLocalMutation: () => () => void;
 	commitReminderState: (reminders: ReminderRecord[], projects?: string[]) => Promise<void>;
 	resetReminderState: () => void;
@@ -50,6 +53,8 @@ export function useReminderSync({
 	const [dataMode, setDataMode] = useState<DataMode>('live');
 	const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
 	const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
+	const [issues, setIssues] = useState<ReminderSourceIssue[]>([]);
+	const issuesRef = useRef<ReminderSourceIssue[]>([]);
 	const remindersRef = useRef(reminders);
 	const projectsRef = useRef(projects);
 	const hydratedCacheRef = useRef(false);
@@ -69,6 +74,8 @@ export function useReminderSync({
 	const hydrateCachedSnapshot = useCallback((snapshot: CachedReminderSnapshot) => {
 		remindersRef.current = snapshot.reminders;
 		projectsRef.current = snapshot.projects;
+		issuesRef.current = snapshot.issues ?? [];
+		setIssues(issuesRef.current);
 		etagRef.current = snapshot.etag;
 		lastCheckedAtRef.current = snapshot.savedAt;
 		setReminders(snapshot.reminders);
@@ -121,11 +128,15 @@ export function useReminderSync({
 					return;
 				}
 				if (!response.ok) throw new Error(await response.text());
-				const result = await response.json() as { reminders?: ReminderRecord[]; projects?: string[]; issues?: Array<{ path: string; reason: string }> };
+				const result = await response.json() as { reminders?: ReminderRecord[]; projects?: string[]; issues?: unknown };
+				const nextIssues = parseReminderSourceIssues(result.issues);
+				if (!nextIssues) throw new Error('The server returned invalid reminder source details. Refresh reminders.');
 				const nextReminders = Array.isArray(result.reminders) ? result.reminders : [];
 				const nextProjects = Array.isArray(result.projects) ? result.projects : [];
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
-				setError(result.issues?.length ? result.issues.map(issue => `${issue.path}: ${issue.reason}`).join("\n") : null);
+				setError(null);
+				issuesRef.current = nextIssues;
+				setIssues(nextIssues);
 				const savedAt = Date.now();
 				const etag = response.headers.get('ETag') ?? undefined;
 				remindersRef.current = nextReminders;
@@ -138,7 +149,7 @@ export function useReminderSync({
 				setLastUpdatedAt(savedAt);
 				setDataMode('live');
 				setIsOffline(false);
-				void saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, etag);
+				void saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, etag, nextIssues);
 			} catch (loadError) {
 				if (!sessionCurrent() || !requestCoordinatorRef.current.shouldApplyRead(readToken)) return;
 				const message = loadError instanceof Error ? loadError.message : String(loadError);
@@ -167,6 +178,15 @@ export function useReminderSync({
 		return promise;
 	}, [apiFetch, authToken, config.folderPath, hydrateCachedSnapshot, setSelectedProject]);
 
+	const rebuildOfflineCache = useCallback(async () => {
+		const sessionCurrent = capturePwaSession();
+		if (!await rebuildCachedReminderSnapshot(config.folderPath) || !sessionCurrent()) return;
+		etagRef.current = undefined;
+		lastCheckedAtRef.current = null;
+		activeReadRef.current = null;
+		await loadReminders({ silent: true });
+	}, [config.folderPath, loadReminders]);
+
 	const beginLocalMutation = useCallback(() => {
 		const coordinator = requestCoordinatorRef.current;
 		const finish = coordinator.beginMutation();
@@ -190,7 +210,7 @@ export function useReminderSync({
 		setLastUpdatedAt(savedAt);
 		setDataMode('live');
 		setIsOffline(false);
-		await saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt);
+		await saveCachedReminderSnapshot(config.folderPath, nextReminders, nextProjects, savedAt, undefined, issuesRef.current);
 	}, [config.folderPath, setSelectedProject]);
 
 	useEffect(() => {
@@ -212,6 +232,8 @@ export function useReminderSync({
 		requestCoordinatorRef.current = createReminderRequestCoordinator();
 		remindersRef.current = [];
 		projectsRef.current = [];
+		issuesRef.current = [];
+		setIssues([]);
 		hydratedCacheRef.current = false;
 		activeReadRef.current = null;
 		setLoading(false);
@@ -230,6 +252,7 @@ export function useReminderSync({
 		loading,
 		refreshing,
 		error,
+		issues,
 		dataMode,
 		lastUpdatedAt,
 		isOffline,
@@ -237,6 +260,7 @@ export function useReminderSync({
 		projectsRef,
 		hydratedCacheRef,
 		hydrateCachedSnapshot,
+		rebuildOfflineCache,
 		loadReminders,
 		beginLocalMutation,
 		commitReminderState,

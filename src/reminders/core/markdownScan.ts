@@ -3,6 +3,9 @@ import { buildStoredReminderDates } from "@/reminders/utils/reminderDate";
 import { normalizeRecurrenceRule } from "@/reminders/utils/recurrenceRule";
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
 import { decodeDescriptionFromMarkdown } from "./markdownReminderFile";
+import { UnresolvedReminderScheduleError } from '../utils/reminderParser';
+import { extractReminderId } from './reminderIdentity';
+import { markdownTaskContexts } from './markdownTaskContext';
 
 interface ScannedReminderRecord {
   id: string;
@@ -44,28 +47,32 @@ export function scanReminderMarkdownContent(
   filePath: string,
   content: string,
   remindersFolderPath: string,
+  options: { skipUnresolvedSchedules?: boolean } = {},
 ): ReminderMarkdownScanResult {
   const reminders: ScannedReminderRecord[] = [];
   const project = getProjectFromPath(filePath, remindersFolderPath);
   const lines = content.split("\n");
 
-  for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
+  for (const lineNumber of markdownTaskContexts(lines).keys()) {
     const line = lines[lineNumber];
-    if (line === undefined) continue;
-    const parsed = parseCheckboxLine(line);
+    if (line === undefined || !extractReminderId(line)) continue;
+    let parsed;
+    try { parsed = parseCheckboxLine(line, { persisted: true }); }
+    catch (error) {
+      if (options.skipUnresolvedSchedules && error instanceof UnresolvedReminderScheduleError) continue;
+      throw error;
+    }
     if (!parsed || !parsed.parsed.cleanContent.trim() || !parsed.reminderId) {
       continue;
     }
 
     const storedDates = buildStoredReminderDates(parsed.parsed.dueDate, parsed.parsed.hasTime);
     let description: string | undefined;
-    let descBlockLineCount = 0;
     const nextIndex = lineNumber + 1;
     const nextLine = lines[nextIndex];
     if (nextLine?.startsWith("<!-- crate-desc:")) {
       if (!nextLine.endsWith(' -->')) throw new Error('Invalid reminder description block');
       description = decodeDescriptionFromMarkdown(nextLine.slice('<!-- crate-desc:'.length, -4)) || undefined;
-      descBlockLineCount = 1;
     }
 
     reminders.push({
@@ -81,12 +88,9 @@ export function scanReminderMarkdownContent(
       filePath,
       lineNumber,
       rawLine: line,
-      contentHash: generateContentHash(parsed.rawContent),
+      contentHash: generateContentHash(parsed.rawContent, { persisted: true }),
     });
 
-    if (descBlockLineCount > 0) {
-      lineNumber = nextIndex + descBlockLineCount - 1;
-    }
   }
 
   return {

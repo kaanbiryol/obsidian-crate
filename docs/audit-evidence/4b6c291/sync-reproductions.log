@@ -1,0 +1,32 @@
+
+ RUN  v4.1.8 /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate
+
+stderr | src/sync/audit-release-4b6c291.test.ts > 4b6c291 audit evidence > full reconciliation deletes a real remote file after a local list failure
+[Crate] [FileDiscovery] Failed to list vault folder: .private Error: temporary I/O failure
+    at Object.list (/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/audit-release-4b6c291.test.ts:24:41)
+    at safeList (/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/file-discovery.ts:199:30)
+    at walkHiddenFolder (/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/file-discovery.ts:143:25)
+    at getAllVaultFiles (/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/file-discovery.ts:92:9)
+    at createFullSyncPlan (/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/planner-full.ts:15:17)
+    at /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/audit-release-4b6c291.test.ts:40:18
+    at file:///Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | src/sync/audit-release-4b6c291.test.ts > 4b6c291 audit evidence > full reconciliation deletes a real remote file after a local stat failure
+[Crate] [FileDiscovery] Failed to stat vault file: .private/note.md Error: temporary I/O failure
+    at Object.stat (/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/audit-release-4b6c291.test.ts:28:41)
+    at safeStat (/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/file-discovery.ts:208:30)
+    at walkHiddenFolder (/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/file-discovery.ts:148:23)
+    at getAllVaultFiles (/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/file-discovery.ts:92:3)
+    at createFullSyncPlan (/Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/planner-full.ts:15:17)
+    at /Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/src/sync/audit-release-4b6c291.test.ts:40:18
+    at file:///Users/kaanbiryol/.codex/worktrees/bdfe/obsidian-crate/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ src/sync/audit-release-4b6c291.test.ts > 4b6c291 audit evidence > full reconciliation deletes a real remote file after a local list failure 8ms
+ ✓ src/sync/audit-release-4b6c291.test.ts > 4b6c291 audit evidence > full reconciliation deletes a real remote file after a local stat failure 1ms
+ ✓ src/sync/audit-release-4b6c291.test.ts > 4b6c291 audit evidence > both periodic detection and full sync miss changed bytes with preserved size and mtime 1ms
+ ✓ src/sync/audit-release-4b6c291.test.ts > 4b6c291 audit evidence > configuration reset leaves a valid temporary checkpoint that the next connection restores 0ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  00:19:36
+   Duration  585ms (transform 333ms, setup 0ms, import 371ms, tests 11ms, environment 0ms)

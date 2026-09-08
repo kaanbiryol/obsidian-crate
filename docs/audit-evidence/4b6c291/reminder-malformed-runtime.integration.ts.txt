@@ -1,0 +1,18 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import schema from '../schema.sql?raw';
+import { handleUpload } from './sync-file-handlers';
+beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+afterEach(async () => { await reset(); });
+it('confirms invalid reminder description stops ordinary note synchronization outside reminders with push unconfigured', async () => {
+ const text = '- [ ] Ordinary note task <!-- crate-id:ordinary -->\n<!-- crate-desc:v1:%invalid -->\n';
+ const response = await handleUpload(new Request('https://test/sync/upload?path=Notes/Example.md', {
+   method: 'PUT', headers: { 'X-Crate-Expected-Hash': 'absent' }, body: text,
+ }), env.BUCKET, env.DB);
+ expect(response.status).toBe(503);
+ expect((await response.json() as { error: string }).error).toContain('URI');
+ expect(await env.DB.prepare('SELECT path FROM files').all()).toMatchObject({ results: [] });
+ expect(await env.DB.prepare('SELECT id FROM notification_policy').all()).toMatchObject({ results: [] });
+});

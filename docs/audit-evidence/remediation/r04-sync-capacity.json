@@ -1,0 +1,611 @@
+{
+  "baseCommit": "93788f9",
+  "runtime": "node 24.19.0 / local workerd, D1 and R2",
+  "measurementScope": "R04 batching implementation; local only; in-memory Obsidian filesystem seam",
+  "samples": [
+    {
+      "scenario": "real-sync-engine-capacity",
+      "localOnly": true,
+      "files": 1000,
+      "directories": 100,
+      "explicitInitial": false,
+      "offlineOperations": 100,
+      "samples": [
+        {
+          "phase": "cold-full-upload",
+          "wallMs": 1984,
+          "requests": 674,
+          "routes": {
+            "GET /sync/manifest": 1,
+            "GET /sync/changes": 1,
+            "GET /.well-known/crate": 336,
+            "POST /sync/batch-upload": 336
+          },
+          "responseBytes": 366950,
+          "longestRequestMs": 14,
+          "preparedStatements": 9016,
+          "r2Gets": 0,
+          "r2Puts": 1000,
+          "uploaded": 1000,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "cold-download",
+          "wallMs": 454,
+          "requests": 22,
+          "routes": {
+            "GET /sync/manifest": 1,
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 20
+          },
+          "responseBytes": 1980938,
+          "longestRequestMs": 30,
+          "preparedStatements": 68,
+          "r2Gets": 1000,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 1000,
+          "deleted": 0
+        },
+        {
+          "phase": "warm-unchanged",
+          "wallMs": 26,
+          "requests": 2,
+          "routes": {
+            "GET /sync/manifest": 1,
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 284118,
+          "longestRequestMs": 4,
+          "preparedStatements": 8,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "warm-unchanged",
+          "wallMs": 14,
+          "requests": 1,
+          "routes": {
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 45,
+          "longestRequestMs": 1,
+          "preparedStatements": 4,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "restart-offline-first",
+          "wallMs": 156,
+          "requests": 49,
+          "routes": {
+            "GET /sync/changes": 1,
+            "GET /.well-known/crate": 24,
+            "POST /sync/batch-upload": 17,
+            "POST /sync/batch-delete": 7
+          },
+          "responseBytes": 29414,
+          "longestRequestMs": 9,
+          "preparedStatements": 751,
+          "r2Gets": 0,
+          "r2Puts": 50,
+          "uploaded": 50,
+          "downloaded": 0,
+          "deleted": 25
+        },
+        {
+          "phase": "restart-offline-second",
+          "wallMs": 134,
+          "requests": 34,
+          "routes": {
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 1,
+            "GET /.well-known/crate": 16,
+            "POST /sync/batch-upload": 9,
+            "POST /sync/batch-delete": 7
+          },
+          "responseBytes": 126729,
+          "longestRequestMs": 20,
+          "preparedStatements": 505,
+          "r2Gets": 50,
+          "r2Puts": 25,
+          "uploaded": 25,
+          "downloaded": 50,
+          "deleted": 50
+        },
+        {
+          "phase": "converge-first",
+          "wallMs": 25,
+          "requests": 2,
+          "routes": {
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 1
+          },
+          "responseBytes": 42505,
+          "longestRequestMs": 9,
+          "preparedStatements": 7,
+          "r2Gets": 25,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 25,
+          "deleted": 25
+        },
+        {
+          "phase": "converge-second",
+          "wallMs": 14,
+          "requests": 1,
+          "routes": {
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 12919,
+          "longestRequestMs": 2,
+          "preparedStatements": 4,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        }
+      ]
+    },
+    {
+      "scenario": "real-sync-engine-capacity",
+      "localOnly": true,
+      "files": 1000,
+      "directories": 100,
+      "explicitInitial": true,
+      "offlineOperations": 100,
+      "samples": [
+        {
+          "phase": "explicit-initial-upload",
+          "wallMs": 1864,
+          "requests": 672,
+          "routes": {
+            "GET /.well-known/crate": 336,
+            "POST /sync/batch-upload": 336
+          },
+          "responseBytes": 366840,
+          "longestRequestMs": 18,
+          "preparedStatements": 9008,
+          "r2Gets": 0,
+          "r2Puts": 1000,
+          "uploaded": 1000,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "cold-download",
+          "wallMs": 405,
+          "requests": 22,
+          "routes": {
+            "GET /sync/manifest": 1,
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 20
+          },
+          "responseBytes": 1980938,
+          "longestRequestMs": 27,
+          "preparedStatements": 68,
+          "r2Gets": 1000,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 1000,
+          "deleted": 0
+        },
+        {
+          "phase": "warm-unchanged",
+          "wallMs": 24,
+          "requests": 2,
+          "routes": {
+            "GET /sync/manifest": 1,
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 284118,
+          "longestRequestMs": 4,
+          "preparedStatements": 8,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "warm-unchanged",
+          "wallMs": 12,
+          "requests": 1,
+          "routes": {
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 45,
+          "longestRequestMs": 1,
+          "preparedStatements": 4,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "restart-offline-first",
+          "wallMs": 147,
+          "requests": 49,
+          "routes": {
+            "GET /sync/changes": 1,
+            "GET /.well-known/crate": 24,
+            "POST /sync/batch-upload": 17,
+            "POST /sync/batch-delete": 7
+          },
+          "responseBytes": 29414,
+          "longestRequestMs": 10,
+          "preparedStatements": 751,
+          "r2Gets": 0,
+          "r2Puts": 50,
+          "uploaded": 50,
+          "downloaded": 0,
+          "deleted": 25
+        },
+        {
+          "phase": "restart-offline-second",
+          "wallMs": 106,
+          "requests": 34,
+          "routes": {
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 1,
+            "GET /.well-known/crate": 16,
+            "POST /sync/batch-upload": 9,
+            "POST /sync/batch-delete": 7
+          },
+          "responseBytes": 126729,
+          "longestRequestMs": 17,
+          "preparedStatements": 505,
+          "r2Gets": 50,
+          "r2Puts": 25,
+          "uploaded": 25,
+          "downloaded": 50,
+          "deleted": 50
+        },
+        {
+          "phase": "converge-first",
+          "wallMs": 28,
+          "requests": 2,
+          "routes": {
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 1
+          },
+          "responseBytes": 42505,
+          "longestRequestMs": 10,
+          "preparedStatements": 7,
+          "r2Gets": 25,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 25,
+          "deleted": 25
+        },
+        {
+          "phase": "converge-second",
+          "wallMs": 17,
+          "requests": 1,
+          "routes": {
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 12919,
+          "longestRequestMs": 5,
+          "preparedStatements": 4,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        }
+      ]
+    },
+    {
+      "scenario": "real-sync-engine-capacity",
+      "localOnly": true,
+      "files": 10000,
+      "directories": 100,
+      "explicitInitial": false,
+      "offlineOperations": 100,
+      "samples": [
+        {
+          "phase": "cold-full-upload",
+          "wallMs": 19632,
+          "requests": 6722,
+          "routes": {
+            "GET /sync/manifest": 1,
+            "GET /sync/changes": 1,
+            "GET /.well-known/crate": 3360,
+            "POST /sync/batch-upload": 3360
+          },
+          "responseBytes": 3668510,
+          "longestRequestMs": 84,
+          "preparedStatements": 90088,
+          "r2Gets": 0,
+          "r2Puts": 10000,
+          "uploaded": 10000,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "cold-download",
+          "wallMs": 5025,
+          "requests": 206,
+          "routes": {
+            "GET /sync/manifest": 5,
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 200
+          },
+          "responseBytes": 19812397,
+          "longestRequestMs": 75,
+          "preparedStatements": 624,
+          "r2Gets": 10000,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 10000,
+          "deleted": 0
+        },
+        {
+          "phase": "warm-unchanged",
+          "wallMs": 269,
+          "requests": 6,
+          "routes": {
+            "GET /sync/manifest": 5,
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 2840597,
+          "longestRequestMs": 25,
+          "preparedStatements": 24,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "warm-unchanged",
+          "wallMs": 116,
+          "requests": 1,
+          "routes": {
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 46,
+          "longestRequestMs": 2,
+          "preparedStatements": 4,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "restart-offline-first",
+          "wallMs": 260,
+          "requests": 49,
+          "routes": {
+            "GET /sync/changes": 1,
+            "GET /.well-known/crate": 24,
+            "POST /sync/batch-upload": 17,
+            "POST /sync/batch-delete": 7
+          },
+          "responseBytes": 29415,
+          "longestRequestMs": 11,
+          "preparedStatements": 751,
+          "r2Gets": 0,
+          "r2Puts": 50,
+          "uploaded": 50,
+          "downloaded": 0,
+          "deleted": 25
+        },
+        {
+          "phase": "restart-offline-second",
+          "wallMs": 232,
+          "requests": 34,
+          "routes": {
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 1,
+            "GET /.well-known/crate": 16,
+            "POST /sync/batch-upload": 9,
+            "POST /sync/batch-delete": 7
+          },
+          "responseBytes": 126805,
+          "longestRequestMs": 19,
+          "preparedStatements": 505,
+          "r2Gets": 50,
+          "r2Puts": 25,
+          "uploaded": 25,
+          "downloaded": 50,
+          "deleted": 50
+        },
+        {
+          "phase": "converge-first",
+          "wallMs": 126,
+          "requests": 2,
+          "routes": {
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 1
+          },
+          "responseBytes": 42631,
+          "longestRequestMs": 9,
+          "preparedStatements": 7,
+          "r2Gets": 25,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 25,
+          "deleted": 25
+        },
+        {
+          "phase": "converge-second",
+          "wallMs": 115,
+          "requests": 1,
+          "routes": {
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 12970,
+          "longestRequestMs": 2,
+          "preparedStatements": 4,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        }
+      ]
+    },
+    {
+      "scenario": "real-sync-engine-capacity",
+      "localOnly": true,
+      "files": 10000,
+      "directories": 100,
+      "explicitInitial": true,
+      "offlineOperations": 100,
+      "samples": [
+        {
+          "phase": "explicit-initial-upload",
+          "wallMs": 19614,
+          "requests": 6720,
+          "routes": {
+            "GET /.well-known/crate": 3360,
+            "POST /sync/batch-upload": 3360
+          },
+          "responseBytes": 3668400,
+          "longestRequestMs": 119,
+          "preparedStatements": 90080,
+          "r2Gets": 0,
+          "r2Puts": 10000,
+          "uploaded": 10000,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "cold-download",
+          "wallMs": 5438,
+          "requests": 206,
+          "routes": {
+            "GET /sync/manifest": 5,
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 200
+          },
+          "responseBytes": 19812397,
+          "longestRequestMs": 69,
+          "preparedStatements": 624,
+          "r2Gets": 10000,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 10000,
+          "deleted": 0
+        },
+        {
+          "phase": "warm-unchanged",
+          "wallMs": 240,
+          "requests": 6,
+          "routes": {
+            "GET /sync/manifest": 5,
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 2840597,
+          "longestRequestMs": 9,
+          "preparedStatements": 24,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "warm-unchanged",
+          "wallMs": 119,
+          "requests": 1,
+          "routes": {
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 46,
+          "longestRequestMs": 2,
+          "preparedStatements": 4,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        },
+        {
+          "phase": "restart-offline-first",
+          "wallMs": 285,
+          "requests": 49,
+          "routes": {
+            "GET /sync/changes": 1,
+            "GET /.well-known/crate": 24,
+            "POST /sync/batch-upload": 17,
+            "POST /sync/batch-delete": 7
+          },
+          "responseBytes": 29415,
+          "longestRequestMs": 16,
+          "preparedStatements": 751,
+          "r2Gets": 0,
+          "r2Puts": 50,
+          "uploaded": 50,
+          "downloaded": 0,
+          "deleted": 25
+        },
+        {
+          "phase": "restart-offline-second",
+          "wallMs": 226,
+          "requests": 34,
+          "routes": {
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 1,
+            "GET /.well-known/crate": 16,
+            "POST /sync/batch-upload": 9,
+            "POST /sync/batch-delete": 7
+          },
+          "responseBytes": 126805,
+          "longestRequestMs": 18,
+          "preparedStatements": 505,
+          "r2Gets": 50,
+          "r2Puts": 25,
+          "uploaded": 25,
+          "downloaded": 50,
+          "deleted": 50
+        },
+        {
+          "phase": "converge-first",
+          "wallMs": 151,
+          "requests": 2,
+          "routes": {
+            "GET /sync/changes": 1,
+            "POST /sync/batch-download": 1
+          },
+          "responseBytes": 42631,
+          "longestRequestMs": 29,
+          "preparedStatements": 7,
+          "r2Gets": 25,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 25,
+          "deleted": 25
+        },
+        {
+          "phase": "converge-second",
+          "wallMs": 120,
+          "requests": 1,
+          "routes": {
+            "GET /sync/changes": 1
+          },
+          "responseBytes": 12970,
+          "longestRequestMs": 2,
+          "preparedStatements": 4,
+          "r2Gets": 0,
+          "r2Puts": 0,
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted": 0
+        }
+      ]
+    }
+  ]
+}

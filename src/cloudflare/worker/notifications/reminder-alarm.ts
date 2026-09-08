@@ -3,6 +3,7 @@ import type { Env } from '../types';
 import { changedRows } from '../db';
 import { parseJsonObject, parseOptionalString } from '../utils';
 import { listPushSubscriptionIds, sendToAllSubscriptions } from './push';
+import { hasNotificationAuthority } from '../reminder-source-state';
 
 interface ReminderData {
 	reminderId: string;
@@ -109,6 +110,7 @@ export class ReminderAlarm implements DurableObject {
 			if (!jobToken) return new Response(JSON.stringify({ error: 'jobToken required' }), { status: 400 });
 			const current = await this.env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'schedule'").bind(reminderId).first<{ job_token: string }>();
 			if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
+			if (!await hasNotificationAuthority(this.env.DB, reminderId, jobToken)) return new Response(JSON.stringify({ error: 'Reminder source verification is pending' }), { status: 409 });
 			// A completed occurrence survives transient schedule cleanup. Replaying
 			// an accepted job (or reprojecting the same due time) cannot notify twice.
 			if (await this.state.storage.get<string>(COMPLETED_OCCURRENCE_KEY) === dueDatetime) {
@@ -224,17 +226,7 @@ export class ReminderAlarm implements DurableObject {
 
         // The file commit and its projection job are atomic. Do not send from a
         // schedule whose source has changed while projection is still catching up.
-        const projection = await db.prepare(`SELECT p.file_revision, f.storage_key,
-          p.notification_token, p.policy_revision, policy.revision AS current_policy_revision,
-          j.path AS pending_path, policy.enabled FROM scheduled_reminders s
-          LEFT JOIN reminder_projections p ON p.reminder_id = s.reminder_id
-          LEFT JOIN files f ON f.path = p.file_path
-          LEFT JOIN notification_projection_jobs j ON j.path = p.file_path
-          LEFT JOIN notification_policy policy ON policy.id = 1
-          WHERE s.reminder_id = ?`).bind(reminder.reminderId)
-          .first<{ file_revision: string | null; storage_key: string | null; pending_path: string | null; enabled: number; notification_token: string | null; policy_revision: string | null; current_policy_revision: string | null }>();
-        if (!projection || projection.file_revision === null || projection.pending_path || projection.file_revision !== projection.storage_key || projection.enabled !== 1
-          || projection.notification_token !== reminder.scheduleToken || projection.policy_revision !== projection.current_policy_revision) {
+        if (!await hasNotificationAuthority(db, reminder.reminderId, reminder.scheduleToken)) {
           await this.writeIfCurrent(reminder.scheduleToken, () => this.state.storage.setAlarm(Date.now() + 60_000));
           return;
         }

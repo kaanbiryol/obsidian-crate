@@ -9,8 +9,9 @@ import type { VaultFile } from './file-discovery';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import { createFullSyncPlan } from './planner';
 import type { CrateSettings } from '../plugin/settings-types';
-import type { FileDiff, PreparedUpload, SyncResult, SyncState } from './types';
+import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from './types';
 import type { FileEntry, FileManifest } from '../protocol/sync-types';
+import { prepareUploadFromPath } from './transfer-prepare';
 
 interface SyncEngineContextDependencies {
 	vault: Vault;
@@ -26,6 +27,7 @@ interface SyncEngineContextDependencies {
 	retryWithBackoff: <T>(fn: () => Promise<T>) => Promise<T>;
 	getModifiedIso: (path: string, fallbackMtime?: number) => Promise<string>;
 	getLocalChanges: () => Promise<{ path: string; hash: string }[]>;
+	verifyContent: (files: VaultFile[]) => Promise<boolean>;
 	getLocalDeletes: () => Promise<string[]>;
 	incrementalSync: (progressCallback?: (current: number, total: number) => void) => Promise<SyncResult | null>;
 	parallelDownloadAndSaveFiles: (requests: DownloadRequest[], result: SyncResult) => Promise<void>;
@@ -71,6 +73,7 @@ export class SyncEngineContexts {
 			vault: dependencies.vault,
 			localManifest: dependencies.getLocalManifest(),
 			shouldIgnore: dependencies.shouldIgnore,
+			verifyContent: dependencies.verifyContent,
 			runConcurrent: dependencies.runConcurrent,
 		};
 	}
@@ -118,8 +121,9 @@ export class SyncEngineContexts {
 			createFullSyncPlan: (remoteFiles: Record<string, FileEntry>, concurrency: number) =>
 				createFullSyncPlan(this.fullSyncPlanner(), remoteFiles, concurrency),
 			processDiff: dependencies.processDiff,
+			prepareFullSyncUpload: (diff: UploadDiff) => prepareUploadFromPath(this.transfer(), diff.path, { force: true, expectedHash: diff.remoteHash ?? null }),
+			uploadPreparedFiles: dependencies.uploadPreparedFiles,
 			parallelDownloadAndSaveFiles: dependencies.parallelDownloadAndSaveFiles,
-			runConcurrent: dependencies.runConcurrent,
 			getLocalManifestEntry: (path: string) => dependencies.getLocalManifest().getEntry(path),
 			setLocalManifestEntry: (path: string, entry: FileEntry) => {
 				dependencies.getLocalManifest().setEntry(path, entry);

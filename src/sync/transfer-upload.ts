@@ -9,6 +9,7 @@ import { BATCH_FILE_SIZE_LIMIT } from '../protocol/sync-limits';
 import { createLogger } from "../plugin/logger";
 import type { VaultFile } from "./file-discovery";
 import { HttpError } from './api';
+import { isQueueVersionConflict } from './queue-failure';
 
 const logger = createLogger("SyncTransfer");
 
@@ -99,7 +100,7 @@ export async function uploadPreparedFiles(
             if (isMarkdownPath(upload.path)) {
               await context.markdownBaseCache?.putBase(upload.path, upload.hash, upload.content);
             }
-          } else if (fileResult.code === 'version_conflict' || fileResult.status === 409) {
+          } else if (fileResult.code === 'version_conflict' || isQueueVersionConflict(fileResult.status, fileResult.code)) {
             versionConflictPaths.add(upload.path);
           } else {
             result.errors.push(`${upload.path}: ${fileResult.error || "Upload failed"}`);
@@ -189,13 +190,13 @@ async function uploadPreparedFilesIndividually(
         return null;
       }
 
-      if (uploadResult.code === 'version_conflict' || uploadResult.status === 409) {
+      if (uploadResult.code === 'version_conflict' || isQueueVersionConflict(uploadResult.status, uploadResult.code)) {
         return upload.path;
       }
       result.errors.push(`${upload.path}: ${uploadResult.error || "Upload failed"}`);
     } catch (error) {
       if (isAbortError(error)) throw error;
-      if (error instanceof HttpError && (error.code === 'version_conflict' || error.status === 409)) {
+      if (error instanceof HttpError && isQueueVersionConflict(error.status, error.code)) {
         return upload.path;
       }
       const uploadError = error instanceof Error ? error.message : "Upload failed";

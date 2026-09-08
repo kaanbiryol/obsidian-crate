@@ -1,5 +1,6 @@
 import { corsResponse } from '../cors';
 import { PUSH_RECIPIENT_AUTHORITY } from '../notifications/recipient-authority';
+import { REMINDER_CACHE_PARSER_VERSION } from '../reminders-web/reminder-cache/types';
 
 function firstCount(result: unknown): number {
 	if (!result || typeof result !== 'object') return 0;
@@ -23,13 +24,17 @@ export async function handleDiagnostics(db: D1Database): Promise<Response> {
 		db.prepare('SELECT COUNT(*) AS count FROM notification_jobs WHERE last_error IS NOT NULL'),
 		db.prepare('SELECT COUNT(*) AS count FROM reminder_operations'),
 		db.prepare('SELECT COUNT(*) AS count FROM scheduled_reminders WHERE delivery_failed_at IS NOT NULL'),
+		db.prepare('SELECT COUNT(*) AS count FROM reminder_source_state WHERE parser_version < ?').bind(REMINDER_CACHE_PARSER_VERSION),
+		db.prepare('SELECT COUNT(*) AS count FROM reminder_source_state WHERE parser_version = ? AND verified = 0').bind(REMINDER_CACHE_PARSER_VERSION),
 	]);
-	const [lastRun, lastError, deliveryHealth] = await Promise.all([
+	const [lastRun, lastError, deliveryHealth, projectionIssues] = await Promise.all([
 		db.prepare("SELECT value FROM maintenance_state WHERE key = 'last_run'").first<{ value: string }>(),
 		db.prepare("SELECT value FROM maintenance_state WHERE key = 'last_error'").first<{ value: string }>(),
 		db.prepare(`SELECT MIN(delivery_failed_at) AS oldestFailureAt,
 			MIN(CASE WHEN due_datetime < ? THEN due_datetime END) AS oldestOverdueAt FROM scheduled_reminders`)
 			.bind(new Date().toISOString()).first<{ oldestFailureAt: string | null; oldestOverdueAt: string | null }>(),
+		db.prepare(`SELECT path, last_error AS reason FROM notification_projection_jobs
+			WHERE last_error IS NOT NULL ORDER BY updated_at, path LIMIT 100`).all<{ path: string; reason: string }>(),
 	]);
 	return corsResponse({
 		status: 'ok',
@@ -48,10 +53,14 @@ export async function handleDiagnostics(db: D1Database): Promise<Response> {
 			failedNotificationJobs: firstCount(results[11]),
 			reminderOperationReceipts: firstCount(results[12]),
 			failedNotificationDeliveries: firstCount(results[13]),
+			pendingReminderSourceVerification: firstCount(results[14]),
+			quarantinedReminderSources: firstCount(results[15]),
 		},
 		lastMaintenanceAt: lastRun?.value ?? null,
 		lastMaintenanceError: lastError?.value ?? null,
 		oldestNotificationFailureAt: deliveryHealth?.oldestFailureAt ?? null,
 		oldestOverdueNotificationAt: deliveryHealth?.oldestOverdueAt ?? null,
+		notificationProjectionIssues: projectionIssues.results,
+		reminderSourceParserVersion: REMINDER_CACHE_PARSER_VERSION,
 	});
 }

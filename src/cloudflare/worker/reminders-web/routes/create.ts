@@ -1,5 +1,4 @@
 import { beginReminderOperation, reminderOperationEffects } from '../operations';
-import { createReminderId } from '@/reminders/core/reminderIdentity';
 import { buildCreateReminderArgs } from '@/reminders/data/reminder-repository/shared';
 import { corsResponse } from '../../cors';
 import { readCommittedMarkdownFileVersion, writeCommittedMarkdownFile } from '../../storage';
@@ -28,6 +27,7 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 
 	const operation = await beginReminderOperation(env.DB, parsedBody.value, 'create');
 	if (operation instanceof Response) return operation;
+	if (parsedBody.value.id !== operation.id) return corsResponse({ error: 'A new reminder must use its operation identity.' }, 400);
 
 	const workspaceResult = parseReminderMutationWorkspace(parsedBody.value);
 	if (workspaceResult instanceof Response) {
@@ -60,7 +60,7 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 		dueDatetime: parseOptionalString(parsedBody.value.dueDatetime, 128) || undefined,
 		id: parseOptionalString(parsedBody.value.id, 128) || undefined,
 	});
-	const reminderId = createArgs.reminderId || createReminderId();
+	const reminderId = operation.id;
 	const filePath = getProjectFilePath(workspaceResult.folderPath, project);
 	const existingFile = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, filePath);
 	const existingContent = existingFile?.content ?? getInitialProjectFileContent(project);

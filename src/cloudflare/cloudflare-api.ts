@@ -197,7 +197,9 @@ export class CloudflareApiClient {
 		const result = await this.request<D1Database[]>(
 			`/accounts/${accountId}/d1/database?name=${encodeURIComponent(name)}&per_page=100`,
 		);
-		return result.find(database => database.name === name) ?? null;
+		const matches = result.filter(database => database.name === name);
+		if (matches.length > 1) throw new Error('Multiple D1 databases match this deployment name. Select the intended server before deploying.');
+		return matches[0] ?? null;
 	}
 
 	async createD1Database(accountId: string, name: string): Promise<D1Database> {

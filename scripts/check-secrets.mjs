@@ -4,6 +4,10 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync, copyFileSy
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
+if (execFileSync('git', ['rev-parse', '--is-shallow-repository'], { encoding: 'utf8' }).trim() !== 'false') {
+	throw new Error('Secret scanning requires complete Git history. Run git fetch --unshallow --tags and retry.');
+}
+
 const version = '8.30.1';
 const platform = { darwin: 'darwin', linux: 'linux' }[process.platform];
 const arch = { arm64: 'arm64', x64: 'x64' }[process.arch];

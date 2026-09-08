@@ -13,4 +13,16 @@ describe('portable sync paths', () => {
 		expect(findPortablePathCollisions(['Notes/A.md', 'notes/a.md'])).toHaveLength(1);
 		expect(() => assertPortablePaths(['café.md', 'cafe\u0301.md'])).toThrow('Unicode-normalizing');
 	});
+
+	it.each([
+		['Projects.md', 'Projects.md/child.md'],
+		['projects.md/child.md', 'Projects.md'],
+		['Café.md', 'cafe\u0301.md/child.md'],
+	])('rejects file ancestors in either order: %j', (first, second) => {
+		expect(() => assertPortablePaths([first, second])).toThrow('parent folder');
+	});
+
+	it('allows ordinary siblings and shared directories', () => {
+		expect(() => assertPortablePaths(['Projects.md', 'Projects.md-copy', 'Projects/a.md', 'Projects/b.md'])).not.toThrow();
+	});
 });

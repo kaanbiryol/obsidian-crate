@@ -24,6 +24,7 @@ export interface SyncQueueControllerContext {
 	isDestroyed(): boolean;
 	currentStatus(): SyncState['status'];
 	prepareUploadFromPath(path: string): Promise<PreparedUpload | null>;
+	assertLocalFileAbsent(path: string): Promise<void>;
 	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	getModifiedIso(path: string, fallbackMtime?: number): Promise<string>;
 	getDebounceDelayMs(): number;
@@ -40,6 +41,7 @@ export class SyncQueueController {
 	private inFlightPaths: Set<string> = new Set();
 	private pendingRevisions = new Map<string, number>();
 	private nextRevision = 0;
+	private flushTasks = new Set<Promise<void>>();
 	private reconciliationScheduled = false;
 	private reconciliationPaths = new Set<string>();
 
@@ -128,6 +130,7 @@ export class SyncQueueController {
 			currentStatus: () => this.context.currentStatus(),
 			markdownBaseCache: this.context.markdownBaseCache,
 			prepareUploadFromPath: (path: string) => this.context.prepareUploadFromPath(path),
+			assertLocalFileAbsent: (path: string) => this.context.assertLocalFileAbsent(path),
 			runConcurrent: <T>(tasks: Array<() => Promise<T>>, concurrency: number) =>
 				this.context.runConcurrent(tasks, concurrency),
 			getModifiedIso: (path: string, fallbackMtime?: number) =>
@@ -156,7 +159,13 @@ export class SyncQueueController {
 	}
 
 	private async processPendingChanges(): Promise<void> {
-		await flushPendingQueueChanges(this.getQueueFlushContext(), this.context.uploadConcurrency);
+		const task = flushPendingQueueChanges(this.getQueueFlushContext(), this.context.uploadConcurrency);
+		this.flushTasks.add(task);
+		try { await task; } finally { this.flushTasks.delete(task); }
+	}
+
+	async waitForIdle(): Promise<void> {
+		await Promise.allSettled([...this.flushTasks]);
 	}
 
 	private requestReconciliation(queueKeys: string[]): void {

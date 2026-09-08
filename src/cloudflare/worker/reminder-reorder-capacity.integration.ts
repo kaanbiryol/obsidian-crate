@@ -1,3 +1,4 @@
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
@@ -16,7 +17,7 @@ afterEach(async () => { await reset(); });
 function reorderRequest(body: Record<string, unknown>) {
 	return new Request('https://reorder.test/reminders/reorder', {
 		method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-			folderPath: 'Reminders', project: 'Inbox', operationId: crypto.randomUUID(), ...body,
+			folderPath: 'Reminders', project: 'Inbox', operationId: newOperationId(), ...body,
 		}),
 	});
 }
@@ -27,7 +28,7 @@ it('reorders a page inside a 1,000-reminder project, retains the rest and retrie
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
 	const orderedIds = [...ids];
 	[orderedIds[600], orderedIds[601]] = [ids[601]!, ids[600]!];
-	const body = { orderedIds, expectedOrder: ids, operationId: crypto.randomUUID() };
+	const body = { orderedIds, expectedOrder: ids, operationId: newOperationId() };
 	const response = await handleReorderReminders(reorderRequest(body), env);
 	expect(response.status).toBe(200);
 	const current = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path);
@@ -46,3 +47,29 @@ it('keeps finite item and JSON byte limits for reorder requests', async () => {
 	expect((await handleReorderReminders(reorderRequest({ orderedIds: ids, expectedOrder: [] }), env)).status).toBe(400);
 	expect((await handleReorderReminders(reorderRequest({ orderedIds: [], expectedOrder: [], padding: 'x'.repeat(1024 * 1024) }), env)).status).toBe(413);
 });
+
+it.each([
+	['first', 'first'],
+	['second', 'missing'],
+	['second', 'done'],
+])('returns an actionable conflict for ambiguous requested order %j without publishing changes', async (...orderedIds) => {
+	const content = '- [ ] Original <!-- crate-id:first -->\n- [ ] Another <!-- crate-id:second -->\n- [x] Completed <!-- crate-id:done -->\n';
+	await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+	const original = await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path);
+	const operationId = newOperationId();
+	const response = await handleReorderReminders(reorderRequest({
+		orderedIds, expectedOrder: ['first', 'second', 'done'], operationId,
+	}), env);
+
+	expect(response.status).toBe(409);
+	expect(await response.json()).toEqual({
+		error: 'Reminder order changed. Refresh the project before reordering; nothing was changed.',
+		code: 'reminder_order_conflict',
+	});
+	expect(await readCommittedMarkdownFileVersion(env.BUCKET, env.DB, path)).toEqual(original);
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM changelog').first()).toEqual({ count: 1 });
+	expect(await env.DB.prepare('SELECT operation_id FROM reminder_operations WHERE operation_id = ?').bind(operationId).first()).toBeNull();
+});
+
+const issuedDay = Math.floor(Date.now() / 86_400_000);
+function newOperationId() { return createReminderOperationId(issuedDay); }

@@ -1,0 +1,123 @@
+{
+  "version": "New tab - Vault - Obsidian 1.13.7",
+  "created": {
+    "id": "8fa5be6b-6fd2-48c0-b0d2-88ef74ca10f2",
+    "content": "[Weekly report](https://example.com/report)",
+    "description": "Preserve these acceptance details.",
+    "dueDate": "2099-01-01",
+    "dueDatetime": "2099-01-01T09:00:00.000Z",
+    "priority": 4,
+    "completed": false,
+    "project": "Inbox",
+    "recurrence": {
+      "frequency": "daily",
+      "hour": 9,
+      "minute": 0,
+      "count": 3,
+      "timezone": "UTC"
+    },
+    "lineNumber": 2
+  },
+  "moved": {
+    "id": "8fa5be6b-6fd2-48c0-b0d2-88ef74ca10f2",
+    "content": "[Weekly report](https://example.com/report)",
+    "description": "Preserve these acceptance details.",
+    "dueDate": "2099-01-01",
+    "dueDatetime": "2099-01-01T09:00:00.000Z",
+    "priority": 1,
+    "completed": false,
+    "project": "Work",
+    "recurrence": {
+      "frequency": "daily",
+      "hour": 9,
+      "minute": 0,
+      "count": 3,
+      "timezone": "UTC"
+    },
+    "lineNumber": 2
+  },
+  "first": {
+    "id": "8fa5be6b-6fd2-48c0-b0d2-88ef74ca10f2",
+    "content": "[Weekly report](https://example.com/report)",
+    "description": "Preserve these acceptance details.",
+    "dueDate": "2099-01-02",
+    "dueDatetime": "2099-01-02T09:00:00.000Z",
+    "priority": 1,
+    "completed": false,
+    "project": "Work",
+    "recurrence": {
+      "frequency": "daily",
+      "hour": 9,
+      "minute": 0,
+      "count": 3,
+      "completedCount": 1,
+      "timezone": "UTC"
+    },
+    "lineNumber": 2
+  },
+  "final": {
+    "id": "8fa5be6b-6fd2-48c0-b0d2-88ef74ca10f2",
+    "content": "[Weekly report](https://example.com/report)",
+    "description": "Preserve these acceptance details.",
+    "dueDate": "2099-01-03",
+    "dueDatetime": "2099-01-03T09:00:00.000Z",
+    "priority": 1,
+    "completed": true,
+    "project": "Work",
+    "recurrence": {
+      "frequency": "daily",
+      "hour": 9,
+      "minute": 0,
+      "count": 3,
+      "completedCount": 3,
+      "timezone": "UTC"
+    },
+    "lineNumber": 2
+  },
+  "reopened": {
+    "id": "8fa5be6b-6fd2-48c0-b0d2-88ef74ca10f2",
+    "content": "[Weekly report](https://example.com/report)",
+    "description": "Preserve these acceptance details.",
+    "dueDate": "2099-01-03",
+    "dueDatetime": "2099-01-03T09:00:00.000Z",
+    "priority": 1,
+    "completed": false,
+    "project": "Work",
+    "recurrence": {
+      "frequency": "daily",
+      "hour": 9,
+      "minute": 0,
+      "count": 3,
+      "completedCount": 2,
+      "timezone": "UTC"
+    },
+    "lineNumber": 2
+  },
+  "reloads": [
+    {
+      "commands": 10,
+      "reminders": 1
+    },
+    {
+      "commands": 10,
+      "reminders": 1
+    },
+    {
+      "commands": 10,
+      "reminders": 1
+    }
+  ],
+  "identityMarkers": 1,
+  "paths": [
+    "Reminders/Work.md",
+    "Reminders/Inbox.md",
+    "Welcome.md"
+  ],
+  "unconfigured": true,
+  "pageErrors": [],
+  "artifacts": {
+    "main.js": "5839a8ef805f002d6856fa31bf6f87f313f84b74555b6c607c38e838d4204d70",
+    "manifest.json": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a",
+    "styles.css": "4cfe6f2949d4d3be2c0e0f08242f6f80202ee961edb4c37b0b81794669379a76"
+  }
+}

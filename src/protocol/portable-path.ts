@@ -40,13 +40,26 @@ export function findPortablePathCollisions(paths: Iterable<string>): PortablePat
 
 export function assertPortablePaths(paths: Iterable<string>): void {
 	const allPaths = [...paths];
-	for (const path of allPaths) {
-		const issue = getPortablePathIssue(path);
-		if (issue) throw new Error(`Path is not portable across supported devices: ${path} (${issue})`);
-	}
+	assertPortablePathNames(allPaths);
 
 	const [collision] = findPortablePathCollisions(allPaths);
 	if (collision) {
 		throw new Error(`Paths collide on a case-insensitive or Unicode-normalizing device: ${collision.paths.join(', ')}`);
+	}
+	const files = new Map(allPaths.map(path => [portablePathKey(path), path]));
+	for (const path of allPaths) {
+		const segments = portablePathKey(path).split('/');
+		for (let length = 1; length < segments.length; length++) {
+			const ancestor = files.get(segments.slice(0, length).join('/'));
+			if (ancestor) throw new Error(`File "${ancestor}" conflicts with the parent folder of "${path}". Rename one of these files or its parent folder, then sync again.`);
+		}
+	}
+}
+
+/** Historical changes need valid names, but need not coexist as live files. */
+export function assertPortablePathNames(paths: Iterable<string>): void {
+	for (const path of paths) {
+		const issue = getPortablePathIssue(path);
+		if (issue) throw new Error(`Path is not portable across supported devices: ${path} (${issue})`);
 	}
 }

@@ -2,6 +2,7 @@ import { sha256HexBytes } from './auth';
 import { corsResponse } from './cors';
 import { queryRows } from './db';
 import { commitStagedFile } from './sync-mutations';
+import { FileNamespaceConflictError } from './file-namespace';
 import {
 	createManagedObjectKey,
 	MAX_FILE_BYTES,
@@ -89,7 +90,8 @@ export async function handleRestoreFileVersion(
 				currentHash: result.currentHash,
 			}, 409);
 		}
-	} catch {
+	} catch (error) {
+		if (error instanceof FileNamespaceConflictError) return error.toResponse();
 		// A failed response may follow a successful commit. Leave the fresh key
 		// for reference-aware orphan cleanup rather than risking live content.
 		return corsResponse({ error: 'Unable to restore file version; retry the request' }, 503);

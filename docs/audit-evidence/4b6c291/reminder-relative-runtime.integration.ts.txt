@@ -1,0 +1,53 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import schema from '../schema.sql?raw';
+import { writeCommittedMarkdownFile } from './storage';
+import { handleListReminders } from './reminders-web/routes/list';
+import { handleUpdateReminder } from './reminders-web/routes/update';
+import { handleNotificationPolicy } from './notification-policy';
+import { drainNotificationProjections } from './notification-projection';
+import type { ReminderRecord } from '@/pwa/types';
+
+beforeEach(async () => { for (const sql of schema.split(';').map(sql => sql.trim()).filter(Boolean)) await env.DB.prepare(sql).run(); });
+afterEach(async () => { vi.useRealTimers(); vi.restoreAllMocks(); await reset(); });
+const path = 'Reminders/Inbox.md';
+const text = '- [ ] Send invoice tomorrow <!-- crate-id:invoice -->\n';
+const request = () => new Request('https://test/reminders/list?folderPath=Reminders');
+
+it('confirms unchanged relative-date note becomes uneditable from the cached PWA listing after midnight', async () => {
+ vi.useFakeTimers({ toFake: ['Date'] });
+ vi.setSystemTime(new Date('2026-09-08T10:00:00Z'));
+ await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, text, null);
+ const first = await handleListReminders(request(), env);
+ expect(first.status).toBe(200);
+ const etag = first.headers.get('ETag')!;
+ const initial = await first.json() as { reminders: ReminderRecord[] };
+ expect(initial.reminders[0]!.dueDate).toBe('2026-09-09');
+ vi.setSystemTime(new Date('2026-09-09T10:00:00Z'));
+ const conditional = await handleListReminders(new Request(request(), { headers: { 'If-None-Match': etag } }), env);
+ expect(conditional.status).toBe(304);
+ const freshResponse = await handleListReminders(request(), env);
+ const cached = await freshResponse.json() as { reminders: ReminderRecord[] };
+ expect(cached.reminders[0]!.dueDate).toBe('2026-09-09');
+ expect(cached.reminders[0]!.revision).toBe(initial.reminders[0]!.revision);
+ const response = await handleUpdateReminder(new Request('https://test/reminders/update', {
+   method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', id: 'invoice', filePath: path,
+     operationId: crypto.randomUUID(), expectedRevision: cached.reminders[0]!.revision, content: 'Updated invoice' }),
+ }), env);
+ expect(response.status).toBe(409);
+ expect(await response.json()).toMatchObject({ code: 'version_conflict' });
+});
+
+it('confirms delayed relative-date projection permanently mismatches its committed due key', async () => {
+ vi.useFakeTimers({ toFake: ['Date'] });
+ vi.setSystemTime(new Date('2026-09-08T10:00:00Z'));
+ await handleNotificationPolicy(new Request('https://test/policy', { method: 'POST', body: JSON.stringify({ folderPath: 'Reminders', timezone: 'UTC', allDayTime: '09:00' }) }), env.DB);
+ await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, text, null);
+ expect(await env.DB.prepare('SELECT due_key FROM reminder_sources WHERE reminder_id = ?').bind('invoice').first()).toMatchObject({ due_key: '2026-09-09' });
+ vi.setSystemTime(new Date('2026-09-09T00:01:00Z'));
+ await drainNotificationProjections(env);
+ expect(await env.DB.prepare('SELECT last_error FROM notification_projection_jobs WHERE path = ?').bind(path).first()).toMatchObject({ last_error: 'Reminder source changed before projection' });
+ expect(await env.DB.prepare('SELECT reminder_id FROM notification_jobs').all()).toMatchObject({ results: [] });
+});

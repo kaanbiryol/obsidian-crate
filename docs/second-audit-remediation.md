@@ -1,0 +1,69 @@
+# Second audit remediation
+
+The fresh audit starts at `f371397`, after the first round of actionable fixes. Historical audit reports remain unchanged. Findings below are independently reproduced and committed; final acceptance results will be recorded against the final candidate.
+
+## R01 — Return committed reminder state
+
+- **Severity / confidence:** medium, confirmed.
+- **Area:** Obsidian reminder repository, Markdown writer and index.
+- **Failure:** complete a recurring reminder through the repository. Markdown and the index advance its due date and occurrence count, but the returned reminder contains the old date/count and `completed: true`. Adding recurrence to an undated reminder likewise omits the generated schedule from the returned value. Consumers can render a state different from the saved note.
+- **Root cause:** mutation methods reconstructed results from the pre-write record. Completion's optimistic index update also omitted the recurrence count.
+- **Fix:** return the current indexed record after the writer completes and include recurrence in the completion update.
+- **Proof:** a real repository/writer/rescan regression failed before the fix. The focused repository and writer suite passes 67 tests, covering partial edits, project moves, generated dates, recurring advancement, final completion, reopening and recompletion.
+
+## R02 — Preserve literal title text during schedule decoding
+
+- **Severity / confidence:** high, confirmed.
+- **Area:** shared reminder parser, editor/Markdown round trip and Worker caches.
+- **Failure:** save an editor title containing `[Weekly report](https://example.com/report)` with a recurrence. The editor protects the link, but durable decoding previously interpreted `Weekly` as the rule and rejected the saved schedule. A literal `!` inside a link changed priority and disappeared from the title. Repeated date/rule text could also remove the wrong occurrence.
+- **Root cause:** durable parsing searched raw text and removed the first matching string, independently of the editor's protected, indexed matches.
+- **Fix:** share those matches, select the appended schedule and remove only its original ranges. Parser version 7 invalidates old list caches and requires current-source notification revalidation without changing Markdown bytes.
+- **Proof:** four new round-trip cases failed before the fix. The reminder/PWA suite passes 753 tests; the final persisted-schedule suite passes 24 cases, including identical all-day/timed date mentions. Thirteen actual Worker tests cover create/list, parser-6 cache replacement, durable authority migration, unchanged R2 bytes and notification migration fences. Targeted lint and both typechecks pass.
+
+## R03 — Preserve damaged or colliding saved editor drafts
+
+- **Severity / confidence:** high, confirmed.
+- **Area:** PWA session storage and reminder editor lifecycle.
+- **Failure:** a saved draft has a string title but an object description or invalid recurrence. Ordinary restore previously passed it to the editor, where it could fail rendering/saving; closing the sheet unconditionally deleted the only original copy. A different operation's draft could also be overwritten when opening recovery in the same slot.
+- **Root cause:** ordinary restore validated only title type; recovery validation omitted recurrence, and neither path provided an exportable quarantine before replacement.
+- **Fix:** validate the draft and retained attempt before rendering. Damaged/incompatible strings stay in place behind a review screen. Close/reload preserves them; exact export, explicit review, same-key/folder/string comparison and verified removal precede a fresh editor. Storage access failure stays actionable. Valid legacy bodies are retained byte for byte.
+- **Proof:** three damaged-field regressions failed before the fix. All 264 PWA unit tests and targeted lint/typecheck pass. Chromium/WebKit draft recovery, first-tap focus, authentication recovery and two-tab outbox recovery pass, including changed bytes, failed deletion, full Unicode export, inert markup and folder isolation.
+
+## R04 — Batch cold full-sync uploads within existing safety budgets
+
+- **Severity / confidence:** medium, confirmed.
+- **Area:** full-sync workflow and upload transport.
+- **Failure:** a 10,000-note cold full sync performed 20,002 requests, including a protocol preflight and individual upload for each note. The initial-upload path already supported bounded batching.
+- **Root cause:** full reconciliation routed upload diffs through the individual conflict-processing function instead of the existing batch transport.
+- **Fix:** reuse byte-budgeted preparation and three-file batch publication. Preparation forces a fresh read with the plan's remote-hash/absence guard; confirmed hash/revision updates, errors, progress and edit/delete notices retain their semantics.
+- **Proof:** the 398-test sync suite, final four-case workflow suite, eight interrupted-history tests, three new real-Worker failure cases and all four 1k/10k capacity cases pass. Targeted lint and both typechecks pass. Cold requests fall to 674/6,722 (about 66% lower), with all final bytes and hashes verified. [Measurements and scope](sync-capacity.md).
+
+## R05 — Reconcile bundle budgets with the shipped recovery features
+
+- **Severity / confidence:** medium, confirmed release-gate failure.
+- **Area:** PWA delivery, lazy recovery controls and artifact budgets.
+- **Failure:** the first-round gate stopped at PWA startup/total limits. Subsequent draft validation and recovery brought startup to 441.29 KiB raw / 149.33 KiB gzip, and all assets to 467.50 / 158.56 KiB, above the original limits.
+- **Root cause:** the original budgets predated the added session, cache, outbox, expiry and draft recovery features. Recovery notices also loaded on every ordinary launch.
+- **Fix:** defer mutation/recovery notices until they are needed; keep editor focus synchronous. A failed deferred asset load shows a reload action and preserves saved intent. Retain the 450,000-byte startup raw ceiling; explicitly revise startup gzip from 150,000 to 154,000 bytes and all-assets limits from 465,000/158,000 to 485,000/168,000 bytes. This is a reviewed budget adjustment, not a claim that all old limits now pass.
+- **Proof:** startup measures 435.91 KiB raw / 148.38 KiB gzip and all assets 470.00 / 161.03 KiB, within the revised ceilings. Chromium/WebKit asset-failure draft recovery, focus, auth recovery, outbox quarantine and expiry checks pass; targeted lint and plugin typecheck pass. The full final gate remains required.
+
+## Gate cleanup
+
+The first clean candidate gate caught an unused priority-removal helper left by R02. Its only caller had been replaced by indexed removal. The obsolete function was removed in a separate commit; this has no runtime effect. The full gate is restarted after this correction.
+
+## R06 — Reuse the reminder pane through Obsidian reload
+
+- **Severity / confidence:** medium, confirmed in Obsidian 1.13.7.
+- **Area:** plugin startup and reminder workspace activation (`workspaceLayout.ts`, `register-integrations.ts`, `plugin-integration.ts`).
+- **Failure:** repeatedly disable and enable the plugin with automatic sidebar opening. Obsidian temporarily reports the old pane as empty while restoring its deferred view, so startup creates another pane. Concurrent open commands can also create duplicates before the first view finishes opening.
+- **Root cause:** view lookup alone cannot identify a temporarily empty pane; activation did not serialize construction or await asynchronous reveal, and ready-layout startup did not await activation.
+- **Fix:** serialize opens with a bounded workspace-owned reservation that survives plugin module reload. Reuse the reserved pane only while it is still attached and represents the reminder or temporary empty view; closed and repurposed panes are left alone. Await reveal/startup and fence late reveals on unload. The reservation holds one pane and a pending promise, and the promise is cleared after completion.
+- **Proof:** the concurrency/reveal regressions failed before the fix. All 41 focused lifecycle/workspace tests, plugin typecheck and lint pass, including module replacement, closed/repurposed panes, failed activation and unload. An isolated real Obsidian vault retains the same single loaded pane through five reloads and three concurrent opens, with ten commands, stable reminder identity and no observed JavaScript errors. The installed artifact and raw acceptance results are included with the final candidate evidence.
+
+## Final verification
+
+The first-round gate passed advisory and secret scans, lint, both typechecks, deadcode, notices, 22 recovery tests, 1,538 unit tests, 220 Worker tests and production builds. It stopped at PWA bundle budgets; later gate steps therefore were not established by that run.
+
+After R01–R06 and the separate unused-helper cleanup, the complete release gate passes on `bb14136`: 1,562 unit tests, 225 local Worker integration tests, 22 recovery tests, all 19 Chromium/WebKit browser scripts, production artifacts, budgets and security scans. The visual typecheck and all 48 visual tests pass. Clean Node 20.19.0, 22.12.0 and 24.0.0 builds produce identical artifacts. Actual Obsidian 1.13.7 editor/reload checks use the final assets.
+
+See the [candidate evidence](audit-evidence/remediation/final-bb14136/README.md) and [final 17-section assessment](pre-release-readiness-bb14136.md). No confirmed code finding remains open from either round. Hosted, minimum-version and physical-device acceptance remains explicitly unverified.

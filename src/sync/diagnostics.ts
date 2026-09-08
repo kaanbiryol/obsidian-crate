@@ -71,6 +71,9 @@ export async function runSyncDiagnostics(client: DiagnosticClient | null): Promi
 					? `Last ran ${backend.lastMaintenanceAt}.`
 					: 'No scheduled maintenance run has been recorded yet.',
 			});
+			for (const issue of backend.notificationProjectionIssues ?? []) {
+				results.push({ name: `Reminders in ${issue.path}`, status: 'warn', message: issue.reason });
+			}
 		} catch (error) {
 			results.push({
 				name: 'Backend diagnostics',

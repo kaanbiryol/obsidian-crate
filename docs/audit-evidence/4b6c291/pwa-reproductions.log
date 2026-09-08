@@ -1,0 +1,10 @@
+{"browser":"chromium","scenario":"401 destroys uncommitted outbox","before":[{"status":"uncertain","title":"Unique text kept only in durable outbox"}],"after":[],"token":null}
+{"browser":"chromium","scenario":"other tab after acknowledged save","first":1,"secondOld":1,"secondNew":0,"visibilityA":"visible","visibilityB":"visible"}
+{"browser":"chromium","scenario":"server subscription never registered but UI claims enabled","attachAttempts":1,"enableButtons":0,"notificationState":"On"}
+{"browser":"chromium","scenario":"partial reminder list silently hides server issues","issueVisible":0,"statusLine":0,"body":"Inbox\n0 reminders\nYour inbox is empty\n\nAdd a new reminder to get started\n\nInbox\nToday\nUpcoming\nProjects"}
+{"browser":"chromium","scenario":"midnight plus unchanged304 keeps yesterday Today view","date":"Wed Sep 09 2026 00:01:00 GMT+0200 (Central European Summer Time)","lists":2,"dueTodayCount":0,"body":"Today\n0 reminders\nNothing due today\n\nEnjoy your free time!\n\nInbox\nToday\nUpcoming\nProjects"}
+{"browser":"webkit","scenario":"401 destroys uncommitted outbox","before":[{"status":"uncertain","title":"Unique text kept only in durable outbox"}],"after":[],"token":null}
+{"browser":"webkit","scenario":"other tab after acknowledged save","first":0,"secondOld":0,"secondNew":1,"visibilityA":"visible","visibilityB":"visible"}
+{"browser":"webkit","scenario":"server subscription never registered but UI claims enabled","attachAttempts":1,"enableButtons":0,"notificationState":"On"}
+{"browser":"webkit","scenario":"partial reminder list silently hides server issues","issueVisible":0,"statusLine":0,"body":"Inbox\n0 reminders\n\nYour inbox is empty\nAdd a new reminder to get started\n\nInbox\n\nToday\n\nUpcoming\n\nProjects\n"}
+{"browser":"webkit","scenario":"midnight keeps yesterday Today view","date":"Wed Sep 09 2026 00:01:00 GMT+0200 (Central European Summer Time)","lists":1,"dueTodayCount":0,"body":"Today\n0 reminders\n\nNothing due today\nEnjoy your free time!\n\nInbox\n\nToday\n\nUpcoming\n\nProjects\n"}

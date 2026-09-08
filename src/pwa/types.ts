@@ -66,8 +66,7 @@ export interface ToastState {
 }
 
 export interface PushState {
-	supported: boolean;
-	subscribed: boolean;
+	phase: 'checking' | 'off' | 'enabled' | 'error' | 'blocked' | 'unsupported' | 'install';
 	status: string | null;
 }
 
@@ -77,6 +76,12 @@ export interface CachedReminderSnapshot {
 	projects: string[];
 	savedAt: number;
 	etag?: string;
+	issues?: ReminderSourceIssue[];
+}
+
+export interface ReminderSourceIssue {
+	path: string;
+	reason: string;
 }
 
 export interface ReminderMutationBody {
