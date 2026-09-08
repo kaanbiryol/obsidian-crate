@@ -39,7 +39,7 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | S08 | Make sync status keyboard accessible and clarify recurring completion undo | Keyboard portion fixed: focusable named button, Enter/Space, visible focus and listener cleanup; actual Chromium/WebKit component checks, lint and typecheck pass. Recurring undo remains pending |
 | S09 | Align security/release checks and improve contributor/dependency maintenance setup | Pending |
 | S10 | Document and verify protocol/schema/cache upgrade and rollback policy | Pending |
-| S11 | Exercise larger sync workloads, interrupted multi-client histories and storage boundaries | Pending |
+| S11 | Exercise larger sync workloads, interrupted multi-client histories and storage boundaries | Fixed: four1k/10k-note actual-engine capacity cases, eight three-device interrupted/expired-history cases and three authenticated storage-boundary cases pass; every final byte/hash checked; [measurements and limits](sync-capacity.md). Cold full-upload request amplification carried into follow-up audit; hosted/mobile performance remains acceptance work |
 | S12 | Record exact-artifact hosted, physical-device, minimum-Obsidian and restore acceptance | Not yet verified; availability of required environments must be established |
 
 ## Completion requirements
