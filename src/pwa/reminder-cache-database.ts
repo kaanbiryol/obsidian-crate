@@ -1,4 +1,4 @@
-export const CACHE_DATABASE_NAME = 'crate-reminders';
+const CACHE_DATABASE_NAME = 'crate-reminders';
 export const CACHE_STORE_NAME = 'snapshots';
 export const FRESHNESS_STORE_NAME = 'freshness';
 const CACHE_DATABASE_VERSION = 2;
