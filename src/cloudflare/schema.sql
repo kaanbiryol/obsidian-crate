@@ -175,6 +175,7 @@ CREATE TABLE IF NOT EXISTS reminder_occurrences (
  reminder_id TEXT NOT NULL, due_key TEXT NOT NULL, first_seen_at INTEGER NOT NULL,
  PRIMARY KEY (reminder_id, due_key)
 );
+CREATE INDEX IF NOT EXISTS reminder_occurrences_first_seen_idx ON reminder_occurrences(first_seen_at);
 
 CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_idx ON push_subscriptions(endpoint);
 CREATE TABLE IF NOT EXISTS request_rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);
