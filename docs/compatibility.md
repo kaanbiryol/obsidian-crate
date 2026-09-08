@@ -8,7 +8,7 @@ Compatibility is a contract among plugin code, the Worker, the PWA asset build, 
 | --- | --- | --- |
 | API writes | `X-Crate-Protocol: 6`; current and oldest compatible are both 6 | Missing, older or future protocols receive 428 before mutations. Authenticated read endpoints remain available at the HTTP layer; an older application's decoder may still require an update. |
 | D1 | `crate_schema = 4` | Empty databases initialize; schema 2/3 upgrade additively; other versions are rejected. Joining an existing deployment does not migrate or upload code. |
-| Reminder parsing | Parser version 6 | List caches are disposable. Durable source verification is rebuilt from current R2 revisions before queued or installed notifications can deliver. |
+| Reminder parsing | Parser version 7 | List caches are disposable. Durable source verification is rebuilt from current R2 revisions before queued or installed notifications can deliver. |
 | Browser read cache | IndexedDB 2; snapshot completeness metadata and session digest | Known version-1 stores receive the freshness store atomically. Old snapshot payloads require a full response. Damaged or newer formats preserve bytes and show recovery guidance. |
 | Browser pending commands | `crate-reminder-outbox:v1:` keys, envelope version 1 | Exact bodies and operation IDs survive reload and explicit same-folder session recovery. New IDs contain a server-issued UTC day. Expired commands require review/export; damaged/unsupported envelopes stay quarantined and exportable. |
 | Browser drafts | Folder-scoped session-storage records | Session expiry/re-enrollment preserves drafts. Explicit logout clears them across tabs. Legacy unscoped drafts are bound before enrollment changes folders. |

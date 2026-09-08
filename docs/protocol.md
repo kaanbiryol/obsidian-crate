@@ -50,7 +50,7 @@ Limits are application guardrails, not a promise that every workload fits a free
 
 ## Supported storage formats
 
-Current formats are D1 `crate_schema` version 4, parser version 6, IndexedDB version 2, generation-bearing authority-bound local file checkpoints, and URI-encoded `crate-desc:v1:` description comments. Provisioning supports an additive D1 schema-2/3-to-4 upgrade; other database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
+Current formats are D1 `crate_schema` version 4, parser version 7, IndexedDB version 2, generation-bearing authority-bound local file checkpoints, and URI-encoded `crate-desc:v1:` description comments. Provisioning supports an additive D1 schema-2/3-to-4 upgrade; other database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
 
 ## Source and occurrence integrity
 

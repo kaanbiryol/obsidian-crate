@@ -1,9 +1,5 @@
 import * as chrono from 'chrono-node';
 import type { Priority, RecurrenceRule } from '../types/reminder';
-import {
-  findStandalonePriorityMarkerIndexes,
-  removeStandalonePriorityMarkers,
-} from './priorityMarker';
 import { parseRecurrenceFromContent } from './recurrenceParser';
 import { parseLocalDateKey } from './reminderDate';
 import { findAllMatches } from './richTextMatchers';
@@ -24,16 +20,6 @@ export class UnresolvedReminderScheduleError extends Error {
   constructor() {
     super('Open this note in Obsidian to save its reminder schedule with an explicit date and timezone.');
   }
-}
-
-function stripUrlsForDateParsing(content: string): string {
-  // Keep link text, but drop URLs so chrono doesn't parse dates from them.
-  let sanitized = content.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
-  // Remove markdown autolinks like <https://...>
-  sanitized = sanitized.replace(/<https?:\/\/[^>\s]+>/gi, ' ');
-  // Remove bare URLs
-  sanitized = sanitized.replace(/\bhttps?:\/\/[^\s)]+/gi, ' ');
-  return sanitized;
 }
 
 /**
@@ -70,11 +56,15 @@ export function parseReminderContent(content: string, knownProjects?: string[], 
 
   // IMPORTANT: Extract recurrence patterns FIRST (before date extraction)
   // This ensures "every Friday 12:00" is captured as recurrence, not just as a date
-  const recurrenceResult = parseRecurrenceFromContent(taskContent);
-  if (recurrenceResult) {
+  const matches = findAllMatches(taskContent, knownProjects, referenceDate);
+  const removed: Array<{ index: number; length: number }> = [];
+  const recurrenceMatch = matches
+    .filter(match => match.type === 'date' && parseRecurrenceFromContent(match.text)).at(-1);
+  const recurrenceResult = recurrenceMatch && parseRecurrenceFromContent(recurrenceMatch.text);
+  if (recurrenceResult && recurrenceMatch) {
     recurrence = recurrenceResult.rule;
     recurrencePart = recurrenceResult.matched;
-    taskContent = taskContent.replace(recurrenceResult.matched, '').trim();
+    removed.push(recurrenceMatch);
 
     // If the recurrence matched a day+time (e.g., "every Friday 12:00"),
     // also extract the date for the first occurrence
@@ -96,9 +86,14 @@ export function parseReminderContent(content: string, knownProjects?: string[], 
   // Also handle seconds/milliseconds + timezone suffix (e.g., 2025-11-02T14:00:00.000Z)
   // Stored reminder lines append their authoritative date after the title. Keep
   // earlier date mentions in the title when the editor saves and reloads them.
-  const dateParseContent = findAllMatches(stripUrlsForDateParsing(taskContent), knownProjects, referenceDate)
-    .filter(match => match.type === 'date' && !parseRecurrenceFromContent(match.text))
-    .at(-1)?.text ?? '';
+  const dateMatch = matches
+    .filter(match => match.type === 'date' && !parseRecurrenceFromContent(match.text)).at(-1);
+  const dateParseContent = dateMatch?.text ?? '';
+  const removeDate = (offset: number, length: number) => {
+    if (!dateMatch) return;
+    const index = dateMatch.index + offset;
+    removed.push({ index, length });
+  };
   const isoDateMatch = dateParseContent.match(
     /@?(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{3})?)?(?:Z|[+-]\d{2}:\d{2})?)?)/
   );
@@ -113,9 +108,7 @@ export function parseReminderContent(content: string, knownProjects?: string[], 
       hasTime = undefined;
     } else {
       datePart = isoDateMatch[0]; // Keep the full match (with @ if present)
-      if (taskContent.includes(isoDateMatch[0])) {
-        taskContent = taskContent.replace(isoDateMatch[0], '').trim();
-      }
+      removeDate(isoDateMatch.index ?? 0, isoDateMatch[0].length);
     }
   } else {
     // Use chrono-node to naturally find and parse dates in the content
@@ -134,71 +127,27 @@ export function parseReminderContent(content: string, knownProjects?: string[], 
           dueDate.setHours(0, 0, 0, 0);
         }
         datePart = result.text;
-        taskContent = taskContent.replace(result.text, '').trim();
+        removeDate(result.index, result.text.length);
       }
     }
   }
 
-  // Extract important marker: ! (with space before, or standalone)
-  // Matches: " !" at word boundary (space before, followed by space or end)
-  // Also matches: "!" as the entire content (standalone after other parts removed)
-  // Does NOT match: "!" without space before when part of text (e.g., "hello!" is not important)
-  const priorityMarkerIndexes = findStandalonePriorityMarkerIndexes(taskContent);
-  if (priorityMarkerIndexes.length > 0) {
+  // Use the same protected, indexed matches as the editor. Removing text by
+  // value can consume an identical token inside an earlier link or title.
+  const projectMatch = matches.filter(match => match.type === 'project').at(-1);
+  if (projectMatch) {
+    const name = projectMatch.text.slice(1);
+    project = knownProjects?.find(value => value.toLowerCase() === name.toLowerCase()) ?? name;
+  }
+  const markers = matches.filter(match => match.type === 'priority' || match === projectMatch);
+  removed.push(...markers);
+  if (markers.some(match => match.type === 'priority')) {
     priority = 1;
     priorityPart = '!';
-    taskContent = removeStandalonePriorityMarkers(taskContent).trim();
   }
-
-  // Extract project tag: #projectname (single word/identifier)
-  // - Must start with a letter (not purely numeric like #338)
-  // - Can contain letters, numbers, underscores, hyphens
-  // - Skip tags inside markdown links [text](url)
-  // - If knownProjects provided, try matching multi-word projects first
-
-  // First, temporarily remove markdown links to avoid matching inside them
-  const linkPlaceholders: string[] = [];
-  const contentWithoutLinks = taskContent.replace(/\[([^\]]*)\]\([^)]*\)/g, (match) => {
-    linkPlaceholders.push(match);
-    return `\x00LINK${linkPlaceholders.length - 1}\x00`;
-  });
-
-  // Try to match against known projects first (supports multi-word projects like "MY Project")
-  // Sort by length descending to match longest first (e.g., "Work Project" before "Work")
-  if (knownProjects && knownProjects.length > 0) {
-    const sortedProjects = [...knownProjects].sort((a, b) => b.length - a.length);
-    for (const knownProject of sortedProjects) {
-      // Escape special regex characters in the project name
-      const escapedProject = knownProject.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // Case-insensitive match with word boundary lookahead (space, end, or next marker)
-      const projectRegex = new RegExp(`#${escapedProject}(?=\\s|$|@|!|#)`, 'i');
-      const knownProjectMatch = contentWithoutLinks.match(projectRegex);
-      if (knownProjectMatch) {
-        // Return original casing from knownProjects
-        project = knownProject;
-        // Remove from the content (use the actual matched text to preserve original content)
-        taskContent = taskContent.replace(projectRegex, '').trim();
-        break;
-      }
-    }
+  for (const match of removed.sort((a, b) => b.index - a.index)) {
+    taskContent = taskContent.slice(0, match.index) + taskContent.slice(match.index + match.length);
   }
-
-  // Fallback: Support nested tags with / (e.g., #Project/Reminders, #work/meetings)
-  // Only if no project was matched from knownProjects
-  if (!project) {
-    const projectMatch = contentWithoutLinks.match(/#([a-zA-Z][a-zA-Z0-9_/-]*)/);
-    const matchedProject = projectMatch?.[1];
-    if (matchedProject) {
-      project = matchedProject.trim();
-      // Remove from the content with links intact
-      // Escape special regex characters in the project name (particularly / for nested tags)
-      const escapedProject = project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      taskContent = taskContent.replace(new RegExp('#' + escapedProject + '(?:\\b|$)'), '').trim();
-    }
-  }
-
-  // Note: Recurrence patterns are now extracted FIRST at the top of this function
-  // This ensures "every Friday 12:00" is captured as recurrence before date parsing
 
   // Clean up extra whitespace
   taskContent = taskContent.replace(/\s+/g, ' ').trim();
