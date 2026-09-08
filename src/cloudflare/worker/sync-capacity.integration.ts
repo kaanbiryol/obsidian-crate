@@ -74,6 +74,11 @@ it.for([1000, 10000].flatMap(count => [false, true].map(initial => ({ count, ini
 			const responses = client.responses.slice(offset);
 			const routes: Record<string, number> = {};
 			for (const response of responses) routes[response.route] = (routes[response.route] ?? 0) + 1;
+			if (phase === 'cold-full-upload') {
+				expect(routes['PUT /sync/upload'] ?? 0).toBe(0);
+				expect(routes['POST /sync/batch-upload']).toBeGreaterThan(0);
+				expect(responses.length).toBeLessThan(count); // Includes each write's compatibility preflight.
+			}
 			samples.push({ phase, wallMs: Math.round(performance.now() - start), requests: responses.length,
 				routes, responseBytes: responses.reduce((sum, response) => sum + response.bytes, 0),
 				longestRequestMs: Math.round(Math.max(0, ...responses.map(response => response.wallMs))),

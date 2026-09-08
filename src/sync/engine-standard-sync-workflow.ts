@@ -6,8 +6,8 @@ import {
 } from './sync-result';
 import {
 	PREPARE_CONCURRENCY,
-	UPLOAD_CONCURRENCY,
 } from './engine-constants';
+import { uploadFullSyncPlan, type FullSyncUploadContext } from './engine-full-sync-upload';
 import { createLogger, errorMessage } from '../plugin/logger';
 import type { FileDiff, SyncResult, SyncState } from './types';
 import type { FileEntry } from '../protocol/sync-types';
@@ -25,7 +25,7 @@ import {
 
 const logger = createLogger('SyncEngine');
 
-export interface SyncWorkflowContext {
+export interface SyncWorkflowContext extends FullSyncUploadContext {
 	apiConfigured(): boolean;
 	getStatus(): SyncStatus;
 	updateState(updates: Partial<SyncState>): void;
@@ -45,7 +45,6 @@ export interface SyncWorkflowContext {
 		result: SyncResult
 	): Promise<DiffApplyOutcome>;
 	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult): Promise<void>;
-	runConcurrent<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]>;
 	getLocalManifestEntry(path: string): FileEntry | undefined;
 	setLocalManifestEntry(path: string, entry: FileEntry): void;
 	saveLocalManifest(): Promise<void>;
@@ -108,19 +107,10 @@ export async function runSyncWorkflow(
 		let current = 0;
 
 		if (uploadDiffs.length > 0) {
-			const uploadTasks = uploadDiffs.map(diff => async () => {
-				try {
-					const outcome = await context.processDiff(diff, localFiles, result);
-					if (outcome.status === 'deferred') {
-						result.errors.push(`${diff.path}: ${outcome.reason}`);
-					}
-				} catch (error) {
-					result.errors.push(`${diff.path}: ${errorMessage(error)}`);
-				}
+			await uploadFullSyncPlan(context, uploadDiffs, localFiles, result, () => {
 				current++;
 				progressCallback?.(current, total);
 			});
-			await context.runConcurrent(uploadTasks, UPLOAD_CONCURRENCY);
 		}
 
 		context.throwIfDestroyed();
