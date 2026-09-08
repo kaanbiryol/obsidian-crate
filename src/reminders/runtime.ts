@@ -5,10 +5,29 @@ import { createReminderRepository } from './data/reminder-repository';
 import { VaultWatcher } from './services/vaultWatcher';
 import { createLogger } from './utils/logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
+import { Notice } from 'obsidian';
+import { createReminderMoveJournal, type ReminderMoveJournal } from './data/reminder-move-journal';
 
 const remindersLogger = createLogger('Reminders');
 const notificationTasks = new WeakMap<CratePlugin, Promise<void>>();
 const backends = new WeakMap<CratePlugin, AbortController>();
+const moveJournals = new WeakMap<CratePlugin, ReminderMoveJournal>();
+
+function reportMoveRecoveryIssues(issues: string[]): void {
+	if (!issues.length) return;
+	for (const issue of issues) remindersLogger.error(issue);
+	new Notice(issues.join('\n\n'), 0);
+}
+
+export async function recoverInterruptedReminderMoves(plugin: CratePlugin): Promise<void> {
+	const journal = moveJournals.get(plugin);
+	if (!journal) { new Notice('Enable reminders before recovering an interrupted move.'); return; }
+	if (plugin.syncRuntime.getState().status === 'syncing') { new Notice('Wait for sync to finish, then recover interrupted reminder moves.'); return; }
+	const issues = await journal.recover();
+	await plugin.reminderIndex.load();
+	reportMoveRecoveryIssues(issues);
+	if (!issues.length) new Notice('Interrupted reminder moves recovered.');
+}
 
 export async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Promise<boolean> {
 	const lifetime = getPluginLifecycleSignal(plugin);
@@ -20,14 +39,26 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	lifetime.addEventListener('abort', abort, { once: true });
 	controller.signal.addEventListener('abort', () => lifetime.removeEventListener('abort', abort), { once: true });
 	plugin.remindersVaultWatcher?.unregister();
+	const journal = createReminderMoveJournal(plugin.app, `${plugin.manifest.dir}/reminder-moves`, folderPath, controller.signal);
+	moveJournals.set(plugin, journal);
+	controller.signal.addEventListener('abort', () => { if (moveJournals.get(plugin) === journal) moveJournals.delete(plugin); }, { once: true });
+	try {
+		if (plugin.syncRuntime.getState().status !== 'syncing') reportMoveRecoveryIssues(await journal.recover());
+	} catch (error) {
+		const cancelled = controller.signal.aborted;
+		controller.abort();
+		if (cancelled) return false;
+		throw error;
+	}
+	if (controller.signal.aborted) return false;
 
 	let verifiedApi = plugin.syncRuntime.getApiClient();
 	let syncingApi: typeof verifiedApi = null;
 	const index = createReminderIndex(plugin.app, folderPath, controller.signal,
-		() => plugin.syncRuntime.getState().status === 'syncing',
+		path => plugin.syncRuntime.getState().status === 'syncing' || Boolean(path && journal.isPendingFile(path)),
 		() => {
 			const api = plugin.syncRuntime.getApiClient();
-			return plugin.syncRuntime.isConfigured() && (!api || api !== verifiedApi)
+			return journal.hasPending() || plugin.syncRuntime.isConfigured() && (!api || api !== verifiedApi)
 				|| ['error', 'offline'].includes(plugin.syncRuntime.getState().status);
 		});
 	const onSyncStateChanged = () => {
@@ -38,7 +69,15 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 			if (status === 'idle' && api && syncingApi === api) verifiedApi = api;
 			syncingApi = null;
 		}
-		void index.flushDeferredScans().catch((error: unknown) => remindersLogger.error('Failed to refresh reminders after sync:', error));
+		const refresh = async () => {
+			if (status === 'syncing' || controller.signal.aborted) return;
+			if (journal.hasPending()) {
+				reportMoveRecoveryIssues(await journal.recover());
+				await index.load();
+			}
+			await index.flushDeferredScans();
+		};
+		void refresh().catch((error: unknown) => { if (!controller.signal.aborted) remindersLogger.error('Failed to refresh reminders after sync:', error); });
 	};
 	plugin.syncRuntime.addStateChangeListener(onSyncStateChanged);
 	controller.signal.addEventListener('abort', () => plugin.syncRuntime.removeStateChangeListener(onSyncStateChanged), { once: true });
@@ -52,7 +91,7 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	}
 	if (controller.signal.aborted) return false;
 	plugin.reminderIndex = index;
-	plugin.markdownWriter = createMarkdownWriter(plugin.app, index);
+	plugin.markdownWriter = createMarkdownWriter(plugin.app, index, journal);
 	plugin.reminderRepository = createReminderRepository(index, plugin.markdownWriter);
 	plugin.markdownWriter.setOnFileWritten(async (file) => {
 		await index.rescanFile(file, true);

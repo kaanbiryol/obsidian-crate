@@ -32,6 +32,7 @@ export async function toggleReminderCompletionInMarkdown(
 	try {
 		const resultHolder: { value?: ReminderCompletionMutation } = {};
 		await context.app.vault.process(file, (fileContent) => {
+			context.moveJournal?.assertActive();
 			const result = setReminderCompletionInContent(fileContent, reminder, requestedCompleted, currentDue);
 			resultHolder.value = result;
 			return result.content;

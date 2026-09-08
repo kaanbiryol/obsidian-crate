@@ -12,6 +12,7 @@ type MockWriter = {
 };
 
 type MockPlugin = {
+	manifest: { dir: string };
 	app: {
 		workspace: {
 			layoutReady: boolean;
@@ -57,6 +58,12 @@ const reminderQueryOnTodayBlock = vi.fn();
 const reminderQueryOnUpcomingBlock = vi.fn();
 const createRemindersBlockExtension = vi.fn(() => 'extension');
 const registerReminderCommands = vi.fn();
+const recoverMoves = vi.fn(async (): Promise<string[]> => []);
+const pendingMoves = vi.fn(() => false);
+const pendingMoveFile = vi.fn(() => false);
+const moveJournal = { recover: recoverMoves, hasPending: pendingMoves, isPendingFile: pendingMoveFile,
+	assertActive: vi.fn(), assertWritable: vi.fn(), execute: vi.fn() };
+const createMoveJournal = vi.fn(() => moveJournal);
 
 let latestWriter: MockWriter;
 let latestWatcher: {
@@ -72,8 +79,9 @@ async function flushMicrotasks(): Promise<void> {
 async function loadPluginIntegrationModule() {
 	vi.doMock('obsidian', () => ({
 		normalizePath: (path: string) => path.replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''),
-
+		Notice: class {},
 	}));
+	vi.doMock('./data/reminder-move-journal', () => ({ createReminderMoveJournal: createMoveJournal }));
 	vi.doMock('./data/reminder-index', () => ({
 		createReminderIndex: reminderIndexFactory,
 	}));
@@ -124,6 +132,7 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 	let layoutReadyHandler: (() => void) | undefined;
 
 	return {
+		manifest: { dir: '.obsidian/plugins/crate' },
 		app: {
 			workspace: {
 				layoutReady: false,
@@ -158,6 +167,10 @@ function createPlugin(overrides: Partial<MockPlugin> = {}): MockPlugin {
 }
 
 beforeEach(() => {
+	recoverMoves.mockReset().mockResolvedValue([]);
+	pendingMoves.mockReset().mockReturnValue(false);
+	pendingMoveFile.mockReset().mockReturnValue(false);
+	createMoveJournal.mockClear();
 	reminderIndexLoad.mockReset();
 	reminderIndexGetAll.mockReset();
 	reminderIndexRescanFile.mockReset();
@@ -200,6 +213,7 @@ afterEach(() => {
 	vi.doUnmock('./data/reminder-index');
 	vi.doUnmock('./data/markdown-writer');
 	vi.doUnmock('./data/reminder-repository');
+	vi.doUnmock('./data/reminder-move-journal');
 	vi.doUnmock('./query/injector');
 	vi.doUnmock('./query/remindersBlockLivePreview');
 	vi.doUnmock('./commands');
@@ -217,7 +231,7 @@ describe('initializeReminders', () => {
 
 		expect(reminderIndexFactory).toHaveBeenCalledWith(plugin.app, 'Reminders', expect.any(AbortSignal), expect.any(Function), expect.any(Function));
 		expect(reminderIndexLoad).toHaveBeenCalledTimes(1);
-		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex);
+		expect(createMarkdownWriter).toHaveBeenCalledWith(plugin.app, plugin.reminderIndex, moveJournal);
 		expect(createReminderRepository).toHaveBeenCalledWith(plugin.reminderIndex, latestWriter);
 		expect(latestWatcher.register).toHaveBeenCalledTimes(1);
 		expect(plugin.registerMarkdownCodeBlockProcessor).toHaveBeenCalledTimes(4);
@@ -295,9 +309,12 @@ it('does not publish a reminder backend or register UI after shutdown during ind
 it('keeps the newer folder backend when an older scan finishes last', async () => {
   const { initializeReminders, reinitializeReminders } = await loadPluginIntegrationModule();
   let finish!: () => void;
-  reminderIndexLoad.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+  let entered!: () => void;
+  const loading = new Promise<void>(resolve => { entered = resolve; });
+  reminderIndexLoad.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; entered(); }));
   const plugin = createPlugin();
   const first = initializeReminders(plugin as never);
+  await loading;
   await reinitializeReminders(plugin as never, 'NewFolder');
   const current = plugin.reminderIndex;
   finish();
@@ -356,4 +373,38 @@ it('defers startup collision repair until the configured connection finishes a s
 	expect(shouldDefer()).toBe(false);
 	plugin.syncRuntime.getApiClient.mockReturnValue({});
 	expect(shouldDefer()).toBe(true); // A replaced connection needs its own reconciliation.
+});
+
+it('recovers interrupted moves before scanning and protects unresolved file paths from normalization', async () => {
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	const plugin = createPlugin();
+	pendingMoves.mockReturnValue(true);
+	pendingMoveFile.mockImplementation((...args: unknown[]) => args[0] === 'Reminders/Pending.md');
+	recoverMoves.mockResolvedValueOnce(['Review both copies before retrying recovery.']);
+	await initializeReminders(plugin as never);
+	expect(recoverMoves.mock.invocationCallOrder[0]).toBeLessThan(reminderIndexLoad.mock.invocationCallOrder[0]!);
+	const defer = reminderIndexFactory.mock.calls[0]?.[3] as (path?: string) => boolean;
+	expect(defer()).toBe(false);
+	expect(defer('Reminders/Healthy.md')).toBe(false);
+	expect(defer('Reminders/Pending.md')).toBe(true);
+	const { recoverInterruptedReminderMoves } = await import('./runtime');
+	pendingMoves.mockReturnValue(false);
+	await recoverInterruptedReminderMoves(plugin as never);
+	expect(recoverMoves).toHaveBeenCalledTimes(2);
+	expect(reminderIndexLoad).toHaveBeenCalledTimes(2);
+});
+
+it('does not start normalization when unloaded during journal recovery', async () => {
+	const { initializeReminders } = await loadPluginIntegrationModule();
+	let finish!: (issues: string[]) => void;
+	recoverMoves.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+	const plugin = createPlugin();
+	const starting = initializeReminders(plugin as never);
+	const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+	endPluginLifecycle(plugin as never);
+	finish([]);
+	await starting;
+	expect(reminderIndexFactory).not.toHaveBeenCalled();
+	expect(createMarkdownWriter).not.toHaveBeenCalled();
+	expect(plugin.reminderIndex).toBeUndefined();
 });
