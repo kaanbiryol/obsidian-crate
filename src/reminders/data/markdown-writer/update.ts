@@ -31,6 +31,7 @@ async function rollbackDestinationReminder(
 ): Promise<void> {
   let removed = false;
   await context.app.vault.process(file, (fileContent) => {
+    context.moveJournal?.assertActive();
     const deletion = deleteReminderBlockFromContent(fileContent, reminder);
     removed = deletion.found;
     return deletion.content;
@@ -93,9 +94,11 @@ export async function updateReminderInMarkdown(
 
     context.index.applyOptimisticUpdate(reminder.id, movedReminder);
 
-    let destinationWritten = false;
-    try {
+    const applyMove = async () => {
+      let destinationWritten = false;
+      try {
       await context.app.vault.process(newFile, (fileContent) => {
+        context.moveJournal?.assertActive();
         if (findReminderLineNumber(fileContent.split("\n"), movedReminder) !== -1) {
           throw new Error(`Reminder ${reminder.id} already exists in ${newFile.path}`);
         }
@@ -108,6 +111,7 @@ export async function updateReminderInMarkdown(
       destinationWritten = true;
 
       await context.app.vault.process(oldFile, (fileContent) => {
+        context.moveJournal?.assertActive();
         const deletion = deleteReminderBlockFromContent(fileContent, reminder);
         if (!deletion.found) {
           throw new Error(
@@ -118,7 +122,11 @@ export async function updateReminderInMarkdown(
       });
     } catch (error) {
       context.index.clearOptimistic(reminder.id);
-      if (destinationWritten) {
+      context.moveJournal?.assertActive();
+      // A durable source write may have succeeded before its acknowledgement
+      // failed. The journal reconciles both notes; deleting the destination here
+      // could remove the only remaining Markdown copy.
+      if (destinationWritten && !context.moveJournal) {
         try {
           await rollbackDestinationReminder(context, newFile, movedReminder);
         } catch (rollbackError) {
@@ -127,6 +135,14 @@ export async function updateReminderInMarkdown(
           );
         }
       }
+      throw error;
+    }
+    };
+    try {
+      if (context.moveJournal) await context.moveJournal.execute(reminder, movedReminder, applyMove);
+      else await applyMove();
+    } catch (error) {
+      context.index.clearOptimistic(reminder.id);
       throw error;
     }
 
@@ -160,6 +176,7 @@ export async function updateReminderInMarkdown(
   try {
     let replacementLineNumber = -1;
     await context.app.vault.process(file, (fileContent) => {
+      context.moveJournal?.assertActive();
       const replacement = replaceUpdatedReminderBlock(fileContent, reminder, mutation);
       replacementLineNumber = replacement.lineNumber;
       return replacement.content;

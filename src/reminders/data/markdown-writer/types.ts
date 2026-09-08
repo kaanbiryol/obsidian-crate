@@ -4,6 +4,7 @@ import type {
   RecurrenceRule,
 } from "@/reminders/types/reminder";
 import type { IndexedReminder, ReminderIndex } from "../reminder-index";
+import type { ReminderMoveJournal } from '../reminder-move-journal';
 
 export interface UpdateReminderInput {
   content?: string;
@@ -20,6 +21,7 @@ export type OnFileWrittenCallback = (file: TFile) => Promise<void>;
 export interface MarkdownWriterContext {
   app: App;
   index: ReminderIndex;
+  moveJournal?: ReminderMoveJournal;
   getFile(filePath: string): Promise<TFile | null>;
   getOrCreateProjectFile(project: string): Promise<TFile>;
   getOnFileWritten(): OnFileWrittenCallback | undefined;

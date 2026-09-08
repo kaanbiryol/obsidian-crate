@@ -146,6 +146,8 @@ When Obsidian adopts or rescans a reminder, relative dates such as `tomorrow` an
 
 Code fences, indented code, frontmatter, and hidden HTML examples are excluded from reminders and remain unchanged during adoption. Reorder supports simple task lists within the same section. Use the Markdown editor to reorder nested tasks or tasks with supporting paragraphs, or to move/delete a task together with its children. Crate rejects these structural changes in the reminder list before editing the note.
 
+Plugin project moves save a recovery record in the plugin's private configuration directory before changing either note. After an interruption, Crate checks both notes before indexing them and completes or rolls back only a verifiable move. If both copies changed, it keeps them and pauses reminder edits and normalization for those notes. Merge or keep the wanted text in one note, remove the duplicate from the other, then run **Crate: Recover interrupted reminder moves**. The notice identifies the affected notes and recovery-record location; damaged records are retained for manual recovery. These records remain on the device and are excluded from vault sync.
+
 Reminder code blocks can be embedded in notes:
 
 ````markdown
