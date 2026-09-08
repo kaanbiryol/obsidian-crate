@@ -27,6 +27,7 @@ export async function toggleReminderCompletionInMarkdown(
 		completed: planned.completed,
 		dueDate: planned.dueDate,
 		dueDatetime: planned.dueDatetime,
+		recurrence: planned.recurrence,
 	});
 
 	try {
