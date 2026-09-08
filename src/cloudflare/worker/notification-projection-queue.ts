@@ -1,4 +1,5 @@
 import { parseReminderSource } from './reminder-source-parse';
+import { recordReminderSourceState } from './reminder-source-state';
 
 /** File bytes, identity ownership and first observation share one commit. */
 export function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null): D1PreparedStatement[] {
@@ -11,7 +12,7 @@ export function enqueueFileProjection(db: D1Database, path: string, storageKey: 
   if (parsed.issue) {
     // Preserve the last verified identities and schedules. This quarantine is
     // published only when the new file revision commits in the same D1 batch.
-    return [db.prepare(`INSERT INTO notification_projection_jobs (path, job_token, last_error)
+    return [recordReminderSourceState(db, path, storageKey, false), db.prepare(`INSERT INTO notification_projection_jobs (path, job_token, last_error)
       SELECT ?, ?, ? WHERE ${guard}
       ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token,
         last_error = excluded.last_error, updated_at = datetime('now')`).bind(path, token, parsed.issue, ...args)];
@@ -24,6 +25,7 @@ export function enqueueFileProjection(db: D1Database, path: string, storageKey: 
   }
   const json = JSON.stringify([...sources.values()]);
   return [
+    recordReminderSourceState(db, path, storageKey, true),
     // Revisit other owners on both collision and repair, including deletion.
     db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
       SELECT DISTINCT file_path, ? FROM reminder_sources WHERE reminder_id IN (

@@ -166,7 +166,9 @@ it('rejects traversal-style upload paths', async () => {
 		const { bucket, store } = createMockR2Bucket({
 			'files/notes/test.md': 'before',
 		});
-		const { db } = createMockD1Database({ failBatch: true });
+		const { db } = createMockD1Database({ failBatch: true,
+			files: { 'notes/test.md': { hash: 'a'.repeat(64), size: 6, storageKey: 'files/notes/test.md' } },
+		});
 
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
@@ -213,8 +215,8 @@ it('rejects traversal-style upload paths', async () => {
 			success: true,
 			path: 'notes/test.md',
 			consumedRevision: managedKey,
-			revision: expect.stringMatching(/^__crate__\/deletions\//),
-			deleteRequestId: expect.any(String),
+			revision: expect.stringMatching(/^__crate__\/deletions\//) as string,
+			deleteRequestId: expect.any(String) as string,
 		});
 		expect(files.has('notes/test.md')).toBe(false);
 		expect(new TextDecoder().decode(store.get(managedKey)?.body)).toBe('before');

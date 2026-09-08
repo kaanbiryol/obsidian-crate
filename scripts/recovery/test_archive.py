@@ -54,6 +54,7 @@ class ArchiveTests(unittest.TestCase):
         db.execute("INSERT INTO reminder_occurrences (reminder_id, due_key, first_seen_at) VALUES ('reminder', '2026-09-07', 123)")
         db.execute("INSERT INTO file_deletion_receipts (consumed_revision, revision, changelog_seq, path, consumed_hash, request_id, device_id) VALUES ('consumed', 'deleted', 1, 'Deleted.md', 'hash', 'original-request', 'old-device')")
         db.execute("INSERT INTO maintenance_state (key, value) VALUES ('crate_deployment_fence', 'old deployment owner')")
+        db.execute("INSERT INTO reminder_source_state (file_path, file_revision, parser_version, verified) VALUES ('Reminders/Inbox.md', ?, 6, 1)", (key,))
         db.commit()
         self.remote = Remote('\n'.join(db.iterdump()).encode(), {key: data})
         db.close()
@@ -76,7 +77,21 @@ class ArchiveTests(unittest.TestCase):
             self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), original.execute(f'SELECT * FROM {table}').fetchall())
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM notification_projection_jobs').fetchone()[0], 1)
         self.assertEqual(restored.execute("SELECT COUNT(*) FROM maintenance_state WHERE key = 'crate_deployment_fence'").fetchone()[0], 0)
+        self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_source_state').fetchone()[0], 0)
         self.assertEqual(len(manifest['objects']), 1)
+    def test_schema_three_backup_restores_with_additive_source_verification_upgrade(self):
+        self.remote.sql += b'\nDROP TABLE reminder_source_state; UPDATE crate_schema SET version = 3;'
+        recovery.backup(self.remote, self.directory)
+        target = Remote(b'', {})
+        target.database, target.bucket = 'restore', 'restore'
+        recovery.restore(target, self.directory)
+        restored = load_database(target.sql)
+        self.addCleanup(restored.close)
+        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 4)
+        self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_source_state').fetchone()[0], 0)
+        self.assertEqual(restored.execute('SELECT first_seen_at FROM reminder_occurrences').fetchone()[0], 123)
+        self.assertEqual(restored.execute('SELECT COUNT(*) FROM file_deletion_receipts').fetchone()[0], 1)
+        self.assertEqual(self.remote.objects, target.objects)
     def test_unsupported_schema_stops_restore_before_remote_mutation(self):
         recovery.backup(self.remote, self.directory)
         sql_path = self.directory / 'database.sql'

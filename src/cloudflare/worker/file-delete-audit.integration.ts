@@ -8,6 +8,8 @@ import { sha256Hex } from './auth';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol';
 import { pruneFileDeletionReceipts } from './file-delete-audit';
 import { BATCH_DELETE_MAX_FILES } from '../../protocol/sync-limits';
+import { commitFileDelete } from './sync-mutations';
+import { getStoredFileRow } from './sync-storage';
 
 const secret = 'Private note content and Bearer credential';
 const path = 'Private folder/Confidential note.md';
@@ -123,6 +125,22 @@ it('keeps a maximum absent-file retry batch within the Free-plan D1 query budget
 	expect(await retry.json()).toMatchObject({ deleted: files.map(file => file.path), results: files.map(file => ({ consumedRevision: file.revision })) });
 });
 
+it('returns the exact receipt without deleting a recreation after the absent snapshot', async () => {
+	const old = await upload();
+	const removed = await remove(old);
+	const receipt = await removed.json() as { revision: string; consumedRevision: string; deleteRequestId: string };
+	const absent = await getStoredFileRow(env.DB, path);
+	expect(absent).toBeNull();
+	const recreated = await upload();
+	const before = await receipts();
+	const retry = await commitFileDelete(env.BUCKET, env.DB, { path, expectedHash: old.hash, expectedRevision: old.revision, previousFile: absent });
+	expect(retry).toMatchObject({ committed: true, idempotent: true, deletion: {
+		revision: receipt.revision, consumedRevision: receipt.consumedRevision, deleteRequestId: receipt.deleteRequestId,
+	} });
+	expect(await getStoredFileRow(env.DB, path)).toMatchObject({ storageKey: recreated.revision });
+	expect(await receipts()).toEqual(before);
+});
+
 it('does not record a deletion on a precondition conflict or failed receipt write', async () => {
 	const file = await upload();
 	expect((await remove({ ...file, revision: 'stale' })).status).toBe(409);
@@ -154,7 +172,7 @@ it('applies the additive schema-2 upgrade repeatedly without changing existing v
 	await env.DB.prepare('UPDATE crate_schema SET version = 2').run();
 	const before = await env.DB.prepare('SELECT * FROM files').all();
 	await applySchema(); await applySchema();
-	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: 3 });
+	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: 4 });
 	expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(before.results);
 	expect((await remove(file)).status).toBe(200);
 	expect(await receipts()).toHaveLength(1);
