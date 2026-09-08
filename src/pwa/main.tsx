@@ -17,11 +17,9 @@ import {
 import { ErrorState, EmptyAuthState } from './components/AuthStates';
 import { PwaHeaderActions, PwaLaunchSplash, PwaPullRefreshIndicator, PwaTopNotices } from './components/PwaChrome';
 import { WebReminderCard } from './components/WebReminderCard';
-import { ReminderSyncNotice } from './components/ReminderSyncNotice';
-import { ReminderRecoveryNotice } from './components/ReminderRecoveryNotice';
 import { ReminderSourceNotice } from './components/ReminderSourceNotice';
 import { ReminderCacheNotice } from './components/ReminderCacheNotice';
-import { ReminderQuarantineNotice } from './components/ReminderQuarantineNotice';
+import { DeferredNotice } from './components/DeferredNotice';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
@@ -51,6 +49,12 @@ import type {
 import { ReminderSheet } from './components/ReminderSheet';
 const SettingsSheet = lazy(() => import('./components/SettingsSheet')
 	.then(module => ({ default: module.SettingsSheet })));
+const ReminderSyncNotice = lazy(() => import('./components/ReminderSyncNotice')
+	.then(module => ({ default: module.ReminderSyncNotice })));
+const ReminderRecoveryNotice = lazy(() => import('./components/ReminderRecoveryNotice')
+	.then(module => ({ default: module.ReminderRecoveryNotice })));
+const ReminderQuarantineNotice = lazy(() => import('./components/ReminderQuarantineNotice')
+	.then(module => ({ default: module.ReminderQuarantineNotice })));
 
 function App() {
 	const { colorScheme, themePreference, setThemePreference } = usePwaColorScheme();
@@ -379,7 +383,7 @@ function App() {
 						>
 							<ReminderSourceNotice issues={issues} refreshing={refreshing} isOffline={isOffline} onRefresh={() => { void loadReminders({ silent: true }); }} />
 							<ReminderCacheNotice isOffline={isOffline} onRebuild={rebuildOfflineCache} />
-							<ReminderSyncNotice
+							{(changes.length > 0 || storageError) && <DeferredNotice><ReminderSyncNotice
 								changes={changes}
 								isOffline={isOffline}
 								storageError={storageError}
@@ -387,9 +391,9 @@ function App() {
 								onRetry={retryChange}
 								onEdit={editFailedChange}
 								onDiscard={discardChange}
-							/>
-							<ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={recoverChanges} />
-							<ReminderQuarantineNotice entries={quarantinedChanges} folderPath={config.folderPath} onRemove={removeQuarantinedChanges} />
+							/></DeferredNotice>}
+							{recoveryChanges.length > 0 && <DeferredNotice><ReminderRecoveryNotice changes={recoveryChanges} folderPath={config.folderPath} onResume={recoverChanges} /></DeferredNotice>}
+							{quarantinedChanges.length > 0 && <DeferredNotice><ReminderQuarantineNotice entries={quarantinedChanges} folderPath={config.folderPath} onRemove={removeQuarantinedChanges} /></DeferredNotice>}
 							{homeScreenInstall.showPrompt && !isProjectDetail && (
 								<HomeScreenInstallPrompt onShowSteps={toggleSettings} onDismiss={homeScreenInstall.dismiss} />
 							)}
