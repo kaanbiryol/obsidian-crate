@@ -6,7 +6,7 @@ import {
 	getReminderSheetClosedOffset,
 	useReminderSheetNavigation,
 } from '../hooks/useReminderSheetNavigation';
-import { discardReminderDraft, restoreReminderDraft, saveReminderDraft } from '../reminder-drafts';
+import { discardReminderDraft, inspectReminderDraft, restoreReminderDraft, saveReminderDraft } from '../reminder-drafts';
 import type { ModalDraft, ModalState } from '../types';
 import {
 	ReminderEditorScreen,
@@ -15,19 +15,10 @@ import {
 import { PwaModalSheet } from './PwaModalSheet';
 const ReminderPickerSheet = lazy(() => import('./ReminderPickerSheet')
 	.then(module => ({ default: module.ReminderPickerSheet })));
+const ReminderDraftRecoverySheet = lazy(() => import('./ReminderDraftRecoverySheet')
+	.then(module => ({ default: module.ReminderDraftRecoverySheet })));
 
-export function ReminderSheet({
-	modal: initialModal,
-	folderPath,
-	projects,
-	colorScheme,
-	saving,
-	isClosing,
-	onClose: dismissModal,
-	onClosed,
-	onSave,
-	onDelete,
-}: {
+type ReminderSheetProps = {
 	modal: ModalState;
 	folderPath: string;
 	projects: string[];
@@ -38,7 +29,29 @@ export function ReminderSheet({
 	onClosed: () => void;
 	onSave: (modal: ModalState) => void;
 	onDelete: (id: string, expectedRevision?: string, filePath?: string) => void;
-}) {
+};
+
+export function ReminderSheet(props: ReminderSheetProps) {
+	const [inspection, setInspection] = useState(() => inspectReminderDraft(props.modal, props.folderPath));
+	if (inspection.recovery || inspection.unavailable) return <Suspense fallback={<p role="status">Opening saved draft recovery…</p>}>
+		<ReminderDraftRecoverySheet inspection={inspection} initial={props.modal} folderPath={props.folderPath} isClosing={props.isClosing}
+			onClose={props.onClose} onClosed={props.onClosed} onRetry={() => setInspection(inspectReminderDraft(props.modal, props.folderPath))} />
+	</Suspense>;
+	return <ReminderEditorSheet {...props} />;
+}
+
+function ReminderEditorSheet({
+	modal: initialModal,
+	folderPath,
+	projects,
+	colorScheme,
+	saving,
+	isClosing,
+	onClose: dismissModal,
+	onClosed,
+	onSave,
+	onDelete,
+}: ReminderSheetProps) {
 	// Keep keystrokes local so the reminder list does not render behind the sheet.
 	const [modal, setModal] = useState(() => restoreReminderDraft(initialModal, folderPath));
 	const onClose = () => { discardReminderDraft(modal, folderPath); dismissModal(); };
