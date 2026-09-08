@@ -1,6 +1,6 @@
 import { resetLocalTimeZone } from '@internationalized/date';
 
-export interface ReminderClockSnapshot { now: Date; timezone: string }
+interface ReminderClockSnapshot { now: Date; timezone: string }
 
 /** One timer and one set of listeners serve all mounted reminder views/cards. */
 export function createReminderClock() {
