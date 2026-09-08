@@ -40,7 +40,7 @@
 		"verify:release-artifacts": "node scripts/verify-release-artifacts.mjs",
 		"notices:generate": "node scripts/generate-third-party-notices.mjs",
 		"notices:check": "node scripts/generate-third-party-notices.mjs --check",
-		"release:check": "npm run check && npm run test:pwa-preview && npm run build:plugin && npm run check:css-scope && npm run size-check && npm run verify:release-artifacts && npm run test:pwa-browser",
+		"release:check": "npm run security:check && npm run check && npm run test:pwa-preview && npm run build:plugin && npm run check:css-scope && npm run size-check && npm run verify:release-artifacts && npm run test:pwa-browser",
 		"deploy:plugin": "node scripts/deploy.mjs",
 		"deploy:plugin:configure": "node scripts/deploy.mjs --configure",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
@@ -55,6 +55,8 @@
 		"test:visual": "playwright test",
 		"typecheck:visual": "tsc -p tests/visual/tsconfig.json",
 		"security:secrets": "node scripts/check-secrets.mjs",
+		"security:audit": "npm audit --audit-level=low --include=dev",
+		"security:check": "npm run security:audit && npm run security:secrets",
 		"test:recovery": "python3 -m unittest discover -s scripts/recovery -p \"test_*.py\"",
 		"benchmark:sync": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync-capacity.integration.ts --reporter=verbose"
 	},
