@@ -55,14 +55,14 @@ export function buildInboxViewModel(reminders: Reminder[]): {
   };
 }
 
-export function buildTodayViewModel(reminders: Reminder[]): {
+export function buildTodayViewModel(reminders: Reminder[], now = new Date()): {
   active: Reminder[];
   completed: Reminder[];
 } {
   const combined = [
-    ...getOverdueReminders(reminders),
-    ...getTodayReminders(reminders),
-    ...getCompletedTodayReminders(reminders),
+    ...getOverdueReminders(reminders, now),
+    ...getTodayReminders(reminders, now),
+    ...getCompletedTodayReminders(reminders, now),
   ];
   const unique = Array.from(new Map(combined.map((reminder) => [reminder.id, reminder])).values());
   const sorted = sortReminders(unique);
@@ -76,10 +76,11 @@ export function buildTodayViewModel(reminders: Reminder[]): {
 export function buildUpcomingViewModel(
   reminders: Reminder[],
   days: number,
+  now = new Date(),
 ): {
   upcomingReminders: Reminder[];
 } {
-  const upcomingReminders = sortReminders(getUpcomingReminders(reminders, days));
+  const upcomingReminders = sortReminders(getUpcomingReminders(reminders, days, now));
   return { upcomingReminders };
 }
 

@@ -24,8 +24,8 @@ export function formatLocalDateKey(date: Date): string {
 export function isReminderDueToday(input: {
   dueDate?: string;
   dueDatetime?: string;
-}): boolean {
-  const todayKey = formatLocalDateKey(new Date());
+}, now = new Date()): boolean {
+  const todayKey = formatLocalDateKey(now);
   if (input.dueDatetime) {
     return formatLocalDateKey(new Date(input.dueDatetime)) === todayKey;
   }
