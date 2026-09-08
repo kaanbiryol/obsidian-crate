@@ -14,8 +14,8 @@ Complete a fresh copy of this checklist for every release candidate. Test the ex
 ## Automated gates
 
 - [ ] `npm ci` completed with the release Node version from `.nvmrc`.
-- [ ] `npm run release:check` passed on the release commit, including Chromium/WebKit safety tests and local recovery tests.
-- [ ] `npm audit` and `npm run security:secrets` passed.
+- [ ] `npm run release:check` passed on the release commit, including `security:check`, Chromium/WebKit safety tests and local recovery tests.
+- [ ] Preserved npm advisory and Gitleaks results from that gate; the checkout contained complete fetched history.
 - [ ] GitHub Actions passed on Node 20.19.0, 22.12.0, and 24.0.0.
 - [ ] Builds from all three Node versions produced identical release artifact hashes.
 - [ ] Obsidian's community-directory **Review branch** scan has no unresolved errors or warnings.
