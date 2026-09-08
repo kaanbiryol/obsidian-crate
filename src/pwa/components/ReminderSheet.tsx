@@ -13,6 +13,7 @@ import {
 	type ReminderEditorScreenHandle,
 } from './ReminderEditorScreen';
 import { PwaModalSheet } from './PwaModalSheet';
+import { DeferredNotice } from './DeferredNotice';
 const ReminderPickerSheet = lazy(() => import('./ReminderPickerSheet')
 	.then(module => ({ default: module.ReminderPickerSheet })));
 const ReminderDraftRecoverySheet = lazy(() => import('./ReminderDraftRecoverySheet')
@@ -33,10 +34,10 @@ type ReminderSheetProps = {
 
 export function ReminderSheet(props: ReminderSheetProps) {
 	const [inspection, setInspection] = useState(() => inspectReminderDraft(props.modal, props.folderPath));
-	if (inspection.recovery || inspection.unavailable) return <Suspense fallback={<p role="status">Opening saved draft recovery…</p>}>
+	if (inspection.recovery || inspection.unavailable) return <DeferredNotice>
 		<ReminderDraftRecoverySheet inspection={inspection} initial={props.modal} folderPath={props.folderPath} isClosing={props.isClosing}
 			onClose={props.onClose} onClosed={props.onClosed} onRetry={() => setInspection(inspectReminderDraft(props.modal, props.folderPath))} />
-	</Suspense>;
+	</DeferredNotice>;
 	return <ReminderEditorSheet {...props} />;
 }
 
