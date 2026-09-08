@@ -92,6 +92,30 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(restored.execute('SELECT first_seen_at FROM reminder_occurrences').fetchone()[0], 123)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM file_deletion_receipts').fetchone()[0], 1)
         self.assertEqual(self.remote.objects, target.objects)
+    def test_schema_two_can_be_backed_up_before_upgrade_and_restores_without_rewriting_its_archive(self):
+        self.remote.sql += b'\nDROP TABLE reminder_source_state; DROP TABLE file_deletion_receipts; UPDATE crate_schema SET version = 2;'
+        recovery.backup(self.remote, self.directory)
+        source_sql = (self.directory / 'database.sql').read_bytes()
+        manifest_bytes = (self.directory / 'archive.json').read_bytes()
+        _, original = verify(self.directory)
+        self.addCleanup(original.close)
+        self.assertEqual(original.execute('SELECT version FROM crate_schema').fetchone()[0], 2)
+        target = Remote(b'', {})
+        target.database, target.bucket = 'restore', 'restore'
+        recovery.restore(target, self.directory)
+        restored = load_database(target.sql)
+        self.addCleanup(restored.close)
+        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 4)
+        for table in ('files', 'file_versions', 'reminder_operations', 'reminder_identities', 'reminder_sources', 'reminder_occurrences'):
+            self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), original.execute(f'SELECT * FROM {table}').fetchall())
+        self.assertEqual(restored.execute('SELECT COUNT(*) FROM file_deletion_receipts').fetchone()[0], 0)
+        self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_source_state').fetchone()[0], 0)
+        self.assertEqual(target.objects, self.remote.objects)
+        self.assertEqual((self.directory / 'database.sql').read_bytes(), source_sql)
+        self.assertEqual((self.directory / 'archive.json').read_bytes(), manifest_bytes)
+        # Repeating a completed restore recognizes the existing target exactly.
+        recovery.restore(target, self.directory)
+        self.assertEqual((self.directory / 'database.sql').read_bytes(), source_sql)
     def test_unsupported_schema_stops_restore_before_remote_mutation(self):
         recovery.backup(self.remote, self.directory)
         sql_path = self.directory / 'database.sql'

@@ -30,7 +30,7 @@ The web index reads at most 20 files and 2 MiB in aggregate per warming request,
 
 `GET /reminders/notification-policy` reads the shared policy. POST initializes only an absent policy. PUT requires `expectedRevision` and explicitly updates folder, timezone, all-day time, or enabled state. These routes require a vault credential.
 
-D1 projection jobs are created in the file transaction. A reserved Durable Object processes at most three files and five outbox jobs per alarm. Projection commits check the current file, policy, and job revisions and publish the expected notification token with each projection. That token is also the outbox command and alarm schedule identity. Delivery requires matching source, policy, and notification revisions, including after projection finishes but before the new outbox command arrives. Missed wakeups are recovered by scheduled maintenance.
+D1 projection jobs are created in the file transaction. A reserved Durable Object verifies at most two sources, projects one file and dispatches two outbox jobs per alarm. Projection commits check the current file, policy, and job revisions and publish the expected notification token with each projection. That token is also the outbox command and alarm schedule identity. Delivery requires matching source, policy, parser and notification revisions, including after projection finishes but before the new outbox command arrives. Missed wakeups are recovered by scheduled maintenance.
 
 The reminder Durable Object keeps the last completed due-time occurrence across schedule cleanup and restart. Replaying an accepted job cannot rearm that occurrence. Rescheduling the same due time preserves recipient progress and terminal failures; a new due time starts new delivery state. Token checks fence schedule cleanup while occurrence checks retain in-flight recipient acknowledgements for the same due time. Delivery callbacks are serialized. Unknown acknowledgements from an external push provider can still cause a retry; this is not an exactly-once provider guarantee.
 
@@ -48,7 +48,7 @@ Limits are application guardrails, not a promise that every workload fits a free
 
 ## Supported storage formats
 
-Current formats are D1 `crate_schema` version 4, IndexedDB version 2, generation-bearing local file checkpoints, and URI-encoded `crate-desc:v1:` description comments. Provisioning supports an additive D1 schema-2/3-to-4 upgrade; other database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache. See the deployment guide for upgrade and rollback policy.
+Current formats are D1 `crate_schema` version 4, parser version 6, IndexedDB version 2, generation-bearing authority-bound local file checkpoints, and URI-encoded `crate-desc:v1:` description comments. Provisioning supports an additive D1 schema-2/3-to-4 upgrade; other database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
 
 ## Source and occurrence integrity
 
@@ -58,6 +58,6 @@ Every successfully parsed Markdown file records its reminder identities and each
 
 Duplicate identities within the configured reminders folder quarantine projection and are omitted from the web list with per-file issues. Editing an ambiguous identity returns 409. Committing a repair or deletion queues all affected source files again.
 
-An explicit fresh enrollment link replaces a stored browser session, including an expired one. The exchange can accept the previous reminder credential solely to revoke that credential and its subscriptions; it cannot revoke a vault credential. Local cache and drafts are cleared before the new authority is installed, and other tabs adopt its folder.
+An explicit fresh enrollment link replaces a stored browser session, including an expired one. The exchange can accept the previous reminder credential solely to revoke that credential and its subscriptions; it cannot revoke a vault credential. The confirmed local cache is cleared before the new authority is installed, and other tabs adopt its folder. Pending commands and drafts remain scoped to their original folder for explicit review/recovery; only explicit logout discards them.
 
 Enrollment consumption, replacement-session creation and previous-session revocation commit atomically. A rolled-back exchange leaves the link usable. A response lost after a successful commit does not make that link reusable; open a new link from Crate to enroll again.
