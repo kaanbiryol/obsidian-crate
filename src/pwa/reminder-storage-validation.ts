@@ -33,5 +33,6 @@ export function isStoredReminderDraft(value: unknown): value is ModalDraft {
 		&& (draft.priority === 1 || draft.priority === 4)
 		&& (draft.activePicker === null || ['date', 'project', 'recurrence'].includes(String(draft.activePicker)))
 		&& typeof draft.deleteConfirm === 'boolean'
+		&& (draft.originalDueDatetime === undefined || typeof draft.originalDueDatetime === 'string')
 		&& (draft.recurrence === undefined || !('error' in validateRecurrence(draft.recurrence)));
 }
