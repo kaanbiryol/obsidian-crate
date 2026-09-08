@@ -1,0 +1,133 @@
+{
+  "result": {
+    "snapshots": [
+      {
+        "phase": "initial",
+        "leaves": [
+          {
+            "id": "81bacb4f09ff8519",
+            "deferred": false,
+            "state": {
+              "type": "reminders-view",
+              "state": {},
+              "icon": "check-circle",
+              "title": "Reminders"
+            }
+          }
+        ],
+        "commands": 10,
+        "reminders": 1
+      },
+      {
+        "phase": "reload-1",
+        "leaves": [
+          {
+            "id": "81bacb4f09ff8519",
+            "deferred": false,
+            "state": {
+              "type": "reminders-view",
+              "state": {},
+              "icon": "check-circle",
+              "title": "Reminders"
+            }
+          }
+        ],
+        "commands": 10,
+        "reminders": 1
+      },
+      {
+        "phase": "reload-2",
+        "leaves": [
+          {
+            "id": "81bacb4f09ff8519",
+            "deferred": false,
+            "state": {
+              "type": "reminders-view",
+              "state": {},
+              "icon": "check-circle",
+              "title": "Reminders"
+            }
+          }
+        ],
+        "commands": 10,
+        "reminders": 1
+      },
+      {
+        "phase": "reload-3",
+        "leaves": [
+          {
+            "id": "81bacb4f09ff8519",
+            "deferred": false,
+            "state": {
+              "type": "reminders-view",
+              "state": {},
+              "icon": "check-circle",
+              "title": "Reminders"
+            }
+          }
+        ],
+        "commands": 10,
+        "reminders": 1
+      },
+      {
+        "phase": "reload-4",
+        "leaves": [
+          {
+            "id": "81bacb4f09ff8519",
+            "deferred": false,
+            "state": {
+              "type": "reminders-view",
+              "state": {},
+              "icon": "check-circle",
+              "title": "Reminders"
+            }
+          }
+        ],
+        "commands": 10,
+        "reminders": 1
+      },
+      {
+        "phase": "reload-5",
+        "leaves": [
+          {
+            "id": "81bacb4f09ff8519",
+            "deferred": false,
+            "state": {
+              "type": "reminders-view",
+              "state": {},
+              "icon": "check-circle",
+              "title": "Reminders"
+            }
+          }
+        ],
+        "commands": 10,
+        "reminders": 1
+      },
+      {
+        "phase": "concurrent-opens",
+        "leaves": [
+          {
+            "id": "81bacb4f09ff8519",
+            "deferred": false,
+            "state": {
+              "type": "reminders-view",
+              "state": {},
+              "icon": "check-circle",
+              "title": "Reminders"
+            }
+          }
+        ],
+        "commands": 10,
+        "reminders": 1
+      }
+    ],
+    "title": "New tab - Vault - Obsidian 1.13.7",
+    "vault": "Vault"
+  },
+  "errors": [],
+  "artifacts": {
+    "main.js": "061f2be0d7e19a66defdd69b7899a1454c9f6fea733bafb10c8e964327213750",
+    "styles.css": "4cfe6f2949d4d3be2c0e0f08242f6f80202ee961edb4c37b0b81794669379a76",
+    "manifest.json": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a"
+  }
+}

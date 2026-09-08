@@ -60,6 +60,10 @@ The first clean candidate gate caught an unused priority-removal helper left by 
 - **Fix:** serialize opens with a bounded workspace-owned reservation that survives plugin module reload. Reuse the reserved pane only while it is still attached and represents the reminder or temporary empty view; closed and repurposed panes are left alone. Await reveal/startup and fence late reveals on unload. The reservation holds one pane and a pending promise, and the promise is cleared after completion.
 - **Proof:** the concurrency/reveal regressions failed before the fix. All 41 focused lifecycle/workspace tests, plugin typecheck and lint pass, including module replacement, closed/repurposed panes, failed activation and unload. An isolated real Obsidian vault retains the same single loaded pane through five reloads and three concurrent opens, with ten commands, stable reminder identity and no observed JavaScript errors. The installed artifact and raw acceptance results are included with the final candidate evidence.
 
-## Verification in progress
+## Final verification
 
-The first-round gate passed advisory and secret scans, lint, both typechecks, deadcode, notices, 22 recovery tests, 1,538 unit tests, 220 Worker tests and production builds. It stopped at PWA bundle budgets; later gate steps therefore were not established by that run. The bundle issue and additional parser, persistence and scale checks are part of this second audit.
+The first-round gate passed advisory and secret scans, lint, both typechecks, deadcode, notices, 22 recovery tests, 1,538 unit tests, 220 Worker tests and production builds. It stopped at PWA bundle budgets; later gate steps therefore were not established by that run.
+
+After R01–R06 and the separate unused-helper cleanup, the complete release gate passes on `bb14136`: 1,562 unit tests, 225 local Worker integration tests, 22 recovery tests, all 19 Chromium/WebKit browser scripts, production artifacts, budgets and security scans. The visual typecheck and all 48 visual tests pass. Clean Node 20.19.0, 22.12.0 and 24.0.0 builds produce identical artifacts. Actual Obsidian 1.13.7 editor/reload checks use the final assets.
+
+See the [candidate evidence](audit-evidence/remediation/final-bb14136/README.md) and [final 17-section assessment](pre-release-readiness-bb14136.md). No confirmed code finding remains open from either round. Hosted, minimum-version and physical-device acceptance remains explicitly unverified.

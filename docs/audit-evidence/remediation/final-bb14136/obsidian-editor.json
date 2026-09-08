@@ -1,0 +1,34 @@
+{
+  "beforeReload": {
+    "id": "0b7fbb6a-7b5a-4658-bdc9-d8b57465fd36",
+    "content": "Editor acceptance check",
+    "description": "Edited using keyboard activation in Obsidian.",
+    "priority": 4,
+    "completed": true,
+    "project": "Inbox",
+    "filePath": "Reminders/Inbox.md",
+    "lineNumber": 2,
+    "rawLine": "- [x] Editor acceptance check <!-- crate-id:0b7fbb6a-7b5a-4658-bdc9-d8b57465fd36 -->",
+    "contentHash": "f6mvn2"
+  },
+  "afterReload": {
+    "id": "0b7fbb6a-7b5a-4658-bdc9-d8b57465fd36",
+    "content": "Editor acceptance check",
+    "description": "Edited using keyboard activation in Obsidian.",
+    "priority": 4,
+    "completed": true,
+    "project": "Inbox",
+    "filePath": "Reminders/Inbox.md",
+    "lineNumber": 2,
+    "rawLine": "- [x] Editor acceptance check <!-- crate-id:0b7fbb6a-7b5a-4658-bdc9-d8b57465fd36 -->",
+    "contentHash": "f6mvn2"
+  },
+  "errors": [],
+  "checks": [
+    "create with title and description",
+    "keyboard enter opens editor",
+    "edit description and save",
+    "complete with checkbox",
+    "exact index record survives plugin reload"
+  ]
+}
