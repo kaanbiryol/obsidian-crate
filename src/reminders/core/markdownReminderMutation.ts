@@ -196,7 +196,14 @@ export function buildReminderCompletionPlan(
 	let recurringInstanceCompleted: ReminderCompletionPlan['recurringInstanceCompleted'];
 
 	if (!completed) {
-		nextLine = sourceLine.replace(/\[x\]/i, '[ ]');
+		const completedCount = recurrence?.completedCount ?? 0;
+		if (reminder.completed && recurrence && completedCount > 0) {
+			// Reopen the displayed occurrence without moving its date backwards.
+			// Completing it again must restore the count, rather than double count it.
+			recurrence = { ...recurrence, completedCount: completedCount - 1 };
+			nextLine = rebuildCheckboxLine(sourceLine.match(/^(\s*)/)?.[1] ?? '', false, reminder.content,
+				currentDue, reminder.priority, undefined, recurrence, currentHasTime, reminder.id);
+		} else nextLine = sourceLine.replace(/\[x\]/i, '[ ]');
 	} else if (recurrence && !reminder.completed) {
 		const completedCount = recurrence.completedCount ?? 0;
 		const nextInstant = calculateNextOccurrence(currentHasTime ? currentDue : recurrenceCalendarInstant(currentDue, recurrence), recurrence, completedCount);
