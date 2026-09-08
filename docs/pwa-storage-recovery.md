@@ -24,6 +24,12 @@ Compare the export with current reminders before restoring missing text in Obsid
 
 After confirming **I saved and reviewed the export**, **Remove exported copies from device** removes only still-damaged entries whose current key and string exactly match that export. Changed, repaired, unexported, or differently scoped entries survive. The operation uses the same cross-tab lock as sending. Explicit logout clears quarantined entries along with other pending commands. Storage-access failures still block queue initialization with an actionable error; an unreadable storage API is never treated as an empty queue.
 
+## Saved editor drafts
+
+Opening an editor validates every stored draft field, recurrence and retained-attempt envelope before rendering it. Malformed JSON, damaged fields, out-of-folder attempts and a different recovery operation remain in their original session-storage key. **Saved draft needs review** offers the same exact-string export and reviewed removal controls as damaged pending commands. Closing or reloading that screen preserves the draft. Export and compare it with current reminders before removing it and opening a fresh editor; a retained earlier attempt may already have committed.
+
+Removal verifies the enrolled folder, storage key and full exported string immediately before deletion, then verifies deletion succeeded. A changed draft or storage error keeps the editor blocked with an explanation. An unreadable storage API offers retry and never opens an editor over an unknown draft. Ordinary valid drafts and valid legacy attempted bodies retain their existing restore behavior. Explicit logout still clears drafts as a privacy operation.
+
 ## Verification
 
 `pwa-cache-test.mjs` covers creation, metadata-only 304 refresh, stale revision guards and clearing. `pwa-cache-recovery-test.mjs` runs native IndexedDB in Chromium and WebKit: additive migration, aborted migration/retry, an old connection blocking upgrade, abandoned-request fencing, damaged rows, quota and denied-storage failures, folder-only rebuild, session isolation, future-format preservation, and blocked deletion. It checks that pending-command and editor-draft bytes survive.
@@ -31,3 +37,5 @@ After confirming **I saved and reviewed the export**, **Remove exported copies f
 `pwa-cache-recovery-ui-test.mjs` exercises the built PWA against native IndexedDB: blocked startup retains the live reminder UI, the keyboard recovery action rebuilds the cache, damaged cached rows stay unrendered during network failure, and reconnection replaces them without using their ETag or losing drafts and pending commands. Cloudflare responses use the local preview server; these tests do not establish physical-device or hosted acceptance.
 
 `pwa-outbox-recovery-test.mjs` exercises two built-PWA tabs in Chromium and WebKit at a mobile viewport. Healthy current and earlier-session commands sync despite damaged neighbors; only valid operation bodies reach the preview server. Downloads preserve exact Unicode and malformed JSON strings, markup stays inert, and removal after a concurrent edit preserves changed and unexported entries. Unit tests also cover quota-free quarantine, invalid reminder presentation fields, conflicting recovery destinations and explicit logout cleanup.
+
+`pwa-draft-recovery-test.mjs` verifies the built editor in Chromium and WebKit: malformed fields stay unrendered, close/reload preserves exact strings, export includes full Unicode text without executing markup, and changed or failed storage removals cannot open an editor over the retained draft. Other folders remain private, and no reminder mutation is sent during recovery.
