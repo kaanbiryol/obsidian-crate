@@ -200,11 +200,15 @@ describe('Cloudflare runtime integration', () => {
 		await drainNotificationJobs(runtimeEnv);
 		const stub = runtimeEnv.REMINDER_ALARMS.get(runtimeEnv.REMINDER_ALARMS.idFromName(reminderId));
 
-		expect(await runDurableObjectAlarm(stub as never)).toBe(true);
+		expect(await runDurableObjectAlarm(stub as never)).toBe(false);
 		const scheduled = await runtimeEnv.DB.prepare(
 			'SELECT reminder_id FROM scheduled_reminders WHERE reminder_id = ?',
 		).bind(reminderId).first();
-		expect(scheduled).toEqual({ reminder_id: reminderId });
-
+		expect(scheduled).toBeNull();
+		const pending = await runtimeEnv.DB.prepare(
+			'SELECT job_token, operation, attempts, available_at FROM notification_jobs WHERE reminder_id = ?',
+		).bind(reminderId).first<{ job_token: string; operation: string; attempts: number; available_at: number }>();
+		expect(pending).toMatchObject({ job_token: 'runtime-job', operation: 'schedule', attempts: 1 });
+		expect(pending!.available_at).toBeGreaterThan(Date.now());
 	});
 });
