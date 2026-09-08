@@ -8,7 +8,7 @@ Run `npm run benchmark:sync` for the four capacity cases. The ordinary Worker ru
 
 The benchmark explicitly clears its test database and bucket between cases: the local runtime's reset helper alone retained D1 rows after a 10,000-file run. Setup/cleanup are outside the measurements. SQL counts are prepared statements, not billed D1 rows read or written. Response sizes include API bodies and base64 encoding where applicable. Timing assertions are intentionally absent; correctness and convergence are required regardless of machine load.
 
-## Local results
+## Baseline local results
 
 The record is based on `0288253` plus the S11 test additions, using Node 24.19.0. Full per-phase data, route counts, response bytes and R2 get/put counts are preserved in [the machine-readable evidence](audit-evidence/remediation/s11-sync-capacity.json).
 
@@ -19,9 +19,22 @@ The record is based on `0288253` plus the S11 test additions, using Node 24.19.0
 | 10,000 | Cold full sync | 29.32 s | 20,002 | 110,008 | 4.63 s / 206 | 126 ms / 1 |
 | 10,000 | Initial upload | 20.70 s | 6,720 | 90,080 | 5.20 s / 206 | 120 ms / 1 |
 
-Initial upload batches small files; cold full reconciliation currently sends each upload individually. Both preflight each mutation. This makes cold full sync materially more expensive over a network than the batched initial path. Downloads batch up to 50 small files, and settled unchanged synchronization uses one changes request. The first full sync following upload also establishes the remote cursor and can need a manifest read. A 10,000-file cold download returned about 19.8 MB of API bodies in this fixture; this is accumulated traffic, not a single response.
+At the baseline, initial upload batched small files while cold full reconciliation sent each upload individually. Both preflighted each mutation, making cold full sync materially more expensive over a network than the batched initial path. Downloads batch up to 50 small files, and settled unchanged synchronization uses one changes request. The first full sync following upload also establishes the remote cursor and can need a manifest read. A 10,000-file cold download returned about 19.8 MB of API bodies in this fixture; this is accumulated traffic, not a single response.
 
-The largest-vault acceptance check must record real request latency, Worker CPU/errors, D1 rows, projection lag and device memory on the intended hosted deployment. These local times do not complete that acceptance check. Cold full-upload request amplification is explicitly carried into the independent follow-up audit.
+The largest-vault acceptance check must record real request latency, Worker CPU/errors, D1 rows, projection lag and device memory on the intended hosted deployment. These local times do not complete that acceptance check. The second-audit correction below addresses cold full-upload request amplification.
+
+## Second-audit batching results
+
+R04 uses the existing byte-budgeted preparation generator and three-file upload protocol during cold full reconciliation. Each file retains the remote hash observed by the plan, including an explicit absence guard. Large files retain the individual route; only confirmed uploads enter the checkpoint. Preparation errors and stale members remain visible and prevent cursor advancement.
+
+The new [machine-readable measurements](audit-evidence/remediation/r04-sync-capacity.json) use Node 24.19.0 with the R04 implementation on base `93788f9`:
+
+| Notes | Cold upload requests, before → after | New cold upload time | New prepared SQL | Explicit initial requests |
+| --- | --- | --- | --- | --- |
+| 1,000 | 2,002 → 674 | 1.98 s | 9,016 | 672 |
+| 10,000 | 20,002 → 6,722 | 19.63 s | 90,088 | 6,720 |
+
+Cold-upload requests fall by about 66%, while R2 still receives exactly one put per note. Byte budgets and per-request file limits stay unchanged. All four capacity cases still check final bytes/hashes after offline edits, deletes, renames and restart. Three additional real-Worker cases verify bounded request membership, confirmed revisions/progress, partial stale-write failure and response loss. A later edit after an unconfirmed first upload has no trusted merge base; it remains available in a visible conflict copy while the committed remote version is retained.
 
 ## Content conservation and storage failures
 
