@@ -38,8 +38,8 @@ try {
 			await page.getByRole('dialog', { name: 'Edit reminder', exact: true }).waitFor({ state: 'detached' });
 			const updatedCard = page.getByRole('group', { name: 'Updated article. Press Enter to edit reminder.', exact: true });
 			await updatedCard.waitFor();
-			// Desktop browsers cannot show the software keyboard. Drive its viewport
-			// frames explicitly to cover the delay between blur and native dismissal.
+			// Desktop browsers cannot show the software keyboard. Simulate its
+			// viewport and verify confirmation preserves editor focus and geometry.
 			await page.evaluate(() => {
 				window.keyboardViewportHeight = 844;
 				const viewport = new EventTarget();
@@ -59,30 +59,64 @@ try {
 			});
 			const sheet = page.locator('.pwa-modal-sheet__container--reminder');
 			await expect(sheet).toHaveCSS('--pwa-keyboard-inset', '334px');
+			await expect(sheet).toHaveCSS('transform', 'none');
+			const editorBeforeDelete = await title.boundingBox();
 			await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
 			const confirmation = page.getByRole('alertdialog', { name: 'Delete reminder?', exact: true });
-			await page.waitForTimeout(50);
-			await expect(confirmation).toBeHidden();
+			await expect(confirmation).toBeVisible();
+			await expect(title).toBeFocused();
+			await expect(confirmation.getByRole('button')).toHaveCount(2);
+			await expect(confirmation.getByRole('button', { name: 'Cancel', exact: true })).not.toBeFocused();
+			const confirmationBounds = await confirmation.boundingBox();
+			assert.ok(confirmationBounds.y >= 0 && confirmationBounds.y + confirmationBounds.height <= 510,
+				`${browserType.name()}: confirmation must fit above the software keyboard`);
+			const editorAfterDelete = await title.boundingBox();
+			assert.ok(Math.abs(editorAfterDelete.y - editorBeforeDelete.y) < 1
+				&& Math.abs(editorAfterDelete.height - editorBeforeDelete.height) < 1,
+				`${browserType.name()}: opening confirmation must not move the editor`);
 			await expect(sheet).toHaveCSS('--pwa-keyboard-inset', '334px');
-			for (const height of [620, 740]) {
-				await page.evaluate(height => {
-					window.keyboardViewportHeight = height;
-					window.visualViewport.dispatchEvent(new Event('resize'));
-				}, height);
-				await expect(sheet).toHaveCSS('--pwa-keyboard-inset', `${844 - height}px`);
-				await expect(confirmation).toBeHidden();
-			}
+			await page.keyboard.type('Blocked while confirming');
+			await page.keyboard.insertText('Blocked pasted text');
+			const blockedNativeEdits = await title.evaluate(element => ['paste', 'cut', 'drop'].map(type => {
+				const event = new Event(type, { bubbles: true, cancelable: true });
+				return !element.dispatchEvent(event);
+			}));
+			assert.deepEqual(blockedNativeEdits, [true, true, true],
+				`${browserType.name()}: confirmation must block editor clipboard and drop handlers`);
+			await expect(title).toHaveText('Unsaved deletion draft');
+			await confirmation.getByRole('button', { name: 'Cancel', exact: true }).tap();
+			await expect(confirmation).toBeHidden();
+			await expect(title).toBeFocused();
+			await expect(title).toHaveText('Unsaved deletion draft');
+			await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
+			await expect(confirmation).toBeVisible();
+			await page.locator('.pwa-delete-confirmation .base-modal-container').tap({ position: { x: 8, y: 8 } });
+			await expect(confirmation).toBeHidden();
+			await expect(title).toBeFocused();
+			await page.waitForTimeout(500);
+			await expect(page.getByRole('dialog', { name: 'Edit reminder', exact: true })).toBeVisible();
+			await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
+			await expect(confirmation).toBeVisible();
+			await page.keyboard.press('Tab');
+			await expect(confirmation.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+			await page.keyboard.press('Tab');
+			await expect(confirmation.getByRole('button', { name: 'Delete', exact: true })).toBeFocused();
+			await page.keyboard.press('Tab');
+			await expect(confirmation.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+			await page.keyboard.press('Escape');
+			await expect(confirmation).toBeHidden();
+			await expect(title).toBeFocused();
+			await page.waitForTimeout(500);
+			await expect(page.getByRole('dialog', { name: 'Edit reminder', exact: true })).toBeVisible();
+			// Confirmation also opens immediately when the keyboard is closed.
 			await page.evaluate(() => {
 				window.keyboardViewportHeight = 844;
 				window.visualViewport.dispatchEvent(new Event('resize'));
 			});
-			await expect(confirmation).toBeVisible();
-			await confirmation.getByRole('button', { name: 'Cancel', exact: true }).tap();
-			await expect(confirmation).toBeHidden();
-			await expect(title).toHaveText('Unsaved deletion draft');
-			// The keyboard is already closed, so a second request opens immediately.
+			await expect(page.locator('.pwa-modal-sheet--reminder')).not.toHaveClass(/is-keyboard-open/);
 			await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
 			await expect(confirmation).toBeVisible();
+			await expect(confirmation).toBeFocused();
 			await confirmation.getByRole('button', { name: 'Delete', exact: true }).tap();
 			await expect(page.getByRole('dialog', { name: 'Edit reminder', exact: true })).toBeHidden();
 			await expect(updatedCard).toBeHidden();

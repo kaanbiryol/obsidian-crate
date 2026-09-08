@@ -70,11 +70,12 @@ export function PwaModalSheet({
 	const mountPoint = typeof document === 'undefined'
 		? undefined
 		: document.querySelector<HTMLElement>('.pwa-shadow-root') ?? undefined;
-	const containerStyle = keyboardInset > 0
-		? ({
-			'--pwa-keyboard-inset': `${keyboardInset}px`,
-		} as React.CSSProperties)
-		: undefined;
+	const containerStyle = {
+		// The library sets pointer-events inline. Keep the transparent area above
+		// the reminder stage clickable through to the backdrop at the same level.
+		pointerEvents: variant === 'reminder' ? 'none' : 'auto',
+		...(keyboardInset > 0 ? { '--pwa-keyboard-inset': `${keyboardInset}px` } : {}),
+	} as React.CSSProperties;
 	const isInteractiveSheetTarget = useCallback((target: EventTarget | null) => (
 		target instanceof Element && Boolean(target.closest(SHEET_INTERACTIVE_TARGET))
 	), []);
@@ -121,7 +122,7 @@ export function PwaModalSheet({
 			<Sheet.Backdrop
 				className="pwa-modal-sheet__backdrop"
 				aria-label={closeOnBackdrop ? 'Close sheet' : undefined}
-				onPointerDown={closeOnBackdrop ? undefined : (event) => event.preventDefault()}
+				onPointerDown={(event) => event.preventDefault()}
 				onClick={closeOnBackdrop ? onClose : undefined}
 			/>
 			<Sheet.Container

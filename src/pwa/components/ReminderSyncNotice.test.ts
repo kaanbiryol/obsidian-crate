@@ -43,10 +43,13 @@ describe('PWA reminder sync recovery notice', () => {
 		expect(markup).not.toContain('>Discard</button>');
 	});
 
-	it('keeps offline pending progress distinct from saved failures', () => {
+	it('leaves routine pending sync to the header and keeps offline recovery actions disabled', () => {
 		const markup = render([change({ status: 'pending' }), change({ operationId: 'failure' })], true);
-		expect(markup).toContain('Waiting for connection · 1 change');
+		expect(markup).not.toContain('Waiting for connection');
+		expect(markup).not.toContain('pwa-reminder-sync-progress');
 		expect(markup).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Retry: Buy milk"/);
+		expect(render([change({ status: 'pending' })])).toBe('');
+		expect(render([change({ status: 'pending' })], true)).toBe('');
 		expect(render([])).toBe('');
 	});
 

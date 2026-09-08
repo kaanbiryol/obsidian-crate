@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useId } from 'react';
 import { BaseModal } from './BaseModal';
 import { IconButton } from '../../ui/shared/IconButton';
 import { ShadowDOMButton } from './ShadowDOMButton';
@@ -12,7 +12,8 @@ interface DeleteConfirmationModalProps {
     confirmLabel?: string;
     cancelLabel?: string;
     isLoading?: boolean;
-    useNativeDialog?: boolean;
+    showCloseButton?: boolean;
+    autoFocusCancel?: boolean;
 }
 
 /**
@@ -27,18 +28,11 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
     confirmLabel = 'Delete',
     cancelLabel = 'Cancel',
     isLoading = false,
-    useNativeDialog = false,
+    showCloseButton = true,
+    autoFocusCancel = true,
 }) => {
     const titleId = useId();
     const messageId = useId();
-    const dialogRef = useRef<HTMLDialogElement>(null);
-
-    useEffect(() => {
-        if (!isOpen || !useNativeDialog) return;
-        const dialog = dialogRef.current;
-        dialog?.showModal();
-        return () => dialog?.close();
-    }, [isOpen, useNativeDialog]);
 
     const handleConfirm = () => {
         onConfirm();
@@ -46,7 +40,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
 
     if (!isOpen) return null;
 
-    const content = (
+    return (
         <BaseModal
             isOpen={isOpen}
             onClose={() => { if (!isLoading) onClose(); }}
@@ -60,19 +54,20 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
             ariaDescribedBy={messageId}
             onKeyDown={(event) => {
                 if (event.key !== 'Escape' || isLoading) return;
+                event.preventDefault();
                 event.stopPropagation();
                 onClose();
             }}
         >
-                <header className="delete-confirmation-header">
+                <header className={`delete-confirmation-header${showCloseButton ? '' : ' has-no-close'}`}>
                     <h2 id={titleId} className="delete-confirmation-title">{title}</h2>
-                    <IconButton
+                    {showCloseButton && <IconButton
                         icon="x"
                         label="Close confirmation"
                         onClick={onClose}
                         disabled={isLoading}
                         className="delete-confirmation-close"
-                    />
+                    />}
                 </header>
                 <div className="delete-confirmation-body">
                     <p id={messageId} className="delete-confirmation-message">
@@ -87,7 +82,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                         onPress={onClose}
                         className="delete-confirmation-button delete-confirmation-cancel"
                         isDisabled={isLoading}
-                        autoFocus
+                        autoFocus={autoFocusCancel}
                     >
                         {cancelLabel}
                     </ShadowDOMButton>
@@ -104,19 +99,4 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
         </BaseModal>
     );
 
-    return useNativeDialog ? (
-        <dialog
-            ref={dialogRef}
-            className="delete-confirmation-dialog"
-            aria-label={title}
-            onCancel={(event) => {
-                event.preventDefault();
-                if (!isLoading) onClose();
-            }}
-            onKeyDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-        >
-            {content}
-        </dialog>
-    ) : content;
 };
