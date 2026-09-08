@@ -1,4 +1,18 @@
 @mixin styles {
+	.pwa-reminder-recovery-preview {
+		max-height: min(30dvh, 240px);
+		overflow: auto;
+		overscroll-behavior: contain;
+		pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+	}
+
+	.pwa-reminder-recovery-confirm {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-height: 44px;
+	}
+
 	.pwa-reminder-source-list {
 		max-height: min(30dvh, 240px);
 		overflow-y: auto;
