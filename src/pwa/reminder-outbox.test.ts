@@ -119,6 +119,23 @@ describe('optimistic reminder outbox', () => {
 		expect(state.storage.load()).toEqual([]);
 	});
 
+	it('retains the exact idempotent command when publishing confirmation fails', async () => {
+		const state = harness();
+		const original = completion();
+		state.commit.mockRejectedValueOnce(new Error('Could not share the confirmed change'));
+		state.enqueue(original);
+		const first = state.drain();
+		state.requests[0]!.resolve(confirmed());
+		await first;
+		expect(state.storage.load()).toMatchObject([{ operationId: original.operationId, body: original.body, status: 'uncertain', ambiguous: true }]);
+		state.retry(original.operationId);
+		const retry = state.drain();
+		expect(state.requests[1]?.init).toEqual(state.requests[0]?.init);
+		state.requests[1]!.resolve(confirmed());
+		await retry;
+		expect(state.storage.load()).toEqual([]);
+	});
+
 	it('persists and sends a later draft only after the original receipt supplies its revision', async () => {
 		const state = harness();
 		const original = saveWithFollowUp();

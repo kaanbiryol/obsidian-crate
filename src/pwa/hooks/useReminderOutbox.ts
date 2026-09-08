@@ -4,6 +4,7 @@ import { createReminderOutboxStorage, createReminderRecoveryStorage } from '../r
 import { capturePwaSession } from '../session-generation';
 import { mergeReminderRecord } from '../reminder-optimistic-state';
 import { mergeProject, reorderProjectReminders } from '../reminder-list-state';
+import { applyReminderSettlement, createReminderSettlementChannel } from '../reminder-settlement';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { ApiFetch, LoadReminders, ReminderRecord, ShowToast } from '../types';
 import type { MutableRefObject } from 'react';
@@ -45,7 +46,7 @@ export function useReminderOutbox(options: {
 		recoverRef.current = null;
 		if (!authToken || !bootstrapped) return;
 		let cleanup = () => {};
-		void Promise.all([createReminderOutboxStorage(authToken, folderPath), createReminderRecoveryStorage(authToken, folderPath)]).then(([storage, recovery]) => {
+		void Promise.all([createReminderOutboxStorage(authToken, folderPath), createReminderRecoveryStorage(authToken, folderPath), createReminderSettlementChannel(authToken, folderPath)]).then(([storage, recovery, settlement]) => {
 			if (!isCurrent()) return;
 			if (!navigator.locks) throw new Error('Update this browser to safely sync changes between tabs.');
 			const outbox = createReminderOutbox({
@@ -66,6 +67,7 @@ export function useReminderOutbox(options: {
 					} else if (change.kind === 'delete') reminders = reminders.filter(item => item.id !== change.recordId);
 					else if (change.kind === 'reorder') reminders = reorderProjectReminders(reminders, change.project!, change.orderedIds!);
 					await current.commitReminderState(reminders, projects);
+					if (isCurrent()) settlement.publish(change, result);
 					if (isCurrent() && result.notificationWarning) current.showToast('info', `Saved. Notification sync failed: ${result.notificationWarning}`);
 					if (isCurrent() && result.reminder && change.followUp) {
 						const { followUpReminderChange } = await import('../save-reminder-command');
@@ -102,8 +104,30 @@ export function useReminderOutbox(options: {
 			};
 			const visible = () => { if (document.visibilityState === 'visible') resume(); };
 			const storageChanged = (event: StorageEvent) => {
-				if (!recovery.acceptsKey(event.key) || !isCurrent()) return;
-				try { setRecoveryChanges(recovery.load()); outbox.refresh(); void outbox.drain(); }
+				if (!isCurrent()) return;
+				if (event.key === settlement.key && event.newValue) {
+					const confirmed = settlement.read(event);
+					const current = optionsRef.current;
+					const finish = current.beginLocalMutation();
+					void (async () => {
+						try {
+							const next = confirmed && current.hasSnapshot !== false ? applyReminderSettlement(current.remindersRef.current, current.projectsRef.current, confirmed) : null;
+							if (next) await current.commitReminderState(next.reminders, next.projects);
+						} catch (error) { if (isCurrent()) current.showToast('error', error instanceof Error ? error.message : String(error)); }
+						finally { finish(); if (isCurrent()) void optionsRef.current.loadReminders({ silent: true }); }
+					})();
+					return;
+				}
+				if (!recovery.acceptsKey(event.key)) return;
+				try {
+					// Also revalidate if a confirmation was missed, or another tab discarded a rejection.
+					if (storage.acceptsKey(event.key) && event.oldValue && event.newValue === null) {
+						const finish = optionsRef.current.beginLocalMutation();
+						finish();
+						void optionsRef.current.loadReminders({ silent: true });
+					}
+					setRecoveryChanges(recovery.load()); outbox.refresh(); void outbox.drain();
+				}
 				catch (error) { optionsRef.current.showToast('error', error instanceof Error ? error.message : String(error)); }
 			};
 			window.addEventListener('online', resume);
