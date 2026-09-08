@@ -1,0 +1,151 @@
+{
+  "commit": "bb14136984e72dcd01888a5154dc55bc675fe85c",
+  "checkout": "clean git archive; fresh npm ci for each runtime",
+  "runs": [
+    {
+      "node": "v20.19.0",
+      "npm": "11.8.0",
+      "commands": [
+        {
+          "command": "npm ci",
+          "exitCode": 0,
+          "seconds": 10.63
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "seconds": 9.97
+        },
+        {
+          "command": "npm run size-check",
+          "exitCode": 0,
+          "seconds": 0.79
+        },
+        {
+          "command": "npm run verify:release-artifacts",
+          "exitCode": 0,
+          "seconds": 0.18
+        }
+      ],
+      "artifacts": {
+        "dist/main.js": {
+          "sha256": "061f2be0d7e19a66defdd69b7899a1454c9f6fea733bafb10c8e964327213750",
+          "bytes": 1438564
+        },
+        "dist/styles.css": {
+          "sha256": "4cfe6f2949d4d3be2c0e0f08242f6f80202ee961edb4c37b0b81794669379a76",
+          "bytes": 140114
+        },
+        "manifest.json": {
+          "sha256": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a",
+          "bytes": 254
+        },
+        ".generated/cloudflare/worker.mjs": {
+          "sha256": "e3e6b4a035ce3e0bc012ca0440dd659c0b93ee85941369df985fe23dedef9798",
+          "bytes": 1300387
+        },
+        ".generated/cloudflare/pwa-client.json": {
+          "sha256": "76a367fdc1d443f4c698a67decc284ab3509facec51a5504f71e7c05848e893c",
+          "bytes": 594292
+        }
+      }
+    },
+    {
+      "node": "v22.12.0",
+      "npm": "11.8.0",
+      "commands": [
+        {
+          "command": "npm ci",
+          "exitCode": 0,
+          "seconds": 11.53
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "seconds": 10.89
+        },
+        {
+          "command": "npm run size-check",
+          "exitCode": 0,
+          "seconds": 0.91
+        },
+        {
+          "command": "npm run verify:release-artifacts",
+          "exitCode": 0,
+          "seconds": 0.26
+        }
+      ],
+      "artifacts": {
+        "dist/main.js": {
+          "sha256": "061f2be0d7e19a66defdd69b7899a1454c9f6fea733bafb10c8e964327213750",
+          "bytes": 1438564
+        },
+        "dist/styles.css": {
+          "sha256": "4cfe6f2949d4d3be2c0e0f08242f6f80202ee961edb4c37b0b81794669379a76",
+          "bytes": 140114
+        },
+        "manifest.json": {
+          "sha256": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a",
+          "bytes": 254
+        },
+        ".generated/cloudflare/worker.mjs": {
+          "sha256": "e3e6b4a035ce3e0bc012ca0440dd659c0b93ee85941369df985fe23dedef9798",
+          "bytes": 1300387
+        },
+        ".generated/cloudflare/pwa-client.json": {
+          "sha256": "76a367fdc1d443f4c698a67decc284ab3509facec51a5504f71e7c05848e893c",
+          "bytes": 594292
+        }
+      }
+    },
+    {
+      "node": "v24.0.0",
+      "npm": "11.8.0",
+      "commands": [
+        {
+          "command": "npm ci",
+          "exitCode": 0,
+          "seconds": 10.91
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "seconds": 9.37
+        },
+        {
+          "command": "npm run size-check",
+          "exitCode": 0,
+          "seconds": 0.76
+        },
+        {
+          "command": "npm run verify:release-artifacts",
+          "exitCode": 0,
+          "seconds": 0.18
+        }
+      ],
+      "artifacts": {
+        "dist/main.js": {
+          "sha256": "061f2be0d7e19a66defdd69b7899a1454c9f6fea733bafb10c8e964327213750",
+          "bytes": 1438564
+        },
+        "dist/styles.css": {
+          "sha256": "4cfe6f2949d4d3be2c0e0f08242f6f80202ee961edb4c37b0b81794669379a76",
+          "bytes": 140114
+        },
+        "manifest.json": {
+          "sha256": "e7fff40af51d7388907e6ed6a2e60e7b472fd08eed026ef8658628c541d5003a",
+          "bytes": 254
+        },
+        ".generated/cloudflare/worker.mjs": {
+          "sha256": "e3e6b4a035ce3e0bc012ca0440dd659c0b93ee85941369df985fe23dedef9798",
+          "bytes": 1300387
+        },
+        ".generated/cloudflare/pwa-client.json": {
+          "sha256": "76a367fdc1d443f4c698a67decc284ab3509facec51a5504f71e7c05848e893c",
+          "bytes": 594292
+        }
+      }
+    }
+  ],
+  "identicalAcrossNodes": true
+}

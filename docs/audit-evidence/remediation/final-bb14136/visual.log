@@ -1,0 +1,75 @@
+
+> obsidian-crate@0.1.0 test:visual
+> playwright test
+
+[WebServer] (node:45828) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 48 tests using 4 workers
+
+(node:45832) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:45833) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:45831) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:45830) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:45831) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:45832) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:45830) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:45833) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   4 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 date (715ms)
+  ✓   2 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 project (737ms)
+  ✓   1 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 editor (722ms)
+  ✓   3 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 cards (743ms)
+  ✓   7 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 monthly (509ms)
+  ✓   6 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 cards (541ms)
+  ✓   5 tests/visual/shared-ui.spec.ts:7:9 › plugin light 390 weekly (638ms)
+  ✓   8 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 editor (702ms)
+  ✓   9 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 date (460ms)
+  ✓  10 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 project (535ms)
+  ✓  11 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 weekly (616ms)
+  ✓  12 tests/visual/shared-ui.spec.ts:7:9 › plugin light 1280 monthly (616ms)
+  ✓  13 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 cards (460ms)
+  ✓  14 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 editor (462ms)
+  ✓  15 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 date (439ms)
+  ✓  16 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 project (485ms)
+  ✓  17 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 weekly (500ms)
+  ✓  18 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 390 monthly (483ms)
+  ✓  19 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 cards (495ms)
+  ✓  20 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 editor (524ms)
+  ✓  21 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 date (460ms)
+  ✓  22 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 project (460ms)
+  ✓  23 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 weekly (640ms)
+  ✓  24 tests/visual/shared-ui.spec.ts:7:9 › plugin dark 1280 monthly (518ms)
+  ✓  25 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 cards (490ms)
+  ✓  26 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 editor (515ms)
+  ✓  27 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 date (452ms)
+  ✓  29 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 weekly (565ms)
+  ✓  28 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 project (622ms)
+  ✓  30 tests/visual/shared-ui.spec.ts:7:9 › pwa light 390 monthly (564ms)
+  ✓  31 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 cards (557ms)
+  ✓  32 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 editor (656ms)
+  ✓  33 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 date (633ms)
+  ✓  34 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 project (621ms)
+  ✓  35 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 weekly (627ms)
+  ✓  36 tests/visual/shared-ui.spec.ts:7:9 › pwa light 1280 monthly (587ms)
+  ✓  38 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 editor (583ms)
+  ✓  37 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 cards (698ms)
+  ✓  39 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 date (511ms)
+  ✓  40 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 project (570ms)
+  ✓  41 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 weekly (553ms)
+  ✓  42 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 390 monthly (537ms)
+  ✓  43 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 cards (506ms)
+  ✓  44 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 editor (633ms)
+  ✓  45 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 date (633ms)
+  ✓  46 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 project (609ms)
+  ✓  47 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 weekly (639ms)
+  ✓  48 tests/visual/shared-ui.spec.ts:7:9 › pwa dark 1280 monthly (378ms)
+
+  48 passed (9.5s)

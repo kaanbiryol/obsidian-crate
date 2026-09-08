@@ -40,7 +40,7 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 | S09 | Align security/release checks and improve contributor/dependency maintenance setup | Fixed: release and Pages builds require advisory/secret checks; shallow history fails and checkout credentials are not persisted. Added contributor/PR/issue guidance and weekly npm/Actions update proposals without auto-merge. Advisory audit reports zero vulnerabilities; pinned Gitleaks scans487 commits plus current source without leaks; shallow-clone rejection, workflow configuration, local links and targeted lint pass. Hosted Actions and repository settings remain final acceptance evidence |
 | S10 | Document and verify protocol/schema/cache upgrade and rollback policy | Fixed: unified [format matrix and upgrade/rollback policy](compatibility.md), corrected stale schema/parser/session documentation, and schema-2 backup-before-upgrade support with isolated current-schema restore. 22 Python,37 focused unit and23 real Worker tests pass; Chromium/WebKit update/native-cache recovery checks, lint/Worker typecheck and documentation links pass. Receipt-retention changes remain separately tracked in S07 |
 | S11 | Exercise larger sync workloads, interrupted multi-client histories and storage boundaries | Fixed: four1k/10k-note actual-engine capacity cases, eight three-device interrupted/expired-history cases and three authenticated storage-boundary cases pass; every final byte/hash checked; [measurements and limits](sync-capacity.md). Cold full-upload request amplification carried into follow-up audit; hosted/mobile performance remains acceptance work |
-| S12 | Record exact-artifact hosted, physical-device, minimum-Obsidian and restore acceptance | Not yet verified; availability of required environments must be established |
+| S12 | Record exact-artifact hosted, physical-device, minimum-Obsidian and restore acceptance | Partially verified: exact-asset Obsidian 1.13.7 desktop editor/reload smoke and clean three-Node reproducible builds pass. Hosted Cloudflare/restore, physical iOS/Android, minimum 1.13.0 and hosted release/scanner evidence remain open; [final acceptance record](audit-evidence/remediation/final-bb14136/README.md) |
 
 ## Completion requirements
 
@@ -48,3 +48,9 @@ The [September 6 remediation record](audit-remediation-2026-09-06.md) is retaine
 - The complete release gate, visual suite, advisory and secret scans pass on the final candidate.
 - A fresh independent audit examines the repaired system and its interactions; any new findings receive separate fixes and commits.
 - Final readiness distinguishes verified behavior, remaining defects and unavailable hosted/physical acceptance evidence. Passing local tests alone does not establish public-release readiness.
+
+## Final disposition
+
+All first-round actionable code findings and all six findings from the [second audit](second-audit-remediation.md) are fixed in individual commits. On code candidate `bb14136`, the full release gate and 48 visual tests pass: 1,562 unit tests, 225 local Worker integration tests, 22 recovery tests and all 19 Chromium/WebKit browser scripts. Clean Node 20.19.0/22.12.0/24.0.0 builds produce identical artifacts. The later evidence/report commit changes documentation only.
+
+The [final 17-section assessment](pre-release-readiness-bb14136.md) rates readiness **87/100**. No reproduced code blocker remains from these audits. Public plugin approval still requires the recorded hosted, minimum-version and physical-device acceptance; GitHub repository controls are separately identified as an operational improvement. No push, public release or Cloudflare deployment was performed.

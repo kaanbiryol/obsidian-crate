@@ -1,0 +1,42 @@
+b3ffba2 chore: record pre-release audit and remediation checklist
+66d576b chore: preserve the earlier audit remediation record
+a9d2b01 fix: preserve markdown during ambiguous reminder reorders
+2c969b5 fix: require verified local absence before remote deletion
+71c8e51 fix: enforce hierarchical file namespace at publication
+c46355c fix: quarantine reminder parse failures without blocking file sync
+c71f43e fix: preserve pending reminder work through session expiry
+110eade fix: isolate sync checkpoints across server transitions
+00a4117 fix: record durable file deletion audit receipts
+34d5b48 fix: preserve reminder identities across project moves
+eaff8a0 fix: verify file contents beyond filesystem fingerprints
+3be05f7 chore: verify the extended deletion response contract
+279249d fix: confirm and repair browser push registration
+1af7e73 fix: persist deterministic reminder schedules
+88370fe fix: surface periodic sync check failures
+451c1d5 feat: record background sync activity and safe diagnostics
+92bfc96 fix: preserve and expose incomplete reminder snapshots
+e6c8b5a fix: serialize deployment publication and reset operations
+f989e70 fix: make sync activity reachable from the keyboard
+5c07a88 fix: respect markdown structure in reminder operations
+bc70f59 fix: preserve descriptions in partial reminder updates
+0288253 fix: revalidate existing notification sources after parser upgrades
+5fa95ce chore: verify large sync workloads and interrupted histories
+793194e fix: converge confirmed reminder changes across open tabs
+f162a88 fix: recover interrupted plugin reminder moves durably
+35f7473 fix: refresh reminder views across clock boundaries
+28af956 fix: preserve recurring occurrence counts when reopening
+1b985da fix: recover unavailable and damaged offline reminder caches
+34108e9 fix: preserve and export damaged pending reminder changes
+3166f00 ci: enforce release security checks and document contributions
+6867dd8 fix: support pre-upgrade backups and define compatibility paths
+7ef0f35 chore: keep cache and clock implementation details private
+a188e7f chore: verify unprojected alarms stay pending
+a306635 fix: prune obsolete reminder occurrence history safely
+f371397 fix: bound reminder retries without replaying expired changes
+c6bf65c fix: return the saved reminder state after mutations
+35351e0 fix: preserve literal reminder titles during schedule parsing
+93788f9 fix: preserve damaged editor drafts for reviewed recovery
+70e005e perf: batch cold sync uploads within transfer budgets
+6ff98a5 perf: defer recovery controls and review pwa bundle budgets
+4da853e refactor: remove obsolete priority marker removal helper
+bb14136 fix: preserve the reminder pane across plugin reloads
