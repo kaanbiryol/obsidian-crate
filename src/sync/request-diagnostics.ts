@@ -1,7 +1,9 @@
 export const MAX_REQUEST_DIAGNOSTICS = 50;
+import { normalizeUploadDiagnostics, type UploadDiagnostic } from './upload-diagnostics';
+import { reminderOperationDay } from '../protocol/reminder-operation';
 const routes = new Set([
 	'/.well-known/crate', '/health', '/settings', '/diagnostics',
-	...['manifest', 'metadata', 'upload', 'download', 'delete', 'changes', 'check', 'batch-upload', 'batch-download', 'batch-delete', 'versions', 'restore'].map(route => `/sync/${route}`),
+	...['manifest', 'metadata', 'upload', 'download', 'delete', 'changes', 'check', 'batch-upload', 'batch-download', 'batch-delete', 'versions', 'restore', 'restore-version'].map(route => `/sync/${route}`),
 	...['tokens', 'revoke', 'enroll', 'enrollment'].map(route => `/auth/${route}`),
 	'/reminders/notification-policy', '/notifications/subscribe', '/notifications/unsubscribe', '/notifications/subscriptions', '/notifications/test',
 ]);
@@ -16,8 +18,14 @@ export interface RequestDiagnostic {
 	route: string;
 	status: number;
 	outcome: 'response' | 'failed' | 'aborted';
+	uploadOperationIds?: string[];
 }
-export interface RequestDiagnostics { clientSession: string; requests: RequestDiagnostic[] }
+export interface RequestDiagnostics { clientSession: string; requests: RequestDiagnostic[]; uploads?: UploadDiagnostic[] }
+
+export function normalizeUploadOperationIds(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	return [...new Set(value.filter((id): id is string => typeof id === 'string' && reminderOperationDay(id) !== null))].slice(0, 3);
+}
 
 export function diagnosticRoute(path: string): string {
 	const route = path.split('?')[0] ?? '';
@@ -40,7 +48,9 @@ export function normalizeRequestDiagnostics(value: unknown): RequestDiagnostics 
 			status: typeof item.status === 'number' && Number.isInteger(item.status) && item.status >= 100 && item.status <= 599 ? item.status : 0,
 			outcome: item.outcome as RequestDiagnostic['outcome'],
 			...(opaqueId(item.requestId) ? { requestId: item.requestId } : {}),
+			...(normalizeUploadOperationIds(item.uploadOperationIds).length ? { uploadOperationIds: normalizeUploadOperationIds(item.uploadOperationIds) } : {}),
 		});
 	}
-	return { clientSession: value.clientSession, requests };
+	return { clientSession: value.clientSession, requests,
+		...('uploads' in value ? { uploads: normalizeUploadDiagnostics(value.uploads) } : {}) };
 }

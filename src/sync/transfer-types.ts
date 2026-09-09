@@ -1,6 +1,7 @@
 import type { TAbstractFile, Vault } from "obsidian";
 import type { BatchDownloadResponse, BatchUploadFile, BatchUploadResponse, FileEntry, UploadResult } from '../protocol/sync-types';
 import type { RecordConflictInput } from './conflict-store';
+import type { UploadApplyPhase } from './upload-diagnostics';
 
 interface TransferManifest {
   getEntry?(path: string): FileEntry | undefined;
@@ -19,6 +20,7 @@ interface TransferConflictStore {
 }
 
 interface TransferApi {
+  recordMergeApplication?(path: string, hash: string, phase: UploadApplyPhase): Promise<void>;
   uploadFile(
     path: string,
     content: ArrayBuffer,
@@ -26,6 +28,8 @@ interface TransferApi {
     size: number,
     contentType: string,
 	expectedHash: string | null,
+	operationId?: string,
+	mergePreimage?: ArrayBuffer,
   ): Promise<UploadResult>;
   downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }>;
   deleteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<{ success: boolean; path: string }>;

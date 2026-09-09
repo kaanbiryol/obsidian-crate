@@ -1,3 +1,4 @@
+import type { UploadResult } from '../protocol/sync-types';
 import type { PreparedUpload, SyncResult, SyncState } from './types';
 
 interface QueueApi {
@@ -9,7 +10,7 @@ interface QueueApi {
 		size: number,
 		contentType: string,
 		expectedHash: string | null,
-	): Promise<{ success: boolean; path: string; hash?: string; revision?: string; error?: string }>;
+	): Promise<UploadResult>;
 	batchDelete(paths: string[], expectedHashes?: Record<string, string>, expectedRevisions?: Record<string, string>): Promise<{
 		success: boolean;
 		deleted: string[];
@@ -48,6 +49,7 @@ export interface QueueUploadFailure {
 }
 
 export interface QueueFlushContext {
+	recoverUploads(): Promise<void>;
 	pendingPaths: Set<string>;
 	inFlightPaths: Set<string>;
 	pendingRevisions?: Map<string, number>;

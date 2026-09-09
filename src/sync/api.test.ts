@@ -29,25 +29,25 @@ function mockTransport(...responses: Response[]) {
 
 describe('SyncApiClient', () => {
 	it('accepts sequential namespace replacements in history while validating the final manifest', async () => {
-		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-09-08' };
+		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-09-08', revision: 'r1' };
 		const changes = [
 			{ seq: 1, path: 'Projects.md', action: 'delete', hash: '', size: 0, created_at: '2026-09-08' },
 			{ seq: 2, path: 'projects.md/child.md', action: 'put', hash: entry.hash, size: 1, created_at: '2026-09-08' },
 		];
 		const client = new SyncApiClient('https://worker.example', 'token', mockTransport(
-			Response.json({ changes, lastSeq: 2, hasMore: false }),
-			Response.json({ files: { 'Projects.md': entry }, snapshotSeq: 0, lastSeq: 0 }),
-			Response.json({ changes, lastSeq: 2, hasMore: false }),
+			Response.json({ changes, lastSeq: 2, hasMore: false, cursorExpired: false }),
+			Response.json({ version: 1, files: { 'Projects.md': entry }, snapshotSeq: 0, lastSeq: 0, hasMore: false, cursorExpired: false }),
+			Response.json({ changes, lastSeq: 2, hasMore: false, cursorExpired: false }),
 		));
 		expect((await client.getChanges(0)).changes).toEqual(changes);
 		expect(Object.keys((await client.getManifest()).files)).toEqual(['projects.md/child.md']);
 	});
 
 	it('refuses to apply an existing invalid ancestor/descendant manifest', async () => {
-		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-09-08' };
+		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-09-08', revision: 'r1' };
 		const client = new SyncApiClient('https://worker.example', 'token', mockTransport(
-			Response.json({ files: { 'Projects.md': entry, 'projects.md/child.md': entry }, lastSeq: 2 }),
-			Response.json({ changes: [], lastSeq: 2, hasMore: false }),
+			Response.json({ version: 1, files: { 'Projects.md': entry, 'projects.md/child.md': entry }, snapshotSeq: 2, lastSeq: 2, hasMore: false, cursorExpired: false }),
+			Response.json({ changes: [], lastSeq: 2, hasMore: false, cursorExpired: false }),
 		));
 		await expect(client.getManifest()).rejects.toThrow('parent folder');
 	});
@@ -55,7 +55,7 @@ describe('SyncApiClient', () => {
 		vi.useFakeTimers();
 		let commit!: () => void;
 		const hash = 'a'.repeat(64);
-		let remoteFiles: Record<string, { hash: string; size: number; modified: string }> = {};
+		let remoteFiles: Record<string, { hash: string; size: number; modified: string; revision: string }> = {};
 		const response = (data: unknown): ApiHttpResponse => {
 			const text = JSON.stringify(data);
 			return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer };
@@ -65,7 +65,7 @@ describe('SyncApiClient', () => {
       if (request.url.includes('/sync/upload')) {
 				return new Promise(resolve => {
 					commit = () => {
-						remoteFiles = { 'note.md': { hash, size: 1, modified: '2026-01-01' } };
+						remoteFiles = { 'note.md': { hash, size: 1, modified: '2026-01-01', revision: 'r1' } };
 						resolve(response({ success: true, path: 'note.md', hash }));
 					};
 				});
@@ -155,7 +155,7 @@ describe('SyncApiClient', () => {
 		const transport = mockTransport(
 			new Response(JSON.stringify({
 				version: 1,
-				files: { 'notes/a.md': { hash: 'a', size: 1, modified: 'one' } },
+				files: { 'notes/a.md': { hash: 'a'.repeat(64), size: 1, modified: '2026-01-01', revision: 'r1' } },
 				lastSeq: 3,
 				snapshotSeq: 3,
 				hasMore: true,
@@ -163,18 +163,18 @@ describe('SyncApiClient', () => {
 			})),
 			new Response(JSON.stringify({
 				version: 1,
-				files: { 'notes/b.md': { hash: 'b', size: 2, modified: 'two' } },
+				files: { 'notes/b.md': { hash: 'b'.repeat(64), size: 2, modified: '2026-01-02', revision: 'r1' } },
 				lastSeq: 4,
 				snapshotSeq: 3,
-				hasMore: false,
+				hasMore: false, cursorExpired: false,
 			})),
 			new Response(JSON.stringify({
 				changes: [
-					{ seq: 4, path: 'notes/a.md', action: 'delete', hash: '', size: 0, created_at: 'four' },
-					{ seq: 5, path: 'notes/c.md', action: 'put', hash: 'c', size: 3, created_at: 'five' },
+					{ seq: 4, path: 'notes/a.md', action: 'delete', hash: '', size: 0, created_at: '2026-01-04' },
+					{ seq: 5, path: 'notes/c.md', action: 'put', hash: 'c'.repeat(64), size: 3, created_at: '2026-01-05' },
 				],
 				lastSeq: 5,
-				hasMore: false,
+				hasMore: false, cursorExpired: false,
 			})),
 		);
 		const client = new SyncApiClient('https://worker.example', 'token', transport);
@@ -182,8 +182,8 @@ describe('SyncApiClient', () => {
 		await expect(client.getManifest()).resolves.toEqual({
 			version: 1,
 			files: {
-				'notes/b.md': { hash: 'b', size: 2, modified: 'two' },
-				'notes/c.md': { hash: 'c', size: 3, modified: 'five' },
+				'notes/b.md': { hash: 'b'.repeat(64), size: 2, modified: '2026-01-02', revision: 'r1' },
+				'notes/c.md': { hash: 'c'.repeat(64), size: 3, modified: '2026-01-05' },
 			},
 			lastSeq: 5,
 		});
@@ -197,14 +197,14 @@ describe('SyncApiClient', () => {
 	it('loads metadata for only the requested sync paths', async () => {
 		const transport = mockTransport(new Response(JSON.stringify({
 			files: {
-				'notes/a.md': { hash: 'hash-a', size: 4, modified: 'now' },
+				'notes/a.md': { hash: 'a'.repeat(64), size: 4, modified: '2026-01-01', revision: 'r1' },
 			},
 		})));
 		const client = new SyncApiClient('https://worker.example', 'token', transport);
 
 		await expect(client.getFileMetadata(['notes/a.md', 'notes/missing.md'])).resolves.toEqual({
 			files: {
-				'notes/a.md': { hash: 'hash-a', size: 4, modified: 'now' },
+				'notes/a.md': { hash: 'a'.repeat(64), size: 4, modified: '2026-01-01', revision: 'r1' },
 			},
 		});
 		const [request] = transport.mock.calls[0]!;
@@ -235,20 +235,20 @@ describe('SyncApiClient', () => {
 			new Response(JSON.stringify({
 				version: 1,
 				files: {
-					'notes/a.md': { hash: 'hash-a', size: 4, modified: 'now' },
-					'notes/unrelated.md': { hash: 'other', size: 5, modified: 'now' },
+					'notes/a.md': { hash: 'a'.repeat(64), size: 4, modified: '2026-01-01', revision: 'r1' },
+					'notes/unrelated.md': { hash: 'd'.repeat(64), size: 5, modified: '2026-01-01', revision: 'r1' },
 				},
 				lastSeq: 3,
 				snapshotSeq: 3,
-				hasMore: false,
+				hasMore: false, cursorExpired: false,
 			})),
-			new Response(JSON.stringify({ changes: [], lastSeq: 3, hasMore: false })),
+			new Response(JSON.stringify({ changes: [], lastSeq: 3, snapshotSeq: 3, hasMore: false, cursorExpired: false })),
 		);
 		const client = new SyncApiClient('https://worker.example', 'token', transport);
 
 		await expect(client.getFileMetadata(['notes/a.md'])).resolves.toEqual({
 			files: {
-				'notes/a.md': { hash: 'hash-a', size: 4, modified: 'now' },
+				'notes/a.md': { hash: 'a'.repeat(64), size: 4, modified: '2026-01-01', revision: 'r1' },
 			},
 		});
 		expect(transport).toHaveBeenCalledTimes(3);

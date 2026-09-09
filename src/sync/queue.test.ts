@@ -111,6 +111,7 @@ function createFlushHarness(overrides: Partial<{
 		save,
 		getModifiedIso,
 		context: {
+			recoverUploads: vi.fn(async () => {}),
 			pendingPaths,
 			inFlightPaths,
 			pendingRevisions,

@@ -3,9 +3,10 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// Upload journaling, shared input validation and embedded Worker safeguards add
-		// about 17 KB raw. Allow 20 KB for this reviewed change; keep the gzip cap.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1470000', 10),
+		// Merge preimages, strict read/checkpoint validation, durable diagnostics and
+		// history pagination bring the measured plugin to 1,471,097 bytes (+0.88%).
+		// Allow a 5 KB raw-budget increase; keep the existing gzip and asset caps.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1475000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '820000', 10),
 	},
 	{

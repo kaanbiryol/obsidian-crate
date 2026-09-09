@@ -42,6 +42,7 @@ export type Harness = {
 		isConfigured: ReturnType<typeof vi.fn>;
 		setAbortSignal: ReturnType<typeof vi.fn>;
 		configureUploadJournal: ReturnType<typeof vi.fn>;
+		recoverUploads: ReturnType<typeof vi.fn>;
 		getChanges: ReturnType<typeof vi.fn>;
 		uploadFile: ReturnType<typeof vi.fn<(
 			path: string,
@@ -68,6 +69,7 @@ export type Harness = {
 		getFiles: ReturnType<typeof vi.fn>;
 	};
 	localManifest: {
+		uploadJournal: { pending: () => unknown[] };
 		load: ReturnType<typeof vi.fn>;
 		save: ReturnType<typeof vi.fn>;
 		hashMatches: ReturnType<typeof vi.fn>;
@@ -210,6 +212,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 		isConfigured: vi.fn().mockReturnValue(true),
 		setAbortSignal: vi.fn(),
 		configureUploadJournal: vi.fn(),
+		recoverUploads: vi.fn(async () => {}),
 		getChanges: vi.fn(),
 		uploadFile: vi.fn<(
 			path: string,
@@ -253,6 +256,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 
 	const manifestFiles: Record<string, ManifestEntry> = {};
 	const localManifest = {
+		uploadJournal: { pending: () => [] },
 		load: vi.fn(),
 		close: vi.fn(async () => {}),
 		save: vi.fn(),

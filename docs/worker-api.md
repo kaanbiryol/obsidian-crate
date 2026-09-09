@@ -26,7 +26,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `POST` | `/sync/batch-upload` | Batch upload `{ files: [...] }` (max 3 files, 10 MiB total) |
 | `POST` | `/sync/batch-download` | Batch download `{ paths: [...] }` (max 50 paths and 8 MB decoded) |
 | `POST` | `/sync/batch-delete` | Conditional batch delete `{ files: [...] }` (max 4 files) |
-| `GET` | `/sync/versions?path=<path>` | List unexpired recoverable file versions |
+| `GET` | `/sync/versions?path=<path>&search=<text>&cursor=<cursor>` | Page through unexpired recoverable file versions (100 per page) |
 | `POST` | `/sync/restore-version` | Restore a retained version with expected-hash compare-and-swap |
 | `GET` | `/diagnostics` | Backend counts, delivery failures, queue pressure, and scheduled-maintenance state |
 | `DELETE` | `/auth/tokens` | Revoke an auth token `{ id }` |
@@ -331,3 +331,9 @@ When a client's `since` cursor points to pruned entries, the `cursorExpired` fla
 ## Bindings Table
 
 See `docs/architecture.md` for the full bindings table. When adding new bindings, update the Worker upload metadata in `src/cloudflare/cloudflare-api.ts` and the deployment flow in `src/cloudflare/provisioner.ts`.
+
+### Retained file history pagination
+
+`GET /sync/versions` returns `{ versions, hasMore, nextCursor? }`. `path` is an optional exact filename and `search` is an optional literal substring (ASCII case insensitive), including folder names. Results sort by `(created_at, storage_key)` descending, and `nextCursor` continues that ordering without offset shifts when newer rows arrive. Reuse the same search and path with the opaque cursor; a changed query or malformed cursor receives HTTP 400. Expired versions are omitted from every page. Search and pages remain available through **Restore remote file** in the plugin. Older Workers lacking pagination must be updated before this client will present their history as complete. Restores retain their existing conditional-write and integrity checks.
+
+Authoritative manifest, targeted metadata and changelog reads are validated at runtime, including required maps, version and cursor framing, path/hash/size/date fields and ordering. Missing or malformed state aborts synchronization before file changes. A valid empty map remains an explicit empty state. Known historical changelog entries may lack revisions; current file metadata must include one.

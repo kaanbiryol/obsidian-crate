@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS file_versions (
 
 CREATE INDEX IF NOT EXISTS file_versions_expires_at_idx ON file_versions(expires_at);
 CREATE INDEX IF NOT EXISTS file_versions_path_idx ON file_versions(path, created_at DESC);
+CREATE INDEX IF NOT EXISTS file_versions_created_key_idx ON file_versions(created_at DESC, storage_key DESC);
+CREATE INDEX IF NOT EXISTS file_versions_path_created_key_idx ON file_versions(path, created_at DESC, storage_key DESC);
 
 CREATE TABLE IF NOT EXISTS maintenance_state (
 	key TEXT PRIMARY KEY,

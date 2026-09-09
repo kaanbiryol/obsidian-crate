@@ -50,7 +50,7 @@ describe('LocalManifest', () => {
 		adapter.read.mockImplementation(async file => disk.get(file)!);
 		adapter.write.mockImplementation(async (file, data) => { disk.set(file, data); });
 		adapter.remove.mockImplementation(async file => { disk.delete(file); });
-		const entry = { hash: 'file-hash', size: 5, modified: '2026-01-01T00:00:00Z', revision: 'r1' };
+		const entry = { hash: 'f'.repeat(64), size: 5, modified: '2026-01-01T00:00:00Z', revision: 'r1' };
 		expect(manifest.hasFile(path)).toBe(false);
 		expect(manifest.getEntry(path)).toBeUndefined();
 		manifest.setEntry(path, entry);
@@ -77,7 +77,7 @@ describe('LocalManifest', () => {
 
 	it('preserves literal prototype names when recovering a newer temporary checkpoint', async () => {
 		const paths = ['__proto__', 'constructor', 'toString'];
-		const files = Object.fromEntries(paths.map(path => [path, { hash: path, size: 1, modified: 'now' }]));
+		const files = Object.fromEntries(paths.map(path => [path, { hash: 'a'.repeat(64), size: 1, modified: '2026-09-09T00:00:00Z' }]));
 		adapter.exists.mockResolvedValue(true);
 		adapter.read.mockImplementation(async path => JSON.stringify({
 			version: 1,
@@ -92,7 +92,7 @@ describe('LocalManifest', () => {
 	});
 
 	it('keeps replacement and cleared manifests free of inherited file entries', () => {
-		const entry = { hash: 'file-hash', size: 1, modified: 'now' };
+		const entry = { hash: 'f'.repeat(64), size: 1, modified: '2026-09-09T00:00:00Z' };
 		const files = Object.create({ inherited: entry }) as Record<string, typeof entry>;
 		Object.defineProperty(files, '__proto__', { value: entry, enumerable: true });
 		manifest.replaceManifest({ version: 1, files });
@@ -108,15 +108,15 @@ describe('LocalManifest', () => {
 	});
 
 	it('persists mutations made while an earlier checkpoint is being written', async () => {
-		const entry = { hash: 'first', size: 5, modified: '2026-01-01T00:00:00Z' };
+		const entry = { hash: 'a'.repeat(64), size: 5, modified: '2026-01-01T00:00:00Z' };
 		manifest.setEntry('a.md', entry);
 		adapter.write.mockImplementationOnce(async () => {
-			manifest.setEntry('b.md', { ...entry, hash: 'second' });
+			manifest.setEntry('b.md', { ...entry, hash: 'b'.repeat(64) });
 		});
 		await manifest.save();
 		const mainWrites = adapter.write.mock.calls.filter(([path]) => path.endsWith('.json'));
 		expect(mainWrites).toHaveLength(2);
-		expect(JSON.parse(mainWrites[1]![1])).toMatchObject({ generation: 2, files: { 'b.md': { hash: 'second' } } });
+		expect(JSON.parse(mainWrites[1]![1])).toMatchObject({ generation: 2, files: { 'b.md': { hash: 'b'.repeat(64) } } });
 	});
 
 	it('serializes overlapping saves', async () => {
@@ -128,18 +128,18 @@ describe('LocalManifest', () => {
 			await Promise.resolve();
 			active--;
 		});
-		manifest.setEntry('a.md', { hash: 'first', size: 5, modified: '2026-01-01T00:00:00Z' });
+		manifest.setEntry('a.md', { hash: 'a'.repeat(64), size: 5, modified: '2026-01-01T00:00:00Z' });
 		await Promise.all([manifest.save(), manifest.save(), manifest.save()]);
 		expect(peak).toBe(1);
 		expect(adapter.write).toHaveBeenCalledTimes(2);
 	});
 
-	it.each([[1, 2, 'new'], [2, 1, 'old']])('selects the newest valid checkpoint (%i, %i)', async (mainGeneration, tmpGeneration, expected) => {
+	it.each([[1, 2, 'b'.repeat(64)], [2, 1, 'a'.repeat(64)]])('selects the newest valid checkpoint (%i, %i)', async (mainGeneration, tmpGeneration, expected) => {
 		adapter.exists.mockResolvedValue(true);
 		adapter.read.mockImplementation(async path => JSON.stringify({
 			version: 1,
 			generation: path.endsWith('.tmp') ? tmpGeneration : mainGeneration,
-			files: { 'a.md': { hash: path.endsWith('.tmp') ? 'new' : 'old', size: 5, modified: '2026-01-01T00:00:00Z' } },
+			files: { 'a.md': { hash: path.endsWith('.tmp') ? 'b'.repeat(64) : 'a'.repeat(64), size: 5, modified: '2026-01-01T00:00:00Z' } },
 		}));
 		await manifest.load();
 		expect(manifest.getEntry('a.md')?.hash).toBe(expected);
@@ -154,7 +154,7 @@ describe('LocalManifest', () => {
 	});
 
 	it('retries a failed checkpoint without losing its dirty state', async () => {
-		manifest.setEntry('a.md', { hash: 'first', size: 5, modified: '2026-01-01T00:00:00Z' });
+		manifest.setEntry('a.md', { hash: 'a'.repeat(64), size: 5, modified: '2026-01-01T00:00:00Z' });
 		adapter.write.mockRejectedValueOnce(new Error('Disk full'));
 		await expect(manifest.save()).rejects.toThrow('Disk full');
 		await manifest.save();
@@ -172,7 +172,7 @@ describe('LocalManifest', () => {
 				lastSeq: 12,
 				files: {
 					'note.md': {
-						hash: 'abc',
+						hash: 'c'.repeat(64),
 						size: 10,
 						modified: '2026-02-06T12:00:00.000Z',
 					},
@@ -183,7 +183,7 @@ describe('LocalManifest', () => {
 		await manifest.load();
 
 		expect(manifest.getEntry('note.md')).toEqual({
-			hash: 'abc',
+			hash: 'c'.repeat(64),
 			size: 10,
 			modified: '2026-02-06T12:00:00.000Z',
 		});
@@ -203,53 +203,22 @@ describe('LocalManifest', () => {
 		expect(manifest.getManifest()).toEqual({ version: 1, files: {} });
 	});
 
-	it('drops malformed persisted file entries instead of trusting them', async () => {
-		adapter.exists.mockImplementation((path: string) =>
-			Promise.resolve(path.endsWith('file-manifest.json') && !path.endsWith('.tmp')),
-		);
-		adapter.read.mockResolvedValue(JSON.stringify({
-			version: 1,
-			generation: 1,
-			lastSeq: 42,
-			files: {
-				'good.md': {
-					hash: 'hash-1',
-					size: 12,
-					modified: '2026-02-06T12:00:00.000Z',
-				},
-				'bad-size.md': {
-					hash: 'hash-2',
-					size: -1,
-					modified: '2026-02-06T12:00:00.000Z',
-				},
-				'bad-modified.md': {
-					hash: 'hash-3',
-					size: 4,
-					modified: 123,
-				},
-			},
-		}));
-
-		await manifest.load();
-
-		expect(manifest.getManifest()).toEqual({
-			version: 1,
-			lastSeq: 42,
-			files: {
-				'good.md': {
-					hash: 'hash-1',
-					size: 12,
-					modified: '2026-02-06T12:00:00.000Z',
-				},
-			},
-		});
+	it('rejects malformed persisted entries without adopting a partial checkpoint', async () => {
+		adapter.exists.mockImplementation(async path => path.endsWith('/file-manifest.json'));
+		adapter.read.mockResolvedValue(JSON.stringify({ version: 1, generation: 1, lastSeq: 42,
+			files: { 'good.md': { hash: 'a'.repeat(64), size: 1, modified: '2026-09-09' },
+				'bad.md': { hash: 'b'.repeat(64), size: -1, modified: '2026-09-09' } } }));
+		await expect(manifest.load()).rejects.toThrow();
+		expect(manifest.getFileCount()).toBe(0);
+		expect(adapter.write).not.toHaveBeenCalled();
+		expect(adapter.remove).not.toHaveBeenCalled();
 	});
 
 	it('recovers from tmp file when main file is corrupt', async () => {
 		const validManifest = JSON.stringify({
 			version: 1,
 			generation: 1,
-			files: { 'a.md': { hash: 'h', size: 5, modified: '2026-01-01T00:00:00.000Z' } },
+			files: { 'a.md': { hash: 'a'.repeat(64), size: 5, modified: '2026-01-01T00:00:00.000Z' } },
 		});
 		adapter.exists.mockImplementation((path: string) => Promise.resolve(true));
 		adapter.read.mockImplementation((path: string) => {
@@ -259,7 +228,7 @@ describe('LocalManifest', () => {
 
 		await manifest.load();
 
-		expect(manifest.getEntry('a.md')).toEqual({ hash: 'h', size: 5, modified: '2026-01-01T00:00:00.000Z' });
+		expect(manifest.getEntry('a.md')).toEqual({ hash: 'a'.repeat(64), size: 5, modified: '2026-01-01T00:00:00.000Z' });
 		// Verify it promoted tmp to main
 		expect(adapter.write).toHaveBeenCalledWith(
 			`${PLUGIN_DIR}/file-manifest.json`,
@@ -274,7 +243,7 @@ describe('LocalManifest', () => {
 
 	it('writes once when changed, then resets dirty state', async () => {
 		manifest.setEntry('note.md', {
-			hash: 'hash-1',
+			hash: '1'.repeat(64),
 			size: 20,
 			modified: '2026-02-06T12:00:00.000Z',
 		});
@@ -296,7 +265,7 @@ describe('LocalManifest', () => {
 
 	it('persists removals after delete', async () => {
 		manifest.setEntry('note.md', {
-			hash: 'hash-1',
+			hash: '1'.repeat(64),
 			size: 20,
 			modified: '2026-02-06T12:00:00.000Z',
 		});
@@ -314,38 +283,15 @@ describe('LocalManifest', () => {
 		const [, lastPayload] = lastWrite!;
 		expect(JSON.parse(lastPayload)).toEqual({
 			generation: 2,
-			version: 1,
+			version: 2,
 			files: {},
 		});
 	});
 
-	it('normalizes replacement manifests before storing them', () => {
-		manifest.replaceManifest({
-			version: 1,
-			files: {
-				'ok.md': {
-					hash: 'hash-1',
-					size: 10,
-					modified: '2026-02-06T12:00:00.000Z',
-				},
-				'bad.md': {
-					hash: '',
-					size: -1,
-					modified: '2026-02-06T12:00:00.000Z',
-				},
-			},
-			lastSeq: -5,
-		} as never);
-
-		expect(manifest.getManifest()).toEqual({
-			version: 1,
-			files: {
-				'ok.md': {
-					hash: 'hash-1',
-					size: 10,
-					modified: '2026-02-06T12:00:00.000Z',
-				},
-			},
-		});
+	it('rejects an invalid replacement without changing current authority', () => {
+		const entry = { hash: 'a'.repeat(64), size: 1, modified: '2026-09-09' };
+		manifest.setEntry('original.md', entry);
+		expect(() => manifest.replaceManifest({ version: 1, files: { 'bad.md': { ...entry, size: -1 } }, lastSeq: -5 })).toThrow();
+		expect(manifest.getManifest().files).toEqual({ 'original.md': entry });
 	});
 });

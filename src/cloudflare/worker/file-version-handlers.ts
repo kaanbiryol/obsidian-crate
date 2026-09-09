@@ -1,6 +1,5 @@
 import { sha256HexBytes } from './auth';
 import { corsResponse } from './cors';
-import { queryRows } from './db';
 import { commitStagedFile } from './sync-mutations';
 import { FileNamespaceConflictError } from './file-namespace';
 import {
@@ -11,6 +10,7 @@ import {
 } from './sync-storage';
 import { parseExpectedFileHash } from './sync-storage';
 import { parseJsonObject, parseOptionalString, sanitizePath } from './utils';
+export { handleListFileVersions } from './file-version-list';
 
 interface FileVersionRow {
 	storage_key: string;
@@ -20,19 +20,6 @@ interface FileVersionRow {
 	reason: 'replaced' | 'deleted';
 	created_at: string;
 	expires_at: number;
-}
-
-export async function handleListFileVersions(request: Request, db: D1Database): Promise<Response> {
-	const rawPath = new URL(request.url).searchParams.get('path');
-	const path = rawPath === null ? null : sanitizePath(rawPath);
-	if (rawPath !== null && !path) return corsResponse({ error: 'Invalid path' }, 400);
-
-	const rows = path
-		? await queryRows<FileVersionRow>(db.prepare(`SELECT storage_key, path, hash, size, reason, created_at, expires_at
-			FROM file_versions WHERE path = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 100`).bind(path, Date.now()))
-		: await queryRows<FileVersionRow>(db.prepare(`SELECT storage_key, path, hash, size, reason, created_at, expires_at
-			FROM file_versions WHERE expires_at > ? ORDER BY created_at DESC LIMIT 100`).bind(Date.now()));
-	return corsResponse({ versions: rows });
 }
 
 export async function handleRestoreFileVersion(

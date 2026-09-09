@@ -112,6 +112,7 @@ export class SyncEngineContexts {
 		const dependencies = this.dependencies;
 		return {
 			apiConfigured: () => dependencies.api.isConfigured(),
+			recoverUploads: () => dependencies.api.recoverUploads(),
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			getManifest: () => dependencies.api.getManifest(),
@@ -143,6 +144,7 @@ export class SyncEngineContexts {
 		return {
 			vault: dependencies.vault,
 			apiConfigured: () => dependencies.api.isConfigured(),
+			recoverUploads: () => dependencies.api.recoverUploads(),
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			shouldIgnore: dependencies.shouldIgnore,
@@ -163,6 +165,7 @@ export class SyncEngineContexts {
 		return {
 			vault: dependencies.vault,
 			apiConfigured: () => dependencies.api.isConfigured(),
+			recoverUploads: () => dependencies.api.recoverUploads(),
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			shouldIgnore: dependencies.shouldIgnore,

@@ -1,6 +1,6 @@
 import { Notice, Setting, type App } from 'obsidian';
 import { SharedModal } from './shared/SharedModal';
-import type { RemoteFileVersion } from '../protocol/sync-types';
+import type { FileVersionsPage } from '../protocol/sync-types';
 import type { SyncRuntime } from '../sync/runtime';
 import { openConfirmationModal } from './confirmation-modal';
 
@@ -12,6 +12,9 @@ function formatSize(bytes: number): string {
 
 class RemoteRecoveryModal extends SharedModal {
 	private closed = false;
+	private requestRevision = 0;
+	private search = '';
+	private resultsEl!: HTMLElement;
 	constructor(app: App, private readonly runtime: SyncRuntime) {
 		super(app);
 	}
@@ -19,7 +22,17 @@ class RemoteRecoveryModal extends SharedModal {
 	onOpen(): void {
 		this.closed = false;
 		this.openLayout('Restore remote file');
-		this.bodyEl.createEl('p', { text: 'Loading retained file versions…' });
+		this.bodyEl.createEl('p', { text: 'Crate retains replaced and deleted remote files for 30 days.' });
+		let query = '';
+		const search = () => { this.search = query.trim(); void this.load(); };
+		new Setting(this.bodyEl).setName('Find a file').addText(text => {
+			text.setPlaceholder('File or folder name').onChange(value => { query = value; });
+			text.inputEl.setAttribute('aria-label', 'File or folder name');
+			text.inputEl.addEventListener('keydown', event => {
+				if (event.key === 'Enter') { event.preventDefault(); search(); }
+			});
+		}).addButton(button => button.setButtonText('Search').onClick(search));
+		this.resultsEl = this.bodyEl.createDiv();
 		void this.load();
 	}
 
@@ -28,32 +41,40 @@ class RemoteRecoveryModal extends SharedModal {
 		super.onClose();
 	}
 
-	private async load(): Promise<void> {
+	private async load(cursor?: string, previous: Array<string | undefined> = []): Promise<void> {
+		const revision = ++this.requestRevision;
+		this.resultsEl.empty();
+		this.resultsEl.createEl('p', { text: 'Loading retained file versions…', attr: { role: 'status' } });
 		try {
-			const versions = await this.runtime.listRecentFileVersions();
-			if (!this.closed) this.renderVersions(versions);
+			const page = await this.runtime.listRecentFileVersions({ search: this.search || undefined, cursor });
+			if (this.closed || revision !== this.requestRevision) return;
+			this.renderVersions(page, cursor, previous);
 		} catch (error) {
-			if (this.closed) return;
-			this.bodyEl.empty();
-			this.bodyEl.createEl('p', {
+			if (this.closed || revision !== this.requestRevision) return;
+			this.resultsEl.empty();
+			this.resultsEl.createEl('p', {
 				text: `Could not load retained files: ${error instanceof Error ? error.message : String(error)}`,
+				attr: { role: 'alert' },
 			});
+			new Setting(this.resultsEl).addButton(button => button.setButtonText('Retry').onClick(() => this.load(cursor, previous)));
 		}
 	}
 
-	private renderVersions(versions: RemoteFileVersion[]): void {
-		this.bodyEl.empty();
-		if (versions.length === 0) {
-			this.bodyEl.createEl('p', { text: 'No restorable remote files were found.' });
-			return;
-		}
-
-		this.bodyEl.createEl('p', {
-			text: 'Crate retains replaced and deleted remote files for 30 days.',
+	private renderVersions(page: FileVersionsPage, cursor: string | undefined, previous: Array<string | undefined>): void {
+		this.resultsEl.empty();
+		this.resultsEl.createEl('p', {
+			text: page.versions.length ? `Page ${previous.length + 1} · ${page.versions.length} retained versions` : 'No restorable remote files were found.',
+			attr: { role: 'status' },
 		});
+		new Setting(this.resultsEl)
+			.addButton(button => button.setButtonText('Previous').setDisabled(previous.length === 0)
+				.onClick(() => this.load(previous.at(-1), previous.slice(0, -1))))
+			.addButton(button => button.setButtonText('Next').setDisabled(!page.hasMore)
+				.onClick(() => this.load(page.nextCursor, [...previous, cursor])));
+		const versions = page.versions;
 		for (const version of versions) {
 			const created = new Date(version.created_at).toLocaleString();
-			new Setting(this.bodyEl)
+			new Setting(this.resultsEl)
 				.setName(version.path)
 				.setDesc(`${version.reason === 'deleted' ? 'Deleted' : 'Replaced'} ${created} · ${formatSize(version.size)}`)
 				.addButton(button => button
@@ -65,7 +86,7 @@ class RemoteRecoveryModal extends SharedModal {
 							details: ['The current remote version, if any, will remain recoverable for 30 days.'],
 							confirmText: 'Restore',
 						});
-						if (!confirmed) return;
+						if (!confirmed || this.closed) return;
 						button.setDisabled(true).setButtonText('Restoring…');
 						try {
 							const result = await this.runtime.restoreRecentFileVersion(version);

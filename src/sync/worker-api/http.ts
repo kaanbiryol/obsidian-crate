@@ -1,3 +1,4 @@
+import { normalizeUploadOperationIds } from '../request-diagnostics';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo } from '../../protocol';
 import { requestUrl } from 'obsidian';
 import { createLogger, errorMessage } from '../../plugin/logger';
@@ -177,9 +178,11 @@ export class WorkerApiHttpClient {
 			?? getHeader(options.headers ?? {}, 'Content-Type')
 			?? undefined;
 		const operationId = crypto.randomUUID();
+		const uploadOperationIds = normalizeUploadOperationIds((getHeader(options.headers ?? {}, 'X-Crate-Upload-Operation')
+			?? getHeader(options.headers ?? {}, 'X-Crate-Upload-Operations') ?? '').split(','));
 		const record = (outcome: RequestDiagnostic['outcome'], response?: ApiHttpResponse) => {
 			this.requestDiagnostics.push({ at: new Date().toISOString(), operationId, method: options.method ?? 'GET',
-				route: diagnosticRoute(path), status: response?.status ?? 0, outcome,
+				...(uploadOperationIds.length ? { uploadOperationIds } : {}), route: diagnosticRoute(path), status: response?.status ?? 0, outcome,
 				requestId: response ? getHeader(response.headers, 'X-Crate-Request-Id') ?? undefined : undefined });
 			if (this.requestDiagnostics.length > MAX_REQUEST_DIAGNOSTICS) this.requestDiagnostics.shift();
 		};

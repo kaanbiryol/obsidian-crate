@@ -1,4 +1,6 @@
 import { createReminderOperationId } from '@/protocol/reminder-operation';
+import { parseFileVersions } from './version-contract';
+import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
 import { errorMessage } from '../../plugin/logger';
 import type {
 	BatchDeleteResponse,
@@ -13,7 +15,8 @@ import type {
 	FileEntry,
 	FileMetadataResponse,
 	HealthResponse,
-	RemoteFileVersion,
+	FileVersionQuery,
+	FileVersionsPage,
 	UploadResult,
 } from '../../protocol/sync-types';
 import {
@@ -75,20 +78,23 @@ export class SyncWorkerApi {
 		let after: string | undefined;
 		let snapshotSeq: number | undefined;
 		let lastSeq = 0;
+		const cursors = new Set<string>();
 		while (true) {
 			const params = new URLSearchParams({ limit: '2000' });
 			if (after) params.set('after', after);
 			if (snapshotSeq !== undefined) params.set('snapshotSeq', String(snapshotSeq));
-			const page = await this.http.requestJson<FileManifest>(`/sync/manifest?${params.toString()}`);
-			if (page.truncated) throw new Error('Remote manifest is too large to sync safely');
+			const page = parseManifestPage(await this.http.requestJson<unknown>(`/sync/manifest?${params.toString()}`));
+			if (snapshotSeq !== undefined && page.snapshotSeq !== snapshotSeq) throw new Error('Remote manifest snapshot changed during pagination');
+			if (Object.keys(page.files).some(path => Object.prototype.hasOwnProperty.call(files, path))) throw new Error('Remote manifest repeated a file during pagination');
 			Object.assign(files, page.files);
 			lastSeq = page.lastSeq ?? lastSeq;
 			snapshotSeq ??= page.snapshotSeq ?? page.lastSeq ?? 0;
 			if (!page.hasMore) break;
-			if (!page.nextCursor || page.nextCursor === after) {
+			if (!page.nextCursor || cursors.has(page.nextCursor)) {
 				throw new Error('Remote manifest pagination did not advance');
 			}
 			after = page.nextCursor;
+			cursors.add(after);
 		}
 
 		let changeCursor = snapshotSeq ?? lastSeq;
@@ -126,10 +132,10 @@ export class SyncWorkerApi {
 		for (let index = 0; index < uniquePaths.length; index += BATCH_DOWNLOAD_MAX_FILES) {
 			const chunk = uniquePaths.slice(index, index + BATCH_DOWNLOAD_MAX_FILES);
 			try {
-				const response = await this.http.requestJson<FileMetadataResponse>('/sync/metadata', {
+				const response = parseFileMetadata(await this.http.requestJson<unknown>('/sync/metadata', {
 					method: 'POST',
 					body: JSON.stringify({ paths: chunk }),
-				});
+				}), chunk);
 				Object.assign(files, response.files);
 			} catch (error) {
 				if (!(error instanceof HttpError) || error.status !== 404) throw error;
@@ -201,11 +207,11 @@ export class SyncWorkerApi {
 	}
 
 	async checkForChanges(since: number): Promise<CheckResponse> {
-		return this.http.requestJson<CheckResponse>(`/sync/check?since=${since}`);
+		return parseChangesCheck(await this.http.requestJson<unknown>(`/sync/check?since=${since}`), since);
 	}
 
 	async getChanges(since: number): Promise<ChangesResponse> {
-		const response = await this.http.requestJson<ChangesResponse>(`/sync/changes?since=${since}`);
+		const response = parseChanges(await this.http.requestJson<unknown>(`/sync/changes?since=${since}`), since);
 		assertPortablePathNames(response.changes.map(change => change.path));
 		return response;
 	}
@@ -219,6 +225,7 @@ export class SyncWorkerApi {
 		return this.http.requestJson<BatchUploadResponse>('/sync/batch-upload', {
 			method: 'POST',
 			body: JSON.stringify({ files }),
+			headers: { 'X-Crate-Upload-Operations': files.map(file => file.operationId).join(',') },
 		}, TRANSFER_TIMEOUT_MS);
 	}
 
@@ -249,9 +256,12 @@ export class SyncWorkerApi {
 		});
 	}
 
-	async listFileVersions(path?: string): Promise<{ versions: RemoteFileVersion[] }> {
-		const query = path ? `?path=${encodeURIComponent(path)}` : '';
-		return this.http.requestJson<{ versions: RemoteFileVersion[] }>(`/sync/versions${query}`);
+	async listFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
+		const params = new URLSearchParams();
+		if (query.path) params.set('path', query.path);
+		if (query.search) params.set('search', query.search);
+		if (query.cursor) params.set('cursor', query.cursor);
+		return parseFileVersions(await this.http.requestJson<unknown>(`/sync/versions?${params.toString()}`));
 	}
 
 	async restoreFileVersion(

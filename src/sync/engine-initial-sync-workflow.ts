@@ -22,6 +22,7 @@ const logger = createLogger('SyncEngine');
 export interface InitialSyncWorkflowContext {
 	vault: Vault;
 	apiConfigured(): boolean;
+	recoverUploads(): Promise<void>;
 	getStatus(): SyncStatus;
 	updateState(updates: Partial<SyncState>): void;
 	shouldIgnore(path: string): boolean;
@@ -52,6 +53,8 @@ export async function runInitialSyncWorkflow(
 	const result = createEmptySyncResult();
 
 	try {
+		await context.recoverUploads();
+		context.throwIfDestroyed();
 		const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path));
 		logger.info(`Initial sync started with ${files.length} files`);
 		const total = files.length;

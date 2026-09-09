@@ -95,6 +95,8 @@ export async function processPendingChanges(
 	context.updateState({ status: 'syncing', pendingChanges: context.pendingPaths.size });
 
 	try {
+		await context.recoverUploads();
+		if (context.isDestroyed()) throw createAbortError('Queue recovery aborted');
 		const uploads: Array<{ path: string }> = [];
 		const deletes = paths.filter(path => path.startsWith('delete:')).flatMap(key => {
 			const path = key.substring(7);

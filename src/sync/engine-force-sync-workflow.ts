@@ -23,6 +23,7 @@ const logger = createLogger('SyncEngine');
 export interface ForceSyncWorkflowContext {
 	vault: Vault;
 	apiConfigured(): boolean;
+	recoverUploads(): Promise<void>;
 	getStatus(): SyncStatus;
 	updateState(updates: Partial<SyncState>): void;
 	shouldIgnore(path: string): boolean;
@@ -57,10 +58,14 @@ export async function runForceFullSyncWorkflow(
 
 	context.updateState({ status: 'syncing' });
 	const result = createEmptySyncResult();
-	const previousLocalManifest = context.snapshotLocalManifest();
+	let previousLocalManifest = context.snapshotLocalManifest();
 	let manifestCommitted = false;
+	let manifestCleared = false;
 
 	try {
+		await context.recoverUploads();
+		previousLocalManifest = context.snapshotLocalManifest();
+		context.throwIfDestroyed();
 		const remoteManifest = await context.getManifest();
 		const remotePaths = new Set(Object.keys(remoteManifest.files));
 
@@ -75,6 +80,7 @@ export async function runForceFullSyncWorkflow(
 		let current = 0;
 
 		context.clearLocalManifest();
+		manifestCleared = true;
 
 		for (const chunk of context.createVaultFileChunks(files)) {
 			const prepared = await context.prepareUploadsFromVaultFiles(chunk, () => {
@@ -131,7 +137,7 @@ export async function runForceFullSyncWorkflow(
 			logGenericError: true,
 		});
 	} finally {
-		if (!manifestCommitted) {
+		if (manifestCleared && !manifestCommitted) {
 			context.replaceLocalManifest(previousLocalManifest);
 			try {
 				await context.saveLocalManifest();

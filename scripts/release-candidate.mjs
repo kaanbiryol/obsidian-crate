@@ -27,7 +27,7 @@ const record = {
 	npm: execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim(),
 	artifacts,
 	inputs,
-	acceptance: { hostedOAuth: 'unverified', hostedPush: 'unverified', independentAccountRestore: 'unverified', physicalIOS: 'unverified', physicalAndroid: 'unverified' },
+	acceptance: { minimumObsidian: 'unverified', hostedLimits: 'unverified', hostedOAuth: 'unverified', hostedPush: 'unverified', independentAccountRestore: 'unverified', physicalIOS: 'unverified', physicalAndroid: 'unverified' },
 };
 await mkdir('.generated', { recursive: true });
 await writeFile('.generated/release-candidate.json', JSON.stringify(record, null, 2) + '\n');

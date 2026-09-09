@@ -22,6 +22,7 @@ export async function uploadPendingFiles(
 				upload.expectedHash ?? null,
 			);
 			if (!result.success) {
+				if (result.status) throw new HttpError(result.error || `Upload failed: ${upload.path}`, result.status, null, result.code);
 				throw new Error(result.error || `Upload failed: ${upload.path}`);
 			}
 			if (result.hash && result.hash !== upload.hash) {

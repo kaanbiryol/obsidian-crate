@@ -106,7 +106,7 @@ export class SyncEngine {
 			getSyncIntervalSeconds: () => this.settings.syncInterval,
 			getLastSeq: () => this.settings.lastSeq,
 			getPendingPathCount: () => this.queueController.getPendingPathCount(),
-			hasLocalFileChanges: () => hasLocalFileChanges(
+			hasLocalFileChanges: async () => this.localManifest.uploadJournal.pending().length > 0 || await hasLocalFileChanges(
 				this.vault,
 				this.localManifest,
 				this.shouldIgnore.bind(this),
@@ -129,6 +129,7 @@ export class SyncEngine {
 		});
 		this.api.setAbortSignal(this.lifecycle.abortSignal);
 		this.queueController = new SyncQueueController({
+			recoverUploads: () => this.api.recoverUploads(),
 			api: this.api,
 			getLocalManifest: () => this.localManifest,
 			markdownBaseCache: this.markdownBaseCache,
@@ -454,6 +455,8 @@ export class SyncEngine {
 	}
 
 	private async reconcilePaths(queueKeys: string[]): Promise<SyncResult> {
+		await this.api.recoverUploads();
+		this.lifecycle.throwIfDestroyed();
 		return reconcileQueuePaths({
 			vault: this.vault,
 			localManifest: this.localManifest,

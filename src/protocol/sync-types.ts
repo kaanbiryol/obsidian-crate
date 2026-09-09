@@ -166,3 +166,15 @@ export interface RemoteFileVersion {
 	created_at: string;
 	expires_at: number;
 }
+
+export interface FileVersionQuery {
+	path?: string;
+	search?: string;
+	cursor?: string;
+}
+
+export interface FileVersionsPage {
+	versions: RemoteFileVersion[];
+	hasMore: boolean;
+	nextCursor?: string;
+}

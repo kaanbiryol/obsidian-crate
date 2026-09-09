@@ -174,10 +174,10 @@ The active Obsidian configuration folder's entire `plugins/` tree is always excl
 
 Files are split by size at the `BATCH_FILE_SIZE_LIMIT` (1 MB) threshold:
 
-- **< 1 MB:** batched into JSON payloads with base64-encoded content. Each batch respects `BATCH_UPLOAD_MAX_FILES` (6) and `BATCH_MAX_BYTES` (10 MB) limits. Sent via `POST /sync/batch-upload`. Per-path failures carry a stable code and status; version conflicts are sent through targeted three-way reconciliation instead of becoming generic upload errors. The smaller mutation limit keeps worst-case conditional-write cleanup below Workers Free D1 query limits.
+- **< 1 MB:** batched into JSON payloads with base64-encoded content. Each batch respects `BATCH_UPLOAD_MAX_FILES` (3) and `BATCH_MAX_BYTES` (10 MB) limits. Sent via `POST /sync/batch-upload`. Per-path failures carry a stable code and status; version conflicts are sent through targeted three-way reconciliation instead of becoming generic upload errors. The smaller mutation limit keeps worst-case conditional-write cleanup below Workers Free D1 query limits.
 - **>= 1 MB:** uploaded individually as binary via `PUT /sync/upload` with retry.
 
-Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable. Conditional deletes are chunked into six-file requests; partial results are aggregated and stale deletes are targeted for reconciliation.
+Downloads smaller than 1 MB use `POST /sync/batch-download` in chunks bounded by `BATCH_DOWNLOAD_MAX_FILES` (50) and `BATCH_DOWNLOAD_MAX_BYTES` (8 MB). Larger files use individual streaming downloads. The client validates returned paths, sizes, and hashes, and falls back to individual `GET /sync/download` requests if a batch is rejected or unavailable. Conditional deletes are chunked into four-file requests; partial results are aggregated and stale deletes are targeted for reconciliation.
 
 Implementation: `transfer.ts:uploadPreparedFiles()`, `transfer.ts:createBatchUploadChunks()`
 
@@ -228,7 +228,7 @@ Implementation: `manifest.ts:LocalManifest`
 
 - **Retry:** failed uploads retry up to 3 times with exponential backoff (1s base delay)
 - **Cancellation:** abort and timeout stop the caller's wait and ignore late responses. Obsidian's HTTP transport may still finish and commit a mutation remotely. Uncertain queued paths remain pending; retries use expected-hash writes and reconciliation, and cancelled incremental runs do not advance the changelog cursor. Concurrent workers are drained before a failed operation unwinds.
-- **Local deletion recovery:** visible files use Obsidian's configured trash action; hidden/unindexed files use the adapter's local trash. The vault's `.trash/` directory is always excluded from sync. A trash failure never falls back to permanent removal. The hash check and deletion are not atomic: an edit arriving between them remains recoverable in trash.
+- **Local deletion recovery:** visible files use Obsidian's local vault trash (`vault.trash(file, false)`); hidden/unindexed files use the adapter's local trash. The vault's `.trash/` directory is always excluded from sync. A trash failure never falls back to permanent removal. The hash check and deletion are not atomic: an edit arriving between them remains recoverable in trash.
 - **Upload memory:** incremental and queued uploads reserve room for the next maximum-size file before preparation, using the 48 MiB mobile / 128 MiB desktop budget and a 128-file cap. Chunks finish uploading before further contents are prepared; history retains paths rather than file buffers. These budgets cover prepared binary contents, not total process memory or request encoding overhead.
 - **Incremental-to-full fallback:** if incremental sync returns `null` (error/cursor expiry), engine runs full sync
 - **Manifest recovery:** corrupt main file recovers from `.tmp` file

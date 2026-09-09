@@ -27,6 +27,7 @@ const logger = createLogger('SyncEngine');
 
 export interface SyncWorkflowContext extends FullSyncUploadContext {
 	apiConfigured(): boolean;
+	recoverUploads(): Promise<void>;
 	getStatus(): SyncStatus;
 	updateState(updates: Partial<SyncState>): void;
 	getManifest(): Promise<RemoteManifest>;
@@ -63,6 +64,8 @@ export async function runSyncWorkflow(
 	logger.info('Sync started');
 
 	try {
+		await context.recoverUploads();
+		context.throwIfDestroyed();
 		const incrementalResult = await context.incrementalSync(progressCallback);
 		if (incrementalResult) {
 			completeWorkflowResult(context, incrementalResult, {
@@ -75,7 +78,10 @@ export async function runSyncWorkflow(
 			logger.info('Incremental sync aborted');
 			return createEmptySyncResult();
 		}
-		throw error;
+		const failed = createEmptySyncResult();
+		handleWorkflowError(context, failed, error, { abortLogMessage: 'Sync recovery aborted', failureLogPrefix: 'Sync recovery failed', logger });
+		finalizeSyncResult(failed);
+		return failed;
 	}
 
 	logger.info('Running full sync');

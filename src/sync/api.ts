@@ -1,8 +1,10 @@
+import type { RequestDiagnostics } from './request-diagnostics';
 import type { MarkdownBaseCache } from './markdown-base-cache';
 import { normalizeWorkerUrl } from './worker-url';
 import type { Vault } from 'obsidian';
 import { assertRenamePreserved } from './rename-dependencies';
 import { DurableUploads } from './durable-uploads';
+import type { UploadApplyPhase } from './upload-diagnostics';
 import type { LocalManifest } from './manifest';
 import { arrayBufferToBase64 } from './encoding';
 import type { NotificationPolicy } from '../protocol/notification-policy';
@@ -22,7 +24,8 @@ import type {
 	FileMetadataResponse,
 	HealthResponse,
 	RegisteredDevice,
-	RemoteFileVersion,
+	FileVersionQuery,
+	FileVersionsPage,
 	UploadResult,
 } from '../protocol/sync-types';
 import type { SharedSettings } from '../plugin/settings-types';
@@ -44,7 +47,7 @@ export class SyncApiClient {
 	private durableUploads?: DurableUploads;
 	private deletionGuard?: (path: string) => Promise<void>;
 	configureUploadJournal(manifest: LocalManifest, vault: Vault, cache: MarkdownBaseCache): void {
-		this.durableUploads = new DurableUploads(manifest, this.syncApi, cache);
+		this.durableUploads = new DurableUploads(manifest, this.syncApi, cache, this.http.getRequestDiagnostics().clientSession);
 		this.deletionGuard = path => assertRenamePreserved(manifest, vault, path);
 	}
 	private readonly http: WorkerApiHttpClient;
@@ -78,8 +81,12 @@ export class SyncApiClient {
 		return this.http.getWorkerUrl();
 	}
 
-	getRequestDiagnostics() {
-		return this.http.getRequestDiagnostics();
+	getRequestDiagnostics(): RequestDiagnostics {
+		return { ...this.http.getRequestDiagnostics(), uploads: this.durableUploads?.getDiagnostics() };
+	}
+
+	async recordMergeApplication(path: string, hash: string, phase: UploadApplyPhase): Promise<void> {
+		await this.durableUploads?.recordMergeApplication(path, hash, phase);
 	}
 
 	async health(): Promise<HealthResponse> {
@@ -99,13 +106,16 @@ export class SyncApiClient {
 	}
 
 	async getManifest(): Promise<FileManifest> {
-		await this.durableUploads?.recover();
 		return this.syncApi.getManifest();
 	}
 
 	async getFileMetadata(paths: string[]): Promise<FileMetadataResponse> {
-		await this.durableUploads?.recover();
 		return this.syncApi.getFileMetadata(paths);
+	}
+
+	/** Called by the owning sync workflow before discovery or planning. */
+	async recoverUploads(): Promise<void> {
+		await this.durableUploads?.recover();
 	}
 
 	async uploadFile(
@@ -116,9 +126,10 @@ export class SyncApiClient {
 		contentType: string,
 		expectedHash: string | null,
 		operationId?: string,
+		mergePreimage?: ArrayBuffer,
 	): Promise<UploadResult> {
 		return this.durableUploads
-			? this.durableUploads.single({ path, content: arrayBufferToBase64(content), hash, size, contentType, expectedHash, operationId })
+			? this.durableUploads.single({ path, content: arrayBufferToBase64(content), hash, size, contentType, expectedHash, operationId }, mergePreimage)
 			: this.syncApi.uploadFile(path, content, hash, size, contentType, expectedHash, operationId);
 	}
 
@@ -136,7 +147,6 @@ export class SyncApiClient {
 	}
 
 	async getChanges(since: number): Promise<ChangesResponse> {
-		await this.durableUploads?.recover();
 		return this.syncApi.getChanges(since);
 	}
 
@@ -157,8 +167,8 @@ export class SyncApiClient {
 		return this.syncApi.batchDelete(paths, expectedHashes, expectedRevisions);
 	}
 
-	async listFileVersions(path?: string): Promise<{ versions: RemoteFileVersion[] }> {
-		return this.syncApi.listFileVersions(path);
+	async listFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
+		return this.syncApi.listFileVersions(query);
 	}
 
 	async restoreFileVersion(

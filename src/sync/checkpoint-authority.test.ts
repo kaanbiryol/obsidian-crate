@@ -6,7 +6,7 @@ import { createDeferred, createRuntimeHarness } from './runtime-test-harness';
 
 const dir = '.obsidian/plugins/crate';
 const main = `${dir}/file-manifest.json`;
-const entry = { hash: 'original', size: 4, modified: new Date(1000).toISOString(), revision: 'old-revision' };
+const entry = { hash: 'a'.repeat(64), size: 4, modified: new Date(1000).toISOString(), revision: 'old-revision' };
 const checkpoint = (authority?: string, generation = 2) => JSON.stringify({ version: 1, generation, authority, files: { 'note.md': entry } });
 
 function createDisk(initial: Record<string, string> = {}) {

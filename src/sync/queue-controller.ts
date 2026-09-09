@@ -16,6 +16,7 @@ import {
 } from './queue-flush';
 
 export interface SyncQueueControllerContext {
+	recoverUploads(): Promise<void>;
 	api: QueueFlushContext['api'];
 	getLocalManifest(): QueueFlushContext['localManifest'];
 	markdownBaseCache?: QueueFlushContext['markdownBaseCache'];
@@ -120,6 +121,7 @@ export class SyncQueueController {
 
 	private getQueueFlushContext(): QueueFlushContext {
 		return {
+			recoverUploads: () => this.context.recoverUploads(),
 			pendingPaths: this.pendingPaths,
 			inFlightPaths: this.inFlightPaths,
 			pendingRevisions: this.pendingRevisions,

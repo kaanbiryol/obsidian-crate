@@ -4,7 +4,7 @@ import { createLogger, errorMessage } from '../plugin/logger';
 import type { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from './types';
-import type { RemoteFileVersion } from '../protocol/sync-types';
+import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../protocol/sync-types';
 import { getPathEntry } from '../protocol/path-record';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
@@ -44,9 +44,9 @@ export class SyncRuntime {
 	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
 	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
-	async listRecentFileVersions(): Promise<RemoteFileVersion[]> {
+	async listRecentFileVersions(query: FileVersionQuery = {}): Promise<FileVersionsPage> {
 		if (!this.apiClient) throw new Error('Sync is not configured');
-		return (await this.apiClient.listFileVersions()).versions;
+		return this.apiClient.listFileVersions(query);
 	}
 
 	async restoreRecentFileVersion(version: RemoteFileVersion): Promise<SyncResult> {

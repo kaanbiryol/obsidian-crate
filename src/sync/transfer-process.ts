@@ -216,6 +216,8 @@ async function tryAutoMergeMarkdownConflict(
     mergedContent.byteLength,
     "text/markdown",
     diff.remoteHash ?? null,
+    undefined,
+    localContent,
   );
   if (!uploadResult.success) {
     throw new Error(uploadResult.error || "Upload failed");
@@ -232,8 +234,12 @@ async function tryAutoMergeMarkdownConflict(
     diff.path,
     mergedContent,
     plannedLocalHash,
-  );
+  ).catch(async (error: unknown) => {
+    await context.api.recordMergeApplication?.(diff.path, mergedHash, 'local-apply-failed');
+    throw error;
+  });
   if (localApplyOutcome.status === "deferred") {
+    await context.api.recordMergeApplication?.(diff.path, mergedHash, 'local-deferred');
     // The uploaded merge already contains this local snapshot. Keep that
     // snapshot as a virtual common ancestor so the next reconciliation can
     // merge only the newer local edits into the remote merge without
