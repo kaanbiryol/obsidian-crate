@@ -26,6 +26,12 @@ describe('PWA header sync indicator', () => {
 		expect(markup).not.toContain('<button');
 	});
 
+	it('shows initial loading instead of claiming everything is synced', () => {
+		const markup = render({ loading: true });
+		expect(markup).toContain('data-sync-state="syncing"');
+		expect(markup).toContain('Loading reminders');
+	});
+
 	it('uses the same indicator for background refresh and successful completion', () => {
 		expect(render({ refreshing: true })).toContain('Refreshing reminders');
 		expect(render()).toContain('data-sync-state="synced"');

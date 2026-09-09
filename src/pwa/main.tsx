@@ -373,6 +373,7 @@ function App() {
 							changes={changes}
 							isOffline={isOffline}
 							refreshing={refreshing}
+							loading={loading}
 							dataMode={dataMode}
 							error={error}
 							storageError={storageError}

@@ -3,30 +3,44 @@
 		display: grid;
 		place-items: center;
 		position: relative;
-		flex: 0 0 32px;
-		width: 32px;
-		height: 44px;
-		color: var(--text-faint);
+		flex: 0 0 28px;
+		width: 28px;
+		height: 28px;
+		color: var(--text-muted);
 		transition: color 180ms ease;
 
-		&[data-sync-state="syncing"] { color: var(--text-muted); }
-		&[data-sync-state="offline"],
+		&[data-sync-state="synced"] { color: var(--crate-success); }
+		&[data-sync-state="syncing"] { color: var(--accent); }
 		&[data-sync-state="cached"] { color: var(--text-warning, #d99a38); }
 		&[data-sync-state="error"] { color: var(--text-error); }
 	}
 
-	.pwa-sync-indicator__glyph {
-		display: grid;
-		place-items: center;
-		animation: pwa-sync-appear 220ms ease-out both;
+	.pwa-sync-indicator__dot {
+		position: relative;
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		background: currentColor;
+		box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent);
+
+		&::before, &::after {
+			content: '';
+			position: absolute;
+			inset: -1px;
+			border: 1.5px solid currentColor;
+			border-radius: inherit;
+			opacity: 0;
+		}
 	}
 
-	.pwa-sync-indicator[data-sync-state="syncing"] svg {
-		animation: pwa-sync-spin 1.1s linear infinite;
+	.pwa-sync-indicator[data-sync-state="syncing"] .pwa-sync-indicator__dot {
+		animation: pwa-sync-breathe 1.4s ease-in-out infinite;
+		&::before, &::after { animation: pwa-sync-ripple 1.4s ease-out infinite; }
+		&::after { animation-delay: 700ms; }
 	}
 
-	.pwa-sync-indicator[data-sync-state="synced"] .pwa-sync-indicator__glyph {
-		animation: pwa-sync-appear 220ms ease-out both, pwa-sync-success 2s ease-out;
+	.pwa-sync-indicator[data-sync-state="synced"] .pwa-sync-indicator__dot {
+		animation: pwa-sync-complete 800ms ease-out both;
 	}
 
 	.pwa-sync-indicator__label {
@@ -40,24 +54,27 @@
 		white-space: nowrap;
 	}
 
-	@keyframes pwa-sync-appear {
-		from { opacity: 0; transform: scale(.8); }
-		to { opacity: 1; transform: scale(1); }
+	@keyframes pwa-sync-ripple {
+		0% { transform: scale(1); opacity: .65; }
+		100% { transform: scale(2.5); opacity: 0; }
 	}
 
-	@keyframes pwa-sync-spin {
-		to { transform: rotate(360deg); }
+	@keyframes pwa-sync-breathe {
+		0%, 100% { transform: scale(.9); }
+		50% { transform: scale(1.2); }
 	}
 
-	@keyframes pwa-sync-success {
-		0%, 45% { color: var(--crate-success); }
-		100% { color: var(--text-faint); }
+	@keyframes pwa-sync-complete {
+		0% { transform: scale(.7); box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); }
+		40% { transform: scale(1.3); }
+		100% { transform: scale(1); box-shadow: 0 0 0 10px transparent; }
 	}
 
 	@media (prefers-reduced-motion: reduce) {
 		.pwa-sync-indicator { transition: none; }
-		.pwa-sync-indicator[data-sync-state] .pwa-sync-indicator__glyph,
-		.pwa-sync-indicator[data-sync-state] svg { animation: none; }
+		.pwa-sync-indicator[data-sync-state] .pwa-sync-indicator__dot {
+			&, &::before, &::after { animation: none; }
+		}
 	}
 
 	.pwa-reminder-recovery-preview {
