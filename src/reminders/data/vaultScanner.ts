@@ -21,6 +21,8 @@ import type { IndexedReminder } from "./reminder-index";
 import { addReminderIdentityOwners, resolveReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from './reminder-identity-owners';
 import { normalizeReminderScheduleLine } from '../core/normalizeReminderSchedule';
 import { markdownTaskContexts } from '../core/markdownTaskContext';
+import { readVaultMarkdown, processVaultMarkdown, VaultMarkdownChangedError } from './vault-markdown';
+import type { ReminderSourceIssue } from './reminder-source-issues';
 
 const log = createLogger('VaultScanner');
 
@@ -28,6 +30,7 @@ export { getProjectFromPath } from "@/reminders/core/markdownScan";
 
 export interface ScanResult {
   reminders: IndexedReminder[];
+  issues: ReminderSourceIssue[];
   filesScanned: number;
   totalLines: number;
   scanDurationMs: number;
@@ -160,7 +163,7 @@ export async function scanFile(
   if (signal?.aborted) return cancelled;
 
   try {
-    const originalContent = await app.vault.read(file);
+    const originalContent = await readVaultMarkdown(app, file);
     if (signal?.aborted) return cancelled;
     const deferred = (): FileScanResult => ({
       filePath,
@@ -177,7 +180,7 @@ export async function scanFile(
     if (normalized.remindersUpdated > 0) {
       let remindersUpdated = 0;
       let targetChanged = false;
-      const content = await app.vault.process(file, (currentContent) => {
+      const content = await processVaultMarkdown(app, file, (currentContent) => {
         // Ownership was verified for the identifiers in the original bytes.
         // Retry with new evidence if a concurrent edit changes the target.
         if (ownership && currentContent !== originalContent) {
@@ -209,6 +212,7 @@ export async function scanFile(
     };
   } catch (error) {
     if (signal?.aborted) return cancelled;
+    if (error instanceof VaultMarkdownChangedError) return { ...cancelled, deferred: true };
     log.error(` Error scanning file ${filePath}:`, error);
     return {
       filePath,
@@ -230,9 +234,12 @@ export async function scanVault(
   signal?: AbortSignal,
   shouldDeferNormalization: (filePath?: string) => boolean = () => false,
   shouldDeferCollisionRepair = () => false,
+  knownOwners: ReminderIdentityOwner[] = [],
 ): Promise<ScanResult> {
   const startTime = Date.now();
   const allReminders: IndexedReminder[] = [];
+  const issues: ReminderSourceIssue[] = [];
+  let filesScanned = 0;
   let totalLines = 0;
 
   // Only get markdown files within the reminders folder tree
@@ -253,13 +260,15 @@ export async function scanVault(
   // remains canonical and later duplicates receive fresh identifiers.
   reminderFiles.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
   const identityOwners: ReminderIdentityOwners = new Map();
+  addReminderIdentityOwners(identityOwners, knownOwners);
   let deferred = false;
   for (const file of reminderFiles) {
     if (signal?.aborted) break;
     if (shouldDeferNormalization()) { deferred = true; break; }
     const result = await scanFile(app, file, remindersFolderPath, new Set(), signal, identityOwners, () => shouldDeferNormalization(file.path), shouldDeferCollisionRepair);
     if (result.deferred) deferred = true;
-    if (result.error) continue;
+    if (result.error) { issues.push({ path: result.filePath, reason: result.error }); continue; }
+    filesScanned++;
     for (const released of result.releasedOwners ?? []) {
       const stale = allReminders.findIndex(reminder => reminder.id === released.id && reminder.filePath === released.filePath);
       if (stale !== -1) allReminders.splice(stale, 1);
@@ -282,7 +291,8 @@ export async function scanVault(
     // Keep healthy persisted reminders visible while collision repair waits
     // for sync. Neither ambiguous owner is exposed as an editable identity.
     reminders: deferred ? allReminders.filter(reminder => identityCounts.get(reminder.id) === 1) : allReminders,
-    filesScanned: reminderFiles.length,
+    issues,
+    filesScanned,
     totalLines,
     scanDurationMs,
     discoveredProjects: Array.from(discoveredProjects).sort(),

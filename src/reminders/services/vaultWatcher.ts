@@ -159,6 +159,9 @@ export class VaultWatcher {
       // Moved within reminders folder - update path
       log.info(` Reminder file renamed: ${oldPath} -> ${file.path}`);
       this.index.renameFile(oldPath, file.path);
+      // A rename must carry pending content work to the new path. Requeue it
+      // so repeated renames coalesce and unload can still cancel the scan.
+      this.handleModify(file);
     } else if (wasInFolder && !nowInFolder) {
       // Moved out of reminders folder - remove
       log.info(` File moved out of reminders folder: ${oldPath}`);

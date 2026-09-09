@@ -9,6 +9,8 @@ import { timezone as getLocalTimeZone } from '../../utils/time';
 function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 	return {
 		isLoaded: true,
+		sourceIssues: [],
+		isComplete: true,
 		remindersFolderPath: 'Reminders',
 		getAll: () => [],
 		getActive: () => [],
@@ -20,7 +22,7 @@ function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 		getByFile: () => [],
 		getById: () => undefined,
 		getProjects: () => [],
-		load: async () => ({ reminders: [], filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [] }),
+		load: async () => ({ reminders: [], issues: [], filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [] }),
 		rescanFile: async () => {},
 		flushDeferredScans: async () => {},
 		removeFile: () => {},

@@ -1,3 +1,4 @@
+import { processVaultMarkdown } from '../vault-markdown';
 import type { Priority, RecurrenceRule } from "@/reminders/types/reminder";
 import { generateContentHash } from "@/reminders/utils/checkboxParser";
 import { createReminderId } from "../../core/reminderIdentity";
@@ -58,7 +59,7 @@ export async function createReminderInMarkdown(
   context.index.applyOptimisticCreate(optimisticReminder);
 
   try {
-    await context.app.vault.process(file, (fileContent) => {
+    await processVaultMarkdown(context.app, file, (fileContent) => {
       context.moveJournal?.assertActive();
       // A lost local write acknowledgement must not append the same identity twice.
       if (fileContent.includes(`<!-- crate-id:${stableReminderId} -->`)) {

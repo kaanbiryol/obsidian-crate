@@ -20,6 +20,7 @@ import { ReminderCard } from '@/reminders/components/ReminderCard';
 import { PWA_STYLES, PWA_LIGHT_THEME_STYLES } from '@/cloudflare/worker/pwa/styles';
 import pluginStyles from '../../../dist/styles.css?raw';
 import fixtureStyles from './fixture.css?raw';
+import { PluginReminderSourceNotice } from '@/reminders/ui/plugin/PluginReminderSourceNotice';
 
 const params = new URLSearchParams(location.search);
 const host = params.get('host') === 'plugin' ? 'plugin' : 'pwa';
@@ -39,6 +40,20 @@ function GalleryIcon(props: ThemeIconProps) {
   return props.id === 'triangle-alert' ? <TriangleAlert size={18} aria-hidden="true" /> : <PwaThemeIcon {...props} />;
 }
 
+function SourceNoticeFixture() {
+  const [issues, setIssues] = useState(Array.from({ length: 21 }, (_, i) => ({
+    path: i === 0 ? 'Reminders/<img src=x onerror=alert(1)>.md' : `Reminders/A long project name/Unreadable note ${i}.md`,
+    reason: 'Save this note as UTF-8 without null characters before editing its reminders. The original vault file remains synced.',
+  })));
+  const attempts = useRef(0);
+  return <><PluginReminderSourceNotice issues={issues} onRefresh={async () => {
+    attempts.current++;
+    await new Promise<void>(resolve => window.addEventListener('crate-test-refresh', () => resolve(), { once: true }));
+    if (attempts.current === 1) throw new Error('Storage is temporarily unavailable. Try again.');
+    setIssues([]);
+  }} /><p>Healthy reminders remain available</p></>;
+}
+
 function Gallery() {
   const [result, setResult] = useState('Ready');
   const [project, setProject] = useState('Work');
@@ -50,7 +65,8 @@ function Gallery() {
   const richRef = useRef<RichTextInputHandle>(null);
   const noop = () => setResult('Closed');
   let content: React.ReactNode;
-  if (scene === 'delete') content = <DeleteConfirmationModal isOpen onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
+  if (scene === 'source') content = <SourceNoticeFixture />;
+  else if (scene === 'delete') content = <DeleteConfirmationModal isOpen onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
   else if (scene === 'progress') content = <ModalLayout title="Updating Crate server" onClose={noop}><StatusContent state="working" description="Checking your Cloudflare account…" /></ModalLayout>;
   else if (scene === 'status') content = <ModalLayout title="Server reset failed" onClose={noop} footer={<div className="crate-status-actions"><Button onClick={noop}>Close</Button><Button className="mod-cta" onClick={() => setResult('Settings opened')}>Open settings</Button></div>}><StatusContent state="error" description="Crate couldn’t finish resetting your Cloudflare server." details={['In Crate settings → Troubleshooting, select “Resume server reset” to try again.']} technicalDetails="Could not verify the complete Durable Object namespace listing." /></ModalLayout>;
   else if (scene === 'project') content = <ProjectPickerContent isOpen projects={projects} project={project} defaultProject="Inbox" isDark={isDark} onSelectProject={setProject} onClose={noop} />;
@@ -61,4 +77,7 @@ function Gallery() {
   return <ThemeIconProvider renderer={GalleryIcon}><div className={`crate-reminders-ui reminders-shadow-root ${host === 'pwa' ? 'pwa-shadow-root' : ''}`}><main data-testid="visual-surface" className={`visual-surface ${['status', 'progress'].includes(scene) ? `modal crate-cloudflare-deployment-modal ${scene === 'progress' ? 'is-working' : ''}` : ''} ${host === 'pwa' ? scene === 'editor' ? 'modal-card pwa-reminder-editor' : 'pwa-picker-sheet' : 'base-modal-surface'} ${isDark ? 'dark' : ''}`}><div className="visual-content">{content}</div></main><output data-testid="result">{result}</output></div></ThemeIconProvider>;
 }
 
-createRoot(document.getElementById('app')!).render(<Gallery />);
+const app = document.getElementById('app')!;
+const mount = scene === 'source' ? document.createElement('div') : app;
+if (scene === 'source') app.attachShadow({ mode: 'open' }).append(style.cloneNode(true), mount);
+createRoot(mount).render(<Gallery />);

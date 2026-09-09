@@ -2,6 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault } from '@/reminders/data/vaultScanner';
 import { TFile, TFolder, type App } from 'obsidian';
 
+// String fixtures model bytes explicitly; production never falls back to read().
+function withBinaryReads(app: App): App {
+  app.vault.adapter = { ...app.vault.adapter, readBinary: async (path: string) =>
+    new TextEncoder().encode(await app.vault.read(makeMockFile(path))).buffer } as App['vault']['adapter'];
+  return app;
+}
+
 function makeMockFile(path: string): TFile {
   const file = new TFile();
   const name = path.split('/').pop() ?? path;
@@ -31,7 +38,7 @@ it.each(['read', 'atomic callback'])('stops ID normalization if shutdown happens
     if (boundary === 'read') controller.abort();
     return original;
   }, process } } as unknown as App;
-  const result = await scanFile(app, makeMockFile('Reminders/Inbox.md'), 'Reminders', new Set(), controller.signal);
+  const result = await scanFile(withBinaryReads(app), makeMockFile('Reminders/Inbox.md'), 'Reminders', new Set(), controller.signal);
   expect(persisted).toBe(original);
   expect(result.reminders).toEqual([]);
   expect(process).toHaveBeenCalledTimes(boundary === 'read' ? 0 : 1);
@@ -61,7 +68,7 @@ describe('vaultScanner', () => {
     } as unknown as App;
 
     const file = makeMockFile('Reminders/Work.md');
-    const result = await scanFile(app, file, 'Reminders');
+    const result = await scanFile(withBinaryReads(app), file, 'Reminders');
 
     expect(result.reminders).toHaveLength(2);
 	expect(result.reminders[0]?.content).toBe('Task A');
@@ -91,7 +98,7 @@ describe('vaultScanner', () => {
       },
     } as unknown as App;
 
-    const result = await scanVault(app, 'Reminders');
+    const result = await scanVault(withBinaryReads(app), 'Reminders');
 
     expect(result.filesScanned).toBe(2);
     expect(result.reminders).toHaveLength(1);
@@ -123,7 +130,7 @@ describe('vaultScanner', () => {
       },
     } as unknown as App;
 
-    const result = await scanVault(app, 'Reminders');
+    const result = await scanVault(withBinaryReads(app), 'Reminders');
 
     expect(result.reminders).toHaveLength(2);
     expect(result.reminders.find((reminder) => reminder.filePath.endsWith('/A.md'))?.id).toBe('shared');
@@ -138,7 +145,7 @@ describe('vaultScanner', () => {
       },
     } as unknown as App;
 
-    const result = await scanVault(app, 'Reminders');
+    const result = await scanVault(withBinaryReads(app), 'Reminders');
 
     expect(result.filesScanned).toBe(0);
     expect(result.reminders).toHaveLength(0);
@@ -152,7 +159,7 @@ describe('vaultScanner', () => {
     } as unknown as App;
 
     const file = makeMockFile('Reminders/Work.md');
-    const result = await scanFile(app, file, 'Reminders');
+    const result = await scanFile(withBinaryReads(app), file, 'Reminders');
 
     expect(result.reminders).toHaveLength(1);
 	expect(result.reminders[0]?.id).toBe('rem-123');
@@ -171,7 +178,7 @@ describe('vaultScanner', () => {
     } as unknown as App;
 
     const file = makeMockFile('Reminders/Work.md');
-    const result = await scanFile(app, file, 'Reminders');
+    const result = await scanFile(withBinaryReads(app), file, 'Reminders');
 
     expect(result.error).toBeUndefined();
     expect(result.reminders).toHaveLength(2);
@@ -181,22 +188,25 @@ describe('vaultScanner', () => {
 
   it('preserves edits made between the initial read and id normalization', async () => {
     const latestContent = '# Added concurrently\n- [ ] Task A';
-    let persistedContent = '';
+    let persistedContent = '- [ ] Task A';
     const process = vi.fn(async (_file: TFile, mutation: (content: string) => string) => {
-      persistedContent = mutation(latestContent);
+      persistedContent = latestContent;
+      persistedContent = mutation(persistedContent);
       return persistedContent;
     });
     const app = {
       vault: {
-        read: vi.fn().mockResolvedValue('- [ ] Task A'),
+        read: vi.fn(async () => persistedContent),
         process,
       },
     } as unknown as App;
 
-    const result = await scanFile(app, makeMockFile('Reminders/Work.md'), 'Reminders');
+    const result = await scanFile(withBinaryReads(app), makeMockFile('Reminders/Work.md'), 'Reminders');
 
-    expect(result.reminders).toHaveLength(1);
-    expect(persistedContent).toContain('# Added concurrently');
+    expect(result.deferred).toBe(true);
+    expect(persistedContent).toBe(latestContent);
+    const retried = await scanFile(withBinaryReads(app), makeMockFile('Reminders/Work.md'), 'Reminders');
+    expect(retried.reminders).toHaveLength(1);
     expect(persistedContent).toContain('<!-- crate-id:');
   });
 
@@ -207,7 +217,7 @@ describe('vaultScanner', () => {
       },
     } as unknown as App;
 
-    const result = await scanFile(app, makeMockFile('Reminders/Work.md'), 'Reminders');
+    const result = await scanFile(withBinaryReads(app), makeMockFile('Reminders/Work.md'), 'Reminders');
 
     expect(result).toMatchObject({
       filePath: 'Reminders/Work.md',

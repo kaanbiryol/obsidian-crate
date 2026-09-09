@@ -1,6 +1,7 @@
 import { TFile, type App } from 'obsidian';
 import { parseCheckboxLine } from '../utils/checkboxParser';
 import { markdownTaskContexts } from '../core/markdownTaskContext';
+import { readVaultMarkdown } from './vault-markdown';
 
 export interface ReminderIdentityOwner { id: string; filePath: string }
 export type ReminderIdentityOwners = Map<string, Set<string>>;
@@ -48,7 +49,7 @@ export async function resolveReminderIdentityOwners(
 		const owner = app.vault.getAbstractFileByPath(ownerPath);
 		observedFiles.set(ownerPath, owner instanceof TFile ? version(owner) : null);
 		// A failed read must fail the scan, never authorize replacing an identity.
-		const currentIds = owner instanceof TFile ? contentIds(await app.vault.read(owner)) : new Set<string>();
+		const currentIds = owner instanceof TFile ? contentIds(await readVaultMarkdown(app, owner)) : new Set<string>();
 		for (const id of ids) {
 			if (currentIds.has(id)) reservedIds.add(id);
 			else releasedOwners.push({ id, filePath: ownerPath });

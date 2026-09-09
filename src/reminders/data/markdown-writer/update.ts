@@ -1,3 +1,4 @@
+import { processVaultMarkdown } from '../vault-markdown';
 import { generateContentHash } from "@/reminders/utils/checkboxParser";
 import type { IndexedReminder } from "../reminder-index";
 import { findReminderLineNumber } from "./helpers";
@@ -30,7 +31,7 @@ async function rollbackDestinationReminder(
   reminder: IndexedReminder,
 ): Promise<void> {
   let removed = false;
-  await context.app.vault.process(file, (fileContent) => {
+  await processVaultMarkdown(context.app, file, (fileContent) => {
     context.moveJournal?.assertActive();
     const deletion = deleteReminderBlockFromContent(fileContent, reminder);
     removed = deletion.found;
@@ -97,7 +98,7 @@ export async function updateReminderInMarkdown(
     const applyMove = async () => {
       let destinationWritten = false;
       try {
-      await context.app.vault.process(newFile, (fileContent) => {
+      await processVaultMarkdown(context.app, newFile, (fileContent) => {
         context.moveJournal?.assertActive();
         if (findReminderLineNumber(fileContent.split("\n"), movedReminder) !== -1) {
           throw new Error(`Reminder ${reminder.id} already exists in ${newFile.path}`);
@@ -110,7 +111,7 @@ export async function updateReminderInMarkdown(
       });
       destinationWritten = true;
 
-      await context.app.vault.process(oldFile, (fileContent) => {
+      await processVaultMarkdown(context.app, oldFile, (fileContent) => {
         context.moveJournal?.assertActive();
         const deletion = deleteReminderBlockFromContent(fileContent, reminder);
         if (!deletion.found) {
@@ -175,7 +176,7 @@ export async function updateReminderInMarkdown(
 
   try {
     let replacementLineNumber = -1;
-    await context.app.vault.process(file, (fileContent) => {
+    await processVaultMarkdown(context.app, file, (fileContent) => {
       context.moveJournal?.assertActive();
       const replacement = replaceUpdatedReminderBlock(fileContent, reminder, mutation);
       replacementLineNumber = replacement.lineNumber;

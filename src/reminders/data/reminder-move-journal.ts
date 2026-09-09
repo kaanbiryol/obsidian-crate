@@ -4,6 +4,7 @@ import { buildDescriptionBlock } from '../core/markdownReminderFile';
 import { hasAttachedMarkdownContent, markdownTaskContexts } from '../core/markdownTaskContext';
 import { createReminderMoveStorage, type ReminderMoveRecord } from './reminder-move-storage';
 import { portablePathKey } from '@/protocol/portable-path';
+import { readVaultMarkdown, processVaultMarkdown } from './vault-markdown';
 
 type MoveSide = ReminderMoveRecord['source'];
 type ObservedBlock = { state: 'absent' | 'changed' | 'exact' | 'ambiguous'; lineNumber?: number; file: TFile | null; version: string | null };
@@ -52,7 +53,7 @@ export function createReminderMoveJournal(app: App, directory: string, folderPat
 		const file = getFile(side.filePath);
 		if (!file && await app.vault.adapter.exists(side.filePath)) throw new Error(`The existing note ${side.filePath} is not indexed yet. Wait for Obsidian to finish loading, then retry recovery.`);
 		const version = fileVersion(file);
-		const result = observeContent(file ? await app.vault.read(file) : '', side, id);
+		const result = observeContent(file ? await readVaultMarkdown(app, file) : '', side, id);
 		assertActive();
 		if (fileVersion(getFile(side.filePath)) !== version) throw new Error('Reminder note changed during recovery');
 		return { ...result, file, version };
@@ -60,7 +61,7 @@ export function createReminderMoveJournal(app: App, directory: string, folderPat
 	const removeExact = async (side: MoveSide, id: string, otherSide: MoveSide, other: ObservedBlock) => {
 		const file = getFile(side.filePath);
 		if (!file) throw new Error('Reminder note disappeared during recovery');
-		await app.vault.process(file, content => {
+		await processVaultMarkdown(app, file, content => {
 			assertActive();
 			if (fileVersion(getFile(otherSide.filePath)) !== other.version) throw new Error('Other reminder note changed during recovery');
 			const observed = observeContent(content, side, id);

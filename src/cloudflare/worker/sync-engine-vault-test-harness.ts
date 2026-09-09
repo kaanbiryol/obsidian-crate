@@ -7,6 +7,7 @@ export const TEST_PLUGIN_DIR = '.obsidian/plugins/crate';
 export class PersistentTestVault {
 	private readonly files = new Map<string, { content: ArrayBuffer; mtime: number }>();
 	private readonly folders = new Set<string>(['']);
+	private readonly fileObjects = new Map<string, TFile>();
 	private mtime = Date.parse('2026-01-01T00:00:00Z');
 	readonly trash = new Map<string, ArrayBuffer>();
 
@@ -29,7 +30,7 @@ export class PersistentTestVault {
 
 	text(path: string): string { return new TextDecoder().decode(this.read(path)); }
 	has(path: string): boolean { return this.files.has(path); }
-	remove(path: string): void { this.files.delete(path); }
+	remove(path: string): void { this.files.delete(path); this.fileObjects.delete(path); }
 
 	rename(from: string, to: string): void {
 		const content = this.read(from);
@@ -50,7 +51,9 @@ export class PersistentTestVault {
 		if (!file || isHiddenPath(path)) return null;
 		const name = path.split('/').at(-1)!;
 		const extension = getExtensionFromPath(path);
-		return Object.assign(new TFile(), {
+		const object = this.fileObjects.get(path) ?? new TFile();
+		this.fileObjects.set(path, object);
+		return Object.assign(object, {
 			path, name, extension, basename: extension ? name.slice(0, -extension.length - 1) : name,
 			stat: { size: file.content.byteLength, mtime: file.mtime, ctime: file.mtime },
 		});

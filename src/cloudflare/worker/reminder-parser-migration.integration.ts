@@ -89,6 +89,18 @@ it('preserves first observation and resumes a genuine occurrence delayed across 
   expect(sendToAllSubscriptions).toHaveBeenCalledOnce();
 });
 
+it('rediscovers CRLF tasks omitted by the previous parser without rewriting their source', async () => {
+  const h = await legacy(text => `${text}\r\n`);
+  await env.DB.prepare('DELETE FROM reminder_sources').run();
+  await revalidateReminderSources(env, 3);
+  await drainNotificationProjections(env);
+  expect(await env.DB.prepare('SELECT reminder_id FROM reminder_sources WHERE file_path = ?').bind(path).first()).toEqual({ reminder_id: id });
+  expect(await env.DB.prepare('SELECT verified, parser_version FROM reminder_source_state WHERE file_path = ?').bind(path).first())
+    .toEqual({ verified: 1, parser_version: REMINDER_CACHE_PARSER_VERSION });
+  expect(await (await env.BUCKET.get(h.file.storageKey))?.text()).toBe(`${h.valid}\r\n`);
+  expect(await command()).toMatchObject({ operation: 'schedule' });
+});
+
 it('quarantines uncertain legacy metadata and permits repair without deriving cancellations', async () => {
   const h = await legacy(text => `${text}\n<!-- crate-desc:v1:%invalid -->`);
   const prior = await command();

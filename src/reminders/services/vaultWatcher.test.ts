@@ -68,4 +68,16 @@ describe('VaultWatcher', () => {
 		expect(vault.offref).toHaveBeenCalledTimes(4);
 		expect(index.rescanFile).not.toHaveBeenCalled();
 	});
+
+	it('cancels a requeued rename scan on unload', async () => {
+		const { handlers, index, watcher } = createHarness();
+		const file = createMarkdownFile('Reminders/Before.md');
+		handlers.get('modify')?.(file as never);
+		file.path = 'Reminders/After.md';
+		handlers.get('rename')?.(file as never, 'Reminders/Before.md' as never);
+		watcher.unregister();
+		await vi.runAllTimersAsync();
+		expect(index.renameFile).toHaveBeenCalledWith('Reminders/Before.md', 'Reminders/After.md');
+		expect(index.rescanFile).not.toHaveBeenCalled();
+	});
 });

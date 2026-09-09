@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 type MockVault = {
 	adapter: {
 		exists: ReturnType<typeof vi.fn<(path: string) => Promise<boolean>>>;
+		readBinary: ReturnType<typeof vi.fn<(path: string) => Promise<ArrayBuffer>>>;
 	};
 	getAbstractFileByPath: ReturnType<typeof vi.fn<(path: string) => TFile | null>>;
 	createFolder: ReturnType<typeof vi.fn<(path: string) => Promise<void>>>;
@@ -43,6 +44,10 @@ export function createMockAppWithVault(initialFiles: Record<string, string> = {}
 	const vault: MockVault = {
 		adapter: {
 			exists: vi.fn(async (path: string) => folders.has(path) || files.has(path)),
+			readBinary: vi.fn(async (path: string) => {
+				if (!files.has(path)) throw new Error('Missing file');
+				return new TextEncoder().encode(await vault.read(createMockTFile(path))).buffer;
+			}),
 		},
 		getAbstractFileByPath: vi.fn((path: string) =>
 			files.has(path) ? createMockTFile(path) : null

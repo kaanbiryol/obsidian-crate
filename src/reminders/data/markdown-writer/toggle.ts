@@ -1,3 +1,4 @@
+import { processVaultMarkdown } from '../vault-markdown';
 import { parseStoredReminderDate } from '@/reminders/utils/reminderDate';
 import {
 	buildReminderCompletionPlan,
@@ -32,7 +33,7 @@ export async function toggleReminderCompletionInMarkdown(
 
 	try {
 		const resultHolder: { value?: ReminderCompletionMutation } = {};
-		await context.app.vault.process(file, (fileContent) => {
+		await processVaultMarkdown(context.app, file, (fileContent) => {
 			context.moveJournal?.assertActive();
 			const result = setReminderCompletionInContent(fileContent, reminder, requestedCompleted, currentDue);
 			resultHolder.value = result;

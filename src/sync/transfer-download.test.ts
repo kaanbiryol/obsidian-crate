@@ -146,7 +146,7 @@ describe('transfer download/process helpers', () => {
 		const harness = createTransferHarness();
 		const content = new TextEncoder().encode('base').buffer as ArrayBuffer;
 		const hash = await computeHash(content);
-		const file = { path: 'notes/a.md' };
+		const file = { path: 'notes/a.md', extension: 'md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(file);
 		harness.adapter.readBinary.mockResolvedValue(content);
 		const result = emptyResult();

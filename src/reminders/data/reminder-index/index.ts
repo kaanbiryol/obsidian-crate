@@ -14,6 +14,7 @@ import { createReminderLookupStore } from "./lookup-store";
 import { createReminderOptimisticState } from "./optimistic-state";
 import { getProjectFromPath, isInRemindersFolder, scanFile, scanVault, type ScanResult } from "../vaultScanner";
 import { addReminderIdentityOwners, type ReminderIdentityOwner, type ReminderIdentityOwners } from '../reminder-identity-owners';
+import type { ReminderSourceIssue } from '../reminder-source-issues';
 
 const log = createLogger("ReminderIndex");
 
@@ -37,6 +38,8 @@ export interface IndexedReminder {
 
 export interface ReminderIndex {
   isLoaded: boolean;
+  readonly sourceIssues: ReminderSourceIssue[];
+  readonly isComplete: boolean;
   lastScanTime?: Date;
   scanDurationMs?: number;
   remindersFolderPath: string;
@@ -74,6 +77,7 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
   let scanDurationMs: number | undefined;
   let discoveredProjects = new Set<string>();
   let ambiguousOwners: ReminderIdentityOwner[] = [];
+  let sourceIssues = new Map<string, ReminderSourceIssue>();
 
   const listeners = new Set<IndexChangeListener>();
   const fileRescanTimestamps = new Map<string, number>();
@@ -108,6 +112,8 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
     get isLoaded() {
       return isLoaded;
     },
+    get sourceIssues() { return [...sourceIssues.values()]; },
+    get isComplete() { return isLoaded && !sourceIssues.size && !deferredLoad && !deferredPaths.size; },
     get lastScanTime() {
       return lastScanTime;
     },
@@ -171,28 +177,31 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
     load: () => enqueueScan(async () => {
       if (signal?.aborted || shouldDeferScan()) {
         deferredLoad = !signal?.aborted;
-        return { reminders, filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [...discoveredProjects] };
+        return { reminders, issues: [...sourceIssues.values()], filesScanned: 0, totalLines: 0, scanDurationMs: 0, discoveredProjects: [...discoveredProjects], deferred: true };
       }
       log.info(` Starting scan of ${remindersFolderPath}/...`);
-      const result = await scanVault(app, remindersFolderPath, signal, shouldDeferScan, shouldDeferCollisionRepair);
+      const result = await scanVault(app, remindersFolderPath, signal, shouldDeferScan, shouldDeferCollisionRepair, [...reminders, ...ambiguousOwners]);
       if (signal?.aborted) return result;
       if (result.deferred) {
         deferredLoad = true;
+        for (const issue of result.issues) sourceIssues.set(issue.path, issue);
         ambiguousOwners = result.ambiguousOwners ?? ambiguousOwners;
         if (!isLoaded) {
           reminders = result.reminders;
           discoveredProjects = new Set(result.discoveredProjects);
           lookupStore.rebuild(reminders);
           isLoaded = true;
-          notifyListeners();
         }
+        notifyListeners();
         return result;
       }
 
-      reminders = result.reminders;
+      deferredLoad = false;
+      sourceIssues = new Map(result.issues.map(issue => [issue.path, issue]));
+      reminders = [...result.reminders, ...reminders.filter(reminder => sourceIssues.has(reminder.filePath))];
       ambiguousOwners = [];
       isLoaded = true;
-      lastScanTime = new Date();
+      if (!sourceIssues.size) lastScanTime = new Date();
       scanDurationMs = result.scanDurationMs;
       discoveredProjects = new Set(result.discoveredProjects);
 
@@ -231,9 +240,14 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
       if (signal?.aborted) return;
       if (result.deferred) { deferredPaths.add(filePath); return; }
       if (result.error) {
+        sourceIssues.set(filePath, { path: filePath, reason: result.error });
+        fileRescanTimestamps.delete(filePath);
         log.error(` Keeping the previous reminder index for ${filePath}: ${result.error}`);
+        notifyListeners();
         return;
       }
+
+      sourceIssues.delete(filePath);
 
       discoveredProjects.add(getProjectFromPath(filePath, remindersFolderPath));
 
@@ -279,6 +293,8 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
 
     removeFile(filePath: string) {
       deferredPaths.delete(filePath);
+      sourceIssues.delete(filePath);
+      fileRescanTimestamps.delete(filePath);
       ambiguousOwners = ambiguousOwners.filter(owner => owner.filePath !== filePath);
       log.info(` Removing file from index: ${filePath}`);
       const before = reminders.length;
@@ -293,6 +309,10 @@ export function createReminderIndex(app: App, remindersFolderPath: string, signa
 
     renameFile(oldPath: string, newPath: string) {
       if (deferredPaths.delete(oldPath)) deferredPaths.add(newPath);
+      const issue = sourceIssues.get(oldPath);
+      if (issue) { sourceIssues.delete(oldPath); sourceIssues.set(newPath, { ...issue, path: newPath }); }
+      fileRescanTimestamps.delete(oldPath);
+      fileRescanTimestamps.delete(newPath);
       ambiguousOwners = ambiguousOwners.map(owner => owner.filePath === oldPath ? { ...owner, filePath: newPath } : owner);
       log.info(` Renaming file in index: ${oldPath} -> ${newPath}`);
 

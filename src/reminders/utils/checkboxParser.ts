@@ -47,7 +47,7 @@ const CHECKBOX_REGEX = /^(\s*)-\s*\[([ xX])\]\s*(.*)$/;
  * @returns ParsedCheckbox if line contains a checkbox, null otherwise
  */
 export function parseCheckboxLine(line: string, options: { persisted?: boolean } = {}): ParsedCheckbox | null {
-  const match = line.match(CHECKBOX_REGEX);
+  const match = (line.endsWith('\r') ? line.slice(0, -1) : line).match(CHECKBOX_REGEX);
   if (!match) {
     return null;
   }

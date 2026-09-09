@@ -16,6 +16,7 @@ import {
     type PluginReminderCardRenderer,
 } from "@/reminders/ui/plugin/PluginRemindersAppShell";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
+import { PluginReminderSourceNotice } from '../plugin/PluginReminderSourceNotice';
 import "../reminders-view.scss";
 
 export const VIEW_TYPE_REMINDERS = "reminders-view";
@@ -188,6 +189,10 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
             renderCard={renderCard}
             onAdd={handleAdd}
             onReorder={handleReorder}
+            belowHeaderContent={<PluginReminderSourceNotice
+                issues={plugin.reminderIndex.sourceIssues}
+                onRefresh={() => plugin.reminderIndex.load()}
+            />}
             topOverlay={onClose ? (
                 <>
                     <RemindersViewCloseButton

@@ -42,7 +42,13 @@ export function createMarkdownWriter(
   let mutationQueue: Promise<void> = Promise.resolve();
 
   const enqueueMutation = <T>(mutation: () => Promise<T>, paths: string[] | (() => string[])): Promise<T> => {
-    const guarded = () => { moveJournal?.assertWritable(typeof paths === 'function' ? paths() : paths); return mutation(); };
+    const guarded = () => {
+      const targets = typeof paths === 'function' ? paths() : paths;
+      moveJournal?.assertWritable(targets);
+      const issue = index.sourceIssues?.find(issue => targets.includes(issue.path));
+      if (issue) throw new Error(`Refresh reminders before editing ${issue.path}. ${issue.reason}`);
+      return mutation();
+    };
     const result = mutationQueue.then(guarded, guarded);
     mutationQueue = result.then(
       () => undefined,

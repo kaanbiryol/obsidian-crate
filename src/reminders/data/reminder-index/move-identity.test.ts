@@ -188,6 +188,7 @@ describe('reminder identity ownership during moves', () => {
 		files.set(destinationPath, '- [ ] New task\n');
 		const concurrentContent = task + '- [ ] New task\n';
 		vault.process.mockImplementationOnce(async (target, update) => {
+			files.set(target.path, concurrentContent);
 			const next = update(concurrentContent);
 			files.set(target.path, next);
 			return next;

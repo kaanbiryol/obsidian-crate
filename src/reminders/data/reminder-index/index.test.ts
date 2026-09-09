@@ -78,6 +78,7 @@ describe('reminderIndex', () => {
       reminders,
       filesScanned: 1,
       totalLines: 4,
+      issues: [],
       scanDurationMs: 10,
       discoveredProjects: ['Work'],
     };
@@ -102,6 +103,7 @@ describe('reminderIndex', () => {
       reminders,
       filesScanned: 1,
       totalLines: 2,
+      issues: [],
       scanDurationMs: 5,
       discoveredProjects: ['Old'],
     };
@@ -153,6 +155,7 @@ describe('reminderIndex', () => {
       reminders,
       filesScanned: 2,
       totalLines: 2,
+      issues: [],
       scanDurationMs: 5,
       discoveredProjects: ['Work', 'Home'],
     };
@@ -180,6 +183,7 @@ describe('reminderIndex', () => {
       reminders,
       filesScanned: 1,
       totalLines: 1,
+      issues: [],
       scanDurationMs: 5,
       discoveredProjects: ['Work'],
     };
@@ -204,6 +208,7 @@ describe('reminderIndex', () => {
       reminders: [makeReminder({ id: 'r1', content: 'Original task', project: 'Work' })],
       filesScanned: 1,
       totalLines: 1,
+      issues: [],
       scanDurationMs: 5,
       discoveredProjects: ['Work'],
     });
@@ -251,6 +256,7 @@ describe('reminderIndex', () => {
       reminders: [baseReminder],
       filesScanned: 1,
       totalLines: 1,
+      issues: [],
       scanDurationMs: 5,
       discoveredProjects: ['Work'],
     };
@@ -287,6 +293,7 @@ describe('reminderIndex', () => {
       ],
       filesScanned: 1,
       totalLines: 1,
+      issues: [],
       scanDurationMs: 5,
       discoveredProjects: ['Work'],
     });
@@ -323,6 +330,7 @@ describe('reminderIndex', () => {
       ],
       filesScanned: 1,
       totalLines: 1,
+      issues: [],
       scanDurationMs: 5,
       discoveredProjects: ['Work'],
     });
@@ -343,6 +351,6 @@ describe('reminderIndex', () => {
     await index.rescanFile(makeMockFile('Reminders/Work.md'), true);
 
     expect(index.getById('r1')?.content).toBe('Persisted task');
-    expect(listener).not.toHaveBeenCalled();
+    expect(listener).toHaveBeenCalledOnce();
   });
 });

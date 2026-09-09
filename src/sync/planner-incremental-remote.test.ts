@@ -86,7 +86,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 		expect(localManifest.save).not.toHaveBeenCalled();
 	});
 
-	it('applies remote delete changes through the file manager', async () => {
+	it('applies remote delete changes through local trash', async () => {
 		const content = new TextEncoder().encode('remote delete base').buffer as ArrayBuffer;
 		const hash = await computeHash(content);
 		const harness = createIncrementalHarness({
@@ -103,7 +103,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 			],
 			lastSeq: 6,
 		});
-		const note = { path: 'notes/old.md' };
+		const note = { path: 'notes/old.md', extension: 'md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(note);
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 		harness.localManifest.getEntry.mockReturnValue({
@@ -141,6 +141,7 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 		});
 		harness.vault.getAbstractFileByPath.mockReturnValue(null);
 		harness.vault.adapter.exists.mockResolvedValue(true);
+		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', ctime: 1, mtime: 1, size: content.byteLength });
 		harness.vault.adapter.readBinary.mockResolvedValue(content);
 		harness.localManifest.getEntry.mockReturnValue({
 			hash,
@@ -186,8 +187,9 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 			}],
 			lastSeq: 6,
 		});
-		harness.vault.getAbstractFileByPath.mockReturnValue(hidden ? null : { path });
+		harness.vault.getAbstractFileByPath.mockReturnValue(hidden ? null : { path, extension: 'md' });
 		harness.vault.adapter.exists.mockResolvedValue(hidden);
+		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', ctime: 1, mtime: 1, size: changedContent.byteLength });
 		harness.vault.adapter.readBinary.mockResolvedValue(changedContent);
 		harness.localManifest.getEntry.mockReturnValue({
 			hash: baseHash,
@@ -208,6 +210,26 @@ it('returns fast success and advances cursor when nothing changed', async () => 
 		expect(result?.uploadedPaths).toContain(path);
 		expect(result?.conflicts).toEqual([]);
 		expect(result?.resolvedRaces).toContainEqual({ path, resolution: 'kept-local-edit' });
+	});
+
+	it('retains the cursor and checkpoint when a file becomes a folder while applying a remote delete', async () => {
+		const path = 'notes/replaced.md';
+		const content = new TextEncoder().encode('original').buffer;
+		const hash = await computeHash(content);
+		const h = createIncrementalHarness({ settings: { lastSeq: 4 }, lastSeq: 6,
+			changes: [{ seq: 6, path, action: 'delete', hash: '', size: 0, created_at: '2026-09-09T00:00:00.000Z' }],
+		});
+		h.localManifest.getEntry.mockReturnValue({ hash, size: content.byteLength, modified: '2026-09-09T00:00:00.000Z' });
+		h.vault.getAbstractFileByPath.mockReturnValue({ path, extension: 'md' });
+		h.vault.adapter.readBinary.mockImplementation(async () => {
+			h.vault.getAbstractFileByPath.mockReturnValue({ path, children: [{ path: `${path}/new-note.md`, extension: 'md' }] });
+			return content;
+		});
+		const result = await runIncrementalSync(h.context, { uploadConcurrency: 5 });
+		expect(result?.errors).toEqual([expect.stringContaining(`${path}: Local deletion target changed`)]);
+		expect(h.settings.lastSeq).toBe(4);
+		expect(h.localManifest.removeEntry).not.toHaveBeenCalled();
+		expect(h.vault.trash).not.toHaveBeenCalled();
 	});
 
 	it('cleans manifest state when a remote delete targets an already missing file', async () => {

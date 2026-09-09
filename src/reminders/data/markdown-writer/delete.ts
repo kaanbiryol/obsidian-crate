@@ -1,3 +1,4 @@
+import { processVaultMarkdown } from '../vault-markdown';
 import { deleteReminderBlockFromContent } from "../../core/markdownReminderFile";
 import type { IndexedReminder } from "../reminder-index";
 import type { MarkdownWriterContext } from "./types";
@@ -19,7 +20,7 @@ export async function deleteReminderInMarkdown(
 
   try {
     let deletedLineNumber = -1;
-    await context.app.vault.process(file, (fileContent) => {
+    await processVaultMarkdown(context.app, file, (fileContent) => {
       context.moveJournal?.assertActive();
       const deletion = deleteReminderBlockFromContent(fileContent, reminder);
       deletedLineNumber = deletion.lineNumber;
