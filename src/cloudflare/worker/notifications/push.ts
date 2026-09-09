@@ -1,3 +1,4 @@
+import { fitPushDisplay } from './payload-budget';
 import {
 	deserializeVapidKeys,
 	generateVapidKeys,
@@ -55,10 +56,11 @@ interface DeclarativePushPayload {
 
 export function createDeclarativePushPayload(payload: PushNotificationPayload): DeclarativePushPayload {
 	const params = new URLSearchParams();
-	if (payload.project) params.set('project', payload.project);
+	// The stable ID locates the reminder and its current project after a move.
+	if (payload.project && !payload.reminderId) params.set('project', payload.project);
 	if (payload.reminderId) params.set('reminderId', payload.reminderId);
 
-	return {
+	return fitPushDisplay({
 		web_push: 8030,
 		notification: {
 			title: payload.title,
@@ -67,11 +69,11 @@ export function createDeclarativePushPayload(payload: PushNotificationPayload): 
 			...(payload.tag ? { tag: payload.tag } : {}),
 			icon: '/notifications/crate-icon-192.png',
 			data: {
-				project: payload.project ?? '',
+				project: payload.reminderId ? '' : payload.project ?? '',
 				reminderId: payload.reminderId ?? '',
 			},
 		},
-	};
+	});
 }
 
 export async function getOrCreateVapidKeys(db: D1Database): Promise<SerializedVapidKeys> {

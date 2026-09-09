@@ -1,3 +1,5 @@
+import { readUploadReceipt, recordUploadReceipt, type UploadOperation } from './upload-operations';
+import type { UploadResult } from '@/protocol/sync-types';
 import { enqueueFileProjection } from './notification-projection-queue';
 import type { CommitEffects } from './commit-effects';
 import { changedRows } from './db';
@@ -22,8 +24,13 @@ function uploadMutation(
 	size: number,
 	objectKey: string,
 	expectedHash: ExpectedFileHash,
+	operation?: UploadOperation,
 ): D1PreparedStatement {
 	const namespace = fileNamespaceGuard(path);
+	if (operation) {
+		namespace.sql += ' AND NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)';
+		namespace.args.push(operation.id);
+	}
 	if (expectedHash === null) {
 		return db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
 			SELECT ?, ?, ?, ?, datetime('now'), ? WHERE ${namespace.sql}
@@ -43,6 +50,7 @@ export interface CommitResult {
 	revision?: string;
 	idempotent?: boolean;
 	deletion?: FileDeletionReceipt;
+	failure?: UploadResult;
 }
 
 export async function commitStagedFile(
@@ -55,6 +63,7 @@ export async function commitStagedFile(
 		objectKey: string;
 		content: string | ArrayBuffer;
 		effects?: CommitEffects;
+		operation?: UploadOperation;
 		expectedHash: ExpectedFileHash;
 		expectedRevision?: string;
 		previousFile: FileStorageRow | null;
@@ -68,6 +77,7 @@ export async function commitStagedFile(
 		params.size,
 		params.objectKey,
 		params.expectedHash,
+		params.operation,
 	);
 	const results: unknown[] = await db.batch([
 		mutation,
@@ -91,7 +101,15 @@ export async function commitStagedFile(
 		)),
 		...enqueueFileProjection(db, params.path, params.objectKey, params.content),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
+		...(params.operation ? [recordUploadReceipt(db, params.operation, params)] : []),
 	]);
+
+	if (params.operation) {
+		const receipt = await readUploadReceipt(db, params.operation);
+		if (!receipt) throw new Error('Upload receipt is unavailable; retry the same operation');
+		if (receipt.revision !== params.objectKey) await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
+		return { committed: receipt.success, currentHash: receipt.success ? params.hash : receipt.currentHash ?? null, revision: receipt.revision, ...(!receipt.success ? { failure: receipt } : {}) };
+	}
 
 	if (changedRows(results[0]) !== 1) {
 		try {

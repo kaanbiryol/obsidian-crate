@@ -1,4 +1,5 @@
 export interface BatchFile {
+	operationId?: unknown;
 	path: string;
 	content: string;
 	hash?: string;

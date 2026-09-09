@@ -1,3 +1,5 @@
+import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
+import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
 import { ReminderFileSizeError } from './reminders-web/limits';
 import { ReminderIdentityConflictError } from './reminder-source-identity';
 import { logMutation } from './request-diagnostics';
@@ -44,7 +46,7 @@ export default {
 					return withRequestId(corsResponse({ error: 'Update Crate and reload the web app before making changes.', code: 'protocol_incompatible', protocol: CRATE_PLUGIN_PROTOCOL }, 428), requestId);
 				}
 			}
-			const rateLimited = await limitNotificationRequest(request, db);
+			const rateLimited = await limitNotificationRequest(request, db, env.NOTIFICATION_REQUEST_LIMITER);
 			if (rateLimited) return withRequestId(rateLimited, requestId);
 			const publicResponse = await handlePublicRoute(request, env, path, method);
 			if (publicResponse) {
@@ -62,6 +64,8 @@ export default {
 			if (response.ok && isCrateMutation(path, method) && context) context.waitUntil(wakeNotificationCoordinator(env).catch(() => undefined));
 			return withRequestId(response, requestId);
 		} catch (error) {
+			if (error instanceof MarkdownEncodingError) return withRequestId(corsResponse({ error: error.message, code: 'unsupported_markdown_encoding' }, 409), requestId);
+			if (error instanceof ReminderInputError) return withRequestId(corsResponse({ error: error.message, field: error.field, code: 'invalid_reminder_input' }, 400), requestId);
 			if (error instanceof ReminderMarkdownContextError) return withRequestId(corsResponse({ error: error.message, code: 'reminder_markdown_context' }, 409), requestId);
 			if (error instanceof FileNamespaceConflictError) return withRequestId(error.toResponse(), requestId);
       if (error instanceof ReminderIdentityConflictError) return withRequestId(corsResponse({ error: error.message, code: 'duplicate_reminder_identity' }, 409), requestId);

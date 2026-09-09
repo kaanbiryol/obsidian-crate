@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schemaSql from '../schema.sql?raw';
 import { handleUpload, handleDownload } from './sync-file-handlers';
 import { handleBatchUpload } from './sync-batch/upload';
@@ -34,8 +35,9 @@ async function expectLiveBytes() {
 
 describe('uncertain commits preserve live content', () => {
 	it('preserves single-upload bytes through the failed response and identical retry', async () => {
+		const operationId = createReminderOperationId(Math.floor(Date.now() / 86400000));
 		const request = () => new Request('https://test/sync/upload?path=note.md', {
-			method: 'PUT', headers: { 'X-Crate-Expected-Hash': 'absent' }, body: 'only copy',
+			method: 'PUT', headers: { 'X-Crate-Upload-Operation': operationId, 'X-Crate-Expected-Hash': 'absent' }, body: 'only copy',
 		});
 		loseNextCommitResponse();
 		expect((await handleUpload(request(), bucket, db)).status).toBe(503);
@@ -47,7 +49,7 @@ describe('uncertain commits preserve live content', () => {
 	it('preserves committed batch uploads', async () => {
 		loseNextCommitResponse();
 		const response = await handleBatchUpload(new Request('https://test/sync/batch-upload', {
-			method: 'POST', body: JSON.stringify({ files: [{ path: 'note.md', content: btoa('only copy'), expectedHash: null }] }),
+			method: 'POST', body: JSON.stringify({ files: [{ path: 'note.md', content: btoa('only copy'), operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)), expectedHash: null }] }),
 		}), bucket, db);
 		expect(response.status).toBe(503);
 		await expectLiveBytes();

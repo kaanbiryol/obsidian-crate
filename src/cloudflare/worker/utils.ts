@@ -25,7 +25,7 @@ export async function parseJsonObject(
 	try {
 		const bodyResult = await readLimitedRequestBody(request, maxBytes, 'JSON body too large');
 		if (!bodyResult.ok) return bodyResult;
-		const body = new TextDecoder().decode(bodyResult.bytes);
+		const body = new TextDecoder('utf-8', { fatal: true }).decode(bodyResult.bytes);
 		const parsed: unknown = JSON.parse(body);
 		if (!isRecord(parsed)) {
 			return { ok: false, response: corsResponse({ error: 'JSON object body required' }, 400) };

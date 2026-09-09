@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schema from '../schema.sql?raw';
 import worker from './index';
 import { sha256Hex } from './auth';
@@ -27,9 +28,9 @@ function request(route: string, init: RequestInit = {}) {
 		...init, headers: { Authorization: 'Bearer parse-token', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), ...init.headers },
 	}), env);
 }
-function upload(path: string, content: string, expectedHash = 'absent') {
+function upload(path: string, content: string, expectedHash = 'absent', operationId = createReminderOperationId(Math.floor(Date.now() / 86400000))) {
 	return request(`/sync/upload?path=${encodeURIComponent(path)}`, {
-		method: 'PUT', body: content, headers: { 'X-Crate-Expected-Hash': expectedHash },
+		method: 'PUT', body: content, headers: { 'X-Crate-Upload-Operation': operationId, 'X-Crate-Expected-Hash': expectedHash },
 	});
 }
 async function put(path: string, content: string, expectedHash?: string): Promise<Uploaded> {
@@ -104,10 +105,11 @@ it('quarantines an uncertain replacement without cancelling or changing verified
 it('publishes quarantine atomically even when the D1 commit response is lost', async () => {
 	const batch = env.DB.batch.bind(env.DB);
 	vi.spyOn(env.DB, 'batch').mockImplementationOnce(async statements => { await batch(statements); throw new Error('lost response'); });
-	expect((await upload('Notes/Ordinary.md', invalid)).status).toBe(503);
+	const operationId = createReminderOperationId(Math.floor(Date.now() / 86400000));
+	expect((await upload('Notes/Ordinary.md', invalid, 'absent', operationId)).status).toBe(503);
 	expect(await (await request('/sync/download?path=Notes%2FOrdinary.md')).text()).toBe(invalid);
 	expect((await quarantine('Notes/Ordinary.md'))?.last_error).toContain('Repair');
-	await put('Notes/Ordinary.md', invalid); // Idempotent retry preserves the committed quarantine.
+	expect((await upload('Notes/Ordinary.md', invalid, 'absent', operationId)).status).toBe(200); // Exact retry preserves the committed quarantine.
 	expect(await rows('changelog')).toHaveLength(1);
 });
 
@@ -152,7 +154,7 @@ it('does not publish quarantine for a failed compare-and-swap or rolled-back tra
 
 it('accepts malformed metadata in batch uploads, atomic pairs, and retained-version restores', async () => {
 	const path = 'Notes/Batch.md';
-	const response = await request('/sync/batch-upload', { method: 'POST', body: JSON.stringify({ files: [{ path, content: btoa(invalid), expectedHash: null }] }) });
+	const response = await request('/sync/batch-upload', { method: 'POST', body: JSON.stringify({ files: [{ path, content: btoa(invalid), operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)), expectedHash: null }] }) });
 	expect(response.status).toBe(200);
 	expect(await response.json()).toMatchObject({ results: [{ success: true }] });
 	const old = await env.DB.prepare('SELECT hash, storage_key AS revision FROM files WHERE path = ?').bind(path).first<Uploaded>();

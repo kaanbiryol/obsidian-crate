@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schema from '../schema.sql?raw';
 import worker from './index';
 import { sha256Hex, sha256HexBytes } from './auth';
@@ -32,7 +33,7 @@ it('round-trips the exact 25 MiB attachment boundary through authenticated Worke
 		for (let offset = 0; offset < content.length; offset += 1024) content[offset] = (offset / 1024) % 251;
 		const hash = await sha256HexBytes(content);
 		const uploaded = await request('/sync/upload?path=attachment.bin', { method: 'PUT', body: content,
-			headers: { 'X-Crate-Expected-Hash': 'absent', 'X-File-Size': String(content.length), 'X-File-Hash': hash } });
+			headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent', 'X-File-Size': String(content.length), 'X-File-Hash': hash } });
 		expect(uploaded.status).toBe(200);
 		expect(await liveFile()).toMatchObject({ hash, size: MAX_FILE_SIZE_BYTES });
 		const downloaded = await request('/sync/download?path=attachment.bin');
@@ -45,7 +46,7 @@ it('round-trips the exact 25 MiB attachment boundary through authenticated Worke
 it('rejects an undeclared streamed byte over the attachment limit without touching the previous incarnation',
 	{ timeout: 120_000 }, async () => {
 		expect((await request('/sync/upload?path=attachment.bin', { method: 'PUT', body: 'preserved',
-			headers: { 'X-Crate-Expected-Hash': 'absent' } })).status).toBe(200);
+			headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent' } })).status).toBe(200);
 		const before = await liveFile();
 		const put = vi.spyOn(env.BUCKET, 'put');
 		let remaining = MAX_FILE_SIZE_BYTES + 1;
@@ -55,7 +56,7 @@ it('rejects an undeclared streamed byte over the attachment limit without touchi
 			if (!remaining) controller.close();
 		} });
 		const rejected = await request('/sync/upload?path=attachment.bin', { method: 'PUT', body: stream,
-			headers: { 'X-Crate-Expected-Hash': before!.hash } });
+			headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': before!.hash } });
 		expect(rejected.status).toBe(413);
 		expect(put).not.toHaveBeenCalled();
 		expect(await liveFile()).toEqual(before);
@@ -65,11 +66,11 @@ it('rejects an undeclared streamed byte over the attachment limit without touchi
 
 it('preserves the prior live object and checkpoint metadata when an R2 write fails before publication', async () => {
 	expect((await request('/sync/upload?path=attachment.bin', { method: 'PUT', body: 'preserved',
-		headers: { 'X-Crate-Expected-Hash': 'absent' } })).status).toBe(200);
+		headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent' } })).status).toBe(200);
 	const before = await liveFile();
 	vi.spyOn(env.BUCKET, 'put').mockRejectedValueOnce(new Error('R2 unavailable at durable write'));
 	const failed = await request('/sync/upload?path=attachment.bin', { method: 'PUT', body: 'replacement',
-		headers: { 'X-Crate-Expected-Hash': before!.hash } });
+		headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': before!.hash } });
 	expect(failed.status).toBeGreaterThanOrEqual(500);
 	expect(await liveFile()).toEqual(before);
 	expect(await (await request('/sync/download?path=attachment.bin')).text()).toBe('preserved');

@@ -1,3 +1,4 @@
+import { PushPayloadError } from './notifications/payload-budget';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReminderAlarm } from './notifications/reminder-alarm';
 import { listPushSubscriptionIds, sendToAllSubscriptions } from './notifications/push';
@@ -140,6 +141,17 @@ describe('reminder alarm delivery', () => {
 		expect(harness.setAlarm).toHaveBeenCalledOnce();
 		expect(harness.run).not.toHaveBeenCalled();
 		expect(harness.storedValues.has('reminder')).toBe(true);
+	});
+
+	it('records deterministic payload errors immediately without retrying or disabling recipients', async () => {
+		vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription-1']);
+		vi.mocked(sendToAllSubscriptions).mockRejectedValueOnce(new PushPayloadError('Invalid notification identifiers'));
+		const harness = createHarness();
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		await harness.alarm.alarm();
+		expect(harness.storedValues.get('deliveryFailure')).toMatchObject({ attempts: 0, error: 'Invalid notification identifiers' });
+		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+		expect(harness.setAlarm).not.toHaveBeenCalled();
 	});
 
 	it('records a terminal delivery failure after the retry budget is exhausted', async () => {

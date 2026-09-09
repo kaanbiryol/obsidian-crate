@@ -2,7 +2,7 @@
 
 Source lives in `src/cloudflare/worker/`; `scripts/build-worker.mjs` writes the deployable module to `.generated/cloudflare/worker.mjs`. The Vite production build embeds a compressed, hashed copy of that generated module for the in-plugin OAuth deployment.
 
-Every mutation requires `X-Crate-Protocol: 6`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics.
+Every mutation requires `X-Crate-Protocol: 7`; check `/.well-known/crate` before writing. Missing/incompatible protocols receive 428. POST metadata and batch-download requests are reads. See [the protocol contract](protocol.md) for retry, revision, storage, and notification guarantees. Responses carry `X-Crate-Request-Id` for diagnostics.
 
 ## Authentication
 
@@ -67,11 +67,12 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 ### PUT /sync/upload
 
 - Query: `?path=<url-encoded-path>`
-- Headers: `X-File-Hash`, `X-File-Size`, `X-Crate-Expected-Hash`, `Content-Type`
+- Headers: `X-File-Hash`, `X-File-Size`, `X-Crate-Expected-Hash`, `X-Crate-Upload-Operation`, `Content-Type`
 - `X-Crate-Expected-Hash` is the 64-character remote hash observed while planning, or `absent` for a new path
 - Body: raw binary, consumed incrementally with a hard 25 MB cap; oversized declared or chunked requests stop before the remainder is buffered
 - Response: `{ success, path, hash, revision }`
 - A stale expected hash returns `409` with `{ success: false, path, error, code: "version_conflict", currentHash }` and does not replace the committed object
+- Persist the exact request and its server-dated operation ID before dispatch. Replaying it returns the original success or rejected precondition, including after deletion. Missing IDs receive 428; mismatched payloads receive 409 `operation_mismatch`; expired IDs without receipts receive 410 `operation_expired`. See [upload recovery](upload-recovery.md).
 
 ### GET /sync/download
 
@@ -85,6 +86,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 {
   "files": [
     {
+      "operationId": "e1_<eight-digit-server-day>_<uuid>",
       "path": "notes/file.md",
       "content": "<base64>",
       "hash": "sha256...",
@@ -96,7 +98,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 }
 ```
 
-Worker validates: max 3 files, total decoded content <= 10 MiB. Mutation batches are deliberately smaller than download batches to stay within Workers Free D1 query limits even on stale-write cleanup paths.
+Worker validates: max 3 files, total decoded content <= 10 MiB. Each file requires its own stable `operationId` with the same receipt and expiry rules as a single upload. Mutation batches are deliberately smaller than download batches to stay within Workers Free D1 query limits even on stale-write cleanup paths.
 
 Response: `{ success, results: [{ path, success, hash?, revision?, error?, code?, status?, currentHash? }] }`. A stale per-file write uses `code: "version_conflict"`, `status: 409`, and the current remote hash; storage failures use `code: "storage"` and `status: 503`.
 
@@ -310,9 +312,9 @@ Requires a `durable_object_namespace` binding (`REMINDER_ALARMS`) and a declarat
 
 ## D1 database schema
 
-The complete current schema is [src/cloudflare/schema.sql](../src/cloudflare/schema.sql). It is hash-verified before provisioning. An empty database is initialized with `crate_schema` version 2; existing databases must already carry that marker. Unsupported schemas are rejected without modifying data. Worker requests never execute DDL.
+The complete current schema is [src/cloudflare/schema.sql](../src/cloudflare/schema.sql). It is hash-verified before provisioning. An empty database is initialized with `crate_schema` version 5; schemas 2/3/4 upgrade additively during provisioning. Unsupported schemas are rejected without modifying data. Worker requests never execute DDL.
 
-The schema stores file metadata, changelog entries, retained versions and cleanup work; device credentials and folder-bound web enrollment tokens; reminder receipts and identity reservations; shared notification policy, projections, and delivery jobs; authenticated push subscriptions and request limits. Derived schedules are rebuilt from committed Markdown during an isolated restore.
+The schema stores file metadata, changelog entries, retained versions, upload/deletion receipts and cleanup work; device credentials and folder-bound web enrollment tokens; reminder receipts and identity reservations; shared notification policy, projections, and delivery jobs; authenticated push subscriptions and request limits. Derived schedules are rebuilt from committed Markdown during an isolated restore.
 
 Reminder mutations replay a matching operation receipt before rereading a moved or deleted source; a different payload under the same operation ID returns 409. Notification time comes from the saved server policy. Successful create/update/completion responses include the acknowledged `reminder` and its new revision.
 

@@ -13,7 +13,7 @@ export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): 
   signal?.throwIfAborted();
   const adapter = plugin.app.vault.adapter;
   const mainPath = `${plugin.manifest.dir}/file-manifest.json`;
-  const checkpoints: Array<{ path: string; content: string }> = [];
+  const checkpoints: Array<{ path: string; content: string; backupPath?: string }> = [];
   for (const path of [mainPath, `${mainPath}.tmp`]) {
     if (await adapter.exists(path)) {
       signal?.throwIfAborted();
@@ -21,12 +21,20 @@ export async function deleteManifestFile(plugin: Plugin, signal?: AbortSignal): 
     }
     signal?.throwIfAborted();
   }
+  const journalDirectory = `${plugin.manifest.dir}/pending-uploads`;
+  if (await adapter.exists(journalDirectory)) {
+    const listing = await adapter.list(journalDirectory);
+    for (const path of listing.files) {
+      signal?.throwIfAborted();
+      checkpoints.push({ path, content: await adapter.read(path), backupPath: `${plugin.manifest.dir}/upload-${path.split('/').at(-1)!}` });
+    }
+  }
   // Preserve both generations for investigation/recovery before invalidating
   // either. These copies are never candidates for normal checkpoint recovery.
   const recoveryId = crypto.randomUUID();
   for (const checkpoint of checkpoints) {
     signal?.throwIfAborted();
-    const backup = `${checkpoint.path}.previous-${recoveryId}`;
+    const backup = `${checkpoint.backupPath ?? checkpoint.path}.previous-${recoveryId}`;
     await adapter.write(backup, checkpoint.content);
     signal?.throwIfAborted();
     if (await adapter.read(backup) !== checkpoint.content) throw new Error('Could not verify the previous sync checkpoint backup');

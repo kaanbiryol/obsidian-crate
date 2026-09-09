@@ -1,3 +1,4 @@
+import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
 import type { CommitEffects } from './commit-effects';
 import { sha256HexBytes } from './auth';
 import { queryRows } from './db';
@@ -12,6 +13,10 @@ export interface StoredTextFile {
 	path: string;
 	content: string;
 	hash: string;
+}
+
+interface StoredMarkdownFileBytes extends Omit<StoredTextFile, 'content'> {
+	content: ArrayBuffer;
 }
 
 export interface StoredMarkdownFileMetadata {
@@ -49,9 +54,8 @@ export async function listStoredMarkdownFileMetadataByPrefix(
 export async function readStoredMarkdownFiles(
 	bucket: R2Bucket,
 	rows: StoredMarkdownFileMetadata[],
-): Promise<StoredTextFile[]> {
-	const decoder = new TextDecoder();
-	const files: Array<StoredTextFile | null> = [];
+): Promise<StoredMarkdownFileBytes[]> {
+	const files: Array<StoredMarkdownFileBytes | null> = [];
 	for (let index = 0; index < rows.length; index += 6) {
 		const chunk = rows.slice(index, index + 6);
 		files.push(...await Promise.all(chunk.map(async (row) => {
@@ -62,16 +66,15 @@ export async function readStoredMarkdownFiles(
 
 			const bytes = await object.arrayBuffer();
 			if (await sha256HexBytes(bytes) !== row.hash) return null;
-			const content = decoder.decode(bytes);
 			return {
 				path: row.path,
-				content,
+				content: bytes,
 				hash: row.hash,
-			} satisfies StoredTextFile;
+			} satisfies StoredMarkdownFileBytes;
 		})));
 	}
 
-	return files.filter((file): file is StoredTextFile => file !== null);
+	return files.filter((file): file is StoredMarkdownFileBytes => file !== null);
 }
 
 export async function readCommittedMarkdownFileVersion(
@@ -96,7 +99,7 @@ export async function readCommittedMarkdownFileVersion(
 	}
 
 	return {
-		content: new TextDecoder().decode(bytes),
+		content: decodeMarkdownBytes(bytes),
 		hash: file.hash,
 	};
 }

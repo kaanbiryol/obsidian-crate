@@ -1,3 +1,4 @@
+import { MAX_PUSH_PAYLOAD_BYTES, PushPayloadError } from './payload-budget';
 import { isValidPushEndpoint } from './push-endpoint';
 import { fromBase64Url, toBase64Url } from 'web-push-browser';
 
@@ -41,6 +42,7 @@ export async function sendPushNotificationWithoutContact(
 	subscription: WebPushSubscription,
 	payload: string,
 ): Promise<Response> {
+	if (new TextEncoder().encode(payload).byteLength > MAX_PUSH_PAYLOAD_BYTES) throw new PushPayloadError('Push payload exceeds the Web Push byte limit');
 	if (!isValidPushEndpoint(subscription.endpoint)) throw new Error('Push service is not supported');
 	const [jwt, encryptedPayload, exportedPublicKey] = await Promise.all([
 		createVapidAuthorizationToken(vapidKeys.privateKey, new URL(subscription.endpoint)),
@@ -113,8 +115,8 @@ async function encryptPayload(
 		await crypto.subtle.importKey('raw', contentEncryptionKey, 'AES-GCM', false, ['encrypt']),
 		plaintext,
 	));
-	if (ciphertext.byteLength > PUSH_RECORD_SIZE - 16) {
-		throw new Error('Push payload is too large for a single Web Push record');
+	if (ciphertext.byteLength + 86 > PUSH_RECORD_SIZE) {
+		throw new PushPayloadError('Push payload is too large for a single Web Push record');
 	}
 
 	const header = new Uint8Array(21 + localPublicKey.byteLength);

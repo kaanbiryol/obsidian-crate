@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schema from '../schema.sql?raw';
 import worker from './index';
 import { sha256Hex } from './auth';
@@ -29,7 +30,7 @@ function request(route: string, init: RequestInit = {}) {
 
 function upload(path: string, body = `content:${path}`, expectedHash = 'absent') {
 	return request(`/sync/upload?path=${encodeURIComponent(path)}`, {
-		method: 'PUT', body, headers: { 'X-Crate-Expected-Hash': expectedHash },
+		method: 'PUT', body, headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': expectedHash },
 	});
 }
 
@@ -96,7 +97,7 @@ it('allows exact-path updates, safe siblings and directories sharing a prefix', 
 
 it('rejects conflicting members of one upload batch without rejecting unrelated files', async () => {
 	const response = await request('/sync/batch-upload', { method: 'POST', body: JSON.stringify({ files:
-		['Projects.md', 'Projects.md/child.md', 'unrelated.md'].map(path => ({ path, content: btoa(path), expectedHash: null })),
+		['Projects.md', 'Projects.md/child.md', 'unrelated.md'].map(path => ({ path, content: btoa(path), operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)), expectedHash: null })),
 	}) });
 	expect(response.status).toBe(200);
 	const body = await response.json() as { results: Array<{ path: string; success: boolean; code?: string; status?: number }> };

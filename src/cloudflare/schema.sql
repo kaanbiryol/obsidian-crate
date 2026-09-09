@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  id INTEGER PRIMARY KEY CHECK (id = 1),
  version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 4);
+INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 5);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,3 +196,13 @@ CREATE TABLE IF NOT EXISTS file_deletion_receipts (
 CREATE INDEX IF NOT EXISTS file_deletion_receipts_created_at_idx ON file_deletion_receipts(created_at);
 
 UPDATE crate_schema SET version = 4 WHERE id = 1 AND version IN (2, 3);
+
+CREATE INDEX IF NOT EXISTS files_storage_key_idx ON files(storage_key);
+
+CREATE TABLE IF NOT EXISTS upload_operations (
+ operation_id TEXT PRIMARY KEY,
+ request_hash TEXT NOT NULL,
+ response_json TEXT NOT NULL,
+ created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+UPDATE crate_schema SET version = 5 WHERE id = 1 AND version IN (2, 3, 4);

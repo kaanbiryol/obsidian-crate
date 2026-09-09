@@ -1,3 +1,4 @@
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { errorMessage } from '../../plugin/logger';
 import type {
 	BatchDeleteResponse,
@@ -152,18 +153,27 @@ export class SyncWorkerApi {
 		size: number,
 		contentType: string,
 		expectedHash: string | null,
+		operationId?: string,
 	): Promise<UploadResult> {
+		operationId ??= await this.newUploadOperationId();
 		const encodedPath = encodeURIComponent(path);
 		return this.http.requestJson<UploadResult>(`/sync/upload?path=${encodedPath}`, {
 			method: 'PUT',
 			body: content,
 			headers: {
+				'X-Crate-Upload-Operation': operationId,
 				'Content-Type': contentType,
 				'X-File-Hash': hash,
 				'X-File-Size': String(size),
 				'X-Crate-Expected-Hash': expectedHash === null ? 'absent' : expectedHash,
 			},
 		}, TRANSFER_TIMEOUT_MS);
+	}
+
+	private async newUploadOperationId(): Promise<string> {
+		const day = (await this.getServerInfo()).reminderOperationDay;
+		if (day === undefined) throw new Error('Update the Crate server before uploading');
+		return createReminderOperationId(day);
 	}
 
 	async downloadFile(path: string): Promise<{ content: ArrayBuffer; contentType: string; size: number; hash: string; revision?: string }> {
@@ -201,6 +211,11 @@ export class SyncWorkerApi {
 	}
 
 	async batchUpload(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
+		if (files.some(file => !file.operationId)) {
+			const day = (await this.getServerInfo()).reminderOperationDay;
+			if (day === undefined) throw new Error('Update the Crate server before uploading');
+			files = files.map(file => ({ ...file, operationId: file.operationId ?? createReminderOperationId(day) }));
+		}
 		return this.http.requestJson<BatchUploadResponse>('/sync/batch-upload', {
 			method: 'POST',
 			body: JSON.stringify({ files }),

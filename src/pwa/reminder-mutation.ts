@@ -1,3 +1,4 @@
+import { assertReminderMutationInput } from '@/reminders/core/reminderMutationInput';
 import { preserveReminderInstant } from '@/reminders/utils/preserveReminderInstant';
 import { buildStoredReminderDates } from '@/reminders/utils/reminderDate';
 import { parseReminderEditorContent } from '@/reminders/utils/reminderEditorParsing';
@@ -41,7 +42,7 @@ export function buildReminderMutationBody({
 	}
 
   if (mode === 'edit') dueDatetime = preserveReminderInstant(dueDatetime, draft.originalDueDatetime) ?? null;
-	return {
+	const body = {
 		folderPath: config.folderPath,
 		content,
 		description: draft.description.trim() || null,
@@ -51,4 +52,6 @@ export function buildReminderMutationBody({
 		dueDatetime,
 		recurrence: recurrence ?? (mode === 'edit' ? null : undefined),
 	};
+	assertReminderMutationInput(body, mode === 'edit' ? 'update' : 'create');
+	return body;
 }

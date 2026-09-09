@@ -1,3 +1,4 @@
+import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from './notification-rate-binding';
 import type { CloudflareApiClient, CloudflareWorkerSettings } from './cloudflare-api';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 
@@ -7,7 +8,7 @@ const CRATE_TABLES = new Set([
 	'crate_schema', 'd1_migrations', '_crate_migrations', 'changelog', 'files', 'auth_tokens',
 	'scheduled_reminders', 'notification_jobs', 'vapid_keys', 'push_subscriptions',
 	'push_enrollment_tokens', 'web_enrollment_tokens', 'object_cleanup_queue',
-	'file_versions', 'file_deletion_receipts', 'maintenance_state', 'reminder_file_cache', 'reminder_operations',
+	'file_versions', 'file_deletion_receipts', 'maintenance_state', 'reminder_file_cache', 'reminder_operations', 'upload_operations',
 	'reminder_identities', 'notification_policy', 'notification_projection_jobs',
 	'reminder_projections', 'reminder_sources', 'reminder_source_state', 'reminder_occurrences', 'request_rate_limits',
 ]);
@@ -17,7 +18,10 @@ export type ResetApi = Pick<CloudflareApiClient,
 	| 'listDurableObjectNamespaces' | 'getR2Bucket' | 'listR2Objects' | 'deleteR2Object' | 'deleteR2Bucket' | 'retireCrateWorker'>;
 
 export function assertWorkerTarget(settings: CloudflareWorkerSettings, metadata: CloudflareDeploymentMetadata, retired = false): void {
-	const bindings = settings.bindings ?? [];
+	const allBindings = settings.bindings ?? [];
+	const rateBindings = allBindings.filter(binding => binding.type === 'ratelimit');
+	if (rateBindings.length > 1 || (retired && rateBindings.length) || rateBindings.some(binding => binding.name !== NOTIFICATION_RATE_BINDING || binding.namespace_id !== notificationRateNamespace(metadata.r2BucketName))) throw new Error('Reset blocked: notification rate limit bindings do not match this vault.');
+	const bindings = allBindings.filter(binding => binding.type !== 'ratelimit');
 	const databases = bindings.filter(binding => binding.type === 'd1');
 	const buckets = bindings.filter(binding => binding.type === 'r2_bucket');
 	if (

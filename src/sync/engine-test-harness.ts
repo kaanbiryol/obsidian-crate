@@ -41,6 +41,7 @@ export type Harness = {
 	api: {
 		isConfigured: ReturnType<typeof vi.fn>;
 		setAbortSignal: ReturnType<typeof vi.fn>;
+		configureUploadJournal: ReturnType<typeof vi.fn>;
 		getChanges: ReturnType<typeof vi.fn>;
 		uploadFile: ReturnType<typeof vi.fn<(
 			path: string,
@@ -208,6 +209,7 @@ export function createHarness(settingsOverrides: Partial<CrateSettings> = {}): H
 	const api = {
 		isConfigured: vi.fn().mockReturnValue(true),
 		setAbortSignal: vi.fn(),
+		configureUploadJournal: vi.fn(),
 		getChanges: vi.fn(),
 		uploadFile: vi.fn<(
 			path: string,

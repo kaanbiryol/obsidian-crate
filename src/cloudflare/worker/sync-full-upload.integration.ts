@@ -84,14 +84,14 @@ it('resumes a cold batch after committed response loss and retains a later local
 	const recovered = await client.engine.sync();
 	expect(recovered.errors).toEqual([]);
 	pause.release();
-	// A lost first upload has no confirmed local merge base. Preserve the later
-	// edit as a visible conflict copy instead of guessing which creation wins.
-	expect(recovered.conflicts).toHaveLength(1);
-	expect(client.disk.text(recovered.conflicts[0]!)).toBe('Edited after the lost response');
+	// The durable receipt restores the original common ancestor, so the later
+	// local edit can now be uploaded without an unnecessary conflict copy.
+	expect(recovered.conflicts).toEqual([]);
 	for (let index = 0; index < 7; index++) {
 		const path = `note-${index}.md`;
-		expect(await remote(client, path)).toBe(`Note ${index}`);
-		expect(client.disk.text(path)).toBe(`Note ${index}`);
+		const expected = index === 0 ? 'Edited after the lost response' : `Note ${index}`;
+		expect(await remote(client, path)).toBe(expected);
+		expect(client.disk.text(path)).toBe(expected);
 	}
 	expect(Object.keys((await client.api.getManifest()).files)).toHaveLength(7);
 });

@@ -1,3 +1,4 @@
+import { assertReminderMutationInput } from '../../core/reminderMutationInput';
 import type { MarkdownWriter } from "../markdown-writer";
 import type { IndexedReminder } from "../reminder-index";
 import type { Priority, Reminder, UpdateReminderParams } from "@/reminders/types/plugin-reminder";
@@ -41,6 +42,7 @@ export function buildCreateReminderArgs(params: {
   description?: string;
   id?: string;
 }) {
+  assertReminderMutationInput(params, "create");
   const project = params.project || "Inbox";
   const reminderId = params.id?.trim();
   const recurrence = normalizeRecurrenceRule(params.recurrence);
@@ -96,6 +98,7 @@ export function buildReminderUpdate(
   hasDueDateUpdate: boolean;
   storedDates: { dueDate?: string; dueDatetime?: string };
 } {
+  assertReminderMutationInput(params, "update");
   const hasRecurrenceUpdate = Object.prototype.hasOwnProperty.call(params, "recurrence");
   const recurrenceUpdate = hasRecurrenceUpdate
     ? params.recurrence === null

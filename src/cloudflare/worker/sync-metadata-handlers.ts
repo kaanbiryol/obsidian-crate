@@ -1,7 +1,7 @@
 import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
 import { corsResponse } from './cors';
 import { parseJsonObject, sanitizePath } from './utils';
-import { getChangelogBounds } from './sync-storage';
+import { CHANGELOG_BOUNDS_SQL, getChangelogBounds } from './sync-storage';
 import { BATCH_DOWNLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import type { FileEntry } from '../../protocol/sync-types';
 import { createPathRecord } from '../../protocol/path-record';
@@ -32,7 +32,7 @@ export async function handleGetChanges(request: Request, db: D1Database): Promis
 
 	const [changesResult, boundsResult] = await db.batch([
 		db.prepare('SELECT seq, path, action, hash, size, revision, created_at FROM changelog WHERE seq > ? ORDER BY seq ASC LIMIT 5000').bind(since),
-		db.prepare('SELECT MAX(seq) as lastSeq, MIN(seq) as minSeq FROM changelog'),
+		db.prepare(CHANGELOG_BOUNDS_SQL),
 	]);
 	const changeRows = batchRows(changesResult);
 	const [bounds] = batchRows<{ lastSeq: number | null; minSeq: number | null }>(boundsResult);

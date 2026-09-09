@@ -153,6 +153,7 @@ export async function runIncrementalSync(
 
     if (localOnlyDeletes.length > 0) {
       try {
+        if (result.errors.length > 0) throw new Error('Remote deletion deferred until uploads and reconciliation finish successfully');
         const deleteFiles = localOnlyDeletes.flatMap((path) => {
           const expectedHash = context.localManifest.getEntry(path)?.hash;
           return expectedHash ? [{ path, expectedHash, expectedRevision: context.localManifest.getEntry(path)?.revision }] : [];

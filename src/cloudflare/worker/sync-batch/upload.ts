@@ -1,3 +1,4 @@
+import { beginUploadOperation, type UploadOperation } from '../upload-operations';
 import { sha256HexBytes } from '../auth';
 import { corsResponse } from '../cors';
 import { commitStagedFile } from '../sync-mutations';
@@ -43,6 +44,7 @@ export async function handleBatchUpload(
 
 	const results: BatchUploadResponse['results'] = [];
 	const uploads: Array<{
+		operation: UploadOperation;
 		safePath: string;
 		bytes: ArrayBuffer;
 		hash: string;
@@ -120,12 +122,20 @@ export async function handleBatchUpload(
 				return corsResponse({ error: 'Total content exceeds 10MB limit' }, 400);
 			}
 
+			const contentType = parseOptionalString(file.contentType, 255) || 'application/octet-stream';
+			const operation = await beginUploadOperation(db, file.operationId, { path: safePath, hash: computedHash, size, contentType, expectedHash });
+			if (operation instanceof Response) {
+				const receipt = await operation.json() as BatchUploadResponse['results'][number];
+				results.push({ ...receipt, path: safePath, ...(!receipt.success ? { status: operation.status } : {}) });
+				continue;
+			}
 			uploads.push({
+				operation,
 				safePath,
 				bytes: bytes.buffer,
 				hash: providedHash || computedHash,
 				size,
-				contentType: parseOptionalString(file.contentType, 255) || 'application/octet-stream',
+				contentType,
 				objectKey: createManagedObjectKey(providedHash || computedHash),
 				expectedHash: expectedHash ?? null,
 			});
@@ -160,6 +170,7 @@ export async function handleBatchUpload(
 				customMetadata: { hash: file.hash },
 			});
 			const commit = await commitStagedFile(bucket, db, {
+				operation: file.operation,
 				path: file.safePath,
 				hash: file.hash,
 				size: file.size,
@@ -169,6 +180,7 @@ export async function handleBatchUpload(
 				previousFile: previousFiles.get(file.safePath) ?? null,
 			});
 			if (!commit.committed) {
+				if (commit.failure) { results.push(commit.failure); return; }
 				results.push({
 					path: file.safePath,
 					success: false,

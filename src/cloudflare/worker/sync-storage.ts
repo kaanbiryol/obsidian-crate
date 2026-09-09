@@ -211,12 +211,15 @@ export async function loadStoredFileRows(db: D1Database, paths: string[]): Promi
 	return new Map(entries);
 }
 
+// Separate indexed endpoints avoid scanning the entire retained changelog.
+export const CHANGELOG_BOUNDS_SQL = 'SELECT (SELECT MAX(seq) FROM changelog) AS lastSeq, (SELECT MIN(seq) FROM changelog) AS minSeq';
+
 export async function getChangelogBounds(db: D1Database): Promise<{
 	lastSeq: number;
 	minSeq: number | null;
 }> {
 	const rows = await queryRows<{ lastSeq: number | null; minSeq: number | null }>(
-		db.prepare('SELECT MAX(seq) as lastSeq, MIN(seq) as minSeq FROM changelog'),
+		db.prepare(CHANGELOG_BOUNDS_SQL),
 	);
 	return {
 		lastSeq: rows[0]?.lastSeq ?? 0,

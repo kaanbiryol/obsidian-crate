@@ -117,7 +117,13 @@ export async function processPendingChanges(
 			failures.push(...uploadFailures);
 		}
 
-		if (deletes.length > 0) {
+		if (deletes.length > 0 && failures.length > 0) {
+			for (const file of deletes) {
+				context.pendingPaths.add(`delete:${file.path}`);
+				failures.push({ path: file.path, error: 'Remote deletion deferred until uploads finish successfully' });
+			}
+		}
+		if (deletes.length > 0 && failures.length === 0) {
 			const deleteResult = await deletePendingFiles(context, deletes, completedQueueKeys);
 			failures.push(...deleteResult.failures);
 			for (const path of deleteResult.reconciliationPaths) reconciliationPaths.add(path);

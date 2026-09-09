@@ -1,3 +1,4 @@
+import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
 import { scanReminderMarkdownFile } from './reminders-web/scan';
 import { REMINDER_INDEX_MAX_FILE_BYTES } from './reminders-web/reminder-cache/types';
 import type { RemoteReminderRecord } from './reminders-web/types';
@@ -15,7 +16,7 @@ export function parseReminderSource(path: string, content: string | ArrayBuffer,
 		return { reminders: [], issue: REMINDER_SOURCE_SIZE_ISSUE };
 	}
 	try {
-		return { reminders: scanReminderMarkdownFile(path, new TextDecoder().decode(bytes), folderPath) };
+		return { reminders: scanReminderMarkdownFile(path, decodeMarkdownBytes(bytes), folderPath) };
 	} catch (error) {
 		const reason = error instanceof Error ? error.message.slice(0, 300) : 'Invalid reminder metadata';
 		return { reminders: [], issue: `Repair the reminder metadata in this note to resume its reminders. The vault file remains synced. ${reason}` };

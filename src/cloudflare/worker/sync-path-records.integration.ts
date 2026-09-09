@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schemaSql from '../schema.sql?raw';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol';
 import type { FileManifest, FileMetadataResponse, UploadResult } from '../../protocol/sync-types';
@@ -33,7 +34,7 @@ describe('literal filenames through the Worker and D1/R2', () => {
 	it('uploads, pages, downloads and deletes prototype-named files without dropping metadata', async () => {
 		for (const path of paths) {
 			const response = await request(`/sync/upload?path=${encodeURIComponent(path)}`, {
-				method: 'PUT', headers: { 'X-Crate-Expected-Hash': 'absent', 'Content-Type': 'text/plain' }, body: `content:${path}`,
+				method: 'PUT', headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent', 'Content-Type': 'text/plain' }, body: `content:${path}`,
 			});
 			expect(response.status).toBe(200);
 			expect(await response.json() as UploadResult).toMatchObject({ path, success: true });

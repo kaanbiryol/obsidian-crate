@@ -1,7 +1,7 @@
 import { portablePathKey } from '../../protocol/portable-path';
 import { corsResponse } from './cors';
 
-function namespacePredicate(path: string): { sql: string; args: string[] } {
+export function namespacePredicate(path: string): { sql: string; args: string[] } {
 	const key = portablePathKey(path);
 	const prefixLengths: number[] = [];
 	let length = 0;

@@ -2,7 +2,7 @@ import type { RemoteReminderRecord } from '../types';
 
 // Bump when parsing behavior or the cached reminder shape changes. The list
 // ETag includes this value so clients revalidate even when file hashes do not.
-export const REMINDER_CACHE_PARSER_VERSION = 7;
+export const REMINDER_CACHE_PARSER_VERSION = 8;
 export const REMINDER_INDEX_MAX_FILE_BYTES = 1024 * 1024;
 export const REMINDER_INDEX_WARM_MAX_FILES = 20;
 export const REMINDER_INDEX_WARM_MAX_BYTES = 2 * 1024 * 1024;

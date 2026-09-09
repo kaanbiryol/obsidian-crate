@@ -1,3 +1,4 @@
+import { beginUploadOperation } from './upload-operations';
 import { sha256HexBytes } from './auth';
 import { readLimitedRequestBody } from './body-reader';
 import { corsHeaders, corsResponse } from './cors';
@@ -70,6 +71,8 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 
 		const hash = hashHeader || computedHash;
 		const size = declaredSize ?? computedSize;
+		const operation = await beginUploadOperation(db, request.headers.get('X-Crate-Upload-Operation'), { path: safePath, hash, size, contentType, expectedHash: expectedRemoteHash });
+		if (operation instanceof Response) return operation;
 		let previousFile: FileStorageRow | null = null;
 		try {
 			previousFile = await getStoredFileRow(db, safePath);
@@ -97,9 +100,11 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 				content: body,
 				expectedHash: expectedRemoteHash,
 				previousFile,
+				operation,
 			});
 			revision = commit.revision;
 			if (!commit.committed) {
+				if (commit.failure) return corsResponse(commit.failure, commit.failure.status ?? 409);
 				return corsResponse({
 					success: false,
 					path: safePath,

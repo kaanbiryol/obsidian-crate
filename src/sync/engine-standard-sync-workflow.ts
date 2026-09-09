@@ -154,6 +154,7 @@ export async function runSyncWorkflow(
 
 		for (const diff of remainingDiffs) {
 			try {
+				if (diff.action === 'delete' && result.errors.length > 0) throw new Error('Remote deletion deferred until uploads and reconciliation finish successfully');
 				const outcome = await context.processDiff(diff, localFiles, result);
 				if (outcome.status === 'deferred') {
 					result.errors.push(`${diff.path}: ${outcome.reason}`);

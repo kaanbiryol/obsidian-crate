@@ -106,7 +106,7 @@ describe('PWA optimistic mutations', () => {
 		expect(outbox.enqueue).not.toHaveBeenCalled();
 		expect(closeModal).not.toHaveBeenCalled();
 		expect(memory.size).toBe(1);
-		expect(showToast).toHaveBeenCalledWith('error', 'Reminder title required');
+		expect(showToast).toHaveBeenCalledWith('error', 'Enter a reminder title.');
 	});
 
 	it('prevents double submission while the save command is being prepared', async () => {

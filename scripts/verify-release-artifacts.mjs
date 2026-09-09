@@ -75,6 +75,7 @@ for (const forbiddenMarker of ['/setup/enroll', '/setup/claim', '/auth/enrollmen
 assert(wrangler.main === '.generated/cloudflare/worker.mjs', 'wrangler main must target the generated Worker bundle');
 assert(wrangler.d1_databases?.some(binding => binding.binding === 'DB'), 'wrangler DB binding is required');
 assert(wrangler.r2_buckets?.some(binding => binding.binding === 'BUCKET'), 'wrangler BUCKET binding is required');
+assert(wrangler.ratelimits?.some(binding => binding.name === 'NOTIFICATION_REQUEST_LIMITER' && binding.simple?.limit === 60 && binding.simple?.period === 60), 'notification rate limit binding is required');
 for (const bindingName of ['REMINDER_ALARMS']) {
 	assert(
 		wrangler.durable_objects?.bindings?.some(binding => binding.name === bindingName),

@@ -6,7 +6,7 @@ import {
 	handleDelete,
 	handleUpload,
 } from './sync-handlers';
-import { createMockD1Database, createMockR2Bucket } from '@/test/factories/cloudflare';
+import { createMockD1Database, createMockR2Bucket, createTestUploadOperationId } from '@/test/factories/cloudflare';
 
 async function responseJson(response: Response): Promise<unknown> {
 	return response.json() as Promise<unknown>;
@@ -45,7 +45,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 		const files = Array.from({ length: 7 }, (_, index) => ({
 			path: `notes/${index}.md`,
 			content: btoa('x'),
-			expectedHash: null,
+			operationId: createTestUploadOperationId(), expectedHash: null,
 		}));
 		const { bucket } = createMockR2Bucket();
 		const { db } = createMockD1Database();
@@ -62,7 +62,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			new Request('https://worker.test/sync/batch-delete', {
 				method: 'POST',
 				body: JSON.stringify({
-					files: files.map((file) => ({ path: file.path, expectedHash: 'a'.repeat(64) })),
+					files: files.map((file) => ({ path: file.path, operationId: createTestUploadOperationId(), expectedHash: 'a'.repeat(64) })),
 				}),
 			}),
 			bucket,
@@ -94,7 +94,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 					files: paths.map((path) => ({
 						path,
 						content: btoa('x'),
-						expectedHash: staleHash,
+						operationId: createTestUploadOperationId(), expectedHash: staleHash,
 					})),
 				}),
 			}),
@@ -134,7 +134,8 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			new Request('https://worker.test/sync/upload?path=notes/test.md', {
 				method: 'PUT',
 				body: 'stale update',
-				headers: { 'X-Crate-Expected-Hash': staleHash },
+				headers: { 'X-Crate-Upload-Operation': createTestUploadOperationId(),
+					'X-Crate-Expected-Hash': staleHash },
 			}),
 			bucket,
 			db,
@@ -163,7 +164,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
 				method: 'POST',
-				body: JSON.stringify({ path: 'notes/test.md', expectedHash: 'd'.repeat(64), expectedRevision: managedKey }),
+				body: JSON.stringify({ path: 'notes/test.md', operationId: createTestUploadOperationId(), expectedHash: 'd'.repeat(64), expectedRevision: managedKey }),
 				headers: { 'Content-Type': 'application/json' },
 			}),
 			bucket,
@@ -193,7 +194,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			new Request('https://worker.test/sync/batch-delete', {
 				method: 'POST',
 				body: JSON.stringify({
-					files: [{ path: 'notes/test.md', expectedHash: 'f'.repeat(64), expectedRevision: 'current-key' }],
+					files: [{ path: 'notes/test.md', operationId: createTestUploadOperationId(), expectedHash: 'f'.repeat(64), expectedRevision: 'current-key' }],
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),

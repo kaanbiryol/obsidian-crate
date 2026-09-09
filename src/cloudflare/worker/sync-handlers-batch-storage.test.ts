@@ -7,7 +7,7 @@ import {
 	handleGetSettings,
 	handlePutSettings,
 } from './sync-handlers';
-import { createMockD1Database, createMockR2Bucket } from '@/test/factories/cloudflare';
+import { createMockD1Database, createMockR2Bucket, createTestUploadOperationId } from '@/test/factories/cloudflare';
 
 async function responseJson(response: Response): Promise<unknown> {
 	return response.json() as Promise<unknown>;
@@ -30,7 +30,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 							content: btoa('after'),
 							size: 5,
 							contentType: 'text/plain',
-							expectedHash: 'a'.repeat(64), expectedRevision: 'files/notes/test.md',
+							operationId: createTestUploadOperationId(), expectedHash: 'a'.repeat(64), expectedRevision: 'files/notes/test.md',
 						},
 					],
 				}),
@@ -68,7 +68,7 @@ it('leaves batch uploads uncommitted when the D1 metadata write fails', async ()
 			new Request('https://worker.test/sync/batch-delete', {
 				method: 'POST',
 				body: JSON.stringify({
-					files: [{ path: 'notes/test.md', expectedHash: 'a'.repeat(64), expectedRevision: 'files/notes/test.md' }],
+					files: [{ path: 'notes/test.md', operationId: createTestUploadOperationId(), expectedHash: 'a'.repeat(64), expectedRevision: 'files/notes/test.md' }],
 				}),
 				headers: { 'Content-Type': 'application/json' },
 			}),

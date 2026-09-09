@@ -1,3 +1,5 @@
+import { createReminderOperationId } from '@/protocol/reminder-operation';
+export const createTestUploadOperationId = () => createReminderOperationId(Math.floor(Date.now() / 86400000));
 import { vi, type Mock } from 'vitest';
 
 interface CompatibleR2HttpMetadata {
@@ -159,6 +161,7 @@ interface MockFileRecord {
 type MockFileInput = string | MockFileRecord;
 
 export function createMockD1Database(options?: { failBatch?: boolean; files?: Record<string, MockFileInput> }) {
+	const receipts = new Map<string, { request_hash: unknown; response_json: string }>();
 	const files = new Map<string, MockFileRecord>(
 		Object.entries(options?.files ?? {}).map(([path, value]) => [path,
 			typeof value === 'object' && value !== null
@@ -188,6 +191,8 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 					return {};
 				}),
 				first: vi.fn(async <T = Record<string, unknown>>() => {
+					if (sql.startsWith('SELECT 1 WHERE')) return { valid: 1 } as T;
+					if (sql.startsWith('SELECT request_hash, response_json FROM upload_operations')) return (receipts.get(String(statement._args[0])) ?? (sql.includes('UNION ALL') ? { request_hash: null, response_json: null } : null)) as T | null;
 					if (sql.includes('FROM files WHERE path = ?')) {
 						const path = getBoundString(statement._args, 0);
 						const file = files.get(path);
@@ -263,6 +268,14 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 						files.delete(path);
 						changes = 1;
 					}
+				} else if (statement._sql.includes('INSERT INTO upload_operations')) {
+					const args = statement._args;
+					const file = files.get(String(args[4]));
+					const success = file?.storageKey === args[5];
+					receipts.set(String(args[0]), { request_hash: args[1], response_json: JSON.stringify(success
+						? { success: true, path: args[6], hash: args[7], revision: args[8] }
+						: { success: false, path: args[9], status: 409, code: 'version_conflict', error: 'Remote file or namespace changed since it was read', currentHash: file?.hash ?? null }) });
+					changes = 1;
 				} else if (statement._sql.includes('INSERT INTO changelog')) {
 					changes = 1;
 				}

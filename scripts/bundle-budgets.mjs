@@ -3,7 +3,9 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1450000', 10),
+		// Upload journaling, shared input validation and embedded Worker safeguards add
+		// about 17 KB raw. Allow 20 KB for this reviewed change; keep the gzip cap.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1470000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '820000', 10),
 	},
 	{
@@ -29,9 +31,10 @@ export const bundleBudgets = {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
 		// Audit recovery plus the merged update, sheet and sync-indicator UI.
-		// The merge adds 5 KB raw allowance while retaining the gzip ceiling.
+		// Shared, lossless reminder validation adds about 1 KB compressed; allow
+		// 1.5 KB for the reviewed change while keeping the existing raw ceiling.
 		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '455000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '154000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '155500', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,

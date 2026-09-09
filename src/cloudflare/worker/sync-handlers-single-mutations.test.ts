@@ -3,7 +3,7 @@ import {
 	handleDelete,
 	handleUpload,
 } from './sync-handlers';
-import { createMockD1Database, createMockR2Bucket } from '@/test/factories/cloudflare';
+import { createMockD1Database, createMockR2Bucket, createTestUploadOperationId } from '@/test/factories/cloudflare';
 
 async function responseJson(response: Response): Promise<unknown> {
 	return response.json() as Promise<unknown>;
@@ -46,6 +46,7 @@ it('rejects traversal-style upload paths', async () => {
 				headers: {
 					'X-File-Hash': '0'.repeat(64),
 					'X-File-Size': '5',
+					'X-Crate-Upload-Operation': createTestUploadOperationId(),
 					'X-Crate-Expected-Hash': 'absent',
 				},
 			}),
@@ -68,6 +69,7 @@ it('rejects traversal-style upload paths', async () => {
 				body: 'hello',
 				headers: {
 					'Content-Type': 'text/plain',
+					'X-Crate-Upload-Operation': createTestUploadOperationId(),
 					'X-Crate-Expected-Hash': 'absent',
 				},
 			}),
@@ -99,6 +101,7 @@ it('rejects traversal-style upload paths', async () => {
 				body: 'after',
 				headers: {
 					'Content-Type': 'text/plain',
+					'X-Crate-Upload-Operation': createTestUploadOperationId(),
 					'X-Crate-Expected-Hash': 'a'.repeat(64),
 				},
 			}),
@@ -128,6 +131,7 @@ it('rejects traversal-style upload paths', async () => {
 				body: 'after',
 				headers: {
 					'Content-Type': 'text/plain',
+					'X-Crate-Upload-Operation': createTestUploadOperationId(),
 					'X-Crate-Expected-Hash': 'absent',
 				},
 			}),
@@ -173,7 +177,7 @@ it('rejects traversal-style upload paths', async () => {
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
 				method: 'POST',
-				body: JSON.stringify({ path: 'notes/test.md', expectedHash: 'a'.repeat(64), expectedRevision: 'files/notes/test.md' }),
+				body: JSON.stringify({ path: 'notes/test.md', operationId: createTestUploadOperationId(), expectedHash: 'a'.repeat(64), expectedRevision: 'files/notes/test.md' }),
 				headers: { 'Content-Type': 'application/json' },
 			}),
 			bucket,
@@ -203,7 +207,7 @@ it('rejects traversal-style upload paths', async () => {
 		const response = await handleDelete(
 			new Request('https://worker.test/sync/delete', {
 				method: 'POST',
-				body: JSON.stringify({ path: 'notes/test.md', expectedHash: 'a'.repeat(64), expectedRevision: managedKey }),
+				body: JSON.stringify({ path: 'notes/test.md', operationId: createTestUploadOperationId(), expectedHash: 'a'.repeat(64), expectedRevision: managedKey }),
 				headers: { 'Content-Type': 'application/json' },
 			}),
 			bucket,

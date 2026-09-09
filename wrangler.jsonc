@@ -5,7 +5,9 @@
 	"workers_dev": true,
 	"no_bundle": true,
 	"triggers": {
-		"crons": ["*/15 * * * *"]
+		"crons": [
+			"*/15 * * * *"
+		]
 	},
 	"d1_databases": [
 		{
@@ -33,5 +35,15 @@
 			"type": "durable-object",
 			"storage": "sqlite"
 		}
-	}
+	},
+	"ratelimits": [
+		{
+			"name": "NOTIFICATION_REQUEST_LIMITER",
+			"namespace_id": "1001",
+			"simple": {
+				"limit": 60,
+				"period": 60
+			}
+		}
+	]
 }

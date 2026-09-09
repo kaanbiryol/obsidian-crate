@@ -41,7 +41,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
 - OAuth state and PKCE material exist only in memory during one deployment; authorization codes and OAuth access tokens are never stored or logged.
-- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases, upgrades schema 2/3 to schema 4 without rewriting vault data, and rejects unsupported schemas. Deployment code is never fetched at runtime.
+- The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases, upgrades schema 2/3/4 to schema 5 without rewriting vault data, and rejects unsupported schemas. Deployment code is never fetched at runtime.
 - Vault devices can be authorized only through the Cloudflare account that owns the server.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
 - When installing the reminders web app, Safari carries a separate, single-use enrollment grant in the install URL and a ten-minute cookie copied into the Home Screen app. The app clears these after enrollment and keeps its own session; Safari's persistent login credential is not copied. Open the new app within ten minutes of creating the link.
@@ -178,11 +178,11 @@ Vault files larger than 25 MiB produce a visible sync error and are left on the 
 
 Existing binary files are never overwritten by an unsafe asynchronous write. Incoming binary changes are saved as review copies and shown in conflicts; review both versions and replace the original when ready. UTF-8 text supported by Obsidian's atomic writer applies automatically when its precondition still matches.
 
-Both clients and the Worker require protocol 6 for writes. Update the plugin/server and reload older web tabs before editing. Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
+Both clients and the Worker require protocol 7 for writes. Follow the [upgrade order](docs/compatibility.md#upgrade-order), update the plugin/server and reload older web tabs before editing. Uploads are journaled locally before dispatch, and retries recover the original result before starting new work; see [upload recovery and rename preservation](docs/upload-recovery.md). Failed web edits retain a local draft. A retry first resolves the original attempted save; later draft edits then become a separate revision-checked update. Another device's intervening changes still produce a conflict.
 
 New web changes use a server-issued date and can be retried through the next 179 UTC dates (a 180-date window). Retained receipts still confirm earlier commits. After expiry and receipt cleanup, the app stops the change for export and comparison with current reminders; it never silently reissues it. Uncommitted requests from older clients also require review after upgrading. See the [retry and retention policy](docs/reminder-retention.md).
 
-Crate supports the current prerelease formats. Provisioning accepts an empty database or schema 2/3/4. Its additive upgrade to schema 4 adds deletion audit receipts and reminder source verification without rewriting existing vault data. Other schemas are rejected without modification. Current recovery tools archive schema 2/3/4 and upgrade supported old archives during isolated restoration. See the [compatibility matrix and rollback policy](docs/compatibility.md).
+Crate supports the current prerelease formats. Provisioning accepts an empty database or schema 2/3/4/5. Its additive upgrade to schema 5 adds upload receipts and an indexed storage-key lookup, retaining deletion receipts and reminder source verification without rewriting existing vault data. Other schemas are rejected without modification. Current recovery tools archive schema 2/3/4/5 and upgrade supported old archives during isolated restoration. See the [compatibility matrix and rollback policy](docs/compatibility.md).
 
 ## Development
 

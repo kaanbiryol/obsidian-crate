@@ -1,4 +1,6 @@
-import React, { useCallback, useRef } from 'react';
+import { assertReminderMutationInput } from '../../core/reminderMutationInput';
+import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
+import React, { useCallback, useRef, useMemo } from 'react';
 import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
 import { RichTextInput, type RichTextInputHandle } from '../../components/RichTextInput';
 import { useProjectAutocomplete } from './useProjectAutocomplete';
@@ -45,6 +47,12 @@ export function ReminderEditorFields({
     const localDescriptionRef = useRef<HTMLTextAreaElement>(null);
     const containerRef = externalContainerRef ?? localContainerRef;
     const descriptionRef = externalDescriptionRef ?? localDescriptionRef;
+    const inputError = useMemo(() => {
+        try {
+            assertReminderMutationInput({ content: content.trim() ? parseReminderEditorContent(content, projects).cleanContent || content : undefined, description }, 'update');
+            return null;
+        } catch (error) { return error instanceof Error ? error.message : 'Check the reminder fields.'; }
+    }, [content, description, projects]);
     const titleFade = useBottomFade(textareaRef);
     const descFade = useBottomFade(descriptionRef);
 
@@ -66,6 +74,7 @@ export function ReminderEditorFields({
             ref={containerRef}
             className="reminder-editor-fields relative"
         >
+            {inputError && <p role="alert" style={{ color: 'var(--text-error, #d33)' }}>{inputError}</p>}
             <RichTextInput
                 {...titleInputProps}
                 readOnly={disabled}

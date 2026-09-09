@@ -147,7 +147,7 @@ it('upgrades schema 3 additively and discovers unchanged sources in resumable in
     SELECT json_extract(value, '$.path'), lower(json_extract(value, '$.path')), json_extract(value, '$.key'), ?, 0 FROM json_each(?)`)
     .bind(hash, JSON.stringify(files)).run();
   for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
-  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 4 });
+  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 5 });
   expect(await revalidateReminderSources(env, 4)).toBe(true);
   expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state').first()).toEqual({ count: 100 });
   expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'reminder_source_scan'").first()).toEqual({ value: 'Notes/099.md' });
@@ -201,4 +201,22 @@ it('bounds combined migration, projection and alarm dispatch and resumes every r
   expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 9 });
   expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_jobs').first()).toEqual({ n: 0 });
   expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_projection_jobs').first()).toEqual({ n: 0 });
+});
+
+it('quarantines previously indexed invalid UTF-8 without changing source bytes or sending its old alarm', async () => {
+	const h = await legacy();
+	const encoded = new TextEncoder().encode(h.valid);
+	const bytes = new Uint8Array([...encoded, 0xff]);
+	await env.BUCKET.put(h.file.storageKey, bytes);
+	const hash = await crypto.subtle.digest('SHA-256', bytes);
+	const hex = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+	await env.DB.prepare('UPDATE files SET hash = ?, size = ? WHERE path = ?').bind(hex, bytes.length, path).run();
+	const prior = await command();
+	await revalidateReminderSources(env, 3);
+	await drainNotificationProjections(env);
+	expect(await command()).toEqual(prior);
+	expect(await env.DB.prepare('SELECT verified, parser_version FROM reminder_source_state').first()).toEqual({ verified: 0, parser_version: REMINDER_CACHE_PARSER_VERSION });
+	await h.alarm.alarm();
+	expect(sendToAllSubscriptions).not.toHaveBeenCalled();
+	expect(new Uint8Array(await (await env.BUCKET.get(h.file.storageKey))!.arrayBuffer())).toEqual(bytes);
 });

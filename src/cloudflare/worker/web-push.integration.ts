@@ -42,3 +42,24 @@ it.each([201, 307])('constructs a Worker-compatible push request and returns sta
 	expect(result.ok).toBe(status === 201);
 	expect(network).toHaveBeenCalledOnce();
 });
+
+it.each(['x', '漢', '🙂', '"\n'])('delivers a maximum-size reminder with %s display text in a 4096-byte encrypted message', async character => {
+	const { createDeclarativePushPayload } = await import('./notifications/push');
+	const title = character.repeat(1024 / character.length);
+	const project = '漢'.repeat(80);
+	const reminderId = 'e1_00020000_' + 'a'.repeat(100);
+	const payload = createDeclarativePushPayload({ title, body: project, project, reminderId, tag: reminderId });
+	expect(payload.notification.navigate).toBe(`/notifications?reminderId=${reminderId}`);
+	expect(JSON.stringify(payload)).not.toContain('�');
+	const vapid = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+	const keys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+	const network = vi.fn(async (request: Request) => {
+		expect((await request.arrayBuffer()).byteLength).toBeLessThanOrEqual(4096);
+		return new Response(null, { status: 201 });
+	});
+	vi.stubGlobal('fetch', network);
+	expect((await sendPushNotificationWithoutContact(vapid, { endpoint: 'https://fcm.googleapis.com/push-test', keys: {
+		p256dh: toBase64Url(await crypto.subtle.exportKey('raw', keys.publicKey)), auth: toBase64Url(new Uint8Array(16)),
+	} }, JSON.stringify(payload))).status).toBe(201);
+	expect(network).toHaveBeenCalledOnce();
+});

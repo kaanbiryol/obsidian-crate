@@ -1,3 +1,5 @@
+import { parseRenameDependencies } from './rename-dependencies';
+import { UploadJournal } from './upload-journal';
 /**
  * Local manifest management for tracking file state.
  * Stored in its own file (file-manifest.json) in the plugin directory,
@@ -62,6 +64,8 @@ function normalizeFileManifest(value: unknown): FileManifest | null {
 }
 
 export class LocalManifest {
+	readonly uploadJournal: UploadJournal;
+	private renameDependencies = new Map<string, string>();
 	private app: App;
 	private manifestPath: string;
 	private tmpPath: string;
@@ -75,6 +79,7 @@ export class LocalManifest {
 
 	constructor(app: App, pluginManifest: PluginManifest, private readonly authority?: string) {
 		this.app = app;
+		this.uploadJournal = new UploadJournal(app.vault.adapter, `${pluginManifest.dir}/pending-uploads`, authority);
 		this.manifestPath = `${pluginManifest.dir}/${MANIFEST_FILENAME}`;
 		this.tmpPath = `${pluginManifest.dir}/${MANIFEST_TMP_FILENAME}`;
 		this.manifest = { version: 1, files: createPathRecord() };
@@ -101,7 +106,7 @@ export class LocalManifest {
 				if (!manifest) return null;
 				const generation = isRecord(parsed) ? normalizeNonNegativeInteger(parsed.generation) : null;
 				if (generation === null) return null;
-				return { manifest, generation, authority: isRecord(parsed) ? parsed.authority : undefined };
+				return { manifest, generation, authority: isRecord(parsed) ? parsed.authority : undefined, settledUploads: isRecord(parsed) ? parsed.settledUploads : undefined, renames: parseRenameDependencies(isRecord(parsed) ? parsed.renameDependencies : undefined) };
 			} catch {
 				logger.warn(`Could not read manifest checkpoint: ${path}`);
 				return null;
@@ -120,12 +125,17 @@ export class LocalManifest {
 				throw new Error('Sync checkpoint is not bound to this server. Disconnect and reconnect before syncing; local files and the previous checkpoint are preserved.');
 			}
 			this.manifest = selected.manifest;
+			this.renameDependencies = selected.renames;
+			await this.uploadJournal.load(selected.settledUploads ?? []);
+			if (this.closed) return;
 			this.generation = selected.generation;
 			if (recoverTmp) {
 				// Leave tmp intact if promotion fails, so the next load can retry.
 				await adapter.write(this.manifestPath, this.serialize());
 				logger.info('Recovered newer manifest checkpoint');
 			}
+		} else {
+			await this.uploadJournal.load();
 		}
 		if (this.closed) return;
 		if (await adapter.exists(this.tmpPath)) {
@@ -137,7 +147,11 @@ export class LocalManifest {
 	/** Serialize checkpoints and include changes made while disk writes await. */
 	save(): Promise<void> {
 		if (this.closed) return Promise.resolve();
-		const save = this.saveChain.catch(() => {}).then(() => this.persist());
+		const save = this.saveChain.catch(() => {}).then(async () => {
+			const completed = this.uploadJournal.completedSnapshot();
+			await this.persist();
+			if (!this.closed) await this.uploadJournal.pruneCompleted(completed);
+		});
 		this.saveChain = save;
 		return save;
 	}
@@ -145,11 +159,11 @@ export class LocalManifest {
 	/** Fence late callbacks and wait for every checkpoint I/O before reset/reuse. */
 	async close(): Promise<void> {
 		this.closed = true;
-		await Promise.allSettled([this.loadTask, this.saveChain]);
+		await Promise.allSettled([this.loadTask, this.saveChain, this.uploadJournal.close()]);
 	}
 
 	private serialize(): string {
-		return JSON.stringify({ ...this.manifest, generation: this.generation, ...(this.authority === undefined ? {} : { authority: this.authority }) });
+		return JSON.stringify({ ...this.manifest, ...(this.uploadJournal.completedSnapshot().length ? { settledUploads: this.uploadJournal.completedSnapshot() } : {}), ...(this.renameDependencies.size ? { renameDependencies: Object.fromEntries(this.renameDependencies) } : {}), generation: this.generation, ...(this.authority === undefined ? {} : { authority: this.authority }) });
 	}
 
 	private async persist(): Promise<void> {
@@ -188,7 +202,27 @@ export class LocalManifest {
 	 * Remove file entry
 	 */
 	removeEntry(path: string): void {
+		this.renameDependencies.delete(path);
 		delete this.manifest.files[path];
+		this.revision++;
+		this.dirty = true;
+	}
+
+	completeUpload(id: string): void {
+		this.uploadJournal.complete(id);
+		this.revision++;
+		this.dirty = true;
+	}
+
+	renameDestination(path: string): string | undefined { return this.renameDependencies.get(path); }
+
+	recordRename(source: string, destination: string): void {
+		const move = (path: string) => path === source ? destination : path.startsWith(`${source}/`) ? destination + path.slice(source.length) : path;
+		for (const [old, target] of this.renameDependencies) this.renameDependencies.set(old, move(target));
+		for (const path of this.getAllPaths()) {
+			const target = move(path);
+			if (target !== path) this.renameDependencies.set(path, target);
+		}
 		this.revision++;
 		this.dirty = true;
 	}

@@ -6,6 +6,7 @@ const CONFIG_DIR = '.vault-config';
 const PLUGIN_DIR = `${CONFIG_DIR}/plugins/crate`;
 
 type MockAdapter = {
+	list: ReturnType<typeof vi.fn>;
 	exists: ReturnType<typeof vi.fn<(path: string) => Promise<boolean>>>;
 	read: ReturnType<typeof vi.fn<(path: string) => Promise<string>>>;
 	write: ReturnType<typeof vi.fn<(path: string, data: string) => Promise<void>>>;
@@ -15,6 +16,7 @@ type MockAdapter = {
 function createMockAdapter(): MockAdapter {
 	return {
 		exists: vi.fn().mockResolvedValue(false),
+		list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
 		read: vi.fn(),
 		write: vi.fn().mockResolvedValue(undefined),
 		remove: vi.fn().mockResolvedValue(undefined),

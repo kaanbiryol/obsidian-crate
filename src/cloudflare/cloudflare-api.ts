@@ -1,3 +1,4 @@
+import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from './notification-rate-binding';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import type { HttpRequest, HttpTransport } from './http';
 import { randomBase64Url } from './pkce';
@@ -118,6 +119,7 @@ export function buildWorkerMultipartBody(input: {
 				{ type: 'd1', name: 'DB', id: input.d1DatabaseId },
 				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: input.r2BucketName },
 				{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },
+				{ type: 'ratelimit', name: NOTIFICATION_RATE_BINDING, namespace_id: notificationRateNamespace(input.r2BucketName), simple: { limit: 60, period: 60 } },
 			],
 		exports: {
 			ReminderAlarm: { type: 'durable-object', storage: 'sqlite', state: 'created' },

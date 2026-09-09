@@ -96,5 +96,6 @@ it('cannot bypass public request limits by varying an unverified bearer header',
   const responses = [];
   for (let i = 0; i < 31; i++) responses.push(await worker.fetch(request('/notifications/reminders-exchange', `unverified-${i}`, { token: 'invalid' }), env));
   expect(responses.at(-1)?.status).toBe(429);
-  expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM request_rate_limits').first<{ count: number }>())?.count).toBe(1);
+  expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM request_rate_limits').first<{ count: number }>())?.count).toBe(2); // One fixed daily budget and one action/IP counter.
+  expect((await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key != 'notification-daily'").first<{ count: number }>())?.count).toBe(10);
 });

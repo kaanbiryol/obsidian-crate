@@ -8,7 +8,7 @@ function mockTransport(...responses: Response[]) {
 	let responseIndex = 0;
 	return vi.fn<ApiHttpTransport>(async request => {
     if (request.url.endsWith('/.well-known/crate') && !explicitMetadata) {
-      const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] });
+      const text = JSON.stringify({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
       return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer };
     }
 		const response = responses[responseIndex++];
@@ -61,7 +61,7 @@ describe('SyncApiClient', () => {
 			return { status: 200, headers: {}, text, arrayBuffer: new TextEncoder().encode(text).buffer as ArrayBuffer };
 		};
 		const transport: ApiHttpTransport = async request => {
-			if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] });
+			if (request.url.endsWith('/.well-known/crate')) return response({ service: 'crate', serverVersion: '0.1.0', protocol: CRATE_PLUGIN_PROTOCOL, reminderOperationDay: Math.floor(Date.now() / 86400000), capabilities: [] });
       if (request.url.includes('/sync/upload')) {
 				return new Promise(resolve => {
 					commit = () => {

@@ -49,6 +49,7 @@
 | `BUCKET` | R2 Bucket | File storage |
 | `DB` | D1 Database | Changelog, file manifest, authentication, subscriptions, and parsed reminder cache |
 | `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
+| `NOTIFICATION_REQUEST_LIMITER` | Rate Limiting API | Bounds notification requests before D1; D1 also enforces a global daily admission ceiling |
 
 ## Component Ownership
 
@@ -111,7 +112,7 @@ The browser-facing PWA source lives in `src/pwa/`, while its Worker-served HTML,
 
 The Obsidian plugin and PWA own separate application shells so viewport, navigation, safe-area, and modal behavior can follow each host. They share reminder panels, cards, and view-model logic rather than sharing host chrome. Both hosts compile the same semantic theme tokens and reminder-card styles; see [Shared plugin and PWA UI](ui-styling.md) for ownership and validation.
 
-The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The schema records version 2 in `crate_schema`. Provisioning accepts empty or current-schema databases and rejects all others without modifying them. No upgrade scripts are bundled.
+The Worker is a separate build product. The production plugin includes gzip-compressed copies of `.generated/cloudflare/worker.mjs` and `src/cloudflare/schema.sql`. The Vite artifact plugin computes SHA-256 hashes at build time; Obsidian verifies them after decompression before deployment. No Worker code or schema is fetched from the network at runtime. The schema records version 5 in `crate_schema`. Provisioning initializes empty databases and upgrades schemas 2/3/4 additively, preserving vault data. Unsupported schemas are rejected without modification. See the [compatibility matrix](compatibility.md).
 
 `npm run release:check` enforces Worker and combined-plugin size budgets and checks that the OAuth entry point remains present.
 

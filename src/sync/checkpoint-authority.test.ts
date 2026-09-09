@@ -108,6 +108,17 @@ describe('checkpoint authority and reset', () => {
 		expect(initialize).not.toHaveBeenCalled();
 	});
 
+	it('archives pending upload bytes before invalidating their old server authority', async () => {
+		const journal = `${dir}/pending-uploads/operation.json`;
+		const content = JSON.stringify({ authority: 'https://old.example', bytes: 'private pending text' });
+		const harness = createDisk({ [main]: checkpoint('https://old.example'), [`${dir}/pending-uploads`]: '', [journal]: content });
+		Object.assign(harness.adapter, { list: async () => ({ files: [journal], folders: [] }) });
+		await deleteManifestFile(harness.plugin as never);
+		expect(harness.disk.has(journal)).toBe(false);
+		const backup = [...harness.disk].find(([path]) => path.startsWith(`${dir}/upload-operation.json.previous-`));
+		expect(backup?.[1]).toBe(content);
+	});
+
 	it('leaves manual sync unavailable after refusing a foreign checkpoint', async () => {
 		const harness = createRuntimeHarness({ syncOnStartup: false });
 		const disk = createDisk({ [main]: checkpoint('https://old.example') });

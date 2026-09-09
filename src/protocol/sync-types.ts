@@ -42,7 +42,7 @@ export interface CheckResponse {
 	cursorExpired?: boolean;
 }
 
-type MutationFailureCode = 'version_conflict' | 'namespace_conflict' | 'validation' | 'storage' | 'unknown';
+type MutationFailureCode = 'version_conflict' | 'namespace_conflict' | 'validation' | 'operation_expired' | 'operation_mismatch' | 'storage' | 'unknown';
 
 export interface UploadResult {
 	success: boolean;
@@ -70,6 +70,7 @@ export interface HealthResponse {
 }
 
 export interface BatchUploadFile {
+	operationId?: string;
 	path: string;
 	content: string;
 	hash: string;

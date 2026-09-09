@@ -1,3 +1,4 @@
+import { assertReminderMutationInput } from '@/reminders/core/reminderMutationInput';
 import { beginReminderOperation, reminderOperationEffects } from '../operations';
 import { buildCreateReminderArgs } from '@/reminders/data/reminder-repository/shared';
 import { corsResponse } from '../../cors';
@@ -38,6 +39,7 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 	if (hasNonEmptyStringValue(parsedBody.value.project) && !parsedProject) {
 		return corsResponse({ error: 'Invalid project' }, 400);
 	}
+	assertReminderMutationInput(parsedBody.value, 'create');
 	const project = parsedProject || 'Inbox';
 	const content = parseOptionalString(parsedBody.value.content, 1024);
 	if (!content) {
@@ -49,7 +51,7 @@ export async function handleCreateReminder(request: Request, env: Env): Promise<
 	}
 
 	const priority = parsedBody.value.priority === 1 ? 1 : 4;
-	const description = parseOptionalString(parsedBody.value.description, 4096) || undefined;
+	const description = typeof parsedBody.value.description === 'string' ? parsedBody.value.description.trim() || undefined : undefined;
 	const createArgs = buildCreateReminderArgs({
 		content,
 		description,

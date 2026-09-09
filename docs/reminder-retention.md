@@ -1,6 +1,6 @@
 # Reminder retry and retention policy
 
-Protocol 6 gives new web commands a finite retry window without making an old request executable again after its receipt disappears. This policy covers web reminder mutations; generic file deletion audit receipts and retained file versions still use their separate 30-day policy.
+The current protocol gives new web commands a finite retry window without making an old request executable again after its receipt disappears. This policy covers web reminder mutations. Protocol 7 extends the same window and monotonic floor to [upload receipts](upload-recovery.md); generic file deletion audit receipts and retained file versions still use their separate 30-day policy.
 
 ## Commands and identities
 
@@ -20,7 +20,7 @@ An expired result does not prove that an earlier attempt failed. The PWA keeps t
 
 Select **Export expired change**, save the full JSON, and compare it with current reminders and vault files. After checking the export and current data, select **Remove exported change from device**. Removal runs under the outbox Web Lock and requires the current stored change to match the reviewed export. Changes made by another tab after export require another export. Restore only missing work as a new reminder or an intentional new edit. The application does not generate a replacement command automatically.
 
-Protocol-5 applications cannot mutate a protocol-6 deployment. After updating the PWA, retained legacy receipts may confirm committed commands. A legacy command without a receipt takes the same review/export path. Independently saved drafts with no dispatched attempt can receive a new operation ID when saved.
+Applications older than protocol 7 cannot mutate the current deployment. After updating the PWA, retained legacy receipts may confirm committed commands. A legacy command without a receipt takes the same review/export path. Independently saved drafts with no dispatched attempt can receive a new operation ID when saved.
 
 ## Notification occurrences
 

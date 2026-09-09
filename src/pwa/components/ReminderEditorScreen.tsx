@@ -207,7 +207,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 							className: 'pwa-editor-title-input pwa-editor-title-rich-input',
 						}}
 						descriptionInputProps={{
-							maxLength: 4096, autoComplete: 'off', autoCorrect: 'off', spellCheck: false,
+							autoComplete: 'off', autoCorrect: 'off', spellCheck: false,
 							onFocus: handleDescriptionFocus, onBlur: handleEditorFieldBlur,
 							className: 'pwa-editor-description-input',
 						}}

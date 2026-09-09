@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
+import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schema from '../schema.sql?raw';
 import worker from './index';
 import { sha256Hex } from './auth';
@@ -35,7 +36,7 @@ function request(route: string, init: RequestInit = {}, device = 'first') {
 	}), env);
 }
 async function upload(filePath = path, body = secret): Promise<File> {
-	const response = await request(`/sync/upload?path=${encodeURIComponent(filePath)}`, { method: 'PUT', body, headers: { 'X-Crate-Expected-Hash': 'absent' } });
+	const response = await request(`/sync/upload?path=${encodeURIComponent(filePath)}`, { method: 'PUT', body, headers: { 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86400000)), 'X-Crate-Expected-Hash': 'absent' } });
 	expect(response.status).toBe(200);
 	return response.json() as Promise<File>;
 }
@@ -172,7 +173,7 @@ it('applies the additive schema-2 upgrade repeatedly without changing existing v
 	await env.DB.prepare('UPDATE crate_schema SET version = 2').run();
 	const before = await env.DB.prepare('SELECT * FROM files').all();
 	await applySchema(); await applySchema();
-	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: 4 });
+	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: 5 });
 	expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(before.results);
 	expect((await remove(file)).status).toBe(200);
 	expect(await receipts()).toHaveLength(1);

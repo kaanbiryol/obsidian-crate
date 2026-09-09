@@ -131,7 +131,7 @@ export function createPwaPreviewServer({ assets, origin, failMutationPaths = [] 
 			return;
 		}
 		if (method === 'GET' && path === '/.well-known/crate') {
-      sendJson(res, 200, { service: 'crate', serverVersion: '0.1.0', protocol: { current: 6, oldestCompatible: 6 }, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
+      sendJson(res, 200, { service: 'crate', serverVersion: '0.1.0', protocol: assets.CRATE_PLUGIN_PROTOCOL, capabilities: [], reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
       return;
     }
 		if (method === 'GET' && path === '/notifications/version.json') {

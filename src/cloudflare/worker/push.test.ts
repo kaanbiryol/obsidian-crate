@@ -42,11 +42,11 @@ describe('createDeclarativePushPayload', () => {
 			notification: {
 				title: 'Review release notes',
 				body: 'Shipping',
-				navigate: '/notifications?project=Shipping&reminderId=reminder-123',
+				navigate: '/notifications?reminderId=reminder-123',
 				tag: 'reminder-123',
 				icon: '/notifications/crate-icon-192.png',
 				data: {
-					project: 'Shipping',
+					project: '',
 					reminderId: 'reminder-123',
 				},
 			},

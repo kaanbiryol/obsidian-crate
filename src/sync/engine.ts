@@ -88,6 +88,7 @@ export class SyncEngine {
 		this.settings = settings;
 		this.localManifest = new LocalManifest(plugin.app, plugin.manifest, normalizeWorkerUrl(settings.workerUrl) || 'unconfigured');
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
+		this.api.configureUploadJournal(this.localManifest, this.vault, this.markdownBaseCache);
 		this.state = {
 			status: 'idle',
 			lastSync: settings.lastSync,
@@ -339,6 +340,7 @@ export class SyncEngine {
 	}
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
+		if (!this.shouldIgnore(oldPath) && !this.shouldIgnore(file.path)) this.localManifest.recordRename(oldPath, file.path);
 		if (isConflictFile(oldPath)) {
 			void this.conflictStore.markResolved(oldPath).catch((error) => {
 				logger.warn('Failed to resolve renamed conflict copy:', errorMessage(error));

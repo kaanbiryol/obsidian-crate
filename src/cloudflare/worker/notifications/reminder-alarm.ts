@@ -1,3 +1,4 @@
+import { PushPayloadError } from './payload-budget';
 import { runNotificationCoordinator } from '../notification-coordinator';
 import type { Env } from '../types';
 import { changedRows } from '../db';
@@ -275,7 +276,8 @@ export class ReminderAlarm implements DurableObject {
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		const dueTime = new Date(reminder.dueDatetime).getTime();
 		if (
-			attempt >= MAX_DELIVERY_RETRY_ATTEMPTS
+			error instanceof PushPayloadError
+			|| attempt >= MAX_DELIVERY_RETRY_ATTEMPTS
 			|| (Number.isFinite(dueTime) && Date.now() - dueTime >= MAX_DELIVERY_RETRY_AGE_MS)
 		) {
 			const failure = {

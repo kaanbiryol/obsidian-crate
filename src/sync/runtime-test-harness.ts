@@ -46,7 +46,7 @@ export function setApiClient(runtime: SyncRuntime, apiClient: {
 	revokeCurrentToken?(): Promise<{ success: boolean }>;
 } | null): void {
 	(runtime as unknown as { apiClient: unknown }).apiClient = apiClient === null ? null : {
-		setAbortSignal: () => {}, getRequestDiagnostics: () => ({ clientSession: crypto.randomUUID(), requests: [] }), ...apiClient,
+		setAbortSignal: () => {}, configureUploadJournal: () => {}, getRequestDiagnostics: () => ({ clientSession: crypto.randomUUID(), requests: [] }), ...apiClient,
 	};
 }
 

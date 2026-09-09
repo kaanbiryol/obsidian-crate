@@ -1,3 +1,4 @@
+import { assertReminderMutationInput } from '@/reminders/core/reminderMutationInput';
 import { beginReminderOperation, reminderOperationEffects } from '../operations';
 import { buildReminderUpdate } from '@/reminders/data/reminder-repository/shared';
 import type { UpdateReminderParams } from '@/reminders/types/plugin-reminder';
@@ -32,6 +33,7 @@ import { loadReminderSource } from '../workspace';
 import { checkReminderRevision } from '../revision';
 
 function parseUpdateParams(body: Record<string, unknown>): UpdateReminderParams | Response {
+	assertReminderMutationInput(body, 'update');
 	const updateParams: UpdateReminderParams = {};
 	if (Object.prototype.hasOwnProperty.call(body, 'content')) {
 		updateParams.content = parseOptionalString(body.content, 1024) || undefined;
@@ -39,7 +41,7 @@ function parseUpdateParams(body: Record<string, unknown>): UpdateReminderParams 
 	if (Object.prototype.hasOwnProperty.call(body, 'description')) {
 		updateParams.description = body.description === null
 			? ''
-			: parseOptionalString(body.description, 4096) || undefined;
+			: typeof body.description === 'string' ? body.description.trim() || undefined : undefined;
 	}
 	if (Object.prototype.hasOwnProperty.call(body, 'priority')) {
 		if (body.priority !== 1 && body.priority !== 4) {
