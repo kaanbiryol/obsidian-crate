@@ -379,19 +379,19 @@ function App() {
 				initialProject={selectedProject ?? undefined}
 				upcomingDays={config.upcomingDays}
 				className="app-shell pwa-reminders-view"
-				headerMetaContent={authToken ? <PwaSyncIndicator
-					changes={changes}
-					isOffline={isOffline}
-					refreshing={refreshing}
-					loading={loading}
-					dataMode={dataMode}
-					error={error}
-					storageError={storageError}
-				/> : undefined}
 				headerRightContent={authToken ? (
 					<PwaHeaderActions
 						settingsOpen={settingsOpen}
 						onToggleSettings={toggleSettings}
+						syncIndicator={<PwaSyncIndicator
+							changes={changes}
+							isOffline={isOffline}
+							refreshing={refreshing}
+							loading={loading}
+							dataMode={dataMode}
+							error={error}
+							storageError={storageError}
+						/>}
 					/>
 				) : undefined}
 				belowHeaderContent={bootstrapped && authToken ? (isProjectDetail) => (

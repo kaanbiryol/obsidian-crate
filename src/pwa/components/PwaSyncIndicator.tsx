@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSyncIndicatorMotion } from '../hooks/useSyncIndicatorMotion';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { DataMode } from '../types';
 
@@ -34,10 +35,12 @@ function syncStatus({ changes, isOffline, refreshing, loading, dataMode, error, 
 /** Stable header space keeps background saves from moving the reminder list. */
 export function PwaSyncIndicator(props: PwaSyncIndicatorProps) {
 	const { state, label } = syncStatus(props);
+	const visualState = useSyncIndicatorMotion(state);
 	return (
-		<div className="pwa-sync-indicator" data-sync-state={state} role="status" aria-live="polite" aria-atomic="true" title={label}>
+		<div className="pwa-sync-indicator" data-sync-state={state} data-visual-state={visualState} role="status" aria-live="polite" aria-atomic="true" title={label}>
 			<span className="pwa-sync-indicator__halo" aria-hidden="true" />
 			<span className="pwa-sync-indicator__dot" aria-hidden="true" />
+			<span className="pwa-sync-indicator__ripple" aria-hidden="true" />
 			<span className="pwa-sync-indicator__label">{label}</span>
 		</div>
 	);

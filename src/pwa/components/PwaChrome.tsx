@@ -32,13 +32,18 @@ function PwaSettingsButton({
 export function PwaHeaderActions({
 	settingsOpen,
 	onToggleSettings,
+	syncIndicator,
 }: {
 	settingsOpen: boolean;
 	onToggleSettings: () => void;
+	syncIndicator?: React.ReactNode;
 }) {
 	return (
 		<div className="pwa-header-actions">
-			<PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />
+			<div className="pwa-settings-status">
+				<PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />
+				{syncIndicator}
+			</div>
 		</div>
 	);
 }
