@@ -54,6 +54,7 @@ export function useReminderMutations(options: {
 			enqueue(change);
 			discardReminderDraft(modal, config.folderPath);
 			closeModal();
+			showToast('success', modal.mode === 'create' ? 'Reminder created' : 'Reminder updated');
 		} catch (error) { if (sessionCurrent()) report(error); }
 		finally { preparingRef.current = false; if (sessionCurrent()) setSaving(false); }
 	};
@@ -78,7 +79,10 @@ export function useReminderMutations(options: {
 			const previous = remindersRef.current.find(item => item.id === id);
 			if (!previous) throw new Error('Refresh reminders before changing this reminder.');
 			const change = await recordChange(id, 'complete', { completed: !completed }, predictReminderCompletion(previous, !completed));
-			if (current()) enqueue(change);
+			if (current()) {
+				enqueue(change);
+				showToast('success', completed ? 'Reminder reopened' : 'Reminder completed');
+			}
 		} catch (error) { if (current()) report(error); }
 	};
 	const deleteReminder = async (id: string, expectedRevision?: string, filePath?: string) => {
@@ -89,6 +93,7 @@ export function useReminderMutations(options: {
 			if (!current()) return;
 			enqueue(change);
 			closeModal();
+			showToast('success', 'Reminder deleted');
 		} catch (error) { if (current()) report(error); }
 	};
 	const persistReorder = async (project: string, orderedIds: string[]) => {
