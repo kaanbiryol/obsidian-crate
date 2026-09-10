@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export function useSheetTransition(onClosed: () => void): {
 	isClosing: boolean;
@@ -26,6 +26,14 @@ export function useSheetTransition(onClosed: () => void): {
 		setIsClosing(false);
 		onClosed();
 	}, [onClosed]);
+
+	useEffect(() => {
+		if (!isClosing) return;
+		// The normal exit takes 260ms. If its completion callback is lost,
+		// unmount the closed sheet so its backdrop and background lock cannot linger.
+		const timeout = window.setTimeout(finishClose, 1000);
+		return () => window.clearTimeout(timeout);
+	}, [isClosing, finishClose]);
 
 	return { isClosing, requestClose, cancelClose, finishClose };
 }
