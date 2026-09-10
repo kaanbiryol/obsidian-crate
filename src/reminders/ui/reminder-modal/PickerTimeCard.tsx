@@ -49,7 +49,13 @@ export function PickerTimeCard({ label, detail, controlIcon, controlEmptyLabel, 
 					icon={controlIcon}
 					hasValue={Boolean(value)}
 					emptyLabel={controlEmptyLabel ?? label}
-				>{input}</PickerNativeControl>
+					>
+						{value && <span className="picker-time-display" hidden aria-hidden="true">
+							{new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+								.format(new Date(2000, 0, 1, hour, minute))}
+						</span>}
+						{input}
+					</PickerNativeControl>
 				: input}
 		</PickerFieldRow>
 	);

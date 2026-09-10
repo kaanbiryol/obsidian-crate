@@ -1,5 +1,35 @@
 // Fit the active picker to its content, shrinking only when it needs to scroll.
 @mixin styles {
+  html[data-pwa-input="pointer"] & .pwa-date-picker-sheet {
+    // Keep the formatted label visible while iOS owns the native date popover.
+    // The transparent input still receives taps and opens the system picker.
+    .picker-native-control .picker-date-display,
+    .picker-native-control .picker-time-display,
+    .picker-native-control:focus-within .picker-native-control-empty {
+      display: block;
+    }
+
+    .reminder-picker .picker-native-control :is(.picker-date-input, .picker-time-input) {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      max-width: none;
+      opacity: 0;
+    }
+
+    .picker-time-display {
+      grid-area: 1 / 1;
+      font-size: var(--reminder-font-base);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .reminder-picker :is(.picker-date-field, .picker-time-card):not(:active) {
+      background: transparent;
+    }
+  }
+
   @media (hover: none) {
     // Touch browsers retain hover and focus after release. Keep feedback tied
     // to the press, while leaving keyboard focus outlines intact.
