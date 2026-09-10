@@ -88,6 +88,12 @@ try {
 			const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
 			await card.tap();
 			await expect(title).toBeFocused();
+			await editor.getByRole('heading', { name: 'Edit reminder', exact: true }).tap();
+			await expect(title).toBeFocused();
+			await editor.locator('.reminder-modal-header').tap({ position: { x: 3, y: 3 } });
+			await expect(title).toBeFocused();
+			await editor.locator('.modal-form').tap({ position: { x: 2, y: 80 } });
+			await expect(title).toBeFocused();
 			await expectNoTouchRing(title);
 			await title.fill('Keep this draft while choosing');
 			await checkNativeEditorGestures(page, title);

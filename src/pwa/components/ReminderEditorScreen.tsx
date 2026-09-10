@@ -69,6 +69,32 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const editorRef = useRef<HTMLDivElement | null>(null);
 	useEditorSheetHeight(editorRef, isActive);
+	useEffect(() => {
+		const editor = editorRef.current;
+		if (!editor) return;
+		let moved = false;
+		const startTouch = () => { moved = false; };
+		const moveTouch = () => { moved = true; };
+		const keepEditorFocus = (event: Event) => {
+			if (event.type === 'touchend' && moved) return;
+			if (!(event.target instanceof Element)) return;
+			const control = event.target.closest('button, input, textarea, select, a[href], label, [contenteditable="true"], [role="button"], [role="option"]');
+			if (!control) event.preventDefault();
+		};
+		// Cancel the tap's focus transfer, not touchstart, so drags on empty
+		// sheet space can still scroll. Actual fields and actions stay native.
+		editor.addEventListener('touchstart', startTouch, { passive: true });
+		editor.addEventListener('touchmove', moveTouch, { passive: true });
+		editor.addEventListener('touchend', keepEditorFocus, { passive: false });
+		editor.addEventListener('mousedown', keepEditorFocus);
+		return () => {
+			editor.removeEventListener('touchstart', startTouch);
+			editor.removeEventListener('touchmove', moveTouch);
+			editor.removeEventListener('touchend', keepEditorFocus);
+			editor.removeEventListener('mousedown', keepEditorFocus);
+		};
+	}, []);
+
 	const setEditorRef = useCallback((element: HTMLDivElement | null) => {
 		editorRef.current = element;
 		if (isActive) dialogRef(element);
