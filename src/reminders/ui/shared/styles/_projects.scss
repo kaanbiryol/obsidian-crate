@@ -62,7 +62,7 @@
 }
 
 // A parent and its children share one surface; the disclosure stays inside it.
-.reminders-view.is-browse .premium-project-group {
+.reminders-browse-view .premium-project-group {
     border: 1px solid var(--crate-project-card-border, var(--crate-divider));
     border-radius: var(--crate-radius-card);
     background: var(--crate-project-card-bg, var(--crate-panel-bg));

@@ -49,7 +49,7 @@ export const BrowseView = memo(function BrowseView({
   // Empty state
   if (projects.length === 0) {
     return (
-      <div className={`flex flex-col h-full ${className}`}>
+      <div className={`reminders-browse-view flex flex-col h-full ${className}`}>
         {showHeader && headerContent}
         <div className="flex-1 flex items-center justify-center">
           <EmptyState
@@ -65,7 +65,7 @@ export const BrowseView = memo(function BrowseView({
   }
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
+    <div className={`reminders-browse-view flex flex-col h-full ${className}`}>
       {showHeader && headerContent}
 
       <div
