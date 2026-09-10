@@ -22,11 +22,12 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 	showToast: ShowToast;
 }): {
 	push: PushState;
+	initialCheckComplete: boolean;
 	refreshPushState: () => Promise<void>;
 	enablePushNotifications: () => Promise<void>;
 	disablePushNotifications: () => Promise<void>;
 } {
-	const [state, setState] = useState<{ authToken: string | null; push: PushState }>({ authToken, push: CHECKING });
+	const [state, setState] = useState<{ authToken: string | null; push: PushState; initialCheckComplete: boolean }>({ authToken, push: CHECKING, initialCheckComplete: false });
 	const sequence = useRef(0);
 	const inFlight = useRef<{ authToken: string; promise: Promise<void> } | null>(null);
 
@@ -36,7 +37,7 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 		const operation = ++sequence.current;
 		const sessionCurrent = capturePwaSession();
 		const isCurrent = () => operation === sequence.current && sessionCurrent();
-		const update = (push: PushState) => { if (isCurrent()) setState({ authToken, push }); };
+		const update = (push: PushState) => { if (isCurrent()) setState(previous => ({ authToken, push, initialCheckComplete: push.phase !== 'checking' || (previous.authToken === authToken && previous.initialCheckComplete) })); };
 		update(CHECKING);
 		const promise = (async () => {
 			try {
@@ -126,8 +127,8 @@ export function usePushNotifications({ authToken, apiFetch, showToast }: {
 		if (operation !== sequence.current) return;
 		// Logout revokes owned server rows even if browser cleanup fails.
 		if (subscription && !await subscription.unsubscribe()) throw new Error('Browser push cleanup failed');
-		if (operation === sequence.current) setState({ authToken: null, push: { phase: 'off', status: null } });
+		if (operation === sequence.current) setState({ authToken: null, push: { phase: 'off', status: null }, initialCheckComplete: false });
 	}, []);
 
-	return { push: state.authToken === authToken ? state.push : CHECKING, refreshPushState, enablePushNotifications, disablePushNotifications };
+	return { initialCheckComplete: state.authToken === authToken && state.initialCheckComplete, push: state.authToken === authToken ? state.push : CHECKING, refreshPushState, enablePushNotifications, disablePushNotifications };
 }

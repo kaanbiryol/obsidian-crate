@@ -8,6 +8,7 @@ import {
 } from './components/PwaRemindersAppShell';
 import {
 	AUTH_TOKEN_KEY,
+	isStandaloneApp,
 	loadStoredConfig,
 } from './config';
 import {
@@ -102,6 +103,7 @@ function App() {
 	const reminderSync = useReminderSync({ apiFetch, authToken, bootstrapped, config, setSelectedProject });
 	const {
 		push,
+		initialCheckComplete,
 		refreshPushState,
 		enablePushNotifications,
 		disablePushNotifications,
@@ -131,6 +133,7 @@ function App() {
 		setError,
 	} = reminderSync;
 	const initialContentReady = isInitialPwaContentReady({
+		notificationPromptReady: !isStandaloneApp() || initialCheckComplete,
 		authToken,
 		bootstrapped,
 		loading,

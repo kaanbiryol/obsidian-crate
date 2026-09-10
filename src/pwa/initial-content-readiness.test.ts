@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isInitialPwaContentReady } from './initial-content-readiness';
 
 describe('initial PWA content readiness', () => {
-	it('waits only for reminder hydration before revealing authenticated content', () => {
+	it('waits for reminder hydration before revealing authenticated content', () => {
 		expect(isInitialPwaContentReady({
 			authToken: 'token',
 			bootstrapped: true,
@@ -23,3 +23,11 @@ describe('initial PWA content readiness', () => {
 		})).toBe(true);
 	});
 });
+
+ it('reveals reminders and the resolved notification prompt together', () => {
+  const ready = { authToken: 'token', bootstrapped: true, loading: false };
+  expect(isInitialPwaContentReady({ ...ready, notificationPromptReady: false })).toBe(false);
+  expect(isInitialPwaContentReady({ ...ready, notificationPromptReady: true })).toBe(true);
+  expect(isInitialPwaContentReady({ ...ready, loading: true, notificationPromptReady: true })).toBe(false);
+  expect(isInitialPwaContentReady({ ...ready, authToken: null, notificationPromptReady: false })).toBe(true);
+ });
