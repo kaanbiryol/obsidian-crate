@@ -54,7 +54,8 @@ interface DeclarativePushPayload {
 	};
 }
 
-export function createDeclarativePushPayload(payload: PushNotificationPayload): DeclarativePushPayload {
+// iOS may accept a push but never display it when declarative URLs are relative.
+export function createDeclarativePushPayload(payload: PushNotificationPayload, origin: string): DeclarativePushPayload {
 	const params = new URLSearchParams();
 	// The stable ID locates the reminder and its current project after a move.
 	if (payload.project && !payload.reminderId) params.set('project', payload.project);
@@ -65,9 +66,9 @@ export function createDeclarativePushPayload(payload: PushNotificationPayload): 
 		notification: {
 			title: payload.title,
 			body: payload.body,
-			navigate: `/notifications${params.size > 0 ? `?${params.toString()}` : ''}`,
+			navigate: new URL(`/notifications${params.size > 0 ? `?${params.toString()}` : ''}`, origin).href,
 			...(payload.tag ? { tag: payload.tag } : {}),
-			icon: '/notifications/crate-icon-192.png',
+			icon: new URL('/notifications/crate-icon-192.png', origin).href,
 			data: {
 				project: payload.reminderId ? '' : payload.project ?? '',
 				reminderId: payload.reminderId ?? '',
@@ -131,7 +132,7 @@ function isRetryablePushStatus(status: number): boolean {
 export async function sendToAllSubscriptions(
 	db: D1Database,
 	payload: PushNotificationPayload,
-	options: { subscriptionIds?: readonly string[] } = {},
+	options: { origin: string; subscriptionIds?: readonly string[] },
 ): Promise<PushDeliveryResult> {
 	const allSubscriptions = await queryRows<PushSubscriptionRow>(
 		db.prepare(`SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE ${PUSH_RECIPIENT_AUTHORITY}`).bind(Date.now()),
@@ -154,7 +155,7 @@ export async function sendToAllSubscriptions(
 
 	const serializedKeys = await getOrCreateVapidKeys(db);
 	const keys = await deserializeVapidKeys(serializedKeys);
-	const payloadString = JSON.stringify(createDeclarativePushPayload(payload));
+	const payloadString = JSON.stringify(createDeclarativePushPayload(payload, options.origin));
 	let sent = 0;
 	let failed = 0;
 	let pruned = 0;

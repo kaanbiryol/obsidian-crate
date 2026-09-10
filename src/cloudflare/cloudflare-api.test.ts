@@ -89,6 +89,7 @@ describe('CloudflareApiClient', () => {
 
 	it('builds a module upload with D1, R2, and declarative Durable Object bindings', () => {
 		const multipart = buildWorkerMultipartBody({
+			publicOrigin: 'https://worker.test',
 			artifacts,
 			d1DatabaseId: '01234567-89ab-cdef-0123-456789abcdef',
 			r2BucketName: 'crate-0123456789abcdef',
@@ -97,6 +98,7 @@ describe('CloudflareApiClient', () => {
 
 		expect(multipart.contentType).toMatch(/^multipart\/form-data; boundary=crate-/);
 		expect(body).toContain('"type":"d1","name":"DB"');
+		expect(body).toContain('"name":"CRATE_PUBLIC_ORIGIN","text":"https://worker.test"');
 		expect(body).toContain('"type":"r2_bucket","name":"BUCKET"');
 		expect(body).toContain('"name":"REMINDER_ALARMS","class_name":"ReminderAlarm"');
 		expect(body).not.toContain('"name":"SETUP"');

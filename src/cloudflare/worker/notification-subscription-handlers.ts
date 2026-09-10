@@ -78,12 +78,12 @@ export async function handleListSubscriptions(db: D1Database): Promise<Response>
 	return corsResponse({ subscriptions: rows });
 }
 
-export async function handleTestPush(db: D1Database): Promise<Response> {
+export async function handleTestPush(db: D1Database, origin: string): Promise<Response> {
 	const delivery = await sendToAllSubscriptions(db, {
 		title: 'Crate Test',
 		body: 'If you see this, push notifications are working!',
 		tag: 'crate-test',
-	});
+	}, { origin });
 	return corsResponse({
 		sent: delivery.sent,
 		failed: delivery.failed,

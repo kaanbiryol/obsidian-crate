@@ -37,14 +37,14 @@ describe('createDeclarativePushPayload', () => {
 			tag: 'reminder-123',
 			project: 'Shipping',
 			reminderId: 'reminder-123',
-		})).toEqual({
+		}, 'https://worker.test')).toEqual({
 			web_push: 8030,
 			notification: {
 				title: 'Review release notes',
 				body: 'Shipping',
-				navigate: '/notifications?reminderId=reminder-123',
+				navigate: 'https://worker.test/notifications?reminderId=reminder-123',
 				tag: 'reminder-123',
-				icon: '/notifications/crate-icon-192.png',
+				icon: 'https://worker.test/notifications/crate-icon-192.png',
 				data: {
 					project: '',
 					reminderId: 'reminder-123',
@@ -57,14 +57,14 @@ describe('createDeclarativePushPayload', () => {
 		expect(createDeclarativePushPayload({
 			title: 'Test notification',
 			body: 'Push notifications are working.',
-		})).toMatchObject({
+		}, 'https://worker.test')).toMatchObject({
 			web_push: 8030,
 			notification: {
-				navigate: '/notifications',
+				navigate: 'https://worker.test/notifications',
 				data: { project: '', reminderId: '' },
 			},
 		});
-		expect(createDeclarativePushPayload({ title: 'Test', body: '' }).notification).not.toHaveProperty('tag');
+		expect(createDeclarativePushPayload({ title: 'Test', body: '' }, 'https://worker.test').notification).not.toHaveProperty('tag');
 	});
 });
 
@@ -159,6 +159,7 @@ describe('sendToAllSubscriptions', () => {
 		const result = await sendToAllSubscriptions(
 			{ prepare } as unknown as D1Database,
 			{ title: 'Test', body: '' },
+			{ origin: 'https://worker.test' },
 		);
 
 		expect(result).toMatchObject({ sent: 12, failed: 0 });
@@ -183,7 +184,7 @@ describe('sendToAllSubscriptions', () => {
 		});
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 
-		const result = await sendToAllSubscriptions({ prepare } as unknown as D1Database, { title: 'Test', body: '' });
+		const result = await sendToAllSubscriptions({ prepare } as unknown as D1Database, { title: 'Test', body: '' }, { origin: 'https://worker.test' });
 
 		expect(result).toMatchObject({ failed: 0, quarantined: 1, failedSubscriptionIds: [] });
 		expect(prepare).toHaveBeenCalledWith(expect.stringContaining('UPDATE push_subscriptions'));
@@ -207,7 +208,7 @@ describe('sendToAllSubscriptions', () => {
 		});
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 
-		const result = await sendToAllSubscriptions({ prepare } as unknown as D1Database, { title: 'Test', body: '' });
+		const result = await sendToAllSubscriptions({ prepare } as unknown as D1Database, { title: 'Test', body: '' }, { origin: 'https://worker.test' });
 
 		expect(result).toMatchObject({ failed: 1, quarantined: 0, failedSubscriptionIds: ['retry-subscription'] });
 	});

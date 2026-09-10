@@ -32,7 +32,7 @@ export async function handleNotificationsRoute(
 		return await withDatabase(db, requiredDb => handleCreateRemindersEnrollmentToken(requiredDb, request));
 	}
 	if (path === '/notifications/test' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleTestPush(requiredDb));
+		return await withDatabase(db, requiredDb => handleTestPush(requiredDb, new URL(request.url).origin));
 	}
 
 	return null;

@@ -21,7 +21,7 @@ export function assertWorkerTarget(settings: CloudflareWorkerSettings, metadata:
 	const allBindings = settings.bindings ?? [];
 	const rateBindings = allBindings.filter(binding => binding.type === 'ratelimit');
 	if (rateBindings.length > 1 || (retired && rateBindings.length) || rateBindings.some(binding => binding.name !== NOTIFICATION_RATE_BINDING || binding.namespace_id !== notificationRateNamespace(metadata.r2BucketName))) throw new Error('Reset blocked: notification rate limit bindings do not match this vault.');
-	const bindings = allBindings.filter(binding => binding.type !== 'ratelimit');
+	const bindings = allBindings.filter(binding => binding.type !== 'ratelimit' && !(binding.type === 'plain_text' && binding.name === 'CRATE_PUBLIC_ORIGIN'));
 	const databases = bindings.filter(binding => binding.type === 'd1');
 	const buckets = bindings.filter(binding => binding.type === 'r2_bucket');
 	if (

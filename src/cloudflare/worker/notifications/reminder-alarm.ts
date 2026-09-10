@@ -249,7 +249,7 @@ export class ReminderAlarm implements DurableObject {
 				tag: reminder.reminderId,
 				project: scheduled.project ?? undefined,
 				reminderId: reminder.reminderId,
-			}, { subscriptionIds: pendingSubscriptionIds });
+			}, { origin: this.env.CRATE_PUBLIC_ORIGIN ?? '', subscriptionIds: pendingSubscriptionIds });
 			if (delivery.failed > 0) {
 				if (!await this.writeIfOccurrenceCurrent(reminder.dueDatetime, () => this.state.storage.put(PENDING_SUBSCRIPTION_IDS_KEY, delivery.failedSubscriptionIds))) return;
 				throw new Error(`Push delivery failed for ${delivery.failed} subscription(s)`);

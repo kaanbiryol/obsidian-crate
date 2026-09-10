@@ -48,8 +48,8 @@ it.each(['x', '漢', '🙂', '"\n'])('delivers a maximum-size reminder with %s d
 	const title = character.repeat(1024 / character.length);
 	const project = '漢'.repeat(80);
 	const reminderId = 'e1_00020000_' + 'a'.repeat(100);
-	const payload = createDeclarativePushPayload({ title, body: project, project, reminderId, tag: reminderId });
-	expect(payload.notification.navigate).toBe(`/notifications?reminderId=${reminderId}`);
+	const payload = createDeclarativePushPayload({ title, body: project, project, reminderId, tag: reminderId }, 'https://worker.test');
+	expect(payload.notification.navigate).toBe(`https://worker.test/notifications?reminderId=${reminderId}`);
 	expect(JSON.stringify(payload)).not.toContain('�');
 	const vapid = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
 	const keys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);

@@ -163,8 +163,10 @@ export async function provisionCloudflareDeployment(input: {
 		await ensureR2Bucket(input.api, input.accountId, input.metadata.r2BucketName, fence);
 		input.onProgress?.('Initializing the database schema…');
 		await fence.mutate(() => input.api.queryD1(input.accountId, databaseId, input.artifacts.d1Schema));
+		const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata, fence);
 		input.onProgress?.('Uploading the Worker and web app to Cloudflare…');
 		await fence.mutate(() => input.api.uploadWorker({
+			publicOrigin: `https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`,
 			accountId: input.accountId,
 			workerName: input.metadata.workerName,
 			artifacts: input.artifacts,
@@ -179,7 +181,6 @@ export async function provisionCloudflareDeployment(input: {
 		));
 
 		input.onProgress?.('Enabling the server address…');
-		const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata, fence);
 		if (input.metadata.workersSubdomain !== workersSubdomain) {
 			input.metadata.workersSubdomain = workersSubdomain;
 			await input.onMetadataChanged();

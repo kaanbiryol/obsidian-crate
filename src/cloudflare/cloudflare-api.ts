@@ -104,6 +104,7 @@ function concatBytes(parts: Uint8Array[]): ArrayBuffer {
 }
 
 export function buildWorkerMultipartBody(input: {
+	publicOrigin: string;
 	artifacts: CloudflareDeploymentArtifacts;
 	d1DatabaseId: string;
 	r2BucketName: string;
@@ -116,6 +117,7 @@ export function buildWorkerMultipartBody(input: {
 			'workers/tag': 'crate',
 		},
 		bindings: [
+				{ type: 'plain_text', name: 'CRATE_PUBLIC_ORIGIN', text: new URL(input.publicOrigin).origin },
 				{ type: 'd1', name: 'DB', id: input.d1DatabaseId },
 				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: input.r2BucketName },
 				{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },
@@ -331,6 +333,7 @@ export class CloudflareApiClient {
 	}
 
 	async uploadWorker(input: {
+		publicOrigin: string;
 		accountId: string;
 		workerName: string;
 		artifacts: CloudflareDeploymentArtifacts;

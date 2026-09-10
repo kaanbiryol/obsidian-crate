@@ -3,6 +3,7 @@
 	"main": ".generated/cloudflare/worker.mjs",
 	"compatibility_date": "2026-08-18",
 	"workers_dev": true,
+	"vars": { "CRATE_PUBLIC_ORIGIN": "http://localhost:8787" },
 	"no_bundle": true,
 	"triggers": {
 		"crons": [
