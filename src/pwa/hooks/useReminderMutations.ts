@@ -33,6 +33,7 @@ export function useReminderMutations(options: {
 	const { changes, ready, outboxRef, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges } = useReminderOutbox({ ...options, folderPath: options.config.folderPath });
 	const { closeModal, config, ensureCanMutate, projects, remindersRef, selectedProject, setReminders, setSaving, showToast } = options;
 	const preparingRef = useRef(false);
+	const pendingPreparations = useRef(0);
 	const report = (error: unknown) => showToast('error', error instanceof Error ? error.message : String(error));
 	const enqueue = (change: PendingReminderChange) => {
 		if (!ready || !outboxRef.current) throw new Error('Pending changes are still loading. Reopen Crate if this continues.');
@@ -75,6 +76,7 @@ export function useReminderMutations(options: {
 	const toggleReminderCompleted = async (id: string, completed: boolean) => {
 		if (!ensureCanMutate()) return;
 		const current = capturePwaSession();
+		pendingPreparations.current += 1;
 		try {
 			const previous = remindersRef.current.find(item => item.id === id);
 			if (!previous) throw new Error('Refresh reminders before changing this reminder.');
@@ -84,10 +86,12 @@ export function useReminderMutations(options: {
 				showToast('success', completed ? 'Reminder reopened' : 'Reminder completed');
 			}
 		} catch (error) { if (current()) report(error); }
+		finally { pendingPreparations.current -= 1; }
 	};
 	const deleteReminder = async (id: string, expectedRevision?: string, filePath?: string) => {
 		if (!ensureCanMutate()) return;
 		const current = capturePwaSession();
+		pendingPreparations.current += 1;
 		try {
 			const change = await recordChange(id, 'delete', {}, undefined, expectedRevision, filePath);
 			if (!current()) return;
@@ -95,10 +99,12 @@ export function useReminderMutations(options: {
 			closeModal();
 			showToast('success', 'Reminder deleted');
 		} catch (error) { if (current()) report(error); }
+		finally { pendingPreparations.current -= 1; }
 	};
 	const persistReorder = async (project: string, orderedIds: string[]) => {
 		if (!ensureCanMutate()) { setReminders(current => [...current]); return; }
 		const current = capturePwaSession();
+		pendingPreparations.current += 1;
 		try {
 			const operationId = await newReminderOperationId();
 			if (!current()) return;
@@ -109,6 +115,7 @@ export function useReminderMutations(options: {
 				status: 'pending', attempts: 0, retryAt: 0,
 			});
 		} catch (error) { if (current()) { setReminders(reminders => [...reminders]); report(error); } }
+		finally { pendingPreparations.current -= 1; }
 	};
 	const retryChange = (operationId: string) => {
 		try { outboxRef.current?.retry(operationId); void outboxRef.current?.drain(); }
@@ -135,5 +142,5 @@ export function useReminderMutations(options: {
 		return modal;
 	};
 	const visible = useMemo(() => applyReminderChanges(options.reminders, projects, changes), [options.reminders, projects, changes]);
-	return { saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, ...visible, changes, ready, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
+	return { isPreparingMutation: () => preparingRef.current || pendingPreparations.current > 0, saveReminder, toggleReminderCompleted, deleteReminder, persistReorder, ...visible, changes, ready, retryChange, discardChange, prepareEdit, storageError, retryInitialization, recoveryChanges, recoverChanges, quarantinedChanges, removeQuarantinedChanges };
 }

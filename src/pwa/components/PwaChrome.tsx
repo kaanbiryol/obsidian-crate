@@ -2,6 +2,7 @@ import React from 'react';
 import { PwaButton as Button } from './PwaButton';
 import {
 	Bell,
+	Download,
 	Settings,
 } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
@@ -69,7 +70,11 @@ export function PwaTopNotices({
 		<div className="pwa-top-notices">
 			{updateAvailable && (
 				<div className="pwa-update-banner" role="status">
-					<span className="pwa-update-banner__text">Update available</span>
+					<span className="pwa-update-banner__icon" aria-hidden="true"><Download size={18} strokeWidth={1.8} /></span>
+					<div className="pwa-update-banner__copy">
+						<span className="pwa-update-banner__text">Update available</span>
+						<span className="pwa-update-banner__detail">Ready to install.</span>
+					</div>
 					<button className="pwa-update-button" type="button" onClick={onReload} disabled={updating} aria-busy={updating} aria-label="Update to the latest version">
 						<span className="pwa-update-button__label" aria-hidden={updating}>Update</span>
 						<span className="pwa-update-button__label pwa-update-button__label--busy" aria-hidden={!updating}>Updating…</span>

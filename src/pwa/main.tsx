@@ -165,7 +165,7 @@ function App() {
 		showToast,
 	});
 
-	const updateAvailable = usePwaRefreshLifecycle({
+	const updateVersion = usePwaRefreshLifecycle({
 		authToken,
 		bootstrapped,
 		hydratedCacheRef,
@@ -225,6 +225,7 @@ function App() {
 		retryChange,
 		discardChange,
 		prepareEdit,
+		isPreparingMutation,
 		storageError,
 		retryInitialization,
 		recoveryChanges,
@@ -262,8 +263,14 @@ function App() {
 		pendingChangesReady: mutationsReady || Boolean(storageError),
 	});
 
-	const { updating, update } = usePwaUpdate(showToast,
-		initialContentReady && (!authToken || mutationsReady || Boolean(storageError)));
+	const { updating, update } = usePwaUpdate(showToast, initialContentReady, {
+		version: updateVersion,
+		canApply: () => initialContentReady && mutationsReady && Boolean(authToken)
+			&& !modal && !settingsOpen && !saving && !loggingOut && !reorderDragging
+			&& !launchReminderId && !loading && !refreshing && !isOffline
+			&& !storageError && changes.length === 0 && recoveryChanges.length === 0
+			&& quarantinedChanges.length === 0 && !isPreparingMutation(),
+	});
 
 	const launchChange = changes.find(change => launchReminderId && (change.recordId === launchReminderId || change.optimistic?.id === launchReminderId));
 	useLaunchReminderModal({
@@ -396,7 +403,7 @@ function App() {
 						<PwaTopNotices
 							statusText={statusText}
 							statusKind={statusKind}
-							updateAvailable={updateAvailable}
+							updateAvailable={Boolean(updateVersion)}
 							updating={updating}
 							showNotificationPrompt={canShowNotificationPrompt && !isProjectDetail}
 							onReload={update}

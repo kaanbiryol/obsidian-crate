@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchPwaAssetVersion } from './api';
-import { applyPwaUpdate, waitForWorkerActivation } from './apply-update';
+import { applyPwaUpdate, preparePwaUpdate, waitForWorkerActivation } from './apply-update';
 
 vi.mock('./api', () => ({ fetchPwaAssetVersion: vi.fn() }));
 
@@ -36,11 +36,49 @@ describe('reliable PWA updates', () => {
 			scope: '/notifications', updateViaCache: 'none',
 		});
 		worker.transition('installed');
-		expect(worker.postMessage).toHaveBeenCalledWith({ type: 'CRATE_ACTIVATE_UPDATE' });
+		await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith({ type: 'CRATE_ACTIVATE_UPDATE' }));
 		expect(reload).not.toHaveBeenCalled();
 		worker.transition('activated');
 		await update;
 		expect(reload).toHaveBeenCalledOnce();
+	});
+
+	it('downloads without activating while an editor is open', async () => {
+		const worker = new UpdateWorker();
+		vi.stubGlobal('navigator', { serviceWorker: { register: vi.fn().mockResolvedValue({ installing: worker }) } });
+		const prepared = preparePwaUpdate('new');
+		worker.transition('installed');
+		await prepared;
+		expect(worker.postMessage).not.toHaveBeenCalled();
+		await expect(applyPwaUpdate(undefined, { version: 'new', canApply: () => false })).resolves.toBe(false);
+		expect(worker.postMessage).not.toHaveBeenCalled();
+		expect(reload).not.toHaveBeenCalled();
+	});
+
+	it('defers if the app becomes unsafe during activation', async () => {
+		const worker = new UpdateWorker();
+		worker.state = 'installed';
+		vi.stubGlobal('navigator', { serviceWorker: { register: vi.fn().mockResolvedValue({ waiting: worker }) } });
+		let safe = true;
+		const beforeReload = vi.fn();
+		const update = applyPwaUpdate(beforeReload, { canApply: () => safe });
+		await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalled());
+		safe = false;
+		worker.transition('activated');
+		await expect(update).resolves.toBe(false);
+		expect(beforeReload).not.toHaveBeenCalled();
+		expect(reload).not.toHaveBeenCalled();
+	});
+
+	it('rechecks visibility after the reload transition and does not mark a cancelled reload', async () => {
+		vi.stubGlobal('navigator', {});
+		let safe = true;
+		const beforeNavigation = vi.fn(() => true);
+		await expect(applyPwaUpdate(async () => { safe = false; }, {
+			canApply: () => safe, beforeNavigation,
+		})).resolves.toBe(false);
+		expect(beforeNavigation).not.toHaveBeenCalled();
+		expect(reload).not.toHaveBeenCalled();
 	});
 
 	it('does not reload an outdated worker or failed registration', async () => {

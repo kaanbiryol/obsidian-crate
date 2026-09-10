@@ -197,6 +197,85 @@ async function testUpdate(browser, launchMode) {
   }
 }
 
+async function testAutomaticUpdate(browser) {
+  let assets = before;
+  let releaseWrite;
+  let writeStarted = false;
+  const writeGate = new Promise(resolve => { releaseWrite = resolve; });
+  const handlers = new Map([before, after].map(version => [version, createPwaPreviewServer({ assets: version, origin: 'http://127.0.0.1' })]));
+  const server = http.createServer(async (req, res) => {
+    if (req.url === '/reminders/update' && req.method === 'POST') {
+      writeStarted = true;
+      await writeGate;
+    }
+    handlers.get(assets).emit('request', req, res);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'standalone', { value: true });
+    // Model Home Screen suspension/resume; physical iOS still needs device QA.
+    window.testVisibility = 'visible';
+    Object.defineProperty(document, 'visibilityState', { get: () => window.testVisibility });
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+    await page.getByRole('group', { name: cardName, exact: true }).waitFor();
+    await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+    const other = await context.newPage();
+    await other.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+    await other.getByRole('group', { name: cardName, exact: true }).click();
+    const otherTitle = other.getByRole('textbox', { name: 'Reminder title', exact: true });
+    await otherTitle.fill('Keep this other tab draft');
+
+    await page.getByRole('group', { name: cardName, exact: true }).click();
+    const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
+    await title.fill('Saved before automatic update');
+    let navigations = 0;
+    page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
+    assets = after;
+    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await page.waitForFunction(async () => Boolean((await navigator.serviceWorker.getRegistration())?.waiting));
+    await page.waitForTimeout(2_500);
+    expect(navigations).toBe(0);
+    await expect(title).toHaveText('Saved before automatic update');
+
+    await page.getByRole('button', { name: 'Save reminder', exact: true }).click();
+    await expect(title).toHaveCount(0);
+    await expect.poll(() => writeStarted).toBe(true);
+    await page.waitForTimeout(2_500);
+    expect(navigations).toBe(0); // The editor closed, but its write is still pending.
+
+    await page.evaluate(() => {
+      window.testVisibility = 'hidden';
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    releaseWrite();
+    await page.waitForTimeout(2_500);
+    expect(navigations).toBe(0);
+    await page.evaluate(() => {
+      window.testVisibility = 'visible';
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('pageshow')); // iOS can deliver both.
+    });
+    await expect.poll(() => navigations, { timeout: 15_000 }).toBe(1);
+    await expect(page.locator('html')).not.toHaveAttribute('data-pwa-updating');
+    await expect(page.getByRole('group', { name: 'Saved before automatic update. Press Enter to edit reminder.', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Update to the latest version', exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => new URL(navigator.serviceWorker.controller.scriptURL).searchParams.get('v'))).toBe(afterVersion);
+    await expect(otherTitle).toHaveText('Keep this other tab draft');
+    expect(await other.locator('script[type="module"]').getAttribute('src')).toContain(beforeVersion);
+    await page.waitForTimeout(2_500);
+    expect(navigations).toBe(1);
+  } finally {
+    releaseWrite();
+    await context.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
 for (const browserType of [chromium, webkit]) {
   const browser = await browserType.launch();
   try {
@@ -204,5 +283,7 @@ for (const browserType of [chromium, webkit]) {
       await testUpdate(browser, mode);
       console.log(`${browserType.name()}: Safari update → ${mode} installation → repeated Home Screen launch passed`);
     }
+    await testAutomaticUpdate(browser);
+    console.log(`${browserType.name()}: automatic update preserves editors and pending writes, waits for Home Screen resume, and keeps other tabs intact`);
   } finally { await browser.close(); }
 }

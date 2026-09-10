@@ -54,6 +54,15 @@ function harness() {
 function body(change: PendingReminderChange): Record<string, unknown> { return JSON.parse(change.body) as Record<string, unknown>; }
 
 describe('PWA optimistic mutations', () => {
+	it('blocks automatic reload while commands are being prepared before enqueue', async () => {
+		const { hook } = harness();
+		const complete = hook.toggleReminderCompleted('one', false);
+		const reorder = hook.persistReorder('Inbox', ['two', 'one']);
+		expect(hook.isPreparingMutation()).toBe(true);
+		await Promise.all([complete, reorder]);
+		expect(hook.isPreparingMutation()).toBe(false);
+	});
+
 	it('persists a save and closes the editor without waiting for its network attempt', async () => {
 		const { hook, render, outbox, changes, closeModal, setSaving, apiFetch, commitReminderState, memory } = harness();
 		const modal = draft();

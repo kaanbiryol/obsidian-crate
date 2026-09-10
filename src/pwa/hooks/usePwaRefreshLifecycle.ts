@@ -16,8 +16,8 @@ export function usePwaRefreshLifecycle({
 	hydratedCacheRef: MutableRefObject<boolean>;
 	loadReminders: LoadReminders;
 	refreshPushState: () => Promise<void>;
-}): boolean {
-	const [updateAvailable, setUpdateAvailable] = useState(false);
+}): string | null {
+	const [updateVersion, setUpdateVersion] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!bootstrapped || !authToken) return;
@@ -31,7 +31,7 @@ export function usePwaRefreshLifecycle({
 		try {
 			const assetVersion = await fetchPwaAssetVersion();
 			if (assetVersion && assetVersion !== PWA_ASSET_VERSION) {
-				setUpdateAvailable(true);
+				setUpdateVersion(assetVersion);
 			}
 		} catch {
 			// Version checks are opportunistic and should not disrupt reminder use.
@@ -63,5 +63,5 @@ export function usePwaRefreshLifecycle({
 		};
 	}, [authToken, bootstrapped, checkForUpdate, loadReminders, refreshPushState]);
 
-	return updateAvailable;
+	return updateVersion;
 }
