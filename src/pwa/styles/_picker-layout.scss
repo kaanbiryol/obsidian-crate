@@ -109,6 +109,12 @@
       margin-inline-end: 0;
     }
 
+    .recurrence-day-button {
+      // Match the 44px stepper plus its row's 2px top and bottom padding.
+      height: calc(var(--crate-picker-row-height) + 4px);
+      min-height: calc(var(--crate-picker-row-height) + 4px);
+    }
+
     .recurrence-stepper-button {
       --crate-icon-button-control-size: 44px;
       width: 44px;
