@@ -36,7 +36,8 @@ export function PwaSyncIndicator(props: PwaSyncIndicatorProps) {
 	const { state, label } = syncStatus(props);
 	return (
 		<div className="pwa-sync-indicator" data-sync-state={state} role="status" aria-live="polite" aria-atomic="true" title={label}>
-			<span key={state} className="pwa-sync-indicator__dot" aria-hidden="true" />
+			<span className="pwa-sync-indicator__halo" aria-hidden="true" />
+			<span className="pwa-sync-indicator__dot" aria-hidden="true" />
 			<span className="pwa-sync-indicator__label">{label}</span>
 		</div>
 	);

@@ -7,40 +7,50 @@
 		width: 28px;
 		height: 28px;
 		color: var(--text-muted);
-		transition: color 180ms ease;
+		transition: color 360ms cubic-bezier(.22, 1, .36, 1);
 
 		&[data-sync-state="synced"] { color: var(--crate-success); }
-		&[data-sync-state="syncing"] { color: var(--accent); }
-		&[data-sync-state="cached"] { color: var(--text-warning, #d99a38); }
+		&[data-sync-state="syncing"] { color: var(--text-warning, #d99a38); }
 		&[data-sync-state="error"] { color: var(--text-error); }
 	}
 
 	.pwa-sync-indicator__dot {
-		position: relative;
+		grid-area: 1 / 1;
 		width: 10px;
 		height: 10px;
 		border-radius: 50%;
 		background: currentColor;
-		box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+		transform: scale(1);
+		transition: transform 360ms cubic-bezier(.22, 1, .36, 1);
+	}
 
-		&::before, &::after {
+	.pwa-sync-indicator__halo {
+		grid-area: 1 / 1;
+		width: 22px;
+		height: 22px;
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 360ms ease;
+
+		&::before {
 			content: '';
-			position: absolute;
-			inset: -1px;
-			border: 1.5px solid currentColor;
-			border-radius: inherit;
-			opacity: 0;
+			display: block;
+			width: 100%;
+			height: 100%;
+			border-radius: 50%;
+			background: color-mix(in srgb, currentColor 14%, transparent);
+			animation: pwa-sync-breathe 1.8s ease-in-out infinite;
+			animation-play-state: paused;
 		}
 	}
 
-	.pwa-sync-indicator[data-sync-state="syncing"] .pwa-sync-indicator__dot {
-		animation: pwa-sync-breathe 1.4s ease-in-out infinite;
-		&::before, &::after { animation: pwa-sync-ripple 1.4s ease-out infinite; }
-		&::after { animation-delay: 700ms; }
-	}
-
-	.pwa-sync-indicator[data-sync-state="synced"] .pwa-sync-indicator__dot {
-		animation: pwa-sync-complete 800ms ease-out both;
+	.pwa-sync-indicator[data-sync-state="syncing"] {
+		.pwa-sync-indicator__dot { transform: scale(.92); }
+		.pwa-sync-indicator__halo {
+			opacity: 1;
+			&::before { animation-play-state: running; }
+		}
 	}
 
 	.pwa-sync-indicator__label {
@@ -54,27 +64,17 @@
 		white-space: nowrap;
 	}
 
-	@keyframes pwa-sync-ripple {
-		0% { transform: scale(1); opacity: .65; }
-		100% { transform: scale(2.5); opacity: 0; }
-	}
-
 	@keyframes pwa-sync-breathe {
-		0%, 100% { transform: scale(.9); }
-		50% { transform: scale(1.2); }
-	}
-
-	@keyframes pwa-sync-complete {
-		0% { transform: scale(.7); box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); }
-		40% { transform: scale(1.3); }
-		100% { transform: scale(1); box-shadow: 0 0 0 10px transparent; }
+		0%, 100% { transform: scale(.82); }
+		50% { transform: scale(1); }
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.pwa-sync-indicator { transition: none; }
-		.pwa-sync-indicator[data-sync-state] .pwa-sync-indicator__dot {
-			&, &::before, &::after { animation: none; }
-		}
+		.pwa-sync-indicator,
+		.pwa-sync-indicator__dot,
+		.pwa-sync-indicator__halo { transition: none; }
+		.pwa-sync-indicator .pwa-sync-indicator__dot { transform: none; }
+		.pwa-sync-indicator__halo::before { animation: none; }
 	}
 
 	.pwa-reminder-recovery-preview {
