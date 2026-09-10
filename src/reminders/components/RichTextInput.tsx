@@ -411,8 +411,6 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         handleClick,
         handleKeyDownInternal,
         handlePaste,
-        handleMouseDown,
-        handleTouchStart,
     } = useRichTextInputInteractions({
         onKeyDown,
         onAutocompleteKeyDown,
@@ -423,11 +421,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     });
 
     return (
-        <div
-            onMouseDown={handleMouseDown}
-            onTouchStart={handleTouchStart}
-            className="rich-text-input-shell"
-        >
+        <div className="rich-text-input-shell">
             <div
                 ref={refCallback}
                 contentEditable={!readOnly}

@@ -1,5 +1,5 @@
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
-import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import {
@@ -49,8 +49,7 @@ import type {
 
 // Keep the editor ready for the tap's synchronous focus/keyboard activation.
 import { ReminderSheet } from './components/ReminderSheet';
-const SettingsSheet = lazy(() => import('./components/SettingsSheet')
-	.then(module => ({ default: module.SettingsSheet })));
+import { SettingsSheet } from './components/SettingsSheet';
 const ReminderSyncNotice = lazy(() => import('./components/ReminderSyncNotice')
 	.then(module => ({ default: module.ReminderSyncNotice })));
 const ReminderRecoveryNotice = lazy(() => import('./components/ReminderRecoveryNotice')
@@ -415,13 +414,14 @@ function App() {
 					</>
 				) : undefined}
 				suppressFab={Boolean(modal) || settingsOpen || readOnly || !mutationsReady}
+				backgroundInert={Boolean(modal) || settingsOpen}
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}
 				onReorder={persistReorder}
 				onReorderDragActiveChange={setReorderDragging}
 			>
 				{settingsOpen && (
-					<Suspense fallback={null}><SettingsSheet
+					<SettingsSheet
 						config={config}
 						homeScreenPlatform={homeScreenInstall.platform}
 						defaultScreen={preferences.defaultScreen}
@@ -435,7 +435,7 @@ function App() {
 						onEnablePush={enablePushNotifications}
 						onThemePreferenceChange={setThemePreference}
 						onLogout={() => void logOut()}
-					/></Suspense>
+					/>
 				)}
 				{modal && (
 					<ReminderSheet

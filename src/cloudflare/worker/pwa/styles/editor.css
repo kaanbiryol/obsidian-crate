@@ -1,6 +1,13 @@
 
 .pwa-shadow-root.has-open-sheet .reminders-content,.pwa-shadow-root.has-open-sheet .reminders-view-scroll{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}
 .pwa-modal-sheet{color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;color-scheme:dark}
+/* Give WebKit a real scroll boundary even for a short editor. The sticky
+   viewport keeps the sheet still throughout this invisible one-pixel range,
+   while overscroll containment stops gestures from reaching the document. */
+.pwa-modal-sheet__scroll-boundary{position:absolute;inset:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:none;scrollbar-width:none;pointer-events:auto}
+.pwa-modal-sheet__scroll-boundary::-webkit-scrollbar{display:none}
+.pwa-modal-sheet__scroll-track{height:calc(100% + 1px)}
+.pwa-modal-sheet__viewport{position:sticky;top:0;height:calc(100% - 1px);overflow:clip}
 .pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.66);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .pwa-modal-sheet__container{right:0;margin:0 auto;overflow:hidden;background:var(--pwa-sheet-surface);border:1px solid rgba(255,255,255,.07);border-bottom:0;border-radius:20px 20px 0 0;box-shadow:0 -1px 0 rgba(255,255,255,.025),0 -24px 70px rgba(0,0,0,.28);backface-visibility:hidden;will-change:transform}
 .pwa-modal-sheet__container--reminder{width:min(1120px,calc(100vw - 36px))!important;height:calc(100% - env(safe-area-inset-top) - 28px)!important;max-height:calc(100% - env(safe-area-inset-top) - 28px)!important;background:transparent;border:0;box-shadow:none}

@@ -23,14 +23,18 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:radial-gradient(circle at 82% -12%,rgba(var(--accent-rgb),.09),transparent 34%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;width:100%;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}
-/* Cover nested scrollers and portal sheets while preserving single-finger scrolling. */
-html,body,body *{touch-action:pan-x pan-y}
 body{min-height:100%;min-height:100dvh;overflow:hidden}
+/* Freeze the document while preserving native scrolling inside modal fields. */
+body.pwa-sheet-scroll-locked{position:fixed!important;width:100%!important;overflow:hidden!important}
+body.pwa-sheet-scroll-locked #app,body.pwa-sheet-scroll-locked .pwa-shadow-root{overflow:clip!important}
+body.pwa-sheet-scroll-locked #app{height:var(--pwa-sheet-layout-height)!important}
+body.pwa-sheet-scroll-locked .pwa-modal-sheet{height:var(--pwa-sheet-layout-height)!important;bottom:auto!important}
+body.pwa-sheet-scroll-locked .pwa-modal-sheet__container--reminder{max-height:calc(var(--pwa-sheet-layout-height) * .9)!important}
 button,input,textarea,select{font:inherit}
 button{cursor:pointer;border:none;background:transparent;color:inherit;user-select:none;-webkit-user-select:none}
 button:disabled{cursor:not-allowed;opacity:.55}
-#app,#app *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
-#app input,#app textarea,#app [contenteditable="true"],#app [contenteditable="true"] *{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
+/* Keep selection policy on controls, never on editor ancestors. */
+#app button,#app [role="button"]{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 :focus-visible{outline:2px solid rgba(var(--accent-rgb),.72);outline-offset:2px}
 .flex{display:flex}.inline-flex{display:inline-flex}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.flex-1{flex:1 1 0%}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.justify-end{justify-content:flex-end}.h-full{height:100%}.h-10{height:2.5rem}.h-auto{height:auto}.w-full{width:100%}.min-w-0{min-width:0}.relative{position:relative}.fixed{position:fixed}.absolute{position:absolute}.inset-0{inset:0}.overflow-hidden{overflow:hidden}.overflow-y-auto{overflow-y:auto}.overflow-y-scroll{overflow-y:scroll}.text-center{text-align:center}.whitespace-nowrap{white-space:nowrap}.bg-transparent{background:transparent}.border-none{border:none}.outline-none{outline:none}.resize-none{resize:none}.rounded-lg{border-radius:8px}.rounded-xl{border-radius:12px}.rounded-2xl{border-radius:16px}.rounded-t-3xl{border-top-left-radius:24px;border-top-right-radius:24px}.px-0{padding-left:0;padding-right:0}.px-5{padding-left:1.25rem;padding-right:1.25rem}.py-0{padding-top:0;padding-bottom:0}.pt-3{padding-top:.75rem}.pt-4{padding-top:1rem}.pb-3{padding-bottom:.75rem}.pb-4{padding-bottom:1rem}.mt-3{margin-top:.75rem}.mt-4{margin-top:1rem}.mt-6{margin-top:1.5rem}.mb-3{margin-bottom:.75rem}.mx-4{margin-left:1rem;margin-right:1rem}.max-w-lg{max-width:32rem}.text-sm{font-size:.875rem}.font-semibold{font-weight:600}.space-y-2>:not([hidden])~:not([hidden]){margin-top:.5rem}.space-y-6>:not([hidden])~:not([hidden]){margin-top:1.5rem}.gap-0{gap:0}.gap-2{gap:.5rem}.w-9{width:2.25rem}.h-9{height:2.25rem}.min-w-9{min-width:2.25rem}.w-16{width:4rem}
 #app{height:100%;height:100dvh;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden}

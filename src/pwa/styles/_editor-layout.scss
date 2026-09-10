@@ -1,5 +1,17 @@
 // Browser sheet geometry and touch targets. Editor presentation is shared.
 @mixin styles {
+  // Hidden overflow still allows Safari's focus scrolling. Only the editor body
+  // should scroll; moving these wrappers lifts the whole sheet above its anchor.
+  .pwa-modal-sheet--reminder,
+  .pwa-modal-sheet--reminder .pwa-modal-sheet__container,
+  .pwa-modal-sheet--reminder .pwa-modal-sheet__content,
+  .pwa-modal-sheet--reminder .pwa-modal-sheet__scroller,
+  .pwa-modal-sheet--reminder .pwa-reminder-sheet-stage,
+  .pwa-modal-sheet--reminder .modal-card.pwa-reminder-editor,
+  .pwa-modal-sheet--reminder .modal-form {
+    overflow: clip !important;
+  }
+
   .pwa-delete-confirmation {
     position: fixed;
     inset: 0;
@@ -86,6 +98,12 @@
       flex: 1;
       min-height: 0;
       overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .reminder-title-input,
+    .reminder-description-input {
+      touch-action: auto;
       overscroll-behavior: contain;
     }
 

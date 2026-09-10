@@ -45,6 +45,7 @@ interface PwaRemindersAppShellProps {
 	children?: React.ReactNode;
 	className?: string;
 	suppressFab?: boolean;
+	backgroundInert?: boolean;
 	incomplete?: boolean;
 	renderCard: PwaReminderCardRenderer;
 	onAdd: (defaultProject: string) => void;
@@ -71,6 +72,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	children,
 	className = '',
 	suppressFab = false,
+	backgroundInert = false,
 	incomplete = false,
 	renderCard,
 	onAdd,
@@ -191,7 +193,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					className,
 				].filter(Boolean).join(' ')}
 			>
-				<div className="pwa-navigation-viewport">
+				<div className="pwa-navigation-viewport" inert={backgroundInert}>
 					<AnimatePresence initial={false} custom={navigationMotion}>
 						{/* Keep shared header actions mounted when switching main tabs. */}
 						<PwaNavigationScreen
@@ -225,6 +227,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 				</div>
 
 				<BottomTabBar
+					inert={backgroundInert}
 					activeTab={viewMode}
 					onTabChange={handleViewModeChange}
 					className="animated-tab-bar animated-tab-bar-bottom"

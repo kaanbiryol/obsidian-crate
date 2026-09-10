@@ -16,8 +16,6 @@ export function useKeyboardDoneSave({
 	onSave: () => void;
 }) {
 	const keyboardDoneTimerRef = useRef<number | null>(null);
-	const titleFocusFrameRef = useRef<number | null>(null);
-	const lastFocusedEditorFieldRef = useRef<'title' | 'description' | null>(null);
 	const lastPagePointerAtRef = useRef(Number.NEGATIVE_INFINITY);
 	const suppressKeyboardDoneSaveRef = useRef(false);
 
@@ -33,9 +31,6 @@ export function useKeyboardDoneSave({
 		if (keyboardDoneTimerRef.current !== null) {
 			window.clearTimeout(keyboardDoneTimerRef.current);
 		}
-		if (titleFocusFrameRef.current !== null) {
-			window.cancelAnimationFrame(titleFocusFrameRef.current);
-		}
 	}, []);
 
 	const handleEditorFieldFocus = useCallback(() => {
@@ -44,28 +39,6 @@ export function useKeyboardDoneSave({
 			keyboardDoneTimerRef.current = null;
 		}
 	}, []);
-
-	const handleTitleFocus = useCallback(() => {
-		handleEditorFieldFocus();
-		const shouldMoveToEnd = lastFocusedEditorFieldRef.current === 'description';
-		lastFocusedEditorFieldRef.current = 'title';
-		if (!shouldMoveToEnd) return;
-
-		if (titleFocusFrameRef.current !== null) {
-			window.cancelAnimationFrame(titleFocusFrameRef.current);
-		}
-		titleFocusFrameRef.current = window.requestAnimationFrame(() => {
-			titleFocusFrameRef.current = null;
-			const titleElement = richTextInputRef.current?.getElement();
-			if (!titleElement?.matches(':focus')) return;
-			richTextInputRef.current?.focus();
-		});
-	}, [handleEditorFieldFocus, richTextInputRef]);
-
-	const handleDescriptionFocus = useCallback(() => {
-		handleEditorFieldFocus();
-		lastFocusedEditorFieldRef.current = 'description';
-	}, [handleEditorFieldFocus]);
 
 	const handleEditorFieldBlur = useCallback((event: FocusEvent<HTMLElement>) => {
 		const relatedTargetWasNull = event.relatedTarget === null;
@@ -101,8 +74,8 @@ export function useKeyboardDoneSave({
 
 	return {
 		dismissEditorKeyboard,
-		handleDescriptionFocus,
+		handleDescriptionFocus: handleEditorFieldFocus,
 		handleEditorFieldBlur,
-		handleTitleFocus,
+		handleTitleFocus: handleEditorFieldFocus,
 	};
 }

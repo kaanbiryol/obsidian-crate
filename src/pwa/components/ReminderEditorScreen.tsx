@@ -149,6 +149,14 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 			aria-hidden={!editorInteractive}
 			inert={!editorInteractive}
 			tabIndex={-1}
+			onPointerDownCapture={(event) => {
+				if (event.pointerType !== 'touch' || !(event.target instanceof Element)) return;
+				const field = event.target.closest<HTMLElement>('textarea, [contenteditable="true"]');
+				if (!field || field === document.activeElement) return;
+				// iOS otherwise pans the document when switching fields. Focus before
+				// its default action, without canceling the tap or changing selection.
+				field.focus({ preventScroll: true });
+			}}
 		>
 			<form
 				className="modal-form"

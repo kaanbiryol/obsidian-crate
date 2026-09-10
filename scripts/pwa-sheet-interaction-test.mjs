@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { checkNativeEditorGestures } from './pwa-editor-gesture-checks.mjs';
 import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
@@ -22,6 +23,20 @@ async function tapBackdropAbove(page, dialog) {
 async function expectNoTouchRing(locator) {
 	await expect(locator).toHaveCSS('outline-style', 'none');
 	await expect(locator).toHaveCSS('box-shadow', 'none');
+}
+
+async function trackEditorBlur(title) {
+	await expect(title).toBeFocused();
+	await title.evaluate(element => {
+		delete document.documentElement.dataset.editorBlurWhileMounted;
+		element.addEventListener('blur', () => {
+			document.documentElement.dataset.editorBlurWhileMounted = String(element.isConnected);
+		}, { once: true });
+	});
+}
+
+async function expectEditorBlurBeforeUnmount(page) {
+	await expect(page.locator('html')).toHaveAttribute('data-editor-blur-while-mounted', 'true');
 }
 
 async function tabTo(page, locator) {
@@ -54,7 +69,20 @@ try {
 		const browser = await browserType.launch();
 		try {
 			const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
+			// Exercise the library's iOS platform branch even in desktop WebKit.
+			await page.addInitScript(() => {
+				Object.defineProperty(navigator, 'platform', { get: () => 'iPhone' });
+			});
 			await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+			// Settings must open on its first tap even when the network disappears.
+			const settingsButton = page.getByRole('button', { name: 'Open settings', exact: true });
+			await expect(settingsButton).toBeVisible();
+			await page.context().setOffline(true);
+			await settingsButton.tap();
+			await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
+			await page.getByRole('dialog', { name: 'Settings', exact: true }).getByRole('button', { name: 'Close settings', exact: true }).tap();
+			await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0);
+			await page.context().setOffline(false);
 			const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
 			const editor = page.getByRole('dialog', { name: 'Edit reminder', exact: true });
 			const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
@@ -62,6 +90,7 @@ try {
 			await expect(title).toBeFocused();
 			await expectNoTouchRing(title);
 			await title.fill('Keep this draft while choosing');
+			await checkNativeEditorGestures(page, title);
 			const priority = editor.getByRole('button', { name: /^(Set|Remove) priority$/ });
 			await priority.tap();
 			await expect(editor).toBeVisible();
@@ -107,7 +136,9 @@ try {
 			await expectNoTouchRing(card);
 			await card.tap();
 			await expect(title).toHaveText('Check this article');
+			await trackEditorBlur(title);
 			await tapBackdropAbove(page, editor);
+			await expectEditorBlurBeforeUnmount(page);
 			await expect(editor).toBeHidden();
 
 			await page.getByRole('button', { name: 'Open settings', exact: true }).tap();
@@ -144,7 +175,9 @@ try {
 			await page.keyboard.press('Enter');
 			await expect(editor).toBeVisible();
 			await expect(page.locator('.pwa-modal-sheet__container')).toHaveCSS('transform', 'none');
+			await trackEditorBlur(title);
 			await page.keyboard.press('Escape');
+			await expectEditorBlurBeforeUnmount(page);
 			await expect(editor).toBeHidden();
 			console.log(`${browserType.name()}: sheet backdrops, interior controls, touch focus and keyboard focus passed`);
 		} finally {

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -55,8 +55,17 @@ function ReminderEditorSheet({
 }: ReminderSheetProps) {
 	// Keep keystrokes local so the reminder list does not render behind the sheet.
 	const [modal, setModal] = useState(() => restoreReminderDraft(initialModal, folderPath));
-	const onClose = () => { discardReminderDraft(modal, folderPath); dismissModal(); };
 	const editorScreenRef = useRef<ReminderEditorScreenHandle | null>(null);
+	const onClose = () => {
+		editorScreenRef.current?.dismissKeyboard();
+		discardReminderDraft(modal, folderPath);
+		dismissModal();
+	};
+	useLayoutEffect(() => {
+		// Also cover closes initiated outside the editor, such as deletion.
+		// Start native keyboard dismissal before painting the sheet's exit.
+		if (isClosing) editorScreenRef.current?.dismissKeyboard();
+	}, [isClosing]);
 	const pickerTransitionClosedOffsetRef = useRef('100%');
 	const pickerTransitionKeyboardInsetRef = useRef(0);
 	const reminderStageRef = useRef<HTMLDivElement | null>(null);

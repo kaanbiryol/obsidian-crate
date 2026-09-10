@@ -41,6 +41,7 @@ const TabButton = memo(function TabButton({
 });
 
 interface BottomTabBarProps {
+  inert?: boolean;
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
   position?: 'top' | 'bottom';
@@ -57,6 +58,7 @@ export const BottomTabBar = memo(function BottomTabBar({
   position = 'bottom',
   className = '',
   animateActiveIndicator = true,
+  inert = false,
 }: BottomTabBarProps) {
   const reduceMotion = useObsidianReducedMotion();
   const shouldAnimateIndicator = animateActiveIndicator && !reduceMotion;
@@ -64,6 +66,7 @@ export const BottomTabBar = memo(function BottomTabBar({
 
   return (
     <nav
+      inert={inert}
       className={`bottom-tab-bar${position === 'bottom' ? ' is-bottom' : ''} ${className}`}
       aria-label="Reminder views"
     >
