@@ -19,6 +19,7 @@ export interface ProjectDetailViewProps {
   project: string;
   hideTitle?: boolean;
   headerRightContent?: React.ReactNode;
+  headerMetaContent?: React.ReactNode;
   reminders: Reminder[];
   onBack: () => void;
   animationConfig?: AnimationConfig;
@@ -45,6 +46,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
   project,
   hideTitle = false,
   headerRightContent,
+  headerMetaContent,
   reminders,
   onBack,
   animationConfig = { enabled: true },
@@ -99,7 +101,7 @@ export const ProjectDetailView = memo(function ProjectDetailView({
               <span>Projects</span>
             </ShadowDOMNativeButton>
           </div>
-          <ProjectDetailHeader project={project} header={header} hideTitle={hideTitle} rightContent={headerRightContent} />
+          <ProjectDetailHeader project={project} header={header} hideTitle={hideTitle} rightContent={headerRightContent} metaContent={headerMetaContent} />
         </>
       }
       emptyState={

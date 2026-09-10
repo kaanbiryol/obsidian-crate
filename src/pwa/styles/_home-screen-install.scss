@@ -15,11 +15,11 @@
 		min-width: 0;
 		flex-direction: column;
 		gap: 3px;
-		font-size: 12px;
+		font-size: var(--pwa-font-detail);
 		line-height: 1.4;
 		color: var(--text-muted);
 
-		strong { font-size: 13px; color: var(--text-normal); }
+		strong { font-size: var(--pwa-font-body); color: var(--text-normal); }
 	}
 
 	.pwa-home-screen-prompt__action {
@@ -28,7 +28,7 @@
 		padding: 0 8px;
 		margin-left: -8px;
 		color: var(--accent);
-		font-size: 13px;
+		font-size: var(--pwa-font-control);
 		font-weight: 600;
 	}
 
@@ -44,7 +44,7 @@
 
 	.pwa-home-screen-instructions {
 		padding: 14px;
-		font-size: 13px;
+		font-size: var(--pwa-font-control);
 		line-height: 1.5;
 		color: var(--text-muted);
 
@@ -54,6 +54,6 @@
 		li { padding-left: 3px; }
 		li + li { margin-top: 10px; }
 		strong { color: var(--text-normal); font-weight: 600; }
-		.pwa-home-screen-instructions__hint { font-size: 12px; }
+		.pwa-home-screen-instructions__hint { font-size: var(--pwa-font-detail); }
 	}
 }

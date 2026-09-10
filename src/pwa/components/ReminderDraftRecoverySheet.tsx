@@ -29,9 +29,9 @@ export function ReminderDraftRecoverySheet({ inspection, initial, folderPath, is
 					setError(cause instanceof Error ? cause.message : 'The saved draft could not be removed. Try again.');
 					return Promise.resolve(false);
 				}
-			}} /> : <><p role="status">Saved drafts could not be read. Restore access to browser storage and try again.</p><button type="button" onClick={onRetry}>Try again</button></>}
+			}} /> : <><p role="status">Saved drafts could not be read. Restore access to browser storage and try again.</p><button className="secondary-button" type="button" onClick={onRetry}>Try again</button></>}
 			{error && <p role="alert">{error}</p>}
-			<button type="button" onClick={onClose}>Close</button>
+			<button className="secondary-button" type="button" onClick={onClose}>Close</button>
 		</div>
 	</PwaModalSheet>;
 }

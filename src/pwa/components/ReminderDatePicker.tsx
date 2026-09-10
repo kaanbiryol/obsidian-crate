@@ -28,7 +28,7 @@ export function ReminderDatePicker({ draft, dialogRef, projectOptions, isDark, o
                     `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
                 ))}
                 onTimeClear={() => onPatch(applyDateFieldsToDraft(draft, projectOptions, draft.dueDate, ''))}
-                onRemove={() => onSelect(applyDatePresetToDraft(draft, projectOptions, 'clear'))}
+                onRemove={() => onPatch(applyDatePresetToDraft(draft, projectOptions, 'clear'))}
             />
         </section>
     );

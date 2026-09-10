@@ -15,4 +15,12 @@
     overflow: hidden;
     background: var(--background-primary);
   }
+
+  .pwa-navigation-screen--project {
+    padding-top: var(--pwa-safe-area-top, 0px);
+
+    .premium-back-button {
+      margin-top: 8px;
+    }
+  }
 }

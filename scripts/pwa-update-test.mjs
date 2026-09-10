@@ -106,7 +106,7 @@ async function testUpdate(browser, launchMode) {
           phase: document.documentElement.dataset.pwaUpdating,
           opacity: getComputedStyle(overlay).opacity,
           background: getComputedStyle(document.documentElement).backgroundColor,
-          button: document.querySelector('.pwa-update-button').textContent,
+          button: document.querySelector('.pwa-update-button__label[aria-hidden="false"]').textContent,
           marker: sessionStorage.getItem(transitionKey),
         }));
       });

@@ -8,6 +8,7 @@ interface ViewHeaderProps {
   className?: string;
   /** Optional right-side action content (e.g., settings button) */
   rightContent?: React.ReactNode;
+  metaContent?: React.ReactNode;
   /** Use large title style (for fullscreen views) */
   large?: boolean;
   /** Hide count metadata while the initial reminder snapshot is loading. */
@@ -27,6 +28,7 @@ export const ViewHeader = memo(function ViewHeader({
   overdueCount = 0,
   className = '',
   rightContent,
+  metaContent,
   large = false,
   showMeta = true,
   reserveMetaSpace = false,
@@ -53,6 +55,7 @@ export const ViewHeader = memo(function ViewHeader({
                 {overdueCount} overdue
               </span>
             )}
+            {metaContent}
           </div>
         )}
       </div>

@@ -129,7 +129,6 @@ export const ProjectPickerContent: React.FC<ProjectPickerContentProps> = ({
                 onClose={onClose}
                 closeLabel={REMINDER_PICKER_COPY.project.closeLabel}
                 title={REMINDER_PICKER_COPY.project.title}
-                action={{ label: REMINDER_PICKER_COPY.project.done, onClick: onClose }}
             />
 
             {/* Project List */}

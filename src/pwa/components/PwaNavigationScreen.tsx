@@ -26,14 +26,15 @@ const variants: Variants = {
 	}),
 };
 
-export function PwaNavigationScreen({ children, motion: navigationMotion }: {
+export function PwaNavigationScreen({ children, motion: navigationMotion, isProjectDetail = false }: {
 	children: React.ReactNode;
 	motion: PwaNavigationMotion;
+	isProjectDetail?: boolean;
 }) {
 	const isPresent = useIsPresent();
 	return (
 		<motion.div
-			className="pwa-navigation-screen"
+			className={`pwa-navigation-screen${isProjectDetail ? ' pwa-navigation-screen--project' : ''}`}
 			custom={navigationMotion}
 			variants={variants}
 			initial="enter"

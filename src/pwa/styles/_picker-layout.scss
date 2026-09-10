@@ -1,12 +1,26 @@
 // Fit the active picker to its content, shrinking only when it needs to scroll.
 @mixin styles {
+  @media (hover: none) {
+    // Touch browsers retain hover and focus after release. Keep feedback tied
+    // to the press, while leaving keyboard focus outlines intact.
+    .pwa-repeat-picker-sheet .reminder-picker :is(.picker-control-row, .recurrence-stepper-button):not(:active) {
+      background: transparent;
+      border-color: transparent;
+    }
+  }
+
   .pwa-picker-sheet {
-    --crate-icon-button-size: 44px;
-    --crate-picker-row-height: 44px;
-    --crate-picker-input-height: 44px;
-    --reminder-font-base: 16px;
+    // Match the plugin's mobile control shape without changing other PWA controls.
+    --crate-radius-control: 8px;
 
     .reminder-picker {
+      // Match the reminder cards' PWA type scale instead of plugin density.
+      --reminder-font-base: 16px;
+      --reminder-font-sm: 15px;
+      --reminder-font-xs: 14px;
+      --reminder-font-xxs: 13px;
+      --crate-picker-row-height: 44px;
+      --crate-picker-input-height: 40px;
       display: flex;
       flex: 0 1 auto;
       min-height: 0;
@@ -23,45 +37,52 @@
       overscroll-behavior: contain;
     }
 
-    :is(.date-quick-button, .project-picker-row, .recurrence-frequency-button, .recurrence-day-button) {
+    .date-quick-button,
+    .picker-control-row,
+    .project-picker-row {
+      min-height: var(--crate-picker-row-height);
+      height: auto;
+    }
+
+    .date-quick-button-copy strong,
+    .picker-field-copy strong,
+    .project-picker-row-label {
+      font-size: var(--reminder-font-base);
+    }
+
+    .picker-native-control,
+    .picker-native-control-value {
+      min-height: var(--crate-picker-input-height);
+    }
+
+    .picker-native-control :is(.picker-date-input, .picker-time-input) {
+      height: var(--crate-picker-input-height);
+      font-size: var(--reminder-font-base);
+    }
+
+    .picker-date-display,
+    .picker-native-control-empty {
+      font-size: var(--reminder-font-base);
+    }
+
+    .recurrence-frequency-button,
+    .recurrence-day-button,
+    .picker-schedule-remove,
+    .picker-repeat-remove {
       min-height: 44px;
     }
 
-    .recurrence-stepper-button { --crate-icon-button-control-size: 44px; }
-    .reminder-picker .picker-native-control {
-      .picker-native-control-value {
-        justify-items: end;
-        text-align: right;
-      }
+    .recurrence-stepper {
+      --stepper-button-size: 44px;
+      // Keep the enlarged controls inside the row, including on narrow phones.
+      grid-template-columns: var(--stepper-button-size) minmax(6ch, max-content) var(--stepper-button-size);
+      margin-inline-end: 0;
+    }
 
-      .picker-date-display,
-      .picker-native-control-empty,
-      input {
-        font-family: var(--font-interface);
-        font-size: 16px;
-        font-weight: 400;
-        font-variant-numeric: tabular-nums;
-        line-height: 1.4;
-        text-align: right;
-      }
-
-      input {
-        min-height: 44px;
-
-        // Safari renders native date/time values inside its own control box.
-        &::-webkit-date-and-time-value {
-          margin: 0;
-          font: inherit;
-          text-align: right;
-        }
-
-        &::-webkit-datetime-edit,
-        &::-webkit-datetime-edit-fields-wrapper {
-          justify-content: flex-end;
-          font: inherit;
-          padding: 0;
-        }
-      }
+    .recurrence-stepper-button {
+      --crate-icon-button-control-size: 44px;
+      width: 44px;
+      height: 44px;
     }
   }
 }

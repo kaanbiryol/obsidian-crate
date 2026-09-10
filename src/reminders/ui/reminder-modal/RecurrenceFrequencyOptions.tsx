@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { RecurrenceRule } from '../../types';
 import { Button } from '../../../ui/shared/Button';
 import { IconButton } from '../../../ui/shared/IconButton';
@@ -90,6 +90,17 @@ export function RecurrenceFrequencyOptions({
 	const dayNames = getRecurrenceDayNames();
 	const intervalUnit = FREQUENCY_UNITS[frequency];
 	const intervalDetail = interval === 1 ? intervalUnit : `${intervalUnit}s`;
+	const detailContentRef = useRef<HTMLDivElement>(null);
+	const [detailHeight, setDetailHeight] = useState<number>();
+	useLayoutEffect(() => {
+		const content = detailContentRef.current;
+		if (frequency === 'daily' || !content) return;
+		const updateHeight = () => setDetailHeight(content.getBoundingClientRect().height);
+		updateHeight();
+		const observer = new ResizeObserver(updateHeight);
+		observer.observe(content);
+		return () => observer.disconnect();
+	}, [frequency]);
 
 	return (
 		<div
@@ -116,11 +127,11 @@ export function RecurrenceFrequencyOptions({
 						key="frequency-detail"
 						className="recurrence-frequency-detail"
 						initial={animationsEnabled ? { height: 0, opacity: 0 } : false}
-						animate={{ height: 'auto', opacity: 1 }}
+						animate={{ height: animationsEnabled ? detailHeight ?? 'auto' : 'auto', opacity: 1 }}
 						exit={{ height: 0, opacity: 0 }}
 						transition={{ duration: animationsEnabled ? 0.16 : 0 }}
 					>
-						<div className="recurrence-frequency-detail-content">
+						<div ref={detailContentRef} className="recurrence-frequency-detail-content">
 							{frequency === 'weekly' && (
 								<div>
 									<div className="recurrence-day-list" role="group" aria-label="Repeat days">

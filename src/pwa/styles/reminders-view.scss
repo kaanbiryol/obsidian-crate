@@ -44,4 +44,9 @@
 	@include home-screen-install.styles;
 	@include reminder-sync-notices.styles;
 	@include reminder-pagination.styles;
+
+	.reminders-empty-state-icon,
+	.reminders-view.is-primary .reminders-empty-state-icon {
+		background: transparent;
+	}
 }

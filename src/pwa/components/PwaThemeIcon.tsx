@@ -16,7 +16,6 @@ import {
   Eye,
   EyeOff,
   Flag,
-  Folder,
   FolderOpen,
   Trash2,
   X,
@@ -24,7 +23,7 @@ import {
   Hash,
   Inbox,
   Plus,
-  Repeat2,
+  Repeat,
   Sparkles,
   type LucideIcon,
 } from 'lucide-react';
@@ -32,7 +31,7 @@ import {
 import type { ThemeIconProps, ThemeIconSize } from '@/reminders/components/theme-icon';
 
 const ICONS: Record<string, LucideIcon> = {
-  folder: Folder,
+  folder: FolderOpen,
   'trash-2': Trash2,
   x: X,
   calendar: Calendar,
@@ -57,7 +56,7 @@ const ICONS: Record<string, LucideIcon> = {
   hash: Hash,
   inbox: Inbox,
   plus: Plus,
-  repeat: Repeat2,
+  repeat: Repeat,
   sparkles: Sparkles,
 };
 

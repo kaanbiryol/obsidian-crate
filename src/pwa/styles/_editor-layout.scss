@@ -58,31 +58,28 @@
     .reminder-modal-header {
       flex-shrink: 0;
       --pwa-header-side-width: 96px;
-      min-height: 56px;
-      padding: 6px 12px;
-      column-gap: 8px;
       border-bottom-color: color-mix(in srgb, var(--crate-divider) 55%, transparent);
-    }
-
-    .reminder-modal-header-title,
-    .reminder-modal-header-action {
-      font-size: 17px;
-      font-weight: 600;
-      line-height: 1.2;
-    }
-
-    .reminder-modal-header-action {
-      min-width: 44px;
-      min-height: 44px;
-      padding-inline: 4px;
     }
 
     .reminder-modal-header-side.is-right {
       gap: 4px;
     }
 
+    // Match the plugin's compact chips independently of standalone form defaults.
     .reminder-action-chip {
-      border-radius: var(--tag-radius);
+      --crate-radius-control: 8px;
+      --reminder-font-sm: 14px;
+      --reminder-font-weight-medium: 600;
+      --reminder-action-chip-height: 30px;
+      height: auto;
+      min-height: 30px;
+      min-width: 30px;
+      padding: 4px 6px;
+      gap: 4px;
+      color: color-mix(in srgb, var(--text-muted) 60%, var(--background-primary));
+
+      &.is-active { color: var(--crate-semantic-color); }
+      &:hover:not(.is-active) { color: var(--text-muted); }
     }
 
     .modal-form {

@@ -1,4 +1,9 @@
 :root{
+	/* PWA text roles shared by settings, notices, and standalone actions. */
+	--pwa-font-body:16px;
+	--pwa-font-control:15px;
+	--pwa-font-detail:14px;
+	--pwa-font-caption:13px;
 	/* Standalone host defaults for the shared UI token contract. */
 	--font-ui-medium:14px;
 	--font-ui-small:13px;

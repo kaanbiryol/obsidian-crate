@@ -23,7 +23,7 @@ function PwaSettingsButton({
 			aria-pressed={settingsOpen}
 			onClick={onToggleSettings}
 		>
-			<Settings size={22} strokeWidth={2.1} />
+			<Settings size={20} strokeWidth={1.8} />
 		</button>
 	);
 }
@@ -31,15 +31,12 @@ function PwaSettingsButton({
 export function PwaHeaderActions({
 	settingsOpen,
 	onToggleSettings,
-	syncIndicator,
 }: {
 	settingsOpen: boolean;
 	onToggleSettings: () => void;
-	syncIndicator?: React.ReactNode;
 }) {
 	return (
 		<div className="pwa-header-actions">
-			{syncIndicator}
 			<PwaSettingsButton settingsOpen={settingsOpen} onToggleSettings={onToggleSettings} />
 		</div>
 	);
@@ -74,7 +71,8 @@ export function PwaTopNotices({
 				<div className="pwa-update-banner" role="status">
 					<span className="pwa-update-banner__text">Update available</span>
 					<button className="pwa-update-button" type="button" onClick={onReload} disabled={updating} aria-busy={updating} aria-label="Update to the latest version">
-						{updating ? 'Updating…' : 'Update'}
+						<span className="pwa-update-button__label" aria-hidden={updating}>Update</span>
+						<span className="pwa-update-button__label pwa-update-button__label--busy" aria-hidden={!updating}>Updating…</span>
 					</button>
 				</div>
 			)}
@@ -87,9 +85,9 @@ export function PwaTopNotices({
 					</div>
 					<div className="pwa-notification-prompt__copy">
 						<strong>Enable notifications</strong>
-						<span>Get reminder alerts from this Home Screen app.</span>
+						<span>Get alerts when reminders are due.</span>
 					</div>
-					<Button className="pwa-inline-button" type="button" onClick={onEnableNotifications}>
+					<Button className="pwa-inline-button pwa-notification-prompt__enable" type="button" onClick={onEnableNotifications}>
 						Enable
 					</Button>
 				</div>

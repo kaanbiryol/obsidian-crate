@@ -56,9 +56,9 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 #app{background:radial-gradient(circle at 84% -10%,rgba(var(--accent-rgb),.055),transparent 33%),var(--background-primary)}
 .reminders-shadow-root{background:var(--background-primary);color:var(--text-normal)}
 .pwa-reminders-view .bottom-tab-bar,.crate-reminders-ui .pwa-reminders-view.is-fullscreen .bottom-tab-bar{background:var(--pwa-tabbar-surface);border-color:var(--background-modifier-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
-.secondary-button,.pwa-header-settings-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
+.secondary-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
 .pwa-header-settings-button:hover,.pwa-header-settings-button.is-active{background:var(--pwa-light-surface-hover);border-color:var(--pwa-light-border-strong);color:var(--text-normal)}
-.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button{background:var(--pwa-light-surface-subtle);border-color:var(--pwa-light-border);color:var(--text-muted)}
+.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button{background:transparent;border-color:transparent;color:var(--text-muted)}
 .pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button:hover,.pwa-reminders-view:is(.is-inbox,.is-today,.is-upcoming,.is-browse) .pwa-header-settings-button.is-active{background:var(--pwa-light-surface-hover);border-color:var(--pwa-light-border-strong);color:var(--text-normal)}
 .pwa-top-notices{background:var(--background-primary)}
 .pwa-status-line,.pwa-notification-prompt,.pwa-update-banner{background:rgba(255,255,255,.76);border-color:var(--background-modifier-border);color:var(--text-normal)}
@@ -70,6 +70,14 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .pwa-modal-sheet{color:var(--text-normal);color-scheme:light}
 .pwa-modal-sheet__backdrop{background:rgba(24,24,27,.42)}
 .pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage{border-color:var(--pwa-light-border);box-shadow:0 -1px 0 rgba(255,255,255,.72),0 -24px 70px rgba(24,24,27,.16)}
+/* Match the plugin's white picker surface and neutral, softer secondary text. */
+.pwa-picker-sheet{
+	--pwa-sheet-surface:#ffffff;
+	--text-normal:#222222;
+	--text-muted:#666666;
+	--text-faint:#aaaaaa;
+	--crate-divider:#e0e0e0;
+}
 .pwa-picker-sheet.pwa-project-picker-sheet,.pwa-picker-sheet.pwa-date-picker-sheet,.pwa-picker-sheet.pwa-repeat-picker-sheet{background:var(--pwa-sheet-surface)}
 .secondary-button.is-danger,.settings-logout-button{color:var(--pwa-light-danger-text)}
 .settings-action-button{color:var(--pwa-light-accent-text)}

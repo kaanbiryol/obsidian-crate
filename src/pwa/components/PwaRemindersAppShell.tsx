@@ -41,6 +41,7 @@ interface PwaRemindersAppShellProps {
 	initialProject?: string;
 	upcomingDays: number;
 	headerRightContent?: React.ReactNode;
+	headerMetaContent?: React.ReactNode;
 	belowHeaderContent?: (isProjectDetail: boolean) => React.ReactNode;
 	children?: React.ReactNode;
 	className?: string;
@@ -68,6 +69,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	initialProject,
 	upcomingDays,
 	headerRightContent,
+	headerMetaContent,
 	belowHeaderContent,
 	children,
 	className = '',
@@ -159,7 +161,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		<RemindersViewPanels
 			viewMode={viewMode}
 			selectedProject={selectedProject}
-			projectHeaderRightContent={headerRightContent}
+			projectHeaderMetaContent={headerMetaContent}
 			isInitialLoadComplete
 			reminders={reminders}
 			projects={projects}
@@ -199,6 +201,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 						<PwaNavigationScreen
 							key={selectedProject === null ? 'tabs' : `project-${selectedProject}`}
 							motion={navigationMotion}
+							isProjectDetail={selectedProject !== null}
 						>
 							{!(viewMode === 'browse' && selectedProject) && (
 								<div className="overflow-hidden">
@@ -207,6 +210,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 										countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
 										large
 										showMeta
+										metaContent={headerMetaContent}
 										rightContent={headerRightContent}
 									/>
 								</div>
