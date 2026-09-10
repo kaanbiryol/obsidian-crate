@@ -1,4 +1,6 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
+import { createDecipheriv, hkdfSync } from 'node:crypto';
+import { Buffer } from 'node:buffer';
 import { afterEach, expect, it, vi } from 'vitest';
 import { toBase64Url } from 'web-push-browser';
 import { sendPushNotificationWithoutContact } from './notifications/web-push';
@@ -62,4 +64,37 @@ it.each(['x', '漢', '🙂', '"\n'])('delivers a maximum-size reminder with %s d
 		p256dh: toBase64Url(await crypto.subtle.exportKey('raw', keys.publicKey)), auth: toBase64Url(new Uint8Array(16)),
 	} }, JSON.stringify(payload))).status).toBe(201);
 	expect(network).toHaveBeenCalledOnce();
+});
+
+
+it('encrypts a notification that an independent receiver can authenticate and decrypt', async () => {
+	const vapid = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+	const receiver = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+	const publicKey = Buffer.from(await crypto.subtle.exportKey('raw', receiver.publicKey));
+	const auth = crypto.getRandomValues(new Uint8Array(16));
+	const payload = JSON.stringify({ title: 'Reminder 🙂', body: 'Review release notes' });
+	vi.stubGlobal('fetch', vi.fn(async (request: Request) => {
+		const record = Buffer.from(await request.arrayBuffer());
+		const salt = record.subarray(0, 16);
+		const senderPublicKey = record.subarray(21, 21 + record[20]!);
+		const ciphertext = record.subarray(21 + record[20]!);
+		const senderKey = await crypto.subtle.importKey('raw', senderPublicKey, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+		const shared = await crypto.subtle.deriveBits({ name: 'ECDH', public: senderKey }, receiver.privateKey, 256);
+		const ikm = hkdfSync('sha256', Buffer.from(shared), auth,
+			Buffer.concat([Buffer.from('WebPush: info\0'), publicKey, senderPublicKey]), 32);
+		const key = hkdfSync('sha256', Buffer.from(ikm), salt, Buffer.from('Content-Encoding: aes128gcm\0'), 16);
+		const nonce = hkdfSync('sha256', Buffer.from(ikm), salt, Buffer.from('Content-Encoding: nonce\0'), 12);
+		const decipher = createDecipheriv('aes-128-gcm', Buffer.from(key), Buffer.from(nonce));
+		decipher.setAuthTag(ciphertext.subarray(-16));
+		const plaintext = Buffer.concat([decipher.update(ciphertext.subarray(0, -16)), decipher.final()]);
+		expect(plaintext.at(-1)).toBe(2);
+		expect(plaintext.subarray(0, -1).toString()).toBe(payload);
+		expect(request.redirect).toBe('manual');
+		expect(request.signal).toBeDefined();
+		return new Response(null, { status: 201 });
+	}));
+	await sendPushNotificationWithoutContact(vapid, {
+		endpoint: 'https://web.push.apple.com/test',
+		keys: { p256dh: toBase64Url(publicKey), auth: toBase64Url(auth) },
+	}, payload);
 });

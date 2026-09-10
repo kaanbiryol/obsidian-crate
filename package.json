@@ -84,6 +84,7 @@
 		"@types/node": "^22.19.15",
 		"@types/react": "^19.2.5",
 		"@types/react-dom": "^19.2.3",
+		"@types/web-push": "^3.6.4",
 		"autoprefixer": "^10.4.22",
 		"chokidar": "^4.0.3",
 		"esbuild": "^0.28.1",
@@ -114,6 +115,7 @@
 		"motion": "^12.38.0",
 		"qrcode-generator": "^2.0.4",
 		"react-modal-sheet": "^5.6.0",
+		"web-push": "3.6.7",
 		"web-push-browser": "^1.4.2",
 		"zustand": "^5.0.6"
 	},

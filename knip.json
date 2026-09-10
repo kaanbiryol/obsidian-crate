@@ -14,6 +14,7 @@
 		"!src/test/**!"
 	],
 	"ignoreFiles": [
+		"src/cloudflare/worker/notifications/web-push-library.d.ts",
 		"src/cloudflare/worker/cloudflare-env.d.ts",
 		"src/cloudflare/worker/pwa/assets.d.ts",
 		"src/cloudflare/worker/pwa/raw-css.d.ts",

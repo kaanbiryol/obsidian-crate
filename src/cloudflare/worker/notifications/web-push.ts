@@ -1,8 +1,9 @@
 import { MAX_PUSH_PAYLOAD_BYTES, PushPayloadError } from './payload-budget';
 import { isValidPushEndpoint } from './push-endpoint';
-import { fromBase64Url, toBase64Url } from 'web-push-browser';
+import { toBase64Url } from 'web-push-browser';
+// Import only encryption: the package root also bundles Node HTTP/proxy transports.
+import { encrypt } from 'web-push/src/encryption-helper.js';
 
-const PUSH_RECORD_SIZE = 4096;
 const VAPID_TOKEN_LIFETIME_SECONDS = 12 * 60 * 60;
 
 interface WebPushSubscription {
@@ -46,7 +47,7 @@ export async function sendPushNotificationWithoutContact(
 	if (!isValidPushEndpoint(subscription.endpoint)) throw new Error('Push service is not supported');
 	const [jwt, encryptedPayload, exportedPublicKey] = await Promise.all([
 		createVapidAuthorizationToken(vapidKeys.privateKey, new URL(subscription.endpoint)),
-		encryptPayload(payload, subscription.keys),
+		encrypt(subscription.keys.p256dh, subscription.keys.auth, payload, 'aes128gcm').cipherText,
 		crypto.subtle.exportKey('raw', vapidKeys.publicKey),
 	]);
 	const headers = new Headers({
@@ -66,98 +67,4 @@ export async function sendPushNotificationWithoutContact(
 		headers,
 		body: encryptedPayload,
 	}));
-}
-
-async function encryptPayload(
-	payload: string,
-	subscriptionKeys: WebPushSubscription['keys'],
-): Promise<Uint8Array> {
-	const userAgentPublicKey = new Uint8Array(fromBase64Url(subscriptionKeys.p256dh));
-	const authSecret = new Uint8Array(fromBase64Url(subscriptionKeys.auth));
-	const salt = crypto.getRandomValues(new Uint8Array(16));
-	const ephemeralKeyPair = await crypto.subtle.generateKey(
-		{ name: 'ECDH', namedCurve: 'P-256' },
-		true,
-		['deriveBits'],
-	);
-	const localPublicKey = new Uint8Array(await crypto.subtle.exportKey('raw', ephemeralKeyPair.publicKey));
-	const importedUserAgentPublicKey = await crypto.subtle.importKey(
-		'raw',
-		userAgentPublicKey,
-		{ name: 'ECDH', namedCurve: 'P-256' },
-		false,
-		[],
-	);
-	const sharedSecret = new Uint8Array(await crypto.subtle.deriveBits(
-		{ name: 'ECDH', public: importedUserAgentPublicKey },
-		ephemeralKeyPair.privateKey,
-		256,
-	));
-	const encoder = new TextEncoder();
-	const inputKeyMaterial = await hkdfExpand(
-		await hkdfExtract(authSecret, sharedSecret),
-		concat(encoder.encode('WebPush: info\0'), userAgentPublicKey, localPublicKey),
-		32,
-	);
-	const contentEncryptionKey = await hkdfExpand(
-		await hkdfExtract(salt, inputKeyMaterial),
-		encoder.encode('Content-Encoding: aes128gcm\0'),
-		16,
-	);
-	const nonce = await hkdfExpand(
-		await hkdfExtract(salt, inputKeyMaterial),
-		encoder.encode('Content-Encoding: nonce\0'),
-		12,
-	);
-	const plaintext = concat(encoder.encode(payload), new Uint8Array([2]));
-	const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
-		{ name: 'AES-GCM', iv: nonce },
-		await crypto.subtle.importKey('raw', contentEncryptionKey, 'AES-GCM', false, ['encrypt']),
-		plaintext,
-	));
-	if (ciphertext.byteLength + 86 > PUSH_RECORD_SIZE) {
-		throw new PushPayloadError('Push payload is too large for a single Web Push record');
-	}
-
-	const header = new Uint8Array(21 + localPublicKey.byteLength);
-	header.set(salt, 0);
-	new DataView(header.buffer).setUint32(16, PUSH_RECORD_SIZE);
-	header[20] = localPublicKey.byteLength;
-	header.set(localPublicKey, 21);
-	return concat(header, ciphertext);
-}
-
-async function hkdfExtract(salt: Uint8Array, inputKeyMaterial: Uint8Array): Promise<Uint8Array> {
-	return signHmac(salt, inputKeyMaterial);
-}
-
-async function hkdfExpand(prk: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
-	const output = new Uint8Array(length);
-	let previous = new Uint8Array(0);
-	for (let offset = 0; offset < length; offset += 32) {
-		previous = await signHmac(prk, concat(previous, info, new Uint8Array([offset / 32 + 1])));
-		output.set(previous.subarray(0, Math.min(32, length - offset)), offset);
-	}
-	return output;
-}
-
-async function signHmac(keyData: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
-	const key = await crypto.subtle.importKey(
-		'raw',
-		keyData,
-		{ name: 'HMAC', hash: 'SHA-256' },
-		false,
-		['sign'],
-	);
-	return new Uint8Array(await crypto.subtle.sign('HMAC', key, data));
-}
-
-function concat(...parts: Uint8Array[]): Uint8Array {
-	const output = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
-	let offset = 0;
-	for (const part of parts) {
-		output.set(part, offset);
-		offset += part.byteLength;
-	}
-	return output;
 }

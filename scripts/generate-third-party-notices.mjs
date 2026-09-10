@@ -53,7 +53,7 @@ PERFORMANCE OF THIS SOFTWARE.`,
 };
 
 function normalizeText(value) {
-	return value.replace(/\r\n/g, '\n').trim();
+	return value.replace(/\r\n/g, '\n').replace(/[ \t]+$/gm, '').trim();
 }
 
 function escapeTableCell(value) {

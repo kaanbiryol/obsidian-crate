@@ -1,4 +1,5 @@
 import { build } from 'esbuild';
+import { builtinModules } from 'node:module';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +31,9 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 		bundle: true,
 		format: 'esm',
 		platform: 'neutral',
+		external: [...builtinModules, ...builtinModules.map(name => `node:${name}`)],
+		// CommonJS dependencies require Node builtins; Workers do not expose import.meta.url.
+		banner: { js: "import { createRequire } from 'node:module'; const require = createRequire('/worker.mjs');" },
 		target: 'esnext',
 		write: false,
 		minify: true,
