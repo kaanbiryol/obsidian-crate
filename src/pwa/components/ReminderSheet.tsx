@@ -97,6 +97,7 @@ function ReminderEditorSheet({
 		isReturningToEditor,
 		isStageClosing,
 		openPicker,
+		transitionDeleteConfirmation,
 		returnToEditor,
 		handleStageAnimationComplete,
 		handleCloseEnd,
@@ -128,7 +129,8 @@ function ReminderEditorSheet({
 		autoFocus: false,
 		escapeDisabled: saving,
 		onEscape: () => {
-			if (modal.draft.deleteConfirm) patchDraft({ deleteConfirm: false });
+			if (isClosing || !canInteract) return;
+			if (modal.draft.deleteConfirm) transitionDeleteConfirmation(false);
 			else if (activeScreen !== 'editor') returnToEditor();
 			else onClose();
 		},
@@ -139,7 +141,7 @@ function ReminderEditorSheet({
 			isOpen={!isClosing}
 			onClose={() => {
 				if (saving || isClosing || !canInteract) return;
-				if (modal.draft.deleteConfirm) patchDraft({ deleteConfirm: false });
+				if (modal.draft.deleteConfirm) transitionDeleteConfirmation(false);
 				else if (activeScreen !== 'editor') returnToEditor();
 				else onClose();
 			}}
@@ -177,6 +179,7 @@ function ReminderEditorSheet({
 					dialogRef={setDialogRef}
 					onPatchDraft={patchDraft}
 					onOpenPicker={openPicker}
+					onDeleteConfirmationChange={transitionDeleteConfirmation}
 					onClose={onClose}
 					onSave={onSave}
 					onDelete={(id) => onDelete(id, modal.expectedRevision, modal.filePath)}

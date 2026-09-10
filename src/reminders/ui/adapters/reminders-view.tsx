@@ -129,8 +129,9 @@ interface RemindersViewContentProps {
 
 export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plugin, shadowRoot, isFullScreen = false, onClose, isModal = Boolean(onClose), initialTab, initialProject, hideTabBar = false, renderHeader }) => {
     const isDarkMode = useObsidianDarkMode();
-    const [reminders, setReminders] = useState<Reminder[]>([]);
-    const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
+    // The index is loaded before this view is registered. Use its snapshot on
+    // the first render so populated views never briefly show an empty state.
+    const [reminders, setReminders] = useState<Reminder[]>(() => plugin.reminderRepository.getAll());
     useObsidianStatusBarInset(shadowRoot, !isModal);
 
     // Subscribe to index changes for automatic refresh (replaces 5-second polling)
@@ -140,7 +141,6 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     const updateReminders = useCallback(() => {
         const allReminders = plugin.reminderRepository.getAll();
         setReminders(allReminders);
-        setIsInitialLoadComplete(true);
     }, [plugin]);
 
     // Load reminders when index changes
@@ -176,7 +176,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
     return (
         <PluginRemindersAppShell
             reminders={reminders}
-            isInitialLoadComplete={isInitialLoadComplete}
+            isInitialLoadComplete
             isDarkMode={isDarkMode}
             isFullScreen={isFullScreen}
             isModal={isModal}

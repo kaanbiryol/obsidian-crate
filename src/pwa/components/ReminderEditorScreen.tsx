@@ -44,6 +44,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	dialogRef: (element: HTMLElement | null) => void;
 	onPatchDraft: (patch: Partial<ModalDraft>) => void;
 	onOpenPicker: (picker: ModalPickerId) => void;
+	onDeleteConfirmationChange: (open: boolean) => void;
 	onClose: () => void;
 	onSave: (modal: ModalState) => void;
 	onDelete: (id: string) => void;
@@ -61,6 +62,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	dialogRef,
 	onPatchDraft,
 	onOpenPicker,
+	onDeleteConfirmationChange,
 	onClose,
 	onSave,
 	onDelete,
@@ -212,7 +214,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 							data-action="toggle-delete-confirm"
 							onClick={() => {
 								dismissEditorKeyboard();
-								onPatchDraft({ deleteConfirm: true, activePicker: null });
+								onDeleteConfirmationChange(true);
 							}}
 						/>
 					) : undefined}
@@ -270,9 +272,9 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 				id={confirmationId}
 				message={buildDeleteConfirmationMessage(draft)}
 				isLoading={saving}
-				onClose={() => { if (!saving) onPatchDraft({ deleteConfirm: false }); }}
+				onClose={() => { if (!saving) onDeleteConfirmationChange(false); }}
 				onConfirm={() => {
-					if (!saving && !isClosing && modal.reminderId) {
+					if (!saving && !isClosing && canInteract && modal.reminderId) {
 						dismissEditorKeyboard();
 						onDelete(modal.reminderId);
 					}

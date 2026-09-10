@@ -18,7 +18,7 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof ReminderEdi
 		modal, colorScheme: 'dark', projectOptions: ['Inbox', 'Work'],
 		saving: false, isClosing: false, isActive: true, isReturningToEditor: false,
 		canInteract: true, keyboardInset: 0, editorFocusRequest: 0,
-		dialogRef: vi.fn(), onPatchDraft: vi.fn(), onOpenPicker: vi.fn(),
+		dialogRef: vi.fn(), onPatchDraft: vi.fn(), onDeleteConfirmationChange: vi.fn(), onOpenPicker: vi.fn(),
 		onClose: vi.fn(), onSave: vi.fn(), onDelete: vi.fn(),
 		...overrides,
 	}));

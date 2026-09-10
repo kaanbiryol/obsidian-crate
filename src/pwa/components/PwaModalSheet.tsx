@@ -1,4 +1,4 @@
-import React, { useLayoutEffect } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import {
 	Sheet,
 	type SheetDetent,
@@ -44,9 +44,15 @@ export function PwaModalSheet({
 }) {
 	// Keep the page locked through the exit animation, until this sheet unmounts.
 	useLayoutEffect(lockSheetDocumentScroll, []);
-	const mountPoint = typeof document === 'undefined'
-		? undefined
-		: document.querySelector<HTMLElement>('.pwa-shadow-root') ?? undefined;
+	const [mountPoint, setMountPoint] = useState(() => typeof document === 'undefined'
+		? null
+		: document.querySelector<HTMLElement>('.pwa-shadow-root'));
+	useLayoutEffect(() => {
+		// Notification launches can mount the app root and sheet in the same commit.
+		// Resolve the root after that commit, before allowing a portal to render.
+		if (!mountPoint) setMountPoint(document.querySelector<HTMLElement>('.pwa-shadow-root'));
+	}, [mountPoint]);
+	if (!mountPoint) return null;
 	const containerStyle = {
 		// The library sets pointer-events inline. Keep the transparent area above
 		// the reminder stage clickable through to the backdrop at the same level.

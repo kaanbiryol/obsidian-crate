@@ -7,6 +7,7 @@ type ReminderSheetScreen = 'editor' | ModalPickerId;
 export interface ReminderSheetTransition {
 	screen: ReminderSheetScreen;
 	patch?: Partial<ModalDraft>;
+	deleteConfirm?: boolean;
 }
 
 export interface ReminderSheetNavigationState {
@@ -56,7 +57,7 @@ export function getReminderSheetTransitionPatch(
 	transition: ReminderSheetTransition,
 ): Partial<ModalDraft> {
 	return transition.screen === 'editor'
-		? { ...transition.patch, activePicker: null, deleteConfirm: false }
+		? { ...transition.patch, activePicker: null, deleteConfirm: transition.deleteConfirm ?? false }
 		: { activePicker: transition.screen, deleteConfirm: false };
 }
 
@@ -118,6 +119,11 @@ export function useReminderSheetNavigation({
 		onBeforeOpenPicker();
 	}, [onBeforeOpenPicker, requestTransition]);
 
+	const transitionDeleteConfirmation = useCallback((deleteConfirm: boolean) => {
+		if (!requestTransition({ screen: 'editor', deleteConfirm })) return;
+		onBeforeOpenPicker();
+	}, [onBeforeOpenPicker, requestTransition]);
+
 	const returnToEditor = useCallback((patch: Partial<ModalDraft> = {}) => {
 		const activeScreen = navigationRef.current.activeScreen;
 		if (activeScreen === 'editor') return;
@@ -165,9 +171,11 @@ export function useReminderSheetNavigation({
 		canInteract: navigation.phase === 'open',
 		editorFocusRequest,
 		isReturningToEditor: navigation.phase === 'closing-for-transition'
+			&& navigation.activeScreen !== 'editor'
 			&& navigation.pendingTransition?.screen === 'editor',
 		isStageClosing: navigation.phase === 'closing-for-transition',
 		openPicker,
+		transitionDeleteConfirmation,
 		returnToEditor,
 		handleStageAnimationComplete,
 		handleCloseEnd,
