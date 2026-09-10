@@ -3,11 +3,13 @@ export function isInitialPwaContentReady({
 	bootstrapped,
 	loading,
 	notificationPromptReady = true,
+	pendingChangesReady = true,
 }: {
 	authToken: string | null;
 	bootstrapped: boolean;
 	loading: boolean;
 	notificationPromptReady?: boolean;
+	pendingChangesReady?: boolean;
 }): boolean {
-	return bootstrapped && (!authToken || (!loading && notificationPromptReady));
+	return bootstrapped && (!authToken || (!loading && notificationPromptReady && pendingChangesReady));
 }

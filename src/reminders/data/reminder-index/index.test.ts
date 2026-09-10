@@ -63,6 +63,41 @@ describe('reminderIndex', () => {
     vi.useRealTimers();
   });
 
+  it.each([false, true])('waits for an initial scan deferred by sync (partial: %s)', async (partial) => {
+    let syncing = !partial;
+    const index = createReminderIndex(app, 'Reminders', undefined, () => syncing);
+    const result: ScanResult = {
+      reminders: [makeReminder({ id: 'today', dueDate: '2026-09-11' })],
+      filesScanned: 1, totalLines: 1, issues: [], scanDurationMs: 1, discoveredProjects: ['Work'],
+    };
+    vi.mocked(vaultScanner.scanVault).mockResolvedValueOnce({ ...result, reminders: [], deferred: true });
+    expect(index.isInitialLoadComplete).toBe(false);
+    await index.load();
+    expect(index.isInitialLoadComplete).toBe(false);
+    expect(index.getAll()).toEqual([]);
+    const snapshots: { ready: boolean; ids: string[] }[] = [];
+    index.onIndexChange(() => snapshots.push({ ready: index.isInitialLoadComplete, ids: index.getAll().map(item => item.id) }));
+    syncing = false;
+    vi.mocked(vaultScanner.scanVault).mockReset().mockResolvedValue(result);
+    await index.flushDeferredScans();
+    expect(snapshots).toEqual([{ ready: true, ids: ['today'] }]);
+    syncing = true;
+    await index.load();
+    expect(index.isInitialLoadComplete).toBe(true);
+    expect(index.getAll().map(item => item.id)).toEqual(['today']);
+  });
+
+  it.each([false, true])('finishes an empty initial scan (source issues: %s)', async (hasIssues) => {
+    const index = createReminderIndex(app, 'Reminders');
+    vi.mocked(vaultScanner.scanVault).mockResolvedValue({
+      reminders: [], filesScanned: 0, totalLines: 0, scanDurationMs: 1, discoveredProjects: [],
+      issues: hasIssues ? [{ path: 'Reminders/Work.md', reason: 'Unreadable file' }] : [],
+    });
+    await index.load();
+    expect(index.isInitialLoadComplete).toBe(true);
+    expect(index.isComplete).toBe(!hasIssues);
+  });
+
   it('filters today, upcoming, and overdue reminders correctly', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-10T12:00:00Z'));

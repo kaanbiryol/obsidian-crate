@@ -9,6 +9,7 @@ import { timezone as getLocalTimeZone } from '../../utils/time';
 function createIndex(overrides: Partial<ReminderIndex> = {}): ReminderIndex {
 	return {
 		isLoaded: true,
+		isInitialLoadComplete: true,
 		sourceIssues: [],
 		isComplete: true,
 		remindersFolderPath: 'Reminders',

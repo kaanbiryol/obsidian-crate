@@ -115,17 +115,20 @@ describe('RemindersViewPanels', () => {
 		}
 	});
 
-	it('suppresses the project detail panel until the initial load completes', async () => {
+	it.each(['today', 'inbox', 'upcoming', 'browse'])('suppresses %s until the initial load completes', async (viewMode) => {
 		const { RemindersViewPanels } = await loadPanelsModule();
 		const props = makeProps({
-			selectedProject: 'Work',
+			viewMode,
+			selectedProject: null,
 			isInitialLoadComplete: false,
 		});
 
 		const html = renderToStaticMarkup(React.createElement(RemindersViewPanels, props as never));
 
 		expect(html).toBe('');
-		expect(projectDetailViewProps).not.toHaveBeenCalled();
+		for (const view of [todayViewProps, inboxViewProps, upcomingViewProps, browseViewProps, projectDetailViewProps]) {
+			expect(view).not.toHaveBeenCalled();
+		}
 	});
 
 	it('renders project detail and upcoming panels with the expected cross-module props', async () => {

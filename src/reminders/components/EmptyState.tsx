@@ -1,5 +1,5 @@
-import React, { createContext, useContext } from 'react';
-import { motion } from 'motion/react';
+import React, { createContext, useContext, useRef } from 'react';
+import { motion, useIsPresent } from 'motion/react';
 import type { AnimationConfig } from '../types/componentAdapter';
 import { EASE_EXPO_OUT, EASE_STANDARD, CONTENT_TRANSITION_DURATION } from '../ui/layoutConstants';
 import { ThemeIcon } from './theme-icon';
@@ -29,7 +29,12 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     animationConfig = { enabled: true },
     compact = false
 }) => {
-	const message = useContext(EmptyStateMessageContext);
+	const currentMessage = useContext(EmptyStateMessageContext);
+	const isPresent = useIsPresent();
+	const lastMessage = useRef(currentMessage);
+	// Preserve loading copy while this state exits to reveal newly loaded cards.
+	if (isPresent) lastMessage.current = currentMessage;
+	const message = isPresent ? currentMessage : lastMessage.current;
     const reduceMotion = useObsidianReducedMotion();
     const animationsEnabled = animationConfig.enabled && !reduceMotion;
     const duration = animationConfig.duration ?? CONTENT_TRANSITION_DURATION;

@@ -134,12 +134,6 @@ function App() {
 		setLoading,
 		setError,
 	} = reminderSync;
-	const initialContentReady = isInitialPwaContentReady({
-		notificationPromptReady: !isStandaloneApp() || initialCheckComplete,
-		authToken,
-		bootstrapped,
-		loading,
-	});
 	const { loggingOut, logOut, suspendLocalSession } = usePwaSessionLifecycle({
 		apiFetch,
 		cancelModalClose: modalTransition.cancelClose,
@@ -260,6 +254,14 @@ function App() {
 		showToast,
 	});
 
+	const initialContentReady = isInitialPwaContentReady({
+		notificationPromptReady: !isStandaloneApp() || initialCheckComplete,
+		authToken,
+		bootstrapped,
+		loading,
+		pendingChangesReady: mutationsReady || Boolean(storageError),
+	});
+
 	const { updating, update } = usePwaUpdate(showToast,
 		initialContentReady && (!authToken || mutationsReady || Boolean(storageError)));
 
@@ -364,6 +366,7 @@ function App() {
 				reminders={sharedReminders}
 				projects={visibleProjects}
 				incomplete={issues.length > 0}
+				checkingReminders={loading || refreshing || (dataMode === 'cached' && !isOffline && !error)}
 				isDarkMode={isDarkMode}
 				initialTab={selectedProject ? 'browse' : startTab}
 				initialProject={selectedProject ?? undefined}

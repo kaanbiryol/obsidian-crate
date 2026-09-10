@@ -31,3 +31,11 @@ describe('initial PWA content readiness', () => {
   expect(isInitialPwaContentReady({ ...ready, loading: true, notificationPromptReady: true })).toBe(false);
   expect(isInitialPwaContentReady({ ...ready, authToken: null, notificationPromptReady: false })).toBe(true);
  });
+
+ it('waits for pending local reminders before showing an empty cached Today view', () => {
+  const ready = { authToken: 'token', bootstrapped: true, loading: false };
+  expect(isInitialPwaContentReady({ ...ready, pendingChangesReady: false })).toBe(false);
+  expect(isInitialPwaContentReady({ ...ready, pendingChangesReady: true })).toBe(true);
+  expect(isInitialPwaContentReady({ ...ready, loading: true, pendingChangesReady: true })).toBe(false);
+  expect(isInitialPwaContentReady({ ...ready, authToken: null, pendingChangesReady: false })).toBe(true);
+ });

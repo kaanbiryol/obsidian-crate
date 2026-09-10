@@ -55,7 +55,7 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 	let verifiedApi = plugin.syncRuntime.getApiClient();
 	let syncingApi: typeof verifiedApi = null;
 	const index = createReminderIndex(plugin.app, folderPath, controller.signal,
-		path => plugin.syncRuntime.getState().status === 'syncing' || Boolean(path && journal.isPendingFile(path)),
+		path => !plugin.app.workspace.layoutReady || plugin.syncRuntime.getState().status === 'syncing' || Boolean(path && journal.isPendingFile(path)),
 		() => {
 			const api = plugin.syncRuntime.getApiClient();
 			return journal.hasPending() || plugin.syncRuntime.isConfigured() && (!api || api !== verifiedApi)
@@ -102,6 +102,17 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 		plugin.reminderIndex,
 	);
 	plugin.remindersVaultWatcher.register();
+	// During application startup the vault's in-memory file list is still empty.
+	// Do not interpret that as an empty reminders folder or block plugin loading
+	// by awaiting layout readiness; resume the deferred scan once files are ready.
+	if (!plugin.app.workspace.layoutReady) {
+		plugin.app.workspace.onLayoutReady(() => {
+			if (controller.signal.aborted) return;
+			void index.flushDeferredScans().catch((error: unknown) => {
+				if (!controller.signal.aborted) remindersLogger.error('Failed to load reminders after vault startup:', error);
+			});
+		});
+	}
 	return true;
 }
 

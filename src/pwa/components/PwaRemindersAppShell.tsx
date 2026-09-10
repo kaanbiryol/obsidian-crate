@@ -25,6 +25,7 @@ import { ReminderPageSizeContext } from '@/reminders/ui/reminder-pagination';
 import { EmptyStateMessageContext } from '@/reminders/components/EmptyState';
 import { useReminderClock } from '@/reminders/ui/useReminderClock';
 
+const LOADING_EMPTY_MESSAGE = { title: 'Loading reminders…', description: 'Checking for the latest reminders.' };
 const INCOMPLETE_EMPTY_MESSAGE = { title: 'No results from available files', description: 'Some source files could not be loaded. Review the notice above for missing reminders.' };
 
 export type PwaReminderCardRenderer = (props: {
@@ -48,6 +49,7 @@ interface PwaRemindersAppShellProps {
 	suppressFab?: boolean;
 	backgroundInert?: boolean;
 	incomplete?: boolean;
+	checkingReminders?: boolean;
 	renderCard: PwaReminderCardRenderer;
 	onAdd: (defaultProject: string) => void;
 	onReorder: (project: string, orderedIds: string[]) => Promise<void> | void;
@@ -76,6 +78,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	suppressFab = false,
 	backgroundInert = false,
 	incomplete = false,
+	checkingReminders = false,
 	renderCard,
 	onAdd,
 	onReorder,
@@ -182,7 +185,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 
 	return (
 		<ReminderPageSizeContext.Provider value={200}>
-		<EmptyStateMessageContext.Provider value={incomplete ? INCOMPLETE_EMPTY_MESSAGE : null}>
+		<EmptyStateMessageContext.Provider value={checkingReminders ? LOADING_EMPTY_MESSAGE : incomplete ? INCOMPLETE_EMPTY_MESSAGE : null}>
 		<ThemeIconProvider renderer={PwaThemeIcon}>
 		  <div
 				className={[

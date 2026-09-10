@@ -398,6 +398,7 @@ it('recovers interrupted moves before scanning and protects unresolved file path
 	await initializeReminders(plugin as never);
 	expect(recoverMoves.mock.invocationCallOrder[0]).toBeLessThan(reminderIndexLoad.mock.invocationCallOrder[0]!);
 	const defer = reminderIndexFactory.mock.calls[0]?.[3] as (path?: string) => boolean;
+	plugin.app.workspace.layoutReady = true;
 	expect(defer()).toBe(false);
 	expect(defer('Reminders/Healthy.md')).toBe(false);
 	expect(defer('Reminders/Pending.md')).toBe(true);
@@ -422,3 +423,31 @@ it('does not start normalization when unloaded during journal recovery', async (
 	expect(createMarkdownWriter).not.toHaveBeenCalled();
 	expect(plugin.reminderIndex).toBeUndefined();
 });
+
+ it('defers scanning the vault until Obsidian has loaded its file list', async () => {
+  const { initializeReminders } = await loadPluginIntegrationModule();
+  const plugin = createPlugin();
+  await initializeReminders(plugin as never);
+  const defer = reminderIndexFactory.mock.calls[0]?.[3] as (path?: string) => boolean;
+  expect(defer()).toBe(true);
+  expect(defer('Reminders/Inbox.md')).toBe(true);
+  expect(plugin.registerView).toHaveBeenCalled();
+  expect(reminderIndexFlushDeferredScans).not.toHaveBeenCalled();
+  plugin.app.workspace.layoutReady = true;
+  for (const [onReady] of plugin.app.workspace.onLayoutReady.mock.calls) onReady();
+  await flushMicrotasks();
+  expect(defer()).toBe(false);
+  expect(reminderIndexFlushDeferredScans).toHaveBeenCalledOnce();
+ });
+
+ it('does not run a deferred startup scan after the backend is unloaded', async () => {
+  const { initializeReminders } = await loadPluginIntegrationModule();
+  const plugin = createPlugin();
+  await initializeReminders(plugin as never);
+  const { endPluginLifecycle } = await import('../plugin/lifecycle-state');
+  endPluginLifecycle(plugin as never);
+  plugin.app.workspace.layoutReady = true;
+  for (const [onReady] of plugin.app.workspace.onLayoutReady.mock.calls) onReady();
+  await flushMicrotasks();
+  expect(reminderIndexFlushDeferredScans).not.toHaveBeenCalled();
+ });

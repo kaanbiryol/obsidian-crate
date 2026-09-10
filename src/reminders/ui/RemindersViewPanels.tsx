@@ -75,6 +75,8 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
     },
   };
 
+  if (!isInitialLoadComplete) return null;
+
   switch (viewMode) {
     case "inbox":
       return (
@@ -124,10 +126,6 @@ export const RemindersViewPanels: React.FC<RemindersViewPanelsProps> = memo(({
             />
           </motion.div>
         );
-      }
-
-      if (!isInitialLoadComplete) {
-        return null;
       }
 
       return (
