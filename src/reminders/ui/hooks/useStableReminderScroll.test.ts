@@ -44,6 +44,34 @@ describe('calculateStableScrollAdjustment', () => {
     expect(adjustment).toBe(84);
   });
 
+  it('preserves a row aligned exactly with the viewport edge', () => {
+    expect(calculateStableScrollAdjustment(
+      [anchor('stable', 'completed', 0)],
+      [anchor('stable', 'completed', 84)],
+    )).toBe(84);
+  });
+
+  it('preserves the first row when the viewport starts in a gap', () => {
+    expect(calculateStableScrollAdjustment(
+      [anchor('stable', 'completed', 6)],
+      [anchor('stable', 'completed', 90)],
+    )).toBe(84);
+  });
+
+  it('keeps a surviving neighbor when the clipped row leaves', () => {
+    expect(calculateStableScrollAdjustment(
+      [anchor('moving', 'completed', -18), anchor('stable', 'completed', 66)],
+      [anchor('moving', 'active', -900), anchor('stable', 'completed', -18)],
+    )).toBe(-84);
+  });
+
+  it('ignores section containers and never matches across sections', () => {
+    expect(calculateStableScrollAdjustment(
+      [anchor('completed-section', 'section', -500), anchor('stable', 'completed', -18)],
+      [anchor('completed-section', 'section', -416), anchor('stable', 'active', 200)],
+    )).toBeNull();
+  });
+
   it('does not fight deliberate card reordering while stabilization is suspended', () => {
     const adjustment = calculateStableScrollAdjustment(
       [anchor('first', 'active', 18), anchor('second', 'active', 102)],
