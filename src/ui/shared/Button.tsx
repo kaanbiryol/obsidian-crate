@@ -27,7 +27,9 @@ export const Button = forwardRef<HTMLButtonElement, NativeButtonProps>(function 
 				onMouseDown?.(event);
 			}}
 			onPointerDown={(event) => {
-				if (preventFocusOnPress) event.preventDefault();
+				// Touch must remain native so a press can become a scroll gesture.
+				// The compatibility mousedown still prevents focus transfer on taps.
+				if (preventFocusOnPress && event.pointerType !== 'touch') event.preventDefault();
 				onPointerDown?.(event);
 			}}
 		>

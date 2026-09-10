@@ -69,6 +69,32 @@
       gap: 4px;
     }
 
+    .reminder-action-chips {
+      flex-wrap: nowrap;
+      min-width: 0;
+      max-width: 100%;
+      overflow-x: auto;
+      touch-action: pan-x;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+
+      &::-webkit-scrollbar { display: none; }
+    }
+
+    .reminder-action-label {
+      white-space: nowrap;
+      overflow-wrap: normal;
+
+      &.is-animated {
+        display: inline-block;
+        flex: 0 0 auto;
+        overflow: clip;
+        vertical-align: middle;
+
+        > span { display: block; width: max-content; }
+      }
+    }
+
     // Match the plugin's compact chips independently of standalone form defaults.
     .reminder-action-chip {
       --crate-radius-control: 8px;
@@ -78,6 +104,7 @@
       height: auto;
       min-height: 30px;
       min-width: 30px;
+      max-width: none;
       padding: 4px 6px;
       gap: 4px;
       color: color-mix(in srgb, var(--text-muted) 60%, var(--background-primary));
@@ -151,4 +178,5 @@
   .pwa-modal-sheet.is-keyboard-open .modal-card.pwa-reminder-editor {
     padding-bottom: 16px;
   }
+
 }

@@ -252,6 +252,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 						}}
 					/>
 					<ReminderActionChips
+						animateLabels
 						dueDate={draft.dueDate || null}
 						dueDateLabel={draft.dueDate ? formatModalDueSummary(draft) : undefined}
 						project={draft.project}

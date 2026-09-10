@@ -6,6 +6,7 @@ import { formatRecurrence } from '../../utils/rruleConverter';
 import { formatDueDate } from '../../utils/dateFormatting';
 import { REMINDER_PICKER_COPY } from './pickerCopy';
 import { useReminderClock } from '../useReminderClock';
+import { AnimatedActionLabel } from './AnimatedActionLabel';
 
 interface ReminderActionChipsProps {
     dueDate: string | null;
@@ -18,6 +19,7 @@ interface ReminderActionChipsProps {
     inert?: boolean;
     preventFocusOnPress?: boolean;
     dueDateLabel?: string;
+    animateLabels?: boolean;
     onOpenDatePicker: () => void;
     onOpenProjectPicker: () => void;
     onOpenRecurrencePicker: () => void;
@@ -34,6 +36,7 @@ export function ReminderActionChips({
     inert = false,
     preventFocusOnPress,
     dueDateLabel,
+    animateLabels = false,
     onOpenDatePicker,
     onOpenProjectPicker,
     onOpenRecurrencePicker,
@@ -41,6 +44,9 @@ export function ReminderActionChips({
 }: ReminderActionChipsProps) {
     const clock = useReminderClock();
     const dueDateDisplay = dueDateLabel ?? formatDueDate(dueDate ?? undefined, undefined, clock.now);
+    const renderLabel = (label: string) => animateLabels
+        ? <AnimatedActionLabel>{label}</AnimatedActionLabel>
+        : <span className="reminder-action-label">{label}</span>;
 
     return (
         <div className="reminder-action-chips" inert={inert}>
@@ -53,9 +59,7 @@ export function ReminderActionChips({
                 className={`reminder-action-chip crate-semantic-token tone-primary${dueDate ? ' is-active' : ''}`}
             >
                 <ThemeIcon size="xs" id="calendar" />
-                <span className="reminder-action-label">
-                    {dueDateDisplay ?? REMINDER_PICKER_COPY.editor.date}
-                </span>
+                {renderLabel(dueDateDisplay ?? REMINDER_PICKER_COPY.editor.date)}
             </Button>
 
             <Button
@@ -67,9 +71,7 @@ export function ReminderActionChips({
                 className={`reminder-action-chip crate-semantic-token tone-secondary${project !== defaultProject ? ' is-active' : ''}`}
             >
                 <ThemeIcon size="xs" id="folder" />
-                <span className="reminder-action-label">
-                    {project || defaultProject || REMINDER_PICKER_COPY.editor.defaultProject}
-                </span>
+                {renderLabel(project || defaultProject || REMINDER_PICKER_COPY.editor.defaultProject)}
             </Button>
 
             <Button
