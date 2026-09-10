@@ -62,7 +62,7 @@ export function getReminderSheetTransitionPatch(
 }
 
 export function getImmediateEditorTransitionPatch(
-	activePicker: ModalPickerId,
+	activePicker: ModalPickerId | null,
 	patch: Partial<ModalDraft>,
 ): Partial<ModalDraft> {
 	return { ...patch, activePicker, deleteConfirm: false };
@@ -119,14 +119,8 @@ export function useReminderSheetNavigation({
 		onBeforeOpenPicker();
 	}, [onBeforeOpenPicker, requestTransition]);
 
-	const transitionDeleteConfirmation = useCallback((deleteConfirm: boolean) => {
-		if (!requestTransition({ screen: 'editor', deleteConfirm })) return;
-		onBeforeOpenPicker();
-	}, [onBeforeOpenPicker, requestTransition]);
-
 	const returnToEditor = useCallback((patch: Partial<ModalDraft> = {}) => {
 		const activeScreen = navigationRef.current.activeScreen;
-		if (activeScreen === 'editor') return;
 
 		let accepted = false;
 		flushSync(() => {
@@ -136,12 +130,21 @@ export function useReminderSheetNavigation({
 				isClosing: isClosingRef.current,
 			})) return;
 			accepted = true;
-			onPatchDraft(getImmediateEditorTransitionPatch(activeScreen, patch));
+			onPatchDraft(getImmediateEditorTransitionPatch(activeScreen === 'editor' ? null : activeScreen, patch));
 			setEditorFocusRequest((request) => request + 1);
 		});
 		// iOS requires focus inside the user gesture, after the editor is focusable.
 		if (accepted) onFocusEditor();
 	}, [applyAction, onFocusEditor, onPatchDraft]);
+
+	const transitionDeleteConfirmation = useCallback((deleteConfirm: boolean) => {
+		if (!deleteConfirm) {
+			returnToEditor();
+			return;
+		}
+		if (!requestTransition({ screen: 'editor', deleteConfirm })) return;
+		onBeforeOpenPicker();
+	}, [onBeforeOpenPicker, requestTransition, returnToEditor]);
 
 	const handleStageAnimationComplete = useCallback(() => {
 		if (isClosingRef.current) return;

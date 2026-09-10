@@ -10,7 +10,8 @@ for (const type of [chromium, webkit]) {
    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
    const waitForStageOpen = () => page.waitForFunction(() => {
     const stage = document.querySelector('.pwa-reminder-sheet-stage');
-    return stage && Math.abs(new DOMMatrixReadOnly(getComputedStyle(stage).transform).m42) < 0.1;
+    return stage && !document.querySelector('.reminder-action-chips')?.inert
+     && Math.abs(new DOMMatrixReadOnly(getComputedStyle(stage).transform).m42) < 0.1;
    });
    await page.goto(`http://127.0.0.1:${server.address().port}/notifications?folder=Reminders&tab=inbox`);
    const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
@@ -29,10 +30,23 @@ for (const type of [chromium, webkit]) {
    await waitForStageOpen();
    if (type === webkit) await page.screenshot({ path: '/tmp/crate-inline-delete.png' });
    await confirmation.getByRole('button', { name: 'Cancel', exact: true }).tap();
-   await expect(confirmation).toBeVisible();
+   await expect(confirmation).toHaveCount(0);
    await expect(title).toBeVisible();
+   await expect(title).toBeFocused();
    await waitForStageOpen();
+   await expect(title).toBeFocused();
    await expect(title).toHaveText('My preserved draft');
+   for (const dismiss of ['close', 'escape']) {
+    await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
+    await expect(confirmation).toBeVisible();
+    await waitForStageOpen();
+    if (dismiss === 'close') await confirmation.getByRole('button', { name: 'Cancel deletion', exact: true }).tap();
+    else await confirmation.press('Escape');
+    await expect(title, `${type.name()}: ${dismiss} restores title focus`).toBeFocused();
+    await waitForStageOpen();
+    await expect(title).toBeFocused();
+    await expect(title).toHaveText('My preserved draft');
+   }
    await page.getByRole('button', { name: 'Delete reminder', exact: true }).tap();
    await expect(confirmation).toBeVisible();
    await waitForStageOpen();
