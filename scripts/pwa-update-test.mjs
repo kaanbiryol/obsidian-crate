@@ -52,6 +52,19 @@ async function testUpdate(browser, launchMode) {
   await safari.addInitScript(({ savedTheme, transitionKey, previewAuthToken }) => {
     if (!localStorage.getItem('crate-reminders-theme')) localStorage.setItem('crate-reminders-theme', savedTheme);
     if (!sessionStorage.getItem(transitionKey)) return;
+    // Model iOS settling its safe-area inset after the hydrated shell mounts.
+    const layoutObserver = new MutationObserver(() => {
+      if (!document.querySelector('.pwa-reminders-view')) return;
+      layoutObserver.disconnect();
+      window.__updateLayoutPhases = [];
+      for (const [delay, inset] of [[80, 30], [160, 59]]) {
+        setTimeout(() => {
+          window.__updateLayoutPhases.push(document.documentElement.dataset.pwaUpdating);
+          document.documentElement.style.setProperty('--pwa-safe-area-top', `${inset}px`);
+        }, delay);
+      }
+    });
+    layoutObserver.observe(document, { childList: true, subtree: true });
     window.__crateUpdateAppGate = new Promise(resolve => { window.__releaseUpdateApp = resolve; });
     const bootstrapGate = new Promise(resolve => { window.__releaseUpdateBootstrap = resolve; });
     const outboxGate = new Promise(resolve => { window.__releaseUpdateOutbox = resolve; });
@@ -140,6 +153,7 @@ async function testUpdate(browser, launchMode) {
     await page.getByRole('group', { name: cardName, exact: true }).waitFor();
     await expect(page.locator('html')).not.toHaveAttribute('data-pwa-updating');
     await expect(transition).toHaveCSS('opacity', '0');
+    expect(await page.evaluate(() => window.__updateLayoutPhases)).toEqual(['restore', 'restore']);
     await expect(page.getByRole('button', { name: 'Open settings', exact: true })).toBeVisible();
     expect(navigations).toBe(1);
     await expect(update).toHaveCount(0);

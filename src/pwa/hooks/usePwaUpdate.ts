@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { applyPwaUpdate } from '../apply-update';
 import { finishPwaUpdateTransition, preparePwaUpdateTransition } from '../update-transition';
+import { whenUpdateLayoutSettles } from '../update-layout-readiness';
 import type { ShowToast } from '../types';
 
 export function usePwaUpdate(showToast: ShowToast, contentReady: boolean) {
@@ -10,12 +11,8 @@ export function usePwaUpdate(showToast: ShowToast, contentReady: boolean) {
 		if (document.documentElement.dataset.pwaUpdating !== 'restore') return;
 		document.getElementById('app')?.setAttribute('inert', '');
 		if (!contentReady) return;
-		// Reveal the hydrated app, including pending local changes, together.
-		// Two frames also let the new document paint its matching curtain first.
-		let frame = requestAnimationFrame(() => {
-			frame = requestAnimationFrame(finishPwaUpdateTransition);
-		});
-		return () => cancelAnimationFrame(frame);
+		// Data readiness can precede safe-area, viewport and notice layout updates.
+		return whenUpdateLayoutSettles(finishPwaUpdateTransition);
 	}, [contentReady]);
 
 	const update = useCallback(() => {
