@@ -1,21 +1,24 @@
 import type { ConflictRecord, SyncActivityProgress } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard } from './rendering';
 
-export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null): void {
+export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.'): void {
 	if (syncing || progress) {
-		const notice = container.createDiv({ cls: 'crate-activity-transfer' });
-		notice.setAttribute('role', 'status');
-		notice.createEl('strong', { text: progress?.type === 'initial' ? 'Uploading your vault…' : 'Syncing files…' });
-		notice.createEl('p', { text: progress && progress.total > 0
-			? `${progress.current.toLocaleString()} of ${progress.total.toLocaleString()} files ${progress.type === 'initial' ? 'prepared for upload' : 'processed'}. Sync is still running.`
-			: 'Checking your vault and preparing transfers…' });
-		if (paths.length === 0) return;
+        const loading = container.createDiv({ cls: 'crate-activity-loading' });
+        loading.setAttribute('role', 'status');
+        loading.setAttribute('aria-live', 'polite');
+        const spinner = loading.createSpan({ cls: 'crate-activity-spinner' });
+        spinner.setAttribute('aria-hidden', 'true');
+        loading.createSpan({
+            cls: 'crate-activity-loading-label',
+            text: progress?.type === 'initial' ? 'Uploading vault…' : 'Syncing…',
+        });
+        return;
 	}
 	if (paths.length === 0) {
 		if (hasError) {
 			renderEmptyState(container, 'inbox', 'No pending files', 'The last sync had errors. View history for details.');
 		} else {
-			renderEmptyState(container, 'check', 'All synced', 'Your vault is up to date.', 'success');
+			renderEmptyState(container, 'check', 'All synced', lastSyncLabel, 'success');
 		}
 		return;
 	}
@@ -32,9 +35,9 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 	for (const filePath of deletes) renderFileMicroCard(list, filePath, 'delete');
 }
 
-export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[]): void {
+export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[], lastSyncLabel: string): void {
 	if (conflicts.length === 0) {
-		renderEmptyState(container, 'shield-check', 'No conflicts', 'Everything looks good.', 'success');
+		renderEmptyState(container, 'shield-check', 'No conflicts', lastSyncLabel, 'success');
 		return;
 	}
 

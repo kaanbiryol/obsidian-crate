@@ -31,7 +31,10 @@ export class ActivityModal extends Modal {
 	private readonly settings: CrateSettings;
 	private readonly deps: ActivityModalDeps;
 	private tabIndicator!: HTMLDivElement;
+	private currentTabIndex = 0;
 	private subtitleEl!: HTMLSpanElement;
+	private footerEl!: HTMLElement;
+	private pendingHasInlineStatus = false;
 	private errorNoticeEl!: HTMLDivElement;
 	private errorMessageEl!: HTMLSpanElement;
 	private syncBtn!: HTMLButtonElement;
@@ -43,17 +46,26 @@ export class ActivityModal extends Modal {
 	private historyPanel!: HTMLDivElement;
 	private allTabs: HTMLButtonElement[] = [];
 	private allPanels: HTMLDivElement[] = [];
-	private currentTabIndex = 0;
 	private readonly onProgress = () => {
 		if (!this.pendingPanel) return;
 		this.updateSyncBtn();
-		this.subtitleEl.setText(this.formatLastSync());
-		this.pendingPanel.empty();
+		this.updateSyncStatusText();
 		this.renderPending();
 	};
 	private renderPending(): void {
 		const state = this.deps.getState();
-		renderPendingPanel(this.pendingPanel, this.deps.getPendingPaths(), state.status === 'error', state.status === 'syncing', this.deps.getActivityProgress?.());
+        const progress = this.deps.getActivityProgress?.();
+        const paths = this.deps.getPendingPaths();
+        this.pendingHasInlineStatus = paths.length === 0 && state.status !== 'error' && state.status !== 'syncing' && !progress;
+        this.updateFooterVisibility();
+        const loadingLabel = this.pendingPanel.querySelector('.crate-activity-loading-label');
+        if (loadingLabel && (state.status === 'syncing' || progress)) {
+            // Keep the spinner mounted through frequent progress updates.
+            loadingLabel.textContent = progress?.type === 'initial' ? 'Uploading vault…' : 'Syncing…';
+            return;
+        }
+        this.pendingPanel.empty();
+		renderPendingPanel(this.pendingPanel, paths, state.status === 'error', state.status === 'syncing', progress, this.formatLastSync());
 	}
 	private readonly onStateChange = () => this.refresh();
 
@@ -77,11 +89,8 @@ export class ActivityModal extends Modal {
 	}
 
 	private renderActivity(contentEl: HTMLDivElement, close: () => void, headerEl: HTMLDivElement): void {
-		this.currentTabIndex = 0;
 
-		const headerText = headerEl.querySelector<HTMLElement>('.reminder-modal-header-copy')!;
 		const header = headerEl.querySelector<HTMLElement>('.reminder-modal-header-side.is-right')!;
-		this.subtitleEl = headerText.createSpan({ text: this.formatLastSync(), cls: 'crate-activity-subtitle' });
 
 		this.syncBtn = header.createEl('button', {
 			cls: 'crate-sync-now-btn',
@@ -129,15 +138,17 @@ export class ActivityModal extends Modal {
 			attr: { type: 'button', role: 'tab', 'aria-selected': 'false' },
 		});
 		historyTab.createSpan({ text: 'History' });
-
 		this.tabIndicator = tabs.createDiv({ cls: 'crate-activity-tab-indicator' });
+
 
 		this.updateTabCounts();
 
 		// Panels
-		this.pendingPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
-		this.conflictsPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
+		this.pendingPanel = contentEl.createDiv({ cls: 'crate-activity-panel crate-activity-panel-pending' });
+		this.conflictsPanel = contentEl.createDiv({ cls: 'crate-activity-panel crate-activity-panel-conflicts' });
 		this.historyPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
+        this.footerEl = contentEl.createEl('footer', { cls: 'crate-activity-footer' });
+        this.subtitleEl = this.footerEl.createSpan({ text: this.formatLastSync(), cls: 'crate-activity-subtitle' });
 		this.conflictsPanel.hide();
 		this.historyPanel.hide();
 
@@ -145,7 +156,7 @@ export class ActivityModal extends Modal {
 		this.allPanels = [this.pendingPanel, this.conflictsPanel, this.historyPanel];
 
 		this.renderPending();
-		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts());
+		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.formatLastSync());
 		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? []);
 
 		for (let i = 0; i < this.allTabs.length; i++) {
@@ -161,7 +172,11 @@ export class ActivityModal extends Modal {
 				panel.tabIndex = 0;
 				tab.setAttribute('aria-controls', panel.id);
 			}
-			tab.addEventListener('click', () => this.switchTab(i));
+			tab.addEventListener('click', (event) => {
+                this.switchTab(i);
+                // Pointer activation should not leave keyboard focus styling behind.
+                if (event.detail > 0) tab.blur();
+            });
 			tab.addEventListener('keydown', (event) => {
 				let next = i;
 				if (event.key === 'ArrowRight') next = (i + 1) % this.allTabs.length;
@@ -178,9 +193,8 @@ export class ActivityModal extends Modal {
 		this.switchTab(this.initialTab === 'history' ? 2 : 0);
 		this.deps.addStateChangeListener(this.onStateChange);
 		this.deps.addProgressListener?.(this.onProgress);
-
-		// Position indicator after layout
 		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
+
 	}
 
 	private switchTab(index: number): void {
@@ -201,8 +215,24 @@ export class ActivityModal extends Modal {
 				panel.hide();
 			}
 		}
+		this.updateFooterVisibility();
 		this.positionIndicator(index);
 	}
+
+    private updateSyncStatusText(): void {
+        const label = this.formatLastSync();
+        this.subtitleEl.setText(label);
+        const conflictStatus = this.conflictsPanel.querySelector('.crate-empty-desc');
+        if (conflictStatus) conflictStatus.textContent = label;
+    }
+
+    private updateFooterVisibility(): void {
+        const hideFooter = this.currentTabIndex === 2
+            || (this.currentTabIndex === 0 && this.pendingHasInlineStatus)
+            || (this.currentTabIndex === 1 && this.deps.getActiveConflicts().length === 0);
+        if (hideFooter) this.footerEl.hide();
+        else this.footerEl.show();
+    }
 
 	private positionIndicator(index: number): void {
 		const tab = this.allTabs[index];
@@ -253,12 +283,11 @@ export class ActivityModal extends Modal {
 	private refresh(): void {
 		this.updateSyncBtn();
 		this.updateSyncErrorNotice();
-		this.subtitleEl.setText(this.formatLastSync());
+		this.updateSyncStatusText();
 		this.updateTabCounts();
-		this.pendingPanel.empty();
 		this.renderPending();
 		this.conflictsPanel.empty();
-		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts());
+		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.formatLastSync());
 		const expanded = new Set(Array.from(this.historyPanel.querySelectorAll('details[open]'))
 			.map((entry) => entry.getAttribute('data-history-key')));
 		const scrollTop = this.historyPanel.scrollTop;

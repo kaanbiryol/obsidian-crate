@@ -53,10 +53,25 @@
 
 .crate-activity-modal > .crate-modal-header-host { flex-shrink: 0; }
 
-.crate-activity-subtitle {
-	font-size: var(--font-ui-small);
-	font-weight: var(--font-normal);
-	color: var(--text-muted);
+.crate-reminders-ui .crate-activity-modal .reminder-modal-header {
+    padding-block: 6px 0;
+    border-bottom: 0;
+}
+
+.crate-activity-footer {
+    display: flex;
+    flex-shrink: 0;
+    justify-content: flex-end;
+    padding: 6px var(--crate-activity-space-inline) 12px;
+}
+
+.crate-activity-subtitle,
+.crate-activity-panel-pending .crate-empty-icon-success + .crate-empty-text .crate-empty-desc,
+.crate-activity-panel-conflicts .crate-empty-icon-success + .crate-empty-text .crate-empty-desc {
+	font-size: calc(var(--font-ui-smaller, 12px) * 0.8);
+	line-height: 1.4;
+	font-weight: 300;
+	color: var(--text-faint);
 	font-variant-numeric: tabular-nums;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -210,7 +225,8 @@
 	margin: 0;
 	min-height: 44px;
 	padding: 10px 14px;
-	border: 0;
+	border: 0 !important;
+	outline: none !important;
 	border-radius: 0;
 	appearance: none;
 	background: transparent !important;
@@ -234,8 +250,10 @@
 	}
 
 	&:focus-visible {
-		outline: 2px solid var(--crate-activity-focus-ring);
-		outline-offset: -2px;
+		text-decoration: underline;
+		text-decoration-color: var(--crate-activity-focus-ring);
+		text-decoration-thickness: 2px;
+		text-underline-offset: 5px;
 	}
 
 	&.crate-activity-tab-active {
@@ -537,6 +555,7 @@
 
 // Respond to the sheet's width, including narrow desktop windows.
 @container (max-width: 440px) {
+
     .crate-history-header {
         grid-template-columns: minmax(0, 1fr) auto;
     }
@@ -571,7 +590,8 @@ body.reduce-motion .crate-activity-modal {
     --crate-activity-motion-fast: 0ms;
     --crate-activity-motion-moderate: 0ms;
 
-    .crate-sync-now-btn.is-syncing .crate-sync-btn-icon svg {
+    .crate-sync-now-btn.is-syncing .crate-sync-btn-icon svg,
+    .crate-activity-spinner {
         animation: none;
     }
 }
@@ -581,7 +601,8 @@ body.reduce-motion .crate-activity-modal {
         --crate-activity-motion-fast: 0ms;
         --crate-activity-motion-moderate: 0ms;
 
-        .crate-sync-now-btn.is-syncing .crate-sync-btn-icon svg {
+        .crate-sync-now-btn.is-syncing .crate-sync-btn-icon svg,
+        .crate-activity-spinner {
             animation: none;
         }
     }
@@ -599,12 +620,23 @@ body.reduce-motion .crate-activity-modal {
     }
 }
 
-.crate-activity-transfer {
-  margin: 16px 0;
-  padding: 16px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  background: var(--background-secondary);
+.crate-activity-loading {
+    display: flex;
+    height: 100%;
+    min-height: 160px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
 
-  p { margin: 6px 0 0; color: var(--text-muted); }
+.crate-activity-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--crate-activity-divider);
+    border-top-color: var(--interactive-accent);
+    border-radius: 50%;
+    animation: crate-spin 1s linear infinite;
 }
