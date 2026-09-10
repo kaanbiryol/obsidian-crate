@@ -28,23 +28,20 @@ export async function decodeAndVerifyArtifacts(input: {
 	fingerprint: string;
 	workerBundleGzipBase64: string;
 	workerBundleSha256: string;
-	d1Schema: string;
+	d1SchemaGzipBase64: string;
 	d1SchemaSha256: string;
 }): Promise<CloudflareDeploymentArtifacts> {
 	if (typeof DecompressionStream === 'undefined') {
 		throw new Error('This Obsidian version cannot unpack the embedded Cloudflare deployment');
 	}
 
-	const compressed = decodeBase64(input.workerBundleGzipBase64);
-	const stream = new Blob([compressed])
-		.stream()
-		.pipeThrough(new DecompressionStream('gzip'));
-	const workerBundle = await new Response(stream).text();
+	const workerBundle = await decompressArtifact(input.workerBundleGzipBase64);
 	if (await sha256Hex(workerBundle) !== input.workerBundleSha256) {
 		throw new Error('The embedded Cloudflare Worker failed its integrity check');
 	}
 
-	if (await sha256Hex(input.d1Schema) !== input.d1SchemaSha256) {
+	const d1Schema = await decompressArtifact(input.d1SchemaGzipBase64);
+	if (await sha256Hex(d1Schema) !== input.d1SchemaSha256) {
 		throw new Error('The embedded D1 schema failed its integrity check');
 	}
 
@@ -53,7 +50,13 @@ export async function decodeAndVerifyArtifacts(input: {
 		fingerprint: input.fingerprint,
 		workerBundle,
 		workerBundleSha256: input.workerBundleSha256,
-		d1Schema: input.d1Schema,
+		d1Schema,
 		d1SchemaSha256: input.d1SchemaSha256,
 	};
+}
+
+async function decompressArtifact(gzipBase64: string): Promise<string> {
+	const compressed = decodeBase64(gzipBase64);
+	const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
+	return new Response(stream).text();
 }

@@ -16,7 +16,7 @@ describe('embedded Cloudflare deployment artifacts', () => {
 			fingerprint: 'f'.repeat(64),
 			workerBundleGzipBase64: await gzipBase64(workerBundle),
 			workerBundleSha256: await sha256Hex(workerBundle),
-			d1Schema: schemaSql,
+			d1SchemaGzipBase64: await gzipBase64(schemaSql),
 			d1SchemaSha256: await sha256Hex(schemaSql),
 		});
 
@@ -31,10 +31,19 @@ describe('embedded Cloudflare deployment artifacts', () => {
 			fingerprint: 'f'.repeat(64),
 			workerBundleGzipBase64: await gzipBase64('worker-code'),
 			workerBundleSha256: '0'.repeat(64),
-			d1Schema: '',
+			d1SchemaGzipBase64: await gzipBase64(''),
 			d1SchemaSha256: await sha256Hex(''),
 		})).rejects.toThrow('integrity check');
 	});
 
+	it('rejects a decompressed schema whose hash does not match', async () => {
+		await expect(decodeAndVerifyArtifacts({
+			version: '0.1.0', fingerprint: 'f'.repeat(64),
+			workerBundleGzipBase64: await gzipBase64('worker-code'),
+			workerBundleSha256: await sha256Hex('worker-code'),
+			d1SchemaGzipBase64: await gzipBase64('altered schema'),
+			d1SchemaSha256: await sha256Hex('original schema'),
+		})).rejects.toThrow('D1 schema failed its integrity check');
+	});
 
 });
