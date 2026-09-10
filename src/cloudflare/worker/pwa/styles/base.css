@@ -22,6 +22,8 @@
 	--pwa-sheet-surface:#101013;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* Allow scrolling, but not page zoom from double taps or pinches. */
+html,body{touch-action:pan-x pan-y}
 html,body{margin:0;padding:0;background:radial-gradient(circle at 82% -12%,rgba(var(--accent-rgb),.09),transparent 34%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;width:100%;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}
 body{min-height:100%;min-height:100dvh;overflow:hidden}
 /* Freeze the document while preserving native scrolling inside modal fields. */
