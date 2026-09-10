@@ -145,11 +145,11 @@
     }
 
     &.is-important:not(.is-checked) .premium-checkbox-visual {
-        border-color: var(--checkbox-border-color, var(--background-modifier-border-hover));
+        border-color: var(--crate-danger);
     }
 
     &.is-important:not(.is-checked):hover .premium-checkbox-visual {
-        border-color: var(--checkbox-border-color-hover, var(--text-muted));
+        border-color: var(--crate-danger);
     }
 }
 
