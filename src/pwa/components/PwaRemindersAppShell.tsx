@@ -165,6 +165,9 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 			viewMode={viewMode}
 			selectedProject={selectedProject}
 			projectHeaderMetaContent={headerMetaContent}
+			projectBelowHeaderContent={belowHeaderContent && selectedProject !== null ? (
+				<div className="pwa-below-header-content">{belowHeaderContent(true)}</div>
+			) : undefined}
 			isInitialLoadComplete
 			reminders={reminders}
 			projects={projects}
@@ -219,9 +222,9 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 								</div>
 							)}
 
-							{belowHeaderContent && (
+							{belowHeaderContent && selectedProject === null && (
 								<div className="pwa-below-header-content">
-									{belowHeaderContent(viewMode === 'browse' && selectedProject !== null)}
+									{belowHeaderContent(false)}
 								</div>
 							)}
 
