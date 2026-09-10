@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { TABS, SPRING_CONFIG, type TabId } from '../ui/layoutConstants';
 import { ShadowDOMNativeButton } from './ShadowDOMNativeButton';
 import { ThemeIcon } from './theme-icon';

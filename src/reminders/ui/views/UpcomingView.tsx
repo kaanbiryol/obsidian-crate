@@ -1,5 +1,5 @@
 import React, { useMemo, memo } from 'react';
-import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
+import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
 import { ReminderListLayout } from './ReminderListLayout';
 

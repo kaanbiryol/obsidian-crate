@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { useShadowDomClickBridge } from './shadowDomClickBridge';
 
 type NativeMotionButtonProps = Omit<React.ComponentProps<typeof motion.button>, 'children' | 'onClick' | 'ref'> & {

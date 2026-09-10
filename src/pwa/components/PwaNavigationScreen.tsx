@@ -1,4 +1,4 @@
-import { motion, useIsPresent, type Variants } from 'framer-motion';
+import { motion, useIsPresent, type Variants } from 'motion/react';
 import React from 'react';
 
 export interface PwaNavigationMotion {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import type { AnimationConfig } from '../types/componentAdapter';
 import { useObsidianReducedMotion } from '../ui/useObsidianReducedMotion';
 

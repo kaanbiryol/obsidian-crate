@@ -10,7 +10,7 @@ const upcomingViewProps = vi.fn();
 const projectDetailViewProps = vi.fn();
 
 async function loadPanelsModule() {
-	vi.doMock('framer-motion', () => ({
+	vi.doMock('motion/react', () => ({
 		motion: {
 			div: ({ children, ...props }: { children?: React.ReactNode }) => React.createElement('div', props, children),
 		},
@@ -79,7 +79,7 @@ beforeEach(() => {
 afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
-	vi.doUnmock('framer-motion');
+	vi.doUnmock('motion/react');
 	vi.doUnmock('@/reminders/ui/views');
 	vi.doUnmock('@/reminders/ui/layoutConstants');
 });

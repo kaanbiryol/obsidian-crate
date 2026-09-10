@@ -1,6 +1,6 @@
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { LayoutGroup } from "framer-motion";
+import { LayoutGroup } from "motion/react";
 import { ReminderMotionRow } from "@/reminders/components/ReminderMotionRow";
 
 import type { Reminder } from "@/reminders/types/plugin-reminder";

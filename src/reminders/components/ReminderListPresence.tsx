@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'motion/react';
 
 /** Rows keep their space during exits; their height animation closes the gap. */
 export function ReminderListPresence({ children }: { children: ReactNode }) {

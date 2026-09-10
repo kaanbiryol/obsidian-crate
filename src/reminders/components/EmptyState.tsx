@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import type { AnimationConfig } from '../types/componentAdapter';
 import { EASE_EXPO_OUT, EASE_STANDARD, CONTENT_TRANSITION_DURATION } from '../ui/layoutConstants';
 import { ThemeIcon } from './theme-icon';

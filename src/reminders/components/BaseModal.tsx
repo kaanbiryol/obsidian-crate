@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { motion, AnimatePresence, MotionConfig, PanInfo, useMotionValue, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig, PanInfo, useMotionValue, useTransform } from 'motion/react';
 import type { AnimationConfig, ModalVariant } from '../types/componentAdapter';
 import {
     IOS_SPRING,

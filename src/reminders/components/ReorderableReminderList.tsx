@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, forwardRef, memo } from 'react';
-import { motion, Reorder, useDragControls, useIsPresent } from 'framer-motion';
+import { motion, Reorder, useDragControls, useIsPresent } from 'motion/react';
 import type { Reminder } from '../types/reminder';
 import { ReminderListPresence } from './ReminderListPresence';
 import { REMINDER_DRAG_SCALE, REMINDER_LIST_LAYOUT_TRANSITION, REMINDER_SECTION_TRANSITION } from '../ui/layoutConstants';

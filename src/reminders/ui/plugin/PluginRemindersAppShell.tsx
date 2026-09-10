@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, MotionConfig } from "framer-motion";
+import { AnimatePresence, motion, MotionConfig } from "motion/react";
 
 import { BottomTabBar } from "@/reminders/components/BottomTabBar";
 import { FloatingActionButton } from "@/reminders/components/FloatingActionButton";

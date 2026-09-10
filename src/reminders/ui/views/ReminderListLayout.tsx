@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react';
-import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
+import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import type { Reminder } from '../../types/reminder';
 import type { AnimationConfig } from '../../types/componentAdapter';
 import { useObsidianReducedMotion } from '../useObsidianReducedMotion';

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { motion, useIsPresent } from 'framer-motion';
+import { motion, useIsPresent } from 'motion/react';
 import { reminderRowMotion } from '../ui/reminderRowMotion';
 
 export function ReminderMotionRow({

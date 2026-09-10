@@ -1,4 +1,4 @@
-import type { Easing } from 'framer-motion';
+import type { Easing } from 'motion/react';
 
 /**
  * Layout spacing constants for consistent UI measurements

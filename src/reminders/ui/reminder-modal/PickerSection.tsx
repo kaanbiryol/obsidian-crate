@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { motion, type MotionProps } from 'framer-motion';
+import { motion, type MotionProps } from 'motion/react';
 
 type PickerSectionMotionProps = Pick<
 	MotionProps,

@@ -1,4 +1,4 @@
-import type { MotionProps } from 'framer-motion';
+import type { MotionProps } from 'motion/react';
 import { REMINDER_LIST_FADE_TRANSITION, REMINDER_SECTION_TRANSITION } from './layoutConstants';
 
 /** Animate occupied space, so fading cards never overlap their neighbors. */

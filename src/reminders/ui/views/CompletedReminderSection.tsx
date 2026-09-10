@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 
 import { ReminderMotionRow } from '../../components/ReminderMotionRow';
 import { ReminderListPresence } from '../../components/ReminderListPresence';
