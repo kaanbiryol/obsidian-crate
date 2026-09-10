@@ -69,7 +69,7 @@ html,body{background:var(--pwa-launch-bg);color:var(--text-normal);color-scheme:
 .pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage,.modal-card,.settings-sheet{background:var(--pwa-sheet-surface);border-color:var(--background-modifier-border)}
 .pwa-modal-sheet{color:var(--text-normal);color-scheme:light}
 .pwa-modal-sheet__backdrop{background:rgba(24,24,27,.42)}
-.pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage{border-color:var(--pwa-light-border);box-shadow:0 -1px 0 rgba(255,255,255,.72),0 -24px 70px rgba(24,24,27,.16)}
+.pwa-modal-sheet__container:not(.pwa-modal-sheet__container--reminder),.pwa-reminder-sheet-stage{box-shadow:0 -24px 70px rgba(24,24,27,.16)}
 /* Match the plugin's white picker surface and neutral, softer secondary text. */
 .pwa-picker-sheet{
 	--pwa-sheet-surface:#ffffff;
