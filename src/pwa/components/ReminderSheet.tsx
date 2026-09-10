@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -13,6 +13,9 @@ import {
 	type ReminderEditorScreenHandle,
 } from './ReminderEditorScreen';
 import { PwaModalSheet } from './PwaModalSheet';
+import { PwaDeleteConfirmation } from './PwaDeleteConfirmation';
+import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-modal/deleteConfirmation';
+import { useEditorSheetHeight } from '../hooks/useEditorSheetHeight';
 import { DeferredNotice } from './DeferredNotice';
 const ReminderPickerSheet = lazy(() => import('./ReminderPickerSheet')
 	.then(module => ({ default: module.ReminderPickerSheet })));
@@ -110,6 +113,9 @@ function ReminderEditorSheet({
 		onPatchDraft: patchDraft,
 		onClosed,
 	});
+	const deleteScreenRef = useRef<HTMLDivElement | null>(null);
+	const confirmationId = useId();
+	useEditorSheetHeight(deleteScreenRef, activeScreen === 'delete', true);
 	const pickerTransitionKeyboardInset = isStageClosing
 		? pickerTransitionKeyboardInsetRef.current
 		: 0;
@@ -147,7 +153,7 @@ function ReminderEditorSheet({
 			}}
 			onCloseEnd={handleCloseEnd}
 			variant="reminder"
-			sheetClassName={activeScreen === 'editor' ? 'is-editor-screen' : undefined}
+			sheetClassName={activeScreen === 'editor' || activeScreen === 'delete' ? 'is-editor-screen' : undefined}
 			keyboardInset={renderedKeyboardInset}
 			closeOnBackdrop={!saving && !isClosing && canInteract}
 			onKeyDown={handleDialogKeyDown}
@@ -182,9 +188,23 @@ function ReminderEditorSheet({
 					onDeleteConfirmationChange={transitionDeleteConfirmation}
 					onClose={onClose}
 					onSave={onSave}
-					onDelete={(id) => onDelete(id, modal.expectedRevision, modal.filePath)}
 				/>
-				{activeScreen !== 'editor' && (
+				{activeScreen === 'delete' && (
+					<div ref={deleteScreenRef} className="pwa-reminder-sheet-screen modal-card pwa-reminder-editor is-active">
+						<PwaDeleteConfirmation
+							id={confirmationId}
+							message={buildDeleteConfirmationMessage(modal.draft)}
+							isLoading={saving}
+							onClose={() => { if (!saving) returnToEditor(); }}
+							onConfirm={() => {
+								if (!saving && !isClosing && canInteract && modal.reminderId) {
+									onDelete(modal.reminderId, modal.expectedRevision, modal.filePath);
+								}
+							}}
+						/>
+					</div>
+				)}
+				{activeScreen !== 'editor' && activeScreen !== 'delete' && (
 					<div className="pwa-reminder-sheet-screen pwa-reminder-sheet-screen--picker is-active">
 						<Suspense fallback={null}><ReminderPickerSheet
 							isDark={colorScheme === 'dark'}

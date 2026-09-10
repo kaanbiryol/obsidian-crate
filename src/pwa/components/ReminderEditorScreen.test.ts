@@ -19,7 +19,7 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof ReminderEdi
 		saving: false, isClosing: false, isActive: true, isReturningToEditor: false,
 		canInteract: true, keyboardInset: 0, editorFocusRequest: 0,
 		dialogRef: vi.fn(), onPatchDraft: vi.fn(), onDeleteConfirmationChange: vi.fn(), onOpenPicker: vi.fn(),
-		onClose: vi.fn(), onSave: vi.fn(), onDelete: vi.fn(),
+		onClose: vi.fn(), onSave: vi.fn(),
 		...overrides,
 	}));
 }
@@ -77,26 +77,10 @@ describe('PWA shared editor integration', () => {
 		expect(markup).toContain('contentEditable="false"');
 	});
 
-	it('shows inline confirmation while hiding and disabling the editor', () => {
-		const markup = renderEditor({
-			keyboardInset: 334,
-			modal: {
-				mode: 'edit', reminderId: 'preview-reminder',
-				draft: {
-					content: 'Buy milk', description: '', project: 'Inbox', defaultProject: 'Inbox',
-					priority: 4, dueDate: '', dueTime: '', activePicker: null, deleteConfirm: true,
-				},
-			},
-		});
-		expect(markup).toContain('role="alertdialog"');
-		expect(markup).toContain('Delete &quot;Buy milk&quot;? This can&#x27;t be undone.');
-		expect(markup).toContain('>Cancel</button>');
-		expect(markup).toContain('Delete reminder</button>');
-		expect(markup).not.toContain('aria-label="Close confirmation"');
-		expect(markup).not.toContain('autofocus=""');
-		expect(markup).toContain('style="display:none"');
-		expect(markup).toContain('>Delete reminder</h2>');
-		expect(markup).toContain('>Edit reminder</h2>');
-		expect(button(markup, 'save-reminder')).toContain('disabled=""');
+	it('keeps the editor focusable but inactive during a return transition', () => {
+		const markup = renderEditor({ isActive: false, isReturningToEditor: true, canInteract: false });
+		expect(markup).toContain('is-focus-target');
+		expect(markup).toContain('aria-hidden="false"');
+		expect(markup).toContain('contentEditable="true"');
 	});
 });

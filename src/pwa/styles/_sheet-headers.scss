@@ -21,10 +21,19 @@
       padding: 0;
       color: var(--text-muted);
 
-      &:hover:not(:disabled),
-      &:focus-visible {
-        color: var(--text-normal);
+      // Touch browsers can retain hover at the old confirmation close button.
+      @media (hover: none) {
+        &:hover:not(:focus-visible) {
+          border-color: transparent !important;
+          background: transparent !important;
+          color: var(--text-muted);
+        }
       }
+
+      @media (hover: hover) {
+        &:hover:not(:disabled) { color: var(--text-normal); }
+      }
+      &:focus-visible { color: var(--text-normal); }
     }
 
     .reminder-modal-header-title,

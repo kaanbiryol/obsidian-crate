@@ -52,11 +52,13 @@ function trapDialogFocus(event: ReactKeyboardEvent<HTMLElement>, dialog: HTMLEle
 export function useDialogFocus({
 	activeKey,
 	autoFocus = true,
+	restoreFocus = true,
 	escapeDisabled = false,
 	onEscape,
 }: {
 	activeKey: string;
 	autoFocus?: boolean;
+	restoreFocus?: boolean;
 	escapeDisabled?: boolean;
 	onEscape: () => void;
 }) {
@@ -74,6 +76,7 @@ export function useDialogFocus({
 		const activeElement = document.activeElement;
 		previousFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
 		return () => {
+			if (!restoreFocus) return;
 			const previousFocus = previousFocusRef.current;
 			// Wait for native dialogs and sheet portals to finish unmounting.
 			// Deleting the final row on a page may remove its original target.
@@ -86,7 +89,7 @@ export function useDialogFocus({
 				target?.focus({ preventScroll: true });
 			});
 		};
-	}, []);
+	}, [restoreFocus]);
 
 	useLayoutEffect(() => {
 		if (!autoFocus) return;

@@ -39,6 +39,24 @@ describe('reminder sheet navigation', () => {
 		expect(reduceReminderSheetNavigation(finished, { type: 'finish-opening' }).phase).toBe('open');
 	});
 
+	it('uses a separate delete screen until its dismissal completes', () => {
+		const closing = reduceReminderSheetNavigation(INITIAL_REMINDER_SHEET_NAVIGATION_STATE, {
+			type: 'request-transition', transition: { screen: 'delete' }, isClosing: false,
+		});
+		expect(closing.activeScreen).toBe('editor');
+		expect(getReminderSheetTransitionPatch({ screen: 'delete' }))
+			.toEqual({ activePicker: null, deleteConfirm: true });
+		const opened = reduceReminderSheetNavigation(
+			reduceReminderSheetNavigation(closing, { type: 'finish-transition' }),
+			{ type: 'finish-opening' },
+		);
+		const returning = reduceReminderSheetNavigation(opened, {
+			type: 'request-transition', transition: { screen: 'editor' }, isClosing: false,
+		});
+		expect(returning.activeScreen).toBe('delete');
+		expect(reduceReminderSheetNavigation(returning, { type: 'finish-transition' }).activeScreen).toBe('editor');
+	});
+
 	it('ignores rapid transition requests while a transition is pending', () => {
 		const requested = reduceReminderSheetNavigation(
 			INITIAL_REMINDER_SHEET_NAVIGATION_STATE,

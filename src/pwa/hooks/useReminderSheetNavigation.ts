@@ -2,12 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { ModalDraft, ModalMode, ModalPickerId } from '../types';
 
-type ReminderSheetScreen = 'editor' | ModalPickerId;
+type ReminderSheetScreen = 'editor' | 'delete' | ModalPickerId;
 
 export interface ReminderSheetTransition {
 	screen: ReminderSheetScreen;
 	patch?: Partial<ModalDraft>;
-	deleteConfirm?: boolean;
 }
 
 export interface ReminderSheetNavigationState {
@@ -57,8 +56,8 @@ export function getReminderSheetTransitionPatch(
 	transition: ReminderSheetTransition,
 ): Partial<ModalDraft> {
 	return transition.screen === 'editor'
-		? { ...transition.patch, activePicker: null, deleteConfirm: transition.deleteConfirm ?? false }
-		: { activePicker: transition.screen, deleteConfirm: false };
+		? { ...transition.patch, activePicker: null, deleteConfirm: false }
+		: { activePicker: transition.screen === 'delete' ? null : transition.screen, deleteConfirm: transition.screen === 'delete' };
 }
 
 export function getImmediateEditorTransitionPatch(
@@ -130,7 +129,7 @@ export function useReminderSheetNavigation({
 				isClosing: isClosingRef.current,
 			})) return;
 			accepted = true;
-			onPatchDraft(getImmediateEditorTransitionPatch(activeScreen === 'editor' ? null : activeScreen, patch));
+			onPatchDraft(getImmediateEditorTransitionPatch(activeScreen === 'editor' || activeScreen === 'delete' ? null : activeScreen, patch));
 			setEditorFocusRequest((request) => request + 1);
 		});
 		// iOS requires focus inside the user gesture, after the editor is focusable.
@@ -142,7 +141,7 @@ export function useReminderSheetNavigation({
 			returnToEditor();
 			return;
 		}
-		if (!requestTransition({ screen: 'editor', deleteConfirm })) return;
+		if (!requestTransition({ screen: 'delete' })) return;
 		onBeforeOpenPicker();
 	}, [onBeforeOpenPicker, requestTransition, returnToEditor]);
 
