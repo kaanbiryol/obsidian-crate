@@ -1,8 +1,14 @@
 export const PWA_UPDATE_TRANSITION_KEY = 'crate-pwa-update-transition';
+export const PWA_UPDATE_TRANSITION_POSITION_KEY = 'crate-pwa-update-position';
 export const PWA_UPDATE_TRANSITION_MAX_AGE_MS = 60_000;
 
 /** Cover only the reload; downloading the update leaves the current app visible. */
 export async function preparePwaUpdateTransition(): Promise<void> {
+	// Mobile browser chrome can resize the viewport during reload. Keep the
+	// message at the same height while the curtain continues to cover the screen.
+	const overlay = document.getElementById('pwa-update-transition');
+	const labelTop = (overlay?.getBoundingClientRect().height ?? window.innerHeight) / 2;
+	document.documentElement.style.setProperty('--pwa-update-label-top', `${labelTop}px`);
 	document.documentElement.dataset.pwaUpdating = 'prepare';
 	document.getElementById('app')?.setAttribute('inert', '');
 	// Let the curtain paint fully before replacing the document. Match the CSS
@@ -10,6 +16,7 @@ export async function preparePwaUpdateTransition(): Promise<void> {
 	const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	await new Promise(resolve => window.setTimeout(resolve, reduceMotion ? 32 : 220));
 	try {
+		sessionStorage.setItem(PWA_UPDATE_TRANSITION_POSITION_KEY, String(labelTop));
 		sessionStorage.setItem(PWA_UPDATE_TRANSITION_KEY, String(Date.now()));
 	} catch {
 		// Updating still works when session storage is unavailable.
@@ -17,10 +24,12 @@ export async function preparePwaUpdateTransition(): Promise<void> {
 }
 
 export function finishPwaUpdateTransition(): void {
+	// Retain the label position through the CSS fade; the next update resets it.
 	delete document.documentElement.dataset.pwaUpdating;
 	document.getElementById('app')?.removeAttribute('inert');
 	try {
 		sessionStorage.removeItem(PWA_UPDATE_TRANSITION_KEY);
+		sessionStorage.removeItem(PWA_UPDATE_TRANSITION_POSITION_KEY);
 	} catch {
 		// The transition is cosmetic and must never prevent recovery.
 	}

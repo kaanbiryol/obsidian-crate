@@ -44,7 +44,7 @@ ${PWA_LIGHT_THEME_STYLES}
 	<script src="/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}"></script>
 </head>
 <body>
-	<div id="pwa-update-transition" role="status" aria-live="polite">Updating Crate…</div>
+	<div id="pwa-update-transition" role="status" aria-live="polite"><span>Updating Crate…</span></div>
 	<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate"></div></div>
 	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
 	</body>
