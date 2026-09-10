@@ -68,7 +68,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	const confirmationId = useId();
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const editorRef = useRef<HTMLDivElement | null>(null);
-	useEditorSheetHeight(editorRef, isActive);
+	useEditorSheetHeight(editorRef, isActive, Boolean(modal.draft.deleteConfirm));
 	useEffect(() => {
 		const editor = editorRef.current;
 		if (!editor) return;
@@ -186,6 +186,8 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 		>
 			<form
 				className="modal-form"
+				style={draft.deleteConfirm ? { display: 'none' } : undefined}
+				inert={Boolean(draft.deleteConfirm)}
 				autoComplete="off"
 				onSubmit={(event) => {
 					event.preventDefault();
@@ -209,6 +211,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 							preventFocusOnPress
 							data-action="toggle-delete-confirm"
 							onClick={() => {
+								dismissEditorKeyboard();
 								onPatchDraft({ deleteConfirm: true, activePicker: null });
 							}}
 						/>
@@ -265,7 +268,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 			</form>
 			{isEditing && draft.deleteConfirm && <PwaDeleteConfirmation
 				id={confirmationId}
-				keyboardInset={keyboardInset}
 				message={buildDeleteConfirmationMessage(draft)}
 				isLoading={saving}
 				onClose={() => { if (!saving) onPatchDraft({ deleteConfirm: false }); }}

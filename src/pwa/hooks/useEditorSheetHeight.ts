@@ -1,12 +1,12 @@
 import { useLayoutEffect, type RefObject } from 'react';
 
 /** Fit the editor to its natural rows, including wrapped chips and resized text. */
-export function useEditorSheetHeight(ref: RefObject<HTMLDivElement | null>, active: boolean): void {
+export function useEditorSheetHeight(ref: RefObject<HTMLDivElement | null>, active: boolean, confirmingDelete = false): void {
 	useLayoutEffect(() => {
 		const editor = ref.current;
 		const container = editor?.closest<HTMLElement>('.pwa-modal-sheet__container');
 		if (!active || !editor || !container) return;
-		const rows = [
+		const rows = confirmingDelete ? [editor.querySelector<HTMLElement>('.pwa-delete-confirmation')].filter((row): row is HTMLElement => row !== null) : [
 			editor.querySelector<HTMLElement>('.reminder-modal-header'),
 			editor.querySelector<HTMLElement>('.reminder-editor-fields'),
 			editor.querySelector<HTMLElement>('.reminder-action-chips'),
@@ -23,5 +23,5 @@ export function useEditorSheetHeight(ref: RefObject<HTMLDivElement | null>, acti
 		const observer = new ResizeObserver(measure);
 		rows.forEach(row => observer.observe(row));
 		return () => observer.disconnect();
-	}, [active, ref]);
+	}, [active, ref, confirmingDelete]);
 }
