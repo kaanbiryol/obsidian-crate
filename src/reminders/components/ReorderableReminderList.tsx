@@ -48,6 +48,7 @@ const ReorderableItem = memo(forwardRef<HTMLDivElement, ReorderableItemProps>(fu
   const dragControls = useDragControls();
   const longPressTimerRef = useRef<number | null>(null);
   const pressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchDragActiveRef = useRef(false);
   const [isLongPressArmed, setIsLongPressArmed] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
 
@@ -62,6 +63,28 @@ const ReorderableItem = memo(forwardRef<HTMLDivElement, ReorderableItemProps>(fu
   }, []);
 
   useEffect(() => cancelLongPress, [cancelLongPress]);
+
+  useEffect(() => {
+    const element = elementRef.current;
+    if (!element) return;
+    // Let swipes scroll until the hold activates. Then retain the touch stream
+    // for Motion instead of letting native scrolling cancel its pointer events.
+    const handleTouchMove = (event: TouchEvent) => {
+      if (touchDragActiveRef.current && event.cancelable) event.preventDefault();
+    };
+    const endTouch = () => {
+      touchDragActiveRef.current = false;
+      cancelLongPress();
+    };
+    element.addEventListener('touchmove', handleTouchMove, { passive: false });
+    element.addEventListener('touchend', endTouch);
+    element.addEventListener('touchcancel', endTouch);
+    return () => {
+      element.removeEventListener('touchmove', handleTouchMove);
+      element.removeEventListener('touchend', endTouch);
+      element.removeEventListener('touchcancel', endTouch);
+    };
+  }, [cancelLongPress]);
 
   useEffect(() => {
     const element = elementRef.current;
@@ -100,6 +123,7 @@ const ReorderableItem = memo(forwardRef<HTMLDivElement, ReorderableItemProps>(fu
   }, [cancelLongPress, onDragStart]);
 
   const handleDragEnd = useCallback(() => {
+    touchDragActiveRef.current = false;
     cancelLongPress();
     setIsReordering(false);
     onDragEnd();
@@ -119,6 +143,7 @@ const ReorderableItem = memo(forwardRef<HTMLDivElement, ReorderableItemProps>(fu
     if (target.closest(LONG_PRESS_INTERACTIVE_SELECTOR)) return;
 
     cancelLongPress();
+    touchDragActiveRef.current = false;
     if (interaction === 'drag' && event.pointerType === 'mouse') {
       setIsDragPressed(true);
       dragControls.start(event);
@@ -129,6 +154,7 @@ const ReorderableItem = memo(forwardRef<HTMLDivElement, ReorderableItemProps>(fu
       longPressTimerRef.current = null;
       pressStartRef.current = null;
       setIsLongPressArmed(true);
+      touchDragActiveRef.current = event.pointerType === 'touch';
       clickGuardRef.current.block();
       dragControls.start(event);
     }, LONG_PRESS_DELAY_MS);
