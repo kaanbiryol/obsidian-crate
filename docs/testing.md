@@ -133,7 +133,7 @@ The test creates real resources only when a person completes Cloudflare consent.
 
 ## Public-release acceptance
 
-Copy [the release acceptance template](release-checklist.md) for each candidate and record the exact artifact checksums and results. Do not publish while any required item is incomplete.
+Keep candidate-specific acceptance records and artifact checksums outside version control. Complete the checks below before publishing.
 
 Record the Obsidian version, operating-system version, and result for each device. Complete this matrix against the exact release assets before publishing:
 

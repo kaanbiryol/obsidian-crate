@@ -41,7 +41,7 @@ npm run release:check
 
 The gate includes the npm advisory audit, pinned Gitleaks history/current-source scan, lint, both TypeScript targets, dead-code checks, license notices, Python recovery tests, unit and actual Worker-runtime tests, production artifacts, bundle budgets, and Chromium/WebKit PWA checks. The security checks require network access and fail on unavailable or incomplete results. The full release gate is supported on macOS/Linux x64/arm64; those are the platforms covered by the checksum-pinned scanner.
 
-For shared UI changes also run `npm run typecheck:visual` and `npm run test:visual`. Review any intended screenshot changes; do not replace baselines just to make a failing comparison pass. Complete the relevant clean-vault smoke tests from the testing guide. Local tests do not substitute for the [exact-artifact public release checklist](docs/release-checklist.md).
+For shared UI changes also run `npm run typecheck:visual` and `npm run test:visual`. Review any intended screenshot changes; do not replace baselines just to make a failing comparison pass. Complete the relevant clean-vault smoke tests from the testing guide. Local tests do not substitute for the [public-release acceptance checks](docs/testing.md#public-release-acceptance).
 
 Keep PRs focused, explain behavior and recovery implications, and state what was actually tested. Follow `AGENTS.md`: use lowercase Conventional Commits (`fix`, `feat`, `chore`, `refactor`, `perf`, `build`, or `ci`); use `ios`/`android` scopes only for platform-specific changes; omit coauthor trailers. Do not commit `node_modules/`, `.generated/`, `dist/`, vault settings or built release files.
 
