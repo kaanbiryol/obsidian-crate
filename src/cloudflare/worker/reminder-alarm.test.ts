@@ -57,7 +57,7 @@ function createHarness() {
             : first })) })),
 	} as unknown as D1Database;
 	return {
-		alarm: new ReminderAlarm(state, { DB: db }),
+		alarm: new ReminderAlarm(state, { DB: db, CRATE_PUBLIC_ORIGIN: 'https://worker.test' }),
 		deleteAll,
 		deleteAlarm,
 		first,
@@ -115,9 +115,11 @@ describe('reminder alarm delivery', () => {
 
 		expect(listPushSubscriptionIds).toHaveBeenCalledOnce();
 		expect(sendToAllSubscriptions).toHaveBeenNthCalledWith(1, expect.anything(), expect.anything(), {
+			origin: 'https://worker.test',
 			subscriptionIds: ['subscription-1', 'subscription-2'],
 		});
 		expect(sendToAllSubscriptions).toHaveBeenNthCalledWith(2, expect.anything(), expect.anything(), {
+			origin: 'https://worker.test',
 			subscriptionIds: ['subscription-2'],
 		});
 		expect(harness.run).toHaveBeenCalledOnce();

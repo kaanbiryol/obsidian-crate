@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
 
 async function readText(path) {
 	try {
@@ -21,7 +23,7 @@ function assert(condition, message) {
 	if (!condition) throw new Error(message);
 }
 
-const [packageJson, manifest, versions, wrangler, pluginBundle, styles, workerBundle] = await Promise.all([
+const [packageJson, manifest, versions, wrangler, pluginBundle, styles, workerBundle, d1Schema] = await Promise.all([
 	readJson('package.json'),
 	readJson('manifest.json'),
 	readJson('versions.json'),
@@ -29,6 +31,7 @@ const [packageJson, manifest, versions, wrangler, pluginBundle, styles, workerBu
 	readText('dist/main.js'),
 	readText('dist/styles.css'),
 	readText('.generated/cloudflare/worker.mjs'),
+	readText('src/cloudflare/schema.sql'),
 ]);
 
 assert(packageJson.version === manifest.version, 'package.json and manifest.json versions must match');
@@ -51,12 +54,24 @@ for (const forbiddenMarker of [
 ]) {
 	assert(!pluginBundle.includes(forbiddenMarker), `Plugin bundle contains server/setup marker: ${forbiddenMarker}`);
 }
+// Verify the actual gzip literals emitted into the plugin, independent of minified names.
+const embeddedArtifacts = new Map();
+for (const match of pluginBundle.matchAll(/["'`](H4sI[A-Za-z0-9+/=]+)["'`]/g)) {
+	const decoded = gunzipSync(Buffer.from(match[1], 'base64'));
+	const digest = createHash('sha256').update(decoded).digest('hex');
+	embeddedArtifacts.set(digest, decoded.toString('utf8'));
+}
+for (const [name, source] of [['Worker', workerBundle], ['D1 schema', d1Schema]]) {
+	const digest = createHash('sha256').update(source).digest('hex');
+	assert(embeddedArtifacts.get(digest) === source, `Plugin bundle is missing the current compressed ${name} artifact`);
+	assert(pluginBundle.includes(digest), `Plugin bundle is missing the ${name} integrity hash`);
+}
 assert(
-	pluginBundle.includes('CREATE TABLE IF NOT EXISTS auth_tokens'),
+	d1Schema.includes('CREATE TABLE IF NOT EXISTS auth_tokens'),
 	'Plugin bundle is missing the initial D1 schema artifact',
 );
 assert(
-	pluginBundle.includes('CREATE TABLE IF NOT EXISTS crate_schema'),
+	d1Schema.includes('CREATE TABLE IF NOT EXISTS crate_schema'),
 	'Plugin bundle is missing the D1 schema-version baseline',
 );
 assert(pluginBundle.includes('https://dash.cloudflare.com/oauth2/auth'), 'Plugin bundle is missing the Cloudflare OAuth entry point');

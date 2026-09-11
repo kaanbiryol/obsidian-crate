@@ -3,10 +3,9 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// Merge preimages, strict read/checkpoint validation, durable diagnostics and
-		// history pagination bring the measured plugin to 1,471,097 bytes (+0.88%).
-		// Allow a 5 KB raw-budget increase; keep the existing gzip and asset caps.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1475000', 10),
+		// The current sync, push and PWA interaction fixes measure about 1.479 MB.
+		// Allow 5 KB more raw space for this beta; retain the compressed ceiling.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1480000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '820000', 10),
 	},
 	{
@@ -31,11 +30,11 @@ export const bundleBudgets = {
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
-		// Audit recovery plus the merged update, sheet and sync-indicator UI.
-		// Shared, lossless reminder validation adds about 1 KB compressed; allow
-		// 1.5 KB for the reviewed change while keeping the existing raw ceiling.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '455000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '155500', 10),
+		// Current startup assets include automatic updates and native sheet/gesture
+		// handling (about 460.3 KB raw). Allow 6 KB more raw space for this beta;
+		// allow 100 compressed bytes for resize-observer scheduling; retain the total cap.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '461000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '155600', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,

@@ -108,7 +108,9 @@ async function verifyVisibleTabs(browser, winner) {
 			for (const page of pages) await expect(row(page, 'Shared edit')).toHaveCount(0);
 			await row(source, 'Shared creation').click();
 			await source.getByRole('button', { name: 'Delete reminder', exact: true }).click();
-			await source.getByRole('alertdialog', { name: 'Delete reminder?', exact: true }).getByRole('button', { name: 'Delete', exact: true }).click();
+			await expect(source.getByRole('alertdialog', { name: 'Delete reminder', exact: true })).toBeVisible();
+			await expect(source.locator('.reminder-action-chips')).not.toHaveAttribute('inert');
+			await source.getByRole('alertdialog', { name: 'Delete reminder', exact: true }).getByRole('button', { name: 'Delete reminder', exact: true }).click();
 			await expect.poll(() => sentBy.length).toBe(5);
 			await settled(pages);
 			for (const page of pages) await expect(row(page, 'Shared creation')).toHaveCount(0);

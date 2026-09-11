@@ -165,6 +165,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 			viewMode={viewMode}
 			selectedProject={selectedProject}
 			projectHeaderMetaContent={headerMetaContent}
+			projectHeaderRightContent={headerRightContent}
 			projectBelowHeaderContent={belowHeaderContent && selectedProject !== null ? (
 				<div className="pwa-below-header-content">{belowHeaderContent(true)}</div>
 			) : undefined}

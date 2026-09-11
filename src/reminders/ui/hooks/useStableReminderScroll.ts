@@ -95,7 +95,10 @@ export function useStableReminderScroll(suspended = false): RefObject<HTMLDivEle
 
     // Height animations continue after the commit. Observe flow containers too:
     // their size includes changing margins and rows that are still exiting.
-    const resizeObserver = new ResizeObserver(stabilize);
+    // Register observations and adjust scrolling outside resize delivery. React
+    // can otherwise replace these observations during WebKit's layout pass.
+    let resizeFrame: number | undefined;
+    const resizeObserver = new ResizeObserver(() => scheduleStabilization());
     const observed = new Set<Element>();
     const observeContent = () => {
       const elements = new Set<Element>([container, ...Array.from(container.querySelectorAll(
@@ -114,11 +117,16 @@ export function useStableReminderScroll(suspended = false): RefObject<HTMLDivEle
         }
       }
     };
-    observeContent();
-    const mutationObserver = new MutationObserver(() => {
-      observeContent();
-      stabilize();
-    });
+    const scheduleStabilization = () => {
+      if (resizeFrame !== undefined) return;
+      resizeFrame = window.requestAnimationFrame(() => {
+        resizeFrame = undefined;
+        observeContent();
+        stabilize();
+      });
+    };
+    scheduleStabilization();
+    const mutationObserver = new MutationObserver(scheduleStabilization);
     mutationObserver.observe(container, {
       childList: true, subtree: true, attributes: true,
       attributeFilter: ['data-reminder-scroll-anchor'],
@@ -134,6 +142,7 @@ export function useStableReminderScroll(suspended = false): RefObject<HTMLDivEle
     visualViewport?.addEventListener('resize', captureCurrentViewport);
     return () => {
       resizeObserver.disconnect();
+      if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       mutationObserver.disconnect();
       container.removeEventListener('scroll', handleScroll);
       container.removeEventListener('pointerdown', captureCurrentViewport, true);

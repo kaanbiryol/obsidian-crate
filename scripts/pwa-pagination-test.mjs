@@ -146,9 +146,9 @@ async function checkLastPageDeletion(browser) {
     const editor = page.locator('.pwa-reminder-editor[role="dialog"]');
     await expect(editor.locator('[contenteditable="true"][aria-label="Reminder title"]')).toHaveText(reminders.at(-1).content);
     await editor.getByRole('button', { name: 'Delete reminder', exact: true }).click();
-    const confirmation = page.getByRole('alertdialog', { name: 'Delete reminder?', exact: true });
+    const confirmation = page.getByRole('alertdialog', { name: 'Delete reminder', exact: true });
     const refreshed = page.waitForResponse(response => new URL(response.url()).pathname === '/reminders/list');
-    await confirmation.getByRole('button', { name: 'Delete', exact: true }).click();
+    await confirmation.getByRole('button', { name: 'Delete reminder', exact: true }).click();
     await editor.waitFor({ state: 'detached' });
     await expect.poll(() => deleted.length).toBe(1);
     // The optimistic outbox refreshes after acknowledgement. Its next server

@@ -268,7 +268,7 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('project-picker-row-check');
         expect(markup).toContain('--project-picker-dot-accent');
         expect(markup).not.toContain('--project-picker-row-accent');
-        expect(markup).toContain('>Done<');
+        expect(markup).not.toContain('>Done<');
         expect(markup).not.toContain('Select Project');
     });
 

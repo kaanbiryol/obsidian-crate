@@ -82,9 +82,10 @@ async function openReminder(page, content) {
 
 async function confirmDelete(page) {
 	await page.getByRole('button', { name: 'Delete reminder', exact: true }).click();
-	const confirmation = page.getByRole('alertdialog', { name: 'Delete reminder?', exact: true });
+	const confirmation = page.getByRole('alertdialog', { name: 'Delete reminder', exact: true });
 	await expect(confirmation).toBeVisible();
-	await confirmation.getByRole('button', { name: 'Delete', exact: true }).click();
+	await expect(page.locator('.reminder-action-chips')).not.toHaveAttribute('inert');
+	await confirmation.getByRole('button', { name: 'Delete reminder', exact: true }).click();
 }
 
 async function holdNextMutation(page, path) {
@@ -163,9 +164,10 @@ async function verifyProjectSyncIndicator(page) {
 	await page.locator('[data-action="switch-tab"][data-tab="projects"]').click();
 	await page.locator('[data-action="open-project"][data-project="Work"]').click();
 	const indicator = page.locator('.project-detail-header .pwa-sync-indicator');
+	const scroll = page.locator('.reminders-view-scroll');
+	await expect(scroll).toHaveCount(1);
 	await expect(indicator).toBeVisible();
 	await expectSynced(page);
-	const scroll = page.locator('.reminders-view-scroll');
 	const originalTop = (await scroll.boundingBox()).y;
 	const mutation = await holdNextMutation(page, '/reminders/update');
 	try {
@@ -178,12 +180,12 @@ async function verifyProjectSyncIndicator(page) {
 		await expectEditorClosed(page);
 		await expect(indicator).toHaveAttribute('data-sync-state', 'syncing');
 		await expect(indicator).toHaveText('Syncing 1 change');
-		await expect(indicator.locator('svg')).toHaveCSS('animation-name', 'pwa-sync-spin');
+		await expect(indicator).toHaveAttribute('data-visual-state', 'syncing');
+		await expect.poll(() => indicator.locator('.pwa-sync-indicator__halo').evaluate(el => getComputedStyle(el, '::before').animationPlayState)).toBe('running');
 		await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
 		expect((await scroll.boundingBox()).y).toBeCloseTo(originalTop, 0);
 		await page.emulateMedia({ reducedMotion: 'reduce' });
-		await expect(indicator.locator('svg')).toHaveCSS('animation-name', 'none');
-		await expect(indicator.locator('.pwa-sync-indicator__glyph')).toHaveCSS('animation-name', 'none');
+		await expect.poll(() => indicator.locator('.pwa-sync-indicator__halo').evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('none');
 	} finally { mutation.finish(); }
 	await expectSynced(page);
 	expect((await scroll.boundingBox()).y).toBeCloseTo(originalTop, 0);

@@ -90,12 +90,11 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('browserToken=browser-token');
 	});
 
-	it('keeps the PWA viewport fitted while allowing user zoom', () => {
+	it('keeps the PWA viewport fitted and prevents gesture zoom while allowing scrolling', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('width=device-width, initial-scale=1, viewport-fit=cover');
-		expect(html).not.toContain('maximum-scale=1');
-		expect(html).not.toContain('user-scalable=no');
+		expect(html).toContain('width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+		expect(html).toContain('html,body{touch-action:pan-x pan-y}');
 		expect(html).not.toContain('height=device-height');
 	});
 
@@ -165,8 +164,8 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}');
 		expect(html).toContain('body{min-height:100%;min-height:100dvh;overflow:hidden}');
 		expect(html).toContain('button{cursor:pointer;border:none;background:transparent;color:inherit;user-select:none;-webkit-user-select:none}');
-		expect(html).toContain('#app,#app *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}');
-		expect(html).toContain('#app input,#app textarea,#app [contenteditable="true"],#app [contenteditable="true"] *{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}');
+		expect(html).toContain('#app button,#app [role="button"]{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}');
+		expect(html).not.toContain('#app,#app *{user-select:none');
 		expect(html).toContain('#app{height:100%;height:100dvh;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden}');
 		expect(html).toContain('@media (display-mode:standalone){html,body{height:100vh;min-height:100vh}#app{height:100vh}}');
 		expect(html).toContain('.reminders-shadow-root{height:100%;width:100%;max-width:100vw;display:flex;flex-direction:column;overflow:hidden;');
@@ -272,7 +271,8 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('transition:padding-bottom');
 		expect(html).not.toContain('pwa-reminder-editor-backdrop');
 		expect(html).not.toContain('--keyboard-usable-height');
-		expect(html).toContain('box-shadow:0 -1px 0 rgba(255,255,255,.025),0 -24px 70px rgba(0,0,0,.28)');
+		expect(html).toContain('border:0;border-radius:20px 20px 0 0;box-shadow:0 -24px 70px rgba(0,0,0,.28)');
+		expect(html).not.toContain('box-shadow:0 -1px 0 rgba(255,255,255,.025)');
 		expect(html).not.toContain('box-shadow:0 -6px 20px rgba(0,0,0,.22)');
 		expect(html).not.toContain('box-shadow:0 -12px 48px rgba(0,0,0,.38)');
 	});
