@@ -5,15 +5,26 @@ on:
     tags:
       - "*.*.*"
 
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to verify and package
+        required: true
+        type: string
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
 permissions:
   contents: read
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -26,16 +37,16 @@ jobs:
       - run: npm ci
 
       - name: Install browser test runtimes
-        run: npx playwright install --with-deps chromium webkit
+        run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium webkit
 
       - name: Verify tag version
-        run: node -e "const manifest=require('./manifest.json'); if (manifest.version !== process.env.GITHUB_REF_NAME) throw new Error('Tag must exactly match manifest.json version')"
+        run: node -e "const manifest=require('./manifest.json'); if (manifest.version !== process.env.RELEASE_TAG) throw new Error('Tag must exactly match manifest.json version')"
 
       - name: Verify release
         run: npm run release:check
 
       - name: Record release artifact hashes
-        run: sha256sum dist/main.js dist/styles.css > /tmp/crate-release-artifacts.sha256
+        run: shasum -a 256 dist/main.js dist/styles.css > /tmp/crate-release-artifacts.sha256
 
       - name: Rebuild from a clean install
         run: |
@@ -43,7 +54,7 @@ jobs:
           npm run build
 
       - name: Verify reproducible artifacts
-        run: sha256sum --check /tmp/crate-release-artifacts.sha256
+        run: shasum -a 256 --check /tmp/crate-release-artifacts.sha256
 
       - name: Prepare release assets
         run: |
@@ -83,9 +94,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" --json isDraft --jq '.isDraft' > /tmp/crate-release-is-draft; then
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > /tmp/crate-release-is-draft; then
             test "$(cat /tmp/crate-release-is-draft)" = "true" || { echo "Refusing to replace an already published release"; exit 1; }
-            gh release upload "$GITHUB_REF_NAME" release/main.js release/manifest.json release/styles.css release/THIRD_PARTY_NOTICES.md --clobber
+            gh release upload "$RELEASE_TAG" release/main.js release/manifest.json release/styles.css release/THIRD_PARTY_NOTICES.md --clobber
           else
-            gh release create "$GITHUB_REF_NAME" release/main.js release/manifest.json release/styles.css release/THIRD_PARTY_NOTICES.md --draft --generate-notes --verify-tag --title "$GITHUB_REF_NAME"
+            gh release create "$RELEASE_TAG" release/main.js release/manifest.json release/styles.css release/THIRD_PARTY_NOTICES.md --draft --generate-notes --verify-tag --title "$RELEASE_TAG"
           fi

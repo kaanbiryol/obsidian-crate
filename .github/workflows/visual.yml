@@ -27,7 +27,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx --yes --package=node@22.14.0 node node_modules/playwright/cli.js install --with-deps chromium
       - run: npm run build
       - run: npm run typecheck:visual
       - name: Compare shared UI screenshots
