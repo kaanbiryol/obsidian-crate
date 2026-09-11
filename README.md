@@ -59,7 +59,7 @@ Read the full [privacy policy](https://crate.kaanbiryol.com/privacy/).
 - A Cloudflare account with R2 enabled
 - Obsidian 1.13.0 or newer
 
-Building from source additionally requires Node.js 20.19+, 22.12+, or 24+ and npm.
+Building from source additionally requires Node.js 26.8.2+ (26.x) and npm; `.nvmrc` pins the version used by every CI workflow.
 
 ## Install From Source
 

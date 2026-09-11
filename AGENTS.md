@@ -8,7 +8,7 @@
 
 ## Environment & tooling
 
-- Node.js: use the version range in `package.json` (`^20.19.0 || ^22.12.0 || >=24.0.0`).
+- Node.js: use the version range in `package.json` (`^26.8.2`).
 - **Package manager: npm** (`package.json` defines the required scripts and dependencies).
 - **Bundler: Vite/Rollup** (`vite.config.mts` builds `src/main.ts` to `dist/main.js` and emits `dist/styles.css`).
 - Types: `obsidian` type definitions.

@@ -4,7 +4,7 @@ Crate's Obsidian plugin, reminders PWA and Cloudflare backend share a sync and r
 
 ## Local setup
 
-Use npm and a supported Node version (`^20.19.0 || ^22.12.0 || >=24.0.0`); `.nvmrc` records the release build version. Clone the full repository history so the release secret scan can examine all fetched refs. A shallow clone needs `git fetch --unshallow --tags` before the release gate.
+Use npm and a supported Node version (`^26.8.2`); `.nvmrc` records the release build version. Clone the full repository history so the release secret scan can examine all fetched refs. A shallow clone needs `git fetch --unshallow --tags` before the release gate.
 
 ```sh
 npm ci

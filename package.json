@@ -14,7 +14,7 @@
 	},
 	"homepage": "https://github.com/kaanbiryol/obsidian-crate#readme",
 	"engines": {
-		"node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+		"node": "^26.8.2"
 	},
 	"scripts": {
 		"build:site": "npm run build:site:main && npm run build:site:crate-ui",
