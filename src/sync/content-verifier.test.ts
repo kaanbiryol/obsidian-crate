@@ -1,3 +1,4 @@
+import type { DataAdapter } from 'obsidian';
 import { describe, expect, it, vi } from 'vitest';
 import { LocalContentVerifier, VERIFICATION_FILE_BUDGET, VERIFICATION_BYTE_BUDGET } from './content-verifier';
 import { LocalManifest } from './manifest';
@@ -27,14 +28,15 @@ async function fixture(count = 1, size = 4) {
 	const manifest = new LocalManifest(app, plugin, 'https://server.example');
 	for (const file of files) manifest.setEntry(file.path, { hash, size, modified: new Date(1000).toISOString(), revision: 'original-revision' });
 	await manifest.save();
-	const verifier = new LocalContentVerifier();
+	const progress = { adapter, path: '.obsidian/plugins/crate/content-verification.json', authority: 'https://server.example' };
+	const verifier = new LocalContentVerifier(progress);
 	const signal = new AbortController().signal;
 	const verify = () => verifier.verify(vault as never, manifest, files, signal);
 	const planner = {
 		vault: vault as never, localManifest: manifest, shouldIgnore: () => false,
 		runConcurrent: <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map(task => task())),
 	};
-	return { files, adapter, manifest, hash, verify, app, plugin, planner, verifier, signal };
+	return { files, adapter, manifest, hash, verify, app, plugin, planner, verifier, signal, progress, disk };
 }
 
 describe('content verification independent of filesystem fingerprints', () => {
@@ -136,4 +138,43 @@ describe('content verification independent of filesystem fingerprints', () => {
 		expect(h.api.batchUpload).toHaveBeenCalledOnce();
 		h.engine.destroy();
 	});
+});
+
+ it('reaches late paths across repeated restarts without rewriting the full manifest', async () => {
+  const h = await fixture(100);
+  h.adapter.write.mockClear();
+  h.adapter.readBinary.mockImplementation(async path => toArrayBuffer(path === h.files[99]!.path ? 'edit' : 'same'));
+  for (let restart = 0; restart < 4; restart++) {
+   await new LocalContentVerifier(h.progress).verify(h.planner.vault, h.manifest, h.files, h.signal);
+  }
+  expect(h.manifest.getEntry(h.files[99]!.path)?.modified).toBe('unverified');
+  expect(h.adapter.write.mock.calls.filter(([path]) => path === h.progress.path)).toHaveLength(4);
+  expect(new Set(h.adapter.readBinary.mock.calls.map(([path]) => path)).size).toBe(100);
+ });
+ it.each(['broken json', JSON.stringify({ version: 1, authority: 'https://another.example', cursor: 'zzz' })])('safely resets a damaged or foreign progress hint', async raw => {
+  const h = await fixture(40); h.disk.set(h.progress.path, raw);
+  await h.verify(); expect(h.adapter.readBinary.mock.calls[0]![0]).toBe(h.files[0]!.path);
+ });
+ it('surfaces progress write failures instead of promising durable coverage', async () => {
+  const h = await fixture(); h.adapter.write.mockRejectedValueOnce(new Error('Disk full'));
+  await expect(h.verify()).rejects.toThrow('Disk full');
+ });
+ it('advances past an unreadable file across restart without losing later coverage', async () => {
+  const h = await fixture(40); h.adapter.readBinary.mockRejectedValueOnce(new Error('Unreadable'));
+  await expect(h.verify()).rejects.toThrow('Unreadable');
+  await new LocalContentVerifier(h.progress).verify(h.planner.vault, h.manifest, h.files, h.signal);
+  expect(h.adapter.readBinary.mock.calls[1]![0]).toBe(h.files[1]!.path);
+ });
+
+it('waits for a started progress write before replacing a destroyed engine', async () => {
+ const h = createHarness({ lastSeq: 42 });
+ h.vault.getFiles.mockReturnValue([]); h.vault.adapter.list.mockResolvedValue({files: [], folders: []});
+ const gate = createDeferred<void>();
+ vi.spyOn(h.vault.adapter as unknown as DataAdapter, 'write').mockImplementation(async path => { if (path.endsWith('/content-verification.json')) await gate.promise; });
+ const checking = h.engine.hasUnsyncedLocalChanges();
+ await vi.waitFor(() => expect(h.vault.adapter.write.mock.calls.some((args: unknown[]) => typeof args[0] === 'string' && args[0].endsWith('/content-verification.json'))).toBe(true));
+ h.engine.destroy(); let settled = false;
+ const closing = h.engine.waitForIdle().then(() => { settled = true; });
+ await Promise.resolve(); expect(settled).toBe(false);
+ gate.resolve(); await checking; await closing; expect(settled).toBe(true);
 });

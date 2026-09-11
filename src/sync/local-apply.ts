@@ -1,4 +1,5 @@
 import type { TFile, Vault } from 'obsidian';
+import { LocalPathObstructionError, prepareLocalFilePath } from './local-path-topology';
 import { createConflictCopy } from './conflict';
 import { isHiddenPath } from './file-discovery';
 import { computeHash } from './hasher';
@@ -41,6 +42,8 @@ export async function applyRemoteContentIfUnchanged(
 	content: ArrayBuffer,
 	expectedLocalHash: string | null,
 ): Promise<DiffApplyOutcome> {
+	const obstruction = await preparePath(context, path, content);
+	if (obstruction) return obstruction;
 	await ensureParentFolder(context.vault, path);
 	const snapshot = await readLocalSnapshot(context.vault, path);
 	const matchesPlan = expectedLocalHash === null
@@ -63,6 +66,8 @@ export async function preserveLocalVersionsAndApplyRemote(
 	remoteContent: ArrayBuffer,
 	onConflictCopy?: (copy: CreatedConflictCopy) => Promise<void>,
 ): Promise<DiffApplyOutcome> {
+	const obstruction = await preparePath(context, path, remoteContent);
+	if (obstruction) return obstruction;
 	await ensureParentFolder(context.vault, path);
 	if (!TEXT_PATH.test(path)) {
 		return applySnapshot(context, path, remoteContent, await readLocalSnapshot(context.vault, path));
@@ -89,6 +94,20 @@ export async function preserveLocalVersionsAndApplyRemote(
 		status: 'deferred',
 		reason: 'Local file kept changing while its conflict copy was being created',
 	};
+}
+
+async function preparePath(context: LocalApplyContext, path: string, content: ArrayBuffer): Promise<DiffApplyOutcome | undefined> {
+	try { await prepareLocalFilePath(context.vault, path); }
+	catch (error) {
+		if (!(error instanceof LocalPathObstructionError)) throw error;
+		if (error.isParent) return { status: 'deferred', reason: error.message };
+		try { await preserveIncomingForReview(context, path, content, '', error.message); }
+		catch (copyError) {
+			if (!(copyError instanceof IncomingFileReviewError)) throw copyError;
+			return { status: 'deferred', reason: copyError.message };
+		}
+	}
+	return undefined;
 }
 
 async function readLocalSnapshot(vault: Vault, path: string): Promise<LocalSnapshot> {

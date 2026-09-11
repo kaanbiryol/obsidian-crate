@@ -262,7 +262,7 @@ function normalizeConflictRecord(value: unknown): ConflictRecord | null {
 		|| typeof value.conflictPath !== 'string'
 		|| typeof value.createdAt !== 'string'
 		|| (value.status !== 'active' && value.status !== 'resolved')
-		|| (value.cause !== 'concurrent-create' && value.cause !== 'concurrent-edit' && value.cause !== 'unknown')
+		|| (value.cause !== 'concurrent-create' && value.cause !== 'concurrent-edit' && value.cause !== 'incoming-review' && value.cause !== 'unknown')
 	) {
 		return null;
 	}

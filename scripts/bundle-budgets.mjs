@@ -3,9 +3,9 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// The current sync, push and PWA interaction fixes measure about 1.479 MB.
-		// Allow 5 KB more raw space for this beta; retain the compressed ceiling.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1480000', 10),
+		// Restore receipts/journaling, durable verification progress and browser
+		// recovery add about 8 KB to the audited 1.479 MB build. Keep gzip unchanged.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1490000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '820000', 10),
 	},
 	{
@@ -30,16 +30,16 @@ export const bundleBudgets = {
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
-		// Current startup assets include automatic updates and native sheet/gesture
-		// handling (about 460.3 KB raw). Allow 6 KB more raw space for this beta;
-		// allow 100 compressed bytes for resize-observer scheduling; retain the total cap.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '461000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '155600', 10),
+		// Device storage status must open offline on the first tap, so its small
+		// component stays eager. Session cleanup adds about 1.6 KB over the audit.
+		// See docs/audits/2026-09-11/remediation.md for measured candidate sizes.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '463000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '156500', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '490000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '493000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '168000', 10),
 	}],
 };

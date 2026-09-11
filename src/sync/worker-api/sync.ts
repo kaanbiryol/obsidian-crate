@@ -18,6 +18,7 @@ import type {
 	FileVersionQuery,
 	FileVersionsPage,
 	UploadResult,
+	RestoreFileRequest,
 } from '../../protocol/sync-types';
 import {
 	isCompatibleCrateServer,
@@ -264,13 +265,11 @@ export class SyncWorkerApi {
 		return parseFileVersions(await this.http.requestJson<unknown>(`/sync/versions?${params.toString()}`));
 	}
 
-	async restoreFileVersion(
-		storageKey: string,
-		expectedHash: string | null,
-	): Promise<{ success: boolean; path: string; hash: string; size: number }> {
+	async restoreFileVersion(request: RestoreFileRequest): Promise<UploadResult> {
 		return this.http.requestJson('/sync/restore-version', {
 			method: 'POST',
-			body: JSON.stringify({ storageKey, expectedHash }),
+			body: JSON.stringify(request),
+			headers: { 'X-Crate-Upload-Operation': request.operationId },
 		});
 	}
 }

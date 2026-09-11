@@ -113,14 +113,14 @@ it.each(conflicts.slice(0, 2))('refuses to restore %s over the namespace occupie
 	await create(livePath);
 	const before = await state();
 	await expectConflict(await request('/sync/restore-version', {
-		method: 'POST', body: JSON.stringify({ storageKey: retained.revision, expectedHash: null }),
+		method: 'POST', body: JSON.stringify({ storageKey: retained.revision, path: retainedPath, expectedHash: null, expectedRevision: null, operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) }),
 	}), retainedPath, livePath);
 	expect(await state()).toEqual(before);
 	// Removing the obstruction permits the retained content to be published.
 	const live = await env.DB.prepare('SELECT hash, storage_key AS revision FROM files WHERE path = ?').bind(livePath).first<UploadedFile>();
 	await remove({ ...live!, path: livePath });
 	expect((await request('/sync/restore-version', {
-		method: 'POST', body: JSON.stringify({ storageKey: retained.revision, expectedHash: null }),
+		method: 'POST', body: JSON.stringify({ storageKey: retained.revision, path: retainedPath, expectedHash: null, expectedRevision: null, operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) }),
 	})).status).toBe(200);
 });
 

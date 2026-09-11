@@ -5,7 +5,6 @@ import type { SecretStorageService } from '../plugin/secret-storage';
 import { SECRET_KEYS, type CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncHistoryEntry, SyncResult, SyncState } from './types';
 import type { FileVersionQuery, FileVersionsPage, RemoteFileVersion } from '../protocol/sync-types';
-import { getPathEntry } from '../protocol/path-record';
 import { StatusBarManager } from '../ui/status';
 import { SyncApiClient } from './api';
 import { isConflictFile, notifyConflicts } from './conflict';
@@ -51,13 +50,14 @@ export class SyncRuntime {
 
 	async restoreRecentFileVersion(version: RemoteFileVersion): Promise<SyncResult> {
 		if (!this.apiClient) throw new Error('Sync is not configured');
-		const manifest = await this.apiClient.getManifest();
-		await this.apiClient.restoreFileVersion(
-			version.storage_key,
-			getPathEntry(manifest.files, version.path)?.hash ?? null,
-		);
-		return this.sync();
+		const api = this.apiClient;
+		await api.restoreFileVersion(version);
+		if (api !== this.apiClient) throw new DOMException('Sync configuration changed during restore', 'AbortError');
+		const result = await this.sync();
+		if (result.success) await api.finishRestore(version.storage_key);
+		return result;
 	}
+	getPendingRestores(): RemoteFileVersion[] { return this.apiClient?.getPendingRestores() ?? []; }
 	private lastForegroundSyncAt: number | null = null;
 
 	private onStatusBarClick: (() => void) | undefined;

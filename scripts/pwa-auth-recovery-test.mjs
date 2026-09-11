@@ -184,6 +184,46 @@ async function verifyRenewalWithExpiringPeer(browser) {
   } finally { await context.close(); }
 }
 
+async function verifyFolderReplacement(browser, delayPeerEvents) {
+  const { context, page, renew } = await harness(browser);
+  try {
+    const peer = await context.newPage();
+    if (delayPeerEvents) await peer.addInitScript(() => {
+      window.deferredStorageEvents = [];
+      window.deferStorageEvents = true;
+      window.addEventListener('storage', event => {
+        if (!window.deferStorageEvents) return;
+        event.stopImmediatePropagation();
+        window.deferredStorageEvents.push({ key: event.key, oldValue: event.oldValue, newValue: event.newValue });
+      }, { capture: true });
+    });
+    await peer.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+    await peer.getByRole('group', { name: cardName, exact: true }).waitFor();
+    await peer.evaluate(() => sessionStorage.setItem('crate-reminder-draft:old', 'private old draft'));
+    const requests = [];
+    peer.on('request', request => {
+      const url = new URL(request.url());
+      if (url.pathname === '/reminders/list') requests.push({ folder: url.searchParams.get('folderPath'), token: request.headers().authorization });
+    });
+    // The real exchange rotates credentials and revokes the old session. The
+    // generic preview returns the same token and cannot model this transition.
+    const token = await renew('Private');
+    await expect(page.getByText('Your inbox is empty', { exact: true })).toBeVisible();
+    if (delayPeerEvents) {
+      await expect.poll(() => peer.evaluate(() => window.deferredStorageEvents.some(event => event.newValue === localStorage.getItem('crate-reminders-auth-token')))).toBe(true);
+      await peer.evaluate(() => {
+        window.deferStorageEvents = false;
+        for (const event of window.deferredStorageEvents) window.dispatchEvent(new StorageEvent('storage', { ...event, storageArea: localStorage }));
+      });
+    }
+    await peer.bringToFront();
+    await expect(peer.getByText('Your inbox is empty', { exact: true })).toBeVisible();
+    expect(requests).toContainEqual({ folder: 'Private', token: `Bearer ${token}` });
+    expect(await peer.getByRole('group', { name: cardName, exact: true }).count()).toBe(0);
+    expect(await peer.evaluate(() => sessionStorage.getItem('crate-reminder-draft:old'))).toBe('private old draft');
+  } finally { await context.close(); }
+}
+
 async function verifyUnsavedDraft(browser) {
   const { context, page, sessions, renew } = await harness(browser);
   try {
@@ -215,6 +255,8 @@ try {
       }
       await verifyScopeAndLogout(browser);
       await verifyScopeAndLogout(browser, true);
+      await verifyFolderReplacement(browser, false);
+      await verifyFolderReplacement(browser, true);
       await verifyUnsavedDraft(browser);
       await verifyRenewalWithExpiringPeer(browser);
       console.log(`${browserType.name()}: expired auth and same-folder renewal retain creates, updates and drafts; explicit review retries identical commands, lost responses deduplicate, other folders stay isolated, and logout clears every tab`);

@@ -5,11 +5,11 @@ import { CRATE_WEB_SESSION_NAME_HEADER } from '@/protocol/web-session';
 import { detectWebSessionName } from './session-label';
 
 export async function exchangeEnrollmentToken(token: string, previousAuthToken: string | null = null): Promise<string> {
-	await requireCompatibleServer();
+	const protocol = await requireCompatibleServer();
 	const response = await fetch('/notifications/reminders-exchange', {
 		signal: AbortSignal.timeout(30_000),
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current) },
+		headers: { 'Content-Type': 'application/json', [CRATE_PROTOCOL_HEADER]: String(protocol) },
 		body: JSON.stringify({ token, deviceName: detectWebSessionName(), ...(previousAuthToken ? { previousAuthToken } : {}) }),
 	});
 
@@ -42,7 +42,7 @@ export function makeApiFetch(authToken: string | null, onUnauthorized: () => voi
 			} catch { /* Non-JSON requests use their server request ID. */ }
 		}
 		headers.set(CRATE_PROTOCOL_HEADER, String(CRATE_PLUGIN_PROTOCOL.current));
-		if (isCrateMutation(path, init.method)) await requireCompatibleServer();
+		if (isCrateMutation(path, init.method)) headers.set(CRATE_PROTOCOL_HEADER, String(await requireCompatibleServer()));
 		if (!sessionCurrent() && !revokingSession) throw new Error('Session changed. Open a fresh link from Crate.');
 		headers.set('Authorization', `Bearer ${authToken}`);
 		if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
@@ -105,6 +105,7 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
 	return outputArray;
 }
 
-async function requireCompatibleServer(): Promise<void> {
-  await (await import('./server-compatibility')).requireCompatibleServer();
+async function requireCompatibleServer(): Promise<number> {
+  const info = await (await import('./server-compatibility')).requireCompatibleServer();
+  return Math.min(CRATE_PLUGIN_PROTOCOL.current, info.protocol.current);
 }

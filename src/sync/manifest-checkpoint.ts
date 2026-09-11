@@ -4,12 +4,13 @@ import { reminderOperationDay } from '../protocol/reminder-operation';
 import type { FileManifest } from '../protocol/sync-types';
 import { parseRenameDependencies } from './rename-dependencies';
 import { normalizeUploadDiagnostics } from './upload-diagnostics';
+import { parseRestoreIntents } from './restore-intent';
 
-export const CHECKPOINT_VERSION = 2;
+export const CHECKPOINT_VERSION = 3;
 
 /** Only a complete, known checkpoint can carry common-ancestor authority. */
 export function parseCheckpoint(value: unknown) {
-	if (!isRecord(value) || ![1, CHECKPOINT_VERSION].includes(Number(value.version)) || typeof value.version !== 'number') {
+	if (!isRecord(value) || ![1, 2, CHECKPOINT_VERSION].includes(Number(value.version)) || typeof value.version !== 'number') {
 		throw new Error('Unsupported manifest checkpoint. Preserve this vault and its metadata; use a compatible Crate version.');
 	}
 	if (!isSyncSequence(value.generation) || (value.lastSeq !== undefined && !isSyncSequence(value.lastSeq))
@@ -22,11 +23,12 @@ export function parseCheckpoint(value: unknown) {
 		manifest: parseLocalManifest(value), generation: value.generation, authority: value.authority,
 		settledUploads: settled, renames: parseRenameDependencies(value.renameDependencies),
 		uploadDiagnostics: normalizeUploadDiagnostics(value.uploadDiagnostics),
+		restoreIntents: parseRestoreIntents(value.restoreIntents),
 	};
 }
 
 export function parseLocalManifest(value: unknown): FileManifest {
-	if (!isRecord(value) || ![1, CHECKPOINT_VERSION].includes(Number(value.version)) || typeof value.version !== 'number'
+	if (!isRecord(value) || ![1, 2, CHECKPOINT_VERSION].includes(Number(value.version)) || typeof value.version !== 'number'
 		|| (value.lastSeq !== undefined && !isSyncSequence(value.lastSeq))
 		|| (value.truncated !== undefined && value.truncated !== false)) throw new Error('Invalid manifest checkpoint');
 	return { version: 1, files: parseSyncFiles(value.files, true),

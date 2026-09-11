@@ -12,6 +12,7 @@ export async function preserveIncomingForReview(
 	path: string,
 	content: ArrayBuffer,
 	localHash: string,
+	reason = 'This file needs manual review because it cannot be replaced atomically.',
 ): Promise<never> {
 	const hash = await computeHash(content);
 	let copy = getIncomingConflictFileName(path, hash);
@@ -28,6 +29,6 @@ export async function preserveIncomingForReview(
 			await context.vault.createBinary(copy, content);
 		}
 	}
-	await context.conflictStore?.record({ originalPath: path, conflictPath: copy, cause: 'concurrent-edit', copySide: 'remote', localHash, remoteHash: hash });
-	throw new IncomingFileReviewError(`Incoming file saved at ${copy}. Review both versions and replace the original when ready`);
+	await context.conflictStore?.record({ originalPath: path, conflictPath: copy, cause: 'incoming-review', copySide: 'remote', localHash, remoteHash: hash });
+	throw new IncomingFileReviewError(`${reason} Incoming file saved at ${copy}. Review both versions and replace the original when ready`);
 }

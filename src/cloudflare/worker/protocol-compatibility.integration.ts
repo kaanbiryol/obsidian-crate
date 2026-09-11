@@ -6,6 +6,7 @@ import schema from '../schema.sql?raw';
 import worker from './index';
 import { sha256HexBytes } from './auth';
 import { writeCommittedMarkdownFile } from './storage';
+import { createReminderOperationId } from '../../protocol/reminder-operation';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol';
 
 const token = 'protocol-compatibility-test-credential';
@@ -52,4 +53,22 @@ describe('old and future clients against the current Worker', () => {
 		const noAuth = await worker.fetch(new Request('https://compatibility.test/sync/download?path=Note.md'), env);
 		expect(noAuth.status).toBe(401);
 	});
+});
+
+it('accepts protocol-7 upload and reminder receipts on protocol 8, while fencing legacy restores', async () => {
+ const body = 'Created by a protocol 7 plugin';
+ const upload = request('/sync/upload?path=previous.md', '7', 'PUT', body);
+ upload.headers.set('X-Crate-Expected-Hash', 'absent');
+ upload.headers.set('X-Crate-Upload-Operation', createReminderOperationId(Math.floor(Date.now() / 86400000)));
+ const first = await worker.fetch(upload.clone(), env);
+ expect(first.status).toBe(200);
+ expect(await (await worker.fetch(upload, env)).json()).toEqual(await first.json());
+ const id = createReminderOperationId(Math.floor(Date.now() / 86400000));
+ const reminder = JSON.stringify({ id, operationId: id, folderPath: 'Reminders', content: 'Protocol 7 offline reminder' });
+ const created = await worker.fetch(request('/reminders/create', '7', 'POST', reminder), env);
+ expect(created.status, await created.clone().text()).toBe(200);
+ expect(await (await worker.fetch(request('/reminders/create', '7', 'POST', reminder), env)).json()).toEqual(await created.json());
+ const before = (await env.DB.prepare('SELECT * FROM files ORDER BY path').all()).results;
+ expect((await worker.fetch(request('/sync/restore-version', '7', 'POST', JSON.stringify({ storageKey: 'legacy', expectedHash: null })), env)).status).toBe(428);
+ expect((await env.DB.prepare('SELECT * FROM files ORDER BY path').all()).results).toEqual(before);
 });

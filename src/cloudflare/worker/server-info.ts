@@ -20,6 +20,7 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 		'sync-v3',
 		'file-revision-deletes',
 		'upload-operation-receipts',
+		'restore-operation-receipts',
 		'reminder-operation-receipts',
 		'conditional-file-mutations',
 		'settings-v1',

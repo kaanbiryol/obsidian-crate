@@ -90,11 +90,11 @@ describe('PWA activation metadata', () => {
 		expect(html).not.toContain('browserToken=browser-token');
 	});
 
-	it('keeps the PWA viewport fitted and prevents gesture zoom while allowing scrolling', () => {
+	it('keeps the PWA viewport fitted and allows scrolling and browser zoom', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
-		expect(html).toContain('width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
-		expect(html).toContain('html,body{touch-action:pan-x pan-y}');
+		expect(html).toContain('width=device-width, initial-scale=1, viewport-fit=cover');
+		expect(html).toContain('html,body{touch-action:auto}');
 		expect(html).not.toContain('height=device-height');
 	});
 

@@ -33,12 +33,16 @@ const sameStat = (left: Stat, right: Stat) => left.type === right.type
 
 async function readDeleteSnapshot(context: LocalDeleteContext, path: string): Promise<DeleteSnapshot | null> {
   const visibleFile = context.vault.getAbstractFileByPath(path);
-  if (visibleFile && !isVaultTFileLike(visibleFile)) throw changedTarget();
+  // An existing directory is not the deleted file. Leave its entire tree
+  // untouched and settle only the file tombstone. Mid-read replacements still
+  // fail the identity check below and are retried from a fresh snapshot.
+  if (visibleFile && !isVaultTFileLike(visibleFile)) return null;
   if (!visibleFile && !await context.vault.adapter.exists(path)) {
     return null;
   }
 
   const stat = visibleFile && !isHiddenPath(path) ? undefined : await context.vault.adapter.stat(path);
+  if (stat?.type === 'folder') return null;
   if ((!visibleFile || isHiddenPath(path)) && stat?.type !== 'file') throw changedTarget();
 
   try {

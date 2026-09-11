@@ -15,6 +15,7 @@ export class PersistentTestVault {
 
 	write(path: string, content: string | ArrayBuffer): void {
 		const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+		if (this.folders.has(path)) throw new Error(`Folder already exists: ${path}`);
 		if (!this.folders.has(parent)) throw new Error(`Missing parent folder: ${parent}`);
 		this.files.set(path, {
 			content: typeof content === 'string' ? new TextEncoder().encode(content).buffer : content.slice(0),
@@ -43,7 +44,11 @@ export class PersistentTestVault {
 
 	private mkdir(path: string): void {
 		const segments = path.split('/');
-		for (let index = 1; index <= segments.length; index++) this.folders.add(segments.slice(0, index).join('/'));
+		for (let index = 1; index <= segments.length; index++) {
+			const folder = segments.slice(0, index).join('/');
+			if (this.files.has(folder)) throw new Error(`File blocks folder: ${folder}`);
+			this.folders.add(folder);
+		}
 	}
 
 	private file(path: string): TFile | null {
@@ -100,6 +105,11 @@ export class PersistentTestVault {
 			write: async (path: string, text: string) => { this.write(path, text); },
 			writeBinary: async (path: string, content: ArrayBuffer) => { this.write(path, content); },
 			remove: async (path: string) => { this.remove(path); },
+			rmdir: async (path: string, recursive: boolean) => {
+				const children = this.list(path);
+				if (recursive || children.files.length || children.folders.length) throw new Error('Directory is not empty');
+				this.folders.delete(path);
+			},
 			mkdir: async (path: string) => { this.mkdir(path); },
 			list: async (path: string) => this.list(path),
 			process: async (path: string, update: (content: string) => string) => this.process(path, update),

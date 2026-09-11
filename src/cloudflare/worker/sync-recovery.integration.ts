@@ -5,6 +5,7 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import schemaSql from '../schema.sql?raw';
 import { sha256HexBytes } from './auth';
+import { createReminderOperationId } from '../../protocol/reminder-operation';
 import { handleRestoreFileVersion } from './file-version-handlers';
 import { sweepOrphanedManagedObjects } from './maintenance/orphan-sweep';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './sync-storage';
@@ -31,9 +32,10 @@ async function retain(path: string, content: Uint8Array) {
 	return { hash, key };
 }
 
-function restore(key: string, expectedHash: string | null = null) {
+async function restore(key: string, expectedHash: string | null = null) {
+	const version = await db.prepare('SELECT path FROM file_versions WHERE storage_key = ?').bind(key).first<{ path: string }>();
 	return handleRestoreFileVersion(new Request('https://example.test/versions/restore', {
-		method: 'POST', body: JSON.stringify({ storageKey: key, expectedHash }),
+		method: 'POST', body: JSON.stringify({ storageKey: key, path: version!.path, expectedHash, expectedRevision: expectedHash ? 'current' : null, operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)) }),
 	}), bucket, db);
 }
 

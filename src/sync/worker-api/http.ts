@@ -163,10 +163,12 @@ export class WorkerApiHttpClient {
 		options: ApiRequestOptions,
 		timeout: number,
 	): Promise<ApiHttpResponse> {
+		let protocol = CRATE_PLUGIN_PROTOCOL.current;
 		if (isCrateMutation(path, options.method)) {
 			const response = await this.runRequest('/.well-known/crate', {}, Math.min(timeout, 30_000));
 			const info = response.status === 200 ? parseCrateServerInfo(parseJsonResponse<unknown>(response.text, '/.well-known/crate')) : null;
 			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
+			protocol = Math.min(protocol, info.protocol.current);
 		}
 		const externalSignal = this.externalSignal;
 		if (externalSignal?.aborted) throw createAbortError('Sync request aborted');
@@ -226,7 +228,7 @@ export class WorkerApiHttpClient {
 					Authorization: `Bearer ${this.authToken}`,
 					'X-Crate-Client-Session': this.clientSession,
 					'X-Crate-Operation-Id': operationId,
-					[CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current),
+					[CRATE_PROTOCOL_HEADER]: String(protocol),
 					...headersWithoutContentType,
 				},
 			}).then(resolveOnce, error => {

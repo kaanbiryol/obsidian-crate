@@ -49,7 +49,7 @@
 | `BUCKET` | R2 Bucket | File storage |
 | `DB` | D1 Database | Changelog, file manifest, authentication, subscriptions, and parsed reminder cache |
 | `REMINDER_ALARMS` | Durable Object Namespace | Reminder alarm DOs |
-| `NOTIFICATION_REQUEST_LIMITER` | Rate Limiting API | Bounds notification requests before D1; D1 also enforces a global daily admission ceiling |
+| `NOTIFICATION_REQUEST_LIMITER` | Rate Limiting API | Limits notification requests per source before D1; authenticated action/day budgets preserve management availability |
 
 ## Component Ownership
 

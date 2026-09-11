@@ -4,6 +4,7 @@ import { normalizeWorkerUrl } from './worker-url';
 import type { Vault } from 'obsidian';
 import { assertRenamePreserved } from './rename-dependencies';
 import { DurableUploads } from './durable-uploads';
+import { DurableRestores } from './durable-restores';
 import type { UploadApplyPhase } from './upload-diagnostics';
 import type { LocalManifest } from './manifest';
 import { arrayBufferToBase64 } from './encoding';
@@ -27,6 +28,7 @@ import type {
 	FileVersionQuery,
 	FileVersionsPage,
 	UploadResult,
+	RemoteFileVersion,
 } from '../protocol/sync-types';
 import type { SharedSettings } from '../plugin/settings-types';
 import type { CrateServerInfo } from '../protocol';
@@ -45,10 +47,12 @@ export { HttpError } from './worker-api/http';
 
 export class SyncApiClient {
 	private durableUploads?: DurableUploads;
+	private durableRestores?: DurableRestores;
 	private deletionGuard?: (path: string) => Promise<void>;
 	configureUploadJournal(manifest: LocalManifest, vault: Vault, cache: MarkdownBaseCache): void {
 		this.durableUploads = new DurableUploads(manifest, this.syncApi, cache, this.http.getRequestDiagnostics().clientSession);
 		this.deletionGuard = path => assertRenamePreserved(manifest, vault, path);
+		this.durableRestores = new DurableRestores(manifest, this.syncApi);
 	}
 	private readonly http: WorkerApiHttpClient;
 	private readonly syncApi: SyncWorkerApi;
@@ -171,12 +175,14 @@ export class SyncApiClient {
 		return this.syncApi.listFileVersions(query);
 	}
 
-	async restoreFileVersion(
-		storageKey: string,
-		expectedHash: string | null,
-	): Promise<{ success: boolean; path: string; hash: string; size: number }> {
-		return this.syncApi.restoreFileVersion(storageKey, expectedHash);
+	async restoreFileVersion(version: RemoteFileVersion): Promise<void> {
+		if (!this.durableRestores) throw new Error('Initialize sync before restoring a file');
+		return this.durableRestores.restore(version);
 	}
+
+	getPendingRestores(): RemoteFileVersion[] { return this.durableRestores?.pending() ?? []; }
+
+	async finishRestore(storageKey: string): Promise<void> { await this.durableRestores?.finish(storageKey); }
 
 	async revokeToken(id: string): Promise<{ success: boolean }> {
 		return this.authApi.revokeToken(id);

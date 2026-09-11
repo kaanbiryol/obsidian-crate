@@ -17,6 +17,7 @@ function createDb(
 	let failSubscriptionInsert = options?.failSubscriptionInsert ?? false;
 
 	const applyMutation = (state: { subscriptions: Map<string, SubscriptionRecord> }, sql: string, args: unknown[]) => {
+		if (sql.includes('INSERT INTO request_rate_limits')) return { results: [{ count: 1 }], meta: { changes: 1 } };
 		if (sql.startsWith('CREATE TABLE')) {
 			return { meta: { changes: 0 } };
 		}

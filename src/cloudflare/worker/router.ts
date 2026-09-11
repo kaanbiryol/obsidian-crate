@@ -1,4 +1,5 @@
 import { parseJsonObject } from './utils';
+import { limitNotificationAction } from './rate-limit';
 import { handleAuthRoute } from './routes/auth';
 import { handleNotificationsRoute } from './routes/notifications';
 import { handlePublicRoute } from './routes/public';
@@ -55,6 +56,8 @@ export async function handleAuthenticatedRoute(
 		if (!principal.folderPath || folder !== principal.folderPath) return corsResponse({ error: 'This session is limited to its enrolled reminders folder' }, 403);
 	}
 	const db = env.DB;
+	const limited = await limitNotificationAction(request, db, principal.tokenId);
+	if (limited) return limited;
 
 	return await handleSyncRoute(request, env, path, method, mutationAuditContext(request, principal, requestId))
 		?? await handleAuthRoute(request, env, path, method)

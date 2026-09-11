@@ -17,6 +17,8 @@ import { PwaModalSheet } from './PwaModalSheet';
 import { HomeScreenInstallInstructions } from './HomeScreenInstall';
 import type { HomeScreenPlatform } from '../hooks/useHomeScreenInstall';
 
+import { DeviceStorageSettings } from './DeviceStorageSettings';
+
 export function SettingsSheet({
 	config,
 	homeScreenPlatform = null,
@@ -183,6 +185,7 @@ export function SettingsSheet({
 					<section className="settings-panel__section" aria-labelledby="settings-sync-title">
 						<h3 id="settings-sync-title" className="settings-panel__title">Sync</h3>
 						<div className="settings-group">
+							<DeviceStorageSettings />
 							<div className="settings-row settings-row--value">
 								<span>Folder</span>
 								<strong title={config.folderPath}>{config.folderPath}</strong>

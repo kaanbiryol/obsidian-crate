@@ -26,7 +26,6 @@ import { usePushNotifications } from './hooks/usePushNotifications';
 import { usePwaBootstrap } from './hooks/usePwaBootstrap';
 import { usePwaColorScheme } from './hooks/usePwaColorScheme';
 import { usePwaInputModality } from './hooks/usePwaInputModality';
-import { usePwaViewportGestures } from './hooks/usePwaViewportGestures';
 import { usePwaRefreshLifecycle } from './hooks/usePwaRefreshLifecycle';
 import { usePwaUpdate } from './hooks/usePwaUpdate';
 import { usePwaSessionLifecycle } from './hooks/usePwaSessionLifecycle';
@@ -61,7 +60,6 @@ const ReminderQuarantineNotice = lazy(() => import('./components/ReminderQuarant
 
 function App() {
 	usePwaInputModality();
-	usePwaViewportGestures();
 	const { colorScheme, themePreference, setThemePreference } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
 	const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_KEY));

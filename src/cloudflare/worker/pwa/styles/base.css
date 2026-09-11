@@ -22,8 +22,8 @@
 	--pwa-sheet-surface:#101013;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-/* Allow scrolling, but not page zoom from double taps or pinches. */
-html,body{touch-action:pan-x pan-y}
+/* Preserve browser scrolling and accessibility zoom. */
+html,body{touch-action:auto}
 html,body{margin:0;padding:0;background:radial-gradient(circle at 82% -12%,rgba(var(--accent-rgb),.09),transparent 34%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;width:100%;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;color-scheme:dark}
 body{min-height:100%;min-height:100dvh;overflow:hidden}
 /* Freeze the document while preserving native scrolling inside modal fields. */
@@ -33,6 +33,8 @@ body.pwa-sheet-scroll-locked #app{height:var(--pwa-sheet-layout-height)!importan
 body.pwa-sheet-scroll-locked .pwa-modal-sheet{height:var(--pwa-sheet-layout-height)!important;bottom:auto!important}
 body.pwa-sheet-scroll-locked .pwa-modal-sheet__container--reminder{max-height:calc(var(--pwa-sheet-layout-height) * .9)!important}
 button,input,textarea,select{font:inherit}
+/* Immediate control taps while preserving pinch zoom. */
+button,a,input,textarea,select{touch-action:manipulation}
 button{cursor:pointer;border:none;background:transparent;color:inherit;user-select:none;-webkit-user-select:none}
 button:disabled{cursor:not-allowed;opacity:.55}
 /* Keep selection policy on controls, never on editor ancestors. */

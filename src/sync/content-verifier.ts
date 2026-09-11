@@ -1,4 +1,4 @@
-import type { Vault } from 'obsidian';
+import type { DataAdapter, Vault } from 'obsidian';
 import type { FileEntry } from '../protocol/sync-types';
 import { MAX_FILE_SIZE_BYTES } from '../protocol/sync-limits';
 import { UNVERIFIED_MODIFIED } from './applied-content';
@@ -18,6 +18,24 @@ interface VerificationManifest {
 export class LocalContentVerifier {
 	private cursor = '';
 	private checks: Promise<unknown> = Promise.resolve();
+	private loaded = false;
+
+	constructor(private readonly progress?: { adapter: Pick<DataAdapter, 'read' | 'write' | 'exists'>; path: string; authority: string }) {}
+
+	private async loadProgress(): Promise<void> {
+		if (this.loaded || !this.progress) return;
+		const { adapter, path, authority } = this.progress;
+		if (await adapter.exists(path)) {
+			// A damaged or foreign cursor is a disposable scheduling hint. I/O
+			// failures remain visible instead of silently restarting every check.
+			const raw = await adapter.read(path);
+			try {
+				const saved = JSON.parse(raw) as { version?: unknown; authority?: unknown; cursor?: unknown };
+				if (saved.version === 1 && saved.authority === authority && typeof saved.cursor === 'string') this.cursor = saved.cursor;
+			} catch { /* Restart the rotation; no sync authority is changed. */ }
+		}
+		this.loaded = true;
+	}
 
 	verify(vault: Vault, manifest: VerificationManifest, files: VaultFile[], signal: AbortSignal): Promise<boolean> {
 		const task = this.checks.then(() => this.check(vault, manifest, files, signal));
@@ -26,6 +44,8 @@ export class LocalContentVerifier {
 	}
 
 	private async check(vault: Vault, manifest: VerificationManifest, files: VaultFile[], signal: AbortSignal): Promise<boolean> {
+		signal.throwIfAborted();
+		await this.loadProgress();
 		const eligible = files.filter(file => file.size <= MAX_FILE_SIZE_BYTES)
 			.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 		let start = eligible.findIndex(file => file.path > this.cursor);
@@ -55,6 +75,10 @@ export class LocalContentVerifier {
 			}
 		} finally {
 			if (changed) await manifest.save();
+			if (this.progress && !signal.aborted) {
+				const { adapter, path, authority } = this.progress;
+				await adapter.write(path, JSON.stringify({ version: 1, authority, cursor: this.cursor }));
+			}
 		}
 		return changed;
 	}

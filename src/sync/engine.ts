@@ -70,7 +70,7 @@ export class SyncEngine {
 	private contexts: SyncEngineContexts;
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private activeWork = new Set<Promise<unknown>>();
-	private contentVerifier = new LocalContentVerifier();
+	private contentVerifier: LocalContentVerifier;
 	private periodicCheckFailed = false;
 	private onAutomaticSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
 	private patternCache = new Map<string, RegExp>();
@@ -87,6 +87,11 @@ export class SyncEngine {
 		this.api = api;
 		this.settings = settings;
 		this.localManifest = new LocalManifest(plugin.app, plugin.manifest, normalizeWorkerUrl(settings.workerUrl) || 'unconfigured');
+		this.contentVerifier = new LocalContentVerifier({
+			adapter: this.vault.adapter,
+			path: `${plugin.manifest.dir}/content-verification.json`,
+			authority: normalizeWorkerUrl(settings.workerUrl) || 'unconfigured',
+		});
 		this.markdownBaseCache = new MarkdownBaseCache(plugin.app, plugin.manifest);
 		this.api.configureUploadJournal(this.localManifest, this.vault, this.markdownBaseCache);
 		this.state = {
@@ -404,7 +409,7 @@ export class SyncEngine {
 	}
 
 	private verifyContent(files: VaultFile[]): Promise<boolean> {
-		return this.contentVerifier.verify(this.vault, this.localManifest, files, this.lifecycle.abortSignal);
+		return this.trackWork(() => this.contentVerifier.verify(this.vault, this.localManifest, files, this.lifecycle.abortSignal));
 	}
 
 	async sync(progressCallback?: (current: number, total: number) => void, verifyAll = false): Promise<SyncResult> {

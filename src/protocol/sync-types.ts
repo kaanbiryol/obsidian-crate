@@ -167,6 +167,14 @@ export interface RemoteFileVersion {
 	expires_at: number;
 }
 
+export interface RestoreFileRequest {
+	operationId: string;
+	storageKey: string;
+	path: string;
+	expectedHash: string | null;
+	expectedRevision: string | null;
+}
+
 export interface FileVersionQuery {
 	path?: string;
 	search?: string;

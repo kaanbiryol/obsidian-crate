@@ -49,7 +49,7 @@ describe('PWA reminder sync recovery notice', () => {
 		expect(markup).not.toContain('pwa-reminder-sync-progress');
 		expect(markup).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Retry: Buy milk"/);
 		expect(render([change({ status: 'pending' })])).toBe('');
-		expect(render([change({ status: 'pending' })], true)).toBe('');
+		expect(render([change({ status: 'pending' })], true)).toContain('Export pending changes');
 		expect(render([])).toBe('');
 	});
 
