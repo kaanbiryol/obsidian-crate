@@ -1,0 +1,2 @@
+/* Screenshot-only: native 12/24-hour presentation is masked separately. */
+input[type="time"] { width: 110px !important; min-width: 110px !important; max-width: 110px !important; }

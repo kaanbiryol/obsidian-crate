@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CRATE_WEB_SESSION_NAME_HEADER } from '../protocol/web-session';
 import { exchangeEnrollmentToken, makeApiFetch } from './api';
 
-vi.mock('./server-compatibility', () => ({ requireCompatibleServer: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('./server-compatibility', () => ({ requireCompatibleServer: vi.fn().mockResolvedValue({ protocol: { current: 7, oldestCompatible: 7 } }) }));
 afterEach(() => vi.unstubAllGlobals());
 
 it.each([false, true])('reports a session label during enrollment and existing-session requests (standalone=%s)', async standalone => {

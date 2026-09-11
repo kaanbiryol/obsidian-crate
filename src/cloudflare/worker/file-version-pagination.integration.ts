@@ -6,6 +6,7 @@ import schema from '../schema.sql?raw';
 import { handleListFileVersions } from './file-version-list';
 import { handleRestoreFileVersion } from './file-version-handlers';
 import { parseFileVersions } from '../../sync/worker-api/version-contract';
+import { createReminderOperationId } from '../../protocol/reminder-operation';
 import { sha256Hex } from './auth';
 
 beforeEach(async () => {
@@ -35,7 +36,7 @@ it('walks all equal-timestamp pages without duplicates and restores an entry bey
 	expect(older.path).toBe('archive/older%.md');
 	await env.BUCKET.put(older.storage_key, 'retained bytes', { customMetadata: { hash: older.hash } });
 	const restored = await handleRestoreFileVersion(new Request('https://worker.test/sync/versions/restore', {
-		method: 'POST', body: JSON.stringify({ storageKey: older.storage_key, expectedHash: null }),
+		method: 'POST', body: JSON.stringify({ storageKey: older.storage_key, path: older.path, expectedHash: null, expectedRevision: null, operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) }),
 	}), env.BUCKET, env.DB);
 	expect(restored.status).toBe(200);
 	expect(await env.DB.prepare('SELECT hash FROM files WHERE path = ?').bind(older.path).first()).toEqual({ hash: older.hash });

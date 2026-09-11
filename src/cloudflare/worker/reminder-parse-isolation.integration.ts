@@ -168,7 +168,7 @@ it('accepts malformed metadata in batch uploads, atomic pairs, and retained-vers
 		expect((await quarantine(affected))?.last_error).toContain('Repair');
 	}
 	const repaired = await put(path, valid, old!.hash);
-	expect((await request('/sync/restore-version', { method: 'POST', body: JSON.stringify({ storageKey: old!.revision, expectedHash: repaired.hash }) })).status).toBe(200);
+	expect((await request('/sync/restore-version', { method: 'POST', body: JSON.stringify({ storageKey: old!.revision, path, expectedHash: repaired.hash, expectedRevision: repaired.revision, operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)) }) })).status).toBe(200);
 	expect(await (await request(`/sync/download?path=${encodeURIComponent(path)}`)).text()).toBe(invalid);
 	expect((await quarantine(path))?.last_error).toContain('Repair');
 });

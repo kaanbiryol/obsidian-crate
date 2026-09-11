@@ -283,7 +283,7 @@ describe('LocalManifest', () => {
 		const [, lastPayload] = lastWrite!;
 		expect(JSON.parse(lastPayload)).toEqual({
 			generation: 2,
-			version: 2,
+			version: 3,
 			files: {},
 		});
 	});

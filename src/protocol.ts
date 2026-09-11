@@ -18,7 +18,7 @@ export interface CrateServerInfo {
  * when support for an older protocol is intentionally removed.
  */
 export const CRATE_PLUGIN_PROTOCOL: CrateProtocolRange = Object.freeze({
-	current: 7,
+	current: 8,
 	oldestCompatible: 7,
 });
 

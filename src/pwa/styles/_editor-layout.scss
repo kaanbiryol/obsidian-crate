@@ -74,7 +74,7 @@
       min-width: 0;
       max-width: 100%;
       overflow-x: auto;
-      touch-action: pan-x;
+      touch-action: pan-x pinch-zoom;
       overscroll-behavior-x: contain;
       scrollbar-width: none;
 

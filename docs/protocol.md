@@ -1,6 +1,6 @@
 # Protocol 7 contract
 
-`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. Every mutation must send `X-Crate-Protocol: 7`; missing or incompatible clients receive 428 before changing state. POST metadata and batch-download endpoints are reads.
+`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The current protocol is 8 with protocol 7 retained for ordinary writes. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
 
 ## Files
 
@@ -40,9 +40,9 @@ D1 projection jobs are created in the file transaction. A reserved Durable Objec
 
 The reminder Durable Object keeps the last completed due-time occurrence across schedule cleanup and restart. Replaying an accepted job cannot rearm that occurrence. Rescheduling the same due time preserves recipient progress and terminal failures; a new due time starts new delivery state. Token checks fence schedule cleanup while occurrence checks retain in-flight recipient acknowledgements for the same due time. Delivery callbacks are serialized. Unknown acknowledgements from an external push provider can still cause a retry; this is not an exactly-once provider guarantee.
 
-Web sessions are limited to their enrolled folder, expire after 90 days, and cannot mint new sessions. A subscription belongs to its session; logout and expiry remove it. The deployment permits 20 subscriptions and five per owner. Notification writes are limited per network address/route to 30 per minute, enrollment to ten, and test pushes to three. Push requests accept only supported provider hosts, reject redirects, and have ten-second deadlines.
+Web sessions are limited to their enrolled folder, expire after 90 days, and cannot mint new sessions. A subscription belongs to its session; logout and expiry remove it. The deployment permits 20 subscriptions and five per owner. Notification writes are limited per authenticated session/route to 30 per minute, enrollment to ten, and test pushes to three. Push requests accept only supported provider hosts, reject redirects, and have ten-second deadlines.
 
-The edge binding admits 60 notification writes per minute per hostname and Cloudflare location; D1 caps global admissions at 1,000 attempts per UTC day before applying per-action limits. Unknown mutation routes and edge-denied requests perform no D1 work. Encrypted push messages fit within 4,096 bytes by truncating display text on Unicode code-point boundaries; stored reminder text stays intact. Deterministic payload failures stop delivery retries immediately.
+The edge binding admits 60 notification writes per minute per source-address hash, hostname and Cloudflare location. After authentication, one D1 transaction applies the per-action and 1,000-per-UTC-day budgets. Invalid bearer credentials and invalid enrollment grants never charge these budgets; an exhausted action does not spend the daily budget. Valid enrollment exchanges use a separate daily pool from authenticated management. Unknown mutation routes and edge-denied requests perform no D1 work. Encrypted push messages fit within 4,096 bytes by truncating display text on Unicode code-point boundaries; stored reminder text stays intact. Deterministic payload failures stop delivery retries immediately.
 
 Recipient selection checks session existence, expiry, and folder authority at send time without waiting for maintenance. Every subscription requires a recorded authenticated owner. Logout revocation captures its credential before clearing local state and may finish dispatching afterward; ordinary old-session writes remain fenced.
 
@@ -56,7 +56,7 @@ Limits are application guardrails, not a promise that every workload fits a free
 
 ## Supported storage formats
 
-Current formats are D1 `crate_schema` version 5, parser version 8, IndexedDB version 2, generation-bearing authority-bound local file checkpoints with settled upload IDs and rename dependencies, ordered upload journals, and URI-encoded `crate-desc:v1:` description comments. Provisioning supports an additive D1 schema-2/3/4-to-5 upgrade; other database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
+Current formats are D1 `crate_schema` version 5, parser version 9, IndexedDB version 2, generation-bearing authority-bound local file checkpoints with settled upload IDs and rename dependencies, ordered upload journals, and URI-encoded `crate-desc:v1:` description comments. Provisioning supports an additive D1 schema-2/3/4-to-5 upgrade; other database/checkpoint formats are rejected and preserved. Signing out deletes the browser cache, including an unsupported cache, and reports blocked cleanup. See the [compatibility matrix](compatibility.md) for upgrade, recovery and rollback policy.
 
 ## Source and occurrence integrity
 
@@ -69,3 +69,9 @@ Duplicate identities within the configured reminders folder quarantine projectio
 An explicit fresh enrollment link replaces a stored browser session, including an expired one. The exchange can accept the previous reminder credential solely to revoke that credential and its subscriptions; it cannot revoke a vault credential. The confirmed local cache is cleared before the new authority is installed, and other tabs adopt its folder. Pending commands and drafts remain scoped to their original folder for explicit review/recovery; only explicit logout discards them.
 
 Enrollment consumption, replacement-session creation and previous-session revocation commit atomically. A rolled-back exchange leaves the link usable. A response lost after a successful commit does not make that link reusable; open a new link from Crate to enroll again.
+
+## Retained-version restore
+
+`POST /sync/restore-version` requires `operationId`, `storageKey`, `path`, `expectedHash` and `expectedRevision`. An absent target uses null for both preconditions; an existing target requires its exact hash and revision. The plugin saves this complete intent in checkpoint format 3 before dispatch and resumes it after lost responses or restarts. Restores share the upload receipt table and its 180-UTC-date retry policy; the request fingerprint also binds the retained key and operation kind.
+
+The file pointer, changelog entry and exact result receipt commit in the same D1 transaction. A retry reads that receipt before looking up retained bytes, so expiry of the retained version or a subsequent edit/delete cannot cause replay. A changed precondition is also recorded as a terminal result. The recovery dialog offers **Resume restore** for pending intents even when their original history entry has expired. Remote confirmation and local sync completion are separate: a failed local sync keeps the committed intent until a later successful sync. Expired unresolved operations require preserving the checkpoint and comparing the current remote state; never replace their operation IDs to force a retry.

@@ -66,8 +66,9 @@ export function discardReviewedReminderDraft(entry: { key: string; raw: string }
 export function discardReminderDraft(modal: ModalState, folderPath: string): void {
 	try { sessionStorage.removeItem(key(modal, folderPath)); } catch { /* Best effort. */ }
 }
-export function clearReminderDrafts(): void {
+export function clearReminderDrafts(): boolean {
 	try {
 		for (const entry of Object.keys(sessionStorage)) if (entry.startsWith(PREFIX)) sessionStorage.removeItem(entry);
-	} catch { /* Storage may be unavailable. */ }
+		return true;
+	} catch { return false; }
 }

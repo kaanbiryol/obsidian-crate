@@ -258,3 +258,7 @@ const context = {
 
 - Uses the full Harness type with all dependencies mocked
 - Tests the orchestration logic (sync mode selection, state transitions, error handling)
+
+## Portable visual baselines
+
+`npm run test:visual` fixes time, timezone and browser locale. Native time controls still use the operating system's 12/24-hour preference, so screenshots normalize their width and mask only the native time-input region. The time value is asserted independently, the surrounding labels/layout keep the existing 0.1% pixel threshold, and project, repeat-tab and time keyboard behavior run in separate tests. Baseline updates should affect only the intended time-control region; inspect mobile and desktop examples before accepting them. Browser zoom remains enabled in production.

@@ -3,7 +3,7 @@ import { corsResponse } from './cors';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
 import { REMINDER_OPERATION_VALID } from './reminders-web/operation-expiry';
 import { fileNamespaceGuard, namespacePredicate, FileNamespaceConflictError } from './file-namespace';
-import type { UploadResult } from '@/protocol/sync-types';
+import type { RestoreFileRequest, UploadResult } from '@/protocol/sync-types';
 
 function decodeReceipt(json: string): UploadResult {
 	const result = JSON.parse(json) as UploadResult & { conflictingPath?: string | null };
@@ -24,7 +24,7 @@ export async function readUploadReceipt(db: D1Database, operation: Pick<UploadOp
 
 export async function beginUploadOperation(db: D1Database, id: unknown, payload: {
 	path: string; hash: string; size: number; contentType: string; expectedHash: string | null;
-}): Promise<UploadOperation | Response> {
+} | (Omit<RestoreFileRequest, 'operationId'> & { kind: 'restore' })): Promise<UploadOperation | Response> {
 	const day = typeof id === 'string' ? reminderOperationDay(id) : null;
 	if (typeof id !== 'string' || day === null) return corsResponse({ success: false, path: payload.path, error: 'A stable upload operationId is required. Update Crate before syncing.', code: 'validation' }, 428);
 	const operation = { id, day, requestHash: await sha256Hex(JSON.stringify(payload)) };

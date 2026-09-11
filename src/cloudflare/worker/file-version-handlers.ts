@@ -1,4 +1,6 @@
 import { sha256HexBytes } from './auth';
+import { beginUploadOperation } from './upload-operations';
+import { isSyncRevision } from '@/protocol/sync-validation';
 import { corsResponse } from './cors';
 import { commitStagedFile } from './sync-mutations';
 import { FileNamespaceConflictError } from './file-namespace';
@@ -31,15 +33,26 @@ export async function handleRestoreFileVersion(
 	if (!parsedBody.ok) return parsedBody.response;
 	const storageKey = parseOptionalString(parsedBody.value.storageKey, 1024);
 	const expectedHash = parseExpectedFileHash(parsedBody.value.expectedHash);
-	if (!storageKey || expectedHash === undefined) {
-		return corsResponse({ error: 'storageKey and expectedHash are required' }, 400);
+	const path = sanitizePath(typeof parsedBody.value.path === 'string' ? parsedBody.value.path : '');
+	const rawRevision = parsedBody.value.expectedRevision;
+	const expectedRevision = rawRevision === null ? null : isSyncRevision(rawRevision) ? rawRevision : undefined;
+	if (!parsedBody.value.operationId) {
+		return corsResponse({ error: 'Update Crate before restoring a file. A durable restore operation is required.', code: 'protocol_incompatible' }, 428);
 	}
+	if (!isSyncRevision(storageKey) || !path || expectedHash === undefined
+		|| expectedRevision === undefined || (expectedHash === null ? expectedRevision !== null : expectedRevision === null)) {
+		return corsResponse({ error: 'A retained version, path and current file precondition are required' }, 400);
+	}
+	// Resolve receipts before reading retained bytes: the original version may
+	// expire after commitment, and later edits/deletes must never be replayed over.
+	const operation = await beginUploadOperation(db, parsedBody.value.operationId,
+		{ kind: 'restore', path, storageKey, expectedHash, expectedRevision });
+	if (operation instanceof Response) return operation;
 
 	const version = await db.prepare(`SELECT storage_key, path, hash, size, reason, created_at, expires_at
 		FROM file_versions WHERE storage_key = ? AND expires_at > ?`).bind(storageKey, Date.now()).first<FileVersionRow>();
 	if (!version) return corsResponse({ error: 'File version not found or expired' }, 404);
-	const path = sanitizePath(version.path);
-	if (!path) return corsResponse({ error: 'Stored file version has an invalid path' }, 409);
+	if (version.path !== path) return corsResponse({ error: 'Retained version does not belong to the requested path' }, 409);
 
 	const object = await bucket.get(version.storage_key);
 	if (!object || object.size > MAX_FILE_BYTES || !storedObjectMatchesMetadata(object, {
@@ -69,19 +82,18 @@ export async function handleRestoreFileVersion(
 			objectKey,
 			content,
 			expectedHash,
+			expectedRevision: expectedRevision ?? undefined,
+			operation,
 			previousFile: previous,
 		});
 		if (!result.committed) {
-			return corsResponse({
-				error: 'Remote file changed before the version could be restored',
-				currentHash: result.currentHash,
-			}, 409);
+			return corsResponse(result.failure ?? { error: 'Remote file changed before the version could be restored', currentHash: result.currentHash }, 409);
 		}
+		return corsResponse({ success: true, path, hash: version.hash, revision: result.revision });
 	} catch (error) {
 		if (error instanceof FileNamespaceConflictError) return error.toResponse();
 		// A failed response may follow a successful commit. Leave the fresh key
 		// for reference-aware orphan cleanup rather than risking live content.
-		return corsResponse({ error: 'Unable to restore file version; retry the request' }, 503);
+		return corsResponse({ error: 'Restore outcome is unconfirmed. Retry the same saved restore operation.' }, 503);
 	}
-	return corsResponse({ success: true, path, hash: version.hash, size: content.byteLength });
 }

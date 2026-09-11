@@ -1,0 +1,33 @@
+import { chromium, webkit, expect } from '@playwright/test';
+import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
+import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
+const assets = await buildPwaPreviewAssets();
+const { server } = await listenPwaPreviewServer({ port: 0, assets });
+const origin = `http://127.0.0.1:${server.address().port}`;
+try {
+  for (const type of [chromium, webkit]) {
+    const browser = await type.launch();
+    try {
+      const page = await browser.newPage({ serviceWorkers: 'block' });
+      const errors = []; page.on('pageerror', error => errors.push(error.message));
+      await page.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
+      const cards = page.getByRole('group', {name: 'Check this article. Press Enter to edit reminder.', exact:true});
+      await cards.waitFor();
+      await page.route('**/auth/session', route => route.fulfill({status:503,body:'Offline revocation'}));
+      await page.evaluate(() => {
+        const remove = Storage.prototype.removeItem;
+        Storage.prototype.removeItem = function(key) {
+          if (this === localStorage && key === 'crate-reminders-auth-token') throw new DOMException('Storage denied during logout', 'SecurityError');
+          return remove.call(this,key);
+        };
+      });
+      await page.getByRole('button',{name:'Open settings',exact:true}).click();
+      await page.getByRole('button',{name:'Log out',exact:true}).click();
+      await expect.poll(() => errors.some(error => error.includes('Storage denied during logout'))).toBe(true);
+      expect(await page.evaluate(() => localStorage.getItem('crate-reminders-auth-token'))).toBeTruthy();
+      await expect(cards).toHaveCount(1);
+      expect(await page.getByRole('button',{name:'Open Obsidian',exact:true}).count()).toBe(0);
+      console.log(`${type.name()}: logout aborts on token storage deletion failure; token and private rendered reminder remain`);
+    } finally { await browser.close(); }
+  }
+} finally { await new Promise(resolve=>server.close(resolve)); }

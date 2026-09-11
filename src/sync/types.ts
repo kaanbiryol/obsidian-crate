@@ -34,7 +34,7 @@ export interface ConflictRecord {
 	originalPath: string;
 	conflictPath: string;
 	createdAt: string;
-	cause: 'concurrent-create' | 'concurrent-edit' | 'unknown';
+	cause: 'concurrent-create' | 'concurrent-edit' | 'incoming-review' | 'unknown';
 	status: 'active' | 'resolved';
 	copySide?: 'local' | 'remote';
 	localHash?: string;

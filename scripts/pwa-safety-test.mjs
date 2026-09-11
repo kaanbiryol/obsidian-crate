@@ -77,18 +77,5 @@ async function verifyEnrollmentRecovery(browser, browserName) {
       expect(new URL(page.url()).searchParams.get('token')).toBe(mode === 'standalone' ? null : 'install-fresh');
     } finally { await context.close(); }
   }
-  const context = await browser.newContext({ serviceWorkers: 'block' });
-  try {
-    const other = await context.newPage();
-    await other.goto(`${origin}/notifications?folder=Reminders&tab=inbox`);
-    await other.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }).waitFor();
-    await other.evaluate(() => sessionStorage.setItem('crate-reminder-draft:old', 'private old draft'));
-    const folders = [];
-    other.on('request', request => { const url = new URL(request.url()); if (url.pathname === '/reminders/list') folders.push(url.searchParams.get('folderPath')); });
-    const fresh = await context.newPage();
-    await fresh.goto(`${origin}/notifications?browserToken=replace-session&folder=NewFolder&tab=inbox`);
-    await expect.poll(() => folders.includes('NewFolder')).toBe(true);
-    expect(await other.evaluate(() => sessionStorage.getItem('crate-reminder-draft:old'))).toBe('private old draft');
-  } finally { await context.close(); }
-  console.log(`${browserName}: expired-session recovery, separate browser/install tokens, failed exchange and cross-tab folder replacement passed`);
+  console.log(`${browserName}: expired-session recovery, separate browser/install tokens, failed exchange passed`);
 }

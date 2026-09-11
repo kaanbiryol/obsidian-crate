@@ -25,6 +25,7 @@ function uploadMutation(
 	objectKey: string,
 	expectedHash: ExpectedFileHash,
 	operation?: UploadOperation,
+	expectedRevision?: string,
 ): D1PreparedStatement {
 	const namespace = fileNamespaceGuard(path);
 	if (operation) {
@@ -38,10 +39,11 @@ function uploadMutation(
 			.bind(path, portablePathKey(path), hash, size, objectKey, ...namespace.args);
 	}
 
+	const revisionGuard = expectedRevision === undefined ? '' : ' AND storage_key = ?';
 	return db.prepare(`UPDATE files
 		SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
-		WHERE path = ? AND hash = ? AND ${namespace.sql}`)
-		.bind(portablePathKey(path), hash, size, objectKey, path, expectedHash, ...namespace.args);
+		WHERE path = ? AND hash = ? AND ${namespace.sql}${revisionGuard}`)
+		.bind(portablePathKey(path), hash, size, objectKey, path, expectedHash, ...namespace.args, ...(expectedRevision === undefined ? [] : [expectedRevision]));
 }
 
 export interface CommitResult {
@@ -78,6 +80,7 @@ export async function commitStagedFile(
 		params.objectKey,
 		params.expectedHash,
 		params.operation,
+		params.expectedRevision,
 	);
 	const results: unknown[] = await db.batch([
 		mutation,

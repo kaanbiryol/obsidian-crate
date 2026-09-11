@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createReminderOperationId } from '../../protocol/reminder-operation';
 import { createMockR2Bucket } from '@/test/factories/cloudflare';
 import { handleRestoreFileVersion } from './file-version-handlers';
 
@@ -17,14 +18,14 @@ describe('file version recovery', () => {
 		};
 		const statement = {
 			bind: vi.fn(() => statement),
-			first: vi.fn(async () => version),
+			first: vi.fn().mockResolvedValueOnce({ request_hash: null, response_json: null }).mockResolvedValue(version),
 		};
 		const db = { prepare: vi.fn(() => statement) } as unknown as D1Database;
 
 		const response = await handleRestoreFileVersion(new Request('https://worker.test/sync/restore-version', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ storageKey, expectedHash: null }),
+			body: JSON.stringify({ storageKey, path: version.path, expectedHash: null, expectedRevision: null, operationId: createReminderOperationId(Math.floor(Date.now() / 86_400_000)) }),
 		}), bucket, db);
 
 		expect(response.status).toBe(503);

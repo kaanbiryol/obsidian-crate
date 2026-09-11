@@ -47,7 +47,7 @@ export function renderConflictsPanel(container: HTMLElement, conflicts: Conflict
 			list,
 			conflict.conflictPath,
 			'conflict',
-			`Original: ${conflict.originalPath} · ${conflict.copySide === 'remote' ? 'Incoming server copy; original retained' : 'Local-only copy'}`,
+			`Original: ${conflict.originalPath} · ${conflict.cause === 'incoming-review' ? 'Manual file review required; original retained' : conflict.copySide === 'remote' ? 'Incoming server copy; original retained' : 'Local-only copy'}`,
 		);
 	}
 }

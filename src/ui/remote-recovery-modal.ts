@@ -71,16 +71,18 @@ class RemoteRecoveryModal extends SharedModal {
 				.onClick(() => this.load(previous.at(-1), previous.slice(0, -1))))
 			.addButton(button => button.setButtonText('Next').setDisabled(!page.hasMore)
 				.onClick(() => this.load(page.nextCursor, [...previous, cursor])));
-		const versions = page.versions;
+		const pending = this.runtime.getPendingRestores();
+		const versions = [...pending.filter(version => !page.versions.some(row => row.storage_key === version.storage_key)), ...page.versions];
 		for (const version of versions) {
 			const created = new Date(version.created_at).toLocaleString();
+			const resuming = pending.some(row => row.storage_key === version.storage_key);
 			new Setting(this.resultsEl)
 				.setName(version.path)
 				.setDesc(`${version.reason === 'deleted' ? 'Deleted' : 'Replaced'} ${created} · ${formatSize(version.size)}`)
 				.addButton(button => button
-					.setButtonText('Restore')
+					.setButtonText(resuming ? 'Resume restore' : 'Restore')
 					.onClick(async () => {
-						const confirmed = await openConfirmationModal(this.app, {
+						const confirmed = resuming || await openConfirmationModal(this.app, {
 							title: 'Restore remote file',
 							message: `Restore ${version.path} and sync it to this device?`,
 							details: ['The current remote version, if any, will remain recoverable for 30 days.'],
@@ -90,12 +92,16 @@ class RemoteRecoveryModal extends SharedModal {
 						button.setDisabled(true).setButtonText('Restoring…');
 						try {
 							const result = await this.runtime.restoreRecentFileVersion(version);
-							if (!result.success) throw new Error(result.errors[0] || 'Sync failed after restore');
-							new Notice(`Restored ${version.path}`);
+							if (!result.success) {
+								new Notice(`Restore confirmed remotely. Local sync is incomplete: ${result.errors[0] || 'Retry sync'}. Resume the saved restore to finish safely.`);
+								button.setDisabled(false).setButtonText('Resume restore');
+								return;
+							}
+							new Notice(`Restore confirmed for ${version.path}. Current remote changes synced.`);
 							this.close();
 						} catch (error) {
-							new Notice(`Restore failed: ${error instanceof Error ? error.message : String(error)}`);
-							button.setDisabled(false).setButtonText('Restore');
+							new Notice(`Restore incomplete: ${error instanceof Error ? error.message : String(error)}`);
+							button.setDisabled(false).setButtonText(this.runtime.getPendingRestores().some(row => row.storage_key === version.storage_key) ? 'Resume restore' : 'Restore');
 						}
 					}));
 		}

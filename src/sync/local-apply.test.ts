@@ -15,6 +15,7 @@ function harness(path: string, initial: ArrayBuffer) {
 		return next;
 	});
 	const adapter = {
+		stat: vi.fn(async (target: string) => files.has(target) ? { type: 'file' } : null),
 		readBinary: vi.fn(async (target: string) => files.get(target)!),
 		exists: vi.fn(async (target: string) => files.has(target)),
 		mkdir: vi.fn(async () => {}),

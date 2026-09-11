@@ -1,3 +1,4 @@
+import { limitNotificationAction } from './rate-limit';
 import { parseFolderPath } from './reminders-web/requests';
 import { createRandomHexToken, sha256Hex } from './auth';
 import { corsResponse } from './cors';
@@ -45,6 +46,10 @@ export async function handleExchangeRemindersEnrollmentToken(
 	const authToken = createRandomHexToken();
 	const tokenHash = await sha256Hex(authToken);
 	const enrollmentHash = await sha256Hex(token);
+	const grant = await db.prepare('SELECT token_hash FROM web_enrollment_tokens WHERE token_hash = ? AND expires_at > ?').bind(enrollmentHash, Date.now()).first();
+	if (!grant) return corsResponse({ error: 'Invalid or expired enrollment token' }, 401);
+	const limited = await limitNotificationAction(request, db, `enrollment:${enrollmentHash}`);
+	if (limited) return limited;
 	const id = crypto.randomUUID();
 	const expiresAt = Date.now() + REMINDERS_AUTH_TOKEN_TTL_MS;
 	const previousToken = parseOptionalString(parsedBody.value.previousAuthToken, 128);

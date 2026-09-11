@@ -110,10 +110,10 @@ describe('local deletion target replacement', () => {
 		expect(trashLocal).not.toHaveBeenCalled();
 	});
 
-	it('refuses an already-replaced folder before reading it', async () => {
+	it('settles a file already replaced by a folder without reading or removing the tree', async () => {
 		const h = createTransferHarness();
 		h.vault.getAbstractFileByPath.mockReturnValue(Object.assign(new TFolder(), { path: 'a.md', children: [] }));
-		await expect(deletePathLocallyIfUnchanged(h.context, 'a.md', 'old-hash')).rejects.toThrow('target changed');
+		await expect(deletePathLocallyIfUnchanged(h.context, 'a.md', 'old-hash')).resolves.toEqual({ status: 'missing' });
 		expect(h.adapter.readBinary).not.toHaveBeenCalled();
 		expect(h.vault.trash).not.toHaveBeenCalled();
 	});

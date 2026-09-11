@@ -1,0 +1,89 @@
+/// <reference types="@cloudflare/vitest-plugin/types" />
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { env } from 'cloudflare:workers';
+import { reset } from 'cloudflare:test';
+import schema from '../schema.sql?raw';
+import { sha256Hex, sha256HexBytes } from './auth';
+import worker from './index';
+import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER } from '../../protocol';
+import { SyncTestDevice } from './sync-engine-test-harness';
+import { createReminderOperationId } from '../../protocol/reminder-operation';
+
+const clients: SyncTestDevice[] = [];
+beforeEach(async () => {
+  vi.stubGlobal('window', { setTimeout, clearTimeout });
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await env.DB.prepare("INSERT INTO auth_tokens (id, token_hash, scope) VALUES ('audit', ?, 'vault')").bind(await sha256Hex('audit')).run();
+});
+afterEach(async () => {
+  for (const client of clients.splice(0)) client.close();
+  vi.restoreAllMocks(); vi.unstubAllGlobals();
+  await reset();
+});
+async function request(path: string, body: unknown, token = 'audit') {
+  return worker.fetch(new Request(`https://worker.test${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }), env);
+}
+
+it('audit reproduction: a lost restore response can resurrect a subsequently deleted file', async () => {
+  const content = new TextEncoder().encode('restored bytes');
+  const hash = await sha256HexBytes(content);
+  const key = `__crate__/files/${hash}/audit-retained`;
+  await env.BUCKET.put(key, content, { customMetadata: { hash } });
+  await env.DB.prepare("INSERT INTO file_versions (storage_key, path, hash, size, reason, expires_at) VALUES (?, 'note.md', ?, ?, 'deleted', ?)")
+    .bind(key, hash, content.byteLength, Date.now() + 60_000).run();
+  const body = { storageKey: key, expectedHash: null };
+  const batch = env.DB.batch.bind(env.DB);
+  vi.spyOn(env.DB, 'batch').mockImplementationOnce(async statements => { await batch(statements); throw new Error('simulated lost D1 response'); });
+  expect((await request('/sync/restore-version', body)).status).toBe(503);
+  const first = await env.DB.prepare("SELECT storage_key FROM files WHERE path='note.md'").first<{ storage_key: string }>();
+  expect(first).not.toBeNull();
+  expect((await request('/sync/delete', { path: 'note.md', expectedHash: hash, expectedRevision: first!.storage_key })).status).toBe(200);
+  expect(await env.DB.prepare("SELECT path FROM files WHERE path='note.md'").first()).toBeNull();
+  expect((await request('/sync/restore-version', body)).status).toBe(200);
+  expect(await env.DB.prepare("SELECT path FROM files WHERE path='note.md'").first()).not.toBeNull();
+  const log = await env.DB.prepare("SELECT action FROM changelog WHERE path='note.md' ORDER BY seq").all();
+  expect(log.results.map(row => row.action)).toEqual(['put', 'delete', 'put']);
+});
+
+it('audit reproduction: an empty local folder permanently blocks its remote replacement file', async () => {
+  const client = new SyncTestDevice('folder-receiver', env);
+  clients.push(client);
+  await client.authorize(); await client.open();
+  await client.disk.vault.createFolder('Projects');
+  client.disk.write('Projects/note.md', 'initial note');
+  expect((await client.engine.sync()).success).toBe(true);
+  const prior = (await client.api.getManifest()).files['Projects/note.md']!;
+  expect((await request('/sync/delete', { path: 'Projects/note.md', expectedHash: prior.hash, expectedRevision: prior.revision })).status).toBe(200);
+  const content = new TextEncoder().encode('replacement parent file');
+  const upload = await worker.fetch(new Request('https://worker.test/sync/upload?path=Projects', {
+    method: 'PUT', body: content,
+    headers: { Authorization: 'Bearer audit', [CRATE_PROTOCOL_HEADER]: String(CRATE_PLUGIN_PROTOCOL.current),
+      'X-Crate-Expected-Hash': 'absent', 'X-Crate-Upload-Operation': createReminderOperationId(Math.floor(Date.now() / 86_400_000)) },
+  }), env);
+  expect(upload.status).toBe(200);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await client.engine.sync();
+    expect(result.success).toBe(false);
+    expect(result.errors.join(' ')).toContain('Projects');
+  }
+  expect(client.disk.has('Projects/note.md')).toBe(false);
+  expect(client.disk.has('Projects')).toBe(false);
+  expect(await client.disk.vault.adapter.stat('Projects')).toMatchObject({ type: 'folder' });
+  expect((await client.api.getManifest()).files.Projects).toBeDefined();
+});
+
+it('audit reproduction: rejected unauthenticated requests consume the global daily notification budget', async () => {
+  const midnight = (Math.floor(Date.now() / 86_400_000) + 1) * 86_400_000;
+  await env.DB.prepare("INSERT INTO request_rate_limits (key, count, expires_at) VALUES ('notification-daily', 999, ?)").bind(midnight).run();
+  // Preseeding 999 admits exactly the final attempt without generating traffic.
+  expect((await request('/notifications/subscribe', {}, 'invalid')).status).toBe(401);
+  expect(await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key='notification-daily'").first()).toEqual({ count: 1000 });
+  const legitimate = await request('/notifications/reminders-enrollment-token', { folderPath: 'Reminders' });
+  expect(legitimate.status).toBe(429);
+  expect(await legitimate.text()).toContain('daily notification request budget');
+});

@@ -1,4 +1,5 @@
 import React from 'react';
+import { exportPendingChanges } from '../export-pending-changes';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import { ExpiredReminderChangeActions } from './ExpiredReminderChangeActions';
 
@@ -35,10 +36,14 @@ export function ReminderSyncNotice({
 	onRetryInitialization?: () => void;
 }) {
 	const errors = changes.filter(change => change.status !== 'pending');
-	if (!errors.length && !storageError) return null;
+	if (!errors.length && !storageError && !(isOffline && changes.length)) return null;
 
 	return (
 		<div className="pwa-reminder-sync-notices" aria-label="Reminder sync">
+			{changes.length > 0 && <section className="pwa-reminder-sync-error" aria-label="Changes on this device">
+				<div className="pwa-reminder-sync-error__copy"><strong>{changes.length} pending {changes.length === 1 ? 'change' : 'changes'}</strong><span>Kept on this device until sync is confirmed. Browser data can be cleared or evicted.</span></div>
+				<div className="pwa-reminder-sync-error__actions"><button type="button" onClick={() => exportPendingChanges(changes)}>Export pending changes</button></div>
+			</section>}
 			{storageError && (
 				<section className="pwa-reminder-sync-error" aria-label="Pending changes unavailable">
 					<div className="pwa-reminder-sync-error__copy">
