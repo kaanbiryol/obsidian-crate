@@ -103,7 +103,7 @@
 		"typescript": "^5.8.3",
 		"typescript-eslint": "8.35.1",
 		"vite": "^8.0.16",
-		"vitest": "^4.1.11"
+		"vitest": "^5.0.0"
 	},
 	"dependencies": {
 		"@internationalized/date": "^3.8.2",
