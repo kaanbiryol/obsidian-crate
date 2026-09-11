@@ -83,6 +83,9 @@ export class ActivityModal extends Modal {
 		this.root = createRoot(this.contentEl);
 		this.root.render(createElement(ActivitySheet, {
 			isMobile: Platform.isMobile,
+			// Motion uses the main window's animation loop, which can pause while
+			// Obsidian's separate Settings window is active.
+			animationsEnabled: this.contentEl.win === window,
 			onClose: () => this.close(),
 			onMount: (container, close, header) => this.renderActivity(container, close, header),
 		}));
