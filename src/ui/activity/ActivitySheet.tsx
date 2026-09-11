@@ -6,15 +6,19 @@ import { BaseModal } from '../../reminders/components/BaseModal';
 
 interface ActivitySheetProps {
     isMobile: boolean;
+    animationsEnabled?: boolean;
     onClose: () => void;
     onMount: (container: HTMLDivElement, close: () => void, header: HTMLDivElement) => void;
 }
 
-export function ActivitySheet({ isMobile, onClose, onMount }: ActivitySheetProps) {
+export function ActivitySheet({ isMobile, animationsEnabled = true, onClose, onMount }: ActivitySheetProps) {
     const [isOpen, setIsOpen] = useState(true);
     const headerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
-    const close = useCallback(() => setIsOpen(false), []);
+    const close = useCallback(() => {
+        if (animationsEnabled) setIsOpen(false);
+        else onClose();
+    }, [animationsEnabled, onClose]);
 
     useLayoutEffect(() => {
         const container = contentRef.current;
@@ -26,6 +30,7 @@ export function ActivitySheet({ isMobile, onClose, onMount }: ActivitySheetProps
     return (
         <BaseModal
             isOpen={isOpen}
+            animationConfig={{ enabled: animationsEnabled }}
             onClose={close}
             onExitComplete={onClose}
             variant={isMobile ? 'bottom-sheet' : 'centered'}
