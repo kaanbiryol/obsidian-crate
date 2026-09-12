@@ -650,3 +650,132 @@ body.reduce-motion .crate-activity-modal {
     border-radius: 50%;
     animation: crate-spin 1s linear infinite;
 }
+
+.crate-conflict-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--crate-activity-divider);
+    .crate-activity-file-card { flex: 1; min-width: 0; }
+    > button { flex-shrink: 0; }
+}
+.modal.crate-shared-modal.crate-conflict-review-modal {
+    width: min(1040px, calc(100vw - 48px));
+    max-width: calc(100vw - 48px);
+    .modal-content {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        max-height: calc(100dvh - 48px);
+        overflow: hidden;
+    }
+    .crate-modal-header-host { flex-shrink: 0; }
+    .crate-modal-body {
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 20px 24px 16px;
+    }
+    button { font-size: var(--font-ui-small); border-radius: var(--radius-s, 6px); }
+}
+.crate-conflict-intro { display: flex; align-items: center; gap: 12px; }
+.crate-conflict-file-heading { min-width: 0; }
+.crate-conflict-review-path { margin: 0 0 4px; font-size: var(--font-ui-medium); font-weight: var(--font-semibold); overflow-wrap: anywhere; }
+.crate-conflict-review-help { color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; overflow-wrap: anywhere; }
+.crate-conflict-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+    button {
+        min-height: 32px;
+        padding: 6px 12px;
+        border: 1px solid var(--background-modifier-border);
+        background: var(--interactive-normal);
+        box-shadow: none;
+        color: var(--text-normal);
+    }
+    button:hover { background: var(--interactive-hover); }
+}
+.crate-conflict-compare {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0;
+    border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m, 8px); overflow: hidden;
+}
+.crate-conflict-version {
+    min-width: 0;
+    + .crate-conflict-version { border-left: 1px solid var(--background-modifier-border); }
+    h3 { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-secondary); }
+    p { padding: 16px; color: var(--text-muted); font-size: var(--font-ui-small); }
+    h3 > button {
+        display: flex; align-items: center; justify-content: space-between;
+        width: 100%; height: auto; padding: 2px 0;
+        background: transparent; box-shadow: none; font-weight: var(--font-medium); color: var(--text-muted);
+        &:hover { color: var(--text-normal); }
+        svg { width: 14px; height: 14px; }
+    }
+}
+.crate-conflict-code {
+    margin: 0; padding: 12px 0; min-height: 260px; max-height: 44dvh;
+    overflow: auto; font-size: var(--font-ui-smaller); line-height: 1.65;
+    background: var(--background-primary); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;
+    counter-reset: conflict-line;
+    > div { position: relative; padding: 0 12px 0 44px; border-left: 2px solid transparent; }
+    > div::before { counter-increment: conflict-line; content: counter(conflict-line); position: absolute; left: 8px; width: 22px; text-align: right; color: var(--text-faint); font-size: 0.9em; user-select: none; }
+    > .crate-conflict-changed { background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left-color: var(--interactive-accent); }
+}
+.crate-conflict-actions {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px;
+    align-items: end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--background-modifier-border);
+    > .mod-cta { grid-column: 2; grid-row: 1; align-self: end; min-height: 34px; }
+}
+.crate-conflict-resolution-help { grid-column: 1; grid-row: 2; margin: 0; min-height: 1.5em; }
+.crate-conflict-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    min-width: 0;
+    legend {
+        padding: 0;
+        font-size: var(--font-ui-smaller);
+        color: var(--text-muted);
+        margin-bottom: 10px;
+    }
+    label {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        padding: 6px 12px;
+        border: 1px solid var(--background-modifier-border);
+        border-radius: var(--radius-s, 6px);
+        cursor: pointer;
+        font-size: var(--font-ui-small);
+        line-height: 1.4;
+        color: var(--text-muted);
+        background: var(--background-primary);
+        &:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+        &:has(input:checked) {
+            background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+            border-color: var(--interactive-accent);
+            color: var(--text-normal);
+        }
+        &:has(input:focus-visible) { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+        &:has(input:disabled) { opacity: 0.5; cursor: default; }
+    }
+    input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+}
+.crate-conflict-manual { margin-top: 16px; font-size: var(--font-ui-small); }
+.crate-conflict-editor { display: block; width: 100%; min-height: 260px; margin-top: 8px; padding: 12px; font-family: var(--font-monospace); font-size: var(--font-ui-smaller); line-height: 1.65; resize: vertical; }
+@media (max-width: 600px) {
+    .modal.crate-shared-modal.crate-conflict-review-modal { width: calc(100vw - 16px); max-width: calc(100vw - 16px); .crate-modal-body { padding: 16px; } }
+    .crate-conflict-intro { flex-wrap: wrap; }
+    .crate-conflict-toolbar { width: 100%; margin-left: 0; }
+    .crate-conflict-compare { grid-template-columns: 1fr; }
+    .crate-conflict-version + .crate-conflict-version { border-left: 0; border-top: 1px solid var(--background-modifier-border); }
+    .crate-conflict-code { min-height: 120px; max-height: 28dvh; }
+    .crate-conflict-actions { grid-template-columns: 1fr; > .mod-cta { grid-column: 1; grid-row: 3; width: 100%; } }
+}

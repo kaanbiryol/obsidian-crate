@@ -1,3 +1,4 @@
+import { createConflictReview } from './conflict-review';
 import type { SyncActivityProgress } from './types';
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger, errorMessage } from '../plugin/logger';
@@ -96,6 +97,13 @@ export class SyncRuntime {
 	async purgeIgnoredRemoteFiles(): Promise<{ deleted: string[]; errors: string[] }> {
 		if (!this.syncEngine) throw new Error('Sync is not configured');
 		return this.syncEngine.purgeIgnoredRemoteFiles();
+	}
+
+	async createConflictReview(record: ConflictRecord) {
+		if (!this.syncEngine || !this.getActiveConflicts().some(item => item.conflictPath === record.conflictPath)) throw new Error('Conflict is no longer active');
+		const engine = this.syncEngine;
+		const review = await createConflictReview(this.plugin.app, this.plugin.manifest.dir!, record, () => this.syncEngine !== engine, () => engine.markConflictResolved(record.conflictPath));
+		return { ...review, resolve: (choice: import('./conflict-review').ConflictChoice, editedText?: string) => engine.runConflictResolution(() => review.resolve(choice, editedText)) };
 	}
 
 	getActiveConflicts(): ConflictRecord[] {
