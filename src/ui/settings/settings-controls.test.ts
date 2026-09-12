@@ -1,4 +1,3 @@
-import type { SyncState } from '../../sync/types';
 import { DEFAULT_SETTINGS } from '../../plugin/settings-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeElement, MockSetting, MockTextComponent, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
@@ -112,35 +111,15 @@ describe('settings controls', () => {
 		expect(save).toHaveBeenCalledExactlyOnceWith(['Archive/', '*.tmp']);
 	});
 
-	it('keeps sync delay visible and preserves drafts during background sync', async () => {
+	it('shows sync preferences without manual sync actions or progress subscriptions', async () => {
 		const { renderSyncSection } = await import('./sync-section');
-		const addStateChangeListener = vi.fn<(listener: (state: SyncState) => void) => void>();
-		const removeStateChangeListener = vi.fn();
-		const rerender = vi.fn();
-		const plugin = {
-			settings: { ...DEFAULT_SETTINGS },
-			syncRuntime: {
-				getState: () => ({ status: 'idle' }),
-				addProgressListener: vi.fn(),
-				removeProgressListener: vi.fn(),
-				addStateChangeListener,
-				removeStateChangeListener,
-			},
-		};
-		const cleanup = renderSyncSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender });
+		const plugin = { settings: { ...DEFAULT_SETTINGS } };
+		renderSyncSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		const names = MockSetting.instances.map(setting => setting.nameEl.textContent);
+		expect(names).not.toContain('Sync now');
+		expect(names).not.toContain('Sync activity');
 		const delay = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Sync delay after editing (seconds)')!;
 		expect(delay.texts[0]!.inputEl.value).toBe('5');
-		delay.texts[0]!.change('12');
-		const state: SyncState = { status: 'idle', lastSync: '2026-09-05T10:00:00Z', lastError: null, pendingChanges: 0, conflictCount: 0 };
-		addStateChangeListener.mock.calls[0]![0]({ ...state, status: 'syncing' });
-		addStateChangeListener.mock.calls[0]![0](state);
-		expect(rerender).not.toHaveBeenCalled();
-		expect(delay.texts[0]!.inputEl.value).toBe('12');
-		const sync = MockSetting.instances.find(setting => setting.nameEl.textContent === 'Sync now')!;
-		expect(sync.descEl.textContent).toContain(new Date(state.lastSync!).toLocaleString());
-		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Sync debug logging')).toBe(false);
-		cleanup();
-		expect(removeStateChangeListener).toHaveBeenCalledWith(addStateChangeListener.mock.calls[0]![0]);
 	});
 
 	it('uses a startup toggle and preserves the saved reminder defaults', async () => {

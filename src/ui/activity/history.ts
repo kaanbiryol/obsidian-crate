@@ -49,7 +49,7 @@ function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expa
 function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry): void {
 	const filesEl = container.createDiv({ cls: 'crate-history-files' });
 	for (const error of entry.errors ?? []) {
-		filesEl.createDiv({ text: error, cls: 'crate-history-summary-error' });
+		filesEl.createDiv({ text: error, cls: 'crate-history-error' });
 	}
 	if (entry.errorCount > (entry.errors?.length ?? 0)) {
 		filesEl.createDiv({ text: entry.errors?.length

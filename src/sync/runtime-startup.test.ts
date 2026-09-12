@@ -30,6 +30,24 @@ describe('SyncRuntime startup event handling', () => {
 		vi.restoreAllMocks();
 	});
 
+	it('ignores vault discovery before layout readiness and keeps manual sync available', async () => {
+		const { runtime, plugin } = createRuntimeHarness({ automaticSync: false });
+		const sync = vi.spyOn(SyncEngine.prototype, 'sync');
+		plugin.app.workspace.layoutReady = false;
+		await runtime.initialize();
+		expect(sync).not.toHaveBeenCalled();
+		runtime.onFileChange({ path: 'existing.md' } as never);
+		runtime.onFileDelete({ path: 'removed.md' } as never);
+		runtime.onFileRename({ path: 'renamed.md' } as never, 'old.md');
+		expect(runtime.getPendingPaths()).toEqual([]);
+		plugin.app.workspace.layoutReady = true;
+		runtime.onFileChange({ path: 'edited.md' } as never);
+		expect(runtime.getPendingPaths()).toEqual(['edited.md']);
+		startupSync.resolve(createEmptySyncResult());
+		await runtime.sync();
+		expect(sync).toHaveBeenCalledOnce();
+	});
+
 	it.each([
 		{
 			name: 'create',

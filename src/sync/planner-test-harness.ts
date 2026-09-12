@@ -11,6 +11,7 @@ export function createSettings(overrides: Partial<CrateSettings> = {}): CrateSet
 		lastSeq: 10,
 		deviceId: 'dev-1',
 		ignorePatterns: [],
+		automaticSync: true,
 		syncOnStartup: false,
 		syncOnResume: true,
 		syncInterval: 0,

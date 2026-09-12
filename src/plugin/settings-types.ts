@@ -2,6 +2,7 @@ import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment-type
 import type { SyncHistoryEntry } from '../sync/types';
 
 export interface CrateSettings {
+	automaticSync: boolean;
 	workerUrl: string;
 	cloudflareDeployment: CloudflareDeploymentMetadata | null;
 	lastSync: string | null;
@@ -28,6 +29,7 @@ export interface SharedSettings {
 }
 
 export const DEFAULT_SETTINGS: CrateSettings = {
+	automaticSync: true,
 	workerUrl: '',
 	cloudflareDeployment: null,
 	lastSync: null,

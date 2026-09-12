@@ -213,6 +213,7 @@ export function normalizeCrateSettings(
 			normalizeStringArray(value?.ignorePatterns, DEFAULT_SETTINGS.ignorePatterns),
 			configDir,
 		),
+		automaticSync: normalizeBoolean(value?.automaticSync, value?.syncOnStartup === false && value?.syncOnResume === false ? false : DEFAULT_SETTINGS.automaticSync),
 		syncOnStartup: normalizeBoolean(value?.syncOnStartup, DEFAULT_SETTINGS.syncOnStartup),
 		syncOnResume: normalizeBoolean(value?.syncOnResume, DEFAULT_SETTINGS.syncOnResume),
 		syncInterval: normalizeNonNegativeInteger(value?.syncInterval, DEFAULT_SETTINGS.syncInterval),

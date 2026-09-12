@@ -16,6 +16,7 @@ import {
 } from './queue-flush';
 
 export interface SyncQueueControllerContext {
+	automaticSyncEnabled?(): boolean;
 	recoverUploads(): Promise<void>;
 	api: QueueFlushContext['api'];
 	getLocalManifest(): QueueFlushContext['localManifest'];
@@ -152,7 +153,14 @@ export class SyncQueueController {
 		};
 	}
 
+	settingsChanged(): void {
+		this.clearDebounceTimer();
+		if (this.pendingPaths.size > 0) this.debouncedSync();
+	}
+
 	private debouncedSync(): void {
+		this.context.updateState({ pendingChanges: this.pendingPaths.size });
+		if (this.context.automaticSyncEnabled?.() === false) return;
 		runDebouncedQueueSync(
 			this.getQueueDebounceContext(),
 			this.context.getDebounceDelayMs(),
@@ -161,6 +169,7 @@ export class SyncQueueController {
 	}
 
 	private async processPendingChanges(): Promise<void> {
+		if (this.context.automaticSyncEnabled?.() === false) return;
 		const task = flushPendingQueueChanges(this.getQueueFlushContext(), this.context.uploadConcurrency);
 		this.flushTasks.add(task);
 		try { await task; } finally { this.flushTasks.delete(task); }
@@ -176,7 +185,7 @@ export class SyncQueueController {
 		this.reconciliationScheduled = true;
 		queueMicrotask(() => {
 			this.reconciliationScheduled = false;
-			if (this.context.isDestroyed()) return;
+			if (this.context.isDestroyed() || this.context.automaticSyncEnabled?.() === false) return;
 			const paths = [...this.reconciliationPaths];
 			this.reconciliationPaths.clear();
 			void this.context.reconcile(paths).catch(() => {
