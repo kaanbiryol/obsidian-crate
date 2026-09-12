@@ -1,5 +1,8 @@
+import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../staged-upload-dispatch';
 import { PushPayloadError } from './payload-budget';
-import { runNotificationCoordinator } from '../notification-coordinator';
+import { runBoundedNotificationCoordinator } from '../notification-lifecycle';
+import { handleCoordinatorRequest } from '../notification-dispatch';
+import { runMaintenanceEpisode } from '../maintenance/lifecycle';
 import type { Env } from '../types';
 import { changedRows } from '../db';
 import { parseJsonObject, parseOptionalString } from '../utils';
@@ -77,17 +80,19 @@ export class ReminderAlarm implements DurableObject {
 		private env: Pick<Env, 'DB'> & Partial<Env>,
 	) {}
 
-	fetch(request: Request): Promise<Response> {
+	async fetch(request: Request): Promise<Response> {
+    if (new URL(request.url).pathname === '/commit-upload' && request.method === 'POST') {
+      const prepared = await prepareCoordinatedUpload(request, this.env as Env);
+      if (prepared instanceof Response) return prepared;
+      return this.withStateLock(() => commitCoordinatedUpload(prepared, this.state, this.env as Env));
+    }
 		return this.withStateLock(() => this.handleFetch(request));
 	}
 
 	private async handleFetch(request: Request): Promise<Response> {
+		const coordinatorResponse = await handleCoordinatorRequest(request, this.state, this.env as Env);
+		if (coordinatorResponse) return coordinatorResponse;
 		const method = request.method;
-		if (new URL(request.url).pathname === '/project' && method === 'POST') {
-			await this.state.storage.put('projectionCoordinator', true);
-			if (await this.state.storage.getAlarm() === null) await this.state.storage.setAlarm(Date.now() + 1);
-			return new Response(JSON.stringify({ success: true }));
-		}
 
 		if (method === 'PUT') {
 			const parsedBody = await parseJsonObject(request);
@@ -195,9 +200,15 @@ export class ReminderAlarm implements DurableObject {
 	}
 
 	private async handleAlarm(): Promise<void> {
+		if (await this.state.storage.get<boolean>('maintenanceCoordinator')) {
+			await this.withStateLock(() => runMaintenanceEpisode(this.state, this.env as Env));
+			return;
+		}
 		if (await this.state.storage.get<boolean>('projectionCoordinator')) {
 			if (!this.env.BUCKET || !this.env.REMINDER_ALARMS) throw new Error('Projection bindings unavailable');
-			await runNotificationCoordinator(this.state, this.env as Env);
+			// Serialize wakeups with the final idle/retry decision so new work cannot
+			// lose its immediate alarm to an older pass scheduling a later retry.
+			await this.withStateLock(() => runBoundedNotificationCoordinator(this.state, this.env as Env));
 			return;
 		}
 		const reminder = await this.withStateLock(() => this.state.storage.get<ReminderData>('reminder'));
@@ -228,7 +239,7 @@ export class ReminderAlarm implements DurableObject {
         // The file commit and its projection job are atomic. Do not send from a
         // schedule whose source has changed while projection is still catching up.
         if (!await hasNotificationAuthority(db, reminder.reminderId, reminder.scheduleToken)) {
-          await this.writeIfCurrent(reminder.scheduleToken, () => this.state.storage.setAlarm(Date.now() + 60_000));
+          await this.scheduleRetryIfCurrent(reminder, new Error('Reminder source is awaiting notification projection'));
           return;
         }
 

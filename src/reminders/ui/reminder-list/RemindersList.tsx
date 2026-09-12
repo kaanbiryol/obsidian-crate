@@ -1,4 +1,5 @@
 import type React from "react";
+import { useRemindersSettingsStore } from "../../settings";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LayoutGroup } from "motion/react";
 import { ReminderMotionRow } from "@/reminders/components/ReminderMotionRow";
@@ -33,7 +34,12 @@ type Props = {
   onToggleShowCompleted?: (newValue: boolean) => void; // Persist showCompleted preference
 };
 
-export const RemindersList: React.FC<Props> = ({
+export const RemindersList: React.FC<Props> = props => {
+  const enabled = useRemindersSettingsStore(state => state.enabled);
+  return enabled ? <ActiveRemindersList {...props} /> : <p>Reminders are disabled on this device.</p>;
+};
+
+const ActiveRemindersList: React.FC<Props> = ({
   projectFilter,
   showCompleted = false,
   showToday = false,

@@ -66,7 +66,15 @@ it('atomically correlates the consumed revision, tombstone, request and authenti
 it('links a retry to the original deletion after the commit acknowledgement is lost', async () => {
 	const file = await upload();
 	const batch = env.DB.batch.bind(env.DB);
-	vi.spyOn(env.DB, 'batch').mockImplementationOnce(async statements => { await batch(statements); throw new Error('lost acknowledgement'); });
+	let loseAcknowledgement = true;
+	vi.spyOn(env.DB, 'batch').mockImplementation(async statements => {
+		const result = await batch(statements);
+		if (loseAcknowledgement && (await receipts()).length) {
+			loseAcknowledgement = false;
+			throw new Error('lost acknowledgement');
+		}
+		return result;
+	});
 	const lost = await remove(file);
 	expect(lost.status).toBe(503);
 	const original = (await receipts())[0]!;

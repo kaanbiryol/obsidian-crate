@@ -64,7 +64,7 @@ async function processNotificationJob(
 			last_error = ?,
 			updated_at = datetime('now')
 			WHERE reminder_id = ? AND job_token = ?`)
-			.bind(Date.now() + retryDelayMs(job.attempts), message.slice(0, 1024), job.reminder_id, job.job_token)
+			.bind(job.attempts + 1 >= 8 ? -1 : Date.now() + retryDelayMs(job.attempts), message.slice(0, 1024), job.reminder_id, job.job_token)
 			.run();
 		return message;
 	}
@@ -73,7 +73,7 @@ async function processNotificationJob(
 export async function drainNotificationJobs(env: Env, limit = OUTBOX_BATCH_SIZE): Promise<void> {
 	const jobs = await queryRows<Pick<NotificationJobRow, 'reminder_id' | 'job_token'>>(
 		env.DB.prepare(`SELECT reminder_id, job_token FROM notification_jobs
-			WHERE available_at <= ? ORDER BY available_at ASC LIMIT ?`)
+			WHERE available_at >= 0 AND available_at <= ? ORDER BY available_at ASC LIMIT ?`)
 			.bind(Date.now(), limit),
 	);
 	for (const job of jobs) {

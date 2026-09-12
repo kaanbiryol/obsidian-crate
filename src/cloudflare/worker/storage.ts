@@ -113,7 +113,7 @@ export async function writeCommittedMarkdownFile(
 	effects?: CommitEffects,
 ): Promise<{ hash: string; size: number }> {
 	const previousFile = await getStoredFileRow(db, path);
-	const staged = await stageMarkdownFile(bucket, path, content, expectedHash);
+	const staged = await stageMarkdownFile(bucket, db, path, content, expectedHash);
 
 	// Leave staged bytes for orphan cleanup if the transaction outcome is unknown.
 	const commit = await commitStagedFile(bucket, db, {

@@ -155,6 +155,8 @@ CREATE TABLE IF NOT EXISTS notification_projection_jobs (
  path TEXT PRIMARY KEY, job_token TEXT NOT NULL,
  last_error TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS notification_projection_ready_idx
+ ON notification_projection_jobs(updated_at, path) WHERE last_error IS NULL;
 CREATE TABLE IF NOT EXISTS reminder_projections (
  notification_token TEXT, policy_revision TEXT,
  reminder_id TEXT PRIMARY KEY, file_path TEXT NOT NULL, file_revision TEXT NOT NULL
@@ -208,3 +210,26 @@ CREATE TABLE IF NOT EXISTS upload_operations (
  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 UPDATE crate_schema SET version = 5 WHERE id = 1 AND version IN (2, 3, 4);
+
+CREATE TABLE IF NOT EXISTS notification_file_retries (
+ path TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0,
+ available_at INTEGER, error TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS notification_file_retries_due_idx
+ ON notification_file_retries(available_at, path) WHERE available_at IS NOT NULL;
+INSERT OR IGNORE INTO notification_file_retries(path, attempts, available_at, error)
+ SELECT path, 1, (unixepoch(updated_at) + 3600) * 1000, last_error
+ FROM notification_projection_jobs WHERE last_error IS NOT NULL;
+INSERT OR IGNORE INTO notification_file_retries(path, attempts, available_at, error)
+ SELECT file_path, 1, (unixepoch(updated_at) + 3600) * 1000, 'Source verification pending'
+ FROM reminder_source_state WHERE verified = 0;
+
+CREATE TABLE IF NOT EXISTS staged_uploads (
+ storage_key TEXT PRIMARY KEY,
+ expires_at INTEGER,
+ state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'deleting')),
+ attempts INTEGER NOT NULL DEFAULT 0,
+ last_error TEXT
+);
+CREATE INDEX IF NOT EXISTS staged_uploads_expiry_idx ON staged_uploads(expires_at, storage_key)
+ WHERE expires_at IS NOT NULL;

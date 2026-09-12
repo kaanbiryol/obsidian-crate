@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS } from '../../plugin/settings-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FakeElement, MockSetting, MockTextComponent, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
+import { FakeElement, MockModal, MockSetting, MockTextComponent, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 
 async function flush(): Promise<void> {
 	for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -94,7 +94,7 @@ describe('settings controls', () => {
 		const { renderExclusionsSetting } = await import('./exclusions-setting');
 		const plugin = {
 			settings: { ignorePatterns: [] as string[] },
-			app: { vault: { getFiles: () => [{ path: 'Archive/a.md' }, { path: 'a.tmp' }, { path: 'b.md' }] } },
+			app: { vault: { getFiles: () => ['Archive/a.md', 'a.tmp', 'b.md'].map(path => ({ path, stat: { size: 1, mtime: 1 }, extension: 'md' })), adapter: { list: async () => ({ files: ['.hidden.tmp'], folders: [] }), stat: async () => ({ type: 'file', size: 1, mtime: 1 }) } } },
 		};
 		const save = vi.fn(async (value: string[]) => { plugin.settings.ignorePatterns = value; });
 		const container = new FakeElement('div');
@@ -103,9 +103,12 @@ describe('settings controls', () => {
 		text.change('Archive/\n*.tmp');
 		expect(save).not.toHaveBeenCalled();
 		MockSetting.instances[1]!.buttons[0]!.click();
-		expect(container.collectText()).toContain('2 matching files');
-		expect(container.collectText()).toContain('Archive/a.md');
-		expect(container.collectText()).not.toContain('b.md');
+		await vi.waitFor(() => expect(MockModal.instances).toHaveLength(1));
+		const preview = MockModal.instances[0]!.contentEl;
+		expect(preview.collectText()).toContain('3 matching files');
+		expect(preview.collectText()).toContain('.hidden.tmp');
+		expect(preview.collectText()).toContain('Archive/a.md');
+		expect(preview.collectText()).not.toContain('b.md');
 		text.inputEl.blur();
 		await flush();
 		expect(save).toHaveBeenCalledExactlyOnceWith(['Archive/', '*.tmp']);

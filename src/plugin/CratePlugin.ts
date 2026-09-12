@@ -2,7 +2,8 @@
  * Crate - Sync your vault to Cloudflare R2 + Reminders
  */
 
-import { Plugin } from 'obsidian';
+import { stopReminderBackend } from '../reminders/runtime';
+import { Notice, Plugin } from 'obsidian';
 import { type CloudflareDeploymentService } from '../cloudflare/deployment-service';
 import { type ReminderIndex } from '../reminders/data/reminder-index';
 import { type MarkdownWriter } from '../reminders/data/markdown-writer';
@@ -143,7 +144,17 @@ export default class CratePlugin extends Plugin {
 		}
 	}
 
+	async disableReminders(): Promise<void> {
+		await this.writeRemindersSettings({ enabled: false });
+		stopReminderBackend(this);
+		this.app.workspace.detachLeavesOfType('reminders-view');
+	}
+
 	async activateRemindersView(project?: string): Promise<void> {
+		if (!this.remindersSettings.enabled) {
+			new Notice('Enable reminders in Crate settings first.');
+			return;
+		}
 		await activateOrRevealRemindersLeaf(this.app.workspace, 'reminders-view', project, getPluginLifecycleSignal(this));
 	}
 

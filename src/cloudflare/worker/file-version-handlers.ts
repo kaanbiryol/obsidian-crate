@@ -1,3 +1,4 @@
+import { trackStagedUpload } from './staged-uploads';
 import { sha256HexBytes } from './auth';
 import { beginUploadOperation } from './upload-operations';
 import { isSyncRevision } from '@/protocol/sync-validation';
@@ -71,7 +72,8 @@ export async function handleRestoreFileVersion(
 	// Expiry cleanup may already own the retained key. Never make it live again.
 	const objectKey = createManagedObjectKey(version.hash);
 	try {
-		await bucket.put(objectKey, content, {
+		await trackStagedUpload(db, objectKey);
+	await bucket.put(objectKey, content, {
 			httpMetadata: object.httpMetadata,
 			customMetadata: { hash: version.hash },
 		});

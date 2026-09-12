@@ -11,7 +11,7 @@ describe('shared-settings helpers', () => {
 		})).toBeNull();
 	});
 
-	it('applies all shared settings to local plugin settings', () => {
+	it('applies shared settings without changing local status bar visibility', () => {
 		const target = {
 			ignorePatterns: ['.trash/'],
 			syncOnStartup: false,
@@ -35,7 +35,7 @@ describe('shared-settings helpers', () => {
 			syncOnStartup: true,
 			syncOnResume: true,
 			syncInterval: 300,
-			showStatusBar: true,
+			showStatusBar: false,
 			pushEnabled: true,
 		});
 	});

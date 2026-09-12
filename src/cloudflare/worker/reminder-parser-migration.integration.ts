@@ -162,7 +162,7 @@ it('upgrades schema 3 additively and discovers unchanged sources in resumable in
   expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 5 });
   expect(await revalidateReminderSources(env, 4)).toBe(true);
   expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state').first()).toEqual({ count: 100 });
-  expect(await env.DB.prepare("SELECT value FROM maintenance_state WHERE key = 'reminder_source_scan'").first()).toEqual({ value: 'Notes/099.md' });
+  expect(await env.DB.prepare(`SELECT value FROM maintenance_state WHERE key = 'reminder_source_scan_v${REMINDER_CACHE_PARSER_VERSION}'`).first()).toEqual({ value: 'Notes/099.md' });
   let pending = await revalidateReminderSources(env, 4);
   expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state').first()).toEqual({ count: 105 });
   for (let attempt = 0; attempt < 30 && pending; attempt++) pending = await revalidateReminderSources(env, 4);

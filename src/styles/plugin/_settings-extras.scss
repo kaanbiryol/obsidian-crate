@@ -105,11 +105,22 @@ body.reduce-motion .crate-action-progress {
 	outline-offset: 2px;
 }
 
-.crate-settings .crate-exclusions-preview {
-	max-height: 240px;
+.crate-exclusion-preview-modal {
+	width: min(720px, 90vw);
+}
+
+.crate-exclusion-preview-modal .crate-exclusion-preview-list {
+	max-height: 55vh;
 	overflow: auto;
 	overflow-wrap: anywhere;
+	padding-left: 24px;
 	font-size: var(--font-ui-small);
+}
+
+.crate-exclusion-preview-modal .crate-exclusion-preview-list li {
+	padding: 4px 0;
+	content-visibility: auto;
+	contain-intrinsic-size: auto 28px;
 }
 
 .crate-settings .crate-sync-interval .setting-item-control {

@@ -159,7 +159,7 @@ describe('renderConfigSection integration', () => {
 		});
 
 		const serverSetting = getSettingByName('Cloudflare server');
-		expect(serverSetting.descEl.textContent).toBe('Your sync server and reminders web app are up to date.');
+		expect(serverSetting.descEl.textContent).toBe('Your server software and reminders web app are up to date.');
 		expect(serverSetting.buttons).toHaveLength(0);
 	});
 });

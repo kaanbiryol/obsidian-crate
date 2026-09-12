@@ -71,9 +71,21 @@ export async function runSyncDiagnostics(client: DiagnosticClient | null): Promi
 					? `Last ran ${backend.lastMaintenanceAt}.`
 					: 'No scheduled maintenance run has been recorded yet.',
 			});
+      if (backend.pausedUploadCleanup?.length) results.push({ name: 'Unfinished upload cleanup', status: 'warn',
+        message: `${backend.pausedUploadCleanup.length} upload records could not be safely cleaned up. Their records are retained for investigation.` });
+      const paused = (backend.pausedNotificationFiles?.length ?? 0) + (backend.pausedNotificationJobs?.length ?? 0);
+      if (paused) results.push({ name: 'Paused notification updates', status: 'fail',
+        message: `${paused} or more updates are paused because of invalid file content or repeated failures. Repair the reported issue, then select Retry paused notifications in Troubleshooting.` });
+      const pausedPaths = new Set(backend.pausedNotificationFiles?.map(file => file.path));
 			for (const issue of backend.notificationProjectionIssues ?? []) {
-				results.push({ name: `Reminders in ${issue.path}`, status: 'warn', message: issue.reason });
+        const stopped = pausedPaths.has(issue.path);
+				results.push({ name: `Reminders in ${issue.path}`, status: stopped ? 'fail' : 'warn',
+          message: stopped ? `Paused: ${issue.reason}` : issue.reason });
 			}
+      for (const job of backend.pausedNotificationJobs ?? []) {
+        results.push({ name: `Notification ${job.reminderId}`, status: 'fail',
+          message: `Paused after ${job.attempts} failed attempts: ${job.error}` });
+      }
 		} catch (error) {
 			results.push({
 				name: 'Backend diagnostics',

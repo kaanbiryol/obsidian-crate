@@ -14,6 +14,7 @@ import {
 	handleUpload,
 } from '../sync';
 import { handleListFileVersions, handleRestoreFileVersion } from '../file-version-handlers';
+import { retryPausedNotifications } from '../notification-retry-handler';
 import { handleDiagnostics } from '../maintenance/diagnostics';
 import type { Env } from '../types';
 import type { RouteMethod } from './shared';
@@ -28,6 +29,7 @@ export async function handleSyncRoute(
 	audit?: MutationAuditContext,
 ): Promise<Response | null> {
 	const db = env.DB;
+  if (path === '/notifications/retry' && method === 'POST') return retryPausedNotifications(db);
 	const bucket = env.BUCKET;
 
 	if (path === '/health' && method === 'GET') return await handleHealth();
@@ -47,7 +49,7 @@ export async function handleSyncRoute(
 		return await withDatabase(db, requiredDb => handleGetFileMetadata(request, requiredDb));
 	}
 	if (path === '/sync/upload' && method === 'PUT') {
-		return await withDatabase(db, requiredDb => handleUpload(request, bucket, requiredDb));
+		return await withDatabase(db, requiredDb => handleUpload(request, bucket, requiredDb, env.commitUpload));
 	}
 	if (path === '/sync/download' && method === 'GET') {
 		return await withDatabase(db, requiredDb => handleDownload(request, bucket, requiredDb));
@@ -56,7 +58,7 @@ export async function handleSyncRoute(
 		return await withDatabase(db, requiredDb => handleDelete(request, bucket, requiredDb, audit));
 	}
 	if (path === '/sync/batch-upload' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb));
+		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb, env.commitUpload));
 	}
 	if (path === '/sync/batch-download' && method === 'POST') {
 		return await withDatabase(db, requiredDb => handleBatchDownload(request, bucket, requiredDb));

@@ -6,9 +6,7 @@
 	"vars": { "CRATE_PUBLIC_ORIGIN": "http://localhost:8787" },
 	"no_bundle": true,
 	"triggers": {
-		"crons": [
-			"*/15 * * * *"
-		]
+		"crons": []
 	},
 	"d1_databases": [
 		{

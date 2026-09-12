@@ -132,7 +132,8 @@ it('updates the parsed cache eagerly after a reminder mutation', async () => {
 
 		expect(createResponse.status).toBe(200);
 		expect(workspace.readCurrentFile('Reminders/Inbox.md')).toContain('Check article');
-		expect(workspace.env.REMINDER_ALARMS.idFromName).toHaveBeenCalledWith('__crate__/projection');
+		// The request coordinator owns wake-ups; file handlers only commit their outbox work.
+		expect(workspace.env.REMINDER_ALARMS.idFromName).not.toHaveBeenCalled();
 
 		const listResponse = await handleListReminders(
 			new Request('https://worker.test/reminders/list?folderPath=Reminders'),

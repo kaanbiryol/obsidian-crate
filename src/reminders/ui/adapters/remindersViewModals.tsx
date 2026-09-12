@@ -1,3 +1,4 @@
+import { useRemindersSettingsStore } from "../../settings";
 import { Modal } from "obsidian";
 import type CratePlugin from "@/main";
 import { PluginContext } from "../reminders-context";
@@ -7,6 +8,7 @@ import { createShadowReactMount, type ShadowReactMount } from "./shadowReactMoun
 
 class CompactReminderModal extends Modal {
   private readonly plugin: CratePlugin;
+  private unsubscribeSettings?: () => void;
   private readonly initialProject: string | undefined;
   private shadowMount: ShadowReactMount | null = null;
   private isOpen = false;
@@ -18,6 +20,8 @@ class CompactReminderModal extends Modal {
   }
 
   async onOpen(): Promise<void> {
+    if (!this.plugin.remindersSettings.enabled) { this.close(); return; }
+    this.unsubscribeSettings = useRemindersSettingsStore.subscribe(state => { if (!state.enabled) this.close(); });
     this.isOpen = true;
     const { contentEl } = this;
 
@@ -48,6 +52,8 @@ class CompactReminderModal extends Modal {
   }
 
   onClose(): void {
+    this.unsubscribeSettings?.();
+    this.unsubscribeSettings = undefined;
     this.isOpen = false;
     this.shadowMount?.unmount();
     this.shadowMount = null;

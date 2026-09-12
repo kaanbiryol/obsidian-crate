@@ -1,3 +1,4 @@
+import { stagedUploadGuard, finishStagedUpload } from './staged-uploads';
 import { readUploadReceipt, recordUploadReceipt, type UploadOperation } from './upload-operations';
 import type { UploadResult } from '@/protocol/sync-types';
 import { enqueueFileProjection } from './notification-projection-queue';
@@ -28,6 +29,9 @@ function uploadMutation(
 	expectedRevision?: string,
 ): D1PreparedStatement {
 	const namespace = fileNamespaceGuard(path);
+  const lease = stagedUploadGuard(objectKey);
+  namespace.sql += ` AND ${lease.sql}`;
+  namespace.args.push(...lease.args);
 	if (operation) {
 		namespace.sql += ' AND NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)';
 		namespace.args.push(operation.id);
@@ -104,6 +108,7 @@ export async function commitStagedFile(
 		)),
 		...enqueueFileProjection(db, params.path, params.objectKey, params.content),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
+		finishStagedUpload(db, params.objectKey),
 		...(params.operation ? [recordUploadReceipt(db, params.operation, params)] : []),
 	]);
 

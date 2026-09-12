@@ -4,7 +4,10 @@ import { env } from 'cloudflare:workers';
 import { reset } from 'cloudflare:test';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import schema from '../schema.sql?raw';
-import worker from './index';
+import { fetchWorkerRequest } from './request-handler';
+
+// These tests step projection manually to inspect its intermediate D1 state.
+const controlledCoordinator = { storage: { put: async () => {}, setAlarm: async () => {} } } as unknown as DurableObjectState;
 import { sha256Hex } from './auth';
 import { CRATE_PLUGIN_PROTOCOL } from '../../protocol';
 import { drainNotificationProjections } from './notification-projection';
@@ -24,9 +27,9 @@ beforeEach(async () => {
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 
 function request(route: string, init: RequestInit = {}) {
-	return worker.fetch(new Request(`https://parse.test${route}`, {
+	return fetchWorkerRequest(new Request(`https://parse.test${route}`, {
 		...init, headers: { Authorization: 'Bearer parse-token', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current), ...init.headers },
-	}), env);
+	}), env, controlledCoordinator);
 }
 function upload(path: string, content: string, expectedHash = 'absent', operationId = createReminderOperationId(Math.floor(Date.now() / 86400000))) {
 	return request(`/sync/upload?path=${encodeURIComponent(path)}`, {
@@ -46,7 +49,7 @@ async function quarantine(path: string) {
 	return env.DB.prepare('SELECT job_token, last_error FROM notification_projection_jobs WHERE path = ?').bind(path).first<{ job_token: string; last_error: string | null }>();
 }
 async function retryProjection() {
-	await env.DB.prepare("UPDATE notification_projection_jobs SET updated_at = datetime('now', '-2 hours')").run();
+	await env.DB.prepare("UPDATE notification_file_retries SET available_at = 0").run();
 	await drainNotificationProjections(env);
 }
 

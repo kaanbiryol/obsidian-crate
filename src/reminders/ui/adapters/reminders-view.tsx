@@ -62,6 +62,7 @@ export class RemindersView extends ItemView {
     }
 
     async onOpen(): Promise<void> {
+        if (!this.plugin.remindersSettings.enabled) { this.leaf.detach(); return; }
         this.isOpen = true;
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();

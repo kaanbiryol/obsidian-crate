@@ -27,7 +27,7 @@ export async function handleDiagnostics(db: D1Database): Promise<Response> {
 		db.prepare('SELECT COUNT(*) AS count FROM reminder_source_state WHERE parser_version < ?').bind(REMINDER_CACHE_PARSER_VERSION),
 		db.prepare('SELECT COUNT(*) AS count FROM reminder_source_state WHERE parser_version = ? AND verified = 0').bind(REMINDER_CACHE_PARSER_VERSION),
 	]);
-	const [lastRun, lastError, deliveryHealth, projectionIssues] = await Promise.all([
+	const [lastRun, lastError, deliveryHealth, projectionIssues, pausedFiles, pausedJobs, stagedIssues] = await Promise.all([
 		db.prepare("SELECT value FROM maintenance_state WHERE key = 'last_run'").first<{ value: string }>(),
 		db.prepare("SELECT value FROM maintenance_state WHERE key = 'last_error'").first<{ value: string }>(),
 		db.prepare(`SELECT MIN(delivery_failed_at) AS oldestFailureAt,
@@ -35,9 +35,15 @@ export async function handleDiagnostics(db: D1Database): Promise<Response> {
 			.bind(new Date().toISOString()).first<{ oldestFailureAt: string | null; oldestOverdueAt: string | null }>(),
 		db.prepare(`SELECT path, last_error AS reason FROM notification_projection_jobs
 			WHERE last_error IS NOT NULL ORDER BY updated_at, path LIMIT 100`).all<{ path: string; reason: string }>(),
+    db.prepare('SELECT path, attempts, error FROM notification_file_retries WHERE (attempts >= 8 OR available_at < 0) ORDER BY path LIMIT 100').all(),
+    db.prepare('SELECT reminder_id AS reminderId, attempts, last_error AS error FROM notification_jobs WHERE available_at < 0 ORDER BY reminder_id LIMIT 100').all(),
+    db.prepare('SELECT storage_key AS storageKey, last_error AS error FROM staged_uploads WHERE expires_at IS NULL ORDER BY storage_key LIMIT 100').all(),
 	]);
 	return corsResponse({
 		status: 'ok',
+    pausedNotificationFiles: pausedFiles.results,
+    pausedUploadCleanup: stagedIssues.results,
+    pausedNotificationJobs: pausedJobs.results,
 		counts: {
 			files: firstCount(results[0]),
 			changelog: firstCount(results[1]),

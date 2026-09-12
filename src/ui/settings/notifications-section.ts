@@ -36,7 +36,7 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
   let enabledToggle: ToggleComponent;
   new Setting(containerEl)
     .setName('Enable push notifications')
-    .setDesc('Send reminder notifications to subscribed phones and browsers. Applies to all devices.')
+    .setDesc('All devices · send reminder notifications to subscribed phones and browsers.')
     .addToggle(toggle => {
       enabledToggle = toggle;
       toggle.setValue(plugin.settings.pushEnabled).onChange(async value => {
@@ -53,14 +53,20 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
     });
   void openedPolicy.then(() => { if (policy) enabledToggle.setValue(policy.enabled !== false); });
 
+  const disclosure = containerEl.createEl('details', { cls: 'crate-settings-disclosure' });
+  disclosure.createEl('summary', { text: 'Notification schedule and devices' });
+  const preferences = disclosure.createDiv();
+  disclosure.open = plugin.settings.pushEnabled;
+  void openedPolicy.then(() => { disclosure.open = policy?.enabled ?? plugin.settings.pushEnabled; });
+
   const saveAllDayTime = async (time: string | null) => {
     await savePolicy({ allDayTime: time });
     await plugin.writeRemindersSettings({ allDayNotificationTime: time });
   };
 	let timeInput: TextComponent;
-	new Setting(containerEl)
+	const timeSetting = new Setting(preferences)
 		.setName('All-day notification time')
-		.setDesc('Shared across devices in the server’s saved timezone. An empty time means off.')
+		.setDesc('All devices · loading the notification timezone…')
 		.addText(text => {
 			timeInput = text;
 			text.inputEl.type = 'time';
@@ -108,15 +114,20 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 			}
 		}));
 
-  void openedPolicy.then(() => { if (policy) timeInput.setValue(policy.allDayTime ?? ''); });
-  const policyDescription = containerEl.createEl('p', { cls: 'setting-item-description' });
+  void openedPolicy.then(() => {
+    if (policy) timeInput.setValue(policy.allDayTime ?? '');
+    timeSetting.setDesc(loadError
+      ? 'Could not load the notification timezone. Reopen settings to retry.'
+      : `All devices · timezone: ${policy?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}. An empty time means off.`);
+  });
+  const policyDescription = preferences.createEl('p', { cls: 'setting-item-description' });
   void openedPolicy.then(() => {
     policyDescription.textContent = loadError ? 'Shared settings could not be loaded. Reopen settings to retry.'
       : policy ? `Server notifications: ${policy.folderPath} · ${policy.timezone}` : 'The first enabled device saves the shared folder and timezone.';
   });
-  new Setting(containerEl).setName('Notification folder and timezone')
-    .setDesc('Use this device’s reminders folder and timezone for notifications on all devices.')
-    .addButton(button => button.setButtonText('Use this device’s settings').onClick(async () => {
+  new Setting(preferences).setName('Notification folder and timezone')
+    .setDesc(`All devices · set the notification folder to ${plugin.remindersSettings.remindersFolderPath} and timezone to ${Intl.DateTimeFormat().resolvedOptions().timeZone}.`)
+    .addButton(button => button.setButtonText('Update folder and timezone').onClick(async () => {
       button.setDisabled(true);
       try {
         await savePolicy({ folderPath: plugin.remindersSettings.remindersFolderPath, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
@@ -125,7 +136,7 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
       finally { button.setDisabled(false); }
     }));
 	const apiClient = plugin.syncRuntime.getApiClient();
-	if (apiClient) renderEnabledDevices(containerEl, plugin, apiClient);
+	if (apiClient) renderEnabledDevices(preferences, plugin, apiClient);
 }
 
 function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, apiClient: SyncApiClient): void {
@@ -197,7 +208,7 @@ async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin): P
 					? 'Notifications paused. Remove this device, sign out in its web app, then open a fresh Crate link to enable notifications again.'
 					: `Subscribed ${new Date(sub.created_at).toLocaleDateString()}`)
 				.addButton(button => {
-					button.setButtonText('Remove');
+					button.setButtonText('Remove notification subscription');
 					button.setDestructive();
 					button.onClick(async () => {
 						try {

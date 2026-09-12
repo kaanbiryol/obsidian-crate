@@ -1,3 +1,4 @@
+import { trackStagedUpload } from './staged-uploads';
 import { sha256HexBytes } from './auth';
 import { createManagedObjectKey, MAX_FILE_BYTES } from './sync-storage';
 
@@ -11,6 +12,7 @@ export interface StagedMarkdownFile {
 
 export async function stageMarkdownFile(
 	bucket: R2Bucket,
+  db: D1Database,
 	path: string,
 	content: string,
 	expectedHash: string | null,
@@ -21,6 +23,7 @@ export async function stageMarkdownFile(
 	}
 	const hash = await sha256HexBytes(bytes.buffer);
 	const objectKey = createManagedObjectKey(hash);
+	await trackStagedUpload(db, objectKey);
 	await bucket.put(objectKey, bytes, {
 		httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
 		customMetadata: { hash },

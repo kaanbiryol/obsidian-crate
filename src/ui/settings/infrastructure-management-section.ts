@@ -1,4 +1,3 @@
-import { renderServerResetSetting } from './server-reset-setting';
 import { Notice, Setting } from 'obsidian';
 import { SyncDiagnosticsModal } from '../sync-diagnostics-modal';
 import { runSyncDiagnostics } from '../../sync/diagnostics';
@@ -9,19 +8,10 @@ import {
 } from './infrastructure-helpers';
 import { renderDiagnostics } from './infrastructure-diagnostics';
 import type { InfrastructureSectionContext } from './infrastructure-types';
-import { createSettingsSubsectionHeading } from './section-helpers';
 import { buildDiagnosticsSettingsStateKey } from '../../plugin/settings-ui-state';
 
 export function renderInfrastructureManagementSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin, isConfigured } = context;
-
-	const deployment = plugin.settings.cloudflareDeployment;
-	const hasPendingRecovery = deployment?.accountId && deployment.d1DatabaseId
-		&& (deployment.reset || !deployment.lastDeployedVersion);
-	if (isConfigured || hasPendingRecovery) {
-		createSettingsSubsectionHeading(containerEl, 'Server management');
-		renderServerResetSetting(containerEl, plugin);
-	}
 
 	const diagnosticsContainer = containerEl.createDiv({ cls: 'crate-diagnostics' });
 	diagnosticsContainer.hide();
@@ -63,6 +53,20 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 						},
 					});
 				}));
+
+    new Setting(containerEl)
+      .setName('Retry paused notifications')
+      .setDesc('After repairing a reported issue, retry notification updates paused because of invalid files or repeated failures.')
+      .addButton(button => button.setButtonText('Retry').onClick(async () => {
+        button.setDisabled(true);
+        try {
+          const client = plugin.syncRuntime.getApiClient();
+          if (!client) throw new Error('Sync is not configured');
+          const result = await client.retryPausedNotifications();
+          new Notice(`${result.retried} notification updates queued.${result.more ? ' More paused updates remain; select Retry again.' : ''}`);
+        } catch (error) { new Notice(`Could not retry notifications: ${getErrorMessage(error)}`); }
+        finally { button.setDisabled(false); }
+      }));
 
 		new Setting(containerEl)
 			.setName('Export diagnostics')

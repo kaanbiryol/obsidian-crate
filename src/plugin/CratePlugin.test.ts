@@ -25,6 +25,24 @@ describe('CratePlugin settings persistence', () => {
 		useRemindersSettingsStore.setState({ ...DEFAULT_REMINDERS_SETTINGS }, true);
 	});
 
+	it('disables reminders, stops watching, and closes views without deleting files', async () => {
+		const plugin = new CratePlugin({} as never, {} as never);
+		const unregister = vi.fn();
+		const detachLeavesOfType = vi.fn();
+		Object.assign(plugin, {
+			app: { vault: { configDir: '.obsidian' }, workspace: { detachLeavesOfType } },
+			settings: normalizeCrateSettings({}, '.obsidian'),
+			saveData: vi.fn(async () => {}),
+			remindersVaultWatcher: { unregister },
+		});
+		useRemindersSettingsStore.setState({ enabled: true });
+		await plugin.disableReminders();
+		expect(plugin.remindersSettings.enabled).toBe(false);
+		expect(unregister).toHaveBeenCalledOnce();
+		expect(detachLeavesOfType).toHaveBeenCalledWith('reminders-view');
+		expect(plugin.remindersVaultWatcher).toBeUndefined();
+	});
+
 	it.each([true, false])('loads the single debug setting: %s', async debugLogging => {
 		const plugin = new CratePlugin({} as never, {} as never);
 		Object.assign(plugin, { app: { vault: { configDir: '.obsidian' } }, loadData: vi.fn(async () => ({ debugLogging })) });

@@ -29,12 +29,13 @@ export function registerReminderCommands(plugin: CratePlugin) {
   plugin.addCommand({
     id: 'recover-reminder-moves',
     name: 'Recover interrupted reminder moves',
-    callback: () => { void recoverInterruptedReminderMoves(plugin).catch((error: unknown) => new Notice(error instanceof Error ? error.message : 'Reminder move recovery failed.')); },
+    callback: () => { if (!plugin.remindersSettings.enabled) return; void recoverInterruptedReminderMoves(plugin).catch((error: unknown) => new Notice(error instanceof Error ? error.message : 'Reminder move recovery failed.')); },
   });
   plugin.addCommand({
     id: "create-reminder",
     name: "Create reminder",
     callback: () => {
+      if (!plugin.remindersSettings.enabled) { new Notice("Enable reminders in Crate settings first."); return; }
       openReminderCreationModal(plugin);
     },
   });
@@ -43,6 +44,7 @@ export function registerReminderCommands(plugin: CratePlugin) {
     id: "open-project",
     name: "Open project",
     callback: () => {
+      if (!plugin.remindersSettings.enabled) { new Notice("Enable reminders in Crate settings first."); return; }
       const projects = plugin.reminderRepository.getProjects();
       if (projects.length === 0) {
         new Notice("No projects found. Create a reminder first.");

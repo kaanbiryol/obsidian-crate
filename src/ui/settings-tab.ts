@@ -2,6 +2,7 @@
  * Settings tab for Crate configuration
  */
 
+import { renderConnectionStatus } from './settings/connection-status';
 import { App, PluginSettingTab } from 'obsidian';
 import type CratePlugin from '../main';
 import { renderConfigSection, renderDisconnectSetting } from './settings/config-section';
@@ -25,8 +26,8 @@ export class CrateSettingTab extends PluginSettingTab {
 		this.cleanup();
 
 		const { containerEl } = this;
-		const openSections = new Set(Array.from(containerEl.querySelectorAll<HTMLDetailsElement>('details[open]'))
-			.map(details => details.querySelector('summary')?.textContent));
+		const openSections = new Map(Array.from(containerEl.querySelectorAll<HTMLDetailsElement>('details'))
+			.map(details => [details.querySelector('summary')?.textContent, details.open]));
 		containerEl.empty();
 		containerEl.addClass('crate-settings');
 
@@ -41,6 +42,8 @@ export class CrateSettingTab extends PluginSettingTab {
 			plugin: this.plugin,
 			rerender: () => this.update(),
 		});
+
+		if (isConfigured) this.cleanupFns.push(renderConnectionStatus(containerEl, this.plugin));
 
 		if (sections.showSync) {
 			renderSyncSection({
@@ -83,7 +86,8 @@ export class CrateSettingTab extends PluginSettingTab {
 		}
 		if (isConfigured) renderDisconnectSetting({ containerEl, plugin: this.plugin, rerender: () => this.update() });
 		for (const details of Array.from(containerEl.querySelectorAll<HTMLDetailsElement>('details'))) {
-			details.open = openSections.has(details.querySelector('summary')?.textContent);
+			const previous = openSections.get(details.querySelector('summary')?.textContent);
+			if (previous !== undefined) details.open = previous;
 		}
 
 	}

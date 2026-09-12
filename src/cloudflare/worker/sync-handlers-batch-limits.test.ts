@@ -1,3 +1,4 @@
+import { commitStagedFile } from './sync-mutations';
 import { describe, expect, it } from 'vitest';
 import {
 	handleBatchDownload,
@@ -87,6 +88,19 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			}])),
 		});
 
+    type PreparedMock = typeof db.prepare;
+    const commits: number[] = [];
+    let pending = Promise.resolve();
+    const commitUpload: typeof commitStagedFile = (bucket, db, params) => {
+      const result = pending.then(async () => {
+        const before = (db.prepare as PreparedMock).mock.calls.length;
+        const committed = await commitStagedFile(bucket, db, params);
+        commits.push((db.prepare as PreparedMock).mock.calls.length - before);
+        return committed;
+      });
+      pending = result.then(() => undefined);
+      return result;
+    };
 		const response = await handleBatchUpload(
 			new Request('https://worker.test/sync/batch-upload', {
 				method: 'POST',
@@ -100,6 +114,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			}),
 			bucket,
 			db,
+      commitUpload,
 		);
 
 		expect(response.status).toBe(200);
@@ -114,9 +129,10 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 			&& result.status === 409
 			&& result.currentHash === currentHash,
 		)).toBe(true);
-		// Reserve two of the 50 available queries for request authentication.
+		// Upload staging and each serialized commit have separate Worker/DO query budgets.
 		expect(db.prepare.mock.calls.length).toBeGreaterThan(0);
-		expect(db.prepare.mock.calls.length).toBeLessThanOrEqual(48);
+		expect(db.prepare.mock.calls.length - commits.reduce((sum, count) => sum + count, 0)).toBeLessThanOrEqual(48);
+    expect(Math.max(...commits)).toBeLessThanOrEqual(50);
 	});
 
 	it('rejects stale uploads without replacing the committed object', async () => {

@@ -1,7 +1,13 @@
-import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
+import { ReminderIdentityConflictError } from './reminder-source-identity';
+import { decodeMarkdownBytes, MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import { scanReminderMarkdownFile } from './reminders-web/scan';
 import { REMINDER_INDEX_MAX_FILE_BYTES } from './reminders-web/reminder-cache/types';
 import type { RemoteReminderRecord } from './reminders-web/types';
+
+export class PermanentReminderSourceError extends Error {}
+export function isPermanentSourceError(error: unknown): boolean {
+  return error instanceof PermanentReminderSourceError || error instanceof MarkdownEncodingError || error instanceof ReminderIdentityConflictError;
+}
 
 type ParsedReminderSource =
 	| { reminders: RemoteReminderRecord[]; issue?: undefined }

@@ -38,7 +38,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 			.setName(updateAvailable ? 'Cloudflare update available' : 'Cloudflare server')
 			.setDesc(updateAvailable
 				? 'This Crate version includes an update for your sync server and reminders web app.'
-				: 'Your sync server and reminders web app are up to date.');
+				: 'Your server software and reminders web app are up to date.');
 
 		if (updateAvailable) {
 			updateSetting.addButton(button => button

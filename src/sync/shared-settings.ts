@@ -23,7 +23,7 @@ function normalizeStringArray(value: unknown): string[] | null {
 
 type SharedSettingsTarget = Pick<
 	CrateSettings,
-	'ignorePatterns' | 'syncOnStartup' | 'syncOnResume' | 'syncInterval' | 'showStatusBar' | 'pushEnabled'
+	'ignorePatterns' | 'syncOnStartup' | 'syncOnResume' | 'syncInterval' | 'pushEnabled'
 >;
 
 export function applySharedSettings(target: SharedSettingsTarget, shared: SharedSettings): void {
@@ -31,7 +31,6 @@ export function applySharedSettings(target: SharedSettingsTarget, shared: Shared
 	target.syncOnStartup = shared.syncOnStartup;
 	target.syncOnResume = shared.syncOnResume;
 	target.syncInterval = shared.syncInterval;
-	target.showStatusBar = shared.showStatusBar;
 	target.pushEnabled = shared.pushEnabled;
 }
 

@@ -1,3 +1,4 @@
+import { stagedUploadGuard, finishStagedUpload } from './staged-uploads';
 import { enqueueFileProjection } from './notification-projection-queue';
 import type { CommitEffects } from './commit-effects';
 import { changedRows } from './db';
@@ -19,8 +20,10 @@ function destinationMutation(
 ): D1PreparedStatement {
 	const destinationNamespace = fileNamespaceGuard(destination.path);
 	const sourceNamespace = fileNamespaceGuard(source.path);
-	const namespaceGuard = `${destinationNamespace.sql} AND ${sourceNamespace.sql}`;
-	const namespaceArgs = [...destinationNamespace.args, ...sourceNamespace.args];
+	const destinationLease = stagedUploadGuard(destination.objectKey);
+  const sourceLease = stagedUploadGuard(source.objectKey);
+  const namespaceGuard = `${destinationNamespace.sql} AND ${sourceNamespace.sql} AND ${destinationLease.sql} AND ${sourceLease.sql}`;
+	const namespaceArgs = [...destinationNamespace.args, ...sourceNamespace.args, ...destinationLease.args, ...sourceLease.args];
 	if (destination.expectedHash === null) {
 		return db.prepare(`/* atomic-destination-insert */
 			INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
@@ -136,12 +139,14 @@ export async function writeCommittedMarkdownFilePair(
 	try {
 		stagedFiles.push(await stageMarkdownFile(
 			bucket,
+      db,
 			params.destination.path,
 			params.destination.content,
 			params.destination.expectedHash,
 		));
 		stagedFiles.push(await stageMarkdownFile(
 			bucket,
+      db,
 			params.source.path,
 			params.source.content,
 			params.source.expectedHash,
@@ -171,6 +176,8 @@ export async function writeCommittedMarkdownFilePair(
 			...previousVersions.map(previous => retainVersionStatement(db, previous, source, destination)),
 			...enqueueFileProjection(db, source.path, source.objectKey, params.source.content),
 			...enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content),
+			finishStagedUpload(db, source.objectKey),
+			finishStagedUpload(db, destination.objectKey),
 			...(params.effects?.([source, destination].map(file => ({ path: file.path, storageKey: file.objectKey }))) ?? []),
 	]);
 

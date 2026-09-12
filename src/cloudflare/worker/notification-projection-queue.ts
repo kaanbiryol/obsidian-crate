@@ -1,21 +1,24 @@
+import { recordFileFailure } from './notification-file-retries';
 import { parseReminderSource } from './reminder-source-parse';
 import { recordReminderSourceState } from './reminder-source-state';
 
 /** File bytes, identity ownership and first observation share one commit. */
-export function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null): D1PreparedStatement[] {
+export function enqueueFileProjection(db: D1Database, path: string, storageKey: string | null, content: string | ArrayBuffer | null, preserveRetries = false): D1PreparedStatement[] {
   if (!path.toLowerCase().endsWith('.md')) return [];
   const guard = storageKey === null ? 'NOT EXISTS (SELECT 1 FROM files WHERE path = ?)'
     : 'EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)';
   const args = storageKey === null ? [path] : [path, storageKey];
   const token = crypto.randomUUID();
   const parsed = content === null ? { reminders: [], issue: undefined } : parseReminderSource(path, content);
+  const reset = preserveRetries ? [] : [db.prepare(`DELETE FROM notification_file_retries WHERE path = ? AND ${guard}`).bind(path, ...args)];
   if (parsed.issue) {
     // Preserve the last verified identities and schedules. This quarantine is
     // published only when the new file revision commits in the same D1 batch.
-    return [recordReminderSourceState(db, path, storageKey, false), db.prepare(`INSERT INTO notification_projection_jobs (path, job_token, last_error)
+    return [...reset, recordReminderSourceState(db, path, storageKey, false), db.prepare(`INSERT INTO notification_projection_jobs (path, job_token, last_error)
       SELECT ?, ?, ? WHERE ${guard}
       ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token,
-        last_error = excluded.last_error, updated_at = datetime('now')`).bind(path, token, parsed.issue, ...args)];
+        last_error = excluded.last_error, updated_at = datetime('now')`).bind(path, token, parsed.issue, ...args),
+      recordFileFailure(db, path, parsed.issue, guard, args, true)];
   }
   const sources = new Map<string, { id: string; due: string; count: number }>();
   for (const reminder of parsed.reminders) {
@@ -25,6 +28,7 @@ export function enqueueFileProjection(db: D1Database, path: string, storageKey: 
   }
   const json = JSON.stringify([...sources.values()]);
   return [
+    ...reset,
     recordReminderSourceState(db, path, storageKey, true),
     // Revisit other owners on both collision and repair, including deletion.
     db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
