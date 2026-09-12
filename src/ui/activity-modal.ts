@@ -65,7 +65,7 @@ export class ActivityModal extends Modal {
             return;
         }
         this.pendingPanel.empty();
-		renderPendingPanel(this.pendingPanel, paths, state.status === 'error', state.status === 'syncing', progress, this.formatLastSync());
+		renderPendingPanel(this.pendingPanel, paths, state.status === 'error', state.status === 'syncing', progress, this.formatLastSync(), state);
 	}
 	private readonly onStateChange = () => this.refresh();
 
@@ -284,6 +284,8 @@ export class ActivityModal extends Modal {
 	}
 
 	private refresh(): void {
+		const scrollContainer = this.historyPanel.parentElement;
+		const scrollTop = scrollContainer?.scrollTop ?? 0;
 		this.updateSyncBtn();
 		this.updateSyncErrorNotice();
 		this.updateSyncStatusText();
@@ -293,13 +295,12 @@ export class ActivityModal extends Modal {
 		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.formatLastSync());
 		const expanded = new Set(Array.from(this.historyPanel.querySelectorAll('details[open]'))
 			.map((entry) => entry.getAttribute('data-history-key')));
-		const scrollTop = this.historyPanel.scrollTop;
 		this.historyPanel.empty();
 		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? []);
 		this.historyPanel.querySelectorAll('details').forEach((entry) => {
 			entry.open = expanded.has(entry.getAttribute('data-history-key'));
 		});
-		this.historyPanel.scrollTop = scrollTop;
+		if (scrollContainer) scrollContainer.scrollTop = scrollTop;
 		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
 	}
 
@@ -307,6 +308,7 @@ export class ActivityModal extends Modal {
 		if (this.deps.getActivityProgress?.()?.type === 'initial') return 'Uploading vault…';
 		if (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress?.()) return 'Syncing…';
 		if (this.deps.getState().status === 'error') return 'Last sync had errors';
+		if (this.deps.getState().status === 'offline') return 'Offline';
 		const lastSync = this.deps.getState().lastSync;
 		if (!lastSync) return 'Not synced yet';
 		const diffMs = Date.now() - new Date(lastSync).getTime();

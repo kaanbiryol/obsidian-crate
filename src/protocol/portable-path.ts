@@ -16,6 +16,15 @@ export function getPortablePathIssue(path: string): string | null {
 	return null;
 }
 
+/** Sync storage accepts native filenames; device restrictions belong at local writes. */
+export function getSyncPathIssue(path: string): string | null {
+	if (!path || path.length > 1024) return 'path is empty or too long';
+	// eslint-disable-next-line no-control-regex -- Reject unsafe protocol paths.
+	if (/[\u0000-\u001f\u007f\\]/u.test(path)) return 'contains a control character or backslash';
+	if (path.split('/').some(segment => !segment || segment === '.' || segment === '..')) return 'contains an invalid path segment';
+	return null;
+}
+
 export function portablePathKey(path: string): string {
 	return path.normalize('NFC').toLowerCase();
 }
@@ -59,7 +68,7 @@ export function assertPortablePaths(paths: Iterable<string>): void {
 /** Historical changes need valid names, but need not coexist as live files. */
 export function assertPortablePathNames(paths: Iterable<string>): void {
 	for (const path of paths) {
-		const issue = getPortablePathIssue(path);
-		if (issue) throw new Error(`Path is not portable across supported devices: ${path} (${issue})`);
+		const issue = getSyncPathIssue(path);
+		if (issue) throw new Error(`Invalid sync path: ${path} (${issue})`);
 	}
 }

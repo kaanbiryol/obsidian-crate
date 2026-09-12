@@ -1,14 +1,14 @@
 import type { Vault } from 'obsidian';
 import type { LocalManifest } from './manifest';
 import { readLocalFileEntry } from './local-file-entry';
-import { getPortablePathIssue } from '@/protocol/portable-path';
+import { getSyncPathIssue } from '@/protocol/portable-path';
 import { isRecord } from '@/plugin/settings';
 
 export function parseRenameDependencies(value: unknown): Map<string, string> {
 	if (value === undefined) return new Map();
 	if (!isRecord(value)) throw new Error('Invalid rename checkpoint. Preserve sync metadata before resetting.');
 	for (const [source, destination] of Object.entries(value)) {
-		if (getPortablePathIssue(source) || typeof destination !== 'string' || getPortablePathIssue(destination)) throw new Error('Invalid rename checkpoint. Preserve sync metadata before resetting.');
+		if (getSyncPathIssue(source) || typeof destination !== 'string' || getSyncPathIssue(destination)) throw new Error('Invalid rename checkpoint. Preserve sync metadata before resetting.');
 	}
 	return new Map(Object.entries(value) as Array<[string, string]>);
 }

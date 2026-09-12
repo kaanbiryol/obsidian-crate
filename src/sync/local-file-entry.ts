@@ -1,3 +1,4 @@
+import { assertLocalSyncPath } from './local-path-safety';
 import type { Vault } from 'obsidian';
 import { computeHash } from './hasher';
 import { isVaultTFileLike } from './planner-helpers';
@@ -9,6 +10,7 @@ export async function readLocalFileEntry(
 	vault: Vault,
 	path: string,
 ): Promise<FileEntry | undefined> {
+	assertLocalSyncPath(path);
 	const abstractFile = vault.getAbstractFileByPath(path);
 	const visibleFile = isVaultTFileLike(abstractFile) ? abstractFile : undefined;
 	if (!visibleFile && !await vault.adapter.exists(path)) return undefined;

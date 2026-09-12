@@ -143,3 +143,14 @@ it('rejects a move whose retained source file is also the destination parent', a
 	})).rejects.toBeInstanceOf(FileNamespaceConflictError);
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first()).toEqual({ count: 1 });
 });
+
+it.each(['99 Utilities/assets/What Improves Developer Productivity at Google?.pdf', ' leading.md', 'trailing.md ', 'folder /note.md'])('round-trips native filename without changing it: %s', async path => {
+ const file = await create(path);
+ const manifest = await (await request('/sync/manifest')).json() as { files: Record<string, unknown> };
+ expect(manifest.files[path]).toBeDefined();
+ expect(() => assertPortablePaths(Object.keys(manifest.files))).not.toThrow();
+ const download = await request(`/sync/download?path=${encodeURIComponent(path)}`);
+ expect(download.status).toBe(200);
+ expect(await download.text()).toBe(`content:${path}`);
+ await remove(file);
+});

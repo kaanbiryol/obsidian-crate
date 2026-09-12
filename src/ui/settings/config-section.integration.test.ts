@@ -76,6 +76,20 @@ describe('renderConfigSection integration', () => {
 		expect(startCloudflareDeployment).toHaveBeenCalledTimes(1);
 	});
 
+	it('offers reconnect for a remembered server on a disconnected device', async () => {
+		const { renderConfigSection } = await loadConfigSectionModule();
+		const plugin = {
+			settings: { cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } },
+			syncRuntime: { isConfigured: () => false },
+		};
+		renderConfigSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual(['Reconnect']);
+		const reconnect = getSettingByName('Reconnect');
+		expect(reconnect.descEl.textContent).toContain('remembers your previous server');
+		reconnect.buttons[0]!.click();
+		expect(startCloudflareDeployment).toHaveBeenCalledExactlyOnceWith(plugin);
+	});
+
 	it('disconnects locally without offering device setup links', async () => {
 		const { renderDisconnectSetting } = await loadConfigSectionModule();
 		const clearSyncConfiguration = vi.fn(async () => {});

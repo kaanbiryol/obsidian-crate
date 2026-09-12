@@ -1,4 +1,5 @@
 import type { Vault } from 'obsidian';
+import { assertLocalSyncPath } from './local-path-safety';
 
 export class LocalPathObstructionError extends Error {
 	constructor(readonly path: string, readonly isParent = false) {
@@ -18,6 +19,7 @@ async function removeEmptyDirectory(vault: Vault, path: string): Promise<void> {
 }
 
 export async function prepareLocalFilePath(vault: Vault, path: string): Promise<void> {
+	assertLocalSyncPath(path);
 	for (let end = path.indexOf('/'); end >= 0; end = path.indexOf('/', end + 1)) {
 		const parent = path.slice(0, end);
 		if ((await vault.adapter.stat(parent))?.type === 'file') throw new LocalPathObstructionError(parent, true);

@@ -1,3 +1,4 @@
+import { assertLocalSyncPath } from './local-path-safety';
 import { computeHash } from "./hasher";
 import { recordAppliedContent, UNVERIFIED_MODIFIED } from './applied-content';
 import { applyRemoteContentIfUnchanged, preserveLocalVersionsAndApplyRemote } from "./local-apply";
@@ -19,6 +20,7 @@ export async function processDiff(
   localFiles: Record<string, FileEntry>,
   result: SyncResult,
 ): Promise<DiffApplyOutcome> {
+  assertLocalSyncPath(diff.path);
   switch (diff.action) {
     case "upload": {
       const uploadFile = await prepareUploadFromPath(context, diff.path, {

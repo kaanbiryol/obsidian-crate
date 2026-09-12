@@ -1,5 +1,5 @@
 import { corsResponse } from './cors';
-import { getPortablePathIssue } from '../../protocol/portable-path';
+import { getSyncPathIssue } from '../../protocol/portable-path';
 import { readLimitedRequestBody } from './body-reader';
 
 const SHA256_HEX_REGEX = /^[a-f0-9]{64}$/i;
@@ -37,21 +37,7 @@ export async function parseJsonObject(
 }
 
 export function sanitizePath(path: string): string | null {
-	if (typeof path !== 'string') return null;
-	if (!path || path.length > 4096 || path !== path.trim() || path.startsWith('/') || path.endsWith('/') || path.includes('\\')) {
-		return null;
-	}
-	if (containsControlCharacters(path)) {
-		return null;
-	}
-
-	const segments = path.split('/');
-	if (segments.length === 0 || segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
-		return null;
-	}
-	if (getPortablePathIssue(path)) return null;
-
-	return segments.join('/');
+	return typeof path === 'string' && !getSyncPathIssue(path) ? path : null;
 }
 
 export function parseOptionalString(value: unknown, maxLength = 4096): string | null {

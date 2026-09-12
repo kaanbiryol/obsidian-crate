@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isSyncPath } from './sync-validation';
 import { assertPortablePaths, findPortablePathCollisions, getPortablePathIssue } from './portable-path';
 
 describe('portable sync paths', () => {
@@ -25,4 +26,13 @@ describe('portable sync paths', () => {
 	it('allows ordinary siblings and shared directories', () => {
 		expect(() => assertPortablePaths(['Projects.md', 'Projects.md-copy', 'Projects/a.md', 'Projects/b.md'])).not.toThrow();
 	});
+});
+
+it.each(['99 Utilities/assets/What Improves Developer Productivity at Google?.pdf', 'notes/CON.md', 'notes/trailing.'])('accepts native filenames in sync storage: %s', path => {
+ expect(isSyncPath(path)).toBe(true);
+ expect(() => assertPortablePaths([path])).not.toThrow();
+});
+it.each(['../escape.md', '/absolute.md', 'a//b.md', 'a\\b.md', 'a\u0000.md'])('still rejects unsafe paths: %s', path => {
+ expect(isSyncPath(path)).toBe(false);
+ expect(() => assertPortablePaths([path])).toThrow();
 });

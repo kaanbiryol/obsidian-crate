@@ -2,6 +2,7 @@ import { access, copyFile, mkdir, readFile, rename, rm } from 'node:fs/promises'
 import { constants } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { loadEnv } from 'vite';
 
 export function testVaultDeployPlugin({ rootDir }) {
 	return {
@@ -24,7 +25,7 @@ export function testVaultDeployPlugin({ rootDir }) {
 }
 
 function resolveTestVaultPath(rootDir) {
-	const configuredPath = process.env.OBSIDIAN_TEST_VAULT?.trim();
+	const configuredPath = loadEnv('development', rootDir, 'OBSIDIAN_TEST_VAULT').OBSIDIAN_TEST_VAULT?.trim();
 	if (!configuredPath) {
 		return path.join(rootDir, 'test-vault');
 	}
