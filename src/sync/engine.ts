@@ -226,6 +226,21 @@ export class SyncEngine {
 		return this.queueController.getPendingPaths();
 	}
 
+	async runConflictResolution<T>(operation: () => Promise<T>): Promise<T> {
+		if (this.state.status === 'syncing') throw new Error('Wait for sync to finish before resolving this conflict.');
+		this.lifecycle.throwIfDestroyed();
+		this.updateState({ status: 'syncing' });
+		return this.trackWork(async () => {
+			try { return await operation(); }
+			finally { if (!this.lifecycle.isDestroyed) this.updateState({ status: 'idle' }); }
+		});
+	}
+
+	async markConflictResolved(path: string): Promise<void> {
+		await this.conflictStore.markResolved(path);
+		this.updateState({ conflictCount: this.conflictStore.getActiveConflicts().length });
+	}
+
 	getActiveConflicts(): ConflictRecord[] {
 		return this.conflictStore.getActiveConflicts();
 	}

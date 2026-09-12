@@ -1,3 +1,5 @@
+import type { ConflictReview } from '../sync/conflict-review';
+import { ConflictReviewModal } from './activity/conflict-review-modal';
 import { Modal, Platform, setIcon, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -9,6 +11,7 @@ import { renderHistoryPanel } from './activity/history';
 import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
 
 export interface ActivityModalDeps {
+	createConflictReview?(record: ConflictRecord): Promise<ConflictReview>;
 	getPendingPaths(): string[];
 	getActiveConflicts(): ConflictRecord[];
 	getState(): SyncState;
@@ -65,7 +68,7 @@ export class ActivityModal extends Modal {
 	}
 	private readonly onStateChange = () => this.refresh();
 
-	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly initialTab: 'pending' | 'history' = 'pending') {
+	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly initialTab: 'pending' | 'conflicts' | 'history' = 'pending') {
 		super(app);
 		this.settings = settings;
 		this.deps = deps;
@@ -155,7 +158,9 @@ export class ActivityModal extends Modal {
 		this.allPanels = [this.pendingPanel, this.conflictsPanel, this.historyPanel];
 
 		this.renderPending();
-		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.formatLastSync());
+		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.formatLastSync(), this.deps.createConflictReview ? conflict => {
+			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview!(conflict), () => this.refresh()).open();
+		} : undefined);
 		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? []);
 
 		for (let i = 0; i < this.allTabs.length; i++) {
@@ -189,7 +194,7 @@ export class ActivityModal extends Modal {
 			});
 		}
 
-		this.switchTab(this.initialTab === 'history' ? 2 : 0);
+		this.switchTab(this.initialTab === 'history' ? 2 : this.initialTab === 'conflicts' ? 1 : 0);
 		this.deps.addStateChangeListener(this.onStateChange);
 		this.deps.addProgressListener?.(this.onProgress);
 		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
@@ -280,7 +285,9 @@ export class ActivityModal extends Modal {
 		this.updateTabCounts();
 		this.renderPending();
 		this.conflictsPanel.empty();
-		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.formatLastSync());
+		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.formatLastSync(), this.deps.createConflictReview ? conflict => {
+			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview!(conflict), () => this.refresh()).open();
+		} : undefined);
 		const expanded = new Set(Array.from(this.historyPanel.querySelectorAll('details[open]'))
 			.map((entry) => entry.getAttribute('data-history-key')));
 		this.historyPanel.empty();

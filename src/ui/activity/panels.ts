@@ -39,7 +39,7 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 	for (const filePath of deletes) renderFileMicroCard(list, filePath, 'delete');
 }
 
-export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[], lastSyncLabel: string): void {
+export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[], lastSyncLabel: string, onReview?: (conflict: ConflictRecord) => void): void {
 	if (conflicts.length === 0) {
 		renderEmptyState(container, 'shield-check', 'No conflicts', lastSyncLabel, 'success');
 		return;
@@ -47,11 +47,16 @@ export function renderConflictsPanel(container: HTMLElement, conflicts: Conflict
 
 	const list = container.createDiv({ cls: 'crate-activity-list' });
 	for (const conflict of conflicts) {
+		const row = list.createDiv({ cls: 'crate-conflict-row' });
 		renderFileMicroCard(
-			list,
+			row,
 			conflict.conflictPath,
 			'conflict',
 			`Original: ${conflict.originalPath} · ${conflict.cause === 'incoming-review' ? 'Manual file review required; original retained' : conflict.copySide === 'remote' ? 'Incoming server copy; original retained' : 'Local-only copy'}`,
 		);
+		if (onReview) {
+			const review = row.createEl('button', { text: 'Review', attr: { type: 'button', 'aria-label': `Review conflict for ${conflict.originalPath}` } });
+			review.addEventListener('click', () => onReview(conflict));
+		}
 	}
 }
