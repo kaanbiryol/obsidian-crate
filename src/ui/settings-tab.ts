@@ -43,12 +43,11 @@ export class CrateSettingTab extends PluginSettingTab {
 		});
 
 		if (sections.showSync) {
-			const syncCleanup = renderSyncSection({
+			renderSyncSection({
 				containerEl,
 				plugin: this.plugin,
 				rerender: () => this.update(),
 			});
-			this.cleanupFns.push(syncCleanup);
 		}
 
 		if (sections.showReminders) {

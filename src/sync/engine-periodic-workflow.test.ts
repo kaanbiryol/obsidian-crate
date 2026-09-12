@@ -20,6 +20,7 @@ function createContext(overrides: Partial<{
 		getFailures: () => consecutiveCheckFailures,
 		sync,
 		context: {
+			automaticSyncEnabled: () => true,
 			apiConfigured: () => true,
 			getStatus: () => 'idle' as const,
 			getSyncIntervalSeconds: () => overrides.syncIntervalSeconds ?? 60,
@@ -43,6 +44,24 @@ function createContext(overrides: Partial<{
 }
 
 describe('runPeriodicCheckWorkflow', () => {
+	it('does not check or sync when periodic syncing is disabled', async () => {
+		const harness = createContext({ localFilesChanged: true });
+		harness.context.automaticSyncEnabled = () => false;
+		await runPeriodicCheckWorkflow(harness.context);
+		expect(harness.checkForChanges).not.toHaveBeenCalled();
+		expect(harness.sync).not.toHaveBeenCalled();
+	});
+
+	it('does not start a sync if disabled during a periodic check', async () => {
+		const harness = createContext({ localFilesChanged: true });
+		harness.checkForChanges.mockImplementation(async () => {
+			harness.context.automaticSyncEnabled = () => false;
+			return { hasChanges: true };
+		});
+		await runPeriodicCheckWorkflow(harness.context);
+		expect(harness.sync).not.toHaveBeenCalled();
+	});
+
 	afterEach(() => {
 		vi.restoreAllMocks();
 	});

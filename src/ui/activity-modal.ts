@@ -33,8 +33,6 @@ export class ActivityModal extends Modal {
 	private tabIndicator!: HTMLDivElement;
 	private currentTabIndex = 0;
 	private subtitleEl!: HTMLSpanElement;
-	private footerEl!: HTMLElement;
-	private pendingHasInlineStatus = false;
 	private errorNoticeEl!: HTMLDivElement;
 	private errorMessageEl!: HTMLSpanElement;
 	private syncBtn!: HTMLButtonElement;
@@ -56,8 +54,6 @@ export class ActivityModal extends Modal {
 		const state = this.deps.getState();
         const progress = this.deps.getActivityProgress?.();
         const paths = this.deps.getPendingPaths();
-        this.pendingHasInlineStatus = paths.length === 0 && state.status !== 'error' && state.status !== 'syncing' && !progress;
-        this.updateFooterVisibility();
         const loadingLabel = this.pendingPanel.querySelector('.crate-activity-loading-label');
         if (loadingLabel && (state.status === 'syncing' || progress)) {
             // Keep the spinner mounted through frequent progress updates.
@@ -142,6 +138,8 @@ export class ActivityModal extends Modal {
 		});
 		historyTab.createSpan({ text: 'History' });
 		this.tabIndicator = tabs.createDiv({ cls: 'crate-activity-tab-indicator' });
+		const statusLabel = this.formatLastSync();
+		this.subtitleEl = tabBar.createSpan({ text: statusLabel === 'Not synced yet' ? '' : statusLabel, cls: 'crate-activity-subtitle' });
 
 
 		this.updateTabCounts();
@@ -150,8 +148,6 @@ export class ActivityModal extends Modal {
 		this.pendingPanel = contentEl.createDiv({ cls: 'crate-activity-panel crate-activity-panel-pending' });
 		this.conflictsPanel = contentEl.createDiv({ cls: 'crate-activity-panel crate-activity-panel-conflicts' });
 		this.historyPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
-        this.footerEl = contentEl.createEl('footer', { cls: 'crate-activity-footer' });
-        this.subtitleEl = this.footerEl.createSpan({ text: this.formatLastSync(), cls: 'crate-activity-subtitle' });
 		this.conflictsPanel.hide();
 		this.historyPanel.hide();
 
@@ -218,24 +214,16 @@ export class ActivityModal extends Modal {
 				panel.hide();
 			}
 		}
-		this.updateFooterVisibility();
 		this.positionIndicator(index);
 	}
 
     private updateSyncStatusText(): void {
         const label = this.formatLastSync();
-        this.subtitleEl.setText(label);
+        this.subtitleEl.setText(label === 'Not synced yet' ? '' : label);
         const conflictStatus = this.conflictsPanel.querySelector('.crate-empty-desc');
         if (conflictStatus) conflictStatus.textContent = label;
     }
 
-    private updateFooterVisibility(): void {
-        const hideFooter = this.currentTabIndex === 2
-            || (this.currentTabIndex === 0 && this.pendingHasInlineStatus)
-            || (this.currentTabIndex === 1 && this.deps.getActiveConflicts().length === 0);
-        if (hideFooter) this.footerEl.hide();
-        else this.footerEl.show();
-    }
 
 	private positionIndicator(index: number): void {
 		const tab = this.allTabs[index];
@@ -284,7 +272,7 @@ export class ActivityModal extends Modal {
 	}
 
 	private refresh(): void {
-		const scrollContainer = this.historyPanel.parentElement;
+		const scrollContainer = this.historyPanel;
 		const scrollTop = scrollContainer?.scrollTop ?? 0;
 		this.updateSyncBtn();
 		this.updateSyncErrorNotice();

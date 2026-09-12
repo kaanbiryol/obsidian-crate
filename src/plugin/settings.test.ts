@@ -3,6 +3,12 @@ import { buildPersistedCrateSettings, DEFAULT_SETTINGS, normalizeCrateSettings }
 import { MAX_SYNC_HISTORY_PATHS } from './settings-types';
 
 describe('normalizeCrateSettings', () => {
+	it('migrates disabled startup and resume switches to manual-only sync', () => {
+		expect(normalizeCrateSettings({ syncOnStartup: false, syncOnResume: false }, '.obsidian').automaticSync).toBe(false);
+		expect(normalizeCrateSettings({}, '.obsidian').automaticSync).toBe(true);
+		expect(normalizeCrateSettings({ automaticSync: true, syncOnStartup: false, syncOnResume: false }, '.obsidian').automaticSync).toBe(true);
+	});
+
 	it('keeps valid non-secret Cloudflare deployment metadata', () => {
 		const settings = normalizeCrateSettings({
 			cloudflareDeployment: {

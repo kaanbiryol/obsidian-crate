@@ -183,7 +183,7 @@ export class SyncRuntime {
 		}
 		this.statusBar?.update(this.syncEngine.getState());
 
-		if (this.settings.syncOnStartup && !options.skipStartupSync) {
+		if (this.settings.automaticSync && !options.skipStartupSync) {
 			this.startupSyncTask = this.sync()
 				.then(async result => {
 					notifyConflicts(result.conflicts);
@@ -195,7 +195,7 @@ export class SyncRuntime {
 						// Resume event capture before probing so edits made after the
 						// startup operation cannot fall into a second blind window.
 						this.acceptingEvents = true;
-						if (await syncEngine.hasUnsyncedLocalChanges()) {
+						if (await syncEngine.hasUnsyncedLocalChanges() && this.settings.automaticSync) {
 							logger.info('Local changes detected after startup sync; running a recovery pass');
 							const recoveryResult = await this.sync();
 							notifyConflicts(recoveryResult.conflicts);
@@ -249,22 +249,25 @@ export class SyncRuntime {
 	}
 
 	onFileChange(file: TAbstractFile): void {
+		if (this.plugin.app.workspace.layoutReady === false) return;
 		if (!this.acceptingEvents && !isConflictFile(file.path)) return;
 		this.syncEngine?.onFileChange(file);
 	}
 
 	onFileDelete(file: TAbstractFile): void {
+		if (this.plugin.app.workspace.layoutReady === false) return;
 		if (!this.acceptingEvents && !isConflictFile(file.path)) return;
 		this.syncEngine?.onFileDelete(file);
 	}
 
 	onFileRename(file: TAbstractFile, oldPath: string): void {
+		if (this.plugin.app.workspace.layoutReady === false) return;
 		if (!this.acceptingEvents && !isConflictFile(file.path) && !isConflictFile(oldPath)) return;
 		this.syncEngine?.onFileRename(file, oldPath);
 	}
 
 	triggerForegroundSync(reason: ForegroundSyncReason): void {
-		if (!this.settings.syncOnResume) return;
+		if (!this.settings.automaticSync) return;
 		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine) return;
 		if (this.syncEngine.getState().status === 'syncing') return;
 		if (this.foregroundSyncTimer) return;
@@ -371,7 +374,7 @@ export class SyncRuntime {
 	}
 
 	private async runForegroundSync(reason: ForegroundSyncReason): Promise<void> {
-		if (!this.settings.syncOnResume) return;
+		if (!this.settings.automaticSync) return;
 		if (!this.acceptingEvents || !this.isConfigured() || !this.syncEngine) return;
 		if (this.syncEngine.getState().status === 'syncing') return;
 		if (this.isForegroundSyncOnCooldown()) return;

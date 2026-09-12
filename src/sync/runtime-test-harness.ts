@@ -68,6 +68,7 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 		lastSeq: 0,
 		deviceId: 'device-1',
 		ignorePatterns: ['.trash/', '*.tmp'],
+		automaticSync: true,
 		syncOnStartup: true,
 		syncOnResume: true,
 		syncInterval: 0,
@@ -84,6 +85,7 @@ export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> =
 	const settings = createSettings(settingsOverrides);
 	const plugin = {
 		app: {
+			workspace: { layoutReady: true },
 			vault: {
 				configDir: CONFIG_DIR,
 				adapter: {

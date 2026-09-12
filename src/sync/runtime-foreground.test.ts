@@ -77,7 +77,7 @@ describe('SyncRuntime foreground sync', () => {
 		await vi.advanceTimersByTimeAsync(FOREGROUND_SYNC_DEBOUNCE_MS);
 		expect(pausedSync).not.toHaveBeenCalled();
 
-		const { runtime: disabledRuntime } = createRuntimeHarness({ syncOnResume: false });
+		const { runtime: disabledRuntime } = createRuntimeHarness({ automaticSync: false });
 		const disabledSync = vi.fn(async () => createEmptySyncResult());
 		setAcceptingEvents(disabledRuntime, true);
 		setSyncEngine(disabledRuntime, {

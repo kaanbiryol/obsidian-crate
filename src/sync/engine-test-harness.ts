@@ -154,6 +154,7 @@ function createSettings(): CrateSettings {
 		lastSeq: 0,
 		deviceId: 'dev-1',
 		ignorePatterns: ['.trash/', '*.tmp'],
+		automaticSync: true,
 		syncOnStartup: false,
 		syncOnResume: true,
 		syncInterval: 0,

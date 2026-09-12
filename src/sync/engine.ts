@@ -108,7 +108,8 @@ export class SyncEngine {
 		this.lifecycle = new SyncEngineLifecycle({
 			apiConfigured: () => this.api.isConfigured(),
 			getStatus: () => this.state.status,
-			getSyncIntervalSeconds: () => this.settings.syncInterval,
+			automaticSyncEnabled: () => this.settings.automaticSync,
+			getSyncIntervalSeconds: () => this.settings.automaticSync ? this.settings.syncInterval : 0,
 			getLastSeq: () => this.settings.lastSeq,
 			getPendingPathCount: () => this.queueController.getPendingPathCount(),
 			hasLocalFileChanges: async () => this.localManifest.uploadJournal.pending().length > 0 || await hasLocalFileChanges(
@@ -134,6 +135,7 @@ export class SyncEngine {
 		});
 		this.api.setAbortSignal(this.lifecycle.abortSignal);
 		this.queueController = new SyncQueueController({
+			automaticSyncEnabled: () => this.settings.automaticSync,
 			recoverUploads: () => this.api.recoverUploads(),
 			api: this.api,
 			getLocalManifest: () => this.localManifest,
@@ -213,6 +215,7 @@ export class SyncEngine {
 		this.settings = settings;
 		this.ignoredDirPrefixes = this.getIgnoredDirPrefixes(settings);
 		this.lifecycle.settingsChanged();
+		this.queueController.settingsChanged();
 	}
 
 	getState(): SyncState {

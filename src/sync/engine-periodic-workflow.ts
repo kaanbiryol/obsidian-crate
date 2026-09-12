@@ -8,6 +8,7 @@ import { isAbortError } from './abort';
 const logger = createLogger('SyncEngine');
 
 export interface PeriodicCheckWorkflowContext {
+	automaticSyncEnabled?(): boolean;
 	apiConfigured(): boolean;
 	getStatus(): SyncStatus;
 	getSyncIntervalSeconds(): number;
@@ -27,7 +28,7 @@ export interface PeriodicCheckWorkflowContext {
 export async function runPeriodicCheckWorkflow(
 	context: PeriodicCheckWorkflowContext
 ): Promise<void> {
-	if (context.getStatus() === 'syncing') return;
+	if (context.getStatus() === 'syncing' || context.automaticSyncEnabled?.() === false) return;
 	if (!context.apiConfigured()) return;
 
 	if (context.getConsecutiveCheckFailures() > 0) {
@@ -55,6 +56,7 @@ export async function runPeriodicCheckWorkflow(
 			return;
 		}
 
+		if (context.automaticSyncEnabled?.() === false) return;
 		logger.info('Periodic check: changes detected, running sync');
 		const result = await context.sync();
 		notifyConflicts(result.conflicts);

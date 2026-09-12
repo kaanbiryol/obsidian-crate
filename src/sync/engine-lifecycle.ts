@@ -5,6 +5,7 @@ import { runPeriodicCheckWorkflow } from './engine-periodic-workflow';
 import { retryWithBackoff, runConcurrentTasks } from './engine-utils';
 
 interface SyncEngineLifecycleDependencies {
+	automaticSyncEnabled?(): boolean;
 	apiConfigured(): boolean;
 	getStatus(): SyncState['status'];
 	getSyncIntervalSeconds(): number;

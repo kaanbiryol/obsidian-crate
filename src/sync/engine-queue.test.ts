@@ -18,6 +18,21 @@ describe('SyncEngine event queue behavior', () => {
 		harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: 1, mtime: 1700000000000 });
 	});
 
+	it('does not flush queued edits after automatic sync is disabled', async () => {
+		vi.useFakeTimers();
+		try {
+			harness.engine.onFileChange({ path: 'notes/a.md' } as never);
+			harness.engine.updateSettings({ ...harness.settings, automaticSync: false });
+			await vi.advanceTimersByTimeAsync(60_000);
+			await flushPendingChanges(harness.engine);
+			expect(harness.api.uploadFile).not.toHaveBeenCalled();
+			expect(harness.engine.getPendingPaths()).toContain('notes/a.md');
+		} finally {
+			harness.engine.destroy();
+			vi.useRealTimers();
+		}
+	});
+
 	it('queues remote delete when renaming from syncable path into ignored path', () => {
 		const debouncedSync = spyOnDebouncedSync(harness.engine);
 

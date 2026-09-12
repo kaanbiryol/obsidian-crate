@@ -116,7 +116,7 @@ After installing the plugin, open the Crate settings tab in Obsidian:
 2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
 3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate reuses an existing Crate server in that account or provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and schema.
 4. Crate registers this device through the Cloudflare-authorized D1 API, revokes the temporary OAuth token, and connects automatically.
-5. No vault files are transferred during connection. Select **Sync now** to sync this vault with the server.
+5. No vault files are transferred during connection. Open the command palette and select **Crate: Sync now** to sync this vault with the server.
 
 The OAuth deployment uses the build-time Worker and current schema included in the installed plugin. Unsupported databases are rejected without modification; see the [recovery runbook](docs/recovery.md) before changing deployments. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered in D1.
 
@@ -128,7 +128,7 @@ For the one-time GitHub Pages and OAuth-client configuration, updates, and recov
 
 ## Sync Scope and Limits
 
-- After the first sync, Crate syncs on startup, when Obsidian resumes, and every five minutes by default. These automatic sync options can be changed under **Settings → Crate → Sync**.
+- Crate automatically syncs on startup, when Obsidian resumes, after file changes, and when periodic checks find changes. Turn off **Settings → Crate → Sync → Automatic sync** for manual-only syncing on this device. A running sync finishes; use **Crate: Sync now** in the command palette to sync manually.
 - Crate syncs files inside the vault, including attachments. Hidden dotfiles and dot-folders can also be synced; they are not excluded as a group.
 - Files larger than 25 MiB (25 × 1024 × 1024 bytes) are skipped and reported as sync errors. They are not uploaded to or downloaded from the remote vault.
 - The default ignore patterns are `.git/`, `.trash/`, `*.tmp`, and `.DS_Store`. Crate always ignores the active Obsidian configuration folder's entire `plugins/` tree, its Markdown merge cache, conflict copies, and `workspace*` files.
