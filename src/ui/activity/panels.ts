@@ -1,7 +1,7 @@
-import type { ConflictRecord, SyncActivityProgress } from '../../sync/types';
+import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard } from './rendering';
 
-export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.'): void {
+export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.', state?: SyncState): void {
 	if (syncing || progress) {
         const loading = container.createDiv({ cls: 'crate-activity-loading' });
         loading.setAttribute('role', 'status');
@@ -17,6 +17,10 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 	if (paths.length === 0) {
 		if (hasError) {
 			renderEmptyState(container, 'inbox', 'No pending files', 'The last sync had errors. View history for details.');
+		} else if (state?.status === 'offline') {
+			renderEmptyState(container, 'wifi-off', 'You’re offline', 'Connect to the internet to check for changes.');
+		} else if (state && !state.lastSync) {
+			renderEmptyState(container, 'refresh-cw', 'Not synced yet', 'Select Sync now to start your first sync.');
 		} else {
 			renderEmptyState(container, 'check', 'All synced', lastSyncLabel, 'success');
 		}

@@ -14,8 +14,13 @@ import { buildDiagnosticsSettingsStateKey } from '../../plugin/settings-ui-state
 export function renderInfrastructureManagementSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin, isConfigured } = context;
 
-	createSettingsSubsectionHeading(containerEl, 'Server management');
-	renderServerResetSetting(containerEl, plugin);
+	const deployment = plugin.settings.cloudflareDeployment;
+	const hasPendingRecovery = deployment?.accountId && deployment.d1DatabaseId
+		&& (deployment.reset || !deployment.lastDeployedVersion);
+	if (isConfigured || hasPendingRecovery) {
+		createSettingsSubsectionHeading(containerEl, 'Server management');
+		renderServerResetSetting(containerEl, plugin);
+	}
 
 	const diagnosticsContainer = containerEl.createDiv({ cls: 'crate-diagnostics' });
 	diagnosticsContainer.hide();

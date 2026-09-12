@@ -3,6 +3,7 @@ import type { Vault } from 'obsidian';
 import {
 	createConflictCopy,
 	getConflictFileName,
+	getIncomingConflictFileName,
 	getOriginalPathFromConflictFile,
 	isConflictFile,
 } from './conflict';
@@ -305,4 +306,14 @@ describe('createConflictCopy', () => {
 		expect(createBinary).toHaveBeenCalledWith(path, content);
 		expect(writeBinary).not.toHaveBeenCalled();
 	});
+});
+
+describe('conflict copies preserve directories and hidden basenames', () => {
+ it.each(['archive.v1/README', '.archive/README', '.gitignore', 'notes/.env'])('keeps %s in the same directory and round-trips the original', path => {
+  for (const copy of [getConflictFileName(path), getIncomingConflictFileName(path, 'a'.repeat(64))]) {
+   expect(copy.split('/').slice(0, -1)).toEqual(path.split('/').slice(0, -1));
+   expect(copy.startsWith(`${path} (conflict `)).toBe(true);
+   expect(getOriginalPathFromConflictFile(copy)).toBe(path);
+  }
+ });
 });

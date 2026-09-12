@@ -12,19 +12,23 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 
 	createSettingsSectionHeading(containerEl, 'Connection');
 
+	const deployment = plugin.settings.cloudflareDeployment;
 	if (!isConfigured) {
+		const rememberedServer = Boolean(deployment?.accountId && deployment.d1DatabaseId);
+		const connectionLabel = rememberedServer ? 'Reconnect' : 'Connect with Cloudflare';
 		new Setting(containerEl)
-			.setName('Connect with Cloudflare')
-			.setDesc('Sign in to connect to an existing Crate server or create one in your Cloudflare account. Cloudflare plan limits and usage charges may apply.')
+			.setName(connectionLabel)
+			.setDesc(rememberedServer
+				? 'Crate remembers your previous server. Sign in with Cloudflare to reconnect this device.'
+				: 'Sign in to connect to an existing Crate server or create one in your Cloudflare account. Cloudflare plan limits and usage charges may apply.')
 			.addButton(button => button
-				.setButtonText('Connect with Cloudflare')
+				.setButtonText(connectionLabel)
 				.setCta()
 				.onClick(() => {
 					void startCloudflareDeployment(plugin);
 				}));
 	}
 
-	const deployment = plugin.settings.cloudflareDeployment;
 	if (isConfigured && deployment) {
 		const updateAvailable = isCloudflareServerUpdateAvailable(
 			deployment,

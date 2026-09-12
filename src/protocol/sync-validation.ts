@@ -1,5 +1,5 @@
 import { isRecord } from '../plugin/settings';
-import { assertPortablePaths, getPortablePathIssue } from './portable-path';
+import { assertPortablePaths, getSyncPathIssue } from './portable-path';
 import { createPathRecord } from './path-record';
 import type { FileEntry } from './sync-types';
 
@@ -12,7 +12,7 @@ export function isSyncPath(value: unknown): value is string {
 	return typeof value === 'string' && value.length > 0 && value.length <= 1024
 		&& !/[\u0000-\u001f\u007f\\]/.test(value)
 		&& value.split('/').every(part => part.length > 0 && part !== '.' && part !== '..')
-		&& getPortablePathIssue(value) === null;
+		&& getSyncPathIssue(value) === null;
 }
 
 export function isSyncDate(value: unknown): value is string {

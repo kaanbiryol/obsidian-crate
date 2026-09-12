@@ -1,3 +1,4 @@
+import { assertLocalSyncPath } from './local-path-safety';
 import type { Stat, TAbstractFile, TFile } from "obsidian";
 import { isHiddenPath } from "./file-discovery";
 import type { Vault } from "obsidian";
@@ -92,6 +93,7 @@ export async function deletePathLocallyIfUnchanged(
   path: string,
   expectedHash: string | null,
 ): Promise<LocalDeleteOutcome> {
+  assertLocalSyncPath(path);
   const snapshot = await readDeleteSnapshot(context, path);
   if (snapshot === null) {
     return { status: "missing" };

@@ -212,6 +212,9 @@ production deploy configuration:
 OBSIDIAN_TEST_VAULT=/path/to/vault npm run dev
 ```
 
+To save the path for future development builds, add `OBSIDIAN_TEST_VAULT=/path/to/vault`
+to `.env.development.local` (ignored by Git).
+
 Run tests:
 
 ```bash

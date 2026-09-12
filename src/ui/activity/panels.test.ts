@@ -50,3 +50,13 @@ it.each(['Synced just now', 'Syncing…', 'Last sync had errors'])(
         expect(element.collectText()).toBe(`No conflicts ${status}`);
     },
 );
+
+it.each([
+ { status: 'idle' as const, lastSync: null, title: 'Not synced yet' },
+ { status: 'offline' as const, lastSync: '2026-09-12T10:00:00Z', title: 'You’re offline' },
+])('does not claim completion for $title', ({ status, lastSync, title }) => {
+ const element = new FakeElement('div');
+ renderPendingPanel(element as never, [], false, false, null, '', { status, lastSync, lastError: null, pendingChanges: 0, conflictCount: 0 });
+ expect(element.collectText()).toContain(title);
+ expect(element.collectText()).not.toContain('All synced');
+});

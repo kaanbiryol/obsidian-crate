@@ -11,7 +11,7 @@ const CONFLICT_TAG_PATTERN = / \(conflict (?:\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}
 
 export function getIncomingConflictFileName(path: string, hash: string, variant = 0): string {
 	const dot = path.lastIndexOf('.');
-	const extension = dot > path.lastIndexOf('/') ? dot : path.length;
+	const extension = dot > path.lastIndexOf('/') + 1 ? dot : path.length;
 	return `${path.slice(0, extension)} (conflict remote ${hash}${variant ? `-${variant}` : ''})${path.slice(extension)}`;
 }
 
@@ -31,7 +31,7 @@ export function getConflictFileName(originalPath: string): string {
 	const tag = `conflict ${timestamp} ${suffix}`;
 
 	const lastDot = originalPath.lastIndexOf('.');
-	if (lastDot === -1) {
+	if (lastDot <= originalPath.lastIndexOf('/') + 1) {
 		return `${originalPath} (${tag})`;
 	}
 

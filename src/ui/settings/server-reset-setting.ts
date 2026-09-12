@@ -13,6 +13,17 @@ export function renderServerResetSetting(containerEl: HTMLElement, plugin: Crate
 		return;
 	}
 
+	if (!plugin.syncRuntime.isConfigured() && !deployment.reset) {
+		if (deployment.lastDeployedVersion) return;
+		new Setting(containerEl)
+			.setName('Repair server')
+			.setDesc('Finish a deployment without deleting remote data. Reconnect this device when setup finishes.')
+			.addButton(button => button
+				.setButtonText('Repair server')
+				.onClick(() => { void startCloudflareDeployment(plugin, 'update'); }));
+		return;
+	}
+
 	new Setting(containerEl)
 		.setName('Reset server')
 		.setDesc('Erase this Crate server’s remote files, history, database, and reminder state. Rebuild the server and upload your local vault afterward.')
@@ -50,13 +61,5 @@ export function renderServerResetSetting(containerEl: HTMLElement, plugin: Crate
 				}
 			}));
 
-	if (!plugin.syncRuntime.isConfigured() && !deployment.reset) {
-		new Setting(containerEl)
-			.setName('Repair server')
-			.setDesc('Finish a deployment without deleting remote data. Reconnect this device when setup finishes.')
-			.addButton(button => button
-				.setButtonText('Repair server')
-				.onClick(() => { void startCloudflareDeployment(plugin, 'update'); }));
-	}
 	renderServerDeleteSetting(containerEl, plugin);
 }

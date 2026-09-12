@@ -1,3 +1,4 @@
+import { Platform } from 'obsidian';
 import { expect, it, vi } from 'vitest';
 import { PersistentTestVault } from '../cloudflare/worker/sync-engine-vault-test-harness';
 import { applyRemoteContentIfUnchanged } from './local-apply';
@@ -34,4 +35,20 @@ it('retains a folder when the host refuses removal and retries safely later', as
 	expect((await applyRemoteContentIfUnchanged({vault:disk.vault},'Project.md',incoming,null)).status).toBe('deferred');
 	expect((await applyRemoteContentIfUnchanged({vault:disk.vault},'Project.md',incoming,null)).status).toBe('applied');
 	expect(disk.read('Project.md')).toEqual(incoming);
+});
+
+it.each([false, true])('checks Windows filenames only on Windows (%s)', async isWin => {
+ const previous = Platform.isWin;
+ Object.assign(Platform, { isWin });
+ try {
+  const disk = new PersistentTestVault();
+  const apply = applyRemoteContentIfUnchanged({ vault: disk.vault }, 'notes/question?.pdf', incoming, null);
+  if (isWin) {
+   await expect(apply).rejects.toThrow('on this Windows device');
+   expect(disk.paths()).toEqual([]);
+  } else {
+   expect(await apply).toEqual({ status: 'applied' });
+   expect(disk.read('notes/question?.pdf')).toEqual(incoming);
+  }
+ } finally { Object.assign(Platform, { isWin: previous }); }
 });
