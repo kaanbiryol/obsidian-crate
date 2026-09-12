@@ -75,7 +75,8 @@ export function buildSharedSettings(settings: CrateSettings): SharedSettings {
     syncOnStartup: settings.syncOnStartup,
     syncOnResume: settings.syncOnResume,
     syncInterval: settings.syncInterval,
-    showStatusBar: settings.showStatusBar,
+    // Retained for older clients; visibility is now a local preference.
+    showStatusBar: true,
     pushEnabled: settings.pushEnabled,
   };
 }

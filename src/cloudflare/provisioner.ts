@@ -2,7 +2,6 @@ import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import { randomHex } from './pkce';
-import { CLOUDFLARE_MAINTENANCE_CRON } from './maintenance-schedule';
 import { deployedArtifact } from './deployment-discovery';
 import { assertDeploymentIsNotDowngrade } from './deployment-update';
 import { DEPLOYMENT_FENCE_KEY, withDeploymentFence, type DeploymentFence } from './deployment-fence';
@@ -177,7 +176,7 @@ export async function provisionCloudflareDeployment(input: {
 		await fence.mutate(() => input.api.updateWorkerSchedules(
 			input.accountId,
 			input.metadata.workerName,
-			[CLOUDFLARE_MAINTENANCE_CRON],
+			[],
 		));
 
 		input.onProgress?.('Enabling the server address…');

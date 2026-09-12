@@ -324,7 +324,7 @@ Reminder mutations replay a matching operation receipt before rereading a moved 
 
 ## Changelog Pruning
 
-The 15-minute maintenance Cron Trigger deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Failures are non-fatal and retried on the next scheduled run.
+Activity schedules one cleanup alarm 24 hours later, which deletes entries older than 30 days (`CHANGELOG_RETENTION_DAYS`). Cleanup runs at most ten passes per activity-triggered episode. It can continue an advancing backlog or wait for a pending upload deadline; unconfirmed upload cleanup pauses after eight attempts. Failures are recorded for diagnostics.
 
 When a client's `since` cursor points to pruned entries, the `cursorExpired` flag is returned so the plugin falls back to full sync.
 

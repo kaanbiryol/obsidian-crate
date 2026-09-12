@@ -18,20 +18,20 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 	}
 
 	const forceSyncSetting = new Setting(containerEl)
-		.setName('Force full sync')
+		.setName('Replace server files')
 		.setDesc('Replace the server copy of your vault with local files. Files found only on the server will be deleted.')
 		.addButton(button => button
-			.setButtonText('Force full update')
+			.setButtonText('Replace server files')
 			.setDestructive()
 			.onClick(async () => {
 				const confirmed = await openConfirmationModal(plugin.app, {
-					title: 'Force full sync',
+					title: 'Replace server files',
 					message: 'Overwrite the remote vault with local files?',
 						details: [
 							'Remote-only files will be deleted.',
 							'Deleted and replaced remote files remain recoverable for 30 days.',
 					],
-					confirmText: 'Force full update',
+					confirmText: 'Replace server files',
 					warning: true,
 				});
 				if (!confirmed) {
@@ -40,7 +40,7 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 
 				await runButtonTask({
 					button,
-					idleText: 'Force full update',
+					idleText: 'Replace server files',
 					runningText: 'Syncing...',
 					onStart: () => {
 						showFileSyncProgress(forceProgress);
@@ -51,13 +51,13 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 					}),
 					onSuccess: (result) => {
 						if (result.success) {
-							new Notice(`Force sync complete: ${result.uploaded} uploaded, ${result.deleted} deleted`);
+							new Notice(`Server files replaced: ${result.uploaded} uploaded, ${result.deleted} deleted`);
 						} else {
-							showSyncErrorNotice(plugin, 'Force sync completed with errors.');
+							showSyncErrorNotice(plugin, 'Server file replacement completed with errors.');
 						}
 					},
 					onError: () => {
-						new Notice('Force full sync failed');
+						new Notice('Could not replace server files');
 					},
 					onFinally: () => {
 						hideFileSyncProgress(forceProgress);
@@ -66,42 +66,4 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 				});
 			}));
 	const forceProgress = createFileSyncProgress(forceSyncSetting);
-
-	new Setting(containerEl)
-		.setName('Remove ignored remote files')
-		.setDesc('Review and delete server copies matching your exclusions. Local files are kept.')
-		.addButton(button => button
-			.setButtonText('Review and remove')
-			.setDestructive()
-			.onClick(async () => {
-				await runButtonTask({
-					button,
-					idleText: 'Review and remove',
-					runningText: 'Checking...',
-					task: async () => {
-						const paths = await plugin.syncRuntime.previewIgnoredRemoteFiles();
-						if (paths.length === 0) return null;
-						const confirmed = await openConfirmationModal(plugin.app, {
-							title: 'Remove ignored remote files',
-							message: `Delete ${paths.length} ignored remote ${paths.length === 1 ? 'file' : 'files'}?`,
-							details: [
-								...paths.slice(0, 5),
-								...(paths.length > 5 ? [`…and ${paths.length - 5} more`] : []),
-								'Deleted files remain recoverable for 30 days.',
-							],
-							confirmText: 'Remove remote copies',
-							warning: true,
-						});
-						return confirmed ? plugin.syncRuntime.purgeIgnoredRemoteFiles() : undefined;
-					},
-					onSuccess: result => {
-						if (result === null) new Notice('No ignored remote files found');
-						else if (result?.errors.length) new Notice(`Removed ${result.deleted.length} files; ${result.errors.length} failed`);
-						else if (result) new Notice(`Removed ${result.deleted.length} ignored remote files`);
-					},
-					onError: () => {
-						new Notice('Could not remove ignored remote files');
-					},
-				});
-			}));
 }

@@ -1,3 +1,4 @@
+import { trackStagedUpload } from './staged-uploads';
 import { beginUploadOperation } from './upload-operations';
 import { sha256HexBytes } from './auth';
 import { readLimitedRequestBody } from './body-reader';
@@ -19,7 +20,7 @@ import {
 	type FileStorageRow,
 } from './sync-storage';
 
-export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database): Promise<Response> {
+export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Database, commitUpload = commitStagedFile): Promise<Response> {
 	const url = new URL(request.url);
 	const rawPath = url.searchParams.get('path');
 	if (!rawPath) return corsResponse({ error: 'Path query parameter required' }, 400);
@@ -85,14 +86,15 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 		}
 
 		const objectKey = createManagedObjectKey(hash);
-		await bucket.put(objectKey, body, {
+		await trackStagedUpload(db, objectKey);
+	await bucket.put(objectKey, body, {
 			httpMetadata: { contentType },
 			customMetadata: { hash },
 		});
 
 		let revision: string | undefined;
 		try {
-			const commit = await commitStagedFile(bucket, db, {
+			const commit = await commitUpload(bucket, db, {
 				path: safePath,
 				hash,
 				size,

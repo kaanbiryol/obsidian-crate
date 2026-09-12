@@ -1,4 +1,4 @@
-import { wakeNotificationCoordinator } from './notification-coordinator';
+import { cleanStagedUploads } from './maintenance/staged-upload-cleanup';
 import { pruneChangelog } from './db';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './storage/index';
 import type { Env } from './types';
@@ -7,19 +7,20 @@ import { sweepOrphanedManagedObjects } from './maintenance/orphan-sweep';
 import { pruneFileDeletionReceipts } from './file-delete-audit';
 import { pruneReminderOccurrences, pruneReminderOperations } from './maintenance/reminder-history';
 
-export async function runScheduledMaintenance(env: Env): Promise<void> {
+export async function runScheduledMaintenance(env: Env): Promise<number> {
 	const errors: string[] = [];
+  let removedObjects = 0;
 	const tasks: Array<[string, () => Promise<unknown>]> = [
 		['expire file versions', () => enqueueExpiredFileVersions(env.DB)],
-		['drain object cleanup', () => drainObjectCleanupQueue(env.BUCKET, env.DB)],
+		['drain object cleanup', async () => { removedObjects = await drainObjectCleanupQueue(env.BUCKET, env.DB); }],
 		['prune changelog', () => pruneChangelog(env.DB)],
 		['prune file deletion receipts', () => pruneFileDeletionReceipts(env.DB)],
 		['prune obsolete reminder occurrences', () => pruneReminderOccurrences(env.DB)],
 		['prune expired reminder operations', () => pruneReminderOperations(env.DB)],
 		['prune request limits', () => env.DB.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
 		['prune tokens', () => pruneExpiredTokens(env.DB)],
-		['wake notification projections', () => wakeNotificationCoordinator(env)],
-		['sweep orphaned objects', () => sweepOrphanedManagedObjects(env.BUCKET, env.DB)],
+		['clean unfinished uploads', async () => { removedObjects += await cleanStagedUploads(env.BUCKET, env.DB); }],
+		['scan legacy orphaned objects', () => sweepOrphanedManagedObjects(env.BUCKET, env.DB)],
 	];
 	for (const [name, task] of tasks) {
 		try {
@@ -31,4 +32,5 @@ export async function runScheduledMaintenance(env: Env): Promise<void> {
 		}
 	}
 	await recordMaintenanceRun(env.DB, errors);
+  return removedObjects;
 }

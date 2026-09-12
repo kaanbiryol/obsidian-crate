@@ -89,7 +89,7 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.updateWorkerSchedules).toHaveBeenCalledWith(
 			metadata.accountId,
 			metadata.workerName,
-			['*/15 * * * *'],
+			[],
 		);
 		expect(metadata.lastDeployedVersion).toBe('0.1.0');
 		expect(metadata.lastDeployedFingerprint).toBe('f'.repeat(64));

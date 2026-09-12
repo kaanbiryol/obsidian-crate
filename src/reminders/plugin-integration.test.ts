@@ -451,3 +451,15 @@ it('does not start normalization when unloaded during journal recovery', async (
   await flushMicrotasks();
   expect(reminderIndexFlushDeferredScans).not.toHaveBeenCalled();
  });
+
+it('stops the backend signal and watcher when reminders are disabled', async () => {
+  const { initializeReminders } = await loadPluginIntegrationModule();
+  const { stopReminderBackend } = await import('./runtime');
+  const plugin = createPlugin();
+  await initializeReminders(plugin as never);
+  const signal = reminderIndexFactory.mock.calls[0]![2] as AbortSignal;
+  expect(signal.aborted).toBe(false);
+  stopReminderBackend(plugin as never);
+  expect(signal.aborted).toBe(true);
+  expect(latestWatcher.unregister).toHaveBeenCalledOnce();
+});

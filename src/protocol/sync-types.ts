@@ -143,6 +143,9 @@ export interface BackendDiagnostics {
 	lastMaintenanceError: string | null;
 	oldestNotificationFailureAt?: string | null;
 	oldestOverdueNotificationAt?: string | null;
+	pausedUploadCleanup?: Array<{ storageKey: string; error: string }>;
+	pausedNotificationFiles?: Array<{ path: string; attempts: number; error: string }>;
+	pausedNotificationJobs?: Array<{ reminderId: string; attempts: number; error: string }>;
 	notificationProjectionIssues?: Array<{ path: string; reason: string }>;
 }
 

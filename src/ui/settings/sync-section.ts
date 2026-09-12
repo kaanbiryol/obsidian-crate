@@ -30,7 +30,7 @@ export function renderSyncSection(context: SyncSectionContext): void {
 
 	new Setting(containerEl)
 		.setName('Automatic sync')
-		.setDesc('Sync on startup, on resume, after file changes, and at regular intervals on this device. Turn off to sync only from the command palette or sync activity. A running sync will finish.')
+		.setDesc('This device · sync on startup, on resume, after file changes, and at regular intervals. Turn off to sync only from the command palette or sync activity. A running sync will finish.')
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.automaticSync)
 			.onChange(async automaticSync => {
@@ -43,7 +43,7 @@ export function renderSyncSection(context: SyncSectionContext): void {
 	if (plugin.settings.automaticSync) {
 		new Setting(containerEl)
 			.setName('Sync delay after editing (seconds)')
-			.setDesc('Wait this many seconds after a file changes before syncing. Set to 0 to sync immediately.')
+			.setDesc('This device · wait this many seconds after a file changes before syncing. Set to 0 to sync immediately.')
 			.addText(text => {
 				text.setValue(String(plugin.settings.debounceDelay));
 				const maximum = Math.floor(2_147_483_647 / 1000);
@@ -64,7 +64,7 @@ export function renderSyncSection(context: SyncSectionContext): void {
 
 	new Setting(containerEl)
 		.setName('Show sync status')
-		.setDesc('Show sync activity in the status bar. Applies to all devices.')
+		.setDesc('This device · show sync activity in the status bar.')
 		.addToggle(toggle => toggle
 			.setValue(plugin.settings.showStatusBar)
 			.onChange(async (value) => {

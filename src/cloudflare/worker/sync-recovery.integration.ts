@@ -108,11 +108,15 @@ describe('sync recovery', () => {
 			return statement;
 		});
 		const now = Date.now() + 2 * 24 * 60 * 60 * 1000;
+		await db.prepare("INSERT INTO maintenance_state(key, value) VALUES ('legacy_orphan_sweep_cutoff', ?)").bind(String(now - 86400_000)).run();
 		expect(await sweepOrphanedManagedObjects(bucket, db, now)).toBe(98);
-		expect(await db.prepare('SELECT value FROM maintenance_state').first()).not.toBeNull();
+		expect(await db.prepare("SELECT value FROM maintenance_state WHERE key = 'orphan_sweep_cursor'").first()).not.toBeNull();
 		expect(await sweepOrphanedManagedObjects(bucket, db, now)).toBe(1);
-		expect(await db.prepare('SELECT value FROM maintenance_state').first()).toBeNull();
+		expect(await db.prepare("SELECT value FROM maintenance_state WHERE key = 'orphan_sweep_cursor'").first()).toBeNull();
 		expect(bindingCounts).toEqual([100, 100, 2]);
+    const listing = vi.spyOn(bucket, 'list');
+    expect(await sweepOrphanedManagedObjects(bucket, db, now)).toBe(0);
+    expect(listing).not.toHaveBeenCalled();
 		expect((await bucket.list()).objects.map(object => object.key)).toEqual([keys[0], keys[99]]);
 	});
 });

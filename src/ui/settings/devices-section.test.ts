@@ -18,7 +18,8 @@ async function loadDevicesSectionModule() {
 	vi.doMock('../confirmation-modal', () => ({
 		openConfirmationModal,
 	}));
-	vi.doMock('./section-helpers', () => ({
+	vi.doMock('./section-helpers', async importOriginal => ({
+		...await importOriginal<typeof import('./section-helpers')>(),
 		createSettingsSectionHeading: vi.fn(),
 	}));
 

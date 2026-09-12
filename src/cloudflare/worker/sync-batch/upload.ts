@@ -1,3 +1,4 @@
+import { trackStagedUpload } from '../staged-uploads';
 import { beginUploadOperation, type UploadOperation } from '../upload-operations';
 import { sha256HexBytes } from '../auth';
 import { corsResponse } from '../cors';
@@ -28,6 +29,7 @@ export async function handleBatchUpload(
 	request: Request,
 	bucket: R2Bucket,
 	db: D1Database,
+  commitUpload = commitStagedFile,
 ): Promise<Response> {
 	const parsedBody = await parseJsonObject(request, 15 * 1024 * 1024);
 	if (!parsedBody.ok) {
@@ -165,11 +167,12 @@ export async function handleBatchUpload(
 	let metadataFailure = false;
 	await Promise.all(uploads.map(async (file) => {
 		try {
+			await trackStagedUpload(db, file.objectKey);
 			await bucket.put(file.objectKey, file.bytes, {
 				httpMetadata: { contentType: file.contentType },
 				customMetadata: { hash: file.hash },
 			});
-			const commit = await commitStagedFile(bucket, db, {
+			const commit = await commitUpload(bucket, db, {
 				operation: file.operation,
 				path: file.safePath,
 				hash: file.hash,

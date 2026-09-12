@@ -1,3 +1,4 @@
+import { useRemindersSettingsStore } from "../../settings";
 import { Modal, Platform } from "obsidian";
 import type { ReactElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
@@ -12,6 +13,7 @@ const log = createLogger("ReminderEditModal");
 
 abstract class BaseReminderModal extends Modal {
   protected readonly plugin: CratePlugin;
+  private unsubscribeSettings?: () => void;
   private root: Root | undefined;
 
   constructor(plugin: CratePlugin) {
@@ -22,6 +24,8 @@ abstract class BaseReminderModal extends Modal {
   protected abstract renderContent(): ReactElement;
 
   onOpen(): void {
+    if (!this.plugin.remindersSettings.enabled) { this.close(); return; }
+    this.unsubscribeSettings = useRemindersSettingsStore.subscribe(state => { if (!state.enabled) this.close(); });
     const { contentEl } = this;
     const isMobile = Platform.isMobile;
 
@@ -47,6 +51,8 @@ abstract class BaseReminderModal extends Modal {
   }
 
   onClose(): void {
+    this.unsubscribeSettings?.();
+    this.unsubscribeSettings = undefined;
     this.root?.unmount();
     this.contentEl.removeClasses(["crate-reminder-editor-modal__content", "crate-reminders-ui"]);
   }

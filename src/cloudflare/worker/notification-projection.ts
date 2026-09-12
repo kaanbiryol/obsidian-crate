@@ -1,10 +1,12 @@
+import { recordFileFailure } from './notification-file-retries';
+import { READY_PROJECTION_JOBS_SQL } from './notification-queue';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { queryRows } from './db';
 import { assertUniqueReminderSources } from './reminder-source-identity';
 import { getStoredFileRow } from './sync-storage';
 import { readStoredMarkdownFiles } from './storage';
 import { getNotificationPolicy } from './notification-policy';
-import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE } from './reminder-source-parse';
+import { parseReminderSource, REMINDER_SOURCE_SIZE_ISSUE, PermanentReminderSourceError, isPermanentSourceError } from './reminder-source-parse';
 import { REMINDER_INDEX_MAX_FILE_BYTES } from './reminders-web/reminder-cache';
 import { hasVerifiedReminderSource } from './reminder-source-state';
 import type { Env } from './types';
@@ -22,20 +24,20 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
   const policy = await getNotificationPolicy(env.DB);
   if (!policy) return;
   const jobs = await queryRows<{ path: string; job_token: string }>(env.DB.prepare(
-    `SELECT path, job_token FROM notification_projection_jobs WHERE last_error IS NULL OR updated_at < datetime('now', '-1 hour') ORDER BY updated_at, path LIMIT ?`).bind(limit));
+    READY_PROJECTION_JOBS_SQL).bind(limit, limit, limit));
   for (const job of jobs) {
     try {
       const file = await getStoredFileRow(env.DB, job.path);
       let reminders: RemoteReminderRecord[] = [];
       if (file) {
-        if (file.size > REMINDER_INDEX_MAX_FILE_BYTES) throw new Error(REMINDER_SOURCE_SIZE_ISSUE);
+        if (file.size > REMINDER_INDEX_MAX_FILE_BYTES) throw new PermanentReminderSourceError(REMINDER_SOURCE_SIZE_ISSUE);
         const [text] = await readStoredMarkdownFiles(env.BUCKET, [{ path: job.path, ...file }]);
         if (!text) throw new Error('Committed reminder content could not be verified');
         // Policy changes can revisit sources outside the current folder. Their
         // uncertain content still cannot authorize removal of prior reminders.
         const parsed = parseReminderSource(job.path, text.content, policy.folderPath);
-        if (parsed.issue) throw new Error(parsed.issue);
-        if (!await hasVerifiedReminderSource(env.DB, job.path, file.storageKey)) throw new Error('Reminder source is awaiting verification with the current parser. Maintenance will retry. The vault file remains synced.');
+        if (parsed.issue) throw new PermanentReminderSourceError(parsed.issue);
+        if (!await hasVerifiedReminderSource(env.DB, job.path, file.storageKey)) throw new Error('Reminder source is awaiting verification with the current parser. Processing will retry within its retry budget. The vault file remains synced.');
         if (job.path.startsWith(`${policy.folderPath}/`)) reminders = parsed.reminders;
       }
       await assertUniqueReminderSources(env.DB, policy.folderPath, reminders.map(reminder => reminder.id));
@@ -45,7 +47,7 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
       const observed = new Map(sources.map(row => [row.reminder_id, row]));
       const ids = new Set<string>();
       const operations = reminders.map(reminder => {
-        if (ids.has(reminder.id)) throw new Error('Duplicate reminder identity in committed file');
+        if (ids.has(reminder.id)) throw new PermanentReminderSourceError('Duplicate reminder identity in committed file');
         ids.add(reminder.id);
         const dueDatetime = notificationDatetime(reminder, policy);
         const source = observed.get(reminder.id);
@@ -57,7 +59,7 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
         } : null };
       });
       const json = JSON.stringify(operations);
-      if (new TextEncoder().encode(json).byteLength > 1536 * 1024) throw new Error('Split this reminder note into smaller files to schedule notifications');
+      if (new TextEncoder().encode(json).byteLength > 1536 * 1024) throw new PermanentReminderSourceError('Split this reminder note into smaller files to schedule notifications');
       const guard = `EXISTS (SELECT 1 FROM notification_projection_jobs WHERE path = ? AND job_token = ?)
         AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
         AND ${file ? 'EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)' : 'NOT EXISTS (SELECT 1 FROM files WHERE path = ?)'} `;
@@ -79,11 +81,16 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
           ON CONFLICT(reminder_id) DO UPDATE SET file_path = excluded.file_path, file_revision = excluded.file_revision,
           notification_token = excluded.notification_token, policy_revision = excluded.policy_revision`)
           .bind(job.path, file?.storageKey ?? '', token, policy.revision, json, ...args),
+        env.DB.prepare(`DELETE FROM notification_file_retries WHERE path = ? AND ${guard}`).bind(job.path, ...args),
         env.DB.prepare(`DELETE FROM notification_projection_jobs WHERE path = ? AND ${guard}`).bind(job.path, ...args),
       ]);
     } catch (error) {
-      await env.DB.prepare("UPDATE notification_projection_jobs SET last_error = ?, updated_at = datetime('now') WHERE path = ? AND job_token = ?")
-        .bind(error instanceof Error ? error.message.slice(0, 512) : 'Projection failed', job.path, job.job_token).run();
+      const message = error instanceof Error ? error.message.slice(0, 512) : 'Projection failed';
+      await env.DB.batch([
+        env.DB.prepare("UPDATE notification_projection_jobs SET last_error = ?, updated_at = datetime('now') WHERE path = ? AND job_token = ?")
+          .bind(message, job.path, job.job_token),
+        recordFileFailure(env.DB, job.path, message, 'EXISTS (SELECT 1 FROM notification_projection_jobs WHERE path = ? AND job_token = ?)', [job.path, job.job_token], isPermanentSourceError(error)),
+      ]);
     }
   }
 }

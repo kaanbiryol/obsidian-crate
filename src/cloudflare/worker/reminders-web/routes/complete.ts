@@ -4,7 +4,6 @@ import { writeCommittedMarkdownFile } from '../../storage';
 import type { Env } from '../../types';
 import { parseJsonObject, parseOptionalString } from '../../utils';
 import { setReminderCompletedInFileContent } from '../file-content';
-import { projectReminderNotifications } from '../notifications';
 import { parseReminderMutationWorkspace, parseReminderSourceFilePath } from '../requests';
 import { saveReminderFileCache } from '../reminder-cache';
 import { scanReminderMarkdownFile, toReminderPayload } from '../scan';
@@ -44,10 +43,8 @@ export async function handleSetReminderCompleted(request: Request, env: Env): Pr
 		reminderOperationEffects(env.DB, operation, response));
 	await saveReminderFileCache(env.DB, workspaceResult.folderPath, reminder.filePath, write.hash, reminders);
 
-	const notificationWarning = await projectReminderNotifications(env);
 	return corsResponse({
 		success: true,
 		reminder: updatedReminder ? await toReminderPayload(updatedReminder) : undefined,
-		notificationWarning,
 	});
 }

@@ -29,6 +29,13 @@ export async function recoverInterruptedReminderMoves(plugin: CratePlugin): Prom
 	if (!issues.length) new Notice('Interrupted reminder moves recovered.');
 }
 
+export function stopReminderBackend(plugin: CratePlugin): void {
+	backends.get(plugin)?.abort();
+	backends.delete(plugin);
+	plugin.remindersVaultWatcher?.unregister();
+	plugin.remindersVaultWatcher = undefined;
+}
+
 export async function setupReminderBackend(plugin: CratePlugin, folderPath: string): Promise<boolean> {
 	const lifetime = getPluginLifecycleSignal(plugin);
 	if (lifetime.aborted) return false;

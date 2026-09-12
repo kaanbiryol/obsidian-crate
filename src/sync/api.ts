@@ -105,6 +105,10 @@ export class SyncApiClient {
 		return this.syncApi.testConnection();
 	}
 
+  async retryPausedNotifications(): Promise<{ retried: number; more: boolean }> {
+    return this.http.requestJson('/notifications/retry', { method: 'POST' });
+  }
+
 	async getDiagnostics(): Promise<BackendDiagnostics> {
 		return this.syncApi.getDiagnostics();
 	}

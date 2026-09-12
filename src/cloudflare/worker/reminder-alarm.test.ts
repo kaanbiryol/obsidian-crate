@@ -12,7 +12,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 });
 
-function createHarness() {
+function createHarness(authority = true) {
 	const reminder = {
 		reminderId: 'reminder-1',
 		scheduleToken: 'schedule-token-1',
@@ -51,7 +51,7 @@ function createHarness() {
 	};
 	const first = vi.fn(async (): Promise<typeof scheduledReminder | null> => scheduledReminder);
 	const db = {
-		prepare: vi.fn((sql: string) => ({ bind: vi.fn(() => ({ run, first: sql.includes('SELECT job_token') ? async () => ({ job_token: 'current-job' }) : sql.includes('LEFT JOIN reminder_projections')
+		prepare: vi.fn((sql: string) => ({ bind: vi.fn(() => ({ run, first: sql.includes('SELECT 1 FROM reminder_projections') ? async () => authority ? { ok: 1 } : null : sql.includes('SELECT job_token') ? async () => ({ job_token: 'current-job' }) : sql.includes('LEFT JOIN reminder_projections')
             ? async () => ({ file_revision: 'source', storage_key: 'source', pending_path: null, enabled: 1,
                 notification_token: scheduledReminder.schedule_token, policy_revision: 'policy', current_policy_revision: 'policy' })
             : first })) })),
@@ -319,3 +319,12 @@ describe('reminder alarm delivery', () => {
 		expect(harness.deleteAlarm).toHaveBeenCalledOnce();
 	});
 });
+
+ it('stops retrying when source authority never becomes available', async () => {
+   const harness = createHarness(false);
+   for (let attempt = 0; attempt < 11; attempt++) await harness.alarm.alarm();
+   expect(harness.setAlarm).toHaveBeenCalledTimes(10);
+   expect(harness.deleteAlarm).toHaveBeenCalledOnce();
+   expect(harness.storedValues.get('deliveryFailure')).toMatchObject({ attempts: 10 });
+   expect(sendToAllSubscriptions).not.toHaveBeenCalled();
+ });

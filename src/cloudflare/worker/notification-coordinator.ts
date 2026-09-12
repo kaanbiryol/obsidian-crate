@@ -1,14 +1,9 @@
+import { NEXT_NOTIFICATION_WORK_SQL, NEXT_SOURCE_RETRY_SQL } from './notification-queue';
 import { getNotificationPolicy } from './notification-policy';
 import type { Env } from './types';
 import { drainNotificationProjections } from './notification-projection';
 import { drainNotificationJobs } from './notification-outbox';
 import { revalidateReminderSources } from './reminder-source-migration';
-
-export async function wakeNotificationCoordinator(env: Env): Promise<void> {
-  const stub = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
-  const response = await stub.fetch('https://do/project', { method: 'POST' });
-  if (!response.ok) throw new Error('Notification projection wakeup failed; maintenance will retry');
-}
 
 export async function runNotificationCoordinator(state: DurableObjectState, env: Env): Promise<void> {
   let sourceWork = false;
@@ -23,10 +18,17 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
       await drainNotificationJobs(env, 2);
     }
   } finally {
-    const pending = await env.DB.prepare(`SELECT
-      (SELECT COUNT(*) FROM notification_projection_jobs) + (SELECT COUNT(*) FROM notification_jobs) AS count,
-      (SELECT COUNT(*) FROM notification_projection_jobs WHERE last_error IS NULL) +
-      (SELECT COUNT(*) FROM notification_jobs WHERE available_at <= ?) AS ready`).bind(Date.now()).first<{ count: number; ready: number }>();
-    if (sourceWork || hasPolicy && pending?.count) await state.storage.setAlarm(Date.now() + (sourceWork || pending && pending.ready > 0 ? 1_000 : 60_000));
+    if (sourceWork) {
+      await state.storage.setAlarm(Date.now() + 1_000);
+    } else {
+      const source = hasPolicy ? null : await env.DB.prepare(NEXT_SOURCE_RETRY_SQL)
+        .first<{ retryAt: number | null }>();
+      const pending = hasPolicy ? await env.DB.prepare(NEXT_NOTIFICATION_WORK_SQL)
+        .first<{ ready: number; projectionRetry: number | null; dispatchAt: number | null }>() : null;
+      const deadlines = [source?.retryAt, pending?.projectionRetry, pending?.dispatchAt,
+        ...(pending?.ready ? [0] : [])].filter((value): value is number => typeof value === 'number');
+      // Idle coordinators leave no alarm behind. Failed jobs sleep until due.
+      if (deadlines.length) await state.storage.setAlarm(Math.max(Date.now() + 1_000, Math.min(...deadlines)));
+    }
   }
 }

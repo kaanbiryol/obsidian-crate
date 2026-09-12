@@ -3,7 +3,7 @@ import type { CachedDevicesState } from '../../plugin/settings-ui-state';
 import type CratePlugin from '../../main';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import { openConfirmationModal } from '../confirmation-modal';
-import { createSettingsSectionHeading } from './section-helpers';
+import { createSettingsDisclosure, createSettingsSectionHeading } from './section-helpers';
 
 export interface DevicesSectionContext {
 	containerEl: HTMLElement;
@@ -50,9 +50,13 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 			const setting = new Setting(listContainer)
 				.setName(label)
 				.setDesc(formatDeviceDescription(token));
+			if (token.device_id) {
+				const details = createSettingsDisclosure(setting.descEl, 'Device details');
+				details.createEl('p', { text: `Device ID: ${token.device_id} · Added ${formatDateTime(token.created_at)}` });
+			}
 			if (token.is_current) continue;
 			setting.addButton(button => {
-				button.setButtonText('Remove').setDestructive();
+				button.setButtonText(token.platform === 'pwa' ? 'Disconnect session' : 'Disconnect device').setDestructive();
 				button.onClick(async () => {
 					const webSession = token.platform === 'pwa';
 					const confirmed = await openConfirmationModal(plugin.app, {
@@ -129,9 +133,7 @@ function orderDevices(tokens: RegisteredDevice[]): RegisteredDevice[] {
 function formatDeviceDescription(token: RegisteredDevice): string {
 	const parts: string[] = [];
 
-	if (token.is_current) {
-		parts.push('Current device');
-	} else if (token.last_seen_at) {
+	if (token.last_seen_at) {
 		parts.push(`Last seen ${formatDateTime(token.last_seen_at)}`);
 	} else {
 		parts.push('Not used yet');
@@ -140,10 +142,6 @@ function formatDeviceDescription(token: RegisteredDevice): string {
 	if (token.platform) {
 		parts.push(formatPlatform(token.platform));
 	}
-	if (token.device_id) {
-		parts.push(token.device_id);
-	}
-	parts.push(`Added ${formatDateTime(token.created_at)}`);
 
 	return parts.join(' • ');
 }

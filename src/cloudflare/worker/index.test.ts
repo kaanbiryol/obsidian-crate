@@ -1,6 +1,6 @@
 import { CRATE_PLUGIN_PROTOCOL } from '@/protocol';
 import { describe, expect, it, vi } from 'vitest';
-import worker from './index';
+import worker, { ReminderAlarm } from './index';
 import { PWA_ASSET_VERSION } from './pwa-version';
 import { CRATE_SERVER_INFO } from './server-info';
 import type { Env } from './types';
@@ -92,10 +92,25 @@ function createDb(
 }
 
 function createEnv(overrides?: Partial<Env>): Env {
-	return {
-		...createEnvDefaults(),
-		...overrides,
-	};
+  const env = { ...createEnvDefaults(), ...overrides };
+  const objects = new Map<string, ReminderAlarm>();
+  env.REMINDER_ALARMS = {
+    idFromName: (name: string) => name,
+    get: (name: string) => {
+      if (!objects.has(name)) {
+        const values = new Map<string, unknown>();
+        let alarm: number | null = null;
+        objects.set(name, new ReminderAlarm({ storage: {
+          get: async (key: string) => values.get(key),
+          put: async (key: string, value: unknown) => { values.set(key, value); },
+          getAlarm: async () => alarm,
+          setAlarm: async (time: number) => { alarm = time; },
+        } } as never, env));
+      }
+      return { fetch: (input: RequestInfo, init?: RequestInit) => objects.get(name)!.fetch(new Request(input, init)) };
+    },
+  } as never;
+  return env;
 }
 
 function createEnvDefaults(): Env {

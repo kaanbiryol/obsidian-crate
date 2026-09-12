@@ -25,6 +25,7 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
     ? db.prepare('INSERT INTO notification_policy (id, folder_path, timezone, all_day_time, revision, enabled) VALUES (1, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(folder, timezone, allDayTime, revision, enabled ? 1 : 0)
     : db.prepare('UPDATE notification_policy SET folder_path = ?, timezone = ?, all_day_time = ?, revision = ?, enabled = ? WHERE id = 1 AND revision = ?').bind(folder, timezone, allDayTime, revision, enabled ? 1 : 0, typeof expectedRevision === 'string' ? expectedRevision : '');
   const results = await db.batch([mutation,
+    db.prepare('DELETE FROM notification_file_retries WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)').bind(revision),
     db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
       SELECT path, ? FROM files WHERE lower(path) LIKE '%.md' AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
       ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`).bind(revision, revision),
