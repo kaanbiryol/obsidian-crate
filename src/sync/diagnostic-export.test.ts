@@ -45,7 +45,7 @@ describe('safe diagnostic export', () => {
 		await source.requestJson('/sync/check');
 		vi.spyOn(client, 'getRequestDiagnostics').mockReturnValue(source.getRequestDiagnostics());
 		vi.spyOn(client, 'getManifest').mockRejectedValue(new Error(`${sensitive}.md: ${sensitive}`));
-		await h.runtime.verifyAllFiles();
+		await h.runtime.sync();
 		const settings = normalizeCrateSettings(h.settings, '.obsidian');
 		expect(settings.syncHistory[0]?.requestDiagnostics?.requests[0]?.requestId).toBe(requestId);
 		const report = buildDiagnosticExport(settings, h.runtime.getState(), '0.1.0');
