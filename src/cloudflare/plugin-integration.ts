@@ -169,7 +169,7 @@ export async function handleCloudflareOAuthProtocol(
 
 	progress.succeed(
 		isReset ? 'Crate server reset' : 'Crate is connected',
-		isReset ? 'This device is connected. Run Initial sync → Upload all to seed the server. Reconnect other devices and set up web push again.' : 'No vault files were transferred. Use Initial sync to seed a new server, or Sync now to join an existing one.',
+		isReset ? 'This device is connected. Select Sync now to sync this vault with the server. Reconnect other devices and set up web push again.' : 'Connected. Select Sync now to sync this vault with the server.',
 	);
 }
 

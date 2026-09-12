@@ -17,53 +17,6 @@ export function renderInfrastructureSyncActions(context: InfrastructureSectionCo
 		return;
 	}
 
-	const initialSyncSetting = new Setting(containerEl)
-		.setName('Initial sync')
-		.setDesc('Upload all local files included in sync. Use this when setting up a new server.')
-		.addButton(button => button
-			.setButtonText('Upload all')
-			.setDestructive()
-			.onClick(async () => {
-				const confirmed = await openConfirmationModal(plugin.app, {
-					title: 'Upload all local files',
-					message: 'Upload all local files in this vault to the sync server?',
-					details: ['Use this for first-time setup on a new remote.'],
-					confirmText: 'Upload all',
-					warning: true,
-				});
-				if (!confirmed) {
-					return;
-				}
-
-				await runButtonTask({
-					button,
-					idleText: 'Upload all',
-					runningText: 'Uploading...',
-					onStart: () => {
-						showFileSyncProgress(initialProgress);
-					},
-					task: async ({ setButtonText }) => plugin.syncRuntime.initialSync((current, total) => {
-						setButtonText(`Uploading... ${current}/${total}`);
-						updateFileSyncProgress(initialProgress, current, total);
-					}),
-					onSuccess: (result) => {
-						if (result.success) {
-							new Notice(`Initial sync complete: ${result.uploaded} files uploaded`);
-						} else {
-							showSyncErrorNotice(plugin, 'Initial sync completed with errors.');
-						}
-					},
-					onError: () => {
-						new Notice('Initial sync failed');
-					},
-					onFinally: () => {
-						hideFileSyncProgress(initialProgress);
-						rerender();
-					},
-				});
-			}));
-	const initialProgress = createFileSyncProgress(initialSyncSetting);
-
 	const forceSyncSetting = new Setting(containerEl)
 		.setName('Force full sync')
 		.setDesc('Replace the server copy of your vault with local files. Files found only on the server will be deleted.')
