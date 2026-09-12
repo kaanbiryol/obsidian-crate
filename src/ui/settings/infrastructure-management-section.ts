@@ -1,5 +1,6 @@
 import { renderServerResetSetting } from './server-reset-setting';
 import { Notice, Setting } from 'obsidian';
+import { SyncDiagnosticsModal } from '../sync-diagnostics-modal';
 import { runSyncDiagnostics } from '../../sync/diagnostics';
 import { getErrorMessage, runButtonTask } from './action-helpers';
 import {
@@ -61,6 +62,15 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 							diagnosticsSetting.descEl.textContent = originalDesc;
 						},
 					});
+				}));
+
+		new Setting(containerEl)
+			.setName('Export diagnostics')
+			.setDesc('Review and copy a sync report to share with support.')
+			.addButton(button => button
+				.setButtonText('Export')
+				.onClick(() => {
+					new SyncDiagnosticsModal(plugin.app, plugin.syncRuntime.exportDiagnostics()).open();
 				}));
 
 		new Setting(containerEl)

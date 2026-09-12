@@ -430,11 +430,10 @@ export class SyncEngine {
 		return this.trackWork(() => this.contentVerifier.verify(this.vault, this.localManifest, files, this.lifecycle.abortSignal));
 	}
 
-	async sync(progressCallback?: (current: number, total: number) => void, verifyAll = false): Promise<SyncResult> {
+	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		return this.trackWork(async () => {
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			const workflow = this.contexts.syncWorkflow();
-			if (verifyAll) workflow.incrementalSync = async () => null;
 			const result = await runSyncWorkflow(workflow, progressCallback);
 			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 			if (result.success) {

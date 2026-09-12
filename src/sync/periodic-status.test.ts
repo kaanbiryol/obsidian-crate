@@ -40,7 +40,7 @@ describe('periodic sync status', () => {
 		h.api.checkForChanges.mockRejectedValueOnce(new Error('network unavailable'));
 		await runPeriodicCheck(h.engine);
 		h.api.getManifest.mockRejectedValueOnce(new Error('vault reconciliation failed'));
-		await h.engine.sync(undefined, true);
+		await h.engine.sync();
 		await runPeriodicCheck(h.engine);
 		expect(h.engine.getState()).toMatchObject({ status: 'error', lastError: 'vault reconciliation failed' });
 		h.engine.destroy();

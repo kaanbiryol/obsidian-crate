@@ -108,18 +108,6 @@ describe('content verification independent of filesystem fingerprints', () => {
 		}
 	});
 
-	it('exposes an immediate safe verification path even with a valid incremental cursor', async () => {
-		const h = createHarness({ lastSeq: 42 });
-		h.vault.getFiles.mockReturnValue([]);
-		h.vault.adapter.list.mockResolvedValue({ files: [], folders: [] });
-		h.api.getManifest.mockResolvedValue({ version: 1, files: {}, lastSeq: 42 });
-		expect((await h.engine.sync(undefined, true)).success).toBe(true);
-		expect(h.api.getManifest).toHaveBeenCalledOnce();
-		expect(h.api.getChanges).not.toHaveBeenCalled();
-		expect(h.api.batchDelete).not.toHaveBeenCalled();
-		h.engine.destroy();
-	});
-
 	it('hands a periodic fingerprint mismatch to the real incremental upload path', async () => {
 		const h = createHarness({ lastSeq: 42 });
 		const path = 'notes/edit.md';

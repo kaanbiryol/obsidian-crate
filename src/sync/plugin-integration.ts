@@ -4,8 +4,6 @@ import type CratePlugin from '../main';
 import { type ForegroundSyncReason, SyncRuntime } from './runtime';
 import { notifyConflicts } from './conflict';
 import { ActivityModal } from '../ui/activity-modal';
-import { SyncDiagnosticsModal } from '../ui/sync-diagnostics-modal';
-import { openConfirmationModal } from '../ui/confirmation-modal';
 import { applySharedSettings } from './shared-settings';
 import { SyncApiClient } from './api';
 import { errorMessage } from '../plugin/logger';
@@ -27,20 +25,6 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 
 export function registerSyncCommands(plugin: CratePlugin): void {
 	plugin.addCommand({
-		id: 'export-sync-diagnostics', name: 'Export sync diagnostics',
-		callback: () => new SyncDiagnosticsModal(plugin.app, plugin.syncRuntime.exportDiagnostics()).open(),
-	});
-	plugin.addCommand({
-		id: 'verify-all-synced-files',
-		name: 'Verify all synced files',
-		checkCallback: checking => {
-			const available = plugin.syncRuntime.isConfigured();
-			if (!checking && available) void runSyncNow(plugin, true);
-			return available;
-		},
-	});
-
-	plugin.addCommand({
 		id: 'sync-now',
 		name: 'Sync now',
 		checkCallback: (checking) => {
@@ -53,87 +37,23 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 	});
 
 	plugin.addCommand({
-		id: 'test-connection',
-		name: 'Test connection',
-		checkCallback: (checking) => {
-			const available = plugin.syncRuntime.isConfigured();
-			if (!checking && available) {
-				void runConnectionTest(plugin);
-			}
-			return available;
-		},
-	});
-
-	plugin.addCommand({
 		id: 'show-activity',
 		name: 'Show sync activity',
 		callback: () => {
 			new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();
 		},
 	});
-
-	plugin.addCommand({
-		id: 'force-full-sync',
-		name: 'Force full sync (overwrite remote)',
-		checkCallback: (checking) => {
-			const available = plugin.syncRuntime.isConfigured();
-			if (!checking && available) {
-				void runForceFullSync(plugin);
-			}
-			return available;
-		},
-	});
 }
 
-async function runSyncNow(plugin: CratePlugin, verifyAll = false): Promise<void> {
+async function runSyncNow(plugin: CratePlugin): Promise<void> {
 	try {
-		if (verifyAll) new Notice('Verifying file contents...');
-		const result = await (verifyAll ? plugin.syncRuntime.verifyAllFiles() : plugin.syncRuntime.sync());
+		const result = await plugin.syncRuntime.sync();
 		if (!result.success) {
 			showSyncErrorNotice(plugin, 'Sync completed with errors.');
-		} else if (verifyAll) new Notice('File verification complete.');
+		}
 		notifyConflicts(result.conflicts);
 	} catch (error) {
 		new Notice(`Sync failed: ${errorMessage(error)}`);
-	}
-}
-
-async function runConnectionTest(plugin: CratePlugin): Promise<void> {
-	try {
-		const result = await plugin.syncRuntime.testConnection();
-		if (result.success) {
-			new Notice('Connection successful!');
-		} else {
-			new Notice(`Connection failed: ${result.error}`);
-		}
-	} catch (error) {
-		new Notice(`Connection test failed: ${errorMessage(error)}`);
-	}
-}
-
-async function runForceFullSync(plugin: CratePlugin): Promise<void> {
-	const confirmed = await openConfirmationModal(plugin.app, {
-		title: 'Force full sync',
-		message: 'Overwrite the remote vault with local files?',
-		details: [
-			'Remote-only files will be deleted.',
-			'Deleted and replaced remote files remain recoverable for 30 days.',
-		],
-		confirmText: 'Force full sync',
-		warning: true,
-	});
-	if (!confirmed) return;
-
-	new Notice('Force full sync started...');
-	try {
-		const result = await plugin.syncRuntime.forceFullSync();
-		if (result.success) {
-			new Notice(`Force sync complete: ${result.uploaded} uploaded, ${result.deleted} deleted`);
-		} else {
-			showSyncErrorNotice(plugin, 'Force sync completed with errors.');
-		}
-	} catch (error) {
-		new Notice(`Force full sync failed: ${errorMessage(error)}`);
 	}
 }
 
