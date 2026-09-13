@@ -72,3 +72,11 @@ it('accepts protocol-7 upload and reminder receipts on protocol 8, while fencing
  expect((await worker.fetch(request('/sync/restore-version', '7', 'POST', JSON.stringify({ storageKey: 'legacy', expectedHash: null })), env)).status).toBe(428);
  expect((await env.DB.prepare('SELECT * FROM files ORDER BY path').all()).results).toEqual(before);
 });
+
+it('reports server elapsed time for successful and rejected requests', async () => {
+  for (const [path, protocol, method] of [['/.well-known/crate', undefined, 'GET'], ['/sync/upload', 'invalid', 'PUT']] as const) {
+    const response = await worker.fetch(request(path, protocol, method), env);
+    expect(response.headers.get('Server-Timing')).toMatch(/^crate;dur=\d+(\.\d+)?$/);
+    expect(response.headers.get('Access-Control-Expose-Headers')).toContain('Server-Timing');
+  }
+});

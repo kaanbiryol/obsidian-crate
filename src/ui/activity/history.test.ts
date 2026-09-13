@@ -73,3 +73,11 @@ describe('activity history', () => {
         expect(container.collectText()).toContain('No changes');
     });
 });
+
+it('does not expose saved timing diagnostics in history', () => {
+  const element = render({ uploaded: 0, uploadedPaths: [], timings: {
+    totalMs: 2000, phases: { scanning: 1500, saving: 500 },
+  } });
+  expect(element.collectText()).not.toContain('Timing details');
+  expect(find(element, 'crate-history-details')).toBeUndefined();
+});

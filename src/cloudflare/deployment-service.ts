@@ -1,3 +1,4 @@
+import { recoverDeployment, type DeploymentRecoveryResult } from './deployment-recovery';
 import { deleteCrateServer } from './server-delete';
 import { resetCrateServer } from './server-reset';
 import type { CrateSettings } from '../plugin/settings';
@@ -108,6 +109,8 @@ export class CloudflareDeploymentService {
 		this.oauthClient = new CloudflareOAuthClient(options.clientId, options.transport);
 		this.now = options.now ?? Date.now;
 	}
+
+	get isBusy(): boolean { return this.handlingCallback; }
 
 	get pendingIntent(): PendingOAuthSession['intent'] | null {
 		return this.pendingSession?.intent ?? null;
@@ -368,6 +371,28 @@ export class CloudflareDeploymentService {
 			return result;
 		} finally { this.handlingCallback = false; }
 	}
+
+    async recoverUpdate(withAuthorization: <T>(operation: (tokens: CloudflareOAuthTokens) => Promise<T>) => Promise<T>): Promise<DeploymentRecoveryResult> {
+        this.lifetime.signal.throwIfAborted();
+        if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
+        const metadata = structuredClone(this.options.settingsOwner.settings.cloudflareDeployment);
+        if (!metadata?.accountId) throw new Error('Connect to your Cloudflare account first.');
+        this.checkSavedTarget(metadata, 'update');
+        this.handlingCallback = true;
+        try {
+            return await withAuthorization(async tokens => {
+                const api = new CloudflareApiClient(tokens.accessToken, async (url, request) => {
+                    this.lifetime.signal.throwIfAborted();
+                    this.checkSavedTarget(metadata, 'update');
+                    const response = await this.options.transport(url, request);
+                    this.lifetime.signal.throwIfAborted();
+                    this.checkSavedTarget(metadata, 'update');
+                    return response;
+                });
+                return recoverDeployment(api, metadata);
+            });
+        } finally { this.handlingCallback = false; }
+    }
 
 	private checkSavedTarget(expected: CloudflareDeploymentMetadata, intent: PendingOAuthSession['intent']): void {
 		const current = this.options.settingsOwner.settings.cloudflareDeployment;

@@ -1,3 +1,4 @@
+import { BULK_NEW_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { reminderOperationDay } from '../../protocol/reminder-operation';
 import type { AuthPrincipal } from './authenticate';
 
@@ -44,7 +45,7 @@ export async function logMutation(request: Request, response: Response, requestI
     route: /^\/(sync|reminders|notifications|auth)\/[a-z-]+$/.test(path) ? path : 'other',
     clientSession: opaque(request.headers.get('X-Crate-Client-Session')),
     operationId: opaque(request.headers.get('X-Crate-Operation-Id')),
-    uploadOperationIds: (request.headers.get('X-Crate-Upload-Operation') ?? request.headers.get('X-Crate-Upload-Operations') ?? '').split(',').filter(id => reminderOperationDay(id) !== null).slice(0, 3),
+    uploadOperationIds: (request.headers.get('X-Crate-Upload-Operation') ?? request.headers.get('X-Crate-Upload-Operations') ?? '').split(',').filter(id => reminderOperationDay(id) !== null).slice(0, BULK_NEW_UPLOAD_MAX_FILES),
     deviceId: principal.tokenId, scope: principal.scope, revisions, consumedRevisions, deleteRequestIds,
   });
 }

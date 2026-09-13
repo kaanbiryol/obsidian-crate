@@ -7,6 +7,7 @@ import type { UploadDiff, PreparedUpload, SyncResult } from './types';
 import { recordResolvedRace } from './sync-result';
 
 export interface FullSyncUploadContext {
+	reportWork?(phase: import('./types').SyncWork['phase'], current?: number, total?: number): void;
 	prepareFullSyncUpload(diff: UploadDiff): Promise<PreparedUpload | null>;
 	uploadPreparedFiles(prepared: PreparedUpload[], result: SyncResult, options: UploadPreparedFilesOptions): Promise<void>;
 	getLocalManifestEntry(path: string): FileEntry | undefined;
@@ -16,6 +17,7 @@ export interface FullSyncUploadContext {
 
 /** Bound retained bytes while using the same CAS/receipt validation as initial sync. */
 export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: UploadDiff[], localFiles: Record<string, FileEntry>, result: SyncResult, onCompleted: () => void): Promise<void> {
+	let processed = 0;
 	const chunks = pipelineUploadChunks(diffs, async diff => {
 		context.throwIfDestroyed();
 		try {
@@ -26,20 +28,25 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 			if (context.isAbortError(error)) throw error;
 			result.errors.push(`${diff.path}: ${errorMessage(error)}`);
 		}
+		processed++;
 		onCompleted();
 		return null;
 	});
 	for await (const chunk of chunks) {
 		context.throwIfDestroyed();
 		let reported = 0;
+		context.reportWork?.('uploading', processed, diffs.length);
 		await context.uploadPreparedFiles(chunk, result, {
 			onProcessed: (count) => {
 				reported += count;
+				processed += count;
+				context.reportWork?.('uploading', processed, diffs.length);
 				for (let index = 0; index < count; index++) onCompleted();
 			},
 			concurrency: UPLOAD_CONCURRENCY, batchConcurrency: BATCH_UPLOAD_CONCURRENCY, retry: false,
 		});
-		for (let index = reported; index < chunk.length; index++) onCompleted();
+		for (let index = reported; index < chunk.length; index++) { processed++; onCompleted(); }
+		context.reportWork?.('uploading', processed, diffs.length);
 	}
 	const uploaded = new Set(result.uploadedPaths);
 	for (const diff of diffs) {

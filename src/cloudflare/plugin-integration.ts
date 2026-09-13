@@ -1,3 +1,4 @@
+import { checkAndRecoverUpdate } from './deployment-recovery-ui';
 import { DeploymentRecoveryRequiredError } from './deployment-fence';
 import { Notice } from 'obsidian';
 import { CloudflareReauthorizationRequired } from './oauth-client';
@@ -104,6 +105,10 @@ async function runCloudflareOperation(
 ): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;
+    if (plugin.cloudflareDeploymentService.isBusy) {
+        new Notice('A Cloudflare operation is still running. Wait for its result before starting another.');
+        return;
+    }
 	const intent = savedIntent ?? plugin.cloudflareDeploymentService.pendingIntent;
 	const originalDeployment = JSON.stringify(plugin.settings.cloudflareDeployment);
 	const isDelete = intent === 'delete';
@@ -157,7 +162,9 @@ async function runCloudflareOperation(
                     'If the operation was interrupted, its Cloudflare status must be checked and the update lock recovered before trying again.',
                     'Closing this message does not clear the lock.',
                 ],
-                { technicalDetails: deploymentErrorMessage(error) },
+                { technicalDetails: deploymentErrorMessage(error), action: isReset || isDelete
+                    ? { label: 'Open settings', onClick: () => plugin.openSettingsTab() }
+                    : { label: 'Check and recover update', onClick: () => { void checkAndRecoverUpdate(plugin); } } },
             );
             return;
         }

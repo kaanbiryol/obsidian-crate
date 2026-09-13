@@ -10,6 +10,11 @@ export function createFenceQueryHarness() {
 				value = params?.[1] ?? null;
 				return [{ results: value ? [{ value }] : [] }];
 			}
+            if (sql.startsWith('UPDATE maintenance_state SET value = ?')) {
+                if (value !== params?.[2]) return [{ results: [] }];
+                value = params?.[0] ?? null;
+                return [{ results: value ? [{ value }] : [] }];
+            }
 			if (sql.startsWith('SELECT value FROM maintenance_state WHERE key = ?')) return [{ results: value ? [{ value }] : [] }];
 			if (sql.startsWith('DELETE FROM maintenance_state WHERE key = ? AND value = ?')) {
 				if (value === params?.[1]) value = null;

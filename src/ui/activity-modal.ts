@@ -61,13 +61,16 @@ export class ActivityModal extends Modal {
         const loadingLabel = this.pendingPanel.querySelector('.crate-activity-loading-label');
         if (loadingLabel && (state.status === 'syncing' || progress)) {
             // Keep the spinner mounted through frequent progress updates.
-            loadingLabel.textContent = formatSyncProgress(progress);
+            loadingLabel.textContent = formatSyncProgress(progress, state.work);
             return;
         }
         this.pendingPanel.empty();
 		renderPendingPanel(this.pendingPanel, paths, state.status === 'error', state.status === 'syncing', progress, this.formatLastSync(), state);
 	}
-	private readonly onStateChange = () => this.refresh();
+	private readonly onStateChange = () => {
+		if (this.deps.getState().status === 'syncing' && this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.onProgress();
+		else this.refresh();
+	};
 
 	constructor(app: App, settings: CrateSettings, deps: ActivityModalDeps, private readonly initialTab: 'pending' | 'conflicts' | 'history' = 'pending') {
 		super(app);
@@ -263,7 +266,7 @@ export class ActivityModal extends Modal {
 			this.syncBtn.removeClass('is-syncing');
 		}
 		const textEl = this.syncBtn.querySelector('.crate-sync-btn-text');
-		if (textEl) textEl.textContent = syncing ? 'Syncing...' : 'Sync now';
+		if (textEl) textEl.textContent = syncing ? 'Syncing…' : 'Sync now';
 	}
 
 	private updateSyncErrorNotice(): void {

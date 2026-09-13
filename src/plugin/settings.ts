@@ -1,3 +1,4 @@
+import { normalizeSyncTimings } from '../sync/timings';
 /**
  * Settings helpers for Crate.
  */
@@ -128,6 +129,7 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 		return null;
 	}
 	const requestDiagnostics = normalizeRequestDiagnostics(value.requestDiagnostics);
+	const timings = normalizeSyncTimings(value.timings);
 
 	return {
 		timestamp,
@@ -143,6 +145,7 @@ function normalizeSyncHistoryEntry(value: unknown): SyncHistoryEntry | null {
 		} : {}),
 		conflictCount: normalizeNonNegativeInteger(value.conflictCount, 0),
 		...(requestDiagnostics ? { requestDiagnostics } : {}),
+		...(timings ? { timings } : {}),
 		...(typeof value.resolvedRaceCount === 'number' ? {
 			resolvedRaceCount: normalizeNonNegativeInteger(value.resolvedRaceCount, 0),
 		} : {}),

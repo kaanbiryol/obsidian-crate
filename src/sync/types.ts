@@ -1,6 +1,13 @@
 export type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
 
+export interface SyncWork {
+	phase: 'recovering' | 'server' | 'scanning' | 'preparing' | 'uploading' | 'downloading' | 'applying' | 'saving';
+	current?: number;
+	total?: number;
+}
+
 export interface SyncState {
+	work?: SyncWork;
 	status: SyncStatus;
 	lastSync: string | null;
 	lastError: string | null;
@@ -48,6 +55,7 @@ export interface ResolvedSyncRace {
 }
 
 export interface SyncHistoryEntry {
+	timings?: import('./timings').SyncTimings;
 	requestDiagnostics?: import('./request-diagnostics').RequestDiagnostics;
 	timestamp: string;
 	type: 'sync' | 'initial' | 'force';

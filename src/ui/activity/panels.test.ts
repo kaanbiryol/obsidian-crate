@@ -9,7 +9,7 @@ afterEach(() => vi.clearAllMocks());
 it('shows active initial upload with an empty pending queue', () => {
     const element = new FakeElement('div');
     renderPendingPanel(element as never, [], false, false, { type: 'initial', current: 12, total: 20 });
-    expect(element.collectText()).toContain('Uploading vault');
+    expect(element.collectText()).toContain('Preparing files for upload: 12/20');
     expect(element.children[0]?.attributes.get('role')).toBe('status');
     expect(element.collectText()).not.toContain('All synced');
 });
@@ -17,7 +17,7 @@ it('shows active initial upload with an empty pending queue', () => {
 it('does not claim completion before transfer progress is available', () => {
     const element = new FakeElement('div');
     renderPendingPanel(element as never, [], false, true);
-    expect(element.collectText()).toContain('Checking for changes…');
+    expect(element.collectText()).toContain('Starting sync…');
     expect(element.collectText()).not.toContain('All synced');
 });
 
@@ -32,14 +32,14 @@ it('shows the normal empty state after syncing finishes', () => {
 it('replaces the pending file list with a loading indicator during sync', () => {
     const element = new FakeElement('div');
     renderPendingPanel(element as never, ['Notes/draft.md', 'delete:old.md'], false, true);
-    expect(element.collectText()).toBe('Checking for changes…');
+    expect(element.collectText()).toBe('Starting sync…');
     expect(element.children[0]?.classNames.has('crate-activity-loading')).toBe(true);
     expect(element.children[0]?.children[0]?.attributes.get('aria-hidden')).toBe('true');
 
     element.empty();
     renderPendingPanel(element as never, ['Notes/draft.md']);
     expect(element.collectText()).toContain('draft.md');
-    expect(element.collectText()).not.toContain('Checking for changes…');
+    expect(element.collectText()).not.toContain('Starting sync…');
 });
 
 it.each(['Synced just now', 'Syncing…', 'Last sync had errors'])(
@@ -52,7 +52,7 @@ it.each(['Synced just now', 'Syncing…', 'Last sync had errors'])(
 );
 
 it.each([
- { status: 'idle' as const, lastSync: null, title: 'Not synced yet' },
+ { status: 'idle' as const, lastSync: null, title: 'No completed sync yet' },
  { status: 'offline' as const, lastSync: '2026-09-12T10:00:00Z', title: 'You’re offline' },
 ])('does not claim completion for $title', ({ status, lastSync, title }) => {
  const element = new FakeElement('div');

@@ -19,16 +19,6 @@ function reportMoveRecoveryIssues(issues: string[]): void {
 	new Notice(issues.join('\n\n'), 0);
 }
 
-export async function recoverInterruptedReminderMoves(plugin: CratePlugin): Promise<void> {
-	const journal = moveJournals.get(plugin);
-	if (!journal) { new Notice('Enable reminders before recovering an interrupted move.'); return; }
-	if (plugin.syncRuntime.getState().status === 'syncing') { new Notice('Wait for sync to finish, then recover interrupted reminder moves.'); return; }
-	const issues = await journal.recover();
-	await plugin.reminderIndex.load();
-	reportMoveRecoveryIssues(issues);
-	if (!issues.length) new Notice('Interrupted reminder moves recovered.');
-}
-
 export function stopReminderBackend(plugin: CratePlugin): void {
 	backends.get(plugin)?.abort();
 	backends.delete(plugin);

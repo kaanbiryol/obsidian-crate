@@ -1,3 +1,5 @@
+import { emptyRequestTimings } from '../timings';
+import type { CrateServerInfo } from '../../protocol';
 import { normalizeUploadOperationIds } from '../request-diagnostics';
 import { CRATE_PLUGIN_PROTOCOL, CRATE_PROTOCOL_HEADER, isCompatibleCrateServer, isCrateMutation, parseCrateServerInfo } from '../../protocol';
 import { requestUrl } from 'obsidian';
@@ -127,6 +129,34 @@ export class WorkerApiHttpClient {
 	private workerUrl: string;
 	private authToken: string;
 	private externalSignal: AbortSignal | undefined;
+	private requestTimings = emptyRequestTimings();
+	resetRequestTimings(): void { this.requestTimings = emptyRequestTimings(); }
+	getRequestTimings() { return { ...this.requestTimings }; }
+	private serverInfo?: { expires: number; value: CrateServerInfo };
+	private serverInfoRequest?: Promise<CrateServerInfo>;
+
+	private clearServerInfo(): void {
+		this.serverInfo = undefined;
+		this.serverInfoRequest = undefined;
+	}
+
+	/** Bound metadata reuse; the Worker still fences every mutation by protocol. */
+	async getServerInfo(timeout = 30_000): Promise<CrateServerInfo> {
+		if (this.externalSignal?.aborted) throw createAbortError('Sync request aborted');
+		if (this.serverInfo && this.serverInfo.expires > performance.now()) return this.serverInfo.value;
+		if (this.serverInfoRequest) return this.serverInfoRequest;
+		const pending = this.requestJson<unknown>('/.well-known/crate', {}, timeout).then(value => {
+			if (this.serverInfoRequest !== pending) throw createAbortError('Server compatibility check was superseded');
+			const info = parseCrateServerInfo(value);
+			if (!info) throw new Error('Server returned invalid Crate compatibility metadata');
+			if (this.serverInfoRequest === pending) this.serverInfo = { value: info, expires: performance.now() + 30_000 };
+			return info;
+		}).finally(() => {
+			if (this.serverInfoRequest === pending) this.serverInfoRequest = undefined;
+		});
+		this.serverInfoRequest = pending;
+		return pending;
+	}
 
 	constructor(
 		workerUrl: string,
@@ -138,10 +168,12 @@ export class WorkerApiHttpClient {
 	}
 
 	setAbortSignal(signal: AbortSignal): void {
+		this.clearServerInfo();
 		this.externalSignal = signal;
 	}
 
 	updateCredentials(workerUrl: string, authToken: string): void {
+		this.clearServerInfo();
 		this.workerUrl = normalizeWorkerUrl(workerUrl);
 		this.authToken = authToken;
 	}
@@ -165,8 +197,7 @@ export class WorkerApiHttpClient {
 	): Promise<ApiHttpResponse> {
 		let protocol = CRATE_PLUGIN_PROTOCOL.current;
 		if (isCrateMutation(path, options.method)) {
-			const response = await this.runRequest('/.well-known/crate', {}, Math.min(timeout, 30_000));
-			const info = response.status === 200 ? parseCrateServerInfo(parseJsonResponse<unknown>(response.text, '/.well-known/crate')) : null;
+			const info = await this.getServerInfo(Math.min(timeout, 30_000));
 			if (!info || !isCompatibleCrateServer(info)) throw new HttpError('Update the Crate server before making changes', 428, null, 'protocol_incompatible');
 			protocol = Math.min(protocol, info.protocol.current);
 		}
@@ -180,9 +211,18 @@ export class WorkerApiHttpClient {
 			?? getHeader(options.headers ?? {}, 'Content-Type')
 			?? undefined;
 		const operationId = crypto.randomUUID();
+		const started = performance.now();
+		const timings = this.requestTimings;
 		const uploadOperationIds = normalizeUploadOperationIds((getHeader(options.headers ?? {}, 'X-Crate-Upload-Operation')
 			?? getHeader(options.headers ?? {}, 'X-Crate-Upload-Operations') ?? '').split(','));
 		const record = (outcome: RequestDiagnostic['outcome'], response?: ApiHttpResponse) => {
+			const durationMs = Math.max(0, performance.now() - started);
+			const header = response ? getHeader(response.headers, 'Server-Timing') : null;
+			const match = header?.match(/(?:^|,)\s*crate;dur=([0-9.]+)/);
+			const serverMs = match ? Number(match[1]) : NaN;
+			timings.count++; timings.totalMs += durationMs; timings.maxMs = Math.max(timings.maxMs, durationMs);
+			if (Number.isFinite(serverMs) && serverMs >= 0) { timings.serverCount++; timings.serverMs += serverMs; }
+
 			this.requestDiagnostics.push({ at: new Date().toISOString(), operationId, method: options.method ?? 'GET',
 				...(uploadOperationIds.length ? { uploadOperationIds } : {}), route: diagnosticRoute(path), status: response?.status ?? 0, outcome,
 				requestId: response ? getHeader(response.headers, 'X-Crate-Request-Id') ?? undefined : undefined });

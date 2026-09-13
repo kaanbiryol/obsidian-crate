@@ -11,7 +11,7 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
         spinner.setAttribute('aria-hidden', 'true');
         loading.createSpan({
             cls: 'crate-activity-loading-label',
-            text: formatSyncProgress(progress),
+            text: formatSyncProgress(progress, state?.work),
         });
         return;
 	}
@@ -21,7 +21,7 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 		} else if (state?.status === 'offline') {
 			renderEmptyState(container, 'wifi-off', 'You’re offline', 'Connect to the internet to check for changes.');
 		} else if (state && !state.lastSync) {
-			renderEmptyState(container, 'refresh-cw', 'No completed sync yet', 'Select Sync now above to sync this device.');
+			renderEmptyState(container, 'refresh-cw', 'No completed sync yet', 'No successful sync is recorded on this device.');
 		} else {
 			renderEmptyState(container, 'check', 'All synced', lastSyncLabel, 'success');
 		}

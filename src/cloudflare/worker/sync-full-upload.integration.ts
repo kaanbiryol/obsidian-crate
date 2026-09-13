@@ -30,7 +30,7 @@ it('batches cold uploads with absent-file guards and preserves confirmed revisio
 	const batch = vi.spyOn(client.api, 'batchUpload'); const progress = vi.fn();
 	const result = await client.engine.sync(progress);
 	expect(result.errors).toEqual([]); expect(result.uploaded).toBe(7);
-	expect(batch.mock.calls.map(([files]) => files.length)).toEqual([3, 3, 1]);
+	expect(batch.mock.calls.map(([files]) => files.length)).toEqual([7]);
 	expect(batch.mock.calls.flatMap(([files]) => files).every(file => file.expectedHash === null)).toBe(true);
 	expect(client.requests).not.toContain('PUT /sync/upload');
 	expect(progress).toHaveBeenLastCalledWith(7, 7);
@@ -94,4 +94,19 @@ it('resumes a cold batch after committed response loss and retains a later local
 		expect(client.disk.text(path)).toBe(expected);
 	}
 	expect(Object.keys((await client.api.getManifest()).files)).toHaveLength(7);
+});
+
+it('uses eight-file commits for the explicit initial-sync workflow', async () => {
+  const client = await device();
+  for (let index = 0; index < 16; index++) client.disk.write(`initial-${index}.md`, `Initial note ${index}`);
+  const batch = vi.spyOn(client.api, 'batchUpload');
+  const result = await client.engine.initialSync();
+  expect(result.errors).toEqual([]);
+  expect(result.uploaded).toBe(16);
+  expect(batch.mock.calls.map(([files]) => files.length)).toEqual([8, 8]);
+  expect(client.requests.filter(route => route === 'POST /sync/batch-upload')).toHaveLength(2);
+  expect(Object.keys(client.checkpoint().files)).toHaveLength(16);
+  for (let index = 0; index < 16; index++) {
+    expect(await remote(client, `initial-${index}.md`)).toBe(`Initial note ${index}`);
+  }
 });

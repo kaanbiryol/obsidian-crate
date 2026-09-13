@@ -34,7 +34,7 @@ export interface InitialSyncWorkflowContext {
 	uploadPreparedFiles(
 		prepared: PreparedUpload[],
 		result: SyncResult,
-		options: { concurrency: number; retry: boolean; batchConcurrency?: number }
+		options: { concurrency: number; retry: boolean; batchConcurrency?: number; onProcessed?: (count: number) => void }
 	): Promise<void>;
 	createVaultFileChunks(files: VaultFile[]): VaultFile[][];
 	saveLocalManifest(): Promise<void>;
@@ -53,10 +53,13 @@ export async function runInitialSyncWorkflow(
 	const result = createEmptySyncResult();
 
 	try {
+		context.updateState({ work: { phase: 'recovering' } });
 		await context.recoverUploads();
 		context.throwIfDestroyed();
+		context.updateState({ work: { phase: 'scanning' } });
 		const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path));
 		logger.info(`Initial sync started with ${files.length} files`);
+		let uploadsProcessed = 0;
 		const total = files.length;
 		let preparedCount = 0;
 		let uploadCandidates = 0;
@@ -64,16 +67,24 @@ export async function runInitialSyncWorkflow(
 		const chunks = context.createVaultFileChunks(files);
 		const prepareChunk = (chunk: VaultFile[]) => context.prepareUploadsFromVaultFiles(chunk, () => {
 			preparedCount++;
+			context.updateState({ work: { phase: 'preparing', current: preparedCount, total } });
 			progressCallback?.(preparedCount, total);
 		});
 
 		for (const chunk of chunks) {
+			context.updateState({ work: { phase: 'preparing', current: preparedCount, total } });
 			const preparedChunk = await prepareChunk(chunk);
 			context.throwIfDestroyed();
 			uploadCandidates += preparedChunk.length;
+			uploadsProcessed += chunk.length - preparedChunk.length;
 
 			if (preparedChunk.length > 0) {
-				await context.uploadPreparedFiles(preparedChunk, result, {
+				context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
+			await context.uploadPreparedFiles(preparedChunk, result, {
+					onProcessed: count => {
+						uploadsProcessed += count;
+						context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
+					},
 					concurrency: UPLOAD_CONCURRENCY,
 					retry: true,
 					batchConcurrency: BATCH_UPLOAD_CONCURRENCY,
@@ -84,6 +95,7 @@ export async function runInitialSyncWorkflow(
 		logger.info(
 			`Prepared ${uploadCandidates}/${total} files for upload (${total - uploadCandidates} unchanged)`,
 		);
+		context.updateState({ work: { phase: 'saving' } });
 		await context.saveLocalManifest();
 
 		logger.info(`Initial sync completed: ${result.uploaded} uploaded`);

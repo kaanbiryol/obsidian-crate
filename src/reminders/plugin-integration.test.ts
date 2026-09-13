@@ -402,11 +402,7 @@ it('recovers interrupted moves before scanning and protects unresolved file path
 	expect(defer()).toBe(false);
 	expect(defer('Reminders/Healthy.md')).toBe(false);
 	expect(defer('Reminders/Pending.md')).toBe(true);
-	const { recoverInterruptedReminderMoves } = await import('./runtime');
-	pendingMoves.mockReturnValue(false);
-	await recoverInterruptedReminderMoves(plugin as never);
-	expect(recoverMoves).toHaveBeenCalledTimes(2);
-	expect(reminderIndexLoad).toHaveBeenCalledTimes(2);
+
 });
 
 it('does not start normalization when unloaded during journal recovery', async () => {

@@ -86,8 +86,8 @@ export class CloudflareDeploymentModal extends Modal {
 		this.update({ state: 'working', title, description });
 	}
 
-	succeed(title: string, description: string): void {
-		this.update({ state: 'success', title, description });
+	succeed(title: string, description: string, options?: FailureOptions): void {
+		this.update({ state: 'success', title, description, ...options });
 	}
 
 	fail(title: string, description: string, details?: string[], options?: FailureOptions): void {

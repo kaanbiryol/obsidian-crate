@@ -142,7 +142,7 @@ describe('durable plugin move recovery', () => {
 		const beforeDestination = files.get(destinationPath)!;
 		const resumed = await session();
 		if (edit === 'both tasks changed') {
-			expect(resumed.issues.join()).toContain('Recover interrupted reminder moves');
+			expect(resumed.issues.join()).toContain('reload Crate to retry recovery');
 			expect(files.get(sourcePath)).toBe(beforeSource);
 			expect(files.get(destinationPath)).toBe(beforeDestination);
 			expect(records()).toHaveLength(1);

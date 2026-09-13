@@ -1,3 +1,4 @@
+import { SyncTimingRecorder } from './timings';
 /**
  * Core sync engine - orchestrates synchronization between local vault and remote storage
  */
@@ -68,6 +69,8 @@ export class SyncEngine {
 	private queueController: SyncQueueController;
 	private lifecycle: SyncEngineLifecycle;
 	private contexts: SyncEngineContexts;
+	private timingRecorder = new SyncTimingRecorder();
+	getTimings() { return { ...this.timingRecorder.snapshot(), requests: this.api.getRequestTimings?.() }; }
 	private onStateChange: ((state: SyncState) => void) | null = null;
 	private activeWork = new Set<Promise<unknown>>();
 	private contentVerifier: LocalContentVerifier;
@@ -136,7 +139,10 @@ export class SyncEngine {
 		this.api.setAbortSignal(this.lifecycle.abortSignal);
 		this.queueController = new SyncQueueController({
 			automaticSyncEnabled: () => this.settings.automaticSync,
-			recoverUploads: () => this.api.recoverUploads(),
+			recoverUploads: async () => {
+				await this.api.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
+				this.updateState({ work: { phase: 'applying' } });
+			},
 			api: this.api,
 			getLocalManifest: () => this.localManifest,
 			markdownBaseCache: this.markdownBaseCache,
@@ -279,8 +285,14 @@ export class SyncEngine {
 
 	private updateState(updates: Partial<SyncState>): void {
 		if (this.lifecycle?.isDestroyed) return;
+		if (updates.status === 'syncing' && this.state.status !== 'syncing') {
+			this.timingRecorder.start(); this.api.resetRequestTimings?.();
+		}
+		this.timingRecorder.change(updates.work);
+		if (updates.status && updates.status !== 'syncing') this.timingRecorder.stop();
 		if ('status' in updates || 'lastError' in updates) this.periodicCheckFailed = false;
 		this.state = { ...this.state, ...updates };
+		if (updates.status) this.state.work = updates.status === 'syncing' ? updates.work : undefined;
 		this.onStateChange?.(this.state);
 	}
 
@@ -484,7 +496,7 @@ export class SyncEngine {
 	}
 
 	private async reconcilePaths(queueKeys: string[]): Promise<SyncResult> {
-		await this.api.recoverUploads();
+		await this.api.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
 		this.lifecycle.throwIfDestroyed();
 		return reconcileQueuePaths({
 			vault: this.vault,
