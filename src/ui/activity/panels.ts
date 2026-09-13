@@ -21,7 +21,7 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 		} else if (state?.status === 'offline') {
 			renderEmptyState(container, 'wifi-off', 'You’re offline', 'Connect to the internet to check for changes.');
 		} else if (state && !state.lastSync) {
-			renderEmptyState(container, 'refresh-cw', 'Not synced yet', 'Select Sync now to start your first sync.');
+			renderEmptyState(container, 'refresh-cw', 'No completed sync yet', 'Select Sync now above to sync this device.');
 		} else {
 			renderEmptyState(container, 'check', 'All synced', lastSyncLabel, 'success');
 		}
