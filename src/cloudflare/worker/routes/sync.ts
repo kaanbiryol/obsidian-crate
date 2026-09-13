@@ -58,7 +58,7 @@ export async function handleSyncRoute(
 		return await withDatabase(db, requiredDb => handleDelete(request, bucket, requiredDb, audit));
 	}
 	if (path === '/sync/batch-upload' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb, env.commitUpload));
+		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb, env.commitUpload, env.commitNewFiles));
 	}
 	if (path === '/sync/batch-download' && method === 'POST') {
 		return await withDatabase(db, requiredDb => handleBatchDownload(request, bucket, requiredDb));

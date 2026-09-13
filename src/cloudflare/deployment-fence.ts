@@ -18,6 +18,9 @@ export interface DeploymentFenceRecord {
 	version: string;
 	fingerprint?: string;
 	startedAt: string;
+	recoveryProtocol?: 1;
+	step?: string;
+	stepState?: 'started' | 'confirmed';
 }
 
 export class DeploymentFence {
@@ -25,15 +28,17 @@ export class DeploymentFence {
 	private databaseRemoved = false;
 	constructor(private api: FenceApi, private account: string, private database: string, private value: string) {}
 
-	async mutate<T>(operation: () => Promise<T>): Promise<T> {
+	async mutate<T>(operation: () => Promise<T>, step = 'server-change'): Promise<T> {
 		const rows = (await this.api.queryD1(this.account, this.database,
 			'SELECT value FROM maintenance_state WHERE key = ?;', [DEPLOYMENT_FENCE_KEY])).flatMap(result => result.results ?? []);
 		if (rows.length !== 1 || rows[0]?.value !== this.value) throw new DeploymentRecoveryRequiredError('Deployment ownership changed. Start again after reviewing the deployment fence.');
+		await this.recordStep(step, 'started');
 		// Never expire or steal this fence: the provider cannot reject an old,
 		// already-dispatched upload using a D1 fencing token.
 		this.uncertain = true;
 		try {
 			const result = await operation();
+			await this.recordStep(step, 'confirmed');
 			this.uncertain = false;
 			return result;
 		} catch (error) {
@@ -41,6 +46,23 @@ export class DeploymentFence {
 			throw error;
 		}
 	}
+
+
+    private async recordStep(step: string, stepState: 'started' | 'confirmed'): Promise<void> {
+        if (this.databaseRemoved) return;
+        const record = JSON.parse(this.value) as DeploymentFenceRecord;
+        const next = JSON.stringify({ ...record, step, stepState });
+        try {
+            const rows = (await this.api.queryD1(this.account, this.database,
+                "UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? RETURNING value;",
+                [next, DEPLOYMENT_FENCE_KEY, this.value])).flatMap(result => result.results ?? []);
+            if (rows.length !== 1 || rows[0]?.value !== next) throw new Error('Deployment ownership changed');
+            this.value = next;
+        } catch {
+            this.uncertain = true;
+            throw new DeploymentRecoveryRequiredError('Could not checkpoint the server operation. Keep the deployment fence held and inspect its recorded step before recovery.');
+        }
+    }
 
 	removedDatabase(): void { this.databaseRemoved = true; }
 
@@ -60,7 +82,7 @@ export async function withDeploymentFence<T>(input: {
 	api: FenceApi; accountId: string; databaseId: string;
 	record: Omit<DeploymentFenceRecord, 'owner' | 'startedAt'>;
 }, operation: (fence: DeploymentFence) => Promise<T>): Promise<T> {
-	const value = JSON.stringify({ ...input.record, owner: crypto.randomUUID(), startedAt: new Date().toISOString() });
+	const value = JSON.stringify({ ...input.record, recoveryProtocol: 1, owner: crypto.randomUUID(), startedAt: new Date().toISOString() });
 	await input.api.queryD1(input.accountId, input.databaseId,
 		"CREATE TABLE IF NOT EXISTS maintenance_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));");
 	let acquired: Array<Record<string, unknown>>;
@@ -104,7 +126,7 @@ export function fenceResetMutations<T extends object>(api: T, fence: DeploymentF
 				const result: unknown = await value.apply(target, args);
 				if (property === 'deleteD1Database') fence.removedDatabase();
 				return result;
-			});
+			}, String(property));
 		},
 	});
 }

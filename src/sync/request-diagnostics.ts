@@ -1,3 +1,4 @@
+import { BULK_NEW_UPLOAD_MAX_FILES } from '../protocol/sync-limits';
 export const MAX_REQUEST_DIAGNOSTICS = 50;
 import { normalizeUploadDiagnostics, type UploadDiagnostic } from './upload-diagnostics';
 import { reminderOperationDay } from '../protocol/reminder-operation';
@@ -24,7 +25,7 @@ export interface RequestDiagnostics { clientSession: string; requests: RequestDi
 
 export function normalizeUploadOperationIds(value: unknown): string[] {
 	if (!Array.isArray(value)) return [];
-	return [...new Set(value.filter((id): id is string => typeof id === 'string' && reminderOperationDay(id) !== null))].slice(0, 3);
+	return [...new Set(value.filter((id): id is string => typeof id === 'string' && reminderOperationDay(id) !== null))].slice(0, BULK_NEW_UPLOAD_MAX_FILES);
 }
 
 export function diagnosticRoute(path: string): string {

@@ -1,3 +1,4 @@
+import { formatSyncProgress } from './activity/progress-label';
 /**
  * Status bar component for sync status display
  */
@@ -10,6 +11,7 @@ export class StatusBarManager {
 	private statusBarEl: HTMLElement | null = null;
 	private enabled: boolean;
 	private syncProgress: { current: number; total: number } | null = null;
+	private work: SyncState['work'];
 	private currentStatus: SyncStatus | null = null;
 	private iconEl: HTMLSpanElement | null = null;
 	private textEl: HTMLSpanElement | null = null;
@@ -67,7 +69,7 @@ export class StatusBarManager {
 	 */
 	setSyncProgress(current: number, total: number): void {
 		this.syncProgress = { current, total };
-		this.update({ status: 'syncing', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
+		this.update({ work: this.work, status: 'syncing', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
 	}
 
 	/**
@@ -82,6 +84,7 @@ export class StatusBarManager {
 	 */
 	update(state: SyncState): void {
 		if (state.status !== 'syncing') this.syncProgress = null;
+		this.work = state.status === 'syncing' ? state.work : undefined;
 		if (!this.statusBarEl) return;
 
 		const { icon, text, tooltip } = this.getDisplayInfo(state);
@@ -124,9 +127,7 @@ export class StatusBarManager {
 			case 'syncing':
 				return {
 					icon: null,
-					text: this.syncProgress && this.syncProgress.total > 0
-					? `Syncing changes ${this.syncProgress.current}/${this.syncProgress.total}`
-					: 'Checking for changes…',
+					text: formatSyncProgress(!this.work && this.syncProgress ? { type: 'sync', ...this.syncProgress } : null, this.work),
 					tooltip: 'Comparing and syncing changes. Unchanged files are skipped. Open sync activity for details.',
 				};
 

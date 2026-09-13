@@ -43,6 +43,7 @@ export interface LocalDiffPlannerContext {
 }
 
 export interface IncrementalSyncPlannerContext {
+  reportWork?(phase: import('./types').SyncWork['phase'], current?: number, total?: number): void;
   throwIfDestroyed?(): void;
   settings: CrateSettings;
   vault: Vault;

@@ -40,7 +40,7 @@ export interface ForceSyncWorkflowContext {
 	uploadPreparedFiles(
 		prepared: PreparedUpload[],
 		result: SyncResult,
-		options: { concurrency: number; retry: boolean; batchConcurrency?: number }
+		options: { concurrency: number; retry: boolean; batchConcurrency?: number; onProcessed?: (count: number) => void }
 	): Promise<void>;
 	throwIfDestroyed(): void;
 	deleteRemoteFile(path: string, expectedHash: string, expectedRevision?: string): Promise<void>;
@@ -63,12 +63,15 @@ export async function runForceFullSyncWorkflow(
 	let manifestCleared = false;
 
 	try {
+		context.updateState({ work: { phase: 'recovering' } });
 		await context.recoverUploads();
 		previousLocalManifest = context.snapshotLocalManifest();
 		context.throwIfDestroyed();
+		context.updateState({ work: { phase: 'server' } });
 		const remoteManifest = await context.getManifest();
 		const remotePaths = new Set(Object.keys(remoteManifest.files));
 
+		context.updateState({ work: { phase: 'scanning' } });
 		const files = await getAllVaultFiles(context.vault, path => context.shouldIgnore(path));
 		const localPaths = new Set(files.map(file => file.path));
 
@@ -76,6 +79,7 @@ export async function runForceFullSyncWorkflow(
 			path => !localPaths.has(path) && !context.shouldIgnore(path),
 		);
 
+		let uploadsProcessed = 0;
 		const total = files.length + remoteOnlyPaths.length;
 		let current = 0;
 
@@ -83,6 +87,7 @@ export async function runForceFullSyncWorkflow(
 		manifestCleared = true;
 
 		for (const chunk of context.createVaultFileChunks(files)) {
+			context.updateState({ work: { phase: 'preparing' } });
 			const prepared = await context.prepareUploadsFromVaultFiles(chunk, () => {
 				current++;
 				progressCallback?.(current, total);
@@ -92,7 +97,12 @@ export async function runForceFullSyncWorkflow(
 			}
 
 			context.throwIfDestroyed();
+			context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
 			await context.uploadPreparedFiles(prepared, result, {
+				onProcessed: count => {
+					uploadsProcessed += count;
+					context.updateState({ work: { phase: 'uploading', current: uploadsProcessed, total: files.length } });
+				},
 				concurrency: FORCE_SYNC_CONCURRENCY,
 				retry: true,
 			});
@@ -103,6 +113,7 @@ export async function runForceFullSyncWorkflow(
 
 		context.throwIfDestroyed();
 
+		if (remoteOnlyPaths.length) context.updateState({ work: { phase: 'applying' } });
 		for (const path of remoteOnlyPaths) {
 			try {
 				const remoteEntry = getPathEntry(remoteManifest.files, path);
@@ -120,6 +131,7 @@ export async function runForceFullSyncWorkflow(
 			progressCallback?.(current, total);
 		}
 
+		context.updateState({ work: { phase: 'saving' } });
 		await context.saveLocalManifest();
 		manifestCommitted = result.errors.length === 0;
 
@@ -140,7 +152,8 @@ export async function runForceFullSyncWorkflow(
 		if (manifestCleared && !manifestCommitted) {
 			context.replaceLocalManifest(previousLocalManifest);
 			try {
-				await context.saveLocalManifest();
+				context.updateState({ work: { phase: 'saving' } });
+		await context.saveLocalManifest();
 			} catch (error) {
 				result.errors.push(`restore local manifest: ${errorMessage(error)}`);
 			}

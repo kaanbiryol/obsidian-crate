@@ -387,6 +387,7 @@ export class SyncRuntime {
 	private recordSyncResult(type: SyncHistoryEntry['type'], result: SyncResult): void {
 		recordSyncHistory(this.settings, type, result);
 		const latest = this.settings.syncHistory[0];
+		if (latest && this.syncEngine) latest.timings = this.syncEngine.getTimings?.();
 		if (latest && this.apiClient) latest.requestDiagnostics = this.apiClient.getRequestDiagnostics();
 	}
 

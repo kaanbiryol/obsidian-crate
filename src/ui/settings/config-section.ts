@@ -1,3 +1,4 @@
+import { checkAndRecoverUpdate } from '../../cloudflare/deployment-recovery-ui';
 import { renderAccountActions } from './account-actions';
 import { Notice, Setting } from 'obsidian';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
@@ -62,6 +63,12 @@ export function renderServerSection(context: ConfigSectionContext): void {
             .setDesc(`${version} ${updateAvailable
                 ? 'An update is available at the top of these settings.'
                 : 'Your server software and reminders web app are up to date.'}`);
+    }
+    if (plugin.syncRuntime.isConfigured() && deployment?.accountId && deployment.d1DatabaseId) {
+        new Setting(containerEl).setName('Interrupted server update')
+            .setDesc('Check an interrupted update and recover it when Cloudflare has confirmed the operation.')
+            .addButton(button => button.setButtonText('Check and recover update')
+                .onClick(() => { void checkAndRecoverUpdate(plugin); }));
     }
 	const details = createSettingsDisclosure(containerEl, 'Server details');
 	new Setting(details).setName('Server address').setDesc(plugin.settings.workerUrl || 'Not connected on this device');

@@ -64,7 +64,9 @@ export async function runSyncWorkflow(
 	logger.info('Sync started');
 
 	try {
+		context.updateState({ work: { phase: 'recovering' } });
 		await context.recoverUploads();
+		context.updateState({ work: { phase: 'server' } });
 		context.throwIfDestroyed();
 		const incrementalResult = await context.incrementalSync(progressCallback);
 		if (incrementalResult) {
@@ -90,7 +92,9 @@ export async function runSyncWorkflow(
 
 	try {
 		context.throwIfDestroyed();
+		context.updateState({ work: { phase: 'server' } });
 		const remoteManifest = await context.getManifest();
+		context.updateState({ work: { phase: 'scanning' } });
 		const plan = await context.createFullSyncPlan(remoteManifest.files, PREPARE_CONCURRENCY);
 
 		const {
@@ -114,6 +118,7 @@ export async function runSyncWorkflow(
 		progressCallback?.(current, total);
 
 		if (uploadDiffs.length > 0) {
+			context.updateState({ work: { phase: 'preparing' } });
 			await uploadFullSyncPlan(context, uploadDiffs, localFiles, result, () => {
 				current++;
 				progressCallback?.(current, total);
@@ -123,6 +128,7 @@ export async function runSyncWorkflow(
 		context.throwIfDestroyed();
 
 		if (downloadDiffs.length > 0) {
+			context.updateState({ work: { phase: 'downloading' } });
 			const downloadRequests: DownloadRequest[] = [];
 			for (const diff of downloadDiffs) {
 				if (!diff.remoteHash) {
@@ -161,6 +167,7 @@ export async function runSyncWorkflow(
 
 		context.throwIfDestroyed();
 
+		if (remainingDiffs.length) context.updateState({ work: { phase: 'applying' } });
 		for (const diff of remainingDiffs) {
 			try {
 				if (diff.action === 'delete' && result.errors.length > 0) throw new Error('Remote deletion deferred until uploads and reconciliation finish successfully');
@@ -180,6 +187,7 @@ export async function runSyncWorkflow(
 				context.setLocalManifestEntry(path, entry);
 			}
 		}
+		context.updateState({ work: { phase: 'saving' } });
 		await context.saveLocalManifest();
 
 		if (

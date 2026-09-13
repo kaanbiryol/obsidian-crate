@@ -167,7 +167,7 @@ describe('transfer upload helpers', () => {
 
 });
 
-it('uses the transfer concurrency for batches and reports each finished batch', async () => {
+it.each([2, 4])('limits batch concurrency to %i and reports every completed file', async (batchConcurrency) => {
     const harness = createTransferHarness();
     let active = 0;
     let maximum = 0;
@@ -190,10 +190,13 @@ it('uses the transfer concurrency for batches and reports each finished batch', 
         active--;
         return { success: true, results: files.map(file => ({ path: file.path, success: true, hash: file.hash })) };
     });
-    const prepared = Array.from({ length: 9 }, (_, index) => ({
+    const prepared = Array.from({ length: 15 }, (_, index) => ({
         path: `file-${index}.md`, content: new ArrayBuffer(1), hash: 'h', size: 1,
     }));
-    await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, emptyResult(), { concurrency: 2, retry: false, onProcessed });
-    expect(maximum).toBe(2);
-    expect(onProcessed.mock.calls.map(([count]) => count)).toEqual([3, 3, 3]);
+    const result = emptyResult();
+    await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, result, { concurrency: 2, batchConcurrency, retry: false, onProcessed });
+    expect(maximum).toBe(batchConcurrency);
+    expect(result.uploaded).toBe(15);
+    expect(result.errors).toEqual([]);
+    expect(onProcessed.mock.calls.map(([count]) => count)).toEqual([3, 3, 3, 3, 3]);
 });

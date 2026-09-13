@@ -1,3 +1,4 @@
+import { recoveryChunks } from './recovery-chunks';
 import type { MarkdownBaseCache } from './markdown-base-cache';
 import type { BatchUploadFile, BatchUploadResponse, UploadResult } from '@/protocol/sync-types';
 import type { LocalManifest } from './manifest';
@@ -22,12 +23,21 @@ export class DurableUploads {
 
 	async batch(files: BatchUploadFile[]): Promise<BatchUploadResponse> {
 		const durable = await this.prepare(files.map(file => ({ ...file, intent: { kind: 'local' } })));
+		return this.sendBatch(durable);
+	}
+
+	private async sendBatch(durable: JournalUpload[], onSettled?: () => Promise<void>): Promise<BatchUploadResponse> {
 		for (const file of durable) this.active.add(file.operationId);
 		try {
 			const response = await this.transport.batchUpload(durable.map(({ intent: _intent, origin: _origin, ...file }) => file));
 			if (response.results.length !== durable.length || new Set(response.results.map(file => file.path)).size !== durable.length) throw new Error('Invalid upload receipt batch');
-			for (const file of durable) this.validate(file, response.results.find(result => result.path === file.path));
-			for (const file of durable) await this.accept(file, response.results.find(result => result.path === file.path)!);
+			const receipts = new Map(response.results.map(result => [result.path, result]));
+			for (const file of durable) this.validate(file, receipts.get(file.path));
+			for (const file of durable) {
+				const receipt = receipts.get(file.path)!;
+				await this.accept(file, receipt);
+				if (receipt.success || this.definitive(receipt)) await onSettled?.();
+			}
 			return response;
 		} finally { for (const file of durable) this.active.delete(file.operationId); }
 	}
@@ -39,17 +49,40 @@ export class DurableUploads {
 	}
 
 	/** Replay original bytes before reading state for a new reconciliation plan. */
-	recover(): Promise<void> {
+	recover(onProgress?: (current: number, total: number) => void): Promise<void> {
 		if (this.recovering) return this.recovering;
 		this.recovering = (async () => {
 			const pending = this.manifest.uploadJournal.pending().filter(file => !this.active.has(file.operationId));
-			for (const file of pending) {
-				if (!this.manifest.getUploadDiagnostics().some(row => row.operationId === file.operationId && row.phase === 'prepared')) await this.trace(file, 'prepared');
-				await this.trace(file, 'replaying');
-				const result = await this.sendSingle(file);
-				if (!result.success && !this.definitive(result)) throw new Error(result.error ?? 'An upload receipt is unresolved');
+			let uncheckpointed = 0;
+			let completed = 0;
+			onProgress?.(0, pending.length);
+			const settled = async () => {
+				uncheckpointed++;
+				onProgress?.(++completed, pending.length);
+				if (uncheckpointed >= 16) {
+					await this.manifest.save();
+					uncheckpointed = 0;
+				}
+			};
+			try {
+				for (const chunk of recoveryChunks(pending)) {
+					for (const file of chunk) {
+						if (!this.manifest.getUploadDiagnostics().some(row => row.operationId === file.operationId && row.phase === 'prepared')) await this.trace(file, 'prepared');
+						await this.trace(file, 'replaying');
+					}
+					if (chunk.length === 1) {
+						const result = await this.sendSingle(chunk[0]!);
+						if (!result.success && !this.definitive(result)) throw new Error(result.error ?? 'An upload receipt is unresolved');
+						await settled();
+					} else {
+						const response = await this.sendBatch(chunk, settled);
+						const unresolved = response.results.find(result => !result.success && !this.definitive(result));
+						if (unresolved) throw new Error(unresolved.error ?? 'An upload receipt is unresolved');
+					}
+				}
+			} finally {
+				if (uncheckpointed > 0) await this.manifest.save();
 			}
-			if (pending.length) await this.manifest.save();
 		})().finally(() => { this.recovering = null; });
 		return this.recovering;
 	}

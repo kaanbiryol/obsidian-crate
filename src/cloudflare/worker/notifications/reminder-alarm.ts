@@ -1,3 +1,4 @@
+import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../bulk-upload-dispatch';
 import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../staged-upload-dispatch';
 import { PushPayloadError } from './payload-budget';
 import { runBoundedNotificationCoordinator } from '../notification-lifecycle';
@@ -81,6 +82,10 @@ export class ReminderAlarm implements DurableObject {
 	) {}
 
 	async fetch(request: Request): Promise<Response> {
+    if (new URL(request.url).pathname === '/commit-new-files' && request.method === 'POST') {
+      const prepared = await prepareCoordinatedNewFiles(request, this.env as Env);
+      return this.withStateLock(() => commitCoordinatedNewFiles(prepared, this.state, this.env as Env));
+    }
     if (new URL(request.url).pathname === '/commit-upload' && request.method === 'POST') {
       const prepared = await prepareCoordinatedUpload(request, this.env as Env);
       if (prepared instanceof Response) return prepared;

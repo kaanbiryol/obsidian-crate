@@ -1,7 +1,6 @@
 import { FuzzySuggestModal, Notice } from "obsidian";
 import type CratePlugin from "@/main";
 import { openCompactReminderModal, openReminderCreationModal } from "@/reminders/ui/adapters/modals";
-import { recoverInterruptedReminderMoves } from './runtime';
 
 class ProjectSuggestModal extends FuzzySuggestModal<string> {
   private readonly plugin: CratePlugin;
@@ -26,11 +25,6 @@ class ProjectSuggestModal extends FuzzySuggestModal<string> {
 }
 
 export function registerReminderCommands(plugin: CratePlugin) {
-  plugin.addCommand({
-    id: 'recover-reminder-moves',
-    name: 'Recover interrupted reminder moves',
-    callback: () => { if (!plugin.remindersSettings.enabled) return; void recoverInterruptedReminderMoves(plugin).catch((error: unknown) => new Notice(error instanceof Error ? error.message : 'Reminder move recovery failed.')); },
-  });
   plugin.addCommand({
     id: "create-reminder",
     name: "Create reminder",

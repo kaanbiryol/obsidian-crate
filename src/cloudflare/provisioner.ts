@@ -47,7 +47,7 @@ async function ensureR2Bucket(
 ): Promise<void> {
 	try {
 		if (await api.getR2Bucket(accountId, bucketName)) return;
-		await fence.mutate(() => api.createR2Bucket(accountId, bucketName));
+		await fence.mutate(() => api.createR2Bucket(accountId, bucketName), 'create-file-bucket');
 	} catch (error) {
 		if (error instanceof CloudflareApiError && error.code === 10042) {
 			throw new Error(
@@ -117,7 +117,7 @@ async function ensureWorkersSubdomain(
 	let lastError: unknown = null;
 	for (const candidate of candidates) {
 		try {
-			return await fence.mutate(() => api.createWorkersSubdomain(accountId, candidate));
+			return await fence.mutate(() => api.createWorkersSubdomain(accountId, candidate), 'create-server-address');
 		} catch (error) {
 			if (!(error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408)) throw error;
 			lastError = error;
@@ -161,7 +161,7 @@ export async function provisionCloudflareDeployment(input: {
 		input.onProgress?.('Preparing the remote file bucket…');
 		await ensureR2Bucket(input.api, input.accountId, input.metadata.r2BucketName, fence);
 		input.onProgress?.('Initializing the database schema…');
-		await fence.mutate(() => input.api.queryD1(input.accountId, databaseId, input.artifacts.d1Schema));
+		await fence.mutate(() => input.api.queryD1(input.accountId, databaseId, input.artifacts.d1Schema), 'apply-schema');
 		const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata, fence);
 		input.onProgress?.('Uploading the Worker and web app to Cloudflare…');
 		await fence.mutate(() => input.api.uploadWorker({
@@ -171,20 +171,20 @@ export async function provisionCloudflareDeployment(input: {
 			artifacts: input.artifacts,
 			d1DatabaseId: databaseId,
 			r2BucketName: input.metadata.r2BucketName,
-		}));
+		}), 'upload-worker');
 		input.onProgress?.('Configuring server maintenance…');
 		await fence.mutate(() => input.api.updateWorkerSchedules(
 			input.accountId,
 			input.metadata.workerName,
 			[],
-		));
+		), 'configure-maintenance');
 
 		input.onProgress?.('Enabling the server address…');
 		if (input.metadata.workersSubdomain !== workersSubdomain) {
 			input.metadata.workersSubdomain = workersSubdomain;
 			await input.onMetadataChanged();
 		}
-		await fence.mutate(() => input.api.enableWorkerSubdomain(input.accountId, input.metadata.workerName));
+		await fence.mutate(() => input.api.enableWorkerSubdomain(input.accountId, input.metadata.workerName), 'enable-server-address');
 
 		if (
 			input.metadata.lastDeployedVersion !== input.artifacts.version

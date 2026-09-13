@@ -1,3 +1,4 @@
+import { BATCH_UPLOAD_CONCURRENCY } from './engine-constants';
 import { pipelineUploadChunks } from './transfer-budget';
 import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
@@ -24,6 +25,7 @@ export async function runIncrementalSync(
   }
 
   try {
+    context.reportWork?.('server');
     const changesByPath = new Map<string, ChangelogEntry>();
     let changeCount = 0;
     let since = context.settings.lastSeq;
@@ -57,6 +59,7 @@ export async function runIncrementalSync(
 
     logger.info(`Incremental sync: ${changeCount} remote changes since seq ${context.settings.lastSeq}`);
 
+    context.reportWork?.('scanning');
     const localChanges = await context.getLocalChanges();
     const localDeletes = await context.getLocalDeletes();
     logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
@@ -92,6 +95,7 @@ export async function runIncrementalSync(
     options.progressCallback?.(current, total);
 
     if (downloadRequests.length > 0) {
+      context.reportWork?.('downloading');
       await context.parallelDownloadAndSaveFiles(downloadRequests, result, () => {
         current++;
         options.progressCallback?.(current, total);
@@ -106,6 +110,7 @@ export async function runIncrementalSync(
     for (const diff of conflicts) {
       try {
         const localFiles = createPathRecord<FileEntry>();
+        context.reportWork?.('applying');
         const outcome = await context.processDiff(diff, localFiles, result);
         if (outcome.status === "deferred") {
           result.errors.push(`${diff.path}: ${outcome.reason}`);
@@ -119,6 +124,7 @@ export async function runIncrementalSync(
     current = changesByPath.size;
     options.progressCallback?.(current, total);
 
+    if (localOnlyChanges.length) context.reportWork?.('preparing');
     const preparedChunks = pipelineUploadChunks(localOnlyChanges, async (file) => {
       context.throwIfDestroyed?.();
       try {
@@ -138,22 +144,29 @@ export async function runIncrementalSync(
       return null;
     });
 
+    let uploadsProcessed = 0;
     for await (const chunk of preparedChunks) {
       context.throwIfDestroyed?.();
       let reported = 0;
+      context.reportWork?.('uploading', uploadsProcessed, localOnlyChanges.length);
       await context.uploadPreparedFiles(chunk, result, {
         onProcessed: (count) => {
           reported += count;
+          uploadsProcessed += count;
+          context.reportWork?.('uploading', uploadsProcessed, localOnlyChanges.length);
           current += count;
           options.progressCallback?.(current, total);
         },
         concurrency: options.uploadConcurrency,
+        batchConcurrency: BATCH_UPLOAD_CONCURRENCY,
         retry: true,
         ...(context.reconcileVersionConflicts ? {
           onVersionConflicts: (paths: string[], syncResult: SyncResult) =>
             context.reconcileVersionConflicts!(paths, syncResult),
         } : {}),
       });
+      uploadsProcessed += chunk.length - reported;
+      context.reportWork?.('uploading', uploadsProcessed, localOnlyChanges.length);
       current += chunk.length - reported;
       options.progressCallback?.(current, total);
     }
@@ -164,6 +177,7 @@ export async function runIncrementalSync(
     }
 
     if (localOnlyDeletes.length > 0) {
+      context.reportWork?.('applying');
       try {
         if (result.errors.length > 0) throw new Error('Remote deletion deferred until uploads and reconciliation finish successfully');
         const deleteFiles = localOnlyDeletes.flatMap((path) => {
@@ -224,6 +238,7 @@ export async function runIncrementalSync(
       options.progressCallback?.(current, total);
     }
 
+    context.reportWork?.('saving');
     await context.localManifest.save();
     if (finalizeSyncResult(result)) {
       context.settings.lastSeq = latestSeq;

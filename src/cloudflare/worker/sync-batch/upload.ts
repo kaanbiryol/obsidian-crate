@@ -1,5 +1,8 @@
-import { trackStagedUpload } from '../staged-uploads';
-import { beginUploadOperation, type UploadOperation } from '../upload-operations';
+import { commitNewFiles } from '../bulk-new-file-commit';
+import { BULK_NEW_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
+import { BATCH_ASSET_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
+import { trackStagedUploads } from '../staged-uploads';
+import { beginUploadOperation } from '../upload-operations';
 import { sha256HexBytes } from '../auth';
 import { corsResponse } from '../cors';
 import { commitStagedFile } from '../sync-mutations';
@@ -30,6 +33,7 @@ export async function handleBatchUpload(
 	bucket: R2Bucket,
 	db: D1Database,
   commitUpload = commitStagedFile,
+  commitBulk = commitNewFiles,
 ): Promise<Response> {
 	const parsedBody = await parseJsonObject(request, 15 * 1024 * 1024);
 	if (!parsedBody.ok) {
@@ -40,13 +44,22 @@ export async function handleBatchUpload(
 	if (!Array.isArray(files) || files.length === 0) {
 		return corsResponse({ error: 'files array required' }, 400);
 	}
-	if (files.length > MAX_BATCH_UPLOAD_FILES) {
-		return corsResponse({ error: `Maximum ${MAX_BATCH_UPLOAD_FILES} files per batch` }, 400);
+	const bulkNew = parsedBody.value.bulkNewFiles === true;
+	if (bulkNew && !(files as BatchFile[]).every(file => parseExpectedFileHash(file?.expectedHash) === null)) {
+		return corsResponse({ error: 'Bulk new-file uploads require absent preconditions' }, 400);
+	}
+	if (bulkNew && new Set((files as BatchFile[]).map(file => file?.operationId)).size !== files.length) {
+		return corsResponse({ error: 'Duplicate operation identity in bulk upload' }, 400);
+	}
+	const maxFiles = bulkNew ? BULK_NEW_UPLOAD_MAX_FILES : (files as BatchFile[]).every(file => typeof file?.path === 'string' && !file.path.toLowerCase().endsWith('.md'))
+		? BATCH_ASSET_UPLOAD_MAX_FILES : MAX_BATCH_UPLOAD_FILES;
+	if (files.length > maxFiles) {
+		return corsResponse({ error: `Maximum ${maxFiles} files per batch` }, 400);
 	}
 
 	const results: BatchUploadResponse['results'] = [];
-	const uploads: Array<{
-		operation: UploadOperation;
+	const candidates: Array<{
+		operationId: unknown;
 		safePath: string;
 		bytes: ArrayBuffer;
 		hash: string;
@@ -125,14 +138,8 @@ export async function handleBatchUpload(
 			}
 
 			const contentType = parseOptionalString(file.contentType, 255) || 'application/octet-stream';
-			const operation = await beginUploadOperation(db, file.operationId, { path: safePath, hash: computedHash, size, contentType, expectedHash });
-			if (operation instanceof Response) {
-				const receipt = await operation.json() as BatchUploadResponse['results'][number];
-				results.push({ ...receipt, path: safePath, ...(!receipt.success ? { status: operation.status } : {}) });
-				continue;
-			}
-			uploads.push({
-				operation,
+			candidates.push({
+				operationId: file.operationId,
 				safePath,
 				bytes: bytes.buffer,
 				hash: providedHash || computedHash,
@@ -146,8 +153,28 @@ export async function handleBatchUpload(
 		}
 	}
 
+	// Receipt checks are independent; do not pay their latency once per file.
+	const checked = await Promise.all(candidates.map(async file => {
+		try {
+			const operation = await beginUploadOperation(db, file.operationId, {
+				path: file.safePath, hash: file.hash, size: file.size,
+				contentType: file.contentType, expectedHash: file.expectedHash,
+			});
+			if (operation instanceof Response) {
+				const receipt = await operation.json() as BatchUploadResponse['results'][number];
+				results.push({ ...receipt, path: file.safePath, ...(!receipt.success ? { status: operation.status } : {}) });
+				return null;
+			}
+			return { ...file, operation };
+		} catch (error) {
+			results.push(validationFailure(file.safePath, formatMutationError(error)));
+			return null;
+		}
+	}));
+	const uploads = checked.filter((file): file is NonNullable<typeof file> => file !== null);
+
 	let previousFiles = new Map<string, FileStorageRow>();
-	if (uploads.length > 0) {
+	if (!bulkNew && uploads.length > 0) {
 		try {
 			previousFiles = await loadStoredFileRows(db, uploads.map((file) => file.safePath));
 		} catch (error: unknown) {
@@ -164,10 +191,48 @@ export async function handleBatchUpload(
 		}
 	}
 
+	try {
+		await trackStagedUploads(db, uploads.map(file => file.objectKey));
+	} catch (error) {
+		return corsResponse({ success: false, results: results.concat(uploads.map(file => ({
+			path: file.safePath, success: false as const, code: 'storage' as const, status: 503,
+			error: formatMetadataCommitFailure('Upload', formatMutationError(error)),
+		}))) }, 503);
+	}
+	if (bulkNew) {
+		const staged: typeof uploads = [];
+		let failed = false;
+		// Bound open R2 connections and retained request data on the Worker.
+		for (let offset = 0; offset < uploads.length; offset += 3) {
+			await Promise.all(uploads.slice(offset, offset + 3).map(async file => {
+				try {
+					await bucket.put(file.objectKey, file.bytes, {
+						httpMetadata: { contentType: file.contentType }, customMetadata: { hash: file.hash },
+					});
+					staged.push(file);
+				} catch (error) {
+					failed = true;
+					results.push({ path: file.safePath, success: false, status: 503, code: 'storage', error: formatMutationError(error) });
+				}
+			}));
+		}
+		try {
+			results.push(...await commitBulk(bucket, db, staged.map(file => ({
+				path: file.safePath, hash: file.hash, size: file.size, objectKey: file.objectKey,
+				operation: file.operation, content: file.bytes,
+			}))));
+		} catch (error) {
+			failed = true;
+			// An uncertain transaction is replayed by operation identity, never cleaned up here.
+			results.push(...staged.map(file => ({ path: file.safePath, success: false, status: 503, code: 'storage' as const,
+				error: formatMetadataCommitFailure('Upload', formatMutationError(error)) })));
+		}
+		return corsResponse({ success: results.every(result => result.success), results }, failed ? 503 : 200);
+	}
+
 	let metadataFailure = false;
 	await Promise.all(uploads.map(async (file) => {
 		try {
-			await trackStagedUpload(db, file.objectKey);
 			await bucket.put(file.objectKey, file.bytes, {
 				httpMetadata: { contentType: file.contentType },
 				customMetadata: { hash: file.hash },

@@ -1,3 +1,4 @@
+import { BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY } from '../../protocol/sync-limits';
 import {
 	CRATE_PLUGIN_PROTOCOL,
 	CRATE_SERVICE_ID,
@@ -17,6 +18,8 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 	serverVersion: CRATE_SERVER_VERSION,
 	protocol: CRATE_PLUGIN_PROTOCOL,
 	capabilities: Object.freeze([
+		BATCH_ASSET_UPLOAD_CAPABILITY,
+		BULK_NEW_UPLOAD_CAPABILITY,
 		'sync-v3',
 		'file-revision-deletes',
 		'upload-operation-receipts',

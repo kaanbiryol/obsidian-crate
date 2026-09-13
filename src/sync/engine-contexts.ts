@@ -87,6 +87,7 @@ export class SyncEngineContexts {
 		const dependencies = this.dependencies;
 		return {
 			settings: dependencies.getSettings(),
+			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
 			throwIfDestroyed: dependencies.throwIfDestroyed,
 			vault: dependencies.vault,
 			fileManager: dependencies.fileManager,
@@ -118,7 +119,8 @@ export class SyncEngineContexts {
 		const dependencies = this.dependencies;
 		return {
 			apiConfigured: () => dependencies.api.isConfigured(),
-			recoverUploads: () => dependencies.api.recoverUploads(),
+			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
+			recoverUploads: () => dependencies.api.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			getManifest: () => dependencies.api.getManifest(),
@@ -150,7 +152,8 @@ export class SyncEngineContexts {
 		return {
 			vault: dependencies.vault,
 			apiConfigured: () => dependencies.api.isConfigured(),
-			recoverUploads: () => dependencies.api.recoverUploads(),
+			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
+			recoverUploads: () => dependencies.api.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			shouldIgnore: dependencies.shouldIgnore,
@@ -171,7 +174,8 @@ export class SyncEngineContexts {
 		return {
 			vault: dependencies.vault,
 			apiConfigured: () => dependencies.api.isConfigured(),
-			recoverUploads: () => dependencies.api.recoverUploads(),
+			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
+			recoverUploads: () => dependencies.api.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
 			getStatus: dependencies.getStatus,
 			updateState: dependencies.updateState,
 			shouldIgnore: dependencies.shouldIgnore,

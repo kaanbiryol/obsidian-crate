@@ -1,3 +1,4 @@
+import { recoverDeployment } from '../deployment-recovery';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
@@ -92,6 +93,7 @@ it('keeps an uncertain upload fenced even after an arbitrarily late provider com
 	h.api.uploadWorker.mockRejectedValueOnce(new Error('transport timed out'));
 	await expect(h.deploy()).rejects.toThrow('fence remains held');
 	const owner = await held();
+	expect(JSON.parse(owner!.value)).toMatchObject({ step: 'upload-worker', stepState: 'started' });
 	await expect(h.deploy(artifact('0.2.0'))).rejects.toThrow('Another deployment');
 	await upload({ artifacts: artifact() }); // The timed-out request completes remotely later.
 	await expect(h.deploy(artifact('0.2.0'))).rejects.toThrow('Another deployment');
@@ -210,4 +212,23 @@ it('refuses stale resource metadata instead of acquiring a fence in a different 
 	await expect(h.deploy(artifact(), h.api, wrong)).rejects.toThrow('bindings do not match');
 	expect(await held()).toBeNull();
 	expect(h.api.uploadWorker).not.toHaveBeenCalled();
+});
+
+it('recovery of a confirmed step prevents the old updater from sending its next mutation', async () => {
+    const h = await harness();
+    const gate = deferred();
+    const started = deferred();
+    h.api.getWorkersSubdomain.mockImplementationOnce(async () => {
+        started.resolve();
+        await gate.promise;
+        return 'test';
+    });
+    const updating = h.deploy();
+    const rejected = expect(updating).rejects.toThrow('Deployment ownership changed');
+    await started.promise;
+    expect(JSON.parse((await held())!.value)).toMatchObject({ recoveryProtocol: 1, step: 'apply-schema', stepState: 'confirmed' });
+    expect((await recoverDeployment(h.api, h.metadata)).status).toBe('recovered');
+    gate.resolve();
+    await rejected;
+    expect(h.api.uploadWorker).not.toHaveBeenCalled();
 });

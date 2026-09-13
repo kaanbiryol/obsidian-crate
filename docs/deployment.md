@@ -190,3 +190,19 @@ If a request or local save fails, use **Resume server reset** in the same sectio
 New deployments bind `NOTIFICATION_REQUEST_LIMITER` to Cloudflare's Rate Limiting API (60 notification writes per minute per source-address hash, Worker hostname and Cloudflare location). Unknown mutation routes return 404 before D1 or authentication. Invalid bearer credentials and expired/invalid enrollment grants cannot spend authenticated quotas. After authority verification, a D1 transaction charges both per-session/action and daily budgets only when both admit the request. Valid enrollment exchanges and authenticated management have separate 1,000-request UTC-day pools. A blocked action cannot exhaust another action's daily allowance. Anonymous traffic can still consume authentication reads and edge capacity, especially across many source addresses; these controls do not claim a global cap on anonymous D1 reads or total account cost. The binding is included in deployment ownership checks. Older/local configurations without the binding have only an isolate-local fallback and should be updated.
 
 An older/local configuration without the binding uses a bounded per-isolate fallback. It is not a global abuse guarantee. Cloudflare's limiter is also location-scoped and eventually consistent; hosted request volume and ordinary Worker quotas still need monitoring. See the [official Rate Limiting API documentation](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
+
+
+### Interrupted operation checkpoints
+
+New deployment locks record the last server-change step and whether its response was confirmed. The inspection script displays these fields. A started step with no confirmation remains uncertain; the step record is evidence for recovery, not permission to release the lock automatically. Older locks have no step information.
+
+File-upload recovery checkpoints confirmed receipts every 16 uploads and saves a partial group if recovery fails. Reopening after another interruption replays only the remaining uncheckpointed operations, using their original operation IDs.
+
+
+### Recover an interrupted update in Crate
+
+Select **Check and recover update** beside the update notice, or under **Server and usage → Interrupted server update**. Crate uses the saved Cloudflare login to inspect the live Worker, its storage bindings, and the operation record.
+
+A confirmed checkpoint written by the recovery-aware client can be released using an exact-value comparison. The previous updater must claim its next step before sending another mutation, so it cannot continue after recovery wins that comparison. After recovery, select **Update server** in the result dialog.
+
+An unconfirmed request, older operation record, reset/deletion, mismatched server, or ownership change remains blocked. The dialog explains the result and offers **Copy diagnostics**. These diagnostics contain server identifiers, build fingerprints, operation identifiers and step metadata, but no credentials or vault contents. They help support inspect the provider outcome; they do not prove an unconfirmed request has stopped.

@@ -5,7 +5,7 @@ import { REMINDER_OPERATION_VALID } from './reminders-web/operation-expiry';
 import { fileNamespaceGuard, namespacePredicate, FileNamespaceConflictError } from './file-namespace';
 import type { RestoreFileRequest, UploadResult } from '@/protocol/sync-types';
 
-function decodeReceipt(json: string): UploadResult {
+export function decodeReceipt(json: string): UploadResult {
 	const result = JSON.parse(json) as UploadResult & { conflictingPath?: string | null };
 	if (result.conflictingPath) result.error = new FileNamespaceConflictError(result.path, result.conflictingPath).message;
 	else delete result.conflictingPath;
@@ -56,7 +56,8 @@ export function recordUploadReceipt(db: D1Database, operation: UploadOperation, 
 				'error', 'Remote file or namespace changed since it was read',
 				'currentHash', (SELECT hash FROM files WHERE path = ?),
 				'conflictingPath', (SELECT path FROM files WHERE ${conflict.sql} LIMIT 1)) END
-		ELSE NULL END WHERE NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)`)
+		ELSE NULL END WHERE NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)
+		RETURNING response_json`)
 		.bind(operation.id, operation.requestHash, operation.day, operation.day, file.path, file.objectKey,
 			file.path, file.hash, file.objectKey, file.path, ...namespace.args, file.path, ...conflict.args, operation.id);
 }

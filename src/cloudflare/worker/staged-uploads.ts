@@ -16,3 +16,10 @@ export function finishStagedUpload(db: D1Database, storageKey: string): D1Prepar
   return db.prepare(`DELETE FROM staged_uploads WHERE storage_key = ?
     AND EXISTS (SELECT 1 FROM files WHERE storage_key = ?)`).bind(storageKey, storageKey);
 }
+
+/** One durable lease registration for the whole request, before any R2 puts. */
+export async function trackStagedUploads(db: D1Database, storageKeys: string[]): Promise<void> {
+  if (!storageKeys.length) return;
+  await db.prepare("INSERT INTO staged_uploads(storage_key, expires_at) SELECT value, unixepoch('now') * 1000 + ? FROM json_each(?)")
+    .bind(STAGED_UPLOAD_TTL_MS, JSON.stringify(storageKeys)).run();
+}

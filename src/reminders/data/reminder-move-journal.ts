@@ -43,7 +43,7 @@ export function createReminderMoveJournal(app: App, directory: string, folderPat
 	const samePath = (left: string, right: string) => portablePathKey(left) === portablePathKey(right);
 	const affectsScope = (record: ReminderMoveRecord) => samePath(record.folderPath, folderPath)
 		|| [record.source.filePath, record.destination.filePath].some(path => portablePathKey(path).startsWith(`${portablePathKey(folderPath)}/`));
-	const issue = (record: ReminderMoveRecord) => `An interrupted reminder move needs review: ${record.source.filePath} and ${record.destination.filePath}. Keep or merge the wanted text in one note, remove the duplicate from the other, then run “Recover interrupted reminder moves”. Recovery records are kept in ${directory}.`;
+	const issue = (record: ReminderMoveRecord) => `An interrupted reminder move needs review: ${record.source.filePath} and ${record.destination.filePath}. Keep or merge the wanted text in one note, remove the duplicate from the other, then reload Crate to retry recovery. Recovery records are kept in ${directory}.`;
 	const getFile = (path: string): TFile | null => {
 		const file = app.vault.getAbstractFileByPath(path);
 		return file instanceof TFile ? file : null;
@@ -90,7 +90,7 @@ export function createReminderMoveJournal(app: App, directory: string, folderPat
 		assertActive,
 		assertWritable(paths) {
 			assertActive();
-			if (unknown) throw new Error(`Reminder recovery records could not be read. Check ${directory}, then run “Recover interrupted reminder moves”.`);
+			if (unknown) throw new Error(`Reminder recovery records could not be read. Check ${directory}, then reload Crate to retry recovery.`);
 			const blocked = pending.find(record => paths.some(path => samePath(record.source.filePath, path) || samePath(record.destination.filePath, path)));
 			if (blocked) throw new Error(issue(blocked));
 		},

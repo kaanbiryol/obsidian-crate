@@ -305,7 +305,17 @@ it.each(['update', 'reset', 'delete'] as const)('does not suggest retrying an un
         'Server operation needs review',
         expect.stringContaining('Further server changes are blocked'),
         expect.arrayContaining(['Closing this message does not clear the lock.']),
-        { technicalDetails: 'Network changed. The deployment fence remains held.' },
+        expect.objectContaining({ technicalDetails: 'Network changed. The deployment fence remains held.' }),
     );
+    expect(progress.fail.mock.calls[0]?.[3]).toHaveProperty('action.label', intent === 'update' ? 'Check and recover update' : 'Open settings');
     expect(JSON.stringify(progress.fail.mock.calls)).not.toContain('settings to try again');
+});
+
+it('does not open another update dialog when the service is busy', async () => {
+    const { startCloudflareDeployment } = await loadPluginIntegration();
+    const plugin = createPlugin(true);
+    Object.assign(plugin.cloudflareDeploymentService, { isBusy: true });
+    await startCloudflareDeployment(plugin as never, 'update');
+    expect(openCloudflareDeploymentModal).not.toHaveBeenCalled();
+    expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization).not.toHaveBeenCalled();
 });

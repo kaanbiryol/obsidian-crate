@@ -6,6 +6,8 @@ import type { PreparedUpload } from './types';
 import {
 	BATCH_UPLOAD_MAX_BYTES as BATCH_MAX_BYTES,
 	BATCH_UPLOAD_MAX_FILES as BATCH_MAX_FILES,
+	BATCH_ASSET_UPLOAD_MAX_FILES,
+	BULK_NEW_UPLOAD_MAX_FILES,
 	MAX_FILE_SIZE_BYTES,
 } from '../protocol/sync-limits';
 import { createLogger } from "../plugin/logger";
@@ -108,7 +110,9 @@ export function createBatchUploadChunks(prepared: PreparedUpload[]): PreparedUpl
 
   for (const upload of prepared) {
     if (
-      currentChunk.length >= BATCH_MAX_FILES
+      currentChunk.length >= (upload.expectedHash === null && currentChunk.every(file => file.expectedHash === null) ? BULK_NEW_UPLOAD_MAX_FILES
+        : upload.path.toLowerCase().endsWith('.md') || currentChunk.some(file => file.path.toLowerCase().endsWith('.md'))
+        ? BATCH_MAX_FILES : BATCH_ASSET_UPLOAD_MAX_FILES)
       || (currentChunk.length > 0 && currentBytes + upload.size > BATCH_MAX_BYTES)
     ) {
       chunks.push(currentChunk);

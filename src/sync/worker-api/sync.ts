@@ -1,3 +1,4 @@
+import { BATCH_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_MAX_FILES, BATCH_ASSET_UPLOAD_MAX_FILES } from '../../protocol/sync-limits';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 import { parseFileVersions } from './version-contract';
 import { parseChanges, parseChangesCheck, parseFileMetadata, parseManifestPage } from './read-contracts';
@@ -22,7 +23,6 @@ import type {
 } from '../../protocol/sync-types';
 import {
 	isCompatibleCrateServer,
-	parseCrateServerInfo,
 	type CrateServerInfo,
 } from '../../protocol';
 import { assertPortablePathNames, assertPortablePaths } from '../../protocol/portable-path';
@@ -43,12 +43,7 @@ export class SyncWorkerApi {
 	}
 
 	async getServerInfo(): Promise<CrateServerInfo> {
-		const value = await this.http.requestJson<unknown>('/.well-known/crate');
-		const info = parseCrateServerInfo(value);
-		if (!info) {
-			throw new Error('Server returned invalid Crate compatibility metadata');
-		}
-		return info;
+		return this.http.getServerInfo();
 	}
 
 	async testConnection(): Promise<{ success: boolean; error?: string }> {
@@ -223,9 +218,22 @@ export class SyncWorkerApi {
 			if (day === undefined) throw new Error('Update the Crate server before uploading');
 			files = files.map(file => ({ ...file, operationId: file.operationId ?? createReminderOperationId(day) }));
 		}
+		const info = await this.getServerInfo();
+		const bulkNew = files.every(file => file.expectedHash === null) && info.capabilities.includes(BULK_NEW_UPLOAD_CAPABILITY);
+		const maxFiles = bulkNew ? BULK_NEW_UPLOAD_MAX_FILES
+			: files.every(file => !file.path.toLowerCase().endsWith('.md')) && info.capabilities.includes(BATCH_ASSET_UPLOAD_CAPABILITY)
+				? BATCH_ASSET_UPLOAD_MAX_FILES : BATCH_UPLOAD_MAX_FILES;
+		if (files.length > maxFiles) {
+			const results: BatchUploadResponse['results'] = [];
+			for (let offset = 0; offset < files.length; offset += maxFiles) {
+				results.push(...(await this.batchUpload(files.slice(offset, offset + maxFiles))).results);
+			}
+			return { success: results.every(result => result.success), results };
+		}
+
 		return this.http.requestJson<BatchUploadResponse>('/sync/batch-upload', {
 			method: 'POST',
-			body: JSON.stringify({ files }),
+			body: JSON.stringify({ files, ...(bulkNew ? { bulkNewFiles: true } : {}) }),
 			headers: { 'X-Crate-Upload-Operations': files.map(file => file.operationId).join(',') },
 		}, TRANSFER_TIMEOUT_MS);
 	}

@@ -85,6 +85,8 @@ export class SyncApiClient {
 		return this.http.getWorkerUrl();
 	}
 
+	resetRequestTimings(): void { this.http.resetRequestTimings(); }
+	getRequestTimings() { return this.http.getRequestTimings(); }
 	getRequestDiagnostics(): RequestDiagnostics {
 		return { ...this.http.getRequestDiagnostics(), uploads: this.durableUploads?.getDiagnostics() };
 	}
@@ -122,8 +124,8 @@ export class SyncApiClient {
 	}
 
 	/** Called by the owning sync workflow before discovery or planning. */
-	async recoverUploads(): Promise<void> {
-		await this.durableUploads?.recover();
+	async recoverUploads(onProgress?: (current: number, total: number) => void): Promise<void> {
+		await this.durableUploads?.recover(onProgress);
 	}
 
 	async uploadFile(

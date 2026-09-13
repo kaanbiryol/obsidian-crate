@@ -1,5 +1,5 @@
 import { stagedUploadGuard, finishStagedUpload } from './staged-uploads';
-import { readUploadReceipt, recordUploadReceipt, type UploadOperation } from './upload-operations';
+import { decodeReceipt, readUploadReceipt, recordUploadReceipt, type UploadOperation } from './upload-operations';
 import type { UploadResult } from '@/protocol/sync-types';
 import { enqueueFileProjection } from './notification-projection-queue';
 import type { CommitEffects } from './commit-effects';
@@ -18,7 +18,7 @@ import {
 	type FileStorageRow,
 } from './sync-storage';
 
-function uploadMutation(
+export function uploadMutation(
 	db: D1Database,
 	path: string,
 	hash: string,
@@ -113,7 +113,9 @@ export async function commitStagedFile(
 	]);
 
 	if (params.operation) {
-		const receipt = await readUploadReceipt(db, params.operation);
+		// RETURNING belongs to the atomic commit. Only a concurrent replay needs a read.
+		const recorded = (results[results.length - 1] as { results?: Array<{ response_json: string }> } | undefined)?.results?.[0];
+		const receipt = recorded ? decodeReceipt(recorded.response_json) : await readUploadReceipt(db, params.operation);
 		if (!receipt) throw new Error('Upload receipt is unavailable; retry the same operation');
 		if (receipt.revision !== params.objectKey) await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
 		return { committed: receipt.success, currentHash: receipt.success ? params.hash : receipt.currentHash ?? null, revision: receipt.revision, ...(!receipt.success ? { failure: receipt } : {}) };

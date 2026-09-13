@@ -1,3 +1,4 @@
+import { DurableUploads } from './durable-uploads';
 import { expect, it, vi } from 'vitest';
 import { LocalManifest } from './manifest';
 import { PersistentTestVault, TEST_PLUGIN_DIR } from '@/cloudflare/worker/sync-engine-vault-test-harness';
@@ -70,4 +71,83 @@ it.each(['legacy', 'unknown-intent', 'damaged-content', 'damaged-preimage'])('pr
 	const bytes = JSON.stringify(raw); disk.write(path, bytes);
 	await expect(create().load()).rejects.toThrow();
 	expect(disk.text(path)).toBe(bytes);
+});
+
+it.each([3, 17])('checkpoints recovered receipts before another interruption (%i uploads)', async count => {
+    const { create, file } = fixture();
+    const manifest = create();
+    const day = Math.floor(Date.now() / 86400000);
+    await manifest.uploadJournal.prepare(Array.from({ length: count }, (_, index) => ({ ...file, path: `note-${index}.md` })), day);
+    let dispatched = 0;
+    const save = vi.spyOn(manifest, 'save');
+    const recovery = new DurableUploads(manifest, {
+        getServerInfo: async () => ({ reminderOperationDay: day }),
+        batchUpload: async files => ({ success: false, results: files.map(file => {
+            dispatched++;
+            return dispatched === count
+                ? { success: false as const, path: file.path, error: 'Connection interrupted again', status: 503 }
+                : { success: true as const, path: file.path, hash: file.hash, revision: `revision-${dispatched}` };
+        }) }),
+        uploadFile: async (path: string, _content: ArrayBuffer, hash: string) => {
+            dispatched++;
+            if (dispatched === count) {
+                if (count === 17) expect(save).toHaveBeenCalledOnce();
+                throw new Error('Connection interrupted again');
+            }
+            return { success: true, path, hash, revision: `revision-${dispatched}` };
+        },
+    }, { putBase: async () => {} } as never, crypto.randomUUID());
+    const progress = vi.fn();
+    await expect(recovery.recover(progress)).rejects.toThrow('Connection interrupted again');
+    expect(progress).toHaveBeenNthCalledWith(1, 0, count);
+    expect(progress).toHaveBeenLastCalledWith(count - 1, count);
+    await manifest.close();
+    const restarted = create();
+    await restarted.load();
+    expect(restarted.uploadJournal.pending().map(entry => entry.path)).toEqual([`note-${count - 1}.md`]);
+    await restarted.close();
+});
+
+
+it('recovers 24 small uploads in three requests using their original identities and bytes', async () => {
+  const { create, file } = fixture(); const manifest = create();
+  const original = await manifest.uploadJournal.prepare(Array.from({ length: 24 }, (_, i) => ({ ...file, path: `${i}.md` })), 20000);
+  const batchUpload = vi.fn(async (files: typeof original) => ({ success: true, results: files.map(f => ({ path: f.path, success: true, hash: f.hash, revision: 'r' })) }));
+  const uploadFile = vi.fn(); const getServerInfo = vi.fn(); const progress = vi.fn();
+  const recovery = new DurableUploads(manifest, { batchUpload, uploadFile, getServerInfo } as never, { putBase: async () => {} } as never, crypto.randomUUID());
+  await recovery.recover(progress);
+  expect(batchUpload.mock.calls.map(([files]) => files.length)).toEqual([8, 8, 8]);
+  expect(batchUpload.mock.calls.flatMap(([files]) => files.map(f => [f.operationId, f.content, f.expectedHash]))).toEqual(original.map(f => [f.operationId, f.content, f.expectedHash]));
+  expect(uploadFile).not.toHaveBeenCalled(); expect(getServerInfo).not.toHaveBeenCalled();
+  expect(progress).toHaveBeenLastCalledWith(24, 24);
+  await manifest.close(); const restarted = create(); await restarted.load();
+  expect(restarted.uploadJournal.pending()).toEqual([]); await restarted.close();
+});
+
+it('checkpoints healthy batch members while retaining only the unresolved upload', async () => {
+  const { create, file } = fixture(); const manifest = create();
+  await manifest.uploadJournal.prepare(['a', 'b', 'c'].map(path => ({ ...file, path: `${path}.md` })), 20000);
+  const recovery = new DurableUploads(manifest, {
+    getServerInfo: vi.fn(), uploadFile: vi.fn(),
+    batchUpload: async files => ({ success: false, results: files.map(f => f.path === 'b.md'
+      ? { path: f.path, success: false as const, status: 503, error: 'Retry needed' }
+      : { path: f.path, success: true as const, hash: f.hash, revision: 'r' }) }),
+  }, { putBase: async () => {} } as never, crypto.randomUUID());
+  const progress = vi.fn();
+  await expect(recovery.recover(progress)).rejects.toThrow('Retry needed');
+  expect(progress).toHaveBeenLastCalledWith(2, 3);
+  await manifest.close(); const restarted = create(); await restarted.load();
+  expect(restarted.uploadJournal.pending().map(f => f.path)).toEqual(['b.md']); await restarted.close();
+});
+
+it('keeps the whole batch when its receipt list is invalid', async () => {
+  const { create, file } = fixture(); const manifest = create();
+  await manifest.uploadJournal.prepare(['a', 'b'].map(path => ({ ...file, path: `${path}.md` })), 20000);
+  const recovery = new DurableUploads(manifest, { getServerInfo: vi.fn(), uploadFile: vi.fn(),
+    batchUpload: async () => ({ success: true, results: [{ path: 'a.md', hash: file.hash, success: true, revision: 'r' }] }),
+  }, { putBase: async () => {} } as never, crypto.randomUUID());
+  const progress = vi.fn();
+  await expect(recovery.recover(progress)).rejects.toThrow('Invalid upload receipt batch');
+  expect(progress).toHaveBeenCalledExactlyOnceWith(0, 2);
+  expect(manifest.uploadJournal.pending()).toHaveLength(2); await manifest.close();
 });

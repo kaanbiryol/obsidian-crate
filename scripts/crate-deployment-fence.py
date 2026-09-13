@@ -66,7 +66,7 @@ def main():
             print('No deployment fence is held.')
         else:
             record = current[1]
-            print(json.dumps({key: record.get(key) for key in ('owner', 'worker', 'kind', 'version', 'fingerprint', 'startedAt')}, indent=2))
+            print(json.dumps({key: record.get(key) for key in ('owner', 'worker', 'kind', 'version', 'fingerprint', 'startedAt', 'step', 'stepState')}, indent=2))
     else:
         if not args.owner:
             parser.error('--owner from the inspection is required')
