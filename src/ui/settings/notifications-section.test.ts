@@ -74,11 +74,25 @@ describe('renderNotificationsSection', () => {
 		});
 		await flushMicrotasks();
 
-		expect(getSettingByName('Enable push notifications')).toBeTruthy();
+		expect(getSettingByName('Test notification').buttons[0]?.buttonEl.classNames.has('is-disabled')).toBe(Boolean(disabled_at));
+		expect(getSettingByName('Send reminder notifications')).toBeTruthy();
 		expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Reminders web app')).toBe(false);
 		expect(getSettingByName('Notification devices').descEl.textContent).toContain('receive reminder push notifications');
 		expect(getSettingByName('iPhone').descEl.textContent).toContain(disabled_at ? 'Notifications paused. Remove this device' : 'Subscribed');
 		expect(getSettingByName('Test notification').descEl.textContent).toBe('Send a test notification to all enabled devices.');
+	});
+
+	it('ignores late subscription results after settings close', async () => {
+		const { renderNotificationsSection } = await loadNotificationsSectionModule();
+		let resolve!: (value: { subscriptions: unknown[] }) => void;
+		const pending = new Promise<{ subscriptions: unknown[] }>(done => { resolve = done; });
+		const container = new FakeElement('div');
+		const cleanup = renderNotificationsSection({ containerEl: container as never,
+			plugin: createPlugin({ getPushSubscriptions: () => pending }), rerender: vi.fn() });
+		cleanup();
+		resolve({ subscriptions: [{ id: 'late', device_name: 'Late phone', created_at: '2026-09-13' }] });
+		await flushMicrotasks();
+		expect(container.collectText()).not.toContain('Late phone');
 	});
 
 	it('provides a time picker and an explicit way to turn all-day notifications off', async () => {
@@ -114,7 +128,7 @@ describe('renderNotificationsSection', () => {
 			plugin: plugin as never,
 			rerender: vi.fn(),
 		});
-		getSettingByName('Enable push notifications').toggles[0]?.change(false);
+		getSettingByName('Send reminder notifications').toggles[0]?.change(false);
 		await flushMicrotasks();
 
 		expect(updateNotificationPolicy).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, revision: 'policy-1' }));
@@ -141,11 +155,11 @@ describe('renderNotificationsSection', () => {
 			plugin: plugin as never,
 			rerender: vi.fn(),
 		});
-		getSettingByName('Enable push notifications').toggles[0]?.change(false);
+		getSettingByName('Send reminder notifications').toggles[0]?.change(false);
 		await flushMicrotasks();
 
 		expect(plugin.settings.pushEnabled).toBe(true);
-    expect(getSettingByName('Enable push notifications').toggles[0]?.value).toBe(false);
+    expect(getSettingByName('Send reminder notifications').toggles[0]?.value).toBe(false);
     expect(noticeMessages.some(message => message.includes('disk full'))).toBe(true);
 	});
 
@@ -200,7 +214,8 @@ describe('renderNotificationsSection', () => {
 		getSettingByName('Test notification').buttons[0]?.click();
 		await flushMicrotasks();
 
-		expect(noticeMessages).toContain('No enabled devices found. Enable notifications in the web app first.');
+		expect(getSettingByName('Test notification').buttons[0]?.buttonEl.classNames.has('is-disabled')).toBe(true);
+		expect(noticeMessages).toEqual([]);
 	});
 
 	it('shows the Worker error when an app code cannot be created', async () => {
@@ -220,7 +235,7 @@ describe('renderNotificationsSection', () => {
 		await flushMicrotasks();
 
 		expect(noticeMessages).toContain('Could not create app code: Invalid token');
-		expect(showCodeButton?.buttonEl.textContent).toBe('Show code');
+		expect(showCodeButton?.buttonEl.textContent).toBe('Show QR code');
 		expect(showCodeButton?.buttonEl.classNames.has('is-disabled')).toBe(false);
 	});
 

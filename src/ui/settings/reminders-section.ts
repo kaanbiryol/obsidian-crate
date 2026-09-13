@@ -16,6 +16,7 @@ export interface RemindersSectionContext {
 	containerEl: HTMLElement;
 	plugin: CratePlugin;
 	rerender: () => void;
+	onAllDayTimeContainer?: (container: HTMLElement) => void;
 }
 
 export function renderRemindersSection(context: RemindersSectionContext): () => void {
@@ -32,6 +33,7 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 
 	createSettingsSectionHeading(containerEl, 'Reminders');
 	let folderSuggest: RemindersFolderSuggest;
+	const enableEl = containerEl.createDiv();
 
 	new Setting(containerEl)
 		.setName('Reminders folder')
@@ -71,45 +73,37 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 			});
 		});
 
-	if (!settings.enabled) {
-		new Setting(containerEl)
-			.setName('Enable reminders')
-			.setDesc('This device · use this folder for reminders. Crate scans its Markdown files and adds ID comments to checkbox lines to track reminders when they change.')
-			.addButton(button => {
-				button.setButtonText('Enable reminders')
-					.setCta()
-					.onClick(async () => {
-						button.setDisabled(true);
-						try {
-							await plugin.enableReminders();
-							new Notice('Reminders enabled');
-							rerender();
-						} catch (error) {
-							new Notice(`Failed to enable reminders: ${errorMessage(error)}`);
-							button.setDisabled(false);
-						}
-					});
-			});
-		renderRemindersWebApp(containerEl, plugin);
-		return () => folderSuggest.close();
-	}
-
-	new Setting(containerEl)
-		.setName('Enable reminders')
-		.setDesc('This device · turn off to stop scanning and close reminder views. Files and ID comments are kept. Web reminders and server notifications stay active.')
-		.addToggle(toggle => toggle.setValue(true).onChange(async enabled => {
-			if (enabled) return;
+	new Setting(enableEl)
+		.setName('Enable reminders on this device')
+		.setDesc(settings.enabled
+			? 'This device · turn off to stop scanning and close reminder views. Files and ID comments are kept. Web reminders and server notifications stay active.'
+			: 'This device · use this folder for reminders. Crate scans its Markdown files and adds ID comments to checkbox lines to track reminders when they change.')
+		.addToggle(toggle => toggle.setValue(settings.enabled).onChange(async enabled => {
 			toggle.setDisabled(true);
 			try {
-				await plugin.disableReminders();
+				if (enabled) {
+					await plugin.enableReminders();
+					new Notice('Reminders enabled');
+				} else {
+					await plugin.disableReminders();
+				}
 				rerender();
 			} catch (error) {
-				new Notice(`Could not disable reminders: ${errorMessage(error)}`);
-				toggle.setValue(true).setDisabled(false);
+				new Notice(`Failed to ${enabled ? 'enable' : 'disable'} reminders: ${errorMessage(error)}`);
+				toggle.setValue(plugin.remindersSettings.enabled).setDisabled(false);
 			}
 		}));
 
-	new Setting(containerEl)
+	renderRemindersWebApp(containerEl, plugin);
+	createSettingsSectionHeading(containerEl, 'Reminders preferences');
+	const preferences = containerEl.createDiv();
+	const allDayTimeEl = containerEl.createDiv();
+	context.onAllDayTimeContainer?.(allDayTimeEl);
+	const viewPreferences = containerEl.createDiv();
+
+	if (!settings.enabled) return () => folderSuggest.close();
+
+	new Setting(preferences)
 		.setName('Default due date')
 		.setDesc('This device · choose the due date filled in for new reminders.')
 		.addDropdown(dropdown => {
@@ -124,18 +118,7 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 				});
 		});
 
-	new Setting(containerEl)
-		.setName('Upcoming range (days)')
-		.setDesc('This device · how many days ahead to show in the upcoming view.')
-		.addText(text => {
-			text.setValue(String(settings.upcomingDaysDefault));
-			configureIntegerInput(text, 1);
-			bindCommittedText(text, () => String(plugin.remindersSettings.upcomingDaysDefault),
-				value => persistSettings({ upcomingDaysDefault: Number(value) }),
-				value => parseSettingInteger(value, 1) !== null);
-		});
-
-	new Setting(containerEl)
+	new Setting(viewPreferences)
 		.setName('Open reminders on startup')
 		.setDesc('This device · open the reminders view when Obsidian starts.')
 		.addToggle(toggle => toggle
@@ -144,7 +127,7 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 				await persistSettings({ autoOpenView: value ? 'sidebar' : 'none' });
 			}));
 
-	new Setting(containerEl)
+	new Setting(viewPreferences)
 		.setName('Default reminders tab')
 		.setDesc('This device · the tab shown when you open the reminders view.')
 		.addDropdown(dropdown => {
@@ -160,6 +143,16 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 				});
 		});
 
-	renderRemindersWebApp(containerEl, plugin);
+	new Setting(viewPreferences)
+		.setName('Upcoming range (days)')
+		.setDesc('This device · how many days ahead to show in the upcoming view.')
+		.addText(text => {
+			text.setValue(String(settings.upcomingDaysDefault));
+			configureIntegerInput(text, 1);
+			bindCommittedText(text, () => String(plugin.remindersSettings.upcomingDaysDefault),
+				value => persistSettings({ upcomingDaysDefault: Number(value) }),
+				value => parseSettingInteger(value, 1) !== null);
+		});
+
 	return () => folderSuggest.close();
 }

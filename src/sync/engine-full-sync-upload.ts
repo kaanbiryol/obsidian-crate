@@ -1,7 +1,7 @@
 import { errorMessage } from '../plugin/logger';
 import type { FileEntry } from '../protocol/sync-types';
 import { BATCH_UPLOAD_CONCURRENCY, UPLOAD_CONCURRENCY } from './engine-constants';
-import { prepareUploadChunks } from './transfer-budget';
+import { pipelineUploadChunks } from './transfer-budget';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import type { UploadDiff, PreparedUpload, SyncResult } from './types';
 import { recordResolvedRace } from './sync-result';
@@ -16,7 +16,7 @@ export interface FullSyncUploadContext {
 
 /** Bound retained bytes while using the same CAS/receipt validation as initial sync. */
 export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: UploadDiff[], localFiles: Record<string, FileEntry>, result: SyncResult, onCompleted: () => void): Promise<void> {
-	const chunks = prepareUploadChunks(diffs, async diff => {
+	const chunks = pipelineUploadChunks(diffs, async diff => {
 		context.throwIfDestroyed();
 		try {
 			const prepared = await context.prepareFullSyncUpload(diff);
@@ -31,10 +31,15 @@ export async function uploadFullSyncPlan(context: FullSyncUploadContext, diffs: 
 	});
 	for await (const chunk of chunks) {
 		context.throwIfDestroyed();
+		let reported = 0;
 		await context.uploadPreparedFiles(chunk, result, {
+			onProcessed: (count) => {
+				reported += count;
+				for (let index = 0; index < count; index++) onCompleted();
+			},
 			concurrency: UPLOAD_CONCURRENCY, batchConcurrency: BATCH_UPLOAD_CONCURRENCY, retry: false,
 		});
-		chunk.forEach(() => onCompleted());
+		for (let index = reported; index < chunk.length; index++) onCompleted();
 	}
 	const uploaded = new Set(result.uploadedPaths);
 	for (const diff of diffs) {

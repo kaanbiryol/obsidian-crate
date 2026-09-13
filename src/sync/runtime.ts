@@ -165,9 +165,7 @@ export class SyncRuntime {
 		const syncEngine = this.syncEngine;
 		syncEngine.setAutomaticSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
 
-		if (this.settings.showStatusBar) {
-			this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
-		}
+		this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
 
 		this.syncEngine.setStateChangeCallback((state: SyncState) => {
 			if (this.syncEngine !== syncEngine || this.initializationRevision !== initializationRevision) return;
@@ -347,18 +345,6 @@ export class SyncRuntime {
 		} catch (error) {
 			logger.error('Failed to push shared settings:', error);
 			return false;
-		}
-	}
-
-	updateStatusBar(enabled: boolean): void {
-		if (enabled && !this.statusBar) {
-			this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
-			if (this.syncEngine) {
-				this.statusBar.update(this.syncEngine.getState());
-			}
-		} else if (!enabled && this.statusBar) {
-			this.statusBar.destroy();
-			this.statusBar = null;
 		}
 	}
 

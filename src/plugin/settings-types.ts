@@ -1,7 +1,9 @@
+import type { UsageSnapshot } from '../cloudflare/usage-snapshot';
 import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment-types';
 import type { SyncHistoryEntry } from '../sync/types';
 
 export interface CrateSettings {
+	usageSnapshot?: UsageSnapshot | null;
 	automaticSync: boolean;
 	workerUrl: string;
 	cloudflareDeployment: CloudflareDeploymentMetadata | null;
@@ -12,6 +14,7 @@ export interface CrateSettings {
 	syncOnStartup: boolean;
 	syncOnResume: boolean;
 	syncInterval: number;
+	/** Legacy compatibility field; sync status is always shown. */
 	showStatusBar: boolean;
 	syncHistory: SyncHistoryEntry[];
 	pushEnabled: boolean;
@@ -24,11 +27,13 @@ export interface SharedSettings {
 	syncOnStartup: boolean;
 	syncOnResume: boolean;
 	syncInterval: number;
+	/** Legacy compatibility field; sync status is always shown. */
 	showStatusBar: boolean;
 	pushEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: CrateSettings = {
+	usageSnapshot: null,
 	automaticSync: true,
 	workerUrl: '',
 	cloudflareDeployment: null,
@@ -51,7 +56,7 @@ export const SECRET_KEYS = {
 	DEVICE_ID: 'crate-device-id',
 } as const;
 
-export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS];
+export type SecretKey = (typeof SECRET_KEYS)[keyof typeof SECRET_KEYS] | `crate-analytics-${string}` | `crate-usage-oauth-${string}`;
 
 export const MAX_SYNC_HISTORY = 20;
 export const MAX_SYNC_HISTORY_PATHS = 50;

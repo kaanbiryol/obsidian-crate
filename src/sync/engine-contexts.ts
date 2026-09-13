@@ -1,3 +1,4 @@
+import { PlannedContent } from './planned-content';
 import type { FileManager, Vault } from 'obsidian';
 import type { SyncApiClient } from './api';
 import type { LocalManifest } from './manifest';
@@ -30,7 +31,7 @@ interface SyncEngineContextDependencies {
 	verifyContent: (files: VaultFile[]) => Promise<boolean>;
 	getLocalDeletes: () => Promise<string[]>;
 	incrementalSync: (progressCallback?: (current: number, total: number) => void) => Promise<SyncResult | null>;
-	parallelDownloadAndSaveFiles: (requests: DownloadRequest[], result: SyncResult) => Promise<void>;
+	parallelDownloadAndSaveFiles: (requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void) => Promise<void>;
 	processDiff: (diff: FileDiff, localFiles: Record<string, FileEntry>, result: SyncResult) => Promise<DiffApplyOutcome>;
 	prepareUploadFromPath: (path: string) => Promise<PreparedUpload | null>;
 	uploadPreparedFiles: (
@@ -50,12 +51,15 @@ interface SyncEngineContextDependencies {
 }
 
 export class SyncEngineContexts {
+	private readonly plannedContent = new PlannedContent();
+	clearPlannedContent(): void { this.plannedContent.clear(); }
 	constructor(private dependencies: SyncEngineContextDependencies) {}
 
 	transfer() {
 		const dependencies = this.dependencies;
 		return {
 			vault: dependencies.vault,
+			plannedContent: this.plannedContent,
 			fileManager: dependencies.fileManager,
 			api: dependencies.api,
 			localManifest: dependencies.getLocalManifest(),
@@ -71,6 +75,7 @@ export class SyncEngineContexts {
 		const dependencies = this.dependencies;
 		return {
 			vault: dependencies.vault,
+			plannedContent: this.plannedContent,
 			localManifest: dependencies.getLocalManifest(),
 			shouldIgnore: dependencies.shouldIgnore,
 			verifyContent: dependencies.verifyContent,
@@ -102,6 +107,7 @@ export class SyncEngineContexts {
 		const dependencies = this.dependencies;
 		return {
 			vault: dependencies.vault,
+			plannedContent: this.plannedContent,
 			localManifest: dependencies.getLocalManifest(),
 			shouldIgnore: dependencies.shouldIgnore,
 			runConcurrent: dependencies.runConcurrent,

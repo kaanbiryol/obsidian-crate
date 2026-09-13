@@ -54,19 +54,6 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 					});
 				}));
 
-    new Setting(containerEl)
-      .setName('Retry paused notifications')
-      .setDesc('After repairing a reported issue, retry notification updates paused because of invalid files or repeated failures.')
-      .addButton(button => button.setButtonText('Retry').onClick(async () => {
-        button.setDisabled(true);
-        try {
-          const client = plugin.syncRuntime.getApiClient();
-          if (!client) throw new Error('Sync is not configured');
-          const result = await client.retryPausedNotifications();
-          new Notice(`${result.retried} notification updates queued.${result.more ? ' More paused updates remain; select Retry again.' : ''}`);
-        } catch (error) { new Notice(`Could not retry notifications: ${getErrorMessage(error)}`); }
-        finally { button.setDisabled(false); }
-      }));
 
 		new Setting(containerEl)
 			.setName('Export diagnostics')
@@ -77,20 +64,5 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 					new SyncDiagnosticsModal(plugin.app, plugin.syncRuntime.exportDiagnostics()).open();
 				}));
 
-		new Setting(containerEl)
-			.setName('Server address')
-			.setDesc('The Cloudflare address this vault uses for sync.')
-			.addText(text => text
-				.setValue(plugin.settings.workerUrl)
-				.setDisabled(true));
-
-		new Setting(containerEl)
-			.setName('Manage server')
-			.setDesc('Open the Cloudflare dashboard to view logs and manage your server resources.')
-			.addButton(button => button
-				.setButtonText('Open Cloudflare')
-				.onClick(() => {
-					window.open('https://dash.cloudflare.com/', '_blank', 'noopener,noreferrer');
-				}));
 	}
 }

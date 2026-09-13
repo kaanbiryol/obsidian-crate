@@ -1,34 +1,35 @@
-import { renderForgetServerSetting } from './server-selection-setting';
 import { renderServerResetSetting } from './server-reset-setting';
 import { renderInfrastructureManagementSection } from './infrastructure-management-section';
 import { renderInfrastructureSyncActions } from './infrastructure-sync-actions';
 import type { InfrastructureSectionContext } from './infrastructure-types';
-import { createSettingsDisclosure, createSettingsSectionHeading } from './section-helpers';
+import { createSettingsDisclosure } from './section-helpers';
 import { renderTroubleshootingSettings } from './troubleshooting-section';
 import { openRemoteRecoveryModal } from '../remote-recovery-modal';
 import { Setting } from 'obsidian';
 
 export function renderInfrastructureSection(context: InfrastructureSectionContext): void {
 	const { containerEl, plugin } = context;
-	createSettingsSectionHeading(containerEl, 'Recovery and troubleshooting');
+	const recoverySection = createSettingsDisclosure(containerEl, 'Recovery and troubleshooting');
 	if (context.isConfigured) {
-		new Setting(containerEl)
-			.setName('Restore remote file')
-			.setDesc('Restore a server copy of a file replaced or deleted in the last 30 days.')
+		const recoveryEl = createSettingsDisclosure(recoverySection, 'File recovery');
+		new Setting(recoveryEl)
+			.setName('Restore a file')
+			.setDesc('Previous versions and deleted files are kept for 30 days.')
 			.addButton(button => button
-				.setButtonText('Browse recoverable files')
+				.setButtonText('Browse files')
 				.onClick(() => openRemoteRecoveryModal(plugin.app, plugin.syncRuntime)));
 
-		const recoveryEl = createSettingsDisclosure(containerEl, 'Recovery tools');
-		renderInfrastructureSyncActions({ ...context, containerEl: recoveryEl });
+
 	}
-	const troubleshootingEl = createSettingsDisclosure(containerEl, 'Troubleshooting');
+	const troubleshootingEl = createSettingsDisclosure(recoverySection, 'Troubleshooting');
 	renderInfrastructureManagementSection({ ...context, containerEl: troubleshootingEl });
 	renderTroubleshootingSettings(troubleshootingEl, plugin);
-	renderForgetServerSetting({ ...context, containerEl: troubleshootingEl });
-	if (plugin.settings.cloudflareDeployment?.d1DatabaseId) {
+	if (context.isConfigured || plugin.settings.cloudflareDeployment?.d1DatabaseId) {
 		const advancedEl = createSettingsDisclosure(containerEl, 'Advanced server actions');
-		renderServerResetSetting(advancedEl, plugin);
+		if (context.isConfigured) renderInfrastructureSyncActions({ ...context, containerEl: advancedEl });
+		const saved = plugin.settings.cloudflareDeployment;
+		const needsRepair = !context.isConfigured && saved && !saved.reset && !saved.lastDeployedVersion;
+		renderServerResetSetting(needsRepair ? troubleshootingEl : advancedEl, plugin);
 		if (!advancedEl.hasChildNodes()) advancedEl.parentElement?.remove();
 	}
 }

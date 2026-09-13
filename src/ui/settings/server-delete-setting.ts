@@ -27,7 +27,7 @@ export function renderServerDeleteSetting(containerEl: HTMLElement, plugin: Crat
                         'Nothing is rebuilt. All devices lose access to this server. Your local files are kept.',
                         'Other Crate deployments and unrelated Cloudflare resources are kept.',
                     ],
-                    confirmText: 'Authorize server deletion',
+                    confirmText: 'Delete server',
                     warning: true,
                 });
                 if (!confirmed) return;

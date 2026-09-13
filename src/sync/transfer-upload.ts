@@ -113,9 +113,10 @@ export async function uploadPreparedFiles(
           result.errors.push(`${upload.path}: ${uploadError}`);
         }
       }
+      options.onProcessed?.(chunk.length);
     });
 
-    await context.runConcurrent(batchTasks, options.batchConcurrency ?? 1);
+    await context.runConcurrent(batchTasks, options.batchConcurrency ?? options.concurrency);
   }
 
   if (individual.length > 0) {
@@ -145,6 +146,7 @@ export interface UploadPreparedFilesOptions {
   concurrency: number;
   retry: boolean;
   batchConcurrency?: number;
+  onProcessed?: (count: number) => void;
   onVersionConflicts?: (paths: string[], result: SyncResult) => Promise<void>;
 }
 
@@ -152,7 +154,7 @@ async function uploadPreparedFilesIndividually(
   context: TransferContext,
   prepared: PreparedUpload[],
   result: SyncResult,
-  options: Pick<UploadPreparedFilesOptions, 'concurrency' | 'retry'>,
+  options: Pick<UploadPreparedFilesOptions, 'concurrency' | 'retry' | 'onProcessed'>,
 ): Promise<string[]> {
   const tasks = prepared.map((upload) => async () => {
     try {
@@ -201,6 +203,8 @@ async function uploadPreparedFilesIndividually(
       }
       const uploadError = error instanceof Error ? error.message : "Upload failed";
       result.errors.push(`${upload.path}: ${uploadError}`);
+    } finally {
+      options.onProcessed?.(1);
     }
     return null;
   });

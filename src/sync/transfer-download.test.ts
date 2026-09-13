@@ -335,3 +335,21 @@ describe('transfer download/process helpers', () => {
 		expect(result.errors).toEqual([]);
 	});
 });
+
+it('reports every file across concurrent download batches', async () => {
+    const harness = createTransferHarness();
+    harness.vault.getAbstractFileByPath.mockReturnValue(null);
+    const content = new TextEncoder().encode('ok');
+    const hash = await computeHash(content.buffer);
+    const onProcessed = vi.fn();
+    harness.api.batchDownload.mockImplementation(async (paths: string[]) => {
+        return { files: paths.map(path => ({ path, content: btoa('ok'), hash, size: 2, contentType: 'text/plain' })) };
+    });
+    const requests = Array.from({ length: 51 }, (_, index) => ({
+        path: `file-${index}.md`, expectedLocalHash: null, expectedRemoteHash: hash, remoteSize: 2,
+    }));
+    const result = emptyResult();
+    await parallelDownloadAndSaveFiles(harness.context, requests, result, 2, onProcessed);
+    expect(result.downloaded).toBe(51);
+    expect(onProcessed).toHaveBeenCalledTimes(51);
+});

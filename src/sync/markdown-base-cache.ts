@@ -28,6 +28,8 @@ export function isMarkdownPath(path: string): boolean {
 export class MarkdownBaseCache {
 	private readonly app: App;
 	private readonly cacheDir: string;
+	private readonly writtenHashes = new Set<string>();
+	private readonly pendingWrites = new Map<string, Promise<void>>();
 	private readonly invalidHashes = new Set<string>();
 
 	constructor(app: App, pluginManifest: PluginManifest) {
@@ -47,11 +49,13 @@ export class MarkdownBaseCache {
 		const cachePath = this.getCachePath(hash);
 		try {
 			if (!await this.app.vault.adapter.exists(cachePath)) {
+				this.writtenHashes.delete(hash);
 				return null;
 			}
 			const content = await this.app.vault.adapter.readBinary(cachePath);
 			if (content.byteLength > MAX_FILE_SIZE_BYTES || await computeHash(content) !== hash) {
 				this.invalidHashes.add(hash);
+				this.writtenHashes.delete(hash);
 				logger.warn(`Ignoring corrupt Markdown base cache for ${path}`);
 				return null;
 			}
@@ -67,13 +71,26 @@ export class MarkdownBaseCache {
 			return;
 		}
 
-		try {
-			await this.ensureCacheDir();
-			await this.app.vault.adapter.writeBinary(this.getCachePath(hash), content);
-			this.invalidHashes.delete(hash);
-		} catch (error) {
-			logger.warn(`Failed to write Markdown base cache for ${path}:`, errorMessage(error));
-		}
+        if (this.writtenHashes.has(hash)) return;
+        const pending = this.pendingWrites.get(hash);
+        if (pending) return pending;
+        const write = (async () => {
+            try {
+                await this.ensureCacheDir();
+                await this.app.vault.adapter.writeBinary(this.getCachePath(hash), content);
+                this.invalidHashes.delete(hash);
+                this.writtenHashes.add(hash);
+                // Bound session bookkeeping; an evicted hash can safely be written again.
+                if (this.writtenHashes.size > 4096) {
+                    const oldest = this.writtenHashes.values().next();
+                    if (!oldest.done) this.writtenHashes.delete(oldest.value);
+                }
+            } catch (error) {
+                logger.warn(`Failed to write Markdown base cache for ${path}:`, errorMessage(error));
+            }
+        })();
+        this.pendingWrites.set(hash, write);
+        try { await write; } finally { this.pendingWrites.delete(hash); }
 	}
 
 	async seedFromManifest(
@@ -142,7 +159,10 @@ export class MarkdownBaseCache {
 				listing.files
 					.filter((path) => path.endsWith('.md'))
 					.filter((path) => !referencedHashes.has(getHashFromCachePath(path)))
-					.map((path) => this.app.vault.adapter.remove(path)),
+					.map(async (path) => {
+                            this.writtenHashes.delete(getHashFromCachePath(path));
+                            await this.app.vault.adapter.remove(path);
+                        }),
 			);
 		} catch {
 			// Cache directory may not exist yet. Pruning is best effort.

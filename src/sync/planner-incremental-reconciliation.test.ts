@@ -110,7 +110,7 @@ it('chunks more than one server batch of local deletes', async () => {
 
 		expect(parallelDownloadAndSaveFiles).toHaveBeenCalledWith([
 			{ path: 'notes/remote.md', expectedLocalHash: null, expectedRemoteHash: 'remote-hash', remoteSize: 12 },
-		], expect.any(Object));
+		], expect.any(Object), expect.any(Function));
 		expect(batchDelete).toHaveBeenCalledWith(
 			['notes/local-delete.md'],
 			{ 'notes/local-delete.md': 'a'.repeat(64) },
@@ -285,4 +285,26 @@ it('chunks more than one server batch of local deletes', async () => {
 		expect(settings.lastSeq).toBe(11);
 		expect(localManifest.save).toHaveBeenCalledTimes(1);
 	});
+});
+
+it('reports local upload progress after transfer, not preparation', async () => {
+    const harness = createIncrementalHarness({
+        settings: { lastSeq: 10 },
+        localChanges: [{ path: 'note.md', hash: 'local-hash' }],
+    });
+    const progressCallback = vi.fn();
+    harness.context.prepareUploadFromPath = vi.fn(async () => ({
+        path: 'note.md', hash: 'local-hash', content: new ArrayBuffer(1), size: 1,
+    }));
+    const uploadPreparedFiles = vi.fn(async () => {
+        expect(progressCallback).toHaveBeenLastCalledWith(0, 1);
+        expect(progressCallback).not.toHaveBeenCalledWith(1, 1);
+    });
+
+    harness.context.uploadPreparedFiles = uploadPreparedFiles;
+    const result = await runIncrementalSync(harness.context, { uploadConcurrency: 2, progressCallback });
+
+    expect(result?.success).toBe(true);
+    expect(uploadPreparedFiles).toHaveBeenCalledOnce();
+    expect(progressCallback).toHaveBeenLastCalledWith(1, 1);
 });

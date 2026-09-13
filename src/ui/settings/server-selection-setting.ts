@@ -7,11 +7,11 @@ export function renderForgetServerSetting({ containerEl, plugin, rerender }: Con
 	if (!saved || saved.reset) return;
 	new Setting(containerEl)
 		.setName('Forget server')
-		.setDesc('Remove the saved connection on this device. Local files and remote server data are kept.')
+		.setDesc('Stop sync and forget this vault’s server selection. Your Cloudflare login, local files, and server data are kept.')
 		.addButton(button => button.setButtonText('Forget server').onClick(async () => {
 			const confirmed = await openConfirmationModal(plugin.app, {
 				title: 'Forget server', message: 'Forget this vault’s saved server connection?',
-				details: ['Sync stops on this device. Local files and Cloudflare resources are kept. You can select the server again later.'],
+				details: ['Sync stops on this device. Local files and Cloudflare resources are kept. The Cloudflare login stays saved. Sign out of Cloudflare first if you also want to remove that login.'],
 				confirmText: 'Forget server',
 			});
 			if (!confirmed) return;

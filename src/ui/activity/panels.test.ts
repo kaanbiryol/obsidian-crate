@@ -17,7 +17,7 @@ it('shows active initial upload with an empty pending queue', () => {
 it('does not claim completion before transfer progress is available', () => {
     const element = new FakeElement('div');
     renderPendingPanel(element as never, [], false, true);
-    expect(element.collectText()).toContain('Syncing…');
+    expect(element.collectText()).toContain('Checking for changes…');
     expect(element.collectText()).not.toContain('All synced');
 });
 
@@ -32,14 +32,14 @@ it('shows the normal empty state after syncing finishes', () => {
 it('replaces the pending file list with a loading indicator during sync', () => {
     const element = new FakeElement('div');
     renderPendingPanel(element as never, ['Notes/draft.md', 'delete:old.md'], false, true);
-    expect(element.collectText()).toBe('Syncing…');
+    expect(element.collectText()).toBe('Checking for changes…');
     expect(element.children[0]?.classNames.has('crate-activity-loading')).toBe(true);
     expect(element.children[0]?.children[0]?.attributes.get('aria-hidden')).toBe('true');
 
     element.empty();
     renderPendingPanel(element as never, ['Notes/draft.md']);
     expect(element.collectText()).toContain('draft.md');
-    expect(element.collectText()).not.toContain('Syncing…');
+    expect(element.collectText()).not.toContain('Checking for changes…');
 });
 
 it.each(['Synced just now', 'Syncing…', 'Last sync had errors'])(
@@ -59,4 +59,11 @@ it.each([
  renderPendingPanel(element as never, [], false, false, null, '', { status, lastSync, lastError: null, pendingChanges: 0, conflictCount: 0 });
  expect(element.collectText()).toContain(title);
  expect(element.collectText()).not.toContain('All synced');
+});
+
+it('shows change progress independently of the pending queue size', () => {
+    const element = new FakeElement('div');
+    renderPendingPanel(element as never, ['queued.md'], false, true, { type: 'sync', current: 3, total: 12 });
+    expect(element.collectText()).toContain('Processing changes: 3/12');
+    expect(element.collectText()).toContain('Unchanged files are skipped.');
 });

@@ -51,11 +51,12 @@ export async function handleBatchDownload(
 		error?: string;
 	}> = [];
 	let totalBytes = 0;
-	for (const rawPath of paths) {
+	let exceeded = false;
+	const download = async (rawPath: string) => {
 		const safePath = sanitizePath(rawPath);
 		if (!safePath) {
 			files.push({ path: rawPath, content: '', hash: '', size: 0, contentType: '', error: 'Invalid path' });
-			continue;
+			return;
 		}
 
 		try {
@@ -63,7 +64,7 @@ export async function handleBatchDownload(
 			const objectKey = storedFile?.storageKey ?? null;
 			if (!objectKey) {
 				files.push({ path: safePath, content: '', hash: '', size: 0, contentType: '', error: 'File not found' });
-				continue;
+				return;
 			}
 
 			const object = await bucket.get(objectKey);
@@ -76,7 +77,7 @@ export async function handleBatchDownload(
 					contentType: '',
 					error: 'File content unavailable',
 				});
-				continue;
+				return;
 			}
 			if (storedFile && !storedObjectMatchesMetadata(object, storedFile)) {
 				files.push({
@@ -87,12 +88,13 @@ export async function handleBatchDownload(
 					contentType: '',
 					error: 'File content failed integrity validation',
 				});
-				continue;
+				return;
 			}
 
 			totalBytes += object.size;
 			if (totalBytes > MAX_BATCH_DOWNLOAD_BYTES) {
-				return corsResponse({ error: 'Batch download exceeds 8MB limit; download files individually' }, 413);
+				exceeded = true;
+				return;
 			}
 
 			const arrayBuffer = await object.arrayBuffer();
@@ -122,6 +124,11 @@ export async function handleBatchDownload(
 				error: error instanceof Error ? error.message : String(error),
 			});
 		}
+	};
+	// Bound simultaneous R2 reads and decoded bodies while hiding request latency.
+	for (let index = 0; index < paths.length; index += 3) {
+		await Promise.all(paths.slice(index, index + 3).map(download));
+		if (exceeded) return corsResponse({ error: 'Batch download exceeds 8MB limit; download files individually' }, 413);
 	}
 
 	return corsResponse({ files });

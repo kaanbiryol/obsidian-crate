@@ -1,16 +1,18 @@
+import { renderAccountActions } from './account-actions';
 import { Notice, Setting } from 'obsidian';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
 import { isCloudflareServerUpdateAvailable } from '../../cloudflare/deployment-update';
 import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
 import { openConfirmationModal } from '../confirmation-modal';
 import type { ConfigSectionContext } from './config-types';
-import { createSettingsSectionHeading } from './section-helpers';
+import { createSettingsSectionHeading, createSettingsDisclosure } from './section-helpers';
 
-export function renderConfigSection(context: ConfigSectionContext): void {
+export function renderConfigSection(context: ConfigSectionContext, showHeading = true): void {
 	const { containerEl, plugin } = context;
 	const isConfigured = plugin.syncRuntime.isConfigured();
 
-	createSettingsSectionHeading(containerEl, 'Connection');
+	if (showHeading) createSettingsSectionHeading(containerEl, 'Account and connection');
+	if (isConfigured) renderAccountSection(context);
 
 	const deployment = plugin.settings.cloudflareDeployment;
 	if (!isConfigured) {
@@ -19,7 +21,7 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 		new Setting(containerEl)
 			.setName(connectionLabel)
 			.setDesc(rememberedServer
-				? 'Crate remembers your previous server. Sign in with Cloudflare to reconnect this device.'
+				? 'Reconnect to your previous server using your saved Cloudflare login. Sign in again only if needed.'
 				: 'Sign in to connect to an existing Crate server or create one in your Cloudflare account. Cloudflare plan limits and usage charges may apply.')
 			.addButton(button => button
 				.setButtonText(connectionLabel)
@@ -29,43 +31,65 @@ export function renderConfigSection(context: ConfigSectionContext): void {
 				}));
 	}
 
-	if (isConfigured && deployment) {
-		const updateAvailable = isCloudflareServerUpdateAvailable(
-			deployment,
-			EMBEDDED_CLOUDFLARE_ARTIFACT,
-		);
-		const updateSetting = new Setting(containerEl)
-			.setName(updateAvailable ? 'Cloudflare update available' : 'Cloudflare server')
-			.setDesc(updateAvailable
-				? 'This Crate version includes an update for your sync server and reminders web app.'
-				: 'Your server software and reminders web app are up to date.');
-
-		if (updateAvailable) {
-			updateSetting.addButton(button => button
-				.setButtonText('Authorize update')
-				.setCta()
-				.onClick(() => {
-					void startCloudflareDeployment(plugin);
-				}));
-		}
-	}
+	if (plugin.settings.cloudflareDeployment?.accountId) renderAccountActions(containerEl, plugin, context.rerender);
 }
 
-export function renderDisconnectSetting(context: ConfigSectionContext): void {
+export function renderServerUpdateNotice(context: ConfigSectionContext): void {
+    const { containerEl, plugin } = context;
+    const deployment = plugin.settings.cloudflareDeployment;
+    if (!plugin.syncRuntime.isConfigured() || !deployment
+        || !isCloudflareServerUpdateAvailable(deployment, EMBEDDED_CLOUDFLARE_ARTIFACT)) return;
+
+    new Setting(containerEl)
+        .setName('Cloudflare update available')
+        .setDesc('Update your sync server and reminders web app to the version included with this Crate plugin.')
+        .addButton(button => button
+            .setButtonText('Update server')
+            .setCta()
+            .onClick(() => { void startCloudflareDeployment(plugin); }));
+}
+
+export function renderServerSection(context: ConfigSectionContext): void {
+    const { containerEl, plugin } = context;
+    const deployment = plugin.settings.cloudflareDeployment;
+    if (plugin.syncRuntime.isConfigured() && deployment) {
+        const updateAvailable = isCloudflareServerUpdateAvailable(deployment, EMBEDDED_CLOUDFLARE_ARTIFACT);
+        const version = deployment.lastDeployedVersion
+            ? `Version ${deployment.lastDeployedVersion}.`
+            : 'Installed version unknown.';
+        new Setting(containerEl)
+            .setName('Cloudflare server')
+            .setDesc(`${version} ${updateAvailable
+                ? 'An update is available at the top of these settings.'
+                : 'Your server software and reminders web app are up to date.'}`);
+    }
+	const details = createSettingsDisclosure(containerEl, 'Server details');
+	new Setting(details).setName('Server address').setDesc(plugin.settings.workerUrl || 'Not connected on this device');
+	new Setting(details).setName('Cloudflare dashboard')
+		.addButton(button => button.setButtonText('Open Cloudflare').onClick(() => {
+			window.open('https://dash.cloudflare.com/', '_blank', 'noopener,noreferrer');
+		}));
+}
+
+export function renderAccountSection(context: ConfigSectionContext): void {
 	const { containerEl, plugin, rerender } = context;
 	const isConfigured = plugin.syncRuntime.isConfigured();
 	if (isConfigured) {
+		const deployment = plugin.settings.cloudflareDeployment;
+		const account = deployment?.accountName?.trim() || deployment?.accountId;
 		new Setting(containerEl)
-			.setName('Disconnect this device')
-			.setDesc('Sign out on this device. Crate remembers your server, and your local files and server data are kept.')
+			.setName(account || 'Connected to Crate')
+			.setDesc(account
+				? 'This device is connected. Disconnecting stops sync here but keeps your saved server and Cloudflare login.'
+				: plugin.settings.workerUrl || 'This device is connected to your Crate server.')
 			.addButton(button => button
-				.setButtonText('Disconnect device')
+				.setButtonText('Disconnect this device')
 				.setDestructive()
 				.onClick(async () => {
 					const confirmed = await openConfirmationModal(plugin.app, {
 						title: 'Disconnect this device',
 						message: 'Disconnect this device from its Crate server?',
-						details: ['Cloudflare resources and synced data will not be deleted.'],
+						details: ['Sync stops on this device. Your saved server and Cloudflare login are kept for reconnecting. Cloudflare resources and synced data are not deleted.'],
 						confirmText: 'Disconnect device',
 						warning: true,
 					});

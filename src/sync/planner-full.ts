@@ -22,6 +22,7 @@ export async function createFullSyncPlan(
     .map((file) => async () => {
       const content = await context.vault.adapter.readBinary(file.path);
       const hash = await computeHash(content);
+      context.plannedContent?.remember(file.path, content, hash);
       return { path: file.path, hash, size: content.byteLength, mtime: file.mtime };
     });
   const hashed = await context.runConcurrent(hashTasks, prepareConcurrency);

@@ -12,8 +12,8 @@ export function renderSyncInterval(
 ): void {
 	let customInput: TextComponent;
 	const setting = new Setting(containerEl)
-		.setName('Check for changes')
-		.setDesc('All devices · how often to check for changes. Off stops periodic checks; edits, startup, and resume can still sync. Custom values are in seconds.')
+		.setName('Check for remote changes')
+		.setDesc('All devices · how often to check for changes when automatic sync is on. Off stops periodic checks; edits, startup, and resume can still sync. Custom values are in seconds.')
 		.addDropdown(dropdown => {
 			for (const [seconds, label] of PRESETS) dropdown.addOption(String(seconds), label);
 			dropdown.addOption('custom', 'Custom');

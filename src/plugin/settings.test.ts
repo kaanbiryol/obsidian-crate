@@ -186,3 +186,11 @@ it.each([false, true])('preserves the cleanup checkpoint across a settings reloa
 	} }, '.obsidian');
 	expect(settings.cloudflareDeployment?.reset).toEqual(reset);
 });
+
+it('persists usage snapshots across settings reloads and rejects malformed cached numbers', () => {
+	const snapshot = { accountId: 'account-a', updatedAt: 1000, groups: [{ label: 'Workers', metrics: [{ label: 'Requests', used: 79 }] }] };
+	const saved = buildPersistedCrateSettings(normalizeCrateSettings({ usageSnapshot: snapshot }, '.obsidian'));
+	expect(normalizeCrateSettings(JSON.parse(JSON.stringify(saved)) as typeof saved, '.obsidian').usageSnapshot).toEqual(snapshot);
+	snapshot.groups[0]!.metrics[0]!.used = -1;
+	expect(normalizeCrateSettings({ usageSnapshot: snapshot }, '.obsidian').usageSnapshot).toBeNull();
+});

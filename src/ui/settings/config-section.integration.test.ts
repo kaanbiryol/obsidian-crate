@@ -25,7 +25,7 @@ async function loadConfigSectionModule() {
 		EMBEDDED_CLOUDFLARE_ARTIFACT: embeddedArtifact,
 	}));
 	vi.doMock('../confirmation-modal', () => ({ openConfirmationModal }));
-	vi.doMock('./section-helpers', () => ({ createSettingsSectionHeading: vi.fn() }));
+	vi.doMock('./section-helpers', () => ({ createSettingsSectionHeading: vi.fn(), createSettingsDisclosure: (container: FakeElement) => container.createDiv() }));
 
 	return import('./config-section');
 }
@@ -85,7 +85,7 @@ describe('renderConfigSection integration', () => {
 		renderConfigSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual(['Reconnect']);
 		const reconnect = getSettingByName('Reconnect');
-		expect(reconnect.descEl.textContent).toContain('remembers your previous server');
+		expect(reconnect.descEl.textContent).toContain('using your saved Cloudflare login');
 		reconnect.buttons[0]!.click();
 		expect(startCloudflareDeployment).toHaveBeenCalledExactlyOnceWith(plugin);
 	});
@@ -119,7 +119,7 @@ describe('renderConfigSection integration', () => {
 	});
 
 	it('disconnects locally without offering device setup links', async () => {
-		const { renderDisconnectSetting } = await loadConfigSectionModule();
+		const { renderAccountSection } = await loadConfigSectionModule();
 		const clearSyncConfiguration = vi.fn(async () => {});
 		const rerender = vi.fn();
 		openConfirmationModal.mockResolvedValue(true);
@@ -133,24 +133,24 @@ describe('renderConfigSection integration', () => {
 			},
 		};
 
-		renderDisconnectSetting({
+		renderAccountSection({
 			containerEl: new FakeElement('div') as never,
 			plugin: plugin as never,
 			rerender,
 		});
 
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
-			'Disconnect this device',
+			'Connected to Crate',
 		]);
-		getSettingByName('Disconnect this device').buttons[0]?.click();
+		getSettingByName('Connected to Crate').buttons[0]?.click();
 		await flushMicrotasks();
 		expect(clearSyncConfiguration).toHaveBeenCalledTimes(1);
 		expect(rerender).toHaveBeenCalledTimes(1);
 	});
 
-	it('offers an in-place server update when OAuth deployment metadata exists', async () => {
-		const { renderConfigSection } = await loadConfigSectionModule();
-		renderConfigSection({
+	it('offers an in-place server update in the top notice when deployment metadata exists', async () => {
+		const { renderServerUpdateNotice } = await loadConfigSectionModule();
+		renderServerUpdateNotice({
 			containerEl: new FakeElement('div') as never,
 			plugin: {
 				settings: {
@@ -170,8 +170,8 @@ describe('renderConfigSection integration', () => {
 	});
 
 	it('shows an up-to-date status without an authorization action', async () => {
-		const { renderConfigSection } = await loadConfigSectionModule();
-		renderConfigSection({
+		const { renderServerSection } = await loadConfigSectionModule();
+		renderServerSection({
 			containerEl: new FakeElement('div') as never,
 			plugin: {
 				settings: {
@@ -187,7 +187,42 @@ describe('renderConfigSection integration', () => {
 		});
 
 		const serverSetting = getSettingByName('Cloudflare server');
-		expect(serverSetting.descEl.textContent).toBe('Your server software and reminders web app are up to date.');
+		expect(serverSetting.descEl.textContent).toBe('Version 0.1.0. Your server software and reminders web app are up to date.');
 		expect(serverSetting.buttons).toHaveLength(0);
 	});
+});
+
+it.each([true, false])('hides the top notice when no update is actionable (connected: %s)', async connected => {
+    const { renderServerUpdateNotice } = await loadConfigSectionModule();
+    renderServerUpdateNotice({
+        containerEl: new FakeElement('div') as never,
+        plugin: {
+            settings: { cloudflareDeployment: {
+                lastDeployedVersion: embeddedArtifact.version,
+                lastDeployedFingerprint: embeddedArtifact.fingerprint,
+            } },
+            syncRuntime: { isConfigured: () => connected },
+        } as never,
+        rerender: vi.fn(),
+    });
+    expect(MockSetting.instances).toHaveLength(0);
+});
+
+it('keeps the installed version in the server section without duplicating the update button', async () => {
+    const { renderServerSection } = await loadConfigSectionModule();
+    renderServerSection({
+        containerEl: new FakeElement('div') as never,
+        plugin: {
+            settings: { cloudflareDeployment: {
+                lastDeployedVersion: '0.0.9',
+                lastDeployedFingerprint: 'old',
+            } },
+            syncRuntime: { isConfigured: () => true },
+        } as never,
+        rerender: vi.fn(),
+    });
+    const server = getSettingByName('Cloudflare server');
+    expect(server.descEl.textContent).toContain('Version 0.0.9.');
+    expect(server.buttons).toHaveLength(0);
+    expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Cloudflare update available')).toBe(false);
 });

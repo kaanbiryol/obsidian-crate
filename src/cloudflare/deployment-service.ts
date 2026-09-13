@@ -10,7 +10,7 @@ import {
 	CLOUDFLARE_OAUTH_REDIRECT_URL,
 	CLOUDFLARE_OAUTH_SCOPES,
 } from './oauth-config';
-import { CloudflareOAuthClient } from './oauth-client';
+import { CloudflareOAuthClient, CloudflareReauthorizationRequired, type CloudflareOAuthTokens } from './oauth-client';
 import { constantTimeEqual, createPkcePair, randomBase64Url, randomHex } from './pkce';
 import { provisionCloudflareDeployment } from './provisioner';
 import {
@@ -55,6 +55,7 @@ export interface CloudflareDeploymentServiceOptions {
 		deployments: DiscoveredCloudflareDeployment[],
 		missingServer?: boolean,
 	) => Promise<DiscoveredCloudflareDeployment | 'create' | null>;
+	onAuthorized?: (accountId: string, tokens: CloudflareOAuthTokens) => void;
 	beforeServerReset?: () => Promise<void>;
 	beforeServerSwitch?: () => Promise<void>;
 	now?: () => number;
@@ -144,7 +145,7 @@ export class CloudflareDeploymentService {
 			response_type: 'code',
 			client_id: this.options.clientId,
 			redirect_uri: CLOUDFLARE_OAUTH_REDIRECT_URL,
-			scope: CLOUDFLARE_OAUTH_SCOPES.join(' '),
+			scope: [...CLOUDFLARE_OAUTH_SCOPES, 'offline_access'].join(' '),
 			state,
 			code_challenge: challenge,
 			code_challenge_method: 'S256',
@@ -194,7 +195,20 @@ export class CloudflareDeploymentService {
 
 		onProgress?.('Completing Cloudflare authorization…');
 		this.lifetime.signal.throwIfAborted();
-		const accessToken = await this.oauthClient.exchangeAuthorizationCode(params.code, pending.verifier);
+		const tokens = await this.oauthClient.exchangeTokens(params.code, pending.verifier);
+		return this.runAuthorizedDeployment(pending, tokens, device, onProgress, selectDeployment);
+	}
+
+	private async runAuthorizedDeployment(
+		pending: PendingOAuthSession,
+		tokens: CloudflareOAuthTokens,
+		device?: CloudflareAuthorizedDevice,
+		onProgress?: (message: string) => void,
+		selectDeployment = this.options.selectDeployment,
+		savedLogin = false,
+	): Promise<CloudflareDeploymentResult> {
+		const accessToken = tokens.accessToken;
+		let retained = savedLogin;
 		let result: CloudflareDeploymentResult;
 		try {
 			this.lifetime.signal.throwIfAborted();
@@ -202,7 +216,13 @@ export class CloudflareDeploymentService {
 			// sides so its late response cannot start another request or save settings.
 			// OAuth stays outside this guard: even a late exchange must be revoked.
 			const api = new CloudflareApiClient(accessToken, (url, request) =>
-				this.whileActive(() => this.options.transport(url, request)));
+				this.whileActive(async () => {
+					if (savedLogin) this.checkSavedTarget(pending.metadata, pending.intent);
+					const response = await this.options.transport(url, request);
+					if (savedLogin) this.checkSavedTarget(pending.metadata, pending.intent);
+					if (savedLogin && (response.status === 401 || response.status === 403)) throw new CloudflareReauthorizationRequired();
+					return response;
+				}));
 			if (pending.intent !== 'reset' && pending.intent !== 'delete' && this.options.settingsOwner.settings.cloudflareDeployment?.reset) throw new Error('Resume the server reset before connecting or updating.');
 			if ((pending.intent === 'reset' || pending.intent === 'delete') && JSON.stringify(pending.metadata) !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) {
 				throw new Error('Server settings changed during authorization. Confirm the reset again.');
@@ -229,6 +249,7 @@ export class CloudflareDeploymentService {
 					discoveredExisting = true;
 				}
 			}
+			if (savedLogin) this.checkSavedTarget(pending.metadata, pending.intent);
 			onProgress?.('Preparing the selected server…');
 			const previous = this.options.settingsOwner.settings.cloudflareDeployment;
 			const changingServer = previous && (previous.accountId !== account.id || previous.workerName !== metadata.workerName);
@@ -248,7 +269,7 @@ export class CloudflareDeploymentService {
 					beforeDelete: () => this.whileActive(this.options.beforeServerReset!), onProgress,
 					persist: () => this.persistMetadata(metadata),
 				}));
-				await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
+				if (!savedLogin) await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
 				return { workerUrl: '', accountName: account.name, deleted: true };
 			}
 			const artifacts = pending.intent === 'reset' ? await this.whileActive(this.options.loadArtifacts) : null;
@@ -295,15 +316,66 @@ export class CloudflareDeploymentService {
 				await this.persistMetadata(metadata);
 			}
 			result = { workerUrl, accountName: account.name };
+			this.lifetime.signal.throwIfAborted();
+			if (!savedLogin && this.options.onAuthorized) {
+				this.options.onAuthorized(account.id, tokens);
+				retained = true;
+			}
 		} finally {
 			try {
-				await this.oauthClient.revokeAccessToken(accessToken);
+				if (!retained) await Promise.all([
+					this.oauthClient.revokeAccessToken(accessToken),
+					...(tokens.refreshToken ? [this.oauthClient.revokeAccessToken(tokens.refreshToken)] : []),
+				]);
 			} catch {
-				// The token remains only in this stack frame and is discarded regardless.
+				// Failed operations discard credentials even if revocation is unavailable.
 			}
 		}
 
 		return result;
+	}
+
+	async deployWithSavedAuthorization(
+		intent: 'connect' | 'update' | 'reset' | 'delete',
+		withAuthorization: <T>(operation: (tokens: CloudflareOAuthTokens) => Promise<T>) => Promise<T>,
+		device?: CloudflareAuthorizedDevice,
+		onProgress?: (message: string) => void,
+		selectDeployment = this.options.selectDeployment,
+	): Promise<CloudflareDeploymentResult> {
+		this.lifetime.signal.throwIfAborted();
+		if (this.handlingCallback) throw new Error('A Cloudflare operation is already in progress.');
+		const metadata = this.options.settingsOwner.settings.cloudflareDeployment;
+		if (!metadata?.accountId) throw new Error('Connect a Cloudflare server first.');
+		this.checkSavedTarget(metadata, intent);
+		if ((intent === 'reset' || intent === 'delete') && !metadata.d1DatabaseId) throw new Error('Connect a Cloudflare server first.');
+		this.pendingSession = null;
+		this.handlingCallback = true;
+		const pending: PendingOAuthSession = {
+			metadata: structuredClone(metadata), intent, discoverExisting: false,
+			originalMetadata: JSON.stringify(metadata), state: '', verifier: '', createdAt: this.now(),
+		};
+		try {
+			const result = await withAuthorization(async tokens => {
+				this.lifetime.signal.throwIfAborted();
+				this.checkSavedTarget(pending.metadata, pending.intent);
+				if (JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment) !== pending.originalMetadata) throw new Error('Server settings changed. Confirm the operation again.');
+				if (tokens.scope !== undefined && CLOUDFLARE_OAUTH_SCOPES.some(scope => !tokens.scope!.split(/\s+/).includes(scope))) {
+					throw new CloudflareReauthorizationRequired();
+				}
+				return this.runAuthorizedDeployment(pending, tokens, device, onProgress, selectDeployment, true);
+			});
+			if (result.deleted) await this.whileActive(() => this.options.settingsOwner.writeSettings({ cloudflareDeployment: null }));
+			return result;
+		} finally { this.handlingCallback = false; }
+	}
+
+	private checkSavedTarget(expected: CloudflareDeploymentMetadata, intent: PendingOAuthSession['intent']): void {
+		const current = this.options.settingsOwner.settings.cloudflareDeployment;
+		if (current?.reset && intent !== (current.reset.deleteOnly ? 'delete' : 'reset')) throw new Error('Resume the server reset or deletion before continuing.');
+		if (!current || current.accountId !== expected.accountId || current.workerName !== expected.workerName
+			|| current.d1DatabaseId !== expected.d1DatabaseId || current.r2BucketName !== expected.r2BucketName) {
+			throw new Error('Server settings changed. Start the update again.');
+		}
 	}
 
 	cancelPendingDeployment(): void {

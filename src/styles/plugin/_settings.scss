@@ -2,8 +2,11 @@
 .crate-settings .crate-settings-section-heading {
 	margin-top: 24px;
 	margin-bottom: 12px;
-	border-bottom: 1px solid var(--background-modifier-border);
-	padding-bottom: 6px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	padding: 0;
 }
 
 .crate-settings > .crate-settings-section-heading:first-child {

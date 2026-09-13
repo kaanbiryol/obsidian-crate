@@ -1,3 +1,4 @@
+import { formatSyncProgress } from './activity/progress-label';
 import type { ConflictReview } from '../sync/conflict-review';
 import { ConflictReviewModal } from './activity/conflict-review-modal';
 import { Modal, Platform, setIcon, type App } from 'obsidian';
@@ -60,7 +61,7 @@ export class ActivityModal extends Modal {
         const loadingLabel = this.pendingPanel.querySelector('.crate-activity-loading-label');
         if (loadingLabel && (state.status === 'syncing' || progress)) {
             // Keep the spinner mounted through frequent progress updates.
-            loadingLabel.textContent = progress?.type === 'initial' ? 'Uploading vault…' : 'Syncing…';
+            loadingLabel.textContent = formatSyncProgress(progress);
             return;
         }
         this.pendingPanel.empty();

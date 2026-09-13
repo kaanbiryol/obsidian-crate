@@ -69,6 +69,7 @@ export async function parallelDownloadAndSaveFiles(
   requests: DownloadRequest[],
   result: SyncResult,
   concurrency: number,
+  onProcessed?: () => void,
 ): Promise<void> {
   const batchable: DownloadRequest[] = [];
   const individual: DownloadRequest[] = [];
@@ -96,7 +97,7 @@ export async function parallelDownloadAndSaveFiles(
     }
     if (currentChunk.length > 0) chunks.push(currentChunk);
 
-    for (const chunk of chunks) {
+    await context.runConcurrent(chunks.map(chunk => async () => {
       try {
         const response = await context.api.batchDownload(chunk.map((request) => request.path));
         const requestsByPath = new Map(chunk.map((request) => [request.path, request] as const));
@@ -144,6 +145,8 @@ export async function parallelDownloadAndSaveFiles(
           } catch (error) {
             const downloadError = error instanceof Error ? error.message : "Download failed";
             result.errors.push(`${file.path}: ${downloadError}`);
+          } finally {
+            onProcessed?.();
           }
         }
         for (const request of chunk) {
@@ -159,11 +162,11 @@ export async function parallelDownloadAndSaveFiles(
         logger.warn("Batch download failed, falling back to individual downloads:", errorMessage(error));
         individual.push(...chunk);
       }
-    }
+    }), Math.min(concurrency, 2));
   }
 
   if (individual.length > 0) {
-    await downloadFilesIndividually(context, individual, result, concurrency);
+    await downloadFilesIndividually(context, individual, result, concurrency, onProcessed);
   }
 }
 
@@ -172,6 +175,7 @@ async function downloadFilesIndividually(
   requests: DownloadRequest[],
   result: SyncResult,
   concurrency: number,
+  onProcessed?: () => void,
 ): Promise<void> {
   const tasks = requests.map((request) => async () => {
     try {
@@ -182,6 +186,8 @@ async function downloadFilesIndividually(
     } catch (error) {
       const downloadError = error instanceof Error ? error.message : "Download failed";
       result.errors.push(`${request.path}: ${downloadError}`);
+    } finally {
+      onProcessed?.();
     }
   });
 

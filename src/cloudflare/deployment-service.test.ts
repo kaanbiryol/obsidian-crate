@@ -58,11 +58,11 @@ vi.mock('./cloudflare-api', () => ({
 
 vi.mock('./provisioner', () => ({ provisionCloudflareDeployment }));
 
-import { CloudflareDeploymentService } from './deployment-service';
+import { CloudflareDeploymentService, type CloudflareDeploymentServiceOptions } from './deployment-service';
 
 const CLIENT_ID = '0123456789abcdef0123456789abcdef';
 
-function createHarness() {
+function createHarness(onAuthorized?: CloudflareDeploymentServiceOptions['onAuthorized']) {
 	const settings: CrateSettings = { ...DEFAULT_SETTINGS };
 	const persisted: string[] = [];
 	const settingsOwner = {
@@ -96,6 +96,7 @@ function createHarness() {
 	const selectDeployment = vi.fn(async (deployments: DiscoveredCloudflareDeployment[]): Promise<DiscoveredCloudflareDeployment | 'create' | null> => deployments[0] ?? 'create');
 	const service = new CloudflareDeploymentService({
 		clientId: CLIENT_ID,
+		onAuthorized,
 		settingsOwner,
 		transport,
 		loadArtifacts,
@@ -136,7 +137,7 @@ describe('CloudflareDeploymentService', () => {
 		expect(authorizationUrl.searchParams.get('response_type')).toBe('code');
 		expect(authorizationUrl.searchParams.get('client_id')).toBe(CLIENT_ID);
 		expect(authorizationUrl.searchParams.get('redirect_uri')).toBe(CLOUDFLARE_OAUTH_REDIRECT_URL);
-		expect(authorizationUrl.searchParams.get('scope')).toBe(CLOUDFLARE_OAUTH_SCOPES.join(' '));
+		expect(authorizationUrl.searchParams.get('scope')).toBe([...CLOUDFLARE_OAUTH_SCOPES, 'offline_access'].join(' '));
 		expect(authorizationUrl.searchParams.get('state')).toMatch(/^[A-Za-z0-9_-]{43}$/);
 		expect(authorizationUrl.searchParams.get('code_challenge_method')).toBe('S256');
 		expect(authorizationUrl.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
@@ -533,4 +534,82 @@ describe('server selection', () => {
 		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
 		expect(h.persisted).toEqual([]);
 	});
+});
+
+it('retains successful setup authorization for usage instead of revoking it', async () => {
+	const retain = vi.fn();
+	const h = createHarness(retain);
+	await h.service.startDeployment();
+	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+	expect(retain).toHaveBeenCalledWith(h.settings.cloudflareDeployment!.accountId, expect.objectContaining({ accessToken: 'temporary-access-token' }));
+	expect(h.transportCalls.some(call => call.url.endsWith('/revoke'))).toBe(false);
+	expect(h.persisted.join('')).not.toContain('temporary-access-token');
+});
+
+it('revokes authorization when saving the shared login fails', async () => {
+	const h = createHarness(() => { throw new Error('Secret storage unavailable'); });
+	await h.service.startDeployment();
+	await expect(h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! })).rejects.toThrow('Secret storage unavailable');
+	expect(h.transportCalls.at(-1)?.url).toContain('/revoke');
+});
+
+it('updates with saved authorization without exchanging or revoking credentials', async () => {
+	const h = createHarness();
+	await h.service.startDeployment();
+	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+	h.transportCalls.length = 0;
+	h.opened.length = 0;
+	provisionCloudflareDeployment.mockClear();
+	await h.service.deployWithSavedAuthorization('update', operation => operation({ accessToken: 'saved', scope: CLOUDFLARE_OAUTH_SCOPES.join(' ') }));
+	expect(apiMocks.constructedWithTokens.at(-1)).toBe('saved');
+	expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
+	expect(h.opened).toHaveLength(0);
+	expect(h.transportCalls).toHaveLength(0);
+});
+
+it('rejects missing saved permissions before provisioning', async () => {
+	const h = createHarness();
+	await h.service.startDeployment();
+	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+	provisionCloudflareDeployment.mockClear();
+	await expect(h.service.deployWithSavedAuthorization('update', operation => operation({ accessToken: 'analytics', scope: 'account-analytics.read' }))).rejects.toThrow('Reconnect Cloudflare');
+	expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+});
+
+it('stops a saved update if the selected server changes while renewing authorization', async () => {
+	const h = createHarness();
+	await h.service.startDeployment();
+	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+	provisionCloudflareDeployment.mockClear();
+	await expect(h.service.deployWithSavedAuthorization('update', operation => {
+		h.settings.cloudflareDeployment!.accountId = 'different-account';
+		return operation({ accessToken: 'saved' });
+	})).rejects.toThrow('Server settings changed');
+	expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+});
+
+it('resets with saved authorization and registers the replacement device', async () => {
+	const h = createHarness();
+	await h.service.startDeployment();
+	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+	h.settings.cloudflareDeployment!.d1DatabaseId = 'database';
+	h.transportCalls.length = 0;
+	const device = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Desktop', platform: 'desktop' };
+	await h.service.deployWithSavedAuthorization('reset', operation => operation({ accessToken: 'saved' }), device);
+	expect(resetCrateServer).toHaveBeenCalledOnce();
+	expect(apiMocks.queryD1).toHaveBeenCalled();
+	expect(h.transportCalls).toHaveLength(0);
+});
+
+it.each(['reset', 'delete'] as const)('rejects a changed confirmation target during saved %s authorization', async intent => {
+	const h = createHarness();
+	await h.service.startDeployment();
+	await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+	h.settings.cloudflareDeployment!.d1DatabaseId = 'database';
+	await expect(h.service.deployWithSavedAuthorization(intent, operation => {
+		h.settings.cloudflareDeployment!.workerName = 'different-worker';
+		return operation({ accessToken: 'saved' });
+	})).rejects.toThrow('Server settings changed');
+	expect(resetCrateServer).not.toHaveBeenCalled();
+	expect(deleteCrateServer).not.toHaveBeenCalled();
 });

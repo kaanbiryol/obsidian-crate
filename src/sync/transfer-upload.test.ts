@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { BatchUploadFile } from '../protocol/sync-types';
 import type { PreparedUpload } from './types';
 import { HttpError } from './api';
 import { uploadPreparedFiles } from './transfer';
@@ -164,4 +165,35 @@ describe('transfer upload helpers', () => {
 		expect(result.errors).toEqual([]);
 	});
 
+});
+
+it('uses the transfer concurrency for batches and reports each finished batch', async () => {
+    const harness = createTransferHarness();
+    let active = 0;
+    let maximum = 0;
+    const onProcessed = vi.fn<(count: number) => void>();
+    const runConcurrent = async <T>(tasks: Array<() => Promise<T>>, concurrency: number) => {
+        const results: T[] = [];
+        let next = 0;
+        await Promise.all(Array.from({ length: concurrency }, async () => {
+            while (next < tasks.length) {
+                const index = next++;
+                results[index] = await tasks[index]!();
+            }
+        }));
+        return results;
+    };
+    harness.api.batchUpload.mockImplementation(async (files: BatchUploadFile[]) => {
+        active++;
+        maximum = Math.max(maximum, active);
+        await new Promise(resolve => setTimeout(resolve, 1));
+        active--;
+        return { success: true, results: files.map(file => ({ path: file.path, success: true, hash: file.hash })) };
+    });
+    const prepared = Array.from({ length: 9 }, (_, index) => ({
+        path: `file-${index}.md`, content: new ArrayBuffer(1), hash: 'h', size: 1,
+    }));
+    await uploadPreparedFiles({ ...harness.context, runConcurrent }, prepared, emptyResult(), { concurrency: 2, retry: false, onProcessed });
+    expect(maximum).toBe(2);
+    expect(onProcessed.mock.calls.map(([count]) => count)).toEqual([3, 3, 3]);
 });

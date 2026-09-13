@@ -171,8 +171,8 @@ export class SyncEngine {
 			verifyContent: files => this.verifyContent(files),
 			getLocalDeletes: () => this.getLocalDeletes(),
 			incrementalSync: (progressCallback) => this.incrementalSync(progressCallback),
-			parallelDownloadAndSaveFiles: (requests, result) =>
-				this.parallelDownloadAndSaveFiles(requests, result),
+			parallelDownloadAndSaveFiles: (requests, result, onProcessed) =>
+				this.parallelDownloadAndSaveFiles(requests, result, onProcessed),
 			processDiff: (diff, localFiles, result) => this.processDiff(diff, localFiles, result),
 			prepareUploadFromPath: (path) => this.prepareUploadFromPath(path),
 			uploadPreparedFiles: (prepared, result, options) =>
@@ -417,12 +417,13 @@ export class SyncEngine {
 		return planLocalChanges(this.contexts.localDiffPlanner(), PREPARE_CONCURRENCY);
 	}
 
-	private async parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult): Promise<void> {
+	private async parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void> {
 		await transferParallelDownloadAndSaveFiles(
 			this.contexts.transfer(),
 			requests,
 			result,
 			DOWNLOAD_CONCURRENCY,
+			onProcessed,
 		);
 	}
 
@@ -434,7 +435,13 @@ export class SyncEngine {
 		return this.trackWork(async () => {
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			const workflow = this.contexts.syncWorkflow();
-			const result = await runSyncWorkflow(workflow, progressCallback);
+			this.contexts.clearPlannedContent();
+            let result: SyncResult;
+            try {
+                result = await runSyncWorkflow(workflow, progressCallback);
+            } finally {
+                this.contexts.clearPlannedContent();
+            }
 			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 			if (result.success) {
 				this.pruneMarkdownBaseCacheInBackground();

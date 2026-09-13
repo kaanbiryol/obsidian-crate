@@ -1,3 +1,4 @@
+import { formatSyncProgress } from './progress-label';
 import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard } from './rendering';
 
@@ -10,7 +11,7 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
         spinner.setAttribute('aria-hidden', 'true');
         loading.createSpan({
             cls: 'crate-activity-loading-label',
-            text: progress?.type === 'initial' ? 'Uploading vault…' : 'Syncing…',
+            text: formatSyncProgress(progress),
         });
         return;
 	}

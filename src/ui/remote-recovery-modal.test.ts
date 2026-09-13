@@ -22,7 +22,7 @@ it('pages to an older version, searches with a fresh cursor, and confirms its re
 		.mockResolvedValueOnce({ versions: [], hasMore: true, nextCursor: 'next' })
 		.mockResolvedValue({ versions: [row], hasMore: false });
 	const { runtime } = await open(list);
-	await vi.waitFor(() => expect(button('Next')).toBeDefined()); button('Next').click();
+	await vi.waitFor(() => expect(button('Load more')).toBeDefined()); button('Load more').click();
 	await vi.waitFor(() => expect(list).toHaveBeenLastCalledWith({ cursor: 'next', search: undefined }));
 	MockSetting.instances[0]!.texts[0]!.change('older'); button('Search').click();
 	await vi.waitFor(() => expect(list).toHaveBeenLastCalledWith({ cursor: undefined, search: 'older' }));
@@ -54,4 +54,20 @@ it('resumes a saved restore after its retained history entry expires', async () 
  button('Resume restore').click();
  await vi.waitFor(() => expect(runtime.restoreRecentFileVersion).toHaveBeenCalledWith(row));
  expect(MockModal.instances).toHaveLength(1);
+});
+
+it('groups versions from multiple pages under one file and deduplicates repeated entries', async () => {
+ const older = { ...row, storage_key: 'older-copy', reason: 'replaced' as const, created_at: '2026-09-08' };
+ const list = vi.fn<(...args: unknown[]) => Promise<FileVersionsPage>>()
+  .mockResolvedValueOnce({ versions: [row], hasMore: true, nextCursor: 'next' })
+  .mockResolvedValueOnce({ versions: [row, older], hasMore: false });
+ const { modal } = await open(list);
+ await vi.waitFor(() => expect(button('Load more')).toBeDefined());
+ button('Load more').click();
+ await vi.waitFor(() => expect(modal.contentEl.collectText()).toContain('2 versions loaded'));
+ const text = modal.contentEl.collectText();
+ expect(text.split('older.md')).toHaveLength(2);
+ expect(text).toContain('Deleted file');
+ expect(text).toContain('Previous version');
+ expect(text).toContain('1 file');
 });

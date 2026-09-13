@@ -32,7 +32,7 @@ In the Cloudflare dashboard, select the account that will own the OAuth client, 
 |---|---|
 | Client name | `Crate` |
 | Response type | `code` |
-| Grant type | `authorization_code` only |
+| Grant type | `authorization_code` and `refresh_token` |
 | Token authentication method | `none` |
 | Redirect URL | `https://crate.kaanbiryol.com/oauth/callback/` |
 | Client URL | `https://kaanbiryol.com` |
@@ -42,9 +42,9 @@ In the Cloudflare dashboard, select the account that will own the OAuth client, 
 | Allowed CORS origins | Leave empty |
 | Post-logout redirect URLs | Leave empty |
 
-Do not enable `refresh_token`, `openid`, `offline_access`, Implicit, or any client-secret authentication method. Crate is a desktop public client and uses a fresh PKCE S256 verifier for each authorization.
+Enable the `refresh_token` grant so the setup login can renew usage access; Cloudflare adds the `offline_access` protocol scope automatically. Do not enable `openid`, Implicit, or any client-secret authentication method. Crate is a desktop public client and uses a fresh PKCE S256 verifier for each authorization.
 
-Select only these four scopes in the dashboard:
+Select these five scopes in the dashboard. Keep all five scopes required. Both deployment and usage explicitly request all five; both also request `offline_access`. Retained usage credentials therefore include server management permissions as well as analytics access. The usage panel uses those credentials only to retrieve usage and renew access.
 
 | Cloudflare scope label | OAuth scope ID | Why Crate needs it |
 |---|---|---|
@@ -52,8 +52,9 @@ Select only these four scopes in the dashboard:
 | D1 Write (may be shown as **D1 Edit**) | `d1.write` | Find/create the D1 database and initialize its schema |
 | Workers R2 Storage Write (may be shown as **Workers R2 Storage Edit**) | `workers-r2.write` | Find/create the R2 bucket |
 | Memberships Read | `memberships.read` | Call `GET /memberships` to discover the account ID selected during consent |
+| Account Analytics Read | `account-analytics.read` | Read account-wide Workers, D1, and R2 usage |
 
-Cloudflare is transitioning permission labels from **Edit** to **Write**. Its current permissions reference lists **Workers Scripts Edit** as granting write access, so select the **Edit** entry when the dashboard does not show **Write**. OAuth scope names correspond to API-token permission names, and the scope ID returned by `GET /oauth/scopes` is the value used by the client. The IDs above are the dot-delimited IDs configured in Crate. Before promoting the client, confirm the four displayed labels and IDs against the authenticated `GET /oauth/scopes` response for the client-owner account; do not add broader account or zone scopes.
+Cloudflare is transitioning permission labels from **Edit** to **Write**. Its current permissions reference lists **Workers Scripts Edit** as granting write access, so select the **Edit** entry when the dashboard does not show **Write**. OAuth scope names correspond to API-token permission names, and the scope ID returned by `GET /oauth/scopes` is the value used by the client. The IDs above are the dot-delimited IDs configured in Crate. Before promoting the client, confirm the five displayed labels and IDs against the authenticated `GET /oauth/scopes` response for the client-owner account; do not add broader account or zone scopes.
 
 Create the client. It starts private, which means only members of its parent account can authorize it. Copy the **Client ID**; Crate neither needs nor accepts a client secret.
 
@@ -93,16 +94,18 @@ Official references:
 1. Enable R2 in the target Cloudflare account. Cloudflare may require accepting the R2 subscription before its API permits bucket creation.
 2. Install the Client-ID-configured Crate build.
 3. Open **Settings → Crate → Configuration** and select **Connect with Cloudflare**.
-4. In Cloudflare, select exactly one account, review the four permissions, and authorize Crate.
+4. In Cloudflare, select exactly one account, review the five permissions, and authorize Crate.
 5. Cloudflare returns to the static callback page. It removes the OAuth query from the browser URL immediately and opens `obsidian://crate-cloudflare-oauth`.
 6. Crate verifies the random OAuth state before exchanging the code with its in-memory PKCE verifier.
 7. Crate discovers existing `crate-<deployment-id>` Workers and their bindings. It reuses the only match automatically, asks the user to choose when several exist, or creates a new Worker, D1 database, R2 bucket, Durable Objects, and workers.dev endpoint when none exists. Joining an existing deployment does not upload code or change schema. Creation initializes the hash-verified current schema. Explicit updates verify the schema marker before installing the new Worker. A newer remote Worker is never downgraded.
-8. Crate registers this device's hashed credential through the Cloudflare D1 API, then revokes and discards the access token.
+8. Crate registers this device's hashed credential through the Cloudflare D1 API, then saves the OAuth access and refresh tokens in Obsidian secret storage for usage. Failed operations revoke and discard their tokens. Existing installations can reconnect once from the usage panel.
 9. Connection does not transfer vault files. Open the command palette and select **Crate: Sync now** to sync this vault with the server.
 
-If the Cloudflare API returns R2 error `10042`, Crate tells the user to activate the R2 subscription and try again. Resource names and Cloudflare IDs are saved without credentials, so retries converge on the same deployment. When the installed plugin contains different Worker, web app, or schema artifacts, **Authorize update** appears and reuses those same Worker, D1, R2, and Durable Object resources. It is hidden when the server already has the exact embedded artifact or was deployed by a newer plugin version.
+If the Cloudflare API returns R2 error `10042`, Crate tells the user to activate the R2 subscription and try again. Resource names and Cloudflare IDs are saved without credentials, so retries converge on the same deployment. When the installed plugin contains different Worker, web app, or schema artifacts, **Update server** appears and reuses those same Worker, D1, R2, and Durable Object resources. It is hidden when the server already has the exact embedded artifact or was deployed by a newer plugin version.
 
-Cloudflare account access is the source of truth for vault devices. The plugin never exposes a Worker claim page or a vault-device setup link. A device credential can be created or rotated only during a successful Cloudflare OAuth session.
+Server updates use the saved Cloudflare login and renew it when needed. **Update server** opens Cloudflare authorization only when credentials are missing, revoked, cannot be renewed, or lack required permissions. Network and server errors are shown in Obsidian without starting another login. Reconnect, repair, reset, and deletion also reuse the saved login. Reset and deletion retain their destructive-action confirmations and resource checks. First-time setup and new devices sign in through Cloudflare.
+
+Cloudflare account access is the source of truth for vault devices. The plugin never exposes a Worker claim page or a vault-device setup link. A device credential can be created or rotated only using valid Cloudflare authorization, either saved or newly obtained.
 
 ## Connecting another device
 
@@ -168,7 +171,7 @@ For paired D1/R2 backup verification and isolated restore commands, use [Backup 
 
 ## Reset a Crate server
 
-**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Reset server** erases this deployment's remote vault data and rebuilds it. The confirmation identifies the account, Worker, D1 database, and R2 bucket. Each attempt requires confirmation and fresh Cloudflare OAuth authorization. Cancelling authorization performs no remote deletion.
+**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Reset server** erases this deployment's remote vault data and rebuilds it. The confirmation identifies the account, Worker, D1 database, and R2 bucket. Each attempt requires confirmation. Crate reuses the saved Cloudflare login when available and opens authorization only when needed. Cancelling authorization performs no remote deletion.
 
 The reset verifies exact deployment names and IDs, live Crate annotations and bindings, database tables, bucket creation identity, and ownership of the ReminderAlarm namespace. It checks other Workers for shared D1, R2, Durable Object, and service bindings. Unreadable ownership information, unexpected bindings or namespaces, newer server versions, unknown database tables, or unknown bucket objects stop the reset. It never searches by name prefix to choose resources to delete.
 
@@ -180,7 +183,7 @@ Remote files, retained versions, recovery history, shared server settings, devic
 
 If a request or local save fails, use **Resume server reset** in the same section. The saved checkpoint identifies the original resources and distinguishes cleanup from rebuilding, so a retry does not wipe newly provisioned data. Regular connection and update actions are blocked while a reset is pending. Keep this vault's plugin settings and avoid manually changing its Cloudflare resources until the reset finishes. Do not rename unrelated resources to bypass a failed ownership check.
 
-**Delete server** in **Settings → Crate → Recovery and troubleshooting → Troubleshooting** permanently removes this vault’s verified Crate Worker/web app, database, file bucket and contents, and reminder state without rebuilding. Local vault files and other deployments are kept. It requires confirmation of the exact resources and fresh Cloudflare authorization. Shared resources or unrecognized data block deletion. After an interruption, use **Resume server deletion**; connecting, updating, and resetting remain blocked until deletion completes.
+**Delete server** in **Settings → Crate → Recovery and troubleshooting → Troubleshooting** permanently removes this vault’s verified Crate Worker/web app, database, file bucket and contents, and reminder state without rebuilding. Local vault files and other deployments are kept. It requires confirmation of the exact resources and valid Cloudflare authorization, reusing the saved login when available. Shared resources or unrecognized data block deletion. After an interruption, use **Resume server deletion**; connecting, updating, and resetting remain blocked until deletion completes.
 
 ### Notification abuse limits
 

@@ -93,11 +93,11 @@ describe('renderDevicesSection', () => {
 		expect(getSettingByName('Connected devices and sessions')).toBeTruthy();
 		expect(MockSetting.instances.map((setting) => setting.nameEl.textContent)).toEqual([
 			'Connected devices and sessions',
-			'Mac (1234) (Current device)',
+			'Mac (1234)',
 			'Android device (5678)',
 		]);
-		expect(getSettingByName('Mac (1234) (Current device)').buttons).toHaveLength(0);
-		expect(getSettingByName('Android device (5678)').descEl.textContent).toContain('Last seen');
+		expect(getSettingByName('Mac (1234)').buttons).toHaveLength(0);
+		expect(getSettingByName('Android device (5678)').descEl.collectText()).toContain('Last seen');
 
 		getSettingByName('Android device (5678)').buttons[0]?.click();
 		await flushMicrotasks();

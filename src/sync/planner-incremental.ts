@@ -1,4 +1,4 @@
-import { prepareUploadChunks } from './transfer-budget';
+import { pipelineUploadChunks } from './transfer-budget';
 import { isAbortError } from "./abort";
 import type { IncrementalSyncPlannerContext } from "./planner-types";
 import { createEmptySyncResult, finalizeSyncResult, hasUnresolvedConflict, recordResolvedRace } from "./sync-result";
@@ -89,17 +89,19 @@ export async function runIncrementalSync(
     );
     const total = changesByPath.size + localOnlyChanges.length + localOnlyDeletes.length;
     let current = 0;
+    options.progressCallback?.(current, total);
 
     if (downloadRequests.length > 0) {
-      await context.parallelDownloadAndSaveFiles(downloadRequests, result);
+      await context.parallelDownloadAndSaveFiles(downloadRequests, result, () => {
+        current++;
+        options.progressCallback?.(current, total);
+      });
       for (const path of restoreDeletedPaths) {
         if (result.downloadedPaths.includes(path) && !hasUnresolvedConflict(result, path)) {
           recordResolvedRace(result, path, "kept-remote-edit");
         }
       }
     }
-    current += changesByPath.size;
-    options.progressCallback?.(current, total);
 
     for (const diff of conflicts) {
       try {
@@ -114,7 +116,10 @@ export async function runIncrementalSync(
       }
     }
 
-    const preparedChunks = prepareUploadChunks(localOnlyChanges, async (file) => {
+    current = changesByPath.size;
+    options.progressCallback?.(current, total);
+
+    const preparedChunks = pipelineUploadChunks(localOnlyChanges, async (file) => {
       context.throwIfDestroyed?.();
       try {
         const uploadFile = await context.prepareUploadFromPath(file.path);
@@ -127,16 +132,21 @@ export async function runIncrementalSync(
       } catch (error) {
         if (isAbortError(error)) throw error;
         result.errors.push(`${file.path}: ${errorMessage(error)}`);
-      } finally {
-        current++;
-        options.progressCallback?.(current, total);
       }
+      current++;
+      options.progressCallback?.(current, total);
       return null;
     });
 
     for await (const chunk of preparedChunks) {
       context.throwIfDestroyed?.();
+      let reported = 0;
       await context.uploadPreparedFiles(chunk, result, {
+        onProcessed: (count) => {
+          reported += count;
+          current += count;
+          options.progressCallback?.(current, total);
+        },
         concurrency: options.uploadConcurrency,
         retry: true,
         ...(context.reconcileVersionConflicts ? {
@@ -144,6 +154,8 @@ export async function runIncrementalSync(
             context.reconcileVersionConflicts!(paths, syncResult),
         } : {}),
       });
+      current += chunk.length - reported;
+      options.progressCallback?.(current, total);
     }
     for (const path of resurrectPaths) {
       if (result.uploadedPaths.includes(path)) {

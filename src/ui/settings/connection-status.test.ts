@@ -20,7 +20,7 @@ describe('connection status', () => {
 			syncRuntime: { getState: () => state, addStateChangeListener, removeStateChangeListener },
 		} as never);
 		const setting = MockSetting.instances[0]!;
-		expect(setting.descEl.textContent).toContain('https://crate.example');
+		expect(setting.descEl.textContent).toContain('Not synced yet');
 		expect(setting.descEl.textContent).toContain('Last successful sync: Never');
 		state = { ...state, status: 'error', lastError: 'Connection failed' };
 		const listener = addStateChangeListener.mock.calls[0]![0] as () => void;
