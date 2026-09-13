@@ -46,6 +46,7 @@ export async function getLocalChanges(
   const tasks = candidates.map((file) => async () => {
     const content = await context.vault.adapter.readBinary(file.path);
     const hash = await computeHash(content);
+      context.plannedContent?.remember(file.path, content, hash);
     const existing = context.localManifest.getEntry(file.path);
     if (!existing || existing.hash !== hash) {
       return { path: file.path, hash };

@@ -4,6 +4,7 @@
 
 import { stopReminderBackend } from '../reminders/runtime';
 import { Notice, Plugin } from 'obsidian';
+import type { CloudflareUsageConnection } from '../cloudflare/usage-connection';
 import { type CloudflareDeploymentService } from '../cloudflare/deployment-service';
 import { type ReminderIndex } from '../reminders/data/reminder-index';
 import { type MarkdownWriter } from '../reminders/data/markdown-writer';
@@ -35,6 +36,7 @@ export default class CratePlugin extends Plugin {
 	secretStorage!: SecretStorageService;
 	syncRuntime!: SyncRuntime;
 	cloudflareDeploymentService!: CloudflareDeploymentService;
+	cloudflareUsageConnection!: CloudflareUsageConnection;
 	readonly settingsUiState: SettingsUiState = createSettingsUiState();
 	private settingTab?: CrateSettingTab;
 	private settingsWriteQueue: Promise<void> = Promise.resolve();

@@ -1,3 +1,4 @@
+import type { PlannedContent } from './planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
 import type { ChangelogEntry, FileEntry, MutationFailure } from '../protocol/sync-types';
 import type { CrateSettings } from '../plugin/settings-types';
@@ -33,6 +34,7 @@ interface PlannerApi {
 }
 
 export interface LocalDiffPlannerContext {
+  plannedContent?: PlannedContent;
   vault: Vault;
   localManifest: PlannerManifest;
   shouldIgnore(path: string): boolean;
@@ -52,7 +54,7 @@ export interface IncrementalSyncPlannerContext {
   shouldIgnore(path: string): boolean;
   getLocalChanges(): Promise<{ path: string; hash: string }[]>;
   getLocalDeletes(): Promise<string[]>;
-  parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult): Promise<void>;
+  parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void>;
   processDiff(
     diff: FileDiff,
     localFiles: Record<string, FileEntry>,
@@ -68,6 +70,7 @@ export interface IncrementalSyncPlannerContext {
 }
 
 export interface FullSyncPlannerContext {
+  plannedContent?: PlannedContent;
   vault: Vault;
   localManifest: PlannerManifest;
   shouldIgnore(path: string): boolean;

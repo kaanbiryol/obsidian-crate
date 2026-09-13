@@ -2,10 +2,13 @@
  * Settings tab for Crate configuration
  */
 
+import { createSettingsDisclosure, createSettingsSectionHeading } from './settings/section-helpers';
+import { renderUsageSection } from './settings/usage-section';
 import { renderConnectionStatus } from './settings/connection-status';
 import { App, PluginSettingTab } from 'obsidian';
 import type CratePlugin from '../main';
-import { renderConfigSection, renderDisconnectSetting } from './settings/config-section';
+import { renderForgetServerSetting } from './settings/server-selection-setting';
+import { renderConfigSection, renderServerSection, renderServerUpdateNotice } from './settings/config-section';
 import { renderDevicesSection } from './settings/devices-section';
 import { renderInfrastructureSection } from './settings/infrastructure-section';
 import { renderSyncSection } from './settings/sync-section';
@@ -37,13 +40,16 @@ export class CrateSettingTab extends PluginSettingTab {
 			hasDeployment: Boolean(this.plugin.settings.cloudflareDeployment?.d1DatabaseId),
 		});
 
-		renderConfigSection({
-			containerEl,
-			plugin: this.plugin,
-			rerender: () => this.update(),
-		});
+		renderServerUpdateNotice({ containerEl, plugin: this.plugin, rerender: () => this.update() });
 
-		if (isConfigured) this.cleanupFns.push(renderConnectionStatus(containerEl, this.plugin));
+		if (!isConfigured) {
+			renderConfigSection({ containerEl, plugin: this.plugin, rerender: () => this.update() });
+			renderForgetServerSetting({ containerEl, plugin: this.plugin, rerender: () => this.update() });
+		}
+		if (isConfigured) {
+			createSettingsSectionHeading(containerEl, 'Sync');
+			this.cleanupFns.push(renderConnectionStatus(containerEl, this.plugin));
+		}
 
 		if (sections.showSync) {
 			renderSyncSection({
@@ -54,26 +60,32 @@ export class CrateSettingTab extends PluginSettingTab {
 		}
 
 		if (sections.showReminders) {
+			const remindersEl = containerEl.createDiv({ cls: 'crate-reminders-settings' });
+			let allDayTimeEl: HTMLElement | undefined;
 			this.cleanupFns.push(renderRemindersSection({
-				containerEl,
+				onAllDayTimeContainer: container => { allDayTimeEl = container; },
+				containerEl: remindersEl,
 				plugin: this.plugin,
 				rerender: () => this.update(),
 			}));
-		}
-
-		if (sections.showNotifications) {
-			renderNotificationsSection({
-				containerEl,
-				plugin: this.plugin,
-				rerender: () => this.update(),
-			});
+			if (sections.showNotifications) {
+				this.cleanupFns.push(renderNotificationsSection({
+					allDayTimeContainerEl: allDayTimeEl,
+					containerEl: remindersEl,
+					plugin: this.plugin,
+					rerender: () => this.update(),
+				}));
+			}
 		}
 
 		if (isConfigured) {
-			this.cleanupFns.push(renderDevicesSection({
-				containerEl,
-				plugin: this.plugin,
-			}));
+			const accountEl = createSettingsDisclosure(containerEl, 'Account and devices');
+			renderConfigSection({ containerEl: accountEl, plugin: this.plugin, rerender: () => this.update() }, false);
+			this.cleanupFns.push(renderDevicesSection({ containerEl: accountEl, plugin: this.plugin }));
+			renderForgetServerSetting({ containerEl: accountEl, plugin: this.plugin, rerender: () => this.update() });
+			const serverEl = createSettingsDisclosure(containerEl, 'Server and usage');
+			renderServerSection({ containerEl: serverEl, plugin: this.plugin, rerender: () => this.update() });
+			this.cleanupFns.push(renderUsageSection(serverEl, this.plugin, accountEl));
 		}
 
 		if (sections.showInfrastructure) {
@@ -84,7 +96,6 @@ export class CrateSettingTab extends PluginSettingTab {
 				rerender: () => this.update(),
 			});
 		}
-		if (isConfigured) renderDisconnectSetting({ containerEl, plugin: this.plugin, rerender: () => this.update() });
 		for (const details of Array.from(containerEl.querySelectorAll<HTMLDetailsElement>('details'))) {
 			const previous = openSections.get(details.querySelector('summary')?.textContent);
 			if (previous !== undefined) details.open = previous;

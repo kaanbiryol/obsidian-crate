@@ -32,7 +32,7 @@ It is not currently distributed through the Obsidian community plugin catalog. I
 
 The Obsidian plugin owns sync planning, change detection, conflict handling, and local settings. The independently deployed Cloudflare Worker is the storage API. It stores file contents in R2, sync metadata and parsed reminder caches in D1, and reminder notification alarms in Durable Objects.
 
-The plugin never asks for a Cloudflare account API token. Deployment and device connection use Cloudflare OAuth Authorization Code + PKCE. Crate discovers or creates the account's server, registers a permanent device credential whose plaintext stays in Obsidian, and then revokes the temporary OAuth token.
+Deployment and device connection use Cloudflare OAuth Authorization Code + PKCE. Crate discovers or creates the account's server, registers a permanent device credential whose plaintext stays in Obsidian, and saves the Cloudflare login in Obsidian secret storage for usage access.
 
 ## Privacy and Security
 
@@ -40,7 +40,7 @@ The plugin never asks for a Cloudflare account API token. Deployment and device 
 - Sync metadata, registered device records, and parsed reminder caches are stored in your D1 database.
 - Crate does not include hidden telemetry.
 - Sync secrets are stored through Obsidian's secret storage.
-- OAuth state and PKCE material exist only in memory during one deployment; authorization codes and OAuth access tokens are never stored or logged.
+- OAuth state and PKCE material exist only in memory during one deployment; authorization codes are never stored or logged. After successful setup, Crate stores OAuth credentials with server management and analytics permissions in Obsidian secret storage.
 - The Worker module and current D1 schema are versioned build-time artifacts inside the plugin. Crate initializes empty databases, upgrades schema 2/3/4 to schema 5 without rewriting vault data, and rejects unsupported schemas. Deployment code is never fetched at runtime.
 - Vault devices can be authorized only through the Cloudflare account that owns the server.
 - Push and reminders web enrollment links are short-lived and cannot grant vault sync access.
@@ -115,7 +115,7 @@ After installing the plugin, open the Crate settings tab in Obsidian:
 1. Select **Connect with Cloudflare**. Your browser opens Cloudflare OAuth.
 2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
 3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate reuses an existing Crate server in that account or provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and schema.
-4. Crate registers this device through the Cloudflare-authorized D1 API, revokes the temporary OAuth token, and connects automatically.
+4. Crate registers this device through the Cloudflare-authorized D1 API, saves the Cloudflare login for usage, and connects automatically.
 5. No vault files are transferred during connection. Open the command palette and select **Crate: Sync now** to sync this vault with the server.
 
 The OAuth deployment uses the build-time Worker and current schema included in the installed plugin. Unsupported databases are rejected without modification; see the [recovery runbook](docs/recovery.md) before changing deployments. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered in D1.
@@ -124,7 +124,9 @@ To connect another computer or mobile device, install Crate there and select **C
 
 **Disconnect this device** removes the local sync credential while retaining the non-secret deployment identity. Signing in to Cloudflare again reconnects the same server.
 
-For the one-time GitHub Pages and OAuth-client configuration, updates, and recovery instructions, see [Deploying and operating the server](docs/deployment.md). When the installed Crate build contains newer Worker, web app, or schema artifacts, Obsidian shows a server-update notice and **Authorize update** appears in Crate settings. Updating reuses the resource IDs saved by the initial OAuth deployment.
+Server updates use the saved Cloudflare login and renew it when needed. **Update server** opens Cloudflare authorization only when credentials are missing, revoked, cannot be renewed, or lack required permissions. Network and server errors are shown in Obsidian without starting another login. Reconnect, repair, reset, and deletion also reuse the saved login. Reset and deletion retain their destructive-action confirmations and resource checks. First-time setup and new devices sign in through Cloudflare.
+
+For the one-time GitHub Pages and OAuth-client configuration, updates, and recovery instructions, see [Deploying and operating the server](docs/deployment.md). When the installed Crate build contains newer Worker, web app, or schema artifacts, Obsidian shows a server-update notice and **Update server** appears in Crate settings. Updating reuses the resource IDs saved by the initial OAuth deployment.
 
 ## Sync Scope and Limits
 
@@ -158,7 +160,7 @@ Reminder code blocks can be embedded in notes:
 ```
 ````
 
-The Worker schedules notifications from committed Markdown using a shared folder, timezone, all-day time, and enabled setting. Another device's startup does not replace that policy. **Settings → Crate → Push notifications** shows the server's folder and timezone; explicit changes apply to all devices. The web app session is restricted to its enrolled reminders folder. Signing out clears its offline data and drafts across tabs and revokes the session's subscriptions. If remote revocation fails, the signed-out screen explains how to remove the session through connected devices in Obsidian.
+The Worker schedules notifications from committed Markdown using a shared folder, timezone, all-day time, and enabled setting. Another device's startup does not replace that policy. **Settings → Crate → Reminders** shows the server's folder and timezone; explicit changes apply to all devices. The web app session is restricted to its enrolled reminders folder. Signing out clears its offline data and drafts across tabs and revokes the session's subscriptions. If remote revocation fails, the signed-out screen explains how to remove the session through connected devices in Obsidian.
 
 The web app checks browser permission and confirms push registration with the current server session when opened, resumed, or reconnected. **On** appears after confirmation. If registration fails, **Retry** repairs the existing browser subscription; if permission is blocked, allow notifications in browser settings and reopen Crate.
 
@@ -264,7 +266,7 @@ Generated files under `.generated/`, `dist/`, and root-level release artifacts s
 
 ## Resetting a Crate server
 
-**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Reset server** erases this deployment's remote files, retained versions, database, subscriptions, and reminder state, then rebuilds the server. Local files are kept. The flow requires confirmation and fresh Cloudflare authorization, checks exact ownership, and blocks shared resources or unknown data. Use **Resume server reset** after an interruption. Afterward, upload your local vault and reconnect other devices. See [server reset and recovery](docs/deployment.md#reset-a-crate-server).
+**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Reset server** erases this deployment's remote files, retained versions, database, subscriptions, and reminder state, then rebuilds the server. Local files are kept. The flow requires confirmation and valid Cloudflare authorization, reusing the saved login when available, checks exact ownership, and blocks shared resources or unknown data. Use **Resume server reset** after an interruption. Afterward, upload your local vault and reconnect other devices. See [server reset and recovery](docs/deployment.md#reset-a-crate-server).
 
 ## License
 
@@ -272,4 +274,10 @@ Crate is licensed under the [0BSD license](LICENSE).
 
 Licenses and notices for bundled dependencies are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). See [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
-**Delete server** in **Settings → Crate → Recovery and troubleshooting → Troubleshooting** permanently removes this vault’s verified Crate Worker/web app, database, file bucket and contents, and reminder state without rebuilding. Local vault files and other deployments are kept. It requires confirmation of the exact resources and fresh Cloudflare authorization. Shared resources or unrecognized data block deletion. After an interruption, use **Resume server deletion**; connecting, updating, and resetting remain blocked until deletion completes.
+**Delete server** in **Settings → Crate → Recovery and troubleshooting → Troubleshooting** permanently removes this vault’s verified Crate Worker/web app, database, file bucket and contents, and reminder state without rebuilding. Local vault files and other deployments are kept. It requires confirmation of the exact resources and valid Cloudflare authorization, reusing the saved login when available. Shared resources or unrecognized data block deletion. After an interruption, use **Resume server deletion**; connecting, updating, and resetting remain blocked until deletion completes.
+
+## Cloudflare usage
+
+Setup connects usage automatically using the same Cloudflare login. Open **Settings → Crate → Server and usage → Cloudflare usage** and select **Refresh** to see account-wide usage and estimated remaining free allowances. Older installations whose setup login was discarded must select **Reconnect Cloudflare** once. Crate obtains credentials with the OAuth app’s required server management and analytics permissions through Cloudflare login and saves them in Obsidian secret storage for that account. The last usage snapshot is saved in plugin settings and shown immediately when you return, with its update time and reporting dates. Refresh retrieves current usage and renews access when needed; there is no background polling. Failed refreshes keep the previous snapshot visible. To remove the saved login, select **Account and devices → Sign out of Cloudflare**. This also requests revocation and affects other vaults sharing that account login on this device; device sync continues. You can also revoke Crate’s authorization in Cloudflare. Revoke previously pasted API tokens separately in Cloudflare.
+
+Only Refresh queries Cloudflare Analytics, sending your account ID and token directly to Cloudflare, without vault contents or filenames. Nothing is polled in the background. Totals include other applications in the same account. Workers and D1 use today in UTC; R2 operations use the current calendar month. Analytics may lag and these free-allowance comparisons are not a bill or an indication of your subscribed plan. Paid allowances and billing periods can differ. Storage shows the sum of reported resource peaks for today, not GB-month billing or remaining storage quota. R2 Infrequent Access, Durable Objects, and other services are not included in the allowance estimates. Unavailable metrics are shown as unavailable.

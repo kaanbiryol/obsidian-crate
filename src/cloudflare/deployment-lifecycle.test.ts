@@ -146,3 +146,18 @@ describe('Cloudflare deployment interruption and recovery', () => {
 		expect(vi.mocked(h.transport).mock.calls.at(-1)?.[0]).toContain('/oauth2/revoke');
 	});
 });
+
+it('deletes with saved credentials through the real deletion path without opening OAuth or revoking the shared login', async () => {
+	const h = harness();
+	const { service } = h.createService();
+	const result = await service.deployWithSavedAuthorization('delete', async operation => {
+		const result = await operation({ accessToken: 'saved' });
+		// Keep the account available until the shared credential operation settles.
+		expect(h.settings.cloudflareDeployment?.accountId).toBe('a'.repeat(32));
+		return result;
+	});
+	expect(result.deleted).toBe(true);
+	expect(h.settings.cloudflareDeployment).toBeNull();
+	expect(h.remote).toMatchObject({ worker: false, database: false, bucket: false });
+	expect(h.transport.mock.calls.some(([url]) => url.includes('/oauth2/'))).toBe(false);
+});

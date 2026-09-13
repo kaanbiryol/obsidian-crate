@@ -1,5 +1,13 @@
 import { CloudflareApiError, type CloudflareApiClient } from './cloudflare-api';
 
+
+export class DeploymentRecoveryRequiredError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'DeploymentRecoveryRequiredError';
+    }
+}
+
 export const DEPLOYMENT_FENCE_KEY = 'crate_deployment_fence';
 type FenceApi = Pick<CloudflareApiClient, 'queryD1'>;
 
@@ -20,7 +28,7 @@ export class DeploymentFence {
 	async mutate<T>(operation: () => Promise<T>): Promise<T> {
 		const rows = (await this.api.queryD1(this.account, this.database,
 			'SELECT value FROM maintenance_state WHERE key = ?;', [DEPLOYMENT_FENCE_KEY])).flatMap(result => result.results ?? []);
-		if (rows.length !== 1 || rows[0]?.value !== this.value) throw new Error('Deployment ownership changed. Start again after reviewing the deployment fence.');
+		if (rows.length !== 1 || rows[0]?.value !== this.value) throw new DeploymentRecoveryRequiredError('Deployment ownership changed. Start again after reviewing the deployment fence.');
 		// Never expire or steal this fence: the provider cannot reject an old,
 		// already-dispatched upload using a D1 fencing token.
 		this.uncertain = true;
@@ -38,12 +46,12 @@ export class DeploymentFence {
 
 	async finish(): Promise<void> {
 		if (this.databaseRemoved) return;
-		if (this.uncertain) throw new Error('A Cloudflare mutation has an uncertain outcome. The deployment fence remains held. See docs/deployment.md and scripts/crate-deployment-fence.py before retrying.');
+		if (this.uncertain) throw new DeploymentRecoveryRequiredError('A Cloudflare mutation has an uncertain outcome. The deployment fence remains held. See docs/deployment.md and scripts/crate-deployment-fence.py before retrying.');
 		try {
 			await this.api.queryD1(this.account, this.database,
 				'DELETE FROM maintenance_state WHERE key = ? AND value = ?;', [DEPLOYMENT_FENCE_KEY, this.value]);
 		} catch {
-			throw new Error('Could not confirm release of the deployment fence. Inspect it with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');
+			throw new DeploymentRecoveryRequiredError('Could not confirm release of the deployment fence. Inspect it with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');
 		}
 	}
 }
@@ -61,10 +69,10 @@ export async function withDeploymentFence<T>(input: {
 			'INSERT INTO maintenance_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING value;', [DEPLOYMENT_FENCE_KEY, value]))
 			.flatMap(result => result.results ?? []);
 	} catch {
-		throw new Error('Could not confirm deployment ownership. Inspect the deployment fence with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');
+		throw new DeploymentRecoveryRequiredError('Could not confirm deployment ownership. Inspect the deployment fence with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');
 	}
 	if (acquired.length !== 1 || acquired[0]?.value !== value) {
-		throw new Error('Another deployment or server reset is active or needs recovery. Wait for it to finish; for an abandoned operation see docs/deployment.md and scripts/crate-deployment-fence.py.');
+		throw new DeploymentRecoveryRequiredError('Another deployment or server reset is active or needs recovery. Wait for it to finish; for an abandoned operation see docs/deployment.md and scripts/crate-deployment-fence.py.');
 	}
 	const fence = new DeploymentFence(input.api, input.accountId, input.databaseId, value);
 	let outcome: { ok: true; value: T } | { ok: false; error: unknown };
@@ -76,7 +84,7 @@ export async function withDeploymentFence<T>(input: {
 	try { await fence.finish(); }
 	catch (error) {
 		const failure = outcome.ok ? undefined : outcome.error;
-		const combined = new Error(`${failure instanceof Error ? `${failure.message}. ` : ''}${error instanceof Error ? error.message : 'Could not release the deployment fence.'}`);
+		const combined = new DeploymentRecoveryRequiredError(`${failure instanceof Error ? `${failure.message}. ` : ''}${error instanceof Error ? error.message : 'Could not release the deployment fence.'}`);
 		if (failure instanceof Error) combined.name = failure.name;
 		throw combined;
 	}

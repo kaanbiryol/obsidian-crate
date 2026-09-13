@@ -45,7 +45,7 @@ export interface SyncWorkflowContext extends FullSyncUploadContext {
 		localFiles: Record<string, FileEntry>,
 		result: SyncResult
 	): Promise<DiffApplyOutcome>;
-	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult): Promise<void>;
+	parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void>;
 	getLocalManifestEntry(path: string): FileEntry | undefined;
 	setLocalManifestEntry(path: string, entry: FileEntry): void;
 	saveLocalManifest(): Promise<void>;
@@ -111,6 +111,7 @@ export async function runSyncWorkflow(
 
 		const total = diffs.length;
 		let current = 0;
+		progressCallback?.(current, total);
 
 		if (uploadDiffs.length > 0) {
 			await uploadFullSyncPlan(context, uploadDiffs, localFiles, result, () => {
@@ -135,9 +136,11 @@ export async function runSyncWorkflow(
 					remoteSize: getPathEntry(remoteManifest.files, diff.path)?.size ?? 0,
 				});
 			}
+			const beforeDownloads = current;
 			await context.parallelDownloadAndSaveFiles(
 				downloadRequests,
 				result,
+				() => { current++; progressCallback?.(current, total); },
 			);
 			for (const diff of downloadDiffs) {
 				if (
@@ -152,7 +155,7 @@ export async function runSyncWorkflow(
 					if (manifestEntry) localFiles[diff.path] = manifestEntry;
 				}
 			}
-			current += downloadDiffs.length;
+			current = beforeDownloads + downloadDiffs.length;
 			progressCallback?.(current, total);
 		}
 

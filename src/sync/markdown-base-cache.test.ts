@@ -179,3 +179,29 @@ describe('MarkdownBaseCache', () => {
 		expect(files.has(`${PLUGIN_DIR}/markdown-base-cache/${removedHash}.md`)).toBe(false);
 	});
 });
+
+it('coalesces duplicate cache writes and retries failed writes', async () => {
+    const { cache, adapter } = createCacheHarness();
+    const content = toArrayBuffer('same content');
+    const hash = await computeHash(content);
+    await Promise.all([cache.putBase('a.md', hash, content), cache.putBase('b.md', hash, content)]);
+    await cache.putBase('a.md', hash, content);
+    expect(adapter.writeBinary).toHaveBeenCalledTimes(1);
+
+    const next = toArrayBuffer('next content');
+    const nextHash = await computeHash(next);
+    adapter.writeBinary.mockRejectedValueOnce(new Error('disk unavailable'));
+    await cache.putBase('a.md', nextHash, next);
+    await cache.putBase('a.md', nextHash, next);
+    expect(adapter.writeBinary).toHaveBeenCalledTimes(3);
+});
+
+it('rewrites a cache entry after pruning it', async () => {
+    const { cache, adapter } = createCacheHarness();
+    const content = toArrayBuffer('content');
+    const hash = await computeHash(content);
+    await cache.putBase('a.md', hash, content);
+    await cache.pruneReferencedHashes(new Set());
+    await cache.putBase('a.md', hash, content);
+    expect(adapter.writeBinary).toHaveBeenCalledTimes(2);
+});

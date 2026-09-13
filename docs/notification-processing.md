@@ -26,7 +26,7 @@ An authenticated mutation arms a separate cleanup Durable Object for one run 24 
 
 Server updates clear the old cron schedule. Reminder alarms intentionally scheduled by the user remain active until delivery, cancellation, or their finite failure limit.
 
-Paused updates appear in Run diagnostics. Retry paused notifications requeues up to 100 files and 100 alarm updates per explicit action and reports whether more remain. It does not resend completed deliveries; missed reminders still need to be rescheduled.
+Paused updates appear in Run diagnostics. The notification retry API requeues up to 100 files and 100 alarm updates per explicit action and reports whether more remain. It does not resend completed deliveries; missed reminders still need to be rescheduled.
 
 ## Unfinished uploads
 

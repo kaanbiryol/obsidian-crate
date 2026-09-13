@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { FakeElement } from '../test/fakes/obsidian-ui';
 import { SyncRuntime } from './runtime';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { SyncResult, SyncState } from './types';
@@ -84,6 +85,8 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> = {}) {
 	const settings = createSettings(settingsOverrides);
 	const plugin = {
+		addStatusBarItem: vi.fn(() => Object.assign(new FakeElement('div'), { toggleClass: vi.fn(), remove: vi.fn(), removeAttribute: vi.fn(), removeEventListener: vi.fn() })),
+		registerDomEvent: vi.fn(),
 		app: {
 			workspace: { layoutReady: true },
 			vault: {

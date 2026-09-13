@@ -3,7 +3,7 @@ import type { CachedDevicesState } from '../../plugin/settings-ui-state';
 import type CratePlugin from '../../main';
 import type { RegisteredDevice } from '../../protocol/sync-types';
 import { openConfirmationModal } from '../confirmation-modal';
-import { createSettingsDisclosure, createSettingsSectionHeading } from './section-helpers';
+import { createSettingsDisclosure } from './section-helpers';
 
 export interface DevicesSectionContext {
 	containerEl: HTMLElement;
@@ -23,8 +23,8 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 	const isActive = () => !disposed && plugin.settingsUiState.devices === cache;
 	let refreshButton: ButtonComponent;
 
-	createSettingsSectionHeading(containerEl, 'Devices and sessions');
-	new Setting(containerEl)
+	const devicesEl = createSettingsDisclosure(containerEl, 'Devices and sessions');
+	new Setting(devicesEl)
 		.setName('Connected devices and sessions')
 		.setDesc('Browsers and home screen apps appear separately, even on the same device.')
 		.addButton(button => {
@@ -32,8 +32,8 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 			button.onClick(() => { void refresh(); });
 		});
 
-	const listContainer = containerEl.createDiv({ cls: 'crate-connected-devices' });
-	const statusEl = containerEl.createEl('p', { cls: 'setting-item-description' });
+	const listContainer = devicesEl.createDiv({ cls: 'crate-connected-devices' });
+	const statusEl = devicesEl.createEl('p', { cls: 'setting-item-description' });
 	statusEl.setAttribute('role', 'status');
 
 	const renderList = () => {
@@ -48,11 +48,16 @@ export function renderDevicesSection(context: DevicesSectionContext): () => void
 		for (const token of orderDevices(cache.tokens)) {
 			const label = formatDeviceLabel(token);
 			const setting = new Setting(listContainer)
-				.setName(label)
-				.setDesc(formatDeviceDescription(token));
+				.setName(label);
+			if (token.is_current) setting.nameEl.createSpan( { text: 'This device', cls: 'crate-current-device-badge' });
 			if (token.device_id) {
-				const details = createSettingsDisclosure(setting.descEl, 'Device details');
-				details.createEl('p', { text: `Device ID: ${token.device_id} · Added ${formatDateTime(token.created_at)}` });
+				setting.descEl.addClass('crate-device-description');
+				const details = createSettingsDisclosure(setting.descEl, formatDeviceDescription(token));
+				if (token.last_seen_at) details.createEl('p', { text: `Last seen ${formatDateTime(token.last_seen_at)}` });
+				details.createEl('p', { text: `Device ID: ${token.device_id}` });
+				details.createEl('p', { text: `Added ${formatDateTime(token.created_at)}` });
+			} else {
+				setting.setDesc(formatDeviceDescription(token));
 			}
 			if (token.is_current) continue;
 			setting.addButton(button => {
@@ -134,7 +139,7 @@ function formatDeviceDescription(token: RegisteredDevice): string {
 	const parts: string[] = [];
 
 	if (token.last_seen_at) {
-		parts.push(`Last seen ${formatDateTime(token.last_seen_at)}`);
+		parts.push(`Last seen ${formatLastSeen(token.last_seen_at)}`);
 	} else {
 		parts.push('Not used yet');
 	}
@@ -148,12 +153,24 @@ function formatDeviceDescription(token: RegisteredDevice): string {
 
 function formatDeviceLabel(token: RegisteredDevice): string {
 	const baseLabel = token.device_name?.trim() || token.device_id?.trim() || 'Unnamed device';
-	return token.is_current ? `${baseLabel} (Current device)` : baseLabel;
+	return token.is_current ? baseLabel.replace(/\s*\((?:this|current device)\)\s*$/i, '') : baseLabel;
+}
+
+function formatLastSeen(value: string): string {
+	const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+	const time = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : `${normalized}Z`).getTime();
+	if (!Number.isFinite(time)) return value;
+	const minutes = Math.max(0, Math.floor((Date.now() - time) / 60000));
+	if (minutes < 1) return 'just now';
+	if (minutes < 60) return `${minutes} min ago`;
+	if (minutes < 1440) return `${Math.floor(minutes / 60)} hr ago`;
+	const days = Math.floor(minutes / 1440);
+	return `${days} ${days === 1 ? 'day' : 'days'} ago`;
 }
 
 function formatDateTime(value: string): string {
 	const normalized = value.includes('T') ? value : value.replace(' ', 'T');
-	const parsed = new Date(normalized);
+	const parsed = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : `${normalized}Z`);
 	return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }
 

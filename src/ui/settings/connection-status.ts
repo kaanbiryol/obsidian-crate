@@ -13,9 +13,9 @@ export function renderConnectionStatus(containerEl: HTMLElement, plugin: CratePl
 		const status = state.status === 'syncing' ? 'Syncing…'
 			: state.status === 'offline' ? 'Offline'
 				: state.status === 'error' ? 'Sync failed'
-					: state.pendingChanges ? `${state.pendingChanges} pending changes` : 'Ready';
+					: state.pendingChanges ? `${state.pendingChanges} pending changes` : state.lastSync ? 'Up to date' : 'Not synced yet';
 		const lastSync = state.lastSync ? new Date(state.lastSync).toLocaleString() : 'Never';
-		setting.setDesc(`${plugin.settings.workerUrl} · ${status} · Last successful sync: ${lastSync}${state.lastError ? ` · ${state.lastError}` : ''}`);
+		setting.setDesc(`${status} · Last successful sync: ${lastSync}${state.lastError ? ` · ${state.lastError}` : ''}`);
 	};
 	setting.addButton(button => button.setButtonText('Sync now').onClick(async () => {
 		button.setDisabled(true);

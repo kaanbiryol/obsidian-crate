@@ -47,7 +47,9 @@ export async function prepareUploadFromVaultFile(
     content = await context.vault.adapter.readBinary(file.path);
   }
 
-  const hash = await computeHash(content);
+  const hash = context.plannedContent
+    ? await context.plannedContent.hash(file.path, content)
+    : await computeHash(content);
 
   if (!options?.force && context.localManifest.hashMatches(file.path, hash)) {
     context.localManifest.setEntry(file.path, {

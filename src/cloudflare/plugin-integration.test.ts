@@ -6,12 +6,15 @@ const hashToken = vi.fn(async () => 'device-token-hash');
 const openCloudflareDeploymentModal = vi.fn();
 
 const progress = {
+	close: vi.fn(),
+	selectVault: vi.fn(),
 	setWorking: vi.fn(),
 	succeed: vi.fn(),
 	fail: vi.fn(),
 };
 
 async function loadPluginIntegration() {
+	vi.doMock('./oauth-config', async () => ({ ...await vi.importActual<object>('./oauth-config'), isCloudflareOAuthConfigured: () => true }));
 	vi.doMock('obsidian', () => ({ Notice: vi.fn() }));
 	vi.doMock('../sync/plugin-integration', () => ({ configureCloudflareAuthorizedDevice }));
 	vi.doMock('../sync/device-token', () => ({ generateSecureToken, hashToken }));
@@ -33,12 +36,15 @@ function createPlugin(configured = false) {
 	);
 	return {
 		app: {},
-		settings: { deviceId: 'device-id' },
+		settings: { deviceId: 'device-id', cloudflareDeployment: { accountId: 'account-a' } },
+		cloudflareUsageConnection: { withAuthorization: vi.fn() },
 		syncRuntime: { isConfigured: vi.fn(() => configured), sync },
 		openSettingsTab: vi.fn(),
 		getSettingsDocument: vi.fn(() => undefined),
 		refreshSettingsTab: vi.fn(),
 		cloudflareDeploymentService: {
+			startDeployment: vi.fn(),
+			deployWithSavedAuthorization: vi.fn(async (..._args: unknown[]) => ({ workerUrl: 'https://crate.example.workers.dev', accountName: 'Example account', deleted: false })),
 			pendingIntent: null as null | 'switch' | 'create' | 'reset' | 'delete',
 			handleCallback: vi.fn(async () => ({
 				accountName: 'Example account',
@@ -63,6 +69,7 @@ afterEach(() => {
 	vi.resetModules();
 	vi.clearAllMocks();
 	vi.doUnmock('obsidian');
+	vi.doUnmock('./oauth-config');
 	vi.doUnmock('../sync/plugin-integration');
 	vi.doUnmock('../sync/device-token');
 	vi.doUnmock('../plugin/deviceInfo');
@@ -181,7 +188,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		expect(progress.fail).toHaveBeenCalledWith(
 			'Could not update your Cloudflare server',
 			'Cloudflare upload failed',
-			['Select “Authorize update” in Crate settings to try again.'],
+			['Select “Update server” in Crate settings to try again.'],
 		);
 	});
 
@@ -244,4 +251,61 @@ describe('handleCloudflareOAuthProtocol', () => {
 		expect(progress.succeed).not.toHaveBeenCalled();
 	});
 
+});
+
+it.each(['connect', 'update', 'reset', 'delete'] as const)('uses saved login for %s and connects devices only when needed', async intent => {
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const plugin = createPlugin(intent === 'update' || intent === 'delete');
+	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockResolvedValue({ workerUrl: 'https://crate.example.workers.dev', accountName: 'Example account', deleted: intent === 'delete' });
+	configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
+	await startCloudflareDeployment(plugin as never, intent === 'connect' ? undefined : intent);
+	expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mock.calls[0]?.[0]).toBe(intent);
+	expect(plugin.cloudflareDeploymentService.startDeployment).not.toHaveBeenCalled();
+	expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledTimes(intent === 'connect' || intent === 'reset' ? 1 : 0);
+	expect(progress.succeed).toHaveBeenCalledOnce();
+});
+
+it('repairs an unconfigured device with saved authorization and then connects it', async () => {
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const plugin = createPlugin(false);
+	configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
+	await startCloudflareDeployment(plugin as never, 'update');
+	expect(plugin.cloudflareDeploymentService.startDeployment).not.toHaveBeenCalled();
+	expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledOnce();
+});
+
+it.each(['reset', 'delete'] as const)('falls back to the same %s intent only for invalid authorization', async intent => {
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const { CloudflareReauthorizationRequired } = await import('./oauth-client');
+	const plugin = createPlugin(true);
+	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new CloudflareReauthorizationRequired());
+	await startCloudflareDeployment(plugin as never, intent);
+	expect(plugin.cloudflareDeploymentService.startDeployment).toHaveBeenCalledWith(intent);
+});
+
+it('does not open Cloudflare for a network failure', async () => {
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const plugin = createPlugin(true);
+	plugin.cloudflareDeploymentService.deployWithSavedAuthorization.mockRejectedValue(new Error('Network unavailable'));
+	await startCloudflareDeployment(plugin as never, 'delete');
+	expect(plugin.cloudflareDeploymentService.startDeployment).not.toHaveBeenCalled();
+	expect(progress.fail).toHaveBeenCalledOnce();
+});
+
+it.each(['update', 'reset', 'delete'] as const)('does not suggest retrying an uncertain %s', async intent => {
+    const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+    const { DeploymentRecoveryRequiredError } = await import('./deployment-fence');
+    const plugin = createPlugin(true);
+    plugin.cloudflareDeploymentService.pendingIntent = intent === 'update' ? null : intent;
+    plugin.cloudflareDeploymentService.handleCallback.mockRejectedValue(
+        new DeploymentRecoveryRequiredError('Network changed. The deployment fence remains held.'),
+    );
+    await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+    expect(progress.fail).toHaveBeenCalledWith(
+        'Server operation needs review',
+        expect.stringContaining('Further server changes are blocked'),
+        expect.arrayContaining(['Closing this message does not clear the lock.']),
+        { technicalDetails: 'Network changed. The deployment fence remains held.' },
+    );
+    expect(JSON.stringify(progress.fail.mock.calls)).not.toContain('settings to try again');
 });

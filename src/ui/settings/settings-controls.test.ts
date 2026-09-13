@@ -1,5 +1,11 @@
+import type { ReactElement } from 'react';
 import { DEFAULT_SETTINGS } from '../../plugin/settings-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('react-dom/client', () => ({ createRoot: (element: HTMLElement) => ({
+	render: (node: ReactElement<{ onMount: (container: HTMLElement) => void }>) => node.props.onMount(element),
+	unmount: vi.fn(),
+}) }));
 import { FakeElement, MockModal, MockSetting, MockTextComponent, createObsidianUiModule, resetObsidianUiMocks } from '../../test/fakes/obsidian-ui';
 
 async function flush(): Promise<void> {
@@ -8,7 +14,7 @@ async function flush(): Promise<void> {
 
 beforeEach(() => {
 	resetObsidianUiMocks();
-	vi.doMock('obsidian', () => createObsidianUiModule());
+	vi.doMock('obsidian', () => ({ ...createObsidianUiModule(), Platform: { isMobile: false } }));
 });
 afterEach(() => {
 	vi.resetModules();
@@ -107,7 +113,7 @@ describe('settings controls', () => {
 		const preview = MockModal.instances[0]!.contentEl;
 		expect(preview.collectText()).toContain('3 matching files');
 		expect(preview.collectText()).toContain('.hidden.tmp');
-		expect(preview.collectText()).toContain('Archive/a.md');
+		expect(preview.collectText()).toContain('a.md');
 		expect(preview.collectText()).not.toContain('b.md');
 		text.inputEl.blur();
 		await flush();

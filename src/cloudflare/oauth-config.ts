@@ -8,12 +8,15 @@ export const CLOUDFLARE_OAUTH_TOKEN_URL = 'https://dash.cloudflare.com/oauth2/to
 export const CLOUDFLARE_OAUTH_REVOKE_URL = 'https://dash.cloudflare.com/oauth2/revoke';
 export const CLOUDFLARE_OAUTH_REDIRECT_URL = 'https://crate.kaanbiryol.com/oauth/callback/';
 
+export const CLOUDFLARE_ANALYTICS_SCOPE = 'account-analytics.read';
+
 /** Scope IDs returned by Cloudflare's authenticated GET /oauth/scopes endpoint. */
 export const CLOUDFLARE_OAUTH_SCOPES = [
 	'workers-scripts.write',
 	'd1.write',
 	'workers-r2.write',
 	'memberships.read',
+	CLOUDFLARE_ANALYTICS_SCOPE,
 ] as const;
 
 export function isCloudflareOAuthConfigured(): boolean {

@@ -46,7 +46,7 @@ export function renderServerResetSetting(containerEl: HTMLElement, plugin: Crate
 							'This server’s database, file bucket, and reminder state are removed and recreated. Its Worker is temporarily taken offline and redeployed. Other deployments are not reset.',
 							'Other devices must reconnect. Set up web push again. No files are uploaded automatically.',
 						],
-						confirmText: 'Authorize server reset',
+						confirmText: 'Reset server',
 						warning: true,
 					});
 					if (!confirmed) return;

@@ -1,3 +1,4 @@
+import type { PlannedContent } from './planned-content';
 import type { TAbstractFile, Vault } from "obsidian";
 import type { BatchDownloadResponse, BatchUploadFile, BatchUploadResponse, FileEntry, UploadResult } from '../protocol/sync-types';
 import type { RecordConflictInput } from './conflict-store';
@@ -38,6 +39,7 @@ interface TransferApi {
 }
 
 export interface TransferContext {
+  plannedContent?: PlannedContent;
   vault: Vault;
   fileManager: {
     trashFile(file: TAbstractFile): Promise<void>;

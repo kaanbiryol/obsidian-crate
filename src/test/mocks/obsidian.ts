@@ -575,3 +575,5 @@ export const Platform = {
 export async function requestUrl(): Promise<never> {
 	throw new Error('requestUrl mock not implemented for this test');
 }
+
+export function setIcon(_element: HTMLElement, _icon: string): void {}

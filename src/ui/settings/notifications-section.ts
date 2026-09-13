@@ -1,21 +1,23 @@
-import { Notice, Setting, type TextComponent, type ToggleComponent } from 'obsidian';
+import { Notice, Setting, type TextComponent, type ToggleComponent, type ButtonComponent } from 'obsidian';
+import { createSettingsSectionHeading } from './section-helpers';
 import type CratePlugin from '../../main';
 import { errorMessage } from '../../plugin/logger';
 import { normalizeTimeString } from '../../reminders/settings';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import type { SyncApiClient } from '../../sync/api';
-import { createSettingsSectionHeading } from './section-helpers';
 
 export interface NotificationsSectionContext {
 	containerEl: HTMLElement;
 	plugin: CratePlugin;
 	rerender: () => void;
+	allDayTimeContainerEl?: HTMLElement;
 }
 
-export function renderNotificationsSection(context: NotificationsSectionContext): void {
+export function renderNotificationsSection(context: NotificationsSectionContext): () => void {
 	const { containerEl, plugin } = context;
+	let active = true;
+	const isActive = () => active;
 
-	createSettingsSectionHeading(containerEl, 'Push notifications');
 
   const policyApi = plugin.syncRuntime.getApiClient();
   let policy: NotificationPolicy | null = null;
@@ -34,8 +36,9 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
     policy = (await policyApi.updateNotificationPolicy({ ...policy, ...patch })).policy;
   };
   let enabledToggle: ToggleComponent;
+  createSettingsSectionHeading(containerEl, 'Reminder notifications');
   new Setting(containerEl)
-    .setName('Enable push notifications')
+    .setName('Send reminder notifications')
     .setDesc('All devices · send reminder notifications to subscribed phones and browsers.')
     .addToggle(toggle => {
       enabledToggle = toggle;
@@ -44,27 +47,21 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
         try {
           await savePolicy({ enabled: value });
           await plugin.writeSettings({ pushEnabled: value });
-          context.rerender();
+          if (active) context.rerender();
         } catch (error) {
           new Notice(`Failed to save push notification settings: ${errorMessage(error)}`);
           toggle.setValue(policy?.enabled ?? plugin.settings.pushEnabled);
         } finally { toggle.setDisabled(false); }
       });
     });
-  void openedPolicy.then(() => { if (policy) enabledToggle.setValue(policy.enabled !== false); });
-
-  const disclosure = containerEl.createEl('details', { cls: 'crate-settings-disclosure' });
-  disclosure.createEl('summary', { text: 'Notification schedule and devices' });
-  const preferences = disclosure.createDiv();
-  disclosure.open = plugin.settings.pushEnabled;
-  void openedPolicy.then(() => { disclosure.open = policy?.enabled ?? plugin.settings.pushEnabled; });
+  void openedPolicy.then(() => { if (active && policy) enabledToggle.setValue(policy.enabled !== false); });
 
   const saveAllDayTime = async (time: string | null) => {
     await savePolicy({ allDayTime: time });
     await plugin.writeRemindersSettings({ allDayNotificationTime: time });
   };
 	let timeInput: TextComponent;
-	const timeSetting = new Setting(preferences)
+	const timeSetting = new Setting(context.allDayTimeContainerEl ?? containerEl)
 		.setName('All-day notification time')
 		.setDesc('All devices · loading the notification timezone…')
 		.addText(text => {
@@ -115,33 +112,49 @@ export function renderNotificationsSection(context: NotificationsSectionContext)
 		}));
 
   void openedPolicy.then(() => {
+    if (!active) return;
     if (policy) timeInput.setValue(policy.allDayTime ?? '');
     timeSetting.setDesc(loadError
       ? 'Could not load the notification timezone. Reopen settings to retry.'
       : `All devices · timezone: ${policy?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}. An empty time means off.`);
   });
-  const policyDescription = preferences.createEl('p', { cls: 'setting-item-description' });
+  const policyDescription = containerEl.createEl('p', { cls: 'setting-item-description' });
   void openedPolicy.then(() => {
+    if (!active) return;
     policyDescription.textContent = loadError ? 'Shared settings could not be loaded. Reopen settings to retry.'
       : policy ? `Server notifications: ${policy.folderPath} · ${policy.timezone}` : 'The first enabled device saves the shared folder and timezone.';
   });
-  new Setting(preferences).setName('Notification folder and timezone')
+  new Setting(containerEl).setName('Notification folder and timezone')
     .setDesc(`All devices · set the notification folder to ${plugin.remindersSettings.remindersFolderPath} and timezone to ${Intl.DateTimeFormat().resolvedOptions().timeZone}.`)
-    .addButton(button => button.setButtonText('Update folder and timezone').onClick(async () => {
+    .addButton(button => button.setButtonText('Use this device’s settings').onClick(async () => {
       button.setDisabled(true);
       try {
         await savePolicy({ folderPath: plugin.remindersSettings.remindersFolderPath, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-        context.rerender();
+        if (active) context.rerender();
       } catch (error) { new Notice(`Failed to save shared settings: ${errorMessage(error)}`); }
       finally { button.setDisabled(false); }
     }));
 	const apiClient = plugin.syncRuntime.getApiClient();
-	if (apiClient) renderEnabledDevices(preferences, plugin, apiClient);
+	if (apiClient) renderEnabledDevices(containerEl, plugin, apiClient, isActive);
+
+	return () => { active = false; };
 }
 
-function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, apiClient: SyncApiClient): void {
+function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, apiClient: SyncApiClient, isActive: () => boolean): void {
 	const devicesContainer = containerEl.createDiv({ cls: 'crate-push-devices' });
 	let listContainer: HTMLElement | null = null;
+	let testButton: ButtonComponent;
+	let enabledCount = 0;
+	let requestRevision = 0;
+	const refresh = async () => {
+		const revision = ++requestRevision;
+		if (!listContainer || !isActive()) return;
+		testButton?.setDisabled(true);
+		await loadSubscriptions(listContainer, plugin, () => isActive() && revision === requestRevision, count => {
+			enabledCount = count;
+			testButton.setDisabled(count === 0);
+		}, refresh);
+	};
 
 	new Setting(devicesContainer)
 		.setName('Notification devices')
@@ -150,20 +163,21 @@ function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, api
 			button.setButtonText('Refresh');
 			button.onClick(async () => {
 				if (listContainer) {
-					await loadSubscriptions(listContainer, plugin);
+					await refresh();
 				}
 			});
 		});
 
 	listContainer = devicesContainer.createDiv({ cls: 'crate-push-subscriptions' });
-	void loadSubscriptions(listContainer, plugin);
+	void refresh();
 
 	new Setting(devicesContainer)
 		.setName('Test notification')
 		.setDesc('Send a test notification to all enabled devices.')
 		.addButton(button => {
-			button.setButtonText('Send test');
+			testButton = button.setButtonText('Send test').setDisabled(enabledCount === 0);
 			button.onClick(async () => {
+				if (!enabledCount || !isActive()) return;
 				button.setButtonText('Sending...');
 				button.setDisabled(true);
 				try {
@@ -178,20 +192,21 @@ function renderEnabledDevices(containerEl: HTMLElement, plugin: CratePlugin, api
 				} catch {
 					new Notice('Failed to send test notification');
 				} finally {
-					button.setButtonText('Send test');
-					button.setDisabled(false);
+					if (isActive()) button.setButtonText('Send test').setDisabled(enabledCount === 0);
 				}
 			});
 		});
 }
 
-async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin): Promise<void> {
-	container.empty();
+async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin, isActive: () => boolean, onCount: (count: number) => void, refresh: () => Promise<void>): Promise<void> {
 	const apiClient = plugin.syncRuntime.getApiClient();
 	if (!apiClient) return;
 
 	try {
 		const { subscriptions } = await apiClient.getPushSubscriptions();
+		if (!isActive()) return;
+		container.empty();
+		onCount(subscriptions.filter(subscription => !subscription.disabled_at).length);
 
 		if (subscriptions.length === 0) {
 			container.createEl('p', {
@@ -214,7 +229,7 @@ async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin): P
 						try {
 							await apiClient.deletePushSubscription(sub.id);
 							container.empty();
-							await loadSubscriptions(container, plugin);
+							await refresh();
 						} catch {
 							new Notice('Failed to remove subscription');
 						}
@@ -222,6 +237,8 @@ async function loadSubscriptions(container: HTMLElement, plugin: CratePlugin): P
 				});
 		}
 	} catch {
+		if (!isActive()) return;
+		onCount(0);
 		container.createEl('p', {
 			text: 'Failed to load subscriptions.',
 			cls: 'setting-item-description',

@@ -2,6 +2,7 @@
  * Settings helpers for Crate.
  */
 
+import { normalizeUsageSnapshot } from '../cloudflare/usage-snapshot';
 import { normalizeWorkerUrl } from '../sync/worker-url';
 import { normalizeRequestDiagnostics } from '../sync/request-diagnostics';
 import type { CloudflareDeploymentMetadata } from '../cloudflare/deployment-types';
@@ -204,6 +205,7 @@ export function normalizeCrateSettings(
 ): CrateSettings {
 	return {
 		...DEFAULT_SETTINGS,
+		usageSnapshot: normalizeUsageSnapshot(value?.usageSnapshot),
 		workerUrl: normalizeWorkerUrl(normalizeString(value?.workerUrl)),
 		cloudflareDeployment: normalizeCloudflareDeployment(value?.cloudflareDeployment),
 		lastSync: normalizeNullableString(value?.lastSync),

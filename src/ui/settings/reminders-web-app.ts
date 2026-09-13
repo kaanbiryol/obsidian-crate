@@ -7,7 +7,7 @@ export function renderRemindersWebApp(containerEl: HTMLElement, plugin: CratePlu
 	if (!plugin.syncRuntime.getApiClient()) return;
 	new Setting(containerEl)
 		.setName('Reminders web app')
-		.setDesc('Create a short-lived link to open your reminders on another device. You can enable notifications in the web app.')
+		.setDesc('Create a short-lived link to open your reminders on your device. You can enable notifications in the web app.')
 		.addButton(button => {
 			button.setButtonText('Copy app link');
 			button.onClick(async () => {
@@ -26,7 +26,7 @@ export function renderRemindersWebApp(containerEl: HTMLElement, plugin: CratePlu
 			});
 		})
 		.addButton(button => {
-			button.setButtonText('Show code');
+			button.setButtonText('Show QR code');
 			button.onClick(async () => {
 				button.setDisabled(true);
 				button.setButtonText('Creating...');
@@ -36,7 +36,7 @@ export function renderRemindersWebApp(containerEl: HTMLElement, plugin: CratePlu
 				} catch (error) {
 					new Notice(`Could not create app code: ${errorMessage(error)}`, 10000);
 				} finally {
-					button.setButtonText('Show code');
+					button.setButtonText('Show QR code');
 					button.setDisabled(false);
 				}
 			});

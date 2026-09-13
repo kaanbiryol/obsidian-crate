@@ -1,4 +1,7 @@
+import { DeploymentRecoveryRequiredError } from './deployment-fence';
 import { Notice } from 'obsidian';
+import { CloudflareReauthorizationRequired } from './oauth-client';
+import { CloudflareUsageConnection } from './usage-connection';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
 import { CloudflareDeploymentService } from './deployment-service';
@@ -14,11 +17,27 @@ import {
 	isCloudflareOAuthConfigured,
 } from './oauth-config';
 
+export function createCloudflareUsageConnection(plugin: CratePlugin): CloudflareUsageConnection {
+	return new CloudflareUsageConnection({
+		clientId: CLOUDFLARE_OAUTH_CLIENT_ID,
+		transport: obsidianHttpTransport,
+		secrets: plugin.secretStorage,
+		cache: {
+			read: () => plugin.settings.usageSnapshot ?? null,
+			write: snapshot => plugin.writeSettings({ usageSnapshot: snapshot }),
+		},
+		accountId: () => plugin.settings.cloudflareDeployment?.accountId,
+		signal: getPluginLifecycleSignal(plugin),
+		openExternal: url => { window.open(url, '_blank', 'noopener,noreferrer'); },
+	});
+}
+
 export function createCloudflareDeploymentService(plugin: CratePlugin): CloudflareDeploymentService {
 	const signal = getPluginLifecycleSignal(plugin);
 	return new CloudflareDeploymentService({
 		clientId: CLOUDFLARE_OAUTH_CLIENT_ID,
 		settingsOwner: plugin,
+		onAuthorized: (accountId, tokens) => plugin.cloudflareUsageConnection.acceptAuthorization(accountId, tokens),
 		transport: obsidianHttpTransport,
 		loadArtifacts: loadEmbeddedCloudflareArtifacts,
 		openExternal: url => {
@@ -48,7 +67,12 @@ export async function startCloudflareDeployment(plugin: CratePlugin, intent?: 's
 		return;
 	}
 	try {
-		await plugin.cloudflareDeploymentService.startDeployment(intent ?? (plugin.syncRuntime.isConfigured() ? 'update' : 'connect'));
+		const selectedIntent = intent ?? (plugin.syncRuntime.isConfigured() ? 'update' : 'connect');
+		if (['connect', 'update', 'reset', 'delete'].includes(selectedIntent) && plugin.settings.cloudflareDeployment?.accountId) {
+			await runCloudflareOperation(plugin, {}, selectedIntent as 'connect' | 'update' | 'reset' | 'delete');
+			return;
+		}
+		await plugin.cloudflareDeploymentService.startDeployment(selectedIntent);
 	} catch (error) {
 		if (signal.aborted) return;
 		new Notice(`Could not start Cloudflare deployment: ${deploymentErrorMessage(error)}`);
@@ -62,9 +86,29 @@ export async function handleCloudflareOAuthProtocol(
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;
 	plugin.openSettingsTab();
-	const isDelete = plugin.cloudflareDeploymentService.pendingIntent === 'delete';
-	const isReset = plugin.cloudflareDeploymentService.pendingIntent === 'reset';
-	const isSwitch = ['switch', 'create'].includes(plugin.cloudflareDeploymentService.pendingIntent ?? '');
+	if (params.state?.startsWith('usage-')) {
+		try {
+			await plugin.cloudflareUsageConnection.handleCallback(params);
+			if (!signal.aborted) new Notice('Cloudflare usage connected. Refresh to load usage.');
+		} catch (error) {
+			if (!signal.aborted) new Notice(deploymentErrorMessage(error));
+		}
+		if (!signal.aborted) plugin.refreshSettingsTab();
+		return;
+	}
+	await runCloudflareOperation(plugin, params);
+}
+
+async function runCloudflareOperation(
+	plugin: CratePlugin, params: Record<string, string>, savedIntent?: 'connect' | 'update' | 'reset' | 'delete',
+): Promise<void> {
+	const signal = getPluginLifecycleSignal(plugin);
+	if (signal.aborted) return;
+	const intent = savedIntent ?? plugin.cloudflareDeploymentService.pendingIntent;
+	const originalDeployment = JSON.stringify(plugin.settings.cloudflareDeployment);
+	const isDelete = intent === 'delete';
+	const isReset = intent === 'reset';
+	const isSwitch = ['switch', 'create'].includes(intent ?? '');
 	const shouldConnectDevice = !isDelete && (isSwitch || isReset || !plugin.syncRuntime.isConfigured());
 	const progress = openCloudflareDeploymentModal(
 		plugin.app,
@@ -83,16 +127,40 @@ export async function handleCloudflareOAuthProtocol(
 			platform: getCurrentPlatformCode(),
 		} : undefined;
 		if (signal.aborted) return;
-		deployment = await plugin.cloudflareDeploymentService.handleCallback(
-			params,
-			device,
-			message => {
-				if (!signal.aborted) progress.setWorking(isReset ? 'Resetting Crate server' : isDelete ? 'Deleting Crate server' : shouldConnectDevice ? 'Setting up Crate' : 'Updating Crate server', message);
-			},
-			(deployments, missingServer) => progress.selectVault(deployments, missingServer),
-		);
+		if (savedIntent && originalDeployment !== JSON.stringify(plugin.settings.cloudflareDeployment)) throw new Error('Server settings changed. Confirm the operation again.');
+		const onProgress = (message: string) => {
+			if (!signal.aborted) progress.setWorking(isReset ? 'Resetting Crate server' : isDelete ? 'Deleting Crate server' : shouldConnectDevice ? 'Setting up Crate' : 'Updating Crate server', message);
+		};
+		const selectDeployment = (deployments: Parameters<typeof progress.selectVault>[0], missingServer?: boolean) => progress.selectVault(deployments, missingServer);
+		deployment = savedIntent
+			? await plugin.cloudflareDeploymentService.deployWithSavedAuthorization(savedIntent,
+				operation => plugin.cloudflareUsageConnection.withAuthorization(operation), device, onProgress, selectDeployment)
+			: await plugin.cloudflareDeploymentService.handleCallback(params, device, onProgress, selectDeployment);
 	} catch (error) {
 		if (signal.aborted) return;
+		if (savedIntent && error instanceof CloudflareReauthorizationRequired) {
+			try {
+				await plugin.cloudflareDeploymentService.startDeployment(savedIntent);
+				if (!signal.aborted) progress.close();
+			} catch (authorizationError) {
+				if (!signal.aborted) progress.fail('Could not connect to Cloudflare', deploymentErrorMessage(authorizationError), ['Try again from Crate settings.']);
+			}
+			return;
+		}
+        if (error instanceof DeploymentRecoveryRequiredError) {
+            plugin.refreshSettingsTab();
+            progress.fail(
+                'Server operation needs review',
+                'Crate couldn’t confirm whether Cloudflare finished the operation. Further server changes are blocked to prevent overlapping updates.',
+                [
+                    'If another device is updating this server, let it finish.',
+                    'If the operation was interrupted, its Cloudflare status must be checked and the update lock recovered before trying again.',
+                    'Closing this message does not clear the lock.',
+                ],
+                { technicalDetails: deploymentErrorMessage(error) },
+            );
+            return;
+        }
 		if (isDelete) {
 			plugin.refreshSettingsTab();
 			progress.fail('Server deletion failed', 'Crate couldn’t finish deleting your Cloudflare server.',
@@ -120,7 +188,7 @@ export async function handleCloudflareOAuthProtocol(
 			deploymentErrorMessage(error),
 			[shouldConnectDevice
 				? 'Select “Connect with Cloudflare” in Crate settings to start again.'
-				: 'Select “Authorize update” in Crate settings to try again.'],
+				: 'Select “Update server” in Crate settings to try again.'],
 		);
 		return;
 	}

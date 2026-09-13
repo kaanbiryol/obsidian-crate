@@ -87,6 +87,7 @@ async function loadLifecycleModule() {
 	}));
 	vi.doMock('../cloudflare/plugin-integration', () => ({
 		createCloudflareDeploymentService,
+		createCloudflareUsageConnection: vi.fn(() => ({})),
 		handleCloudflareOAuthProtocol,
 	}));
 	vi.doMock('../cloudflare/update-notice', () => ({ showCloudflareServerUpdateNotice }));

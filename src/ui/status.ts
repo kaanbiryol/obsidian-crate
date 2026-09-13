@@ -63,7 +63,7 @@ export class StatusBarManager {
 	}
 
 	/**
-	 * Set sync progress for initial sync display
+	 * Set progress for the active sync
 	 */
 	setSyncProgress(current: number, total: number): void {
 		this.syncProgress = { current, total };
@@ -81,6 +81,7 @@ export class StatusBarManager {
 	 * Update status display
 	 */
 	update(state: SyncState): void {
+		if (state.status !== 'syncing') this.syncProgress = null;
 		if (!this.statusBarEl) return;
 
 		const { icon, text, tooltip } = this.getDisplayInfo(state);
@@ -123,10 +124,10 @@ export class StatusBarManager {
 			case 'syncing':
 				return {
 					icon: null,
-					text: this.syncProgress
-					? `Syncing ${this.syncProgress.current}/${this.syncProgress.total}`
-					: state.pendingChanges > 0 ? `Syncing (${state.pendingChanges})` : 'Syncing...',
-					tooltip: 'Sync in progress',
+					text: this.syncProgress && this.syncProgress.total > 0
+					? `Syncing changes ${this.syncProgress.current}/${this.syncProgress.total}`
+					: 'Checking for changes…',
+					tooltip: 'Comparing and syncing changes. Unchanged files are skipped. Open sync activity for details.',
 				};
 
 			case 'error':
@@ -156,8 +157,8 @@ export class StatusBarManager {
 				if (state.pendingChanges > 0) {
 					return {
 						icon: '◐',
-						text: `${state.pendingChanges} pending`,
-						tooltip: `${state.pendingChanges} changes waiting to sync`,
+						text: `${state.pendingChanges} change${state.pendingChanges === 1 ? '' : 's'} queued`,
+						tooltip: `${state.pendingChanges} local file changes waiting to sync, including deletions. This is not the total number of files in your vault.`,
 					};
 				}
 

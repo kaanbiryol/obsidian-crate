@@ -13,6 +13,7 @@ import { SECRET_KEYS } from "./settings-types";
 import type CratePlugin from "./CratePlugin";
 import {
   createCloudflareDeploymentService,
+  createCloudflareUsageConnection,
   handleCloudflareOAuthProtocol,
 } from "../cloudflare/plugin-integration";
 import { showCloudflareServerUpdateNotice } from "../cloudflare/update-notice";
@@ -61,6 +62,7 @@ async function initializePluginCore(plugin: CratePlugin, signal: AbortSignal): P
     await restoreManagedWorkerConnection(plugin);
     if (signal.aborted) return false;
     plugin.cloudflareDeploymentService = createCloudflareDeploymentService(plugin);
+    plugin.cloudflareUsageConnection = createCloudflareUsageConnection(plugin);
     initializeSyncManagers(plugin);
     ensurePluginDeviceId(plugin);
     return true;
