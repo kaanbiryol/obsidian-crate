@@ -90,6 +90,34 @@ describe('renderConfigSection integration', () => {
 		expect(startCloudflareDeployment).toHaveBeenCalledExactlyOnceWith(plugin);
 	});
 
+	it.each([true, false])('forgets a server only after confirmation (%s)', async confirmed => {
+		await loadConfigSectionModule();
+		const { renderForgetServerSetting } = await import('./server-selection-setting');
+		const saved = { accountId: 'account', d1DatabaseId: 'database' };
+		const plugin = {
+			app: {}, settings: { cloudflareDeployment: saved as typeof saved | null },
+			cloudflareDeploymentService: { cancelPendingDeployment: vi.fn() },
+			clearSettingsUiState: vi.fn(),
+			syncRuntime: { isConfigured: () => false, clearSyncConfiguration: vi.fn(async () => {}) },
+			writeSettings: vi.fn(async (update: { cloudflareDeployment: null }) => { Object.assign(plugin.settings, update); }),
+		};
+		const rerender = vi.fn();
+		openConfirmationModal.mockResolvedValue(confirmed);
+		renderForgetServerSetting({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender });
+		getSettingByName('Forget server').buttons[0]!.click();
+		if (confirmed) {
+			await vi.waitFor(() => expect(rerender).toHaveBeenCalledOnce());
+			expect(plugin.settings.cloudflareDeployment).toBeNull();
+			expect(plugin.syncRuntime.clearSyncConfiguration).toHaveBeenCalledOnce();
+			expect(plugin.cloudflareDeploymentService.cancelPendingDeployment).toHaveBeenCalledOnce();
+		} else {
+			await flushMicrotasks();
+			expect(plugin.settings.cloudflareDeployment).toBe(saved);
+			expect(plugin.syncRuntime.clearSyncConfiguration).not.toHaveBeenCalled();
+		}
+		expect(startCloudflareDeployment).not.toHaveBeenCalled();
+	});
+
 	it('disconnects locally without offering device setup links', async () => {
 		const { renderDisconnectSetting } = await loadConfigSectionModule();
 		const clearSyncConfiguration = vi.fn(async () => {});

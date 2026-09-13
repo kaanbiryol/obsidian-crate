@@ -8,16 +8,17 @@ class CloudflareServerPickerModal extends SharedModal {
 	constructor(
 		app: App,
 		private readonly deployments: DiscoveredCloudflareDeployment[],
-		private readonly resolve: (deployment: DiscoveredCloudflareDeployment | null) => void,
+		private readonly resolve: (deployment: DiscoveredCloudflareDeployment | 'create' | null) => void,
+		private readonly missingServer = false,
 	) {
 		super(app);
 	}
 
 	onOpen(): void {
 		this.modalEl.addClass('crate-cloudflare-server-picker-modal');
-		this.openLayout('Choose a Crate server');
+		this.openLayout(this.missingServer ? 'Your previous server is no longer available' : this.deployments.length ? 'Choose a server' : 'Create a server');
 		this.bodyEl.createEl('p', {
-			text: 'This Cloudflare account has more than one Crate server. Select the one for this vault.',
+			text: (this.missingServer ? 'Your previous server is gone. Choose another server or create a new one. ' : 'Select a server for this vault or create a new one. ') + ' Local files are kept. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.',
 			cls: 'crate-cloudflare-server-picker-description',
 		});
 
@@ -33,6 +34,10 @@ class CloudflareServerPickerModal extends SharedModal {
 					.setCta()
 					.onClick(() => this.finish(deployment)));
 		}
+		new Setting(this.bodyEl)
+			.setName('Create server')
+			.setDesc('Create a separate Crate server in this account. Cloudflare usage charges may apply.')
+			.addButton(button => button.setButtonText('Create server').onClick(() => this.finish('create')));
 	}
 
 	onClose(): void {
@@ -43,7 +48,7 @@ class CloudflareServerPickerModal extends SharedModal {
 		}
 	}
 
-	private finish(deployment: DiscoveredCloudflareDeployment): void {
+	private finish(deployment: DiscoveredCloudflareDeployment | 'create'): void {
 		if (this.settled) return;
 		this.settled = true;
 		this.resolve(deployment);
@@ -54,8 +59,9 @@ class CloudflareServerPickerModal extends SharedModal {
 export function selectCloudflareServer(
 	app: App,
 	deployments: DiscoveredCloudflareDeployment[],
-): Promise<DiscoveredCloudflareDeployment | null> {
+	missingServer = false,
+): Promise<DiscoveredCloudflareDeployment | 'create' | null> {
 	return new Promise(resolve => {
-		new CloudflareServerPickerModal(app, deployments, resolve).open();
+		new CloudflareServerPickerModal(app, deployments, resolve, missingServer).open();
 	});
 }

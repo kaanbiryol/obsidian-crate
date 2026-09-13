@@ -1,3 +1,4 @@
+import { renderForgetServerSetting } from './server-selection-setting';
 import { renderServerResetSetting } from './server-reset-setting';
 import { renderInfrastructureManagementSection } from './infrastructure-management-section';
 import { renderInfrastructureSyncActions } from './infrastructure-sync-actions';
@@ -24,9 +25,11 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 	const troubleshootingEl = createSettingsDisclosure(containerEl, 'Troubleshooting');
 	renderInfrastructureManagementSection({ ...context, containerEl: troubleshootingEl });
 	renderTroubleshootingSettings(troubleshootingEl, plugin);
+	renderForgetServerSetting({ ...context, containerEl: troubleshootingEl });
 	if (plugin.settings.cloudflareDeployment?.d1DatabaseId) {
 		const advancedEl = createSettingsDisclosure(containerEl, 'Advanced server actions');
 		renderServerResetSetting(advancedEl, plugin);
+		if (!advancedEl.hasChildNodes()) advancedEl.parentElement?.remove();
 	}
 }
 export type { InfrastructureSectionContext } from './infrastructure-types';

@@ -24,7 +24,12 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 		openExternal: url => {
 			window.open(url, '_blank', 'noopener,noreferrer');
 		},
-		selectDeployment: deployments => selectCloudflareServer(plugin.app, deployments),
+		selectDeployment: (deployments, missingServer) => selectCloudflareServer(plugin.app, deployments, missingServer),
+		beforeServerSwitch: async () => {
+			plugin.clearSettingsUiState();
+			await plugin.syncRuntime.clearSyncConfiguration(signal);
+			plugin.refreshSettingsTab();
+		},
 		beforeServerReset: async () => {
 			signal.throwIfAborted();
 			plugin.clearSettingsUiState();
@@ -35,7 +40,7 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 	});
 }
 
-export async function startCloudflareDeployment(plugin: CratePlugin, intent?: 'update' | 'reset' | 'delete'): Promise<void> {
+export async function startCloudflareDeployment(plugin: CratePlugin, intent?: 'switch' | 'create' | 'update' | 'reset' | 'delete'): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;
 	if (!isCloudflareOAuthConfigured()) {
@@ -59,10 +64,12 @@ export async function handleCloudflareOAuthProtocol(
 	plugin.openSettingsTab();
 	const isDelete = plugin.cloudflareDeploymentService.pendingIntent === 'delete';
 	const isReset = plugin.cloudflareDeploymentService.pendingIntent === 'reset';
-	const shouldConnectDevice = !isDelete && (isReset || !plugin.syncRuntime.isConfigured());
+	const isSwitch = ['switch', 'create'].includes(plugin.cloudflareDeploymentService.pendingIntent ?? '');
+	const shouldConnectDevice = !isDelete && (isSwitch || isReset || !plugin.syncRuntime.isConfigured());
 	const progress = openCloudflareDeploymentModal(
 		plugin.app,
 		shouldConnectDevice ? 'setup' : 'update',
+		plugin.getSettingsDocument(),
 	);
 	if (isDelete) progress.setWorking('Deleting Crate server', 'Verifying this server, then removing its remote data and Worker. Keep Obsidian open.');
 	if (isReset) progress.setWorking('Resetting Crate server', 'Verifying this deployment, then erasing its remote data and rebuilding. Keep Obsidian open.');
@@ -82,6 +89,7 @@ export async function handleCloudflareOAuthProtocol(
 			message => {
 				if (!signal.aborted) progress.setWorking(isReset ? 'Resetting Crate server' : isDelete ? 'Deleting Crate server' : shouldConnectDevice ? 'Setting up Crate' : 'Updating Crate server', message);
 			},
+			(deployments, missingServer) => progress.selectVault(deployments, missingServer),
 		);
 	} catch (error) {
 		if (signal.aborted) return;
