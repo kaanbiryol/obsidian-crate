@@ -35,7 +35,8 @@ interface PendingOAuthSession {
 	createdAt: number;
 	metadata: CloudflareDeploymentMetadata;
 	discoverExisting: boolean;
-	intent: 'connect' | 'update' | 'reset' | 'delete';
+	originalMetadata: string;
+	intent: 'connect' | 'switch' | 'create' | 'update' | 'reset' | 'delete';
 }
 
 export interface CloudflareDeploymentResult {
@@ -52,8 +53,10 @@ export interface CloudflareDeploymentServiceOptions {
 	openExternal: (url: string) => void;
 	selectDeployment: (
 		deployments: DiscoveredCloudflareDeployment[],
-	) => Promise<DiscoveredCloudflareDeployment | null>;
+		missingServer?: boolean,
+	) => Promise<DiscoveredCloudflareDeployment | 'create' | null>;
 	beforeServerReset?: () => Promise<void>;
+	beforeServerSwitch?: () => Promise<void>;
 	now?: () => number;
 }
 
@@ -109,7 +112,7 @@ export class CloudflareDeploymentService {
 		return this.pendingSession?.intent ?? null;
 	}
 
-	async startDeployment(intent: 'connect' | 'update' | 'reset' | 'delete' = 'connect'): Promise<void> {
+	async startDeployment(intent: 'connect' | 'switch' | 'create' | 'update' | 'reset' | 'delete' = 'connect'): Promise<void> {
 		this.lifetime.signal.throwIfAborted();
 		if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
 		const existingMetadata = this.options.settingsOwner.settings.cloudflareDeployment;
@@ -119,7 +122,7 @@ export class CloudflareDeploymentService {
 		if ((intent === 'reset' || intent === 'delete') && (!existingMetadata?.accountId || !existingMetadata.d1DatabaseId)) {
 			throw new Error('Connect to a Crate server before resetting its remote data.');
 		}
-		const metadata = existingMetadata
+		const metadata = existingMetadata && intent !== 'switch' && intent !== 'create'
 			? { ...existingMetadata }
 			: createCloudflareDeploymentMetadata();
 
@@ -131,7 +134,8 @@ export class CloudflareDeploymentService {
 			state,
 			createdAt: this.now(),
 			metadata,
-			discoverExisting: existingMetadata === null,
+			originalMetadata: JSON.stringify(existingMetadata),
+			discoverExisting: intent === 'switch' || (intent === 'connect' && (!existingMetadata || Boolean(existingMetadata.lastDeployedVersion))),
 			intent,
 		};
 
@@ -148,7 +152,7 @@ export class CloudflareDeploymentService {
 		this.options.openExternal(authorizationUrl.toString());
 	}
 
-	async handleCallback(params: Record<string, string>, device?: CloudflareAuthorizedDevice, onProgress?: (message: string) => void): Promise<CloudflareDeploymentResult> {
+	async handleCallback(params: Record<string, string>, device?: CloudflareAuthorizedDevice, onProgress?: (message: string) => void, selectDeployment = this.options.selectDeployment): Promise<CloudflareDeploymentResult> {
 		this.lifetime.signal.throwIfAborted();
 		if (this.handlingCallback) throw new Error('A Cloudflare operation is already in progress.');
 		this.handlingCallback = true;
@@ -156,7 +160,7 @@ export class CloudflareDeploymentService {
 			return await this.whileActive(() => this.handleAuthorizedCallback(params, device, message => {
 				this.lifetime.signal.throwIfAborted();
 				onProgress?.(message);
-			}));
+			}, selectDeployment));
 		} finally {
 			this.handlingCallback = false;
 		}
@@ -166,6 +170,7 @@ export class CloudflareDeploymentService {
 		params: Record<string, string>,
 		device?: CloudflareAuthorizedDevice,
 		onProgress?: (message: string) => void,
+		selectDeployment = this.options.selectDeployment,
 	): Promise<CloudflareDeploymentResult> {
 		const pending = this.pendingSession;
 		if (!pending) {
@@ -202,22 +207,34 @@ export class CloudflareDeploymentService {
 			if ((pending.intent === 'reset' || pending.intent === 'delete') && JSON.stringify(pending.metadata) !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) {
 				throw new Error('Server settings changed during authorization. Confirm the reset again.');
 			}
+			if ((pending.intent === 'switch' || pending.intent === 'create') && pending.originalMetadata !== JSON.stringify(this.options.settingsOwner.settings.cloudflareDeployment)) throw new Error('Server settings changed during authorization. Start again.');
 			let metadata = pending.metadata;
 			let discoveredExisting = false;
 			onProgress?.('Checking your Cloudflare account…');
 			const account = selectAccount(await this.whileActive(() => api.listAuthorizedAccounts()), metadata);
 			if (pending.discoverExisting) {
+				onProgress?.('Finding your Crate servers…');
+				const remembered = pending.intent === 'connect' && Boolean(metadata.d1DatabaseId);
+				const workers = remembered ? await this.whileActive(() => api.listWorkers(account.id)) : null;
+				const missingServer = Boolean(workers && !workers.some(worker => worker.id === metadata.workerName));
 				const deployments = await this.whileActive(() => discoverCloudflareDeployments(api, account));
-				const [onlyDeployment] = deployments;
-				if (deployments.length === 1 && onlyDeployment) {
-					metadata = onlyDeployment.metadata;
-					discoveredExisting = true;
-				} else if (deployments.length > 1) {
-					const selected = await this.whileActive(() => this.options.selectDeployment(deployments));
-					if (!selected) throw new Error('No Cloudflare server was selected');
+				const selected = !missingServer && pending.intent === 'connect' && deployments.length === 1
+					? deployments[0]!
+					: await this.whileActive(() => selectDeployment(deployments, missingServer));
+				if (!selected) throw new Error('No Cloudflare server was selected');
+				if (selected === 'create') {
+					metadata = createCloudflareDeploymentMetadata();
+				} else {
 					metadata = selected.metadata;
 					discoveredExisting = true;
 				}
+			}
+			onProgress?.('Preparing the selected server…');
+			const previous = this.options.settingsOwner.settings.cloudflareDeployment;
+			const changingServer = previous && (previous.accountId !== account.id || previous.workerName !== metadata.workerName);
+			if (changingServer || pending.intent === 'switch' || pending.intent === 'create') {
+				if (!this.options.beforeServerSwitch) throw new Error('Switching servers requires sync shutdown.');
+				await this.whileActive(this.options.beforeServerSwitch);
 			}
 			metadata.accountId = account.id;
 			metadata.accountName = account.name;
@@ -244,7 +261,7 @@ export class CloudflareDeploymentService {
 				}));
 			}
 			let workerUrl: string;
-			if (pending.intent === 'connect' && metadata.d1DatabaseId && (discoveredExisting || metadata.lastDeployedVersion)) {
+			if ((pending.intent === 'connect' || pending.intent === 'switch') && metadata.d1DatabaseId && (discoveredExisting || metadata.lastDeployedVersion)) {
 				// Registering a replica must never replace shared Worker/PWA code.
 				const subdomain = await this.whileActive(() => api.getWorkersSubdomain(account.id));
 				if (!subdomain) throw new Error('Existing Cloudflare server has no workers.dev subdomain');
@@ -287,6 +304,11 @@ export class CloudflareDeploymentService {
 		}
 
 		return result;
+	}
+
+	cancelPendingDeployment(): void {
+		if (this.handlingCallback) throw new Error('Wait for the current Cloudflare operation to finish.');
+		this.pendingSession = null;
 	}
 
 	destroy(): void {

@@ -147,6 +147,17 @@
 		padding: 16px;
 	}
 
+	.crate-vault-selection {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+
+		p {
+			margin: 0;
+			line-height: 1.45;
+		}
+	}
+
 	.crate-status-content {
 		overflow-wrap: anywhere;
 	}

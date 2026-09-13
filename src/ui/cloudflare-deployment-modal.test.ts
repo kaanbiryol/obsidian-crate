@@ -77,3 +77,57 @@ describe('CloudflareDeploymentModal', () => {
 		);
 	});
 });
+
+it('replaces progress with vault selection in the same modal and settles on close', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { openCloudflareDeploymentModal } = await import('./cloudflare-deployment-modal');
+	const modal = openCloudflareDeploymentModal({} as never);
+	modal.setWorking('Setting up Crate', 'Checking your Cloudflare account…');
+	const selected = modal.selectVault([], true);
+	expect(MockModal.instances).toHaveLength(1);
+	const host = MockModal.instances[0]!;
+	expect(host.titleEl.textContent).toBe('Your previous server is no longer available');
+	expect(host.contentEl.collectText()).toContain('Create server');
+	expect(host.contentEl.collectText()).not.toContain('Checking your Cloudflare account');
+	modal.close();
+	await expect(selected).resolves.toBeNull();
+	await expect(modal.selectVault([])).resolves.toBeNull();
+});
+
+it('attaches the dialog to the settings document even when another window is active', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { openCloudflareDeploymentModal } = await import('./cloudflare-deployment-modal');
+	const focus = vi.fn();
+	const container = { querySelector: () => ({ focus }) };
+	Object.defineProperty(MockModal.prototype, 'containerEl', { configurable: true, get: () => container });
+	try {
+		const host = { body: { appendChild: vi.fn() }, defaultView: { focus: vi.fn() } };
+		openCloudflareDeploymentModal({} as never, 'setup', host as never);
+		expect(host.body.appendChild).toHaveBeenCalledWith(container);
+		expect(host.defaultView.focus).toHaveBeenCalledOnce();
+		expect(focus).toHaveBeenCalledOnce();
+	} finally {
+		Reflect.deleteProperty(MockModal.prototype, 'containerEl');
+	}
+});
+
+it('does not confuse Obsidian’s saved editor selection with the vault picker state', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { openCloudflareDeploymentModal } = await import('./cloudflare-deployment-modal');
+	const open = vi.spyOn(MockModal.prototype, 'open').mockImplementation(function (this: MockModal) {
+		// Obsidian sets its internal selection while opening a modal.
+		Object.assign(this, { selection: { anchor: 0, head: 0 } });
+		MockModal.instances.push(this);
+		void this.onOpen();
+	});
+	try {
+		const modal = openCloudflareDeploymentModal({} as never);
+		expect(MockModal.instances[0]?.titleEl.textContent).toBe('Setting up Crate');
+		const pending = modal.selectVault([], true);
+		expect(MockModal.instances[0]?.titleEl.textContent).toBe('Your previous server is no longer available');
+		modal.close();
+		await expect(pending).resolves.toBeNull();
+	} finally {
+		open.mockRestore();
+	}
+});

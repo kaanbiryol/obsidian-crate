@@ -196,6 +196,10 @@ export default class CratePlugin extends Plugin {
 		return true;
 	}
 
+	getSettingsDocument(): Document | undefined {
+		return this.settingTab?.containerEl.ownerDocument;
+	}
+
 	refreshSettingsTab(): void {
 		this.settingTab?.update();
 	}

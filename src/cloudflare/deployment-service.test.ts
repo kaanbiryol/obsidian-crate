@@ -92,17 +92,20 @@ function createHarness() {
 		d1SchemaSha256: 'schema-hash',
 	}));
 	const beforeServerReset = vi.fn(async () => {});
+	const beforeServerSwitch = vi.fn(async () => {});
+	const selectDeployment = vi.fn(async (deployments: DiscoveredCloudflareDeployment[]): Promise<DiscoveredCloudflareDeployment | 'create' | null> => deployments[0] ?? 'create');
 	const service = new CloudflareDeploymentService({
 		clientId: CLIENT_ID,
 		settingsOwner,
 		transport,
 		loadArtifacts,
 		openExternal: url => opened.push(url),
-		selectDeployment: vi.fn(async (deployments: DiscoveredCloudflareDeployment[]) => deployments[0] ?? null),
+		selectDeployment,
+		beforeServerSwitch,
 		beforeServerReset,
 		now: () => 1_000,
 	});
-	return { service, settings, settingsOwner, persisted, opened, transportCalls, transport, loadArtifacts, beforeServerReset };
+	return { service, settings, settingsOwner, persisted, opened, transportCalls, transport, loadArtifacts, beforeServerReset, beforeServerSwitch, selectDeployment };
 }
 
 function firstOpenedUrl(opened: string[]): URL {
@@ -439,4 +442,95 @@ describe('server reset authorization', () => {
 		await expect(h.service.startDeployment(intent)).rejects.toThrow('Resume server deletion');
 	});
 
+});
+
+function savedServer() {
+	return { deploymentId: '0123456789abcdef', accountId: CLIENT_ID, accountName: 'Personal',
+		workerName: 'crate-0123456789abcdef', d1DatabaseName: 'crate-0123456789abcdef',
+		d1DatabaseId: 'old-db', r2BucketName: 'crate-0123456789abcdef', workersSubdomain: 'example',
+		lastDeployedVersion: '0.1.0', lastDeployedFingerprint: null };
+}
+
+describe('server selection', () => {
+	it('preserves the current server and sync when selection is cancelled', async () => {
+		const h = createHarness();
+		h.settings.cloudflareDeployment = savedServer();
+		h.selectDeployment.mockResolvedValue(null);
+		await h.service.startDeployment('switch');
+		await expect(h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! })).rejects.toThrow('No Cloudflare server');
+		expect(h.beforeServerSwitch).not.toHaveBeenCalled();
+		expect(h.persisted).toEqual([]);
+		expect(h.settings.cloudflareDeployment).toEqual(savedServer());
+	});
+
+	it('switches to a selected server without replacing its Worker', async () => {
+		const h = createHarness();
+		h.settings.cloudflareDeployment = savedServer();
+		const selected = { ...savedServer(), deploymentId: 'fedcba9876543210', workerName: 'crate-fedcba9876543210', d1DatabaseId: 'new-db' };
+		h.selectDeployment.mockResolvedValue({ metadata: selected, modifiedOn: null });
+		h.beforeServerSwitch.mockImplementation(async () => { expect(h.settings.cloudflareDeployment).toEqual(savedServer()); });
+		await h.service.startDeployment('switch');
+		await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+		expect(h.beforeServerSwitch).toHaveBeenCalledOnce();
+		expect(h.settings.cloudflareDeployment?.d1DatabaseId).toBe('new-db');
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+	});
+
+	it.each([1, 2])('reconnects with %i available vaults', async count => {
+		const h = createHarness();
+		const saved = savedServer();
+		h.settings.cloudflareDeployment = saved;
+		apiMocks.workers = [{ id: saved.workerName }];
+		apiMocks.workerSettings.set(saved.workerName, {
+			annotations: { 'workers/message': 'Crate 0.1.0' },
+			bindings: [{ type: 'd1', name: 'DB', id: saved.d1DatabaseId },
+				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: saved.r2BucketName },
+				{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' }],
+		});
+		if (count === 2) {
+			const otherName = 'crate-fedcba9876543210';
+			apiMocks.workers.push({ id: otherName });
+			apiMocks.workerSettings.set(otherName, apiMocks.workerSettings.get(saved.workerName));
+		}
+		await h.service.startDeployment('connect');
+		await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+		if (count === 1) expect(h.selectDeployment).not.toHaveBeenCalled();
+		else expect(h.selectDeployment).toHaveBeenCalledOnce();
+		expect(h.beforeServerSwitch).not.toHaveBeenCalled();
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+	});
+
+	it('offers creation during reconnect when the saved server is gone', async () => {
+		const h = createHarness();
+		h.settings.cloudflareDeployment = savedServer();
+		h.selectDeployment.mockResolvedValue('create');
+		await h.service.startDeployment('connect');
+		await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+		expect(h.selectDeployment).toHaveBeenCalledWith([], true);
+		expect(h.beforeServerSwitch).toHaveBeenCalledOnce();
+		expect(h.settings.cloudflareDeployment?.workerName).not.toBe(savedServer().workerName);
+		expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
+	});
+
+	it('creates a fresh server identity instead of reusing the remembered server', async () => {
+		const h = createHarness();
+		h.settings.cloudflareDeployment = savedServer();
+		await h.service.startDeployment('create');
+		await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+		expect(h.beforeServerSwitch).toHaveBeenCalledOnce();
+		expect(h.selectDeployment).not.toHaveBeenCalled();
+		expect(h.settings.cloudflareDeployment?.workerName).not.toBe(savedServer().workerName);
+		expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
+	});
+
+	it('offers recovery for a missing remembered server without creating on cancellation', async () => {
+		const h = createHarness();
+		h.settings.cloudflareDeployment = savedServer();
+		h.selectDeployment.mockResolvedValue(null);
+		await h.service.startDeployment('connect');
+		await expect(h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! })).rejects.toThrow('No Cloudflare server');
+		expect(h.selectDeployment).toHaveBeenCalledWith([], true);
+		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+		expect(h.persisted).toEqual([]);
+	});
 });

@@ -37,12 +37,38 @@ describe('selectCloudflareServer', () => {
 		const result = selectCloudflareServer({} as never, [first, second] as never);
 
 		expect(MockModal.instances[0]?.contentEl.collectText()).toContain('reminder-modal-header');
-		expect(MockModal.instances[0]?.titleEl.textContent).toBe('Choose a Crate server');
+		expect(MockModal.instances[0]?.titleEl.textContent).toBe('Choose a server');
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
 			'crate-0123456789abcdef',
 			'crate-fedcba9876543210',
+			'Create server',
 		]);
 		MockSetting.instances[1]?.buttons[0]?.click();
 		await expect(result).resolves.toBe(second);
 	});
+});
+
+it('offers creation for an account without servers', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { selectCloudflareServer } = await import('./cloudflare-server-picker-modal');
+	const result = selectCloudflareServer({} as never, []);
+	MockSetting.instances[0]?.buttons[0]?.click();
+	await expect(result).resolves.toBe('create');
+});
+
+it('cancels without selecting or creating a server', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { selectCloudflareServer } = await import('./cloudflare-server-picker-modal');
+	const result = selectCloudflareServer({} as never, []);
+	MockModal.instances[0]?.close();
+	await expect(result).resolves.toBeNull();
+});
+
+it('explains a missing previous vault and offers creation', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { selectCloudflareServer } = await import('./cloudflare-server-picker-modal');
+	const result = selectCloudflareServer({} as never, [], true);
+	expect(MockModal.instances[0]?.titleEl.textContent).toBe('Your previous server is no longer available');
+	MockSetting.instances[0]?.buttons[0]?.click();
+	await expect(result).resolves.toBe('create');
 });

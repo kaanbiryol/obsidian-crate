@@ -36,9 +36,10 @@ function createPlugin(configured = false) {
 		settings: { deviceId: 'device-id' },
 		syncRuntime: { isConfigured: vi.fn(() => configured), sync },
 		openSettingsTab: vi.fn(),
+		getSettingsDocument: vi.fn(() => undefined),
 		refreshSettingsTab: vi.fn(),
 		cloudflareDeploymentService: {
-			pendingIntent: null as null | 'reset' | 'delete',
+			pendingIntent: null as null | 'switch' | 'create' | 'reset' | 'delete',
 			handleCallback: vi.fn(async () => ({
 				accountName: 'Example account',
 				workerUrl: 'https://crate.example.workers.dev',
@@ -72,10 +73,11 @@ afterEach(() => {
 });
 
 describe('handleCloudflareOAuthProtocol', () => {
-	it('connects the device without transferring vault files', async () => {
+	it.each([null, 'switch', 'create'] as const)('connects the device without transferring vault files for %s', async intent => {
 		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
 		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
-		const plugin = createPlugin();
+		const plugin = createPlugin(intent !== null);
+		plugin.cloudflareDeploymentService.pendingIntent = intent;
 
 		await handleCloudflareOAuthProtocol(plugin as never, {
 			code: 'authorization-code',
@@ -83,7 +85,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		});
 
 		expect(plugin.openSettingsTab).toHaveBeenCalledTimes(1);
-		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'setup');
+		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'setup', undefined);
 		expect(plugin.openSettingsTab.mock.invocationCallOrder[0])
 			.toBeLessThan(openCloudflareDeploymentModal.mock.invocationCallOrder[0] ?? 0);
 		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledWith(
@@ -99,6 +101,16 @@ describe('handleCloudflareOAuthProtocol', () => {
 			'Crate is connected',
 			'Connected. Open the command palette and select Crate: Sync now to sync this vault with the server.',
 		);
+	});
+
+	it('passes the settings document to the OAuth dialog without waiting for animation frames', async () => {
+		const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
+		const plugin = createPlugin();
+		const hostDocument = {} as never;
+		plugin.getSettingsDocument.mockReturnValue(hostDocument);
+		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
+		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
+		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'setup', hostDocument);
 	});
 
 	it('refreshes the visible settings after updating an already connected server', async () => {
@@ -118,7 +130,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 			'Cloudflare server updated',
 			'Your Worker and Crate web app are now up to date.',
 		);
-		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'update');
+		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'update', undefined);
 	});
 
 	it('registers and reconnects a fresh device after resetting an already connected server', async () => {
@@ -127,7 +139,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		plugin.cloudflareDeploymentService.pendingIntent = 'reset';
 		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
 		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
-		expect(plugin.cloudflareDeploymentService.handleCallback).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tokenHash: 'device-token-hash' }), expect.any(Function));
+		expect(plugin.cloudflareDeploymentService.handleCallback).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tokenHash: 'device-token-hash' }), expect.any(Function), expect.any(Function));
 		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledWith(plugin, 'https://crate.example.workers.dev', 'device-token');
 		const report = (plugin.cloudflareDeploymentService.handleCallback.mock.calls[0] as unknown as [unknown, unknown, (message: string) => void])[2];
 		report('Checking remote files: 10 checked…');
