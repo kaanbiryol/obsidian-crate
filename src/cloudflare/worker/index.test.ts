@@ -59,7 +59,7 @@ function createDb(
 						? [...subscriptions.values()].find(row => row.endpoint === statement._args[0]) ?? null
 					: null),
 				run: vi.fn(async () => applyMutation({ subscriptions }, sql, statement._args)),
-				all: vi.fn(async () => ({ results: [] })),
+				all: vi.fn(async (): Promise<{ results: unknown[] }> => { const row = await statement.first(); return { results: row ? [row] : [] }; }),
 			};
 			return statement;
 		}),

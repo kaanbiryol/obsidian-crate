@@ -1,3 +1,4 @@
+import { withD1Usage } from './d1-usage';
 import { coordinatedNewFiles } from './bulk-upload-dispatch';
 import { MarkdownEncodingError } from '@/reminders/core/markdownEncoding';
 import { ReminderInputError } from '@/reminders/core/reminderMutationInput';
@@ -28,7 +29,11 @@ function withRequestId(response: Response, requestId: string, started: number): 
 	});
 }
 
-export async function fetchWorkerRequest(request: Request, env: Env, coordinatorState?: DurableObjectState): Promise<Response> {
+export function fetchWorkerRequest(request: Request, env: Env, coordinatorState?: DurableObjectState): Promise<Response> {
+  return withD1Usage(env, measured => handleWorkerRequest(request, measured, coordinatorState));
+}
+
+async function handleWorkerRequest(request: Request, env: Env, coordinatorState?: DurableObjectState): Promise<Response> {
 	const requestId = crypto.randomUUID();
 	const started = performance.now();
 	if (request.method === 'OPTIONS') {

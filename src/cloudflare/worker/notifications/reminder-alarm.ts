@@ -1,3 +1,4 @@
+import { withD1Usage } from '../d1-usage';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../bulk-upload-dispatch';
 import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../staged-upload-dispatch';
 import { PushPayloadError } from './payload-budget';
@@ -81,21 +82,25 @@ export class ReminderAlarm implements DurableObject {
 		private env: Pick<Env, 'DB'> & Partial<Env>,
 	) {}
 
-	async fetch(request: Request): Promise<Response> {
+	fetch(request: Request): Promise<Response> {
+    return withD1Usage(this.env as Env, env => this.fetchMeasured(request, env));
+  }
+
+  private async fetchMeasured(request: Request, env: Env): Promise<Response> {
     if (new URL(request.url).pathname === '/commit-new-files' && request.method === 'POST') {
-      const prepared = await prepareCoordinatedNewFiles(request, this.env as Env);
-      return this.withStateLock(() => commitCoordinatedNewFiles(prepared, this.state, this.env as Env));
+      const prepared = await prepareCoordinatedNewFiles(request, env);
+      return this.withStateLock(() => commitCoordinatedNewFiles(prepared, this.state, env));
     }
     if (new URL(request.url).pathname === '/commit-upload' && request.method === 'POST') {
-      const prepared = await prepareCoordinatedUpload(request, this.env as Env);
+      const prepared = await prepareCoordinatedUpload(request, env);
       if (prepared instanceof Response) return prepared;
-      return this.withStateLock(() => commitCoordinatedUpload(prepared, this.state, this.env as Env));
+      return this.withStateLock(() => commitCoordinatedUpload(prepared, this.state, env));
     }
-		return this.withStateLock(() => this.handleFetch(request));
+		return this.withStateLock(() => this.handleFetch(request, env));
 	}
 
-	private async handleFetch(request: Request): Promise<Response> {
-		const coordinatorResponse = await handleCoordinatorRequest(request, this.state, this.env as Env);
+	private async handleFetch(request: Request, env: Env): Promise<Response> {
+		const coordinatorResponse = await handleCoordinatorRequest(request, this.state, env);
 		if (coordinatorResponse) return coordinatorResponse;
 		const method = request.method;
 
@@ -119,13 +124,13 @@ export class ReminderAlarm implements DurableObject {
 			}
 			const jobToken = parseOptionalString(parsedBody.value.jobToken, 128);
 			if (!jobToken) return new Response(JSON.stringify({ error: 'jobToken required' }), { status: 400 });
-			const current = await this.env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'schedule'").bind(reminderId).first<{ job_token: string }>();
+			const current = await env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'schedule'").bind(reminderId).first<{ job_token: string }>();
 			if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
-			if (!await hasNotificationAuthority(this.env.DB, reminderId, jobToken)) return new Response(JSON.stringify({ error: 'Reminder source verification is pending' }), { status: 409 });
+			if (!await hasNotificationAuthority(env.DB, reminderId, jobToken)) return new Response(JSON.stringify({ error: 'Reminder source verification is pending' }), { status: 409 });
 			// A completed occurrence survives transient schedule cleanup. Replaying
 			// an accepted job (or reprojecting the same due time) cannot notify twice.
 			if (await this.state.storage.get<string>(COMPLETED_OCCURRENCE_KEY) === dueDatetime) {
-				await this.env.DB.prepare('DELETE FROM scheduled_reminders WHERE reminder_id = ?').bind(reminderId).run();
+				await env.DB.prepare('DELETE FROM scheduled_reminders WHERE reminder_id = ?').bind(reminderId).run();
 				await this.state.storage.deleteAlarm();
 				await this.clearScheduleState();
 				return new Response(JSON.stringify({ success: true }));
@@ -153,7 +158,7 @@ export class ReminderAlarm implements DurableObject {
 					await this.state.storage.setAlarm(sameOccurrence ? snapshot.alarmTime ?? alarmTime : alarmTime);
 				}
 				const failure = sameOccurrence ? snapshot.deliveryFailure : undefined;
-				const saved = await this.env.DB.prepare(
+				const saved = await env.DB.prepare(
 					`INSERT OR REPLACE INTO scheduled_reminders
 						(reminder_id, schedule_token, content, project, due_datetime, delivery_failed_at, delivery_error, delivery_attempts)
 						SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'schedule')`,
@@ -177,12 +182,12 @@ export class ReminderAlarm implements DurableObject {
 			const jobToken = parseOptionalString(new URL(request.url).searchParams.get('jobToken'), 128);
 			if (!jobToken) return new Response(JSON.stringify({ error: 'jobToken required' }), { status: 400 });
 			try {
-				const current = await this.env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'cancel'").bind(reminderId).first<{ job_token: string }>();
+				const current = await env.DB.prepare("SELECT job_token FROM notification_jobs WHERE reminder_id = ? AND operation = 'cancel'").bind(reminderId).first<{ job_token: string }>();
 				if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
-				const deleted = await this.env.DB.prepare(`DELETE FROM scheduled_reminders WHERE reminder_id = ? AND EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'cancel')`)
+				const deleted = await env.DB.prepare(`DELETE FROM scheduled_reminders WHERE reminder_id = ? AND EXISTS (SELECT 1 FROM notification_jobs WHERE reminder_id = ? AND job_token = ? AND operation = 'cancel')`)
 					.bind(reminderId, reminderId, jobToken).run();
 				if (changedRows(deleted) === 0) {
-					const current = await this.env.DB.prepare('SELECT job_token FROM notification_jobs WHERE reminder_id = ?').bind(reminderId).first<{ job_token: string }>();
+					const current = await env.DB.prepare('SELECT job_token FROM notification_jobs WHERE reminder_id = ?').bind(reminderId).first<{ job_token: string }>();
 				if (current?.job_token !== jobToken) return new Response(JSON.stringify({ success: true, superseded: true }));
 				}
 				await this.state.storage.deleteAlarm();
