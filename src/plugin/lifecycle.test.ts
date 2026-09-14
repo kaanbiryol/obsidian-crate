@@ -45,6 +45,7 @@ class FakeDocumentFragment {
 }
 
 async function loadLifecycleModule() {
+	vi.doMock('../sync/checkpoint-backup-cleanup', () => ({ registerCheckpointBackupCleanup: vi.fn() }));
 	vi.doMock('obsidian', () => ({
 		Notice: class Notice {
 			constructor(message?: string | object) {

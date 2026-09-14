@@ -19,6 +19,8 @@ import {
 import { showCloudflareServerUpdateNotice } from "../cloudflare/update-notice";
 import { beginPluginLifecycle, endPluginLifecycle } from './lifecycle-state';
 
+import { registerCheckpointBackupCleanup } from '../sync/checkpoint-backup-cleanup';
+
 const logger = createLogger("Plugin");
 
 export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
@@ -30,6 +32,7 @@ export async function bootstrapPlugin(plugin: CratePlugin): Promise<void> {
     return;
   }
 
+  registerCheckpointBackupCleanup(plugin, signal);
   plugin.registerSettingsTab(new CrateSettingTab(plugin.app, plugin));
   registerVaultSyncEventHandlers(plugin);
   if (plugin.remindersSettings.enabled) {
