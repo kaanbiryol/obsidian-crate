@@ -1,8 +1,25 @@
 # Upload retries and rename preservation
 
-Protocol 7 binds every upload to a stable operation ID, exact content hash, size, path, content type and expected remote hash. The plugin saves the exact payload in its private `pending-uploads/` directory before dispatch. Each batch member has its own identity. A disk-write failure prevents dispatch.
+A never-populated remote uses a separate initial import in protocol 10. Its committed
+file inventory is the resume checkpoint: the client compares path, hash and size,
+skips matching files and uploads only missing or changed content. Initial imports
+create no per-file receipt journal, changelog, or version history. Locally deleted
+files are pruned while the import is open. Shared staging leases cover at most 32 files per initial-import request, and
+durable object cleanup protects interrupted puts. The decoded request size remains
+limited to 10 MiB; large files use individual binary requests. Completion verifies the inventory, records a
+single baseline, and permanently closes import writes. Normal history and recovery
+begin with subsequent changes. This supports finishing the first device before
+adding another device. Initial sync reports completion only after selected-folder
+reminder setup finishes. If that phase is interrupted, the next sync resumes it
+from the server’s persisted marker; committed files are kept. Local edits sync
+before the readiness wait so correcting an invalid reminder note can unblock setup.
+
+
+Normal sync (protocol 7 and later) binds every upload to a stable operation ID, exact content hash, size, path, content type and expected remote hash. The plugin saves the exact payload in its private `pending-uploads/` directory before dispatch. Each batch member has its own identity. A disk-write failure prevents dispatch.
 
 D1 atomically records both successful commits and rejected preconditions. Replaying a successful upload returns its original revision even if another device has since edited or deleted the file; it never recreates that file. A rejected request cannot become a write when the state changes. Reusing an ID with different input fails.
+
+New-file batches share one staging lease per request attempt, covering at most eight distinct object keys. Each file still has its own operation identity and receipt. Publication checks lease membership and expiry inside the transaction. The same transaction queues rejected objects for cleanup and removes resolved members from the lease. Failed or uncertain object puts remain tracked because their bytes can arrive after the response is lost. Cleanup fences expired leases before checking references or deleting bytes, retries unresolved keys up to eight times, then surfaces them in upload-cleanup diagnostics. Restoring a backup discards unfinished upload leases because those transfers belong to the source deployment.
 
 On restart, the plugin replays unresolved records in dispatch order before reading remote state for a new sync plan. An ordinary upload receipt restores its uploaded bytes as the common ancestor. A merge receipt instead restores the original local preimage as a virtual ancestor: those bytes are already included in the remote merge, but the merged bytes may not have reached the local file. Only a verified local application advances that ancestor to the merged content. The journal stores the preimage bytes and their SHA-256 hash before dispatch; recovery verifies and saves them in the Markdown base cache before settling the upload. A new local edit is reconciled against that preimage, preserving the already committed remote edits. The local checkpoint records settled identities before journal files are removed. Failed cleanup cannot roll the checkpoint backward. Records stay bound to their original server; disconnect/reconfiguration archives them alongside previous checkpoint generations.
 

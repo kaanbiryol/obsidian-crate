@@ -1,6 +1,6 @@
-# Protocol 7 contract
+# Protocol contract
 
-`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The current protocol is 8 with protocol 7 retained for ordinary writes. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
+`GET /.well-known/crate` publishes the current and oldest compatible protocol. The plugin and web app check it before writes. The current protocol is 10 with protocol 7 retained for ordinary writes. Clients send the highest mutually supported version in `X-Crate-Protocol`; missing or incompatible versions receive 428 before changing state. Restore requires the `restore-operation-receipts` capability and a durable operation regardless of the header version. POST metadata and batch-download endpoints are reads.
 
 ## Files
 
@@ -36,7 +36,7 @@ Shared mutation validation rejects invalid input before normalization: titles ar
 
 `GET /reminders/notification-policy` reads the shared policy. POST initializes only an absent policy. PUT requires `expectedRevision` and explicitly updates folder, timezone, all-day time, or enabled state. These routes require a vault credential.
 
-D1 projection jobs are created in the file transaction. A reserved Durable Object verifies at most two sources, projects one file and dispatches two outbox jobs per alarm. Projection commits check the current file, policy, and job revisions and publish the expected notification token with each projection. That token is also the outbox command and alarm schedule identity. Delivery requires matching source, policy, parser and notification revisions, including after projection finishes but before the new outbox command arrives. Mutations run under the coordinator lock with a durable alarm stored before the write. No periodic notification recovery scan is needed.
+D1 projection jobs are created in the file transaction. A reserved Durable Object verifies at most two sources and projects one file per alarm. A separate invocation of the same class dispatches up to five outbox commands, with its own query budget. Projection commits check the current file, policy, and job revisions and publish the expected notification token with each projection. That token is also the outbox command and alarm schedule identity. Delivery requires matching source, policy, parser and notification revisions, including after projection finishes but before the new outbox command arrives. Mutations run under the coordinator lock with a durable alarm stored before the write. No periodic notification recovery scan is needed.
 
 The reminder Durable Object keeps the last completed due-time occurrence across schedule cleanup and restart. Replaying an accepted job cannot rearm that occurrence. Rescheduling the same due time preserves recipient progress and terminal failures; a new due time starts new delivery state. Token checks fence schedule cleanup while occurrence checks retain in-flight recipient acknowledgements for the same due time. Delivery callbacks are serialized. Unknown acknowledgements from an external push provider can still cause a retry; this is not an exactly-once provider guarantee.
 
@@ -75,3 +75,16 @@ Enrollment consumption, replacement-session creation and previous-session revoca
 `POST /sync/restore-version` requires `operationId`, `storageKey`, `path`, `expectedHash` and `expectedRevision`. An absent target uses null for both preconditions; an existing target requires its exact hash and revision. The plugin saves this complete intent in checkpoint format 3 before dispatch and resumes it after lost responses or restarts. Restores share the upload receipt table and its 180-UTC-date retry policy; the request fingerprint also binds the retained key and operation kind.
 
 The file pointer, changelog entry and exact result receipt commit in the same D1 transaction. A retry reads that receipt before looking up retained bytes, so expiry of the retained version or a subsequent edit/delete cannot cause replay. A changed precondition is also recorded as a terminal result. The recovery dialog offers **Resume restore** for pending intents even when their original history entry has expired. Remote confirmation and local sync completion are separate: a failed local sync keeps the committed intent until a later successful sync. Expired unresolved operations require preserving the checkpoint and comparing the current remote state; never replace their operation IDs to force a retry.
+
+## Initial import readiness
+
+`resumable-initial-import-v2` uses protocol 10. `/sync/import/complete` seals the
+file inventory and, when a reminder policy exists, records pending reminder setup.
+`POST /sync/import/readiness` checks the selected-folder scan and durable source,
+projection and schedule queues, then atomically acknowledges readiness. Probes
+return `{ ready: false }` while work remains, optionally with an error requiring
+attention. `/sync/import` returns the completed-upload session while its reminder
+setup is pending, allowing a restarted client to resume without retransfers.
+Local corrections sync before this acknowledgement so a failed reminder source
+can be repaired. The client shows completion only after readiness is acknowledged. A cancelled
+wait or the three-hour foreground wait bound leaves all progress intact.
