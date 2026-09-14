@@ -11,7 +11,9 @@ export function renderServerDeleteSetting(containerEl: HTMLElement, plugin: Crat
     const label = deployment.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server';
     new Setting(containerEl)
         .setName('Delete server')
-        .setDesc('Permanently remove this Crate server and all its remote data without rebuilding. Local vault files are kept.')
+        .setDesc(deployment.reset?.deleteOnly
+            ? 'Check the interrupted deletion and continue removing this server. Local vault files are kept.'
+            : 'Permanently remove this Crate server and all its remote data without rebuilding. Local vault files are kept.')
         .addButton(button => button.setButtonText(label).setDestructive().onClick(async () => {
             button.setDisabled(true);
             try {

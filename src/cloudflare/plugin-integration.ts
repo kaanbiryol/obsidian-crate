@@ -159,7 +159,9 @@ async function runCloudflareOperation(
                 'Crate couldn’t confirm whether Cloudflare finished the operation. Further server changes are blocked to prevent overlapping updates.',
                 [
                     'If another device is updating this server, let it finish.',
-                    'If the operation was interrupted, its Cloudflare status must be checked and the update lock recovered before trying again.',
+                    isDelete
+                        ? 'Once your connection is stable, open Crate settings → Advanced server actions and select Resume server deletion. Crate will check the interrupted step before continuing. If it still needs review, keep the technical details for support.'
+                        : 'If the operation was interrupted, its Cloudflare status must be checked and the update lock recovered before trying again.',
                     'Closing this message does not clear the lock.',
                 ],
                 { technicalDetails: deploymentErrorMessage(error), action: isReset || isDelete
@@ -171,7 +173,7 @@ async function runCloudflareOperation(
 		if (isDelete) {
 			plugin.refreshSettingsTab();
 			progress.fail('Server deletion failed', 'Crate couldn’t finish deleting your Cloudflare server.',
-				['Open Crate settings → Troubleshooting to review and retry server deletion.'],
+				[`Once your connection is stable, open Crate settings → Advanced server actions and select ${plugin.settings.cloudflareDeployment?.reset?.deleteOnly ? 'Resume server deletion' : 'Delete server'} to check and continue.`],
 				{ technicalDetails: deploymentErrorMessage(error), action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } });
 			return;
 		}

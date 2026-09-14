@@ -1,3 +1,4 @@
+import { inspectResumableDeletion } from './server-delete-recovery';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { assertDeploymentIsNotDowngrade } from './deployment-update';
 import { deployedArtifact } from './deployment-discovery';
@@ -117,7 +118,9 @@ export async function resetCrateServer(input: {
 	// Once the old database is gone, the checkpointed reset stub blocks updates
 	// from other devices; there is no remaining database fence to acquire.
 	if (!database) return removeVerifiedResources();
-	return withDeploymentFence({ api, accountId, databaseId,
+	const recoverDeletionValue = input.deleteOnly && metadata.reset?.deleteOnly && retired
+		? await inspectResumableDeletion(api, metadata) : undefined;
+	return withDeploymentFence({ api, accountId, databaseId, recoverDeletionValue,
 		record: { worker: name, kind: input.deleteOnly ? 'delete' : 'reset', version: input.version },
 	}, async fence => {
 		api = fenceResetMutations(api, fence);

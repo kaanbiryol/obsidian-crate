@@ -292,7 +292,7 @@ it('does not open Cloudflare for a network failure', async () => {
 	expect(progress.fail).toHaveBeenCalledOnce();
 });
 
-it.each(['update', 'reset', 'delete'] as const)('does not suggest retrying an uncertain %s', async intent => {
+it.each(['update', 'reset', 'delete'] as const)('shows recovery guidance for an uncertain %s', async intent => {
     const { handleCloudflareOAuthProtocol } = await loadPluginIntegration();
     const { DeploymentRecoveryRequiredError } = await import('./deployment-fence');
     const plugin = createPlugin(true);
@@ -308,7 +308,8 @@ it.each(['update', 'reset', 'delete'] as const)('does not suggest retrying an un
         expect.objectContaining({ technicalDetails: 'Network changed. The deployment fence remains held.' }),
     );
     expect(progress.fail.mock.calls[0]?.[3]).toHaveProperty('action.label', intent === 'update' ? 'Check and recover update' : 'Open settings');
-    expect(JSON.stringify(progress.fail.mock.calls)).not.toContain('settings to try again');
+    if (intent === 'delete') expect(JSON.stringify(progress.fail.mock.calls)).toContain('select Resume server deletion');
+    else expect(JSON.stringify(progress.fail.mock.calls)).not.toContain('select Resume server deletion');
 });
 
 it('does not open another update dialog when the service is busy', async () => {
