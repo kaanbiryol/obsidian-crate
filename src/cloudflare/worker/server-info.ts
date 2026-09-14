@@ -1,3 +1,5 @@
+import release from '../server-release.json';
+import type { Env } from './types';
 import { BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY } from '../../protocol/sync-limits';
 import {
 	CRATE_PLUGIN_PROTOCOL,
@@ -35,6 +37,6 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 	]),
 });
 
-export function handleServerInfo(): Response {
-	return corsResponse({ ...CRATE_SERVER_INFO, reminderOperationDay: Math.floor(Date.now() / 86_400_000) }, 200, { 'Cache-Control': 'no-store' });
+export function handleServerInfo(env: Env): Response {
+	return corsResponse({ ...CRATE_SERVER_INFO, serverRevision: release.revision, schemaVersion: release.schemaVersion, deploymentFingerprint: env.CRATE_DEPLOYMENT_FINGERPRINT, reminderOperationDay: Math.floor(Date.now() / 86_400_000) }, 200, { 'Cache-Control': 'no-store' });
 }

@@ -21,7 +21,7 @@ export async function inspectResumableDeletion(api: ResetApi, metadata: Cloudfla
 	} catch { throw blocked(); }
 	if (record.worker !== metadata.workerName || record.kind !== 'delete' || record.recoveryProtocol !== 1
 		|| typeof record.owner !== 'string' || !/^[a-f0-9-]{36}$/.test(record.owner)
-		|| record.schemaUpgradePending === true) throw blocked();
+		|| record.verificationPending === true) throw blocked();
 	const confirmed = record.stepState === 'confirmed'
 		&& ['retireCrateWorker', 'deleteR2Object', 'deleteR2Bucket'].includes(String(record.step));
 	// A late object DELETE can only remove data this same permanent deletion is

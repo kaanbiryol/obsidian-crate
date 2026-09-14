@@ -39,7 +39,7 @@ the plugin require a fresh confirmation; failed requests remain eligible for ret
 
 The local workerd/D1 billing-metadata regression measures **11,256 row writes for
 10,000 ordinary notes**, including import setup and completion with 32-file batches.
-The same fixture used 31,256 writes before the schema-6 inventory redesign: a
+The same fixture used 31,256 writes before the pre-release inventory redesign: a
 20,000-write (64%) reduction. Eight-file batches now cost 15,004 writes, down from
 45,004 before these optimizations. Replaying a committed batch writes zero rows
 and uploads no R2 objects.
@@ -86,7 +86,7 @@ folder are skipped by the portable primary key.
 
 This measurement uses the new database layout: `WITHOUT ROWID` for file metadata,
 upload receipts, staging records, reminder verification, and projection jobs.
-Provisioning migrates existing schema-2/3/4/5 file inventories once, under the deployment fence. It copies persisted portable keys without renaming files or touching R2 bytes. This migration has a separate write cost; schema reapplication after migration does not rewrite file records. These
+This layout is now the first-release baseline, with no historical inventory migration. These
 figures exclude device setup, actual reminder indexing, failures and cleanup, and
 other activity sharing the account's daily quota. They do not guarantee that every
 10,000-file vault consumes the same allowance.
@@ -230,5 +230,5 @@ and schema. Reapplying the current schema used zero writes. Inserting 32 additio
 file records used exactly 32 writes. The temporary database was deleted.
 
 The 11,256-write complete-import figure above is measured with local workerd/D1
-billing metadata; the earlier hosted 10,000-file run predates schema 6. No production
+billing metadata; the earlier hosted 10,000-file run predates the baseline inventory layout. No production
 resources were changed during this verification.

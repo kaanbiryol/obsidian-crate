@@ -1,5 +1,6 @@
 import type { NotificationRateLimiter } from './rate-limit';
 export interface Env {
+  CRATE_DEPLOYMENT_FINGERPRINT?: string;
   commitNewFiles?: typeof import('./bulk-new-file-commit').commitNewFiles;
   commitUpload?: import('./staged-upload-dispatch').CommitUpload;
 	CRATE_PUBLIC_ORIGIN?: string;

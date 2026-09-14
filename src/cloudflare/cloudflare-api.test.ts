@@ -236,3 +236,16 @@ describe('R2 cursor pagination compatibility', () => {
 		await expect(new CloudflareApiClient('token', transport).listR2Objects('account', 'bucket', 'current')).rejects.toThrow('complete R2');
 	});
 });
+
+it('probes the exact Worker release without forwarding management credentials', async () => {
+  const metadata = { service: 'crate', serverRevision: 1, schemaVersion: 1, deploymentFingerprint: artifacts.fingerprint };
+  const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify(metadata) }));
+  const client = new CloudflareApiClient('management-secret', transport);
+  await client.verifyWorkerDeployment('https://crate.example.workers.dev', artifacts.fingerprint);
+  expect(transport).toHaveBeenCalledWith('https://crate.example.workers.dev/.well-known/crate', { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
+  expect(JSON.stringify(transport.mock.calls)).not.toContain('management-secret');
+  for (const changed of [{ serverRevision: 2 }, { schemaVersion: 2 }, { deploymentFingerprint: 'other' }, { service: 'other' }]) {
+    transport.mockResolvedValueOnce({ status: 200, text: JSON.stringify({ ...metadata, ...changed }) });
+    await expect(client.verifyWorkerDeployment('https://crate.example.workers.dev', artifacts.fingerprint)).rejects.toThrow('live check');
+  }
+});

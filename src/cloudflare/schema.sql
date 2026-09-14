@@ -1,8 +1,9 @@
 CREATE TABLE IF NOT EXISTS crate_schema (
  id INTEGER PRIMARY KEY CHECK (id = 1),
- version INTEGER NOT NULL
+ version INTEGER NOT NULL,
+ created_version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 6);
+INSERT OR IGNORE INTO crate_schema (id, version, created_version) VALUES (1, 1, 1);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,10 +26,6 @@ CREATE TABLE IF NOT EXISTS files (
 	storage_key TEXT NOT NULL
 ) WITHOUT ROWID;
 
-DROP INDEX IF EXISTS files_portable_path_idx;
--- Reminder queries use the primary path index within the selected folder.
--- Retire the old whole-vault Markdown index, which charged every note upload.
-DROP INDEX IF EXISTS files_markdown_path_idx;
 
 CREATE TABLE IF NOT EXISTS auth_tokens (
 	id TEXT PRIMARY KEY,
@@ -202,9 +199,7 @@ CREATE TABLE IF NOT EXISTS file_deletion_receipts (
 );
 CREATE INDEX IF NOT EXISTS file_deletion_receipts_created_at_idx ON file_deletion_receipts(created_at);
 
-UPDATE crate_schema SET version = 4 WHERE id = 1 AND version IN (2, 3);
 
-DROP INDEX IF EXISTS files_storage_key_idx;
 
 CREATE TABLE IF NOT EXISTS upload_operations (
  operation_id TEXT PRIMARY KEY,
@@ -212,7 +207,6 @@ CREATE TABLE IF NOT EXISTS upload_operations (
  response_json TEXT NOT NULL,
  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 ) WITHOUT ROWID;
-UPDATE crate_schema SET version = 6 WHERE id = 1 AND version IN (2, 3, 4, 5);
 
 CREATE TABLE IF NOT EXISTS notification_file_retries (
  path TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0,
@@ -220,13 +214,6 @@ CREATE TABLE IF NOT EXISTS notification_file_retries (
 );
 CREATE INDEX IF NOT EXISTS notification_file_retries_due_idx
  ON notification_file_retries(available_at, path) WHERE available_at IS NOT NULL;
-INSERT OR IGNORE INTO notification_file_retries(path, attempts, available_at, error)
- SELECT path, 1, (unixepoch(updated_at) + 3600) * 1000, last_error
- FROM notification_projection_jobs WHERE last_error IS NOT NULL;
-INSERT OR IGNORE INTO notification_file_retries(path, attempts, available_at, error)
- SELECT file_path, 1, (unixepoch(updated_at) + 3600) * 1000, 'Source verification pending'
- FROM reminder_source_state WHERE verified = 0;
-
 CREATE TABLE IF NOT EXISTS staged_uploads (
  storage_key TEXT PRIMARY KEY,
  file_path TEXT,
@@ -254,4 +241,18 @@ CREATE TABLE IF NOT EXISTS initial_import (
  state TEXT NOT NULL CHECK (state IN ('importing', 'complete')),
  generation INTEGER NOT NULL DEFAULT 0,
  snapshot_seq INTEGER NOT NULL DEFAULT 0
+);
+
+-- Committed only after the exact Worker and schema have been verified.
+CREATE TABLE IF NOT EXISTS crate_release (
+ id INTEGER PRIMARY KEY CHECK (id = 1),
+ revision INTEGER NOT NULL CHECK (revision > 0),
+ fingerprint TEXT NOT NULL,
+ schema_version INTEGER NOT NULL,
+ schema_hash TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS crate_migrations (
+ id TEXT PRIMARY KEY,
+ checksum TEXT NOT NULL,
+ applied_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
