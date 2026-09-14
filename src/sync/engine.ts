@@ -76,6 +76,7 @@ export class SyncEngine {
 	private contentVerifier: LocalContentVerifier;
 	private periodicCheckFailed = false;
 	private onAutomaticSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
+	private prepareReminderScope?: () => Promise<void>;
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
 	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -121,7 +122,10 @@ export class SyncEngine {
 				this.shouldIgnore.bind(this),
 				files => this.verifyContent(files),
 			),
-			checkForChanges: (lastSeq: number) => this.api.checkForChanges(lastSeq),
+			checkForChanges: async (lastSeq: number) => {
+				void this.retryReminderScope();
+				return this.api.checkForChanges(lastSeq);
+			},
 			sync: async () => {
 				const result = await this.sync();
 				if (!this.lifecycle.isDestroyed) await this.onAutomaticSyncResult?.(result);
@@ -140,6 +144,7 @@ export class SyncEngine {
 		this.queueController = new SyncQueueController({
 			automaticSyncEnabled: () => this.settings.automaticSync,
 			recoverUploads: async () => {
+				void this.retryReminderScope();
 				await this.api.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
 				this.updateState({ work: { phase: 'applying' } });
 			},
@@ -222,6 +227,18 @@ export class SyncEngine {
 		this.ignoredDirPrefixes = this.getIgnoredDirPrefixes(settings);
 		this.lifecycle.settingsChanged();
 		this.queueController.settingsChanged();
+	}
+
+	setReminderScopePreparation(prepare?: () => Promise<void>): void {
+		this.prepareReminderScope = prepare;
+	}
+
+	private async retryReminderScope(): Promise<void> {
+		try {
+			await this.prepareReminderScope?.();
+		} catch (error) {
+			if (!this.lifecycle.isDestroyed) logger.warn('Reminder settings will retry on the next sync:', errorMessage(error));
+		}
 	}
 
 	getState(): SyncState {
@@ -445,6 +462,7 @@ export class SyncEngine {
 
 	async sync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		return this.trackWork(async () => {
+			void this.retryReminderScope();
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			const workflow = this.contexts.syncWorkflow();
 			this.contexts.clearPlannedContent();
@@ -542,6 +560,7 @@ export class SyncEngine {
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		return this.trackWork(async () => {
+			void this.retryReminderScope();
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			const result = await runInitialSyncWorkflow(this.contexts.initialSyncWorkflow(), progressCallback);
 			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
@@ -554,6 +573,7 @@ export class SyncEngine {
 
 	async forceFullSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		return this.trackWork(async () => {
+			void this.retryReminderScope();
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			const result = await runForceFullSyncWorkflow(this.contexts.forceSyncWorkflow(), progressCallback);
 			this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);

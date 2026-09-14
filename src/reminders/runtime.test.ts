@@ -4,10 +4,11 @@ import type CratePlugin from '../main';
 
 function harness(pushEnabled = true) {
 	const ensureNotificationPolicy = vi.fn().mockResolvedValue({ policy: {} });
+	const api = { ensureNotificationPolicy };
 	const plugin = {
 		settings: { pushEnabled },
 		remindersSettings: { remindersFolderPath: 'Tasks', allDayNotificationTime: '09:00' },
-		syncRuntime: { getApiClient: () => ({ ensureNotificationPolicy }) },
+		syncRuntime: { getApiClient: () => api },
 	} as unknown as CratePlugin;
 	return { plugin, ensureNotificationPolicy };
 }
@@ -17,14 +18,14 @@ describe('reminder notification policy initialization', () => {
 		const { plugin, ensureNotificationPolicy } = harness();
 		await Promise.all([ensureReminderNotificationPolicy(plugin), ensureReminderNotificationPolicy(plugin)]);
 		expect(ensureNotificationPolicy).toHaveBeenCalledExactlyOnceWith({
-			folderPath: 'Tasks', allDayTime: '09:00', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+			enabled: true, folderPath: 'Tasks', allDayTime: '09:00', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 		});
 	});
 
-	it('does not contact the server when notifications are disabled', async () => {
+	it('registers the selected folder with notifications disabled', async () => {
 		const { plugin, ensureNotificationPolicy } = harness(false);
 		await ensureReminderNotificationPolicy(plugin);
-		expect(ensureNotificationPolicy).not.toHaveBeenCalled();
+		expect(ensureNotificationPolicy).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, folderPath: 'Tasks' }));
 	});
 
 	it('allows a later attempt after a network failure', async () => {

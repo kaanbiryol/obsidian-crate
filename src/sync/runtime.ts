@@ -67,7 +67,8 @@ export class SyncRuntime {
 		private plugin: Plugin,
 		private settings: CrateSettings,
 		private secretStorage: SecretStorageService,
-		private persistSettings: () => Promise<void>
+		private persistSettings: () => Promise<void>,
+    private prepareReminderScope?: () => Promise<void>,
 	) {}
 
 	setStatusBarClickHandler(handler: () => void): void {
@@ -164,6 +165,7 @@ export class SyncRuntime {
 		this.syncEngine = new SyncEngine(this.plugin, this.apiClient, this.settings);
 		const syncEngine = this.syncEngine;
 		syncEngine.setAutomaticSyncResultCallback(result => this.recordAutomaticSyncResult(syncEngine, result));
+		syncEngine.setReminderScopePreparation(this.prepareReminderScope);
 
 		this.statusBar = new StatusBarManager(this.plugin, true, this.onStatusBarClick);
 

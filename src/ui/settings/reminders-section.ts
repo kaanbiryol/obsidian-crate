@@ -1,4 +1,5 @@
 import { Notice, Setting } from 'obsidian';
+import { changeReminderFolder } from '../../reminders/notification-policy-sync';
 import type CratePlugin from '../../main';
 import {
 	normalizeRemindersFolderPath,
@@ -37,7 +38,7 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 
 	new Setting(containerEl)
 		.setName('Reminders folder')
-		.setDesc('This device · the vault folder containing your reminder files. Changing this folder does not move existing files.')
+		.setDesc('The folder used for reminders on this device and the server. Changes save on this device immediately and reach the server when connected. Files are not moved.')
 		.addText(text => {
 			folderSuggest = new RemindersFolderSuggest(plugin.app, text.inputEl);
 
@@ -50,10 +51,7 @@ export function renderRemindersSection(context: RemindersSectionContext): () => 
 					return;
 				}
 
-				await plugin.writeRemindersSettings({ remindersFolderPath: normalizedPath });
-				if (plugin.remindersSettings.enabled) {
-					await plugin.reinitializeWithFolder(normalizedPath);
-				}
+				await changeReminderFolder(plugin, normalizedPath);
 				new Notice(`Reminders folder updated to "${normalizedPath}"`);
 			};
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createDeferred } from './runtime-test-harness';
 import {
 	createHarness,
 	createSyncResult,
@@ -78,7 +79,10 @@ describe('SyncEngine event queue behavior', () => {
 		expect(idlePendingCounts.at(-1)).toBe(0);
 	});
 
-	it('reports successful automatic uploads for sync activity history', async () => {
+	it.each(['failed', 'pending'])('reports successful automatic uploads while reminder settings are %s', async status => {
+		const pending = createDeferred<void>();
+		const prepare = vi.fn(() => status === 'failed' ? Promise.reject(new Error('settings unavailable')) : pending.promise);
+		harness.engine.setReminderScopePreparation(prepare);
 		const content = toArrayBuffer('A');
 		harness.vault.getAbstractFileByPath.mockReturnValue({
 			path: 'notes/a.md',
@@ -98,6 +102,9 @@ describe('SyncEngine event queue behavior', () => {
 			uploaded: 1,
 			uploadedPaths: ['notes/a.md'],
 		}));
+		expect(prepare).toHaveBeenCalledOnce();
+		pending.resolve();
+		harness.engine.destroy();
 	});
 
 	it('keeps new paths queued when they arrive during pending flush', async () => {

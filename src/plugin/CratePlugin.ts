@@ -98,11 +98,11 @@ export default class CratePlugin extends Plugin {
 		});
 	}
 
-	async writeRemindersSettings(update: Partial<RemindersSettings>): Promise<void> {
+	async writeRemindersSettings(update: Partial<RemindersSettings> | ((current: RemindersSettings) => Partial<RemindersSettings>)): Promise<void> {
 		await this.enqueueSettingsWrite(async signal => {
 			const nextSettings = normalizeRemindersSettings({
 				...this.remindersSettings,
-				...update,
+				...(typeof update === 'function' ? update(this.remindersSettings) : update),
 			});
 			await this.saveData({
 				...buildPersistedCrateSettings(this.settings),

@@ -8,15 +8,18 @@ import { applySharedSettings } from './shared-settings';
 import { SyncApiClient } from './api';
 import { errorMessage } from '../plugin/logger';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
+import { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from '../reminders/runtime';
 
 const registeredVaultHandlers = new WeakSet<CratePlugin>();
 
 export function initializeSyncManagers(plugin: CratePlugin): void {
+	plugin.registerDomEvent(window, 'online', () => { void refreshReminderNotificationPolicy(plugin); });
 	plugin.syncRuntime = new SyncRuntime(
 		plugin,
 		plugin.settings,
 		plugin.secretStorage,
 		() => plugin.saveSettings(),
+    () => ensureReminderNotificationPolicy(plugin, true),
 	);
 	plugin.syncRuntime.setStatusBarClickHandler(() => {
 		new ActivityModal(plugin.app, plugin.settings, plugin.syncRuntime).open();

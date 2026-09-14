@@ -16,6 +16,33 @@ function fixture() {
 }
 
 describe('periodic sync status', () => {
+	it('retries reminder settings during periodic checks even when no files changed', async () => {
+		const h = fixture();
+		const prepare = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
+		h.engine.setReminderScopePreparation(prepare);
+		await runPeriodicCheck(h.engine);
+		expect(h.api.checkForChanges).toHaveBeenCalledOnce();
+		expect(h.engine.getState()).toMatchObject({ status: 'idle', lastError: null });
+		await runPeriodicCheck(h.engine);
+		expect(prepare).toHaveBeenCalledTimes(2);
+		expect(h.api.checkForChanges).toHaveBeenCalledTimes(2);
+		h.engine.destroy();
+	});
+	it('checks for file changes while a reminder-settings request is still pending', async () => {
+		const h = fixture();
+		const pending = createDeferred<void>();
+		const prepare = vi.fn(() => pending.promise);
+		h.engine.setReminderScopePreparation(prepare);
+		try {
+			await runPeriodicCheck(h.engine);
+			expect(prepare).toHaveBeenCalledOnce();
+			expect(h.api.checkForChanges).toHaveBeenCalledOnce();
+			expect(h.engine.getState()).toMatchObject({ status: 'idle', lastError: null });
+		} finally {
+			pending.resolve();
+			h.engine.destroy();
+		}
+	});
 	it('shows a failed check instead of Synced and restores only its own error on recovery', async () => {
 		const h = fixture();
 		h.api.checkForChanges.mockRejectedValueOnce(new Error('network unavailable'));

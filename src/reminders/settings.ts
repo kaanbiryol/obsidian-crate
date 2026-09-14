@@ -19,6 +19,8 @@ type QueryViewPreference = {
 };
 
 export type RemindersSettings = {
+	/** Explicit local edit waiting for this server, never copied to another connection. */
+	pendingServerFolder?: { id: string; workerUrl: string; folderPath: string };
 	enabled: boolean;
 	taskCreationDefaultDueDate: DueDateDefaultSetting;
 	remindersFolderPath: string;
@@ -139,6 +141,11 @@ export function normalizeRemindersSettings(
 	value: Partial<RemindersSettings> | null | undefined,
 ): RemindersSettings {
 	return {
+		...(isRecord(value?.pendingServerFolder) && typeof value.pendingServerFolder.id === 'string'
+			&& typeof value.pendingServerFolder.workerUrl === 'string' && value.pendingServerFolder.workerUrl
+			&& typeof value.pendingServerFolder.folderPath === 'string'
+			? { pendingServerFolder: { id: value.pendingServerFolder.id, workerUrl: value.pendingServerFolder.workerUrl,
+				folderPath: normalizeRemindersFolderPath(value.pendingServerFolder.folderPath) } } : {}),
 		enabled: typeof value?.enabled === 'boolean'
 			? value.enabled
 			: DEFAULT_REMINDERS_SETTINGS.enabled,
