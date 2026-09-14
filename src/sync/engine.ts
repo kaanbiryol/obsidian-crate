@@ -142,6 +142,7 @@ export class SyncEngine {
 		});
 		this.api.setAbortSignal(this.lifecycle.abortSignal);
 		this.queueController = new SyncQueueController({
+			finishInitialSetup: () => this.contexts.finishInitialSetup(),
 			automaticSyncEnabled: () => this.settings.automaticSync,
 			recoverUploads: async () => {
 				void this.retryReminderScope();
@@ -166,6 +167,7 @@ export class SyncEngine {
 			onFlushResult: (result) => this.onAutomaticSyncResult?.(result),
 		});
 		this.contexts = new SyncEngineContexts({
+			prepareReminderScope: async () => { await this.prepareReminderScope?.(); },
 			vault: this.vault,
 			fileManager: this.plugin.app.fileManager,
 			api: this.api,
@@ -488,6 +490,7 @@ export class SyncEngine {
 				const result = await this.reconcilePaths(queueKeys);
 				this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 				if (result.success) {
+					await this.contexts.finishInitialSetup();
 					const lastSync = new Date().toISOString();
 					this.settings.lastSync = lastSync;
 					this.updateState({

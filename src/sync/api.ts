@@ -42,10 +42,12 @@ import type {
 import { NotificationsWorkerApi } from './worker-api/notifications';
 import { SharedSettingsWorkerApi } from './worker-api/shared-settings';
 import { SyncWorkerApi } from './worker-api/sync';
+import { InitialImportApi } from './worker-api/initial-import';
 
 export { HttpError } from './worker-api/http';
 
 export class SyncApiClient {
+  readonly initialImport: InitialImportApi;
 	private durableUploads?: DurableUploads;
 	private durableRestores?: DurableRestores;
 	private deletionGuard?: (path: string) => Promise<void>;
@@ -62,6 +64,7 @@ export class SyncApiClient {
 
 	constructor(workerUrl: string, authToken: string, transport?: ApiHttpTransport) {
 		this.http = new WorkerApiHttpClient(workerUrl, authToken, transport);
+    this.initialImport = new InitialImportApi(this.http);
 		this.syncApi = new SyncWorkerApi(this.http);
 		this.authApi = new AuthWorkerApi(this.http);
 		this.sharedSettingsApi = new SharedSettingsWorkerApi(this.http);

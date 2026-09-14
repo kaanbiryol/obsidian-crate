@@ -49,6 +49,7 @@ export interface QueueUploadFailure {
 }
 
 export interface QueueFlushContext {
+	finishInitialSetup?(): Promise<void>;
 	recoverUploads(): Promise<void>;
 	pendingPaths: Set<string>;
 	inFlightPaths: Set<string>;

@@ -151,6 +151,7 @@ export async function processPendingChanges(
 
 		context.inFlightPaths.clear();
 		const didWork = uploads.length > 0 || deletes.length > 0;
+		await context.finishInitialSetup?.();
 		context.updateState({
 			status: 'idle',
 			...(didWork ? { lastSync: new Date().toISOString(), lastError: null } : {}),

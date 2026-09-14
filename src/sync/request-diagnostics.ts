@@ -3,7 +3,7 @@ export const MAX_REQUEST_DIAGNOSTICS = 50;
 import { normalizeUploadDiagnostics, type UploadDiagnostic } from './upload-diagnostics';
 import { reminderOperationDay } from '../protocol/reminder-operation';
 const routes = new Set([
-	'/.well-known/crate', '/health', '/settings', '/diagnostics',
+	'/sync/import', '/sync/import/upload', '/sync/import/prune', '/sync/import/complete', '/.well-known/crate', '/health', '/settings', '/diagnostics',
 	...['manifest', 'metadata', 'upload', 'download', 'delete', 'changes', 'check', 'batch-upload', 'batch-download', 'batch-delete', 'versions', 'restore', 'restore-version'].map(route => `/sync/${route}`),
 	...['tokens', 'revoke', 'enroll', 'enrollment'].map(route => `/auth/${route}`),
 	'/reminders/notification-policy', '/notifications/subscribe', '/notifications/unsubscribe', '/notifications/subscriptions', '/notifications/test',

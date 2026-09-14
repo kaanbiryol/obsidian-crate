@@ -13,8 +13,10 @@ import type { CrateSettings } from '../plugin/settings-types';
 import type { FileDiff, UploadDiff, PreparedUpload, SyncResult, SyncState } from './types';
 import type { FileEntry, FileManifest } from '../protocol/sync-types';
 import { prepareUploadFromPath } from './transfer-prepare';
+import { runInitialImport } from './initial-import';
 
 interface SyncEngineContextDependencies {
+	prepareReminderScope?: () => Promise<void>;
 	vault: Vault;
 	fileManager: FileManager;
 	api: SyncApiClient;
@@ -118,6 +120,8 @@ export class SyncEngineContexts {
 	syncWorkflow() {
 		const dependencies = this.dependencies;
 		return {
+      finishInitialSetup: () => this.finishInitialSetup(),
+      tryInitialImport: (result: import('./types').SyncResult, progress?: (current: number, total: number) => void) => this.tryInitialImport(result, progress),
 			apiConfigured: () => dependencies.api.isConfigured(),
 			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
 			recoverUploads: () => dependencies.api.recoverUploads((current, total) => dependencies.updateState({ work: { phase: 'recovering', current, total } })),
@@ -150,6 +154,8 @@ export class SyncEngineContexts {
 	initialSyncWorkflow() {
 		const dependencies = this.dependencies;
 		return {
+      finishInitialSetup: () => this.finishInitialSetup(),
+      tryInitialImport: (result: import('./types').SyncResult, progress?: (current: number, total: number) => void) => this.tryInitialImport(result, progress),
 			vault: dependencies.vault,
 			apiConfigured: () => dependencies.api.isConfigured(),
 			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),
@@ -169,9 +175,30 @@ export class SyncEngineContexts {
 		};
 	}
 
+  async finishInitialSetup(): Promise<void> {
+    const { api, updateState, throwIfDestroyed, prepareReminderScope } = this.dependencies;
+    if (!api.initialImport?.isPreparingReminders()) return;
+    updateState({ work: { phase: 'reminders' } });
+    await prepareReminderScope?.();
+    throwIfDestroyed();
+    await api.initialImport.finishReminderSetup(throwIfDestroyed);
+  }
+
+  private tryInitialImport(result: import('./types').SyncResult, progress?: (current: number, total: number) => void) {
+    const dependencies = this.dependencies;
+    return runInitialImport({ transfer: this.transfer(), api: dependencies.api,
+      prepareReminderScope: dependencies.prepareReminderScope,
+      shouldIgnore: dependencies.shouldIgnore, throwIfDestroyed: dependencies.throwIfDestroyed,
+      save: () => dependencies.getLocalManifest().save(),
+      setLastSeq: seq => { dependencies.getSettings().lastSeq = seq; },
+      report: work => dependencies.updateState({ work }),
+    }, result, progress);
+  }
+
 	forceSyncWorkflow() {
 		const dependencies = this.dependencies;
 		return {
+      finishInitialSetup: () => this.finishInitialSetup(),
 			vault: dependencies.vault,
 			apiConfigured: () => dependencies.api.isConfigured(),
 			reportWork: (phase: import('./types').SyncWork['phase'], current?: number, total?: number) => dependencies.updateState({ work: { phase, current, total } }),

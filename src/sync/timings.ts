@@ -1,5 +1,5 @@
 import type { SyncWork } from './types';
-export const SYNC_PHASES = ['starting', 'recovering', 'server', 'scanning', 'preparing', 'uploading', 'downloading', 'applying', 'saving'] as const;
+export const SYNC_PHASES = ['starting', 'recovering', 'server', 'scanning', 'preparing', 'uploading', 'downloading', 'applying', 'saving', 'reminders'] as const;
 type Phase = typeof SYNC_PHASES[number];
 export interface RequestTimings { count: number; totalMs: number; maxMs: number; serverCount: number; serverMs: number; d1?: { rowsRead: number; rowsWritten: number; reportedRequests: number; completeRequests: number } }
 export interface SyncTimings { totalMs: number; phases: Partial<Record<Phase, number>>; requests?: RequestTimings }
