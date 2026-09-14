@@ -1,7 +1,7 @@
 import type { SyncWork } from './types';
 export const SYNC_PHASES = ['starting', 'recovering', 'server', 'scanning', 'preparing', 'uploading', 'downloading', 'applying', 'saving'] as const;
 type Phase = typeof SYNC_PHASES[number];
-export interface RequestTimings { count: number; totalMs: number; maxMs: number; serverCount: number; serverMs: number }
+export interface RequestTimings { count: number; totalMs: number; maxMs: number; serverCount: number; serverMs: number; d1?: { rowsRead: number; rowsWritten: number; reportedRequests: number; completeRequests: number } }
 export interface SyncTimings { totalMs: number; phases: Partial<Record<Phase, number>>; requests?: RequestTimings }
 export const emptyRequestTimings = (): RequestTimings => ({ count: 0, totalMs: 0, maxMs: 0, serverCount: 0, serverMs: 0 });
 const valid = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0;
@@ -19,6 +19,11 @@ export function normalizeSyncTimings(value: unknown): SyncTimings | undefined {
     const r = raw.requests as Record<string, unknown>;
     if (['count', 'totalMs', 'maxMs', 'serverCount', 'serverMs'].every(key => valid(r[key]))) {
       requests = { count: r.count as number, totalMs: r.totalMs as number, maxMs: r.maxMs as number, serverCount: r.serverCount as number, serverMs: r.serverMs as number };
+      const d1 = r.d1 as Record<string, unknown> | undefined;
+      if (d1 && ['rowsRead', 'rowsWritten', 'reportedRequests', 'completeRequests'].every(key => valid(d1[key]) && Number.isSafeInteger(d1[key]))
+        && (d1.completeRequests as number) <= (d1.reportedRequests as number) && (d1.reportedRequests as number) <= requests.count) {
+        requests.d1 = { rowsRead: d1.rowsRead as number, rowsWritten: d1.rowsWritten as number, reportedRequests: d1.reportedRequests as number, completeRequests: d1.completeRequests as number };
+      }
     }
   }
   return { totalMs: raw.totalMs, phases, ...(requests ? { requests } : {}) };

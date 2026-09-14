@@ -51,7 +51,7 @@ function createHarness(authority = true) {
 	};
 	const first = vi.fn(async (): Promise<typeof scheduledReminder | null> => scheduledReminder);
 	const db = {
-		prepare: vi.fn((sql: string) => ({ bind: vi.fn(() => ({ run, first: sql.includes('SELECT 1 FROM reminder_projections') ? async () => authority ? { ok: 1 } : null : sql.includes('SELECT job_token') ? async () => ({ job_token: 'current-job' }) : sql.includes('LEFT JOIN reminder_projections')
+		prepare: vi.fn((sql: string) => ({ bind: vi.fn(() => ({ run, async all() { const row = await this.first(); return { results: row ? [row] : [] }; }, first: sql.includes('SELECT 1 FROM reminder_projections') ? async () => authority ? { ok: 1 } : null : sql.includes('SELECT file_path FROM reminder_projections') ? async () => ({ file_path: 'Notes/task.md' }) : sql.includes('SELECT job_token') ? async () => ({ job_token: 'current-job' }) : sql.includes('LEFT JOIN reminder_projections')
             ? async () => ({ file_revision: 'source', storage_key: 'source', pending_path: null, enabled: 1,
                 notification_token: scheduledReminder.schedule_token, policy_revision: 'policy', current_policy_revision: 'policy' })
             : first })) })),

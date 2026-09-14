@@ -21,7 +21,8 @@ afterEach(() => vi.resetAllMocks());
       getAlarm: async () => Date.parse(old.dueDatetime), setAlarm: async () => {}, deleteAlarm: async () => {},
     }};
     const db = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({
-      first: async () => sql.includes('SELECT job_token') ? { job_token: 'new-job' } : sql.includes('LEFT JOIN reminder_projections')
+      async all() { return { results: [await this.first()] }; },
+      first: async () => sql.includes('SELECT file_path FROM reminder_projections') ? { file_path: 'Notes/task.md' } : sql.includes('SELECT job_token') ? { job_token: 'new-job' } : sql.includes('LEFT JOIN reminder_projections')
         ? { file_revision: 'source', storage_key: 'source', pending_path: null, enabled: 1,
             notification_token: schedule.schedule_token, policy_revision: 'policy', current_policy_revision: 'policy' }
         : schedule,

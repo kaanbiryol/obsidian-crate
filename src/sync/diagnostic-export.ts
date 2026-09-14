@@ -1,4 +1,5 @@
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
+import { normalizeSyncTimings } from './timings';
 import { MAX_SYNC_HISTORY, type CrateSettings } from '../plugin/settings-types';
 import type { SyncState } from './types';
 import { normalizeRequestDiagnostics, type RequestDiagnostics } from './request-diagnostics';
@@ -25,6 +26,7 @@ export function buildDiagnosticExport(settings: CrateSettings, state: SyncState,
 			merged: count(entry.merged), deleted: count(entry.deleted), errors: count(entry.errorCount),
 			conflicts: count(entry.conflictCount), resolvedRaces: count(entry.resolvedRaceCount),
 			requests: normalizeRequestDiagnostics(entry.requestDiagnostics),
+			timings: normalizeSyncTimings(entry.timings),
 		})),
 	}, null, 2);
 }

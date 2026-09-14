@@ -1,3 +1,4 @@
+import { D1_USAGE_HEADER, parseD1Usage } from '@/protocol/d1-usage';
 import { emptyRequestTimings } from '../timings';
 import type { CrateServerInfo } from '../../protocol';
 import { normalizeUploadOperationIds } from '../request-diagnostics';
@@ -131,7 +132,7 @@ export class WorkerApiHttpClient {
 	private externalSignal: AbortSignal | undefined;
 	private requestTimings = emptyRequestTimings();
 	resetRequestTimings(): void { this.requestTimings = emptyRequestTimings(); }
-	getRequestTimings() { return { ...this.requestTimings }; }
+	getRequestTimings() { return { ...this.requestTimings, ...(this.requestTimings.d1 ? { d1: { ...this.requestTimings.d1 } } : {}) }; }
 	private serverInfo?: { expires: number; value: CrateServerInfo };
 	private serverInfoRequest?: Promise<CrateServerInfo>;
 
@@ -222,6 +223,13 @@ export class WorkerApiHttpClient {
 			const serverMs = match ? Number(match[1]) : NaN;
 			timings.count++; timings.totalMs += durationMs; timings.maxMs = Math.max(timings.maxMs, durationMs);
 			if (Number.isFinite(serverMs) && serverMs >= 0) { timings.serverCount++; timings.serverMs += serverMs; }
+
+      const usage = response ? parseD1Usage(getHeader(response.headers, D1_USAGE_HEADER)) : undefined;
+      if (usage) {
+        const d1 = timings.d1 ??= { rowsRead: 0, rowsWritten: 0, reportedRequests: 0, completeRequests: 0 };
+        d1.rowsRead += usage.rowsRead; d1.rowsWritten += usage.rowsWritten;
+        d1.reportedRequests++; if (usage.complete) d1.completeRequests++;
+      }
 
 			this.requestDiagnostics.push({ at: new Date().toISOString(), operationId, method: options.method ?? 'GET',
 				...(uploadOperationIds.length ? { uploadOperationIds } : {}), route: diagnosticRoute(path), status: response?.status ?? 0, outcome,
