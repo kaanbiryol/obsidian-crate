@@ -5,7 +5,7 @@ import { deployedArtifact } from './deployment-discovery';
 import { randomHex } from './pkce';
 import { assertWorkerTarget, assertUnsharedResources, assertOwnedNamespace, readCrateTables, type ResetApi } from './reset-ownership';
 import { createObjectOwnershipCheck, inspectBucketObjects, clearBucketObjects } from './reset-objects';
-import { fenceResetMutations, withDeploymentFence } from './deployment-fence';
+import { fenceResetMutations, withDeploymentFence, type DeploymentFence } from './deployment-fence';
 
 export async function resetCrateServer(input: {
 	api: ResetApi;
@@ -67,9 +67,9 @@ export async function resetCrateServer(input: {
 	if (!database && bucket) throw new Error('Reset blocked: the database needed to verify bucket objects is missing.');
 	input.onProgress?.('Checking the database and remote file references…');
 	const check = database ? await createObjectOwnershipCheck(api, accountId, databaseId, await readCrateTables(api, accountId, databaseId)) : null;
-	if (bucket && check) await inspectBucketObjects(api, accountId, name, check, input.onProgress);
+	const objectCount = bucket && check ? await inspectBucketObjects(api, accountId, name, check, input.onProgress) : 0;
 
-	const removeVerifiedResources = async () => {
+	const removeVerifiedResources = async (fence?: DeploymentFence) => {
 		input.onProgress?.('Stopping sync on this device before removing remote data…');
 		await input.beforeDelete();
 		if (!metadata.reset) {
@@ -105,7 +105,9 @@ export async function resetCrateServer(input: {
 		input.onProgress?.('Checking that other Workers do not share this server’s resources…');
 		await assertUnsharedResources(api, metadata, namespaceId);
 		if (bucket && check) {
-			await clearBucketObjects(api, accountId, name, check, verifyTarget, input.onProgress);
+			if (!fence) throw new Error('Reset blocked: missing deployment fence for file removal.');
+			await clearBucketObjects(input.api, accountId, name, check, verifyTarget,
+				operation => fence.mutate(operation, 'deleteR2Object'), objectCount, input.onProgress);
 			input.onProgress?.('Removing the empty file bucket…');
 			await api.deleteR2Bucket(accountId, name);
 		}
@@ -124,6 +126,6 @@ export async function resetCrateServer(input: {
 		record: { worker: name, kind: input.deleteOnly ? 'delete' : 'reset', version: input.version },
 	}, async fence => {
 		api = fenceResetMutations(api, fence);
-		await removeVerifiedResources();
+		await removeVerifiedResources(fence);
 	});
 }
