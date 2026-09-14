@@ -9,6 +9,7 @@ const labels: Record<SyncWork['phase'], string> = {
     downloading: 'Downloading files',
     applying: 'Applying changes and resolving conflicts',
     saving: 'Saving sync progress',
+    reminders: 'Preparing reminder schedules',
 };
 
 export function formatSyncProgress(progress?: SyncActivityProgress | null, work?: SyncWork): string {

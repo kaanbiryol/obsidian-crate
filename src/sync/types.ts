@@ -1,7 +1,7 @@
 export type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
 
 export interface SyncWork {
-	phase: 'recovering' | 'server' | 'scanning' | 'preparing' | 'uploading' | 'downloading' | 'applying' | 'saving';
+	phase: 'recovering' | 'server' | 'scanning' | 'preparing' | 'uploading' | 'downloading' | 'applying' | 'saving' | 'reminders';
 	current?: number;
 	total?: number;
 }

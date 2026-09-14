@@ -26,6 +26,8 @@ import {
 const logger = createLogger('SyncEngine');
 
 export interface SyncWorkflowContext extends FullSyncUploadContext {
+  finishInitialSetup?(): Promise<void>;
+  tryInitialImport?(result: SyncResult, progress?: (current: number, total: number) => void): Promise<SyncResult | null>;
 	apiConfigured(): boolean;
 	recoverUploads(): Promise<void>;
 	getStatus(): SyncStatus;
@@ -62,14 +64,24 @@ export async function runSyncWorkflow(
 
 	context.updateState({ status: 'syncing' });
 	logger.info('Sync started');
+	let result = createEmptySyncResult();
 
 	try {
 		context.updateState({ work: { phase: 'recovering' } });
 		await context.recoverUploads();
+    const imported = await context.tryInitialImport?.(result, progressCallback);
+    if (imported) {
+      result = imported;
+      if (!imported.errors.length) await context.finishInitialSetup?.();
+      completeWorkflowResult(context, imported, { errorFallback: 'Initial sync completed with errors' });
+      return imported;
+    }
 		context.updateState({ work: { phase: 'server' } });
 		context.throwIfDestroyed();
 		const incrementalResult = await context.incrementalSync(progressCallback);
 		if (incrementalResult) {
+			result = incrementalResult;
+			if (!result.errors.length) await context.finishInitialSetup?.();
 			completeWorkflowResult(context, incrementalResult, {
 				errorFallback: 'Incremental sync completed with errors',
 			});
@@ -78,17 +90,14 @@ export async function runSyncWorkflow(
 	} catch (error) {
 		if (context.isAbortError(error)) {
 			logger.info('Incremental sync aborted');
-			return createEmptySyncResult();
+			return result;
 		}
-		const failed = createEmptySyncResult();
-		handleWorkflowError(context, failed, error, { abortLogMessage: 'Sync recovery aborted', failureLogPrefix: 'Sync recovery failed', logger });
-		finalizeSyncResult(failed);
-		return failed;
+		handleWorkflowError(context, result, error, { abortLogMessage: 'Sync recovery aborted', failureLogPrefix: 'Sync recovery failed', logger });
+		finalizeSyncResult(result);
+		return result;
 	}
 
 	logger.info('Running full sync');
-
-	const result = createEmptySyncResult();
 
 	try {
 		context.throwIfDestroyed();
@@ -197,6 +206,7 @@ export async function runSyncWorkflow(
 		) {
 			context.setLastSeq(remoteManifest.lastSeq);
 		}
+		if (!result.errors.length) await context.finishInitialSetup?.();
 		completeWorkflowResult(context, result, {
 			errorFallback: 'Full sync completed with errors',
 		});

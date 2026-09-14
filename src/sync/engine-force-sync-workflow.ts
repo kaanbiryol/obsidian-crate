@@ -21,6 +21,7 @@ import {
 const logger = createLogger('SyncEngine');
 
 export interface ForceSyncWorkflowContext {
+	finishInitialSetup?(): Promise<void>;
 	vault: Vault;
 	apiConfigured(): boolean;
 	recoverUploads(): Promise<void>;
@@ -138,6 +139,7 @@ export async function runForceFullSyncWorkflow(
 		logger.info(
 			`Force full sync completed: ${result.uploaded} uploaded, ${result.deleted} remote-only deleted`,
 		);
+		if (!result.errors.length) await context.finishInitialSetup?.();
 		completeWorkflowResult(context, result, {
 			errorFallback: 'Force full sync completed with errors',
 		});
