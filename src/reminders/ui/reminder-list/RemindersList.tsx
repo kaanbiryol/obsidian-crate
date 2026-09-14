@@ -23,6 +23,7 @@ import {
   formatDateHeader,
   loadRemindersListData,
 } from "./reminderListModel";
+import { RemindersLoading } from "../RemindersLoading";
 import "./styles.scss";
 import { useReminderClock } from '../useReminderClock';
 
@@ -58,13 +59,14 @@ const ActiveRemindersList: React.FC<Props> = ({
   const { refreshToken, triggerRefresh } = useIndexRefresh();
 
   // State for reminders (needed because getAll is async when showCompleted is true)
-  const [rawReminders, setRawReminders] = useState<Reminder[]>([]);
+  const [{ rawReminders, isInitialLoadComplete }, setLoadedReminders] = useState<{ rawReminders: Reminder[]; isInitialLoadComplete: boolean }>({ rawReminders: [], isInitialLoadComplete: false });
   const clock = useReminderClock(rawReminders);
 
   // Load reminders - always use markdown index (markdown-first mode)
   useEffect(() => {
     let active = true;
     const loadReminders = async () => {
+      const ready = plugin.reminderIndex.isInitialLoadComplete;
       const loaded = await loadRemindersListData({
         repository: plugin.reminderRepository,
         showToday,
@@ -72,7 +74,7 @@ const ActiveRemindersList: React.FC<Props> = ({
         showCompleted: showCompletedState,
         effectiveDays,
       });
-      if (active) setRawReminders(loaded);
+      if (active) setLoadedReminders({ rawReminders: loaded, isInitialLoadComplete: ready });
     };
     void loadReminders();
     return () => { active = false; };
@@ -101,7 +103,7 @@ const ActiveRemindersList: React.FC<Props> = ({
       showCompleted: showCompletedState,
       effectiveDays,
     });
-    setRawReminders(loaded);
+    setLoadedReminders({ rawReminders: loaded, isInitialLoadComplete: plugin.reminderIndex.isInitialLoadComplete });
   }, [plugin, presentation.effectiveProject, triggerRefresh, showToday, showUpcoming, showCompletedState, effectiveDays]);
   const order = useReminderOrder(presentation.activeReminders, handleReorderCommit);
 
@@ -123,6 +125,8 @@ const ActiveRemindersList: React.FC<Props> = ({
       }
     );
   };
+
+  if (!isInitialLoadComplete) return <RemindersLoading compact />;
 
   return (
     <ThemeIconProvider renderer={ObsidianIcon}>

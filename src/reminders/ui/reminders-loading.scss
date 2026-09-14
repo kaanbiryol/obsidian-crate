@@ -1,0 +1,94 @@
+.crate-reminders-ui {
+  .reminders-loading {
+    width: min(100%, 420px);
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: 32px 24px;
+    color: var(--text-muted);
+  }
+
+  .reminders-loading--compact {
+    width: 100%;
+    margin: 1em 0;
+    padding: 16px 20px;
+  }
+
+  .reminders-loading-label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  .reminders-loading-indicator {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--interactive-accent, var(--text-muted));
+  }
+
+  .reminders-loading-preview {
+    display: grid;
+    gap: 10px;
+    animation: crate-reminders-loading-pulse 1.8s ease-in-out infinite;
+  }
+
+  .reminders-loading-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 15px 14px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 12px;
+    background: var(--background-secondary);
+
+    &:nth-child(2) .reminders-loading-line { width: 62%; }
+    &:nth-child(3) .reminders-loading-line { width: 74%; }
+    &:nth-child(2) .reminders-loading-detail { width: 40%; }
+  }
+
+  .reminders-loading-check {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    border: 1.5px solid var(--background-modifier-border);
+    border-radius: 50%;
+  }
+
+  .reminders-loading-lines {
+    display: grid;
+    flex: 1;
+    gap: 9px;
+    padding-top: 2px;
+  }
+
+  .reminders-loading-line,
+  .reminders-loading-detail {
+    display: block;
+    height: 8px;
+    width: 85%;
+    border-radius: 4px;
+    background: var(--background-modifier-border);
+  }
+
+  .reminders-loading-detail {
+    width: 28%;
+    height: 6px;
+    opacity: 0.65;
+  }
+
+  .reminders-loading--still .reminders-loading-preview { animation: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reminders-loading-preview { animation: none; }
+  }
+}
+
+@keyframes crate-reminders-loading-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
