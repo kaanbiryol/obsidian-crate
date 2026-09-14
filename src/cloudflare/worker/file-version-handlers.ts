@@ -72,7 +72,7 @@ export async function handleRestoreFileVersion(
 	// Expiry cleanup may already own the retained key. Never make it live again.
 	const objectKey = createManagedObjectKey(version.hash);
 	try {
-		await trackStagedUpload(db, objectKey);
+		await trackStagedUpload(db, objectKey, path);
 	await bucket.put(objectKey, content, {
 			httpMetadata: object.httpMetadata,
 			customMetadata: { hash: version.hash },

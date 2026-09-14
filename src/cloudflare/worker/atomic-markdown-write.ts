@@ -1,3 +1,4 @@
+import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { stagedUploadGuard, finishStagedUpload } from './staged-uploads';
 import { enqueueFileProjection } from './notification-projection-queue';
 import type { CommitEffects } from './commit-effects';
@@ -28,18 +29,18 @@ function destinationMutation(
 		return db.prepare(`/* atomic-destination-insert */
 			INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
 			SELECT ?, ?, ?, ?, datetime('now'), ?
-			WHERE NOT EXISTS (SELECT 1 FROM files WHERE path = ?)
-			AND EXISTS (SELECT 1 FROM files WHERE path = ? AND hash = ?)
+			WHERE NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})
+			AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?)
 			AND ${namespaceGuard}
-			ON CONFLICT(path) DO NOTHING`)
+			ON CONFLICT(portable_path) DO NOTHING`)
 			.bind(
 				destination.path,
 				portablePathKey(destination.path),
 				destination.hash,
 				destination.size,
 				destination.objectKey,
-				destination.path,
-				source.path,
+				...filePathArgs(destination.path),
+				...filePathArgs(source.path),
 				source.expectedHash,
 				...namespaceArgs,
 			);
@@ -47,17 +48,17 @@ function destinationMutation(
 
 	return db.prepare(`/* atomic-destination-update */
 		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
-		WHERE path = ? AND hash = ?
-		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND hash = ?)
+		WHERE ${FILE_PATH_MATCH} AND hash = ?
+		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?)
 		AND ${namespaceGuard}`)
 		.bind(
 			portablePathKey(destination.path),
 			destination.hash,
 			destination.size,
 			destination.objectKey,
-			destination.path,
+			...filePathArgs(destination.path),
 			destination.expectedHash,
-			source.path,
+			...filePathArgs(source.path),
 			source.expectedHash,
 			...namespaceArgs,
 		);
@@ -70,16 +71,16 @@ function sourceMutation(
 ): D1PreparedStatement {
 	return db.prepare(`/* atomic-source-update */
 		UPDATE files SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
-		WHERE path = ? AND hash = ?
-		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
+		WHERE ${FILE_PATH_MATCH} AND hash = ?
+		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`)
 		.bind(
 			portablePathKey(source.path),
 			source.hash,
 			source.size,
 			source.objectKey,
-			source.path,
+			...filePathArgs(source.path),
 			source.expectedHash,
-			destination.path,
+			...filePathArgs(destination.path),
 			destination.objectKey,
 		);
 }
@@ -87,8 +88,8 @@ function sourceMutation(
 function changelogStatement(db: D1Database, staged: StagedMarkdownFile): D1PreparedStatement {
 	return db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
 		SELECT ?, 'put', ?, ?, ?
-		WHERE EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
-		.bind(staged.path, staged.hash, staged.size, staged.objectKey, staged.path, staged.objectKey);
+		WHERE EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`)
+		.bind(staged.path, staged.hash, staged.size, staged.objectKey, ...filePathArgs(staged.path), staged.objectKey);
 }
 
 function retainVersionStatement(
@@ -100,17 +101,17 @@ function retainVersionStatement(
 	return db.prepare(`INSERT OR IGNORE INTO file_versions
 		(storage_key, path, hash, size, reason, expires_at)
 		SELECT ?, ?, ?, ?, 'replaced', ?
-		WHERE EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)
-		AND EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)`)
+		WHERE EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
+		AND EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`)
 		.bind(
 			previous.storageKey,
 			previous.path,
 			previous.hash,
 			previous.size,
 			Date.now() + FILE_VERSION_RETENTION_MS,
-			source.path,
+			...filePathArgs(source.path),
 			source.objectKey,
-			destination.path,
+			...filePathArgs(destination.path),
 			destination.objectKey,
 		);
 }
@@ -152,7 +153,7 @@ export async function writeCommittedMarkdownFilePair(
 			params.source.expectedHash,
 		));
 	} catch (error) {
-		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => file.objectKey));
+		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => ({ storageKey: file.objectKey, path: file.path })));
 		throw error;
 	}
 
@@ -174,10 +175,10 @@ export async function writeCommittedMarkdownFilePair(
 			changelogStatement(db, destination),
 			changelogStatement(db, source),
 			...previousVersions.map(previous => retainVersionStatement(db, previous, source, destination)),
-			...enqueueFileProjection(db, source.path, source.objectKey, params.source.content),
-			...enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content),
-			finishStagedUpload(db, source.objectKey),
-			finishStagedUpload(db, destination.objectKey),
+			...await enqueueFileProjection(db, source.path, source.objectKey, params.source.content),
+			...await enqueueFileProjection(db, destination.path, destination.objectKey, params.destination.content),
+			finishStagedUpload(db, source.objectKey, source.path),
+			finishStagedUpload(db, destination.objectKey, destination.path),
 			...(params.effects?.([source, destination].map(file => ({ path: file.path, storageKey: file.objectKey }))) ?? []),
 	]);
 
@@ -187,7 +188,7 @@ export async function writeCommittedMarkdownFilePair(
 		if (destinationCommitted !== sourceCommitted) {
 			throw new Error('Atomic reminder move committed only one file');
 		}
-		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => file.objectKey));
+		await deleteBucketObjectsOrQueue(bucket, db, stagedFiles.map(file => ({ storageKey: file.objectKey, path: file.path })));
 		await assertFileNamespaceAvailable(db, source.path);
 		await assertFileNamespaceAvailable(db, destination.path);
 		const [currentSource, currentDestination] = await Promise.all([

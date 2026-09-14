@@ -1,3 +1,4 @@
+import schemaV6 from './schema-v6.sql?raw';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
@@ -63,19 +64,21 @@ async function validateD1Schema(input: {
 	accountId: string;
 	databaseId: string;
 	artifacts: CloudflareDeploymentArtifacts;
-}): Promise<void> {
+}): Promise<number | null> {
 	const query = (sql: string) => input.api.queryD1(input.accountId, input.databaseId, sql);
 	const tables = (await query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';"))
 		.flatMap(result => result.results ?? []).map(row => row.name);
 	if (tables.length === 1 && tables[0] === 'maintenance_state') {
 		const unexpected = (await query(`SELECT key FROM maintenance_state WHERE key != '${DEPLOYMENT_FENCE_KEY}' LIMIT 1;`)).flatMap(result => result.results ?? []);
-		if (unexpected.length === 0) return; // Interrupted empty-database fence bootstrap.
+		if (unexpected.length === 0) return null; // Interrupted empty-database fence bootstrap.
 	}
 	if (tables.length > 0) {
 		if (!tables.includes('crate_schema')) throw new Error('Unsupported database schema. Use an empty database or a current Crate deployment.');
 		const versions = (await query('SELECT version FROM crate_schema WHERE id = 1;')).flatMap(result => result.results ?? []);
-		if (versions.length !== 1 || versions[0]?.version !== 2 && versions[0]?.version !== 3 && versions[0]?.version !== 4 && versions[0]?.version !== 5) throw new Error('Unsupported database schema. Use a matching Crate build.');
+		if (versions.length !== 1 || versions[0]?.version !== 2 && versions[0]?.version !== 3 && versions[0]?.version !== 4 && versions[0]?.version !== 5 && versions[0]?.version !== 6) throw new Error('Unsupported database schema. Use a matching Crate build.');
+		return versions[0].version;
 	}
+	return null;
 }
 
 async function checkRemoteDeployment(input: { api: CloudflareApiClient; accountId: string; metadata: CloudflareDeploymentMetadata; artifacts: CloudflareDeploymentArtifacts }): Promise<string | null> {
@@ -157,10 +160,14 @@ export async function provisionCloudflareDeployment(input: {
 		// Recheck after acquiring ownership: another device may have completed an
 		// update after the initial read but before this attempt acquired the fence.
 		if (await checkRemoteDeployment(input) !== expectedRemote) throw new Error('The server changed while this update was starting. Refresh its deployment status before authorizing another update.');
-		await validateD1Schema(schemaInput);
+		const schemaVersion = await validateD1Schema(schemaInput);
 		input.onProgress?.('Preparing the remote file bucket…');
 		await ensureR2Bucket(input.api, input.accountId, input.metadata.r2BucketName, fence);
 		input.onProgress?.('Initializing the database schema…');
+		if (schemaVersion !== null && schemaVersion < 6) {
+      fence.beginSchemaUpgrade();
+      await fence.mutate(() => input.api.queryD1(input.accountId, databaseId, schemaV6), 'upgrade-file-inventory');
+    }
 		await fence.mutate(() => input.api.queryD1(input.accountId, databaseId, input.artifacts.d1Schema), 'apply-schema');
 		const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata, fence);
 		input.onProgress?.('Uploading the Worker and web app to Cloudflare…');
@@ -172,6 +179,7 @@ export async function provisionCloudflareDeployment(input: {
 			d1DatabaseId: databaseId,
 			r2BucketName: input.metadata.r2BucketName,
 		}), 'upload-worker');
+    fence.completeSchemaUpgrade();
 		input.onProgress?.('Configuring server maintenance…');
 		await fence.mutate(() => input.api.updateWorkerSchedules(
 			input.accountId,

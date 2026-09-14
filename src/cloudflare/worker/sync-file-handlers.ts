@@ -86,7 +86,7 @@ export async function handleUpload(request: Request, bucket: R2Bucket, db: D1Dat
 		}
 
 		const objectKey = createManagedObjectKey(hash);
-		await trackStagedUpload(db, objectKey);
+		await trackStagedUpload(db, objectKey, safePath);
 	await bucket.put(objectKey, body, {
 			httpMetadata: { contentType },
 			customMetadata: { hash },

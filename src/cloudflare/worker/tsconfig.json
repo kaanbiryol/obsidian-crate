@@ -4,6 +4,7 @@
 		"moduleResolution": "Bundler"
 	},
 	"include": [
+		"../raw-sql.d.ts",
 		"./**/*.ts",
 		"./**/*.tsx",
 		"./**/*.js",

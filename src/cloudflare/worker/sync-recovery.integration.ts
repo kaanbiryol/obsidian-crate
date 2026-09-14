@@ -113,7 +113,7 @@ describe('sync recovery', () => {
 		expect(await db.prepare("SELECT value FROM maintenance_state WHERE key = 'orphan_sweep_cursor'").first()).not.toBeNull();
 		expect(await sweepOrphanedManagedObjects(bucket, db, now)).toBe(1);
 		expect(await db.prepare("SELECT value FROM maintenance_state WHERE key = 'orphan_sweep_cursor'").first()).toBeNull();
-		expect(bindingCounts).toEqual([100, 100, 2]);
+		expect(bindingCounts).toEqual([1, 1]);
     const listing = vi.spyOn(bucket, 'list');
     expect(await sweepOrphanedManagedObjects(bucket, db, now)).toBe(0);
     expect(listing).not.toHaveBeenCalled();

@@ -1,3 +1,4 @@
+import { FILE_PATH_MATCH, filePathArgs } from '../file-identity';
 import { sha256HexBytes } from '../auth';
 import { corsResponse } from '../cors';
 import type { CommitEffects } from '../commit-effects';
@@ -29,8 +30,8 @@ async function readReminderReceipt(db: D1Database, operation: Pick<ReminderOpera
 }
 export function reminderOperationEffects(db: D1Database, operation: ReminderOperation, response: Record<string, unknown>, createdId?: string): CommitEffects {
 	return files => {
-		const predicate = files.map(() => 'EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)').join(' AND ');
-		const bindings = files.flatMap(file => [file.path, file.storageKey]);
+		const predicate = files.map(() => `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)`).join(' AND ');
+		const bindings = files.flatMap(file => [...filePathArgs(file.path), file.storageKey]);
 		return [
 			// An operation can expire while R2 is being staged. A NOT NULL failure
 			// aborts the entire D1 batch, including both files of a project move.

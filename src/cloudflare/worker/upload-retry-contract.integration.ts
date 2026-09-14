@@ -16,6 +16,7 @@ beforeEach(async () => {
 	vi.stubGlobal('window', { setTimeout, clearTimeout });
 	vi.spyOn(console, 'info').mockImplementation(() => {});
 	for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+	await env.DB.prepare("INSERT INTO initial_import(id, token, state) VALUES(1, 'established', 'complete')").run();
 });
 afterEach(async () => { for (const device of devices.splice(0)) device.close(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await reset(); });
 const day = () => Math.floor(Date.now() / 86400000);

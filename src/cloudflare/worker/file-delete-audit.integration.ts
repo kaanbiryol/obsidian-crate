@@ -181,7 +181,7 @@ it('applies the additive schema-2 upgrade repeatedly without changing existing v
 	await env.DB.prepare('UPDATE crate_schema SET version = 2').run();
 	const before = await env.DB.prepare('SELECT * FROM files').all();
 	await applySchema(); await applySchema();
-	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: 5 });
+	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: 6 });
 	expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(before.results);
 	expect((await remove(file)).status).toBe(200);
 	expect(await receipts()).toHaveLength(1);

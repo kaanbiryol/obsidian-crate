@@ -1,3 +1,4 @@
+import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
 import { decodeMarkdownBytes } from '@/reminders/core/markdownEncoding';
 import type { CommitEffects } from './commit-effects';
 import { sha256HexBytes } from './auth';
@@ -40,8 +41,8 @@ export async function listStoredMarkdownFileMetadataByPrefix(
 	const rows = await queryRows<{ path: string; hash: string; size: number; storage_key: string }>(
 		db.prepare(
 			`SELECT path, hash, size, storage_key FROM files
-			WHERE path >= ? AND path < ? AND lower(path) LIKE '%.md' ORDER BY path ASC`,
-		).bind(`${pathPrefix}/`, `${pathPrefix}0`),
+			WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md' ORDER BY path ASC`,
+		).bind(...fileFolderArgs(pathPrefix)),
 	);
 	return rows.map((row) => ({
 		path: row.path,

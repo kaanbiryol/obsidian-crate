@@ -1,3 +1,4 @@
+import { portablePathKey } from '../../protocol/portable-path';
 import { createReminderOperationId } from '@/protocol/reminder-operation';
 export const createTestUploadOperationId = () => createReminderOperationId(Math.floor(Date.now() / 86400000));
 import { vi, type Mock } from 'vitest';
@@ -193,8 +194,8 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 				first: vi.fn(async <T = Record<string, unknown>>() => {
 					if (sql.startsWith('SELECT 1 WHERE')) return { valid: 1 } as T;
 					if (sql.startsWith('SELECT request_hash, response_json FROM upload_operations')) return (receipts.get(String(statement._args[0])) ?? (sql.includes('UNION ALL') ? { request_hash: null, response_json: null } : null)) as T | null;
-					if (sql.includes('FROM files WHERE path = ?')) {
-						const path = getBoundString(statement._args, 0);
+					if (sql.includes('FROM files WHERE portable_path = ? AND path = ?')) {
+						const path = getBoundString(statement._args, 1);
 						const file = files.get(path);
 						if (!file) {
 							return null;
@@ -210,12 +211,13 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 					return null;
 				}) as MockD1Statement['first'],
 				all: vi.fn(async <T = Record<string, unknown>>() => {
-					if (sql.includes('FROM files WHERE path IN')) {
+					if (sql.includes('FROM files WHERE portable_path IN')) {
 						const results = statement._args.flatMap((value) => {
 							if (typeof value !== 'string') return [];
-							const file = files.get(value);
+							const entry = [...files.entries()].find(([path]) => portablePathKey(path) === value);
+              const file = entry?.[1];
 							return file ? [{
-								path: value,
+								path: entry[0],
 								hash: file.hash,
 								size: file.size,
 								storage_key: file.storageKey,
@@ -249,8 +251,8 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 						changes = 1;
 					}
 				} else if (statement._sql.startsWith('UPDATE files')) {
-					const path = getBoundString(statement._args, 4);
-					const expectedHash = getBoundString(statement._args, 5);
+					const path = getBoundString(statement._args, 5);
+					const expectedHash = getBoundString(statement._args, 6);
 					const current = files.get(path);
 					if (current?.hash === expectedHash) {
 						files.set(path, {
@@ -261,20 +263,20 @@ export function createMockD1Database(options?: { failBatch?: boolean; files?: Re
 						changes = 1;
 					}
 				} else if (statement._sql.includes('DELETE FROM files WHERE')) {
-					const path = getBoundString(statement._args, 0);
+					const path = getBoundString(statement._args, 1);
 					const current = files.get(path);
-					const expectedHash = statement._args[1];
-					if (current && current.hash === expectedHash && current.storageKey === statement._args[2]) {
+					const expectedHash = statement._args[2];
+					if (current && current.hash === expectedHash && current.storageKey === statement._args[3]) {
 						files.delete(path);
 						changes = 1;
 					}
 				} else if (statement._sql.includes('INSERT INTO upload_operations')) {
 					const args = statement._args;
-					const file = files.get(String(args[4]));
-					const success = file?.storageKey === args[5];
+					const file = files.get(String(args[5]));
+					const success = file?.storageKey === args[6];
 					receipts.set(String(args[0]), { request_hash: args[1], response_json: JSON.stringify(success
-						? { success: true, path: args[6], hash: args[7], revision: args[8] }
-						: { success: false, path: args[9], status: 409, code: 'version_conflict', error: 'Remote file or namespace changed since it was read', currentHash: file?.hash ?? null }) });
+						? { success: true, path: args[7], hash: args[8], revision: args[9] }
+						: { success: false, path: args[10], status: 409, code: 'version_conflict', error: 'Remote file or namespace changed since it was read', currentHash: file?.hash ?? null }) });
 					changes = 1;
 				} else if (statement._sql.includes('INSERT INTO changelog')) {
 					changes = 1;

@@ -85,7 +85,7 @@ it.each(conflicts)('serializes simultaneous publication of %s and %s', async (fi
 	expect(Object.keys(manifest.files)).toHaveLength(1);
 	expect(() => assertPortablePaths(Object.keys(manifest.files))).not.toThrow();
 	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM changelog').first()).toEqual({ count: 1 });
-	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM notification_projection_jobs').first()).toEqual({ count: 1 });
+	expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM notification_projection_jobs').first()).toEqual({ count: 0 });
 });
 
 it('allows exact-path updates, safe siblings and directories sharing a prefix', async () => {

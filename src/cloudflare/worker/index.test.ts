@@ -142,6 +142,26 @@ function createSubscriptionRequest(): Request {
 }
 
 describe('worker entrypoint', () => {
+	it.each([false, true])('rejects an initial upload before forwarding it without vault authority (signed in: %s)', async signedIn => {
+		const runtime = createEnv({ DB: createDb({ authenticatedScope: 'reminders' }).db as never });
+		const forward = vi.spyOn(runtime.REMINDER_ALARMS, 'get');
+		const headers: Record<string, string> = { 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) };
+		if (signedIn) headers.Authorization = 'Bearer reminders-token';
+		const response = await worker.fetch(new Request('https://worker.test/sync/import/upload', {
+			method: 'POST', headers, body: '{}',
+		}), runtime);
+		expect(response.status).toBe(signedIn ? 403 : 401);
+		expect(forward).not.toHaveBeenCalled();
+	});
+
+	it('does not expose the internal import upload endpoint publicly', async () => {
+		const runtime = createEnv();
+		const response = await worker.fetch(new Request('https://worker.test/import-upload', {
+			method: 'POST', headers: { Authorization: 'Bearer vault-token', 'X-Crate-Protocol': String(CRATE_PLUGIN_PROTOCOL.current) }, body: '{}',
+		}), runtime);
+		expect(response.status).toBe(404);
+	});
+
 	it('serves server metadata at the root without a public claim page', async () => {
 		const response = await worker.fetch(
 			new Request('https://worker.test/'),

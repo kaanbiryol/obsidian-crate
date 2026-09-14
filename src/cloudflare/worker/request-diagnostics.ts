@@ -42,7 +42,7 @@ export async function logMutation(request: Request, response: Response, requestI
   const path = new URL(request.url).pathname;
   console.info('crate.mutation', {
     requestId, status: response.status, method: request.method,
-    route: /^\/(sync|reminders|notifications|auth)\/[a-z-]+$/.test(path) ? path : 'other',
+    route: /^\/(sync|reminders|notifications|auth)\/(?:import\/)?[a-z-]+$/.test(path) ? path : 'other',
     clientSession: opaque(request.headers.get('X-Crate-Client-Session')),
     operationId: opaque(request.headers.get('X-Crate-Operation-Id')),
     uploadOperationIds: (request.headers.get('X-Crate-Upload-Operation') ?? request.headers.get('X-Crate-Upload-Operations') ?? '').split(',').filter(id => reminderOperationDay(id) !== null).slice(0, BULK_NEW_UPLOAD_MAX_FILES),

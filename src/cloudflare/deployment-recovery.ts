@@ -55,6 +55,9 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
     if (record.recoveryProtocol !== 1 || record.stepState !== 'confirmed' || !confirmedSteps.has(String(record.step))) {
         return result('blocked', 'Cloudflare may still be processing the interrupted request. Crate cannot safely unlock it yet. Copy diagnostics for support; no server data was changed.');
     }
+    if (record.schemaUpgradePending === true && build[2] !== record.fingerprint) {
+        return result('blocked', 'The database upgrade needs its matching server build. Finish deploying that build before clearing the operation lock.');
+    }
     const removed = (await api.queryD1(account, database,
         'DELETE FROM maintenance_state WHERE key = ? AND value = ? RETURNING key;', [DEPLOYMENT_FENCE_KEY, value])).flatMap(row => row.results ?? []);
     if (removed.length !== 1 || removed[0]?.key !== DEPLOYMENT_FENCE_KEY) {

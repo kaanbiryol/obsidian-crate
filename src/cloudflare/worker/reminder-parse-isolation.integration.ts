@@ -65,14 +65,21 @@ for (const policy of ['none', 'outside', 'inside']) {
 		expect(await rows('file_versions')).toMatchObject([{ storage_key: first.revision, hash: first.hash, reason: 'replaced' }]);
 		expect(await (await request(`/sync/versions?path=${encodeURIComponent(path)}`)).json()).toMatchObject({ versions: [{ storage_key: first.revision }] });
 		expect(await rows('changelog')).toHaveLength(2);
-		expect((await quarantine(path))?.last_error).toContain('vault file remains synced');
-		await retryProjection();
-		expect((await quarantine(path))?.last_error).toContain('vault file remains synced');
-		expect(await (await request('/diagnostics')).json()).toMatchObject({
-			counts: { failedNotificationProjections: 1 }, notificationProjectionIssues: [{ path, reason: expect.stringContaining('Repair') as string }],
-		});
+		if (policy === 'inside') {
+			expect((await quarantine(path))?.last_error).toContain('vault file remains synced');
+			await retryProjection();
+			expect((await quarantine(path))?.last_error).toContain('vault file remains synced');
+			expect(await (await request('/diagnostics')).json()).toMatchObject({
+				counts: { failedNotificationProjections: 1 }, notificationProjectionIssues: [{ path, reason: expect.stringContaining('Repair') as string }],
+			});
+		} else {
+			expect(await quarantine(path)).toBeNull();
+			expect(await rows('reminder_source_state')).toEqual([]);
+			expect(await (await request('/diagnostics')).json()).toMatchObject({ counts: { failedNotificationProjections: 0 } });
+		}
 		expect((await put(path, valid, current.hash)).hash).toBe(await sha256Hex(valid));
-		expect((await quarantine(path))?.last_error).toBeNull();
+		if (policy === 'inside') expect((await quarantine(path))?.last_error).toBeNull();
+		else expect(await quarantine(path)).toBeNull();
 		await drainNotificationProjections(env);
 		if (policy === 'inside') expect(await rows('notification_jobs')).toMatchObject([{ reminder_id: id, operation: 'schedule' }]);
 	});
@@ -106,28 +113,28 @@ it('quarantines an uncertain replacement without cancelling or changing verified
 });
 
 it('publishes quarantine atomically even when the D1 commit response is lost', async () => {
+	await configure();
 	const batch = env.DB.batch.bind(env.DB);
 	vi.spyOn(env.DB, 'batch').mockImplementationOnce(async statements => { await batch(statements); throw new Error('lost response'); });
 	const operationId = createReminderOperationId(Math.floor(Date.now() / 86400000));
-	expect((await upload('Notes/Ordinary.md', invalid, 'absent', operationId)).status).toBe(503);
-	expect(await (await request('/sync/download?path=Notes%2FOrdinary.md')).text()).toBe(invalid);
-	expect((await quarantine('Notes/Ordinary.md'))?.last_error).toContain('Repair');
-	expect((await upload('Notes/Ordinary.md', invalid, 'absent', operationId)).status).toBe(200); // Exact retry preserves the committed quarantine.
+	expect((await upload('Reminders/Ordinary.md', invalid, 'absent', operationId)).status).toBe(503);
+	expect(await (await request('/sync/download?path=Reminders%2FOrdinary.md')).text()).toBe(invalid);
+	expect((await quarantine('Reminders/Ordinary.md'))?.last_error).toContain('Repair');
+	expect((await upload('Reminders/Ordinary.md', invalid, 'absent', operationId)).status).toBe(200); // Exact retry preserves the committed quarantine.
 	expect(await rows('changelog')).toHaveLength(1);
 });
 
-it.each([{ kind: 'malformed', content: invalid }, { kind: 'oversized', content: `${valid}\n${'a'.repeat(1024 * 1024)}` }])('retains verified state for a $kind source after a policy change', async ({ content }) => {
+it.each([{ kind: 'malformed', content: invalid }, { kind: 'oversized', content: `${valid}\n${'a'.repeat(1024 * 1024)}` }])('cancels a $kind source outside the newly selected folder without parsing it', async ({ content }) => {
 	await configure();
 	const path = 'Reminders/Inbox.md';
 	const first = await put(path, valid);
 	await drainNotificationProjections(env);
-	const before = await rows('notification_jobs');
 	await put(path, content, first.hash);
 	const policy = await env.DB.prepare('SELECT revision FROM notification_policy').first<{ revision: string }>();
 	expect((await request('/reminders/notification-policy', { method: 'PUT', body: JSON.stringify({ folderPath: 'Other', timezone: 'UTC', allDayTime: '09:00', expectedRevision: policy!.revision }) })).status).toBe(200);
 	await drainNotificationProjections(env);
-	expect(await rows('notification_jobs')).toEqual(before);
-	expect((await quarantine(path))?.last_error).toContain('vault file remains synced');
+	expect(await rows('notification_jobs')).toMatchObject([{ reminder_id: id, operation: 'cancel' }]);
+	expect(await quarantine(path)).toBeNull();
 });
 
 it('permits explicit deletion of a quarantined source to cancel its verified reminders', async () => {
@@ -144,29 +151,31 @@ it('permits explicit deletion of a quarantined source to cancel its verified rem
 });
 
 it('does not publish quarantine for a failed compare-and-swap or rolled-back transaction', async () => {
-	const path = 'Notes/Ordinary.md';
+	await configure();
+	const path = 'Reminders/Ordinary.md';
 	await put(path, 'current');
 	const before = await quarantine(path);
 	expect((await upload(path, invalid, '0'.repeat(64))).status).toBe(409);
 	expect(await quarantine(path)).toEqual(before);
 	await env.DB.prepare("CREATE TRIGGER reject_projection BEFORE INSERT ON notification_projection_jobs BEGIN SELECT RAISE(ABORT, 'test quarantine failure'); END").run();
-	expect((await upload('Notes/Rejected.md', invalid)).status).toBe(503);
-	expect(await quarantine('Notes/Rejected.md')).toBeNull();
-	expect((await request('/sync/download?path=Notes%2FRejected.md')).status).toBe(404);
+	expect((await upload('Reminders/Rejected.md', invalid)).status).toBe(503);
+	expect(await quarantine('Reminders/Rejected.md')).toBeNull();
+	expect((await request('/sync/download?path=Reminders%2FRejected.md')).status).toBe(404);
 });
 
 it('accepts malformed metadata in batch uploads, atomic pairs, and retained-version restores', async () => {
-	const path = 'Notes/Batch.md';
+	await configure();
+	const path = 'Reminders/Batch.md';
 	const response = await request('/sync/batch-upload', { method: 'POST', body: JSON.stringify({ files: [{ path, content: btoa(invalid), operationId: createReminderOperationId(Math.floor(Date.now() / 86400000)), expectedHash: null }] }) });
 	expect(response.status).toBe(200);
 	expect(await response.json()).toMatchObject({ results: [{ success: true }] });
 	const old = await env.DB.prepare('SELECT hash, storage_key AS revision FROM files WHERE path = ?').bind(path).first<Uploaded>();
-	const source = await put('Notes/Source.md', 'source');
+	const source = await put('Reminders/Source.md', 'source');
 	await writeCommittedMarkdownFilePair(env.BUCKET, env.DB, {
-		source: { path: 'Notes/Source.md', content: invalid, expectedHash: source.hash },
-		destination: { path: 'Notes/Destination.md', content: invalid, expectedHash: null },
+		source: { path: 'Reminders/Source.md', content: invalid, expectedHash: source.hash },
+		destination: { path: 'Reminders/Destination.md', content: invalid, expectedHash: null },
 	});
-	for (const affected of ['Notes/Source.md', 'Notes/Destination.md']) {
+	for (const affected of ['Reminders/Source.md', 'Reminders/Destination.md']) {
 		expect(await (await request(`/sync/download?path=${encodeURIComponent(affected)}`)).text()).toBe(invalid);
 		expect((await quarantine(affected))?.last_error).toContain('Repair');
 	}

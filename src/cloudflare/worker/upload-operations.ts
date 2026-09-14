@@ -1,3 +1,4 @@
+import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { sha256Hex } from './auth';
 import { corsResponse } from './cors';
 import { reminderOperationDay } from '@/protocol/reminder-operation';
@@ -49,15 +50,15 @@ export function recordUploadReceipt(db: D1Database, operation: UploadOperation, 
 	const conflict = namespacePredicate(file.path);
 	return db.prepare(`INSERT INTO upload_operations (operation_id, request_hash, response_json)
 		SELECT ?, ?, CASE WHEN ${REMINDER_OPERATION_VALID} THEN
-			CASE WHEN EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)
+			CASE WHEN EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)
 			THEN json_object('success', json('true'), 'path', ?, 'hash', ?, 'revision', ?)
 			ELSE json_object('success', json('false'), 'path', ?, 'status', 409,
 				'code', CASE WHEN ${namespace.sql} THEN 'version_conflict' ELSE 'namespace_conflict' END,
 				'error', 'Remote file or namespace changed since it was read',
-				'currentHash', (SELECT hash FROM files WHERE path = ?),
+				'currentHash', (SELECT hash FROM files WHERE ${FILE_PATH_MATCH}),
 				'conflictingPath', (SELECT path FROM files WHERE ${conflict.sql} LIMIT 1)) END
 		ELSE NULL END WHERE NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)
 		RETURNING response_json`)
-		.bind(operation.id, operation.requestHash, operation.day, operation.day, file.path, file.objectKey,
-			file.path, file.hash, file.objectKey, file.path, ...namespace.args, file.path, ...conflict.args, operation.id);
+		.bind(operation.id, operation.requestHash, operation.day, operation.day, ...filePathArgs(file.path), file.objectKey,
+			file.path, file.hash, file.objectKey, file.path, ...namespace.args, ...filePathArgs(file.path), ...conflict.args, operation.id);
 }

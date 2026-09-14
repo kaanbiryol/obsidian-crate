@@ -23,7 +23,7 @@ export async function stageMarkdownFile(
 	}
 	const hash = await sha256HexBytes(bytes.buffer);
 	const objectKey = createManagedObjectKey(hash);
-	await trackStagedUpload(db, objectKey);
+	await trackStagedUpload(db, objectKey, path);
 	await bucket.put(objectKey, bytes, {
 		httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
 		customMetadata: { hash },

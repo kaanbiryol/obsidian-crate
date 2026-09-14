@@ -37,7 +37,7 @@ it('loads metadata for a maximum download batch with one D1 query', async () => 
 
 		expect(response.status).toBe(200);
 		const metadataQueries = db.prepare.mock.calls.filter(([sql]) =>
-			typeof sql === 'string' && sql.includes('FROM files WHERE path IN'));
+			typeof sql === 'string' && sql.includes('FROM files WHERE portable_path IN'));
 		expect(metadataQueries).toHaveLength(1);
 		expect(metadataQueries[0]?.[0]).toContain(Array.from({ length: 50 }, () => '?').join(', '));
 	});

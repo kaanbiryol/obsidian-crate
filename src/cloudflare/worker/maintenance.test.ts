@@ -11,7 +11,7 @@ function createStatement(sql: string) {
 		}),
 		first: vi.fn(async () => null),
     all: vi.fn(async () => ({
-			results: sql.startsWith('SELECT storage_key') && !sql.includes('UNION')
+			results: sql.startsWith('SELECT storage_key, file_path FROM object_cleanup_queue')
 				? [{ storage_key: 'queued-object' }]
 				: [],
 		})),

@@ -27,11 +27,11 @@ async function remote(client: SyncTestDevice, path: string) {
 it('batches cold uploads with absent-file guards and preserves confirmed revisions and progress', async () => {
 	const client = await device();
 	for (let index = 0; index < 7; index++) client.disk.write(`note-${index}.md`, `Note ${index}`);
-	const batch = vi.spyOn(client.api, 'batchUpload'); const progress = vi.fn();
+	const batch = vi.spyOn(client.api.initialImport, 'upload'); const progress = vi.fn();
 	const result = await client.engine.sync(progress);
 	expect(result.errors).toEqual([]); expect(result.uploaded).toBe(7);
-	expect(batch.mock.calls.map(([files]) => files.length)).toEqual([7]);
-	expect(batch.mock.calls.flatMap(([files]) => files).every(file => file.expectedHash === null)).toBe(true);
+	expect(batch.mock.calls.map(([, files]) => files.length)).toEqual([7]);
+	expect(batch.mock.calls.flatMap(([, files]) => files).every(file => file.expectedHash === null)).toBe(true);
 	expect(client.requests).not.toContain('PUT /sync/upload');
 	expect(progress).toHaveBeenLastCalledWith(7, 7);
 	const manifest = await client.api.getManifest();
@@ -84,8 +84,7 @@ it('resumes a cold batch after committed response loss and retains a later local
 	const recovered = await client.engine.sync();
 	expect(recovered.errors).toEqual([]);
 	pause.release();
-	// The durable receipt restores the original common ancestor, so the later
-	// local edit can now be uploaded without an unnecessary conflict copy.
+	// Remote metadata checkpoints the committed files; only the edited file is uploaded again.
 	expect(recovered.conflicts).toEqual([]);
 	for (let index = 0; index < 7; index++) {
 		const path = `note-${index}.md`;
@@ -96,17 +95,17 @@ it('resumes a cold batch after committed response loss and retains a later local
 	expect(Object.keys((await client.api.getManifest()).files)).toHaveLength(7);
 });
 
-it('uses eight-file commits for the explicit initial-sync workflow', async () => {
+it('uses larger commits for the explicit initial-sync workflow', async () => {
   const client = await device();
-  for (let index = 0; index < 16; index++) client.disk.write(`initial-${index}.md`, `Initial note ${index}`);
-  const batch = vi.spyOn(client.api, 'batchUpload');
+  for (let index = 0; index < 64; index++) client.disk.write(`initial-${index}.md`, `Initial note ${index}`);
+  const batch = vi.spyOn(client.api.initialImport, 'upload');
   const result = await client.engine.initialSync();
   expect(result.errors).toEqual([]);
-  expect(result.uploaded).toBe(16);
-  expect(batch.mock.calls.map(([files]) => files.length)).toEqual([8, 8]);
-  expect(client.requests.filter(route => route === 'POST /sync/batch-upload')).toHaveLength(2);
-  expect(Object.keys(client.checkpoint().files)).toHaveLength(16);
-  for (let index = 0; index < 16; index++) {
+  expect(result.uploaded).toBe(64);
+  expect(batch.mock.calls.map(([, files]) => files.length)).toEqual([32, 32]);
+  expect(client.requests.filter(route => route === 'POST /sync/import/upload')).toHaveLength(2);
+  expect(Object.keys(client.checkpoint().files)).toHaveLength(64);
+  for (let index = 0; index < 64; index++) {
     expect(await remote(client, `initial-${index}.md`)).toBe(`Initial note ${index}`);
   }
 });

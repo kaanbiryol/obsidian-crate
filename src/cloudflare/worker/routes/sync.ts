@@ -1,6 +1,5 @@
 import {
 	handleBatchDelete,
-	handleBatchDownload,
 	handleBatchUpload,
 	handleCheckChanges,
 	handleDelete,
@@ -20,6 +19,10 @@ import type { Env } from '../types';
 import type { RouteMethod } from './shared';
 import { withDatabase } from './shared';
 import type { MutationAuditContext } from '../request-diagnostics';
+import { beginInitialImport, finishInitialImport } from '../initial-import';
+import { pruneInitialImport } from '../initial-import-prune';
+import { forwardTransferRequest } from '../transfer-dispatch';
+import { finishInitialReminderSetup } from '../initial-import-readiness';
 
 export async function handleSyncRoute(
 	request: Request,
@@ -31,6 +34,19 @@ export async function handleSyncRoute(
 	const db = env.DB;
   if (path === '/notifications/retry' && method === 'POST') return retryPausedNotifications(db);
 	const bucket = env.BUCKET;
+  if (path === '/sync/import' && method === 'POST') return beginInitialImport(db, async () => {
+    const coordinator = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/projection'));
+    const response = await coordinator.fetch('https://do/project', { method: 'POST' });
+    if (!response.ok) throw new Error('Unable to resume reminder setup');
+  });
+  if (path === '/sync/import/complete' && method === 'POST') return finishInitialImport(request, db);
+  if (path === '/sync/import/readiness' && method === 'POST') return finishInitialReminderSetup(request, db);
+  if (path === '/sync/import/prune' && method === 'POST') return pruneInitialImport(request, db);
+  if (path === '/sync/import/upload' && (method === 'POST' || method === 'PUT')) {
+    // Hashing, R2 writes and D1 publication use the existing object's CPU allowance.
+    // The public Worker has already checked protocol, authorization and maintenance.
+    return forwardTransferRequest(request, env, '/import-upload');
+  }
 
 	if (path === '/health' && method === 'GET') return await handleHealth();
 	if (path === '/diagnostics' && method === 'GET') {
@@ -61,7 +77,7 @@ export async function handleSyncRoute(
 		return await withDatabase(db, requiredDb => handleBatchUpload(request, bucket, requiredDb, env.commitUpload, env.commitNewFiles));
 	}
 	if (path === '/sync/batch-download' && method === 'POST') {
-		return await withDatabase(db, requiredDb => handleBatchDownload(request, bucket, requiredDb));
+		return forwardTransferRequest(request, env, '/batch-download');
 	}
 	if (path === '/sync/batch-delete' && method === 'POST') {
 		return await withDatabase(db, requiredDb => handleBatchDelete(request, bucket, requiredDb, audit));

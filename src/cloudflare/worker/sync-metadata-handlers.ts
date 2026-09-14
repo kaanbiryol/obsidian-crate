@@ -1,3 +1,4 @@
+import { portablePathKey } from '../../protocol/portable-path';
 import { normalizeSharedSettingsValue } from '../../sync/shared-settings';
 import { corsResponse } from './cors';
 import { parseJsonObject, sanitizePath } from './utils';
@@ -20,8 +21,8 @@ export async function handleCheckChanges(request: Request, db: D1Database): Prom
 	const url = new URL(request.url);
 	const since = parseInt(url.searchParams.get('since') || '0', 10);
 	if (isNaN(since) || since < 0) return corsResponse({ error: 'Invalid since parameter' }, 400);
-	const { lastSeq, minSeq } = await getChangelogBounds(db);
-	const cursorExpired = since > 0 && (minSeq === null || since + 1 < minSeq);
+	const { lastSeq, minSeq, snapshotSeq } = await getChangelogBounds(db);
+	const cursorExpired = since < snapshotSeq || since > 0 && since !== lastSeq && (minSeq === null || since + 1 < minSeq);
 	return corsResponse({ lastSeq, hasChanges: lastSeq > since, ...(cursorExpired && { cursorExpired: true }) });
 }
 
@@ -35,10 +36,10 @@ export async function handleGetChanges(request: Request, db: D1Database): Promis
 		db.prepare(CHANGELOG_BOUNDS_SQL),
 	]);
 	const changeRows = batchRows(changesResult);
-	const [bounds] = batchRows<{ lastSeq: number | null; minSeq: number | null }>(boundsResult);
+	const [bounds] = batchRows<{ lastSeq: number | null; minSeq: number | null; snapshotSeq?: number }>(boundsResult);
 	const lastSeq = bounds?.lastSeq ?? 0;
 	const minSeq = bounds?.minSeq ?? null;
-	const cursorExpired = since > 0 && (minSeq === null || since + 1 < minSeq);
+	const cursorExpired = since < (bounds?.snapshotSeq ?? 0) || since > 0 && since !== lastSeq && (minSeq === null || since + 1 < minSeq);
 
 	return corsResponse({
 		changes: changeRows,
@@ -63,12 +64,12 @@ export async function handleGetManifest(request: Request, db: D1Database): Promi
 	}
 	const filesStatement = after
 		? db.prepare(`SELECT path, hash, size, modified, storage_key AS revision FROM files
-			WHERE path > ? ORDER BY path ASC LIMIT ?`).bind(after, requestedLimit + 1)
-		: db.prepare('SELECT path, hash, size, modified, storage_key AS revision FROM files ORDER BY path ASC LIMIT ?')
+			WHERE portable_path > ? ORDER BY portable_path ASC LIMIT ?`).bind(portablePathKey(after), requestedLimit + 1)
+		: db.prepare('SELECT path, hash, size, modified, storage_key AS revision FROM files ORDER BY portable_path ASC LIMIT ?')
 			.bind(requestedLimit + 1);
 	const [filesResult, seqResult] = await db.batch([
 		filesStatement,
-		db.prepare('SELECT MAX(seq) as lastSeq FROM changelog'),
+		db.prepare(CHANGELOG_BOUNDS_SQL),
 	]);
 	const filesRows = batchRows<{ path: string; hash: string; size: number; modified: string; revision?: string }>(filesResult);
 	const seqRows = batchRows<{ lastSeq: number | null }>(seqResult);
@@ -117,13 +118,14 @@ export async function handleGetFileMetadata(request: Request, db: D1Database): P
 
 	const placeholders = paths.map(() => '?').join(', ');
 	const result = await db.prepare(
-		`SELECT path, hash, size, modified, storage_key AS revision FROM files WHERE path IN (${placeholders})`,
-	).bind(...paths).all();
+		`SELECT path, hash, size, modified, storage_key AS revision FROM files WHERE portable_path IN (${placeholders})`,
+	).bind(...paths.map(portablePathKey)).all();
 	const rows = Array.isArray(result.results)
 		? result.results as Array<{ path: string; hash: string; size: number; modified: string; revision?: string }>
 		: [];
 	const files = createPathRecord<FileEntry>();
 	for (const row of rows) {
+		if (!paths.includes(row.path)) continue;
 		files[row.path] = { hash: row.hash, size: row.size, modified: row.modified, revision: row.revision };
 	}
 	return corsResponse({ files });

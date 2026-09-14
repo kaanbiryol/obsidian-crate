@@ -26,8 +26,10 @@ it('commits eight notes with grouped projection writes and one transaction', asy
   expect(response.results).toHaveLength(8);
   expect(batch).toHaveBeenCalledTimes(1);
   expect(prepare.mock.calls.length).toBeLessThanOrEqual(46);
-  expect((await env.DB.prepare('SELECT * FROM reminder_source_state WHERE verified = 1').all()).results).toHaveLength(8);
+  expect((await env.DB.prepare('SELECT * FROM reminder_source_state WHERE verified = 1').all()).results).toHaveLength(0);
   expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(8);
+  expect(await env.DB.prepare('SELECT path FROM notification_projection_jobs').first()).toBeNull();
+  expect(await env.DB.prepare('SELECT id FROM staged_upload_batches').first()).toBeNull();
   const repeat = await body(files);
   expect(repeat.results.sort((a,b) => a.path.localeCompare(b.path))).toEqual(response.results.sort((a,b) => a.path.localeCompare(b.path)));
   expect(batch).toHaveBeenCalledTimes(1);
@@ -67,13 +69,14 @@ it('rejects duplicate identities and non-absent preconditions before writing', a
   expect(put).not.toHaveBeenCalled();
 });
 it('records reminder ownership and quarantines malformed notes in the bulk transaction', async () => {
+  await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
   const id = '11111111-1111-4111-8111-111111111111';
   const valid = `- [ ] Due @2099-01-02T10:00:00.000Z <!-- crate-id:${id} -->`;
-  const result = await body([file('a.md', valid), file('b.md', valid), file('bad.md', valid + '\n<!-- crate-desc:v1:%invalid -->')]);
+  const result = await body([file('Reminders/a.md', valid), file('Reminders/b.md', valid), file('Reminders/bad.md', valid + '\n<!-- crate-desc:v1:%invalid -->')]);
   expect(result.success, JSON.stringify(result)).toBe(true);
   expect((await env.DB.prepare('SELECT * FROM reminder_sources').all()).results).toHaveLength(2);
-  expect(await env.DB.prepare("SELECT verified FROM reminder_source_state WHERE file_path = 'bad.md'").first()).toEqual({ verified: 0 });
-  expect(await env.DB.prepare("SELECT available_at FROM notification_file_retries WHERE path = 'bad.md'").first()).toEqual({ available_at: -1 });
+  expect(await env.DB.prepare("SELECT verified FROM reminder_source_state WHERE file_path = 'Reminders/bad.md'").first()).toEqual({ verified: 0 });
+  expect(await env.DB.prepare("SELECT available_at FROM notification_file_retries WHERE path = 'Reminders/bad.md'").first()).toEqual({ available_at: -1 });
 });
 it('replays original receipts after deletion without resurrecting files', async () => {
   const files = [file('gone.md')];
@@ -91,6 +94,8 @@ it('recovers the missing member after an interrupted object upload', async () =>
   expect((await body(files)).success).toBe(true);
   expect(put).toHaveBeenCalledTimes(1);
   expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(8);
+  const pending = await env.DB.prepare('SELECT storage_keys FROM staged_upload_batches').first<{ storage_keys: string }>();
+  expect(JSON.parse(pending!.storage_keys)).toHaveLength(1); // An uncertain put can still arrive later.
 });
 it('commits each logical file once across simultaneous bulk retries', async () => {
   const files = Array.from({ length: 8 }, (_, i) => file(`${i}.md`));
@@ -99,6 +104,8 @@ it('commits each logical file once across simultaneous bulk retries', async () =
   expect(a.success).toBe(true); expect(b.success).toBe(true);
   expect(sort(a)).toEqual(sort(b));
   expect((await env.DB.prepare('SELECT * FROM changelog').all()).results).toHaveLength(8);
+  expect(await env.DB.prepare('SELECT id FROM staged_upload_batches').first()).toBeNull();
+  expect(await env.DB.prepare('SELECT storage_key FROM object_cleanup_queue').first()).toBeNull();
 });
 it('publishes no file if the transaction fails before commit, then retries safely', async () => {
   const files = Array.from({ length: 8 }, (_, i) => file(`${i}.md`));

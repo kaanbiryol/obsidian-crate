@@ -232,3 +232,42 @@ it('recovery of a confirmed step prevents the old updater from sending its next 
     await rejected;
     expect(h.api.uploadWorker).not.toHaveBeenCalled();
 });
+
+async function downgradeFileInventory() {
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE files_old(path TEXT PRIMARY KEY, portable_path TEXT NOT NULL, hash TEXT NOT NULL DEFAULT '',
+      size INTEGER NOT NULL DEFAULT 0, modified TEXT NOT NULL DEFAULT(datetime('now')), storage_key TEXT NOT NULL)`),
+    env.DB.prepare('INSERT INTO files_old SELECT * FROM files'),
+    env.DB.prepare('DROP TABLE files'), env.DB.prepare('ALTER TABLE files_old RENAME TO files'),
+    env.DB.prepare('CREATE UNIQUE INDEX files_portable_path_idx ON files(portable_path)'),
+    env.DB.prepare('ALTER TABLE object_cleanup_queue DROP COLUMN file_path'),
+    env.DB.prepare('ALTER TABLE staged_uploads DROP COLUMN file_path'),
+    env.DB.prepare('UPDATE crate_schema SET version = 5'),
+  ]);
+}
+
+it('upgrades an existing file inventory before uploading and releases the fence only after deployment', async () => {
+  const h = await harness();
+  await downgradeFileInventory();
+  await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('Notes/École.md', 'notes/école.md', 'existing-key')").run();
+  await h.deploy();
+  expect(await held()).toBeNull();
+  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 6 });
+  expect(await env.DB.prepare('SELECT path, storage_key FROM files').first()).toEqual({ path: 'Notes/École.md', storage_key: 'existing-key' });
+  const copy = h.api.queryD1.mock.calls.findIndex(call => call[2].includes('CREATE TABLE files_v6'));
+  expect(copy).toBeGreaterThanOrEqual(0);
+  expect(h.api.queryD1.mock.invocationCallOrder[copy]).toBeLessThan(h.api.uploadWorker.mock.invocationCallOrder[0]!);
+});
+
+it('holds a migrated inventory fenced if deployment fails, including automatic recovery', async () => {
+  const h = await harness();
+  await downgradeFileInventory();
+  h.api.getWorkersSubdomain.mockRejectedValueOnce(new CloudflareApiError('rejected', 400, null));
+  await expect(h.deploy()).rejects.toThrow('database upgrade needs its matching Worker');
+  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 6 });
+  const record = JSON.parse((await held())!.value) as Record<string, unknown>;
+  expect(record).toMatchObject({ schemaUpgradePending: true, step: 'apply-schema', stepState: 'confirmed' });
+  expect((await recoverDeployment(h.api as never, h.metadata)).status).toBe('blocked');
+  expect(await held()).not.toBeNull();
+  expect(h.api.uploadWorker).not.toHaveBeenCalled();
+});

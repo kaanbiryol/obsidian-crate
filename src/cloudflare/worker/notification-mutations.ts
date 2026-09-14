@@ -1,6 +1,7 @@
 import { parseJsonObject } from './utils';
 
 const ROUTES = new Set([
+  'POST /sync/import/complete',
   'POST /sync/delete', 'POST /sync/batch-delete', 'POST /sync/restore-version',
   'POST /reminders/create', 'POST /reminders/update', 'POST /reminders/set-completed',
   'DELETE /reminders/delete', 'POST /reminders/reorder',
@@ -11,6 +12,7 @@ const ROUTES = new Set([
 export async function affectsNotifications(request: Request): Promise<boolean> {
   const path = new URL(request.url).pathname;
   if (!ROUTES.has(`${request.method} ${path}`)) return false;
+  if (path === '/sync/import/complete') return true;
   if (!path.startsWith('/sync/')) return true;
   const body = await parseJsonObject(request.clone());
   if (!body.ok) return false; // The route returns the validation error without scheduling work.

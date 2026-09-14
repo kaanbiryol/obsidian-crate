@@ -1,3 +1,4 @@
+import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { recordFileFailure } from './notification-file-retries';
 import { READY_PROJECTION_JOBS_SQL } from './notification-queue';
 import { parseDateTime, toZoned } from '@internationalized/date';
@@ -12,6 +13,7 @@ import { hasVerifiedReminderSource } from './reminder-source-state';
 import type { Env } from './types';
 import type { RemoteReminderRecord } from './reminders-web/types';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
+import { isReminderPath } from './reminder-scope';
 
 export function notificationDatetime(reminder: Pick<RemoteReminderRecord, 'dueDate' | 'dueDatetime'>, policy: NotificationPolicy): string | undefined {
   if (reminder.dueDatetime) return reminder.dueDatetime;
@@ -29,7 +31,7 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
     try {
       const file = await getStoredFileRow(env.DB, job.path);
       let reminders: RemoteReminderRecord[] = [];
-      if (file) {
+      if (file && isReminderPath(job.path, policy.folderPath)) {
         if (file.size > REMINDER_INDEX_MAX_FILE_BYTES) throw new PermanentReminderSourceError(REMINDER_SOURCE_SIZE_ISSUE);
         const [text] = await readStoredMarkdownFiles(env.BUCKET, [{ path: job.path, ...file }]);
         if (!text) throw new Error('Committed reminder content could not be verified');
@@ -62,8 +64,8 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
       if (new TextEncoder().encode(json).byteLength > 1536 * 1024) throw new PermanentReminderSourceError('Split this reminder note into smaller files to schedule notifications');
       const guard = `EXISTS (SELECT 1 FROM notification_projection_jobs WHERE path = ? AND job_token = ?)
         AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
-        AND ${file ? 'EXISTS (SELECT 1 FROM files WHERE path = ? AND storage_key = ?)' : 'NOT EXISTS (SELECT 1 FROM files WHERE path = ?)'} `;
-      const args = [job.path, job.job_token, policy.revision, job.path, ...(file ? [file.storageKey] : [])];
+        AND ${file ? `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)` : `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`} `;
+      const args = [job.path, job.job_token, policy.revision, ...filePathArgs(job.path), ...(file ? [file.storageKey] : [])];
       const token = crypto.randomUUID();
       const upsertJob = `ON CONFLICT(reminder_id) DO UPDATE SET job_token = excluded.job_token,
         operation = excluded.operation, payload_json = excluded.payload_json, attempts = 0, available_at = 0, last_error = NULL, updated_at = datetime('now')`;

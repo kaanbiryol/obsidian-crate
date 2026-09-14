@@ -3,6 +3,8 @@ import { commitStagedFile } from './sync-mutations';
 import { armNotificationCoordinator } from './notification-lifecycle';
 import { FileNamespaceConflictError } from './file-namespace';
 import type { Env } from './types';
+import { isReminderPath } from './reminder-scope';
+import { getNotificationPolicy } from './notification-policy';
 
 type UploadParams = Parameters<typeof commitStagedFile>[2];
 export type CommitUpload = typeof commitStagedFile;
@@ -26,6 +28,9 @@ export function coordinatedUpload(env: Env): CommitUpload {
 export async function prepareCoordinatedUpload(request: Request, env: Env): Promise<UploadParams | Response> {
   // Only the authenticated Worker calls this internal DO endpoint. No public route exposes it.
   const metadata = await request.json() as Omit<UploadParams, 'content'>;
+  const policy = await getNotificationPolicy(env.DB);
+  metadata.reminderPolicyRevision = policy?.revision ?? null;
+  if (!isReminderPath(metadata.path, policy?.folderPath ?? null)) return { ...metadata, content: new ArrayBuffer(0) };
   const object = await env.BUCKET.get(metadata.objectKey);
   if (!object) return Response.json({ error: 'Staged object unavailable' }, { status: 503 });
   const content = await object.arrayBuffer();
@@ -33,6 +38,9 @@ export async function prepareCoordinatedUpload(request: Request, env: Env): Prom
 }
 
 export async function commitCoordinatedUpload(params: UploadParams, state: DurableObjectState, env: Env): Promise<Response> {
+  if (params.reminderPolicyRevision !== undefined && params.reminderPolicyRevision !== ((await getNotificationPolicy(env.DB))?.revision ?? null)) {
+    return Response.json({ error: 'Reminder folder changed during upload. Retry the upload.' }, { status: 503 });
+  }
   const previousFile = await getStoredFileRow(env.DB, params.path);
   await armNotificationCoordinator(state);
   try {

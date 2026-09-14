@@ -1,3 +1,5 @@
+import { FILE_PATH_MATCH, filePathArgs } from '../../file-identity';
+import { portablePathKey } from '../../../../protocol/portable-path';
 import type { RemoteReminderRecord } from '../types';
 import { changedRows } from '../../db';
 import {
@@ -35,7 +37,7 @@ function createCacheUpsertStatement(
 		)
 		SELECT ?, ?, ?, ?, ?, datetime('now')
 		WHERE EXISTS (
-			SELECT 1 FROM files WHERE path = ? AND hash = ?
+			SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND hash = ?
 		)
 		ON CONFLICT(folder_path, file_path) DO UPDATE SET
 			file_hash = excluded.file_hash,
@@ -48,7 +50,7 @@ function createCacheUpsertStatement(
 			entry.fileHash,
 			REMINDER_CACHE_PARSER_VERSION,
 			remindersJson,
-			entry.filePath,
+			...filePathArgs(entry.filePath),
 			entry.fileHash,
 		);
 }
@@ -93,11 +95,14 @@ export async function writeReminderFileCacheEntries(
 }
 
 export async function pruneReminderFileCache(db: D1Database, folderPath: string): Promise<void> {
-	await db.prepare(`DELETE FROM reminder_file_cache
-		WHERE folder_path = ?
-		AND NOT EXISTS (
-			SELECT 1 FROM files WHERE path = reminder_file_cache.file_path
-		)`).bind(folderPath).run();
+  const rows = await db.prepare('SELECT file_path FROM reminder_file_cache WHERE folder_path = ?').bind(folderPath).all<{ file_path: string }>();
+  for (let offset = 0; offset < rows.results.length; offset += 100) {
+    const json = JSON.stringify(rows.results.slice(offset, offset + 100).map(row => ({ path: row.file_path, portable: portablePathKey(row.file_path) })));
+    await db.prepare(`DELETE FROM reminder_file_cache WHERE folder_path = ? AND file_path IN (
+      SELECT json_extract(i.value, '$.path') FROM json_each(?) i WHERE NOT EXISTS (
+        SELECT 1 FROM files WHERE portable_path = json_extract(i.value, '$.portable') AND path = json_extract(i.value, '$.path')))`)
+      .bind(folderPath, json).run();
+  }
 }
 
 export async function saveReminderFileCache(

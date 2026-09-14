@@ -65,7 +65,7 @@ export class SyncTestDevice {
 			method: request.method, body: request.body,
 			headers: { ...request.headers, ...(request.contentType ? { 'Content-Type': request.contentType } : {}) },
 		}), this.runtimeEnv);
-		if (this.pause && response.ok && (path === '/sync/upload' || path === '/sync/batch-upload')) {
+		if (this.pause && response.ok && (path === '/sync/upload' || path === '/sync/batch-upload' || path === '/sync/import/upload')) {
 			const pause = this.pause;
 			this.pause = null;
 			pause.committed();

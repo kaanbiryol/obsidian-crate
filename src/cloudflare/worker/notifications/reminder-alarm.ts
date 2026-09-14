@@ -1,4 +1,7 @@
 import { withD1Usage } from '../d1-usage';
+import { drainNotificationJobs } from '../notification-outbox';
+import { uploadInitialFiles } from '../initial-import-upload';
+import { handleBatchDownload } from '../sync-batch/download';
 import { prepareCoordinatedNewFiles, commitCoordinatedNewFiles } from '../bulk-upload-dispatch';
 import { prepareCoordinatedUpload, commitCoordinatedUpload } from '../staged-upload-dispatch';
 import { PushPayloadError } from './payload-budget';
@@ -87,6 +90,20 @@ export class ReminderAlarm implements DurableObject {
   }
 
   private async fetchMeasured(request: Request, env: Env): Promise<Response> {
+    if (new URL(request.url).pathname === '/dispatch-jobs' && request.method === 'POST') {
+      return this.withStateLock(async () => {
+        await drainNotificationJobs(env);
+        return new Response(null, { status: 204 });
+      });
+    }
+    if (new URL(request.url).pathname === '/batch-download' && request.method === 'POST') {
+      return this.withStateLock(() => handleBatchDownload(request, env.BUCKET, env.DB));
+    }
+    if (new URL(request.url).pathname === '/import-upload' && ['POST', 'PUT'].includes(request.method)) {
+      // One decoded batch at a time bounds memory even for large attachments.
+      // This is only the unpublished import; its generation/lease guards still apply.
+      return this.withStateLock(() => uploadInitialFiles(request, env.BUCKET, env.DB));
+    }
     if (new URL(request.url).pathname === '/commit-new-files' && request.method === 'POST') {
       const prepared = await prepareCoordinatedNewFiles(request, env);
       return this.withStateLock(() => commitCoordinatedNewFiles(prepared, this.state, env));

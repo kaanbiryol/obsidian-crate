@@ -19,6 +19,13 @@ interface NotificationJobRow {
 const OUTBOX_BATCH_SIZE = 5;
 const OUTBOX_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 
+/** The existing class supplies a separate request budget; no extra persistent state. */
+export async function dispatchNotificationJobs(env: Env): Promise<void> {
+	const dispatcher = env.REMINDER_ALARMS.get(env.REMINDER_ALARMS.idFromName('__crate__/notification-dispatch'));
+	const response = await dispatcher.fetch('https://do/dispatch-jobs', { method: 'POST' });
+	if (!response.ok) throw new Error('Unable to process reminder schedules');
+}
+
 function retryDelayMs(attempt: number): number {
 	return Math.min(60_000 * (2 ** Math.min(attempt, 8)), OUTBOX_MAX_DELAY_MS);
 }
