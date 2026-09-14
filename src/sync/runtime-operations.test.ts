@@ -17,7 +17,7 @@ describe('SyncRuntime operation wrappers', () => {
 		{ method: (runtime: SyncRuntime, callback: (current: number, total: number) => void) => runtime.initialSync(callback), historyType: 'initial' as const },
 		{ method: (runtime: SyncRuntime, callback: (current: number, total: number) => void) => runtime.forceFullSync(callback), historyType: 'force' as const },
 	])('records history, persists settings, and clears progress for $method', async ({ method, historyType }) => {
-		const { runtime, persistSettings, settings } = createRuntimeHarness();
+		const { runtime, persistSettings, settings } = createRuntimeHarness({}, async () => { throw new Error('reminder settings unavailable'); });
 		const result: SyncResult = {
 			...createEmptySyncResult(),
 			success: false,

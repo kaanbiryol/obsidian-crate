@@ -9,7 +9,7 @@ import { Notice } from 'obsidian';
 import { createReminderMoveJournal, type ReminderMoveJournal } from './data/reminder-move-journal';
 
 const remindersLogger = createLogger('Reminders');
-const notificationTasks = new WeakMap<CratePlugin, Promise<void>>();
+export { ensureReminderNotificationPolicy, refreshReminderNotificationPolicy } from './notification-policy-sync';
 const backends = new WeakMap<CratePlugin, AbortController>();
 const moveJournals = new WeakMap<CratePlugin, ReminderMoveJournal>();
 
@@ -111,25 +111,4 @@ export async function setupReminderBackend(plugin: CratePlugin, folderPath: stri
 		});
 	}
 	return true;
-}
-
-export async function ensureReminderNotificationPolicy(plugin: CratePlugin): Promise<void> {
-	const api = plugin.syncRuntime.getApiClient();
-	if (!plugin.settings.pushEnabled || !api) return;
-	const active = notificationTasks.get(plugin);
-	if (active) return active;
-	const settings = plugin.remindersSettings;
-	const task = api.ensureNotificationPolicy({
-		folderPath: settings.remindersFolderPath,
-		timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-		allDayTime: settings.allDayNotificationTime,
-	}).then(() => undefined).catch((error: unknown) => {
-		remindersLogger.warn('Failed to initialize reminder notification policy:', error);
-	});
-	notificationTasks.set(plugin, task);
-	try {
-		await task;
-	} finally {
-		if (notificationTasks.get(plugin) === task) notificationTasks.delete(plugin);
-	}
 }

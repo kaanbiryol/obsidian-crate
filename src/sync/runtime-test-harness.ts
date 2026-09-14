@@ -82,7 +82,7 @@ function createSettings(overrides: Partial<CrateSettings> = {}): CrateSettings {
 	};
 }
 
-export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> = {}) {
+export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> = {}, prepareReminderScope?: () => Promise<void>) {
 	const settings = createSettings(settingsOverrides);
 	const plugin = {
 		addStatusBarItem: vi.fn(() => Object.assign(new FakeElement('div'), { toggleClass: vi.fn(), remove: vi.fn(), removeAttribute: vi.fn(), removeEventListener: vi.fn() })),
@@ -122,6 +122,7 @@ export function createRuntimeHarness(settingsOverrides: Partial<CrateSettings> =
 			settings,
 			secretStorage as never,
 			persistSettings,
+			prepareReminderScope,
 		),
 		persistSettings,
 		secretStorage,
