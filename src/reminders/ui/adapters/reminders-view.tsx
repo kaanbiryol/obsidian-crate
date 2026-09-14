@@ -16,6 +16,7 @@ import {
 } from "@/reminders/ui/plugin/PluginRemindersAppShell";
 import { persistReminderOrder } from "@/reminders/ui/plugin/persistReminderOrder";
 import { PluginReminderSourceNotice } from '../plugin/PluginReminderSourceNotice';
+import { RemindersLoading } from "../RemindersLoading";
 import "../reminders-view.scss";
 
 export const VIEW_TYPE_REMINDERS = "reminders-view";
@@ -180,7 +181,7 @@ export const RemindersViewContent: React.FC<RemindersViewContentProps> = ({ plug
         <PluginRemindersAppShell
             reminders={reminders}
             isInitialLoadComplete={isInitialLoadComplete}
-            loadingContent={!isInitialLoadComplete ? <div role="status" className="flex h-full items-center justify-center reminders-muted-label">Loading reminders…</div> : undefined}
+            loadingContent={!isInitialLoadComplete ? <RemindersLoading /> : undefined}
             isDarkMode={isDarkMode}
             isFullScreen={isFullScreen}
             isModal={isModal}
