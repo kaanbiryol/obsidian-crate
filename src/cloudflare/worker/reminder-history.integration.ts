@@ -57,7 +57,8 @@ it('does not rearm a forgotten occurrence when old Markdown is restored after cl
 		body: JSON.stringify({ folderPath: 'Reminders', timezone: 'UTC', allDayTime: '09:00' }) }), env.DB);
 	await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Restored.md', `- [ ] Old task @${due} <!-- crate-id:${id} -->`, null);
 	await drainNotificationProjections(env);
-	expect(await env.DB.prepare('SELECT operation FROM notification_jobs WHERE reminder_id = ?').bind(id).first()).toEqual({ operation: 'cancel' });
+	expect(await env.DB.prepare('SELECT operation FROM notification_jobs WHERE reminder_id = ?').bind(id).first()).toBeNull();
+	expect(await env.DB.prepare('SELECT 1 FROM scheduled_reminders').first()).toBeNull();
 	const observed = await env.DB.prepare('SELECT first_seen_at FROM reminder_occurrences WHERE reminder_id = ?').bind(id).first<{ first_seen_at: number }>();
 	expect(observed!.first_seen_at).toBeGreaterThan(Date.parse(due));
 });

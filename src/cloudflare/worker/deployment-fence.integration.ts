@@ -8,6 +8,7 @@ import { provisionCloudflareDeployment } from '../provisioner';
 import { resetCrateServer } from '../server-reset';
 import { CloudflareApiError, type CloudflareWorkerSettings } from '../cloudflare-api';
 import { DEPLOYMENT_FENCE_KEY } from '../deployment-fence';
+import { SERVER_RELEASE } from '../database-upgrades';
 import type { CloudflareDeploymentMetadata } from '../deployment-types';
 
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
@@ -267,7 +268,7 @@ it('blocks lower revisions and different artifacts at the same revision before p
   const h = await harness();
   await h.deploy();
   await expect(h.deploy(artifact('0.1.0', 'a'.repeat(64)))).rejects.toThrow('different build');
-  await env.DB.prepare('UPDATE crate_release SET revision = 2').run();
+  await env.DB.prepare('UPDATE crate_release SET revision = ?').bind(SERVER_RELEASE.revision + 1).run();
   await expect(h.deploy()).rejects.toThrow('newer or different build');
   expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
 });

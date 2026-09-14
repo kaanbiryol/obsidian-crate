@@ -63,7 +63,8 @@ it.each(['unchanged', 'title edit', 'project move', 'rename'])('delivers a first
 it('does not notify newly imported historical reminders', async () => {
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/A.md', note('Historical', new Date(Date.now() - 60_000).toISOString()), null);
   await drainNotificationProjections(env);
-  expect(await command()).toMatchObject({ operation: 'cancel' });
+  expect(await command()).toBeNull();
+  expect(await env.DB.prepare('SELECT 1 FROM scheduled_reminders').first()).toBeNull();
 });
 
 it('records a missed delivery after the late window instead of sending or silently cancelling', async () => {

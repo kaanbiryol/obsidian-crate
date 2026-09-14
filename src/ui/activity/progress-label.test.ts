@@ -20,3 +20,9 @@ it('shows upload-specific counts instead of preparation or overall counters', ()
   expect(formatSyncProgress({ type: 'initial', current: 500, total: 500 }, { phase: 'uploading', current: 400, total: 500 }))
     .toBe('Uploading files: 400/500');
 });
+
+it('shows remaining scheduling work without reusing upload counts', () => {
+  expect(formatSyncProgress({ type: 'initial', current: 400, total: 400 }, {
+    phase: 'reminders', reminderSetup: { scanning: false, remainingFiles: 0, remainingSchedules: 42 },
+  })).toBe('Preparing reminder schedules: 42 remaining');
+});

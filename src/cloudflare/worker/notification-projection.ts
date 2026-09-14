@@ -1,3 +1,4 @@
+import { planNotificationOperations, type NotificationOperation } from './notification-projection-plan';
 import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { recordFileFailure } from './notification-file-retries';
 import { READY_PROJECTION_JOBS_SQL } from './notification-queue';
@@ -48,7 +49,7 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
         LEFT JOIN reminder_occurrences o ON o.reminder_id = s.reminder_id AND o.due_key = s.due_key WHERE s.file_path = ?`).bind(job.path));
       const observed = new Map(sources.map(row => [row.reminder_id, row]));
       const ids = new Set<string>();
-      const operations = reminders.map(reminder => {
+      const operations = reminders.map<NotificationOperation>(reminder => {
         if (ids.has(reminder.id)) throw new PermanentReminderSourceError('Duplicate reminder identity in committed file');
         ids.add(reminder.id);
         const dueDatetime = notificationDatetime(reminder, policy);
@@ -56,33 +57,36 @@ export async function drainNotificationProjections(env: Env, limit = 4): Promise
         if (!source || source.due_key !== (reminder.dueDatetime ?? reminder.dueDate ?? '')) throw new Error('Reminder source changed before projection');
         const schedule = policy.enabled !== false && !reminder.completed && dueDatetime
           && source.first_seen_at !== null && source.first_seen_at <= Date.parse(dueDatetime);
-        return { id: reminder.id, operation: schedule ? 'schedule' : 'cancel', payload: schedule ? {
+        return schedule ? { id: reminder.id, operation: 'schedule', payload: {
           reminderId: reminder.id, content: reminder.content, project: reminder.project, dueDatetime,
-        } : null };
+        } } : { id: reminder.id, operation: 'cancel', payload: null };
       });
-      const json = JSON.stringify(operations);
+      const token = crypto.randomUUID();
+      const json = JSON.stringify(await planNotificationOperations(env.DB, operations, token));
       if (new TextEncoder().encode(json).byteLength > 1536 * 1024) throw new PermanentReminderSourceError('Split this reminder note into smaller files to schedule notifications');
       const guard = `EXISTS (SELECT 1 FROM notification_projection_jobs WHERE path = ? AND job_token = ?)
         AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
         AND ${file ? `EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?)` : `NOT EXISTS (SELECT 1 FROM files WHERE ${FILE_PATH_MATCH})`} `;
       const args = [job.path, job.job_token, policy.revision, ...filePathArgs(job.path), ...(file ? [file.storageKey] : [])];
-      const token = crypto.randomUUID();
       const upsertJob = `ON CONFLICT(reminder_id) DO UPDATE SET job_token = excluded.job_token,
         operation = excluded.operation, payload_json = excluded.payload_json, attempts = 0, available_at = 0, last_error = NULL, updated_at = datetime('now')`;
+      // Only changed alarms need commands. Unchanged alarms retain their tokens
+      // while their file revision and policy authority advance in this transaction.
       await env.DB.batch([
         env.DB.prepare(`INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, attempts, available_at)
           SELECT reminder_id, ?, 'cancel', NULL, 0, 0 FROM reminder_projections WHERE file_path = ?
           AND reminder_id NOT IN (SELECT json_extract(value, '$.id') FROM json_each(?)) AND ${guard} ${upsertJob}`)
           .bind(token, job.path, json, ...args),
         env.DB.prepare(`INSERT INTO notification_jobs (reminder_id, job_token, operation, payload_json, attempts, available_at)
-          SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.operation'), json_extract(value, '$.payload'), 0, 0
-          FROM json_each(?) WHERE ${guard} ${upsertJob}`).bind(token, json, ...args),
+          SELECT json_extract(value, '$.id'), json_extract(value, '$.token'), json_extract(value, '$.operation'), json_extract(value, '$.payload'), 0, 0
+          FROM json_each(?) WHERE json_extract(value, '$.enqueue') = 1 AND ${guard}
+          ${upsertJob}`).bind(json, ...args),
         env.DB.prepare(`DELETE FROM reminder_projections WHERE file_path = ? AND ${guard}`).bind(job.path, ...args),
         env.DB.prepare(`INSERT INTO reminder_projections (reminder_id, file_path, file_revision, notification_token, policy_revision)
-          SELECT json_extract(value, '$.id'), ?, ?, ?, ? FROM json_each(?) WHERE ${guard}
+          SELECT json_extract(value, '$.id'), ?, ?, json_extract(value, '$.token'), ? FROM json_each(?) WHERE ${guard}
           ON CONFLICT(reminder_id) DO UPDATE SET file_path = excluded.file_path, file_revision = excluded.file_revision,
           notification_token = excluded.notification_token, policy_revision = excluded.policy_revision`)
-          .bind(job.path, file?.storageKey ?? '', token, policy.revision, json, ...args),
+          .bind(job.path, file?.storageKey ?? '', policy.revision, json, ...args),
         env.DB.prepare(`DELETE FROM notification_file_retries WHERE path = ? AND ${guard}`).bind(job.path, ...args),
         env.DB.prepare(`DELETE FROM notification_projection_jobs WHERE path = ? AND ${guard}`).bind(job.path, ...args),
       ]);

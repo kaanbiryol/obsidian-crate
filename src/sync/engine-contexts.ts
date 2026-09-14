@@ -181,7 +181,9 @@ export class SyncEngineContexts {
     updateState({ work: { phase: 'reminders' } });
     await prepareReminderScope?.();
     throwIfDestroyed();
-    await api.initialImport.finishReminderSetup(throwIfDestroyed);
+    await api.initialImport.finishReminderSetup(throwIfDestroyed, reminderSetup => {
+      updateState({ work: { phase: 'reminders', reminderSetup } });
+    });
   }
 
   private tryInitialImport(result: import('./types').SyncResult, progress?: (current: number, total: number) => void) {
