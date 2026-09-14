@@ -32,6 +32,8 @@ export async function checkAndRecoverUpdate(plugin: CratePlugin): Promise<void> 
                         .catch(() => { new Notice('Could not copy diagnostics. Select the technical details and copy them manually.'); });
                 } },
             });
+        } else if (result.status === 'completed') {
+            progress.succeed('Server updated', result.message);
         } else {
             progress.succeed('Server update checked', result.message, {
                 action: { label: 'Update server', onClick: () => { void startCloudflareDeployment(plugin, 'update'); } },

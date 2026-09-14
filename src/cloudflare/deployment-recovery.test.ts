@@ -73,3 +73,12 @@ it('diagnostics omit arbitrary record contents and credentials', async () => {
     expect(result.diagnostics).not.toContain('private');
     expect(JSON.parse(result.diagnostics)).toMatchObject({ step: 'upload-worker', liveVersion: '0.1.0' });
 });
+
+it.each(['confirmed', 'rejected', 'settled'])('retains a pending %s update for exact-artifact resumption', async stepState => {
+    const h = harness({ verificationPending: true, stepState });
+    const original = h.held();
+    expect((await recoverDeployment(h.api, target, 'b'.repeat(64))).status).toBe('blocked');
+    expect(await recoverDeployment(h.api, target, 'a'.repeat(64))).toMatchObject({ status: 'resume', resumeValue: original });
+    expect(h.held()).toBe(original);
+    expect(h.api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('DELETE'))).toBe(false);
+});

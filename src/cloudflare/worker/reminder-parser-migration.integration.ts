@@ -148,18 +148,14 @@ it('does not publish a parsed older revision over a concurrent new file commit',
   expect(await env.DB.prepare('SELECT file_revision, verified FROM reminder_source_state WHERE file_path = ?').bind(path).first()).toEqual({ file_revision: current!.storage_key, verified: 1 });
 });
 
-it('upgrades schema 3 additively and waits for a selected folder before discovering sources in indexed pages', async () => {
+it('initializes source verification and waits for a selected folder before discovering sources in indexed pages', async () => {
   await env.DB.prepare('DELETE FROM notification_policy').run();
-  await env.DB.prepare('DROP TABLE reminder_source_state').run();
-  await env.DB.prepare('UPDATE crate_schema SET version = 3').run();
   const hash = await sha256Hex('');
   const files = Array.from({ length: 105 }, (_, index) => ({ path: `Notes/${String(index).padStart(3, '0')}.md`, key: `__uploads__/migration-${index}` }));
   for (const file of files) await env.BUCKET.put(file.key, '');
   await env.DB.prepare(`INSERT INTO files (path, portable_path, storage_key, hash, size)
     SELECT json_extract(value, '$.path'), lower(json_extract(value, '$.path')), json_extract(value, '$.key'), ?, 0 FROM json_each(?)`)
     .bind(hash, JSON.stringify(files)).run();
-  for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
-  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 6 });
   expect(await revalidateReminderSources(env, 4)).toBe(false);
   expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state').first()).toEqual({ count: 0 });
   await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Notes', 'UTC', 'policy')").run();

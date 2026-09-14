@@ -170,7 +170,7 @@ describe('worker entrypoint', () => {
 
 		expect(response.status).toBe(200);
 		expect(response.headers.get('Content-Type')).toBe('application/json');
-		expect(await response.json()).toEqual({ ...CRATE_SERVER_INFO, reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
+		expect(await response.json()).toEqual({ ...CRATE_SERVER_INFO, schemaVersion: 1, serverRevision: 1, reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
 	});
 
 	it('does not expose the public device enrollment routes', async () => {
@@ -263,7 +263,7 @@ describe('worker entrypoint', () => {
 
 		expect(response.status).toBe(200);
 		expect(response.headers.get('Cache-Control')).toBe('no-store');
-		expect(await response.json()).toEqual({ ...CRATE_SERVER_INFO, reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
+		expect(await response.json()).toEqual({ ...CRATE_SERVER_INFO, schemaVersion: 1, serverRevision: 1, reminderOperationDay: Math.floor(Date.now() / 86_400_000) });
 	});
 
 	it('serves PWA version metadata without authentication', async () => {

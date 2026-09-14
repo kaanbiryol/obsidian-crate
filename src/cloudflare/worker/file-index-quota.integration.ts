@@ -32,15 +32,6 @@ it('reads only the selected folder without indexing every Markdown file', async 
   expect(JSON.stringify(plan.results)).toContain('PRIMARY KEY');
 });
 
-it('retires the old index when applying the schema without rewriting file metadata', async () => {
-  await env.DB.prepare("CREATE INDEX files_markdown_path_idx ON files(path) WHERE lower(path) LIKE '%.md'").run();
-  await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('Note.md', 'note.md', 'key')").run();
-  const before = await env.DB.prepare('SELECT * FROM files').all();
-  await initialize();
-  expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(before.results);
-  expect(await env.DB.prepare("SELECT name FROM sqlite_master WHERE name = 'files_markdown_path_idx'").first()).toBeNull();
-});
-
 it('prunes only named paths in a 10,000-file paused import and preserves changed files', async () => {
   const { import: session } = await (await beginInitialImport(env.DB)).json() as { import: { token: string } };
   const hash = 'a'.repeat(64);

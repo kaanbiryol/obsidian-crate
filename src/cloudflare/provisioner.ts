@@ -1,11 +1,12 @@
-import schemaV6 from './schema-v6.sql?raw';
+import { inspectDeploymentDatabase, prepareDeploymentDatabase, recordDeploymentRelease } from './deployment-database';
+import { SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import { CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import { randomHex } from './pkce';
 import { deployedArtifact } from './deployment-discovery';
 import { assertDeploymentIsNotDowngrade } from './deployment-update';
-import { DEPLOYMENT_FENCE_KEY, withDeploymentFence, type DeploymentFence } from './deployment-fence';
+import { withDeploymentFence, type DeploymentFence } from './deployment-fence';
 
 async function ensureD1Database(
 	api: CloudflareApiClient,
@@ -19,6 +20,7 @@ async function ensureD1Database(
 			if (existingById.name !== metadata.d1DatabaseName || named?.uuid !== existingById.uuid) throw new Error('The deployment database identity is ambiguous or changed. Reconnect to the intended server.');
 			return existingById.uuid;
 		}
+    throw new Error('The saved server database is missing. Restore its data or explicitly create a new server.');
 	}
 
 	const existingByName = await api.findD1Database(accountId, metadata.d1DatabaseName);
@@ -44,10 +46,12 @@ async function ensureR2Bucket(
 	api: CloudflareApiClient,
 	accountId: string,
 	bucketName: string,
+  allowCreate: boolean,
 	fence: DeploymentFence,
 ): Promise<void> {
 	try {
 		if (await api.getR2Bucket(accountId, bucketName)) return;
+    if (!allowCreate) throw new Error('The saved server file bucket is missing. Restore its data or explicitly create a new server.');
 		await fence.mutate(() => api.createR2Bucket(accountId, bucketName), 'create-file-bucket');
 	} catch (error) {
 		if (error instanceof CloudflareApiError && error.code === 10042) {
@@ -57,28 +61,6 @@ async function ensureR2Bucket(
 		}
 		throw error;
 	}
-}
-
-async function validateD1Schema(input: {
-	api: CloudflareApiClient;
-	accountId: string;
-	databaseId: string;
-	artifacts: CloudflareDeploymentArtifacts;
-}): Promise<number | null> {
-	const query = (sql: string) => input.api.queryD1(input.accountId, input.databaseId, sql);
-	const tables = (await query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';"))
-		.flatMap(result => result.results ?? []).map(row => row.name);
-	if (tables.length === 1 && tables[0] === 'maintenance_state') {
-		const unexpected = (await query(`SELECT key FROM maintenance_state WHERE key != '${DEPLOYMENT_FENCE_KEY}' LIMIT 1;`)).flatMap(result => result.results ?? []);
-		if (unexpected.length === 0) return null; // Interrupted empty-database fence bootstrap.
-	}
-	if (tables.length > 0) {
-		if (!tables.includes('crate_schema')) throw new Error('Unsupported database schema. Use an empty database or a current Crate deployment.');
-		const versions = (await query('SELECT version FROM crate_schema WHERE id = 1;')).flatMap(result => result.results ?? []);
-		if (versions.length !== 1 || versions[0]?.version !== 2 && versions[0]?.version !== 3 && versions[0]?.version !== 4 && versions[0]?.version !== 5 && versions[0]?.version !== 6) throw new Error('Unsupported database schema. Use a matching Crate build.');
-		return versions[0].version;
-	}
-	return null;
 }
 
 async function checkRemoteDeployment(input: { api: CloudflareApiClient; accountId: string; metadata: CloudflareDeploymentMetadata; artifacts: CloudflareDeploymentArtifacts }): Promise<string | null> {
@@ -137,7 +119,15 @@ export async function provisionCloudflareDeployment(input: {
 	artifacts: CloudflareDeploymentArtifacts;
 	onMetadataChanged: () => Promise<void>;
 	onProgress?: (message: string) => void;
+  beforeDatabaseUpgrade?: (migrations: readonly DatabaseMigration[]) => Promise<void>;
+  resumeUpdateValue?: string;
 }): Promise<string> {
+  if (input.resumeUpdateValue) {
+    const record = JSON.parse(input.resumeUpdateValue) as Record<string, unknown>;
+    if (record.kind !== 'update' || record.worker !== input.metadata.workerName
+      || record.fingerprint !== input.artifacts.fingerprint || record.recoveryProtocol !== 1
+      || !['confirmed', 'rejected', 'settled'].includes(String(record.stepState))) throw new Error('This update cannot be safely resumed by this build.');
+  }
 	const expectedRemote = await checkRemoteDeployment(input);
 	input.onProgress?.('Preparing the server database…');
 	const databaseId = await ensureD1Database(input.api, input.accountId, input.metadata);
@@ -153,24 +143,22 @@ export async function provisionCloudflareDeployment(input: {
 		databaseId,
 		artifacts: input.artifacts,
 	};
-	await validateD1Schema(schemaInput);
+	await inspectDeploymentDatabase(schemaInput);
 	return withDeploymentFence({ api: input.api, accountId: input.accountId, databaseId,
-		record: { worker: input.metadata.workerName, kind: 'update', version: input.artifacts.version, fingerprint: input.artifacts.fingerprint },
+		record: { worker: input.metadata.workerName, kind: 'update', version: input.artifacts.version, fingerprint: input.artifacts.fingerprint, verificationPending: Boolean(input.resumeUpdateValue) },
+    resumeUpdateValue: input.resumeUpdateValue,
 	}, async fence => {
 		// Recheck after acquiring ownership: another device may have completed an
 		// update after the initial read but before this attempt acquired the fence.
 		if (await checkRemoteDeployment(input) !== expectedRemote) throw new Error('The server changed while this update was starting. Refresh its deployment status before authorizing another update.');
-		const schemaVersion = await validateD1Schema(schemaInput);
+		const schemaVersion = await inspectDeploymentDatabase(schemaInput);
 		input.onProgress?.('Preparing the remote file bucket…');
-		await ensureR2Bucket(input.api, input.accountId, input.metadata.r2BucketName, fence);
-		input.onProgress?.('Initializing the database schema…');
-		if (schemaVersion !== null && schemaVersion < 6) {
-      fence.beginSchemaUpgrade();
-      await fence.mutate(() => input.api.queryD1(input.accountId, databaseId, schemaV6), 'upgrade-file-inventory');
-    }
-		await fence.mutate(() => input.api.queryD1(input.accountId, databaseId, input.artifacts.d1Schema), 'apply-schema');
+		await ensureR2Bucket(input.api, input.accountId, input.metadata.r2BucketName, schemaVersion === null, fence);
+		await prepareDeploymentDatabase(schemaInput, schemaVersion, fence, input.beforeDatabaseUpgrade);
+    await fence.checkpoint('prepare-database');
 		const workersSubdomain = await ensureWorkersSubdomain(input.api, input.accountId, input.metadata, fence);
 		input.onProgress?.('Uploading the Worker and web app to Cloudflare…');
+    fence.requireVerification();
 		await fence.mutate(() => input.api.uploadWorker({
 			publicOrigin: `https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`,
 			accountId: input.accountId,
@@ -179,7 +167,6 @@ export async function provisionCloudflareDeployment(input: {
 			d1DatabaseId: databaseId,
 			r2BucketName: input.metadata.r2BucketName,
 		}), 'upload-worker');
-    fence.completeSchemaUpgrade();
 		input.onProgress?.('Configuring server maintenance…');
 		await fence.mutate(() => input.api.updateWorkerSchedules(
 			input.accountId,
@@ -193,6 +180,17 @@ export async function provisionCloudflareDeployment(input: {
 			await input.onMetadataChanged();
 		}
 		await fence.mutate(() => input.api.enableWorkerSubdomain(input.accountId, input.metadata.workerName), 'enable-server-address');
+
+    input.onProgress?.('Verifying the updated server…');
+    const settings = await input.api.getWorkerSettings(input.accountId, input.metadata.workerName);
+    if (deployedArtifact(settings).fingerprint !== input.artifacts.fingerprint) throw new Error('The expected Worker is not live yet. Check and recover this update.');
+    await checkRemoteDeployment(input);
+    const versions = (await input.api.queryD1(input.accountId, databaseId, 'SELECT version FROM crate_schema WHERE id = 1;')).flatMap(result => result.results ?? []);
+    if (versions.length !== 1 || versions[0]?.version !== SERVER_RELEASE.schemaVersion) throw new Error('The updated database could not be verified.');
+    await input.api.queryD1(input.accountId, databaseId, 'SELECT path, storage_key FROM files LIMIT 1; SELECT id FROM auth_tokens LIMIT 1;');
+    await input.api.verifyWorkerDeployment(`https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`, input.artifacts.fingerprint);
+    await recordDeploymentRelease(schemaInput, fence);
+    await fence.completeVerification();
 
 		if (
 			input.metadata.lastDeployedVersion !== input.artifacts.version

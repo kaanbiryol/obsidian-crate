@@ -30,8 +30,8 @@ export async function handlePublicRoute(
 	method: RouteMethod,
 ): Promise<Response | null> {
 	const db = env.DB;
-	if (path === '/.well-known/crate' && method === 'GET') return handleServerInfo();
-	if (path === '/' && method === 'GET') return handleServerInfo();
+	if (path === '/.well-known/crate' && method === 'GET') return handleServerInfo(env);
+	if (path === '/' && method === 'GET') return handleServerInfo(env);
 	if (path === '/notifications' && method === 'GET') return handleNotificationsPage(request);
 	if (path === '/notifications/app.js' && method === 'GET') return handlePwaApp(request);
 	if (path.startsWith('/notifications/assets/') && method === 'GET') {

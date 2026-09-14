@@ -29,10 +29,11 @@ const artifacts = {
 };
 
 function createApi() {
+  let initialized = false;
 	const fence = createFenceQueryHarness();
 	const metadata = createMetadata();
 	return {
-		getWorkerSettings: vi.fn(async () => ({ annotations: { 'workers/message': 'Crate 0.1.0' }, bindings: [
+		getWorkerSettings: vi.fn(async () => ({ annotations: { 'workers/message': `Crate 0.1.0 ${artifacts.fingerprint}` }, bindings: [
 			{ type: 'd1', name: 'DB', id: metadata.d1DatabaseId! }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: metadata.r2BucketName },
 		] })),
 		getD1Database: vi.fn(async (_accountId: string, databaseId: string) => ({ uuid: databaseId, name: metadata.d1DatabaseName })),
@@ -40,8 +41,9 @@ function createApi() {
 		createD1Database: vi.fn(),
 		getR2Bucket: vi.fn(async () => ({ name: 'crate-0123456789abcdef' })),
 		createR2Bucket: vi.fn(),
-		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? []),
+		queryD1: vi.fn(async (_account: string, _database: string, sql: string, params?: string[]): Promise<Array<{ results?: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? (sql === artifacts.d1Schema ? (initialized = true, []) : sql.includes('sqlite_master') && initialized ? [{ results: [{ name: 'crate_schema' }] }] : sql.startsWith('SELECT version') ? [{ results: [{ version: 1, created_version: 1 }] }] : [])),
 		uploadWorker: vi.fn(async () => {}),
+    verifyWorkerDeployment: vi.fn(async () => {}),
 		updateWorkerSchedules: vi.fn(async () => {}),
 		getWorkersSubdomain: vi.fn(async () => 'personal-crate'),
 		createWorkersSubdomain: vi.fn(),
@@ -99,11 +101,11 @@ describe('provisionCloudflareDeployment', () => {
 	it.each([
 		{ tables: ['files'], version: 999 },
 		{ tables: ['crate_schema'], version: 999 },
-		{ tables: ['crate_schema'], version: 1 },
+		...[2, 3, 4, 5, 6].map(version => ({ tables: ['crate_schema'], version })),
 	])('rejects an unsupported existing database before uploading: %j', async ({ tables, version }) => {
 		const api = createApi();
 		api.queryD1.mockResolvedValueOnce([{ results: tables.map(name => ({ name })) }]);
-		api.queryD1.mockResolvedValueOnce([{ results: [{ version }] }]);
+		api.queryD1.mockResolvedValueOnce([{ results: [{ version, created_version: 1 }] }]);
 		const metadata = createMetadata();
 		await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
 			.rejects.toThrow('Unsupported database schema');
@@ -111,15 +113,17 @@ describe('provisionCloudflareDeployment', () => {
 		expect(api.queryD1).not.toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
 	});
 
-	it.each([2, 3, 4])('applies the additive schema upgrade or retries initialization from schema %i', async version => {
-		const api = createApi();
-		api.queryD1.mockResolvedValueOnce([{ results: [{ name: 'crate_schema' }] }]);
-		api.queryD1.mockResolvedValueOnce([{ results: [{ version }] }]);
-		const metadata = createMetadata();
-		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
-		expect(api.queryD1).toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
-		expect(api.uploadWorker).toHaveBeenCalledOnce();
-	});
+
+  it('updates a baseline database without reapplying the fresh schema', async () => {
+    const api = createApi();
+    const query = api.queryD1.getMockImplementation()!;
+    api.queryD1.mockImplementation((account, database, sql, params) => sql.includes('sqlite_master')
+      ? Promise.resolve([{ results: [{ name: 'crate_schema' }] }]) : query(account, database, sql, params));
+    const metadata = createMetadata();
+    await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
+    expect(api.queryD1).not.toHaveBeenCalledWith(metadata.accountId, metadata.d1DatabaseId, artifacts.d1Schema);
+    expect(api.verifyWorkerDeployment).toHaveBeenCalledWith('https://crate-0123456789abcdef.personal-crate.workers.dev', artifacts.fingerprint);
+  });
 
 	it('explains how to activate R2 when the account is not entitled', async () => {
 		const api = createApi();

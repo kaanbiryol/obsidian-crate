@@ -1,3 +1,4 @@
+import serverRelease from './server-release.json';
 import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from './notification-rate-binding';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import type { HttpRequest, HttpTransport } from './http';
@@ -117,6 +118,7 @@ export function buildWorkerMultipartBody(input: {
 			'workers/tag': 'crate',
 		},
 		bindings: [
+				{ type: 'plain_text', name: 'CRATE_DEPLOYMENT_FINGERPRINT', text: input.artifacts.fingerprint },
 				{ type: 'plain_text', name: 'CRATE_PUBLIC_ORIGIN', text: new URL(input.publicOrigin).origin },
 				{ type: 'd1', name: 'DB', id: input.d1DatabaseId },
 				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: input.r2BucketName },
@@ -347,6 +349,20 @@ export class CloudflareApiClient {
 			body: multipart.body,
 		});
 	}
+
+  async verifyWorkerDeployment(origin: string, fingerprint: string): Promise<void> {
+    // Deliberately use the unauthenticated transport: never send the Cloudflare
+    // management bearer token to a Worker origin.
+    const response = await this.transport(`${origin}/.well-known/crate`, { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
+    const info: unknown = JSON.parse(response.text);
+    if (response.status !== 200 || !info || typeof info !== 'object'
+      || !('service' in info) || info.service !== 'crate'
+      || !('deploymentFingerprint' in info) || info.deploymentFingerprint !== fingerprint
+      || !('serverRevision' in info) || info.serverRevision !== serverRelease.revision
+      || !('schemaVersion' in info) || info.schemaVersion !== serverRelease.schemaVersion) {
+      throw new Error('The updated server did not pass its live check. Check and recover the update.');
+    }
+  }
 
 	async updateWorkerSchedules(accountId: string, workerName: string, crons: string[]): Promise<void> {
 		await this.request(

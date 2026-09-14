@@ -44,6 +44,7 @@ async function harness(empty = false) {
 			for (const statement of sql.split(';').map(value => value.trim()).filter(Boolean)) results.push(await env.DB.prepare(statement).bind(...params ?? []).all());
 			return results;
 		}),
+		verifyWorkerDeployment: vi.fn(async () => {}),
 		uploadWorker: vi.fn(async (input: { artifacts: ReturnType<typeof artifact> }) => { state.worker = { annotations: { 'workers/message': `Crate ${input.artifacts.version} ${input.artifacts.fingerprint}` }, bindings }; }),
 		updateWorkerSchedules: vi.fn(async () => {}), getWorkersSubdomain: vi.fn(async (): Promise<string | null> => 'test'),
 		createWorkersSubdomain: vi.fn(async () => 'test'), enableWorkerSubdomain: vi.fn(async () => {}),
@@ -53,7 +54,7 @@ async function harness(empty = false) {
 		deleteR2Bucket: vi.fn(async () => { state.bucket = false; }), deleteD1Database: vi.fn(async () => { state.database = false; }),
 		retireCrateWorker: vi.fn(async (_account: string, _name: string, resetId: string) => { state.worker = { annotations: { 'workers/message': `Crate reset ${resetId}` }, bindings: bindings.slice(0, 2) }; }),
 	};
-	const deploy = (build = artifact(), client = api, saved = structuredClone(metadata)) => provisionCloudflareDeployment({ api: client as never,
+	const deploy = (build = artifact(), client = api, saved = { ...structuredClone(metadata), d1DatabaseId: empty ? null : metadata.d1DatabaseId }) => provisionCloudflareDeployment({ api: client as never,
 		accountId: metadata.accountId!, metadata: saved, artifacts: build, onMetadataChanged: async () => {} });
 	const resetInput = { api, accountId: metadata.accountId!, metadata: structuredClone(metadata), version: '0.1.0', beforeDelete: vi.fn(async () => {}), persist: vi.fn(async () => {}) };
 	return { api, state, metadata, deploy, resetInput };
@@ -70,8 +71,8 @@ it('serializes same-version updates with different fingerprints through the enti
 	expect(h.api.uploadWorker).toHaveBeenCalledOnce();
 	gate.resolve(); await first;
 	expect(await held()).toBeNull();
-	await h.deploy(artifact('0.1.0', 'e'.repeat(64)));
-	expect(h.state.worker?.annotations?.['workers/message']).toContain('e'.repeat(64));
+	await expect(h.deploy(artifact('0.1.0', 'e'.repeat(64)))).rejects.toThrow('different build');
+	expect(h.state.worker?.annotations?.['workers/message']).toContain('f'.repeat(64));
 });
 
 it.each(['0.1.0', '0.2.0'])('rejects a stale preflight when another device publishes %s before acquisition', async version => {
@@ -79,7 +80,7 @@ it.each(['0.1.0', '0.2.0'])('rejects a stale preflight when another device publi
 	const gate = deferred(); const started = deferred();
 	const olderApi = { ...h.api, getD1Database: vi.fn(async () => { started.resolve(); await gate.promise; return h.api.getD1Database(); }) };
 	const older = h.deploy(artifact(), olderApi);
-	const rejection = expect(older).rejects.toThrow(version === '0.1.0' ? 'server changed' : 'downgrades are not supported');
+	const rejection = expect(older).rejects.toThrow(version === '0.1.0' ? 'different build' : 'downgrades are not supported');
 	await started.promise;
 	await h.deploy(artifact(version, 'e'.repeat(64)));
 	gate.resolve(); await rejection;
@@ -103,15 +104,17 @@ it('keeps an uncertain upload fenced even after an arbitrarily late provider com
 	await h.deploy(artifact('0.2.0'));
 });
 
-it('releases a definite publication rejection but does not retry an uncertain subdomain creation', async () => {
+it('preserves definite publication rejections for recovery and does not retry uncertain subdomain creation', async () => {
 	const h = await harness();
 	h.api.uploadWorker.mockRejectedValueOnce(new CloudflareApiError('forbidden', 403, null));
 	await expect(h.deploy()).rejects.toThrow('forbidden');
-	expect(await held()).toBeNull();
-	h.api.getWorkersSubdomain.mockResolvedValue(null);
-	h.api.createWorkersSubdomain.mockRejectedValueOnce(new Error('lost subdomain response'));
-	await expect(h.deploy()).rejects.toThrow('fence remains held');
-	expect(h.api.createWorkersSubdomain).toHaveBeenCalledOnce();
+	expect(JSON.parse((await held())!.value)).toMatchObject({ stepState: 'rejected' });
+  await reset();
+  const next = await harness();
+	next.api.getWorkersSubdomain.mockResolvedValue(null);
+	next.api.createWorkersSubdomain.mockRejectedValueOnce(new Error('lost subdomain response'));
+	await expect(next.deploy()).rejects.toThrow('fence remains held');
+	expect(next.api.createWorkersSubdomain).toHaveBeenCalledOnce();
 	expect(await held()).not.toBeNull();
 });
 
@@ -226,48 +229,83 @@ it('recovery of a confirmed step prevents the old updater from sending its next 
     const updating = h.deploy();
     const rejected = expect(updating).rejects.toThrow('Deployment ownership changed');
     await started.promise;
-    expect(JSON.parse((await held())!.value)).toMatchObject({ recoveryProtocol: 1, step: 'apply-schema', stepState: 'confirmed' });
+    expect(JSON.parse((await held())!.value)).toMatchObject({ recoveryProtocol: 1, step: 'prepare-database', stepState: 'confirmed' });
     expect((await recoverDeployment(h.api, h.metadata)).status).toBe('recovered');
     gate.resolve();
     await rejected;
     expect(h.api.uploadWorker).not.toHaveBeenCalled();
 });
 
-async function downgradeFileInventory() {
-  await env.DB.batch([
-    env.DB.prepare(`CREATE TABLE files_old(path TEXT PRIMARY KEY, portable_path TEXT NOT NULL, hash TEXT NOT NULL DEFAULT '',
-      size INTEGER NOT NULL DEFAULT 0, modified TEXT NOT NULL DEFAULT(datetime('now')), storage_key TEXT NOT NULL)`),
-    env.DB.prepare('INSERT INTO files_old SELECT * FROM files'),
-    env.DB.prepare('DROP TABLE files'), env.DB.prepare('ALTER TABLE files_old RENAME TO files'),
-    env.DB.prepare('CREATE UNIQUE INDEX files_portable_path_idx ON files(portable_path)'),
-    env.DB.prepare('ALTER TABLE object_cleanup_queue DROP COLUMN file_path'),
-    env.DB.prepare('ALTER TABLE staged_uploads DROP COLUMN file_path'),
-    env.DB.prepare('UPDATE crate_schema SET version = 5'),
-  ]);
-}
 
-it('upgrades an existing file inventory before uploading and releases the fence only after deployment', async () => {
+it('preserves existing file references and never reapplies fresh DDL during an update', async () => {
   const h = await harness();
-  await downgradeFileInventory();
   await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('Notes/École.md', 'notes/école.md', 'existing-key')").run();
   await h.deploy();
   expect(await held()).toBeNull();
-  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 6 });
+  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 1 });
   expect(await env.DB.prepare('SELECT path, storage_key FROM files').first()).toEqual({ path: 'Notes/École.md', storage_key: 'existing-key' });
-  const copy = h.api.queryD1.mock.calls.findIndex(call => call[2].includes('CREATE TABLE files_v6'));
-  expect(copy).toBeGreaterThanOrEqual(0);
-  expect(h.api.queryD1.mock.invocationCallOrder[copy]).toBeLessThan(h.api.uploadWorker.mock.invocationCallOrder[0]!);
+  expect(h.api.queryD1.mock.calls.some(call => call[2] === schema)).toBe(false);
+  expect(h.api.verifyWorkerDeployment).toHaveBeenCalledOnce();
 });
 
-it('holds a migrated inventory fenced if deployment fails, including automatic recovery', async () => {
+it('keeps a failed live check locked and resumes only the exact build without unlocking writes', async () => {
   const h = await harness();
-  await downgradeFileInventory();
-  h.api.getWorkersSubdomain.mockRejectedValueOnce(new CloudflareApiError('rejected', 400, null));
-  await expect(h.deploy()).rejects.toThrow('database upgrade needs its matching Worker');
-  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 6 });
+  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
+  await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
   const record = JSON.parse((await held())!.value) as Record<string, unknown>;
-  expect(record).toMatchObject({ schemaUpgradePending: true, step: 'apply-schema', stepState: 'confirmed' });
-  expect((await recoverDeployment(h.api as never, h.metadata)).status).toBe('blocked');
+  expect(record).toMatchObject({ verificationPending: true, step: 'enable-server-address', stepState: 'confirmed' });
+  expect((await recoverDeployment(h.api as never, h.metadata, 'a'.repeat(64))).status).toBe('blocked');
+  const recovery = await recoverDeployment(h.api as never, h.metadata, artifact().fingerprint);
+  expect(recovery.status).toBe('resume');
   expect(await held()).not.toBeNull();
+  await provisionCloudflareDeployment({ api: h.api as never, accountId: h.metadata.accountId!, metadata: h.metadata,
+    artifacts: artifact(), resumeUpdateValue: recovery.resumeValue, onMetadataChanged: async () => {} });
+  expect(await held()).toBeNull();
+});
+
+it('blocks lower revisions and different artifacts at the same revision before publication', async () => {
+  const h = await harness();
+  await h.deploy();
+  await expect(h.deploy(artifact('0.1.0', 'a'.repeat(64)))).rejects.toThrow('different build');
+  await env.DB.prepare('UPDATE crate_release SET revision = 2').run();
+  await expect(h.deploy()).rejects.toThrow('newer or different build');
+  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+});
+
+it('keeps initialization recoverable after a definite upload rejection', async () => {
+  const h = await harness(true);
+  h.api.uploadWorker.mockRejectedValueOnce(new CloudflareApiError('rejected', 403, null));
+  await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
+  expect(JSON.parse((await held())!.value)).toMatchObject({ verificationPending: true, step: 'upload-worker', stepState: 'rejected' });
+  const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+  expect(recovery.status).toBe('resume');
+  await provisionCloudflareDeployment({ api: h.api as never, accountId: h.metadata.accountId!, metadata: h.metadata,
+    artifacts: artifact(), resumeUpdateValue: recovery.resumeValue, onMetadataChanged: async () => {} });
+  expect(await held()).toBeNull();
+  expect(h.api.queryD1.mock.calls.filter(call => call[2] === schema)).toHaveLength(1);
+});
+
+it('refuses a schema edit hidden inside a code-only release and preserves storage', async () => {
+  const h = await harness();
+  await h.deploy();
+  const changed = { ...artifact(), d1SchemaSha256: 'changed-schema' };
+  await expect(h.deploy(changed)).rejects.toThrow('schema version change');
+  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+  expect(await held()).toBeNull();
+});
+
+it('refuses missing saved storage rather than silently creating a replacement database', async () => {
+  const h = await harness();
+  h.state.database = false;
+  await expect(h.deploy()).rejects.toThrow('saved server database is missing');
+  expect(h.api.createD1Database).not.toHaveBeenCalled();
+  expect(h.api.uploadWorker).not.toHaveBeenCalled();
+});
+
+it('refuses a missing file bucket instead of substituting empty storage', async () => {
+  const h = await harness();
+  h.state.bucket = false;
+  await expect(h.deploy()).rejects.toThrow('file bucket is missing');
+  expect(h.api.createR2Bucket).not.toHaveBeenCalled();
   expect(h.api.uploadWorker).not.toHaveBeenCalled();
 });

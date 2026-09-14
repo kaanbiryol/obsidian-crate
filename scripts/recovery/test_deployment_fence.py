@@ -52,6 +52,19 @@ class FenceTests(unittest.TestCase):
             fence.release(self.remote, self.worker, self.owner, True)
         self.assertEqual(fence.inspect(self.remote, self.worker)[1], newer)
 
+    def test_pending_update_is_settled_without_unlocking(self):
+        record = dict(self.record, kind='update', recoveryProtocol=1, verificationPending=True, step='upload-worker', stepState='started')
+        self.remote.db.execute('UPDATE maintenance_state SET value = ?', (json.dumps(record),))
+        with self.assertRaises(ValueError):
+            fence.release(self.remote, self.worker, self.owner, True)
+        with self.assertRaises(ValueError):
+            fence.settle(self.remote, self.worker, self.owner)
+        with self.assertRaises(ValueError):
+            fence.settle(self.remote, self.worker, 'other', True)
+        self.assertTrue(fence.settle(self.remote, self.worker, self.owner, True))
+        self.assertEqual(fence.inspect(self.remote, self.worker)[1]['stepState'], 'settled')
+        self.assertTrue(fence.inspect(self.remote, self.worker)[1]['verificationPending'])
+
     def test_refuses_a_different_worker(self):
         with self.assertRaises(ValueError):
             fence.release(self.remote, 'crate-' + 'b' * 16, self.owner, True)

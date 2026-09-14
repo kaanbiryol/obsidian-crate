@@ -63,7 +63,6 @@ class ArchiveTests(unittest.TestCase):
         self.temp.cleanup()
     def test_paired_restore_preserves_bytes_and_receipts_and_resets_derived_state(self):
         self.remote.sql += b"\nINSERT INTO maintenance_state (key, value) VALUES ('reminder_operation_floor', '20524');"
-        self.remote.sql += b'\nDROP INDEX reminder_operations_created_at_idx; DROP INDEX reminder_occurrences_first_seen_idx;'
         recovery.backup(self.remote, self.directory)
         manifest, original = verify(self.directory)
         self.addCleanup(original.close)
@@ -85,36 +84,22 @@ class ArchiveTests(unittest.TestCase):
         indexes = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
         self.assertTrue({'reminder_operations_created_at_idx', 'reminder_occurrences_first_seen_idx'} <= indexes)
         self.assertEqual(len(manifest['objects']), 1)
-    def test_schema_three_backup_restores_with_additive_source_verification_upgrade(self):
-        self.remote.sql += b'\nDROP TABLE reminder_source_state; UPDATE crate_schema SET version = 3;'
-        recovery.backup(self.remote, self.directory)
-        target = Remote(b'', {})
-        target.database, target.bucket = 'restore', 'restore'
-        recovery.restore(target, self.directory)
-        restored = load_database(target.sql)
-        self.addCleanup(restored.close)
-        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 6)
-        self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_source_state').fetchone()[0], 0)
-        self.assertEqual(restored.execute('SELECT first_seen_at FROM reminder_occurrences').fetchone()[0], 123)
-        self.assertEqual(restored.execute('SELECT COUNT(*) FROM file_deletion_receipts').fetchone()[0], 1)
-        self.assertEqual(self.remote.objects, target.objects)
-    def test_schema_two_can_be_backed_up_before_upgrade_and_restores_without_rewriting_its_archive(self):
-        self.remote.sql += b'\nDROP TABLE reminder_source_state; DROP TABLE file_deletion_receipts; UPDATE crate_schema SET version = 2;'
+    def test_baseline_restore_preserves_its_source_archive(self):
         recovery.backup(self.remote, self.directory)
         source_sql = (self.directory / 'database.sql').read_bytes()
         manifest_bytes = (self.directory / 'archive.json').read_bytes()
         _, original = verify(self.directory)
         self.addCleanup(original.close)
-        self.assertEqual(original.execute('SELECT version FROM crate_schema').fetchone()[0], 2)
+        self.assertEqual(original.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
         target = Remote(b'', {})
         target.database, target.bucket = 'restore', 'restore'
         recovery.restore(target, self.directory)
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
-        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 6)
+        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
         for table in ('files', 'file_versions', 'reminder_operations', 'reminder_identities', 'reminder_sources', 'reminder_occurrences'):
             self.assertEqual(restored.execute(f'SELECT * FROM {table}').fetchall(), original.execute(f'SELECT * FROM {table}').fetchall())
-        self.assertEqual(restored.execute('SELECT COUNT(*) FROM file_deletion_receipts').fetchone()[0], 0)
+        self.assertEqual(restored.execute('SELECT COUNT(*) FROM file_deletion_receipts').fetchone()[0], 1)
         self.assertEqual(restored.execute('SELECT COUNT(*) FROM reminder_source_state').fetchone()[0], 0)
         self.assertEqual(target.objects, self.remote.objects)
         self.assertEqual((self.directory / 'database.sql').read_bytes(), source_sql)
@@ -130,39 +115,10 @@ class ArchiveTests(unittest.TestCase):
         recovery.restore(target, self.directory)
         restored = load_database(target.sql)
         self.addCleanup(restored.close)
-        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 6)
+        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 1)
         self.assertEqual(restored.execute('SELECT request_hash FROM upload_operations').fetchone()[0], 'hash')
         indexes = {row[0] for row in restored.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
         self.assertNotIn('files_storage_key_idx', indexes)
-
-    def test_schema_five_inventory_migration_preserves_original_paths_and_objects(self):
-        db = load_database(self.remote.sql)
-        db.executescript("""
-          CREATE TABLE files_old(path TEXT PRIMARY KEY, portable_path TEXT NOT NULL,
-            hash TEXT NOT NULL DEFAULT '', size INTEGER NOT NULL DEFAULT 0,
-            modified TEXT NOT NULL DEFAULT(datetime('now')), storage_key TEXT NOT NULL);
-          INSERT INTO files_old SELECT * FROM files;
-          DROP TABLE files;
-          ALTER TABLE files_old RENAME TO files;
-          CREATE UNIQUE INDEX files_portable_path_idx ON files(portable_path);
-          CREATE INDEX files_storage_key_idx ON files(storage_key);
-          ALTER TABLE object_cleanup_queue DROP COLUMN file_path;
-          ALTER TABLE staged_uploads DROP COLUMN file_path;
-          UPDATE crate_schema SET version = 5;
-        """)
-        self.remote.sql = '\n'.join(db.iterdump()).encode()
-        before = tuple(db.execute('SELECT * FROM files').fetchone())
-        db.close()
-        recovery.backup(self.remote, self.directory)
-        target = Remote(b'', {})
-        target.database, target.bucket = 'restore', 'restore'
-        recovery.restore(target, self.directory)
-        restored = load_database(target.sql)
-        self.addCleanup(restored.close)
-        self.assertEqual(tuple(restored.execute('SELECT * FROM files').fetchone()), before)
-        self.assertEqual(references(restored).keys(), self.remote.objects.keys())
-        self.assertEqual({row[1]: row[5] for row in restored.execute('PRAGMA table_info(files)')}['portable_path'], 1)
-        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 6)
 
     def test_restore_discards_incomplete_upload_leases(self):
         self.remote.sql += b"\nINSERT INTO staged_uploads(storage_key, expires_at) VALUES ('unfinished', 1);"
@@ -190,20 +146,6 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual([row[0] for row in restored.execute('SELECT path FROM notification_projection_jobs')], ['Reminders/Inbox.md'])
         self.assertEqual(tuple(restored.execute('SELECT token, state, generation FROM initial_import').fetchone()), ('resume-token', 'importing', 4))
         self.assertEqual(restored.execute("SELECT COUNT(*) FROM maintenance_state WHERE key GLOB 'reminder_source_scan*'").fetchone()[0], 0)
-
-    def test_schema_four_upgrades_upload_receipts_without_rewriting_the_source_archive(self):
-        self.remote.sql += b'\nDROP TABLE upload_operations; DROP INDEX IF EXISTS files_storage_key_idx; UPDATE crate_schema SET version = 4;'
-        recovery.backup(self.remote, self.directory)
-        source_sql = (self.directory / 'database.sql').read_bytes()
-        target = Remote(b'', {})
-        target.database, target.bucket = 'restore', 'restore'
-        recovery.restore(target, self.directory)
-        restored = load_database(target.sql)
-        self.addCleanup(restored.close)
-        self.assertEqual(restored.execute('SELECT version FROM crate_schema').fetchone()[0], 6)
-        self.assertEqual(restored.execute('SELECT COUNT(*) FROM upload_operations').fetchone()[0], 0)
-        self.assertEqual((self.directory / 'database.sql').read_bytes(), source_sql)
-        self.assertEqual(self.remote.objects, target.objects)
 
     def test_unsupported_schema_stops_restore_before_remote_mutation(self):
         recovery.backup(self.remote, self.directory)

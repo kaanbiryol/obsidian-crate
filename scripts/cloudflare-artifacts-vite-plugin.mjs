@@ -24,7 +24,22 @@ export function cloudflareArtifactsPlugin({ rootDir }) {
 			const workerBundleSha256 = sha256(workerBundle);
 			const d1Schema = readFileSync(resolve(rootDir, 'src/cloudflare/schema.sql'), 'utf8');
 			const d1SchemaSha256 = sha256(d1Schema);
-			const artifactFingerprint = sha256(JSON.stringify({ workerBundleSha256, d1SchemaSha256 }));
+			const serverRelease = JSON.parse(readFileSync(resolve(rootDir, 'src/cloudflare/server-release.json'), 'utf8'));
+      if (!Number.isSafeInteger(serverRelease.revision) || serverRelease.revision < 1
+        || !Number.isSafeInteger(serverRelease.schemaVersion) || serverRelease.schemaVersion < 1
+        || !Number.isSafeInteger(serverRelease.minimumSchemaVersion) || serverRelease.minimumSchemaVersion < 1
+        || serverRelease.minimumSchemaVersion > serverRelease.schemaVersion || !Array.isArray(serverRelease.migrations)) throw new Error('Invalid server release manifest');
+      let schemaVersion = 1;
+      const migrationIds = new Set();
+      for (const migration of serverRelease.migrations) {
+        if (!/^[a-z0-9-]+$/.test(migration.id) || migrationIds.has(migration.id) || migration.from !== schemaVersion || migration.to !== schemaVersion + 1
+          || migration.file !== `${migration.id}.sql`) throw new Error('Invalid database migration chain');
+        migrationIds.add(migration.id);
+        schemaVersion = migration.to;
+        if (!/^[a-z0-9-]+\.sql$/.test(migration.file) || sha256(readFileSync(resolve(rootDir, 'src/cloudflare/migrations', migration.file))) !== migration.checksum) throw new Error('Invalid database migration artifact');
+      }
+      if (schemaVersion !== serverRelease.schemaVersion) throw new Error('Missing database migration path');
+      const artifactFingerprint = sha256(JSON.stringify({ workerBundleSha256, d1SchemaSha256, serverRelease }));
 
 			return [
 				`export const artifactVersion = ${JSON.stringify(packageJson.version)};`,

@@ -175,13 +175,12 @@ it('drops non-opaque client correlation values and never treats absence as a new
 	for (const privateValue of [path, secret, 'credential-first', 'Never uploaded.md']) expect(logged).not.toContain(privateValue);
 });
 
-it('applies the additive schema-2 upgrade repeatedly without changing existing vault rows', async () => {
+it('reapplying the baseline schema preserves existing vault rows', async () => {
 	const file = await upload();
 	await env.DB.prepare('DROP TABLE file_deletion_receipts').run();
-	await env.DB.prepare('UPDATE crate_schema SET version = 2').run();
 	const before = await env.DB.prepare('SELECT * FROM files').all();
 	await applySchema(); await applySchema();
-	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: 6 });
+	expect(await env.DB.prepare('SELECT * FROM crate_schema').first()).toEqual({ id: 1, version: 1, created_version: 1 });
 	expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(before.results);
 	expect((await remove(file)).status).toBe(200);
 	expect(await receipts()).toHaveLength(1);

@@ -20,15 +20,17 @@ export interface DeploymentFenceRecord {
 	startedAt: string;
 	recoveryProtocol?: 1;
 	step?: string;
-	stepState?: 'started' | 'confirmed';
-  schemaUpgradePending?: boolean;
+	stepState?: 'started' | 'confirmed' | 'rejected' | 'settled';
+  verificationPending?: boolean;
 }
 
 export class DeploymentFence {
 	private uncertain = false;
-  private schemaUpgradePending = false;
+  private verificationPending = false;
 	private databaseRemoved = false;
-	constructor(private api: FenceApi, private account: string, private database: string, private value: string) {}
+	constructor(private api: FenceApi, private account: string, private database: string, private value: string) {
+    this.verificationPending = (JSON.parse(value) as DeploymentFenceRecord).verificationPending === true;
+  }
 
 	async mutate<T>(operation: () => Promise<T>, step = 'server-change'): Promise<T> {
 		const rows = (await this.api.queryD1(this.account, this.database,
@@ -44,16 +46,19 @@ export class DeploymentFence {
 			this.uncertain = false;
 			return result;
 		} catch (error) {
-			if (error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408) this.uncertain = false;
+			if (error instanceof CloudflareApiError && error.status >= 400 && error.status < 500 && error.status !== 408) {
+        await this.recordStep(step, 'rejected');
+        this.uncertain = false;
+      }
 			throw error;
 		}
 	}
 
 
-    private async recordStep(step: string, stepState: 'started' | 'confirmed'): Promise<void> {
+    private async recordStep(step: string, stepState: 'started' | 'confirmed' | 'rejected' | 'settled'): Promise<void> {
         if (this.databaseRemoved) return;
         const record = JSON.parse(this.value) as DeploymentFenceRecord;
-        const next = JSON.stringify({ ...record, step, stepState, ...(this.schemaUpgradePending || record.schemaUpgradePending ? { schemaUpgradePending: this.schemaUpgradePending } : {}) });
+        const next = JSON.stringify({ ...record, step, stepState, ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
         try {
             const rows = (await this.api.queryD1(this.account, this.database,
                 "UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? RETURNING value;",
@@ -66,16 +71,20 @@ export class DeploymentFence {
         }
     }
 
-  // The old Worker cannot use the new primary key. Keep mutations fenced if
-  // migration succeeds but deployment fails, even for a definite API rejection.
-  beginSchemaUpgrade(): void { this.schemaUpgradePending = true; }
-  completeSchemaUpgrade(): void { this.schemaUpgradePending = false; }
+  // Once storage or code changes, keep the lock until both have been verified.
+  async checkpoint(step: string): Promise<void> { await this.recordStep(step, 'confirmed'); }
+  requireVerification(): void { this.verificationPending = true; }
+  async completeVerification(): Promise<void> {
+    this.verificationPending = false;
+    try { await this.recordStep('verify-deployment', 'confirmed'); }
+    catch (error) { this.verificationPending = true; throw error; }
+  }
 
 	removedDatabase(): void { this.databaseRemoved = true; }
 
 	async finish(): Promise<void> {
 		if (this.databaseRemoved) return;
-		if (this.schemaUpgradePending) throw new DeploymentRecoveryRequiredError('The database upgrade needs its matching Worker. Keep the deployment fence held and finish the deployment before allowing sync.');
+		if (this.verificationPending) throw new DeploymentRecoveryRequiredError('The update needs its matching Worker and database verified. The deployment fence remains held until recovery completes.');
 		if (this.uncertain) throw new DeploymentRecoveryRequiredError('A Cloudflare mutation has an uncertain outcome. The deployment fence remains held. See docs/deployment.md and scripts/crate-deployment-fence.py before retrying.');
 		try {
 			await this.api.queryD1(this.account, this.database,
@@ -91,17 +100,19 @@ export async function withDeploymentFence<T>(input: {
 	record: Omit<DeploymentFenceRecord, 'owner' | 'startedAt'>;
 	/** Exact inspected deletion record; replacing it prevents the old client advancing. */
 	recoverDeletionValue?: string;
+  resumeUpdateValue?: string;
 }, operation: (fence: DeploymentFence) => Promise<T>): Promise<T> {
+	const recoveredValue = input.resumeUpdateValue ?? input.recoverDeletionValue;
 	const value = JSON.stringify({ ...input.record, recoveryProtocol: 1, owner: crypto.randomUUID(), startedAt: new Date().toISOString() });
 	await input.api.queryD1(input.accountId, input.databaseId,
 		"CREATE TABLE IF NOT EXISTS maintenance_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));");
 	let acquired: Array<Record<string, unknown>>;
 	try {
 		acquired = (await input.api.queryD1(input.accountId, input.databaseId,
-			input.recoverDeletionValue === undefined
+			recoveredValue === undefined
 				? 'INSERT INTO maintenance_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING value;'
 				: "UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? RETURNING value;",
-			input.recoverDeletionValue === undefined ? [DEPLOYMENT_FENCE_KEY, value] : [value, DEPLOYMENT_FENCE_KEY, input.recoverDeletionValue]))
+			recoveredValue === undefined ? [DEPLOYMENT_FENCE_KEY, value] : [value, DEPLOYMENT_FENCE_KEY, recoveredValue]))
 			.flatMap(result => result.results ?? []);
 	} catch {
 		throw new DeploymentRecoveryRequiredError('Could not confirm deployment ownership. Inspect the deployment fence with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');

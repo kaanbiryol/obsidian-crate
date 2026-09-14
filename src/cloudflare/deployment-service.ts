@@ -389,7 +389,15 @@ export class CloudflareDeploymentService {
                     this.checkSavedTarget(metadata, 'update');
                     return response;
                 });
-                return recoverDeployment(api, metadata);
+                const artifacts = await this.whileActive(this.options.loadArtifacts);
+                const recovery = await recoverDeployment(api, metadata, artifacts.fingerprint);
+                if (recovery.status !== 'resume' || !recovery.resumeValue) return recovery;
+                await this.whileActive(() => provisionCloudflareDeployment({
+                    api, accountId: metadata.accountId!, metadata, artifacts,
+                    resumeUpdateValue: recovery.resumeValue,
+                    onMetadataChanged: () => this.persistMetadata(metadata),
+                }));
+                return { status: 'completed', message: 'The interrupted server update was completed and verified.', diagnostics: recovery.diagnostics };
             });
         } finally { this.handlingCallback = false; }
     }

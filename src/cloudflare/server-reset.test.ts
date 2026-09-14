@@ -32,7 +32,7 @@ function harness() {
 		getR2Bucket: vi.fn(async () => bucket),
 		listDurableObjectNamespaces: vi.fn(async () => worker.bindings?.some(binding => binding.type === 'durable_object_namespace') ? [{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' }] : []),
 		queryD1: vi.fn(async (_account: string, _db: string, sql: string, params?: string[]): Promise<Array<{ results: Array<Record<string, unknown>> }>> => fence.query(sql, params) ?? [{ results: sql.startsWith('PRAGMA')
-			? [{ name: 'storage_key' }] : ['files', 'auth_tokens', 'd1_migrations'].map(name => ({ name })) }]),
+			? [{ name: 'storage_key' }] : ['files', 'auth_tokens', 'crate_migrations'].map(name => ({ name })) }]),
 		listR2Objects: vi.fn(async (_account: string, _bucket: string, _cursor?: string): Promise<{ keys: string[]; cursor?: string }> => ({ keys: [...objects] })),
 		deleteR2Object: vi.fn(async (_account: string, _bucket: string, key: string) => { objects.delete(key); }),
 		deleteR2Bucket: vi.fn(async () => { bucket = null; }),
@@ -373,11 +373,11 @@ it('identifies the exact unknown and missing tables before any deletion', async 
 });
 
 
-it.each([resetCrateServer, deleteCrateServer])('recognizes the original OAuth provisioner migration table during cleanup', async cleanup => {
+it.each([resetCrateServer, deleteCrateServer])('recognizes the baseline release tables during cleanup', async cleanup => {
 	const h = harness();
 	const query = h.api.queryD1.getMockImplementation()!;
 	h.api.queryD1.mockImplementation(async (account, database, sql, params) => sql.includes('sqlite_master')
-		? [{ results: ['files', 'auth_tokens', '_crate_migrations'].map(name => ({ name })) }]
+		? [{ results: ['files', 'auth_tokens', 'crate_release'].map(name => ({ name })) }]
 		: query(account, database, sql, params));
 	await cleanup(h.input);
 	expect(h.api.deleteD1Database).toHaveBeenCalledOnce();
