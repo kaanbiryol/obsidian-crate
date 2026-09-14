@@ -81,6 +81,8 @@ export class DeploymentFence {
 export async function withDeploymentFence<T>(input: {
 	api: FenceApi; accountId: string; databaseId: string;
 	record: Omit<DeploymentFenceRecord, 'owner' | 'startedAt'>;
+	/** Exact inspected deletion record; replacing it prevents the old client advancing. */
+	recoverDeletionValue?: string;
 }, operation: (fence: DeploymentFence) => Promise<T>): Promise<T> {
 	const value = JSON.stringify({ ...input.record, recoveryProtocol: 1, owner: crypto.randomUUID(), startedAt: new Date().toISOString() });
 	await input.api.queryD1(input.accountId, input.databaseId,
@@ -88,7 +90,10 @@ export async function withDeploymentFence<T>(input: {
 	let acquired: Array<Record<string, unknown>>;
 	try {
 		acquired = (await input.api.queryD1(input.accountId, input.databaseId,
-			'INSERT INTO maintenance_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING value;', [DEPLOYMENT_FENCE_KEY, value]))
+			input.recoverDeletionValue === undefined
+				? 'INSERT INTO maintenance_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING RETURNING value;'
+				: "UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? RETURNING value;",
+			input.recoverDeletionValue === undefined ? [DEPLOYMENT_FENCE_KEY, value] : [value, DEPLOYMENT_FENCE_KEY, input.recoverDeletionValue]))
 			.flatMap(result => result.results ?? []);
 	} catch {
 		throw new DeploymentRecoveryRequiredError('Could not confirm deployment ownership. Inspect the deployment fence with scripts/crate-deployment-fence.py before retrying; see docs/deployment.md.');

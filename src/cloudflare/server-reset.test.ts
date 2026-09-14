@@ -194,6 +194,85 @@ describe('Crate server reset boundaries', () => {
 
 
 describe('delete-only server removal', () => {
+	it.each([false, true])('resumes an interrupted object deletion, including a lost response (applied=%s)', async applied => {
+		const h = harness();
+		h.api.deleteR2Object.mockImplementationOnce(async (_account, _bucket, key) => {
+			if (applied) h.objects.delete(key);
+			throw new Error('net::ERR_NETWORK_CHANGED');
+		});
+		await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
+		await deleteCrateServer(h.input);
+		expect(h.api.deleteWorker).toHaveBeenCalledOnce();
+		expect(h.api.retireCrateWorker).toHaveBeenCalledOnce();
+		expect(h.objects.size).toBe(0);
+	});
+
+	it('does not let an old deletion continue after another resume takes ownership', async () => {
+		const h = harness();
+		let release!: () => void;
+		let started!: () => void;
+		const pending = new Promise<void>(resolve => { release = resolve; });
+		const dispatched = new Promise<void>(resolve => { started = resolve; });
+		h.api.deleteR2Object.mockImplementationOnce(async (_account, _bucket, key) => {
+			started();
+			await pending;
+			h.objects.delete(key);
+		});
+		const original = deleteCrateServer(h.input);
+		const rejected = expect(original).rejects.toThrow('checkpoint');
+		await dispatched;
+		await deleteCrateServer(h.input);
+		release();
+		await rejected;
+		expect(h.api.deleteR2Bucket).toHaveBeenCalledOnce();
+		expect(h.api.deleteD1Database).toHaveBeenCalledOnce();
+		expect(h.api.deleteWorker).toHaveBeenCalledOnce();
+	});
+
+	it('keeps an uncertain Worker retirement locked', async () => {
+		const h = harness();
+		const retire = h.api.retireCrateWorker.getMockImplementation()!;
+		h.api.retireCrateWorker.mockImplementationOnce(async (...args) => {
+			await retire(...args);
+			throw new Error('net::ERR_NETWORK_CHANGED');
+		});
+		await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
+		await expect(deleteCrateServer(h.input)).rejects.toThrow('cannot be resumed automatically');
+		expect(h.api.deleteR2Object).not.toHaveBeenCalled();
+	});
+
+	it('leaves reset recovery blocked after an uncertain file deletion', async () => {
+		const h = harness();
+		h.api.deleteR2Object.mockRejectedValueOnce(new Error('offline'));
+		await expect(resetCrateServer(h.input)).rejects.toThrow('uncertain outcome');
+		await expect(resetCrateServer(h.input)).rejects.toThrow('Another deployment');
+		expect(h.api.deleteR2Object).toHaveBeenCalledOnce();
+	});
+
+	it('does not steal ownership when the inspected record changes', async () => {
+		const h = harness();
+		h.api.deleteR2Object.mockRejectedValueOnce(new Error('offline'));
+		await expect(deleteCrateServer(h.input)).rejects.toThrow('uncertain outcome');
+		const query = h.api.queryD1.getMockImplementation()!;
+		h.api.queryD1.mockImplementation(async (account, database, sql, params) => {
+			if (sql.startsWith('UPDATE maintenance_state SET value = ?')) {
+				await query(account, database, sql, ['replacement-owner', params![1]!, params![2]!]);
+			}
+			return query(account, database, sql, params);
+		});
+		await expect(deleteCrateServer(h.input)).rejects.toThrow('Another deployment');
+		expect(h.api.deleteR2Object).toHaveBeenCalledOnce();
+		expect(h.api.deleteR2Bucket).not.toHaveBeenCalled();
+	});
+
+	it('refuses recovery when the bucket was replaced', async () => {
+		const h = harness();
+		h.api.deleteR2Object.mockRejectedValueOnce(new Error('offline'));
+		await expect(deleteCrateServer(h.input)).rejects.toThrow();
+		h.api.getR2Bucket.mockResolvedValue({ name: h.metadata.r2BucketName, creation_date: 'different' });
+		await expect(deleteCrateServer(h.input)).rejects.toThrow('bucket identity changed');
+		expect(h.api.deleteR2Bucket).not.toHaveBeenCalled();
+	});
 	it('removes the retired Worker after storage and keeps a deletion checkpoint', async () => {
 		const h = harness();
 		await deleteCrateServer(h.input);
