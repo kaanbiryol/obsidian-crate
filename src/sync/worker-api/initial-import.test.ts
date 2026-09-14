@@ -42,3 +42,15 @@ it('stops polling when the sync is cancelled', async () => {
   await vi.advanceTimersByTimeAsync(500); await rejected;
   expect(requestJson).toHaveBeenCalledOnce();
 });
+
+it('reports live remaining work while polling and accepts older servers without progress', async () => {
+  vi.useFakeTimers();
+  const { api, requestJson } = harness();
+  const progress = vi.fn();
+  const counts = { scanning: false, remainingFiles: 0, remainingSchedules: 42 };
+  requestJson.mockResolvedValueOnce({ ready: false, progress: counts })
+    .mockResolvedValueOnce({ ready: false }).mockResolvedValueOnce({ ready: true });
+  const waiting = api.waitUntilReady('token', () => {}, progress);
+  await vi.advanceTimersByTimeAsync(2000); await waiting;
+  expect(progress).toHaveBeenCalledExactlyOnceWith(counts);
+});

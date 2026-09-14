@@ -33,11 +33,11 @@ it('keeps readiness pending until every schedule is installed and writes nothing
   const content = Array.from({ length: 12 }, () => note('2099-01-01T12:00:00.000Z')).join('\n');
   await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/tasks.md', content, null);
   const meter = meterD1Writes(env.DB);
-  expect(await readiness(meter.db)).toEqual({ ready: false });
+  expect(await readiness(meter.db)).toMatchObject({ ready: false });
   expect(meter.writes()).toBe(0);
   await pass();
-  expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 5 });
-  expect(await readiness(meter.db)).toEqual({ ready: false });
+  expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 10 });
+  expect(await readiness(meter.db)).toMatchObject({ ready: false, progress: { scanning: false, remainingFiles: 0, remainingSchedules: 2 } });
   expect(meter.writes()).toBe(0);
   await pass(); await pass();
   expect(await readiness(meter.db)).toEqual({ ready: true });
@@ -180,3 +180,57 @@ it.each(['failed', 'pending'])('syncs an ordinary edit while reminder settings a
     expect(await (await env.BUCKET.get(stored!.storage_key))!.text()).toBe('updated');
   } finally { release(); }
 }, 15_000);
+
+it('finishes 400 newly imported overdue reminders without creating cancellation jobs', async () => {
+  await pendingImport();
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/history.md',
+    Array.from({ length: 400 }, () => note('2020-01-01T12:00:00.000Z')).join('\n'), null);
+  const dispatch = vi.spyOn(env.REMINDER_ALARMS, 'get');
+  await pass();
+  expect(await readiness()).toEqual({ ready: true });
+  expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_projections').first()).toEqual({ n: 400 });
+  expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM notification_jobs').first()).toEqual({ n: 0 });
+  // The dispatcher is called once; no per-reminder cancellation objects are opened.
+  expect(dispatch).toHaveBeenCalledTimes(1);
+});
+
+it.each([false, true])('cancels a completed reminder with an existing alarm or pending schedule (dispatched=%s)', async dispatched => {
+  await pendingImport();
+  const path = 'Reminders/task.md';
+  const content = note('2099-01-01T12:00:00.000Z');
+  const first = await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content, null);
+  const { drainNotificationProjections } = await import('./notification-projection');
+  await drainNotificationProjections(env);
+  if (dispatched) await pass();
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, path, content.replace('[ ]', '[x]'), first.hash);
+  await drainNotificationProjections(env);
+  expect(await env.DB.prepare('SELECT operation FROM notification_jobs').first()).toEqual({ operation: 'cancel' });
+  await pass();
+  expect(await env.DB.prepare('SELECT 1 FROM scheduled_reminders').first()).toBeNull();
+  expect(await readiness()).toEqual({ ready: true });
+});
+
+it('dispatches ten jobs in bounded parallel groups within the request query budget', async () => {
+  await env.DB.prepare(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x < 10)
+    INSERT INTO notification_jobs(reminder_id, job_token, operation, available_at)
+    SELECT 'parallel-'||x, 'token-'||x, 'cancel', 0 FROM n`).run();
+  let active = 0, peak = 0;
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const fetch = vi.fn(async () => {
+    active++; peak = Math.max(peak, active);
+    await gate; active--;
+    return new Response(null, { status: 204 });
+  });
+  const prepare = vi.spyOn(env.DB, 'prepare');
+  const { drainNotificationJobs } = await import('./notification-outbox');
+  const draining = drainNotificationJobs({ ...env, REMINDER_ALARMS: {
+    idFromName: (id: string) => id, get: () => ({ fetch }),
+  } } as never);
+  try { await vi.waitFor(() => expect(active).toBe(5)); }
+  finally { release(); await draining; }
+  expect(peak).toBe(5);
+  expect(fetch).toHaveBeenCalledTimes(10);
+  expect(prepare.mock.calls.length).toBeLessThan(50);
+  expect(await env.DB.prepare('SELECT 1 FROM notification_jobs').first()).toBeNull();
+});

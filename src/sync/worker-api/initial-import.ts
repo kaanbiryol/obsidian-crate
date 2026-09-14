@@ -1,4 +1,4 @@
-import { INITIAL_IMPORT_CAPABILITY, type InitialImport } from '@/protocol/initial-import';
+import { INITIAL_IMPORT_CAPABILITY, type InitialImport, type ReminderSetupProgress } from '@/protocol/initial-import';
 import type { BatchUploadResponse } from '@/protocol/sync-types';
 import { TRANSFER_TIMEOUT_MS, type WorkerApiHttpClient } from './http';
 import { arrayBufferToBase64 } from '../encoding';
@@ -49,18 +49,18 @@ export class InitialImportApi {
 
   isPreparingReminders(): boolean { return this.pendingSetup?.workerUrl === this.http.getWorkerUrl(); }
 
-  async finishReminderSetup(throwIfDestroyed: () => void): Promise<void> {
-    if (this.pendingSetup && this.isPreparingReminders()) await this.waitUntilReady(this.pendingSetup.token, throwIfDestroyed);
+  async finishReminderSetup(throwIfDestroyed: () => void, onProgress?: (progress: ReminderSetupProgress) => void): Promise<void> {
+    if (this.pendingSetup && this.isPreparingReminders()) await this.waitUntilReady(this.pendingSetup.token, throwIfDestroyed, onProgress);
   }
 
-  async waitUntilReady(token: string, throwIfDestroyed: () => void): Promise<void> {
+  async waitUntilReady(token: string, throwIfDestroyed: () => void, onProgress?: (progress: ReminderSetupProgress) => void): Promise<void> {
     const workerUrl = this.http.getWorkerUrl();
     // Bound a foreground wait; the durable marker survives a timeout, close or restart.
     const deadline = Date.now() + 3 * 60 * 60 * 1000;
     while (Date.now() < deadline) {
       throwIfDestroyed();
       if (this.http.getWorkerUrl() !== workerUrl) throw new Error('Sync connection changed during reminder setup');
-      const status = await this.http.requestJson<{ ready: boolean; error?: string }>('/sync/import/readiness', {
+      const status = await this.http.requestJson<{ ready: boolean; error?: string; progress?: ReminderSetupProgress }>('/sync/import/readiness', {
         method: 'POST', body: JSON.stringify({ token }),
       });
       throwIfDestroyed();
@@ -71,6 +71,11 @@ export class InitialImportApi {
         return;
       }
       if (status.ready !== false) throw new Error('Invalid reminder setup response');
+      if (status.progress && typeof status.progress.scanning === 'boolean'
+        && Number.isSafeInteger(status.progress.remainingFiles) && status.progress.remainingFiles >= 0
+        && Number.isSafeInteger(status.progress.remainingSchedules) && status.progress.remainingSchedules >= 0) {
+        onProgress?.(status.progress);
+      }
       if (status.error) throw new Error(`Files uploaded. Reminder setup needs attention: ${status.error}`);
       await new Promise(resolve => setTimeout(resolve, 1000));
     }

@@ -21,7 +21,7 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
     }
   } finally {
     if (sourceWork) {
-      await state.storage.setAlarm(Date.now() + 1_000);
+      await state.storage.setAlarm(Date.now() + 1);
     } else {
       const source = hasPolicy ? null : await env.DB.prepare(NEXT_SOURCE_RETRY_SQL)
         .first<{ retryAt: number | null }>();
@@ -29,8 +29,9 @@ export async function runNotificationCoordinator(state: DurableObjectState, env:
         .first<{ ready: number; projectionRetry: number | null; dispatchAt: number | null }>() : null;
       const deadlines = [source?.retryAt, pending?.projectionRetry, pending?.dispatchAt,
         ...(pending?.ready ? [0] : [])].filter((value): value is number => typeof value === 'number');
-      // Idle coordinators leave no alarm behind. Failed jobs sleep until due.
-      if (deadlines.length) await state.storage.setAlarm(Math.max(Date.now() + 1_000, Math.min(...deadlines)));
+      // Continue ready work immediately in a fresh invocation with its own budget.
+      // Idle coordinators leave no alarm behind; failed jobs sleep until due.
+      if (deadlines.length) await state.storage.setAlarm(Math.max(Date.now() + 1, Math.min(...deadlines)));
     }
   }
 }

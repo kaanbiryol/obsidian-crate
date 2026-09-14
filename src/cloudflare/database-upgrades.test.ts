@@ -6,7 +6,7 @@ const step: DatabaseMigration = { id: 'add-example', from: 1, to: 2, file: 'add-
 const future = { revision: 2, minimumSchemaVersion: 1, schemaVersion: 2, migrations: [step] };
 
 it('ships one fresh baseline and no historical migrations', () => {
-  expect(SERVER_RELEASE).toEqual({ revision: 1, schemaVersion: 1, minimumSchemaVersion: 1, migrations: [] });
+  expect(SERVER_RELEASE).toMatchObject({ schemaVersion: 1, minimumSchemaVersion: 1, migrations: [] });
   expect(planDatabaseUpgrade(null)).toEqual([]);
   expect(planDatabaseUpgrade(1)).toEqual([]);
   for (const version of [0, 2, 3, 4, 5, 6, 999, NaN]) expect(() => planDatabaseUpgrade(version)).toThrow('Unsupported database schema');

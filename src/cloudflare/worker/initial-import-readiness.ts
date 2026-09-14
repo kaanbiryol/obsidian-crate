@@ -4,7 +4,7 @@ import { REMINDER_CACHE_PARSER_VERSION } from './reminders-web/reminder-cache/ty
 
 export const INITIAL_REMINDERS_PENDING = 'initial_import_reminders_pending';
 
-// Every probe uses primary keys or bounded index lookups, never a full vault scan.
+// Readiness uses indexed existence checks; progress counts only outstanding work.
 const READY_SQL = `NOT EXISTS (SELECT 1 FROM notification_policy) OR (
   EXISTS (SELECT 1 FROM notification_policy p JOIN maintenance_state m
     ON m.key = 'reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:' || p.folder_path AND m.value = '')
@@ -32,5 +32,19 @@ export async function finishInitialReminderSetup(request: Request, db: D1Databas
       .bind(INITIAL_REMINDERS_PENDING, current.token),
   ]);
   const status = result[1]!.results[0]!;
-  return corsResponse({ ready: Boolean(status.ready), ...(!status.ready && status.error ? { error: status.error } : {}) });
+  const progress = status.ready ? undefined : await db.prepare(`SELECT
+    NOT EXISTS (SELECT 1 FROM notification_policy p JOIN maintenance_state m
+      ON m.key = 'reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:' || p.folder_path AND m.value = '') AS scanning,
+    (SELECT COUNT(*) FROM (
+      SELECT file_path FROM reminder_source_state WHERE parser_version < ${REMINDER_CACHE_PARSER_VERSION}
+      UNION SELECT file_path FROM reminder_source_state WHERE verified = 0
+      UNION SELECT path FROM notification_projection_jobs
+    )) AS remainingFiles,
+    (SELECT COUNT(*) FROM notification_jobs) AS remainingSchedules`).first<{
+      scanning: number; remainingFiles: number; remainingSchedules: number;
+    }>();
+  return corsResponse({ ready: Boolean(status.ready),
+    ...(progress ? { progress: { ...progress, scanning: Boolean(progress.scanning) } } : {}),
+    ...(!status.ready && status.error ? { error: status.error } : {}),
+  });
 }

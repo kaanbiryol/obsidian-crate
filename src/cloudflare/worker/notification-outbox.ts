@@ -16,7 +16,7 @@ interface NotificationJobRow {
 	attempts: number;
 }
 
-const OUTBOX_BATCH_SIZE = 5;
+const OUTBOX_BATCH_SIZE = 10;
 const OUTBOX_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 
 /** The existing class supplies a separate request budget; no extra persistent state. */
@@ -83,7 +83,12 @@ export async function drainNotificationJobs(env: Env, limit = OUTBOX_BATCH_SIZE)
 			WHERE available_at >= 0 AND available_at <= ? ORDER BY available_at ASC LIMIT ?`)
 			.bind(Date.now(), limit),
 	);
-	for (const job of jobs) {
-		await processNotificationJob(env, job.reminder_id, job.job_token);
+	// Distinct reminder IDs have independent Durable Object locks. Five at a time
+	// bounds outgoing requests while avoiding serial network round trips.
+	for (let offset = 0; offset < jobs.length; offset += 5) {
+		const results = await Promise.allSettled(jobs.slice(offset, offset + 5).map(job =>
+			processNotificationJob(env, job.reminder_id, job.job_token)));
+		const failed = results.find(result => result.status === 'rejected');
+		if (failed?.status === 'rejected') throw failed.reason;
 	}
 }

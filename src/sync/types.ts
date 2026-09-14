@@ -2,6 +2,7 @@ export type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
 
 export interface SyncWork {
 	phase: 'recovering' | 'server' | 'scanning' | 'preparing' | 'uploading' | 'downloading' | 'applying' | 'saving' | 'reminders';
+	reminderSetup?: import('../protocol/initial-import').ReminderSetupProgress;
 	current?: number;
 	total?: number;
 }
