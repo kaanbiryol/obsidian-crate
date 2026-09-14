@@ -49,6 +49,11 @@ export async function sweepOrphanedManagedObjects(
   if (candidates.length) {
     const tracked = await db.prepare('SELECT storage_key FROM staged_uploads WHERE storage_key IN (SELECT value FROM json_each(?))').bind(JSON.stringify(candidates)).all<{ storage_key: string }>();
     const keys = new Set(tracked.results.map(row => row.storage_key));
+    const batches = await db.prepare(`SELECT CASE WHEN k.type = 'text' THEN k.value ELSE json_extract(k.value, '$.storageKey') END AS storage_key
+      FROM staged_upload_batches b, json_each(b.storage_keys) k
+      WHERE CASE WHEN k.type = 'text' THEN k.value ELSE json_extract(k.value, '$.storageKey') END
+        IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(candidates)).all<{ storage_key: string }>();
+    for (const row of batches.results) keys.add(row.storage_key);
     candidates = candidates.filter(key => !keys.has(key));
   }
 	let deleted = 0;

@@ -1,4 +1,5 @@
 import { cleanStagedUploads } from './maintenance/staged-upload-cleanup';
+import { cleanStagedBatches } from './maintenance/staged-batch-cleanup';
 import { pruneChangelog } from './db';
 import { drainObjectCleanupQueue, enqueueExpiredFileVersions } from './storage/index';
 import type { Env } from './types';
@@ -20,6 +21,7 @@ export async function runScheduledMaintenance(env: Env): Promise<number> {
 		['prune request limits', () => env.DB.prepare('DELETE FROM request_rate_limits WHERE expires_at < ?').bind(Date.now() - 60_000).run()],
 		['prune tokens', () => pruneExpiredTokens(env.DB)],
 		['clean unfinished uploads', async () => { removedObjects += await cleanStagedUploads(env.BUCKET, env.DB); }],
+		['clean unfinished upload batches', async () => { removedObjects += await cleanStagedBatches(env.BUCKET, env.DB); }],
 		['scan legacy orphaned objects', () => sweepOrphanedManagedObjects(env.BUCKET, env.DB)],
 	];
 	for (const [name, task] of tasks) {

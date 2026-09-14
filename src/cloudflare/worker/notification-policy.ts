@@ -1,3 +1,4 @@
+import { FILE_FOLDER_MATCH, fileFolderArgs } from './file-identity';
 import type { NotificationPolicy } from '../../protocol/notification-policy';
 import { changedRows } from './db';
 import { corsResponse } from './cors';
@@ -27,8 +28,11 @@ export async function handleNotificationPolicy(request: Request, db: D1Database)
   const results = await db.batch([mutation,
     db.prepare('DELETE FROM notification_file_retries WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)').bind(revision),
     db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
-      SELECT path, ? FROM files WHERE lower(path) LIKE '%.md' AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
-      ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`).bind(revision, revision),
+      SELECT path, ? FROM files WHERE ${FILE_FOLDER_MATCH} AND lower(path) LIKE '%.md'
+        AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
+      ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`).bind(revision, ...fileFolderArgs(folder), revision),
+    db.prepare(`DELETE FROM maintenance_state WHERE key LIKE 'reminder_source_scan_%'
+      AND EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)`).bind(revision),
     db.prepare(`INSERT INTO notification_projection_jobs (path, job_token)
       SELECT DISTINCT file_path, ? FROM reminder_projections WHERE EXISTS (SELECT 1 FROM notification_policy WHERE revision = ?)
       ON CONFLICT(path) DO UPDATE SET job_token = excluded.job_token, last_error = NULL`).bind(revision, revision),

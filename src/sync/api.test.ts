@@ -336,13 +336,13 @@ describe('SyncApiClient', () => {
 		const transport = mockTransport(new Response(JSON.stringify({
 			service: 'crate',
 			serverVersion: '9.0.0',
-			protocol: { current: 9, oldestCompatible: 9 },
+			protocol: { current: 99, oldestCompatible: 99 },
 			capabilities: ['sync-v1'],
 		}), { headers: { 'X-Test-Metadata': 'true' } }));
 		const client = new SyncApiClient('https://worker.example', 'token', transport);
 		await expect(client.testConnection()).resolves.toEqual({
 			success: false,
-			error: 'Incompatible Crate server protocol 9',
+			error: 'Incompatible Crate server protocol 99',
 		});
 		expect(transport).toHaveBeenCalledTimes(1);
 	});

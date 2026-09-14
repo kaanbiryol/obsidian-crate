@@ -21,10 +21,12 @@ export interface DeploymentFenceRecord {
 	recoveryProtocol?: 1;
 	step?: string;
 	stepState?: 'started' | 'confirmed';
+  schemaUpgradePending?: boolean;
 }
 
 export class DeploymentFence {
 	private uncertain = false;
+  private schemaUpgradePending = false;
 	private databaseRemoved = false;
 	constructor(private api: FenceApi, private account: string, private database: string, private value: string) {}
 
@@ -51,7 +53,7 @@ export class DeploymentFence {
     private async recordStep(step: string, stepState: 'started' | 'confirmed'): Promise<void> {
         if (this.databaseRemoved) return;
         const record = JSON.parse(this.value) as DeploymentFenceRecord;
-        const next = JSON.stringify({ ...record, step, stepState });
+        const next = JSON.stringify({ ...record, step, stepState, ...(this.schemaUpgradePending || record.schemaUpgradePending ? { schemaUpgradePending: this.schemaUpgradePending } : {}) });
         try {
             const rows = (await this.api.queryD1(this.account, this.database,
                 "UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? RETURNING value;",
@@ -64,10 +66,16 @@ export class DeploymentFence {
         }
     }
 
+  // The old Worker cannot use the new primary key. Keep mutations fenced if
+  // migration succeeds but deployment fails, even for a definite API rejection.
+  beginSchemaUpgrade(): void { this.schemaUpgradePending = true; }
+  completeSchemaUpgrade(): void { this.schemaUpgradePending = false; }
+
 	removedDatabase(): void { this.databaseRemoved = true; }
 
 	async finish(): Promise<void> {
 		if (this.databaseRemoved) return;
+		if (this.schemaUpgradePending) throw new DeploymentRecoveryRequiredError('The database upgrade needs its matching Worker. Keep the deployment fence held and finish the deployment before allowing sync.');
 		if (this.uncertain) throw new DeploymentRecoveryRequiredError('A Cloudflare mutation has an uncertain outcome. The deployment fence remains held. See docs/deployment.md and scripts/crate-deployment-fence.py before retrying.');
 		try {
 			await this.api.queryD1(this.account, this.database,

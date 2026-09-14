@@ -23,6 +23,7 @@ const request = () => new Request('https://test/reminders/list?folderPath=Remind
 function clock(date: string) { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(date)); }
 
 it.each(['[Weekly report](https://example.com/report)', '[Review ! #work](https://example.com/report)'])('preserves %s through create, cache upgrade and source revalidation', async content => {
+  await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
 	const operationId = newOperationId();
 	const dueDatetime = '2099-01-01T09:00:00.000Z';
 	const recurrence = { frequency: 'daily', timezone: 'UTC', hour: 9, minute: 0 };

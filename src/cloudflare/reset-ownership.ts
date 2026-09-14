@@ -5,8 +5,8 @@ import type { CloudflareDeploymentMetadata } from './deployment-types';
 // Current and prerelease Crate tables. Unknown tables block deletion, including
 // when somebody has repurposed a database which still has a Crate resource name.
 const CRATE_TABLES = new Set([
-	'crate_schema', 'd1_migrations', '_crate_migrations', 'changelog', 'files', 'auth_tokens',
-	'staged_uploads', 'notification_file_retries', 'scheduled_reminders', 'notification_jobs', 'vapid_keys', 'push_subscriptions',
+	'crate_schema', 'd1_migrations', '_crate_migrations', 'changelog', 'files', 'files_v6', 'auth_tokens', 'initial_import',
+	'staged_uploads', 'staged_upload_batches', 'notification_file_retries', 'scheduled_reminders', 'notification_jobs', 'vapid_keys', 'push_subscriptions',
 	'push_enrollment_tokens', 'web_enrollment_tokens', 'object_cleanup_queue',
 	'file_versions', 'file_deletion_receipts', 'maintenance_state', 'reminder_file_cache', 'reminder_operations', 'upload_operations',
 	'reminder_identities', 'notification_policy', 'notification_projection_jobs',

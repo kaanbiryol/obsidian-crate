@@ -2,6 +2,7 @@ import { commitNewFiles } from '../bulk-new-file-commit';
 import { BULK_NEW_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 import { BATCH_ASSET_UPLOAD_MAX_FILES } from '../../../protocol/sync-limits';
 import { trackStagedUploads } from '../staged-uploads';
+import { trackStagedBatch } from '../staged-upload-batches';
 import { beginUploadOperation } from '../upload-operations';
 import { sha256HexBytes } from '../auth';
 import { corsResponse } from '../cors';
@@ -191,8 +192,10 @@ export async function handleBatchUpload(
 		}
 	}
 
+	let stagingBatchId: string | undefined;
 	try {
-		await trackStagedUploads(db, uploads.map(file => file.objectKey));
+		if (bulkNew) stagingBatchId = await trackStagedBatch(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })));
+		else await trackStagedUploads(db, uploads.map(file => ({ storageKey: file.objectKey, path: file.safePath })));
 	} catch (error) {
 		return corsResponse({ success: false, results: results.concat(uploads.map(file => ({
 			path: file.safePath, success: false as const, code: 'storage' as const, status: 503,
@@ -219,7 +222,7 @@ export async function handleBatchUpload(
 		try {
 			results.push(...await commitBulk(bucket, db, staged.map(file => ({
 				path: file.safePath, hash: file.hash, size: file.size, objectKey: file.objectKey,
-				operation: file.operation, content: file.bytes,
+				operation: file.operation, content: file.bytes, stagingBatchId,
 			}))));
 		} catch (error) {
 			failed = true;

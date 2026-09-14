@@ -1,4 +1,6 @@
+import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { stagedUploadGuard, finishStagedUpload } from './staged-uploads';
+import { stagedBatchGuard } from './staged-upload-batches';
 import { decodeReceipt, readUploadReceipt, recordUploadReceipt, type UploadOperation } from './upload-operations';
 import type { UploadResult } from '@/protocol/sync-types';
 import { enqueueFileProjection } from './notification-projection-queue';
@@ -27,11 +29,17 @@ export function uploadMutation(
 	expectedHash: ExpectedFileHash,
 	operation?: UploadOperation,
 	expectedRevision?: string,
+	stagingBatchId?: string,
+	importToken?: string,
 ): D1PreparedStatement {
 	const namespace = fileNamespaceGuard(path);
-  const lease = stagedUploadGuard(objectKey);
+  const lease = stagingBatchId ? stagedBatchGuard(stagingBatchId, objectKey) : stagedUploadGuard(objectKey);
   namespace.sql += ` AND ${lease.sql}`;
   namespace.args.push(...lease.args);
+  if (importToken) {
+    namespace.sql += " AND EXISTS (SELECT 1 FROM initial_import WHERE token = ? AND state = 'importing')";
+    namespace.args.push(importToken);
+  }
 	if (operation) {
 		namespace.sql += ' AND NOT EXISTS (SELECT 1 FROM upload_operations WHERE operation_id = ?)';
 		namespace.args.push(operation.id);
@@ -39,15 +47,15 @@ export function uploadMutation(
 	if (expectedHash === null) {
 		return db.prepare(`INSERT INTO files (path, portable_path, hash, size, modified, storage_key)
 			SELECT ?, ?, ?, ?, datetime('now'), ? WHERE ${namespace.sql}
-			ON CONFLICT(path) DO NOTHING`)
+			ON CONFLICT(portable_path) DO NOTHING`)
 			.bind(path, portablePathKey(path), hash, size, objectKey, ...namespace.args);
 	}
 
 	const revisionGuard = expectedRevision === undefined ? '' : ' AND storage_key = ?';
 	return db.prepare(`UPDATE files
 		SET portable_path = ?, hash = ?, size = ?, modified = datetime('now'), storage_key = ?
-		WHERE path = ? AND hash = ? AND ${namespace.sql}${revisionGuard}`)
-		.bind(portablePathKey(path), hash, size, objectKey, path, expectedHash, ...namespace.args, ...(expectedRevision === undefined ? [] : [expectedRevision]));
+		WHERE ${FILE_PATH_MATCH} AND hash = ? AND ${namespace.sql}${revisionGuard}`)
+		.bind(portablePathKey(path), hash, size, objectKey, ...filePathArgs(path), expectedHash, ...namespace.args, ...(expectedRevision === undefined ? [] : [expectedRevision]));
 }
 
 export interface CommitResult {
@@ -63,6 +71,7 @@ export async function commitStagedFile(
 	bucket: R2Bucket,
 	db: D1Database,
 	params: {
+		reminderPolicyRevision?: string | null;
 		path: string;
 		hash: string;
 		size: number;
@@ -91,24 +100,24 @@ export async function commitStagedFile(
 		db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
 			SELECT ?, 'put', ?, ?, ?
 			WHERE EXISTS (
-				SELECT 1 FROM files WHERE path = ? AND storage_key = ?
-			)`).bind(params.path, params.hash, params.size, params.objectKey, params.path, params.objectKey),
+				SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?
+			)`).bind(params.path, params.hash, params.size, params.objectKey, ...filePathArgs(params.path), params.objectKey),
 		...cleanupKeys.map((key) => db.prepare(`INSERT OR IGNORE INTO file_versions
 			(storage_key, path, hash, size, reason, expires_at)
 			SELECT ?, ?, ?, ?, 'replaced', ? WHERE EXISTS (
-				SELECT 1 FROM files WHERE path = ? AND storage_key = ?
+				SELECT 1 FROM files WHERE ${FILE_PATH_MATCH} AND storage_key = ?
 			)`).bind(
 			key,
 			params.path,
 			params.previousFile?.hash ?? '',
 			params.previousFile?.size ?? 0,
 			Date.now() + FILE_VERSION_RETENTION_MS,
-			params.path,
+			...filePathArgs(params.path),
 			params.objectKey,
 		)),
-		...enqueueFileProjection(db, params.path, params.objectKey, params.content),
+		...await enqueueFileProjection(db, params.path, params.objectKey, params.content),
 		...(params.effects?.([{ path: params.path, storageKey: params.objectKey }]) ?? []),
-		finishStagedUpload(db, params.objectKey),
+		finishStagedUpload(db, params.objectKey, params.path),
 		...(params.operation ? [recordUploadReceipt(db, params.operation, params)] : []),
 	]);
 
@@ -117,7 +126,7 @@ export async function commitStagedFile(
 		const recorded = (results[results.length - 1] as { results?: Array<{ response_json: string }> } | undefined)?.results?.[0];
 		const receipt = recorded ? decodeReceipt(recorded.response_json) : await readUploadReceipt(db, params.operation);
 		if (!receipt) throw new Error('Upload receipt is unavailable; retry the same operation');
-		if (receipt.revision !== params.objectKey) await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
+		if (receipt.revision !== params.objectKey) await deleteBucketObjectsOrQueue(bucket, db, [{ storageKey: params.objectKey, path: params.path }]);
 		return { committed: receipt.success, currentHash: receipt.success ? params.hash : receipt.currentHash ?? null, revision: receipt.revision, ...(!receipt.success ? { failure: receipt } : {}) };
 	}
 
@@ -125,7 +134,7 @@ export async function commitStagedFile(
 		try {
 			await assertFileNamespaceAvailable(db, params.path);
 		} catch (error) {
-			if (error instanceof FileNamespaceConflictError) await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
+			if (error instanceof FileNamespaceConflictError) await deleteBucketObjectsOrQueue(bucket, db, [{ storageKey: params.objectKey, path: params.path }]);
 			throw error;
 		}
 		const current = await getStoredFileRow(db, params.path);
@@ -134,10 +143,10 @@ export async function commitStagedFile(
 			if (!object || object.size !== current.size || await sha256HexBytes(await object.arrayBuffer()) !== current.hash) {
 				throw new Error('Committed file content is unavailable; restore a verified version before retrying');
 			}
-			await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
+			await deleteBucketObjectsOrQueue(bucket, db, [{ storageKey: params.objectKey, path: params.path }]);
 			return { committed: true, currentHash: current.hash, revision: current.storageKey, idempotent: true };
 		}
-		await deleteBucketObjectsOrQueue(bucket, db, [params.objectKey]);
+		await deleteBucketObjectsOrQueue(bucket, db, [{ storageKey: params.objectKey, path: params.path }]);
 		return { committed: false, currentHash: current?.hash ?? null };
 	}
 
@@ -165,11 +174,11 @@ export async function commitFileDelete(
 	const audit = params.audit ?? { requestId: crypto.randomUUID(), deviceId: null, clientSession: null, operationId: null };
 	const revision = `__crate__/deletions/${crypto.randomUUID()}`;
 	const expectedPredicate = params.expectedHash === null
-			? 'path = ? AND 0'
-			: 'path = ? AND hash = ? AND storage_key = ?';
+			? `${FILE_PATH_MATCH} AND 0`
+			: `${FILE_PATH_MATCH} AND hash = ? AND storage_key = ?`;
 	const predicateArgs = params.expectedHash === null
-		? [params.path]
-		: [params.path, params.expectedHash, params.expectedRevision ?? ''];
+		? filePathArgs(params.path)
+		: [...filePathArgs(params.path), params.expectedHash, params.expectedRevision ?? ''];
 	const results: unknown[] = await db.batch([
 		db.prepare(`INSERT INTO changelog (path, action, hash, size, revision)
 			SELECT path, 'delete', '', 0, ? FROM files WHERE ${expectedPredicate}`)
@@ -180,7 +189,7 @@ export async function commitFileDelete(
 			.bind(Date.now() + FILE_VERSION_RETENTION_MS, ...predicateArgs),
 		db.prepare(`DELETE FROM files WHERE ${expectedPredicate}`).bind(...predicateArgs),
 		recordFileDeletion(db, params.path, params.expectedHash ?? '', params.expectedRevision ?? '', revision, audit),
-		...enqueueFileProjection(db, params.path, null, null),
+		...await enqueueFileProjection(db, params.path, null, null),
 	]);
 
 	if (changedRows(results[2]) !== 1) {

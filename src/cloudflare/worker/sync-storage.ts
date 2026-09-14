@@ -1,5 +1,7 @@
+import { portablePathKey } from '../../protocol/portable-path';
+import { FILE_PATH_MATCH, filePathArgs } from './file-identity';
 import { changedRows, queryRows } from './db';
-import { findReferencedStorageKeys } from './storage-references';
+import { findReferencedStorageKeys, objectReference, type ObjectReference } from './storage-references';
 export {
 	BATCH_DELETE_MAX_FILES as MAX_BATCH_DELETE_FILES,
 	BATCH_DOWNLOAD_MAX_BYTES as MAX_BATCH_DOWNLOAD_BYTES,
@@ -69,17 +71,12 @@ export function collectCleanupKeys(previousFile: FileStorageRow | null, preserve
 	return Array.from(keys);
 }
 
-async function queueObjectCleanup(db: D1Database, keys: string[]): Promise<void> {
-	if (keys.length === 0) return;
-
-	try {
-		for (let index = 0; index < keys.length; index += MAX_D1_BOUND_PARAMETERS) {
-			const chunk = keys.slice(index, index + MAX_D1_BOUND_PARAMETERS);
-			const placeholders = chunk.map(() => '(?)').join(', ');
-			await db.prepare(
-				`INSERT OR IGNORE INTO object_cleanup_queue (storage_key) VALUES ${placeholders}`,
-			).bind(...chunk).run();
-		}
+async function queueObjectCleanup(db: D1Database, objects: ObjectReference[]): Promise<void> {
+	if (!objects.length) return;
+  try {
+    await db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue(storage_key, file_path)
+      SELECT json_extract(value, '$.storageKey'), json_extract(value, '$.path') FROM json_each(?)`)
+      .bind(JSON.stringify(objects)).run();
 	} catch {
 		// Cleanup must never turn an already-committed file mutation into a failure.
 	}
@@ -106,13 +103,13 @@ async function removeQueuedObjectCleanup(db: D1Database, keys: string[]): Promis
 async function deleteQueuedBucketObjects(
 	bucket: R2Bucket,
 	db: D1Database,
-	keys: string[],
+	objects: ObjectReference[],
 ): Promise<number> {
-	const uniqueKeys = Array.from(new Set(keys.filter((key) => key.length > 0)));
+	const uniqueKeys = [...new Set(objects.map(object => object.storageKey).filter(Boolean))];
 	if (uniqueKeys.length === 0) return 0;
 
 	try {
-		const referenced = await findReferencedStorageKeys(db, uniqueKeys);
+		const referenced = await findReferencedStorageKeys(db, objects);
 		const unused = uniqueKeys.filter(key => !referenced.has(key));
 		if (unused.length > 0) await bucket.delete(unused.length === 1 ? unused[0]! : unused);
 		// Referenced keys must leave this queue as well; their eventual expiry
@@ -128,12 +125,11 @@ async function deleteQueuedBucketObjects(
 
 export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database): Promise<number> {
 	try {
-		const rows = await queryRows<{ storage_key: string }>(
-			db.prepare('SELECT storage_key FROM object_cleanup_queue ORDER BY created_at LIMIT ?')
+		const rows = await queryRows<{ storage_key: string; file_path: string | null }>(
+			db.prepare('SELECT storage_key, file_path FROM object_cleanup_queue ORDER BY created_at LIMIT ?')
 				.bind(CLEANUP_BATCH_LIMIT),
 		);
-		const keys = rows.map(({ storage_key }) => storage_key).filter((key) => key.length > 0);
-		return await deleteQueuedBucketObjects(bucket, db, keys);
+		return await deleteQueuedBucketObjects(bucket, db, rows.map(row => ({ storageKey: row.storage_key, path: row.file_path })));
 	} catch {
 		// The scheduled handler will retry on its next invocation.
 	}
@@ -142,8 +138,8 @@ export async function drainObjectCleanupQueue(bucket: R2Bucket, db: D1Database):
 
 export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now()): Promise<void> {
 	await db.batch([
-		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key)
-			SELECT storage_key FROM file_versions WHERE expires_at <= ?`).bind(now),
+		db.prepare(`INSERT OR IGNORE INTO object_cleanup_queue (storage_key, file_path)
+			SELECT storage_key, path FROM file_versions WHERE expires_at <= ?`).bind(now),
 		db.prepare('DELETE FROM file_versions WHERE expires_at <= ?').bind(now),
 	]);
 }
@@ -151,11 +147,11 @@ export async function enqueueExpiredFileVersions(db: D1Database, now = Date.now(
 export async function deleteBucketObjectsOrQueue(
 	bucket: R2Bucket,
 	db: D1Database,
-	keys: string[],
+	keys: Array<string | ObjectReference>,
 ): Promise<void> {
-	const uniqueKeys = Array.from(new Set(keys.filter((key) => key.length > 0)));
-	await queueObjectCleanup(db, uniqueKeys);
-	await deleteQueuedBucketObjects(bucket, db, uniqueKeys);
+	const objects = keys.map(objectReference).filter(object => object.storageKey.length > 0);
+	await queueObjectCleanup(db, objects);
+	await deleteQueuedBucketObjects(bucket, db, objects);
 }
 
 export function storedObjectMatchesMetadata(
@@ -171,8 +167,8 @@ export function formatMetadataCommitFailure(actionLabel: 'Upload' | 'Delete', me
 }
 
 export async function getStoredFileRow(db: D1Database, path: string): Promise<FileStorageRow | null> {
-	const row = await db.prepare('SELECT hash, size, storage_key FROM files WHERE path = ?')
-		.bind(path)
+	const row = await db.prepare(`SELECT hash, size, storage_key FROM files WHERE ${FILE_PATH_MATCH}`)
+		.bind(...filePathArgs(path))
 		.first<{ hash?: string; size?: number; storage_key?: string }>();
 	const storageKey = normalizeStorageKey(row?.storage_key);
 	if (!row || !storageKey) {
@@ -199,14 +195,14 @@ export async function loadStoredFileRows(db: D1Database, paths: string[]): Promi
 		size?: number;
 		storage_key?: string;
 	}>(db.prepare(
-		`SELECT path, hash, size, storage_key FROM files WHERE path IN (${placeholders})`,
-	).bind(...paths));
+		`SELECT path, hash, size, storage_key FROM files WHERE portable_path IN (${placeholders})`,
+	).bind(...paths.map(portablePathKey)));
 
 	const entries: Array<readonly [string, FileStorageRow]> = [];
 	for (const row of rows) {
 		const path = typeof row.path === 'string' ? row.path : null;
 		const storageKey = normalizeStorageKey(row.storage_key);
-		if (!path || !storageKey) continue;
+		if (!path || !storageKey || !paths.includes(path)) continue;
 		entries.push([path, {
 			hash: typeof row.hash === 'string' ? row.hash : '',
 			size: typeof row.size === 'number' ? row.size : 0,
@@ -218,17 +214,22 @@ export async function loadStoredFileRows(db: D1Database, paths: string[]): Promi
 }
 
 // Separate indexed endpoints avoid scanning the entire retained changelog.
-export const CHANGELOG_BOUNDS_SQL = 'SELECT (SELECT MAX(seq) FROM changelog) AS lastSeq, (SELECT MIN(seq) FROM changelog) AS minSeq';
+export const CHANGELOG_BOUNDS_SQL = `SELECT MAX(COALESCE((SELECT MAX(seq) FROM changelog), 0),
+  COALESCE((SELECT snapshot_seq FROM initial_import), 0)) AS lastSeq,
+  (SELECT MIN(seq) FROM changelog) AS minSeq,
+  COALESCE((SELECT snapshot_seq FROM initial_import), 0) AS snapshotSeq`;
 
 export async function getChangelogBounds(db: D1Database): Promise<{
 	lastSeq: number;
 	minSeq: number | null;
+  snapshotSeq: number;
 }> {
-	const rows = await queryRows<{ lastSeq: number | null; minSeq: number | null }>(
+	const rows = await queryRows<{ lastSeq: number | null; minSeq: number | null; snapshotSeq: number }>(
 		db.prepare(CHANGELOG_BOUNDS_SQL),
 	);
 	return {
 		lastSeq: rows[0]?.lastSeq ?? 0,
 		minSeq: rows[0]?.minSeq ?? null,
+    snapshotSeq: rows[0]?.snapshotSeq ?? 0,
 	};
 }

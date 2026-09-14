@@ -5,6 +5,7 @@ import {
 	type CrateServerInfo,
 } from '../../protocol';
 import { corsResponse } from './cors';
+import { INITIAL_IMPORT_CAPABILITY } from '@/protocol/initial-import';
 
 declare const __CRATE_SERVER_VERSION__: string | undefined;
 
@@ -18,6 +19,7 @@ export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 	serverVersion: CRATE_SERVER_VERSION,
 	protocol: CRATE_PLUGIN_PROTOCOL,
 	capabilities: Object.freeze([
+    INITIAL_IMPORT_CAPABILITY,
 		BATCH_ASSET_UPLOAD_CAPABILITY,
 		BULK_NEW_UPLOAD_CAPABILITY,
 		'sync-v3',

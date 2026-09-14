@@ -13,7 +13,7 @@ export function namespacePredicate(path: string): { sql: string; args: string[] 
 	}
 	prefixLengths.push(length);
 	return {
-		// Both lookups use files_portable_path_idx. The half-open range includes
+		// Both lookups use the portable primary key. The half-open range includes
 		// descendants of key + '/' without matching siblings such as key + '-x'.
 		sql: `path != ? AND (portable_path IN (SELECT substr(?, 1, value) FROM json_each(?))
 			OR (portable_path >= ? AND portable_path < ?))`,

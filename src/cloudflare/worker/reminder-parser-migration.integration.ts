@@ -12,7 +12,6 @@ import { ReminderAlarm } from './notifications/reminder-alarm';
 import { sendToAllSubscriptions } from './notifications/push';
 import { REMINDER_CACHE_PARSER_VERSION } from './reminders-web/reminder-cache/types';
 import { runNotificationCoordinator } from './notification-coordinator';
-import type { Env } from './types';
 
 vi.mock('./notifications/push', () => ({ listPushSubscriptionIds: vi.fn(async () => ['sub']), sendToAllSubscriptions: vi.fn(async () => ({ sent: 1, failed: 0, pruned: 0, quarantined: 0, errors: [], failedSubscriptionIds: [] })) }));
 beforeEach(async () => {
@@ -119,6 +118,7 @@ it('quarantines uncertain legacy metadata and permits repair without deriving ca
 });
 
 it('bounds R2 reparsing to 2 MiB and resumes source migration in later invocations', async () => {
+  await env.DB.prepare("UPDATE notification_policy SET folder_path = 'Notes'").run();
   const text = 'a'.repeat(900 * 1024);
   for (let index = 0; index < 5; index++) await writeCommittedMarkdownFile(env.BUCKET, env.DB, `Notes/${index}.md`, text, null);
   await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 0').run();
@@ -148,7 +148,7 @@ it('does not publish a parsed older revision over a concurrent new file commit',
   expect(await env.DB.prepare('SELECT file_revision, verified FROM reminder_source_state WHERE file_path = ?').bind(path).first()).toEqual({ file_revision: current!.storage_key, verified: 1 });
 });
 
-it('upgrades schema 3 additively and discovers unchanged sources in resumable indexed pages without a policy', async () => {
+it('upgrades schema 3 additively and waits for a selected folder before discovering sources in indexed pages', async () => {
   await env.DB.prepare('DELETE FROM notification_policy').run();
   await env.DB.prepare('DROP TABLE reminder_source_state').run();
   await env.DB.prepare('UPDATE crate_schema SET version = 3').run();
@@ -159,18 +159,22 @@ it('upgrades schema 3 additively and discovers unchanged sources in resumable in
     SELECT json_extract(value, '$.path'), lower(json_extract(value, '$.path')), json_extract(value, '$.key'), ?, 0 FROM json_each(?)`)
     .bind(hash, JSON.stringify(files)).run();
   for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
-  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 5 });
+  expect(await env.DB.prepare('SELECT version FROM crate_schema').first()).toEqual({ version: 6 });
+  expect(await revalidateReminderSources(env, 4)).toBe(false);
+  expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state').first()).toEqual({ count: 0 });
+  await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Notes', 'UTC', 'policy')").run();
+
   expect(await revalidateReminderSources(env, 4)).toBe(true);
   expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state').first()).toEqual({ count: 100 });
-  expect(await env.DB.prepare(`SELECT value FROM maintenance_state WHERE key = 'reminder_source_scan_v${REMINDER_CACHE_PARSER_VERSION}'`).first()).toEqual({ value: 'Notes/099.md' });
+  expect(await env.DB.prepare(`SELECT value FROM maintenance_state WHERE key = 'reminder_source_scan_portable_v${REMINDER_CACHE_PARSER_VERSION}:Notes'`).first()).toEqual({ value: 'Notes/099.md' });
   let pending = await revalidateReminderSources(env, 4);
   expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state').first()).toEqual({ count: 105 });
   for (let attempt = 0; attempt < 30 && pending; attempt++) pending = await revalidateReminderSources(env, 4);
   expect(pending).toBe(false);
   expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM reminder_source_state WHERE verified = 1 AND parser_version = ?').bind(REMINDER_CACHE_PARSER_VERSION).first()).toEqual({ count: 105 });
   expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM files').first()).toEqual({ count: 105 });
-  const plan = await env.DB.prepare("EXPLAIN QUERY PLAN SELECT path FROM files WHERE lower(path) LIKE '%.md' AND path > ? ORDER BY path LIMIT 100").bind('').all();
-  expect(JSON.stringify(plan.results)).toContain('files_markdown_path_idx');
+  const plan = await env.DB.prepare("EXPLAIN QUERY PLAN SELECT path FROM files WHERE portable_path >= ? AND portable_path < ? AND path >= ? AND path < ? AND lower(path) LIKE '%.md' AND portable_path > ? ORDER BY portable_path LIMIT 100").bind('notes/', 'notes0', 'Notes/', 'Notes0', '').all();
+  expect(JSON.stringify(plan.results)).toContain('PRIMARY KEY');
 });
 
 it('retains genuine duplicate quarantine while an older parser source is revalidated', async () => {
@@ -185,7 +189,7 @@ it('retains genuine duplicate quarantine while an older parser source is revalid
   expect(sendToAllSubscriptions).not.toHaveBeenCalled();
 });
 
-it('bounds combined migration, projection and alarm dispatch and resumes every remaining job', async () => {
+it('bounds each migration, projection and dispatch invocation and resumes every remaining job', async () => {
   const due = new Date(Date.now() + 600_000).toISOString();
   for (let file = 0; file < 3; file++) {
     const content = Array.from({ length: 3 }, () => `- [ ] Pending @${due} <!-- crate-id:${crypto.randomUUID()} -->`).join('\n');
@@ -193,21 +197,34 @@ it('bounds combined migration, projection and alarm dispatch and resumes every r
   }
   await env.DB.prepare('UPDATE reminder_source_state SET parser_version = 0').run();
   const alarms = new Map<string, ReminderAlarm>();
-  // Invoke the real alarm with the same D1 handle so this conservative count
-  // also includes SQL that would run in separate Durable Object invocations.
-  const runtime = { ...env, REMINDER_ALARMS: {
+  const counts = new Map<string, number>();
+  const peaks = new Map<string, number>();
+  const measuredDb = (name: string): D1Database => ({
+    prepare(sql) { counts.set(name, (counts.get(name) ?? 0) + 1); return env.DB.prepare(sql); },
+    batch: env.DB.batch.bind(env.DB), exec: env.DB.exec.bind(env.DB),
+  });
+  const namespace = {
     idFromName: (name: string) => name,
     get(name: string) {
-      if (!alarms.has(name)) alarms.set(name, new ReminderAlarm(state() as never, env));
-      return { fetch: (input: string, init?: RequestInit) => alarms.get(name)!.fetch(new Request(input, init)) };
+      if (!alarms.has(name)) alarms.set(name, new ReminderAlarm(state() as never,
+        { ...env, DB: measuredDb(name), REMINDER_ALARMS: namespace as never }));
+      return { fetch: async (input: string, init?: RequestInit) => {
+        counts.set(name, 0);
+        const response = await alarms.get(name)!.fetch(new Request(input, init));
+        peaks.set(name, Math.max(peaks.get(name) ?? 0, counts.get(name)!));
+        expect(counts.get(name)).toBeLessThanOrEqual(50);
+        return response;
+      } };
     },
-  } } as unknown as Env;
-  const prepare = vi.spyOn(env.DB, 'prepare');
-  for (let pass = 0; pass < 6; pass++) {
-    prepare.mockClear();
+  };
+  const runtime = { ...env, DB: measuredDb('projection'), REMINDER_ALARMS: namespace as never };
+  for (let pass = 0; pass < 12; pass++) {
+    counts.set('projection', 0);
     await runNotificationCoordinator(state() as never, runtime);
-    expect(prepare.mock.calls.length).toBeLessThanOrEqual(50);
+    peaks.set('projection', Math.max(peaks.get('projection') ?? 0, counts.get('projection')!));
+    expect(counts.get('projection')).toBeLessThanOrEqual(50);
   }
+  expect(peaks.get('__crate__/notification-dispatch')).toBeGreaterThan(0);
   expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM reminder_source_state WHERE verified = 1 AND parser_version = ?')
     .bind(REMINDER_CACHE_PARSER_VERSION).first()).toEqual({ n: 3 });
   expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM scheduled_reminders').first()).toEqual({ n: 9 });

@@ -12,6 +12,7 @@ import { READY_PROJECTION_JOBS_SQL, NEXT_NOTIFICATION_WORK_SQL } from './notific
 
 beforeEach(async () => {
   for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
 });
 afterEach(async () => { await reset(); });
 
@@ -62,11 +63,11 @@ it.each([null, -1])('does not scan ten thousand paused files looking for runnabl
 });
 
 it('still gives temporary storage failures eight attempts', async () => {
-  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Note.md', 'Hello', null);
-  const source = await env.DB.prepare('SELECT storage_key FROM files WHERE path = ?').bind('Note.md').first<{ storage_key: string }>();
+  await writeCommittedMarkdownFile(env.BUCKET, env.DB, 'Reminders/Note.md', 'Hello', null);
+  const source = await env.DB.prepare('SELECT storage_key FROM files WHERE path = ?').bind('Reminders/Note.md').first<{ storage_key: string }>();
   await env.BUCKET.delete(source!.storage_key);
-  await env.DB.prepare("UPDATE reminder_source_state SET verified = 0 WHERE file_path = 'Note.md'").run();
-  await env.DB.prepare("INSERT INTO notification_file_retries(path, attempts, available_at, error) VALUES ('Note.md', 0, 0, 'temporary')").run();
+  await env.DB.prepare("UPDATE reminder_source_state SET verified = 0 WHERE file_path = 'Reminders/Note.md'").run();
+  await env.DB.prepare("INSERT INTO notification_file_retries(path, attempts, available_at, error) VALUES ('Reminders/Note.md', 0, 0, 'temporary')").run();
   for (let i = 0; i < 8; i++) {
     await env.DB.prepare('UPDATE notification_file_retries SET available_at = 0 WHERE available_at >= 0').run();
     await revalidateReminderSources(env, 2);

@@ -12,6 +12,7 @@ import { ReminderAlarm } from './notifications/reminder-alarm';
 
 beforeEach(async () => {
   for (const sql of schema.split(';').map(value => value.trim()).filter(Boolean)) await env.DB.prepare(sql).run();
+  await env.DB.prepare("INSERT OR IGNORE INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
 });
 afterEach(async () => { vi.restoreAllMocks(); await reset(); });
 
@@ -75,9 +76,9 @@ it('finishes migration once and performs no file scan or writes on subsequent id
 });
 
 it('sleeps until failed work is due instead of waking every minute', async () => {
-  await env.DB.prepare("INSERT INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
-  await env.DB.prepare("INSERT INTO notification_projection_jobs(path, job_token, last_error) VALUES ('failed', 'token', 'temporary failure')").run();
-  await env.DB.prepare(`INSERT INTO notification_file_retries(path, attempts, available_at, error) VALUES ('failed', 1, ?, 'temporary failure')`).bind(Date.now() + 3600_000).run();
+  await env.DB.prepare("INSERT OR IGNORE INTO notification_policy(id, folder_path, timezone, revision) VALUES (1, 'Reminders', 'UTC', 'policy')").run();
+  await env.DB.prepare("INSERT INTO notification_projection_jobs(path, job_token, last_error) VALUES ('Reminders/failed.md', 'token', 'temporary failure')").run();
+  await env.DB.prepare(`INSERT INTO notification_file_retries(path, attempts, available_at, error) VALUES ('Reminders/failed.md', 1, ?, 'temporary failure')`).bind(Date.now() + 3600_000).run();
   const retry = await env.DB.prepare(NEXT_NOTIFICATION_WORK_SQL).first<{ projectionRetry: number }>();
   const setAlarm = vi.fn();
   await runNotificationCoordinator({ storage: { setAlarm } } as never, env);
@@ -118,7 +119,7 @@ it('handles new file changes after migration without rescanning the vault', asyn
 it('drains deleted legacy source rows after the migration scan has completed', async () => {
   await revalidateReminderSources(env, 2);
   await env.DB.prepare(`INSERT INTO reminder_source_state(file_path, file_revision, parser_version, verified)
-    VALUES ('deleted-1.md', 'old', 0, 0), ('deleted-2.md', 'old', 0, 0), ('deleted-3.md', 'old', 0, 0)`).run();
+    VALUES ('Reminders/deleted-1.md', 'old', 0, 0), ('Reminders/deleted-2.md', 'old', 0, 0), ('Reminders/deleted-3.md', 'old', 0, 0)`).run();
   expect(await revalidateReminderSources(env, 2)).toBe(true);
   expect(await revalidateReminderSources(env, 2)).toBe(false);
   expect((await env.DB.prepare('SELECT file_path FROM reminder_source_state').all()).results).toEqual([]);

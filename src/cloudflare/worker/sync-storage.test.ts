@@ -36,7 +36,7 @@ describe('R2 object cleanup queue', () => {
 
 		expect(db.batch).not.toHaveBeenCalled();
 		expect(prepared[0]?.sql).toContain('INSERT OR IGNORE INTO object_cleanup_queue');
-		expect(prepared[0]?.args).toEqual(['object-key']);
+		expect(prepared[0]?.args).toEqual(['[{"storageKey":"object-key"}]']);
 		expect(prepared[0]?.run).toHaveBeenCalledOnce();
 	});
 
@@ -45,7 +45,7 @@ describe('R2 object cleanup queue', () => {
 		const db = {
 			prepare: vi.fn((sql: string) => {
 				const statement = createStatement(sql);
-				if (sql.startsWith('SELECT storage_key')) {
+				if (sql.startsWith('SELECT storage_key, file_path FROM object_cleanup_queue')) {
 					statement.all.mockResolvedValue({ results: [{ storage_key: 'queued-key' }] });
 				}
 				prepared.push(statement);

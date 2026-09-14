@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS crate_schema (
  id INTEGER PRIMARY KEY CHECK (id = 1),
  version INTEGER NOT NULL
 );
-INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 5);
+INSERT OR IGNORE INTO crate_schema (id, version) VALUES (1, 6);
 
 CREATE TABLE IF NOT EXISTS changelog (
 	seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,16 +17,18 @@ CREATE TABLE IF NOT EXISTS changelog (
 CREATE INDEX IF NOT EXISTS changelog_created_at_idx ON changelog(created_at);
 
 CREATE TABLE IF NOT EXISTS files (
-	path TEXT PRIMARY KEY,
-	portable_path TEXT NOT NULL,
+	path TEXT NOT NULL,
+	portable_path TEXT PRIMARY KEY,
 	hash TEXT NOT NULL DEFAULT '',
 	size INTEGER NOT NULL DEFAULT 0,
 	modified TEXT NOT NULL DEFAULT (datetime('now')),
 	storage_key TEXT NOT NULL
-);
+) WITHOUT ROWID;
 
-CREATE UNIQUE INDEX IF NOT EXISTS files_portable_path_idx ON files(portable_path);
-CREATE INDEX IF NOT EXISTS files_markdown_path_idx ON files(path) WHERE lower(path) LIKE '%.md';
+DROP INDEX IF EXISTS files_portable_path_idx;
+-- Reminder queries use the primary path index within the selected folder.
+-- Retire the old whole-vault Markdown index, which charged every note upload.
+DROP INDEX IF EXISTS files_markdown_path_idx;
 
 CREATE TABLE IF NOT EXISTS auth_tokens (
 	id TEXT PRIMARY KEY,
@@ -100,6 +102,7 @@ CREATE INDEX IF NOT EXISTS web_enrollment_tokens_expires_at_idx ON web_enrollmen
 
 CREATE TABLE IF NOT EXISTS object_cleanup_queue (
 	storage_key TEXT PRIMARY KEY,
+  file_path TEXT,
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -154,7 +157,7 @@ CREATE TABLE IF NOT EXISTS notification_policy (
 CREATE TABLE IF NOT EXISTS notification_projection_jobs (
  path TEXT PRIMARY KEY, job_token TEXT NOT NULL,
  last_error TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS notification_projection_ready_idx
  ON notification_projection_jobs(updated_at, path) WHERE last_error IS NULL;
 CREATE TABLE IF NOT EXISTS reminder_projections (
@@ -173,7 +176,7 @@ CREATE TABLE IF NOT EXISTS reminder_source_state (
  file_path TEXT PRIMARY KEY, file_revision TEXT NOT NULL,
  parser_version INTEGER NOT NULL, verified INTEGER NOT NULL CHECK (verified IN (0, 1)),
  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS reminder_source_state_version_idx ON reminder_source_state(parser_version, file_path);
 CREATE INDEX IF NOT EXISTS reminder_source_state_retry_idx ON reminder_source_state(updated_at, file_path) WHERE verified = 0;
 CREATE TABLE IF NOT EXISTS reminder_occurrences (
@@ -201,15 +204,15 @@ CREATE INDEX IF NOT EXISTS file_deletion_receipts_created_at_idx ON file_deletio
 
 UPDATE crate_schema SET version = 4 WHERE id = 1 AND version IN (2, 3);
 
-CREATE INDEX IF NOT EXISTS files_storage_key_idx ON files(storage_key);
+DROP INDEX IF EXISTS files_storage_key_idx;
 
 CREATE TABLE IF NOT EXISTS upload_operations (
  operation_id TEXT PRIMARY KEY,
  request_hash TEXT NOT NULL,
  response_json TEXT NOT NULL,
  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-UPDATE crate_schema SET version = 5 WHERE id = 1 AND version IN (2, 3, 4);
+) WITHOUT ROWID;
+UPDATE crate_schema SET version = 6 WHERE id = 1 AND version IN (2, 3, 4, 5);
 
 CREATE TABLE IF NOT EXISTS notification_file_retries (
  path TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0,
@@ -226,10 +229,29 @@ INSERT OR IGNORE INTO notification_file_retries(path, attempts, available_at, er
 
 CREATE TABLE IF NOT EXISTS staged_uploads (
  storage_key TEXT PRIMARY KEY,
+ file_path TEXT,
  expires_at INTEGER,
  state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'deleting')),
  attempts INTEGER NOT NULL DEFAULT 0,
  last_error TEXT
-);
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS staged_uploads_expiry_idx ON staged_uploads(expires_at, storage_key)
  WHERE expires_at IS NOT NULL;
+CREATE TABLE IF NOT EXISTS staged_upload_batches (
+ id TEXT PRIMARY KEY,
+ storage_keys TEXT NOT NULL CHECK (json_valid(storage_keys) AND json_type(storage_keys) = 'array'),
+ expires_at INTEGER,
+ state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'deleting')),
+ attempts INTEGER NOT NULL DEFAULT 0,
+ last_error TEXT
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS staged_upload_batches_expiry_idx ON staged_upload_batches(expires_at, id)
+ WHERE expires_at IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS initial_import (
+ id INTEGER PRIMARY KEY CHECK (id = 1),
+ token TEXT NOT NULL,
+ state TEXT NOT NULL CHECK (state IN ('importing', 'complete')),
+ generation INTEGER NOT NULL DEFAULT 0,
+ snapshot_seq INTEGER NOT NULL DEFAULT 0
+);

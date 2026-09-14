@@ -152,8 +152,8 @@ function createDb(options?: {
 					if (sql.includes('FROM notification_jobs WHERE reminder_id = ?')) {
 						return notificationJobs.get(getBoundString(statement._args, 0)) ?? null;
 					}
-					if (sql.includes('FROM files WHERE path = ?')) {
-						const path = getBoundString(statement._args, 0);
+					if (sql.includes('FROM files WHERE portable_path = ? AND path = ?')) {
+						const path = getBoundString(statement._args, 1);
 						if (!files.has(path)) {
 							return null;
 						}
@@ -187,7 +187,7 @@ function createDb(options?: {
 						};
 					}
 					if (sql.includes('path >= ?') && sql.includes("lower(path) LIKE '%.md'")) {
-						const prefix = getBoundString(statement._args, 0);
+						const prefix = getBoundString(statement._args, 2);
 						return {
 							results: Array.from(files.keys())
 								.filter((path) => path.startsWith(prefix) && path.toLowerCase().endsWith('.md'))
@@ -214,8 +214,8 @@ function createDb(options?: {
 				let changes = 0;
 				if (statement._sql.includes('atomic-destination-insert')) {
 					const destinationPath = getBoundString(statement._args, 0);
-					const sourcePath = getBoundString(statement._args, 6);
-					const sourceExpectedHash = getBoundString(statement._args, 7);
+					const sourcePath = getBoundString(statement._args, 8);
+					const sourceExpectedHash = getBoundString(statement._args, 9);
 					if (!files.has(destinationPath) && hashes.get(sourcePath) === sourceExpectedHash) {
 						files.set(destinationPath, getBoundString(statement._args, 4));
 						hashes.set(destinationPath, getBoundString(statement._args, 2));
@@ -224,11 +224,11 @@ function createDb(options?: {
 						changes = 1;
 					}
 				} else if (statement._sql.includes('atomic-destination-update')) {
-					const destinationPath = getBoundString(statement._args, 4);
-					const sourcePath = getBoundString(statement._args, 6);
+					const destinationPath = getBoundString(statement._args, 5);
+					const sourcePath = getBoundString(statement._args, 8);
 					if (
-						hashes.get(destinationPath) === getBoundString(statement._args, 5)
-						&& hashes.get(sourcePath) === getBoundString(statement._args, 7)
+						hashes.get(destinationPath) === getBoundString(statement._args, 6)
+						&& hashes.get(sourcePath) === getBoundString(statement._args, 9)
 					) {
 						files.set(destinationPath, getBoundString(statement._args, 3));
 						hashes.set(destinationPath, getBoundString(statement._args, 1));
@@ -237,11 +237,11 @@ function createDb(options?: {
 						changes = 1;
 					}
 				} else if (statement._sql.includes('atomic-source-update')) {
-					const sourcePath = getBoundString(statement._args, 4);
-					const destinationPath = getBoundString(statement._args, 6);
+					const sourcePath = getBoundString(statement._args, 5);
+					const destinationPath = getBoundString(statement._args, 8);
 					if (
-						hashes.get(sourcePath) === getBoundString(statement._args, 5)
-						&& files.get(destinationPath) === getBoundString(statement._args, 7)
+						hashes.get(sourcePath) === getBoundString(statement._args, 6)
+						&& files.get(destinationPath) === getBoundString(statement._args, 9)
 					) {
 						files.set(sourcePath, getBoundString(statement._args, 3));
 						hashes.set(sourcePath, getBoundString(statement._args, 1));
@@ -271,8 +271,8 @@ function createDb(options?: {
 						changes = 1;
 					}
 				} else if (statement._sql.startsWith('UPDATE files')) {
-					const path = getBoundString(statement._args, 4);
-					if (hashes.get(path) === getBoundString(statement._args, 5)) {
+					const path = getBoundString(statement._args, 5);
+					if (hashes.get(path) === getBoundString(statement._args, 6)) {
 						files.set(path, getBoundString(statement._args, 3));
 						hashes.set(path, getBoundString(statement._args, 1));
 						sizes.set(path, Number(statement._args[2]));
@@ -281,8 +281,8 @@ function createDb(options?: {
 					}
 				}
 				if (statement._sql.includes('DELETE FROM files WHERE')) {
-					const path = getBoundString(statement._args, 0);
-					const expectedHash = statement._args[1];
+					const path = getBoundString(statement._args, 1);
+					const expectedHash = statement._args[2];
 					if (files.has(path) && (expectedHash === undefined || hashes.get(path) === expectedHash)) {
 						files.delete(path);
 						hashes.delete(path);
