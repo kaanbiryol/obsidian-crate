@@ -94,13 +94,15 @@ const device = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Test', plat
 describe('Cloudflare deployment interruption and recovery', () => {
 	it.each(['reset', 'delete'] as const)('stops %s during object clearing and preserves the saved recovery checkpoint', async intent => {
 		const h = harness();
+		for (let i = 0; i < 99; i++) h.objects.add(`__crate__/files/${i.toString(16).padStart(64, '0')}/01234567-89ab-cdef-0123-456789abcdef`);
 		let release!: () => void;
-		let paused = false;
+		const pending = new Promise<void>(resolve => { release = resolve; });
+		let dispatched = false;
 		const transport: HttpTransport = async (url, request) => {
 			const response = await h.transport(url, request);
-			if (!paused && request.method === 'DELETE' && url.includes('/objects/')) {
-				paused = true;
-				await new Promise<void>(resolve => { release = resolve; });
+			if (request.method === 'DELETE' && url.includes('/objects/')) {
+				dispatched = true;
+				await pending;
 			}
 			return response;
 		};
@@ -108,15 +110,15 @@ describe('Cloudflare deployment interruption and recovery', () => {
 		const params = await first.authorize(intent);
 		const running = first.service.handleCallback(params, device);
 		const rejected = expect(running).rejects.toMatchObject({ name: 'AbortError' });
-		await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+		await vi.waitFor(() => expect(dispatched).toBe(true));
 		const checkpoint = structuredClone(h.settings.cloudflareDeployment!.reset);
 		const writes = h.writeSettings.mock.calls.length;
 		first.service.destroy();
 		release();
 		await rejected;
-		expect(h.objects.size).toBe(1);
+		expect(h.objects.size).toBe(91);
 		expect(h.remote).toEqual({ worker: true, bucket: true, database: true, retired: true });
-		expect(h.mutations).toHaveLength(2); // The retired Worker and one dispatched object deletion.
+		expect(h.mutations).toHaveLength(11); // The retired Worker and one dispatched batch; no second batch.
 		expect(h.writeSettings).toHaveBeenCalledTimes(writes);
 		expect(h.settings.cloudflareDeployment!.reset).toEqual(checkpoint);
 		expect(checkpoint?.phase).toBe('clearing');
@@ -131,7 +133,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 			expect(h.remote).toEqual({ worker: false, bucket: false, database: false, retired: true });
 			expect(h.objects.size).toBe(0);
 			// No repeated Worker retirement, object deletion or database deletion.
-			expect(h.mutations).toHaveLength(6);
+			expect(h.mutations).toHaveLength(105);
 		}
 	});
 
