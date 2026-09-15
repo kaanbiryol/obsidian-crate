@@ -168,7 +168,7 @@ export class ActivityModal extends Modal {
 		this.allPanels = [this.pendingPanel, this.conflictsPanel, this.historyPanel];
 
 		this.renderPending();
-		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.formatLastSync(), this.deps.createConflictReview ? conflict => {
+		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.isCheckingConflicts(), this.deps.createConflictReview ? conflict => {
 			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview!(conflict), () => this.refresh()).open();
 		} : undefined);
 		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? []);
@@ -230,13 +230,19 @@ export class ActivityModal extends Modal {
 			}
 		}
 		this.positionIndicator(index);
+        this.updateSyncStatusText();
 	}
 
     private updateSyncStatusText(): void {
         const label = this.formatLastSync();
-        this.subtitleEl.setText(label === 'Not synced yet' ? '' : label);
-        const conflictStatus = this.conflictsPanel.querySelector('.crate-empty-desc');
-        if (conflictStatus) conflictStatus.textContent = label;
+        const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
+        this.subtitleEl.setText(syncing
+            ? this.currentTabIndex === 0 ? '' : formatSyncProgress(this.deps.getActivityProgress?.(), this.deps.getState().work)
+            : label === 'Not synced yet' ? '' : label);
+        if (this.deps.getActiveConflicts().length === 0) {
+            this.conflictsPanel.empty();
+            renderConflictsPanel(this.conflictsPanel, [], this.isCheckingConflicts());
+        }
     }
 
 
@@ -261,18 +267,18 @@ export class ActivityModal extends Modal {
 		}
 	}
 
+    private isCheckingConflicts(): boolean {
+        const state = this.deps.getState();
+        return (state.status === 'syncing' || !!this.deps.getActivityProgress?.())
+            && !['saving', 'reminders'].includes(state.work?.phase ?? '');
+    }
+
 	private updateSyncBtn(): void {
 		const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
 		this.syncBtn.disabled = syncing;
 		this.syncBtn.setAttribute('aria-label', syncing ? 'Syncing' : 'Sync now');
 		this.syncBtn.setAttribute('title', syncing ? 'Syncing' : 'Sync now');
-		if (syncing) {
-			this.syncBtn.addClass('is-syncing');
-		} else {
-			this.syncBtn.removeClass('is-syncing');
-		}
-		const textEl = this.syncBtn.querySelector('.crate-sync-btn-text');
-		if (textEl) textEl.textContent = syncing ? 'Syncing…' : 'Sync now';
+
 	}
 
 	private updateSyncErrorNotice(): void {
@@ -295,7 +301,7 @@ export class ActivityModal extends Modal {
 		this.updateTabCounts();
 		this.renderPending();
 		this.conflictsPanel.empty();
-		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.formatLastSync(), this.deps.createConflictReview ? conflict => {
+		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.isCheckingConflicts(), this.deps.createConflictReview ? conflict => {
 			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview!(conflict), () => this.refresh()).open();
 		} : undefined);
 		const expanded = new Set(Array.from(this.historyPanel.querySelectorAll('details[open]'))

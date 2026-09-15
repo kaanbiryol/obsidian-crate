@@ -42,14 +42,11 @@ it('replaces the pending file list with a loading indicator during sync', () => 
     expect(element.collectText()).not.toContain('Starting sync…');
 });
 
-it.each(['Synced just now', 'Syncing…', 'Last sync had errors'])(
-    'shows the current sync status beneath No conflicts: %s',
-    (status) => {
-        const element = new FakeElement('div');
-        renderConflictsPanel(element as never, [], status);
-        expect(element.collectText()).toBe(`No conflicts ${status}`);
-    },
-);
+it.each([false, true])('shows a conflict state without a duplicate sync subtitle (checking: %s)', checking => {
+    const element = new FakeElement('div');
+    renderConflictsPanel(element as never, [], checking);
+    expect(element.collectText()).toBe(checking ? 'Checking for conflicts…' : 'No conflicts');
+});
 
 it.each([
  { status: 'idle' as const, lastSync: null, title: 'No completed sync yet' },
@@ -66,4 +63,17 @@ it('shows change progress independently of the pending queue size', () => {
     renderPendingPanel(element as never, ['queued.md'], false, true, { type: 'sync', current: 3, total: 12 });
     expect(element.collectText()).toContain('Processing changes: 3/12');
     expect(element.collectText()).toContain('Unchanged files are skipped.');
+});
+
+it('shows one spinner with the file count during uploads', () => {
+    const element = new FakeElement('div');
+    renderPendingPanel(element as never, [], false, true, null, '', {
+        status: 'syncing', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0,
+        work: { phase: 'uploading', current: 640, total: 1986 },
+    });
+    const indicator = element.children[0]?.children[0];
+    expect(indicator?.classNames.has('crate-activity-spinner')).toBe(true);
+    expect(indicator?.attributes.get('aria-hidden')).toBe('true');
+    expect(element.children[0]?.children).toHaveLength(2);
+    expect(element.collectText()).toBe('Uploading 640 of 1,986 files');
 });

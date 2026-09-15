@@ -21,7 +21,12 @@ export function formatSyncProgress(progress?: SyncActivityProgress | null, work?
             if (remainingFiles > 0) return `Preparing reminders: ${remainingFiles} files and ${remainingSchedules} schedules remaining`;
             return `${label}: ${remainingSchedules} remaining`;
         }
-        if (work.total !== undefined && work.total > 0 && work.current !== undefined) return `${label}: ${work.current}/${work.total}`;
+        if (work.total !== undefined && work.total > 0 && work.current !== undefined) {
+            if (work.phase === 'uploading' || work.phase === 'downloading') {
+                return `${work.phase === 'uploading' ? 'Uploading' : 'Downloading'} ${work.current.toLocaleString()} of ${work.total.toLocaleString()} files`;
+            }
+            return `${label}: ${work.current}/${work.total}`;
+        }
         if (['uploading', 'downloading', 'applying'].includes(work.phase) && progress?.type === 'sync' && progress.total > 0) {
             return `${label}… ${progress.current}/${progress.total} changes processed`;
         }
