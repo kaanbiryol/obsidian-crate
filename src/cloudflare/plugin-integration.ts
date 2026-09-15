@@ -121,7 +121,7 @@ async function runCloudflareOperation(
 		plugin.getSettingsDocument(),
 	);
 	if (isDelete) progress.setWorking('Deleting Crate server', 'Verifying this server, then removing its remote data and Worker. Keep Obsidian open.');
-	if (isReset) progress.setWorking('Resetting Crate server', 'Verifying this deployment, then erasing its remote data and rebuilding. Keep Obsidian open.');
+	if (isReset) progress.setWorking('Rebuilding Crate server', 'Verifying this deployment, then erasing its remote data and rebuilding. Keep Obsidian open.');
 	const deviceToken = shouldConnectDevice ? generateSecureToken() : null;
 	let deployment;
 	try {
@@ -134,7 +134,7 @@ async function runCloudflareOperation(
 		if (signal.aborted) return;
 		if (savedIntent && originalDeployment !== JSON.stringify(plugin.settings.cloudflareDeployment)) throw new Error('Server settings changed. Confirm the operation again.');
 		const onProgress = (message: string) => {
-			if (!signal.aborted) progress.setWorking(isReset ? 'Resetting Crate server' : isDelete ? 'Deleting Crate server' : shouldConnectDevice ? 'Setting up Crate' : 'Updating Crate server', message);
+			if (!signal.aborted) progress.setWorking(isReset ? 'Rebuilding Crate server' : isDelete ? 'Deleting Crate server' : shouldConnectDevice ? 'Setting up Crate' : 'Updating Crate server', message);
 		};
 		const selectDeployment = (deployments: Parameters<typeof progress.selectVault>[0], missingServer?: boolean) => progress.selectVault(deployments, missingServer);
 		deployment = savedIntent
@@ -179,13 +179,13 @@ async function runCloudflareOperation(
 		}
 		if (isReset) {
 			plugin.refreshSettingsTab();
-			const resetAction = plugin.settings.cloudflareDeployment?.reset ? 'Resume server reset' : 'Reset server';
+			const resetAction = plugin.settings.cloudflareDeployment?.reset ? 'Resume server rebuild' : 'Rebuild server';
 			progress.fail(
-				'Server reset failed',
-				'Crate couldn’t finish resetting your Cloudflare server.',
+				'Server rebuild failed',
+				'Crate couldn’t finish rebuilding your Cloudflare server.',
 				[deploymentErrorMessage(error).startsWith('Reset blocked:')
-					? 'Review the technical details below. The reported issue must be resolved before resetting this server.'
-					: `In Crate settings → Troubleshooting, select “${resetAction}” to try again.`],
+					? 'Review the technical details below. The reported issue must be resolved before rebuilding this server.'
+					: `In Crate settings → Recovery and troubleshooting → Troubleshooting, select “${resetAction}” to try again.`],
 				{ technicalDetails: deploymentErrorMessage(error), action: { label: 'Open settings', onClick: () => plugin.openSettingsTab() } },
 			);
 			return;
@@ -253,7 +253,7 @@ async function runCloudflareOperation(
 	}
 
 	progress.succeed(
-		isReset ? 'Crate server reset' : 'Crate is connected',
+		isReset ? 'Crate server rebuilt' : 'Crate is connected',
 		isReset ? 'This device is connected. Open the command palette and select Crate: Sync now to sync this vault with the server. Reconnect other devices and set up web push again.' : 'Connected. Open the command palette and select Crate: Sync now to sync this vault with the server.',
 	);
 }

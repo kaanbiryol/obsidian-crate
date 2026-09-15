@@ -1,4 +1,3 @@
-import { renderServerDeleteSetting } from './server-delete-setting';
 import { Notice, Setting } from 'obsidian';
 import type CratePlugin from '../../main';
 import { startCloudflareDeployment } from '../../cloudflare/plugin-integration';
@@ -8,10 +7,7 @@ export function renderServerResetSetting(containerEl: HTMLElement, plugin: Crate
 	const saved = plugin.settings.cloudflareDeployment;
 	if (!saved?.accountId || !saved.d1DatabaseId) return;
 	const deployment = { ...saved };
-	if (deployment.reset?.deleteOnly) {
-		renderServerDeleteSetting(containerEl, plugin);
-		return;
-	}
+	if (deployment.reset?.deleteOnly) return;
 
 	if (!plugin.syncRuntime.isConfigured() && !deployment.reset) {
 		if (deployment.lastDeployedVersion) return;
@@ -25,16 +21,16 @@ export function renderServerResetSetting(containerEl: HTMLElement, plugin: Crate
 	}
 
 	new Setting(containerEl)
-		.setName('Reset server')
-		.setDesc('Erase this Crate server’s remote files, history, database, and reminder state. Rebuild the server and upload your local vault afterward.')
+		.setName('Rebuild server')
+		.setDesc('Erase this Crate server’s remote files, history, database, and reminder state. Rebuild the server, then select Crate: Sync now to upload your local vault.')
 		.addButton(button => button
-			.setButtonText(deployment.reset ? 'Resume server reset' : 'Reset server')
+			.setButtonText(deployment.reset ? 'Resume server rebuild' : 'Rebuild server')
 			.setDestructive()
 			.onClick(async () => {
 				button.setDisabled(true);
 				try {
 					const confirmed = await openConfirmationModal(plugin.app, {
-						title: deployment.reset ? 'Resume server reset' : 'Reset server',
+						title: deployment.reset ? 'Resume server rebuild' : 'Rebuild server',
 						message: 'Permanently erase this Crate server’s remote data and rebuild it from scratch?',
 						details: [
 							`Account: ${deployment.accountName ?? deployment.accountId} (${deployment.accountId})`,
@@ -44,15 +40,15 @@ export function renderServerResetSetting(containerEl: HTMLElement, plugin: Crate
 							'All verified Crate remote files, retained versions, recovery history, device registrations, and push subscriptions will be erased.',
 							'Your local files are kept. Confirm your local vault contains everything you want to upload again.',
 							'This server’s database, file bucket, and reminder state are removed and recreated. Its Worker is temporarily taken offline and redeployed. Other deployments are not reset.',
-							'Other devices must reconnect. Set up web push again. No files are uploaded automatically.',
+							'Other devices must reconnect. Set up web push again. Select Crate: Sync now afterward to upload your local vault. No files are uploaded automatically.',
 						],
-						confirmText: 'Reset server',
+						confirmText: 'Rebuild server',
 						warning: true,
 					});
 					if (!confirmed) return;
 					// The displayed resource identity is the one the user confirmed.
 					if (JSON.stringify(plugin.settings.cloudflareDeployment) !== JSON.stringify(deployment)) {
-						new Notice('Server settings changed. Open the reset confirmation again.');
+						new Notice('Server settings changed. Open the rebuild confirmation again.');
 						return;
 					}
 					await startCloudflareDeployment(plugin, 'reset');
@@ -60,6 +56,4 @@ export function renderServerResetSetting(containerEl: HTMLElement, plugin: Crate
 					button.setDisabled(false);
 				}
 			}));
-
-	renderServerDeleteSetting(containerEl, plugin);
 }

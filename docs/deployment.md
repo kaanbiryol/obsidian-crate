@@ -158,7 +158,7 @@ python3 scripts/crate-deployment-fence.py release \
   --owner <inspected-owner-id> --confirm-quiescent
 ```
 
-The conditional release cannot erase a replacement owner, but it cannot fence an old in-flight upload. The confirmation asserts that the operator resolved those requests; the script cannot prove it. Keep the original vault's reset checkpoint and select **Resume server reset** or **Resume server deletion** after release. For an interrupted update, `release` refuses to discard pending verification. Use `settle` followed by **Check and recover update** instead. If the original database was successfully deleted, there is no fence left to clear: resume the saved reset/deletion checkpoint rather than creating a replacement lock in another database.
+The conditional release cannot erase a replacement owner, but it cannot fence an old in-flight upload. The confirmation asserts that the operator resolved those requests; the script cannot prove it. Keep the original vault's reset checkpoint and select **Resume server rebuild** or **Resume server deletion** after release. For an interrupted update, `release` refuses to discard pending verification. Use `settle` followed by **Check and recover update** instead. If the original database was successfully deleted, there is no fence left to clear: resume the saved reset/deletion checkpoint rather than creating a replacement lock in another database.
 
 ## Recovery and deletion
 
@@ -173,7 +173,7 @@ For paired D1/R2 backup verification and isolated restore commands, use [Backup 
 
 ## Reset a Crate server
 
-**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Reset server** erases this deployment's remote vault data and rebuilds it. The confirmation identifies the account, Worker, D1 database, and R2 bucket. Each attempt requires confirmation. Crate reuses the saved Cloudflare login when available and opens authorization only when needed. Cancelling authorization performs no remote deletion.
+**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Rebuild server** erases this deployment's remote vault data and rebuilds it. The confirmation identifies the account, Worker, D1 database, and R2 bucket. Each attempt requires confirmation. Crate reuses the saved Cloudflare login when available and opens authorization only when needed. Cancelling authorization performs no remote deletion.
 
 The reset verifies exact deployment names and IDs, live Crate annotations and bindings, database tables, bucket creation identity, and ownership of the ReminderAlarm namespace. It checks other Workers for shared D1, R2, Durable Object, and service bindings. Unreadable ownership information, unexpected bindings or namespaces, newer server versions, unknown database tables, or unknown bucket objects stop the reset. It never searches by name prefix to choose resources to delete.
 
@@ -183,9 +183,9 @@ After verification, local sync disconnects and Crate saves a reset checkpoint. I
 
 Remote files, retained versions, recovery history, shared server settings, device registrations, subscriptions, and reminder state are erased. Local vault files are kept. After success, select **Crate: Sync now** in the command palette, reconnect other devices, and enroll web push again. Crate does not upload vault files automatically as part of the reset. Independently exported backups, files cached on other devices, and Cloudflare-managed logs or retention are outside this reset.
 
-If a request or local save fails, use **Resume server reset** in the same section. The saved checkpoint identifies the original resources and distinguishes cleanup from rebuilding, so a retry does not wipe newly provisioned data. Regular connection and update actions are blocked while a reset is pending. Keep this vault's plugin settings and avoid manually changing its Cloudflare resources until the reset finishes. Do not rename unrelated resources to bypass a failed ownership check.
+If a request or local save fails, use **Resume server rebuild** in the same section. The saved checkpoint identifies the original resources and distinguishes cleanup from rebuilding, so a retry does not wipe newly provisioned data. Regular connection and update actions are blocked while a reset is pending. Keep this vault's plugin settings and avoid manually changing its Cloudflare resources until the reset finishes. Do not rename unrelated resources to bypass a failed ownership check.
 
-**Delete server** in **Settings → Crate → Recovery and troubleshooting → Troubleshooting** permanently removes this vault’s verified Crate Worker/web app, database, file bucket and contents, and reminder state without rebuilding. Local vault files and other deployments are kept. It requires confirmation of the exact resources and valid Cloudflare authorization, reusing the saved login when available. Shared resources or unrecognized data block deletion. After an interruption, use **Resume server deletion**; connecting, updating, and resetting remain blocked until deletion completes.
+**Delete server** in **Settings → Crate → Advanced server actions** permanently removes this vault’s verified Crate Worker/web app, database, file bucket and contents, and reminder state without rebuilding. Local vault files and other deployments are kept. It requires confirmation of the exact resources and valid Cloudflare authorization, reusing the saved login when available. Shared resources or unrecognized data block deletion. After an interruption, use **Resume server deletion**; connecting, updating, and resetting remain blocked until deletion completes.
 
 ### Notification abuse limits
 

@@ -150,8 +150,8 @@ describe('handleCloudflareOAuthProtocol', () => {
 		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledWith(plugin, 'https://crate.example.workers.dev', 'device-token');
 		const report = (plugin.cloudflareDeploymentService.handleCallback.mock.calls[0] as unknown as [unknown, unknown, (message: string) => void])[2];
 		report('Checking remote files: 10 checked…');
-		expect(progress.setWorking).toHaveBeenCalledWith('Resetting Crate server', 'Checking remote files: 10 checked…');
-		expect(progress.succeed).toHaveBeenCalledWith('Crate server reset', expect.stringContaining('Crate: Sync now'));
+		expect(progress.setWorking).toHaveBeenCalledWith('Rebuilding Crate server', 'Checking remote files: 10 checked…');
+		expect(progress.succeed).toHaveBeenCalledWith('Crate server rebuilt', expect.stringContaining('Crate: Sync now'));
 		expect(plugin.syncRuntime.sync).not.toHaveBeenCalled();
 	});
 
@@ -163,9 +163,9 @@ describe('handleCloudflareOAuthProtocol', () => {
 		plugin.cloudflareDeploymentService.handleCallback.mockRejectedValue(new Error('Namespace listing incomplete'));
 		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
 		expect(progress.fail).toHaveBeenCalledWith(
-			'Server reset failed',
-			'Crate couldn’t finish resetting your Cloudflare server.',
-			[expect.stringContaining(resumable ? 'Resume server reset' : 'Reset server')],
+			'Server rebuild failed',
+			'Crate couldn’t finish rebuilding your Cloudflare server.',
+			[expect.stringContaining(resumable ? 'Resume server rebuild' : 'Rebuild server')],
 			expect.objectContaining({ technicalDetails: 'Namespace listing incomplete' }),
 		);
 		const options = progress.fail.mock.calls[0]![3] as { action: { onClick: () => void } };

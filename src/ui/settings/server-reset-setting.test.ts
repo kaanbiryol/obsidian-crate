@@ -88,6 +88,8 @@ describe('server reset settings', () => {
 
 	it('requires confirmation of exact resources for delete-only authorization', async () => {
 		const plugin = await render();
+		const { renderServerDeleteSetting } = await import('./server-delete-setting');
+		renderServerDeleteSetting(new FakeElement('div') as never, plugin as never);
 		confirm.mockResolvedValue(true);
 		const setting = MockSetting.instances.find(item => item.nameEl.textContent === 'Delete server')!;
 		setting.buttons[0]!.click();
