@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { chromium, webkit, expect } from '@playwright/test';
 
-// Use the production Preact runtime and real sheet portal. A notification can
+// Use the production React runtime and real sheet portal. A notification can
 // open the sheet in the same render that replaces the splash with the app root.
 const { outputFiles } = await build({
 	stdin: { contents: `
@@ -22,7 +22,7 @@ const { outputFiles } = await build({
 		createRoot(document.getElementById('root')).render(<Harness />);
 	`, resolveDir: process.cwd(), loader: 'tsx' },
 	bundle: true, write: false, format: 'iife', platform: 'browser',
-	alias: { react: 'preact/compat', 'react-dom': 'preact/compat', 'react/jsx-runtime': 'preact/jsx-runtime' },
+	define: { 'process.env.NODE_ENV': '"production"' },
 });
 for (const browserType of [chromium, webkit]) {
 	const browser = await browserType.launch();

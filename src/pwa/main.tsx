@@ -1,5 +1,6 @@
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import React, { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import {
@@ -62,7 +63,13 @@ function App() {
 	usePwaInputModality();
 	const { colorScheme, themePreference, setThemePreference } = usePwaColorScheme();
 	const isDarkMode = colorScheme === 'dark';
-	const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_KEY));
+	const [authSession, setAuthSession] = useState(() => ({ token: localStorage.getItem(AUTH_TOKEN_KEY) }));
+	const authToken = authSession.token;
+	const setAuthToken = useCallback<Dispatch<SetStateAction<string | null>>>((next) => {
+		// React may batch a clear and re-enrollment with the same token. Retain
+		// the new session identity so its API client captures the new authority.
+		setAuthSession(current => ({ token: typeof next === 'function' ? next(current.token) : next }));
+	}, []);
 	const [bootstrapped, setBootstrapped] = useState(false);
 	const [storedConfig, setConfig] = useState<StoredConfig>(() => loadStoredConfig());
 	const [preferences, setPreferences] = useState(loadPwaPreferences);
@@ -97,8 +104,8 @@ function App() {
 	}, [showToast]);
 
 	const apiFetch = useMemo(
-		() => makeApiFetch(authToken, () => handleUnauthorizedRef.current()),
-		[authToken],
+		() => makeApiFetch(authSession.token, () => handleUnauthorizedRef.current()),
+		[authSession],
 	);
 	const reminderSync = useReminderSync({ apiFetch, authToken, bootstrapped, config, setSelectedProject });
 	const {

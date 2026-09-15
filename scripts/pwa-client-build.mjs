@@ -27,11 +27,6 @@ export async function bundlePwaClient(assetVersion, root) {
 			'process.env.NODE_ENV': JSON.stringify('production'),
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(assetVersion),
 		},
-		alias: {
-			'react': 'preact/compat',
-			'react-dom': 'preact/compat',
-			'react/jsx-runtime': 'preact/jsx-runtime',
-		},
 		mainFields: ['browser', 'module', 'main'],
 		conditions: ['browser', 'import'],
 		legalComments: 'eof',

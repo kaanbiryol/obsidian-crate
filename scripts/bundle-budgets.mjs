@@ -3,10 +3,9 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// Restore receipts/journaling, durable verification progress and browser
-		// recovery add about 8 KB to the audited 1.479 MB build. Keep gzip unchanged.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1490000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '820000', 10),
+		// React baseline: about 1.84 MB raw / 957 KB gzip, with the plugin UI and embedded PWA.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1860000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '970000', 10),
 	},
 	{
 		path: 'dist/styles.css',
@@ -18,28 +17,28 @@ export const bundleBudgets = {
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
 		// The deployable Worker embeds the complete reminders PWA assets.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '1430000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '615000', 10),
+		// React baseline: about 1.57 MB raw / 665 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '1600000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '675000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
 		assetName: 'app.js',
-		// Eager editor focus plus durable optimistic writes and recovery controls.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '130000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '43000', 10),
+		// Includes React DOM; about 315 KB raw / 98 KB gzip after the runtime switch.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_BUDGET_BYTES ?? '320000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_ENTRY_GZIP_BUDGET_BYTES ?? '100000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
-		// Device storage status must open offline on the first tap, so its small
-		// component stays eager. Session cleanup adds about 1.6 KB over the audit.
-		// See docs/audits/2026-09-11/remediation.md for measured candidate sizes.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '463000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '156500', 10),
+		// React startup graph: about 646 KB raw / 210 KB gzip. Includes the editor
+		// and recovery UI needed for synchronous first-tap focus and offline use.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '655000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '215000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '493000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '168000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '690000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '225000', 10),
 	}],
 };
