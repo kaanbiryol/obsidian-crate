@@ -1,5 +1,5 @@
 import { showSyncErrorNotice } from '../ui/sync-error-notice';
-import { Notice, type TAbstractFile } from 'obsidian';
+import { Notice, type Events, type TAbstractFile } from 'obsidian';
 import type CratePlugin from '../main';
 import { type ForegroundSyncReason, SyncRuntime } from './runtime';
 import { notifyConflicts } from './conflict';
@@ -87,6 +87,13 @@ export function registerVaultSyncEventHandlers(plugin: CratePlugin): void {
 	plugin.registerEvent(
 		plugin.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
 			plugin.syncRuntime.onFileRename(file, oldPath);
+		}),
+	);
+
+	// Obsidian emits raw paths for configuration and hidden files that have no TFile.
+	plugin.registerEvent(
+		(plugin.app.vault as Events).on('raw', (path: unknown) => {
+			if (typeof path === 'string') plugin.syncRuntime.onRawFileChange(path);
 		}),
 	);
 

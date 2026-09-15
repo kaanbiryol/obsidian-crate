@@ -60,11 +60,11 @@ export class SyncQueueController {
 		return this.pendingPaths.size;
 	}
 
-	onFileChange(file: TAbstractFile): void {
+	onFileChange(file: Pick<TAbstractFile, 'path'>): void {
 		queueOnFileChange(this.getQueueEventContext(), file);
 	}
 
-	onFileDelete(file: TAbstractFile): void {
+	onFileDelete(file: Pick<TAbstractFile, 'path'>): void {
 		queueOnFileDelete(this.getQueueEventContext(), file);
 	}
 
