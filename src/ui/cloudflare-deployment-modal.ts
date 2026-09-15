@@ -110,13 +110,13 @@ export class CloudflareDeploymentModal extends Modal {
 			this.root?.render(createElement(ThemeIconProvider, { renderer: ObsidianIcon, children: createElement(ModalLayout, {
 				title, onClose: () => this.close(),
 				children: createElement('div', { className: 'crate-vault-selection' },
-					createElement('p', null, missing ? 'Your previous server is gone. Choose another server or create a new one.' : 'Select a server for this vault or create a new one.'),
-					createElement('p', null, 'Local files are kept. Syncing combines local and remote files; files with the same path may be updated. No files are synced automatically.'),
+					createElement('p', null, deployments.length ? (missing ? 'Your previous server is gone. Choose another server or create a new one.' : 'Select a server for this vault or create a new one.') : (missing ? 'Your previous server is gone. Create a new Cloudflare server for this vault.' : 'Create a Cloudflare server for this vault.')),
+					createElement('p', null, deployments.length ? 'Your local files stay unchanged during setup. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.' : 'Your local files stay unchanged during setup. When setup is complete, select Crate: Sync now from the command palette to start syncing.'),
 					...deployments.map(deployment => createElement(Button, {
 						key: deployment.metadata.workerName,
 						onClick: () => this.finishSelection(deployment), children: deployment.metadata.workerName,
 					})),
-					createElement('p', null, 'Creating a server may incur Cloudflare usage charges.'),
+					createElement('p', null, 'Cloudflare usage charges may apply.'),
 				),
 				footer: createElement('div', { className: 'crate-status-actions' },
 					createElement(Button, { onClick: () => this.close(), children: 'Cancel' }),

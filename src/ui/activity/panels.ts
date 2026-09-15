@@ -40,9 +40,9 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 	for (const filePath of deletes) renderFileMicroCard(list, filePath, 'delete');
 }
 
-export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[], lastSyncLabel: string, onReview?: (conflict: ConflictRecord) => void): void {
+export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[], checking: boolean, onReview?: (conflict: ConflictRecord) => void): void {
 	if (conflicts.length === 0) {
-		renderEmptyState(container, 'shield-check', 'No conflicts', lastSyncLabel, 'success');
+		renderEmptyState(container, checking ? 'search' : 'shield-check', checking ? 'Checking for conflicts…' : 'No conflicts', '', checking ? 'accent' : 'success');
 		return;
 	}
 

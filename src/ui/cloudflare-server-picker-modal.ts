@@ -18,7 +18,7 @@ class CloudflareServerPickerModal extends SharedModal {
 		this.modalEl.addClass('crate-cloudflare-server-picker-modal');
 		this.openLayout(this.missingServer ? 'Your previous server is no longer available' : this.deployments.length ? 'Choose a server' : 'Create a server');
 		this.bodyEl.createEl('p', {
-			text: (this.missingServer ? 'Your previous server is gone. Choose another server or create a new one. ' : 'Select a server for this vault or create a new one. ') + ' Local files are kept. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.',
+			text: this.deployments.length === 0 ? `${this.missingServer ? 'Your previous server is gone. ' : ''}Create a Cloudflare server for this vault. Your local files stay unchanged during setup. When setup is complete, select Crate: Sync now from the command palette to start syncing.` : (this.missingServer ? 'Your previous server is gone. Choose another server or create a new one. ' : 'Select a server for this vault or create a new one. ') + ' Local files are kept. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.',
 			cls: 'crate-cloudflare-server-picker-description',
 		});
 

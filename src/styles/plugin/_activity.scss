@@ -183,9 +183,6 @@
 		cursor: default;
 	}
 
-	&.is-syncing .crate-sync-btn-icon svg {
-		animation: crate-spin var(--anim-duration-slow, 1s) linear infinite;
-	}
 }
 
 /* Underline tabs */
@@ -601,7 +598,6 @@ body.reduce-motion .crate-activity-modal {
     --crate-activity-motion-fast: 0ms;
     --crate-activity-motion-moderate: 0ms;
 
-    .crate-sync-now-btn.is-syncing .crate-sync-btn-icon svg,
     .crate-activity-spinner {
         animation: none;
     }
@@ -612,7 +608,6 @@ body.reduce-motion .crate-activity-modal {
         --crate-activity-motion-fast: 0ms;
         --crate-activity-motion-moderate: 0ms;
 
-        .crate-sync-now-btn.is-syncing .crate-sync-btn-icon svg,
         .crate-activity-spinner {
             animation: none;
         }
