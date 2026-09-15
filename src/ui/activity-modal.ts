@@ -50,6 +50,12 @@ export class ActivityModal extends Modal {
 	private allPanels: HTMLDivElement[] = [];
 	private readonly onProgress = () => {
 		if (!this.pendingPanel) return;
+		// Manual sync records history after the engine's final state event.
+		// Its completion progress event must refresh history as well as pending files.
+		if (this.deps.getState().status !== 'syncing' && !this.deps.getActivityProgress?.()) {
+			this.refresh();
+			return;
+		}
 		this.updateSyncBtn();
 		this.updateSyncStatusText();
 		this.renderPending();

@@ -56,15 +56,18 @@ function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry): vo
 			? `Showing ${entry.errors.length} of ${entry.errorCount} errors.`
 			: 'Error details were not saved for this sync. Run sync again to record them.' });
 	}
-	const groups: Array<{ paths: string[]; type: FileCardType }> = [
-		{ paths: entry.uploadedPaths ?? [], type: 'upload' },
-		{ paths: entry.downloadedPaths ?? [], type: 'download' },
-		{ paths: entry.mergedPaths ?? [], type: 'merge' },
-		{ paths: entry.deletedPaths ?? [], type: 'delete' },
-		{ paths: entry.conflictPaths ?? [], type: 'conflict' },
+	const groups: Array<{ paths: string[]; type: FileCardType; total: number; label: string }> = [
+		{ paths: entry.uploadedPaths ?? [], type: 'upload', total: entry.uploaded, label: 'uploaded' },
+		{ paths: entry.downloadedPaths ?? [], type: 'download', total: entry.downloaded, label: 'downloaded' },
+		{ paths: entry.mergedPaths ?? [], type: 'merge', total: entry.merged, label: 'merged' },
+		{ paths: entry.deletedPaths ?? [], type: 'delete', total: entry.deleted, label: 'deleted' },
+		{ paths: entry.conflictPaths ?? [], type: 'conflict', total: entry.conflictCount, label: 'conflicting' },
 	];
 	for (const group of groups) {
 		for (const filePath of group.paths) renderFileMicroCard(filesEl, filePath, group.type);
+		if (group.total > group.paths.length) {
+			filesEl.createDiv({ text: `Showing ${group.paths.length} of ${group.total} ${group.label} files.`, cls: 'crate-file-path' });
+		}
 	}
 	for (const race of entry.resolvedRaces ?? []) {
 		renderFileMicroCard(
