@@ -38,14 +38,14 @@ function addPendingPath(context: QueueEventContext, path: string): void {
 	context.markPending?.(path);
 }
 
-export function onFileChange(context: QueueEventContext, file: TAbstractFile): void {
+export function onFileChange(context: QueueEventContext, file: Pick<TAbstractFile, 'path'>): void {
 	if (!(file instanceof TFolder) && !context.shouldIgnore(file.path)) {
 		addPendingPath(context, file.path);
 		context.triggerDebouncedSync();
 	}
 }
 
-export function onFileDelete(context: QueueEventContext, file: TAbstractFile): void {
+export function onFileDelete(context: QueueEventContext, file: Pick<TAbstractFile, 'path'>): void {
 	if (!context.shouldIgnore(file.path)) {
 		addPendingPath(context, `delete:${file.path}`);
 		context.triggerDebouncedSync();

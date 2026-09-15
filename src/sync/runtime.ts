@@ -256,6 +256,11 @@ export class SyncRuntime {
 		if (this.initializationRevision !== revision) throw new DOMException('Sync configuration changed during reset', 'AbortError');
 	}
 
+	onRawFileChange(path: string): void {
+		if (this.plugin.app.workspace.layoutReady === false || !this.acceptingEvents) return;
+		void this.syncEngine?.onRawFileChange(path);
+	}
+
 	onFileChange(file: TAbstractFile): void {
 		if (this.plugin.app.workspace.layoutReady === false) return;
 		if (!this.acceptingEvents && !isConflictFile(file.path)) return;

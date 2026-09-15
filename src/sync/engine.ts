@@ -9,7 +9,8 @@ import { LocalManifest } from './manifest';
 import { MarkdownBaseCache } from './markdown-base-cache';
 import { ConflictStore } from './conflict-store';
 import { isConflictFile } from './conflict';
-import type { VaultFile } from './file-discovery';
+import { isHiddenPath, type VaultFile } from './file-discovery';
+import { assertLocalSyncPath } from './local-path-safety';
 import type { DownloadRequest } from './transfer-download';
 import { SyncQueueController } from './queue-controller';
 import { isAbortError as isSyncAbortError } from './abort';
@@ -77,6 +78,7 @@ export class SyncEngine {
 	private periodicCheckFailed = false;
 	private onAutomaticSyncResult: ((result: SyncResult) => void | Promise<void>) | null = null;
 	private prepareReminderScope?: () => Promise<void>;
+	private rawEventRevisions = new Map<string, object>();
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
 	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -372,6 +374,25 @@ export class SyncEngine {
 
 	private isAbortError(error: unknown): boolean {
 		return isSyncAbortError(error);
+	}
+
+	async onRawFileChange(path: string): Promise<void> {
+		const configDir = this.vault.configDir;
+		if (!isHiddenPath(path) && !path.startsWith(`${configDir}/`)) return;
+		if (this.lifecycle.isDestroyed || this.shouldIgnore(path)) return;
+		const revision = {};
+		this.rawEventRevisions.set(path, revision);
+		try {
+			assertLocalSyncPath(path);
+			const stat = await this.vault.adapter.stat(path);
+			if (this.lifecycle.isDestroyed || this.rawEventRevisions.get(path) !== revision || this.shouldIgnore(path)) return;
+			if (stat?.type === 'file') this.queueController.onFileChange({ path });
+			else if (!stat) this.queueController.onFileDelete({ path });
+		} catch (error) {
+			logger.warn('Failed to inspect changed configuration file:', errorMessage(error));
+		} finally {
+			if (this.rawEventRevisions.get(path) === revision) this.rawEventRevisions.delete(path);
+		}
 	}
 
 	onFileChange(file: TAbstractFile): void {
