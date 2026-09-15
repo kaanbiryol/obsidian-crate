@@ -10,13 +10,14 @@ function listFiles(directory) {
 	});
 }
 
-export function createPwaAssetVersion(clientAssets, root) {
+export function createPwaAssetVersion(clientAssets, root, onRead = () => {}) {
 	const hash = createHash('sha256');
 	for (const [name, source] of Object.entries(clientAssets).sort(([left], [right]) => left.localeCompare(right))) {
 		hash.update(name);
 		hash.update(source);
 	}
 	for (const path of listFiles(resolve(root, 'src/cloudflare/worker/pwa')).sort()) {
+		onRead(path);
 		hash.update(relative(root, path));
 		hash.update(readFileSync(path));
 	}

@@ -1,6 +1,6 @@
 # Server release and upgrade contract
 
-Crate has not shipped a server deployment. The first supported database is schema 1, with the complete current file inventory, receipts, reminder state and indexes. There are no historical database migrations to run. Developer databases using previous experimental markers are unsupported; they are never reset or interpreted as empty by the updater.
+The first supported database is schema 1, with the complete current file inventory, receipts, reminder state and indexes. There are no historical database migrations to run. Developer databases using previous experimental markers are unsupported; they are never reset or interpreted as empty by the updater.
 
 ## Independent versions
 
@@ -26,6 +26,8 @@ Wire protocol ranges, capabilities, parser versions and browser/local storage en
 
 A failed check keeps writers fenced. **Check and recover update** resumes a confirmed or definitively rejected step with the exact same artifact, replacing ownership conditionally without an unlocked interval. Old updaters cannot advance once their ownership has been replaced. A first installation that has not yet created a Worker is recoverable too.
 
+Acquiring or taking over the fence atomically records a confirmed acquisition checkpoint. Closing the app or losing the response immediately afterward remains recoverable, including repeated interruptions during recovery. The next provider mutation must first conditionally advance that exact ownership record; recovering a paused acquisition prevents the old owner from dispatching it.
+
 A timed-out provider request remains uncertain. Do not infer completion from elapsed time or from a matching annotation. After an operator has stopped old deployment clients and established that all in-flight requests have settled, `scripts/crate-deployment-fence.py settle ... --confirm-quiescent` marks only the inspected owner as settled while retaining the fence. Then use **Check and recover update**. The script refuses to release an update that still needs verification.
 
 ## Adding the first real migration
@@ -39,5 +41,9 @@ For a large data copy, storage replacement, or Durable Object architecture chang
 Keep a forward-fix path. Rolling Worker code back does not restore D1/R2 data. Historical recovery uses a matching paired archive in isolated resources and must account for writes after that archive.
 
 ## Release evidence
+
+`npm run check` includes the server revision gate. `npm run check:server-revision` runs it independently against uncommitted changes relative to `HEAD`; use `npm run check:server-revision -- --base <git-ref>` to check a complete branch or release. It rebuilds the server and follows the Worker, PWA, provisioner and build-script dependency graphs, including shared UI and transitive Sass imports. Database SQL, migration artifacts and compilation settings are included explicitly. Dependency-lock changes conservatively require a revision too; plugin package version and descriptive metadata changes alone do not.
+
+CI selects the complete comparison automatically: the PR base, the previous push tip, or the default branch for a new branch. Tag and manual release checks compare with the previous reachable release tag, falling back to the parent commit for the first release. Both workflows fetch full Git history. Missing references fail the check. A baseline predating the first release manifest is treated as its initial introduction. Revision decreases, schema edits without a schema version increase, and edits or removal of released migrations also fail.
 
 For each schema change, freeze a real source-schema fixture and test every supported source through the current registry. Test rollback inside a step, interruption between steps, repeat application, missing/edited receipts, two competing updaters, same-version stale builds, live verification failure and exact-artifact recovery. Assert that unchanged file contents and operation identities survive. Use realistic large-vault fixtures for backfills. Run hosted acceptance with the exact distributable artifacts before release; local D1 runtime tests alone cannot establish hosted rollout behavior.

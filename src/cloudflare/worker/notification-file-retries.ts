@@ -1,4 +1,4 @@
-export const MAX_FILE_ATTEMPTS = 8;
+const MAX_FILE_ATTEMPTS = 8;
 
 /** Shared by source verification and projection so they cannot reset each other's budget. */
 export function recordFileFailure(db: D1Database, path: string, error: string, guard = '1', args: unknown[] = [], permanent = false): D1PreparedStatement {

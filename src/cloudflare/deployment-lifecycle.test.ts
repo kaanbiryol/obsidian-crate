@@ -4,6 +4,7 @@ import { CloudflareDeploymentService } from './deployment-service';
 import type { CloudflareWorkerSettings } from './cloudflare-api';
 import type { HttpTransport } from './http';
 import { createFenceQueryHarness } from './deployment-fence-test-harness';
+import { sha256Hex } from './deployment-artifacts';
 
 // Exercise the real service, API client and reset/delete implementation through
 // a local transport. Remote mutations happen before their response is released.
@@ -40,13 +41,25 @@ function harness() {
 		if (path === '/oauth2/token') return { status: 200, text: JSON.stringify({ access_token: 'temporary-token' }) };
 		if (path === '/oauth2/revoke') return { status: 200, text: '{}' };
 		if (path === '/client/v4/memberships') return json([{ status: 'accepted', account: { id: accountId, name: 'Personal' } }]);
+		if (path.endsWith('/workers/subdomain')) return json({ subdomain: 'example' });
+		if (path === '/.well-known/crate-reset') return { status: 200, text: JSON.stringify({ service: 'crate-reset', protocol: 1, resetId: settings.cloudflareDeployment!.reset!.id }) };
+		if (path === '/__crate__/reset/objects' && request.method === 'POST' && typeof request.body === 'string') {
+			const [result] = fence.query('SELECT value FROM maintenance_state WHERE key = ?;', ['crate_deployment_fence'])!;
+			const record = JSON.parse(result!.results[0]!.value as string) as Record<string, unknown>;
+			const keys = JSON.parse(request.body) as string[];
+			const token = request.headers?.Authorization?.replace('Bearer ', '') ?? '';
+			if (record.cleanupTokenHash !== await sha256Hex(token) || record.batchHash !== await sha256Hex(request.body)
+				|| record.stepState !== 'started') return { status: 403, text: 'Unauthorized batch' };
+			mutations.push(path);
+			keys.forEach(key => objects.delete(key));
+			return { status: 200, text: JSON.stringify({ service: 'crate-reset', protocol: 1, resetId: settings.cloudflareDeployment!.reset!.id, batchHash: record.batchHash, deleted: keys.length }) };
+		}
 		if (path.endsWith('/workers/scripts')) return json(remote.worker ? [{ id: name }] : []);
 		if (path.endsWith('/settings')) return json(worker);
 		if (path.endsWith('/durable_objects/namespaces')) return json(remote.retired ? [] : [{ id: 'c'.repeat(32), script: name, class: 'ReminderAlarm' }]);
 		if (request.method === 'DELETE') {
 			mutations.push(path);
-			if (path.includes('/objects/')) objects.delete(decodeURIComponent(path.split('/objects/')[1]!));
-			else if (path.endsWith(`/r2/buckets/${name}`)) remote.bucket = false;
+			if (path.endsWith(`/r2/buckets/${name}`)) remote.bucket = false;
 			else if (path.endsWith(`/d1/database/${databaseId}`)) remote.database = false;
 			else if (path.endsWith(`/workers/scripts/${name}`)) remote.worker = false;
 			else throw new Error(`Unexpected deletion: ${path}`);
@@ -56,12 +69,17 @@ function harness() {
 			mutations.push(path);
 			remote.retired = true;
 			worker.annotations = { 'workers/message': `Crate reset ${settings.cloudflareDeployment!.reset!.id}` };
-			worker.bindings = worker.bindings!.filter(binding => binding.type !== 'durable_object_namespace');
+			worker.bindings = [...worker.bindings!.filter(binding => ['d1', 'r2_bucket'].includes(binding.type!)),
+				{ type: 'plain_text', name: 'CRATE_RESET_ID', text: settings.cloudflareDeployment!.reset!.id }];
 			return json({});
 		}
 		if (path.endsWith(`/d1/database/${databaseId}`)) return remote.database ? json({ uuid: databaseId, name }) : json(null, 404);
 		if (path.endsWith(`/r2/buckets/${name}`)) return remote.bucket ? json({ name, creation_date: '2026-01-01' }) : json(null, 404);
-		if (path.endsWith('/objects')) return json([...objects].map(key => ({ key })));
+		if (path.endsWith('/objects')) {
+			const offset = Number(new URL(url).searchParams.get('cursor') ?? 0);
+			return { status: 200, text: JSON.stringify({ success: true, result: [...objects].slice(offset, offset + 1000).map(key => ({ key })),
+				result_info: offset + 1000 < objects.size ? { cursor: String(offset + 1000) } : {} }) };
+		}
 		if (path.endsWith('/query') && typeof request.body === 'string') {
 			const { sql, params } = JSON.parse(request.body) as { sql: string; params?: string[] };
 			const fenced = fence.query(sql, params);
@@ -86,7 +104,7 @@ function harness() {
 			},
 		};
 	}
-	return { settings, writeSettings, mutations, objects, remote, transport, beforeServerReset, createService, clearFence: fence.clear };
+	return { settings, writeSettings, mutations, objects, remote, transport, beforeServerReset, createService };
 }
 
 const device = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Test', platform: 'desktop' };
@@ -94,13 +112,13 @@ const device = { tokenHash: 'hash', deviceId: 'device', deviceName: 'Test', plat
 describe('Cloudflare deployment interruption and recovery', () => {
 	it.each(['reset', 'delete'] as const)('stops %s during object clearing and preserves the saved recovery checkpoint', async intent => {
 		const h = harness();
-		for (let i = 0; i < 99; i++) h.objects.add(`__crate__/files/${i.toString(16).padStart(64, '0')}/01234567-89ab-cdef-0123-456789abcdef`);
+		for (let i = 0; i < 1498; i++) h.objects.add(`__crate__/files/${i.toString(16).padStart(64, '0')}/01234567-89ab-cdef-0123-456789abcdef`);
 		let release!: () => void;
 		const pending = new Promise<void>(resolve => { release = resolve; });
 		let dispatched = false;
 		const transport: HttpTransport = async (url, request) => {
 			const response = await h.transport(url, request);
-			if (request.method === 'DELETE' && url.includes('/objects/')) {
+			if (request.method === 'POST' && url.endsWith('/__crate__/reset/objects')) {
 				dispatched = true;
 				await pending;
 			}
@@ -116,16 +134,15 @@ describe('Cloudflare deployment interruption and recovery', () => {
 		first.service.destroy();
 		release();
 		await rejected;
-		expect(h.objects.size).toBe(91);
+		expect(h.objects.size).toBe(500);
 		expect(h.remote).toEqual({ worker: true, bucket: true, database: true, retired: true });
-		expect(h.mutations).toHaveLength(11); // The retired Worker and one dispatched batch; no second batch.
+		expect(h.mutations).toHaveLength(2); // The retired Worker and one bulk request; no second batch.
 		expect(h.writeSettings).toHaveBeenCalledTimes(writes);
 		expect(h.settings.cloudflareDeployment!.reset).toEqual(checkpoint);
 		expect(checkpoint?.phase).toBe('clearing');
 		expect(vi.mocked(h.transport).mock.calls.at(-1)?.[0]).toContain('/oauth2/revoke');
 
 		if (intent === 'delete') {
-			h.clearFence(); // Operator confirmed the interrupted request has settled.
 			const retry = h.createService();
 			const result = await retry.service.handleCallback(await retry.authorize('delete'));
 			expect(result.deleted).toBe(true);
@@ -133,7 +150,7 @@ describe('Cloudflare deployment interruption and recovery', () => {
 			expect(h.remote).toEqual({ worker: false, bucket: false, database: false, retired: true });
 			expect(h.objects.size).toBe(0);
 			// No repeated Worker retirement, object deletion or database deletion.
-			expect(h.mutations).toHaveLength(105);
+			expect(h.mutations).toHaveLength(6);
 		}
 	});
 

@@ -20,15 +20,17 @@ export async function inspectResumableDeletion(api: ResetApi, metadata: Cloudfla
 		record = parsed as Record<string, unknown>;
 	} catch { throw blocked(); }
 	if (record.worker !== metadata.workerName || record.kind !== 'delete' || record.recoveryProtocol !== 1
+		|| record.resetId !== undefined && record.resetId !== checkpoint.id
 		|| typeof record.owner !== 'string' || !/^[a-f0-9-]{36}$/.test(record.owner)
 		|| record.verificationPending === true) throw blocked();
 	const confirmed = record.stepState === 'confirmed'
-		&& ['retireCrateWorker', 'deleteR2Object', 'deleteR2Bucket'].includes(String(record.step));
+		&& ['acquire-deployment', 'retireCrateWorker', 'deleteR2Object', 'deleteR2Objects', 'deleteR2Bucket'].includes(String(record.step));
 	// A late object DELETE can only remove data this same permanent deletion is
 	// already removing. The retirement Worker blocks writers, and delete-only never
 	// rebuilds these resources. Do not generalize this to publication or reset.
-	// Legacy records omit the object key; re-list the verified bucket on resume.
-	const repeatable = record.stepState === 'started' && record.step === 'deleteR2Object';
+	// Re-list after either a legacy single-object request or a bulk request. A new
+	// owner gets a new cleanup token, revoking requests that have not dispatched yet.
+	const repeatable = record.stepState === 'started' && ['deleteR2Object', 'deleteR2Objects'].includes(String(record.step));
 	if (!confirmed && !repeatable) throw blocked();
 	const worker = await api.getWorkerSettings(metadata.accountId, metadata.workerName);
 	assertWorkerTarget(worker, metadata, true);

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { rawTextPlugin } from './raw-text-plugin.mjs';
 import { createPwaAssetVersion } from './pwa-asset-version.mjs';
 import { bundlePwaClient } from './pwa-client-build.mjs';
+import { collectServerInputs } from './server-build-inputs.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
@@ -15,6 +16,7 @@ const generatedDir = resolve(root, '.generated/cloudflare');
 // changing the Worker bundle and prompting users to redeploy their server.
 const serverVersion = 'crate';
 const PWA_VERSION_PLACEHOLDER = 'crate-pwa-version-placeholder';
+const rawInputs = new Set();
 
 function writeGeneratedJson(fileName, payload) {
 	mkdirSync(generatedDir, { recursive: true });
@@ -27,6 +29,7 @@ function writeGeneratedJson(fileName, payload) {
 
 async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets) {
 	const result = await build({
+		absWorkingDir: root,
 		entryPoints: [resolve(root, 'src/cloudflare/worker/index.ts')],
 		bundle: true,
 		format: 'esm',
@@ -36,6 +39,7 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 		banner: { js: "import { createRequire } from 'node:module'; const require = createRequire('/worker.mjs');" },
 		target: 'esnext',
 		write: false,
+		metafile: true,
 		minify: true,
 		legalComments: 'eof',
 		mainFields: ['module', 'main'],
@@ -47,19 +51,20 @@ async function buildWorkerBundle(pwaClientAssets, pwaAssetVersion, startupAssets
 			__CRATE_PWA_CLIENT_ASSETS__: JSON.stringify(pwaClientAssets),
 			__CRATE_PWA_STARTUP_ASSETS__: JSON.stringify(startupAssets),
 		},
-		plugins: [rawTextPlugin()],
+		plugins: [rawTextPlugin(path => rawInputs.add(path))],
 	});
 
 	const code = result.outputFiles[0].text;
 	mkdirSync(generatedDir, { recursive: true });
 	writeFileSync(resolve(generatedDir, 'worker.mjs'), code, 'utf-8');
 	console.log('Deployable Worker bundle written to .generated/cloudflare/worker.mjs');
+	return result.metafile;
 }
 
 async function buildPwaClientBundle() {
 	const versionTemplate = await bundlePwaClient(PWA_VERSION_PLACEHOLDER, root);
-	const version = createPwaAssetVersion(versionTemplate.assets, root);
-	const { assets, startupAssets } = await bundlePwaClient(version, root);
+	const version = createPwaAssetVersion(versionTemplate.assets, root, path => rawInputs.add(path));
+	const { assets, startupAssets, metafile } = await bundlePwaClient(version, root);
 	const script = assets['app.js'];
 	if (!script) throw new Error('PWA client build did not emit app.js');
 	writeGeneratedJson('pwa-client.json', {
@@ -69,8 +74,9 @@ async function buildPwaClientBundle() {
 		startupAssets,
 	});
 	console.log('PWA client bundle written to .generated/cloudflare/pwa-client.json');
-	return { assets, version, startupAssets };
+	return { assets, version, startupAssets, metafile };
 }
 
 const pwaClient = await buildPwaClientBundle();
-await buildWorkerBundle(pwaClient.assets, pwaClient.version, pwaClient.startupAssets);
+const workerMetafile = await buildWorkerBundle(pwaClient.assets, pwaClient.version, pwaClient.startupAssets);
+writeGeneratedJson('server-inputs.json', await collectServerInputs(root, [workerMetafile, pwaClient.metafile], rawInputs));

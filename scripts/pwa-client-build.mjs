@@ -4,6 +4,7 @@ import { getPwaClientAssets, getPwaStartupAssets } from './pwa-startup-assets.mj
 
 export async function bundlePwaClient(assetVersion, root) {
 	const result = await build({
+		absWorkingDir: root,
 		// A second build entry gives the editor a stable chunk boundary. App still
 		// imports it statically, so first-tap keyboard activation stays synchronous.
 		entryPoints: {
@@ -37,6 +38,7 @@ export async function bundlePwaClient(assetVersion, root) {
 	});
 	const reachableAssets = new Set(getPwaClientAssets(result.metafile));
 	return {
+		metafile: result.metafile,
 		assets: Object.fromEntries(result.outputFiles
 			.filter(output => reachableAssets.has(basename(output.path)))
 			.map(output => [basename(output.path), output.text])),

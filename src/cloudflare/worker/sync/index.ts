@@ -1,6 +1,5 @@
 export {
 	handleBatchDelete,
-	handleBatchDownload,
 	handleBatchUpload,
 	handleCheckChanges,
 	handleDelete,

@@ -46,7 +46,8 @@ export async function createConflictReview(
         openVersion: async version => {
             const target = file(version === 'current' ? record.originalPath : record.conflictPath);
             if (Platform.isDesktopApp && app.vault.adapter instanceof FileSystemAdapter) {
-                // Electron is only available in the desktop host; never loaded on mobile.
+                // Electron is provided by Obsidian's desktop host and excluded in
+                // Vite/Knip; it is not an npm dependency and is never loaded on mobile.
                 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Electron must load only in the desktop host.
                 const { shell } = require('electron') as { shell: { openPath(path: string): Promise<string> } };
                 const error = await shell.openPath(app.vault.adapter.getFullPath(target.path));

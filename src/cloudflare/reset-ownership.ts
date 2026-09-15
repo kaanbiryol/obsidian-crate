@@ -15,13 +15,22 @@ const CRATE_TABLES = new Set([
 
 export type ResetApi = Pick<CloudflareApiClient,
 	'getWorkerSettings' | 'listWorkers' | 'getD1Database' | 'queryD1' | 'deleteD1Database'
-	| 'listDurableObjectNamespaces' | 'getR2Bucket' | 'listR2Objects' | 'deleteR2Object' | 'deleteR2Bucket' | 'retireCrateWorker'>;
+	| 'listDurableObjectNamespaces' | 'getR2Bucket' | 'listR2Objects' | 'deleteR2Objects' | 'deleteR2Bucket' | 'retireCrateWorker'
+	| 'getWorkersSubdomain' | 'verifyResetWorker'>;
 
 export function assertWorkerTarget(settings: CloudflareWorkerSettings, metadata: CloudflareDeploymentMetadata, retired = false): void {
 	const allBindings = settings.bindings ?? [];
+	if (new Set(allBindings.map(binding => binding.name)).size !== allBindings.length) throw new Error('Reset blocked: duplicate Worker bindings.');
 	const rateBindings = allBindings.filter(binding => binding.type === 'ratelimit');
 	if (rateBindings.length > 1 || (retired && rateBindings.length) || rateBindings.some(binding => binding.name !== NOTIFICATION_RATE_BINDING || binding.namespace_id !== notificationRateNamespace(metadata.r2BucketName))) throw new Error('Reset blocked: notification rate limit bindings do not match this vault.');
-	const bindings = allBindings.filter(binding => binding.type !== 'ratelimit' && !(binding.type === 'plain_text' && binding.name === 'CRATE_PUBLIC_ORIGIN'));
+	const bindings = allBindings.filter(binding => {
+		if (binding.type === 'ratelimit') return false;
+		if (binding.type !== 'plain_text') return true;
+		if (!retired && binding.name === 'CRATE_PUBLIC_ORIGIN') return false;
+		if (!retired && binding.name === 'CRATE_DEPLOYMENT_FINGERPRINT' && /^[a-f0-9]{64}$/.test(binding.text ?? '')) return false;
+		if (retired && binding.name === 'CRATE_RESET_ID' && binding.text === metadata.reset?.id) return false;
+		return true;
+	});
 	const databases = bindings.filter(binding => binding.type === 'd1');
 	const buckets = bindings.filter(binding => binding.type === 'r2_bucket');
 	if (
