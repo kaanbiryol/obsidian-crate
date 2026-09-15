@@ -39,6 +39,17 @@ describe('activity history', () => {
         expect(find(container, 'crate-history-dot')).toBeUndefined();
     });
 
+    it('shows plugin uploads and their configuration folder paths', () => {
+        const uploadedPaths = Array.from({ length: 53 }, (_, index) => `.obsidian/plugins/plugin-${index}/data.json`);
+        const container = render({ uploaded: 53, uploadedPaths });
+        expect(container.collectText()).toContain('53 uploaded');
+        expect(container.collectText()).not.toContain('No changes');
+        for (const path of uploadedPaths) {
+            expect(container.collectText()).toContain(`data.json ${path.slice(0, path.lastIndexOf('/'))}`);
+        }
+        expect(find(container, 'crate-history-details')).toBeDefined();
+    });
+
     it('shows errors even when no files transferred', () => {
         const container = render({ success: false, uploaded: 0, uploadedPaths: [], errorCount: 1, errors: ['Upload failed: Notes.md'] });
         expect(find(container, 'crate-history-details')).toBeDefined();
