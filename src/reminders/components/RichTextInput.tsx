@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useLayoutEffect, useImperativeHandle, forward
 import { buildHTML, buildRichTextSegments, getPlainText, getRichTextChipParts } from '../utils/richTextParsing';
 import { getLogicalTextLength, saveCursorPosition, restoreCursorPosition } from '../utils/cursorPosition';
 import { extractHashtagQuery } from '../utils/projectSearch';
+import { getEditorSelectionRange } from '../utils/editorSelection';
 import { commitReminderMarkers, toReminderTextOffset, toReminderCursorOffset } from '../utils/reminderEditorEdits';
 import {
     clearActiveRichTextChip,
@@ -252,14 +253,13 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
 
         const hashInfo = extractHashtagQuery(plainText, toReminderTextOffset(plainText, cursorPos));
         if (hashInfo) {
-            const sel = window.getSelection();
-            const rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
+            const rect = actualRef.current ? getEditorSelectionRange(actualRef.current)?.getBoundingClientRect() : null;
             onAutocompleteQuery(hashInfo.query, rect ?? null);
             return;
         }
 
         onAutocompleteQuery(null, null);
-    }, [onAutocompleteQuery]);
+    }, [actualRef, onAutocompleteQuery]);
 
     const captureHistorySnapshot = useCallback(() => {
         const snapshot = getCurrentHistorySnapshot();

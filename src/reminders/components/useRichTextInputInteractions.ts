@@ -51,7 +51,7 @@ export function useRichTextInputInteractions({
 		e.preventDefault();
 		captureHistorySnapshot?.();
 		const text = e.clipboardData.getData('text/plain');
-		insertPlainTextAtSelection(text);
+		insertPlainTextAtSelection(text, e.currentTarget as HTMLElement);
 		handleInput(true);
 	}, [captureHistorySnapshot, handleInput]);
 

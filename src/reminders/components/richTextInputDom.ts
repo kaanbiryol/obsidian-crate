@@ -1,5 +1,6 @@
 import { reconcileRichTextChildren } from './richTextReconciliation';
 import { moveCursorToEnd } from "../utils/cursorPosition";
+import { getEditorSelectionRange } from '../utils/editorSelection';
 import { buildRichTextSegments, getRichTextChipParts, type RichTextSegment } from "../utils/richTextRenderer";
 
 const ELEMENT_NODE_TYPE = typeof Node !== "undefined" ? Node.ELEMENT_NODE : 1;
@@ -103,7 +104,9 @@ export function syncActiveRichTextChip(element: HTMLDivElement): void {
 		return;
 	}
 
-	const focusNode = element.ownerDocument.getSelection()?.focusNode ?? null;
+	const selectionFocus = element.ownerDocument.getSelection()?.focusNode ?? null;
+	const focusNode = selectionFocus && element.contains(selectionFocus)
+		? selectionFocus : getEditorSelectionRange(element)?.endContainer ?? null;
 	if (!focusNode || !element.contains(focusNode)) {
 		return;
 	}
@@ -117,29 +120,27 @@ export function syncActiveRichTextChip(element: HTMLDivElement): void {
 	}
 }
 
-export function insertPlainTextAtSelection(text: string): void {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) {
-    return;
-  }
-
-  const range = selection.getRangeAt(0);
+export function insertPlainTextAtSelection(text: string, element: HTMLElement): void {
+  const ownerDocument = element.ownerDocument;
+  const selection = ownerDocument.getSelection();
+  const range = getEditorSelectionRange(element);
+  if (!selection || !range) return;
   range.deleteContents();
 
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
-  const fragment = document.createDocumentFragment();
+  const fragment = ownerDocument.createDocumentFragment();
   let lastInsertedNode: Node | null = null;
 
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index] ?? "";
     if (line) {
-      const textNode = document.createTextNode(line);
+      const textNode = ownerDocument.createTextNode(line);
       fragment.append(textNode);
       lastInsertedNode = textNode;
     }
 
     if (index < lines.length - 1) {
-      const lineBreak = document.createElement("br");
+      const lineBreak = ownerDocument.createElement("br");
       fragment.append(lineBreak);
       lastInsertedNode = lineBreak;
     }
@@ -151,27 +152,25 @@ export function insertPlainTextAtSelection(text: string): void {
 
   range.insertNode(fragment);
 
-  const nextRange = document.createRange();
+  const nextRange = ownerDocument.createRange();
   if (lastInsertedNode.nodeType === Node.TEXT_NODE) {
     nextRange.setStart(lastInsertedNode, lastInsertedNode.textContent?.length ?? 0);
   } else {
     nextRange.setStartAfter(lastInsertedNode);
   }
   nextRange.collapse(true);
-  selection.removeAllRanges();
-  selection.addRange(nextRange);
+  selection.setBaseAndExtent(nextRange.startContainer, nextRange.startOffset, nextRange.endContainer, nextRange.endOffset);
 }
 
 export function selectElementContents(element: HTMLElement): void {
-  const selection = window.getSelection();
+  const selection = element.ownerDocument.getSelection();
   if (!selection) {
     return;
   }
 
   const range = element.ownerDocument.createRange();
   range.selectNodeContents(element);
-  selection.removeAllRanges();
-  selection.addRange(range);
+  selection.setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
 }
 
 export function focusRichTextElement(element: HTMLDivElement, options: RichTextFocusOptions = {}): void {

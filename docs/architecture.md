@@ -31,6 +31,12 @@
 
 **Design philosophy:** sync intelligence (change detection, conflict resolution, batching) lives in the plugin. The Worker stores files, exposes reminder web/PWA endpoints, and schedules push notifications, but does not decide sync plans.
 
+The plugin and PWA share React components and use the same React/React DOM runtime.
+Vite uses `@vitejs/plugin-react` for the plugin and visual gallery; the PWA uses
+esbuild with the React JSX runtime. Browser test harnesses use these same packages.
+Obsidian mounts reminder views inside Shadow DOM, so editor selection and event
+handling are tested there as well as in the PWA's document.
+
 ## Infrastructure Stack
 
 | Service | Role |

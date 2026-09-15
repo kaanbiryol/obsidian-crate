@@ -1,6 +1,7 @@
 /**
  * Utilities for saving and restoring cursor position in contenteditable elements
  */
+import { getEditorSelectionRange } from './editorSelection';
 
 const TEXT_NODE_TYPE = typeof Node !== 'undefined' ? Node.TEXT_NODE : 3;
 
@@ -214,10 +215,8 @@ export function resolveLogicalCursorPosition(
 export const saveCursorPosition = (element: HTMLElement | null): number | null => {
     if (!element) return null;
 
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return null;
-
-    const range = sel.getRangeAt(0);
+    const range = getEditorSelectionRange(element);
+    if (!range) return null;
     return getLogicalCursorOffset(element, range.endContainer, range.endOffset);
 };
 
@@ -229,17 +228,16 @@ export const saveCursorPosition = (element: HTMLElement | null): number | null =
 export const restoreCursorPosition = (element: HTMLElement | null, position: number | null): void => {
     if (position === null || !element) return;
 
-    const sel = window.getSelection();
+    const sel = element.ownerDocument.getSelection();
     if (!sel) return;
 
     const resolved = resolveLogicalCursorPosition(element, position);
-    const range = document.createRange();
+    const range = element.ownerDocument.createRange();
 
     if (!resolved) {
         range.selectNodeContents(element);
         range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
+        sel.setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
         return;
     }
 
@@ -250,8 +248,7 @@ export const restoreCursorPosition = (element: HTMLElement | null, position: num
     }
 
     range.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(range);
+    sel.setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
 };
 
 /**

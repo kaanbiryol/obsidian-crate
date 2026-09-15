@@ -131,6 +131,7 @@ try {
 			const afterDescription = await title.boundingBox();
 			assert.ok(Math.abs(afterDescription.y - beforeDescription.y) < 1, 'Focusing description must not move the sheet');
 			await description.fill('A long description that still needs native scrolling.\n'.repeat(20));
+			await expect(description).toHaveValue('A long description that still needs native scrolling.\n'.repeat(20));
 			await description.evaluate(element => { element.scrollTop = 0; });
 			await description.hover();
 			await page.mouse.wheel(0, 180);

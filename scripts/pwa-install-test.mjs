@@ -133,6 +133,8 @@ async function testInstall(browser, launchMode) {
   expect(folders).not.toContain('WrongFolder');
 
   // Replace A with B, then launch immutable A with its obsolete folder settings.
+  // The preview returns the same auth token. Even when React batches the clear
+  // and replacement, the renewed API client must use the new session generation.
   await home.goto(`${origin}/notifications?token=renewal-${launchMode}&folder=RenewedTasks&tab=inbox`);
   await home.getByRole('group', { name: cardName, exact: true }).waitFor();
   expect(exchanges.at(-1).previousAuthToken).toBe(existingAuth);

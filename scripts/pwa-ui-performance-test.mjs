@@ -7,7 +7,8 @@ const { outputFiles } = await build({
 	stdin: {
 		resolveDir: process.cwd(), loader: 'tsx', contents: `
 			import React, { useState } from 'react';
-			import { render } from 'preact';
+			import { createRoot } from 'react-dom/client';
+			import { flushSync } from 'react-dom';
 			import { RichTextInput } from './src/reminders/components/RichTextInput';
 			import { useKeyboardHeight } from './src/reminders/ui/hooks/useKeyboardHeight';
 			import { PwaPullRefreshIndicator } from './src/pwa/components/PwaChrome';
@@ -25,13 +26,17 @@ const { outputFiles } = await build({
 				const [refreshes, setRefreshes] = useState(0);
 				return <div className="pwa-reminders-view"><div className="pwa-below-header-content"><PwaPullRefreshIndicator enabled onRefresh={async () => { setRefreshes(value => value + 1); }} /></div><div id="scroll" className="ios-scroll" style={{height: 250, overflow: 'auto'}}><div style={{height: 600}}>Reminders</div></div><output id="refreshes">{refreshes}</output></div>;
 			}
-			export function mount(kind) { const root = document.getElementById('app'); render(null, root); render(kind === 'editor' ? <Editor /> : kind === 'keyboard' ? <Keyboard /> : <Pull />, root); }
-			export function unmount() { render(null, document.getElementById('app')); }
+			let root;
+			export function mount(kind) {
+				unmount();
+				root = createRoot(document.getElementById('app'));
+				flushSync(() => root.render(kind === 'editor' ? <Editor /> : kind === 'keyboard' ? <Keyboard /> : <Pull />));
+			}
+			export function unmount() { root?.unmount(); root = undefined; }
 		`,
 	},
 	bundle: true, format: 'iife', globalName: 'uiTest', write: false,
 	define: { 'process.env.NODE_ENV': '"production"' },
-	alias: { react: 'preact/compat', 'react-dom': 'preact/compat', 'react/jsx-runtime': 'preact/jsx-runtime' },
 });
 const css = await readFile('src/cloudflare/worker/pwa/styles/reminders-view.css', 'utf8');
 

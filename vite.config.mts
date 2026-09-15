@@ -1,5 +1,5 @@
 import replace from "@rollup/plugin-replace";
-import preact from "@preact/preset-vite";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { resolve } from "node:path";
 import { builtinModules } from "node:module";
@@ -9,7 +9,7 @@ import { cloudflareArtifactsPlugin } from "./scripts/cloudflare-artifacts-vite-p
 export default defineConfig(({ mode }) => ({
 	plugins: [
 		cloudflareArtifactsPlugin({ rootDir: __dirname }),
-		preact(),
+		react(),
 		replace({
 			"process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
 			preventAssignment: true,
@@ -70,10 +70,5 @@ export default defineConfig(({ mode }) => ({
 	},
 	resolve: {
 		tsconfigPaths: true,
-		alias: {
-			"react": "preact/compat",
-			"react-dom": "preact/compat",
-			"react/jsx-runtime": "preact/jsx-runtime",
-		},
 	},
 }));
