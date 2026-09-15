@@ -13,24 +13,6 @@
     padding: 16px 20px;
   }
 
-  .reminders-loading-label {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    margin-bottom: 20px;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 20px;
-  }
-
-  .reminders-loading-indicator {
-    width: 7px;
-    height: 7px;
-    flex: 0 0 auto;
-    border-radius: 50%;
-    background: var(--interactive-accent, var(--text-muted));
-  }
-
   .reminders-loading-preview {
     display: grid;
     gap: 10px;

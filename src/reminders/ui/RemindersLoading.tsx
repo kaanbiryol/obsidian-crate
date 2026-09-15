@@ -5,11 +5,7 @@ import './reminders-loading.scss';
 export function RemindersLoading({ compact = false }: { compact?: boolean }) {
   const reduceMotion = useObsidianReducedMotion();
   return (
-    <div className={`reminders-loading${compact ? ' reminders-loading--compact' : ''}${reduceMotion ? ' reminders-loading--still' : ''}`} role="status" aria-live="polite">
-      <div className="reminders-loading-label">
-        <span className="reminders-loading-indicator" aria-hidden="true" />
-        <span>Loading reminders</span>
-      </div>
+    <div className={`reminders-loading${compact ? ' reminders-loading--compact' : ''}${reduceMotion ? ' reminders-loading--still' : ''}`} role="status" aria-live="polite" aria-label="Loading reminders">
       <div className="reminders-loading-preview" aria-hidden="true">
         {[0, 1, 2].map(row => (
           <div className="reminders-loading-row" key={row}>
