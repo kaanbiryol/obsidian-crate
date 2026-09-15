@@ -1,3 +1,4 @@
+import { renderServerDeleteSetting } from './server-delete-setting';
 import { renderServerResetSetting } from './server-reset-setting';
 import { renderInfrastructureManagementSection } from './infrastructure-management-section';
 import { renderInfrastructureSyncActions } from './infrastructure-sync-actions';
@@ -24,12 +25,12 @@ export function renderInfrastructureSection(context: InfrastructureSectionContex
 	const troubleshootingEl = createSettingsDisclosure(recoverySection, 'Troubleshooting');
 	renderInfrastructureManagementSection({ ...context, containerEl: troubleshootingEl });
 	renderTroubleshootingSettings(troubleshootingEl, plugin);
+	renderServerResetSetting(troubleshootingEl, plugin);
 	if (context.isConfigured || plugin.settings.cloudflareDeployment?.d1DatabaseId) {
 		const advancedEl = createSettingsDisclosure(containerEl, 'Advanced server actions');
 		if (context.isConfigured) renderInfrastructureSyncActions({ ...context, containerEl: advancedEl });
 		const saved = plugin.settings.cloudflareDeployment;
-		const needsRepair = !context.isConfigured && saved && !saved.reset && !saved.lastDeployedVersion;
-		renderServerResetSetting(needsRepair ? troubleshootingEl : advancedEl, plugin);
+		if (context.isConfigured || saved?.reset?.deleteOnly) renderServerDeleteSetting(advancedEl, plugin);
 		if (!advancedEl.hasChildNodes()) advancedEl.parentElement?.remove();
 	}
 }

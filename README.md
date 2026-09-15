@@ -270,7 +270,7 @@ Generated files under `.generated/`, `dist/`, and root-level release artifacts s
 
 ## Resetting a Crate server
 
-**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Reset server** erases this deployment's remote files, retained versions, database, subscriptions, and reminder state, then rebuilds the server. Local files are kept. The flow requires confirmation and valid Cloudflare authorization, reusing the saved login when available, checks exact ownership, and blocks shared resources or unknown data. Use **Resume server reset** after an interruption. Afterward, upload your local vault and reconnect other devices. See [server reset and recovery](docs/deployment.md#reset-a-crate-server).
+**Settings → Crate → Recovery and troubleshooting → Troubleshooting → Rebuild server** erases this deployment's remote files, retained versions, database, subscriptions, and reminder state, then rebuilds the server. Local files are kept. The flow requires confirmation and valid Cloudflare authorization, reusing the saved login when available, checks exact ownership, and blocks shared resources or unknown data. Use **Resume server rebuild** after an interruption. Afterward, upload your local vault and reconnect other devices. See [server reset and recovery](docs/deployment.md#reset-a-crate-server).
 
 ## License
 
