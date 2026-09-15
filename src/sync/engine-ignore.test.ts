@@ -8,7 +8,7 @@ import {
 function createIgnoreContext(ignorePatterns: string[] = []) {
 	return {
 		ignoredDirPrefixes: [
-			'.vault-config/plugins/',
+			'.vault-config/plugins/crate/',
 			...ignorePatterns.filter(pattern => pattern.endsWith('/')),
 		],
 		ignorePatterns,
@@ -49,13 +49,15 @@ describe('shouldIgnoreSyncPath', () => {
 		expect(shouldIgnoreConfiguredPath('.trash', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('.trash-notes.md', context)).toBe(false);
 	});
-	it('always ignores executable plugin directories', () => {
+	it('keeps Crate local while allowing other plugins', () => {
 		const context = createIgnoreContext();
 
 		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/data.json', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/file-manifest.json', context)).toBe(true);
 		expect(shouldIgnoreSyncPath('.vault-config/plugins/crate/main.js', context)).toBe(true);
-		expect(shouldIgnoreSyncPath('.vault-config/plugins/other-plugin/manifest.json', context)).toBe(true);
+		for (const file of ['main.js', 'manifest.json', 'styles.css', 'data.json']) {
+			expect(shouldIgnoreSyncPath(`.vault-config/plugins/other-plugin/${file}`, context)).toBe(false);
+		}
 	});
 
 	it('ignores conflict files and configured filename patterns', () => {

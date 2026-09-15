@@ -56,6 +56,10 @@ export function renderSyncSection(context: SyncSectionContext): void {
 		});
 	}
 
+	new Setting(containerEl)
+		.setName('Plugins and settings')
+		.setDesc('Other plugins and their settings sync with your vault. Settings can contain credentials or device-specific values; exclude any files you want to keep local below. Restart Obsidian after syncing to load changes. Crate itself stays local.');
+
 	renderExclusionsSetting(containerEl, plugin, async ignorePatterns => {
 		if (await persistSettings({ ignorePatterns })) plugin.syncRuntime.updateSyncSettings();
 	});

@@ -328,10 +328,8 @@ export class SyncEngine {
 	}
 
 	private getIgnoredDirPrefixes(settings: CrateSettings): string[] {
-		const configDir = this.vault.configDir.replace(/\/+$/, '');
 		const pluginDir = this.plugin.manifest.dir?.replace(/\/+$/, '');
 		return [...new Set([
-			`${configDir}/plugins/`,
 			...(pluginDir ? [`${pluginDir}/`] : []),
 			...settings.ignorePatterns.filter(p => p.endsWith('/')),
 			this.markdownBaseCache.getIgnoredPrefix(),
