@@ -1,3 +1,4 @@
+import serverRelease from './server-release.json';
 import { describe, expect, it, vi } from 'vitest';
 import { buildWorkerMultipartBody, buildResetWorkerMultipartBody, CloudflareApiClient, CloudflareApiError } from './cloudflare-api';
 import type { HttpTransport } from './http';
@@ -19,26 +20,26 @@ describe('CloudflareApiClient', () => {
 		expect(transport).toHaveBeenCalledWith('https://api.cloudflare.com/client/v4/accounts/account/d1/database/database', expect.objectContaining({ method: 'DELETE' }));
 	});
 
-	it('retires only ReminderAlarm using a deleted export and an offline Worker with no public cleanup route', () => {
+	it('retires only ReminderAlarm and installs the authenticated cleanup Worker', () => {
 		const body = new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket').body);
 		expect(body).toContain('"ReminderAlarm":{"type":"durable-object","state":"deleted"}');
 		expect(body).not.toContain('export class');
-		expect(body).not.toContain('force');
+		expect(body).not.toContain('"force":true');
 		expect(body).toContain('status: 503');
 		expect(body).toContain('Crate reset reset-id');
+		expect(body).toContain('"name":"CRATE_RESET_ID","text":"reset-id"');
+		expect(body).toContain('record.cleanupTokenHash');
+		expect(new TextDecoder().decode(buildResetWorkerMultipartBody('reset-id', 'database', 'crate-bucket', true).body)).not.toContain('"state":"deleted"');
 	});
 
-	it('reads R2 pagination metadata and encodes object keys without encoding path separators', async () => {
+	it('reads R2 pagination metadata and encodes the listing cursor', async () => {
 		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({
 			success: true, result: [{ key: 'Notes/a #b.md' }], result_info: { is_truncated: true, cursor: 'next/page' },
 		}) }));
 		const client = new CloudflareApiClient('token', transport);
 		expect(await client.listR2Objects('account', 'crate-bucket', 'first/page')).toEqual({ keys: ['Notes/a #b.md'], cursor: 'next/page' });
 		expect(transport.mock.calls[0]?.[0]).toContain('cursor=first%2Fpage');
-		await client.deleteR2Object('account', 'crate-bucket', 'Notes/a #b.md');
-		expect(transport.mock.calls[1]?.[0]).toBe('https://api.cloudflare.com/client/v4/accounts/account/r2/buckets/crate-bucket/objects/Notes/a%20%23b.md');
-		await expect(client.deleteR2Object('account', 'crate-bucket', '../../other')).rejects.toThrow('Unsafe');
-		expect(transport).toHaveBeenCalledTimes(2);
+		expect(transport).toHaveBeenCalledOnce();
 	});
 
 	it('rejects an ambiguous truncated R2 listing', async () => {
@@ -238,13 +239,13 @@ describe('R2 cursor pagination compatibility', () => {
 });
 
 it('probes the exact Worker release without forwarding management credentials', async () => {
-  const metadata = { service: 'crate', serverRevision: 1, schemaVersion: 1, deploymentFingerprint: artifacts.fingerprint };
+  const metadata = { service: 'crate', serverRevision: serverRelease.revision, schemaVersion: serverRelease.schemaVersion, deploymentFingerprint: artifacts.fingerprint };
   const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify(metadata) }));
   const client = new CloudflareApiClient('management-secret', transport);
   await client.verifyWorkerDeployment('https://crate.example.workers.dev', artifacts.fingerprint);
   expect(transport).toHaveBeenCalledWith('https://crate.example.workers.dev/.well-known/crate', { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
   expect(JSON.stringify(transport.mock.calls)).not.toContain('management-secret');
-  for (const changed of [{ serverRevision: 2 }, { schemaVersion: 2 }, { deploymentFingerprint: 'other' }, { service: 'other' }]) {
+  for (const changed of [{ serverRevision: serverRelease.revision + 1 }, { schemaVersion: serverRelease.schemaVersion + 1 }, { deploymentFingerprint: 'other' }, { service: 'other' }]) {
     transport.mockResolvedValueOnce({ status: 200, text: JSON.stringify({ ...metadata, ...changed }) });
     await expect(client.verifyWorkerDeployment('https://crate.example.workers.dev', artifacts.fingerprint)).rejects.toThrow('live check');
   }

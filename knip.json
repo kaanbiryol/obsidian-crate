@@ -22,6 +22,7 @@
 	],
 	"ignoreDependencies": [
 		"cloudflare",
+		"electron",
 		"preact",
 		"tailwindcss"
 	],

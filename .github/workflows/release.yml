@@ -42,7 +42,7 @@ jobs:
       - name: Verify tag version
         run: node -e "const manifest=require('./manifest.json'); if (manifest.version !== process.env.RELEASE_TAG) throw new Error('Tag must exactly match manifest.json version')"
 
-      - name: Verify release
+      - name: Verify release and server revision
         run: npm run release:check
 
       - name: Record release artifact hashes

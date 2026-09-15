@@ -50,7 +50,7 @@
 		"test:worker-runtime": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts",
 		"benchmark:reminders": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/reminder-capacity.integration.ts --reporter=verbose",
 		"benchmark:pwa": "node scripts/pwa-capacity-test.mjs",
-		"check": "npm run lint && npm run typecheck && npm run typecheck:worker && npm run deadcode && npm run notices:check && npm run test:recovery && npm test && npm run test:worker-runtime",
+		"check": "npm run lint && npm run typecheck && npm run typecheck:worker && npm run deadcode && npm run notices:check && npm run test:server-revision && npm run check:server-revision && npm run test:recovery && npm test && npm run test:worker-runtime",
 		"preview:ui": "vite --config vite.visual.config.mts",
 		"test:visual": "playwright test",
 		"typecheck:visual": "tsc -p tests/visual/tsconfig.json",
@@ -59,7 +59,9 @@
 		"security:check": "npm run security:audit && npm run security:secrets",
 		"test:recovery": "python3 -m unittest discover -s scripts/recovery -p \"test_*.py\"",
 		"benchmark:sync": "npm run build:worker && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/sync-capacity.integration.ts --reporter=verbose",
-		"release:candidate": "node scripts/release-candidate.mjs"
+		"release:candidate": "node scripts/release-candidate.mjs",
+		"check:server-revision": "npm run build:worker && node scripts/check-server-revision.mjs",
+		"test:server-revision": "node --test scripts/check-server-revision.test.mjs"
 	},
 	"keywords": [
 		"obsidian",

@@ -1,4 +1,3 @@
-import { deleteObjectGroup } from './reset-delete-pool';
 import type { ResetApi } from './reset-ownership';
 
 // Include orphaned uploads with Crate's generated key format, retained versions,
@@ -47,19 +46,22 @@ export async function inspectBucketObjects(api: ResetApi, accountId: string, buc
 	return checked;
 }
 
-export async function clearBucketObjects(api: ResetApi, accountId: string, bucketName: string, check: (key: string) => Promise<void>, verifyTarget: () => Promise<void>, mutate: (operation: () => Promise<void>) => Promise<void>, total: number, onProgress?: (message: string) => void): Promise<void> {
+export async function clearBucketObjects(api: ResetApi, accountId: string, bucketName: string, check: (key: string) => Promise<void>, verifyTarget: () => Promise<void>, remove: (keys: string[]) => Promise<void>, total: number, onProgress?: (message: string) => void): Promise<void> {
 	// Restart at the beginning after each deletion batch so changing pagination
 	// cannot skip objects. A failed request leaves the reset checkpoint resumable.
 	let deleted = 0;
 	const startedAt = Date.now();
-	const report = (throttled = false) => {
+	const report = () => {
 		const elapsed = Date.now() - startedAt;
 		const remainingSeconds = deleted >= 10 && elapsed >= 3000 && total > deleted
 			? Math.ceil(elapsed / deleted * (total - deleted) / 1000) : 0;
 		const minutes = Math.ceil(remainingSeconds / 60);
+		const duration = remainingSeconds < 60
+			? `${remainingSeconds} ${remainingSeconds === 1 ? 'second' : 'seconds'}`
+			: `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 		const estimate = remainingSeconds > 0
-			? ` · about ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} remaining` : '';
-		onProgress?.(`Removing remote files: ${deleted.toLocaleString()} / ${total.toLocaleString()} deleted${throttled ? ' · rate limited, retrying shortly' : estimate}…`);
+			? ` · about ${duration} remaining` : '';
+		onProgress?.(`Removing remote files: ${deleted.toLocaleString()} / ${total.toLocaleString()} deleted${estimate}…`);
 	};
 	report();
 	let previousFirst: string | undefined;
@@ -75,13 +77,12 @@ export async function clearBucketObjects(api: ResetApi, accountId: string, bucke
 		for (const key of page.keys) await check(key);
 		// The preflight total can grow if uploads finished before retirement.
 		total = Math.max(total, deleted + page.keys.length);
-		for (let offset = 0; offset < page.keys.length; offset += 100) {
-			// Keep the fence writes serial, with up to ten object requests in flight.
-			await mutate(() => deleteObjectGroup(page.keys.slice(offset, offset + 100),
-				key => api.deleteR2Object(accountId, bucketName, key), () => {
-					deleted++;
-					report();
-				}, () => report(true)));
+		for (let offset = 0; offset < page.keys.length; offset += 1000) {
+			const keys = page.keys.slice(offset, offset + 1000);
+			await remove(keys);
+			// Count only a verified bulk response; re-list after an uncertain result.
+			deleted += keys.length;
+			report();
 		}
 		report();
 	}

@@ -45,15 +45,15 @@ async function harness(empty = false) {
 			for (const statement of sql.split(';').map(value => value.trim()).filter(Boolean)) results.push(await env.DB.prepare(statement).bind(...params ?? []).all());
 			return results;
 		}),
-		verifyWorkerDeployment: vi.fn(async () => {}),
+		verifyWorkerDeployment: vi.fn(async () => {}), verifyResetWorker: vi.fn(async () => {}),
 		uploadWorker: vi.fn(async (input: { artifacts: ReturnType<typeof artifact> }) => { state.worker = { annotations: { 'workers/message': `Crate ${input.artifacts.version} ${input.artifacts.fingerprint}` }, bindings }; }),
 		updateWorkerSchedules: vi.fn(async () => {}), getWorkersSubdomain: vi.fn(async (): Promise<string | null> => 'test'),
 		createWorkersSubdomain: vi.fn(async () => 'test'), enableWorkerSubdomain: vi.fn(async () => {}),
 		listWorkers: vi.fn(async () => [{ id: metadata.workerName }]),
 		listDurableObjectNamespaces: vi.fn(async () => state.worker?.bindings?.some(binding => binding.type === 'durable_object_namespace') ? [{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' }] : []),
-		listR2Objects: vi.fn(async () => ({ keys: [] })), deleteR2Object: vi.fn(async () => {}),
+		listR2Objects: vi.fn(async () => ({ keys: [] })), deleteR2Objects: vi.fn(async () => {}),
 		deleteR2Bucket: vi.fn(async () => { state.bucket = false; }), deleteD1Database: vi.fn(async () => { state.database = false; }),
-		retireCrateWorker: vi.fn(async (_account: string, _name: string, resetId: string) => { state.worker = { annotations: { 'workers/message': `Crate reset ${resetId}` }, bindings: bindings.slice(0, 2) }; }),
+		retireCrateWorker: vi.fn(async (_account: string, _name: string, resetId: string) => { state.worker = { annotations: { 'workers/message': `Crate reset ${resetId}` }, bindings: [...bindings.slice(0, 2), { type: 'plain_text', name: 'CRATE_RESET_ID', text: resetId }] }; }),
 	};
 	const deploy = (build = artifact(), client = api, saved = { ...structuredClone(metadata), d1DatabaseId: empty ? null : metadata.d1DatabaseId }) => provisionCloudflareDeployment({ api: client as never,
 		accountId: metadata.accountId!, metadata: saved, artifacts: build, onMetadataChanged: async () => {} });
@@ -284,6 +284,88 @@ it('keeps initialization recoverable after a definite upload rejection', async (
     artifacts: artifact(), resumeUpdateValue: recovery.resumeValue, onMetadataChanged: async () => {} });
   expect(await held()).toBeNull();
   expect(h.api.queryD1.mock.calls.filter(call => call[2] === schema)).toHaveLength(1);
+});
+
+it.each([false, true])('recovers a lost acquisition response before any provider mutation (empty: %s)', async empty => {
+  const h = await harness(empty);
+  const query = h.api.queryD1.getMockImplementation()!;
+  let lost = false;
+  h.api.queryD1.mockImplementation(async (...args) => {
+    const result = await query(...args);
+    if (!lost && args[2].startsWith('INSERT INTO maintenance_state')) {
+      lost = true;
+      throw new Error('lost acquisition response');
+    }
+    return result;
+  });
+  await expect(h.deploy()).rejects.toThrow('Could not confirm deployment ownership');
+  expect(JSON.parse((await held())!.value)).toMatchObject({ step: 'acquire-deployment', stepState: 'confirmed', verificationPending: false });
+  expect(h.api.uploadWorker).not.toHaveBeenCalled();
+  expect(h.api.createR2Bucket).not.toHaveBeenCalled();
+  expect((await recoverDeployment(h.api, h.metadata, artifact().fingerprint)).status).toBe('recovered');
+  await h.deploy();
+  expect(await held()).toBeNull();
+});
+
+it('keeps repeated lost takeover responses recoverable without ever unlocking pending writes', async () => {
+  const h = await harness();
+  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
+  await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
+  const query = h.api.queryD1.getMockImplementation()!;
+  const resume = (resumeUpdateValue: string | undefined) => provisionCloudflareDeployment({
+    api: h.api as never, accountId: h.metadata.accountId!, metadata: h.metadata,
+    artifacts: artifact(), resumeUpdateValue, onMetadataChanged: async () => {},
+  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+    expect(recovery.status).toBe('resume');
+    const previous = JSON.parse(recovery.resumeValue!) as { owner: string };
+    let lost = false;
+    h.api.queryD1.mockImplementation(async (...args) => {
+      const result = await query(...args);
+      if (!lost && args[2].startsWith('UPDATE maintenance_state')) {
+        lost = true;
+        expect(await held()).not.toBeNull();
+        throw new Error('lost takeover response');
+      }
+      return result;
+    });
+    await expect(resume(recovery.resumeValue)).rejects.toThrow('Could not confirm deployment ownership');
+    const next = JSON.parse((await held())!.value) as { owner: string };
+    expect(next).toMatchObject({ step: 'acquire-deployment', stepState: 'confirmed', verificationPending: true });
+    expect(next.owner).not.toBe(previous.owner);
+    // A client holding the old snapshot cannot take ownership back.
+    await expect(resume(recovery.resumeValue)).rejects.toThrow('Another deployment');
+  }
+  h.api.queryD1.mockImplementation(query);
+  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+  expect(h.api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('DELETE FROM maintenance_state'))).toBe(false);
+  const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+  await resume(recovery.resumeValue);
+  expect(await held()).toBeNull();
+  expect(h.api.uploadWorker).toHaveBeenCalledTimes(2);
+});
+
+it('prevents a paused owner from advancing after its acquisition checkpoint is recovered', async () => {
+  const h = await harness();
+  const gate = deferred(), acquired = deferred();
+  const query = h.api.queryD1.getMockImplementation()!;
+  h.api.queryD1.mockImplementation(async (...args) => {
+    const result = await query(...args);
+    if (args[2].startsWith('INSERT INTO maintenance_state')) {
+      acquired.resolve();
+      await gate.promise;
+    }
+    return result;
+  });
+  const updating = h.deploy();
+  const rejected = expect(updating).rejects.toThrow('Could not checkpoint');
+  await acquired.promise;
+  expect((await recoverDeployment(h.api, h.metadata)).status).toBe('recovered');
+  gate.resolve();
+  await rejected;
+  expect(h.api.uploadWorker).not.toHaveBeenCalled();
+  expect(await held()).toBeNull();
 });
 
 it('refuses a schema edit hidden inside a code-only release and preserves storage', async () => {

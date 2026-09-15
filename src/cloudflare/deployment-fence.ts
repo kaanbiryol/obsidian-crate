@@ -22,6 +22,9 @@ export interface DeploymentFenceRecord {
 	step?: string;
 	stepState?: 'started' | 'confirmed' | 'rejected' | 'settled';
   verificationPending?: boolean;
+	resetId?: string;
+	cleanupTokenHash?: string;
+	batchHash?: string;
 }
 
 export class DeploymentFence {
@@ -32,11 +35,11 @@ export class DeploymentFence {
     this.verificationPending = (JSON.parse(value) as DeploymentFenceRecord).verificationPending === true;
   }
 
-	async mutate<T>(operation: () => Promise<T>, step = 'server-change'): Promise<T> {
+	async mutate<T>(operation: () => Promise<T>, step = 'server-change', batchHash?: string): Promise<T> {
 		const rows = (await this.api.queryD1(this.account, this.database,
 			'SELECT value FROM maintenance_state WHERE key = ?;', [DEPLOYMENT_FENCE_KEY])).flatMap(result => result.results ?? []);
 		if (rows.length !== 1 || rows[0]?.value !== this.value) throw new DeploymentRecoveryRequiredError('Deployment ownership changed. Start again after reviewing the deployment fence.');
-		await this.recordStep(step, 'started');
+		await this.recordStep(step, 'started', batchHash);
 		// Never expire or steal this fence: the provider cannot reject an old,
 		// already-dispatched upload using a D1 fencing token.
 		this.uncertain = true;
@@ -55,10 +58,10 @@ export class DeploymentFence {
 	}
 
 
-    private async recordStep(step: string, stepState: 'started' | 'confirmed' | 'rejected' | 'settled'): Promise<void> {
+    private async recordStep(step: string, stepState: 'started' | 'confirmed' | 'rejected' | 'settled', batchHash?: string): Promise<void> {
         if (this.databaseRemoved) return;
         const record = JSON.parse(this.value) as DeploymentFenceRecord;
-        const next = JSON.stringify({ ...record, step, stepState, ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
+        const next = JSON.stringify({ ...record, step, stepState, batchHash, ...(this.verificationPending || record.verificationPending ? { verificationPending: this.verificationPending } : {}) });
         try {
             const rows = (await this.api.queryD1(this.account, this.database,
                 "UPDATE maintenance_state SET value = ?, updated_at = datetime('now') WHERE key = ? AND value = ? RETURNING value;",
@@ -103,7 +106,11 @@ export async function withDeploymentFence<T>(input: {
   resumeUpdateValue?: string;
 }, operation: (fence: DeploymentFence) => Promise<T>): Promise<T> {
 	const recoveredValue = input.resumeUpdateValue ?? input.recoverDeletionValue;
-	const value = JSON.stringify({ ...input.record, recoveryProtocol: 1, owner: crypto.randomUUID(), startedAt: new Date().toISOString() });
+	// Acquisition itself dispatches no provider mutation. Persist its checkpoint
+	// atomically with ownership so a lost response or crash is always recoverable.
+	// Any following mutation must CAS this exact record to "started" first.
+	const value = JSON.stringify({ ...input.record, recoveryProtocol: 1, owner: crypto.randomUUID(), startedAt: new Date().toISOString(),
+		step: 'acquire-deployment', stepState: 'confirmed' });
 	await input.api.queryD1(input.accountId, input.databaseId,
 		"CREATE TABLE IF NOT EXISTS maintenance_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')));");
 	let acquired: Array<Record<string, unknown>>;
@@ -140,7 +147,7 @@ export async function withDeploymentFence<T>(input: {
 
 /** Keep reset's read-only verification separate from its fenced mutations. */
 export function fenceResetMutations<T extends object>(api: T, fence: DeploymentFence): T {
-	const methods = new Set(['retireCrateWorker', 'deleteR2Object', 'deleteR2Bucket', 'deleteD1Database']);
+	const methods = new Set(['retireCrateWorker', 'deleteR2Bucket', 'deleteD1Database']);
 	return new Proxy(api, {
 		get(target, property, receiver) {
 			const value: unknown = Reflect.get(target, property, receiver);

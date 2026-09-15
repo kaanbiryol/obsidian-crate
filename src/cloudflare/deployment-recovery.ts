@@ -10,7 +10,7 @@ export interface DeploymentRecoveryResult {
     message: string;
     diagnostics: string;
 }
-const confirmedSteps = new Set(['prepare-database', 'create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker', 'configure-maintenance', 'enable-server-address', 'record-release', 'verify-deployment']);
+const confirmedSteps = new Set(['acquire-deployment', 'prepare-database', 'create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker', 'configure-maintenance', 'enable-server-address', 'record-release', 'verify-deployment']);
 
 /** A confirmed checkpoint can be removed conditionally: the old updater must CAS
  * it to "started" before dispatching its next mutation. Never steal a started step. */

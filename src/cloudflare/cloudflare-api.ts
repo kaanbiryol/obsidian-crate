@@ -1,4 +1,6 @@
 import serverRelease from './server-release.json';
+import resetWorkerSource from './worker/reset-worker.js?raw';
+import { deleteResetWorkerObjects, verifyResetWorker } from './reset-worker-client';
 import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from './notification-rate-binding';
 import type { CloudflareDeploymentArtifacts } from './deployment-artifacts';
 import type { HttpRequest, HttpTransport } from './http';
@@ -35,6 +37,7 @@ export interface CloudflareWorkerScript {
 }
 
 export interface CloudflareWorkerBinding {
+	text?: string;
 	type?: string;
 	name?: string;
 	id?: string;
@@ -132,13 +135,14 @@ export function buildWorkerMultipartBody(input: {
 	return buildWorkerModule(metadata, input.artifacts.workerBundle);
 }
 
-export function buildResetWorkerMultipartBody(resetId: string, databaseId: string, bucketName: string): { body: ArrayBuffer; contentType: string } {
+export function buildResetWorkerMultipartBody(resetId: string, databaseId: string, bucketName: string, alreadyRetired = false): { body: ArrayBuffer; contentType: string } {
 	return buildWorkerModule({
 		main_module: 'worker.mjs', compatibility_date: '2026-08-18',
 		annotations: { 'workers/message': `Crate reset ${resetId}`, 'workers/tag': 'crate' },
-		bindings: [{ type: 'd1', name: 'DB', id: databaseId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName }],
-		exports: { ReminderAlarm: { type: 'durable-object', state: 'deleted' } },
-	}, 'export default { fetch() { return new Response("Crate server reset in progress", { status: 503 }); }, scheduled() {} };');
+		bindings: [{ type: 'd1', name: 'DB', id: databaseId }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: bucketName },
+			{ type: 'plain_text', name: 'CRATE_RESET_ID', text: resetId }],
+		...(!alreadyRetired ? { exports: { ReminderAlarm: { type: 'durable-object', state: 'deleted' } } } : {}),
+	}, resetWorkerSource);
 }
 
 function buildWorkerModule(metadata: Record<string, unknown>, workerBundle: string): { body: ArrayBuffer; contentType: string } {
@@ -289,10 +293,12 @@ export class CloudflareApiClient {
 		return { keys: response.result.map(object => object.key!), ...(next ? { cursor: next } : {}) };
 	}
 
-	async deleteR2Object(accountId: string, bucketName: string, key: string): Promise<void> {
-		if (key.split('/').some(segment => segment === '.' || segment === '..')) throw new Error('Unsafe R2 object key.');
-		const objectPath = key.split('/').map(segment => encodeURIComponent(segment)).join('/');
-		await this.request(`/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucketName)}/objects/${objectPath}`, { method: 'DELETE' });
+	async deleteR2Objects(origin: string, resetId: string, token: string, keys: string[]): Promise<void> {
+		await deleteResetWorkerObjects(this.transport, origin, resetId, token, keys);
+	}
+
+	async verifyResetWorker(origin: string, resetId: string): Promise<void> {
+		await verifyResetWorker(this.transport, origin, resetId);
 	}
 
 	async deleteR2Bucket(accountId: string, bucketName: string): Promise<void> {
@@ -309,8 +315,8 @@ export class CloudflareApiClient {
 		}
 	}
 
-	async retireCrateWorker(accountId: string, workerName: string, resetId: string, databaseId: string, bucketName: string): Promise<void> {
-		const multipart = buildResetWorkerMultipartBody(resetId, databaseId, bucketName);
+	async retireCrateWorker(accountId: string, workerName: string, resetId: string, databaseId: string, bucketName: string, alreadyRetired = false): Promise<void> {
+		const multipart = buildResetWorkerMultipartBody(resetId, databaseId, bucketName, alreadyRetired);
 		await this.request(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
 			method: 'PUT', headers: { 'Content-Type': multipart.contentType }, body: multipart.body,
 		});
