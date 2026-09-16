@@ -3,16 +3,16 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// React baseline: about 1.84 MB raw / 957 KB gzip, with the plugin UI and embedded PWA.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1860000', 10),
+		// 0.2.0: about 1.865 MB raw / 964 KB gzip, including sync diffs and file actions.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '1880000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '970000', 10),
 	},
 	{
 		path: 'dist/styles.css',
-		// Shared editor and picker rules currently use about 141 KB raw. Keep a tight
-		// raw ceiling and the existing 20 KB compressed limit after removing stale CSS.
-		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '142000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '20000', 10),
+		// 0.2.0: about 167 KB raw / 24 KB gzip, including the shared React UI
+		// and sync file browser. Keep a small margin for subsequent changes.
+		maxBytes: Number.parseInt(process.env.CRATE_STYLES_BUDGET_BYTES ?? '170000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_STYLES_GZIP_BUDGET_BYTES ?? '24000', 10),
 	}],
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',

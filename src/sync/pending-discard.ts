@@ -9,7 +9,7 @@ import { deletePathLocallyIfUnchanged } from './planner-helpers';
 import { applyRemoteContentIfUnchanged, TEXT_PATH } from './local-apply';
 import { validateDownloadedContent } from './transfer-download';
 
-export interface DiscardItem {
+interface DiscardItem {
     path: string;
     action: 'restore' | 'trash';
 }
