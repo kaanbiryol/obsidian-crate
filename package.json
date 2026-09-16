@@ -17,7 +17,8 @@
 		"node": "^26.8.2"
 	},
 	"scripts": {
-		"build:site": "npm run build:site:main && npm run build:site:crate-ui",
+		"build:site": "npm run build:site:main && npm run build:site:crate-ui && npm run build:site:canvas",
+		"build:site:canvas": "node scripts/build-canvas-composer.mjs",
 		"build:site:main": "npx @tailwindcss/cli -i ./site/assets/site.css -o ./site/assets/site.generated.css --minify",
 		"build:site:crate-ui": "npx @tailwindcss/cli -i ./site/website-options/crate-ui/source.css -o ./site/website-options/crate-ui/crate-ui.generated.css --minify",
 		"dev:site": "npx @tailwindcss/cli -i ./site/assets/site.css -o ./site/assets/site.generated.css --watch",

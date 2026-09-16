@@ -19,7 +19,6 @@ export default tseslint.config(
 						'vite.config.mts',
 						'vitest.cloudflare.config.ts',
 						'vitest.config.ts',
-						'site/assets/*.js',
 					]
 				},
 				tsconfigRootDir: import.meta.dirname,
@@ -201,6 +200,7 @@ export default tseslint.config(
 		"dist/**",
 		".generated",
 		".generated/**",
+		"site/assets/*.generated.js",
 		"test-vault",
 		"test-vault/**",
 		"test-results/**",
