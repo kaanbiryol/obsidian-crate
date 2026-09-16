@@ -1,5 +1,7 @@
-import { FileSystemAdapter, Platform, TFile, type App } from 'obsidian';
+import { FileSystemAdapter, Platform, type App } from 'obsidian';
 import type { ConflictRecord } from './types';
+import { conflictReviewFile } from './conflict-review-file';
+import { TEXT_PATH } from './local-apply';
 
 export type ConflictChoice = 'current' | 'saved' | 'both' | 'manual';
 export interface ConflictReview {
@@ -21,30 +23,34 @@ export async function createConflictReview(
     app: App, backupRoot: string, record: ConflictRecord,
     isSyncing: () => boolean, onResolved: () => Promise<void>,
 ): Promise<ConflictReview> {
-    const file = (path: string) => {
-        const found = app.vault.getAbstractFileByPath(path);
-        if (!(found instanceof TFile)) throw new Error(`File unavailable: ${path}. Reopen the conflict after checking the vault.`);
-        return found;
-    };
-    const original = file(record.originalPath), saved = file(record.conflictPath);
-    const currentBytes = await app.vault.readBinary(original);
-    const savedBytes = await app.vault.readBinary(saved);
-    const markdown = original.extension.toLowerCase() === 'md' && Math.max(currentBytes.byteLength, savedBytes.byteLength) <= 1_000_000;
+    const original = await conflictReviewFile(app, record.originalPath);
+    const saved = await conflictReviewFile(app, record.conflictPath);
+    const currentBytes = await original.read();
+    const savedBytes = await saved.read();
+    let currentText: string | undefined, savedText: string | undefined;
+    if (TEXT_PATH.test(original.path) && Math.max(currentBytes.byteLength, savedBytes.byteLength) <= 1_000_000) {
+        try {
+            const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+            const current = decoder.decode(currentBytes), other = decoder.decode(savedBytes);
+            // Avoid presenting binary content as editable text.
+            const binary = /[\x00-\x08\x0b\x0c\x0e-\x1f]/; // eslint-disable-line no-control-regex -- Detect binary control characters.
+            if (!binary.test(current) && !binary.test(other)) { currentText = current; savedText = other; }
+        } catch { /* Binary files can still be opened and resolved without a text preview. */ }
+    }
+    const text = currentText !== undefined && savedText !== undefined;
     let busy = false;
     let completed = false;
     const verify = async () => {
         if (isSyncing()) throw new Error('Wait for sync to finish before resolving this conflict.');
-        if (original.path !== record.originalPath || saved.path !== record.conflictPath
-            || !equal(await app.vault.readBinary(file(record.originalPath)), currentBytes)
-            || !equal(await app.vault.readBinary(file(record.conflictPath)), savedBytes)) {
+        if (!equal(await original.read(), currentBytes) || !equal(await saved.read(), savedBytes)) {
             throw new Error('A file changed while you were reviewing it. Close and reopen this review.');
         }
     };
     return {
         currentSize: currentBytes.byteLength, savedSize: savedBytes.byteLength,
-        ...(markdown ? { currentText: new TextDecoder().decode(currentBytes), savedText: new TextDecoder().decode(savedBytes) } : {}),
+        ...(text ? { currentText, savedText } : {}),
         openVersion: async version => {
-            const target = file(version === 'current' ? record.originalPath : record.conflictPath);
+            const target = version === 'current' ? original : saved;
             if (Platform.isDesktopApp && app.vault.adapter instanceof FileSystemAdapter) {
                 // Electron is provided by Obsidian's desktop host and excluded in
                 // Vite/Knip; it is not an npm dependency and is never loaded on mobile.
@@ -53,7 +59,8 @@ export async function createConflictReview(
                 const error = await shell.openPath(app.vault.adapter.getFullPath(target.path));
                 if (error) throw new Error(error);
             } else {
-                await app.workspace.getLeaf('tab').openFile(target);
+                if (!target.visible) throw new Error('This configuration file cannot be opened in Obsidian. Use the comparison below.');
+                await app.workspace.getLeaf('tab').openFile(target.visible);
             }
         },
         resolve: async (choice, editedText) => {
@@ -76,19 +83,19 @@ export async function createConflictReview(
                     const ext = dot > original.path.lastIndexOf('/') ? original.path.slice(dot) : '';
                     await app.vault.createBinary(`${stem} (saved copy ${crypto.randomUUID().slice(0, 8)})${ext}`, savedBytes);
                 } else if (choice === 'saved' || choice === 'manual') {
-                    if (choice === 'manual' && (!markdown || editedText === undefined)) throw new Error('Edited Markdown is required.');
-                    if (markdown) {
-                        await app.vault.process(original, current => {
+                    if (choice === 'manual' && (!text || editedText === undefined)) throw new Error('Edited text is required.');
+                    if (text) {
+                        await original.process(current => {
                             if (!equal(new TextEncoder().encode(current).buffer, currentBytes)) throw new Error('The current file changed. Reopen this review.');
-                            return choice === 'manual' ? editedText! : new TextDecoder().decode(savedBytes);
+                            return choice === 'manual' ? editedText! : savedText!;
                         });
                     } else {
-                        await app.vault.modifyBinary(original, savedBytes);
+                        await original.writeBinary(savedBytes);
                     }
                 }
                 // Do not discard a saved copy edited during the operation.
-                if (!equal(await app.vault.readBinary(saved), savedBytes)) throw new Error('The saved copy changed and was kept. Reopen the conflict to review it.');
-                await app.fileManager.trashFile(saved);
+                if (!equal(await saved.read(), savedBytes)) throw new Error('The saved copy changed and was kept. Reopen the conflict to review it.');
+                await saved.trash();
                 await onResolved();
                 completed = true;
                 return folder;

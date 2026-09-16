@@ -14,6 +14,9 @@ export interface PendingDiff {
 }
 
 const MAX_PREVIEW_BYTES = 256_000;
+// Some binary formats (including PDFs) can contain valid UTF-8. Never expose
+// their storage representation as a text diff, even when decoding would pass.
+const BINARY_PATH = /\.(?:pdf|png|jpe?g|gif|webp|avif|heic|heif|bmp|tiff?|ico|icns|psd|ai|eps|mp3|m4a|aac|wav|flac|ogg|opus|aiff?|mp4|m4v|mov|webm|avi|mkv|mpeg|mpg|zip|gz|bz2|xz|7z|rar|tar|docx?|xlsx?|pptx?|odt|ods|odp|epub|woff2?|ttf|otf|eot|db|sqlite3?|exe|dll|dmg|wasm)$/i;
 
 /** Read a snapshot for display only; never advance the manifest or sync queue. */
 export async function loadPendingDiff(
@@ -33,6 +36,9 @@ export async function loadPendingDiff(
         afterSize: local?.size ?? 0,
         kind: deleted ? 'deleted' : remote ? 'modified' : 'added',
     };
+    if (BINARY_PATH.test(path)) {
+        return { ...result, unavailable: 'A text preview isn’t available for this file. Open it to review its contents.' };
+    }
     if (Math.max(result.beforeSize, result.afterSize) > MAX_PREVIEW_BYTES) {
         return { ...result, unavailable: 'This file is too large to preview (limit: 256 KB).' };
     }
