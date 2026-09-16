@@ -13,7 +13,7 @@ const { outputFiles } = await build({
 			window.setSyncProps = setProps;
 			return React.createElement(PwaSyncIndicator, {
 				changes: [], isOffline: false, refreshing: false, dataMode: 'live',
-				error: null, storageError: null, ...props,
+				error: null, storageError: null, onShowStatus: label => { window.lastSyncStatus = label; }, ...props,
 			});
 		}
 		window.root = createRoot(document.getElementById('root'));
@@ -38,6 +38,9 @@ for (const browserType of [chromium, webkit]) {
 		const setState = props => page.evaluate(value => window.setSyncProps(value), props);
 		await expect(indicator).toHaveAttribute('data-visual-state', 'synced');
 		assert.equal(await indicator.locator('.pwa-sync-indicator__dot').evaluate(el => getComputedStyle(el).animationName), 'none', 'Initial idle mount must not celebrate');
+
+		await indicator.getByRole('button').click();
+		assert.equal(await page.evaluate(() => window.lastSyncStatus), 'All changes synced');
 
 		await setState({ refreshing: true });
 		await expect(indicator).toHaveAttribute('data-visual-state', 'syncing');

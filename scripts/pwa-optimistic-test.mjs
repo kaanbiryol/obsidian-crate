@@ -161,13 +161,17 @@ async function verifyImmediateUpdates(page) {
 }
 
 async function verifyProjectSyncIndicator(page) {
+	await expect(page.getByRole('button', { name: 'Open settings', exact: true })).toBeVisible();
 	await page.locator('[data-action="switch-tab"][data-tab="projects"]').click();
 	await page.locator('[data-action="open-project"][data-project="Work"]').click();
 	const indicator = page.locator('.project-detail-header .pwa-sync-indicator');
 	const scroll = page.locator('.reminders-view-scroll');
 	await expect(scroll).toHaveCount(1);
 	await expect(indicator).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Open settings', exact: true })).toHaveCount(0);
 	await expectSynced(page);
+	await indicator.getByRole('button').click();
+	await expect(page.locator('.toast')).toContainText('All changes synced');
 	const originalTop = (await scroll.boundingBox()).y;
 	const mutation = await holdNextMutation(page, '/reminders/update');
 	try {
@@ -181,7 +185,7 @@ async function verifyProjectSyncIndicator(page) {
 		await expect(indicator).toHaveAttribute('data-sync-state', 'syncing');
 		await expect(indicator).toHaveText('Syncing 1 change');
 		await expect(indicator).toHaveAttribute('data-visual-state', 'syncing');
-		await expect.poll(() => indicator.locator('.pwa-sync-indicator__halo').evaluate(el => getComputedStyle(el, '::before').animationPlayState)).toBe('running');
+		await expect.poll(() => indicator.locator('.pwa-sync-indicator__halo').evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('pwa-sync-breathe');
 		await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
 		expect((await scroll.boundingBox()).y).toBeCloseTo(originalTop, 0);
 		await page.emulateMedia({ reducedMotion: 'reduce' });
