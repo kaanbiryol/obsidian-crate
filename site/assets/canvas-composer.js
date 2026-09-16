@@ -1,4 +1,4 @@
-import { createElement as h, useCallback, useEffect, useRef, useState } from 'react';
+import { createElement as h, useCallback, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThemeIconProvider } from '../../src/reminders/components/theme-icon';
 import { PwaThemeIcon } from '../../src/pwa/components/PwaThemeIcon';
@@ -42,7 +42,7 @@ function createTask(modal, projects) {
 }
 
 function Composer({ projects, defaultProject, onAdd, onClose }) {
-  const names = projects.map((project) => project.name);
+  const names = useMemo(() => projects.map((project) => project.name), [projects]);
   const [modal, setModal] = useState({ mode: 'create', draft: { content: '', description: '', defaultProject,
     project: defaultProject, priority: 4, dueDate: '', dueTime: '', activePicker: null, deleteConfirm: false } });
   const [error, setError] = useState('');
@@ -55,9 +55,7 @@ function Composer({ projects, defaultProject, onAdd, onClose }) {
     patch({ ...update, ...(update.project === 'Inbox' ? { defaultProject: 'Inbox' } : {}), activePicker: null });
     setFocusRequest((value) => value + 1);
   }, [patch]);
-  useEffect(() => {
-    if (picker) activeDialog.current?.focus({ preventScroll: true });
-  }, [picker]);
+  const focusPicker = useCallback(() => activeDialog.current?.focus({ preventScroll: true }), []);
   function save(current) {
     try { onAdd(createTask(current, projects), completeCreatedReminder); onClose(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not add the example. Try again.'); }
@@ -77,12 +75,12 @@ function Composer({ projects, defaultProject, onAdd, onClose }) {
   return h(ThemeIconProvider, { renderer: PwaThemeIcon }, h('div', { className: 'pwa-modal-sheet', onKeyDown: keyDown }, [
     h('div', { key: 'editor', hidden: Boolean(picker) }, h(ReminderEditorScreen, {
       modal, colorScheme: 'dark', projectOptions: names, saving: false, isClosing: false,
-      isActive: !picker, isReturningToEditor: false, canInteract: !picker, editorFocusRequest: focusRequest,
+      isActive: !picker, isReturningToEditor: false, canInteract: !picker, keyboardInset: 0, editorFocusRequest: focusRequest,
       dialogRef: (node) => { if (!picker) activeDialog.current = node; }, onPatchDraft: patch,
-      onOpenPicker: (activePicker) => patch({ activePicker }), onClose, onSave: save, onDelete: () => {},
+      onOpenPicker: (activePicker) => patch({ activePicker }), onClose, onSave: save, onDeleteConfirmationChange: () => {},
     })),
     picker && h(ReminderPickerSheet, { key: picker, isDark: true, draft: modal.draft, projectOptions: names,
-      dialogRef: (node) => { activeDialog.current = node; }, onPatch: patch, onSelect: closePicker, onClose: () => closePicker() }),
+      dialogRef: (node) => { activeDialog.current = node; }, onPatch: patch, onSelect: closePicker, onClose: () => closePicker(), onReady: focusPicker }),
     error && h('p', { key: 'error', role: 'alert', className: 'canvas-composer-error' }, error),
     !picker && h('div', { key: 'hint', className: 'canvas-composer-intro' }, [
       'Try: ', h('button', { type: 'button', onClick: tryExample }, 'Review launch notes tomorrow at 9am'),

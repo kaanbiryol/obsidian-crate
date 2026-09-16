@@ -8,7 +8,6 @@ await build({
   outfile: 'site/assets/canvas-composer.generated.js',
   bundle: true, format: 'esm', platform: 'browser', target: 'es2020', minify: true,
   define: { 'process.env.NODE_ENV': '"production"' },
-  alias: { react: 'preact/compat', 'react-dom': 'preact/compat', 'react/jsx-runtime': 'preact/jsx-runtime' },
   mainFields: ['browser', 'module', 'main'], conditions: ['browser', 'import'], legalComments: 'eof',
 });
 const palette = await Promise.all(['theme.css', 'reminders-view.css'].map(async (file) => {
