@@ -56,9 +56,12 @@
 .crate-activity-modal > .crate-modal-header-host { flex-shrink: 0; }
 
 .crate-reminders-ui .crate-activity-modal .reminder-modal-header {
-    padding-block: 6px 0;
+    min-height: 40px;
+    padding-block: 2px;
     border-bottom: 0;
 }
+
+.crate-reminders-ui .crate-activity-modal .reminder-modal-header-title { font-size: 14px; font-weight: 500; }
 
 .crate-activity-subtitle {
     display: block;
@@ -204,8 +207,8 @@
 .crate-activity-tab-indicator {
 	position: absolute;
 	bottom: -1px;
-	height: 2px;
-	border-radius: 1px;
+	height: 1px;
+	border-radius: 0;
 	background: var(--text-normal);
 	transition: left var(--crate-activity-motion-moderate) var(--crate-activity-motion-easing), width var(--crate-activity-motion-moderate) var(--crate-activity-motion-easing);
 	pointer-events: none;
@@ -219,8 +222,8 @@
 	justify-content: center;
 	gap: 4px;
 	margin: 0;
-	min-height: 44px;
-	padding: 10px 14px;
+	min-height: 36px;
+	padding: 8px 12px;
 	border: 0 !important;
 	outline: none !important;
 	border-radius: 0;
@@ -254,7 +257,7 @@
 
 	&.crate-activity-tab-active {
 		color: var(--text-normal);
-		font-weight: var(--nav-item-weight-active, var(--font-semibold));
+		font-weight: 500;
 	}
 }
 
@@ -793,4 +796,8 @@ body.reduce-motion .crate-activity-modal {
     .crate-conflict-version + .crate-conflict-version { border-left: 0; border-top: 1px solid var(--background-modifier-border); }
     .crate-conflict-code { min-height: 120px; max-height: 28dvh; }
     .crate-conflict-actions { grid-template-columns: 1fr; > .mod-cta { grid-column: 1; grid-row: 3; width: 100%; } }
+}
+
+@container (max-width: 640px) {
+    .crate-activity-modal .crate-activity-tab { min-height: 44px; }
 }

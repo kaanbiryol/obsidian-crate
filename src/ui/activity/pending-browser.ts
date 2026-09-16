@@ -43,6 +43,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
     const fileInfo = toolbar.createDiv({ cls: 'crate-browser-file-heading' });
     const fileName = fileInfo.createDiv({ cls: 'crate-browser-file-title' });
     const filePath = fileInfo.createDiv({ cls: 'crate-browser-file-folder' });
+    const comparisonHeader = toolbar.createDiv({ cls: 'crate-diff-header' });
     toolbar.hidden = true;
     const preview = detail.createDiv({ cls: 'crate-file-diff' });
     const empty = preview.createDiv({ cls: 'crate-browser-empty' });
@@ -100,6 +101,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
         rows.forEach((item, i) => {
             item.button.tabIndex = i === index ? 0 : -1;
         });
+        comparisonHeader.empty();
         preview.empty();
         preview.createDiv({ cls: 'crate-diff-message', text: 'Loading changes…', attr: { role: 'status' } });
         preview.setAttribute('aria-busy', 'true');
@@ -109,7 +111,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
             const snapshot = await comparisons.read(index);
             if (!browser.isConnected || revision !== requestRevision) return;
             preview.empty();
-            renderDiffPreview(preview, snapshot, path);
+            renderDiffPreview(preview, snapshot, path, comparisonHeader);
         } catch (error) {
             if (!browser.isConnected || revision !== requestRevision) return;
             preview.empty();

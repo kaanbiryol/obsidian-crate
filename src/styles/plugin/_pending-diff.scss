@@ -1,6 +1,8 @@
-.crate-file-diff {
+.crate-browser-detail {
     --crate-diff-added: var(--text-success, #37855a);
     --crate-diff-removed: var(--text-error, #c65353);
+}
+.crate-file-diff {
     display: flex;
     flex: 1;
     min-height: 0;
@@ -9,7 +11,7 @@
     background: var(--background-primary);
     font-size: var(--font-ui-smaller);
 }
-.crate-diff-header, .crate-diff-footnote {
+.crate-diff-footnote {
     display: flex;
     flex-shrink: 0;
     align-items: center;
@@ -19,10 +21,9 @@
     padding: 10px 12px;
     color: var(--text-muted);
 }
-.crate-diff-header { background: var(--background-secondary); border-bottom: 1px solid var(--crate-activity-divider); }
-.crate-diff-labels, .crate-diff-stats { display: flex; align-items: center; gap: 10px; }
-.crate-diff-labels { flex-wrap: wrap; }
-.crate-diff-kind { color: var(--crate-diff-added); font-size: 11px; }
+.crate-diff-header { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 12px; color: var(--text-muted); font-size: 11px; }
+.crate-diff-header:empty { display: none; }
+.crate-diff-stats { display: flex; align-items: center; gap: 6px; }
 .crate-diff-stats {
     font-family: var(--font-monospace);
     font-variant-numeric: tabular-nums;
@@ -81,7 +82,7 @@
     &:focus-visible { outline: 2px solid var(--crate-activity-focus-ring); outline-offset: -2px; }
 }
 .crate-file-diff .crate-diff-gap > button { width: 100%; border-radius: 0; text-align: left; padding-left: 24px; }
-.crate-diff-message { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px; color: var(--text-muted); overflow-wrap: anywhere; text-align: center; line-height: 1.6; }
+.crate-diff-message { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; color: var(--text-muted); overflow-wrap: anywhere; text-align: center; line-height: 1.6; }
 @container (max-width: 440px) {
     .crate-diff-line { grid-template-columns: 3ch 3ch 2ch minmax(0, 1fr); padding-right: 8px; }
 }
