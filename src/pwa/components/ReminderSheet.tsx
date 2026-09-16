@@ -111,7 +111,6 @@ function ReminderEditorSheet({
 	const {
 		activeScreen,
 		canInteract,
-		editorFocusRequest,
 		isReturningToEditor,
 		isStageClosing,
 		openPicker,
@@ -124,7 +123,7 @@ function ReminderEditorSheet({
 		reminderId: modal.reminderId,
 		isClosing,
 		onBeforeOpenPicker: dismissEditorKeyboard,
-		onFocusEditor: () => editorScreenRef.current?.focusTitle(),
+		onFocusEditor: () => editorScreenRef.current?.restoreFocus(),
 		onPatchDraft: patchDraft,
 		onClosed,
 	});
@@ -200,7 +199,6 @@ function ReminderEditorSheet({
 					isReturningToEditor={isReturningToEditor}
 					canInteract={canInteract}
 					keyboardInset={keyboardInset}
-					editorFocusRequest={editorFocusRequest}
 					dialogRef={setDialogRef}
 					onPatchDraft={patchDraft}
 					onOpenPicker={openPicker}

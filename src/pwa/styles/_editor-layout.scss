@@ -131,8 +131,37 @@
 
     .reminder-title-input,
     .reminder-description-input {
+      box-sizing: border-box;
+      min-width: 0;
+      max-width: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
       touch-action: auto;
       overscroll-behavior: contain;
+
+      &:focus {
+        mask-image: none;
+        -webkit-mask-image: none;
+      }
+    }
+
+    .reminder-title-input {
+      // Leave room for the caret at the end of a full-width line in WebKit.
+      padding-right: 2px;
+    }
+
+    .reminder-title-input :is(
+      .rich-text-chip-date,
+      .rich-text-chip-project,
+      .rich-text-chip-priority
+    ) {
+      display: inline-block;
+      box-sizing: border-box;
+      // Account for both chip margins and WebKit's trailing caret space.
+      max-width: calc(100% - 0.16em - 2px);
+      white-space: normal;
     }
 
     // These rows must keep their natural height even when the body scrolls.

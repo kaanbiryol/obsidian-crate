@@ -90,7 +90,6 @@ export function useReminderSheetNavigation({
 	onClosed: () => void;
 }) {
 	const [navigation, setNavigation] = useState(INITIAL_REMINDER_SHEET_NAVIGATION_STATE);
-	const [editorFocusRequest, setEditorFocusRequest] = useState(0);
 	const navigationRef = useRef(navigation);
 	const isClosingRef = useRef(isClosing);
 	isClosingRef.current = isClosing;
@@ -106,7 +105,6 @@ export function useReminderSheetNavigation({
 
 	useEffect(() => {
 		applyAction({ type: 'reset' });
-		setEditorFocusRequest(0);
 	}, [applyAction, mode, reminderId]);
 
 	const requestTransition = useCallback((transition: ReminderSheetTransition) => (
@@ -130,7 +128,6 @@ export function useReminderSheetNavigation({
 			})) return;
 			accepted = true;
 			onPatchDraft(getImmediateEditorTransitionPatch(activeScreen === 'editor' || activeScreen === 'delete' ? null : activeScreen, patch));
-			setEditorFocusRequest((request) => request + 1);
 		});
 		// iOS requires focus inside the user gesture, after the editor is focusable.
 		if (accepted) onFocusEditor();
@@ -171,7 +168,6 @@ export function useReminderSheetNavigation({
 	return {
 		activeScreen: navigation.activeScreen,
 		canInteract: navigation.phase === 'open',
-		editorFocusRequest,
 		isReturningToEditor: navigation.phase === 'closing-for-transition'
 			&& navigation.activeScreen !== 'editor'
 			&& navigation.pendingTransition?.screen === 'editor',
