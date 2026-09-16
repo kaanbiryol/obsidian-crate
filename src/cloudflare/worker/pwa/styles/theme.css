@@ -27,18 +27,15 @@
 	--checkbox-marker-color:var(--text-on-accent);
 	--pwa-launch-bg:#0b0b0d;
 	--pwa-tabbar-surface:rgba(13,13,15,.9);
-	--pwa-status-bar-clearance:0px;
-	--pwa-safe-area-top-floor:0px;
-	--pwa-safe-area-top:calc(max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px)) + var(--pwa-status-bar-clearance));
+	/* The opaque native status bar owns its height; honor only the remaining viewport inset. */
+	--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px));
 	--pwa-safe-area-bottom-floor:0px;
 	--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px));
 	--crate-primary-header-padding:calc(var(--pwa-safe-area-top) + 14px) 16px 10px;
 	--crate-project-accent-hover-shadow:none;
 	color-scheme:dark;
 }
-@media (display-mode:standalone) and (orientation:portrait) and (max-width:600px){:root{--pwa-safe-area-top-floor:59px;--pwa-safe-area-top:calc(max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px),var(--pwa-safe-area-top-floor)) + var(--pwa-status-bar-clearance));--pwa-safe-area-bottom-floor:34px;--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px),var(--pwa-safe-area-bottom-floor))}}
-/* Keep header text below iOS 27's native top-edge blur in installed portrait apps. */
-@media (orientation:portrait){:root[data-pwa-ios-scroll-edge]{--pwa-status-bar-clearance:16px}}
+@media (display-mode:standalone) and (orientation:portrait) and (max-width:600px){:root{--pwa-safe-area-bottom-floor:34px;--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px),var(--pwa-safe-area-bottom-floor))}}
 .pwa-launch-splash{width:100%;height:100%;overflow:hidden;background:var(--pwa-launch-bg)}
 .pwa-launch-splash.is-updating{position:relative}
 #pwa-update-transition{position:fixed;inset:0;z-index:10000;background:var(--pwa-launch-bg);color:var(--text-muted);font-size:14px;line-height:1.4;visibility:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease,visibility 0s linear .18s}

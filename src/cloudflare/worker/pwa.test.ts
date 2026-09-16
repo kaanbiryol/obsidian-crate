@@ -145,7 +145,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('html,body,#app{background-color:#0b0b0d;color-scheme:dark}');
 		expect(html).toContain('@media (prefers-color-scheme: light){:root{--pwa-launch-bg:#f7f7f8;color-scheme:light}html,body,#app{background-color:#f7f7f8;color-scheme:light}}');
 		expect(html).toContain('<body>');
-		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
+		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="default">');
 		expect(html).toContain('<style id="pwa-light-theme" media="(prefers-color-scheme: light)">');
 		expect(html).toContain('<script src="/notifications/theme-bootstrap.js?v=');
 		expect(html).not.toContain('<script>');
@@ -195,8 +195,12 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-header-settings-button{position:relative;width:44px;height:44px;min-width:44px;');
 		expect(html).toContain('.pwa-reminders-view .ios-scroll{scrollbar-width:none;overscroll-behavior-y:contain}');
 		expect(html).toContain('position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none');
-		expect(html).toContain('--pwa-safe-area-top:calc(max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px)) + var(--pwa-status-bar-clearance))');
-		expect(html).toContain('@media (display-mode:standalone) and (orientation:portrait) and (max-width:600px){:root{--pwa-safe-area-top-floor:59px;--pwa-safe-area-top:calc(max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px),var(--pwa-safe-area-top-floor)) + var(--pwa-status-bar-clearance));--pwa-safe-area-bottom-floor:34px;--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px),var(--pwa-safe-area-bottom-floor))}}');
+		expect(html).toContain('--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px))');
+		expect(html).not.toContain('black-translucent');
+		expect(html).not.toContain('--pwa-safe-area-top-floor');
+		expect(html).not.toContain('--pwa-status-bar-clearance');
+		expect(PWA_THEME_BOOTSTRAP_JS).not.toContain('pwaIosScrollEdge');
+		expect(html).toContain('@media (display-mode:standalone) and (orientation:portrait) and (max-width:600px){:root{--pwa-safe-area-bottom-floor:34px;--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px),var(--pwa-safe-area-bottom-floor))}}');
 		expect(html).toContain('.pwa-reminders-view .view-header{max-width:100vw;overflow:hidden;padding:calc(var(--pwa-safe-area-top) + 17px)');
 		expect(html).toContain('.pwa-reminders-view .premium-back-button{margin-top:calc(var(--pwa-safe-area-top) + 12px)}');
 		expect(html).not.toContain('@supports (-webkit-touch-callout: none)');
