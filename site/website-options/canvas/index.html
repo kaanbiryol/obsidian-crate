@@ -6,15 +6,18 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
   <meta name="description" content="Your notes. One continuous flow. Self-hosted Obsidian vault sync and Markdown reminders, powered by your own Cloudflare account.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <title>Crate — Your notes. One continuous flow.</title>
   <link rel="icon" href="../../assets/logo.png">
   <link rel="stylesheet" href="../studies.css">
   <link rel="stylesheet" href="../product-ui.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="sections.css">
-  <script src="../../assets/website-studies.js" defer></script>
+  <link rel="stylesheet" href="macos-preview.css">
+  <link rel="stylesheet" href="canvas-pwa.css">
+  <link rel="stylesheet" href="../../assets/canvas-composer.generated.css">
   <script src="../../assets/canvas.js" defer></script>
+  <script src="../../assets/canvas-desktop.js" type="module"></script>
 </head>
 <body data-direction="canvas">
   <a class="skip-link" href="#main">Skip to content</a>
@@ -24,20 +27,193 @@
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-navigation">Menu <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#chevron"></use></svg></button>
       <nav class="nav-links" id="main-navigation" aria-label="Main navigation">
         <a href="#features">Features</a>
-        <a href="#reminders">Reminders</a>
         <a href="#sync">Sync</a>
+        <a href="#reminders">Reminders</a>
         <a href="#setup">Setup</a>
       </nav>
       <a class="header-action" href="https://github.com/kaanbiryol/obsidian-crate">GitHub <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#external"></use></svg></a>
     </header>
   </div>
   <main id="main">
-    <section class="canvas-hero wrap"><p class="eyebrow"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#command"></use></svg> Built around your Obsidian vault</p><h1 class="hero-title">Your notes.<br><span>One continuous flow.</span></h1><p class="body-copy">Write it in Obsidian. Pick it up on your phone.<br> Crate keeps your vault and reminders connected.</p><div class="actions"><a class="button" href="#setup">Get started with Crate <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a><a class="text-link" href="#features">Explore Crate <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a></div><p class="release-note">Early release · Manual installation · Your Cloudflare account</p><div class="canvas-stage" id="markdown-example"><div class="canvas-windowbar"><span><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sidebar"></use></svg> My vault</span><span>Product launch.md</span><span class="window-connected"><i class="status-dot"></i> Crate connected</span></div>
-<div class="canvas-workspace"><aside class="canvas-files"><p>My vault</p><span><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#projects"></use></svg> Projects</span><span class="selected"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#note"></use></svg> Product launch</span><span><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#note"></use></svg> Weekly notes</span><span><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#note"></use></svg> Reading list</span><div><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sync"></use></svg> Vault synced</div></aside><div class="markdown-window"><div class="window-bar"><span><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#note"></use></svg> Product launch.md</span><span><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#more"></use></svg></span></div><div class="markdown-body"><p class="note-breadcrumb">Reminders / Crate</p><h3>Product launch</h3><p>Keep the context. Make the next step clear.</p><div class="markdown-task" data-note-task="launch"><span>- [ ]</span> Review launch notes<br><mark>@today 18:00</mark></div><div class="markdown-task" data-note-task="screens"><span>- [ ]</span> Prepare the screenshots<br><mark>@today 20:00</mark></div><p class="markdown-detail">Check the copy before sharing.</p></div><div class="window-status"><span class="status-dot"></span> Synced with your vault</div></div><div class="demo-app" data-demo="canvas"><div class="app-views"><section class="app-view" role="tabpanel" id="canvas-inbox" aria-labelledby="canvas-tab-inbox" tabindex="0" hidden><div class="app-heading"><div><h3>Inbox</h3><p class="app-count">3 reminders</p></div><div class="app-heading-actions" aria-hidden="true"><span class="app-icon sync-icon"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sync"></use></svg><i></i></span><span class="app-icon"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#settings"></use></svg></span></div></div><div class="app-list"><label class="reminder-card"><input type="checkbox" data-task="launch" aria-label="Complete Review launch notes in this example"><span class="reminder-body"><strong>Review launch notes</strong><span class="reminder-description">Check the copy before sharing.</span><span class="reminder-tags"><span class="tag tag-date danger"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#clock"></use></svg>Today, 18:00</span><span class="tag"># Crate</span></span></span></label><label class="reminder-card"><input type="checkbox" data-task="screens" aria-label="Complete Prepare the screenshots in this example"><span class="reminder-body"><strong>Prepare the screenshots</strong><span class="reminder-description">Capture the desktop and mobile views.</span><span class="reminder-tags"><span class="tag tag-date "><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#clock"></use></svg>Today, 20:00</span><span class="tag"># Crate</span></span></span></label><label class="reminder-card"><input type="checkbox" data-task="weekly" aria-label="Complete Weekly review in this example"><span class="reminder-body"><strong>Weekly review</strong><span class="reminder-description">Look back. Make a little room for next week.</span><span class="reminder-tags"><span class="tag tag-date "><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#clock"></use></svg>Friday, 09:00</span><span class="tag"># Personal</span></span></span></label></div></section>
-<section class="app-view" role="tabpanel" id="canvas-today" aria-labelledby="canvas-tab-today" tabindex="0"><div class="app-heading"><div><h3>Today</h3><p class="app-count">2 reminders</p></div><div class="app-heading-actions" aria-hidden="true"><span class="app-icon sync-icon"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sync"></use></svg><i></i></span><span class="app-icon"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#settings"></use></svg></span></div></div><div class="app-list"><label class="reminder-card"><input type="checkbox" data-task="launch" aria-label="Complete Review launch notes in this example"><span class="reminder-body"><strong>Review launch notes</strong><span class="reminder-description">Check the copy before sharing.</span><span class="reminder-tags"><span class="tag tag-date danger"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#clock"></use></svg>Today, 18:00</span><span class="tag"># Crate</span></span></span></label><label class="reminder-card"><input type="checkbox" data-task="screens" aria-label="Complete Prepare the screenshots in this example"><span class="reminder-body"><strong>Prepare the screenshots</strong><span class="reminder-description">Capture the desktop and mobile views.</span><span class="reminder-tags"><span class="tag tag-date "><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#clock"></use></svg>Today, 20:00</span><span class="tag"># Crate</span></span></span></label></div></section>
-<section class="app-view" role="tabpanel" id="canvas-upcoming" aria-labelledby="canvas-tab-upcoming" tabindex="0" hidden><div class="app-heading"><div><h3>Upcoming</h3><p class="app-count">1 reminder</p></div><div class="app-heading-actions" aria-hidden="true"><span class="app-icon sync-icon"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sync"></use></svg><i></i></span><span class="app-icon"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#settings"></use></svg></span></div></div><div class="app-list"><label class="reminder-card"><input type="checkbox" data-task="weekly" aria-label="Complete Weekly review in this example"><span class="reminder-body"><strong>Weekly review</strong><span class="reminder-description">Look back. Make a little room for next week.</span><span class="reminder-tags"><span class="tag tag-date "><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#clock"></use></svg>Friday, 09:00</span><span class="tag"># Personal</span></span></span></label></div></section>
-<section class="app-view" role="tabpanel" id="canvas-projects" aria-labelledby="canvas-tab-projects" tabindex="0" hidden><div class="app-heading"><div><h3>Projects</h3><p class="app-count">2 projects</p></div><div class="app-heading-actions" aria-hidden="true"><span class="app-icon sync-icon"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sync"></use></svg><i></i></span><span class="app-icon"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#settings"></use></svg></span></div></div><div class="app-list"><div class="app-project" data-project="launch,screens"><span class="project-color"></span><div><strong>Crate</strong><small>2 reminders</small></div></div><div class="app-project personal" data-project="weekly"><span class="project-color"></span><div><strong>Personal</strong><small>1 reminder</small></div></div></div></section></div><a class="app-fab" href="#setup" aria-label="See how to install Crate and add reminders"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#plus"></use></svg></a><div class="app-tabs" role="tablist" aria-label="Example reminder views"><button type="button" role="tab" id="canvas-tab-inbox" aria-controls="canvas-inbox" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#inbox"></use></svg><span>Inbox</span></button><button type="button" role="tab" id="canvas-tab-today" aria-controls="canvas-today" aria-selected="true" tabindex="0"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#today"></use></svg><span>Today</span></button><button type="button" role="tab" id="canvas-tab-upcoming" aria-controls="canvas-upcoming" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#upcoming"></use></svg><span>Upcoming</span></button><button type="button" role="tab" id="canvas-tab-projects" aria-controls="canvas-projects" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#projects"></use></svg><span>Projects</span></button></div></div></div>
-<div class="canvas-caption"><p id="demo-feedback" role="status">Try it: complete a reminder and watch the Markdown update.</p><button class="reset-demo" type="button" disabled>Reset example</button></div></div></section>
+    <section class="canvas-hero wrap"><p class="eyebrow"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#command"></use></svg> Built around your Obsidian vault</p><h1 class="hero-title">Your notes.<br><span>One continuous flow.</span></h1><p class="body-copy">Your whole Obsidian vault, in sync across your devices.<br> With a home for your reminders, too.</p><div class="actions"><a class="button" href="#setup">Get started with Crate <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a><a class="text-link" href="#features">Explore Crate <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a></div><p class="release-note">Early release · Manual installation · Your Cloudflare account</p><div class="canvas-stage" id="markdown-example"><div class="mac-titlebar">
+  <div class="mac-sidebar-tools"><span class="mac-traffic-lights" aria-hidden="true"><i></i><i></i><i></i></span><span class="mac-tool-decoration" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#projects"></use></svg><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#search"></use></svg></span><span class="mac-tool-decoration sidebar-toggle-decoration" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sidebar"></use></svg></span></div>
+  <div class="mac-note-tabs"><div class="note-tab-strip" role="tablist" aria-label="Example Obsidian notes">
+    <button type="button" role="tab" id="note-tab-crate" aria-controls="note-crate" aria-selected="true" tabindex="0" data-note="crate">Crate</button>
+    <button type="button" role="tab" id="note-tab-travel" aria-controls="note-travel" aria-selected="false" tabindex="-1" data-note="travel">Travel plans</button>
+    <button type="button" role="tab" id="note-tab-ideas" aria-controls="note-ideas" aria-selected="false" tabindex="-1" data-note="ideas">Project ideas</button>
+    <button type="button" role="tab" id="note-tab-inbox" aria-controls="note-inbox" aria-selected="false" tabindex="-1" data-note="inbox">Inbox</button>
+    <button type="button" role="tab" id="note-tab-launch" aria-controls="note-launch" aria-selected="false" tabindex="-1" data-note="launch">Product launch</button>
+    <button type="button" role="tab" id="note-tab-weekly" aria-controls="note-weekly" aria-selected="false" tabindex="-1" data-note="weekly">Weekly notes</button>
+    <button type="button" role="tab" id="note-tab-reading" aria-controls="note-reading" aria-selected="false" tabindex="-1" data-note="reading">Reading list</button>
+  </div></div>
+  <div class="mac-plugin-tools" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#obsidian-tags"></use></svg><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#obsidian-outline"></use></svg><span class="selected"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#obsidian-reminders"></use></svg></span></div>
+</div>
+<div class="canvas-workspace">
+  <aside class="canvas-files" aria-label="Example vault files">
+    <details class="canvas-folder" open>
+      <summary><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#chevron"></use></svg> Reminders</summary>
+      <div class="project-note-files">
+        <button type="button" data-open-note="inbox">Inbox</button>
+        <button type="button" data-open-note="launch">Product launch</button>
+        <button type="button" data-open-note="weekly">Weekly notes</button>
+        <button type="button" data-open-note="reading">Reading list</button>
+      </div>
+    </details>
+    <button type="button" data-open-note="crate" class="selected" aria-current="page">Crate</button>
+    <button type="button" data-open-note="travel">Travel plans</button>
+    <button type="button" data-open-note="ideas">Project ideas</button>
+  </aside>
+  <div class="obsidian-editor">
+    <div class="editor-toolbar">
+      <div class="editor-history"><button type="button" data-history="back" aria-label="Previous example note" disabled><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></button><button type="button" data-history="forward" aria-label="Next example note" disabled><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></button></div>
+      <span class="editor-document-name">Crate</span>
+      <button class="editor-mode" type="button" aria-label="Show Markdown source" aria-pressed="false" title="Show Markdown source"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#note"></use></svg></button>
+      <span class="editor-more" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#more"></use></svg></span>
+    </div>
+    <div class="editor-scroll">
+      <section class="editor-note" id="note-crate" role="tabpanel" aria-labelledby="note-tab-crate" tabindex="0">
+        <div class="note-reading">
+          <h3>Crate</h3>
+          <p>Your whole Obsidian vault, in sync across devices. Notes and attachments stay connected through your own Cloudflare account.</p>
+          <h4>Reminders, too.</h4>
+          <p>Keep tasks in Markdown. Add or complete a reminder in Obsidian or the companion app on your phone. Changes sync back to the same note.</p>
+          <p class="editor-note-link">Explore <button type="button" data-open-note="travel">Travel plans</button>, or open <button type="button" data-open-note="inbox">Inbox</button> and check something off.</p>
+        </div>
+        <div class="note-source" hidden>
+          <h3><span>#</span> Crate</h3>
+          <p>Your whole Obsidian vault, in sync across devices. Notes and attachments stay connected through your own Cloudflare account.</p>
+          <h4><span>##</span> Reminders, too.</h4>
+          <p>Keep tasks in Markdown. Add or complete a reminder in Obsidian or the companion app on your phone. Changes sync back to the same note.</p>
+          <p>Explore <span class="source-wikilink">[[Travel plans]]</span>, or open <span class="source-wikilink">[[Inbox]]</span> and check something off.</p>
+        </div>
+      </section>
+      <section class="editor-note" id="note-travel" role="tabpanel" aria-labelledby="note-tab-travel" tabindex="0" hidden>
+        <div class="note-reading">
+          <h3>Travel plans</h3><p>A long weekend in Copenhagen. Enough of a plan to leave room for getting lost.</p>
+          <h4>Friday · Settle in</h4><ul><li>Train arrives at 16:30. Walk to the apartment.</li><li>Coffee, then a slow wander along the water.</li><li>Dinner somewhere small in Nørrebro.</li></ul>
+          <h4>Places to keep</h4><p>The Designmuseum, the botanical gardens, and that bookshop Alex mentioned. Save Saturday afternoon for whatever we find.</p>
+          <blockquote>Pack light. Bring a notebook.</blockquote>
+          <p class="editor-note-link">A few thoughts for later: <button type="button" data-open-note="ideas">Project ideas</button></p>
+        </div>
+        <div class="note-source" hidden>
+          <h3><span>#</span> Travel plans</h3><p>A long weekend in Copenhagen. Enough of a plan to leave room for getting lost.</p>
+          <h4><span>##</span> Friday · Settle in</h4><p>- Train arrives at 16:30. Walk to the apartment.<br>- Coffee, then a slow wander along the water.<br>- Dinner somewhere small in Nørrebro.</p>
+          <h4><span>##</span> Places to keep</h4><p>The Designmuseum, the botanical gardens, and that bookshop Alex mentioned. Save Saturday afternoon for whatever we find.</p>
+          <p>&gt; Pack light. Bring a notebook.</p><p>A few thoughts for later: <span class="source-wikilink">[[Project ideas]]</span></p>
+        </div>
+      </section>
+      <section class="editor-note" id="note-ideas" role="tabpanel" aria-labelledby="note-tab-ideas" tabindex="0" hidden>
+        <div class="note-reading">
+          <h3>Project ideas</h3><p>A place for the ideas that aren’t a project yet.</p>
+          <h4>A small travel journal</h4><p>One photo and a few lines each day. Less time arranging things, more time remembering them.</p>
+          <h4>A shelf of good references</h4><ul><li>Book covers with beautiful typography.</li><li>Interfaces that feel calm without feeling empty.</li><li>Maps that make a new city feel familiar.</li></ul>
+          <blockquote>Let an idea sit for a while. See what stays interesting.</blockquote>
+          <p class="editor-note-link">Start with <button type="button" data-open-note="travel">Travel plans</button>.</p>
+        </div>
+        <div class="note-source" hidden>
+          <h3><span>#</span> Project ideas</h3><p>A place for the ideas that aren’t a project yet.</p>
+          <h4><span>##</span> A small travel journal</h4><p>One photo and a few lines each day. Less time arranging things, more time remembering them.</p>
+          <h4><span>##</span> A shelf of good references</h4><p>- Book covers with beautiful typography.<br>- Interfaces that feel calm without feeling empty.<br>- Maps that make a new city feel familiar.</p>
+          <p>&gt; Let an idea sit for a while. See what stays interesting.</p><p>Start with <span class="source-wikilink">[[Travel plans]]</span>.</p>
+        </div>
+      </section>
+      <section class="editor-note" id="note-inbox" role="tabpanel" aria-labelledby="note-tab-inbox" tabindex="0" hidden>
+        <div class="note-reading">
+          <h3>Inbox</h3><p>Catch it here. Give it a home later.</p>
+          <label class="editor-task"><input type="checkbox" data-editor-task="capture" aria-label="Complete Book a table for Friday from the note"><span>Book a table for Friday</span></label>
+          <p class="editor-task-description">Somewhere near the station.</p>
+          <label class="editor-task"><input type="checkbox" data-editor-task="call" aria-label="Complete Call Alex from the note"><span>Call Alex <time>today at 17:00</time></span></label>
+          <p class="editor-task-description">Catch up about the weekend.</p>
+          <label class="editor-task"><input type="checkbox" data-editor-task="organize" aria-label="Reopen Gather the travel ideas from the note" checked><span>Gather the travel ideas</span></label>
+          <p class="editor-note-link">The plan is in <button type="button" data-open-note="travel">Travel plans</button>.</p>
+        </div>
+        <div class="note-source" hidden>
+          <h3><span>#</span> Inbox</h3><p>Catch it here. Give it a home later.</p>
+          <div class="markdown-task" data-note-task="capture"><span>- [ ]</span> Book a table for Friday <span class="source-metadata">&lt;!-- crate-id:c1e78567-140d-5494-b315-cb332158ee05 --&gt;</span></div>
+          <div class="source-metadata">&lt;!-- crate-desc:v1:Somewhere%20near%20the%20station. --&gt;</div>
+          <div class="markdown-task" data-note-task="call"><span>- [ ]</span> Call Alex <mark>2026-09-07T15:00:00.000Z</mark> <span class="source-metadata">&lt;!-- crate-id:c5f06799-b4a5-5a5f-aa5a-dbda2c173a99 --&gt;</span></div>
+          <div class="source-metadata">&lt;!-- crate-desc:v1:Catch%20up%20about%20the%20weekend. --&gt;</div>
+          <div class="markdown-task is-complete" data-note-task="organize"><span>- [x]</span> Gather the travel ideas <span class="source-metadata">&lt;!-- crate-id:2b423927-ce21-5418-bd4f-d85890b3a22c --&gt;</span></div>
+          <p>The plan is in <span class="source-wikilink">[[Travel plans]]</span>.</p>
+        </div>
+      </section>
+      <section class="editor-note" id="note-launch" role="tabpanel" aria-labelledby="note-tab-launch" tabindex="0" hidden>
+        <div class="note-reading">
+          <h3>Product launch</h3>
+          <p>A few final details before we share Crate with the world.</p>
+          <h4>Before we ship</h4>
+          <label class="editor-task"><input type="checkbox" data-editor-task="launch" aria-label="Complete Review launch notes from the note"><span>Review launch notes <time>today at 18:00</time></span></label>
+          <p class="editor-task-description">Check the copy before sharing.</p>
+          <label class="editor-task"><input type="checkbox" data-editor-task="screens" aria-label="Complete Prepare the screenshots from the note"><span>Prepare the screenshots <time>today at 20:00</time></span></label>
+          <p class="editor-task-description">Capture the desktop and mobile views.</p>
+          <h4>Keep the context</h4>
+          <p>One place for the plan, the details, and the next step. Pick it up in Crate when you’re away from your desk.</p>
+          <p class="editor-note-link">Next up: <button type="button" data-open-note="weekly">Weekly notes</button></p>
+        </div>
+        <div class="note-source" hidden>
+          <h3><span>#</span> Product launch</h3>
+          <p>A few final details before we share Crate with the world.</p>
+          <h4><span>##</span> Before we ship</h4>
+          <div class="markdown-task" data-note-task="launch"><span>- [ ]</span> Review launch notes <mark>2026-09-07T16:00:00.000Z</mark> <span class="source-metadata">&lt;!-- crate-id:008005d1-4d96-5fb4-8c33-a2d031d88943 --&gt;</span></div>
+          <div class="source-metadata">&lt;!-- crate-desc:v1:Check%20the%20copy%20before%20sharing. --&gt;</div>
+          <div class="markdown-task" data-note-task="screens"><span>- [ ]</span> Prepare the screenshots <mark>2026-09-07T18:00:00.000Z</mark> <span class="source-metadata">&lt;!-- crate-id:bd0c02a0-bc1a-51c5-9490-45bc24f8e05e --&gt;</span></div>
+          <div class="source-metadata">&lt;!-- crate-desc:v1:Capture%20the%20desktop%20and%20mobile%20views. --&gt;</div>
+          <h4><span>##</span> Keep the context</h4>
+          <p>One place for the plan, the details, and the next step. Pick it up in Crate when you’re away from your desk.</p>
+          <p>Next up: <span class="source-wikilink">[[Weekly notes]]</span></p>
+        </div>
+      </section>
+      <section class="editor-note" id="note-weekly" role="tabpanel" aria-labelledby="note-tab-weekly" tabindex="0" hidden>
+        <div class="note-reading">
+          <h3>Weekly notes</h3><p>A little space to look back, then look ahead.</p>
+          <h4>Make room for next week</h4>
+          <label class="editor-task"><input type="checkbox" data-editor-task="weekly" aria-label="Complete Weekly review from the note"><span>Weekly review <time>Friday at 09:00</time></span></label>
+          <p class="editor-task-description">Look back. Make a little room for next week.</p>
+          <h4>What moved forward?</h4><ul><li>The launch notes are coming together.</li><li>The phone and desktop feel like one product.</li><li>There’s a clear next step for the week ahead.</li></ul>
+          <p class="editor-note-link">Related: <button type="button" data-open-note="launch">Product launch</button></p>
+        </div>
+        <div class="note-source" hidden>
+          <h3><span>#</span> Weekly notes</h3><p>A little space to look back, then look ahead.</p>
+          <h4><span>##</span> Make room for next week</h4>
+          <div class="markdown-task" data-note-task="weekly"><span>- [ ]</span> Weekly review <mark>2026-09-11T07:00:00.000Z</mark> <span class="source-metadata">&lt;!-- crate-id:a9587bfd-636a-5726-86c1-0ea32e02ccca --&gt;</span></div>
+          <div class="source-metadata">&lt;!-- crate-desc:v1:Look%20back.%20Make%20a%20little%20room%20for%20next%20week. --&gt;</div>
+          <h4><span>##</span> What moved forward?</h4><p>- The launch notes are coming together.<br>- The phone and desktop feel like one product.<br>- There’s a clear next step for the week ahead.</p>
+          <p>Related: <span class="source-wikilink">[[Product launch]]</span></p>
+        </div>
+      </section>
+      <section class="editor-note" id="note-reading" role="tabpanel" aria-labelledby="note-tab-reading" tabindex="0" hidden>
+        <div class="note-reading">
+          <h3>Reading list</h3><p>Ideas worth keeping close.</p>
+          <h4>Next on the list</h4>
+          <label class="editor-task"><input type="checkbox" data-editor-task="article" aria-label="Complete Read the saved article from the note"><span>Read the saved article <time>tomorrow at 10:00</time></span></label>
+          <p class="editor-task-description">Keep one useful idea in this note.</p>
+          <h4>A few things to revisit</h4><ul><li>Tools that make room for focused work.</li><li>Small habits that make a project easier to return to.</li><li>Why plain text stands the test of time.</li></ul>
+          <blockquote>Keep the useful part. Leave yourself a next step.</blockquote>
+          <p class="editor-note-link">Back to <button type="button" data-open-note="launch">Product launch</button></p>
+        </div>
+        <div class="note-source" hidden>
+          <h3><span>#</span> Reading list</h3><p>Ideas worth keeping close.</p>
+          <h4><span>##</span> Next on the list</h4>
+          <div class="markdown-task" data-note-task="article"><span>- [ ]</span> Read the saved article <mark>2026-09-08T08:00:00.000Z</mark> <span class="source-metadata">&lt;!-- crate-id:98b4f141-3b4d-544b-87d5-95776460c900 --&gt;</span></div>
+          <div class="source-metadata">&lt;!-- crate-desc:v1:Keep%20one%20useful%20idea%20in%20this%20note. --&gt;</div>
+          <h4><span>##</span> A few things to revisit</h4><p>- Tools that make room for focused work.<br>- Small habits that make a project easier to return to.<br>- Why plain text stands the test of time.</p>
+          <p>&gt; Keep the useful part. Leave yourself a next step.</p><p>Back to <span class="source-wikilink">[[Product launch]]</span></p>
+        </div>
+      </section>
+    </div>
+  </div><div class="demo-app canvas-pwa" data-demo="canvas">
+    <div class="app-views"><section class="app-view" role="tabpanel" id="canvas-panel" aria-labelledby="canvas-tab-inbox" tabindex="0"><div class="app-heading"><div><h3>Inbox</h3><p class="app-count">2 reminders</p></div></div></section></div>
+    <button class="app-fab" type="button" aria-label="Add a reminder to the example" aria-haspopup="dialog"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#plus"></use></svg></button>
+    <div class="app-tabs" role="tablist" aria-label="Example reminder views">
+      <button type="button" role="tab" id="canvas-tab-inbox" data-view="inbox" aria-controls="canvas-panel" aria-selected="true" tabindex="0"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#inbox"></use></svg><span>Inbox</span></button>
+      <button type="button" role="tab" id="canvas-tab-today" data-view="today" aria-controls="canvas-panel" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#today"></use></svg><span>Today</span></button>
+      <button type="button" role="tab" id="canvas-tab-upcoming" data-view="upcoming" aria-controls="canvas-panel" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#upcoming"></use></svg><span>Upcoming</span></button>
+      <button type="button" role="tab" id="canvas-tab-projects" data-view="projects" aria-controls="canvas-panel" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#projects"></use></svg><span>Projects</span></button>
+    </div>
+  </div>
+</div>
+<div class="mac-statusbar"><div><span>0 backlinks</span><span id="note-word-count">64 words</span><span class="mac-sync-status"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#check"></use></svg> Synced</span></div></div>
+<div class="canvas-caption"><p id="demo-feedback" role="status">Explore the notes. Open Inbox or a project to try its reminders.</p><button class="reset-demo" type="button" disabled>Reset example</button></div></div></section>
     <div class="highlights wrap">
       <div><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#desktop"></use></svg><span><b>Desktop and mobile</b><p>One vault across your devices.</p></span></div>
       <div><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#bell"></use></svg><span><b>Reminders in Markdown</b><p>Your next step stays with the note.</p></span></div>
@@ -45,13 +221,32 @@
     </div>
     <section class="feature-section wrap" id="features" aria-labelledby="features-title">
       <div class="section-heading">
-        <div><p class="eyebrow">Fits into the way you work</p><h2 class="section-title" id="features-title">Your notes move.<br>Your reminders follow.</h2></div>
-        <p class="body-copy">Keep your vault and its next steps together, from Obsidian to the companion web app.</p>
+        <div><p class="eyebrow">Fits into the way you work</p><h2 class="section-title" id="features-title">Your whole vault.<br>Wherever you open it.</h2></div>
+        <p class="body-copy">Sync your notes and files between Obsidian devices. Keep the next steps close with reminders and a companion app.</p>
       </div>
       <div class="feature-grid">
         <article class="feature-card"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sync"></use></svg><h3>Your vault, in sync.</h3><p>Bring notes, attachments, renames, and deletes across your Obsidian devices.</p><a class="feature-detail text-link" href="#sync">See how sync works <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a></article>
         <article class="feature-card"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#bell"></use></svg><h3>A nudge when it’s due.</h3><p>Give a reminder a date, keep its context, and enable optional push notifications.</p><a class="feature-detail text-link" href="#reminders">Meet your reminders <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a></article>
-        <article class="feature-card"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#note"></use></svg><h3>Still your Markdown.</h3><p>Reminders live in ordinary notes. Every edit in Crate finds its way back to your vault.</p><a class="feature-detail text-link" href="#markdown-example">Try the connection <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a></article>
+        <article class="feature-card"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#note"></use></svg><h3>Still your Markdown.</h3><p>Travel plans, ideas, and everyday notes stay in the format you know. Your reminders are Markdown, too.</p><a class="feature-detail text-link" href="#markdown-example">Try the connection <svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#arrow"></use></svg></a></article>
+      </div>
+    </section>
+    <section class="sync-section" id="sync" aria-labelledby="sync-title">
+      <div class="wrap">
+        <div class="section-heading">
+          <div><p class="eyebrow">One connection. Your infrastructure.</p><h2 class="section-title" id="sync-title">Your vault has<br>a place to call home.</h2></div>
+          <p class="body-copy">Crate connects your devices through your own Cloudflare account. Your files live in your R2 bucket, with no separate Crate account to create.</p>
+        </div>
+        <div class="sync-map" role="img" aria-label="Your Obsidian devices sync vault files through your Cloudflare account. The companion app reads and updates your reminders through the same server.">
+          <div class="sync-endpoint"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#desktop"></use></svg><strong>Your Obsidian vault</strong><span>Notes, files, and reminders</span></div>
+          <div class="sync-connection"><span>Vault sync</span><i></i><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sync"></use></svg></div>
+          <div class="sync-endpoint sync-home"><span class="brand-tile"><img src="../../assets/logo.png" width="25" height="25" alt=""></span><strong>Your Cloudflare account</strong><span>Your server. Your storage.</span><small><i class="status-dot"></i> Powered by Crate</small></div>
+          <div class="sync-connection"><span>Reminders</span><i></i><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sync"></use></svg></div>
+          <div class="sync-endpoint"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#phone"></use></svg><strong>Your companion app</strong><span>Capture, complete, carry on</span></div>
+        </div>
+        <div class="sync-details">
+          <article><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#layers"></use></svg><div><h3>Room for both versions</h3><p>When edits conflict, Crate preserves a copy for you to review. Keep a separate backup of your vault.</p></div></article>
+          <article><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#shield"></use></svg><div><h3>Know where your data lives</h3><p>Crate does not provide end-to-end encryption. Your Cloudflare account and Worker can access synced data.</p></div></article>
+        </div>
       </div>
     </section>
     <section class="reminders-section wrap" id="reminders" aria-labelledby="reminders-title">
@@ -87,25 +282,6 @@
         <div class="composer-image"><div class="composer-window"><img src="../../assets/screenshots/canvas-reminder-editor.png" width="390" height="780" loading="lazy" alt="The current Crate mobile reminder editor: Review launch notes, tomorrow at 9am, with description, project, priority, and repeat controls."></div></div>
         <figcaption>A natural date, ready to go.<span>Captured from the current PWA with sample data.</span></figcaption>
       </figure>
-    </section>
-    <section class="sync-section" id="sync" aria-labelledby="sync-title">
-      <div class="wrap">
-        <div class="section-heading">
-          <div><p class="eyebrow">One connection. Your infrastructure.</p><h2 class="section-title" id="sync-title">Your vault has<br>a place to call home.</h2></div>
-          <p class="body-copy">Crate connects your devices through your own Cloudflare account. Your files live in your R2 bucket, with no separate Crate account to create.</p>
-        </div>
-        <div class="sync-map" role="img" aria-label="Your Obsidian devices sync vault files through your Cloudflare account. The companion app reads and updates your reminders through the same server.">
-          <div class="sync-endpoint"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#desktop"></use></svg><strong>Your Obsidian vault</strong><span>Notes, files, and reminders</span></div>
-          <div class="sync-connection"><span>Vault sync</span><i></i><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sync"></use></svg></div>
-          <div class="sync-endpoint sync-home"><span class="brand-tile"><img src="../../assets/logo.png" width="25" height="25" alt=""></span><strong>Your Cloudflare account</strong><span>Your server. Your storage.</span><small><i class="status-dot"></i> Powered by Crate</small></div>
-          <div class="sync-connection"><span>Reminders</span><i></i><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#sync"></use></svg></div>
-          <div class="sync-endpoint"><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#phone"></use></svg><strong>Your companion app</strong><span>Capture, complete, carry on</span></div>
-        </div>
-        <div class="sync-details">
-          <article><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#layers"></use></svg><div><h3>Room for both versions</h3><p>When edits conflict, Crate preserves a copy for you to review. Keep a separate backup of your vault.</p></div></article>
-          <article><svg class="icon" aria-hidden="true"><use href="../../assets/study-icons.svg#shield"></use></svg><div><h3>Know where your data lives</h3><p>Crate does not provide end-to-end encryption. Your Cloudflare account and Worker can access synced data.</p></div></article>
-        </div>
-      </div>
     </section>
     <section class="setup-section wrap" id="setup" aria-labelledby="setup-title">
       <div class="section-heading"><div><p class="eyebrow">From your vault to your other devices</p><h2 class="section-title" id="setup-title">Make the connection.</h2></div><p class="body-copy">Bring Obsidian 1.13.0 or newer and a Cloudflare account with R2 enabled.</p></div>

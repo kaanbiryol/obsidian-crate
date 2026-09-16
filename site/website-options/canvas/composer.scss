@@ -1,0 +1,59 @@
+@use '../../../src/ui/shared/styles/tokens';
+@use '../../../src/ui/shared/styles/controls';
+@use '../../../src/ui/shared/styles/modal-header';
+@use '../../../src/ui/shared/styles/modal-layout';
+@use '../../../src/ui/shared/styles/delete-confirmation';
+@use '../../../src/reminders/ui/shared/styles/editor-fields';
+@use '../../../src/reminders/ui/shared/styles/editor-actions';
+@use '../../../src/reminders/ui/shared/styles/pickers';
+@use '../../../src/pwa/styles/editor-layout';
+@use '../../../src/pwa/styles/picker-layout';
+@use '../../../src/pwa/styles/sheet-headers';
+
+.canvas-composer {
+  @include tokens.styles;
+  @include controls.styles;
+  @include modal-header.styles;
+  @include modal-layout.styles;
+  @include delete-confirmation.styles;
+  @include editor-fields.styles;
+  @include editor-actions.styles;
+  @include pickers.styles;
+  @include editor-layout.styles;
+  @include picker-layout.styles;
+  @include sheet-headers.styles;
+
+  width: min(460px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border-hover);
+  border-radius: 18px;
+  box-shadow: 0 24px 100px #0009;
+  font: 14px/1.5 var(--font-interface);
+  color-scheme: dark;
+  text-align: left;
+  &::backdrop { background: #0008; backdrop-filter: blur(4px); }
+  * { box-sizing: border-box; }
+  .relative { position: relative; }
+  .pwa-reminder-editor { min-height: 210px; }
+  .pwa-picker-sheet { display: flex; flex-direction: column; max-height: calc(100dvh - 112px); }
+  .pwa-reminder-editor .reminder-modal-header { border-bottom: 1px solid var(--crate-divider); }
+  .reminder-modal-header-title { margin: 0; }
+  .reminder-modal-header { --pwa-header-side-width: 64px; }
+  .reminder-modal-body { padding-top: 4px; }
+  .canvas-composer-intro { padding: 12px 16px; border-top: 1px solid var(--crate-divider); color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+  .canvas-composer-intro button { background: transparent; padding: 0; border: 0; color: #c4b5fd; font: inherit; text-align: left; }
+  .canvas-composer-intro button:hover { text-decoration: underline; }
+  .canvas-composer-error { margin: 0; padding: 8px 16px; color: var(--text-error); }
+  [hidden] { display: none !important; }
+  .reminder-title-input,.reminder-description-input { overflow-wrap: anywhere; }
+  .pwa-picker-sheet .reminder-picker-scroll { max-height: calc(100dvh - 170px); }
+}
+@media(max-width:600px) {
+  .canvas-composer { width: 100%; margin: auto 0 0; max-height: calc(100dvh - 24px); border-radius: 20px 20px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+}

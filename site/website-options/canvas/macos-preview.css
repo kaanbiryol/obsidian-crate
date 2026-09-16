@@ -1,0 +1,103 @@
+/* Obsidian's macOS window structure, surrounding the existing Crate sidebar. */
+.canvas-stage { --editor-bg: #1e1e1e; --editor-chrome: #262626; --editor-text: #dadada; --editor-muted: #999; --editor-line: #ffffff0d; border-radius: 12px; }
+.mac-titlebar,.canvas-workspace { display: grid; grid-template-columns: 170px minmax(0,1.05fr) minmax(0,1fr); }
+.mac-titlebar { position: relative; min-height: 42px; background: var(--editor-chrome); color: var(--editor-muted); border-bottom: 1px solid var(--editor-line); }
+.mac-sidebar-tools { display: flex; align-items: center; gap: 12px; padding-inline: 14px; background: var(--panel-2); border-right: 1px solid var(--line); }
+.mac-traffic-lights { display: flex; align-items: center; gap: 6px; }
+.mac-traffic-lights i { width: 10px; height: 10px; border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 1px #0001; }
+.mac-traffic-lights i:nth-child(2) { background: #febc2e; }
+.mac-traffic-lights i:nth-child(3) { background: #28c840; }
+.mac-tool-decoration { display: flex; align-items: center; gap: 10px; }
+.mac-titlebar .icon { width: 16px; height: 16px; }
+.sidebar-toggle-decoration { margin-left: auto; }
+.sidebar-toggle-decoration .icon { width: 15px; }
+.mac-note-tabs { display: flex; align-items: stretch; gap: 3px; min-width: 0; padding: 6px 6px 0; }
+.mac-note-tabs button { flex: 1; min-width: 0; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0; background: transparent; color: var(--editor-muted); padding: 9px 10px; text-align: left; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mac-note-tabs button[aria-selected=true] { color: var(--editor-text); background: var(--editor-bg); border-color: var(--editor-line); box-shadow: 0 2px 0 var(--editor-bg); }
+.mac-note-tabs button:hover { color: var(--editor-text); }
+.mac-note-tabs button:focus-visible { outline-offset: -3px; }
+.mac-plugin-tools { display: flex; align-items: center; gap: 14px; padding: 6px 16px; background: var(--panel-2); border-left: 1px solid var(--line); }
+.mac-plugin-tools .selected { display: grid; place-items: center; height: 28px; width: 30px; border-radius: 5px; background: var(--panel-3); color: var(--text); }
+.canvas-folder summary { display: flex; align-items: center; gap: 5px; padding: 7px 3px; color: var(--muted); font-size: 12px; list-style: none; cursor: pointer; }
+.canvas-folder summary::-webkit-details-marker { display: none; }
+.canvas-folder summary .icon { width: 12px; height: 12px; transition: transform 150ms ease; }
+.canvas-folder[open] summary .icon { transform: rotate(90deg); }
+.canvas-folder summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.project-note-files { display: grid; gap: 3px; margin-left: 8px; padding-left: 4px; border-left: 1px solid var(--line); }
+.canvas-files [data-open-note] { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; padding: 8px 5px; border: 0; border-radius: 4px; background: transparent; text-align: left; line-height: 1.5; }
+.canvas-files [data-open-note]:hover { background: var(--panel-3); }
+.canvas-files [data-open-note].selected { background: rgba(var(--accent-rgb),.12); color: var(--accent-text); }
+.project-inbox-empty { padding: 2rem 1rem; color: var(--muted); text-align: center; font-size: 14px; line-height: 1.7; }
+.project-inbox-empty strong { color: var(--text); font-weight: 500; }
+.project-inbox-empty p { margin-top: .6rem; font-size: 12px; }
+.obsidian-editor { min-width: 0; background: var(--editor-bg); color: var(--editor-text); border-right: 1px solid var(--line); }
+.editor-toolbar { display: flex; align-items: center; gap: 10px; height: 38px; padding: 4px 14px; color: var(--editor-muted); font-size: 12px; }
+.editor-toolbar button { display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--editor-muted); width: 28px; height: 28px; padding: 5px; }
+.editor-toolbar button:hover:not(:disabled) { background: #ffffff0a; color: var(--editor-text); }
+.editor-toolbar button:disabled { opacity: .3; cursor: default; }
+.editor-toolbar .icon { width: 16px; height: 16px; }
+.editor-history { display: flex; gap: 0; }
+.editor-history button:first-child .icon { transform: rotate(180deg); }
+.editor-document-name { flex: 1; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.editor-mode[aria-pressed=true] { color: var(--accent-text); background: rgba(var(--accent-rgb),.12); }
+.editor-more { display: grid; place-items: center; width: 22px; }
+.editor-scroll { height: 510px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #ffffff20 transparent; }
+.editor-note { padding: 30px 30px 36px; outline-offset: -3px; font-size: 15px; line-height: 1.7; text-align: left; }
+.editor-note h3 { font-size: 28px; line-height: 1.3; font-weight: 650; letter-spacing: -.035em; margin-bottom: 24px; color: #efefef; }
+.editor-note h4 { font-size: 19px; line-height: 1.4; letter-spacing: -.025em; margin: 28px 0 14px; font-weight: 600; color: #e6e6e6; }
+.editor-note p { margin: 14px 0; }
+.editor-task { display: flex; gap: 9px; align-items: baseline; cursor: pointer; line-height: 1.7; }
+.editor-task input { appearance: none; position: relative; width: 14px; height: 14px; flex: 0 0 14px; margin: 0; border: 1px solid #ffffff4d; border-radius: 3px; transform: translateY(1px); background: transparent; cursor: pointer; }
+.editor-task input:checked { border-color: var(--accent); background: var(--accent); }
+.editor-task input:checked::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 7px; border: solid white; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.editor-task input:checked + span { text-decoration: line-through; color: #858585; }
+.editor-task time { color: #b5a0ed; font-size: .9em; white-space: nowrap; }
+.editor-note .editor-task-description { margin: 5px 0 13px 23px; font-size: 13px; color: var(--editor-muted); }
+.editor-note-link button { border: 0; padding: 0; background: transparent; color: #b5a0ed; text-decoration: underline; text-underline-offset: 3px; font: inherit; }
+.editor-note-link button:hover { color: #d0c0ff; }
+.editor-note ul { padding-left: 20px; }
+.editor-note li { padding-left: 3px; margin-block: 8px; }
+.editor-note li::marker { color: var(--editor-muted); }
+.editor-note blockquote { margin: 24px 0; border-left: 3px solid var(--accent); padding: 8px 16px; background: #ffffff03; color: var(--editor-muted); }
+.note-source { font-family: "SFMono-Regular",Consolas,monospace; font-size: 13px; line-height: 1.8; }
+.note-source h3 { font-family: inherit; font-size: 22px; font-weight: 600; }
+.note-source h4 { font-size: 16px; }
+.note-source h3 > span,.note-source h4 > span { color: #777; }
+.note-source p { white-space: pre-wrap; }
+.note-source .source-metadata { color: #888; overflow-wrap: anywhere; }
+.note-source .markdown-task { margin-top: 14px; font-size: 13px; line-height: 1.8; }
+.note-source .markdown-task mark { margin-left: 0; padding: 0; background: transparent; color: #b5a0ed; }
+.source-wikilink { color: #b5a0ed; }
+.mac-statusbar { display: flex; align-items: center; justify-content: flex-end; gap: 1rem; min-height: 27px; padding: 5px 12px; color: var(--editor-muted); background: var(--editor-bg); border-top: 1px solid var(--editor-line); font-size: 11px; line-height: 1.4; }
+.mac-statusbar > div { display: flex; align-items: center; gap: 14px; }
+.mac-sync-status { display: flex; align-items: center; gap: 4px; }
+.mac-sync-status .icon { width: 13px; height: 13px; }
+.canvas-caption { background: var(--bg); }
+@media(max-width:1050px) {
+  .mac-titlebar,.canvas-workspace { grid-template-columns: minmax(0,1.05fr) minmax(0,1fr); }
+  .mac-sidebar-tools { position: absolute; inset: 0 auto 0 0; width: 72px; border: 0; background: transparent; }
+  .mac-sidebar-tools .mac-tool-decoration { display: none; }
+  .mac-note-tabs { padding-left: 74px; }
+  .editor-note { padding-inline: 24px; }
+}
+@media(max-width:760px) {
+  .mac-titlebar { grid-template-columns: 1fr auto; }
+  .mac-note-tabs { min-height: 42px; }
+  .mac-note-tabs button { padding: 5px 6px; white-space: normal; line-height: 1.2; text-align: center; }
+  .mac-plugin-tools { gap: 0; padding: 6px 12px; }
+  .mac-plugin-tools > .icon { display: none; }
+  .canvas-workspace { display: flex; flex-direction: column; }
+  .obsidian-editor { border-right: 0; border-bottom: 1px solid var(--line); }
+  .editor-scroll { height: 340px; }
+  .editor-note { padding: 20px 24px 28px; font-size: 14px; }
+  .editor-note h3 { font-size: 26px; margin-bottom: 18px; }
+  .editor-note h4 { font-size: 18px; margin-top: 24px; }
+  .editor-toolbar { padding-inline: 12px; }
+  .canvas-workspace .demo-app { min-height: 400px; }
+}
+@media(max-width:400px) {
+  .mac-note-tabs button { font-size: 11px; }
+  .editor-note { padding-inline: 20px; }
+  .mac-statusbar { font-size: 10px; }
+  .mac-statusbar > div { gap: 10px; }
+}
