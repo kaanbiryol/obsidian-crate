@@ -32,8 +32,11 @@ export class ConflictReviewModal extends SharedModal {
             if (this.active && revision === this.revision) this.render(review, returning);
         } catch (error) {
             if (this.active && revision === this.revision) {
-                this.bodyEl.setText(error instanceof Error ? error.message : String(error));
-                this.addReloadButton(this.bodyEl);
+                this.bodyEl.empty();
+                const errorState = this.bodyEl.createDiv({ cls: 'crate-conflict-load-error', attr: { role: 'alert' } });
+                errorState.createEl('h3', { text: 'Could not load both versions' });
+                errorState.createEl('p', { text: error instanceof Error ? error.message : String(error), cls: 'crate-conflict-review-help' });
+                this.addReloadButton(errorState);
             }
         }
     }
@@ -58,11 +61,11 @@ export class ConflictReviewModal extends SharedModal {
             el.addEventListener('click', action); controls.push(el); return el;
         };
         const compare = body.createDiv({ cls: 'crate-conflict-compare' });
-        const markdown = review.currentText !== undefined && review.savedText !== undefined;
+        const textPreview = review.currentText !== undefined && review.savedText !== undefined;
         const left = review.currentText?.split('\n') ?? [], right = review.savedText?.split('\n') ?? [];
         const changedLeft = new Set<number>(), changedRight = new Set<number>();
         let offset = 0;
-        if (markdown) for (const hunk of diffSequence(left, right)) {
+        if (textPreview) for (const hunk of diffSequence(left, right)) {
             for (let i = hunk.start; i < hunk.end; i++) changedLeft.add(i);
             for (let i = 0; i < hunk.replacement.length; i++) changedRight.add(hunk.start + offset + i);
             offset += hunk.replacement.length - (hunk.end - hunk.start);
@@ -81,7 +84,7 @@ export class ConflictReviewModal extends SharedModal {
             });
             open.title = Platform.isDesktopApp ? 'Open in the default system application' : 'Open file in Obsidian';
             setIcon(open.createSpan({ attr: { 'aria-hidden': 'true' } }), 'external-link');
-            if (markdown) {
+            if (textPreview) {
                 const code = panel.createEl('pre', { cls: 'crate-conflict-code', attr: { tabindex: '0', 'aria-label': title } });
                 lines.forEach((line, index) => code.createDiv({ text: line || ' ', cls: changed.has(index) ? 'crate-conflict-changed' : '' }));
             } else panel.createEl('p', { text: `${Math.ceil(size / 1024)} KB · Select the title to open this file.` });
@@ -90,7 +93,7 @@ export class ConflictReviewModal extends SharedModal {
         const manual = body.createDiv({ cls: 'crate-conflict-manual' });
         manual.hide();
         const label = manual.createEl('label', { text: 'Result — saved to the original file' });
-        const editor = label.createEl('textarea', { cls: 'crate-conflict-editor', attr: { 'aria-label': 'Result Markdown', spellcheck: 'false' } });
+        const editor = label.createEl('textarea', { cls: 'crate-conflict-editor', attr: { 'aria-label': 'Result text', spellcheck: 'false' } });
         editor.value = this.draft ?? review.currentText ?? '';
         editor.addEventListener('input', () => { this.draft = editor.value; });
         const actions = body.createDiv({ cls: 'crate-conflict-actions' });
@@ -113,10 +116,10 @@ export class ConflictReviewModal extends SharedModal {
                 explanation.setText(explanations[value]);
             });
         }
-        if (markdown) button(toolbar, 'Edit result', () => {
+        if (textPreview) button(toolbar, 'Edit result', () => {
             selected = 'manual'; radios.forEach(radio => { radio.checked = false; });
             manual.show(); primary.textContent = 'Save and resolve'; primary.disabled = false;
-            explanation.setText('Save the edited Markdown to the original file and keep recovery copies of both previous versions.');
+            explanation.setText('Save the edited text to the original file and keep recovery copies of both previous versions.');
             editor.focus();
         });
         const primary = button(actions, 'Resolve conflict', () => { if (selected) void resolve(selected); });
@@ -131,7 +134,8 @@ export class ConflictReviewModal extends SharedModal {
                 new Notice('Conflict resolved. Recovery copies saved on this device.');
             } catch (error) {
                 status.setText(error instanceof Error ? error.message : String(error));
-                this.addReloadButton(status);
+                const retry = status.createDiv({ cls: 'crate-conflict-retry' });
+                this.addReloadButton(retry);
                 controls.forEach(el => { el.disabled = false; }); editor.disabled = false;
             } finally { this.busy = false; }
         };
