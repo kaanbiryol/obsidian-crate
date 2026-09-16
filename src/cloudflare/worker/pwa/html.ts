@@ -24,7 +24,8 @@ html,body,#app{background-color:${PWA_CHROME_COLOR};color-scheme:dark}
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crate">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- Keep the viewport below the native status bar instead of drawing beneath its blur. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="application-name" content="Crate">
 <meta name="mobile-web-app-capable" content="yes">
 <meta id="${PWA_THEME_COLOR_META_ID}" name="theme-color" content="${PWA_CHROME_COLOR}" media="(prefers-color-scheme: dark)">

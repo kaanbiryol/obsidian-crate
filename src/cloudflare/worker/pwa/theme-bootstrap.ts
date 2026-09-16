@@ -7,21 +7,8 @@ import {
 import { PWA_UPDATE_OPENING_PROGRESS, PWA_UPDATE_TRANSITION_KEY, PWA_UPDATE_TRANSITION_MAX_AGE_MS, PWA_UPDATE_TRANSITION_POSITION_KEY } from '../../../pwa/update-transition';
 import { PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
 
-// Run before app startup so installed iOS headers never jump after first paint.
-export const PWA_THEME_BOOTSTRAP_JS = String.raw`(()=>{
-	const ua=navigator.userAgent;
-	const ios=/iPad|iPhone|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
-	const standalone=navigator.standalone||window.matchMedia('(display-mode: standalone)').matches;
-	if(!ios||!standalone)return;
-	const osMajor=Number(ua.match(/\bOS (\d+)[_.]/)?.[1]||0);
-	const safariMajor=Number(ua.match(/\bVersion\/(\d+)(?:\.|\s|$)/)?.[1]||0);
-	// Safari freezes the OS token at 18.x; some Home Screen UAs omit Version/ too.
-	// In that case, base-select (introduced in Safari 27) is a version proxy.
-	// https://bugs.webkit.org/show_bug.cgi?id=298473
-	// https://webkit.org/blog/17967/news-from-wwdc26-webkit-in-safari-27-beta/
-	const modern=safariMajor? safariMajor>=27 : osMajor>=26? osMajor>=27 : window.CSS?.supports('appearance','base-select');
-	if(modern)document.documentElement.dataset.pwaIosScrollEdge='';
-})();` + `
+// Apply the saved theme before app startup to avoid a first-paint flash.
+export const PWA_THEME_BOOTSTRAP_JS = `
 (()=>{let preference='system';try{const stored=localStorage.getItem(${JSON.stringify(PWA_THEME_PREFERENCE_KEY)});if(stored==='light'||stored==='dark')preference=stored}catch{}const systemLight=window.matchMedia(${JSON.stringify(PWA_LIGHT_SCHEME_MEDIA)}).matches;const isLight=preference==='light'||(preference==='system'&&systemLight);const scheme=isLight?'light':'dark';const color=isLight?${JSON.stringify(PWA_LIGHT_CHROME_COLOR)}:${JSON.stringify(PWA_CHROME_COLOR)};const root=document.documentElement;root.dataset.pwaColorScheme=scheme;root.style.setProperty('--pwa-launch-bg',color);root.style.background=color;root.style.colorScheme=scheme;const lightTheme=document.getElementById(${JSON.stringify(PWA_LIGHT_THEME_STYLE_ID)});if(lightTheme)lightTheme.media=preference==='light'?'all':preference==='dark'?'not all':${JSON.stringify(PWA_LIGHT_SCHEME_MEDIA)};const themeColor=document.getElementById(${JSON.stringify(PWA_THEME_COLOR_META_ID)});if(themeColor){themeColor.setAttribute('media','all');themeColor.setAttribute('content',color)}})();
 // Consume the marker before the first paint; ordinary launches stay unchanged.
 (()=>{try{const key=${JSON.stringify(PWA_UPDATE_TRANSITION_KEY)};const positionKey=${JSON.stringify(PWA_UPDATE_TRANSITION_POSITION_KEY)};const started=Number(sessionStorage.getItem(key));const labelTop=Number(sessionStorage.getItem(positionKey));sessionStorage.removeItem(key);sessionStorage.removeItem(positionKey);sessionStorage.removeItem('crate-pwa-update-animation');const age=Date.now()-started;if(started>0&&age>=0&&age<${PWA_UPDATE_TRANSITION_MAX_AGE_MS}){const root=document.documentElement;const top=labelTop>0&&labelTop<window.innerHeight?labelTop:window.innerHeight/2;root.style.setProperty('--pwa-update-label-top',top+'px');root.style.setProperty('--pwa-update-progress','${PWA_UPDATE_OPENING_PROGRESS}');root.dataset.pwaUpdating='restore'}}catch{}})();`;
