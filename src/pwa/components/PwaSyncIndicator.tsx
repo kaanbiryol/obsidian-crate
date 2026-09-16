@@ -11,6 +11,7 @@ interface PwaSyncIndicatorProps {
 	dataMode: DataMode;
 	error: string | null;
 	storageError: string | null;
+	onShowStatus: (label: string) => void;
 }
 
 function syncStatus({ changes, isOffline, refreshing, loading, dataMode, error, storageError }: PwaSyncIndicatorProps) {
@@ -37,11 +38,13 @@ export function PwaSyncIndicator(props: PwaSyncIndicatorProps) {
 	const { state, label } = syncStatus(props);
 	const visualState = useSyncIndicatorMotion(state);
 	return (
-		<div className="pwa-sync-indicator" data-sync-state={state} data-visual-state={visualState} role="status" aria-live="polite" aria-atomic="true" title={label}>
-			<span className="pwa-sync-indicator__halo" aria-hidden="true" />
-			<span className="pwa-sync-indicator__dot" aria-hidden="true" />
-			<span className="pwa-sync-indicator__ripple" aria-hidden="true" />
-			<span className="pwa-sync-indicator__label">{label}</span>
+		<div className="pwa-sync-indicator" data-sync-state={state} data-visual-state={visualState} title={label}>
+			<button className="pwa-sync-indicator__button" type="button" aria-label={`Sync status: ${label}`} onClick={() => props.onShowStatus(label)}>
+				<span className="pwa-sync-indicator__halo" aria-hidden="true" />
+				<span className="pwa-sync-indicator__dot" aria-hidden="true" />
+				<span className="pwa-sync-indicator__ripple" aria-hidden="true" />
+			</button>
+			<span className="pwa-sync-indicator__label" role="status" aria-live="polite" aria-atomic="true">{label}</span>
 		</div>
 	);
 }

@@ -12,18 +12,19 @@ const pending: PendingReminderChange = {
 function render(overrides: Partial<React.ComponentProps<typeof PwaSyncIndicator>> = {}) {
 	return renderToStaticMarkup(React.createElement(PwaSyncIndicator, {
 		changes: [], isOffline: false, refreshing: false, dataMode: 'live', error: null, storageError: null,
+		onShowStatus: () => undefined,
 		...overrides,
 	}));
 }
 
 describe('PWA header sync indicator', () => {
-	it('announces pending changes without adding an interactive control', () => {
+	it('announces pending changes and labels the status control', () => {
 		const markup = render({ changes: [pending] });
 		expect(markup).toContain('data-sync-state="syncing"');
 		expect(markup).toContain('Syncing 1 change');
 		expect(markup).toContain('role="status"');
 		expect(markup).toContain('aria-live="polite"');
-		expect(markup).not.toContain('<button');
+		expect(markup).toContain('aria-label="Sync status: Syncing 1 change"');
 	});
 
 	it('shows initial loading instead of claiming everything is synced', () => {
