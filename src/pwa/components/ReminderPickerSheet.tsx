@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect } from 'react';
 import { ProjectPickerContent } from '@/reminders/ui/reminder-modal/ProjectPickerContent';
 import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
 import {
@@ -16,6 +16,7 @@ interface ReminderPickerSheetProps {
 	onPatch: (patch: Partial<ModalDraft>) => void;
 	onSelect: (patch?: Partial<ModalDraft>) => void;
 	onClose: () => void;
+	onReady: () => void;
 }
 
 export function ReminderPickerSheet({
@@ -26,7 +27,9 @@ export function ReminderPickerSheet({
 	onPatch,
 	onSelect,
 	onClose,
+	onReady,
 }: ReminderPickerSheetProps) {
+	useLayoutEffect(onReady, [onReady]);
 	if (!draft.activePicker) return null;
 
 	if (draft.activePicker === 'date') {
