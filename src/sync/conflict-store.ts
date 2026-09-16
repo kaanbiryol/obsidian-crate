@@ -4,6 +4,7 @@ import type { ConflictRecord } from './types';
 import { createLogger, errorMessage } from '../plugin/logger';
 import { getOriginalPathFromConflictFile, isConflictFile } from './conflict';
 import { getAllVaultFiles } from './file-discovery';
+import { computeHash } from './hasher';
 
 const logger = createLogger('ConflictStore');
 const STORE_FILENAME = 'conflicts.json';
@@ -161,6 +162,35 @@ export class ConflictStore {
 			if (!existing || existing.status === 'resolved') return;
 			existing.status = 'resolved';
 			this.dirty = true;
+			await this.save();
+			this.notifyCountChanged();
+		});
+	}
+
+	/** Retire first-sync review entries only after their exact bytes are installed.
+	 * Keep saved copies and any entry that could represent a real local conflict. */
+	resolveAppliedIncoming(originalPath: string, hash: string): Promise<void> {
+		return this.enqueueMutation(async () => {
+			const candidates = this.data.conflicts.filter(conflict =>
+				conflict.status === 'active' && conflict.originalPath === originalPath
+				&& conflict.cause === 'incoming-review' && conflict.copySide === 'remote'
+				&& conflict.localHash === '' && conflict.remoteHash === hash);
+			if (!candidates.length) return;
+			const adapter = this.app.vault.adapter;
+			let changed = false;
+			for (const conflict of candidates) {
+				try {
+					if (await computeHash(await adapter.readBinary(conflict.conflictPath)) !== hash
+						|| await computeHash(await adapter.readBinary(originalPath)) !== hash) continue;
+				} catch {
+					// Missing or unreadable files are not evidence of resolution.
+					continue;
+				}
+				conflict.status = 'resolved';
+				this.dirty = true;
+				changed = true;
+			}
+			if (!changed) return;
 			await this.save();
 			this.notifyCountChanged();
 		});

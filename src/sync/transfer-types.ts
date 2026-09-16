@@ -18,6 +18,7 @@ interface TransferMarkdownBaseCache {
 
 interface TransferConflictStore {
   record(conflict: RecordConflictInput): Promise<void>;
+  resolveAppliedIncoming?(path: string, hash: string): Promise<void>;
 }
 
 interface TransferApi {

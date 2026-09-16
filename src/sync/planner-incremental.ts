@@ -95,9 +95,12 @@ export async function runIncrementalSync(
     options.progressCallback?.(current, total);
 
     if (downloadRequests.length > 0) {
-      context.reportWork?.('downloading');
+      let downloadsProcessed = 0;
+      context.reportWork?.('downloading', downloadsProcessed, downloadRequests.length);
       await context.parallelDownloadAndSaveFiles(downloadRequests, result, () => {
+        downloadsProcessed++;
         current++;
+        context.reportWork?.('downloading', downloadsProcessed, downloadRequests.length);
         options.progressCallback?.(current, total);
       });
       for (const path of restoreDeletedPaths) {

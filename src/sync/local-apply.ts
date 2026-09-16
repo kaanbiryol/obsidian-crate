@@ -179,11 +179,12 @@ async function writeLocalContent(
 		}
 		return;
 	}
-	if (snapshot.exists || isHiddenPath(path)) {
+	if (snapshot.exists) {
 		return preserveIncomingForReview(context, path, content, snapshot.hash ?? '');
 	}
-	// Vault.createBinary refuses an existing visible path, including a create
-	// that races our earlier snapshot. Never fall back to an overwriting write.
+	// createBinary checks adapter.exists for hidden paths too. Its return value
+	// can be null for unindexed files; only the completed write matters here.
+	// Never fall back to an overwriting write if the host rejects creation.
 	await vault.createBinary(path, content);
 }
 

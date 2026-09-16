@@ -137,7 +137,6 @@ export async function runSyncWorkflow(
 		context.throwIfDestroyed();
 
 		if (downloadDiffs.length > 0) {
-			context.updateState({ work: { phase: 'downloading' } });
 			const downloadRequests: DownloadRequest[] = [];
 			for (const diff of downloadDiffs) {
 				if (!diff.remoteHash) {
@@ -152,10 +151,17 @@ export async function runSyncWorkflow(
 				});
 			}
 			const beforeDownloads = current;
+			let downloadsProcessed = 0;
+			context.updateState({ work: { phase: 'downloading', current: downloadsProcessed, total: downloadRequests.length } });
 			await context.parallelDownloadAndSaveFiles(
 				downloadRequests,
 				result,
-				() => { current++; progressCallback?.(current, total); },
+				() => {
+					downloadsProcessed++;
+					current++;
+					context.updateState({ work: { phase: 'downloading', current: downloadsProcessed, total: downloadRequests.length } });
+					progressCallback?.(current, total);
+				},
 			);
 			for (const diff of downloadDiffs) {
 				if (
