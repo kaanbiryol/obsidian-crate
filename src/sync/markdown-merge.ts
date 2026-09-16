@@ -49,6 +49,7 @@ export function mergeMarkdownContent(
 
 	const localHunks = diffSequence(baseLines, localLines);
 	const remoteHunks = diffSequence(baseLines, remoteLines);
+	if (!localHunks || !remoteHunks) return { success: false, reason: 'too-large' };
 	const mergedLines = mergeSequences(baseLines, localHunks, remoteHunks, {
 		mergeOverlap: createInlineMerger(baseLines),
 	});

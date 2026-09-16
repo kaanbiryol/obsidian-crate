@@ -10,6 +10,8 @@ for (const browserType of [chromium, webkit]) {
 	const browser = await browserType.launch();
 	try {
 		const page = await browser.newPage();
+		const errors = [];
+		page.on('pageerror', error => errors.push(error.message));
 		await page.route('**/*', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Cache recovery</title>' }));
 		await page.goto('https://pwa-cache-recovery.test');
 		await page.addScriptTag({ content: outputFiles[0].text });
@@ -91,6 +93,26 @@ for (const browserType of [chromium, webkit]) {
 			IDBObjectStore.prototype.put = nativePut;
 			const afterQuota = await cache.loadCachedReminderSnapshot('Reminders');
 
+			// A request succeeding does not mean its transaction committed.
+			IDBObjectStore.prototype.put = function (...args) {
+				const request = nativePut.apply(this, args);
+				if (this.name === 'snapshots') request.addEventListener('success', () => this.transaction.abort());
+				return request;
+			};
+			await cache.saveCachedReminderSnapshot('Reminders', [{ ...reminder, content: 'Aborted write' }], ['Inbox'], 350, 'aborted');
+			const abortedWriteProblem = cache.reminderCacheHealth.getSnapshot();
+			IDBObjectStore.prototype.put = nativePut;
+			const afterAbortedWrite = await cache.loadCachedReminderSnapshot('Reminders');
+			const nativeGet = IDBObjectStore.prototype.get;
+			IDBObjectStore.prototype.get = function (...args) {
+				const request = nativeGet.apply(this, args);
+				if (this.name === 'snapshots') request.addEventListener('success', () => this.transaction.abort());
+				return request;
+			};
+			const abortedRead = await cache.loadCachedReminderSnapshot('Reminders');
+			const abortedReadProblem = cache.reminderCacheHealth.getSnapshot();
+			IDBObjectStore.prototype.get = nativeGet;
+
 			IDBFactory.prototype.open = () => { throw new DOMException('Injected denied storage', 'SecurityError'); };
 			const denied = await cache.loadCachedReminderSnapshot('Reminders');
 			const deniedProblem = cache.reminderCacheHealth.getSnapshot();
@@ -117,7 +139,8 @@ for (const browserType of [chromium, webkit]) {
 			await cache.saveCachedReminderSnapshot('Reminders', [reminder], ['Inbox'], 400, 'four');
 			const afterClear = await cache.loadCachedReminderSnapshot('Reminders');
 			return { snapshot, migrated, migration, interrupted, afterInterruption, retried, blocked, blockedMs, blockedProblem, afterAbandonedOpen, unblocked,
-				damaged, damagedProblem, beforeRebuild, rebuilt, afterRebuild, healthy, quotaProblem, afterQuota, denied, deniedProblem, otherSession,
+				damaged, damagedProblem, beforeRebuild, rebuilt, afterRebuild, healthy, quotaProblem, afterQuota,
+				abortedWriteProblem, afterAbortedWrite, abortedRead, abortedReadProblem, denied, deniedProblem, otherSession,
 				future, futureProblem, futureReset, futurePreserved, blockedClear, afterClear,
 				pending: localStorage.getItem('crate-reminder-outbox:recovery-fixture'), draft: sessionStorage.getItem('crate-reminder-draft:recovery-fixture') };
 		});
@@ -134,11 +157,15 @@ for (const browserType of [chromium, webkit]) {
 		assert.deepEqual(results.afterRebuild.raw.map(row => row.folderPath), ['Other']);
 		assert.equal(results.healthy.savedAt, 200); assert.equal(results.quotaProblem, 'unavailable');
 		assert.deepEqual(results.afterQuota, results.healthy);
+		assert.equal(results.abortedWriteProblem, 'unavailable');
+		assert.deepEqual(results.afterAbortedWrite, results.healthy);
+		assert.equal(results.abortedRead, null); assert.equal(results.abortedReadProblem, 'unavailable');
 		assert.equal(results.denied, null); assert.equal(results.deniedProblem, 'unavailable'); assert.equal(results.otherSession, null);
 		assert.equal(results.future, null); assert.equal(results.futureProblem, 'unsupported'); assert.equal(results.futureReset, false);
 		assert.deepEqual(results.futurePreserved, { version: 3, stores: ['future-store', 'snapshots'], raw: [results.snapshot] });
 		assert.equal(results.blockedClear, false); assert.equal(results.afterClear.savedAt, 400);
 		assert.equal(results.pending, 'local-only text must survive'); assert.equal(results.draft, results.pending);
+		assert.deepEqual(errors, [], 'Cache failures must not leak unhandled promise rejections');
 		console.log(`${browserType.name()}: native IndexedDB migration, interruption, blocking, corruption, quota, session isolation and future-format preservation passed`);
 	} finally { await browser.close(); }
 }

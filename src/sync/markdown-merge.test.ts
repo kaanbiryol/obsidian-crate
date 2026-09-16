@@ -119,6 +119,17 @@ describe('mergeMarkdownContent', () => {
 		}
 	});
 
+	it('uses jsdiff alignment when another device duplicates the base line', () => {
+		const base = toArrayBuffer('# A\n');
+		const edited = toArrayBuffer('# B\n');
+		const duplicated = toArrayBuffer('# C\n# A\n# A\n');
+		for (const [local, remote] of [[edited, duplicated], [duplicated, edited]]) {
+			const result = mergeMarkdownContent(base, local!, remote!);
+			expect(result.success).toBe(true);
+			if (result.success) expect(result.text).toBe('# C\n# B\n# A\n');
+		}
+	});
+
 	it('rejects overlapping different edits', () => {
 		const result = mergeMarkdownContent(
 			toArrayBuffer('a\nold\nb\n'),

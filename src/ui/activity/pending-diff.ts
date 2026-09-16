@@ -17,7 +17,7 @@ export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff,
     }
     const diff = buildDiff(snapshot.before, snapshot.after);
     if (diff.limited) {
-        container.createDiv({ cls: 'crate-diff-message', text: 'This file has too many lines to preview.' });
+        container.createDiv({ cls: 'crate-diff-message', text: 'This comparison is too large to preview. Open the file to review it.' });
         return;
     }
     if (diff.added === 0 && diff.removed === 0) {

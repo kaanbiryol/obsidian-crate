@@ -1,3 +1,5 @@
+import type { InferOutput } from 'valibot';
+import type { reminderDraftSchema, reminderRecordSchema } from './reminder-storage-validation';
 import type { RecurrenceRule } from '@/reminders/types/reminder';
 
 export type ModalMode = 'create' | 'edit';
@@ -9,20 +11,7 @@ export type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 export type LoadReminders = (options?: { silent?: boolean; maxAgeMs?: number }) => Promise<void>;
 export type ShowToast = (kind: ToastKind, message: string) => void;
 
-export interface ReminderRecord {
-	id: string;
-	revision?: string;
-	content: string;
-	description?: string;
-	dueDate?: string;
-	dueDatetime?: string;
-	priority: 1 | 4;
-	completed: boolean;
-	project: string;
-	recurrence?: RecurrenceRule;
-	filePath: string;
-	lineNumber?: number;
-}
+export type ReminderRecord = InferOutput<typeof reminderRecordSchema>;
 
 export interface StoredConfig {
 	folderPath: string;
@@ -30,19 +19,7 @@ export interface StoredConfig {
 	allDayNotificationTime: string | null;
 }
 
-export interface ModalDraft {
-  originalDueDatetime?: string;
-	content: string;
-	description: string;
-	project: string;
-	defaultProject: string;
-	priority: ReminderRecord['priority'];
-	dueDate: string;
-	dueTime: string;
-	recurrence?: RecurrenceRule;
-	activePicker: ModalPickerId | null;
-	deleteConfirm: boolean;
-}
+export type ModalDraft = InferOutput<typeof reminderDraftSchema>;
 
 export interface ModalState {
 	mode: ModalMode;

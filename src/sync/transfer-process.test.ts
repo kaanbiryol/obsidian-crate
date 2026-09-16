@@ -80,11 +80,17 @@ describe('processDiff conflict handling', () => {
 		vi.useRealTimers();
 	});
 
-	it('creates a conflict copy and replaces the main file with remote content', async () => {
+	it.each(['missing-base', 'edit-budget'] as const)('preserves both versions when auto-merge cannot run (%s)', async reason => {
 		const harness = createProcessHarness();
 		const path = 'notes/merge.md';
-		const local = 'LOCAL\nline2\nline3';
-		const remote = 'line1\nline2\nREMOTE';
+		const lines = (prefix: string) => Array.from({ length: 1_100 }, (_, i) => `${prefix} ${i}`).join('\n');
+		const local = reason === 'edit-budget' ? lines('local') : 'LOCAL\nline2\nline3';
+		const remote = reason === 'edit-budget' ? lines('remote') : 'line1\nline2\nREMOTE';
+		if (reason === 'edit-budget') {
+			const base = toArrayBuffer(lines('base'));
+			harness.localManifest.getEntry.mockReturnValue({ hash: await computeHash(base), size: base.byteLength, modified: '2026-02-14T00:00:00.000Z' });
+			harness.markdownBaseCache.readBase.mockResolvedValue(base);
+		}
 		const localFile = { path, extension: 'md' };
 		harness.vault.getAbstractFileByPath.mockReturnValue(localFile);
 		harness.adapter.readBinary.mockResolvedValue(toArrayBuffer(local));

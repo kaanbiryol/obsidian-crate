@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildDiff, groupDiffContext } from './diff-model';
 
 describe('diff presentation', () => {
@@ -46,5 +46,33 @@ describe('diff presentation', () => {
     });
     it('bounds work for files with excessive line counts', () => {
         expect(buildDiff('a\n'.repeat(4_001), '').limited).toBe(true);
+    });
+    it('matches repeated lines without treating the entire region as replaced', () => {
+        const before = 'red\nblue\nred\nblue', after = 'blue\nred\nblue\nred';
+        const diff = buildDiff(before, after);
+        expect(diff).toMatchObject({ added: 1, removed: 1, limited: false });
+        expect(diff.lines.filter(line => line.kind !== 'added').map(line => line.text).join('\n')).toBe(before);
+        expect(diff.lines.filter(line => line.kind !== 'removed').map(line => line.text).join('\n')).toBe(after);
+    });
+    it('preserves blank lines, whitespace, Unicode, and exact line endings', () => {
+        const before = 'Café ☕\r\n\r\n  task\r\n', after = 'Café ☕\n\n\ttask\n';
+        const diff = buildDiff(before, after);
+        expect(diff.limited).toBe(false);
+        expect(diff.lines.filter(line => line.kind !== 'added').map(line => line.text)).toEqual(before.split('\n'));
+        expect(diff.lines.filter(line => line.kind !== 'removed').map(line => line.text)).toEqual(after.split('\n'));
+        expect(diff.lines.filter(line => line.before).map(line => line.before)).toEqual([1, 2, 3, 4]);
+        expect(diff.lines.filter(line => line.after).map(line => line.after)).toEqual([1, 2, 3, 4]);
+    });
+    it('gives up on very different files without showing partial results or zero-change statistics', () => {
+        const before = Array.from({ length: 1_100 }, (_, i) => `before ${i}`).join('\n');
+        const after = Array.from({ length: 1_100 }, (_, i) => `after ${i}`).join('\n');
+        expect(buildDiff(before, after)).toEqual({ lines: [], added: 0, removed: 0, limited: true });
+    });
+    it('stops a comparison when its UI time budget expires', () => {
+        let clock = 0;
+        const now = vi.spyOn(Date, 'now').mockImplementation(() => clock += 100);
+        try {
+            expect(buildDiff('a\nb', 'c\nd').limited).toBe(true);
+        } finally { now.mockRestore(); }
     });
 });

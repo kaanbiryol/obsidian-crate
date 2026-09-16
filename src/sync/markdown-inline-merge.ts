@@ -70,7 +70,10 @@ export function createInlineMerger(baseLines: string[]): (local: ChangeHunk, rem
 				|| characters > MAX_INLINE_CHARACTERS || characters > remainingCharacters) return null;
 			remainingCharacters -= characters;
 			const tokens = tokenize(base);
-			const result = mergeSequences(tokens, diffSequence(tokens, tokenize(left)), diffSequence(tokens, tokenize(right)), {
+			const localHunks = diffSequence(tokens, tokenize(left));
+			const remoteHunks = diffSequence(tokens, tokenize(right));
+			if (!localHunks || !remoteHunks) return null;
+			const result = mergeSequences(tokens, localHunks, remoteHunks, {
 				combineInsertions: false,
 			});
 			if (!result) return null;

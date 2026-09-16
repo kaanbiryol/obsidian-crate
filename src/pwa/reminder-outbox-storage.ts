@@ -1,8 +1,8 @@
+import * as v from 'valibot';
+import { isStoredReminderChange, OPERATION_ID, storedChangeSchema } from './reminder-outbox-validation';
 import type { PendingReminderChange } from './reminder-outbox-types';
-import { isStoredReminderDraft, isStoredReminderRecord } from './reminder-storage-validation';
 
 const PREFIX = 'crate-reminder-outbox:';
-const OPERATION_ID = /^[a-zA-Z0-9_-]{16,128}$/;
 const STORAGE_ERROR = 'Could not access pending changes on this device. Free up storage and try again.';
 const CORRUPT_ERROR = 'Pending changes on this device could not be read. Keep this app open and try again.';
 
@@ -29,60 +29,10 @@ interface StoredChange {
 	change: PendingReminderChange;
 }
 
-function object(value: unknown): value is Record<string, unknown> {
-	return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function strings(value: unknown): value is string[] {
-	return Array.isArray(value) && value.every(item => typeof item === 'string');
-}
-
-function validRecord(value: unknown, id: string, folderPath: string): boolean {
-	return isStoredReminderRecord(value, folderPath) && value.id === id;
-}
-
-function validChange(value: unknown, operationId: string, folderPath: string): value is PendingReminderChange {
-	if (!object(value) || value.operationId !== operationId || !OPERATION_ID.test(operationId)
-		|| !['pending', 'uncertain', 'failed'].includes(String(value.status))
-		|| !Number.isSafeInteger(value.attempts) || Number(value.attempts) < 0
-		|| typeof value.retryAt !== 'number' || !Number.isFinite(value.retryAt) || value.retryAt < 0
-		|| (value.ambiguous !== undefined && typeof value.ambiguous !== 'boolean')
-		|| (value.reviewRequired !== undefined && typeof value.reviewRequired !== 'boolean')
-		|| (value.reviewRequired === true && (value.status !== 'failed' || value.ambiguous !== true))
-		|| typeof value.body !== 'string' || (value.error !== undefined && typeof value.error !== 'string')) return false;
-	let body: unknown;
-	try { body = JSON.parse(value.body); } catch { return false; }
-	if (!object(body) || body.operationId !== operationId || body.folderPath !== folderPath) return false;
-	if (value.followUp !== undefined && (!object(value.followUp) || value.kind !== 'save'
-		|| typeof value.followUp.operationId !== 'string' || !OPERATION_ID.test(value.followUp.operationId)
-		|| value.followUp.operationId === operationId || !object(value.followUp.input)
-		|| value.followUp.input.folderPath !== folderPath || typeof value.followUp.input.content !== 'string'
-		|| typeof value.followUp.input.project !== 'string')) return false;
-	if (value.kind === 'reorder') {
-		return value.path === '/reminders/reorder' && value.method === 'POST'
-			&& typeof value.project === 'string' && body.project === value.project
-			&& strings(value.orderedIds) && strings(body.expectedOrder)
-			&& JSON.stringify(body.orderedIds) === JSON.stringify(value.orderedIds);
-	}
-	if (typeof value.recordId !== 'string' || !value.recordId || body.id !== value.recordId) return false;
-	if (value.optimistic !== undefined && !validRecord(value.optimistic, value.recordId, folderPath)) return false;
-	if (value.previous !== undefined && !validRecord(value.previous, value.recordId, folderPath)) return false;
-	if (value.modal !== undefined && (!object(value.modal) || !isStoredReminderDraft(value.modal.draft)
-		|| !['create', 'edit'].includes(String(value.modal.mode)))) return false;
-	if (value.kind === 'save') return value.method === 'POST'
-		&& ['/reminders/create', '/reminders/update'].includes(String(value.path))
-		&& typeof body.content === 'string' && typeof body.project === 'string';
-	if (value.kind === 'complete') return value.path === '/reminders/set-completed'
-		&& value.method === 'POST' && typeof body.completed === 'boolean';
-	return value.kind === 'delete' && value.path === '/reminders/delete' && value.method === 'DELETE';
-}
-
 function readStored(raw: string, operationId: string, folderPath: string): StoredChange {
 	let stored: unknown;
 	try { stored = JSON.parse(raw); } catch { throw new Error(CORRUPT_ERROR); }
-	if (!object(stored) || stored.version !== 1 || typeof stored.createdAt !== 'number'
-		|| !Number.isFinite(stored.createdAt) || stored.createdAt < 0
-		|| !validChange(stored.change, operationId, folderPath)) throw new Error(CORRUPT_ERROR);
+	if (!v.is(storedChangeSchema, stored) || !isStoredReminderChange(stored.change, operationId, folderPath)) throw new Error(CORRUPT_ERROR);
 	return stored as unknown as StoredChange;
 }
 
@@ -155,7 +105,7 @@ export async function createReminderOutboxStorage(authToken: string, folderPath:
 				.map(entry => entry.change);
 		},
 		put(change) {
-			if (!validChange(change, change.operationId, folderPath)) throw new Error(CORRUPT_ERROR);
+			if (!isStoredReminderChange(change, change.operationId, folderPath)) throw new Error(CORRUPT_ERROR);
 			const key = scope + change.operationId;
 			const existing = read(key);
 			const canCorrect = existing?.change.status === 'failed' && !existing.change.ambiguous;

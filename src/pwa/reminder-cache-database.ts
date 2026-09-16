@@ -1,3 +1,5 @@
+import { wrap, type IDBPDatabase } from 'idb';
+
 const CACHE_DATABASE_NAME = 'crate-reminders';
 export const CACHE_STORE_NAME = 'snapshots';
 export const FRESHNESS_STORE_NAME = 'freshness';
@@ -25,7 +27,7 @@ function supportedStores(database: IDBDatabase, transaction: IDBTransaction, ver
 }
 
 /** A blocked/failed upgrade must not hold bootstrap or a confirmed mutation open. */
-export function openCacheDatabase(): Promise<IDBDatabase> {
+export function openCacheDatabase(): Promise<IDBPDatabase> {
 	return new Promise((resolve, reject) => {
 		let abandoned = false;
 		const fail = (reason: CacheProblem, error?: unknown) => {
@@ -41,18 +43,23 @@ export function openCacheDatabase(): Promise<IDBDatabase> {
 		catch (error) { fail('unavailable', error); return; }
 		request.onblocked = () => fail('blocked');
 		request.onupgradeneeded = event => {
-			if (abandoned) { request.transaction?.abort(); return; }
-			const database = request.result;
-			if (event.oldVersion === 0) {
-				database.createObjectStore(CACHE_STORE_NAME, { keyPath: 'folderPath' });
-				database.createObjectStore(FRESHNESS_STORE_NAME, { keyPath: 'folderPath' });
-			} else if (event.oldVersion === 1 && request.transaction && supportedStores(database, request.transaction, 1)) {
-				// Add only disposable freshness metadata. Existing snapshots and
-				// their bytes survive an interrupted migration transaction.
-				if (!database.objectStoreNames.contains(FRESHNESS_STORE_NAME)) database.createObjectStore(FRESHNESS_STORE_NAME, { keyPath: 'folderPath' });
-			} else {
-				fail('unsupported');
-				request.transaction?.abort();
+			try {
+				if (abandoned) { request.transaction?.abort(); return; }
+				const database = request.result;
+				if (event.oldVersion === 0) {
+					database.createObjectStore(CACHE_STORE_NAME, { keyPath: 'folderPath' });
+					database.createObjectStore(FRESHNESS_STORE_NAME, { keyPath: 'folderPath' });
+				} else if (event.oldVersion === 1 && request.transaction && supportedStores(database, request.transaction, 1)) {
+					// Add only disposable freshness metadata. Existing snapshots and
+					// their bytes survive an interrupted migration transaction.
+					if (!database.objectStoreNames.contains(FRESHNESS_STORE_NAME)) database.createObjectStore(FRESHNESS_STORE_NAME, { keyPath: 'folderPath' });
+				} else {
+					fail('unsupported');
+					request.transaction?.abort();
+				}
+			} catch (error) {
+				fail('unavailable', error);
+				try { request.transaction?.abort(); } catch { /* The upgrade may already have aborted. */ }
 			}
 		};
 		request.onsuccess = () => {
@@ -65,7 +72,8 @@ export function openCacheDatabase(): Promise<IDBDatabase> {
 			} catch (error) { database.close(); fail('unsupported', error); return; }
 			clearTimeout(timer);
 			database.onversionchange = () => database.close();
-			resolve(database);
+			// Keep native open/upgrade fencing above; idb handles transaction promises.
+			resolve(wrap(database));
 		};
 		request.onerror = () => fail(request.error?.name === 'VersionError' ? 'unsupported' : 'unavailable', request.error);
 	});
