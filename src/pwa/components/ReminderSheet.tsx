@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useKeyboardHeight } from '@/reminders/ui/hooks/useKeyboardHeight';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -17,8 +17,9 @@ import { PwaDeleteConfirmation } from './PwaDeleteConfirmation';
 import { buildDeleteConfirmationMessage } from '@/reminders/ui/reminder-modal/deleteConfirmation';
 import { useEditorSheetHeight } from '../hooks/useEditorSheetHeight';
 import { DeferredNotice } from './DeferredNotice';
-const ReminderPickerSheet = lazy(() => import('./ReminderPickerSheet')
-	.then(module => ({ default: module.ReminderPickerSheet })));
+const loadReminderPickerSheet = () => import('./ReminderPickerSheet')
+	.then(module => ({ default: module.ReminderPickerSheet }));
+const ReminderPickerSheet = lazy(loadReminderPickerSheet);
 const ReminderDraftRecoverySheet = lazy(() => import('./ReminderDraftRecoverySheet')
 	.then(module => ({ default: module.ReminderDraftRecoverySheet })));
 
@@ -58,6 +59,20 @@ function ReminderEditorSheet({
 }: ReminderSheetProps) {
 	// Keep keystrokes local so the reminder list does not render behind the sheet.
 	const [modal, setModal] = useState(() => restoreReminderDraft(initialModal, folderPath));
+	const [pickerReady, setPickerReady] = useState(false);
+	const handlePickerReady = useCallback(() => setPickerReady(true), []);
+	const [preloadedPicker, setPreloadedPicker] = useState<typeof import('./ReminderPickerSheet').ReminderPickerSheet | null>(null);
+	const PickerSheet = preloadedPicker ?? ReminderPickerSheet;
+	useEffect(() => {
+		// Fetch and evaluate pickers while the editor opens, before the first chip
+		// tap. Render the resolved component directly to avoid Suspense's first
+		// fallback delay even when the dynamic import is already cached.
+		let active = true;
+		void loadReminderPickerSheet().then(module => {
+			if (active) setPreloadedPicker(() => module.default);
+		}).catch(() => undefined);
+		return () => { active = false; };
+	}, []);
 	const editorScreenRef = useRef<ReminderEditorScreenHandle | null>(null);
 	const onClose = () => {
 		editorScreenRef.current?.dismissKeyboard();
@@ -125,11 +140,15 @@ function ReminderEditorSheet({
 	const stageClosedOffset = isStageClosing
 		? pickerTransitionClosedOffsetRef.current
 		: '100%';
+	// Lazy picker code may arrive after the outgoing animation. Keep its stage
+	// below the viewport until the content has mounted and has a real height.
+	const isPickerLoading = activeScreen !== 'editor' && activeScreen !== 'delete' && !pickerReady;
 	const handleReminderStageAnimationComplete = useCallback(() => {
+		if (isPickerLoading) return;
 		pickerTransitionClosedOffsetRef.current = '100%';
 		pickerTransitionKeyboardInsetRef.current = 0;
 		handleStageAnimationComplete();
-	}, [handleStageAnimationComplete]);
+	}, [handleStageAnimationComplete, isPickerLoading]);
 	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
 		activeKey: activeScreen,
 		autoFocus: false,
@@ -162,12 +181,12 @@ function ReminderEditorSheet({
 				ref={reminderStageRef}
 				className="pwa-reminder-sheet-stage"
 				initial={false}
-				animate={{ y: isStageClosing ? stageClosedOffset : '0%' }}
-				transition={prefersReducedMotion
+				animate={{ y: isStageClosing || isPickerLoading ? stageClosedOffset : '0%' }}
+				transition={prefersReducedMotion || isPickerLoading
 					? { duration: 0 }
 					: isStageClosing
-						? { duration: 0.26, ease: [0.4, 0, 1, 1] }
-						: { duration: 0.36, ease: [0.32, 0.72, 0, 1] }}
+						? { duration: 0.18, ease: [0.4, 0, 1, 1] }
+						: { duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
 				onAnimationComplete={handleReminderStageAnimationComplete}
 			>
 				<ReminderEditorScreen
@@ -206,7 +225,7 @@ function ReminderEditorSheet({
 				)}
 				{activeScreen !== 'editor' && activeScreen !== 'delete' && (
 					<div className="pwa-reminder-sheet-screen pwa-reminder-sheet-screen--picker is-active">
-						<Suspense fallback={null}><ReminderPickerSheet
+						<Suspense fallback={null}><PickerSheet
 							isDark={colorScheme === 'dark'}
 							draft={modal.draft}
 							dialogRef={setDialogRef}
@@ -214,6 +233,7 @@ function ReminderEditorSheet({
 							onPatch={patchDraft}
 							onSelect={returnToEditor}
 							onClose={() => returnToEditor()}
+							onReady={handlePickerReady}
 						/></Suspense>
 					</div>
 				)}
