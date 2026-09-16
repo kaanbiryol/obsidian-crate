@@ -28,6 +28,7 @@ export async function recordAppliedContent(
   const entry = { hash, size: content.byteLength, modified, revision };
   context.localManifest.setEntry(path, entry);
   if (isMarkdownPath(path)) await context.markdownBaseCache?.putBase(path, hash, content);
+  await context.conflictStore?.resolveAppliedIncoming?.(path, hash);
   await context.api.recordMergeApplication?.(path, hash, 'local-applied');
   return entry;
 }

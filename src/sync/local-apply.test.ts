@@ -38,7 +38,7 @@ function harness(path: string, initial: ArrayBuffer) {
 }
 
 describe('safe local application', () => {
-	it.each(['notes/note.md', '.hidden/note.md', 'drawing.canvas', 'settings.json', '.hidden/settings.json'])('retains an edit arriving after the hash check: %s', async (path) => {
+	it.each(['notes/note.md', '.hidden/note.md', 'drawing.canvas', 'settings.json', '.hidden/settings.json', '.obsidian/plugins/omnisearch/data.json'])('retains an edit arriving after the hash check: %s', async (path) => {
 		const original = encode('original');
 		const h = harness(path, original);
 		h.beforeProcess(() => h.files.set(path, encode('new local edit')));
@@ -97,14 +97,15 @@ describe('safe local application', () => {
 		expect(h.vault.process).not.toHaveBeenCalled();
 	});
 
-	it('does not overwrite a concurrent visible create', async () => {
+	it.each(['new.png', '.obsidian/plugins/omnisearch/data.json', '.obsidian/themes/Minimal/theme.css'])('does not overwrite a create detected by the host: %s', async (target) => {
 		const h = harness('unrelated.md', encode('unrelated'));
 		h.vault.createBinary.mockImplementation(async (path) => {
 			h.files.set(path, encode('created by another plugin'));
 			throw new Error('File exists');
 		});
-		await expect(applyRemoteContentIfUnchanged(h.context, 'new.png', encode('remote'), null)).rejects.toThrow('File exists');
-		expect(decode(h.files.get('new.png')!)).toBe('created by another plugin');
+		await expect(applyRemoteContentIfUnchanged(h.context, target, encode('remote'), null)).rejects.toThrow('File exists');
+		expect(decode(h.files.get(target)!)).toBe('created by another plugin');
+		expect(h.vault.adapter.writeBinary).not.toHaveBeenCalled();
 	});
 });
 
