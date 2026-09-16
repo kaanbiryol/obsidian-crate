@@ -63,7 +63,7 @@ describe('activity history', () => {
 
     it('spells out transfer and deletion counts', () => {
         const container = render({ downloaded: 2, deleted: 3 });
-        expect(container.collectText()).toContain('1 uploaded, 2 downloaded, 3 deleted');
+        expect(container.collectText()).toContain('1 uploaded 2 downloaded 3 deleted');
     });
 
     it('retains failure, conflict, and resolved-race information', () => {
@@ -73,7 +73,7 @@ describe('activity history', () => {
             resolvedRaces: [{ path: 'Draft.md', resolution: 'kept-local-edit' }],
         });
         expect(find(container, 'crate-history-entry')?.classNames.has('is-error')).toBe(true);
-        expect(container.collectText()).toContain('Failed (2 errors), 1 conflict, 1 race resolved');
+        expect(container.collectText()).toContain('Failed (2 errors) 1 uploaded 1 conflict 1 race resolved');
         expect(container.collectText()).toContain('Edit/delete race: kept local edit');
     });
 

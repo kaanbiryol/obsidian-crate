@@ -27,6 +27,11 @@ export function renderHistoryPanel(container: HTMLElement, history: SyncHistoryE
 
 function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expandable: boolean): void {
 	const header = element.createDiv({ cls: 'crate-history-header' });
+	if (expandable) {
+		const chevron = header.createDiv({ cls: 'crate-history-chevron', attr: { 'aria-hidden': 'true' } });
+		setIcon(chevron, 'chevron-right');
+	}
+	renderHistorySummary(header, entry);
 	const meta = header.createDiv({ cls: 'crate-history-meta' });
 	if (entry.type !== 'sync') {
         meta.createSpan({ text: entry.type === 'initial' ? 'Initial sync' : 'Full sync', cls: 'crate-history-type' });
@@ -35,15 +40,6 @@ function renderHistoryHeader(element: HTMLElement, entry: SyncHistoryEntry, expa
     timestamp.setAttribute('title', new Intl.DateTimeFormat(undefined, {
         dateStyle: 'long', timeStyle: 'long', hourCycle: 'h23',
     }).format(new Date(entry.timestamp)));
-	header.createSpan({
-		text: formatSummary(entry),
-		cls: `crate-history-summary${entry.success ? '' : ' crate-history-summary-error'}`,
-	});
-	if (expandable) {
-		const chevron = header.createDiv({ cls: 'crate-history-chevron' });
-		setIcon(chevron, 'chevron-down');
-        chevron.setAttribute('aria-hidden', 'true');
-	}
 }
 
 function renderHistoryFiles(container: HTMLElement, entry: SyncHistoryEntry): void {
@@ -97,38 +93,28 @@ function formatTimestamp(iso: string): string {
     }).format(date);
 }
 
-function formatSummary(entry: SyncHistoryEntry): string {
-	if (!entry.success) {
-		const parts = [`Failed (${entry.errorCount} error${entry.errorCount !== 1 ? 's' : ''})`];
-		if (entry.merged > 0) parts.push(`${entry.merged} merged`);
-		if (entry.conflictCount > 0) {
-			parts.push(`${entry.conflictCount} conflict${entry.conflictCount !== 1 ? 's' : ''}`);
-		}
-		if ((entry.resolvedRaceCount ?? 0) > 0) {
-			parts.push(`${entry.resolvedRaceCount} race${entry.resolvedRaceCount !== 1 ? 's' : ''} resolved`);
-		}
-		return parts.join(', ');
-	}
-
-	if (
-		entry.uploaded === 0
-		&& entry.downloaded === 0
-		&& entry.merged === 0
-		&& entry.deleted === 0
-		&& entry.conflictCount === 0
-		&& (entry.resolvedRaceCount ?? 0) === 0
-	) return 'No changes';
-
-	const parts: string[] = [];
-	if (entry.uploaded > 0) parts.push(`${entry.uploaded} uploaded`);
-	if (entry.downloaded > 0) parts.push(`${entry.downloaded} downloaded`);
-	if (entry.merged > 0) parts.push(`${entry.merged} merged`);
-	if (entry.deleted > 0) parts.push(`${entry.deleted} deleted`);
-	if (entry.conflictCount > 0) {
-		parts.push(`${entry.conflictCount} conflict${entry.conflictCount !== 1 ? 's' : ''}`);
-	}
-	if ((entry.resolvedRaceCount ?? 0) > 0) {
-		parts.push(`${entry.resolvedRaceCount} race${entry.resolvedRaceCount !== 1 ? 's' : ''} resolved`);
-	}
-	return parts.join(', ');
+function renderHistorySummary(header: HTMLElement, entry: SyncHistoryEntry): void {
+    const summary = header.createDiv({ cls: 'crate-history-summary' });
+    if (!entry.success) {
+        summary.createSpan({
+            text: `Failed (${entry.errorCount} error${entry.errorCount !== 1 ? 's' : ''})`,
+            cls: 'crate-history-summary-error',
+        });
+    }
+    const metrics = [
+        { count: entry.uploaded, label: 'uploaded' },
+        { count: entry.downloaded, label: 'downloaded' },
+        { count: entry.merged, label: 'merged' },
+        { count: entry.deleted, label: 'deleted' },
+        { count: entry.conflictCount, label: entry.conflictCount === 1 ? 'conflict' : 'conflicts' },
+        { count: entry.resolvedRaceCount ?? 0, label: entry.resolvedRaceCount === 1 ? 'race resolved' : 'races resolved' },
+    ].filter(metric => metric.count > 0);
+    for (const metric of metrics) {
+        const stat = summary.createSpan({ cls: 'crate-history-stat' });
+        stat.createSpan({ text: metric.count.toLocaleString(), cls: 'crate-history-count' });
+        stat.createSpan({ text: metric.label });
+    }
+    if (entry.success && metrics.length === 0) {
+        summary.createSpan({ text: 'No changes', cls: 'crate-history-unchanged' });
+    }
 }

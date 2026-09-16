@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createHarness, type Harness } from './engine-test-harness';
+import { createHarness, toArrayBuffer, type Harness } from './engine-test-harness';
 import { createDeferred } from './runtime-test-harness';
+import { computeHash } from './hasher';
 
 let harness: Harness;
 const path = '.vault-config/plugins/example/data.json';
@@ -68,4 +69,15 @@ it('does not queue an inspection that completes after unload', async () => {
 	pendingStat.resolve(fileStat);
 	await pending;
 	expect(harness.engine.getPendingPaths()).toEqual([]);
+});
+
+it('keeps touched configuration files visible even when their contents match the last sync', async () => {
+	const bytes = toArrayBuffer('same bytes');
+	harness.localManifest.getEntry.mockReturnValue({ hash: await computeHash(bytes), size: bytes.byteLength, modified: new Date(0).toISOString() });
+	harness.vault.adapter.stat.mockResolvedValue({ type: 'file', size: bytes.byteLength, mtime: 50 });
+	harness.vault.adapter.readBinary.mockResolvedValue(bytes);
+	await harness.engine.onRawFileChange(path);
+	expect(harness.engine.getPendingPaths()).toEqual([path]);
+	expect(harness.engine.getState().pendingChanges).toBe(1);
+	expect(harness.api.uploadFile).not.toHaveBeenCalled();
 });

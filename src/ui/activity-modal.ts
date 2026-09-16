@@ -1,7 +1,10 @@
+import { getPendingFileActions } from './activity/file-actions';
+import type { PendingDiscardReview } from '../sync/pending-discard';
+import { PendingDiscardModal } from './activity/pending-discard-modal';
 import { formatSyncProgress } from './activity/progress-label';
 import type { ConflictReview } from '../sync/conflict-review';
 import { ConflictReviewModal } from './activity/conflict-review-modal';
-import { Modal, Platform, setIcon, type App } from 'obsidian';
+import { Modal, Notice, Platform, setIcon, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ActivitySheet } from './activity/ActivitySheet';
@@ -10,8 +13,12 @@ import type { CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncState, SyncActivityProgress } from '../sync/types';
 import { renderHistoryPanel } from './activity/history';
 import { renderConflictsPanel, renderPendingPanel } from './activity/panels';
+import type { PendingDiffLoader, PendingBrowserState } from './activity/pending-browser';
 
 export interface ActivityModalDeps {
+	loadPendingDiff?: PendingDiffLoader;
+    syncSelected?(keys: string[]): Promise<unknown>;
+    createPendingDiscard?(keys: string[]): Promise<PendingDiscardReview>;
 	createConflictReview?(record: ConflictRecord): Promise<ConflictReview>;
 	getPendingPaths(): string[];
 	getActiveConflicts(): ConflictRecord[];
@@ -44,6 +51,7 @@ export class ActivityModal extends Modal {
 	private pendingCount!: HTMLSpanElement;
 	private conflictsCount!: HTMLSpanElement;
 	private pendingPanel!: HTMLDivElement;
+	private readonly pendingBrowserState: PendingBrowserState = {};
 	private conflictsPanel!: HTMLDivElement;
 	private historyPanel!: HTMLDivElement;
 	private allTabs: HTMLButtonElement[] = [];
@@ -70,8 +78,22 @@ export class ActivityModal extends Modal {
             loadingLabel.textContent = formatSyncProgress(progress, state.work);
             return;
         }
+        this.pendingBrowserState.dispose?.();
+        this.pendingBrowserState.startChecks = undefined;
+        this.pendingBrowserState.pauseChecks = undefined;
+        this.pendingBrowserState.dispose = undefined;
         this.pendingPanel.empty();
-		renderPendingPanel(this.pendingPanel, paths, state.status === 'error', state.status === 'syncing', progress, this.formatLastSync(), state);
+		renderPendingPanel(this.pendingPanel, paths, state.status === 'error', state.status === 'syncing', progress, this.formatLastSync(), state,
+			this.deps.loadPendingDiff ? (path, deleted) => this.deps.loadPendingDiff!(path, deleted) : undefined, this.pendingBrowserState,
+            this.deps.syncSelected && this.deps.createPendingDiscard ? {
+                syncSelected: async keys => {
+                    try { return await this.deps.syncSelected!(keys); }
+                    catch (error) { new Notice(error instanceof Error ? error.message : 'Could not sync selected files.'); throw error; }
+                },
+                fileActions: path => getPendingFileActions(this.app, path, () => this.close()),
+                discard: keys => new PendingDiscardModal(this.app, () => this.deps.createPendingDiscard!(keys.filter(key => this.deps.getPendingPaths().includes(key))), () => this.refresh()).open(),
+            } : undefined);
+        this.updateSyncBtn();
 	}
 	private readonly onStateChange = () => {
 		if (this.deps.getState().status === 'syncing' && this.pendingPanel?.querySelector('.crate-activity-loading-label')) this.onProgress();
@@ -212,7 +234,10 @@ export class ActivityModal extends Modal {
 	}
 
 	private switchTab(index: number): void {
+		if (index === 0) this.pendingBrowserState.startChecks?.();
+		else this.pendingBrowserState.pauseChecks?.();
 		this.currentTabIndex = index;
+        this.updateSyncBtn();
 		for (let i = 0; i < this.allTabs.length; i++) {
 			const tab = this.allTabs[i];
 			const panel = this.allPanels[i];
@@ -276,6 +301,7 @@ export class ActivityModal extends Modal {
 	private updateSyncBtn(): void {
 		const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
 		this.syncBtn.disabled = syncing;
+        this.syncBtn.hidden = this.currentTabIndex === 0 && !!this.deps.syncSelected && !!this.deps.createPendingDiscard && this.deps.getPendingPaths().length > 0 && !!this.deps.loadPendingDiff;
 		this.syncBtn.setAttribute('aria-label', syncing ? 'Syncing' : 'Sync now');
 		this.syncBtn.setAttribute('title', syncing ? 'Syncing' : 'Sync now');
 
@@ -332,6 +358,7 @@ export class ActivityModal extends Modal {
 	}
 
 	onClose(): void {
+		this.pendingBrowserState.dispose?.();
 		this.deps.removeStateChangeListener(this.onStateChange);
 		this.deps.removeProgressListener?.(this.onProgress);
 		this.root?.unmount();
