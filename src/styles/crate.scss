@@ -2,4 +2,6 @@
 @use 'plugin/settings';
 @use 'plugin/dialogs';
 @use 'plugin/activity';
+@use 'plugin/pending-diff';
+@use 'plugin/pending-browser';
 @use 'plugin/settings-extras';

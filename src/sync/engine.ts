@@ -48,7 +48,10 @@ import {
 import { SyncEngineContexts } from './engine-contexts';
 import { SyncEngineLifecycle } from './engine-lifecycle';
 import { reconcileQueuePaths } from './reconcile-paths';
-import { createSyncFailureResult } from './sync-result';
+import { createEmptySyncResult, createSyncFailureResult } from './sync-result';
+import { createPendingDiscard } from './pending-discard';
+import { readLocalFileEntry } from './local-file-entry';
+import { recordAppliedContent } from './applied-content';
 import type { DiffApplyOutcome } from './transfer-types';
 import type { UploadPreparedFilesOptions } from './transfer-upload';
 import { mergeSyncResults } from './sync-result';
@@ -252,6 +255,57 @@ export class SyncEngine {
 	getPendingPaths(): string[] {
 		return this.queueController.getPendingPaths();
 	}
+
+    async syncSelected(keys: string[]): Promise<SyncResult> {
+        this.assertPendingSelection(keys);
+        return this.reconcileFromQueue([...new Set(keys)], true);
+    }
+
+    private assertPendingSelection(keys: string[]): void {
+        this.lifecycle.throwIfDestroyed();
+        if (!this.api.isConfigured()) throw new Error('Sync is not configured.');
+        if (this.state.status === 'syncing') throw new Error('Wait for the current sync to finish.');
+        if (this.localManifest.uploadJournal.pending().length > 0) throw new Error('Run Sync now to recover interrupted uploads before changing individual files.');
+        const pending = new Set(this.getPendingPaths());
+        if (!keys.length || keys.some(key => !pending.has(key))) throw new Error('Pending files changed. Review the current selection and try again.');
+    }
+
+    async createPendingDiscard(keys: string[]) {
+        this.assertPendingSelection(keys);
+        const review = await createPendingDiscard({
+            vault: this.vault, api: this.api,
+            backupRoot: `${this.plugin.manifest.dir}/discard-recovery`,
+            verify: () => {
+                this.lifecycle.throwIfDestroyed();
+            },
+            beforeBinaryReplace: async path => {
+                // A crash between trash and recreation must not become a remote
+                // deletion. With no baseline, the next sync retrieves the server copy.
+                this.localManifest.removeEntry(path);
+                await this.localManifest.save();
+            },
+            applied: async (path, remote, content) => {
+                if (remote && content) await recordAppliedContent(this.contexts.transfer(), path, content, remote.revision);
+                else this.localManifest.removeEntry(path);
+                await this.localManifest.save();
+                const revisions = this.queueController.snapshotPendingRevisions();
+                const local = await readLocalFileEntry(this.vault, path);
+                if ((local?.hash ?? null) === (remote?.hash ?? null)) {
+                    const result = createEmptySyncResult();
+                    result.settledPaths = [path, `delete:${path}`];
+                    this.queueController.clearSyncedPendingPaths(result, revisions);
+                }
+            },
+        }, keys);
+        return { ...review, discard: async () => {
+            this.assertPendingSelection(keys);
+            this.updateState({ status: 'syncing' });
+            return this.trackWork(async () => {
+                try { return await review.discard(); }
+                finally { if (!this.lifecycle.isDestroyed) this.updateState({ status: 'idle' }); }
+            });
+        } };
+    }
 
 	async runConflictResolution<T>(operation: () => Promise<T>): Promise<T> {
 		if (this.state.status === 'syncing') throw new Error('Wait for sync to finish before resolving this conflict.');
@@ -501,15 +555,16 @@ export class SyncEngine {
 		});
 	}
 
-	private async reconcileFromQueue(queueKeys: string[]): Promise<SyncResult> {
+	private async reconcileFromQueue(queueKeys: string[], selectedOnly = false): Promise<SyncResult> {
+        if (this.state.status === 'syncing') return createSyncFailureResult('Sync already in progress');
 		return this.trackWork(async () => {
 			const pendingRevisionSnapshot = this.queueController.snapshotPendingRevisions();
 			this.updateState({ status: 'syncing' });
 			try {
-				const result = await this.reconcilePaths(queueKeys);
+				const result = await this.reconcilePaths(queueKeys, !selectedOnly);
 				this.queueController.clearSyncedPendingPaths(result, pendingRevisionSnapshot);
 				if (result.success) {
-					await this.contexts.finishInitialSetup();
+					if (!selectedOnly) await this.contexts.finishInitialSetup();
 					const lastSync = new Date().toISOString();
 					this.settings.lastSync = lastSync;
 					this.updateState({
@@ -535,8 +590,8 @@ export class SyncEngine {
 		mergeSyncResults(result, reconciliation);
 	}
 
-	private async reconcilePaths(queueKeys: string[]): Promise<SyncResult> {
-		await this.api.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
+	private async reconcilePaths(queueKeys: string[], recover = true): Promise<SyncResult> {
+		if (recover) await this.api.recoverUploads((current, total) => this.updateState({ work: { phase: 'recovering', current, total } }));
 		this.lifecycle.throwIfDestroyed();
 		return reconcileQueuePaths({
 			vault: this.vault,

@@ -29,7 +29,7 @@ interface LocalApplyContext {
 	conflictStore?: { record(input: RecordConflictInput): Promise<void> };
 }
 
-const TEXT_PATH = /\.(?:md|txt|canvas|json|jsonc|css|scss|js|mjs|cjs|ts|tsx|jsx|svg|xml|html|csv|tsv|yaml|yml|toml|ini|excalidraw)$/i;
+export const TEXT_PATH = /\.(?:md|txt|canvas|json|jsonc|css|scss|js|mjs|cjs|ts|tsx|jsx|svg|xml|html|csv|tsv|yaml|yml|toml|ini|excalidraw)$/i;
 
 interface CreatedConflictCopy {
 	path: string;

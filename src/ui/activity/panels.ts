@@ -1,8 +1,11 @@
+import type { PendingActions } from './pending-actions';
 import { formatSyncProgress } from './progress-label';
 import type { ConflictRecord, SyncActivityProgress, SyncState } from '../../sync/types';
 import { renderEmptyState, renderFileMicroCard } from './rendering';
+import { renderPendingBrowser, type PendingDiffLoader, type PendingBrowserState } from './pending-browser';
 
-export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.', state?: SyncState): void {
+export function renderPendingPanel(container: HTMLElement, paths: string[], hasError = false, syncing = false, progress?: SyncActivityProgress | null, lastSyncLabel = 'Your vault is up to date.', state?: SyncState, loadDiff?: PendingDiffLoader, browserState?: PendingBrowserState, actions?: PendingActions): void {
+	container.toggleClass('has-file-browser', !!loadDiff && paths.length > 0 && !syncing && !progress);
 	if (syncing || progress) {
         const loading = container.createDiv({ cls: 'crate-activity-loading' });
         loading.setAttribute('role', 'status');
@@ -28,6 +31,11 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 		return;
 	}
 
+	if (loadDiff) {
+		renderPendingBrowser(container, paths, loadDiff, browserState, actions);
+		return;
+	}
+
 	const uploads: string[] = [];
 	const deletes: string[] = [];
 	for (const raw of paths) {
@@ -36,8 +44,12 @@ export function renderPendingPanel(container: HTMLElement, paths: string[], hasE
 	}
 
 	const list = container.createDiv({ cls: 'crate-activity-list' });
-	for (const filePath of uploads) renderFileMicroCard(list, filePath, 'upload');
-	for (const filePath of deletes) renderFileMicroCard(list, filePath, 'delete');
+	for (const filePath of uploads) {
+		renderFileMicroCard(list, filePath, 'upload');
+	}
+	for (const filePath of deletes) {
+		renderFileMicroCard(list, filePath, 'delete');
+	}
 }
 
 export function renderConflictsPanel(container: HTMLElement, conflicts: ConflictRecord[], checking: boolean, onReview?: (conflict: ConflictRecord) => void): void {

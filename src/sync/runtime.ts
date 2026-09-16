@@ -1,4 +1,5 @@
 import { createConflictReview } from './conflict-review';
+import { loadPendingDiff } from './pending-diff';
 import type { SyncActivityProgress } from './types';
 import type { Plugin, TAbstractFile } from 'obsidian';
 import { createLogger, errorMessage } from '../plugin/logger';
@@ -84,6 +85,21 @@ export class SyncRuntime {
 
 	getPendingPaths(): string[] {
 		return this.syncEngine?.getPendingPaths() ?? [];
+	}
+
+	async loadPendingDiff(path: string, deleted: boolean) {
+		const api = this.apiClient;
+		if (!api) throw new Error('Sync is not configured');
+		const pendingPath = deleted ? `delete:${path}` : path;
+		const verify = () => {
+			if (api !== this.apiClient || this.getState().status === 'syncing' || !this.getPendingPaths().includes(pendingPath)) {
+				throw new Error('Pending changes were updated. Reopen the file to refresh its preview.');
+			}
+		};
+		verify();
+		const preview = await loadPendingDiff(this.plugin.app.vault.adapter, api, path, deleted);
+		verify();
+		return preview;
 	}
 
 	exportDiagnostics(): string {
@@ -472,6 +488,15 @@ export class SyncRuntime {
 			'Sync triggered',
 		);
 	}
+
+    async syncSelected(keys: string[]): Promise<SyncResult> {
+        return this.runSyncOperation('sync', engine => engine.syncSelected(keys));
+    }
+
+    async createPendingDiscard(keys: string[]) {
+        if (!this.syncEngine) throw new Error('Sync is not configured.');
+        return this.syncEngine.createPendingDiscard(keys);
+    }
 
 	async initialSync(progressCallback?: (current: number, total: number) => void): Promise<SyncResult> {
 		return this.runSyncOperation(
