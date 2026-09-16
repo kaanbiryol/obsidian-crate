@@ -65,7 +65,9 @@ export class ConflictReviewModal extends SharedModal {
         const left = review.currentText?.split('\n') ?? [], right = review.savedText?.split('\n') ?? [];
         const changedLeft = new Set<number>(), changedRight = new Set<number>();
         let offset = 0;
-        if (textPreview) for (const hunk of diffSequence(left, right)) {
+        const hunks = textPreview ? diffSequence(left, right) : [];
+        if (!hunks) intro.createEl('p', { text: 'These versions are too different to highlight. Review the full text below.' });
+        for (const hunk of hunks ?? []) {
             for (let i = hunk.start; i < hunk.end; i++) changedLeft.add(i);
             for (let i = 0; i < hunk.replacement.length; i++) changedRight.add(hunk.start + offset + i);
             offset += hunk.replacement.length - (hunk.end - hunk.start);

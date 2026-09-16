@@ -32,13 +32,15 @@ export const bundleBudgets = {
 		startupAssets: true,
 		// React startup graph: about 646 KB raw / 210 KB gzip. Includes the editor
 		// and recovery UI needed for synchronous first-tap focus and offline use.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '655000', 10),
+		// Outbox and retained-draft schemas need another 2 KB of raw startup allowance.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '657000', 10),
 		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '215000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
+		// idb transactions and Valibot storage schemas add about 3 KiB gzip.
 		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '690000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '225000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '228000', 10),
 	}],
 };

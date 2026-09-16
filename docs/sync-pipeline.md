@@ -94,6 +94,13 @@ different insertions at the same word boundary remain conflicts. Frontmatter,
 fenced code, and indented code retain the line-level policy. Inline refinement
 is limited to 16,000 combined characters per line and 128,000 per merge.
 
+Line and word changes are computed with jsdiff. Each comparison permits at most
+2,000 token insertions/deletions; exceeding that budget falls back to conflict
+handling without applying a partial merge. The limit is based on edit count,
+not elapsed time, so device speed does not change the decision. Repeated lines
+follow jsdiff's alignment and can be interpreted as shared deletions plus
+independent insertions.
+
 Cached common bases are hash-verified before use. A corrupt base is treated as
 missing and marked for repair; background seeding can repair it only when the
 local file still matches the manifest hash. Existing cache files are not read or
