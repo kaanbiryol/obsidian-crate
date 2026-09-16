@@ -17,7 +17,7 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof ReminderEdi
 	return renderToStaticMarkup(React.createElement(ReminderEditorScreen, {
 		modal, colorScheme: 'dark', projectOptions: ['Inbox', 'Work'],
 		saving: false, isClosing: false, isActive: true, isReturningToEditor: false,
-		canInteract: true, keyboardInset: 0, editorFocusRequest: 0,
+		canInteract: true, keyboardInset: 0,
 		dialogRef: vi.fn(), onPatchDraft: vi.fn(), onDeleteConfirmationChange: vi.fn(), onOpenPicker: vi.fn(),
 		onClose: vi.fn(), onSave: vi.fn(),
 		...overrides,

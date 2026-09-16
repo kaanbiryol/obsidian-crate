@@ -15,6 +15,7 @@ import { ReminderEditorFields } from '@/reminders/ui/reminder-modal/ReminderEdit
 import { ReminderActionChips } from '@/reminders/ui/reminder-modal/ReminderActionChips';
 import { useKeyboardDoneSave } from '../hooks/useKeyboardDoneSave';
 import { useEditorSheetHeight } from '../hooks/useEditorSheetHeight';
+import { useEditorFocus } from '../hooks/useEditorFocus';
 import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
@@ -24,7 +25,7 @@ import type { ModalDraft, ModalPickerId, ModalState } from '../types';
 
 export interface ReminderEditorScreenHandle {
 	dismissKeyboard(): void;
-	focusTitle(): void;
+	restoreFocus(): void;
 }
 
 export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
@@ -37,7 +38,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	isReturningToEditor: boolean;
 	canInteract: boolean;
 	keyboardInset: number;
-	editorFocusRequest: number;
 	dialogRef: (element: HTMLElement | null) => void;
 	onPatchDraft: (patch: Partial<ModalDraft>) => void;
 	onOpenPicker: (picker: ModalPickerId) => void;
@@ -54,7 +54,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	isReturningToEditor,
 	canInteract,
 	keyboardInset,
-	editorFocusRequest,
 	dialogRef,
 	onPatchDraft,
 	onOpenPicker,
@@ -97,6 +96,9 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	}, [dialogRef, isActive]);
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+	const { rememberFocus, restoreFocus } = useEditorFocus({
+		titleRef: contentRef, descriptionRef, editorRef, active: isActive, keyboardInset,
+	});
 	const draft = modal.draft;
 	const contentMetadata = useMemo(
 		() => deriveReminderDraftContentMetadata(draft.content, projectOptions, draft.defaultProject),
@@ -135,9 +137,9 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	}, [dismissEditorKeyboard, onClose]);
 
 	useImperativeHandle(ref, () => ({
-		dismissKeyboard: dismissEditorKeyboard,
-		focusTitle: () => richTextInputRef.current?.focus(),
-	}), [dismissEditorKeyboard]);
+		dismissKeyboard: () => { rememberFocus(); dismissEditorKeyboard(); },
+		restoreFocus,
+	}), [dismissEditorKeyboard, rememberFocus, restoreFocus]);
 
 	useEffect(() => {
 		if (!isActive || !canInteract) return;
@@ -204,7 +206,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 							preventFocusOnPress
 							data-action="toggle-delete-confirm"
 							onClick={() => {
-								dismissEditorKeyboard();
 								onDeleteConfirmationChange(true);
 							}}
 						/>
@@ -230,10 +231,9 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 						disabled={saving || !editorInteractive}
 						allowAutoFocus={!saving && !isClosing}
 						titleInputProps={{
-							preserveSelection: true, externalChangeCursor: 'end', syncContentBeforePaint: true,
+							preserveSelection: true, externalChangeCursor: 'preserve', syncContentBeforePaint: true,
 							autoComplete: 'off', autoCorrect: 'off', spellCheck: false,
 							onFocus: handleTitleFocus, onBlur: handleEditorFieldBlur,
-							focusRequestKey: editorFocusRequest,
 							className: 'pwa-editor-title-input pwa-editor-title-rich-input',
 						}}
 						descriptionInputProps={{
