@@ -20,8 +20,8 @@
     justify-content: space-between;
     align-items: center;
     flex-shrink: 0;
-    min-height: 40px;
-    padding: 10px 20px;
+    min-height: 34px;
+    padding: 8px 20px;
     color: var(--text-muted);
     font-size: 11px;
     font-weight: var(--font-medium);
@@ -34,11 +34,11 @@
     gap: 10px;
     width: 100%;
     height: auto;
-    min-height: 48px;
-    padding: 8px 12px;
+    min-height: 44px;
+    padding: 7px 12px;
     margin: 1px 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: 4px;
     background: transparent;
     box-shadow: none;
     color: var(--text-normal);
@@ -51,7 +51,7 @@
     &:focus-visible { outline: 2px solid var(--crate-activity-focus-ring); outline-offset: -2px; }
 }
 .crate-browser-file-icon { display: flex; flex-shrink: 0; padding-top: 2px; color: var(--text-muted); svg { width: 15px; height: 15px; } }
-.crate-browser-file-info { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.crate-browser-file-info { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .crate-browser-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
 .crate-browser-file-meta { display: flex; min-width: 0; gap: 8px; font-size: 11px; color: var(--text-muted); }
 .crate-browser-file-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -63,13 +63,13 @@
     align-items: center;
     flex-shrink: 0;
     gap: 12px;
-    min-height: 65px;
-    padding: 14px 20px;
+    min-height: 54px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--crate-activity-divider);
     &[hidden] { display: none; }
 }
 .crate-browser-file-heading { min-width: 0; flex: 1; }
-.crate-browser-file-title { font-size: 13px; font-weight: var(--font-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crate-browser-file-title { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crate-browser-file-folder { font-size: 11px; color: var(--text-muted); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crate-pending-browser .crate-browser-back {
     display: flex;
@@ -116,7 +116,7 @@
         .crate-browser-detail { display: flex; }
     }
     .crate-pending-browser .crate-browser-back { display: flex; min-height: 36px; }
-    .crate-browser-toolbar { padding: 12px; gap: 10px; }
+    .crate-browser-toolbar { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
     .crate-pending-browser .crate-browser-file { min-height: 52px; }
     .crate-browser-file-name { font-size: 13px; }
     .crate-browser-file-meta { font-size: 12px; }
@@ -171,8 +171,11 @@
 .crate-pending-browser .crate-browser-file-row {
     display: flex;
     align-items: center;
-    border-radius: 6px;
-    &:hover, &:has(.crate-browser-file[aria-pressed='true']) { background: var(--background-modifier-hover); }
+    border-radius: 4px;
+    &:hover { background: var(--background-modifier-hover); }
+    &:has(.crate-browser-file[aria-pressed='true']) { background: color-mix(in srgb, var(--text-normal) 7%, var(--background-primary)); }
+    &:has(.crate-browser-file[aria-pressed='true']):has(+ .crate-browser-file-row .crate-browser-file[aria-pressed='true']) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    &:has(.crate-browser-file[aria-pressed='true']) + .crate-browser-file-row:has(.crate-browser-file[aria-pressed='true']) { border-top-left-radius: 0; border-top-right-radius: 0; }
     &:has(.crate-browser-file:focus-visible) { outline: 1px solid var(--crate-activity-focus-ring); outline-offset: -1px; }
     .crate-browser-file {
         flex: 1;
@@ -191,7 +194,7 @@
     justify-content: flex-end;
     flex-shrink: 0;
     gap: 8px;
-    padding: 10px 12px;
+    padding: 12px;
     border-top: 1px solid var(--crate-activity-divider);
     button {
         display: inline-flex;
@@ -199,11 +202,11 @@
         justify-content: center;
         gap: 8px;
         width: auto;
-        height: 32px;
-        min-height: 32px;
+        height: 36px;
+        min-height: 36px;
         padding: 0 10px;
         border: 1px solid transparent;
-        border-radius: 6px;
+        border-radius: 4px;
         box-shadow: none;
         font-family: inherit;
         font-size: 12px;
@@ -213,6 +216,7 @@
     }
     .crate-browser-sync {
         order: 2;
+        width: 100%;
         border-color: var(--crate-activity-divider);
         background: var(--background-secondary);
         color: var(--text-normal);
@@ -231,9 +235,6 @@
     font-variant-numeric: tabular-nums;
 }
 .crate-browser-action-status { order: 3; flex-basis: 100%; color: var(--text-error); font-size: 12px; line-height: 1.4; &:empty { display: none; } }
-@container (max-width: 640px) {
-    .crate-pending-browser .crate-browser-actions button { min-height: 36px; }
-}
 .crate-pending-discard-modal {
     .crate-discard-file-list { max-height: 40vh; overflow: auto; margin-block: 16px; }
     .crate-discard-file { display: flex; gap: 16px; padding-block: 10px; border-bottom: 1px solid var(--background-modifier-border); font-size: var(--font-ui-small); }

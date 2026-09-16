@@ -9,13 +9,7 @@ function renderLine(container: HTMLElement, line: DiffLine): void {
     row.createEl('code', { text: line.text || ' ', cls: 'crate-diff-text' });
 }
 
-export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff, path: string): void {
-    const header = container.createDiv({ cls: 'crate-diff-header' });
-    const labels = header.createDiv({ cls: 'crate-diff-labels' });
-    labels.createSpan({ text: 'Server' });
-    labels.createSpan({ text: '→', attr: { 'aria-hidden': 'true' } });
-    labels.createSpan({ text: snapshot.kind === 'deleted' ? 'Deleted locally' : 'This device' });
-    if (snapshot.kind === 'added') labels.createSpan({ text: 'New file', cls: 'crate-diff-kind' });
+export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff, path: string, header: HTMLElement): void {
     if (snapshot.unavailable || snapshot.before === undefined || snapshot.after === undefined) {
         container.createDiv({ cls: 'crate-diff-message', text: snapshot.unavailable ?? 'Preview unavailable.' });
         container.createDiv({ cls: 'crate-diff-footnote', text: `${formatSize(snapshot.beforeSize)} on server · ${formatSize(snapshot.afterSize)} on this device` });
@@ -27,9 +21,9 @@ export function renderDiffPreview(container: HTMLElement, snapshot: PendingDiff,
         return;
     }
     if (diff.added === 0 && diff.removed === 0) {
-        const message = container.createDiv({ cls: 'crate-diff-message' });
+        const message = container.createDiv({ cls: 'crate-diff-message', attr: snapshot.kind === 'modified' ? { title: 'Touched files stay listed until sync, even when their contents match the server.' } : {} });
         message.createDiv({ cls: 'crate-browser-empty-title', text: snapshot.kind === 'modified' ? 'Unchanged' : snapshot.kind === 'added' ? 'New empty file' : 'Empty file deleted' });
-        message.createDiv({ text: snapshot.kind === 'modified' ? 'Contents match the server. This file stays listed until sync.'
+        message.createDiv({ text: snapshot.kind === 'modified' ? 'Matches the server copy.'
                 : snapshot.kind === 'added' ? 'This empty file will be added to the server.' : 'This empty file was deleted on this device.' });
     } else {
         const stats = header.createDiv({ cls: 'crate-diff-stats', attr: { 'aria-label': `${diff.added} added lines, ${diff.removed} removed lines` } });

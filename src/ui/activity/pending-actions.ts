@@ -18,7 +18,7 @@ export function createPendingActions(
     heading.prepend(selectAll);
     const footer = sidebar.createDiv({ cls: 'crate-browser-actions' });
     const sync = footer.createEl('button', { cls: 'crate-browser-sync', attr: { type: 'button' } });
-    const syncLabel = sync.createSpan({ text: 'Sync selected' });
+    const syncLabel = sync.createSpan({ text: 'Sync checked' });
     const syncCount = sync.createSpan({ cls: 'crate-browser-sync-count', attr: { 'aria-hidden': 'true' } });
     const status = footer.createDiv({ cls: 'crate-browser-action-status', attr: { role: 'status', 'aria-live': 'polite' } });
     const checkboxes = new Map<string, HTMLInputElement>();
@@ -30,9 +30,9 @@ export function createPendingActions(
         all.indeterminate = selected.length > 0 && selected.length < keys.length;
         all.disabled = busy;
         for (const [key, input] of checkboxes) { input.checked = !excluded.has(key); input.disabled = busy; }
-        syncLabel.textContent = busy ? 'Syncing…' : 'Sync selected';
+        syncLabel.textContent = busy ? 'Syncing…' : 'Sync checked';
         syncCount.textContent = String(selected.length);
-        sync.setAttribute('aria-label', busy ? 'Syncing…' : `Sync selected (${selected.length})`);
+        sync.setAttribute('aria-label', busy ? 'Syncing…' : `Sync checked (${selected.length})`);
         sync.disabled = busy || selected.length === 0;
     };
     all.addEventListener('change', () => {
@@ -56,7 +56,6 @@ export function createPendingActions(
             void action.run().catch((error: unknown) => new Notice(error instanceof Error ? error.message : 'Could not open this file.'));
         }));
         if (fileActions.length) menu.addSeparator();
-        menu.addItem(item => item.setTitle('Select all').setIcon('list-checks').setDisabled(busy).onClick(rows.selectAll));
         if (targets.length) menu.addItem(item => item
             .setTitle(`Discard ${targets.length} item${targets.length === 1 ? '' : 's'}…`)
             .setIcon('undo-2').setDisabled(busy).onClick(() => actions.discard(targets)));

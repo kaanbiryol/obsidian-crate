@@ -148,11 +148,11 @@ for (const browserType of [chromium, webkit]) {
                     input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--text-muted); }
                     .mod-warning { border: 0; border-radius: 5px; background: var(--text-error); color: white; padding: 6px 12px; }
                     .crate-activity-modal { height: 660px; max-width: 940px; margin: auto; overflow: hidden; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-primary); }
-                    .fixture-header { display: flex; align-items: center; gap: 16px; padding: 24px; color: var(--text-normal); font-size: 17px; font-weight: 600; }
+                    .fixture-header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: var(--text-normal); font-size: 14px; font-weight: 500; }
                     .fixture-close { color: var(--text-faint); font-size: 22px; font-weight: 400; }
-                    .fixture-tab { padding: 12px 14px; color: var(--text-muted); font-size: 12px; }
-                    .fixture-tab:first-child { border-bottom: 2px solid var(--text-normal); color: var(--text-normal); font-weight: 600; }
-                    @media(max-width: 440px) { body { padding: 12px 6px; } .fixture-header { padding: 20px; } }
+                    .fixture-tab { padding: 8px 12px; color: var(--text-muted); font-size: 12px; }
+                    .fixture-tab:first-child { border-bottom: 1px solid var(--text-normal); color: var(--text-normal); font-weight: 500; }
+                    @media(max-width: 440px) { body { padding: 12px 6px; } .fixture-header { padding: 12px 16px; } }
                 </style><div class="crate-activity-modal">
                     <div class="fixture-header"><span class="fixture-close">×</span>Sync activity</div>
                     <div class="crate-activity-tab-bar"><span class="fixture-tab">Pending (6)</span><span class="fixture-tab">Conflicts</span><span class="fixture-tab">History</span><span class="crate-activity-subtitle">Synced 1h ago</span></div>
@@ -175,7 +175,7 @@ for (const browserType of [chromium, webkit]) {
                 await expect(page.locator('.crate-browser-file[aria-pressed="true"]')).toHaveCount(0);
                 const all = page.getByRole('checkbox', { name: 'Include all files in sync', exact: true });
                 const checks = page.locator('.crate-browser-file-check input');
-                const syncSelected = page.getByRole('button', { name: 'Sync selected (6)', exact: true });
+                const syncSelected = page.getByRole('button', { name: 'Sync checked (6)', exact: true });
                 await expect(page.locator('.crate-browser-actions button')).toHaveCount(1);
                 await expect(page.getByRole('button', { name: 'File actions', exact: true })).toHaveCount(0);
                 await expect(all).toBeChecked();
@@ -188,9 +188,9 @@ for (const browserType of [chromium, webkit]) {
                 assert.equal(await first.evaluate(el => getComputedStyle(el.parentElement).backgroundColor), rowBackground);
 
                 await checks.nth(1).uncheck();
-                await expect(page.getByRole('button', { name: 'Sync selected (5)' })).toBeEnabled();
+                await expect(page.getByRole('button', { name: 'Sync checked (5)' })).toBeEnabled();
                 await expect(page.locator('.crate-browser-file[aria-pressed="true"]')).toHaveCount(0);
-                await page.getByRole('button', { name: 'Sync selected (5)' }).click();
+                await page.getByRole('button', { name: 'Sync checked (5)' }).click();
                 assert.deepEqual(await page.evaluate(() => window.syncKeys), [
                     '.obsidian/appearance.json', '.obsidian/types.json', '.obsidian/community-plugins.json', '.obsidian/plugins/omnisearch/data.json', 'delete:Notes/Archive.md',
                 ]);
@@ -199,7 +199,7 @@ for (const browserType of [chromium, webkit]) {
                 await all.check();
                 await expect(syncSelected).toBeEnabled();
                 await all.uncheck();
-                await expect(page.getByRole('button', { name: 'Sync selected (0)' })).toBeDisabled();
+                await expect(page.getByRole('button', { name: 'Sync checked (0)' })).toBeDisabled();
                 const highlighted = page.locator('.crate-browser-file[aria-pressed="true"]');
                 for (const shortcut of ['Control+a', 'Meta+a']) {
                     await first.focus();
@@ -207,16 +207,15 @@ for (const browserType of [chromium, webkit]) {
                     await expect(all).not.toBeChecked();
                     await expect(page.locator('.crate-browser-file-check input:checked')).toHaveCount(0);
                     await expect(highlighted).toHaveCount(6);
-                    await expect(page.getByRole('button', { name: 'Sync selected (0)' })).toBeDisabled();
+                    await expect(page.getByRole('button', { name: 'Sync checked (0)' })).toBeDisabled();
                 }
                 await checks.nth(1).check();
                 await expect(highlighted).toHaveCount(6);
                 await rows.nth(1).click({ button: 'right' });
                 await expect(page.getByRole('menuitem', { name: 'Discard 6 items…', exact: true })).toBeVisible();
-                await page.getByRole('menuitem', { name: 'Select all', exact: true }).click();
+                await expect(page.getByRole('menuitem', { name: 'Select all', exact: true })).toHaveCount(0);
                 await expect(all).not.toBeChecked();
                 await expect(highlighted).toHaveCount(6);
-                await first.click({ button: 'right' });
                 await page.getByRole('menuitem', { name: 'Discard 6 items…', exact: true }).click();
                 await expect(page.getByRole('button', { name: 'Discard changes (2)' })).toBeEnabled();
                 await expect(page.getByText('4 unchanged files will be kept.', { exact: true })).toBeVisible();
@@ -236,7 +235,7 @@ for (const browserType of [chromium, webkit]) {
                 await first.focus();
                 await page.keyboard.press('Space');
                 await expect(checks.first()).not.toBeChecked();
-                await expect(page.getByRole('button', { name: 'Sync selected (5)' })).toBeEnabled();
+                await expect(page.getByRole('button', { name: 'Sync checked (5)' })).toBeEnabled();
                 await expect(first).toBeFocused();
                 await expect(highlighted).toHaveCount(6);
                 await page.keyboard.down('Space');
@@ -245,7 +244,7 @@ for (const browserType of [chromium, webkit]) {
                 await expect(checks.first()).toBeChecked();
                 await expect(first).toBeFocused();
                 await page.keyboard.press('Enter');
-                await expect(preview.locator('.crate-diff-stats')).toHaveText('+2−2');
+                await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveText('+2−2');
                 await expect(first).toHaveAttribute('aria-pressed', 'true');
                 await showFiles();
                 await checks.first().uncheck();
@@ -285,11 +284,11 @@ for (const browserType of [chromium, webkit]) {
                 await expect(preview.getByText('Could not reach the sync server.')).toBeVisible();
                 await page.evaluate(() => { window.fail = false; });
                 await preview.getByRole('button', { name: 'Try again' }).click();
-                await expect(preview.locator('.crate-diff-stats')).toHaveText('+2−2');
+                await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveText('+2−2');
                 await showFiles();
                 await rows.nth(1).click();
                 await expect(preview.getByText('Unchanged', { exact: true })).toBeVisible();
-                await expect(preview.locator('.crate-diff-stats')).toHaveCount(0);
+                await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveCount(0);
                 await expect(rows).toHaveCount(6);
                 await showFiles();
                 await expect(rows.nth(1).getByText('Unchanged', { exact: true })).toBeVisible();
@@ -299,7 +298,7 @@ for (const browserType of [chromium, webkit]) {
                     await page.screenshot({ path: `.generated/activity-diff/${theme}-${width}-files.png` });
                 }
                 await first.click();
-                await expect(preview.locator('.crate-diff-stats')).toHaveText('+2−2');
+                await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveText('+2−2');
                 if (browserType === chromium) {
                     await page.evaluate(() => document.activeElement?.blur());
                     await page.screenshot({ path: `.generated/activity-diff/${theme}-${width}.png` });
@@ -320,7 +319,7 @@ for (const browserType of [chromium, webkit]) {
                     await expect(preview.getByText('Unchanged', { exact: true })).toBeVisible();
                     await page.keyboard.press('Home');
                     await expect(first).toBeFocused();
-                    await expect(preview.locator('.crate-diff-stats')).toHaveText('+2−2');
+                    await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveText('+2−2');
                 }
                 if (!isMobile) {
                     // Row selection never changes sync inclusion, including unchecked discard targets.
@@ -353,7 +352,7 @@ for (const browserType of [chromium, webkit]) {
                     // macOS reserves native Control-click for context menus; simulate the Windows click event.
                     await rows.nth(2).dispatchEvent('click', { ctrlKey: true });
                     await expect(highlighted).toHaveCount(3);
-                    await expect(page.getByRole('button', { name: 'Sync selected (5)' })).toBeEnabled();
+                    await expect(page.getByRole('button', { name: 'Sync checked (5)' })).toBeEnabled();
                     if (browserType === chromium) await page.screenshot({ path: `.generated/activity-diff/${theme}-${width}-multiselect.png` });
                     // Cmd+A in the diff keeps row selection intact.
                     await preview.click();
@@ -365,7 +364,7 @@ for (const browserType of [chromium, webkit]) {
                 // A normal refresh retains the selected file and narrow-screen detail state.
                 await page.evaluate(() => window.mount());
                 await expect(first).toHaveAttribute('aria-pressed', 'true');
-                await expect(preview.locator('.crate-diff-stats')).toHaveText('+2−2');
+                await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveText('+2−2');
                 // A late response from the previous file cannot replace the current selection.
                 await page.evaluate(() => { window.delayed = true; });
                 await page.evaluate(() => window.mount());
@@ -381,7 +380,7 @@ for (const browserType of [chromium, webkit]) {
                 await expect(page.locator('.crate-browser-file[aria-pressed="true"]')).toHaveCount(0);
                 await expect(rows.first()).toBeVisible();
                 await rows.first().click();
-                await expect(preview.locator('.crate-diff-stats')).toHaveText('+2−2');
+                await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveText('+2−2');
                 await page.evaluate(() => { window.delayed = true; });
                 await page.evaluate(() => window.mount());
                 await expect(preview.getByText('Loading changes…')).toBeVisible();
@@ -396,7 +395,7 @@ for (const browserType of [chromium, webkit]) {
                 await all.uncheck();
                 await first.focus();
                 await page.keyboard.press('Control+a');
-                await expect(page.getByRole('button', { name: 'Sync selected (0)' })).toBeDisabled();
+                await expect(page.getByRole('button', { name: 'Sync checked (0)' })).toBeDisabled();
                 await expect(highlighted).toHaveCount(20);
                 await page.keyboard.press('Shift+F10');
                 await page.getByRole('menuitem', { name: 'Discard 20 items…', exact: true }).click();
