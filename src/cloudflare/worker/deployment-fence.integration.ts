@@ -1,4 +1,5 @@
 import { recoverDeployment } from '../deployment-recovery';
+import { completePublishedDeployment } from '../complete-published-deployment';
 /// <reference types="@cloudflare/vitest-plugin/types" />
 import { afterEach, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
@@ -46,9 +47,11 @@ async function harness(empty = false) {
 			return results;
 		}),
 		verifyWorkerDeployment: vi.fn(async () => {}), verifyResetWorker: vi.fn(async () => {}),
+		verifyPublishedWorkerDeployment: vi.fn(async () => ({ revision: SERVER_RELEASE.revision - 1, schemaVersion: SERVER_RELEASE.schemaVersion })),
 		uploadWorker: vi.fn(async (input: { artifacts: ReturnType<typeof artifact> }) => { state.worker = { annotations: { 'workers/message': `Crate ${input.artifacts.version} ${input.artifacts.fingerprint}` }, bindings }; }),
 		updateWorkerSchedules: vi.fn(async () => {}), getWorkersSubdomain: vi.fn(async (): Promise<string | null> => 'test'),
 		createWorkersSubdomain: vi.fn(async () => 'test'), enableWorkerSubdomain: vi.fn(async () => {}),
+		getWorkerSubdomain: vi.fn(async () => ({ enabled: true, previews_enabled: false })),
 		listWorkers: vi.fn(async () => [{ id: metadata.workerName }]),
 		listDurableObjectNamespaces: vi.fn(async () => state.worker?.bindings?.some(binding => binding.type === 'durable_object_namespace') ? [{ id: 'c'.repeat(32), script: metadata.workerName, class: 'ReminderAlarm' }] : []),
 		listR2Objects: vi.fn(async () => ({ keys: [] })), deleteR2Objects: vi.fn(async () => {}),
@@ -249,18 +252,17 @@ it('preserves existing file references and never reapplies fresh DDL during an u
   expect(h.api.verifyWorkerDeployment).toHaveBeenCalledOnce();
 });
 
-it('keeps a failed live check locked and resumes only the exact build without unlocking writes', async () => {
+it('keeps a failed live check locked until the published build is verified', async () => {
   const h = await harness();
   h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
   await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
   const record = JSON.parse((await held())!.value) as Record<string, unknown>;
   expect(record).toMatchObject({ verificationPending: true, step: 'enable-server-address', stepState: 'confirmed' });
-  expect((await recoverDeployment(h.api as never, h.metadata, 'a'.repeat(64))).status).toBe('blocked');
+  expect((await recoverDeployment(h.api as never, h.metadata, 'a'.repeat(64))).status).toBe('verify');
   const recovery = await recoverDeployment(h.api as never, h.metadata, artifact().fingerprint);
-  expect(recovery.status).toBe('resume');
+  expect(recovery.status).toBe('verify');
   expect(await held()).not.toBeNull();
-  await provisionCloudflareDeployment({ api: h.api as never, accountId: h.metadata.accountId!, metadata: h.metadata,
-    artifacts: artifact(), resumeUpdateValue: recovery.resumeValue, onMetadataChanged: async () => {} });
+  await completePublishedDeployment(h.api, h.metadata, artifact(), recovery.resumeValue!);
   expect(await held()).toBeNull();
 });
 
@@ -312,13 +314,10 @@ it('keeps repeated lost takeover responses recoverable without ever unlocking pe
   h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('not live yet'));
   await expect(h.deploy()).rejects.toThrow('matching Worker and database verified');
   const query = h.api.queryD1.getMockImplementation()!;
-  const resume = (resumeUpdateValue: string | undefined) => provisionCloudflareDeployment({
-    api: h.api as never, accountId: h.metadata.accountId!, metadata: h.metadata,
-    artifacts: artifact(), resumeUpdateValue, onMetadataChanged: async () => {},
-  });
+  const resume = (resumeUpdateValue: string | undefined) => completePublishedDeployment(h.api, h.metadata, artifact(), resumeUpdateValue!);
   for (let attempt = 0; attempt < 2; attempt++) {
     const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
-    expect(recovery.status).toBe('resume');
+    expect(recovery.status).toBe('verify');
     const previous = JSON.parse(recovery.resumeValue!) as { owner: string };
     let lost = false;
     h.api.queryD1.mockImplementation(async (...args) => {
@@ -343,7 +342,7 @@ it('keeps repeated lost takeover responses recoverable without ever unlocking pe
   const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
   await resume(recovery.resumeValue);
   expect(await held()).toBeNull();
-  expect(h.api.uploadWorker).toHaveBeenCalledTimes(2);
+  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
 });
 
 it('prevents a paused owner from advancing after its acquisition checkpoint is recovered', async () => {
@@ -391,4 +390,115 @@ it('refuses a missing file bucket instead of substituting empty storage', async 
   await expect(h.deploy()).rejects.toThrow('file bucket is missing');
   expect(h.api.createR2Bucket).not.toHaveBeenCalled();
   expect(h.api.uploadWorker).not.toHaveBeenCalled();
+});
+
+it('finishes a confirmed older publication from a newer plugin without uploading or changing vault data', async () => {
+  const h = await harness();
+  await env.DB.prepare("INSERT INTO files(path, portable_path, storage_key) VALUES ('Notes/Keep.md', 'notes/keep.md', 'existing-key')").run();
+  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+  await expect(h.deploy()).rejects.toThrow('fence remains held');
+  const value = (await held())!.value;
+  const newer = artifact('0.2.0', 'e'.repeat(64));
+  expect((await recoverDeployment(h.api, h.metadata, newer.fingerprint)).status).toBe('verify');
+  const filesBefore = await env.DB.prepare('SELECT * FROM files').all();
+  await completePublishedDeployment(h.api, h.metadata, newer, value);
+  expect(await held()).toBeNull();
+  expect(await env.DB.prepare('SELECT revision, fingerprint FROM crate_release WHERE id = 1').first()).toEqual({ revision: SERVER_RELEASE.revision - 1, fingerprint: artifact().fingerprint });
+  expect(h.metadata.lastDeployedFingerprint).toBe(artifact().fingerprint);
+  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+  expect(h.api.enableWorkerSubdomain).not.toHaveBeenCalled();
+  expect((await env.DB.prepare('SELECT * FROM files').all()).results).toEqual(filesBefore.results);
+});
+
+it('keeps failed publication verification locked and permits checking it again', async () => {
+  const h = await harness();
+  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+  await expect(h.deploy()).rejects.toThrow('fence remains held');
+  const newer = artifact('0.2.0', 'e'.repeat(64));
+  h.api.verifyPublishedWorkerDeployment.mockRejectedValueOnce(new Error('Public fingerprint mismatch'));
+  await expect(completePublishedDeployment(h.api, h.metadata, newer, (await held())!.value)).rejects.toThrow('Public fingerprint mismatch');
+  expect(JSON.parse((await held())!.value)).toMatchObject({ completionOnly: true, verificationPending: true, step: 'acquire-deployment', stepState: 'confirmed' });
+  const recovery = await recoverDeployment(h.api, h.metadata, newer.fingerprint);
+  expect(recovery.status).toBe('verify');
+  await completePublishedDeployment(h.api, h.metadata, newer, recovery.resumeValue!);
+  expect(await held()).toBeNull();
+  expect(h.api.uploadWorker).toHaveBeenCalledTimes(1);
+});
+
+it('does not take ownership if the old updater advances after inspection', async () => {
+  const h = await harness();
+  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+  await expect(h.deploy()).rejects.toThrow('fence remains held');
+  const value = (await held())!.value;
+  const advanced = JSON.stringify({ ...JSON.parse(value), step: 'record-release', stepState: 'started' });
+  await env.DB.prepare('UPDATE maintenance_state SET value = ? WHERE key = ?').bind(advanced, DEPLOYMENT_FENCE_KEY).run();
+  await expect(completePublishedDeployment(h.api, h.metadata, artifact('0.2.0', 'e'.repeat(64)), value)).rejects.toThrow('Another deployment');
+  expect((await held())!.value).toBe(advanced);
+  expect(h.api.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
+});
+
+it.each(['storage', 'schema', 'release'])('retains the publication lock when %s verification fails', async problem => {
+  const h = await harness();
+  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+  await expect(h.deploy()).rejects.toThrow('fence remains held');
+  if (problem === 'storage') h.state.worker!.bindings![0]!.id = 'different-database';
+  if (problem === 'schema') await env.DB.prepare('UPDATE crate_schema SET version = 999').run();
+  if (problem === 'release') h.api.verifyPublishedWorkerDeployment.mockResolvedValue({ revision: SERVER_RELEASE.revision + 1, schemaVersion: SERVER_RELEASE.schemaVersion });
+  await expect(completePublishedDeployment(h.api, h.metadata, artifact('0.2.0', 'e'.repeat(64)), (await held())!.value)).rejects.toThrow('fence remains held');
+  expect(await held()).not.toBeNull();
+  expect(await env.DB.prepare('SELECT * FROM crate_release').first()).toBeNull();
+});
+
+it('never retries an unconfirmed release-record write during publication recovery', async () => {
+  const h = await harness();
+  h.api.verifyWorkerDeployment.mockRejectedValueOnce(new Error('Old public route'));
+  await expect(h.deploy()).rejects.toThrow('fence remains held');
+  const query = h.api.queryD1.getMockImplementation()!;
+  h.api.queryD1.mockImplementation(async (...args) => {
+    const result = await query(...args);
+    if (args[2].startsWith('INSERT INTO crate_release')) throw new Error('Lost release write response');
+    return result;
+  });
+  const newer = artifact('0.2.0', 'e'.repeat(64));
+  await expect(completePublishedDeployment(h.api, h.metadata, newer, (await held())!.value)).rejects.toThrow('Lost release write response');
+  expect(JSON.parse((await held())!.value)).toMatchObject({ completionOnly: true, step: 'record-release', stepState: 'started' });
+  expect((await recoverDeployment(h.api, h.metadata, newer.fingerprint)).status).toBe('blocked');
+  expect(h.api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('DELETE FROM maintenance_state'))).toBe(false);
+});
+
+it('recovers an observed address activation and prevents its late owner from advancing', async () => {
+  const h = await harness();
+  const dispatched = deferred();
+  const response = deferred();
+  h.api.getWorkerSubdomain.mockResolvedValueOnce({ enabled: false, previews_enabled: false });
+  h.api.enableWorkerSubdomain.mockImplementationOnce(async () => { dispatched.resolve(); await response.promise; });
+  const oldUpdate = h.deploy();
+  const oldFailure = expect(oldUpdate).rejects.toThrow('checkpoint');
+  await dispatched.promise;
+  expect(JSON.parse((await held())!.value)).toMatchObject({ step: 'enable-server-address', stepState: 'started' });
+  const recovery = await recoverDeployment(h.api, h.metadata, artifact().fingerprint);
+  expect(recovery.status).toBe('verify');
+  await completePublishedDeployment(h.api, h.metadata, artifact(), recovery.resumeValue!);
+  expect(await held()).toBeNull();
+  expect(h.api.enableWorkerSubdomain).toHaveBeenCalledTimes(1);
+  // A delayed identical route-setting request cannot republish the old Worker.
+  const newer = artifact('0.2.0', 'e'.repeat(64));
+  await h.deploy(newer);
+  response.resolve();
+  await oldFailure;
+  expect(await held()).toBeNull();
+  expect(await env.DB.prepare('SELECT fingerprint FROM crate_release WHERE id = 1').first()).toEqual({ fingerprint: newer.fingerprint });
+  expect(h.state.worker!.annotations!['workers/message']).toContain(newer.fingerprint);
+  expect(h.api.enableWorkerSubdomain).toHaveBeenCalledTimes(1);
+});
+
+it.each([{ enabled: false, previews_enabled: false }, { enabled: true, previews_enabled: true }])('keeps an unconfirmed activation untouched when address settings differ: %j', async address => {
+  const h = await harness();
+  h.api.getWorkerSubdomain.mockResolvedValue(address);
+  h.api.enableWorkerSubdomain.mockRejectedValueOnce(new Error('Lost activation response'));
+  await expect(h.deploy()).rejects.toThrow('Lost activation response');
+  const original = (await held())!.value;
+  await expect(completePublishedDeployment(h.api, h.metadata, artifact(), original)).rejects.toThrow('address settings');
+  expect((await held())!.value).toBe(original);
+  expect(h.api.verifyPublishedWorkerDeployment).not.toHaveBeenCalled();
 });

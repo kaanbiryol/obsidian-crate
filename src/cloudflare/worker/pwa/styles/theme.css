@@ -40,8 +40,19 @@
 /* Keep header text below iOS 27's native top-edge blur in installed portrait apps. */
 @media (orientation:portrait){:root[data-pwa-ios-scroll-edge]{--pwa-status-bar-clearance:16px}}
 .pwa-launch-splash{width:100%;height:100%;overflow:hidden;background:var(--pwa-launch-bg)}
+.pwa-launch-splash.is-updating{position:relative}
 #pwa-update-transition{position:fixed;inset:0;z-index:10000;background:var(--pwa-launch-bg);color:var(--text-muted);font-size:14px;line-height:1.4;visibility:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease,visibility 0s linear .18s}
-#pwa-update-transition>span{position:absolute;top:var(--pwa-update-label-top,50%);left:50%;transform:translate(-50%,-50%);white-space:nowrap}
+.pwa-update-screen{position:absolute;top:clamp(40%,var(--pwa-update-label-top,50%),60%);left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;width:calc(100% - 48px);max-width:320px;text-align:center}
+.pwa-update-screen__icon{position:relative;isolation:isolate;width:76px;height:76px;margin-bottom:28px}
+.pwa-update-screen__icon::before{content:"";position:absolute;z-index:-1;inset:-52px;border-radius:50%;background:radial-gradient(circle,rgba(var(--accent-rgb),.15),rgba(var(--accent-rgb),.045) 45%,transparent 70%)}
+.pwa-update-screen__icon img{display:block;width:76px;height:76px;border-radius:22px;box-shadow:0 12px 32px rgba(var(--accent-rgb),.14),0 0 0 1px var(--line)}
+.pwa-update-screen__title{color:var(--text);font-size:21px;font-weight:600;line-height:1.3;letter-spacing:-.035em}
+.pwa-update-screen__detail{margin-top:8px;color:var(--text-muted);font-size:14px;line-height:1.5}
+.pwa-update-screen__activity{width:128px;height:3px;margin-top:28px;overflow:hidden;border-radius:999px;background:rgba(var(--accent-rgb),.12)}
+.pwa-update-screen__activity span{display:block;width:100%;height:100%;border-radius:inherit;background:var(--accent);transform-origin:left center;transform:scaleX(var(--pwa-update-progress,.32));transition:transform .18s ease-out}
+.pwa-update-screen__activity span.is-resetting{transition:none}
+@media (orientation:landscape){.pwa-update-screen{top:50%}}
 :root[data-pwa-updating] #pwa-update-transition{visibility:visible;opacity:1;pointer-events:auto;transition-delay:0s}
 :root[data-pwa-updating="restore"] #pwa-update-transition{transition:none}
-@media (prefers-reduced-motion:reduce){#pwa-update-transition{transition:none}}
+:root[data-pwa-updating="revealing"] #pwa-update-transition{opacity:0;transition:opacity .32s ease-out}
+@media (prefers-reduced-motion:reduce){#pwa-update-transition{transition:none}.pwa-update-screen__activity span{transition:none}}

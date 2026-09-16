@@ -8,6 +8,7 @@ vi.mock('obsidian', () => ({ Notice: class {} }));
 vi.mock('../ui/cloudflare-deployment-modal', () => ({ openCloudflareDeploymentModal: () => mocks.modal }));
 vi.mock('./plugin-integration', () => ({ startCloudflareDeployment: mocks.start }));
 import { checkAndRecoverUpdate } from './deployment-recovery-ui';
+import { DeploymentRecoveryRequiredError } from './deployment-fence';
 
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
 function plugin(status: 'blocked' | 'recovered') {
@@ -37,4 +38,12 @@ it('offers an explicit update after successful recovery', async () => {
     expect(mocks.start).not.toHaveBeenCalled();
     options.action.onClick();
     expect(mocks.start).toHaveBeenCalledWith(instance, 'update');
+});
+
+it('explains a retained verification lock without misreporting it as a network failure', async () => {
+    const instance = plugin('recovered');
+    instance.cloudflareDeploymentService.recoverUpdate.mockRejectedValue(new DeploymentRecoveryRequiredError('Public fingerprint mismatch'));
+    await checkAndRecoverUpdate(instance as never);
+    expect(mocks.modal.fail).toHaveBeenCalledWith('Could not check the server', expect.stringContaining('lock remains held'), undefined,
+        { technicalDetails: 'Public fingerprint mismatch' });
 });

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import type { DataMode } from '../types';
+import { PWA_UPDATE_SCREEN_HTML } from '../update-screen';
 
 function PwaSettingsButton({
 	settingsOpen,
@@ -78,7 +79,7 @@ export function PwaTopNotices({
 					<span className="pwa-update-banner__icon" aria-hidden="true"><Download size={18} strokeWidth={1.8} /></span>
 					<div className="pwa-update-banner__copy">
 						<span className="pwa-update-banner__text">Update available</span>
-						<span className="pwa-update-banner__detail">Ready to install.</span>
+						<span className="pwa-update-banner__detail">Install the latest version when you’re ready.</span>
 					</div>
 					<button className="pwa-update-button" type="button" onClick={onReload} disabled={updating} aria-busy={updating} aria-label="Update to the latest version">
 						<span className="pwa-update-button__label" aria-hidden={updating}>Update</span>
@@ -146,12 +147,13 @@ export function PwaPullRefreshIndicator({
 	);
 }
 
-export function PwaLaunchSplash() {
+export function PwaLaunchSplash({ updating = false }: { updating?: boolean }) {
 	return (
 		<div
-			className="pwa-launch-splash"
+			className={`pwa-launch-splash${updating ? ' is-updating' : ''}`}
 			role="status"
-			aria-label="Loading Crate"
+			aria-label={updating ? 'Updating Crate' : 'Loading Crate'}
+			dangerouslySetInnerHTML={updating ? { __html: PWA_UPDATE_SCREEN_HTML } : undefined}
 		/>
 	);
 }

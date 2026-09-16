@@ -1,11 +1,11 @@
 import { SERVER_RELEASE } from './database-upgrades';
-import { DEPLOYMENT_FENCE_KEY } from './deployment-fence';
+import { DEPLOYMENT_FENCE_KEY, isPendingAddressActivation } from './deployment-fence';
 import { CloudflareApiError, type CloudflareApiClient, type CloudflareWorkerSettings } from './cloudflare-api';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 
 type RecoveryApi = Pick<CloudflareApiClient, 'queryD1' | 'getWorkerSettings'>;
 export interface DeploymentRecoveryResult {
-    status: 'ready' | 'recovered' | 'blocked' | 'resume' | 'completed';
+    status: 'ready' | 'recovered' | 'blocked' | 'resume' | 'verify' | 'completed';
     resumeValue?: string;
     message: string;
     diagnostics: string;
@@ -13,12 +13,13 @@ export interface DeploymentRecoveryResult {
 const confirmedSteps = new Set(['acquire-deployment', 'prepare-database', 'create-file-bucket', 'initialize-database', 'create-server-address', 'upload-worker', 'configure-maintenance', 'enable-server-address', 'record-release', 'verify-deployment']);
 
 /** A confirmed checkpoint can be removed conditionally: the old updater must CAS
- * it to "started" before dispatching its next mutation. Never steal a started step. */
+ * it to "started" before dispatching its next mutation. Pending address activation
+ * has a separate read-and-verify recovery path; other started steps stay blocked. */
 export async function recoverDeployment(api: RecoveryApi, target: CloudflareDeploymentMetadata, fingerprint?: string): Promise<DeploymentRecoveryResult> {
     if (!target.accountId || !target.d1DatabaseId || target.reset) throw new Error('Select the original server and finish any pending reset or deletion first.');
     const account = target.accountId;
     const database = target.d1DatabaseId;
-    const report: Record<string, unknown> = { worker: target.workerName, database, checkedAt: new Date().toISOString() };
+    const report: Record<string, unknown> = { worker: target.workerName, database, checkedAt: new Date().toISOString(), currentFingerprint: fingerprint };
     const result = (status: DeploymentRecoveryResult['status'], message: string): DeploymentRecoveryResult =>
         ({ status, message, diagnostics: JSON.stringify({ ...report, status }, null, 2) });
     let settings: CloudflareWorkerSettings | null;
@@ -59,10 +60,19 @@ export async function recoverDeployment(api: RecoveryApi, target: CloudflareDepl
         || !/^[a-f0-9-]{36}$/.test(record.owner)) {
         return result('blocked', 'This record belongs to another operation. No lock was cleared.');
     }
-    if (record.recoveryProtocol !== 1 || !['confirmed', 'rejected', 'settled'].includes(String(record.stepState)) || !confirmedSteps.has(String(record.step)) && !SERVER_RELEASE.migrations.some(migration => record.step === `migrate-${migration.id}`)) {
+    const pendingAddress = isPendingAddressActivation(record);
+    const settled = ['confirmed', 'rejected', 'settled'].includes(String(record.stepState));
+    const knownStep = confirmedSteps.has(String(record.step)) || SERVER_RELEASE.migrations.some(migration => record.step === `migrate-${migration.id}`);
+    if (record.recoveryProtocol !== 1 || !(settled || pendingAddress) || !knownStep) {
         return result('blocked', 'Cloudflare may still be processing the interrupted request. Crate cannot safely unlock it yet. Copy diagnostics for support; no server data was changed.');
     }
     if (record.verificationPending === true) {
+        if (build?.[2] === record.fingerprint && build?.[1] === record.version
+            && (pendingAddress || record.stepState === 'confirmed' && ['enable-server-address', 'record-release', 'verify-deployment'].includes(String(record.step))
+                || record.completionOnly === true && ['acquire-deployment', 'record-release', 'verify-deployment'].includes(String(record.step)))) {
+            return { ...result('verify', 'The published update can be verified under new ownership.'), resumeValue: value };
+        }
+        if (pendingAddress) return result('blocked', 'The pending address activation belongs to a different published build. No lock was cleared.');
         if (!fingerprint || fingerprint !== record.fingerprint) return result('blocked', 'Resume this update with the exact plugin build that started it. No lock was cleared.');
         return { ...result('resume', 'The confirmed update can resume under new ownership.'), resumeValue: value };
     }

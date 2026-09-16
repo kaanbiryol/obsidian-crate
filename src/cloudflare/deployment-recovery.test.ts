@@ -82,3 +82,21 @@ it.each(['confirmed', 'rejected', 'settled'])('retains a pending %s update for e
     expect(h.held()).toBe(original);
     expect(h.api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('DELETE'))).toBe(false);
 });
+
+it('offers verification of a confirmed published update even from a different build', async () => {
+    const h = harness({ verificationPending: true, step: 'enable-server-address' });
+    expect(await recoverDeployment(h.api, target, 'b'.repeat(64))).toMatchObject({ status: 'verify', resumeValue: h.held() });
+    expect(h.api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('DELETE'))).toBe(false);
+});
+
+it.each([{ stepState: 'rejected' }, { fingerprint: 'c'.repeat(64) }, { step: 'upload-worker', stepState: 'started' }])('does not verify an uncertain or mismatched publication: %j', async change => {
+    const h = harness({ verificationPending: true, step: 'enable-server-address', ...change });
+    expect((await recoverDeployment(h.api, target, 'b'.repeat(64))).status).toBe('blocked');
+});
+
+it('offers read-and-verify recovery for the fixed address activation without clearing its lock', async () => {
+    const h = harness({ verificationPending: true, step: 'enable-server-address', stepState: 'started' });
+    const value = h.held();
+    expect(await recoverDeployment(h.api, target, 'b'.repeat(64))).toMatchObject({ status: 'verify', resumeValue: value });
+    expect(h.held()).toBe(value);
+});

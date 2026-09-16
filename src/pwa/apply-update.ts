@@ -46,12 +46,15 @@ export async function applyPwaUpdate(beforeReload?: () => Promise<void>, options
 	version?: string;
 	canApply?: () => boolean;
 	beforeNavigation?: () => boolean;
+	onStage?: (stage: 'downloading' | 'activating') => void;
 } = {}): Promise<boolean> {
 	const version = options.version ?? await fetchPwaAssetVersion();
 	if (!version) throw new Error('Could not check for updates. Please try again.');
+	options.onStage?.('downloading');
 	const worker = await preparePwaUpdate(version);
 	// The user may have started editing or backgrounded the iPhone during download.
 	if (options.canApply && !options.canApply()) return false;
+	options.onStage?.('activating');
 	if (worker) await waitForWorkerActivation(worker);
 	if (options.canApply && !options.canApply()) return false;
 	await beforeReload?.();

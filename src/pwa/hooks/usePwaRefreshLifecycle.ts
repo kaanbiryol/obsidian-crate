@@ -16,7 +16,8 @@ export function usePwaRefreshLifecycle({
 	hydratedCacheRef: MutableRefObject<boolean>;
 	loadReminders: LoadReminders;
 	refreshPushState: () => Promise<void>;
-}): string | null {
+}): { updateVersion: string | null; updateCheckComplete: boolean } {
+	const [updateCheckComplete, setUpdateCheckComplete] = useState(false);
 	const [updateVersion, setUpdateVersion] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -35,6 +36,8 @@ export function usePwaRefreshLifecycle({
 			}
 		} catch {
 			// Version checks are opportunistic and should not disrupt reminder use.
+		} finally {
+			setUpdateCheckComplete(true);
 		}
 	}, []);
 
@@ -63,5 +66,5 @@ export function usePwaRefreshLifecycle({
 		};
 	}, [authToken, bootstrapped, checkForUpdate, loadReminders, refreshPushState]);
 
-	return updateVersion;
+	return { updateVersion, updateCheckComplete };
 }

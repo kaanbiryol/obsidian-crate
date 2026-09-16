@@ -179,7 +179,12 @@ export async function provisionCloudflareDeployment(input: {
 			input.metadata.workersSubdomain = workersSubdomain;
 			await input.onMetadataChanged();
 		}
-		await fence.mutate(() => input.api.enableWorkerSubdomain(input.accountId, input.metadata.workerName), 'enable-server-address');
+		const address = await input.api.getWorkerSubdomain(input.accountId, input.metadata.workerName);
+		if (address.enabled && !address.previews_enabled) {
+			await fence.checkpoint('enable-server-address');
+		} else {
+			await fence.mutate(() => input.api.enableWorkerSubdomain(input.accountId, input.metadata.workerName), 'enable-server-address');
+		}
 
     input.onProgress?.('Verifying the updated server…');
     const settings = await input.api.getWorkerSettings(input.accountId, input.metadata.workerName);

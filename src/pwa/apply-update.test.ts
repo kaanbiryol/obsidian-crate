@@ -30,13 +30,16 @@ describe('reliable PWA updates', () => {
 		const worker = new UpdateWorker();
 		const register = vi.fn().mockResolvedValue({ installing: worker });
 		vi.stubGlobal('navigator', { serviceWorker: { register } });
-		const update = applyPwaUpdate();
+		const onStage = vi.fn();
+		const update = applyPwaUpdate(undefined, { onStage });
 		await vi.waitFor(() => expect(register).toHaveBeenCalled());
+		expect(onStage.mock.calls).toEqual([['downloading']]);
 		expect(register).toHaveBeenCalledWith('/notifications/sw.js?v=new', {
 			scope: '/notifications', updateViaCache: 'none',
 		});
 		worker.transition('installed');
 		await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith({ type: 'CRATE_ACTIVATE_UPDATE' }));
+		expect(onStage.mock.calls).toEqual([['downloading'], ['activating']]);
 		expect(reload).not.toHaveBeenCalled();
 		worker.transition('activated');
 		await update;

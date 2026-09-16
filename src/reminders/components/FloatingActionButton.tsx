@@ -8,6 +8,7 @@ interface FloatingActionButtonProps {
   className?: string;
   icon?: React.ReactNode;
   animateOnMount?: boolean;
+  inert?: boolean;
   'aria-label'?: string;
   'data-action'?: string;
 }
@@ -21,6 +22,7 @@ export const FloatingActionButton = memo(function FloatingActionButton({
   className = '',
   icon,
   animateOnMount = true,
+  inert = false,
   'aria-label': ariaLabel = 'Add reminder',
   'data-action': dataAction,
 }: FloatingActionButtonProps) {
@@ -29,6 +31,7 @@ export const FloatingActionButton = memo(function FloatingActionButton({
   return (
     <ShadowDOMNativeMotionButton
       onClick={onClick}
+      inert={inert}
       className={`reminders-fab ${className}`}
       initial={prefersReducedMotion || !animateOnMount ? false : { opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}

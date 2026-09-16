@@ -1,4 +1,5 @@
 import { recoverDeployment, type DeploymentRecoveryResult } from './deployment-recovery';
+import { completePublishedDeployment } from './complete-published-deployment';
 import { deleteCrateServer } from './server-delete';
 import { resetCrateServer } from './server-reset';
 import type { CrateSettings } from '../plugin/settings';
@@ -391,6 +392,12 @@ export class CloudflareDeploymentService {
                 });
                 const artifacts = await this.whileActive(this.options.loadArtifacts);
                 const recovery = await recoverDeployment(api, metadata, artifacts.fingerprint);
+                if (recovery.status === 'verify' && recovery.resumeValue) {
+                    const resumeValue = recovery.resumeValue;
+                    await this.whileActive(() => completePublishedDeployment(api, metadata, artifacts, resumeValue));
+                    await this.persistMetadata(metadata);
+                    return { status: 'recovered', message: 'The previously published update was verified and its lock released. You can now update to the version included with this plugin.', diagnostics: recovery.diagnostics };
+                }
                 if (recovery.status !== 'resume' || !recovery.resumeValue) return recovery;
                 await this.whileActive(() => provisionCloudflareDeployment({
                     api, accountId: metadata.accountId!, metadata, artifacts,
