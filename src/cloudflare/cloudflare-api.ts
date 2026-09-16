@@ -1,4 +1,4 @@
-import serverRelease from './server-release.json';
+import { verifyWorkerDeployment } from './verify-worker-deployment';
 import resetWorkerSource from './worker/reset-worker.js?raw';
 import { deleteResetWorkerObjects, verifyResetWorker } from './reset-worker-client';
 import { NOTIFICATION_RATE_BINDING, notificationRateNamespace } from './notification-rate-binding';
@@ -357,17 +357,11 @@ export class CloudflareApiClient {
 	}
 
   async verifyWorkerDeployment(origin: string, fingerprint: string): Promise<void> {
-    // Deliberately use the unauthenticated transport: never send the Cloudflare
-    // management bearer token to a Worker origin.
-    const response = await this.transport(`${origin}/.well-known/crate`, { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
-    const info: unknown = JSON.parse(response.text);
-    if (response.status !== 200 || !info || typeof info !== 'object'
-      || !('service' in info) || info.service !== 'crate'
-      || !('deploymentFingerprint' in info) || info.deploymentFingerprint !== fingerprint
-      || !('serverRevision' in info) || info.serverRevision !== serverRelease.revision
-      || !('schemaVersion' in info) || info.schemaVersion !== serverRelease.schemaVersion) {
-      throw new Error('The updated server did not pass its live check. Check and recover the update.');
-    }
+    await verifyWorkerDeployment(this.transport, origin, fingerprint);
+  }
+
+  async verifyPublishedWorkerDeployment(origin: string, fingerprint: string): Promise<{ revision: number; schemaVersion: number }> {
+    return verifyWorkerDeployment(this.transport, origin, fingerprint, true);
   }
 
 	async updateWorkerSchedules(accountId: string, workerName: string, crons: string[]): Promise<void> {
@@ -399,6 +393,14 @@ export class CloudflareApiClient {
 		});
 		if (!result.subdomain) throw new Error('Cloudflare did not return the new workers.dev subdomain');
 		return result.subdomain;
+	}
+
+	async getWorkerSubdomain(accountId: string, workerName: string): Promise<{ enabled: boolean; previews_enabled: boolean }> {
+		const result = await this.request<{ enabled?: unknown; previews_enabled?: unknown }>(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/subdomain`);
+		if (!result || typeof result.enabled !== 'boolean' || typeof result.previews_enabled !== 'boolean') {
+			throw new Error('Cloudflare returned invalid server address settings.');
+		}
+		return { enabled: result.enabled, previews_enabled: result.previews_enabled };
 	}
 
 	async enableWorkerSubdomain(accountId: string, workerName: string): Promise<void> {

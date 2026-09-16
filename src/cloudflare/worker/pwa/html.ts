@@ -2,6 +2,7 @@ import { PWA_ASSET_VERSION } from '../pwa-version';
 import { PWA_STARTUP_ASSETS } from '../pwa-client-bundle';
 import { manifestHrefForUrl, PWA_CHROME_COLOR, PWA_LIGHT_CHROME_COLOR } from './pwa-params';
 import { PWA_LIGHT_THEME_STYLES, PWA_STYLES } from './styles';
+import { PWA_UPDATE_SCREEN_HTML } from '../../../pwa/update-screen';
 import {
 	PWA_LIGHT_SCHEME_MEDIA,
 	PWA_LIGHT_THEME_STYLE_ID,
@@ -44,7 +45,7 @@ ${PWA_LIGHT_THEME_STYLES}
 	<script src="/notifications/theme-bootstrap.js?v=${PWA_ASSET_VERSION}"></script>
 </head>
 <body>
-	<div id="pwa-update-transition" role="status" aria-live="polite"><span>Updating Crate…</span></div>
+	<div id="pwa-update-transition" role="status" aria-live="polite">${PWA_UPDATE_SCREEN_HTML}</div>
 	<div id="app"><div class="pwa-launch-splash" role="status" aria-label="Loading Crate"></div></div>
 	<script type="module" src="/notifications/app.js?v=${PWA_ASSET_VERSION}"></script>
 	</body>

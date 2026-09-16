@@ -170,7 +170,7 @@ function App() {
 		showToast,
 	});
 
-	const updateVersion = usePwaRefreshLifecycle({
+	const { updateVersion, updateCheckComplete } = usePwaRefreshLifecycle({
 		authToken,
 		bootstrapped,
 		hydratedCacheRef,
@@ -268,8 +268,9 @@ function App() {
 		pendingChangesReady: mutationsReady || Boolean(storageError),
 	});
 
-	const { updating, update } = usePwaUpdate(showToast, initialContentReady, {
+	const { updating, update, launchPending } = usePwaUpdate(showToast, initialContentReady, {
 		version: updateVersion,
+		checkComplete: updateCheckComplete,
 		canApply: () => initialContentReady && mutationsReady && Boolean(authToken)
 			&& !modal && !settingsOpen && !saving && !loggingOut && !reorderDragging
 			&& !launchReminderId && !loading && !refreshing && !isOffline
@@ -354,8 +355,8 @@ function App() {
 		/>
 	), [editReminder, toggleReminderCompleted]);
 
-	if (!initialContentReady) {
-		return <PwaLaunchSplash />;
+	if (!initialContentReady || launchPending) {
+		return <PwaLaunchSplash updating={launchPending && Boolean(updateVersion)} />;
 	}
 
 	if (bootstrapped && !authToken) {
@@ -433,7 +434,7 @@ function App() {
 						</PwaTopNotices>
 					</>
 				) : undefined}
-				suppressFab={Boolean(modal) || settingsOpen || readOnly || !mutationsReady}
+				suppressFab={readOnly || !mutationsReady}
 				backgroundInert={Boolean(modal) || settingsOpen}
 				renderCard={renderSharedCard}
 				onAdd={(defaultProject) => openModal('create', undefined, defaultProject)}

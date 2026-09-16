@@ -68,6 +68,10 @@ export async function fetchPwaAssetVersion(): Promise<string | null> {
 
 export async function registerPwaServiceWorker(): Promise<ServiceWorkerRegistration | null> {
 	if (!('serviceWorker' in navigator)) return null;
+	const existing = await navigator.serviceWorker.getRegistration('/notifications');
+	// Push checks must not queue another registration behind an update download
+	// or replace its waiting worker with the version of this older document.
+	if (existing?.active && new URL(existing.active.scriptURL).searchParams.get('v') === PWA_ASSET_VERSION) return existing;
 	return navigator.serviceWorker.register(`/notifications/sw.js?v=${PWA_ASSET_VERSION}`, {
 		scope: '/notifications',
 	});

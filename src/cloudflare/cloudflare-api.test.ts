@@ -13,6 +13,17 @@ const artifacts = {
 };
 
 describe('CloudflareApiClient', () => {
+	it('reads address activation and preview settings without mutating them', async () => {
+		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: { enabled: true, previews_enabled: false } }) }));
+		await expect(new CloudflareApiClient('token', transport).getWorkerSubdomain('account', 'crate worker')).resolves.toEqual({ enabled: true, previews_enabled: false });
+		expect(transport).toHaveBeenCalledWith('https://api.cloudflare.com/client/v4/accounts/account/workers/scripts/crate%20worker/subdomain', expect.objectContaining({ method: 'GET' }));
+		expect(transport).toHaveBeenCalledOnce();
+	});
+
+	it.each([null, {}, { enabled: true }, { enabled: 'true', previews_enabled: false }, { enabled: true, previews_enabled: null }])('rejects invalid address settings: %j', async result => {
+		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result }) }));
+		await expect(new CloudflareApiClient('token', transport).getWorkerSubdomain('account', 'worker')).rejects.toThrow('invalid server address');
+	});
 	it('deletes exactly the requested D1 database with no other requests', async () => {
 		const transport = vi.fn<HttpTransport>(async () => ({ status: 200, text: JSON.stringify({ success: true, result: {} }) }));
 		await new CloudflareApiClient('token', transport).deleteD1Database('account', 'database');
@@ -245,8 +256,4 @@ it('probes the exact Worker release without forwarding management credentials', 
   await client.verifyWorkerDeployment('https://crate.example.workers.dev', artifacts.fingerprint);
   expect(transport).toHaveBeenCalledWith('https://crate.example.workers.dev/.well-known/crate', { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
   expect(JSON.stringify(transport.mock.calls)).not.toContain('management-secret');
-  for (const changed of [{ serverRevision: serverRelease.revision + 1 }, { schemaVersion: serverRelease.schemaVersion + 1 }, { deploymentFingerprint: 'other' }, { service: 'other' }]) {
-    transport.mockResolvedValueOnce({ status: 200, text: JSON.stringify({ ...metadata, ...changed }) });
-    await expect(client.verifyWorkerDeployment('https://crate.example.workers.dev', artifacts.fingerprint)).rejects.toThrow('live check');
-  }
 });

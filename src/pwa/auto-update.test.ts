@@ -4,13 +4,12 @@ import { preparePwaUpdate } from './apply-update';
 
 vi.mock('./apply-update', () => ({ preparePwaUpdate: vi.fn() }));
 
-describe('foreground automatic PWA updates', () => {
-	let doc: EventTarget & { visibilityState: string; querySelector: ReturnType<typeof vi.fn> };
-	let win: EventTarget;
-	let online: { onLine: boolean };
+describe('launch-only automatic PWA updates', () => {
+	let doc: { visibilityState: string; querySelector: ReturnType<typeof vi.fn> };
 	let memory: Map<string, string>;
 	let stop: () => void;
 	const safe = vi.fn(() => true);
+	const deferred = vi.fn();
 	const apply = vi.fn(async (_version: string, guard: () => boolean, mark: () => boolean) => guard() && mark());
 
 	beforeEach(() => {
@@ -18,13 +17,10 @@ describe('foreground automatic PWA updates', () => {
 		vi.clearAllMocks();
 		safe.mockReturnValue(true);
 		vi.mocked(preparePwaUpdate).mockResolvedValue(null);
-		doc = Object.assign(new EventTarget(), { visibilityState: 'visible', querySelector: vi.fn(() => null) });
-		win = new EventTarget();
-		online = { onLine: true };
+		doc = { visibilityState: 'visible', querySelector: vi.fn(() => null) };
 		memory = new Map();
 		vi.stubGlobal('document', doc);
-		vi.stubGlobal('window', win);
-		vi.stubGlobal('navigator', online);
+		vi.stubGlobal('navigator', { onLine: true });
 		vi.stubGlobal('sessionStorage', {
 			getItem: (key: string) => memory.get(key) ?? null,
 			setItem: (key: string, value: string) => memory.set(key, value),
@@ -32,85 +28,77 @@ describe('foreground automatic PWA updates', () => {
 	});
 	afterEach(() => { stop?.(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-	it('precaches immediately and applies once after an idle interval', async () => {
-		stop = startAutoPwaUpdate('new', safe, apply);
+	it('precaches and applies immediately while launch is safe, without an idle delay', async () => {
+		stop = startAutoPwaUpdate('new', safe, apply, deferred);
+		await vi.advanceTimersByTimeAsync(0);
 		expect(preparePwaUpdate).toHaveBeenCalledWith('new');
-		expect(apply).not.toHaveBeenCalled();
-		await vi.advanceTimersByTimeAsync(2_000);
-		expect(apply).toHaveBeenCalledOnce();
-		await vi.advanceTimersByTimeAsync(20_000);
 		expect(apply).toHaveBeenCalledOnce();
 		stop();
-		stop = startAutoPwaUpdate('new', safe, apply);
+		stop = startAutoPwaUpdate('new', safe, apply, deferred);
 		await vi.advanceTimersByTimeAsync(5_000);
-		expect(apply).toHaveBeenCalledOnce(); // Old shell cannot enter a reload loop.
+		expect(apply).toHaveBeenCalledOnce();
+		expect(deferred).toHaveBeenCalledOnce();
 	});
 
-	it('waits for editors and pending work, then applies without a tap', async () => {
+	it('waits for hydration and pending work while the launch window remains open', async () => {
 		safe.mockReturnValue(false);
-		stop = startAutoPwaUpdate('new', safe, apply);
-		await vi.advanceTimersByTimeAsync(8_000);
-		expect(preparePwaUpdate).toHaveBeenCalledOnce();
+		stop = startAutoPwaUpdate('new', safe, apply, deferred);
+		await vi.advanceTimersByTimeAsync(500);
 		expect(apply).not.toHaveBeenCalled();
 		safe.mockReturnValue(true);
-		await vi.advanceTimersByTimeAsync(2_000);
+		await vi.advanceTimersByTimeAsync(50);
 		expect(apply).toHaveBeenCalledOnce();
 	});
 
-	it('waits for touch release, scrolling, and nested dialogs', async () => {
-		stop = startAutoPwaUpdate('new', safe, apply);
-		doc.dispatchEvent(new Event('pointerdown'));
-		await vi.advanceTimersByTimeAsync(5_000);
-		expect(apply).not.toHaveBeenCalled();
-		doc.dispatchEvent(new Event('pointerup'));
-		await vi.advanceTimersByTimeAsync(1_500);
-		doc.dispatchEvent(new Event('scroll'));
-		await vi.advanceTimersByTimeAsync(1_500);
-		expect(apply).not.toHaveBeenCalled();
-		doc.querySelector.mockReturnValue({} as never);
-		await vi.advanceTimersByTimeAsync(3_000);
-		expect(apply).not.toHaveBeenCalled();
-		doc.querySelector.mockReturnValue(null);
-		await vi.advanceTimersByTimeAsync(2_000);
-		expect(apply).toHaveBeenCalledOnce();
-	});
-
-	it.each(['visibilitychange', 'pageshow'])('resumes after iPhone suspension via %s', async event => {
-		doc.visibilityState = 'hidden';
-		stop = startAutoPwaUpdate('new', safe, apply);
-		await vi.advanceTimersByTimeAsync(60_000);
-		expect(preparePwaUpdate).not.toHaveBeenCalled();
-		doc.visibilityState = 'visible';
-		(event === 'pageshow' ? win : doc).dispatchEvent(new Event(event));
-		await vi.advanceTimersByTimeAsync(2_000);
-		expect(apply).toHaveBeenCalledOnce();
-	});
-
-	it('retries a failed download on reconnect without an automatic retry loop', async () => {
-		vi.mocked(preparePwaUpdate).mockRejectedValueOnce(new Error('Offline'));
-		stop = startAutoPwaUpdate('new', safe, apply);
-		await vi.advanceTimersByTimeAsync(60_000);
-		expect(preparePwaUpdate).toHaveBeenCalledOnce();
-		expect(apply).not.toHaveBeenCalled();
-		win.dispatchEvent(new Event('online'));
-		await vi.advanceTimersByTimeAsync(2_000);
-		expect(apply).toHaveBeenCalledOnce();
-	});
-
-	it('does not activate after backgrounding during a download or after cleanup', async () => {
+	it('does not activate after the launch window closes during a download', async () => {
 		let resolve!: (worker: null) => void;
 		vi.mocked(preparePwaUpdate).mockReturnValue(new Promise(done => { resolve = done; }));
-		stop = startAutoPwaUpdate('new', safe, apply);
-		await vi.advanceTimersByTimeAsync(2_000);
-		doc.visibilityState = 'hidden';
-		doc.dispatchEvent(new Event('visibilitychange'));
+		stop = startAutoPwaUpdate('new', safe, apply, deferred);
+		stop();
 		resolve(null);
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(apply).not.toHaveBeenCalled();
+		expect(deferred).not.toHaveBeenCalled();
+	});
+
+	it('does not retry once content is shown even if pending work settles', async () => {
+		safe.mockReturnValue(false);
+		stop = startAutoPwaUpdate('new', safe, apply, deferred);
+		await vi.advanceTimersByTimeAsync(500);
 		stop();
-		doc.visibilityState = 'visible';
-		win.dispatchEvent(new Event('pageshow'));
+		safe.mockReturnValue(true);
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(apply).not.toHaveBeenCalled();
+	});
+
+	it('defers to manual updating after backgrounding during download', async () => {
+		let resolve!: (worker: null) => void;
+		vi.mocked(preparePwaUpdate).mockReturnValue(new Promise(done => { resolve = done; }));
+		stop = startAutoPwaUpdate('new', safe, apply, deferred);
+		doc.visibilityState = 'hidden';
+		resolve(null);
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(apply).not.toHaveBeenCalled();
+		expect(deferred).toHaveBeenCalledOnce();
+		doc.visibilityState = 'visible';
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(apply).not.toHaveBeenCalled();
+	});
+
+	it('falls back without a retry loop when installation fails', async () => {
+		vi.mocked(preparePwaUpdate).mockRejectedValueOnce(new Error('Offline'));
+		stop = startAutoPwaUpdate('new', safe, apply, deferred);
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(preparePwaUpdate).toHaveBeenCalledOnce();
+		expect(apply).not.toHaveBeenCalled();
+		expect(deferred).toHaveBeenCalledOnce();
+	});
+
+	it('keeps manual updating when session storage cannot guard a reload', async () => {
+		vi.stubGlobal('sessionStorage', { getItem: () => { throw new Error('Blocked'); } });
+		stop = startAutoPwaUpdate('new', safe, apply, deferred);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(apply).not.toHaveBeenCalled();
+		expect(deferred).toHaveBeenCalledOnce();
 	});
 });

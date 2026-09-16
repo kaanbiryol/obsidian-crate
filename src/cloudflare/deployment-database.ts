@@ -59,8 +59,8 @@ export async function prepareDeploymentDatabase(input: DeploymentDatabase, versi
   }
 }
 
-export async function recordDeploymentRelease(input: DeploymentDatabase, fence: DeploymentFence): Promise<void> {
+export async function recordDeploymentRelease(input: DeploymentDatabase, fence: DeploymentFence, revision = SERVER_RELEASE.revision): Promise<void> {
   await fence.mutate(() => input.api.queryD1(input.accountId, input.databaseId,
     'INSERT INTO crate_release(id, revision, fingerprint, schema_version, schema_hash) VALUES (1, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET revision = excluded.revision, fingerprint = excluded.fingerprint, schema_version = excluded.schema_version, schema_hash = excluded.schema_hash;',
-    [String(SERVER_RELEASE.revision), input.artifacts.fingerprint, String(SERVER_RELEASE.schemaVersion), input.artifacts.d1SchemaSha256]), 'record-release');
+    [String(revision), input.artifacts.fingerprint, String(SERVER_RELEASE.schemaVersion), input.artifacts.d1SchemaSha256]), 'record-release');
 }

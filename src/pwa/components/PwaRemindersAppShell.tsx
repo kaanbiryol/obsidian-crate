@@ -118,8 +118,9 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	const showFab = shouldShowReminderFab(viewMode, selectedProject);
 
 	const handleAdd = useCallback(() => {
+		if (backgroundInert) return;
 		onAdd(getReminderCreateProject(viewMode, selectedProject));
-	}, [onAdd, selectedProject, viewMode]);
+	}, [backgroundInert, onAdd, selectedProject, viewMode]);
 
 	const panelCardRenderer = useCallback((reminder: Reminder, index: number) => {
 		return renderCard({
@@ -245,12 +246,12 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 					animateActiveIndicator={!reduceMotion}
 				/>
 
-				<AnimatePresence>
+				<AnimatePresence initial={false}>
 					{showFab && !suppressFab && (
 						<FloatingActionButton
 							onClick={handleAdd}
+							inert={backgroundInert}
 							className="fab"
-							animateOnMount={false}
 							data-action="open-create-modal"
 						/>
 					)}

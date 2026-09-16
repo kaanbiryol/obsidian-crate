@@ -48,10 +48,28 @@ function createApi() {
 		getWorkersSubdomain: vi.fn(async () => 'personal-crate'),
 		createWorkersSubdomain: vi.fn(),
 		enableWorkerSubdomain: vi.fn(async () => {}),
+		getWorkerSubdomain: vi.fn(async () => ({ enabled: false, previews_enabled: false })),
 	};
 }
 
 describe('provisionCloudflareDeployment', () => {
+	it('skips address activation when Cloudflare already has the exact settings', async () => {
+		const api = createApi();
+		api.getWorkerSubdomain.mockResolvedValue({ enabled: true, previews_enabled: false });
+		const metadata = createMetadata();
+		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
+		expect(api.enableWorkerSubdomain).not.toHaveBeenCalled();
+		expect(api.verifyWorkerDeployment).toHaveBeenCalledOnce();
+		expect(metadata.lastDeployedFingerprint).toBe(artifacts.fingerprint);
+	});
+
+	it('disables preview URLs even when the main address is already enabled', async () => {
+		const api = createApi();
+		api.getWorkerSubdomain.mockResolvedValue({ enabled: true, previews_enabled: true });
+		const metadata = createMetadata();
+		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
+		expect(api.enableWorkerSubdomain).toHaveBeenCalledOnce();
+	});
 	it('rejects a newer remote Worker before changing schema or uploading code', async () => {
 		const api = createApi();
 		api.getWorkerSettings.mockResolvedValue({ annotations: { 'workers/message': 'Crate 9.0.0' }, bindings: [] });
@@ -136,5 +154,16 @@ describe('provisionCloudflareDeployment', () => {
 			artifacts,
 			onMetadataChanged: vi.fn(async () => {}),
 		})).rejects.toThrow('Enable an R2 subscription');
+	});
+
+	it('keeps the update locked and unrecorded when live verification fails', async () => {
+		const api = createApi();
+		api.verifyWorkerDeployment.mockRejectedValue(new Error('Live check failed'));
+		const metadata = createMetadata();
+		await expect(provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} }))
+			.rejects.toThrow('deployment fence remains held');
+		expect(metadata.lastDeployedFingerprint).toBeNull();
+		expect(api.uploadWorker).toHaveBeenCalledTimes(1);
+		expect(api.queryD1.mock.calls.some(([, , sql]) => sql.startsWith('INSERT INTO crate_release') || sql.startsWith('DELETE FROM maintenance_state'))).toBe(false);
 	});
 });

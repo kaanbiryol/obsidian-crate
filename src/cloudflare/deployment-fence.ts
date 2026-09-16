@@ -22,9 +22,21 @@ export interface DeploymentFenceRecord {
 	step?: string;
 	stepState?: 'started' | 'confirmed' | 'rejected' | 'settled';
   verificationPending?: boolean;
+  completionOnly?: boolean;
 	resetId?: string;
 	cleanupTokenHash?: string;
 	batchHash?: string;
+}
+
+/** Protocol 1 always writes { enabled: true, previews_enabled: false } here.
+ * A late repeat only applies those same route flags; it cannot publish code or
+ * alter data. Recovery must read both flags and verify the published build.
+ * This exception must never be used for uploads, schema writes or deletion. */
+export function isPendingAddressActivation(record: {
+    kind?: unknown; recoveryProtocol?: unknown; step?: unknown; stepState?: unknown; verificationPending?: unknown;
+}): boolean {
+    return record.kind === 'update' && record.recoveryProtocol === 1 && record.verificationPending === true
+        && record.step === 'enable-server-address' && record.stepState === 'started';
 }
 
 export class DeploymentFence {
