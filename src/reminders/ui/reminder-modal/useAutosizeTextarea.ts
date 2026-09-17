@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import type React from 'react';
 
 const MAX_DESCRIPTION_HEIGHT = 120;
@@ -13,7 +13,8 @@ export function useAutosizeTextarea(
     ref: React.RefObject<HTMLTextAreaElement | null>,
     enabled: boolean,
 ): void {
-    useEffect(() => {
+    // Size before the parent sheet measures its rows and starts its entrance.
+    useLayoutEffect(() => {
         const element = ref.current;
         if (element && enabled) {
             autosizeTextarea(element);

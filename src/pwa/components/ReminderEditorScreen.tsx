@@ -16,6 +16,7 @@ import { ReminderActionChips } from '@/reminders/ui/reminder-modal/ReminderActio
 import { useKeyboardDoneSave } from '../hooks/useKeyboardDoneSave';
 import { useEditorSheetHeight } from '../hooks/useEditorSheetHeight';
 import { useEditorFocus } from '../hooks/useEditorFocus';
+import { useEditorFieldActivation } from '../hooks/useEditorFieldActivation';
 import {
 	applyReminderTextUpdate,
 	deriveDraftPatchFromContent,
@@ -61,6 +62,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 }, ref) {
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const editorRef = useRef<HTMLDivElement | null>(null);
+	const fieldActivation = useEditorFieldActivation();
 	useEditorSheetHeight(editorRef, isActive);
 	useEffect(() => {
 		const editor = editorRef.current;
@@ -163,14 +165,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 			aria-hidden={!editorInteractive}
 			inert={!editorInteractive}
 			tabIndex={-1}
-			onPointerDownCapture={(event) => {
-				if (event.pointerType !== 'touch' || !(event.target instanceof Element)) return;
-				const field = event.target.closest<HTMLElement>('textarea, [contenteditable="true"]');
-				if (!field || field === document.activeElement) return;
-				// iOS otherwise pans the document when switching fields. Focus before
-				// its default action, without canceling the tap or changing selection.
-				field.focus({ preventScroll: true });
-			}}
+			{...fieldActivation}
 		>
 			<form
 				className="modal-form"

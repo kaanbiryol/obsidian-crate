@@ -145,11 +145,6 @@
   }
 }
 
-.has-bottom-fade {
-  mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent);
-  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent);
-}
-
 .reminder-description-wrap {
   flex: 1 1 auto;
   min-height: 32px;

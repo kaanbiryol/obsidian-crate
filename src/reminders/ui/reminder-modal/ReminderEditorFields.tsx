@@ -5,7 +5,6 @@ import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
 import { RichTextInput, type RichTextInputHandle } from '../../components/RichTextInput';
 import { useProjectAutocomplete } from './useProjectAutocomplete';
 import { autosizeTextarea, useAutosizeTextarea } from './useAutosizeTextarea';
-import { useBottomFade } from './useBottomFade';
 
 interface ReminderEditorFieldsProps {
     content: string;
@@ -53,9 +52,6 @@ export function ReminderEditorFields({
             return null;
         } catch (error) { return error instanceof Error ? error.message : 'Check the reminder fields.'; }
     }, [content, description, projects]);
-    const titleFade = useBottomFade(textareaRef);
-    const descFade = useBottomFade(descriptionRef);
-
     useAutosizeTextarea(descriptionRef, Boolean(description));
 
     const autocomplete = useProjectAutocomplete({
@@ -94,7 +90,7 @@ export function ReminderEditorFields({
                     ? `project-autocomplete-option-${autocomplete.highlightedIndex}`
                     : undefined}
                 ariaExpanded={autocomplete.isOpen}
-                className={`reminder-title-input ios-scroll${titleFade ? ' has-bottom-fade' : ''} ${titleInputProps?.className ?? ''}`}
+                className={`reminder-title-input ios-scroll ${titleInputProps?.className ?? ''}`}
             />
             {!disabled && autocomplete.isOpen && (
                 <ProjectAutocompleteDropdown
@@ -116,7 +112,7 @@ export function ReminderEditorFields({
                     onChange={(event) => onDescriptionChange(event.target.value)}
                     placeholder="Description"
                     rows={1}
-                    className={`reminder-description-input ios-scroll${descFade ? ' has-bottom-fade' : ''} ${descriptionInputProps?.className ?? ''}`}
+                    className={`reminder-description-input ios-scroll ${descriptionInputProps?.className ?? ''}`}
                     onInput={(event) => autosizeTextarea(event.currentTarget)}
                 />
             </div>
