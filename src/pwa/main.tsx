@@ -35,6 +35,7 @@ import { useLaunchReminderModal } from './hooks/useLaunchReminderModal';
 import { useReminderSync } from './hooks/useReminderSync';
 import { useReminderMutations } from './hooks/useReminderMutations';
 import { useSheetTransition } from './hooks/useSheetTransition';
+import { usePrepareReminderEditor } from './hooks/usePrepareReminderEditor';
 import { useToast } from './hooks/useToast';
 import { useHomeScreenInstall } from './hooks/useHomeScreenInstall';
 import { HomeScreenInstallPrompt } from './components/HomeScreenInstall';
@@ -279,6 +280,8 @@ function App() {
 	});
 
 	const launchChange = changes.find(change => launchReminderId && (change.recordId === launchReminderId || change.optimistic?.id === launchReminderId));
+	usePrepareReminderEditor(initialContentReady && !launchPending && Boolean(authToken)
+		&& !modal && !settingsOpen && !launchReminderId);
 	useLaunchReminderModal({
 		authToken,
 		bootstrapped,
