@@ -67,7 +67,7 @@ try {
 				window.keyboardViewportHeight = 510;
 				window.visualViewport.dispatchEvent(new Event('resize'));
 			});
-			await expect(page.locator('.pwa-modal-sheet__container--reminder')).toHaveCSS('--pwa-keyboard-inset', '334px');
+			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('padding-bottom', '334px');
 			await expect.poll(async () => (await selectionState(title)).visible).toBe(true);
 			await title.evaluate(async element => {
 				element.scrollTop = 0;
@@ -121,6 +121,24 @@ try {
 
 			const description = page.getByRole('textbox', { name: 'Reminder description', exact: true });
 			await description.fill('A description with many lines.\n'.repeat(20));
+			await title.tap({ position: { x: 8, y: 24 } });
+			assert.equal((await selectionState(title)).start, (await title.textContent()).length, 'Switching to the title defaults to its end');
+			await expect(description).toHaveCSS('mask-image', 'none');
+			await description.tap({ position: { x: 8, y: 8 } });
+			await expect(title).toHaveCSS('mask-image', 'none');
+			assert.equal(await description.evaluate(element => element.selectionStart), (await description.inputValue()).length,
+				'Switching to the description defaults to its end');
+			// A second tap is an intentional caret placement, not field activation.
+			await description.evaluate(element => { element.scrollTop = 0; });
+			await description.tap({ position: { x: 120, y: 35 } });
+			assert.ok(await description.evaluate(element => element.selectionStart < element.value.length), 'An already focused description retains native tap placement');
+			await title.tap({ position: { x: 8, y: 24 } });
+			await title.evaluate(element => { element.scrollTop = 0; });
+			await title.tap({ position: { x: 120, y: 40 } });
+			assert.ok((await selectionState(title)).start < (await title.textContent()).length, 'An already focused title retains native tap placement');
+			// Keyboard/accessibility focus also defaults to the end.
+			await description.focus();
+			assert.equal(await description.evaluate(element => element.selectionStart), (await description.inputValue()).length);
 			await description.evaluate(element => { element.setSelectionRange(90, 95, 'backward'); element.scrollTop = 36; });
 			const descriptionBefore = await description.evaluate(element => ({ start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection, scroll: element.scrollTop }));
 			await expect(description).toHaveCSS('mask-image', 'none');
@@ -133,7 +151,7 @@ try {
 			await expect(description).toBeFocused();
 			assert.deepEqual(await description.evaluate(element => ({ start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection, scroll: element.scrollTop })), descriptionBefore);
 			assert.equal(await page.evaluate(() => window.scrollY), 0, 'The document stays anchored');
-			console.log(`${browserType.name()}: long reminder caret visibility, picker selection/scroll restoration and focused-field fades passed`);
+			console.log(`${browserType.name()}: long reminder caret visibility, picker selection/scroll restoration and unmasked editor fields passed`);
 		} finally { await browser.close(); }
 	}
 } finally { await new Promise(resolve => server.close(resolve)); }

@@ -140,11 +140,6 @@
       overflow-wrap: anywhere;
       touch-action: auto;
       overscroll-behavior: contain;
-
-      &:focus {
-        mask-image: none;
-        -webkit-mask-image: none;
-      }
     }
 
     .reminder-title-input {
