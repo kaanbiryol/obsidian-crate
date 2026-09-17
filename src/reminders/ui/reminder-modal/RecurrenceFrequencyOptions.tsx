@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { RecurrenceRule } from '../../types';
-import { Button } from '../../../ui/shared/Button';
+import { Tabs } from '@base-ui/react/tabs';
+import { Toggle } from '@base-ui/react/toggle';
 import { IconButton } from '../../../ui/shared/IconButton';
 import {
 	getRecurrenceDayLabels,
@@ -103,11 +104,9 @@ export function RecurrenceFrequencyOptions({
 	}, [frequency]);
 
 	return (
-		<div
+		<Tabs.Panel
+			value={frequency}
 			className="recurrence-options"
-			id="recurrence-options-panel"
-			role="tabpanel"
-			aria-labelledby={`recurrence-frequency-${frequency}`}
 			tabIndex={-1}
 		>
 			<StepperControl
@@ -138,15 +137,15 @@ export function RecurrenceFrequencyOptions({
 										{dayLabels.map((label, idx) => {
 											const isSelected = selectedDays.includes(idx);
 											return (
-												<Button
+												<Toggle
 													key={idx}
-													onClick={() => onToggleDay(idx)}
+													onPressedChange={() => onToggleDay(idx)}
 													aria-label={dayNames[idx]}
-													aria-pressed={isSelected}
+													pressed={isSelected}
 													className={`recurrence-day-button${isSelected ? ' is-selected' : ''}`}
 												>
 													{label}
-												</Button>
+												</Toggle>
 											);
 										})}
 									</div>
@@ -169,6 +168,6 @@ export function RecurrenceFrequencyOptions({
 					</motion.div>
 				)}
 			</AnimatePresence>
-		</div>
+		</Tabs.Panel>
 	);
 }

@@ -1,4 +1,18 @@
 @mixin styles {
+  .completed-section-panel {
+    height: var(--collapsible-panel-height);
+    opacity: 1;
+    overflow: hidden;
+    padding-top: 12px;
+    transition: height 240ms ease, opacity 160ms ease, padding-top 240ms ease;
+    &[data-starting-style], &[data-ending-style] { height: 0; opacity: 0; padding-top: 0; }
+    &[data-no-animation] { transition: none; }
+    &[data-open]:not([data-starting-style]) { overflow: visible; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .completed-section-panel { transition: none; }
+  }
+
   .crate-icon-button {
     --crate-icon-button-control-size: var(--crate-icon-button-size);
 

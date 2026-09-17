@@ -1,3 +1,4 @@
+import { Button as BaseButton } from '@base-ui/react/button';
 import React, { useEffect, useState } from 'react';
 import { browserStorageStatus, type BrowserStorageStatus } from '../browser-storage';
 
@@ -15,9 +16,9 @@ export function DeviceStorageSettings() {
 			<span role="status">{status === 'persistent' ? 'Persistent storage granted.' : status === 'checking' ? 'Checking storage…' : status === 'unavailable' ? 'Storage protection is unavailable in this browser.' : 'Best effort storage. This browser may evict offline data.'} Pending changes exist only here until synced. Export them before clearing site data.</span>
 			{status === 'persistent' && <span>Clearing site data or losing this device can still erase offline changes.</span>}
 		</div>
-		{status === 'best-effort' && <button className="settings-action-button" type="button" disabled={requesting} onClick={() => {
+		{status === 'best-effort' && <BaseButton className="settings-action-button" type="button" disabled={requesting} onClick={() => {
 			setRequesting(true);
 			void browserStorageStatus(true).then(setStatus).finally(() => setRequesting(false));
-		}}>Protect offline data</button>}
+		}}>Protect offline data</BaseButton>}
 	</div>;
 }

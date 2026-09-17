@@ -1,12 +1,10 @@
 import { DatePickerContent } from '@/reminders/ui/reminder-modal/DatePickerContent';
-import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
 import { formatLocalDateKey, parseReminderDateValue } from '@/reminders/utils/reminderDate';
 import { applyDateFieldsToDraft, applyDatePresetToDraft } from '../reminder-state';
 import type { ModalDraft } from '../types';
 
-export function ReminderDatePicker({ draft, dialogRef, projectOptions, isDark, onPatch, onSelect, onClose }: {
+export function ReminderDatePicker({ draft, projectOptions, isDark, onPatch, onSelect, onClose }: {
     draft: ModalDraft;
-    dialogRef: (element: HTMLElement | null) => void;
     projectOptions: string[];
     isDark: boolean;
     onPatch: (patch: Partial<ModalDraft>) => void;
@@ -17,7 +15,7 @@ export function ReminderDatePicker({ draft, dialogRef, projectOptions, isDark, o
         ? parseReminderDateValue(draft.dueTime ? `${draft.dueDate}T${draft.dueTime}` : draft.dueDate, Boolean(draft.dueTime)) ?? null
         : null;
     return (
-        <section ref={dialogRef} className="pwa-picker-sheet pwa-date-picker-sheet" role="dialog" aria-modal="true" aria-label={REMINDER_PICKER_COPY.schedule.dialogLabel} tabIndex={-1}>
+        <section className="pwa-picker-sheet pwa-date-picker-sheet" tabIndex={-1}>
             <DatePickerContent
                 currentDate={currentDate} hasTime={Boolean(draft.dueTime)} isDark={isDark}
                 idPrefix="pwa" commitDateOnChange onClose={onClose}

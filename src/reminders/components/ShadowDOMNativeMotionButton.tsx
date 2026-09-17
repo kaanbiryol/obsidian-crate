@@ -1,6 +1,8 @@
 import React, { forwardRef } from 'react';
 import { motion } from 'motion/react';
-import { useShadowDomClickBridge } from './shadowDomClickBridge';
+import { Button } from '../../ui/shared/Button';
+
+const MotionButton = motion.create(Button);
 
 type NativeMotionButtonProps = Omit<React.ComponentProps<typeof motion.button>, 'children' | 'onClick' | 'ref'> & {
 	onClick: () => void;
@@ -15,10 +17,9 @@ export const ShadowDOMNativeMotionButton = forwardRef<HTMLButtonElement, NativeM
 	type = 'button',
 	...props
 }, ref) {
-	const combinedRef = useShadowDomClickBridge(onClick, ref);
 	return (
-		<motion.button ref={combinedRef} className={className} style={style} type={type} {...props}>
+		<MotionButton ref={ref} onClick={onClick} className={className} style={style} type={type} {...props}>
 			{children}
-		</motion.button>
+		</MotionButton>
 	);
 });

@@ -62,7 +62,7 @@ export function usePullToRefresh(enabled: boolean, onRefresh: () => Promise<void
 
 		function handleTouchStart(event: TouchEvent) {
 			if (refreshing || active || event.touches.length !== 1) return;
-			if ((event.target as Element | null)?.closest('.react-modal-sheet-root')) return;
+			if ((event.target as Element | null)?.closest('.pwa-modal-sheet')) return;
 			const nextScrollTarget = findPullScrollTarget(event.target);
 			if (!nextScrollTarget || nextScrollTarget.scrollTop > 0) return;
 

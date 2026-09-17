@@ -1,3 +1,4 @@
+import { Toggle } from '@base-ui/react/toggle';
 import React, { useRef, useState } from 'react';
 import type { PwaPreferences } from '../preferences';
 import { PwaButton as Button } from './PwaButton';
@@ -10,7 +11,6 @@ import {
 	Sun,
 } from 'lucide-react';
 import { ModalHeader } from '@/ui/shared/ModalHeader';
-import { useDialogFocus } from '../hooks/useDialogFocus';
 import type { PwaThemePreference } from '../theme';
 import type { PushState, StoredConfig } from '../types';
 import { PwaModalSheet } from './PwaModalSheet';
@@ -52,22 +52,16 @@ export function SettingsSheet({
 	const defaultScreenPointerSelection = useRef(false);
 	const notificationDescription = push.status
 		?? (push.phase === 'enabled' ? 'Reminders are enabled on this device.' : 'Get alerts when Crate is closed.');
-	const { handleDialogKeyDown, setDialogRef } = useDialogFocus({
-		activeKey: 'settings',
-		escapeDisabled: loggingOut || isClosing,
-		onEscape: onClose,
-	});
 	return (
 		<PwaModalSheet
 			isOpen={!isClosing}
 			onClose={onClose}
 			onCloseEnd={onClosed}
 			variant="settings"
-			detent="content"
-			closeOnBackdrop={!loggingOut && !isClosing}
-			onKeyDown={handleDialogKeyDown}
+			label="Settings"
+			dismissible={!loggingOut && !isClosing}
 		>
-			<aside ref={setDialogRef} className="settings-sheet outline-none" role="dialog" aria-modal="true" aria-label="Settings" aria-busy={loggingOut || isClosing} tabIndex={-1}>
+			<aside className="settings-sheet outline-none" aria-busy={loggingOut || isClosing} tabIndex={-1}>
 				<ModalHeader
 					title="Settings"
 					closeLabel="Close settings"
@@ -93,17 +87,17 @@ export function SettingsSheet({
 										const Icon = option.icon;
 										const active = themePreference === option.value;
 										return (
-											<Button
+											<Toggle
 												key={option.value}
 												className={`settings-theme-option${active ? ' is-active' : ''}`}
 												type="button"
 												data-theme={option.value}
-												aria-pressed={active}
-												onClick={() => onThemePreferenceChange(option.value)}
+												pressed={active}
+												onPressedChange={() => onThemePreferenceChange(option.value)}
 											>
 												<Icon size={15} />
 												<span>{option.label}</span>
-											</Button>
+											</Toggle>
 										);
 									})}
 								</div>

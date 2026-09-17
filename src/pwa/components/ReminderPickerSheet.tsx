@@ -1,6 +1,5 @@
 import React, { useLayoutEffect } from 'react';
 import { ProjectPickerContent } from '@/reminders/ui/reminder-modal/ProjectPickerContent';
-import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
 import {
 	applyReminderTextUpdate,
 } from '../reminder-state';
@@ -11,7 +10,6 @@ import { ReminderRecurrencePicker } from './ReminderRecurrencePicker';
 interface ReminderPickerSheetProps {
 	isDark: boolean;
 	draft: ModalDraft;
-	dialogRef: (element: HTMLElement | null) => void;
 	projectOptions: string[];
 	onPatch: (patch: Partial<ModalDraft>) => void;
 	onSelect: (patch?: Partial<ModalDraft>) => void;
@@ -22,7 +20,6 @@ interface ReminderPickerSheetProps {
 export function ReminderPickerSheet({
 	isDark,
 	draft,
-	dialogRef,
 	projectOptions,
 	onPatch,
 	onSelect,
@@ -37,7 +34,6 @@ export function ReminderPickerSheet({
 			<ReminderDatePicker
 				isDark={isDark}
 				draft={draft}
-				dialogRef={dialogRef}
 				projectOptions={projectOptions}
 				onPatch={onPatch}
 				onSelect={onSelect}
@@ -48,7 +44,7 @@ export function ReminderPickerSheet({
 
 	if (draft.activePicker === 'project') {
 		return (
-			<section ref={dialogRef} className="pwa-picker-sheet pwa-project-picker-sheet" role="dialog" aria-modal="true" aria-label={REMINDER_PICKER_COPY.project.dialogLabel} tabIndex={-1}>
+			<section className="pwa-picker-sheet pwa-project-picker-sheet" tabIndex={-1}>
                 <ProjectPickerContent
                     isOpen projects={projectOptions} project={draft.project} defaultProject={draft.defaultProject}
                     isDark={isDark} onClose={onClose}
@@ -58,5 +54,5 @@ export function ReminderPickerSheet({
 		);
 	}
 
-	return <ReminderRecurrencePicker isDark={isDark} draft={draft} dialogRef={dialogRef} projectOptions={projectOptions} onSelect={onSelect} onClose={onClose} />;
+	return <ReminderRecurrencePicker isDark={isDark} draft={draft} projectOptions={projectOptions} onSelect={onSelect} onClose={onClose} />;
 }

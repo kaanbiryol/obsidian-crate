@@ -1,3 +1,4 @@
+import { Progress } from '@base-ui/react/progress';
 import { memo } from 'react';
 
 interface ProgressMeterProps {
@@ -18,21 +19,17 @@ export const ProgressMeter = memo(function ProgressMeter({
 	const boundedPercentage = Math.min(100, Math.max(0, percentage));
 
 	return (
-		<div
+		<Progress.Root
+			value={boundedPercentage}
 			className={['crate-progress-meter', className].filter(Boolean).join(' ')}
-			role="progressbar"
 			aria-label={label}
-			aria-valuemin={0}
-			aria-valuemax={100}
-			aria-valuenow={boundedPercentage}
 		>
-			<div
+			<Progress.Indicator
 				className={['crate-progress-meter-fill', fillClassName].filter(Boolean).join(' ')}
 				style={{
-					width: `${boundedPercentage}%`,
 					backgroundColor: color,
 				}}
 			/>
-		</div>
+		</Progress.Root>
 	);
 });

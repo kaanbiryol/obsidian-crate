@@ -31,7 +31,37 @@ both hosts together.
   behavior. The PWA editor layout sets browser sheet height, safe areas, and
   touch target sizes. Its focus/keyboard-save hook remains in the PWA adapter.
   Date, project, and repeat picker content and styles are shared too. Host adapters
-  keep native modal behavior, apply/cancel semantics, and date-input commit timing.
+  keep apply/cancel semantics, keyboard geometry, and date-input commit timing.
+- `src/pwa/components/PwaModalSheet.tsx` wraps Base UI Drawer for focus containment,
+  dismissal, and downward swipe gestures. `drawer.css` owns its transitions,
+  including reduced motion. The PWA retains its document scroll lock and editor
+  keyboard geometry; editor fields opt out of swiping to preserve native selection
+  and scrolling. Swiping the editor retains its draft, while swiping a picker or
+  delete confirmation returns to the editor. Explicit editor close still discards
+  the draft. Busy operations and screen transitions block dismissal.
+
+- `src/reminders/components/BaseModal.tsx` uses Base UI Dialog on desktop and
+  Drawer for mobile sheets. Portals remain inside the same themed mount and
+  owner document, including Obsidian Shadow DOM and popout windows. Nested
+  pickers share the parent's dialog tree and restore editor focus. Pending
+  saves/deletes reject all dismissal paths. `_modal.scss` owns transitions.
+- `BaseUiModal` retains Obsidian's modal shell, history, and selection restoration,
+  replacing its keyboard scope so native Escape and focus handling do not race
+  Base UI. The React trap yields when Obsidian opens a native menu or another
+  modal above it. Activity and Exclusions initialize their imperative content
+  inside the mounted portal.
+- React buttons use Base UI Button; recurrence and activity tabs use Tabs;
+  completion controls use Checkbox; priority/date/day controls use Toggle;
+  completed lists and project branches use Collapsible; progress uses Progress.
+  The project list composes Toolbar's roving focus with its existing listbox
+  semantics and explicit Enter/click selection. The old click bridge and Motion
+  sheet gesture/backdrop components are removed. Motion remains for list,
+  reorder, and content animations.
+- Obsidian Settings, Notice, Menu, and its other native modal screens stay on
+  Obsidian's APIs. Plain native select/number/date/time inputs and review
+  checkboxes remain browser controls. The rich-text editor's caret-based project
+  completion remains editor logic; it is not a plain combobox input.
+
 
 ## Making a visual change
 
@@ -78,10 +108,15 @@ new baselines, dispatch **Shared UI visual checks** with **Generate candidate
 baselines for review**, inspect its artifact, and commit only approved images
 from `tests/visual/baselines`. Normal CI never updates baselines automatically.
 
-The CSS cleanup reduced the plugin stylesheet from approximately 146 KB to
-138 KB by limiting Tailwind scanning to application source, shortening repeated
-primary-screen selectors, and removing obsolete picker/footer rules. The raw
-budget is now 140,000 bytes; the existing 20,000-byte gzip limit is unchanged.
+The stylesheet is approximately 170 KB raw / 24 KB gzip after the shared Base UI
+migration. `scripts/bundle-budgets.mjs` records measured baselines and explicit
+limits for the plugin, embedded Worker, and PWA startup/deferred assets.
+
+`scripts/base-ui-plugin-test.mjs` checks Dialog/Drawer nesting, keyboard navigation,
+focus return, pending mutations, native Obsidian overlay handoff, touch gestures,
+and portal content initialization in Chromium and WebKit. The smaller
+`scripts/react-shadow-dom-test.mjs` covers editing and single button activation
+across mount/unmount cycles.
 
 Knip ignores the `tailwindcss` dependency because its direct import is the Sass
 `@use "tailwindcss/theme.css"` in `src/styles/main.scss`, which Knip does not scan.

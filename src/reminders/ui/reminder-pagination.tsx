@@ -1,3 +1,4 @@
+import { Button as BaseButton } from '@base-ui/react/button';
 import { createContext, useContext, useMemo, useState } from 'react';
 
 /** Hosts opt in to bounded rendering; the Obsidian plugin retains its full lists. */
@@ -47,14 +48,14 @@ export function ReminderPagination({ pagination, label, disabled = false }: {
     <nav aria-label={`${label} pages`} className="reminder-pagination">
       <span>{(start + 1).toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()}</span>
       <div className="reminder-pagination-controls">
-        <button type="button" aria-label={`Previous ${label.toLowerCase()} page`} aria-disabled={disabled || page === 0}
-          onClick={() => { if (!disabled && page > 0) setPage(page - 1); }}>Previous</button>
+        <BaseButton type="button" aria-label={`Previous ${label.toLowerCase()} page`} aria-disabled={disabled || page === 0}
+          onClick={() => { if (!disabled && page > 0) setPage(page - 1); }}>Previous</BaseButton>
         <select aria-label={`${label} page`} value={page} disabled={disabled}
           onChange={event => { if (!disabled) setPage(Number(event.currentTarget.value)); }}>
           {Array.from({ length: pageCount }, (_, index) => <option key={index} value={index}>Page {index + 1}</option>)}
         </select>
-        <button type="button" aria-label={`Next ${label.toLowerCase()} page`} aria-disabled={disabled || page === pageCount - 1}
-          onClick={() => { if (!disabled && page < pageCount - 1) setPage(page + 1); }}>Next</button>
+        <BaseButton type="button" aria-label={`Next ${label.toLowerCase()} page`} aria-disabled={disabled || page === pageCount - 1}
+          onClick={() => { if (!disabled && page < pageCount - 1) setPage(page + 1); }}>Next</BaseButton>
       </div>
     </nav>
   );

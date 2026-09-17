@@ -10,7 +10,7 @@ export function getPickerModalProps(pickerMode: 'replace' | 'overlay'): PickerMo
     return {
         variant: pickerMode === 'overlay' ? 'centered' : 'bottom-sheet',
         performanceMode: pickerMode === 'overlay' ? 'standard' : 'reduced-effects',
-        showBackdrop: false,
+        showBackdrop: pickerMode !== 'overlay',
         showDragHandle: pickerMode !== 'overlay',
         zIndex: pickerMode === 'overlay' ? 70 : 60,
     };

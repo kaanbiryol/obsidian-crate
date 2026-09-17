@@ -1,0 +1,22 @@
+/* Base UI supplies behavior; the PWA owns geometry and transition timing. */
+/* Keep keyboard interpolation local to the stage. Inheriting this animated
+   value forces style recalculation throughout the editor on every frame. */
+@property --pwa-keyboard-inset{syntax:"<length>";inherits:false;initial-value:0px}
+/* Approximate a damped, non-bouncing spring with a compositor-friendly cubic
+   curve: accelerate briefly, then settle. Keep direct dragging unanimated. */
+.pwa-modal-sheet{position:fixed;inset:0;z-index:1000;pointer-events:none}
+.pwa-modal-sheet__backdrop{position:absolute;inset:0;opacity:calc(1 - var(--drawer-swipe-progress,0));transition:opacity 240ms ease-out}
+.pwa-modal-sheet__container{position:absolute;bottom:0;left:0;display:flex;flex-direction:column;outline:none;pointer-events:auto;transform:none;transition:transform 420ms cubic-bezier(.19,0,0,1)}
+.pwa-reminder-sheet-stage{transition:--pwa-keyboard-inset 180ms ease-out}
+.pwa-modal-sheet__container[data-starting-style],.pwa-modal-sheet__container[data-ending-style]{transform:translateY(var(--pwa-sheet-travel,100%))}
+.pwa-modal-sheet__container[data-starting-style]{transition:none}
+.pwa-modal-sheet__container[data-ending-style]{transition-duration:calc(280ms * var(--drawer-swipe-strength,1));transition-timing-function:cubic-bezier(.4,0,.7,.2)}
+.pwa-modal-sheet__container[data-swiping]{transform:translateY(var(--drawer-swipe-movement-y,0px));transition:none}
+.pwa-modal-sheet__backdrop[data-starting-style],.pwa-modal-sheet__backdrop[data-ending-style]{opacity:0}
+.pwa-modal-sheet__backdrop[data-ending-style]{transition-duration:220ms}
+.pwa-modal-sheet__backdrop[data-swiping]{transition:none}
+.pwa-modal-sheet__content{display:flex;flex-direction:column}
+.pwa-modal-sheet__scroller{flex:1}
+@media(prefers-reduced-motion:reduce){
+ .pwa-modal-sheet__container,.pwa-modal-sheet__backdrop,.pwa-reminder-sheet-stage{transition-duration:0ms!important}
+}

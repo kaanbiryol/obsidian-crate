@@ -1,5 +1,5 @@
 import { isSameDay } from 'date-fns';
-import { Button } from '../../../ui/shared/Button';
+import { ToggleButton } from '../../../ui/shared/ToggleButton';
 import { ThemeIcon } from '../../components/theme-icon';
 import {
 	getReminderDateForPreset,
@@ -52,10 +52,10 @@ export function DateQuickButtons({
 					? `${weekdayFormatter.format(optionDate)}, ${timeFormatter.format(optionDate)}`
 					: dateFormatter.format(optionDate);
 				return (
-					<Button
+					<ToggleButton
 						key={id}
-						onClick={() => onSelectPreset(id)}
-						aria-pressed={isActive}
+						onPressedChange={() => onSelectPreset(id)}
+						pressed={isActive}
 						className={`date-quick-button${isActive ? ' is-active' : ''}`}
 					>
 						<ThemeIcon
@@ -68,7 +68,7 @@ export function DateQuickButtons({
 							<strong>{label}</strong>
 							<small>{detail}</small>
 						</span>
-					</Button>
+					</ToggleButton>
 				);
 			})}
 		</div>

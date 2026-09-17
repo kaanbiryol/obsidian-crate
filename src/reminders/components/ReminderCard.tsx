@@ -1,3 +1,4 @@
+import { Checkbox } from '@base-ui/react/checkbox';
 import React from 'react';
 import { motion } from 'motion/react';
 import { ThemeIcon } from './theme-icon';
@@ -127,11 +128,11 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
             {/* Card content */}
             <div className="premium-reminder-content">
                 {/* Custom checkbox */}
-                <button
-                    type="button"
+                <Checkbox.Root
+                    render={<button type="button" />}
+                    nativeButton
                     className={`premium-checkbox${isCheckboxChecked ? ' is-checked' : ''}${isImportant ? ' is-important' : ''}${completionPreview ? ' is-completing' : ''}`}
-                    role="checkbox"
-                    aria-checked={isCheckboxChecked}
+                    checked={isCheckboxChecked}
                     aria-disabled={completionPreview}
                     aria-label={completionPreview
                         ? `Completing ${reminder.content}`
@@ -150,7 +151,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                             <ThemeIcon size="xs" id="check" className="premium-checkbox-icon" />
                         )}
                     </span>
-                </button>
+                </Checkbox.Root>
 
                 {/* Main content area */}
                 <div className="premium-reminder-body">

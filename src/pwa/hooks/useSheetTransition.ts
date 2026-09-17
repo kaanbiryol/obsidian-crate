@@ -29,7 +29,7 @@ export function useSheetTransition(onClosed: () => void): {
 
 	useEffect(() => {
 		if (!isClosing) return;
-		// The normal exit takes 260ms. If its completion callback is lost,
+		// If the exit animation's completion callback is lost,
 		// unmount the closed sheet so its backdrop and background lock cannot linger.
 		const timeout = window.setTimeout(finishClose, 1000);
 		return () => window.clearTimeout(timeout);

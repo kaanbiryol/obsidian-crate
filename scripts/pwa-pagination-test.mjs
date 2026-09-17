@@ -143,7 +143,7 @@ async function checkLastPageDeletion(browser) {
     await expect(cards).toHaveCount(1);
     await expect(page.locator('[data-action="open-create-modal"]')).toBeVisible();
     await cards.first().click();
-    const editor = page.locator('.pwa-reminder-editor[role="dialog"]');
+    const editor = page.locator('.pwa-modal-sheet__container--reminder[role="dialog"]');
     await expect(editor.locator('[contenteditable="true"][aria-label="Reminder title"]')).toHaveText(reminders.at(-1).content);
     await editor.getByRole('button', { name: 'Delete reminder', exact: true }).click();
     const confirmation = page.getByRole('alertdialog', { name: 'Delete reminder', exact: true });
@@ -221,7 +221,7 @@ async function checkSecondPageReorder(browser) {
     await expect(select).toBeEnabled();
     await expect(select).toHaveValue('1');
     assert.deepEqual(await mountedIds(page), expected.slice(200, 400));
-    await expect(page.locator('.pwa-reminder-editor[role="dialog"]')).toHaveCount(0);
+    await expect(page.locator('.pwa-modal-sheet__container--reminder[role="dialog"]')).toHaveCount(0);
   });
 }
 

@@ -1,3 +1,4 @@
+import { Button as BaseButton } from '@base-ui/react/button';
 import React from 'react';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 
@@ -27,8 +28,8 @@ export function ReminderRecoveryNotice({ changes, folderPath, onResume }: {
 			</p>)}</details>
 		</div>
 		<div className="pwa-reminder-sync-error__actions">
-			<button type="button" onClick={onResume}>Resume saved changes</button>
-			<button type="button" onClick={exportChanges}>Export saved changes</button>
+			<BaseButton type="button" onClick={onResume}>Resume saved changes</BaseButton>
+			<BaseButton type="button" onClick={exportChanges}>Export saved changes</BaseButton>
 		</div>
 	</section>;
 }

@@ -1,5 +1,5 @@
-import React, { useId, useState } from 'react';
-import { ShadowDOMNativeButton } from '../../components/ShadowDOMNativeButton';
+import React, { useState } from 'react';
+import { Collapsible } from '@base-ui/react/collapsible';
 import { ThemeIcon } from '../../components/theme-icon';
 import { BrowseProjectCard } from './BrowseProjectCard';
 import type { BrowseProjectCardViewModel } from './viewModels';
@@ -47,23 +47,19 @@ function ProjectBranch({ node, onProjectSelect }: {
   onProjectSelect: (project: string) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
-  const childrenId = useId();
-  return <li className={node.children.length > 0 ? 'premium-project-group' : undefined}>
+  return <Collapsible.Root render={<li />} open={expanded} onOpenChange={setExpanded} className={node.children.length > 0 ? 'premium-project-group' : undefined}>
     <div className="premium-project-tree-row">
       {node.card ? <BrowseProjectCard card={node.card} label={node.label} hideChevron={node.children.length > 0} onClick={() => onProjectSelect(node.path)} />
         : <span className="premium-project-group-name">{node.label}</span>}
-      {node.children.length > 0 && <ShadowDOMNativeButton
+      {node.children.length > 0 && <Collapsible.Trigger
         className="premium-project-expand"
         aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.path} subprojects`}
-        aria-expanded={expanded}
-        aria-controls={childrenId}
-        onClick={() => setExpanded(value => !value)}
       >
         <ThemeIcon size="s" id={expanded ? 'chevron-down' : 'chevron-right'} />
-      </ShadowDOMNativeButton>}
+      </Collapsible.Trigger>}
     </div>
-    {node.children.length > 0 && <div id={childrenId} hidden={!expanded} className="premium-project-children">
+    {node.children.length > 0 && <Collapsible.Panel keepMounted className="premium-project-children">
       <ProjectTree nodes={node.children} onProjectSelect={onProjectSelect} />
-    </div>}
-  </li>;
+    </Collapsible.Panel>}
+  </Collapsible.Root>;
 }

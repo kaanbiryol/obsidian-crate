@@ -1,3 +1,4 @@
+import { Button as BaseButton } from '@base-ui/react/button';
 import React from 'react';
 import { PwaButton as Button } from './PwaButton';
 import {
@@ -17,7 +18,7 @@ function PwaSettingsButton({
 	onToggleSettings: () => void;
 }) {
 	return (
-		<button
+		<BaseButton
 			className={`pwa-header-settings-button${settingsOpen ? ' is-active' : ''}`}
 			type="button"
 			data-action="toggle-settings"
@@ -26,7 +27,7 @@ function PwaSettingsButton({
 			onClick={onToggleSettings}
 		>
 			<Settings size={20} strokeWidth={1.8} />
-		</button>
+		</BaseButton>
 	);
 }
 
@@ -81,10 +82,10 @@ export function PwaTopNotices({
 						<span className="pwa-update-banner__text">Update available</span>
 						<span className="pwa-update-banner__detail">Install the latest version when you’re ready.</span>
 					</div>
-					<button className="pwa-update-button" type="button" onClick={onReload} disabled={updating} aria-busy={updating} aria-label="Update to the latest version">
+					<BaseButton className="pwa-update-button" type="button" onClick={onReload} disabled={updating} aria-busy={updating} aria-label="Update to the latest version">
 						<span className="pwa-update-button__label" aria-hidden={updating}>Update</span>
 						<span className="pwa-update-button__label pwa-update-button__label--busy" aria-hidden={!updating}>Updating…</span>
-					</button>
+					</BaseButton>
 				</div>
 			)}
 			{showStatusLine && <div className={`pwa-status-line is-${statusKind}`} role="status">{statusText}</div>}

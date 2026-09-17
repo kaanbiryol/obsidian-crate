@@ -15,6 +15,7 @@ import { REMINDER_PICKER_COPY } from './pickerCopy';
 interface DatePickerModalProps {
     isOpen: boolean;
     onClose: () => void;
+    finalFocus?: () => HTMLElement | false | null;
     animationConfig: AnimationConfig;
     pickerMode: 'replace' | 'overlay';
     dueDate: string | null;
@@ -26,6 +27,7 @@ interface DatePickerModalProps {
 export const DatePickerModal: React.FC<DatePickerModalProps> = ({
     isOpen,
     onClose,
+    finalFocus,
     animationConfig,
     pickerMode,
     dueDate,
@@ -89,6 +91,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
         <BaseModal
             isOpen={isOpen}
             onClose={onClose}
+            finalFocus={finalFocus}
             animationConfig={animationConfig}
             className={`crate-reminder-picker-surface is-date-picker${reduceMotion ? ' is-reduced-motion' : ''}`}
             ariaLabel={REMINDER_PICKER_COPY.schedule.dialogLabel}

@@ -9,6 +9,17 @@ import { ProjectPickerModal } from './ProjectPickerModal';
 import { RecurrencePickerModal } from './RecurrencePickerModal';
 import { ReminderActionChips } from './ReminderActionChips';
 
+// Portals do not render during SSR; keep these assertions focused on the editor's content.
+// Modal lifecycle, focus and keyboard behavior run in base-ui-plugin-test.mjs.
+vi.mock('../../components/BaseModal', () => ({
+    BaseModal: ({ children, isOpen = true, className, role = 'dialog', ariaLabel, ariaLabelledBy, ariaDescribedBy }: {
+        children: React.ReactNode; isOpen?: boolean; className?: string; role?: string;
+        ariaLabel?: string; ariaLabelledBy?: string; ariaDescribedBy?: string;
+    }) => isOpen ? React.createElement('div', {
+        className, role, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy,
+    }, children) : null,
+}));
+
 describe('reminder editor chrome', () => {
     it('focuses the title on the next paint instead of waiting for the opening animation', async () => {
         const presentation = await readFile(
@@ -288,7 +299,6 @@ describe('reminder editor chrome', () => {
         expect(markup).toContain('autofocus=""');
         expect(markup).not.toContain('style="opacity:0');
         expect(markup).not.toMatch(/transform:(?!none)/);
-        expect(markup).toContain('base-modal-surface');
         expect(markup).toContain('delete-confirmation-header');
         expect(markup).toContain('aria-label="Close confirmation"');
         expect(markup).not.toContain('reminder-modal-header');

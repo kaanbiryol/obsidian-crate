@@ -9,10 +9,10 @@ async function tapBackdropAbove(page, dialog) {
 	// apparent backdrop immediately above the content to catch invisible blockers.
 	const sheet = page.locator('.pwa-reminder-sheet-stage');
 	await expect(dialog).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Close sheet', exact: true })).toBeVisible();
+	await expect(page.locator('.pwa-modal-sheet__backdrop')).toBeVisible();
 	await expect(page.locator('.pwa-modal-sheet__container')).toHaveCSS('transform', 'none');
 	if (await sheet.count()) await expect(sheet).toHaveCSS('transform', 'none');
-	const bounds = await dialog.boundingBox();
+	const bounds = await (await sheet.count() ? sheet : dialog).boundingBox();
 	assert.ok(bounds && bounds.y > 24, 'The sheet must leave a visible backdrop');
 	const point = { x: bounds.x + bounds.width / 2, y: bounds.y - 24 };
 	assert.ok(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('pwa-modal-sheet__backdrop'), point),
@@ -44,6 +44,8 @@ async function tabTo(page, locator) {
 	const tab = page.context().browser().browserType().name() === 'webkit' ? 'Alt+Tab' : 'Tab';
 	for (let attempts = 0; attempts < 30; attempts++) {
 		await page.keyboard.press(tab);
+		// Base UI's focus guards wrap focus on the next animation frame.
+		await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
 		if (await locator.evaluate(element => element === document.activeElement)) return;
 	}
 	assert.fail('Keyboard navigation did not reach the requested control');
@@ -100,7 +102,7 @@ try {
 			await expect(page.getByRole('dialog', { name: 'New reminder', exact: true })).toHaveCount(0);
 			await editor.getByRole('heading', { name: 'Edit reminder', exact: true }).tap();
 			await expect(title).toBeFocused();
-			await editor.locator('.reminder-modal-header').tap({ position: { x: 3, y: 3 } });
+			await editor.locator('.reminder-modal-header').tap({ position: { x: 85, y: 28 } });
 			await expect(title).toBeFocused();
 			await editor.locator('.modal-form').tap({ position: { x: 2, y: 80 } });
 			await expect(title).toBeFocused();
@@ -121,7 +123,7 @@ try {
 			await expect(title).toContainText('Keep this draft while choosing');
 			await editor.getByRole('button', { name: 'Inbox', exact: true }).tap();
 			await expect(project).toBeVisible();
-			await expect(page.getByRole('button', { name: 'Close sheet', exact: true })).toBeVisible();
+			await expect(page.locator('.pwa-modal-sheet__backdrop')).toBeVisible();
 			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
 			await project.getByRole('option', { name: 'Work', exact: true }).tap();
 			await expect(editor.getByRole('button', { name: 'Work', exact: true })).toBeVisible();
@@ -163,7 +165,9 @@ try {
 			const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
 			await expect(fab).toHaveAttribute('inert', '');
 			await expect(fab).toHaveCSS('opacity', '1');
-			await expectNoTouchRing(settings);
+			// The dialog role now belongs to the popup, which has a deliberate sheet shadow.
+			await expect(settings).toHaveCSS('outline-style', 'none');
+			await expectNoTouchRing(settings.locator('.settings-sheet'));
 			const darkTheme = settings.getByRole('button', { name: 'Dark', exact: true });
 			await darkTheme.tap();
 			await expect(darkTheme).toHaveAttribute('aria-pressed', 'true');
