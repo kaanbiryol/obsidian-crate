@@ -23,8 +23,21 @@ export function useEditorSheetHeight(ref: RefObject<HTMLDivElement | null>, acti
 			measureSheetTravel(container);
 		};
 		measure();
-		const observer = new ResizeObserver(measure);
+		let frame = 0;
+		const observer = new ResizeObserver(() => {
+			// Changing an ancestor's height during resize delivery can resize the
+			// observed rows again, producing a WebKit ResizeObserver loop error.
+			// Initial sizing above stays synchronous; later changes share one frame.
+			if (frame) return;
+			frame = requestAnimationFrame(() => {
+				frame = 0;
+				measure();
+			});
+		});
 		rows.forEach(row => observer.observe(row));
-		return () => observer.disconnect();
+		return () => {
+			observer.disconnect();
+			cancelAnimationFrame(frame);
+		};
 	}, [active, ref, confirmingDelete]);
 }

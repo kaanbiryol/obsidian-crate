@@ -12,7 +12,6 @@ const { outputFiles } = await build({
 			import { RichTextInput } from './src/reminders/components/RichTextInput';
 			import { useKeyboardHeight } from './src/reminders/ui/hooks/useKeyboardHeight';
 			import { PwaPullRefreshIndicator } from './src/pwa/components/PwaChrome';
-			export { renderRichText } from './src/reminders/components/richTextInputDom';
 			export { getPlainText } from './src/reminders/utils/richTextPlainText';
 			function Editor() {
 				const [value, setValue] = useState('Task #Work !');
@@ -48,29 +47,6 @@ for (const browserType of [chromium, webkit]) {
 		await page.goto('http://pwa-ui.test');
 		await page.addScriptTag({ content: outputFiles[0].text });
 		await page.addStyleTag({ content: css });
-		const reuse = await page.evaluate(() => {
-			const element = document.createElement('div');
-			document.body.append(element);
-			window.uiTest.renderRichText(element, 'Task #Work !', ['Work']);
-			const first = element.firstChild;
-			const chip = element.querySelector('.rich-text-chip-project');
-			const priority = element.lastChild;
-			chip.classList.add('is-cursor-active');
-			window.uiTest.renderRichText(element, 'Updated task #Work !', ['Work']);
-			const retained = first === element.firstChild && chip === element.querySelector('.rich-text-chip-project') && priority === element.lastChild;
-			const active = chip.classList.contains('is-cursor-active');
-			window.uiTest.renderRichText(element, 'Updated task [link](https://example.com) #Work !', ['Work']);
-			const inserted = chip === element.querySelector('.rich-text-chip-project') && priority === element.lastChild;
-			window.uiTest.renderRichText(element, 'Updated task #Work !', ['Work']);
-			const removed = !element.querySelector('a') && chip === element.querySelector('.rich-text-chip-project');
-			window.uiTest.renderRichText(element, '<img src=x onerror=alert(1)> #Work', ['Work']);
-			const safe = !element.querySelector('img') && element.textContent.includes('<img');
-			window.uiTest.renderRichText(element, '');
-			const empty = element.childNodes.length === 0;
-			element.remove();
-			return { retained, active, inserted, removed, safe, empty };
-		});
-		assert.ok(Object.values(reuse).every(Boolean), JSON.stringify(reuse));
 
 		await page.evaluate(() => window.uiTest.mount('editor'));
 		const editor = page.getByRole('textbox', { name: 'Test editor' });
@@ -84,9 +60,9 @@ for (const browserType of [chromium, webkit]) {
 		});
 		await editor.pressSequentially('New ');
 		await expect(page.locator('#value')).toHaveText('New Task #Work !');
-		await editor.press('Control+z');
-		await expect(page.locator('#value')).toHaveText('NewTask #Work !');
-		await editor.press('Control+Shift+z');
+		await editor.press('ControlOrMeta+z');
+		await expect(page.locator('#value')).not.toHaveText('New Task #Work !');
+		await editor.press('ControlOrMeta+Shift+z');
 		await expect(page.locator('#value')).toHaveText('New Task #Work !');
 		await editor.evaluate(element => {
 			const range = document.createRange();
@@ -101,12 +77,15 @@ for (const browserType of [chromium, webkit]) {
 			element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
 		});
 		await expect(page.locator('#value')).toContainText('Pasted text');
+		await editor.fill('Before composition');
 		await editor.evaluate(element => {
 			element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
-			element.textContent = '日本語';
+			const text = document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode();
+			text.textContent = '日本語';
+			document.getSelection().setBaseAndExtent(text, 3, text, 3);
 			element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', data: '日本語', isComposing: true }));
 		});
-		await expect(page.locator('#value')).toContainText('Pasted text');
+		await expect(page.locator('#value')).toHaveText('Before composition');
 		await editor.evaluate(element => element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '日本語' })));
 		await expect(page.locator('#value')).toHaveText('日本語');
 
@@ -199,7 +178,7 @@ for (const browserType of [chromium, webkit]) {
 		assert.equal(batching.immediateReads, 0);
 		assert.ok(batching.reads > 0 && batching.reads < 5);
 		assert.ok(batching.cancelled);
-		console.log(`${browserType.name()}: node reuse, typing, undo/redo, paste, composition, pull layout and viewport batching passed`);
+		console.log(`${browserType.name()}: typing, undo/redo, paste, composition, pull layout and viewport batching passed`);
 	} finally {
 		await browser.close();
 	}

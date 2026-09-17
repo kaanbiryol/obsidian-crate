@@ -3,9 +3,9 @@ export const bundleBudgets = {
 	plugin: [{
 		path: 'dist/main.js',
 		// Includes the compressed, integrity-checked Worker and PWA used by OAuth deployment.
-		// Shared Base UI controls: about 2.061 MB raw / 1.055 MB gzip, including embedded PWA assets.
-		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '2100000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1080000', 10),
+		// Lexical editor plus embedded Worker/PWA: about 2.35 MB raw / 1.19 MB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_MAIN_JS_BUDGET_BYTES ?? '2400000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_MAIN_JS_GZIP_BUDGET_BYTES ?? '1220000', 10),
 	},
 	{
 		path: 'dist/styles.css',
@@ -17,9 +17,9 @@ export const bundleBudgets = {
 	worker: [{
 		path: '.generated/cloudflare/worker.mjs',
 		// The deployable Worker embeds the complete reminders PWA assets.
-		// Shared Base UI baseline: about 1.707 MB raw / 713 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '1740000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '730000', 10),
+		// Lexical PWA baseline: about 1.914 MB raw / 780 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_WORKER_BUDGET_BYTES ?? '1950000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_WORKER_GZIP_BUDGET_BYTES ?? '800000', 10),
 	}],
 	pwa: [{
 		path: '.generated/cloudflare/pwa-client.json',
@@ -30,16 +30,16 @@ export const bundleBudgets = {
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		startupAssets: true,
-		// Startup graph with shared Base UI controls: about 758 KB raw / 251 KB gzip.
+		// Startup graph with Lexical: about 963 KB raw / 318 KB gzip.
 		// Includes the editor and recovery UI for synchronous first-tap focus and offline use.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '775000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '258000', 10),
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_BUDGET_BYTES ?? '985000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_STARTUP_GZIP_BUDGET_BYTES ?? '326000', 10),
 	}, {
 		path: '.generated/cloudflare/pwa-client.json',
 		allAssets: true,
 		// Includes deferred cache/session/outbox/draft and expired-operation recovery.
-		// Shared Base UI baseline: about 808 KB raw / 270 KB gzip.
-		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '825000', 10),
-		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '275000', 10),
+		// Lexical baseline: about 1.012 MB raw / 336 KB gzip.
+		maxBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_BUDGET_BYTES ?? '1040000', 10),
+		maxGzipBytes: Number.parseInt(process.env.CRATE_PWA_TOTAL_GZIP_BUDGET_BYTES ?? '345000', 10),
 	}],
 };

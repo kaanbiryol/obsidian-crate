@@ -4,9 +4,14 @@
 		"src/main.ts!",
 		"src/cloudflare/worker/index.ts!",
 		"src/pwa/main.tsx!",
-		"scripts/*.mjs"
+		"scripts/*.mjs",
+		"tests/editor-contract/fixture.tsx",
+		"tests/editor-contract/*.spec.ts",
+		"tests/editor-contract/*.config.{ts,mts}"
 	],
 	"project": [
+		"tests/visual/**/*.{ts,tsx}",
+		"tests/editor-contract/**/*.{ts,tsx,mts}",
 		"src/**/*.{ts,tsx}!",
 		"scripts/*.mjs",
 		"*.{js,mjs,mts,ts}",

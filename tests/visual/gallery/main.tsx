@@ -23,6 +23,8 @@ import fixtureStyles from './fixture.css?raw';
 import { PluginReminderSourceNotice } from '@/reminders/ui/plugin/PluginReminderSourceNotice';
 
 import { RemindersLoading } from '@/reminders/ui/RemindersLoading';
+import { LexicalTrial } from './lexical/LexicalTrial';
+import lexicalStyles from './lexical/trial.css?raw';
 
 const params = new URLSearchParams(location.search);
 const host = params.get('host') === 'plugin' ? 'plugin' : 'pwa';
@@ -34,7 +36,7 @@ document.documentElement.dataset.scene = scene;
 document.documentElement.dataset.host = host;
 document.documentElement.dataset.theme = theme;
 const style = document.createElement('style');
-style.textContent = (host === 'plugin' ? pluginStyles : PWA_STYLES + (isDark ? '' : PWA_LIGHT_THEME_STYLES)) + fixtureStyles;
+style.textContent = (host === 'plugin' ? pluginStyles : PWA_STYLES + (isDark ? '' : PWA_LIGHT_THEME_STYLES)) + fixtureStyles + (scene === 'lexical' ? lexicalStyles : '');
 document.head.append(style);
 
 function GalleryIcon(props: ThemeIconProps) {
@@ -67,7 +69,8 @@ function Gallery() {
   const richRef = useRef<RichTextInputHandle>(null);
   const noop = () => setResult('Closed');
   let content: React.ReactNode;
-  if (scene === 'source') content = <SourceNoticeFixture />;
+  if (scene === 'lexical') content = <LexicalTrial />;
+  else if (scene === 'source') content = <SourceNoticeFixture />;
   else if (scene === 'delete') content = <DeleteConfirmationModal isOpen onClose={() => setResult('Closed')} onConfirm={() => setResult('Deleted')} />;
   else if (scene === 'progress') content = <ModalLayout title="Updating Crate server" onClose={noop}><StatusContent state="working" description="Checking your Cloudflare account…" /></ModalLayout>;
   else if (scene === 'status') content = <ModalLayout title="Server rebuild failed" onClose={noop} footer={<div className="crate-status-actions"><Button onClick={noop}>Close</Button><Button className="mod-cta" onClick={() => setResult('Settings opened')}>Open settings</Button></div>}><StatusContent state="error" description="Crate couldn’t finish rebuilding your Cloudflare server." details={['In Crate settings → Recovery and troubleshooting → Troubleshooting, select “Resume server rebuild” to try again.']} technicalDetails="Could not verify the complete Durable Object namespace listing." /></ModalLayout>;
@@ -81,6 +84,7 @@ function Gallery() {
 }
 
 const app = document.getElementById('app')!;
-const mount = scene === 'source' ? document.createElement('div') : app;
-if (scene === 'source') app.attachShadow({ mode: 'open' }).append(style.cloneNode(true), mount);
+const useShadow = scene === 'source' || (scene === 'lexical' && host === 'plugin');
+const mount = useShadow ? document.createElement('div') : app;
+if (useShadow) app.attachShadow({ mode: 'open' }).append(style.cloneNode(true), mount);
 createRoot(mount).render(<Gallery />);

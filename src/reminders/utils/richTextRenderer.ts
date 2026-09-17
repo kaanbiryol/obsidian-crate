@@ -5,48 +5,6 @@ export type RichTextSegment =
     | { kind: 'chip'; text: string; type: 'priority' | 'date' | 'project' }
     | { kind: 'link'; text: string; url: string };
 
-export interface RichTextChipParts {
-    marker: string;
-    label: string;
-}
-
-export function getRichTextChipParts(type: string, text: string): RichTextChipParts {
-    if (type === 'priority') {
-        return { marker: text, label: '' };
-    }
-
-    if (type === 'project' && text.startsWith('#')) {
-        return { marker: '#', label: text.slice(1) };
-    }
-
-    return { marker: '', label: text };
-}
-
-/**
- * Escape HTML special characters
- */
-const escapeHTML = (str: string): string => {
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;')
-        .replace(/\n/g, '<br>');
-};
-
-/**
- * Create HTML for a chip
- */
-export const createChipHTML = (type: string, text: string): string => {
-    const chipType = ['priority', 'date', 'project'].includes(type) ? type : 'default';
-    const { marker, label } = getRichTextChipParts(chipType, text);
-    const markerHTML = marker
-        ? `<span class="rich-text-chip-marker">${escapeHTML(marker)}</span>`
-        : '';
-    return `<span class="rich-text-chip rich-text-chip-${chipType}">${markerHTML}${escapeHTML(label)}</span>`;
-};
-
 export const buildRichTextSegments = (text: string, knownProjects?: string[]): RichTextSegment[] => {
     if (!text) return [];
 
@@ -72,17 +30,4 @@ export const buildRichTextSegments = (text: string, knownProjects?: string[]): R
     }
 
     return segments;
-};
-
-/**
- * Build HTML with chips from plain text
- * @param text The text to render
- * @param knownProjects Optional array of known project names for multi-word matching
- */
-export const buildHTML = (text: string, knownProjects?: string[], segments = buildRichTextSegments(text, knownProjects)): string => {
-    return segments.map((segment) => {
-        if (segment.kind === 'text') return escapeHTML(segment.text);
-        if (segment.kind === 'chip') return createChipHTML(segment.type, segment.text);
-        return `<a href="${escapeHTML(segment.url)}" class="reminder-markdown-link" data-markdown-link="true" target="_blank" rel="noopener noreferrer">${escapeHTML(segment.text)}</a>`;
-    }).join('');
 };

@@ -84,7 +84,7 @@ try {
 			assert.equal(await title.evaluate(element => element.scrollTop), 0, 'Picker return preserves a manually scrolled reading position');
 
 			// Selection moves reveal the caret; ordinary scrolling must remain under user control.
-			await title.evaluate(element => document.getSelection().setBaseAndExtent(element.firstChild, 220, element.firstChild, 220));
+			await title.evaluate(element => document.getSelection().setBaseAndExtent(document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode(), 220, document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode(), 220));
 			await expect.poll(async () => (await selectionState(title)).visible).toBe(true);
 			const middle = await selectionState(title);
 			await editor.getByRole('button', { name: 'Inbox', exact: true }).tap();
@@ -107,7 +107,7 @@ try {
 			await page.keyboard.insertText('INSERTED ');
 			await expect(title).toContainText(content.slice(0, 220) + 'INSERTED ' + content.slice(220));
 
-			await title.evaluate(element => document.getSelection().setBaseAndExtent(element.firstChild, 230, element.firstChild, 220));
+			await title.evaluate(element => document.getSelection().setBaseAndExtent(document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode(), 230, document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode(), 220));
 			const selected = await selectionState(title);
 			await editor.getByRole('button', { name: 'Work', exact: true }).tap();
 			await expect(project).toBeVisible();

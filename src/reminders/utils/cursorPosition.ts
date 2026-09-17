@@ -225,7 +225,7 @@ export const saveCursorPosition = (element: HTMLElement | null): number | null =
  * @param element - The contenteditable element
  * @param position - Character offset to restore
  */
-export const restoreCursorPosition = (element: HTMLElement | null, position: number | null): void => {
+const restoreCursorPosition = (element: HTMLElement | null, position: number | null): void => {
     if (position === null || !element) return;
 
     const sel = element.ownerDocument.getSelection();
@@ -256,6 +256,11 @@ export const restoreCursorPosition = (element: HTMLElement | null, position: num
  */
 export const moveCursorToEnd = (element: HTMLElement | null): void => {
     if (!element) return;
+
+    // Let a stateful editor move its own selection before reconciling the DOM.
+    if (element.dataset?.editor === 'lexical') {
+        element.dispatchEvent(new Event('crate-editor-select-end'));
+    }
 
     restoreCursorPosition(element, getLogicalTextLength(element));
 };
