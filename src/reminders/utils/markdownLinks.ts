@@ -21,7 +21,13 @@ export function parseMarkdownLinks(content: string): ParsedMarkdownLink[] {
             index: match.index,
         });
     }
-    return links;
+    for (const direct of content.matchAll(/\bhttps?:\/\/[^\s<>[\]"`]+/gi)) {
+        if (links.some(link => direct.index >= link.index && direct.index < link.index + link.fullMatch.length)) continue;
+        let url = direct[0].replace(/[.,!?;:]+$/, '');
+        while (url.endsWith(')') && (url.match(/\)/g)?.length ?? 0) > (url.match(/\(/g)?.length ?? 0)) url = url.slice(0, -1);
+        if (isSafeUrl(url)) links.push({ fullMatch: url, text: url, url, index: direct.index });
+    }
+    return links.sort((a, b) => a.index - b.index);
 }
 
 export function isSafeUrl(url: string): boolean {
@@ -32,4 +38,13 @@ export function isSafeUrl(url: string): boolean {
         // Relative URLs or malformed - reject
         return false;
     }
+}
+
+/** Notification surfaces display labels without exposing Markdown destinations. */
+export function readableLinkText(content: string): string {
+    let result = content;
+    for (const link of parseMarkdownLinks(content).reverse()) {
+        result = result.slice(0, link.index) + (link.text || link.url) + result.slice(link.index + link.fullMatch.length);
+    }
+    return result;
 }

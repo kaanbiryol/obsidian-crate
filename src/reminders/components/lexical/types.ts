@@ -14,6 +14,8 @@ export interface RichTextInputHandle {
 }
 
 export interface RichTextInputProps {
+    /** Descriptions support links without interpreting reminder metadata. */
+    markers?: boolean;
     value: string;
     onChange: (value: string) => void;
     onKeyDown?: (e: React.KeyboardEvent) => void;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMarkdownLinks, isSafeUrl } from './markdownLinks';
+import { parseMarkdownLinks, isSafeUrl, readableLinkText } from './markdownLinks';
 
 describe('parseMarkdownLinks', () => {
     it('parses a single markdown link', () => {
@@ -69,4 +69,18 @@ describe('isSafeUrl', () => {
     it('rejects malformed URLs', () => {
         expect(isSafeUrl('')).toBe(false);
     });
+});
+
+describe('reminder links', () => {
+  it('recognizes direct URLs without duplicating Markdown destinations', () => {
+    expect(parseMarkdownLinks('See [docs](https://example.com) and https://example.org/path#Work.').map(link => link.fullMatch))
+      .toEqual(['[docs](https://example.com)', 'https://example.org/path#Work']);
+  });
+  it('preserves balanced URL parentheses and excludes surrounding punctuation', () => {
+    expect(parseMarkdownLinks('(https://example.com/wiki/Topic_(detail)).')[0]?.url).toBe('https://example.com/wiki/Topic_(detail)');
+  });
+  it('uses labels in notifications and preserves direct URLs with no label', () => {
+    expect(readableLinkText('Check [this article](https://example.com) !')).toBe('Check this article !');
+    expect(readableLinkText('Visit https://example.com')).toBe('Visit https://example.com');
+  });
 });

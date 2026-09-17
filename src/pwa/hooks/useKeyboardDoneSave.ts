@@ -11,7 +11,7 @@ export function useKeyboardDoneSave({
 }: {
 	canSubmit: boolean;
 	contentRef: RefObject<HTMLDivElement | null>;
-	descriptionRef: RefObject<HTMLTextAreaElement | null>;
+	descriptionRef: RefObject<HTMLDivElement | null>;
 	richTextInputRef: RefObject<RichTextInputHandle | null>;
 	onSave: () => void;
 }) {

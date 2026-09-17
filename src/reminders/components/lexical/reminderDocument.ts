@@ -9,6 +9,7 @@ import { findActiveReminderMatches } from '@/reminders/utils/reminderEditorParsi
 import { ReminderTextNode } from './ReminderTextNode';
 
 function $serialize(node: LexicalNode): string {
+  if (node instanceof ReminderLinkNode && node.isDirect()) return node.getTextContent();
   if ($isLinkNode(node)) return `[${node.getTextContent()}](${node.getURL()})`;
   if ($isElementNode(node)) return node.getChildren().map($serialize).join('');
   return node.getTextContent();
@@ -19,18 +20,23 @@ export function $readReminder(): string {
   return $getRoot().getChildren().map($serialize).join('\n');
 }
 
-export function $writeReminder(value: string, projects: string[]): void {
+export function $writeReminder(value: string, projects: string[], caret?: number, markers = true): void {
   const paragraph = $createParagraphNode();
-  for (const segment of buildRichTextSegments(value, projects)) {
-    if (segment.kind === 'link') {
+  let offset = 0;
+  for (const segment of buildRichTextSegments(value, projects, markers)) {
+    const length = segment.kind === 'link' ? segment.source.length : segment.text.length;
+    if (segment.kind === 'link' && caret !== undefined && caret >= offset && caret <= offset + length) {
+      paragraph.append(new ReminderTextNode(segment.source, 'text'));
+    } else if (segment.kind === 'link') {
       paragraph.append(new ReminderLinkNode(segment.url, { target: '_blank', rel: 'noopener noreferrer' })
-        .append($createTextNode(segment.text)));
+        .setDirect(segment.source === segment.url).append($createTextNode(segment.text)));
     } else {
       segment.text.split('\n').forEach((line, index) => {
         if (index) paragraph.append($createLineBreakNode());
         if (line) paragraph.append(new ReminderTextNode(line, segment.kind === 'chip' ? segment.type : 'text'));
       });
     }
+    offset += length;
   }
   $getRoot().clear().append(paragraph);
 }

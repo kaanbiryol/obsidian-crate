@@ -71,7 +71,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     });
     editorRef.current = editor;
     editor.setRootElement(element);
-    editor.update(() => $writeReminder(latest.current.value, latest.current.knownProjects ?? []), {
+    editor.update(() => $writeReminder(latest.current.value, latest.current.knownProjects ?? [], undefined, latest.current.markers !== false), {
       discrete: true, tag: ['external-value', SKIP_DOM_SELECTION_TAG],
     });
     const history = createEmptyHistoryState();
@@ -79,7 +79,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const unregister = mergeRegister(
       registerPlainText(editor),
       registerHistory(editor, history, 300, Date.now, undefined, 100),
-      registerReminderEditing(editor, () => latest.current.knownProjects ?? []),
+      registerReminderEditing(editor, () => latest.current.knownProjects ?? [], () => latest.current.markers !== false),
       editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves, tags }) => {
         if (editor.isComposing() || tags.has('external-value') || (!dirtyElements.size && !dirtyLeaves.size && !tags.has(COMPOSITION_END_TAG))) return;
         const { text, offsets } = editorState.read(() => ({ text: $readReminder(), offsets: $selectionOffsets(true) }));
@@ -129,7 +129,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
         : active && props.preserveSelection !== false ? captureSelection(element) : null;
       const scrollTop = pending?.scrollTop ?? element.scrollTop;
       editor.update(() => {
-        if (changed) $writeReminder(props.value, props.knownProjects ?? []);
+        if (changed) $writeReminder(props.value, props.knownProjects ?? [], undefined, props.markers !== false);
         else if (projectsChanged) $getRoot().markDirty();
         if (!pending && active && props.externalChangeCursor === 'end') $getRoot().selectEnd();
         else $restoreOffsets(offsets);
@@ -152,6 +152,10 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
       if (props.onAutocompleteKeyDown?.(event)) { event.preventDefault(); event.stopPropagation(); return; }
       props.onKeyDown?.(event);
       if (event.defaultPrevented) event.stopPropagation();
+    }}
+    onMouseDown={event => {
+      // Keep the rendered anchor available until the modifier-click opens it.
+      if ((event.metaKey || event.ctrlKey) && (event.target as Element).closest('a[data-markdown-link]')) event.preventDefault();
     }}
     onClick={event => {
       const link = (event.target as Element).closest<HTMLAnchorElement>('a[data-markdown-link]');

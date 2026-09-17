@@ -4,7 +4,6 @@ import React, { useCallback, useRef, useMemo } from 'react';
 import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
 import { RichTextInput, type RichTextInputHandle } from '../../components/RichTextInput';
 import { useProjectAutocomplete } from './useProjectAutocomplete';
-import { autosizeTextarea, useAutosizeTextarea } from './useAutosizeTextarea';
 
 interface ReminderEditorFieldsProps {
     content: string;
@@ -17,13 +16,13 @@ interface ReminderEditorFieldsProps {
     textareaRef: React.RefObject<HTMLDivElement | null>;
     richTextInputRef: React.RefObject<RichTextInputHandle | null>;
     containerRef?: React.RefObject<HTMLDivElement | null>;
-    descriptionRef?: React.RefObject<HTMLTextAreaElement | null>;
+    descriptionRef?: React.RefObject<HTMLDivElement | null>;
     disabled?: boolean;
     titleInputProps?: Pick<React.ComponentProps<typeof RichTextInput>,
         'onFocus' | 'onBlur' | 'focusRequestKey' | 'preserveSelection' | 'externalChangeCursor'
         | 'syncContentBeforePaint' | 'autoComplete' | 'autoCorrect' | 'spellCheck' | 'className'>;
-    descriptionInputProps?: Pick<React.TextareaHTMLAttributes<HTMLTextAreaElement>,
-        'onFocus' | 'onBlur' | 'maxLength' | 'autoComplete' | 'autoCorrect' | 'spellCheck' | 'className'>;
+    descriptionInputProps?: Pick<React.ComponentProps<typeof RichTextInput>,
+        'onFocus' | 'onBlur' | 'autoComplete' | 'autoCorrect' | 'spellCheck' | 'className'>;
 }
 
 export function ReminderEditorFields({
@@ -43,7 +42,7 @@ export function ReminderEditorFields({
     descriptionInputProps,
 }: ReminderEditorFieldsProps) {
     const localContainerRef = useRef<HTMLDivElement>(null);
-    const localDescriptionRef = useRef<HTMLTextAreaElement>(null);
+    const localDescriptionRef = useRef<HTMLDivElement>(null);
     const containerRef = externalContainerRef ?? localContainerRef;
     const descriptionRef = externalDescriptionRef ?? localDescriptionRef;
     const inputError = useMemo(() => {
@@ -52,7 +51,6 @@ export function ReminderEditorFields({
             return null;
         } catch (error) { return error instanceof Error ? error.message : 'Check the reminder fields.'; }
     }, [content, description, projects]);
-    useAutosizeTextarea(descriptionRef, Boolean(description));
 
     const autocomplete = useProjectAutocomplete({
         content,
@@ -103,17 +101,16 @@ export function ReminderEditorFields({
             )}
 
             <div className="reminder-description-wrap">
-                <textarea
+                <RichTextInput
                     {...descriptionInputProps}
-                    disabled={disabled}
-                    aria-label="Reminder description"
-                    ref={descriptionRef}
+                    readOnly={disabled}
+                    markers={false}
+                    ariaLabel="Reminder description"
+                    inputRef={descriptionRef}
                     value={description}
-                    onChange={(event) => onDescriptionChange(event.target.value)}
+                    onChange={onDescriptionChange}
                     placeholder="Description"
-                    rows={1}
                     className={`reminder-description-input ios-scroll ${descriptionInputProps?.className ?? ''}`}
-                    onInput={(event) => autosizeTextarea(event.currentTarget)}
                 />
             </div>
         </div>

@@ -30,6 +30,10 @@ beforeEach(() => {
 });
 
 describe('createDeclarativePushPayload', () => {
+  it('displays a Markdown link label as the notification title', () => {
+    expect(createDeclarativePushPayload({ title: 'Check [this article](https://example.com) !', body: '' }, 'https://worker.test').notification.title)
+      .toBe('Check this article !');
+  });
 	it('creates an iOS declarative web push payload with a reminder deep link', () => {
 		expect(createDeclarativePushPayload({
 			title: 'Review release notes',

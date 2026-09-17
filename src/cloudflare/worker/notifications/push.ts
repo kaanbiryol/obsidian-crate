@@ -1,3 +1,4 @@
+import { readableLinkText } from '../../../reminders/utils/markdownLinks';
 import { fitPushDisplay } from './payload-budget';
 import {
 	deserializeVapidKeys,
@@ -64,7 +65,7 @@ export function createDeclarativePushPayload(payload: PushNotificationPayload, o
 	return fitPushDisplay({
 		web_push: 8030,
 		notification: {
-			title: payload.title,
+			title: readableLinkText(payload.title),
 			body: payload.body,
 			navigate: new URL(`/notifications${params.size > 0 ? `?${params.toString()}` : ''}`, origin).href,
 			...(payload.tag ? { tag: payload.tag } : {}),

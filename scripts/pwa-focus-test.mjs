@@ -133,7 +133,7 @@ for (const browserType of [chromium, webkit]) {
 			const afterDescription = await title.boundingBox();
 			assert.ok(Math.abs(afterDescription.y - beforeDescription.y) < 1, 'Focusing description must not move the sheet');
 			await description.fill('A long description that still needs native scrolling.\n'.repeat(20));
-			await expect(description).toHaveValue('A long description that still needs native scrolling.\n'.repeat(20));
+			await expect(description).toHaveText('A long description that still needs native scrolling.\n'.repeat(20), { useInnerText: true });
 			await description.evaluate(element => { element.scrollTop = 0; });
 			await description.hover();
 			await page.mouse.wheel(0, 180);
@@ -165,7 +165,7 @@ for (const browserType of [chromium, webkit]) {
 			await expect(confirmation).toHaveCount(0);
 			await expect(title).toBeFocused();
 			await expect(title).toHaveText('Unsaved deletion draft');
-			await expect(description).toHaveValue('A long description that still needs native scrolling.\n'.repeat(20));
+			await expect(description).toHaveText('A long description that still needs native scrolling.\n'.repeat(20), { useInnerText: true });
 			// Confirm deletion after the software keyboard has closed too.
 			await page.evaluate(() => {
 				window.keyboardViewportHeight = 844;

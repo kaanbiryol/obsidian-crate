@@ -1,8 +1,11 @@
 import { $createRangeSelection, $getRoot, $getSelection, $isElementNode, $isRangeSelection, $isTextNode, $setSelection, type LexicalNode, type PointType } from 'lexical';
+import { ReminderLinkNode } from './ReminderLinkNode';
 import { $isLinkNode } from '@lexical/link';
 
+function $hasSyntax(node: LexicalNode) { return $isLinkNode(node) && !(node instanceof ReminderLinkNode && node.isDirect()); }
+
 function $size(node: LexicalNode, markdown: boolean): number {
-  return node.getTextContentSize() + (markdown && $isLinkNode(node) ? node.getURL().length + 4 : 0);
+  return node.getTextContentSize() + (markdown && $isLinkNode(node) && $hasSyntax(node) ? node.getURL().length + 4 : 0);
 }
 
 function $offset(point: PointType, markdown: boolean): number {
@@ -14,7 +17,7 @@ function $offset(point: PointType, markdown: boolean): number {
   while (node.getParent()) {
     offset += node.getPreviousSiblings().reduce((sum, sibling) => sum + $size(sibling, markdown), 0);
     node = node.getParentOrThrow();
-    if (markdown && $isLinkNode(node)) offset++; // opening [ before the label
+    if (markdown && $hasSyntax(node)) offset++; // opening [ before the label
   }
   return offset;
 }
