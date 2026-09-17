@@ -15,6 +15,21 @@ for (const browserType of [chromium, webkit]) {
     await page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true }).tap();
     const title = page.getByRole('textbox', { name: 'Reminder title', exact: true });
     await expect(page.locator('.reminder-action-chips')).not.toHaveAttribute('inert');
+    // Contenteditable can leave a non-breaking space after a decorated date.
+    for (const separator of [' ', '\u00a0']) {
+      await title.fill(`dsakldsaj tomorrow${separator}`);
+      await expect(title.locator('.rich-text-chip-date')).toHaveText('tomorrow');
+      await title.press('ControlOrMeta+ArrowRight');
+      await page.keyboard.type('#');
+      await expect(page.getByRole('option', { name: 'Work', exact: true })).toBeVisible();
+      await page.keyboard.type('Wo');
+      await expect(page.getByRole('option', { name: 'Work', exact: true })).toBeVisible();
+      await page.keyboard.press('Enter');
+      await expect(title.locator('.rich-text-chip-project')).toHaveText('#Work');
+      await expect(title.locator('.rich-text-chip-date')).toHaveText('tomorrow');
+      await page.keyboard.type('then');
+      await expect(title).toContainText('#Work then');
+    }
     await title.fill('Read [docs](https://example.com) ');
     await expect(title.locator('a')).toHaveText('docs');
     // Start autocomplete with keyboard input after the initial link is rendered.

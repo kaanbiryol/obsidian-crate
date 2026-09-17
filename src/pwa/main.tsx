@@ -393,18 +393,18 @@ function App() {
 						settingsOpen={settingsOpen}
 						onToggleSettings={toggleSettings}
 						showSettings={!isProjectDetail}
-						syncIndicator={<PwaSyncIndicator
-							onShowStatus={(label) => showToast('info', label)}
-							changes={changes}
-							isOffline={isOffline}
-							refreshing={refreshing}
-							loading={loading}
-							dataMode={dataMode}
-							error={error}
-							storageError={storageError}
-						/>}
 					/>
 				) : undefined}
+				headerTitleContent={authToken ? <PwaSyncIndicator
+					onShowStatus={(label) => showToast('info', `Sync across all projects: ${label}`)}
+					changes={changes}
+					isOffline={isOffline}
+					refreshing={refreshing}
+					loading={loading}
+					dataMode={dataMode}
+					error={error}
+					storageError={storageError}
+				/> : undefined}
 				belowHeaderContent={bootstrapped && authToken ? (isProjectDetail) => (
 					<>
 						<PwaPullRefreshIndicator

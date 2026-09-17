@@ -9,12 +9,14 @@ export const ProjectDetailHeader = memo(function ProjectDetailHeader({
   header,
   hideTitle = false,
   rightContent,
+  titleContent,
   metaContent,
 }: {
   project: string;
   hideTitle?: boolean;
   header: ProjectDetailHeaderViewModel;
   rightContent?: React.ReactNode;
+  titleContent?: React.ReactNode;
   metaContent?: React.ReactNode;
 }) {
   const progressColor = header.isComplete ? 'var(--text-success)' : header.accentColor;
@@ -22,7 +24,10 @@ export const ProjectDetailHeader = memo(function ProjectDetailHeader({
   return (
     <div className="project-detail-header">
       {(!hideTitle || rightContent) && <div className="project-detail-header-top">
-        {!hideTitle && <h1 className="project-detail-title">{project}</h1>}
+        {!hideTitle && <div className="project-detail-title-row">
+          <h1 className="project-detail-title">{project}</h1>
+          {titleContent}
+        </div>}
         {rightContent}
       </div>}
       {header.total === 0 && metaContent}

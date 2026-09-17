@@ -30,7 +30,7 @@ export function filterProjects(projects: string[], query: string): string[] {
  * Returns the partial query text and the start index of the `#` character,
  * or null if the cursor isn't inside a `#token`.
  *
- * The `#` must be at the start of the text or preceded by a space.
+ * The `#` must be at the start of the text or preceded by whitespace.
  */
 export function extractHashtagQuery(
     text: string,
@@ -43,14 +43,14 @@ export function extractHashtagQuery(
     for (let i = cursorOffset - 1; i >= 0; i--) {
         const ch = text[i];
         if (ch === '#') {
-            // '#' must be at start or preceded by a space
-            if (i === 0 || text[i - 1] === ' ') {
+            // '#' must be at start or preceded by whitespace
+            if (i === 0 || /\s/.test(text[i - 1]!)) {
                 hashIndex = i;
             }
             break;
         }
-        // Stop scanning if we hit a space (no # in this token)
-        if (ch === ' ') break;
+        // Treat editor-inserted non-breaking spaces like ordinary token boundaries.
+        if (/\s/.test(ch!)) break;
     }
 
     if (hashIndex === -1) return null;

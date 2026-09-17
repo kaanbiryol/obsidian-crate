@@ -42,6 +42,7 @@ interface PwaRemindersAppShellProps {
 	initialProject?: string;
 	upcomingDays: number;
 	headerRightContent?: (isProjectDetail: boolean) => React.ReactNode;
+	headerTitleContent?: React.ReactNode;
 	headerMetaContent?: React.ReactNode;
 	belowHeaderContent?: (isProjectDetail: boolean) => React.ReactNode;
 	children?: React.ReactNode;
@@ -71,6 +72,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 	initialProject,
 	upcomingDays,
 	headerRightContent,
+	headerTitleContent,
 	headerMetaContent,
 	belowHeaderContent,
 	children,
@@ -165,6 +167,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 		<RemindersViewPanels
 			viewMode={viewMode}
 			selectedProject={selectedProject}
+			projectHeaderTitleContent={headerTitleContent}
 			projectHeaderMetaContent={headerMetaContent}
 			projectHeaderRightContent={headerRightContent?.(true)}
 			projectBelowHeaderContent={belowHeaderContent && selectedProject !== null ? (
@@ -218,6 +221,7 @@ export const PwaRemindersAppShell: React.FC<PwaRemindersAppShellProps> = ({
 										countUnit={viewMode === 'browse' ? 'project' : 'reminder'}
 										large
 										showMeta
+										titleContent={headerTitleContent}
 										metaContent={headerMetaContent}
 										rightContent={headerRightContent?.(false)}
 									/>
