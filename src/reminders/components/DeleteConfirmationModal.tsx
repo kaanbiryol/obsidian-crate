@@ -1,6 +1,5 @@
 import React, { useId } from 'react';
 import { BaseModal } from './BaseModal';
-import { IconButton } from '../../ui/shared/IconButton';
 import { ShadowDOMButton } from './ShadowDOMButton';
 
 interface DeleteConfirmationModalProps {
@@ -12,7 +11,6 @@ interface DeleteConfirmationModalProps {
     confirmLabel?: string;
     cancelLabel?: string;
     isLoading?: boolean;
-    showCloseButton?: boolean;
     autoFocusCancel?: boolean;
 }
 
@@ -28,7 +26,6 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
     confirmLabel = 'Delete',
     cancelLabel = 'Cancel',
     isLoading = false,
-    showCloseButton = true,
     autoFocusCancel = true,
 }) => {
     const titleId = useId();
@@ -54,15 +51,8 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
             ariaDescribedBy={messageId}
             dismissible={!isLoading}
         >
-                <header className={`delete-confirmation-header${showCloseButton ? '' : ' has-no-close'}`}>
+                <header className="delete-confirmation-header">
                     <h2 id={titleId} className="delete-confirmation-title">{title}</h2>
-                    {showCloseButton && <IconButton
-                        icon="x"
-                        label="Close confirmation"
-                        onClick={onClose}
-                        disabled={isLoading}
-                        className="delete-confirmation-close"
-                    />}
                 </header>
                 <div className="delete-confirmation-body">
                     <p id={messageId} className="delete-confirmation-message">
