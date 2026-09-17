@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { commitReminderMarkers, replaceReminderProject, toReminderCursorOffset, toReminderTextOffset } from './reminderEditorEdits';
-import { RichTextInputHistory } from '../components/richTextInputHistory';
 
 describe('reminder editor token edits', () => {
     it('waits for a boundary before replacing a typed project', () => {
@@ -93,13 +92,4 @@ describe('reminder editor token edits', () => {
         expect(toReminderCursorOffset(next.text, next.cursor)).toBe('docs #Home '.length);
     });
 
-    it('records token replacement as an undoable edit', () => {
-        const before = { value: 'Task #Work #Home', cursor: 16 };
-        const history = new RichTextInputHistory(before);
-        const next = commitReminderMarkers(`${before.value} `, before.value.length + 1);
-        const after = { value: next.text, cursor: next.cursor };
-        history.record(after);
-        expect(history.undo(after)).toEqual(before);
-        expect(history.redo(before)).toEqual(after);
-    });
 });

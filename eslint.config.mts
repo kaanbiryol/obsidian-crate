@@ -84,7 +84,7 @@ export default tseslint.config(
 			'src/pwa/**/*.{ts,tsx}',
 			'src/test/**/*.{ts,tsx}',
 			'src/**/*.test.{ts,tsx}',
-			'tests/**/*.{ts,tsx}',
+			'tests/**/*.{ts,tsx,mts}',
 			'vite.visual.config.mts',
 			'playwright.config.ts',
 			'vite.config.mts',
@@ -161,7 +161,7 @@ export default tseslint.config(
 	},
 	{
 		// The standalone visual fixture loads the selected host stylesheet explicitly.
-		files: ['tests/visual/gallery/main.tsx'],
+		files: ['tests/visual/gallery/main.tsx', 'tests/editor-contract/fixture.tsx'],
 		rules: { 'obsidianmd/no-forbidden-elements': 'off' },
 	},
 	{

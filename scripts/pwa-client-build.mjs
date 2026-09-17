@@ -28,7 +28,7 @@ export async function bundlePwaClient(assetVersion, root) {
 			__CRATE_PWA_ASSET_VERSION__: JSON.stringify(assetVersion),
 		},
 		mainFields: ['browser', 'module', 'main'],
-		conditions: ['browser', 'import'],
+		conditions: ['browser', 'import', 'production'],
 		legalComments: 'eof',
 	});
 	const reachableAssets = new Set(getPwaClientAssets(result.metafile));

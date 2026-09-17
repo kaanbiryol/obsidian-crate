@@ -1,0 +1,16 @@
+.lexical-trial { padding: 28px; color: var(--text-normal, #e4e4e7); font: 15px/1.6 system-ui, sans-serif; }
+.lexical-trial header { margin-bottom: 28px; }
+.lexical-trial-eyebrow { color: #b3a0ed; font-size: 11px; text-transform: uppercase; letter-spacing: .14em; }
+.lexical-trial h1 { margin: 8px 0; font-size: 30px; font-weight: 600; letter-spacing: -.04em; }
+.lexical-trial h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+.lexical-trial p { color: var(--text-muted, #aaa); margin: 8px 0; }
+.lexical-trial section { padding: 20px 0; border-top: 1px solid var(--background-modifier-border, #3b3b40); }
+.lexical-trial .rich-text-input-editor { display: block; min-height: 80px; padding: 14px; border: 1px solid #6666; border-radius: 10px; font-size: 17px; line-height: 1.8; white-space: pre-wrap; outline: none; }
+.lexical-trial .rich-text-input-editor:focus { border-color: #a78bfa; box-shadow: 0 0 0 2px #a78bfa22; }
+.lexical-trial .lexical-reminder-paragraph { margin: 0; color: inherit; }
+.lexical-trial details { margin-top: 12px; font-size: 12px; color: var(--text-muted, #aaa); }
+.lexical-trial summary { cursor: pointer; }
+.lexical-trial pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.lexical-trial textarea { box-sizing: border-box; width: 100%; min-height: 85px; padding: 10px; background: transparent; color: inherit; border: 1px solid #6666; border-radius: 8px; font: inherit; }
+.lexical-trial button { margin-top: 12px; padding: 8px 14px; border: 0; border-radius: 8px; background: #a78bfa; color: #211631; font: inherit; cursor: pointer; }
+.lexical-trial-note { font-size: 12px; }

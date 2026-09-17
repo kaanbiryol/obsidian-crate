@@ -33,7 +33,9 @@ export function useEditorFieldActivation() {
 			const tap = activation.current;
 			if (tap && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 8) activation.current = null;
 		},
-		onPointerCancelCapture() { activation.current = null; },
+		// WebKit can cancel a touch when focus scrolls Lexical's paragraph under
+		// the finger, then still send its click. A same-position short click is
+		// an activation; a cancelled scroll has no click and the next down resets it.
 		onContextMenuCapture() { activation.current = null; },
 		onClickCapture(event: MouseEvent<HTMLDivElement>) {
 			const tap = activation.current;
@@ -41,6 +43,7 @@ export function useEditorFieldActivation() {
 			// Native pointer handling can replace the focus selection before click.
 			// Correct only a short activation tap, never an existing-field selection.
 			if (tap && event.timeStamp - tap.time < 500 && editorField(event.target) === tap.field
+				&& Math.hypot(event.clientX - tap.x, event.clientY - tap.y) <= 8
 				&& tap.field.ownerDocument.activeElement === tap.field) placeCaretAtEnd(tap.field);
 		},
 	};

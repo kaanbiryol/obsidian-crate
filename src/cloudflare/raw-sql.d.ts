@@ -9,5 +9,5 @@ declare module '*.js?raw' {
 }
 
 interface ImportMeta {
-  glob: import('vite/types/importGlob').ImportGlobFunction;
+  glob: import('vite/types/importGlob.d.ts').ImportGlobFunction;
 }

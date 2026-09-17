@@ -1,20 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { buildHTML, getPlainText } from './richTextParsing';
-import { createChipHTML } from './richTextRenderer';
+import { getPlainText } from './richTextPlainText';
 import { findProjectMatches, findPriorityMatches, findLinkMatches, findAllMatches } from './richTextMatchers';
-
-describe('createChipHTML', () => {
-    it('wraps text in a rich-text-chip span', () => {
-        const html = createChipHTML('project', '#forge');
-        expect(html).toBe('<span class="rich-text-chip rich-text-chip-project"><span class="rich-text-chip-marker">#</span>forge</span>');
-    });
-
-    it('escapes HTML entities', () => {
-        const html = createChipHTML('project', '#a<b');
-        expect(html).toContain('&lt;');
-        expect(html).not.toContain('<b');
-    });
-});
 
 describe('findProjectMatches', () => {
     it('matches single-word project tags', () => {
@@ -42,56 +28,6 @@ describe('findPriorityMatches', () => {
         expect(matches).toHaveLength(1);
 		expect(matches[0]?.text).toBe('!');
     });
-});
-
-describe('buildHTML', () => {
-    it('returns empty string for empty input', () => {
-        expect(buildHTML('')).toBe('');
-    });
-
-    it('wraps project tags in chip spans', () => {
-        const html = buildHTML('buy milk #forge');
-        expect(html).toContain('<span class="rich-text-chip rich-text-chip-project"');
-        expect(html).toContain('<span class="rich-text-chip-marker">#</span>forge');
-        expect(html).toMatch(/^buy milk /);
-    });
-
-    it('removes project chip markup when the hash marker is deleted', () => {
-        expect(buildHTML('#Crate Demo', ['Crate Demo'])).toContain('rich-text-chip-project');
-        expect(buildHTML('Crate Demo', ['Crate Demo'])).toBe('Crate Demo');
-    });
-
-    it('leaves plain text unmodified', () => {
-        const html = buildHTML('just plain text');
-        expect(html).toBe('just plain text');
-    });
-
-    it('escapes HTML in non-chip text', () => {
-        const html = buildHTML('a < b');
-        expect(html).toContain('&lt;');
-    });
-
-    it('renders markdown links as anchor tags', () => {
-        const html = buildHTML('click [here](https://example.com) please');
-        expect(html).toContain('<a href="https://example.com"');
-        expect(html).toContain('data-markdown-link="true"');
-        expect(html).toContain('>here</a>');
-        expect(html).toMatch(/^click /);
-        expect(html).toMatch(/ please$/);
-    });
-
-    it('escapes HTML in link text and URL', () => {
-        const html = buildHTML('[a<b](https://example.com?x=1&y=2)');
-        expect(html).toContain('>a&lt;b</a>');
-        expect(html).toContain('href="https://example.com?x=1&amp;y=2"');
-    });
-
-    it('does not render links with unsafe URLs', () => {
-        const html = buildHTML('[click](javascript:alert(1))');
-        // Should not contain an anchor tag
-        expect(html).not.toContain('<a ');
-    });
-
 });
 
 describe('findLinkMatches', () => {
