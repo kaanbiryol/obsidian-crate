@@ -62,17 +62,20 @@ function ReminderEditorSheet({
 	const [pickerReady, setPickerReady] = useState(false);
 	const handlePickerReady = useCallback(() => setPickerReady(true), []);
 	const [preloadedPicker, setPreloadedPicker] = useState<typeof import('./ReminderPickerSheet').ReminderPickerSheet | null>(null);
+	const [entranceComplete, setEntranceComplete] = useState(false);
+	const handleOpenEnd = useCallback(() => setEntranceComplete(true), []);
 	const PickerSheet = preloadedPicker ?? ReminderPickerSheet;
 	useEffect(() => {
-		// Fetch and evaluate pickers while the editor opens, before the first chip
-		// tap. Render the resolved component directly to avoid Suspense's first
-		// fallback delay even when the dynamic import is already cached.
+		if (!entranceComplete || isClosing) return;
+		// Keep picker module evaluation out of the entrance animation. An earlier
+		// chip tap still loads it on demand through Suspense. Render the resolved
+		// component directly to avoid a fallback delay on subsequent chip taps.
 		let active = true;
 		void loadReminderPickerSheet().then(module => {
 			if (active) setPreloadedPicker(() => module.default);
 		}).catch(() => undefined);
 		return () => { active = false; };
-	}, []);
+	}, [entranceComplete, isClosing]);
 	const editorScreenRef = useRef<ReminderEditorScreenHandle | null>(null);
 	const onClose = () => {
 		editorScreenRef.current?.dismissKeyboard();
@@ -167,6 +170,7 @@ function ReminderEditorSheet({
 				return false;
 			}}
 			onCloseEnd={handleCloseEnd}
+			onOpenEnd={handleOpenEnd}
 			variant="reminder"
 			label={activeScreen === 'editor' ? modal.mode === 'edit' ? 'Edit reminder' : 'New reminder'
 				: activeScreen === 'delete' ? 'Delete reminder'

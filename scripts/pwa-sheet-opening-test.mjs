@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { chromium, webkit, expect } from '@playwright/test';
 import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
+import { checkEditorOpeningGeometry } from './pwa-editor-opening-geometry.mjs';
+import { checkPickerReturnTiming } from './pwa-picker-return-timing.mjs';
 
 async function trackOpening(page, content, animated) {
 	await page.evaluate(({ content, animated }) => {
@@ -49,6 +51,7 @@ try {
 		const browser = await browserType.launch();
 		try {
 			for (const reducedMotion of ['no-preference', 'reduce']) {
+				await checkEditorOpeningGeometry(browser, origin, reducedMotion);
 				for (const picker of pickers) {
 					// Each picker must be the first lazy sheet in a fresh app instance.
 					const page = await browser.newPage({
@@ -60,10 +63,18 @@ try {
 						const card = page.getByRole('group', { name: 'Check this article. Press Enter to edit reminder.', exact: true });
 						await card.waitFor();
 						let pickerRequests = 0;
+						let loadedDuringEntrance = false;
+						const pendingPickerRequests = new Set();
+						page.on('requestfinished', request => pendingPickerRequests.delete(request));
+						page.on('requestfailed', request => pendingPickerRequests.delete(request));
 						// Slow assets from the editor's warm-up onward, so an immediate
 						// chip tap still exercises the content-readiness guard.
 						await page.route('**/notifications/assets/*.js', async route => {
+							pendingPickerRequests.add(route.request());
 							pickerRequests++;
+							loadedDuringEntrance ||= await page.evaluate(() =>
+								document.querySelector('.pwa-modal-sheet__container')?.getAnimations()
+									.some(animation => animation.playState === 'running') ?? false);
 							await new Promise(resolve => setTimeout(resolve, 1200));
 							await route.continue();
 						});
@@ -77,10 +88,16 @@ try {
 
 						await expect.poll(() => pickerRequests,
 							{ message: 'Picker assets should start loading before a picker is selected' }).toBeGreaterThan(0);
+						assert.equal(loadedDuringEntrance, false, 'Picker warm-up must wait for the editor entrance to finish');
 						const preparedSchedule = picker.button === 'Date' && reducedMotion === 'no-preference';
 						// Also cover a user who spends time editing before the first chip
 						// tap: cached code must not incur React's initial fallback delay.
-						if (preparedSchedule) await page.waitForLoadState('networkidle');
+						if (preparedSchedule) {
+							// Network idle can fire while a route is deliberately paused.
+							// Wait for the actual assets before testing a prepared picker.
+							await expect.poll(() => pendingPickerRequests.size).toBe(0);
+							await page.waitForLoadState('networkidle');
+						}
 						for (let opening = 0; opening < 2; opening++) {
 							await trackOpening(page, picker.selector, '.pwa-reminder-sheet-stage');
 							await editor.getByRole('button', { name: picker.button, exact: true }).tap();
@@ -88,7 +105,9 @@ try {
 							await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
 							if (reducedMotion === 'no-preference') await expectAnimatedOpening(page,
 								`${picker.dialog}, opening ${opening + 1}`, preparedSchedule ? 370 : undefined);
-							await page.touchscreen.tap(195, 20);
+							// A zero transform can precede Motion's completion callback by a frame.
+							await expect(page.locator('.pwa-modal-sheet__container')).not.toHaveAttribute('data-base-ui-swipe-ignore');
+							await checkPickerReturnTiming(page, reducedMotion, `${browserType.name()} ${picker.dialog} ${reducedMotion}`);
 							await expect(page.getByRole('dialog', { name: picker.dialog, exact: true })).toHaveCount(0);
 							await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('transform', 'none');
 							await expect(title).toHaveText('Keep this draft through the first load');
