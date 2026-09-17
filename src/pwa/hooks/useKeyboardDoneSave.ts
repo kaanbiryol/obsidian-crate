@@ -40,7 +40,7 @@ export function useKeyboardDoneSave({
 		}
 	}, []);
 
-	const handleEditorFieldBlur = useCallback((event: FocusEvent<HTMLElement>) => {
+	const handleEditorFieldBlur = useCallback((event: FocusEvent) => {
 		const relatedTargetWasNull = event.relatedTarget === null;
 		const hadRecentPagePointer = performance.now() - lastPagePointerAtRef.current < 750;
 		if (keyboardDoneTimerRef.current !== null) {

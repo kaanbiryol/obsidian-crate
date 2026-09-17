@@ -140,7 +140,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
       focusRequestRef.current = props.focusRequestKey;
       if (!props.readOnly) focus();
     }
-  }, [props.value, props.knownProjects, props.readOnly, props.autoComplete, props.preserveSelection, props.externalChangeCursor, props.focusRequestKey, focus]);
+  }, [props.value, props.markers, props.knownProjects, props.readOnly, props.autoComplete, props.preserveSelection, props.externalChangeCursor, props.focusRequestKey, focus]);
 
   return <div className="rich-text-input-shell"><div ref={setRoot}
     contentEditable={!props.readOnly} role="textbox" aria-label={props.ariaLabel ?? props.placeholder}

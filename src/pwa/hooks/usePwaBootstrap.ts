@@ -45,9 +45,19 @@ export function usePwaBootstrap({
 	setStartTab: Dispatch<SetStateAction<StartTab>>;
 	showToast: ShowToast;
 }): void {
-	const initialAuthTokenRef = useRef(authToken);
+	// Bootstrap owns a single mount-time session, even if callers rerender during enrollment.
+	const initialOptionsRef = useRef({
+		authToken, suspendLocalSession, hydrateCachedSnapshot, hydratedCacheRef,
+		setAuthToken, setBootstrapped, setConfig, setError, setLaunchReminderId,
+		setLoading, setSelectedProject, setStartTab, showToast,
+	});
 
 	useEffect(() => {
+		const {
+			authToken: initialAuthToken, suspendLocalSession, hydrateCachedSnapshot, hydratedCacheRef,
+			setAuthToken, setBootstrapped, setConfig, setError, setLaunchReminderId,
+			setLoading, setSelectedProject, setStartTab, showToast,
+		} = initialOptionsRef.current;
 		let cancelled = false;
 		let sessionCurrent = capturePwaSession();
 
@@ -57,7 +67,7 @@ export function usePwaBootstrap({
 				const storedConfig = loadStoredConfig();
 				scopeLegacyReminderDrafts(storedConfig.folderPath);
 				const applied = applyConfigFromUrl(storedConfig);
-				let nextToken = initialAuthTokenRef.current;
+				let nextToken = initialAuthToken;
 				// Existing credentials are folder-scoped. A cleaned-up old link
 				// must not change their configuration without a new enrollment.
 				let nextConfig = nextToken && !applied.token ? storedConfig : applied.config;

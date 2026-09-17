@@ -5,7 +5,7 @@ vi.mock('./push', () => ({ listPushSubscriptionIds: vi.fn(), sendToAllSubscripti
 afterEach(() => vi.resetAllMocks());
   it.each([false, true])('an old alarm cannot mark or retry a new schedule (failed=%s)', async failed => {
     vi.mocked(listPushSubscriptionIds).mockResolvedValue(['subscription']);
-    let resolveDelivery!: (value: unknown) => void;
+    let resolveDelivery!: (value: Awaited<ReturnType<typeof sendToAllSubscriptions>>) => void;
     let started!: () => void;
     const sending = new Promise<void>(resolve => { started = resolve; });
     vi.mocked(sendToAllSubscriptions).mockImplementationOnce(async () => {

@@ -36,6 +36,7 @@ function harness() {
 	hookState.setters = [];
 	const requests: Array<{ resolve: (value: Response) => void }> = [];
 	const apiFetch = vi.fn<ApiFetch>(() => new Promise<Response>(resolve => { requests.push({ resolve }); }));
+	// eslint-disable-next-line react-hooks/rules-of-hooks -- React is mocked above; this harness exercises hook logic without a React render.
 	const hook = useReminderSync({
 		apiFetch, authToken: 'token', bootstrapped: true,
 		config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 }, setSelectedProject: vi.fn(),
