@@ -22,11 +22,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: 8px;
-  padding: 12px 12px 8px 20px;
-
-  &.has-no-close {
-    padding: 20px 20px 8px;
-  }
+  padding: 20px 20px 8px;
 }
 
 .delete-confirmation-title {
@@ -38,11 +34,6 @@
   font-weight: var(--reminder-font-weight-semibold);
   line-height: 1.3;
   overflow-wrap: anywhere;
-}
-
-.delete-confirmation-close {
-  --crate-icon-button-control-size: 44px;
-  flex-shrink: 0;
 }
 
 .delete-confirmation-body {
