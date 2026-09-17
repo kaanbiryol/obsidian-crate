@@ -3,7 +3,7 @@ import { captureTitleSelection, restoreTitleSelection, revealTitleCaret } from '
 
 export function useEditorFocus({ titleRef, descriptionRef, editorRef, active, keyboardInset }: {
 	titleRef: RefObject<HTMLDivElement | null>;
-	descriptionRef: RefObject<HTMLTextAreaElement | null>;
+	descriptionRef: RefObject<HTMLDivElement | null>;
 	editorRef: RefObject<HTMLDivElement | null>;
 	active: boolean;
 	keyboardInset: number;
@@ -11,7 +11,7 @@ export function useEditorFocus({ titleRef, descriptionRef, editorRef, active, ke
 	const savedRef = useRef<{
 		field: 'title' | 'description';
 		titleSelection: ReturnType<typeof captureTitleSelection>;
-		descriptionSelection: [number, number, 'forward' | 'backward' | 'none'];
+		descriptionSelection: ReturnType<typeof captureTitleSelection>;
 		titleScroll: number;
 		descriptionScroll: number;
 		bodyScroll: number;
@@ -35,7 +35,7 @@ export function useEditorFocus({ titleRef, descriptionRef, editorRef, active, ke
 		savedRef.current = {
 			field: descriptionFocused ? 'description' : 'title',
 			titleSelection: captureTitleSelection(title),
-			descriptionSelection: [description.selectionStart, description.selectionEnd, description.selectionDirection],
+			descriptionSelection: captureTitleSelection(description),
 			titleScroll: title.scrollTop, descriptionScroll: description.scrollTop,
 			bodyScroll: body()?.scrollTop ?? 0,
 		};
@@ -50,7 +50,7 @@ export function useEditorFocus({ titleRef, descriptionRef, editorRef, active, ke
 		// This runs synchronously inside the picker tap so iOS can reopen its keyboard.
 		if (saved?.field === 'description') {
 			description.focus({ preventScroll: true });
-			description.setSelectionRange(...saved.descriptionSelection);
+			restoreTitleSelection(description, saved.descriptionSelection);
 		} else {
 			title.focus({ preventScroll: true });
 			restoreTitleSelection(title, saved?.titleSelection ?? null);
@@ -65,16 +65,19 @@ export function useEditorFocus({ titleRef, descriptionRef, editorRef, active, ke
 		const ownerWindow = ownerDocument.defaultView;
 		if (!ownerWindow) return;
 		let frame = 0;
-		let lastSelection = captureTitleSelection(title);
+		const fields = [title, descriptionRef.current].filter((field): field is HTMLDivElement => field !== null);
+		const activeField = () => fields.find(field => field.matches(':focus')) ?? title;
+		let lastSelection = captureTitleSelection(activeField());
 		const reveal = () => {
-			if (title.matches(':focus')) revealTitleCaret(title, body());
+			const field = activeField();
+			if (field.matches(':focus')) revealTitleCaret(field, body());
 		};
 		const scheduleReveal = () => {
 			ownerWindow.cancelAnimationFrame(frame);
 			frame = ownerWindow.requestAnimationFrame(reveal);
 		};
 		const selectionChanged = () => {
-			const next = captureTitleSelection(title);
+			const next = captureTitleSelection(activeField());
 			if (next?.start === lastSelection?.start && next?.end === lastSelection?.end) return;
 			lastSelection = next;
 			scheduleReveal();
@@ -84,22 +87,22 @@ export function useEditorFocus({ titleRef, descriptionRef, editorRef, active, ke
 			restoreScroll();
 		} else reveal();
 		ownerDocument.addEventListener('selectionchange', selectionChanged);
-		title.addEventListener('input', scheduleReveal);
+		fields.forEach(field => field.addEventListener('input', scheduleReveal));
 		let initialResize = true;
 		const observer = new ResizeObserver(() => {
 			if (!initialResize) scheduleReveal();
 			initialResize = false;
 		});
-		observer.observe(title);
+		fields.forEach(field => observer.observe(field));
 		const scroller = body();
 		if (scroller) observer.observe(scroller);
 		return () => {
 			ownerWindow.cancelAnimationFrame(frame);
 			observer.disconnect();
 			ownerDocument.removeEventListener('selectionchange', selectionChanged);
-			title.removeEventListener('input', scheduleReveal);
+			fields.forEach(field => field.removeEventListener('input', scheduleReveal));
 		};
-	}, [active, body, keyboardInset, restoreScroll, titleRef]);
+	}, [active, body, descriptionRef, keyboardInset, restoreScroll, titleRef]);
 
 	return { rememberFocus, restoreFocus };
 }

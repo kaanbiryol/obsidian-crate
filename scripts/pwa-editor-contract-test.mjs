@@ -86,12 +86,15 @@ for (const browserType of [chromium, webkit]) {
     })).toMatchObject({ content: draftTitle, description: draftDescription });
     await page.reload();
     await page.locator('[data-action="open-create-modal"]').tap();
+    await expect(title).toHaveText(draftTitle);
+    await description.focus();
     await expect(title).toHaveText('Draft 👩🏽‍💻 reference');
     await expect(title.locator('a')).toHaveAttribute('href', 'https://example.com/draft');
-    await expect(description).toHaveValue(draftDescription);
+    await expect(description).toHaveText(draftDescription, { useInnerText: true });
     // Mounting a recovered draft must not import the previous reminder's history.
     await title.focus();
     await title.press('ControlOrMeta+z');
+    await description.focus();
     await expect(title).toHaveText('Draft 👩🏽‍💻 reference');
     const createPromise = page.waitForRequest(request => request.url().endsWith('/reminders/create') && request.method() === 'POST');
     await page.getByRole('button', { name: 'Add reminder', exact: true }).tap();

@@ -175,7 +175,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                     {/* Description */}
                     {reminder.description && !reminder.completed && (
                         <div className="premium-reminder-description">
-                            {reminder.description}
+                            {renderContentWithLinks(reminder.description)}
                         </div>
                     )}
 

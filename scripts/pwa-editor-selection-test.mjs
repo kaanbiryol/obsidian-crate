@@ -16,10 +16,12 @@ async function selectionState(title) {
 		const prefix = range.cloneRange();
 		prefix.selectNodeContents(element);
 		prefix.setEnd(range.startContainer, range.startOffset);
+		const prefixContents = prefix.cloneContents();
+		prefixContents.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
 		const caret = range.getBoundingClientRect();
 		const bounds = element.getBoundingClientRect();
 		return {
-			start: prefix.toString().length, selected: range.toString(),
+			start: prefixContents.textContent.length, selected: range.toString(),
 			scrollTop: element.scrollTop,
 			visible: caret.height > 0 && caret.top >= bounds.top && caret.bottom <= bounds.bottom,
 			backward: selection.focusNode === range.startContainer && selection.focusOffset === range.startOffset,
@@ -126,21 +128,35 @@ try {
 			await expect(description).toHaveCSS('mask-image', 'none');
 			await description.tap({ position: { x: 8, y: 8 } });
 			await expect(title).toHaveCSS('mask-image', 'none');
-			assert.equal(await description.evaluate(element => element.selectionStart), (await description.inputValue()).length,
+			assert.equal((await selectionState(description)).start, (await description.evaluate(element => element.innerText)).length,
 				'Switching to the description defaults to its end');
 			// A second tap is an intentional caret placement, not field activation.
 			await description.evaluate(element => { element.scrollTop = 0; });
 			await description.tap({ position: { x: 120, y: 35 } });
-			assert.ok(await description.evaluate(element => element.selectionStart < element.value.length), 'An already focused description retains native tap placement');
+			assert.ok((await selectionState(description)).start < (await description.innerText()).length, 'An already focused description retains native tap placement');
 			await title.tap({ position: { x: 8, y: 24 } });
 			await title.evaluate(element => { element.scrollTop = 0; });
 			await title.tap({ position: { x: 120, y: 40 } });
 			assert.ok((await selectionState(title)).start < (await title.textContent()).length, 'An already focused title retains native tap placement');
 			// Keyboard/accessibility focus also defaults to the end.
 			await description.focus();
-			assert.equal(await description.evaluate(element => element.selectionStart), (await description.inputValue()).length);
-			await description.evaluate(element => { element.setSelectionRange(90, 95, 'backward'); element.scrollTop = 36; });
-			const descriptionBefore = await description.evaluate(element => ({ start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection, scroll: element.scrollTop }));
+			assert.equal((await selectionState(description)).start, (await description.evaluate(element => element.innerText)).length);
+			await description.evaluate(element => {
+                const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+                let offset = 0;
+                const points = [];
+                while (walker.nextNode()) {
+                    const node = walker.currentNode;
+                    for (const requested of [90, 95]) {
+                        if (requested >= offset && requested <= offset + node.length) points[requested === 90 ? 0 : 1] = [node, requested - offset];
+                    }
+                    offset += node.length;
+                }
+                document.getSelection().setBaseAndExtent(...points[1], ...points[0]);
+                document.dispatchEvent(new Event('selectionchange'));
+                element.scrollTop = 36;
+            });
+			const descriptionBefore = await selectionState(description);
 			await expect(description).toHaveCSS('mask-image', 'none');
 			await editor.getByRole('button', { name: 'Work', exact: true }).tap();
 			await expect(project).toBeVisible();
@@ -149,7 +165,7 @@ try {
 			await expect(project).toBeHidden();
 			await settled(page);
 			await expect(description).toBeFocused();
-			assert.deepEqual(await description.evaluate(element => ({ start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection, scroll: element.scrollTop })), descriptionBefore);
+			assert.deepEqual(await selectionState(description), descriptionBefore);
 			assert.equal(await page.evaluate(() => window.scrollY), 0, 'The document stays anchored');
 			console.log(`${browserType.name()}: long reminder caret visibility, picker selection/scroll restoration and unmasked editor fields passed`);
 		} finally { await browser.close(); }

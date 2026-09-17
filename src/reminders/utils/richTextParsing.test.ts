@@ -104,6 +104,13 @@ describe('getPlainText', () => {
         expect(getPlainText(root as unknown as HTMLElement)).toBe('click [here](https://example.com) done');
     });
 
+    it('preserves bare URLs when reading editor text for autocomplete', () => {
+        const root = elementNode('div', [elementNode('a', [textNode('https://example.com')], {
+            'data-markdown-link': 'true', 'data-direct-link': 'true', href: 'https://example.com',
+        })]);
+        expect(getPlainText(root as unknown as HTMLElement)).toBe('https://example.com');
+    });
+
     it('extracts plain text from regular elements', () => {
         const root = elementNode('div', [
             textNode('just '),

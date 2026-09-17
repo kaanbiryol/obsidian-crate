@@ -91,7 +91,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	}, []);
 
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
-	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+	const descriptionRef = useRef<HTMLDivElement | null>(null);
 	const { rememberFocus, restoreFocus } = useEditorFocus({
 		titleRef: contentRef, descriptionRef, editorRef, active: isActive, keyboardInset,
 	});

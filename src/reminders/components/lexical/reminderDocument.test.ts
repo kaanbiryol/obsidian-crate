@@ -14,14 +14,21 @@ function makeEditor(value: string) {
 }
 
 const examples = [
-  '', 'plain text', '  leading and trailing  ', '\n', 'a\n\nb\n',
+  'Visit https://example.com/path#Work and [docs](https://example.org)', '', 'plain text', '  leading and trailing  ', '\n', 'a\n\nb\n',
   '👩🏽‍💻 café e\u0301 日本語 العربية', '#Work ! tomorrow', '#Crate Demo',
-  '[docs](https://example.com)', '[one](https://a.test) [two](https://b.test/path?q=1#x)',
+  '[](https://example.com)', '[docs](https://example.com)', '[one](https://a.test) [two](https://b.test/path?q=1#x)',
   'before\n[docs](https://example.com)\nafter #Work', '[unfinished](https://',
   '<script>alert(1)</script> & "quoted"', '#Unknown ! !!!',
 ];
 
 describe('Lexical Markdown boundary', () => {
+  it('keeps description metadata as prose', () => {
+    const editor = makeEditor('');
+    const value = 'Tomorrow #Work ! #Home ! https://example.com';
+    editor.update(() => $writeReminder(value, projects, undefined, false), { discrete: true });
+    expect(editor.getEditorState().read($readReminder)).toBe(value);
+    expect(editor.getEditorState().read(() => $getRoot().getAllTextNodes().filter(node => node instanceof ReminderTextNode && node.getKind() !== 'text'))).toHaveLength(0);
+  });
   it.each(examples)('round-trips %j without losing text', value => {
     const editor = makeEditor(value);
     expect(editor.getEditorState().read($readReminder)).toBe(value);

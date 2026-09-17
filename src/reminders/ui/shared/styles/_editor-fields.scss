@@ -190,7 +190,8 @@
   resize: none;
   appearance: none;
 
-  &::placeholder {
+  &::placeholder,
+  &::before {
     color: var(--text-faint);
     font-size: var(--reminder-font-sm);
     opacity: 1;

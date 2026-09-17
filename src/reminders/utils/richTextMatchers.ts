@@ -151,7 +151,7 @@ const findDateMatches = (text: string, referenceDate: Date): TextMatch[] => {
  */
 export const findLinkMatches = (text: string): TextMatch[] => {
     return parseMarkdownLinks(text)
-        .filter(link => isSafeUrl(link.url))
+        .filter(link => link.text.length > 0 && isSafeUrl(link.url))
         .map(link => ({
             text: link.fullMatch,
             index: link.index,

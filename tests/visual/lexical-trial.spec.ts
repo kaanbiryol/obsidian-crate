@@ -42,6 +42,58 @@ for (const browserName of ['chromium', 'webkit'] as const) {
         return { editor, output };
       }
 
+      test('reveals Markdown at the caret, edits destinations and renders again on blur', async () => {
+        const { editor, output } = await load('Check [this article](https://example.com) !');
+        await expect(editor.locator('a')).toHaveText('this article');
+        await selectRange(editor, 9, 9);
+        await expect(editor).toHaveText('Check [this article](https://example.com) !');
+        await expect(output).toHaveText('Check [this article](https://example.com) !');
+        await selectRange(editor, 29, 40);
+        await page.keyboard.insertText('example.org');
+        await expect(output).toHaveText('Check [this article](https://example.org) !');
+        await selectRange(editor, 0, 0);
+        await expect(editor.locator('a')).toHaveText('this article');
+        await selectRange(editor, 9, 9);
+        await expect(editor).toHaveText('Check [this article](https://example.org) !');
+        await page.getByRole('textbox', { name: 'Sample reminder' }).focus();
+        await expect(editor.locator('a')).toHaveAttribute('href', 'https://example.org');
+      });
+
+      test('preserves bare URLs while rendering and editing them', async () => {
+        const original = 'Visit https://example.com/path#Work now';
+        const { editor, output } = await load(original);
+        await expect(editor.locator('a')).toHaveText('https://example.com/path#Work');
+        await selectRange(editor, 12, 12);
+        await expect(editor.locator('a')).toHaveCount(0);
+        await page.getByRole('textbox', { name: 'Sample reminder' }).focus();
+        await expect(editor.locator('a')).toHaveCount(1);
+        await expect(output).toHaveText(original);
+      });
+
+      test('description links render without interpreting reminder metadata', async () => {
+        await page.goto(`/?scene=editor&host=${host}&theme=dark`);
+        const description = page.getByRole('textbox', { name: 'Reminder description' });
+        const title = page.getByRole('textbox', { name: 'Reminder title' });
+        const value = 'Tomorrow #Work ! #Home ! [article](https://example.com) https://example.org';
+        await description.fill(value);
+        await title.focus();
+        await expect(description.locator('a')).toHaveCount(2);
+        await expect(description.locator('.rich-text-chip')).toHaveCount(0);
+        await selectRange(description, 28, 28);
+        await expect(description).toContainText('[article](https://example.com)');
+        await expect(description).toContainText('Tomorrow #Work ! #Home !');
+      });
+
+      test('modifier-click opens a rendered link without entering Markdown editing', async () => {
+        const { editor, output } = await load('Check [docs](https://example.com) now');
+        await page.evaluate(() => {
+          window.open = (url) => { document.body.dataset.openedLink = String(url); return null; };
+        });
+        await editor.locator('a').click({ modifiers: ['ControlOrMeta'] });
+        await expect(page.locator('body')).toHaveAttribute('data-opened-link', 'https://example.com/');
+        await expect(output).toHaveText('Check [docs](https://example.com) now');
+      });
+
       for (const backward of [false, true]) {
         test(`replaces a ${backward ? 'backward' : 'forward'} selection across a link and chip, then restores it with undo`, async () => {
           const original = 'Start [docs](https://example.com) #Work end';

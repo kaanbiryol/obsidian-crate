@@ -13,7 +13,7 @@ export const getPlainText = (element: HTMLElement | null): string => {
         } else if (node.nodeName === 'A' && (node as HTMLElement).hasAttribute('data-markdown-link')) {
             const linkText = node.textContent || '';
             const href = (node as HTMLAnchorElement).getAttribute('href') || '';
-            text += `[${linkText}](${href})`;
+            text += (node as HTMLElement).hasAttribute('data-direct-link') ? linkText : `[${linkText}](${href})`;
         } else if (node.childNodes) {
             node.childNodes.forEach(walk);
         }

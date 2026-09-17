@@ -221,7 +221,7 @@ async function verifyRejectedSaveRecovery(page) {
 	await expect(card(page, 'Rejected draft title')).toBeVisible();
 	await notice.getByRole('button', { name: 'Edit: Rejected draft title', exact: true }).click();
 	await expect(title(page)).toHaveText('Rejected draft title');
-	await expect(page.getByRole('textbox', { name: 'Reminder description', exact: true })).toHaveValue('Keep these details after a failed save and reload.');
+	await expect(page.getByRole('textbox', { name: 'Reminder description', exact: true })).toHaveText('Keep these details after a failed save and reload.');
 	await title(page).fill('Corrected draft title');
 	await save(page).click();
 	await expectEditorClosed(page);

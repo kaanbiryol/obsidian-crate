@@ -147,7 +147,8 @@
       padding-right: 2px;
     }
 
-    .reminder-description-input::placeholder {
+    .reminder-description-input::placeholder,
+    .reminder-description-input::before {
       // The native caret uses the input font metrics, even while it is empty.
       font-size: inherit;
     }
