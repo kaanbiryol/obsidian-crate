@@ -1,13 +1,15 @@
+import { BaseUiModal } from './shared/BaseUiModal';
 import { getPendingFileActions } from './activity/file-actions';
 import type { PendingDiscardReview } from '../sync/pending-discard';
 import { PendingDiscardModal } from './activity/pending-discard-modal';
 import { formatSyncProgress } from './activity/progress-label';
 import type { ConflictReview } from '../sync/conflict-review';
 import { ConflictReviewModal } from './activity/conflict-review-modal';
-import { Modal, Notice, Platform, setIcon, type App } from 'obsidian';
+import { Notice, Platform, setIcon, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ActivitySheet } from './activity/ActivitySheet';
+import { ActivityTabs } from './activity/ActivityTabs';
 import { hideNativeModalCloseButton } from '../reminders/ui/adapters/modalShell';
 import type { CrateSettings } from '../plugin/settings-types';
 import type { ConflictRecord, SyncState, SyncActivityProgress } from '../sync/types';
@@ -31,17 +33,11 @@ export interface ActivityModalDeps {
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
 }
 
-let nextActivityId = 0;
-
-export class ActivityModal extends Modal {
-    // Obsidian's native Modal.open() otherwise focuses the first control after
-    // onOpen(). The shared sheet owns initial focus instead (Obsidian 1.13+).
-    hasInitialInputFocus = false;
-	private readonly tabIdPrefix = `crate-activity-${++nextActivityId}`;
+export class ActivityModal extends BaseUiModal {
 	private root: Root | undefined;
 	private readonly settings: CrateSettings;
 	private readonly deps: ActivityModalDeps;
-	private tabIndicator!: HTMLDivElement;
+	private tabsRoot: Root | undefined;
 	private currentTabIndex = 0;
 	private subtitleEl!: HTMLSpanElement;
 	private errorNoticeEl!: HTMLDivElement;
@@ -54,8 +50,6 @@ export class ActivityModal extends Modal {
 	private readonly pendingBrowserState: PendingBrowserState = {};
 	private conflictsPanel!: HTMLDivElement;
 	private historyPanel!: HTMLDivElement;
-	private allTabs: HTMLButtonElement[] = [];
-	private allPanels: HTMLDivElement[] = [];
 	private readonly onProgress = () => {
 		if (!this.pendingPanel) return;
 		// Manual sync records history after the engine's final state event.
@@ -149,112 +143,32 @@ export class ActivityModal extends Modal {
 		this.errorMessageEl = errorCopyEl.createSpan({ cls: 'crate-sync-error-message' });
 		this.updateSyncErrorNotice();
 
-		// Tab bar
-		const tabBar = contentEl.createDiv({ cls: 'crate-activity-tab-bar' });
-		const tabs = tabBar.createDiv({ cls: 'crate-activity-tabs', attr: { role: 'tablist', 'aria-label': 'Sync activity' } });
 
-		const pendingTab = tabs.createEl('button', {
-			cls: 'crate-activity-tab crate-activity-tab-active',
-			attr: { type: 'button', role: 'tab', 'aria-selected': 'true' },
-		});
-		pendingTab.createSpan({ text: 'Pending' });
-		this.pendingCount = pendingTab.createSpan({ cls: 'crate-tab-count' });
-
-		const conflictsTab = tabs.createEl('button', {
-			cls: 'crate-activity-tab',
-			attr: { type: 'button', role: 'tab', 'aria-selected': 'false' },
-		});
-		conflictsTab.createSpan({ text: 'Conflicts' });
-		this.conflictsCount = conflictsTab.createSpan({ cls: 'crate-tab-count' });
-
-		const historyTab = tabs.createEl('button', {
-			cls: 'crate-activity-tab',
-			attr: { type: 'button', role: 'tab', 'aria-selected': 'false' },
-		});
-		historyTab.createSpan({ text: 'History' });
-		this.tabIndicator = tabs.createDiv({ cls: 'crate-activity-tab-indicator' });
-		const statusLabel = this.formatLastSync();
-		this.subtitleEl = tabBar.createSpan({ text: statusLabel === 'Not synced yet' ? '' : statusLabel, cls: 'crate-activity-subtitle' });
-
-
-		this.updateTabCounts();
-
-		// Panels
-		this.pendingPanel = contentEl.createDiv({ cls: 'crate-activity-panel crate-activity-panel-pending' });
-		this.conflictsPanel = contentEl.createDiv({ cls: 'crate-activity-panel crate-activity-panel-conflicts' });
-		this.historyPanel = contentEl.createDiv({ cls: 'crate-activity-panel' });
-		this.conflictsPanel.hide();
-		this.historyPanel.hide();
-
-		this.allTabs = [pendingTab, conflictsTab, historyTab];
-		this.allPanels = [this.pendingPanel, this.conflictsPanel, this.historyPanel];
-
-		this.renderPending();
-		renderConflictsPanel(this.conflictsPanel, this.deps.getActiveConflicts(), this.isCheckingConflicts(), this.deps.createConflictReview ? conflict => {
-			new ConflictReviewModal(this.app, conflict, () => this.deps.createConflictReview!(conflict), () => this.refresh()).open();
-		} : undefined);
-		renderHistoryPanel(this.historyPanel, this.settings.syncHistory ?? []);
-
-		for (let i = 0; i < this.allTabs.length; i++) {
-			const tab = this.allTabs[i];
-			if (!tab) continue;
-			tab.tabIndex = i === 0 ? 0 : -1;
-			tab.id = `${this.tabIdPrefix}-tab-${i}`;
-			const panel = this.allPanels[i];
-			if (panel) {
-				panel.id = `${this.tabIdPrefix}-panel-${i}`;
-				panel.setAttribute('role', 'tabpanel');
-				panel.setAttribute('aria-labelledby', tab.id);
-				panel.tabIndex = 0;
-				tab.setAttribute('aria-controls', panel.id);
-			}
-			tab.addEventListener('click', (event) => {
-                this.switchTab(i);
-                // Pointer activation should not leave keyboard focus styling behind.
-                if (event.detail > 0) tab.blur();
-            });
-			tab.addEventListener('keydown', (event) => {
-				let next = i;
-				if (event.key === 'ArrowRight') next = (i + 1) % this.allTabs.length;
-				else if (event.key === 'ArrowLeft') next = (i + this.allTabs.length - 1) % this.allTabs.length;
-				else if (event.key === 'Home') next = 0;
-				else if (event.key === 'End') next = this.allTabs.length - 1;
-				else return;
-				event.preventDefault();
-				this.switchTab(next);
-				this.allTabs[next]?.focus();
-			});
-		}
-
-		this.switchTab(this.initialTab === 'history' ? 2 : this.initialTab === 'conflicts' ? 1 : 0);
-		this.deps.addStateChangeListener(this.onStateChange);
-		this.deps.addProgressListener?.(this.onProgress);
-		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
-
-	}
+        const tabsHost = contentEl.createDiv({ cls: 'crate-activity-tabs-host' });
+        this.tabsRoot = createRoot(tabsHost);
+        this.tabsRoot.render(createElement(ActivityTabs, {
+            initialTab: this.initialTab,
+            onTabChange: index => this.switchTab(index),
+            onMount: elements => {
+                this.pendingPanel = elements.pending;
+                this.conflictsPanel = elements.conflicts;
+                this.historyPanel = elements.history;
+                this.pendingCount = elements.pendingCount;
+                this.conflictsCount = elements.conflictsCount;
+                this.subtitleEl = elements.subtitle;
+                this.refresh();
+                this.switchTab(this.initialTab === 'history' ? 2 : this.initialTab === 'conflicts' ? 1 : 0);
+                this.deps.addStateChangeListener(this.onStateChange);
+                this.deps.addProgressListener?.(this.onProgress);
+            },
+        }));
+    }
 
 	private switchTab(index: number): void {
 		if (index === 0) this.pendingBrowserState.startChecks?.();
 		else this.pendingBrowserState.pauseChecks?.();
 		this.currentTabIndex = index;
         this.updateSyncBtn();
-		for (let i = 0; i < this.allTabs.length; i++) {
-			const tab = this.allTabs[i];
-			const panel = this.allPanels[i];
-			if (!tab || !panel) continue;
-			if (i === index) {
-				tab.addClass('crate-activity-tab-active');
-				tab.setAttribute('aria-selected', 'true');
-				tab.tabIndex = 0;
-				panel.show();
-			} else {
-				tab.removeClass('crate-activity-tab-active');
-				tab.setAttribute('aria-selected', 'false');
-				tab.tabIndex = -1;
-				panel.hide();
-			}
-		}
-		this.positionIndicator(index);
         this.updateSyncStatusText();
 	}
 
@@ -270,13 +184,6 @@ export class ActivityModal extends Modal {
         }
     }
 
-
-	private positionIndicator(index: number): void {
-		const tab = this.allTabs[index];
-		if (!tab) return;
-		this.tabIndicator.style.left = `${tab.offsetLeft}px`;
-		this.tabIndicator.style.width = `${tab.offsetWidth}px`;
-	}
 
 	private updateTabCounts(): void {
 		const pendingLen = this.deps.getPendingPaths().length;
@@ -338,7 +245,6 @@ export class ActivityModal extends Modal {
 			entry.open = expanded.has(entry.getAttribute('data-history-key'));
 		});
 		if (scrollContainer) scrollContainer.scrollTop = scrollTop;
-		this.contentEl.win.requestAnimationFrame(() => this.positionIndicator(this.currentTabIndex));
 	}
 
 	private formatLastSync(): string {
@@ -361,6 +267,8 @@ export class ActivityModal extends Modal {
 		this.pendingBrowserState.dispose?.();
 		this.deps.removeStateChangeListener(this.onStateChange);
 		this.deps.removeProgressListener?.(this.onProgress);
+		this.tabsRoot?.unmount();
+		this.tabsRoot = undefined;
 		this.root?.unmount();
 		this.root = undefined;
 		this.contentEl.empty();

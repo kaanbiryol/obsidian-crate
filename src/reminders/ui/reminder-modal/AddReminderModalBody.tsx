@@ -58,6 +58,7 @@ export const AddReminderModalBody: React.FC<AddReminderModalBodyProps> = ({
         <ThemeIconProvider renderer={ObsidianIcon}>
             <div
                 className="reminder-modal-body"
+                data-base-ui-swipe-ignore=""
                 style={{ '--reminder-project-color': projectColor } as React.CSSProperties}
             >
                 <ReminderEditorFields

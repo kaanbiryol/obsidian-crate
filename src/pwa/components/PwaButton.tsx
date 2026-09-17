@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react';
+import { Button } from '@base-ui/react/button';
 
 type PwaButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 	isDisabled?: boolean;
@@ -23,7 +24,7 @@ export const PwaButton = forwardRef<HTMLButtonElement, PwaButtonProps>(function 
 	...props
 }, ref) {
 	return (
-		<button
+		<Button
 			ref={ref}
 			{...props}
 			disabled={disabled || isDisabled}
@@ -38,6 +39,6 @@ export const PwaButton = forwardRef<HTMLButtonElement, PwaButtonProps>(function 
 		>
 			{children}
 			{endContent}
-		</button>
+		</Button>
 	);
 });

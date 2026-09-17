@@ -13,7 +13,7 @@ interface TabButtonProps {
 
 /**
  * Individual tab button component
- * Uses the shared capture-phase click bridge for Shadow DOM compatibility.
+ * Uses the shared Base UI button in both host environments.
  */
 const TabButton = memo(function TabButton({
   tab,

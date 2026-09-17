@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { useShadowDomClickBridge } from './shadowDomClickBridge';
+import { Button } from '../../ui/shared/Button';
 
 interface ButtonBehaviorProps {
 	onPress: () => void;
@@ -68,12 +68,11 @@ export const ShadowDOMButton = forwardRef<HTMLButtonElement, NativeButtonProps>(
 	isIconOnly,
 	...props
 }, ref) {
-	const combinedRef = useShadowDomClickBridge(onPress, ref);
 	const behavior = { onPress, children, isDisabled, isLoading, startContent, endContent, variant, color, size, radius, isIconOnly };
 
 	return (
-		<button
-			ref={combinedRef}
+		<Button
+			ref={ref} onClick={onPress}
 			type={type}
 			className={buttonClassName(className)}
 			disabled={isDisabled || isLoading}
@@ -81,6 +80,6 @@ export const ShadowDOMButton = forwardRef<HTMLButtonElement, NativeButtonProps>(
 			{...props}
 		>
 			{buttonContent(behavior)}
-		</button>
+		</Button>
 	);
 });

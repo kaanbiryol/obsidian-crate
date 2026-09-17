@@ -1,3 +1,4 @@
+import { Button as BaseButton } from '@base-ui/react/button';
 import React, { useState } from 'react';
 import type { QuarantinedReminderEntry } from '../reminder-outbox-storage';
 
@@ -40,8 +41,8 @@ export function ReminderQuarantineNotice({ entries, folderPath, onRemove, kind =
 			{exported.length > 0 && <label className="pwa-reminder-recovery-confirm"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.currentTarget.checked)} /> I saved and reviewed the export</label>}
 		</div>
 		<div className="pwa-reminder-sync-error__actions">
-			<button type="button" onClick={exportEntries}>Export damaged entries</button>
-			{exported.length > 0 && <button type="button" disabled={!reviewed || busy} onClick={() => { void remove(); }}>Remove exported copies from device</button>}
+			<BaseButton type="button" onClick={exportEntries}>Export damaged entries</BaseButton>
+			{exported.length > 0 && <BaseButton type="button" disabled={!reviewed || busy} onClick={() => { void remove(); }}>Remove exported copies from device</BaseButton>}
 		</div>
 	</section>;
 }

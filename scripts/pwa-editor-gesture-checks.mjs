@@ -13,7 +13,8 @@ export async function checkNativeEditorGestures(page, title) {
 		const background = element.closest('.modal-form').querySelector('.reminder-modal-body');
 		const dispatch = target => ['touchstart', 'touchmove', 'touchend'].map(type => {
 			const event = new Event(type, { bubbles: true, cancelable: true });
-			const touches = type === 'touchend' ? [] : [{ clientX: 100, clientY: type === 'touchmove' ? 80 : 100 }];
+			const rect = target.getBoundingClientRect();
+			const touches = type === 'touchend' ? [] : [{ clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 + (type === 'touchmove' ? -10 : 0) }];
 			Object.defineProperties(event, { touches: { value: touches }, changedTouches: { value: touches } });
 			target.dispatchEvent(event);
 			return event.defaultPrevented;

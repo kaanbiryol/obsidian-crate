@@ -1,11 +1,11 @@
-import { Modal, Platform, Setting, type App } from 'obsidian';
+import { BaseUiModal } from './shared/BaseUiModal';
+import { Platform, Setting, type App } from 'obsidian';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ExclusionSheet } from './ExclusionSheet';
 import { hideNativeModalCloseButton } from '../reminders/ui/adapters/modalShell';
 
-export class ExclusionPreviewModal extends Modal {
-	hasInitialInputFocus = false;
+export class ExclusionPreviewModal extends BaseUiModal {
 	private root?: Root;
 	constructor(app: App, private readonly paths: readonly string[]) { super(app); }
 

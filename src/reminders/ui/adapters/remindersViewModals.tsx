@@ -1,12 +1,12 @@
 import { useRemindersSettingsStore } from "../../settings";
-import { Modal } from "obsidian";
+import { BaseUiModal } from "../../../ui/shared/BaseUiModal";
 import type CratePlugin from "@/main";
 import { PluginContext } from "../reminders-context";
 import { ProjectSheet } from "./ProjectSheet";
 import { hideNativeModalCloseButton } from "./modalShell";
 import { createShadowReactMount, type ShadowReactMount } from "./shadowReactMount";
 
-class CompactReminderModal extends Modal {
+class CompactReminderModal extends BaseUiModal {
   private readonly plugin: CratePlugin;
   private unsubscribeSettings?: () => void;
   private readonly initialProject: string | undefined;

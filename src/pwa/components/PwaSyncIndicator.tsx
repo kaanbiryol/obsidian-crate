@@ -1,3 +1,4 @@
+import { Button as BaseButton } from '@base-ui/react/button';
 import React from 'react';
 import { useSyncIndicatorMotion } from '../hooks/useSyncIndicatorMotion';
 import type { PendingReminderChange } from '../reminder-outbox-types';
@@ -39,11 +40,11 @@ export function PwaSyncIndicator(props: PwaSyncIndicatorProps) {
 	const visualState = useSyncIndicatorMotion(state);
 	return (
 		<div className="pwa-sync-indicator" data-sync-state={state} data-visual-state={visualState} title={label}>
-			<button className="pwa-sync-indicator__button" type="button" aria-label={`Sync status: ${label}`} onClick={() => props.onShowStatus(label)}>
+			<BaseButton className="pwa-sync-indicator__button" type="button" aria-label={`Sync status: ${label}`} onClick={() => props.onShowStatus(label)}>
 				<span className="pwa-sync-indicator__halo" aria-hidden="true" />
 				<span className="pwa-sync-indicator__dot" aria-hidden="true" />
 				<span className="pwa-sync-indicator__ripple" aria-hidden="true" />
-			</button>
+			</BaseButton>
 			<span className="pwa-sync-indicator__label" role="status" aria-live="polite" aria-atomic="true">{label}</span>
 		</div>
 	);

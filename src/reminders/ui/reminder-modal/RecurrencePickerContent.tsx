@@ -1,3 +1,4 @@
+import { Tabs } from '@base-ui/react/tabs';
 import { ModalHeader } from '../../../ui/shared/ModalHeader';
 import { Button } from '../../../ui/shared/Button';
 import { PickerTimeCard } from './PickerTimeCard';
@@ -23,7 +24,7 @@ export function RecurrencePickerContent({ state, onChange, isDark, animationsEna
     const { frequency, interval, daysOfWeek: selectedDays, dayOfMonth, hour, minute } = state;
     const summaryText = summarizeRecurrencePickerState(state);
     return (
-        <div className={`reminder-picker reminder-recurrence-picker${isDark ? ' dark' : ''}`}>
+        <Tabs.Root value={frequency} onValueChange={value => onChange({ frequency: value as typeof frequency })} className={`reminder-picker reminder-recurrence-picker${isDark ? ' dark' : ''}`}>
             <ModalHeader
                 onClose={onClose}
                 closeLabel={REMINDER_PICKER_COPY.repeat.closeLabel}
@@ -38,7 +39,6 @@ export function RecurrencePickerContent({ state, onChange, isDark, animationsEna
                 <PickerContent>
                     <RecurrenceFrequencyTabs
                         frequency={frequency}
-                        onChange={(frequency) => onChange({ frequency })}
                     />
 
                     <RecurrenceFrequencyOptions
@@ -78,6 +78,6 @@ export function RecurrencePickerContent({ state, onChange, isDark, animationsEna
                     </div>
                 </PickerContent>
             </div>
-        </div>
+        </Tabs.Root>
     );
 }

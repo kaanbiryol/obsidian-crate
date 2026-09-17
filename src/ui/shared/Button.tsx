@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { useShadowDomClickBridge } from '../../reminders/components/shadowDomClickBridge';
+import { Button as BaseButton } from '@base-ui/react/button';
 
 type NativeButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'children'> & {
 	onClick?: () => void;
@@ -18,10 +18,9 @@ export const Button = forwardRef<HTMLButtonElement, NativeButtonProps>(function 
 	type = 'button',
 	...props
 }, ref) {
-	const combinedRef = useShadowDomClickBridge(onClick, ref);
 	return (
-		<button
-			ref={combinedRef} className={className} style={style} type={type} {...props}
+		<BaseButton
+			ref={ref} onClick={onClick} className={className} style={style} type={type} {...props}
 			onMouseDown={(event) => {
 				if (preventFocusOnPress) event.preventDefault();
 				onMouseDown?.(event);
@@ -34,6 +33,6 @@ export const Button = forwardRef<HTMLButtonElement, NativeButtonProps>(function 
 			}}
 		>
 			{children}
-		</button>
+		</BaseButton>
 	);
 });

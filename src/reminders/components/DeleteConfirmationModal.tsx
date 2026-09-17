@@ -52,12 +52,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
             role="alertdialog"
             ariaLabelledBy={titleId}
             ariaDescribedBy={messageId}
-            onKeyDown={(event) => {
-                if (event.key !== 'Escape' || isLoading) return;
-                event.preventDefault();
-                event.stopPropagation();
-                onClose();
-            }}
+            dismissible={!isLoading}
         >
                 <header className={`delete-confirmation-header${showCloseButton ? '' : ' has-no-close'}`}>
                     <h2 id={titleId} className="delete-confirmation-title">{title}</h2>
@@ -83,6 +78,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
                         className="delete-confirmation-button delete-confirmation-cancel"
                         isDisabled={isLoading}
                         autoFocus={autoFocusCancel}
+                        data-initial-focus={autoFocusCancel ? '' : undefined}
                     >
                         {cancelLabel}
                     </ShadowDOMButton>

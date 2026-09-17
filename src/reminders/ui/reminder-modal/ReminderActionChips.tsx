@@ -1,3 +1,4 @@
+import { ToggleButton } from '../../../ui/shared/ToggleButton';
 import React from 'react';
 import { Button } from '../../../ui/shared/Button';
 import { ThemeIcon } from '../../components/theme-icon';
@@ -74,19 +75,19 @@ export function ReminderActionChips({
                 {renderLabel(project || defaultProject || REMINDER_PICKER_COPY.editor.defaultProject)}
             </Button>
 
-            <Button
+            <ToggleButton
                 disabled={disabled}
                 preventFocusOnPress={preventFocusOnPress}
                 onMouseDown={(event: React.MouseEvent) => event.preventDefault()}
-                onClick={onTogglePriority}
+                onPressedChange={onTogglePriority}
                 data-action="toggle-priority"
                 aria-label={priority === 1 ? 'Remove priority' : 'Set priority'}
-                aria-pressed={priority === 1}
+                pressed={priority === 1}
                 className={`reminder-action-chip crate-semantic-token tone-danger${priority === 1 ? ' is-active' : ''}`}
             >
                 <ThemeIcon size="xs" id="flag" />
                 <span className="reminder-action-label">{REMINDER_PICKER_COPY.editor.priority}</span>
-            </Button>
+            </ToggleButton>
 
             <Button
                 disabled={disabled}

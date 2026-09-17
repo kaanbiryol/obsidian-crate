@@ -204,7 +204,12 @@
 	min-width: 0;
 }
 
+.crate-activity-tabs-host, .crate-activity-tabs-layout { display: contents; }
+.crate-activity-panel[hidden] { display: none; }
+
 .crate-activity-tab-indicator {
+    left: var(--active-tab-left);
+    width: var(--active-tab-width);
 	position: absolute;
 	bottom: -1px;
 	height: 1px;

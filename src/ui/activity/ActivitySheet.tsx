@@ -13,19 +13,10 @@ interface ActivitySheetProps {
 
 export function ActivitySheet({ isMobile, animationsEnabled = true, onClose, onMount }: ActivitySheetProps) {
     const [isOpen, setIsOpen] = useState(true);
-    const headerRef = useRef<HTMLDivElement>(null);
-    const contentRef = useRef<HTMLDivElement>(null);
     const close = useCallback(() => {
         if (animationsEnabled) setIsOpen(false);
         else onClose();
     }, [animationsEnabled, onClose]);
-
-    useLayoutEffect(() => {
-        const container = contentRef.current;
-        if (!container || !headerRef.current) return;
-        onMount(container, close, headerRef.current);
-        container.closest<HTMLElement>('.crate-activity-surface')?.focus({ preventScroll: true });
-    }, [close, onMount]);
 
     return (
         <BaseModal
@@ -40,14 +31,29 @@ export function ActivitySheet({ isMobile, animationsEnabled = true, onClose, onM
             showDragHandle={false}
             disableSwipeToDismiss
         >
-            <div className="crate-activity-modal">
-                <div ref={headerRef} className="crate-modal-header-host">
-                    <ThemeIconProvider renderer={ObsidianIcon}>
-                        <ModalHeader title="Sync activity" closeLabel="Close sync activity" onClose={close} />
-                    </ThemeIconProvider>
-                </div>
-                <div ref={contentRef} className="crate-activity-body" />
-            </div>
+            <ActivityContent close={close} onMount={onMount} />
         </BaseModal>
+    );
+}
+
+function ActivityContent({ close, onMount }: { close: () => void; onMount: ActivitySheetProps['onMount'] }) {
+    const headerRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+        const container = contentRef.current;
+        if (!container || !headerRef.current) return;
+        onMount(container, close, headerRef.current);
+        container.closest<HTMLElement>('.crate-activity-surface')?.focus({ preventScroll: true });
+    }, [close, onMount]);
+
+    return (
+        <div className="crate-activity-modal">
+            <div ref={headerRef} className="crate-modal-header-host">
+                <ThemeIconProvider renderer={ObsidianIcon}>
+                    <ModalHeader title="Sync activity" closeLabel="Close sync activity" onClose={close} />
+                </ThemeIconProvider>
+            </div>
+            <div ref={contentRef} className="crate-activity-body" />
+        </div>
     );
 }

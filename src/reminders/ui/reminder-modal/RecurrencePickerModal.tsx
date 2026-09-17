@@ -16,6 +16,7 @@ import { REMINDER_PICKER_COPY } from './pickerCopy';
 interface RecurrencePickerModalProps {
     isOpen: boolean;
     onClose: () => void;
+    finalFocus?: () => HTMLElement | false | null;
     animationConfig: AnimationConfig;
     pickerMode: 'replace' | 'overlay';
     isDark: boolean;
@@ -26,6 +27,7 @@ interface RecurrencePickerModalProps {
 export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
     isOpen,
     onClose,
+    finalFocus,
     animationConfig,
     pickerMode,
     isDark,
@@ -74,6 +76,7 @@ export const RecurrencePickerModal: React.FC<RecurrencePickerModalProps> = ({
         <BaseModal
             isOpen={isOpen}
             onClose={onClose}
+            finalFocus={finalFocus}
             animationConfig={animationConfig}
             className={`crate-reminder-picker-surface is-recurrence-picker${reduceMotion ? ' is-reduced-motion' : ''}`}
             ariaLabel={REMINDER_PICKER_COPY.repeat.dialogLabel}

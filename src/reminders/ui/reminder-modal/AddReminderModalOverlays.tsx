@@ -21,6 +21,7 @@ interface AddReminderModalOverlaysProps {
   defaultProject: string;
   recurrence?: RecurrenceRule;
   onClosePicker: () => void;
+  editorFocus: () => HTMLElement | false;
   onDateTimeChange: (value: string | null, hasTime?: boolean) => void;
   onSelectProject: (project: string) => void;
   onApplyRecurrence: (rule: RecurrenceRule | null) => void;
@@ -44,6 +45,7 @@ export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> =
   defaultProject,
   recurrence,
   onClosePicker,
+  editorFocus,
   onDateTimeChange,
   onSelectProject,
   onApplyRecurrence,
@@ -58,6 +60,7 @@ export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> =
       <DatePickerModal
         isOpen={currentView === "date" && !isClosing}
         onClose={onClosePicker}
+        finalFocus={editorFocus}
         animationConfig={animationConfig}
         pickerMode={pickerMode}
         dueDate={dueDate}
@@ -68,6 +71,7 @@ export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> =
       <ProjectPickerModal
         isOpen={currentView === "project" && !isClosing}
         onClose={onClosePicker}
+        finalFocus={editorFocus}
         animationConfig={animationConfig}
         pickerMode={pickerMode}
         projects={projects}
@@ -79,6 +83,7 @@ export const AddReminderModalOverlays: React.FC<AddReminderModalOverlaysProps> =
       <RecurrencePickerModal
         isOpen={currentView === "recurrence" && !isClosing}
         onClose={onClosePicker}
+        finalFocus={editorFocus}
         animationConfig={animationConfig}
         pickerMode={pickerMode}
         isDark={isDark}

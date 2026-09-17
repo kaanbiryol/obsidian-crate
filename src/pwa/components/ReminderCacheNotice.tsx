@@ -1,3 +1,4 @@
+import { Button as BaseButton } from '@base-ui/react/button';
 import React, { useState, useSyncExternalStore } from 'react';
 import { reminderCacheHealth } from '../reminder-cache-database';
 
@@ -19,7 +20,7 @@ export function ReminderCacheNotice({ isOffline, onRebuild }: { isOffline: boole
 			<span role="status">{explanations[problem]}</span>
 		</div>
 		{problem !== 'unsupported' && <div className="pwa-reminder-sync-error__actions">
-			<button type="button" disabled={isOffline || busy} onClick={() => { void rebuild(); }}>Rebuild offline copy</button>
+			<BaseButton type="button" disabled={isOffline || busy} onClick={() => { void rebuild(); }}>Rebuild offline copy</BaseButton>
 		</div>}
 	</section>;
 }

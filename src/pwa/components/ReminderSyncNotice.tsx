@@ -1,3 +1,4 @@
+import { Button as BaseButton } from '@base-ui/react/button';
 import React from 'react';
 import { exportPendingChanges } from '../export-pending-changes';
 import type { PendingReminderChange } from '../reminder-outbox-types';
@@ -42,7 +43,7 @@ export function ReminderSyncNotice({
 		<div className="pwa-reminder-sync-notices" aria-label="Reminder sync">
 			{changes.length > 0 && <section className="pwa-reminder-sync-error" aria-label="Changes on this device">
 				<div className="pwa-reminder-sync-error__copy"><strong>{changes.length} pending {changes.length === 1 ? 'change' : 'changes'}</strong><span>Kept on this device until sync is confirmed. Browser data can be cleared or evicted.</span></div>
-				<div className="pwa-reminder-sync-error__actions"><button type="button" onClick={() => exportPendingChanges(changes)}>Export pending changes</button></div>
+				<div className="pwa-reminder-sync-error__actions"><BaseButton type="button" onClick={() => exportPendingChanges(changes)}>Export pending changes</BaseButton></div>
 			</section>}
 			{storageError && (
 				<section className="pwa-reminder-sync-error" aria-label="Pending changes unavailable">
@@ -51,7 +52,7 @@ export function ReminderSyncNotice({
 						<span role="status">{storageError}</span>
 					</div>
 					{onRetryInitialization && <div className="pwa-reminder-sync-error__actions">
-						<button type="button" onClick={onRetryInitialization} aria-label="Retry loading pending changes">Retry</button>
+						<BaseButton type="button" onClick={onRetryInitialization} aria-label="Retry loading pending changes">Retry</BaseButton>
 					</div>}
 				</section>
 			)}
@@ -76,12 +77,12 @@ export function ReminderSyncNotice({
 						</div>
 						<div className="pwa-reminder-sync-error__actions">
 							{change.reviewRequired ? <ExpiredReminderChangeActions change={change} onDiscard={onDiscard} /> : <>
-							<button type="button" onClick={() => onRetry(change.operationId)} disabled={isOffline} aria-label={`Retry: ${title}`}>Retry</button>
-							{failedSave && <button type="button" onClick={() => onEdit(change.operationId)} disabled={isOffline} aria-label={`Edit: ${title}`}>Edit</button>}
+							<BaseButton type="button" onClick={() => onRetry(change.operationId)} disabled={isOffline} aria-label={`Retry: ${title}`}>Retry</BaseButton>
+							{failedSave && <BaseButton type="button" onClick={() => onEdit(change.operationId)} disabled={isOffline} aria-label={`Edit: ${title}`}>Edit</BaseButton>}
 							{change.status === 'failed' && (
-								<button type="button" onClick={() => onDiscard(change.operationId)} aria-label={`${failedSave ? 'Discard' : 'Dismiss'}: ${title}`}>
+								<BaseButton type="button" onClick={() => onDiscard(change.operationId)} aria-label={`${failedSave ? 'Discard' : 'Dismiss'}: ${title}`}>
 									{failedSave ? 'Discard' : 'Dismiss'}
-								</button>
+								</BaseButton>
 							)}
 							</>}
 						</div>

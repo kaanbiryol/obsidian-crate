@@ -2,13 +2,11 @@ import { useEffect, useState } from 'react';
 import { useObsidianReducedMotion } from '@/reminders/ui/useObsidianReducedMotion';
 import { RecurrencePickerContent } from '@/reminders/ui/reminder-modal/RecurrencePickerContent';
 import { buildRecurrencePickerDraft, recurrenceRuleFromPickerDraft } from '@/reminders/ui/reminder-modal/recurrencePickerShared';
-import { REMINDER_PICKER_COPY } from '@/reminders/ui/reminder-modal/pickerCopy';
 import { applyReminderTextUpdate } from '../reminder-state';
 import type { ModalDraft } from '../types';
 
-export function ReminderRecurrencePicker({ draft, dialogRef, projectOptions, isDark, onSelect, onClose }: {
+export function ReminderRecurrencePicker({ draft, projectOptions, isDark, onSelect, onClose }: {
     draft: ModalDraft;
-    dialogRef: (element: HTMLElement | null) => void;
     projectOptions: string[];
     isDark: boolean;
     onSelect: (patch?: Partial<ModalDraft>) => void;
@@ -19,7 +17,7 @@ export function ReminderRecurrencePicker({ draft, dialogRef, projectOptions, isD
     useEffect(() => setRecurrenceDraft(buildRecurrencePickerDraft(draft.recurrence)), [draft.recurrence]);
     const liveRule = recurrenceRuleFromPickerDraft(recurrenceDraft);
     return (
-        <section ref={dialogRef} className="pwa-picker-sheet pwa-repeat-picker-sheet" role="dialog" aria-modal="true" aria-label={REMINDER_PICKER_COPY.repeat.dialogLabel} tabIndex={-1}>
+        <section className="pwa-picker-sheet pwa-repeat-picker-sheet" tabIndex={-1}>
             <RecurrencePickerContent
                 isDark={isDark} animationsEnabled={!reduceMotion} canRemove={Boolean(draft.recurrence)}
                 state={{ ...recurrenceDraft, hour: liveRule.hour ?? 9, minute: liveRule.minute ?? 0 }}

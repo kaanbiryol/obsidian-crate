@@ -69,7 +69,7 @@ async function measureCapacity(browser, count) {
     await cards.first().click();
     // Scope editor selectors so benchmark timings do not include accessibility
     // tree scans of every reminder by the browser automation harness.
-    const editor = page.locator('.pwa-reminder-editor[role="dialog"]');
+    const editor = page.locator('.pwa-modal-sheet__container--reminder[role="dialog"]');
     const title = editor.locator('[contenteditable="true"][aria-label="Reminder title"]');
     await expect(title).toBeFocused();
     await expect(title).toHaveText('Capacity reminder 00001');

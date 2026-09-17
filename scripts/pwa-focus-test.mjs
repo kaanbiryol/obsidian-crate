@@ -4,10 +4,12 @@ import { buildPwaPreviewAssets } from './pwa-preview-assets.mjs';
 import { listenPwaPreviewServer } from './pwa-preview-server.mjs';
 
 const assets = await buildPwaPreviewAssets();
-const { server } = await listenPwaPreviewServer({ port: 0, assets });
-const origin = `http://127.0.0.1:${server.address().port}`;
-try {
-	for (const browserType of [chromium, webkit]) {
+for (const browserType of [chromium, webkit]) {
+	// Mutations settle after optimistic removal. Isolate browser fixtures so a
+	// late deletion cannot race a reset and remove the next browser's reminder.
+	const { server } = await listenPwaPreviewServer({ port: 0, assets });
+	const origin = `http://127.0.0.1:${server.address().port}`;
+	try {
 		const browser = await browserType.launch();
 		try {
 			const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
@@ -64,7 +66,7 @@ try {
 				window.visualViewport.dispatchEvent(new Event('resize'));
 			});
 			const sheet = page.locator('.pwa-modal-sheet__container--reminder');
-			await expect(sheet).toHaveCSS('--pwa-keyboard-inset', '334px');
+			await expect(page.locator('.pwa-reminder-sheet-stage')).toHaveCSS('padding-bottom', '334px');
 			await expect(sheet).toHaveCSS('transform', 'none');
 			const description = page.getByRole('textbox', { name: 'Reminder description', exact: true });
 			const beforeDescription = await title.boundingBox();
@@ -181,12 +183,11 @@ try {
 			await expect(page.getByRole('dialog', { name: 'Edit reminder', exact: true })).toBeHidden();
 			await expect(updatedCard).toBeHidden();
 			await expect(page.getByRole('group', { name: 'Unsaved deletion draft. Press Enter to edit reminder.', exact: true })).toBeHidden();
-			await page.request.post(`${origin}/preview/reset`);
 			console.log(`${browserType.name()}: synchronous focus, discarded drafts, saving and keyboard-aware deletion passed`);
 		} finally {
 			await browser.close();
 		}
+	} finally {
+		await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 	}
-} finally {
-	await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 }

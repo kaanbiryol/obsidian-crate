@@ -38,7 +38,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	isReturningToEditor: boolean;
 	canInteract: boolean;
 	keyboardInset: number;
-	dialogRef: (element: HTMLElement | null) => void;
 	onPatchDraft: (patch: Partial<ModalDraft>) => void;
 	onOpenPicker: (picker: ModalPickerId) => void;
 	onDeleteConfirmationChange: (open: boolean) => void;
@@ -54,7 +53,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 	isReturningToEditor,
 	canInteract,
 	keyboardInset,
-	dialogRef,
 	onPatchDraft,
 	onOpenPicker,
 	onDeleteConfirmationChange,
@@ -90,10 +88,6 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 		};
 	}, []);
 
-	const setEditorRef = useCallback((element: HTMLDivElement | null) => {
-		editorRef.current = element;
-		if (isActive) dialogRef(element);
-	}, [dialogRef, isActive]);
 	const richTextInputRef = useRef<RichTextInputHandle | null>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 	const { rememberFocus, restoreFocus } = useEditorFocus({
@@ -163,11 +157,8 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 
 	return (
 		<div
-			ref={setEditorRef}
+			ref={editorRef}
 			className={`pwa-reminder-sheet-screen pwa-reminder-sheet-screen--editor modal-card pwa-reminder-editor${isActive ? ' is-active' : ''}${isReturningToEditor ? ' is-focus-target' : ''}`}
-			role="dialog"
-			aria-modal="true"
-			aria-label={title}
 			aria-busy={saving || isClosing}
 			aria-hidden={!editorInteractive}
 			inert={!editorInteractive}
@@ -216,7 +207,7 @@ export const ReminderEditorScreen = forwardRef<ReminderEditorScreenHandle, {
 						type: 'submit', disabled: !canSubmit, busy: saving, dataAction: 'save-reminder',
 					}}
 				/>
-				<div className="reminder-modal-body" style={{
+				<div className="reminder-modal-body" data-base-ui-swipe-ignore="" style={{
 					'--reminder-project-color': getProjectColor(draft.project || draft.defaultProject)[colorScheme].accent,
 				} as React.CSSProperties}>
 					<ReminderEditorFields
