@@ -152,6 +152,11 @@
       padding-right: 2px;
     }
 
+    .reminder-description-input::placeholder {
+      // The native caret uses the input font metrics, even while it is empty.
+      font-size: inherit;
+    }
+
     .reminder-title-input :is(
       .rich-text-chip-date,
       .rich-text-chip-project,
