@@ -83,9 +83,9 @@ async function testInstall(browser, launchMode) {
   failNextExchange = launchMode === 'retry';
   await home.goto(launchUrl);
   if (launchMode === 'retry') {
-    await home.getByRole('button', { name: 'Retry', exact: true }).waitFor();
+    await home.getByRole('button', { name: 'Try again', exact: true }).waitFor();
     expect(new URL(home.url()).searchParams.get('token')).toBe(installToken);
-    await home.getByRole('button', { name: 'Retry', exact: true }).click();
+    await home.getByRole('button', { name: 'Try again', exact: true }).click();
   }
   await home.getByRole('group', { name: cardName, exact: true }).waitFor();
   const installExchanges = exchanges.slice(1);
