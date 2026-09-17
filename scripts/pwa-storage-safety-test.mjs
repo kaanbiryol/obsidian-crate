@@ -50,7 +50,23 @@ try {
     await page.getByRole('button', { name: 'Open settings', exact: true }).click();
     if (granted === null) await expect(page.getByText('Storage protection is unavailable', { exact: false })).toBeVisible();
     else {
-     await page.getByRole('button', { name: 'Protect offline data', exact: true }).click();
+     const protect = page.getByRole('button', { name: 'Protect offline data', exact: true });
+     await expect(protect).toBeVisible();
+     for (const width of [320, 393, 820]) {
+      await page.setViewportSize({ width, height: 844 });
+      await protect.scrollIntoViewIfNeeded();
+      const layout = await protect.evaluate(button => {
+       const bounds = button.getBoundingClientRect();
+       const row = button.closest('.settings-row').getBoundingClientRect();
+       const copy = button.closest('.settings-row').querySelector('.settings-row__copy').getBoundingClientRect();
+       return { fits: button.scrollWidth <= button.clientWidth && bounds.left >= row.left && bounds.right <= row.right,
+        belowCopy: bounds.top >= copy.bottom, height: bounds.height };
+      });
+      expect(layout.fits).toBe(true);
+      expect(layout.belowCopy).toBe(true);
+      expect(layout.height).toBeGreaterThanOrEqual(44);
+     }
+     await protect.click();
      await expect(page.getByText(granted ? 'Persistent storage granted.' : 'Best effort storage.', { exact: false })).toBeVisible();
     }
     await page.close();

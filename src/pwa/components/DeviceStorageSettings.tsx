@@ -10,7 +10,7 @@ export function DeviceStorageSettings() {
 		void browserStorageStatus().then(value => { if (active) setStatus(value); });
 		return () => { active = false; };
 	}, []);
-	return <div className="settings-row">
+	return <div className="settings-row settings-row--storage">
 		<div className="settings-row__copy">
 			<strong>Device storage</strong>
 			<span role="status">{status === 'persistent' ? 'Persistent storage granted.' : status === 'checking' ? 'Checking storage…' : status === 'unavailable' ? 'Storage protection is unavailable in this browser.' : 'Best effort storage. This browser may evict offline data.'} Pending changes exist only here until synced. Export them before clearing site data.</span>
