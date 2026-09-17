@@ -1,4 +1,5 @@
 import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
 import obsidianmd from "eslint-plugin-obsidianmd";
 import globals from "globals";
 import { globalIgnores } from "eslint/config";
@@ -27,6 +28,14 @@ export default tseslint.config(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		files: ['**/*.{ts,tsx,js,mjs,mts}'],
+		plugins: { 'react-hooks': reactHooks },
+		rules: {
+			'react-hooks/rules-of-hooks': 'error',
+			'react-hooks/exhaustive-deps': 'error',
+		},
+	},
 	{
 		files: ['scripts/**/*.mjs', 'vite.visual.config.mts', 'playwright.config.ts', 'vite.config.mts', 'vitest.cloudflare.config.ts', 'vitest.config.ts'],
 		extends: [tseslint.configs.disableTypeChecked],

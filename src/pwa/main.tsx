@@ -89,6 +89,8 @@ function App() {
 	const finalizeSettingsClose = useCallback(() => setSettingsOpen(false), []);
 	const modalTransition = useSheetTransition(finalizeModalClose);
 	const settingsTransition = useSheetTransition(finalizeSettingsClose);
+	const { requestClose: requestModalClose, cancelClose: cancelModalClose } = modalTransition;
+	const { requestClose: requestSettingsClose, cancelClose: cancelSettingsClose } = settingsTransition;
 
 	useEffect(() => {
 		const reportVersion = () => navigator.serviceWorker?.controller?.postMessage({ type: 'CRATE_CLIENT_VERSION', version: PWA_ASSET_VERSION });
@@ -142,8 +144,8 @@ function App() {
 	} = reminderSync;
 	const { loggingOut, logOut, suspendLocalSession } = usePwaSessionLifecycle({
 		apiFetch,
-		cancelModalClose: modalTransition.cancelClose,
-		cancelSettingsClose: settingsTransition.cancelClose,
+		cancelModalClose,
+		cancelSettingsClose,
 		disablePushNotifications,
 		handleUnauthorizedRef,
 		resetReminderState,
@@ -207,17 +209,17 @@ function App() {
 	const closeModal = useCallback(() => {
 		if (!modal) return;
 		setSaving(false);
-		modalTransition.requestClose();
-	}, [modal, modalTransition.requestClose]);
+		requestModalClose();
+	}, [modal, requestModalClose]);
 
 	const toggleSettings = useCallback(() => {
 		if (settingsOpen) {
-			settingsTransition.requestClose();
+			requestSettingsClose();
 			return;
 		}
-		settingsTransition.cancelClose();
+		cancelSettingsClose();
 		setSettingsOpen(true);
-	}, [settingsOpen, settingsTransition.cancelClose, settingsTransition.requestClose]);
+	}, [settingsOpen, cancelSettingsClose, requestSettingsClose]);
 
 	const {
 		saveReminder,
@@ -310,25 +312,25 @@ function App() {
 			return;
 		}
 		const reminder = reminderId ? visibleReminders.find((item) => item.id === reminderId) ?? null : null;
-		settingsTransition.cancelClose();
-		modalTransition.cancelClose();
+		cancelSettingsClose();
+		cancelModalClose();
 		setSettingsOpen(false);
 		setSaving(false);
 		flushSync(() => {
 			setModal({ mode, reminderId, expectedRevision: reminder?.revision, filePath: reminder?.filePath, operationId: crypto.randomUUID(), draft: buildModalDraft(reminder, defaultProject ?? selectedProject) });
 		});
-	}, [changes, ensureCanMutate, modalTransition.cancelClose, mutationsReady, visibleReminders, selectedProject, settingsTransition.cancelClose, showToast]);
+	}, [changes, ensureCanMutate, cancelModalClose, mutationsReady, visibleReminders, selectedProject, cancelSettingsClose, showToast]);
 
 	const editFailedChange = useCallback((operationId: string) => {
 		if (!mutationsReady || !ensureCanMutate()) return;
 		const draft = prepareEdit(operationId);
 		if (!draft) return;
-		settingsTransition.cancelClose();
-		modalTransition.cancelClose();
+		cancelSettingsClose();
+		cancelModalClose();
 		setSettingsOpen(false);
 		setSaving(false);
 		flushSync(() => setModal(draft));
-	}, [ensureCanMutate, modalTransition.cancelClose, mutationsReady, prepareEdit, settingsTransition.cancelClose]);
+	}, [ensureCanMutate, cancelModalClose, mutationsReady, prepareEdit, cancelSettingsClose]);
 
 	const updatePreferences = (patch: Partial<PwaPreferences>) => {
 		const next = { ...preferences, ...patch };
@@ -456,7 +458,7 @@ function App() {
 						themePreference={themePreference}
 						loggingOut={loggingOut}
 						isClosing={settingsTransition.isClosing}
-						onClose={settingsTransition.requestClose}
+						onClose={requestSettingsClose}
 						onClosed={settingsTransition.finishClose}
 						onEnablePush={enablePushNotifications}
 						onThemePreferenceChange={setThemePreference}

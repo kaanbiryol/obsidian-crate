@@ -46,6 +46,7 @@ function harness() {
 		config: { folderPath: 'Reminders', allDayNotificationTime: null, upcomingDays: 7 },
 		projects: ['Inbox'], selectedProject: null, closeModal, setProjects: vi.fn(), setSaving, showToast, loadReminders: vi.fn(),
 	};
+	// eslint-disable-next-line react-hooks/rules-of-hooks -- React is mocked above; this harness exercises hook logic without a React render.
 	const render = () => useReminderMutations({ ...options, reminders: remindersRef.current });
 	return { hook: render(), render, state, outbox, changes, remindersRef, apiFetch, closeModal, showToast,
 		setSaving, ensureCanMutate, commitReminderState, setReminders, memory };

@@ -1,6 +1,6 @@
 import { assertReminderMutationInput } from '../../core/reminderMutationInput';
 import { parseReminderEditorContent } from '../../utils/reminderEditorParsing';
-import React, { useCallback, useRef, useMemo } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { ProjectAutocompleteDropdown } from './ProjectAutocompleteDropdown';
 import { RichTextInput, type RichTextInputHandle } from '../../components/RichTextInput';
 import { useProjectAutocomplete } from './useProjectAutocomplete';
@@ -59,9 +59,7 @@ export function ReminderEditorFields({
         richTextInputRef,
     });
 
-    const handleAutocompleteQuery = useCallback((query: string | null, rect: DOMRect | null) => {
-        autocomplete.updateAutocomplete(query, rect);
-    }, [autocomplete.updateAutocomplete]);
+    const handleAutocompleteQuery = autocomplete.updateAutocomplete;
 
     return (
         <div

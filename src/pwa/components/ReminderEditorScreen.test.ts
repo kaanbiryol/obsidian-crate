@@ -57,8 +57,11 @@ describe('PWA shared editor integration', () => {
 		for (const action of ['save-reminder', 'toggle-delete-confirm', 'toggle-picker', 'toggle-priority']) {
 			expect(button(markup, action)).toContain('disabled=""');
 		}
-		expect(markup).toContain('contentEditable="false"');
-		expect(markup).toMatch(/<textarea[^>]*disabled=""/);
+		for (const label of ['Reminder title', 'Reminder description']) {
+			const field = markup.match(new RegExp(`<div[^>]*aria-label="${label}"[^>]*>`))?.[0];
+			expect(field).toContain('contentEditable="false"');
+			expect(field).toContain('aria-readonly="true"');
+		}
 		expect(markup).toContain('aria-label="Saving reminder"');
 	});
 

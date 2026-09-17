@@ -35,7 +35,8 @@ export function bindCommittedText(
 		}
 	};
 	text.inputEl.addEventListener('blur', () => { void commit(); });
-	text.inputEl.addEventListener('keydown', (event: KeyboardEvent) => {
+	const inputEl: HTMLElement = text.inputEl;
+	inputEl.addEventListener('keydown', (event: KeyboardEvent) => {
 		if (event.key === 'Enter' && text.inputEl.tagName === 'INPUT') {
 			event.preventDefault();
 			text.inputEl.blur();

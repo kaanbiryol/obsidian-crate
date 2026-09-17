@@ -84,7 +84,8 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
     colorScheme = 'dark',
     completionPreview = false,
 }) => {
-    const animationsEnabled = animationConfig.enabled && !useObsidianReducedMotion();
+    const reducedMotion = useObsidianReducedMotion();
+    const animationsEnabled = animationConfig.enabled && !reducedMotion;
     const trackedReminders = React.useMemo(() => [reminder], [reminder]);
     const clock = useReminderClock(trackedReminders);
     const dueDate = reminder.dueDatetime || reminder.dueDate;
