@@ -8,6 +8,7 @@ interface ViewHeaderProps {
   className?: string;
   /** Optional right-side action content (e.g., settings button) */
   rightContent?: React.ReactNode;
+  titleContent?: React.ReactNode;
   metaContent?: React.ReactNode;
   /** Use large title style (for fullscreen views) */
   large?: boolean;
@@ -28,6 +29,7 @@ export const ViewHeader = memo(function ViewHeader({
   overdueCount = 0,
   className = '',
   rightContent,
+  titleContent,
   metaContent,
   large = false,
   showMeta = true,
@@ -38,9 +40,10 @@ export const ViewHeader = memo(function ViewHeader({
       className={`view-header${large ? ' is-large' : ''} ${className}`}
     >
       <div className="view-header-copy">
-        <h1 className="view-header-title">
-          {title}
-        </h1>
+        <div className="view-header-title-row">
+          <h1 className="view-header-title">{title}</h1>
+          {titleContent}
+        </div>
         {(showMeta || reserveMetaSpace) && (
           <div
             className={`view-header-meta${showMeta ? '' : ' is-reserved'}`}

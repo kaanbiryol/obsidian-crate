@@ -63,7 +63,24 @@
 
 .view-header-copy {
     flex: 1;
+    min-width: 0;
 }
+
+.view-header-title-row,
+.project-detail-title-row {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+
+    > h1 {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
 
 .view-header-title {
     margin: 0;

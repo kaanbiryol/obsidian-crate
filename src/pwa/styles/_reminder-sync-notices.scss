@@ -1,4 +1,15 @@
 @mixin styles {
+	// Center the status against visible capitals, excluding font ascent/descent padding.
+	@supports (text-box: trim-both cap alphabetic) {
+		.view-header-title-row > h1,
+		.project-detail-title-row > h1 {
+			text-box: trim-both cap alphabetic;
+			// Preserve accents and descenders inside the title's ellipsis clipping box.
+			padding-block: .25em;
+			margin-block: -.25em;
+		}
+	}
+
 	.pwa-sync-indicator__button {
 		display: grid;
 		place-items: center;
