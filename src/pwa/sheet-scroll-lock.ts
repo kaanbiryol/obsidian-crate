@@ -8,7 +8,11 @@ export function lockSheetDocumentScroll(): () => void {
 		const root = document.documentElement;
 		const viewport = window.visualViewport;
 		let layoutWidth = window.innerWidth;
-		let layoutHeight = Math.max(window.innerHeight, root.clientHeight, viewport?.height ?? 0);
+		// Under translucent iOS chrome, viewport APIs can exclude the status
+		// bar even when CSS fills the screen. Freeze the rendered canvas too.
+		const measureLayoutHeight = () => Math.max(window.innerHeight, root.clientHeight,
+			root.getBoundingClientRect().height, viewport?.height ?? 0);
+		let layoutHeight = measureLayoutHeight();
 		const scrollX = window.scrollX;
 		const scrollY = window.scrollY;
 		const properties = ['top', 'left'] as const;
@@ -23,7 +27,7 @@ export function lockSheetDocumentScroll(): () => void {
 		const preserveLayoutHeight = () => {
 			if (window.innerWidth !== layoutWidth) {
 				layoutWidth = window.innerWidth;
-				layoutHeight = Math.max(window.innerHeight, root.clientHeight, viewport?.height ?? 0);
+				layoutHeight = measureLayoutHeight();
 			}
 			// iOS standalone can change its layout height during field focus.
 			// Keep the app and sheet at their pre-keyboard size until rotation.

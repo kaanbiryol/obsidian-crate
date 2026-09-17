@@ -8,7 +8,7 @@
 .pwa-modal-sheet__scroll-boundary::-webkit-scrollbar{display:none}
 .pwa-modal-sheet__scroll-track{height:calc(100% + 1px)}
 .pwa-modal-sheet__viewport{position:sticky;top:0;height:calc(100% - 1px);overflow:clip}
-.pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.66);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.32)}
 .pwa-modal-sheet__container{right:0;margin:0 auto;overflow:hidden;background:var(--pwa-sheet-surface);border:0;border-radius:20px 20px 0 0;box-shadow:0 -24px 70px rgba(0,0,0,.28);backface-visibility:hidden;will-change:transform}
 .pwa-modal-sheet__container--reminder{width:min(1120px,calc(100vw - 36px))!important;height:calc(100% - env(safe-area-inset-top) - 28px)!important;max-height:calc(100% - env(safe-area-inset-top) - 28px)!important;background:transparent;border:0;box-shadow:none}
 .pwa-modal-sheet__container--settings{width:min(520px,calc(100vw - 36px))!important;max-height:calc(100% - env(safe-area-inset-top) - 28px)!important}

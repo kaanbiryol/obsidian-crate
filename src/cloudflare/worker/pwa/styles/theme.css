@@ -27,7 +27,7 @@
 	--checkbox-marker-color:var(--text-on-accent);
 	--pwa-launch-bg:#0b0b0d;
 	--pwa-tabbar-surface:rgba(13,13,15,.9);
-	/* The opaque native status bar owns its height; honor only the remaining viewport inset. */
+	/* Keep content below translucent native chrome, while backdrops fill the viewport. */
 	--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px));
 	--pwa-safe-area-bottom-floor:0px;
 	--pwa-safe-area-bottom:max(env(safe-area-inset-bottom),env(safe-area-max-inset-bottom,0px));

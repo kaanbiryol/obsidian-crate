@@ -145,7 +145,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('html,body,#app{background-color:#0b0b0d;color-scheme:dark}');
 		expect(html).toContain('@media (prefers-color-scheme: light){:root{--pwa-launch-bg:#f7f7f8;color-scheme:light}html,body,#app{background-color:#f7f7f8;color-scheme:light}}');
 		expect(html).toContain('<body>');
-		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="default">');
+		expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">');
 		expect(html).toContain('<style id="pwa-light-theme" media="(prefers-color-scheme: light)">');
 		expect(html).toContain('<script src="/notifications/theme-bootstrap.js?v=');
 		expect(html).not.toContain('<script>');
@@ -174,15 +174,15 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.crate-reminders-ui.pwa-shadow-root .pwa-reminders-view.is-modal.is-fullscreen .animated-tab-bar-bottom{margin-bottom:0}');
 		expect(html).toContain('--pwa-tabbar-content-height:64px');
 		expect(html).toContain('--pwa-tabbar-safe-area:var(--pwa-safe-area-bottom)');
-		expect(html).toContain('--pwa-tabbar-content-offset:min(4px,var(--pwa-tabbar-safe-area))');
+		expect(html).not.toContain('--pwa-tabbar-content-offset');
 		expect(html).toContain('--reminders-tabbar-height:calc(var(--pwa-tabbar-content-height) + var(--pwa-tabbar-safe-area));--reminders-tabbar-overlay:0px');
 		expect(html).toContain('.crate-reminders-ui.pwa-shadow-root .pwa-reminders-view.is-modal.is-fullscreen{--reminders-tabbar-overlay:0px;');
 		expect(html).toContain('--pwa-tabbar-bleed:0px');
 		expect(html).toContain('.pwa-reminders-view .reminders-view-scroll{overflow-anchor:none}');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none;');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:var(--pwa-tabbar-safe-area);transform:none;');
 		expect(html).toContain('border-top:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.065)');
-		expect(html).not.toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none;background:rgba(13,13,15,.9);backdrop-filter:blur(28px) saturate(150%);-webkit-backdrop-filter:blur(28px) saturate(150%);border-top:1px');
-		expect(html).toContain('display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--pwa-tabbar-content-height);max-width:42rem!important;margin:0 auto!important;padding:0!important;transform:translate3d(0,var(--pwa-tabbar-content-offset),0)!important');
+		expect(html).not.toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:var(--pwa-tabbar-safe-area);transform:none;background:rgba(13,13,15,.9);backdrop-filter:blur(28px) saturate(150%);-webkit-backdrop-filter:blur(28px) saturate(150%);border-top:1px');
+		expect(html).toContain('display:flex!important;align-items:center;justify-content:space-around;width:100%;height:var(--pwa-tabbar-content-height);max-width:42rem!important;margin:0 auto!important;padding:0!important;transform:none!important');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-slider-track {');
 		expect(html).toContain('inset: 6px 8px;');
 		expect(html).toContain('.crate-reminders-ui .bottom-tab-slider {');
@@ -196,7 +196,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('.pwa-reminders-view .ios-scroll{scrollbar-width:none;overscroll-behavior-y:contain}');
 		expect(html).toContain('position:relative;bottom:auto;left:auto;right:auto;flex-shrink:0;margin-bottom:0;transform:none');
 		expect(html).toContain('--pwa-safe-area-top:max(env(safe-area-inset-top),env(safe-area-max-inset-top,0px))');
-		expect(html).not.toContain('black-translucent');
+		expect(html).not.toContain('name="apple-mobile-web-app-status-bar-style" content="default"');
 		expect(html).not.toContain('--pwa-safe-area-top-floor');
 		expect(html).not.toContain('--pwa-status-bar-clearance');
 		expect(PWA_THEME_BOOTSTRAP_JS).not.toContain('pwaIosScrollEdge');
@@ -244,7 +244,7 @@ describe('PWA activation metadata', () => {
 		const html = createPwaHtml('https://worker.test/notifications');
 
 		expect(html).toContain('.pwa-shadow-root.has-open-sheet .reminders-content,.pwa-shadow-root.has-open-sheet .reminders-view-scroll{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}');
-		expect(html).toContain('.pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.66);backdrop-filter:blur(10px);');
+		expect(html).toContain('.pwa-modal-sheet__backdrop{border:0;background:rgba(0,0,0,.32)}');
 		expect(html).not.toContain('.pwa-modal-sheet.is-screen-transition-closing .pwa-modal-sheet__backdrop');
 		expect(html).not.toContain('backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:opacity');
 		expect(html).toContain('.pwa-modal-sheet__container--reminder{width:min(1120px,calc(100vw - 36px))!important;height:calc(100% - env(safe-area-inset-top) - 28px)!important;');
@@ -297,7 +297,7 @@ describe('PWA activation metadata', () => {
 		expect(html).toContain('--reminders-fab-gap:16px;--reminders-fab-size:44px;');
 		expect(html).toContain('.pwa-reminders-view .reminders-fab{position:absolute;bottom:');
 		expect(html).not.toContain('.pwa-header-add-button');
-		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:0;transform:none;background:rgba(13,13,15,.9);');
+		expect(html).toContain('.pwa-reminders-view .bottom-tab-bar{width:100%;max-width:none;height:var(--reminders-tabbar-height);overflow:visible;padding-bottom:var(--pwa-tabbar-safe-area);transform:none;background:rgba(13,13,15,.9);');
 	});
 
 	it('ships an offline-capable installed app shell service worker', () => {
