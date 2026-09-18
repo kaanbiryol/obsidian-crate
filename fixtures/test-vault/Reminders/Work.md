@@ -1,11 +1,8 @@
 # Work
 
-- [ ] Rebuild plugin after source changes every Friday 12:00 <!-- crate-id:seed-work-rebuild -->
-- [ ] Test sync conflict handling Jun 19, 2026 14:00 ! <!-- crate-id:seed-work-sync-conflict -->
-<!-- crate-desc:v1:Edit%20or%20rename%20a%20sample%20note%20while%20sync%20is%20disabled%2C%20then%20verify%20the%20conflict%20copy%20is%20understandable. -->
-- [x] Review release asset checklist Jun 22, 2026 <!-- crate-id:seed-work-release-assets -->
-- [x] Run `npm run check` before recording the demo tomorrow 10:30 <!-- crate-id:seed-work-run-check -->
-<!-- crate-desc:v1:This%20covers%20worker%20build%2C%20lint%2C%20typecheck%2C%20worker%20typecheck%2C%20and%20the%20Vitest%20suite. -->
-- [x] Compare desktop and mobile settings layouts next Monday <!-- crate-id:seed-work-settings-layouts -->
-- [x] Archive old reminder copy Jun 16, 2026 <!-- crate-id:seed-work-archive-copy -->
-<!-- crate-desc:v1:Completed%20items%20should%20stay%20visible%20when%20show%2Dcompleted%20is%20enabled. -->
+- [ ] Send the revised proposal 2026-09-18 ! <!-- crate-id:website-work-1 -->
+- [ ] Plan next week every Fri 2026-09-18 <!-- crate-rule:%7B%22frequency%22%3A%22weekly%22%2C%22daysOfWeek%22%3A%5B5%5D%2C%22timezone%22%3A%22Europe%2FBerlin%22%7D --> <!-- crate-id:website-work-2 -->
+<!-- crate-desc:v1:Leave%20room%20for%20one%20uninterrupted%20morning. -->
+- [ ] Sketch the onboarding flow 2026-09-21 <!-- crate-id:website-work-3 -->
+- [ ] Share the design review 2026-09-23T12:00:00.000Z <!-- crate-id:website-work-4 -->
+- [x] Send meeting notes 2026-09-17 <!-- crate-id:website-work-5 -->
