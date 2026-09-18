@@ -84,7 +84,13 @@ export function BaseModal({
         aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
         initialFocus={() => popupRef.current?.querySelector<HTMLElement>('[data-initial-focus], [contenteditable="true"]') ?? popupRef.current}
-        finalFocus={finalFocus ?? (() => returnFocusRef.current?.isConnected ? returnFocusRef.current : true)}
+        finalFocus={finalFocus ?? (() => {
+            const target = returnFocusRef.current;
+            // Base UI focuses a target's first tabbable descendant. Returning
+            // the document body sends focus to unrelated Obsidian navigation.
+            if (!target?.isConnected || target === target.ownerDocument.body || target === target.ownerDocument.documentElement) return false;
+            return target;
+        })}
         onKeyDown={onKeyDown}
         data-base-ui-swipe-ignore={disableSwipeToDismiss || !dismissible ? '' : undefined}
     >{bottomSheet ? <Drawer.Content className="base-modal-content">{contents}</Drawer.Content> : contents}</Popup>;

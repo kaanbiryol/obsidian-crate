@@ -38,6 +38,7 @@ const { outputFiles } = await build({
       return <>
         <Button onClick={() => {setMode('centered');setOpen('editor')}}>Desktop editor</Button>
         <Button onClick={() => {setMode('bottom-sheet');setOpen('editor')}}>Mobile editor</Button>
+        <Button onClick={event => {event.currentTarget.blur();setMode('centered');setOpen('editor')}}>Editor without focused opener</Button>
         <Button onClick={() => setOpen('activity')}>Activity</Button>
         <Button onClick={() => setOpen('tabs')}>Activity tabs</Button>
         <Button onClick={() => setOpen('exclusion')}>Exclusions</Button>
@@ -79,8 +80,24 @@ for (const browserType of [chromium, webkit]) {
  try {
   const page = await browser.newPage({viewport:{width:390,height:844},hasTouch:true});
   const errors=[]; page.on('pageerror', error => errors.push(error.message));
-  await page.setContent('<div id="host" class="modal-container"></div>');
+  await page.setContent('<button id="navigation-back">Back</button><div id="host" class="modal-container"></div>');
   await page.addScriptTag({content:outputFiles[0].text});
+  // A command or pointer action can open the editor while the body is focused.
+  // Closing must not restore focus to the body's first button (Obsidian Back).
+  for (const closeAction of ['save', 'cancel']) {
+    await page.getByRole('button',{name:'Editor without focused opener',exact:true}).click();
+    const editor=page.getByRole('dialog',{name:'Edit reminder',exact:true});
+    await expect(page.getByRole('textbox',{name:'Reminder title',exact:true})).toBeFocused();
+    if (closeAction === 'save') {
+      await page.getByRole('button',{name:'Save reminder',exact:true}).click();
+      await page.evaluate(() => window.finishSave());
+    } else {
+      await page.keyboard.press('Escape');
+    }
+    await expect(editor).toHaveCount(0);
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await expect(page.locator('#navigation-back')).not.toBeFocused();
+  }
   for (const mode of ['Desktop','Mobile']) {
     const trigger=page.getByRole('button',{name:`${mode} editor`,exact:true});
     await trigger.click();
