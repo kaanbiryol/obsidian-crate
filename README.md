@@ -229,6 +229,14 @@ OBSIDIAN_TEST_VAULT=/path/to/vault npm run dev
 To save the path for future development builds, add `OBSIDIAN_TEST_VAULT=/path/to/vault`
 to `.env.development.local` (ignored by Git).
 
+To install each development build into multiple vaults, set `OBSIDIAN_DEV_VAULTS`
+to a JSON array in `.env.development.local`. This takes precedence over
+`OBSIDIAN_TEST_VAULT`:
+
+```dotenv
+OBSIDIAN_DEV_VAULTS='["./test-vault", "/path/to/another/vault"]'
+```
+
 Run tests:
 
 ```bash
