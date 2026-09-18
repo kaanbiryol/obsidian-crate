@@ -17,7 +17,7 @@ const css = compileString('@use "src/styles/plugin-ui/modal"; .crate-reminders-u
 `;
 const { outputFiles } = await build({
   stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
-    import React, { useState } from 'react';
+    import React, { useEffect, useState } from 'react';
     import { createRoot } from 'react-dom/client';
     import { Button } from './src/ui/shared/Button';
     import { AddReminderModal } from './src/reminders/ui/reminder-modal/AddReminderModal';
@@ -26,6 +26,7 @@ const { outputFiles } = await build({
     import { ActivityTabs } from './src/ui/activity/ActivityTabs';
     import { ActivitySheet } from './src/ui/activity/ActivitySheet';
     import { ExclusionSheet } from './src/ui/ExclusionSheet';
+    import { StatusBarManager } from './src/ui/status';
     class HostShell extends BaseUiModal {}
     const hostShell = new HostShell({}); hostShell.open();
     const shadow = document.getElementById('host').attachShadow({mode:'open'});
@@ -35,6 +36,24 @@ const { outputFiles } = await build({
     function Harness() {
       const [open,setOpen] = useState(null);
       const [mode,setMode] = useState('centered');
+      useEffect(() => {
+        const manager = new StatusBarManager({
+          addStatusBarItem() {
+            const el = document.createElement('div'); el.id = 'sync-status'; document.body.append(el);
+            el.addClass = name => el.classList.add(name);
+            el.toggleClass = (name, enabled) => el.classList.toggle(name, enabled);
+            el.empty = () => el.replaceChildren();
+            el.createSpan = ({cls, text}) => {
+              const span = document.createElement('span'); span.className = cls;
+              span.textContent = text ?? ''; el.append(span); return span;
+            };
+            return el;
+          },
+          registerDomEvent(el, name, handler) { el.addEventListener(name, handler); },
+        }, true, () => setOpen('activity'));
+        window.setSyncState = state => manager.update({ status:'idle', lastSync:null, lastError:null, pendingChanges:0, conflictCount:0, ...state });
+        return () => manager.destroy();
+      }, []);
       return <>
         <Button onClick={() => {setMode('centered');setOpen('editor')}}>Desktop editor</Button>
         <Button onClick={() => {setMode('bottom-sheet');setOpen('editor')}}>Mobile editor</Button>
@@ -82,6 +101,68 @@ for (const browserType of [chromium, webkit]) {
   const errors=[]; page.on('pageerror', error => errors.push(error.message));
   await page.setContent('<button id="navigation-back">Back</button><div id="host" class="modal-container"></div>');
   await page.addScriptTag({content:outputFiles[0].text});
+  await page.addStyleTag({content: compileString('@use "src/styles/plugin/status";', {loadPaths:[process.cwd()]}).css});
+  const status = page.locator('#sync-status');
+  const origin = page.getByRole('button',{name:'Desktop editor',exact:true});
+  for (const closeAction of ['click', 'escape']) {
+    await origin.focus();
+    await status.click();
+    await expect(page.getByRole('dialog',{name:'Sync activity',exact:true})).toBeVisible();
+    if (closeAction === 'click') await page.getByRole('button',{name:'Close sync activity'}).click();
+    else await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(origin).toBeFocused();
+    await expect(status).not.toBeFocused();
+  }
+  // Restoring focus to the status control is intentional for keyboard users.
+  await status.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog',{name:'Sync activity',exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(status).toBeFocused();
+  const indicator = status.locator('.crate-sync-indicator');
+  await expect(indicator.locator('.crate-sync-indicator__dot')).toHaveCSS('width', '7px');
+  await page.evaluate(() => window.setSyncState({status:'syncing', work:{phase:'applying'}}));
+  await expect(indicator).toHaveAttribute('data-visual-state','syncing');
+  await expect(status).toHaveText('');
+  await expect(status).toHaveAttribute('aria-label', /Syncing…/);
+  const dot = indicator.locator('.crate-sync-indicator__dot');
+  await expect(dot).toHaveCSS('background-color','rgb(245, 158, 11)');
+  await page.evaluate(() => window.setSyncState({lastSync:new Date().toISOString()}));
+  await expect(indicator).toHaveAttribute('data-visual-state','settling');
+  const colors = await dot.evaluate(el => {
+    const transition = el.getAnimations().find(animation => animation.transitionProperty === 'background-color');
+    if (!transition) throw new Error('Expected a dot color transition');
+    transition.pause();
+    transition.currentTime = Number(transition.effect.getTiming().duration) / 2;
+    const middle = getComputedStyle(el).backgroundColor;
+    transition.finish();
+    return { middle, end: getComputedStyle(el).backgroundColor };
+  });
+  assert.notEqual(colors.middle, 'rgb(245, 158, 11)');
+  assert.notEqual(colors.middle, colors.end);
+  await expect(indicator).toHaveAttribute('data-visual-state','synced');
+  await page.evaluate(() => window.setSyncState({lastSync:new Date().toISOString(),pendingChanges:1}));
+  await expect(indicator).toHaveAttribute('data-visual-state','pending');
+  await page.evaluate(() => window.setSyncState({status:'syncing'}));
+  await expect(indicator).toHaveAttribute('data-visual-state','syncing');
+  await page.evaluate(() => {
+    window.setSyncState({status:'error'});
+  });
+  await expect(indicator).toHaveAttribute('data-visual-state','error');
+  await expect(status).toHaveText('');
+  await expect(status).toHaveAttribute('aria-label', /Sync error/);
+  await status.click();
+  await expect(page.getByRole('dialog',{name:'Sync activity',exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.evaluate(() => window.setSyncState({status:'syncing'}));
+  await expect(indicator.locator('.crate-sync-indicator__dot')).toHaveCSS('animation-name','none');
+  await page.evaluate(() => window.setSyncState({lastSync:new Date().toISOString()}));
+  await expect(indicator).toHaveAttribute('data-visual-state','synced');
+  await page.emulateMedia({reducedMotion:'no-preference'});
   // A command or pointer action can open the editor while the body is focused.
   // Closing must not restore focus to the body's first button (Obsidian Back).
   for (const closeAction of ['save', 'cancel']) {

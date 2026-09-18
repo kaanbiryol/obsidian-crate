@@ -3,8 +3,11 @@ import { formatSyncProgress } from './activity/progress-label';
  * Status bar component for sync status display
  */
 
-import { setIcon, type Plugin } from 'obsidian';
-import type { SyncState, SyncStatus } from '../sync/types';
+import type { Plugin } from 'obsidian';
+import { createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { StatusBarIndicator } from './StatusBarIndicator';
+import type { SyncState } from '../sync/types';
 
 export class StatusBarManager {
 	private plugin: Plugin;
@@ -12,11 +15,15 @@ export class StatusBarManager {
 	private enabled: boolean;
 	private syncProgress: { current: number; total: number } | null = null;
 	private work: SyncState['work'];
-	private currentStatus: SyncStatus | null = null;
+	private indicatorRoot: Root | null = null;
 	private iconEl: HTMLSpanElement | null = null;
-	private textEl: HTMLSpanElement | null = null;
 	private onClick: (() => void) | null;
 	private readonly activate = () => this.onClick?.();
+	private readonly onMouseDown = (event: MouseEvent) => {
+		// Keep the editor as the return-focus target when activity opens by mouse.
+		// Keyboard activation still focuses this control and restores focus here.
+		if (event.button === 0) event.preventDefault();
+	};
 	private readonly onKeyDown = (event: KeyboardEvent) => {
 		if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
 			event.preventDefault();
@@ -44,6 +51,7 @@ export class StatusBarManager {
 			this.statusBarEl.setAttribute('role', 'button');
 			this.statusBarEl.tabIndex = 0;
 			this.plugin.registerDomEvent(this.statusBarEl, 'click', this.activate);
+			this.plugin.registerDomEvent(this.statusBarEl, 'mousedown', this.onMouseDown);
 			this.plugin.registerDomEvent(this.statusBarEl, 'keydown', this.onKeyDown);
 		}
 		this.update({ status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 });
@@ -87,29 +95,14 @@ export class StatusBarManager {
 		this.work = state.status === 'syncing' ? state.work : undefined;
 		if (!this.statusBarEl) return;
 
-		const { icon, text, tooltip } = this.getDisplayInfo(state);
-		const statusChanged = this.currentStatus !== state.status;
-
-		if (statusChanged || !this.iconEl || !this.textEl) {
+		const { text, tooltip } = this.getDisplayInfo(state);
+		if (!this.iconEl) {
 			this.statusBarEl.empty();
-			this.statusBarEl.setAttribute('data-status', state.status);
-			this.iconEl = this.statusBarEl.createSpan({ cls: 'crate-status-icon' });
-			this.iconEl.setAttribute('aria-hidden', 'true');
-			if (icon) {
-				this.iconEl.textContent = icon;
-			} else {
-				setIcon(this.iconEl, 'loader-circle');
-			}
-			this.textEl = this.statusBarEl.createSpan({ text: ` ${text}`, cls: 'crate-status-text' });
-			this.currentStatus = state.status;
-		} else {
-			this.textEl.textContent = ` ${text}`;
-			if (icon) {
-				this.iconEl.textContent = icon;
-			}
+			this.iconEl = this.statusBarEl.createSpan({ cls: 'crate-status-indicator-host' });
+			this.indicatorRoot = createRoot(this.iconEl);
 		}
-
-		this.statusBarEl.toggleClass('crate-has-conflicts', state.conflictCount > 0);
+		this.statusBarEl.setAttribute('data-status', state.status);
+		this.indicatorRoot?.render(createElement(StatusBarIndicator, { state }));
 		if (tooltip) {
 			this.statusBarEl.setAttribute('aria-label', this.onClick ? `Open sync activity. ${text}. ${tooltip}` : tooltip);
 			this.statusBarEl.setAttribute('data-tooltip-position', 'top');
@@ -122,25 +115,22 @@ export class StatusBarManager {
 	/**
 	 * Get display information for state
 	 */
-	private getDisplayInfo(state: SyncState): { icon: string | null; text: string; tooltip: string | null } {
+	private getDisplayInfo(state: SyncState): { text: string; tooltip: string | null } {
 		switch (state.status) {
 			case 'syncing':
 				return {
-					icon: null,
-					text: formatSyncProgress(!this.work && this.syncProgress ? { type: 'sync', ...this.syncProgress } : null, this.work),
+					text: this.work?.phase === 'applying' ? 'Syncing…' : formatSyncProgress(!this.work && this.syncProgress ? { type: 'sync', ...this.syncProgress } : null, this.work),
 					tooltip: 'Comparing and syncing changes. Unchanged files are skipped. Open sync activity for details.',
 				};
 
 			case 'error':
 				return {
-					icon: '⚠',
 					text: 'Sync error',
 					tooltip: null,
 				};
 
 			case 'offline':
 				return {
-					icon: '○',
 					text: 'Offline',
 					tooltip: 'Cannot connect to sync server',
 				};
@@ -149,7 +139,6 @@ export class StatusBarManager {
 			default:
 				if (state.conflictCount > 0) {
 					return {
-						icon: '⚠',
 						text: state.conflictCount === 1 ? '1 conflict' : `${state.conflictCount} conflicts`,
 						tooltip: 'Local-only conflict copies need review. Open Sync activity → Conflicts.',
 					};
@@ -157,7 +146,6 @@ export class StatusBarManager {
 
 				if (state.pendingChanges > 0) {
 					return {
-						icon: '◐',
 						text: `${state.pendingChanges} change${state.pendingChanges === 1 ? '' : 's'} queued`,
 						tooltip: `${state.pendingChanges} local file changes waiting to sync, including deletions. This is not the total number of files in your vault.`,
 					};
@@ -167,14 +155,12 @@ export class StatusBarManager {
 					const lastSyncDate = new Date(state.lastSync);
 					const ago = this.formatTimeAgo(lastSyncDate);
 					return {
-						icon: '✓',
 						text: 'Synced',
 						tooltip: `Last sync: ${ago}`,
 					};
 				}
 
 				return {
-					icon: '○',
 					text: 'Not synced',
 					tooltip: 'No sync has been performed yet',
 				};
@@ -209,12 +195,13 @@ export class StatusBarManager {
 	destroy(): void {
 		if (this.statusBarEl) {
 			this.statusBarEl.removeEventListener('click', this.activate);
+			this.statusBarEl.removeEventListener('mousedown', this.onMouseDown);
 			this.statusBarEl.removeEventListener('keydown', this.onKeyDown);
+			this.indicatorRoot?.unmount();
+			this.indicatorRoot = null;
 			this.statusBarEl.remove();
 			this.statusBarEl = null;
 			this.iconEl = null;
-			this.textEl = null;
-			this.currentStatus = null;
 		}
 	}
 }
