@@ -184,12 +184,12 @@ async function verifyProjectSyncIndicator(page) {
 		await expectEditorClosed(page);
 		await expect(indicator).toHaveAttribute('data-sync-state', 'syncing');
 		await expect(indicator).toHaveText('Syncing 1 change');
-		await expect(indicator).toHaveAttribute('data-visual-state', 'syncing');
-		await expect.poll(() => indicator.locator('.pwa-sync-indicator__halo').evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('pwa-sync-breathe');
+		await expect(indicator.locator('.crate-sync-indicator')).toHaveAttribute('data-visual-state', 'syncing');
+		await expect.poll(() => indicator.locator('.crate-sync-indicator__halo').evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('pwa-sync-breathe');
 		await expect(page.locator('.pwa-reminder-sync-notices')).toHaveCount(0);
 		expect((await scroll.boundingBox()).y).toBeCloseTo(originalTop, 0);
 		await page.emulateMedia({ reducedMotion: 'reduce' });
-		await expect.poll(() => indicator.locator('.pwa-sync-indicator__halo').evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('none');
+		await expect.poll(() => indicator.locator('.crate-sync-indicator__halo').evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('none');
 	} finally { mutation.finish(); }
 	await expectSynced(page);
 	expect((await scroll.boundingBox()).y).toBeCloseTo(originalTop, 0);

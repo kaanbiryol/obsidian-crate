@@ -33,7 +33,22 @@
 		&:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
 	}
 
-	@include sync-indicator.styles(".pwa-sync-indicator");
+	.pwa-sync-indicator {
+		display: grid;
+		place-items: center;
+		align-self: center;
+		position: relative;
+		flex: 0 0 44px;
+		width: 44px;
+		height: 44px;
+	}
+
+	@include sync-indicator.styles(".crate-sync-indicator");
+
+	@media (prefers-reduced-motion: reduce) {
+		.pwa-sync-indicator__button { transition: none; }
+		.pwa-sync-indicator__button:active { transform: none; }
+	}
 
 	.pwa-sync-indicator__label {
 		position: absolute;
