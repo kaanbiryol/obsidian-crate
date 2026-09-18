@@ -1,8 +1,4 @@
 # Finance
 
-- [ ] Reconcile June budget Jun 19, 2026 18:30 ! <!-- crate-id:seed-finance-june-budget -->
-<!-- crate-desc:v1:Nested%20project%20sample%20for%20Browse%20and%20project%20detail%20views. -->
-- [ ] Export receipt PDFs Jun 21, 2026 <!-- crate-id:seed-finance-receipts -->
-- [ ] Pay credit card Jun 24, 2026 09:00 <!-- crate-id:seed-finance-card-payment -->
-- [ ] Review subscriptions monthly on the 28th 08:00 <!-- crate-id:seed-finance-subscriptions -->
-- [x] File warranty email Jun 17, 2026 <!-- crate-id:seed-finance-warranty-email -->
+- [ ] Sort this month’s receipts 2026-09-20 <!-- crate-id:website-personal-finance-1 -->
+- [ ] Review subscriptions monthly on the 28th 2026-09-28 <!-- crate-rule:%7B%22frequency%22%3A%22monthly%22%2C%22dayOfMonth%22%3A28%2C%22timezone%22%3A%22Europe%2FBerlin%22%7D --> <!-- crate-id:website-personal-finance-2 -->
