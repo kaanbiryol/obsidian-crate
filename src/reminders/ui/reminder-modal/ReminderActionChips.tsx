@@ -44,7 +44,7 @@ export function ReminderActionChips({
     onTogglePriority,
 }: ReminderActionChipsProps) {
     const clock = useReminderClock();
-    const dueDateDisplay = dueDateLabel ?? formatDueDate(dueDate ?? undefined, undefined, clock.now);
+    const dueDateDisplay = dueDateLabel ?? formatDueDate(dueDate ?? undefined, undefined, clock.now, recurrence);
     const renderLabel = (label: string) => animateLabels
         ? <AnimatedActionLabel>{label}</AnimatedActionLabel>
         : <span className="reminder-action-label">{label}</span>;

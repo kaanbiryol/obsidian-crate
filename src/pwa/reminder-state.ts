@@ -15,7 +15,7 @@ import type { ModalDraft } from './types';
 
 export function formatModalDueSummary(draft: ModalDraft): string {
 	if (!draft.dueDate) return 'No date';
-	return formatDueDate(draft.dueTime ? `${draft.dueDate}T${draft.dueTime}` : draft.dueDate) ?? 'No date';
+	return formatDueDate(draft.dueTime ? `${draft.dueDate}T${draft.dueTime}` : draft.dueDate, undefined, undefined, draft.recurrence) ?? 'No date';
 }
 
 export function hasReminderDraftTitle(

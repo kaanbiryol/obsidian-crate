@@ -11,6 +11,10 @@
 }
 
 .reminder-action-chip {
+  &.tone-primary {
+    --crate-semantic-color: var(--crate-date-text);
+  }
+
   --reminder-action-chip-height: max(
     26px,
     calc(var(--input-height, 32px) - 6px)

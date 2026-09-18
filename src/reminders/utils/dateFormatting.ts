@@ -1,4 +1,4 @@
-import type { Reminder } from '../types/reminder';
+import type { Reminder, RecurrenceRule } from '../types/reminder';
 import { formatLocalDateKey, parseReminderDateValue } from './reminderDate';
 import { getUiLocale, sentenceCaseLocalized } from './uiLocale';
 
@@ -17,6 +17,7 @@ export function formatDueDate(
   dateString: string | undefined,
   locale = getUiLocale(),
   now = new Date(),
+  recurrence?: RecurrenceRule,
 ): string | null {
   if (!dateString) return null;
   const hasTime = dateString.includes('T');
@@ -37,14 +38,17 @@ export function formatDueDate(
     }).format(date);
   }
 
-  // Add time if available (presence of 'T' indicates time component)
-  // Note: Don't check hours/minutes as date-only strings like 'YYYY-MM-DD'
-  // are parsed as UTC by JavaScript, causing timezone issues
-  if (dateString.includes('T')) {
+  // Explicit timestamps take precedence over the recurring schedule's time.
+  const recurrenceHour = recurrence?.hour;
+  if (hasTime || recurrenceHour !== undefined) {
+    // Date-only occurrences keep their wall-clock time in the repeat rule.
+    // Format that time in UTC to avoid shifting it through a local DST gap.
+    const time = hasTime ? date : new Date(Date.UTC(2000, 0, 1, recurrenceHour, recurrence?.minute ?? 0));
     const timeText = new Intl.DateTimeFormat(locale, {
       hour: '2-digit',
       minute: '2-digit', hourCycle: 'h23',
-    }).format(date);
+      ...(!hasTime ? { timeZone: 'UTC' } : {}),
+    }).format(time);
     dateText += `, ${timeText}`;
   }
 

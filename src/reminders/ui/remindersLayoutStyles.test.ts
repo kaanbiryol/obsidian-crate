@@ -235,7 +235,7 @@ describe('plugin reminder layout styles', () => {
     expect(dateChip).toContain('height: 0.9em');
     expect(dateChip).toContain('margin-right: 0.25em');
     expect(dateChip).toContain('vertical-align: -0.1em');
-    expect(dateChip).toContain('color: var(--crate-accent-text)');
+    expect(dateChip).toContain('color: var(--crate-date-text)');
     expect(dateChip).not.toContain('var(--crate-success)');
     expect(projectChip).toContain('padding: 0.05em 0.4em');
     expect(projectChip).toContain('width: 0.9em');

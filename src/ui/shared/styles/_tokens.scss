@@ -20,6 +20,8 @@
   --crate-focus-ring: var(--background-modifier-border-focus, var(--interactive-accent));
   --crate-accent: var(--interactive-accent);
   --crate-accent-text: var(--text-accent, var(--interactive-accent));
+  // Dates must remain readable even when the user chooses a low-contrast accent.
+  --crate-date-text: var(--text-normal);
   --crate-accent-hover: var(--interactive-accent-hover);
   --crate-danger: var(--text-error);
   --crate-warning: var(--text-warning);
