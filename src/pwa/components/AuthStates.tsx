@@ -1,5 +1,5 @@
 import React from 'react';
-import { Folder, ExternalLink, RefreshCw } from 'lucide-react';
+import { Folder, ExternalLink, RefreshCw, Link2Off, WifiOff } from 'lucide-react';
 import { PwaButton as Button } from './PwaButton';
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
 import { isStandaloneApp } from '../config';
@@ -15,10 +15,10 @@ function openObsidianRecoveryLink() {
 	window.location.href = '/notifications/open-obsidian';
 }
 
-function AuthLayout({ title, description, detail, config, children }: {
+function AuthLayout({ title, description, notice, config, children }: {
 	title: string;
 	description: string;
-	detail?: string;
+	notice?: React.ReactNode;
 	config: StoredConfig;
 	children: React.ReactNode;
 }) {
@@ -29,8 +29,8 @@ function AuthLayout({ title, description, detail, config, children }: {
 				<div className="auth-card__heading">
 					<h1 id="auth-title">{title}</h1>
 					<p>{description}</p>
-					{detail && <p role="alert">{detail}</p>}
 				</div>
+				{notice}
 				<div className="auth-card__folder">
 					<Folder size={18} aria-hidden="true" />
 					<div><span>Reminders folder</span><strong>{config.folderPath}</strong></div>
@@ -61,10 +61,20 @@ export function ErrorState({ error, config, onRetry }: { error: string; config: 
 	return (
 		<AuthLayout
 			title={needsLink ? 'Reconnect to Crate' : 'Unable to connect'}
-			detail={error || undefined}
 			description={needsLink
-				? 'Your app link has expired or is no longer valid. Open Crate in Obsidian and send a new app link.'
-				: 'Crate couldn’t connect. Check your connection and try again. If this continues, open a new app link from Crate in Obsidian.'}
+				? 'Open Crate in Obsidian and send a new app link to reconnect.'
+				: 'Check your internet connection and try again.'}
+			notice={
+				<div className="auth-card__notice" role="alert">
+					{needsLink ? <Link2Off size={20} aria-hidden="true" /> : <WifiOff size={20} aria-hidden="true" />}
+					<div>
+						<strong>{needsLink ? 'A new app link is needed' : 'Crate couldn’t be reached'}</strong>
+						<p>{needsLink
+							? 'Your link or session has expired or is no longer valid.'
+							: 'If this keeps happening, open Crate in Obsidian and send a new app link.'}</p>
+					</div>
+				</div>
+			}
 			config={config}
 		>
 			{needsLink ? (
