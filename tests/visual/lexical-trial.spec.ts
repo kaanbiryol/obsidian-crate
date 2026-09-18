@@ -42,6 +42,20 @@ for (const browserName of ['chromium', 'webkit'] as const) {
         return { editor, output };
       }
 
+      test('keeps the project after a time while typing a word starting with p', async () => {
+        const initial = 'tomorrow 12:00 #Work ';
+        const { editor, output } = await load(initial);
+        await selectRange(editor, initial.length, initial.length);
+        let expected = initial;
+        for (const letter of 'pizza ') {
+          await page.keyboard.type(letter);
+          expected += letter;
+          await expect(output).toHaveJSProperty('textContent', expected);
+          await expect(editor.locator('.rich-text-chip-project')).toHaveText('#Work');
+          await expect(editor.locator('.rich-text-chip-date')).toHaveText('tomorrow 12:00');
+        }
+      });
+
       test('reveals Markdown at the caret, edits destinations and renders again on blur', async () => {
         const { editor, output } = await load('Check [this article](https://example.com) !');
         await expect(editor.locator('a')).toHaveText('this article');

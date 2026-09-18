@@ -5,6 +5,25 @@ import { parseReminderEditorContent } from './reminderEditorParsing';
 import { parseCheckboxLine, rebuildCheckboxLine } from './checkboxParser';
 
 describe('reminder editor metadata', () => {
+    it.each(['p', 'pm', 'a', 'am', 'pizza'])('preserves a project between a time and typed text: %s', suffix => {
+        const text = `tomorrow 12:00 #Home ${suffix}`;
+        expect(buildRichTextSegments(text, ['Home'])).toEqual([
+            { kind: 'chip', type: 'date', text: 'tomorrow 12:00' },
+            { kind: 'text', text: ' ' },
+            { kind: 'chip', type: 'project', text: '#Home' },
+            { kind: 'text', text: ` ${suffix}` },
+        ]);
+        expect(parseReminderEditorContent(text, ['Home'])).toMatchObject({
+            cleanContent: suffix, project: 'Home', hasTime: true,
+        });
+    });
+
+    it('does not extend a time across a Markdown link', () => {
+        expect(parseReminderEditorContent('tomorrow 12:00 [notes](https://example.com) p')).toMatchObject({
+            cleanContent: '[notes](https://example.com) p', hasTime: true,
+        });
+    });
+
     it('scans the full title once when deriving metadata and cleaned content', () => {
         const scan = vi.spyOn(matchers, 'findAllMatches');
         try {
