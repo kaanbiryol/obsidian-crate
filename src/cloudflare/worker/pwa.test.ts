@@ -152,7 +152,7 @@ describe('PWA activation metadata', () => {
 		expect(PWA_THEME_BOOTSTRAP_JS).toContain('localStorage.getItem("crate-reminders-theme")');
 		expect(PWA_THEME_BOOTSTRAP_JS).toContain("lightTheme.media=preference==='light'?'all':preference==='dark'?'not all':\"(prefers-color-scheme: light)\"");
 		expect(PWA_THEME_BOOTSTRAP_JS).toContain("themeColor.setAttribute('media','all')");
-		expect(html).toContain('<link rel="icon" type="image/png" sizes="192x192" href="/notifications/crate-icon-192.png?v=');
+		expect(html).toContain('<link rel="icon" type="image/png" sizes="256x256" href="/notifications/crate-mark-256.png?v=');
 		expect(html).toContain('<link rel="apple-touch-icon" sizes="180x180" href="/notifications/apple-touch-icon-180.png?v=');
 		expect(html).not.toContain('apple-touch-startup-image');
 		expect(PWA_THEME_BOOTSTRAP_JS).toContain('(prefers-color-scheme: light)');
