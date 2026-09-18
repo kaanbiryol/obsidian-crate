@@ -43,7 +43,10 @@ export async function reconcileQueuePaths(
 		queueKey.startsWith('delete:') ? queueKey.substring(7) : queueKey))];
 	const remoteEntries = createPathRecord(await context.getRemoteEntries(targetPaths));
 
-	for (const queueKey of uniqueQueueKeys) {
+	// Settle uploads and acknowledge matching server copies before deleting old
+	// rename sources. Queue insertion order puts the old name first.
+	const work = uniqueQueueKeys.map(queueKey => ({ queueKey, allowDelete: false }));
+	for (const { queueKey, allowDelete } of work) {
 		const path = queueKey.startsWith('delete:') ? queueKey.substring(7) : queueKey;
 		if (context.shouldIgnore(path)) {
 			result.settledPaths.push(queueKey);
@@ -51,16 +54,25 @@ export async function reconcileQueuePaths(
 		}
 
 		let settled = false;
+		let deletionDeferred = false;
 		for (let attempt = 1; attempt <= MAX_RECONCILE_ATTEMPTS; attempt++) {
 			try {
 				const localEntry = await readLocalFileEntry(context.vault, path);
 				const remoteEntry = getPathEntry(remoteEntries, path);
 				const baseEntry = context.localManifest.getEntry(path);
 				const decision = classifyPath(path, localEntry, remoteEntry, baseEntry);
+				if (decision?.action === 'delete' && !allowDelete) {
+					work.push({ queueKey, allowDelete: true });
+					deletionDeferred = true;
+					break;
+				}
 				const localFiles = createPathRecord<FileEntry>();
 				if (localEntry) localFiles[path] = localEntry;
 
 				if (decision) {
+					if (decision.action === 'delete' && result.errors.length > 0) {
+						throw new Error('Remote deletion deferred until uploads and reconciliation finish successfully');
+					}
 					const outcome = await context.processDiff(decision, localFiles, result);
 					if (outcome.status === 'deferred') {
 						if (attempt < MAX_RECONCILE_ATTEMPTS) {
@@ -93,7 +105,7 @@ export async function reconcileQueuePaths(
 			}
 		}
 
-		if (!settled && !result.errors.some((error) => error.startsWith(`${path}:`))) {
+		if (!settled && !deletionDeferred && !result.errors.some((error) => error.startsWith(`${path}:`))) {
 			result.errors.push(`${path}: Reconciliation did not converge`);
 		}
 	}
