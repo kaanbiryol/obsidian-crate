@@ -115,7 +115,7 @@ const findDateMatches = (text: string, referenceDate: Date): TextMatch[] => {
     const matches: TextMatch[] = [];
     let remaining = text;
     const mask = (index: number, length: number) => {
-        remaining = remaining.slice(0, index) + ' '.repeat(length) + remaining.slice(index + length);
+        remaining = remaining.slice(0, index) + '\uFFFC'.repeat(length) + remaining.slice(index + length);
     };
 
     // Protect entire links and project names, including names such as #Tomorrow.
@@ -171,8 +171,10 @@ export const findLinkMatches = (text: string): TextMatch[] => {
 export const findAllMatches = (text: string, knownProjects?: string[], referenceDate = new Date()): TextMatch[] => {
     const projects = findProjectMatches(text, knownProjects);
     let dateText = text;
+    // Keep offsets without letting date parsing bridge a protected marker:
+    // spaces would turn "12:00 #Home p" into a single PM time match.
     for (const project of projects) {
-        dateText = dateText.slice(0, project.index) + ' '.repeat(project.length) + dateText.slice(project.index + project.length);
+        dateText = dateText.slice(0, project.index) + '\uFFFC'.repeat(project.length) + dateText.slice(project.index + project.length);
     }
     const allMatches = [
         ...findLinkMatches(text),
