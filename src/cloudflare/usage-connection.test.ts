@@ -20,7 +20,7 @@ function setup() {
 		cache: { read: () => snapshot, write: async value => { snapshot = value; } },
 		clientId: 'client', transport, openExternal, signal: abort.signal,
 		accountId: () => account, now: () => time,
-		secrets: { get: key => values.get(key), set: (key, value) => { values.set(key, value); }, delete: key => { values.delete(key); } },
+		secrets: { get: key => values.get(key), set: (key, value) => { values.set(key, value); } },
 	});
 	async function start() {
 		await connection.connect();
@@ -79,24 +79,6 @@ describe('usage OAuth connection', () => {
 		await h.connection.fetchUsage();
 		expect(h.transport.mock.calls[0]?.[1]?.body).toContain('grant_type=refresh_token');
 		expect(h.values.get('crate-usage-oauth-account-a')).toContain('rotated');
-	});
-
-	it('disconnect removes local credentials and revokes access and refresh tokens', async () => {
-		const h = setup(); await h.connect(); h.transport.mockClear();
-		await h.connection.disconnect();
-		expect(h.connection.connected).toBe(false);
-		expect(h.transport.mock.calls).toHaveLength(2);
-		expect(h.transport.mock.calls.every(call => call[0].endsWith('/revoke'))).toBe(true);
-	});
-
-	it('does not restore credentials if disconnected during renewal', async () => {
-		const h = setup(); await h.connect(); h.advance(3_600_000);
-		h.transport.mockImplementationOnce(async () => {
-			await h.connection.disconnect();
-			return { status: 200, text: '{"access_token":"late","refresh_token":"late-refresh","expires_in":3600}' };
-		});
-		await expect(h.connection.fetchUsage()).rejects.toThrow('changed');
-		expect(h.values.size).toBe(0);
 	});
 });
 

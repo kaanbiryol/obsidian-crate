@@ -11,7 +11,6 @@ interface Credentials extends CloudflareOAuthTokens { expiresAt: number }
 interface Secrets {
 	get(key: SecretKey): string | null | undefined;
 	set(key: SecretKey, value: string): void;
-	delete(key: SecretKey): void;
 }
 interface Options {
 	clientId: string;
@@ -168,19 +167,6 @@ export class CloudflareUsageConnection {
 			this.check(accountId, revision);
 			return groups;
 		});
-	}
-
-	async disconnect(): Promise<void> {
-		++this.revision;
-		this.pending = undefined;
-		const accountId = this.options.accountId();
-		if (!accountId) return;
-		const credentials = this.read(accountId);
-		this.options.secrets.delete(this.key(accountId));
-		this.options.secrets.delete(`crate-analytics-${accountId}`);
-		if (credentials && !await this.revoke(credentials)) {
-			throw new Error('Removed from this device. Cloudflare could not confirm revocation; revoke Crate access in Cloudflare.');
-		}
 	}
 
 	private key(account: string): SecretKey { return `crate-usage-oauth-${account}`; }
