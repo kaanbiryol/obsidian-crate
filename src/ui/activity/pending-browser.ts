@@ -1,5 +1,6 @@
 import { setIcon } from 'obsidian';
 import type { PendingDiff } from '../../sync/pending-diff';
+import { isBinaryPreviewPath } from '../../sync/preview-format';
 import { buildDiff } from './diff-model';
 import { renderDiffPreview } from './pending-diff';
 import { PendingComparisons } from './pending-comparisons';
@@ -53,6 +54,8 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
 
     let requestRevision = 0;
     let selectedIndex = -1;
+    // Binary files have no text diff; load their metadata only when selected.
+    const canPreview = (index: number) => !isBinaryPreviewPath(paths[index]!);
     const rows: Array<{ button: HTMLButtonElement; status: HTMLSpanElement }> = [];
     const comparisons = new PendingComparisons(paths.length, index => {
         const key = paths[index]!;
@@ -65,7 +68,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
         status.classList.toggle('is-unchanged', status.textContent === 'Unchanged');
     }, index => {
         if (browser.isConnected) rows[index]!.status.textContent = 'Unavailable';
-    });
+    }, canPreview);
     state.startChecks = () => comparisons.start();
     state.pauseChecks = () => comparisons.pause();
     state.dispose = () => comparisons.dispose();
@@ -145,7 +148,7 @@ export function renderPendingBrowser(container: HTMLElement, paths: string[], lo
         info.createSpan({ cls: 'crate-browser-file-name', text: parts.pop() ?? path, attr: { title: path } });
         const meta = info.createSpan({ cls: 'crate-browser-file-meta' });
         meta.createSpan({ cls: 'crate-browser-file-path', text: parts.join('/') || 'Vault root' });
-        const status = meta.createSpan({ cls: 'crate-browser-file-status', text: 'Checking…' });
+        const status = meta.createSpan({ cls: 'crate-browser-file-status', text: canPreview(index) ? 'Checking…' : 'No preview' });
         status.id = `${detail.id}-status-${index}`;
         button.setAttribute('aria-describedby', status.id);
         rows.push({ button, status });
