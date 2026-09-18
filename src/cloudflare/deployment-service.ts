@@ -1,3 +1,4 @@
+import { normalizeVaultName } from './vault-name';
 import { recoverDeployment, type DeploymentRecoveryResult } from './deployment-recovery';
 import { completePublishedDeployment } from './complete-published-deployment';
 import { deleteCrateServer } from './server-delete';
@@ -49,6 +50,7 @@ export interface CloudflareDeploymentResult {
 
 export interface CloudflareDeploymentServiceOptions {
 	clientId: string;
+	getVaultName?: () => string;
 	settingsOwner: DeploymentSettingsOwner;
 	transport: HttpTransport;
 	loadArtifacts: () => Promise<CloudflareDeploymentArtifacts>;
@@ -63,11 +65,12 @@ export interface CloudflareDeploymentServiceOptions {
 	now?: () => number;
 }
 
-function createCloudflareDeploymentMetadata(): CloudflareDeploymentMetadata {
+function createCloudflareDeploymentMetadata(vaultName?: string): CloudflareDeploymentMetadata {
 	const deploymentId = randomHex(8);
 	const resourceName = `crate-${deploymentId}`;
 	return {
 		deploymentId,
+		...(normalizeVaultName(vaultName) ? { vaultName: normalizeVaultName(vaultName) } : {}),
 		accountId: null,
 		accountName: null,
 		workerName: resourceName,
@@ -129,7 +132,7 @@ export class CloudflareDeploymentService {
 		}
 		const metadata = existingMetadata && intent !== 'switch' && intent !== 'create'
 			? { ...existingMetadata }
-			: createCloudflareDeploymentMetadata();
+			: createCloudflareDeploymentMetadata(this.options.getVaultName?.());
 
 		const { verifier, challenge } = await createPkcePair();
 		this.lifetime.signal.throwIfAborted();
@@ -252,7 +255,7 @@ export class CloudflareDeploymentService {
 					?? await this.whileActive(() => selectDeployment(deployments, missingServer));
 				if (!selected) throw new Error('No Cloudflare server was selected');
 				if (selected === 'create') {
-					metadata = createCloudflareDeploymentMetadata();
+					metadata = createCloudflareDeploymentMetadata(this.options.getVaultName?.());
 				} else {
 					metadata = selected.metadata;
 					discoveredExisting = true;
@@ -265,6 +268,9 @@ export class CloudflareDeploymentService {
 			if (changingServer || pending.intent === 'switch' || pending.intent === 'create') {
 				if (!this.options.beforeServerSwitch) throw new Error('Switching servers requires sync shutdown.');
 				await this.whileActive(this.options.beforeServerSwitch);
+			}
+			if (!metadata.vaultName && (pending.intent === 'update' || pending.intent === 'reset')) {
+				metadata.vaultName = normalizeVaultName(this.options.getVaultName?.());
 			}
 			metadata.accountId = account.id;
 			metadata.accountName = account.name;

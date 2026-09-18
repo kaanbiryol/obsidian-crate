@@ -1,3 +1,4 @@
+import { normalizeVaultName, VAULT_NAME_BINDING } from './vault-name';
 import { verifyWorkerDeployment } from './verify-worker-deployment';
 import resetWorkerSource from './worker/reset-worker.js?raw';
 import { deleteResetWorkerObjects, verifyResetWorker } from './reset-worker-client';
@@ -109,6 +110,7 @@ function concatBytes(parts: Uint8Array[]): ArrayBuffer {
 
 export function buildWorkerMultipartBody(input: {
 	publicOrigin: string;
+	vaultName?: string;
 	artifacts: CloudflareDeploymentArtifacts;
 	d1DatabaseId: string;
 	r2BucketName: string;
@@ -121,6 +123,7 @@ export function buildWorkerMultipartBody(input: {
 			'workers/tag': 'crate',
 		},
 		bindings: [
+				...(normalizeVaultName(input.vaultName) ? [{ type: 'plain_text', name: VAULT_NAME_BINDING, text: normalizeVaultName(input.vaultName) }] : []),
 				{ type: 'plain_text', name: 'CRATE_DEPLOYMENT_FINGERPRINT', text: input.artifacts.fingerprint },
 				{ type: 'plain_text', name: 'CRATE_PUBLIC_ORIGIN', text: new URL(input.publicOrigin).origin },
 				{ type: 'd1', name: 'DB', id: input.d1DatabaseId },
@@ -342,6 +345,7 @@ export class CloudflareApiClient {
 
 	async uploadWorker(input: {
 		publicOrigin: string;
+		vaultName?: string;
 		accountId: string;
 		workerName: string;
 		artifacts: CloudflareDeploymentArtifacts;

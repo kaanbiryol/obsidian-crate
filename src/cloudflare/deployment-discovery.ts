@@ -1,3 +1,4 @@
+import { readVaultName } from './vault-name';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
 import type {
 	CloudflareAccount,
@@ -70,6 +71,7 @@ function toDeployment(
 	return {
 		metadata: {
 			deploymentId,
+			...(readVaultName(settings) ? { vaultName: readVaultName(settings) } : {}),
 			accountId: account.id,
 			accountName: account.name,
 			workerName,

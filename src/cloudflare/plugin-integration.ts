@@ -37,6 +37,7 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 	const signal = getPluginLifecycleSignal(plugin);
 	return new CloudflareDeploymentService({
 		clientId: CLOUDFLARE_OAUTH_CLIENT_ID,
+		getVaultName: () => plugin.app.vault.getName(),
 		settingsOwner: plugin,
 		onAuthorized: (accountId, tokens) => plugin.cloudflareUsageConnection.acceptAuthorization(accountId, tokens),
 		transport: obsidianHttpTransport,

@@ -131,3 +131,19 @@ it('does not confuse Obsidian’s saved editor selection with the vault picker s
 		open.mockRestore();
 	}
 });
+
+
+it('shows the saved vault name in the setup picker', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { openCloudflareDeploymentModal } = await import('./cloudflare-deployment-modal');
+	const modal = openCloudflareDeploymentModal({} as never);
+	const selected = modal.selectVault([{
+		metadata: { vaultName: 'Notes', workerName: 'crate-0123456789abcdef', deploymentId: '0123456789abcdef' },
+		modifiedOn: null,
+	}] as never);
+	const markup = MockModal.instances[0]!.contentEl.collectText();
+	expect(markup).toContain('>Notes</button>');
+	expect(markup).not.toContain('>crate-0123456789abcdef</button>');
+	modal.close();
+	await expect(selected).resolves.toBeNull();
+});

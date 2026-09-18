@@ -13,6 +13,7 @@ describe('normalizeCrateSettings', () => {
 		const settings = normalizeCrateSettings({
 			cloudflareDeployment: {
 				deploymentId: '0123456789abcdef',
+				vaultName: '  Notes  ',
 				accountId: '0123456789abcdef0123456789abcdef',
 				accountName: 'Personal account',
 				workerName: 'crate-0123456789abcdef',
@@ -26,6 +27,7 @@ describe('normalizeCrateSettings', () => {
 		}, 'vault-config');
 
 		expect(settings.cloudflareDeployment?.workerName).toBe('crate-0123456789abcdef');
+		expect(settings.cloudflareDeployment?.vaultName).toBe('Notes');
 	});
 
 	it('drops malformed Cloudflare deployment metadata', () => {

@@ -105,7 +105,7 @@ describe('Crate server reset boundaries', () => {
 
 	it('accepts the fingerprint and public origin bindings on a current deployment', async () => {
 		const h = harness();
-		h.worker.bindings!.push({ type: 'plain_text', name: 'CRATE_DEPLOYMENT_FINGERPRINT', text: 'f'.repeat(64) },
+		h.worker.bindings!.push({ type: 'plain_text', name: 'CRATE_VAULT_NAME', text: 'Notes' }, { type: 'plain_text', name: 'CRATE_DEPLOYMENT_FINGERPRINT', text: 'f'.repeat(64) },
 			{ type: 'plain_text', name: 'CRATE_PUBLIC_ORIGIN', text: `https://${h.metadata.workerName}.example.workers.dev` });
 		await deleteCrateServer(h.input);
 		expect(h.api.deleteWorker).toHaveBeenCalledOnce();

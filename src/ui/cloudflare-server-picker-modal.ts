@@ -1,3 +1,4 @@
+import { vaultChoiceLabel } from '../cloudflare/vault-name';
 import { Setting, type App } from 'obsidian';
 import { SharedModal } from './shared/SharedModal';
 import type { DiscoveredCloudflareDeployment } from '../cloudflare/deployment-discovery';
@@ -27,7 +28,7 @@ class CloudflareServerPickerModal extends SharedModal {
 				? `Updated ${new Date(deployment.modifiedOn).toLocaleString()}`
 				: 'Existing Cloudflare deployment';
 			new Setting(this.bodyEl)
-				.setName(deployment.metadata.workerName)
+				.setName(vaultChoiceLabel(deployment.metadata, this.deployments.map(item => item.metadata)))
 				.setDesc(modified)
 				.addButton(button => button
 					.setButtonText('Connect')

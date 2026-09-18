@@ -96,6 +96,7 @@ function createHarness(onAuthorized?: CloudflareDeploymentServiceOptions['onAuth
 	const selectDeployment = vi.fn(async (deployments: DiscoveredCloudflareDeployment[]): Promise<DiscoveredCloudflareDeployment | 'create' | null> => deployments[0] ?? 'create');
 	const service = new CloudflareDeploymentService({
 		clientId: CLIENT_ID,
+		getVaultName: () => 'Local vault',
 		onAuthorized,
 		settingsOwner,
 		transport,
@@ -523,6 +524,7 @@ describe('server selection', () => {
 			expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
 			expect(h.settings.cloudflareDeployment?.workerName).not.toBe(existing.workerName);
 			expect(h.settings.cloudflareDeployment?.r2BucketName).not.toBe(existing.r2BucketName);
+			expect(h.settings.cloudflareDeployment?.vaultName).toBe('Local vault');
 		}
 		expect(h.selectDeployment).toHaveBeenCalledOnce();
 		expect(h.selectDeployment.mock.calls[0]?.[0]).toHaveLength(1);

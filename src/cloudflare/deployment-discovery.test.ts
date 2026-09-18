@@ -12,6 +12,7 @@ describe('discoverCloudflareDeployments', () => {
 				annotations: { 'workers/message': `Crate 0.1.0 ${'f'.repeat(64)}` },
 				bindings: [
 					{ type: 'd1', name: 'DB', id: 'database-id' },
+					{ type: 'plain_text', name: 'CRATE_VAULT_NAME', text: 'Notes' },
 					{ type: 'r2_bucket', name: 'BUCKET', bucket_name: 'crate-0123456789abcdef' },
 					{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' },
 				],
@@ -26,6 +27,7 @@ describe('discoverCloudflareDeployments', () => {
 		expect(result).toEqual([{
 			metadata: {
 				deploymentId: '0123456789abcdef',
+				vaultName: 'Notes',
 				accountId: 'account-id',
 				accountName: 'Personal',
 				workerName: 'crate-0123456789abcdef',

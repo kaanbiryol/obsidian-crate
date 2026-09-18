@@ -1,6 +1,7 @@
 /** Non-secret identifiers used to make deployment retries converge. */
 export interface CloudflareDeploymentMetadata {
 	deploymentId: string;
+	vaultName?: string;
 	accountId: string | null;
 	accountName: string | null;
 	workerName: string;
