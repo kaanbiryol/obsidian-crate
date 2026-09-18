@@ -1,6 +1,6 @@
 import { Button as BaseButton } from '@base-ui/react/button';
 import React from 'react';
-import { useSyncIndicatorMotion } from '../hooks/useSyncIndicatorMotion';
+import { useSyncIndicatorMotion } from '../../ui/shared/useSyncIndicatorMotion';
 import type { PendingReminderChange } from '../reminder-outbox-types';
 import type { DataMode } from '../types';
 

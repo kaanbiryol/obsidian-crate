@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 const MIN_SYNC_MOTION_MS = 650;
-const SETTLE_MOTION_MS = 800;
+// Let the color turn green before the completion pulse finishes.
+const SETTLE_MOTION_MS = 2800;
 
 /** Hold only the visual success transition; accessible status stays current. */
 export function useSyncIndicatorMotion(state: string): string {
@@ -9,7 +10,7 @@ export function useSyncIndicatorMotion(state: string): string {
 	const [phase, setPhase] = useState<'idle' | 'syncing' | 'settling'>(state === 'syncing' ? 'syncing' : 'idle');
 
 	useEffect(() => {
-		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('reduce-motion')) {
 			startedAt.current = null;
 			setPhase('idle');
 			return;
@@ -25,15 +26,15 @@ export function useSyncIndicatorMotion(state: string): string {
 			return;
 		}
 
-		let settleTimer: ReturnType<typeof setTimeout> | undefined;
-		const finishTimer = setTimeout(() => {
+		let settleTimer: number | undefined;
+		const finishTimer = window.setTimeout(() => {
 			startedAt.current = null;
 			setPhase('settling');
-			settleTimer = setTimeout(() => setPhase('idle'), SETTLE_MOTION_MS);
+			settleTimer = window.setTimeout(() => setPhase('idle'), SETTLE_MOTION_MS);
 		}, Math.max(0, MIN_SYNC_MOTION_MS - (performance.now() - startedAt.current)));
 		return () => {
-			clearTimeout(finishTimer);
-			clearTimeout(settleTimer);
+			window.clearTimeout(finishTimer);
+			window.clearTimeout(settleTimer);
 		};
 	}, [state]);
 

@@ -1,0 +1,117 @@
+@mixin styles($selector) {
+	#{$selector} {
+		display: grid;
+		place-items: center;
+		position: relative;
+		flex: 0 0 44px;
+		width: 44px;
+		height: 44px;
+		--sync-indicator-color: var(--text-muted);
+		--sync-indicator-color-duration: 900ms;
+		color: var(--sync-indicator-color);
+
+		// Keep sync colors consistent across Obsidian themes and the PWA.
+		&[data-visual-state="synced"],
+		&[data-visual-state="settling"] {
+			--sync-indicator-color: #22c55e;
+			--sync-indicator-color-duration: 1600ms;
+		}
+		&[data-visual-state="syncing"] { --sync-indicator-color: #f59e0b; }
+		&[data-visual-state="error"] { --sync-indicator-color: var(--text-error); }
+	}
+
+	#{$selector}__dot {
+		grid-area: 1 / 1;
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--sync-indicator-color);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--sync-indicator-color) 10%, transparent);
+		transform: scale(1);
+		// Animate the painted dot and glow directly, rather than inherited color.
+		transition: background-color var(--sync-indicator-color-duration) ease-in-out, box-shadow var(--sync-indicator-color-duration) ease-in-out, transform 600ms cubic-bezier(.22, 1, .36, 1);
+	}
+
+	#{$selector}__halo {
+		grid-area: 1 / 1;
+		width: 16px;
+		height: 16px;
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 600ms ease;
+
+		&::before {
+			content: '';
+			display: block;
+			width: 100%;
+			height: 100%;
+			border-radius: 50%;
+			background: color-mix(in srgb, var(--sync-indicator-color) 14%, transparent);
+			transition: background-color var(--sync-indicator-color-duration) ease-in-out;
+			animation: pwa-sync-breathe 1.8s ease-in-out infinite;
+			animation-play-state: paused;
+		}
+	}
+
+	#{$selector}[data-visual-state="syncing"] {
+		#{$selector}__dot { transform: scale(.92); }
+		#{$selector}__halo {
+			opacity: 1;
+			&::before { animation-play-state: running; }
+		}
+	}
+
+	#{$selector}__ripple {
+		grid-area: 1 / 1;
+		width: 12px;
+		height: 12px;
+		border: 1px solid var(--sync-indicator-color);
+		border-radius: 50%;
+		opacity: 0;
+		pointer-events: none;
+		transition: border-color var(--sync-indicator-color-duration) ease-in-out;
+	}
+
+	#{$selector}[data-visual-state="settling"] {
+		#{$selector}__halo { transition-duration: 1400ms; }
+		#{$selector}__dot { animation: pwa-sync-settle 1200ms ease-in-out 1400ms; }
+		#{$selector}__ripple { animation: pwa-sync-ripple 1400ms ease-out 1200ms both; }
+	}
+
+	@keyframes pwa-sync-settle {
+		0%, 100% {
+			transform: scale(1);
+			box-shadow: 0 0 0 3px color-mix(in srgb, var(--sync-indicator-color) 10%, transparent);
+		}
+		35% {
+			transform: scale(1.14);
+			box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--sync-indicator-color) 15%, transparent), 0 0 5px color-mix(in srgb, var(--sync-indicator-color) 18%, transparent);
+		}
+	}
+
+	@keyframes pwa-sync-ripple {
+		0% { transform: scale(.7); opacity: 0; }
+		20% { opacity: .32; }
+		100% { transform: scale(1.55); opacity: 0; }
+	}
+
+	@keyframes pwa-sync-breathe {
+		0%, 100% { transform: scale(.82); }
+		50% { transform: scale(1); }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		#{$selector},
+		#{$selector}__dot,
+		#{$selector}__halo,
+		#{$selector}__halo::before,
+		#{$selector}__ripple,
+		#{$selector}__button { transition: none; }
+		#{$selector}__button:active { transform: none; }
+		#{$selector} #{$selector}__dot { transform: none; }
+		#{$selector}__halo::before,
+		#{$selector}[data-visual-state] #{$selector}__dot,
+		#{$selector}[data-visual-state] #{$selector}__ripple { animation: none; }
+	}
+
+}
