@@ -59,12 +59,6 @@
 
 @include sync-indicator.styles(".crate-sync-indicator");
 
-.crate-status-bar .crate-sync-indicator {
-	flex: 0 0 16px;
-	width: 16px;
-	height: 16px;
-}
-
 body.reduce-motion .crate-sync-indicator {
 	&, *, .crate-sync-indicator__halo::before { transition: none; }
 	.crate-sync-indicator__halo::before,
