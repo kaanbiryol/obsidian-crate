@@ -101,15 +101,15 @@
   }
 
   &.is-enabled {
-    color: var(--crate-accent-text);
+    color: var(--text-normal);
     cursor: pointer;
 
     &:hover {
-      background: color-mix(in srgb, var(--crate-accent-text) 9%, transparent);
+      background: var(--crate-control-hover-bg);
     }
 
     &:active {
-      background: color-mix(in srgb, var(--crate-accent-text) 14%, transparent);
+      background: var(--crate-control-active-bg);
     }
   }
 }

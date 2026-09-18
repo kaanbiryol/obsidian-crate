@@ -193,7 +193,7 @@ const ReminderCard: React.FC<ReminderCardProps> = ({
                                     ) : (
                                         <ThemeIcon size="xs" id="calendar" />
                                     )}
-                                    <span>{dueDate ? formatDueDate(dueDate, undefined, clock.now) : null}</span>
+                                    <span>{dueDate ? formatDueDate(dueDate, undefined, clock.now, reminder.recurrence) : null}</span>
                                 </span>
                             )}
 
