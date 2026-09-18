@@ -41,6 +41,7 @@ export class SyncRuntime {
 	private initializationError: string | null = null;
 	private initializationRevision = 0;
 	private stoppingWork: Promise<void> = Promise.resolve();
+	private stopSyncTask: Promise<void> | null = null;
 	private configurationChain: Promise<void> = Promise.resolve();
 	private startupSyncTask: Promise<boolean> = Promise.resolve(false);
 	private foregroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
@@ -68,7 +69,7 @@ export class SyncRuntime {
 		private plugin: Plugin,
 		private settings: CrateSettings,
 		private secretStorage: SecretStorageService,
-		private persistSettings: () => Promise<void>,
+		private persistSettings: (update?: Partial<CrateSettings>) => Promise<void>,
     private prepareReminderScope?: () => Promise<void>,
 	) {}
 
@@ -252,6 +253,26 @@ export class SyncRuntime {
 		this.syncEngine = null;
 		this.apiClient = null;
 		this.statusBar = null;
+	}
+
+	stopSync(): Promise<void> {
+		if (this.stopSyncTask) return this.stopSyncTask;
+		// Abort immediately, before waiting for disk work or settings persistence.
+		this.settings.automaticSync = false;
+		this.destroy();
+		const revision = this.initializationRevision;
+		this.activityProgress = null;
+		this.stopSyncTask = this.changeConfiguration(async () => {
+			await this.stoppingWork;
+			this.assertTransitionActive(revision);
+			await this.persistSettings({ automaticSync: false });
+			this.assertTransitionActive(revision);
+			if (this.isConfigured()) await this.initialize({ skipStartupSync: true });
+		}).finally(() => {
+			this.stopSyncTask = null;
+			this.emitCurrentState();
+		});
+		return this.stopSyncTask;
 	}
 
 	private stopEngine(): void {
@@ -442,6 +463,7 @@ export class SyncRuntime {
 		progressCallback?: (current: number, total: number) => void,
 		logMessage?: string,
 	): Promise<SyncResult> {
+		if (this.stopSyncTask) return createSyncFailureResult('Sync is stopping. Try again when it finishes.');
 		if (!this.syncEngine) return createSyncFailureResult(SYNC_ERROR_MESSAGES.NOT_CONFIGURED);
 
 		const engine = this.syncEngine;

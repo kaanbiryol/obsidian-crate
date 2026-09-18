@@ -18,7 +18,7 @@ export function initializeSyncManagers(plugin: CratePlugin): void {
 		plugin,
 		plugin.settings,
 		plugin.secretStorage,
-		() => plugin.saveSettings(),
+		update => update ? plugin.writeSettings(update) : plugin.saveSettings(),
     () => ensureReminderNotificationPolicy(plugin, true),
 	);
 	plugin.syncRuntime.setStatusBarClickHandler(() => {
@@ -34,6 +34,20 @@ export function registerSyncCommands(plugin: CratePlugin): void {
 			const available = plugin.syncRuntime.isConfigured();
 			if (!checking && available) {
 				void runSyncNow(plugin);
+			}
+			return available;
+		},
+	});
+
+	plugin.addCommand({
+		id: 'stop-sync',
+		name: 'Stop sync',
+		checkCallback: checking => {
+			const available = plugin.syncRuntime.isConfigured();
+			if (!checking && available) {
+				void plugin.syncRuntime.stopSync()
+					.then(() => { plugin.refreshSettingsTab(); new Notice('Sync stopped. Automatic sync is off on this device.'); })
+					.catch(error => { new Notice(`Could not finish stopping sync: ${errorMessage(error)}`); });
 			}
 			return available;
 		},
