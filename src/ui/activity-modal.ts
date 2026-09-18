@@ -44,8 +44,7 @@ export class ActivityModal extends BaseUiModal {
 	private errorNoticeEl!: HTMLDivElement;
 	private errorMessageEl!: HTMLSpanElement;
 	private syncBtn!: HTMLButtonElement;
-	private syncBtnIcon!: HTMLSpanElement;
-	private syncBtnIconName = '';
+	private syncBtnLabel!: HTMLSpanElement;
 	private stoppingSync = false;
 	private pendingCount!: HTMLSpanElement;
 	private conflictsCount!: HTMLSpanElement;
@@ -124,11 +123,10 @@ export class ActivityModal extends BaseUiModal {
 		const header = headerEl.querySelector<HTMLElement>('.reminder-modal-header-side.is-right')!;
 
 		this.syncBtn = header.createEl('button', {
-			cls: 'crate-sync-now-btn',
+			cls: 'crate-sync-now-btn reminder-modal-header-action',
 			attr: { type: 'button', 'aria-label': 'Sync now', title: 'Sync now' },
 		});
-		this.syncBtnIcon = this.syncBtn.createSpan({ cls: 'crate-sync-btn-icon', attr: { 'aria-hidden': 'true' } });
-		this.syncBtnIconName = '';
+		this.syncBtnLabel = this.syncBtn.createSpan({ cls: 'reminder-modal-header-action-label' });
 		this.syncBtn.addEventListener('click', () => {
 			if (this.deps.stopSync && (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress?.())) {
 				this.stoppingSync = true;
@@ -219,16 +217,13 @@ export class ActivityModal extends BaseUiModal {
 	private updateSyncBtn(): void {
 		const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
 		const canStop = syncing && !!this.deps.stopSync;
-		const label = this.stoppingSync ? 'Pausing…' : canStop ? 'Pause sync' : syncing ? 'Syncing' : 'Sync now';
+		const label = this.stoppingSync ? 'Stopping…' : canStop ? 'Stop sync' : syncing ? 'Syncing…' : 'Sync now';
 		this.syncBtn.disabled = this.stoppingSync || (syncing && !canStop);
 		this.syncBtn.hidden = !syncing && !this.stoppingSync && this.currentTabIndex === 0 && !!this.deps.syncSelected && !!this.deps.createPendingDiscard && this.deps.getPendingPaths().length > 0 && !!this.deps.loadPendingDiff;
 		this.syncBtn.setAttribute('aria-label', label);
 		this.syncBtn.setAttribute('title', label);
-		const icon = canStop || this.stoppingSync ? 'pause' : 'refresh-cw';
-		if (icon !== this.syncBtnIconName) {
-			setIcon(this.syncBtnIcon, icon);
-			this.syncBtnIconName = icon;
-		}
+		this.syncBtnLabel.setText(label);
+		this.syncBtn.toggleClass('is-enabled', !this.syncBtn.disabled);
 
 	}
 

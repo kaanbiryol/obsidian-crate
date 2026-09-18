@@ -7,14 +7,13 @@ describe('sync activity modal styles', () => {
 			new URL('../styles/plugin/_activity.scss', import.meta.url),
 			'utf8',
 		);
-		const syncButton = styles.match(/^\.crate-activity-modal \.crate-sync-now-btn \{([\s\S]*?)^\}/m)?.[1];
 
-		expect(styles).toContain('--crate-activity-header-control-size: var(--clickable-icon-size');
+		expect(styles).not.toContain('padding-block: 2px');
 		expect(styles).toContain('--crate-activity-space-inline: var(--size-4-4, 16px)');
 		const component = await readFile(new URL('./activity/ActivitySheet.tsx', import.meta.url), 'utf8');
 		expect(component).toContain('<ModalHeader title="Sync activity"');
 		expect(styles).not.toContain('.crate-activity-close-btn');
-		expect(syncButton).toContain('height: var(--crate-activity-header-control-size)');
+		expect(styles).not.toContain('.crate-sync-now-btn {');
 		expect(styles).toContain('margin: 0 var(--crate-activity-space-inline) 16px');
 		expect(styles).toContain('padding: 0 var(--crate-activity-space-inline) 20px');
 	});
