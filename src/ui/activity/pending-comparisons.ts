@@ -17,6 +17,7 @@ export class PendingComparisons {
         private readonly load: (index: number) => Promise<PendingDiff>,
         private readonly onResult: (index: number, snapshot: PendingDiff) => void,
         private readonly onError: (index: number) => void,
+        private readonly shouldCheck: (index: number) => boolean = () => true,
     ) {}
 
     read(index: number): Promise<PendingDiff> {
@@ -81,6 +82,7 @@ export class PendingComparisons {
         try {
             while (this.active && !this.disposed && this.cursor < this.count) {
                 const index = this.cursor++;
+                if (!this.shouldCheck(index)) continue;
                 try { await this.read(index); }
                 catch { /* A failed check labels that row; keep checking the others. */ }
             }

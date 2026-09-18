@@ -402,6 +402,19 @@ for (const browserType of [chromium, webkit]) {
                 await expect(page.getByRole('button', { name: 'Discard changes (20)' })).toBeEnabled();
                 assert.equal((await page.evaluate(() => window.discardKeys)).length, 20);
                 await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+                // Large attachment queues do not make a request per image before reaching text.
+                await page.evaluate(() => {
+                    window.paths = Array.from({ length: 499 }, (_, i) => (i % 2 ? 'delete:' : '') + 'Image ' + i + '.PNG');
+                    window.paths.push('Note.md');
+                    window.calls = 0;
+                    window.mount();
+                });
+                await expect(rows.last().locator('.crate-browser-file-status')).toHaveText('+2 −2');
+                await expect(page.locator('.crate-browser-file-status', { hasText: 'No preview' })).toHaveCount(499);
+                assert.equal(await page.evaluate(() => window.calls), 1, 'Only the text file is checked in the background');
+                await rows.first().click();
+                await expect(page.locator('.crate-browser-toolbar .crate-diff-stats')).toHaveText('+2−2');
+                assert.equal(await page.evaluate(() => window.calls), 2, 'Selecting a binary file loads its details on demand');
                 assert.deepEqual(errors, []);
                 await page.close();
             }

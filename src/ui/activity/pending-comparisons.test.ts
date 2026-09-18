@@ -30,6 +30,20 @@ describe('background pending comparisons', () => {
         comparisons.dispose();
     });
 
+    it('skips background checks for binary files while allowing selection to load them', async () => {
+        const load = vi.fn(async () => snapshot);
+        const result = vi.fn();
+        const comparisons = new PendingComparisons(500, load, result, vi.fn(), index => index === 499);
+        comparisons.start();
+        await vi.waitFor(() => expect(result).toHaveBeenCalledWith(499, snapshot));
+        expect(load.mock.calls).toHaveLength(1);
+        await expect(comparisons.read(0)).resolves.toEqual(snapshot);
+        expect(load).toHaveBeenCalledTimes(2);
+        await comparisons.read(0);
+        expect(load).toHaveBeenCalledTimes(2);
+        comparisons.dispose();
+    });
+
     it('continues after a failed file and supports an explicit retry', async () => {
         const load = vi.fn().mockRejectedValueOnce(new Error('Offline')).mockResolvedValue(snapshot);
         const error = vi.fn(), result = vi.fn();
