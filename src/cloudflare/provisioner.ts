@@ -1,3 +1,4 @@
+import { readVaultName } from './vault-name';
 import { inspectDeploymentDatabase, prepareDeploymentDatabase, recordDeploymentRelease } from './deployment-database';
 import { SERVER_RELEASE, type DatabaseMigration } from './database-upgrades';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
@@ -78,7 +79,9 @@ async function checkRemoteDeployment(input: { api: CloudflareApiClient; accountI
 			|| bucket?.length !== 1 || bucket[0]?.name !== 'BUCKET' || bucket[0]?.bucket_name !== input.metadata.r2BucketName) {
 			throw new Error('The live Worker bindings do not match this deployment. Reconnect to the correct server before updating.');
 		}
-		return JSON.stringify([message, database[0].id, bucket[0].bucket_name]);
+		const vaultName = readVaultName(settings);
+		if (vaultName) input.metadata.vaultName = vaultName;
+		return JSON.stringify([message, database[0].id, bucket[0].bucket_name, vaultName]);
 	} catch (error) {
 		if (!(error instanceof CloudflareApiError && error.status === 404)) throw error;
 		return null;
@@ -128,6 +131,7 @@ export async function provisionCloudflareDeployment(input: {
       || record.fingerprint !== input.artifacts.fingerprint || record.recoveryProtocol !== 1
       || !['confirmed', 'rejected', 'settled'].includes(String(record.stepState))) throw new Error('This update cannot be safely resumed by this build.');
   }
+	const previousVaultName = input.metadata.vaultName;
 	const expectedRemote = await checkRemoteDeployment(input);
 	input.onProgress?.('Preparing the server database…');
 	const databaseId = await ensureD1Database(input.api, input.accountId, input.metadata);
@@ -163,6 +167,7 @@ export async function provisionCloudflareDeployment(input: {
 			publicOrigin: `https://${input.metadata.workerName}.${workersSubdomain}.workers.dev`,
 			accountId: input.accountId,
 			workerName: input.metadata.workerName,
+			vaultName: input.metadata.vaultName,
 			artifacts: input.artifacts,
 			d1DatabaseId: databaseId,
 			r2BucketName: input.metadata.r2BucketName,
@@ -200,6 +205,7 @@ export async function provisionCloudflareDeployment(input: {
 		if (
 			input.metadata.lastDeployedVersion !== input.artifacts.version
 			|| input.metadata.lastDeployedFingerprint !== input.artifacts.fingerprint
+			|| input.metadata.vaultName !== previousVaultName
 		) {
 			input.metadata.lastDeployedVersion = input.artifacts.version;
 			input.metadata.lastDeployedFingerprint = input.artifacts.fingerprint;

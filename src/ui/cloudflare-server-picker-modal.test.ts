@@ -26,11 +26,11 @@ describe('selectCloudflareServer', () => {
 		vi.doMock('obsidian', () => createObsidianUiModule());
 		const { selectCloudflareServer } = await import('./cloudflare-server-picker-modal');
 		const first = {
-			metadata: { workerName: 'crate-0123456789abcdef' },
+			metadata: { workerName: 'crate-0123456789abcdef', deploymentId: '0123456789abcdef', vaultName: 'Notes' },
 			modifiedOn: '2026-08-23T09:00:00.000Z',
 		};
 		const second = {
-			metadata: { workerName: 'crate-fedcba9876543210' },
+			metadata: { workerName: 'crate-fedcba9876543210', deploymentId: 'fedcba9876543210', vaultName: 'Work' },
 			modifiedOn: null,
 		};
 
@@ -39,8 +39,8 @@ describe('selectCloudflareServer', () => {
 		expect(MockModal.instances[0]?.contentEl.collectText()).toContain('reminder-modal-header');
 		expect(MockModal.instances[0]?.titleEl.textContent).toBe('Choose a server');
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual([
-			'crate-0123456789abcdef',
-			'crate-fedcba9876543210',
+			'Notes',
+			'Work',
 			'Create server',
 		]);
 		MockSetting.instances[1]?.buttons[0]?.click();

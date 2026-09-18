@@ -1,3 +1,4 @@
+import { normalizeVaultName } from '../cloudflare/vault-name';
 import { normalizeSyncTimings } from '../sync/timings';
 /**
  * Settings helpers for Crate.
@@ -74,6 +75,7 @@ function normalizeCloudflareDeployment(value: unknown): CloudflareDeploymentMeta
 	}
 	return {
 		deploymentId,
+		...(normalizeVaultName(value.vaultName) ? { vaultName: normalizeVaultName(value.vaultName) } : {}),
 		accountId,
 		accountName: normalizeNullableString(value.accountName),
 		workerName,

@@ -126,6 +126,8 @@ The OAuth deployment uses the build-time Worker and current schema included in t
 
 To connect another computer or mobile device, install Crate there and select **Connect with Cloudflare**. Access to the Cloudflare account is the source of truth for vault membership. For a vault without a saved server connection, Obsidian always asks which server to use, even if the account has only one. Reconnecting a previously configured vault reuses its saved server.
 
+Server choices show the vault name saved when the server was created. The name is stored in your Cloudflare Worker settings so other devices can see it; server addresses and storage IDs stay unchanged. Older servers show **Unnamed vault** until you select **Save vault name** in Crate’s server settings from the original vault (or update its server). Duplicate names include a short ID to distinguish them.
+
 Multiple separate vaults can use the same Cloudflare account: create a separate Crate server for each vault. Connecting two vaults to the same server combines their files during sync; local vault names do not separate remote data.
 
 **Disconnect this device** removes the local sync credential while retaining the non-secret deployment identity. Signing in to Cloudflare again reconnects the same server.

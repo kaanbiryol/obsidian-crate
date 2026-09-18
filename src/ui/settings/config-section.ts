@@ -61,6 +61,12 @@ export function renderServerSection(context: ConfigSectionContext): void {
                 ? 'An update is available at the top of these settings.'
                 : 'Your server software and reminders web app are up to date.'}`);
     }
+    if (plugin.syncRuntime.isConfigured() && deployment?.accountId && !deployment.vaultName) {
+        new Setting(containerEl).setName('Vault name')
+            .setDesc('Save this vault’s name so you can recognize its server on other devices. This updates the Cloudflare server.')
+            .addButton(button => button.setButtonText('Save vault name')
+                .onClick(() => { void startCloudflareDeployment(plugin, 'update'); }));
+    }
     if (plugin.syncRuntime.isConfigured() && deployment?.accountId && deployment.d1DatabaseId) {
         new Setting(containerEl).setName('Interrupted server update')
             .setDesc('Check an interrupted update and recover it when Cloudflare has confirmed the operation.')

@@ -1,3 +1,4 @@
+import { vaultChoiceLabel } from '../cloudflare/vault-name';
 import type { DiscoveredCloudflareDeployment } from '../cloudflare/deployment-discovery';
 import { Modal, type App } from 'obsidian';
 import { createElement } from 'react';
@@ -114,7 +115,8 @@ export class CloudflareDeploymentModal extends Modal {
 					createElement('p', null, deployments.length ? 'Your local files stay unchanged during setup. Syncing combines local and remote files; files with the same path may be updated. Review local and remote files before syncing.' : 'Your local files stay unchanged during setup. When setup is complete, select Crate: Sync now from the command palette to start syncing.'),
 					...deployments.map(deployment => createElement(Button, {
 						key: deployment.metadata.workerName,
-						onClick: () => this.finishSelection(deployment), children: deployment.metadata.workerName,
+						onClick: () => this.finishSelection(deployment), title: deployment.metadata.workerName,
+						children: vaultChoiceLabel(deployment.metadata, deployments.map(item => item.metadata)),
 					})),
 					createElement('p', null, 'Cloudflare usage charges may apply.'),
 				),

@@ -226,3 +226,17 @@ it('keeps the installed version in the server section without duplicating the up
     expect(server.buttons).toHaveLength(0);
     expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Cloudflare update available')).toBe(false);
 });
+
+
+it('lets an older server save its vault name through an explicit update', async () => {
+	const { renderServerSection } = await loadConfigSectionModule();
+	const plugin = {
+		settings: { workerUrl: 'https://crate.example', cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } },
+		syncRuntime: { isConfigured: () => true },
+	};
+	renderServerSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
+	const setting = getSettingByName('Vault name');
+	expect(setting.buttons[0]?.buttonEl.textContent).toBe('Save vault name');
+	setting.buttons[0]?.click();
+	expect(startCloudflareDeployment).toHaveBeenCalledWith(plugin, 'update');
+});

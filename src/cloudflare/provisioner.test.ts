@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudflareDeploymentMetadata } from './deployment-types';
-import { CloudflareApiError } from './cloudflare-api';
+import { CloudflareApiError, type CloudflareWorkerSettings } from './cloudflare-api';
 import { provisionCloudflareDeployment } from './provisioner';
 import { createFenceQueryHarness } from './deployment-fence-test-harness';
 
@@ -33,7 +33,7 @@ function createApi() {
 	const fence = createFenceQueryHarness();
 	const metadata = createMetadata();
 	return {
-		getWorkerSettings: vi.fn(async () => ({ annotations: { 'workers/message': `Crate 0.1.0 ${artifacts.fingerprint}` }, bindings: [
+		getWorkerSettings: vi.fn(async (): Promise<CloudflareWorkerSettings> => ({ annotations: { 'workers/message': `Crate 0.1.0 ${artifacts.fingerprint}` }, bindings: [
 			{ type: 'd1', name: 'DB', id: metadata.d1DatabaseId! }, { type: 'r2_bucket', name: 'BUCKET', bucket_name: metadata.r2BucketName },
 		] })),
 		getD1Database: vi.fn(async (_accountId: string, databaseId: string) => ({ uuid: databaseId, name: metadata.d1DatabaseName })),
@@ -53,6 +53,19 @@ function createApi() {
 }
 
 describe('provisionCloudflareDeployment', () => {
+	it('preserves the remote vault name when updating from a differently named local copy', async () => {
+		const api = createApi();
+		const settings = await api.getWorkerSettings();
+		api.getWorkerSettings.mockResolvedValue({
+			...settings,
+			bindings: [...(settings.bindings ?? []), { type: 'plain_text', name: 'CRATE_VAULT_NAME', text: 'Notes' }],
+		});
+		const metadata = { ...createMetadata(), vaultName: 'Notes on laptop' };
+		await provisionCloudflareDeployment({ api: api as never, accountId: metadata.accountId!, metadata, artifacts, onMetadataChanged: async () => {} });
+		expect(api.uploadWorker).toHaveBeenCalledWith(expect.objectContaining({ vaultName: 'Notes', workerName: metadata.workerName }));
+		expect(metadata.vaultName).toBe('Notes');
+	});
+
 	it('skips address activation when Cloudflare already has the exact settings', async () => {
 		const api = createApi();
 		api.getWorkerSubdomain.mockResolvedValue({ enabled: true, previews_enabled: false });
