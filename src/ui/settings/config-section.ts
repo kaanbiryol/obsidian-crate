@@ -1,5 +1,4 @@
 import { checkAndRecoverUpdate } from '../../cloudflare/deployment-recovery-ui';
-import { renderAccountActions } from './account-actions';
 import { Notice, Setting } from 'obsidian';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
 import { isCloudflareServerUpdateAvailable } from '../../cloudflare/deployment-update';
@@ -31,8 +30,6 @@ export function renderConfigSection(context: ConfigSectionContext, showHeading =
 					void startCloudflareDeployment(plugin);
 				}));
 	}
-
-	if (plugin.settings.cloudflareDeployment?.accountId) renderAccountActions(containerEl, plugin, context.rerender);
 }
 
 export function renderServerUpdateNotice(context: ConfigSectionContext): void {
