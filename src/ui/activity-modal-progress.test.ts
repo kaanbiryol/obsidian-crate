@@ -47,7 +47,7 @@ describe('activity modal completion progress', () => {
 });
 
 
-it('keeps Pause sync visible and enabled while pending files are transferring', () => {
+it('keeps Stop sync visible and enabled while pending files are transferring', () => {
     let syncing = true;
     const deps = {
         getState: () => ({ status: syncing ? 'syncing' : 'idle' } as SyncState),
@@ -57,18 +57,25 @@ it('keeps Pause sync visible and enabled while pending files are transferring', 
     };
     const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, deps);
     const button = new FakeElement('button');
-    const icon = new FakeElement('span');
+    const label = new FakeElement('span');
     const internal = modal as unknown as {
-        syncBtn: HTMLElement; syncBtnIcon: HTMLElement; updateSyncBtn(): void;
+        syncBtn: HTMLElement; syncBtnLabel: HTMLElement; stoppingSync: boolean; updateSyncBtn(): void;
     };
     internal.syncBtn = button as unknown as HTMLElement;
-    internal.syncBtnIcon = icon as unknown as HTMLElement;
+    internal.syncBtnLabel = label as unknown as HTMLElement;
     internal.updateSyncBtn();
     expect((button as unknown as HTMLButtonElement).hidden).toBe(false);
     expect((button as unknown as HTMLButtonElement).disabled).toBe(false);
-    expect(button.getAttribute('aria-label')).toBe('Pause sync');
+    expect(button.getAttribute('aria-label')).toBe('Stop sync');
+    expect(label.collectText()).toBe('Stop sync');
+    internal.stoppingSync = true;
+    internal.updateSyncBtn();
+    expect(label.collectText()).toBe('Stopping…');
+    expect((button as unknown as HTMLButtonElement).disabled).toBe(true);
+    internal.stoppingSync = false;
     syncing = false;
     internal.updateSyncBtn();
     expect(button.getAttribute('aria-label')).toBe('Sync now');
+    expect(label.collectText()).toBe('Sync now');
     expect((button as unknown as HTMLButtonElement).hidden).toBe(true);
 });

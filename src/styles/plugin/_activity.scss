@@ -11,7 +11,6 @@
 	--crate-activity-motion-fast: var(--anim-duration-fast, 160ms);
 	--crate-activity-motion-moderate: var(--anim-duration-moderate, 250ms);
 	--crate-activity-motion-easing: var(--anim-motion-baseline, ease);
-	--crate-activity-header-control-size: var(--clickable-icon-size, var(--input-height, 36px));
 	--crate-activity-space-inline: var(--size-4-4, 16px);
 }
 
@@ -56,12 +55,8 @@
 .crate-activity-modal > .crate-modal-header-host { flex-shrink: 0; }
 
 .crate-reminders-ui .crate-activity-modal .reminder-modal-header {
-    min-height: 40px;
-    padding-block: 2px;
     border-bottom: 0;
 }
-
-.crate-reminders-ui .crate-activity-modal .reminder-modal-header-title { font-size: 14px; font-weight: 500; }
 
 .crate-activity-subtitle {
     display: block;
@@ -123,60 +118,6 @@
 	color: var(--text-muted);
 	overflow-wrap: anywhere;
 	user-select: text;
-}
-
-/* Matching icon actions for starting and pausing sync. */
-.crate-activity-modal .crate-sync-now-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--crate-activity-header-control-size);
-    min-width: var(--crate-activity-header-control-size);
-    height: var(--crate-activity-header-control-size);
-    min-height: var(--crate-activity-header-control-size);
-    padding: 0;
-    font-family: inherit;
-    font-size: var(--reminder-font-base, 14px);
-    font-weight: var(--reminder-font-weight-medium, 500);
-    color: var(--text-normal);
-    white-space: nowrap;
-    cursor: pointer;
-    appearance: none;
-    background: transparent !important;
-    border: 0 !important;
-    border-radius: 6px;
-    box-shadow: none !important;
-    transition: background-color var(--crate-activity-motion-fast) var(--crate-activity-motion-easing);
-
-    .crate-sync-btn-icon {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        svg {
-            width: 18px;
-            height: 18px;
-            stroke-width: 1.75;
-        }
-    }
-
-    &:hover:not(:disabled) {
-        background: var(--crate-activity-control-hover-bg) !important;
-    }
-
-    &:focus:not(:focus-visible) {
-        outline: none !important;
-    }
-
-    &:focus-visible {
-        outline: 2px solid var(--crate-activity-focus-ring);
-        outline-offset: -2px;
-    }
-
-    &:disabled {
-        opacity: 0.6;
-        cursor: default;
-    }
 }
 
 /* Underline tabs */
