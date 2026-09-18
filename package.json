@@ -113,7 +113,7 @@
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.8.0",
-		"@internationalized/date": "^3.8.2",
+		"@internationalized/date": "^3.12.4",
 		"@lexical/history": "0.50.0",
 		"@lexical/link": "0.50.0",
 		"@lexical/plain-text": "0.50.0",
