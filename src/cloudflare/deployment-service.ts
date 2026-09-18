@@ -242,9 +242,14 @@ export class CloudflareDeploymentService {
 				const workers = remembered ? await this.whileActive(() => api.listWorkers(account.id)) : null;
 				const missingServer = Boolean(workers && !workers.some(worker => worker.id === metadata.workerName));
 				const deployments = await this.whileActive(() => discoverCloudflareDeployments(api, account));
-				const selected = !missingServer && pending.intent === 'connect' && deployments.length === 1
-					? deployments[0]!
-					: await this.whileActive(() => selectDeployment(deployments, missingServer));
+				// Account membership does not identify a vault. Only reuse this vault's saved server.
+				const savedDeployment = remembered && !missingServer
+					? deployments.find(deployment => deployment.metadata.workerName === metadata.workerName
+						&& deployment.metadata.d1DatabaseId === metadata.d1DatabaseId
+						&& deployment.metadata.r2BucketName === metadata.r2BucketName)
+					: undefined;
+				const selected = savedDeployment
+					?? await this.whileActive(() => selectDeployment(deployments, missingServer));
 				if (!selected) throw new Error('No Cloudflare server was selected');
 				if (selected === 'create') {
 					metadata = createCloudflareDeploymentMetadata();

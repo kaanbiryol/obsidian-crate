@@ -490,15 +490,44 @@ describe('server selection', () => {
 		});
 		if (count === 2) {
 			const otherName = 'crate-fedcba9876543210';
-			apiMocks.workers.push({ id: otherName });
+			apiMocks.workers.unshift({ id: otherName, modified_on: '2026-09-18' });
 			apiMocks.workerSettings.set(otherName, apiMocks.workerSettings.get(saved.workerName));
 		}
 		await h.service.startDeployment('connect');
 		await h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
-		if (count === 1) expect(h.selectDeployment).not.toHaveBeenCalled();
-		else expect(h.selectDeployment).toHaveBeenCalledOnce();
+		expect(h.selectDeployment).not.toHaveBeenCalled();
+		expect(h.settings.cloudflareDeployment?.workerName).toBe(saved.workerName);
 		expect(h.beforeServerSwitch).not.toHaveBeenCalled();
 		expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+	});
+
+	it.each(['create', 'cancel'] as const)('lets a new vault %s instead of joining the only existing server', async choice => {
+		const h = createHarness();
+		const existing = savedServer();
+		apiMocks.workers = [{ id: existing.workerName }];
+		apiMocks.workerSettings.set(existing.workerName, {
+			annotations: { 'workers/message': 'Crate 0.1.0' },
+			bindings: [{ type: 'd1', name: 'DB', id: existing.d1DatabaseId },
+				{ type: 'r2_bucket', name: 'BUCKET', bucket_name: existing.r2BucketName },
+				{ type: 'durable_object_namespace', name: 'REMINDER_ALARMS', class_name: 'ReminderAlarm' }],
+		});
+		h.selectDeployment.mockResolvedValue(choice === 'create' ? 'create' : null);
+		await h.service.startDeployment();
+		const result = h.service.handleCallback({ code: 'code', state: firstOpenedUrl(h.opened).searchParams.get('state')! });
+		if (choice === 'cancel') {
+			await expect(result).rejects.toThrow('No Cloudflare server');
+			expect(h.persisted).toEqual([]);
+			expect(provisionCloudflareDeployment).not.toHaveBeenCalled();
+		} else {
+			await result;
+			expect(provisionCloudflareDeployment).toHaveBeenCalledOnce();
+			expect(h.settings.cloudflareDeployment?.workerName).not.toBe(existing.workerName);
+			expect(h.settings.cloudflareDeployment?.r2BucketName).not.toBe(existing.r2BucketName);
+		}
+		expect(h.selectDeployment).toHaveBeenCalledOnce();
+		expect(h.selectDeployment.mock.calls[0]?.[0]).toHaveLength(1);
+		expect(h.selectDeployment.mock.calls[0]?.[0][0]?.metadata.workerName).toBe(existing.workerName);
+		expect(apiMocks.queryD1).not.toHaveBeenCalled();
 	});
 
 	it('offers creation during reconnect when the saved server is gone', async () => {

@@ -116,13 +116,15 @@ After installing the plugin, open the Crate settings tab in Obsidian:
 
 1. Select **Connect with Cloudflare**. Your browser opens Cloudflare OAuth.
 2. Select one Cloudflare account, review the minimum permissions, and authorize Crate.
-3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Crate reuses an existing Crate server in that account or provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and schema.
+3. The static callback at `crate.kaanbiryol.com` returns to Obsidian. Choose an existing server for another copy of the same vault, or select **Create server** for a separate vault. Creating a server provisions a new Worker, R2 bucket, D1 database, Durable Objects, endpoint, and schema.
 4. Crate registers this device through the Cloudflare-authorized D1 API, saves the Cloudflare login for usage, and connects automatically.
 5. No vault files are transferred during connection. Open the command palette and select **Crate: Sync now** to sync this vault with the server.
 
 The OAuth deployment uses the build-time Worker and current schema included in the installed plugin. Unsupported databases are rejected without modification; see the [recovery runbook](docs/recovery.md) before changing deployments. The permanent sync credential is generated inside Obsidian; only its SHA-256 hash is registered in D1.
 
-To connect another computer or mobile device, install Crate there and select **Connect with Cloudflare**. Access to the Cloudflare account is the source of truth for vault membership. If the account contains more than one Crate server, Obsidian asks which one belongs to the vault.
+To connect another computer or mobile device, install Crate there and select **Connect with Cloudflare**. Access to the Cloudflare account is the source of truth for vault membership. For a vault without a saved server connection, Obsidian always asks which server to use, even if the account has only one. Reconnecting a previously configured vault reuses its saved server.
+
+Multiple separate vaults can use the same Cloudflare account: create a separate Crate server for each vault. Connecting two vaults to the same server combines their files during sync; local vault names do not separate remote data.
 
 **Disconnect this device** removes the local sync credential while retaining the non-secret deployment identity. Signing in to Cloudflare again reconnects the same server.
 
