@@ -11,6 +11,21 @@ import { renderConnectionStatus } from './connection-status';
 afterEach(() => { resetObsidianUiMocks(); vi.clearAllMocks(); });
 
 describe('connection status', () => {
+	it('can stop an active sync without disconnecting the vault', async () => {
+		const stopSync = vi.fn(async () => {});
+		const cleanup = renderConnectionStatus(new FakeElement('div') as never, {
+			refreshSettingsTab: vi.fn(),
+			syncRuntime: {
+				getState: () => ({ status: 'syncing', lastSync: null }),
+				stopSync, addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
+			},
+		} as never);
+		const button = MockSetting.instances[0]!.buttons.find(button => button.buttonEl.textContent === 'Stop sync')!;
+		button.click();
+		await vi.waitFor(() => expect(stopSync).toHaveBeenCalledOnce());
+		cleanup();
+	});
+
 	it('shows runtime failures and removes its live listener when settings close', () => {
 		let state: SyncState = { status: 'idle', lastSync: null, lastError: null, pendingChanges: 0, conflictCount: 0 };
 		const addStateChangeListener = vi.fn();

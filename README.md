@@ -110,6 +110,8 @@ npm run deploy:plugin
 
 `npm run deploy:plugin` builds the plugin and copies `dist/main.js`, `manifest.json`, and `dist/styles.css` into the configured vault plugin folder. You can also set `OBSIDIAN_VAULT` for one-off deploys.
 
+To stop a running sync, select **Pause sync** in sync activity or **Stop sync** in Crate settings, or run **Crate: Stop sync** from the command palette. This also turns off automatic sync on this device, including after restarting Obsidian. Completed transfers remain; a request or local write already dispatched may still finish. Select **Sync now** to sync manually, or enable **Automatic sync** in settings to resume automatic syncing.
+
 ## Cloudflare Setup
 
 After installing the plugin, open the Crate settings tab in Obsidian:

@@ -125,67 +125,58 @@
 	user-select: text;
 }
 
-/* Sync button */
-.crate-sync-now-btn {
-	display: inline-flex;
-	justify-self: end;
-	align-items: center;
-	width: var(--crate-activity-header-control-size);
-	height: var(--crate-activity-header-control-size);
-	min-width: var(--crate-activity-header-control-size);
-	min-height: var(--crate-activity-header-control-size);
-	justify-content: center;
-	gap: 0;
-	padding: 0;
-	font-size: var(--font-ui-smaller);
-	font-weight: var(--font-medium);
-	font-family: inherit;
-	color: var(--text-muted);
-	cursor: pointer;
-	white-space: nowrap;
-	appearance: none;
-	background: transparent !important;
-	border: 0 !important;
-	border-radius: var(--button-radius, var(--crate-activity-radius-control));
-	box-shadow: none !important;
-	transition: transform var(--crate-activity-motion-fast) var(--crate-activity-motion-easing), color var(--crate-activity-motion-fast) var(--crate-activity-motion-easing), background-color var(--crate-activity-motion-fast) var(--crate-activity-motion-easing);
+/* Matching icon actions for starting and pausing sync. */
+.crate-activity-modal .crate-sync-now-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--crate-activity-header-control-size);
+    min-width: var(--crate-activity-header-control-size);
+    height: var(--crate-activity-header-control-size);
+    min-height: var(--crate-activity-header-control-size);
+    padding: 0;
+    font-family: inherit;
+    font-size: var(--reminder-font-base, 14px);
+    font-weight: var(--reminder-font-weight-medium, 500);
+    color: var(--text-normal);
+    white-space: nowrap;
+    cursor: pointer;
+    appearance: none;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 6px;
+    box-shadow: none !important;
+    transition: background-color var(--crate-activity-motion-fast) var(--crate-activity-motion-easing);
 
-	.crate-sync-btn-icon {
-		display: flex;
-		align-items: center;
+    .crate-sync-btn-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
 
-		svg {
-			width: var(--icon-s, 14px);
-			height: var(--icon-s, 14px);
-			stroke-width: var(--icon-s-stroke-width, 2px);
-		}
-	}
+        svg {
+            width: 18px;
+            height: 18px;
+            stroke-width: 1.75;
+        }
+    }
 
-	.crate-sync-btn-text {
-		display: none;
-	}
+    &:hover:not(:disabled) {
+        background: var(--crate-activity-control-hover-bg) !important;
+    }
 
-	&:hover {
-		color: var(--interactive-accent);
-		background: var(--crate-activity-control-hover-bg) !important;
-		box-shadow: none !important;
-	}
+    &:focus:not(:focus-visible) {
+        outline: none !important;
+    }
 
-	&:active {
-		transform: scale(0.97);
-	}
+    &:focus-visible {
+        outline: 2px solid var(--crate-activity-focus-ring);
+        outline-offset: -2px;
+    }
 
-	&:focus-visible {
-		outline: 2px solid var(--crate-activity-focus-ring);
-		outline-offset: 2px;
-	}
-
-	&:disabled {
-		color: var(--text-muted);
-		opacity: 1;
-		cursor: default;
-	}
-
+    &:disabled {
+        opacity: 0.6;
+        cursor: default;
+    }
 }
 
 /* Underline tabs */
@@ -612,13 +603,6 @@
 		--crate-activity-space-inline: 14px;
 	}
 
-	.crate-sync-now-btn {
-		.crate-sync-btn-icon svg {
-			width: var(--icon-s, 16px);
-			height: var(--icon-s, 16px);
-			stroke-width: var(--icon-s-stroke-width, 2px);
-		}
-	}
 
 }
 

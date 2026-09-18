@@ -29,6 +29,7 @@ export interface ActivityModalDeps {
 	addProgressListener?(listener: (current: number, total: number) => void): void;
 	removeProgressListener?(listener: (current: number, total: number) => void): void;
 	sync(): Promise<unknown>;
+	stopSync?(): Promise<void>;
 	addStateChangeListener(listener: (state: SyncState) => void): void;
 	removeStateChangeListener(listener: (state: SyncState) => void): void;
 }
@@ -44,6 +45,8 @@ export class ActivityModal extends BaseUiModal {
 	private errorMessageEl!: HTMLSpanElement;
 	private syncBtn!: HTMLButtonElement;
 	private syncBtnIcon!: HTMLSpanElement;
+	private syncBtnIconName = '';
+	private stoppingSync = false;
 	private pendingCount!: HTMLSpanElement;
 	private conflictsCount!: HTMLSpanElement;
 	private pendingPanel!: HTMLDivElement;
@@ -124,11 +127,19 @@ export class ActivityModal extends BaseUiModal {
 			cls: 'crate-sync-now-btn',
 			attr: { type: 'button', 'aria-label': 'Sync now', title: 'Sync now' },
 		});
-		this.syncBtnIcon = this.syncBtn.createSpan({ cls: 'crate-sync-btn-icon' });
-		setIcon(this.syncBtnIcon, 'refresh-cw');
-		this.syncBtn.createSpan({ text: 'Sync now', cls: 'crate-sync-btn-text' });
+		this.syncBtnIcon = this.syncBtn.createSpan({ cls: 'crate-sync-btn-icon', attr: { 'aria-hidden': 'true' } });
+		this.syncBtnIconName = '';
 		this.syncBtn.addEventListener('click', () => {
-			void this.deps.sync();
+			if (this.deps.stopSync && (this.deps.getState().status === 'syncing' || this.deps.getActivityProgress?.())) {
+				this.stoppingSync = true;
+				this.updateSyncBtn();
+				void this.deps.stopSync()
+					.then(() => { new Notice('Sync stopped. Automatic sync is off on this device.'); })
+					.catch(error => { new Notice(error instanceof Error ? error.message : 'Could not stop sync.'); })
+					.finally(() => { this.stoppingSync = false; this.updateSyncBtn(); });
+			} else {
+				void this.deps.sync().catch(error => { new Notice(error instanceof Error ? error.message : 'Could not sync.'); });
+			}
 		});
 		this.updateSyncBtn();
 
@@ -207,10 +218,17 @@ export class ActivityModal extends BaseUiModal {
 
 	private updateSyncBtn(): void {
 		const syncing = this.deps.getState().status === 'syncing' || !!this.deps.getActivityProgress?.();
-		this.syncBtn.disabled = syncing;
-        this.syncBtn.hidden = this.currentTabIndex === 0 && !!this.deps.syncSelected && !!this.deps.createPendingDiscard && this.deps.getPendingPaths().length > 0 && !!this.deps.loadPendingDiff;
-		this.syncBtn.setAttribute('aria-label', syncing ? 'Syncing' : 'Sync now');
-		this.syncBtn.setAttribute('title', syncing ? 'Syncing' : 'Sync now');
+		const canStop = syncing && !!this.deps.stopSync;
+		const label = this.stoppingSync ? 'Pausing…' : canStop ? 'Pause sync' : syncing ? 'Syncing' : 'Sync now';
+		this.syncBtn.disabled = this.stoppingSync || (syncing && !canStop);
+		this.syncBtn.hidden = !syncing && !this.stoppingSync && this.currentTabIndex === 0 && !!this.deps.syncSelected && !!this.deps.createPendingDiscard && this.deps.getPendingPaths().length > 0 && !!this.deps.loadPendingDiff;
+		this.syncBtn.setAttribute('aria-label', label);
+		this.syncBtn.setAttribute('title', label);
+		const icon = canStop || this.stoppingSync ? 'pause' : 'refresh-cw';
+		if (icon !== this.syncBtnIconName) {
+			setIcon(this.syncBtnIcon, icon);
+			this.syncBtnIconName = icon;
+		}
 
 	}
 

@@ -45,3 +45,30 @@ describe('activity modal completion progress', () => {
         expect(panel.collectText()).toContain('Showing 50 of 53 uploaded files.');
     });
 });
+
+
+it('keeps Pause sync visible and enabled while pending files are transferring', () => {
+    let syncing = true;
+    const deps = {
+        getState: () => ({ status: syncing ? 'syncing' : 'idle' } as SyncState),
+        getPendingPaths: () => ['note.md'], getActiveConflicts: () => [],
+        sync: vi.fn(), stopSync: vi.fn(), syncSelected: vi.fn(), createPendingDiscard: vi.fn(), loadPendingDiff: vi.fn(),
+        addStateChangeListener: vi.fn(), removeStateChangeListener: vi.fn(),
+    };
+    const modal = new ActivityModal({} as never, DEFAULT_SETTINGS, deps);
+    const button = new FakeElement('button');
+    const icon = new FakeElement('span');
+    const internal = modal as unknown as {
+        syncBtn: HTMLElement; syncBtnIcon: HTMLElement; updateSyncBtn(): void;
+    };
+    internal.syncBtn = button as unknown as HTMLElement;
+    internal.syncBtnIcon = icon as unknown as HTMLElement;
+    internal.updateSyncBtn();
+    expect((button as unknown as HTMLButtonElement).hidden).toBe(false);
+    expect((button as unknown as HTMLButtonElement).disabled).toBe(false);
+    expect(button.getAttribute('aria-label')).toBe('Pause sync');
+    syncing = false;
+    internal.updateSyncBtn();
+    expect(button.getAttribute('aria-label')).toBe('Sync now');
+    expect((button as unknown as HTMLButtonElement).hidden).toBe(true);
+});

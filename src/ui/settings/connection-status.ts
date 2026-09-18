@@ -27,6 +27,16 @@ export function renderConnectionStatus(containerEl: HTMLElement, plugin: CratePl
 			new Notice(`Sync failed: ${errorMessage(error)}`);
 		} finally { button.setDisabled(false); }
 	}));
+	setting.addButton(button => button.setButtonText('Stop sync').onClick(async () => {
+		button.setDisabled(true);
+		try {
+			await runtime.stopSync();
+			plugin.refreshSettingsTab();
+			new Notice('Sync stopped. Automatic sync is off on this device.');
+		} catch (error) {
+			new Notice(`Could not finish stopping sync: ${errorMessage(error)}`);
+		} finally { button.setDisabled(false); render(); }
+	}));
 	setting.addButton(button => button.setButtonText('View activity').onClick(() => {
 		new ActivityModal(plugin.app, plugin.settings, runtime).open();
 	}));
