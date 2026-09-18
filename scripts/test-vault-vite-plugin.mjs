@@ -11,25 +11,34 @@ export function testVaultDeployPlugin({ rootDir }) {
 		async writeBundle() {
 			const manifestPath = path.join(rootDir, 'manifest.json');
 			const manifest = await readJson(manifestPath);
-			const vaultPath = resolveTestVaultPath(rootDir);
-			const pluginDir = path.join(vaultPath, '.obsidian', 'plugins', manifest.id);
+			for (const vaultPath of resolveDevVaultPaths(rootDir)) {
+				const pluginDir = path.join(vaultPath, '.obsidian', 'plugins', manifest.id);
 
-			await mkdir(pluginDir, { recursive: true });
-			await replaceRequiredFile(path.join(rootDir, 'dist', 'main.js'), path.join(pluginDir, 'main.js'));
-			await replaceRequiredFile(manifestPath, path.join(pluginDir, 'manifest.json'));
-			await replaceOptionalFile(path.join(rootDir, 'dist', 'styles.css'), path.join(pluginDir, 'styles.css'));
+				await mkdir(pluginDir, { recursive: true });
+				await replaceRequiredFile(path.join(rootDir, 'dist', 'main.js'), path.join(pluginDir, 'main.js'));
+				await replaceRequiredFile(manifestPath, path.join(pluginDir, 'manifest.json'));
+				await replaceOptionalFile(path.join(rootDir, 'dist', 'styles.css'), path.join(pluginDir, 'styles.css'));
 
-			console.log(`Deployed ${manifest.id} to ${path.relative(rootDir, pluginDir)}`);
+				console.log(`Deployed ${manifest.id} to ${path.relative(rootDir, pluginDir)}`);
+			}
 		},
 	};
 }
 
-function resolveTestVaultPath(rootDir) {
-	const configuredPath = loadEnv('development', rootDir, 'OBSIDIAN_TEST_VAULT').OBSIDIAN_TEST_VAULT?.trim();
-	if (!configuredPath) {
-		return path.join(rootDir, 'test-vault');
+function resolveDevVaultPaths(rootDir) {
+	const env = loadEnv('development', rootDir, 'OBSIDIAN_');
+	const configuredPaths = env.OBSIDIAN_DEV_VAULTS?.trim();
+	const vaultPaths = configuredPaths
+		? JSON.parse(configuredPaths)
+		: [env.OBSIDIAN_TEST_VAULT?.trim() || 'test-vault'];
+	if (!Array.isArray(vaultPaths) || vaultPaths.length === 0
+		|| vaultPaths.some(value => typeof value !== 'string' || !value.trim())) {
+		throw new Error('OBSIDIAN_DEV_VAULTS must be a non-empty JSON array of vault paths');
 	}
+	return [...new Set(vaultPaths.map(value => resolveVaultPath(rootDir, value.trim())))];
+}
 
+function resolveVaultPath(rootDir, configuredPath) {
 	const unquotedPath = configuredPath.replace(/^['"]|['"]$/g, '');
 	const expandedPath = unquotedPath === '~'
 		? os.homedir()
