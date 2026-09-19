@@ -9,6 +9,8 @@ import { Button } from './shared/Button';
 import { ThemeIconProvider } from '../reminders/components/theme-icon';
 import { ObsidianIcon } from '../reminders/components/obsidian-icon';
 
+const activeOperations = new WeakMap<App, CloudflareDeploymentModal>();
+
 type DeploymentProgressState = 'working' | 'success' | 'error';
 export type CloudflareDeploymentMode = 'setup' | 'update';
 
@@ -33,6 +35,7 @@ export class CloudflareDeploymentModal extends Modal {
 	private content: DeploymentProgressContent;
 	private closed = false;
 	private root: Root | undefined;
+	private releaseLifecycle?: () => void;
 	private vaultSelection?: { deployments: DiscoveredCloudflareDeployment[]; missing: boolean; resolve: (value: DiscoveredCloudflareDeployment | 'create' | null) => void };
 
 	constructor(app: App, mode: CloudflareDeploymentMode = 'setup') {
@@ -52,6 +55,7 @@ export class CloudflareDeploymentModal extends Modal {
 
 	onOpen(): void {
 		this.closed = false;
+		if (this.content.state === 'working') activeOperations.set(this.app, this);
 		this.modalEl.addClass('crate-cloudflare-deployment-modal');
 		this.modalEl.addClass('crate-custom-modal-close');
 		this.contentEl.addClass('crate-reminders-ui');
@@ -59,8 +63,43 @@ export class CloudflareDeploymentModal extends Modal {
 		this.render();
 	}
 
+	close(): void {
+		// Obsidian routes backdrop, Escape, and the close button through here.
+		if (this.content.state === 'working' && !this.vaultSelection) return;
+		super.close();
+	}
+
+	/** Only lifecycle shutdown and the OAuth hand-off may hide active work. */
+	dismiss(): void {
+		if (activeOperations.get(this.app) === this) activeOperations.delete(this.app);
+		this.releaseLifecycle?.();
+		this.releaseLifecycle = undefined;
+		super.close();
+	}
+
+	bindLifecycle(signal: AbortSignal): void {
+		this.releaseLifecycle?.();
+		const close = () => this.dismiss();
+		signal.addEventListener('abort', close, { once: true });
+		this.releaseLifecycle = () => signal.removeEventListener('abort', close);
+		if (signal.aborted) this.dismiss();
+	}
+
+	reveal(hostDocument?: Document): void {
+		if (this.closed) this.open();
+		if (hostDocument) hostDocument.body.appendChild(this.containerEl);
+		const document = hostDocument ?? this.containerEl.ownerDocument;
+		document.defaultView?.focus();
+		this.containerEl.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
+	}
+
 	onClose(): void {
 		this.closed = true;
+		if (this.vaultSelection || this.content.state !== 'working') {
+			this.releaseLifecycle?.();
+			this.releaseLifecycle = undefined;
+			if (activeOperations.get(this.app) === this) activeOperations.delete(this.app);
+		}
 		this.vaultSelection?.resolve(null);
 		this.vaultSelection = undefined;
 		this.root?.unmount();
@@ -97,6 +136,10 @@ export class CloudflareDeploymentModal extends Modal {
 
 	private update(content: DeploymentProgressContent): void {
 		this.content = content;
+		if (content.state !== 'working') {
+			if (activeOperations.get(this.app) === this) activeOperations.delete(this.app);
+			if (this.closed) { this.releaseLifecycle?.(); this.releaseLifecycle = undefined; }
+		}
 		if (!this.closed) {
 			this.render();
 		}
@@ -142,6 +185,7 @@ export class CloudflareDeploymentModal extends Modal {
 		);
 		this.root?.render(createElement(ThemeIconProvider, { renderer: ObsidianIcon, children: createElement(ModalLayout, {
 			title: this.content.title,
+			closeDisabled: this.content.state === 'working',
 			onClose: () => this.close(),
 			footer,
 			children: createElement(StatusContent, this.content),
@@ -154,9 +198,11 @@ export function openCloudflareDeploymentModal(
 	app: App,
 	mode: CloudflareDeploymentMode = 'setup',
 	hostDocument?: Document,
+	signal?: AbortSignal,
 ): CloudflareDeploymentModal {
 	const modal = new CloudflareDeploymentModal(app, mode);
 	modal.open();
+	if (signal) modal.bindLifecycle(signal);
 	// OAuth may return to a different window than the detached Settings window.
 	// Place the complete modal in its intended document instead of waiting for
 	// activeWindow or animation frames, which can pause in background windows.
@@ -166,4 +212,12 @@ export function openCloudflareDeploymentModal(
 		modal.containerEl.querySelector<HTMLElement>('button')?.focus();
 	}
 	return modal;
+}
+
+/** Bring the existing operation back instead of starting overlapping work. */
+export function revealCloudflareOperation(app: App, hostDocument?: Document): boolean {
+	const modal = activeOperations.get(app);
+	if (!modal) return false;
+	modal.reveal(hostDocument);
+	return true;
 }

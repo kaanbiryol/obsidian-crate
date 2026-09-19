@@ -5,8 +5,10 @@ const generateSecureToken = vi.fn(() => 'device-token');
 const hashToken = vi.fn(async () => 'device-token-hash');
 const openCloudflareDeploymentModal = vi.fn();
 
+const revealCloudflareOperation = vi.fn(() => false);
+
 const progress = {
-	close: vi.fn(),
+	dismiss: vi.fn(),
 	selectVault: vi.fn(),
 	setWorking: vi.fn(),
 	succeed: vi.fn(),
@@ -22,7 +24,7 @@ async function loadPluginIntegration() {
 		getCurrentDeviceName: vi.fn(() => 'Test device'),
 		getCurrentPlatformCode: vi.fn(() => 'desktop'),
 	}));
-	vi.doMock('../ui/cloudflare-deployment-modal', () => ({ openCloudflareDeploymentModal }));
+	vi.doMock('../ui/cloudflare-deployment-modal', () => ({ openCloudflareDeploymentModal, revealCloudflareOperation }));
 	vi.doMock('../ui/cloudflare-server-picker-modal', () => ({ selectCloudflareServer: vi.fn() }));
 	vi.doMock('./embedded-artifacts', () => ({ loadEmbeddedCloudflareArtifacts: vi.fn() }));
 	vi.doMock('./http', () => ({ obsidianHttpTransport: vi.fn() }));
@@ -59,6 +61,7 @@ beforeEach(() => {
 	generateSecureToken.mockClear();
 	hashToken.mockClear();
 	openCloudflareDeploymentModal.mockReset();
+	revealCloudflareOperation.mockReset().mockReturnValue(false);
 	openCloudflareDeploymentModal.mockReturnValue(progress);
 	progress.setWorking.mockReset();
 	progress.succeed.mockReset();
@@ -92,7 +95,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		});
 
 		expect(plugin.openSettingsTab).toHaveBeenCalledTimes(1);
-		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'setup', undefined);
+		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'setup', undefined, expect.any(AbortSignal));
 		expect(plugin.openSettingsTab.mock.invocationCallOrder[0])
 			.toBeLessThan(openCloudflareDeploymentModal.mock.invocationCallOrder[0] ?? 0);
 		expect(configureCloudflareAuthorizedDevice).toHaveBeenCalledWith(
@@ -117,7 +120,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 		plugin.getSettingsDocument.mockReturnValue(hostDocument);
 		configureCloudflareAuthorizedDevice.mockResolvedValue({ success: true });
 		await handleCloudflareOAuthProtocol(plugin as never, { code: 'code', state: 'state' });
-		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'setup', hostDocument);
+		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'setup', hostDocument, expect.any(AbortSignal));
 	});
 
 	it('refreshes the visible settings after updating an already connected server', async () => {
@@ -137,7 +140,7 @@ describe('handleCloudflareOAuthProtocol', () => {
 			'Cloudflare server updated',
 			'Your Worker and Crate web app are now up to date.',
 		);
-		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'update', undefined);
+		expect(openCloudflareDeploymentModal).toHaveBeenCalledWith(plugin.app, 'update', undefined, expect.any(AbortSignal));
 	});
 
 	it('registers and reconnects a fresh device after resetting an already connected server', async () => {
@@ -319,4 +322,15 @@ it('does not open another update dialog when the service is busy', async () => {
     await startCloudflareDeployment(plugin as never, 'update');
     expect(openCloudflareDeploymentModal).not.toHaveBeenCalled();
     expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization).not.toHaveBeenCalled();
+});
+
+
+it('reveals existing progress instead of starting another server operation', async () => {
+	const { startCloudflareDeployment } = await loadPluginIntegration();
+	const plugin = createPlugin(true);
+	revealCloudflareOperation.mockReturnValue(true);
+	await startCloudflareDeployment(plugin as never, 'update');
+	expect(revealCloudflareOperation).toHaveBeenCalledWith(plugin.app, undefined);
+	expect(plugin.cloudflareDeploymentService.deployWithSavedAuthorization).not.toHaveBeenCalled();
+	expect(openCloudflareDeploymentModal).not.toHaveBeenCalled();
 });

@@ -60,18 +60,22 @@ export async function runIncrementalSync(
     logger.info(`Incremental sync: ${changeCount} remote changes since seq ${context.settings.lastSeq}`);
 
     context.reportWork?.('scanning');
-    const localChanges = await context.getLocalChanges();
+    const unchangedPaths: string[] = [];
+    const localChanges = await context.getLocalChanges(path => unchangedPaths.push(path));
     const localDeletes = await context.getLocalDeletes();
     logger.info(`Incremental sync: ${localChanges.length} local changes detected`);
     logger.info(`Incremental sync: ${localDeletes.length} local deletes detected`);
 
+    const result = createEmptySyncResult();
+    result.settledPaths.push(...unchangedPaths.filter(path => !changesByPath.has(path)));
+
     if (changeCount === 0 && localChanges.length === 0 && localDeletes.length === 0) {
+      if (unchangedPaths.length > 0) await context.localManifest.save();
       context.settings.lastSeq = latestSeq;
-      return createEmptySyncResult();
+      return result;
     }
 
 
-    const result = createEmptySyncResult();
     const {
       resurrectPaths,
       restoreDeletedPaths,

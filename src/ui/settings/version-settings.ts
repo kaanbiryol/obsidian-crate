@@ -1,0 +1,27 @@
+import { Setting } from 'obsidian';
+import type CratePlugin from '../../plugin/CratePlugin';
+import release from '../../cloudflare/server-release.json';
+import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
+
+export function renderVersionSettings(container: HTMLElement, plugin: CratePlugin): void {
+	new Setting(container).setName('Plugin version').setDesc(plugin.manifest.version);
+	new Setting(container).setName('Bundled server').setDesc(`Revision ${release.revision}`);
+	const server = new Setting(container).setName('Connected server').setDesc('Checking version…');
+	void plugin.syncRuntime.getVersionInfo().then(info => {
+		const version = info.serverRevision ? `Revision ${info.serverRevision}` : 'Revision unknown';
+		const comparison = info.deploymentFingerprint
+			? info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint
+				? 'Matches the bundled server.' : 'Differs from the bundled server.'
+			: 'Build comparison unavailable.';
+		server.setDesc(`${version} · ${comparison}`);
+	}).catch(() => server.setDesc('Version unavailable. Connect to the server to check.'));
+}
+
+export function renderUpdateVersions(setting: Setting, plugin: CratePlugin): void {
+	const target = `revision ${release.revision} (${EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint.slice(0, 8)})`;
+	setting.setDesc(`Server revision unknown → ${target}. Update your sync server and reminders web app.`);
+	void plugin.syncRuntime.getVersionInfo().then(info => {
+		if (info.deploymentFingerprint === EMBEDDED_CLOUDFLARE_ARTIFACT.fingerprint) { setting.settingEl.hide(); return; }
+		setting.setDesc(`Server ${info.serverRevision ? `revision ${info.serverRevision}` : 'revision unknown'} → ${target}. Update your sync server and reminders web app.`);
+	}).catch(() => {});
+}

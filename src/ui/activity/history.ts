@@ -121,6 +121,6 @@ function renderHistorySummary(header: HTMLElement, entry: SyncHistoryEntry, coun
         stat.createSpan({ text: metrics.length === 1 && metric.count === 1 && ['uploaded', 'downloaded', 'merged', 'deleted'].includes(metric.label) ? `file ${metric.label}` : metric.label });
     }
     if (entry.success && metrics.length === 0) {
-        summary.createSpan({ text: count > 1 ? `No changes · ${count.toLocaleString()} syncs` : 'No changes', cls: 'crate-history-unchanged' });
+        summary.createSpan({ text: count > 1 ? `No changes · ${count.toLocaleString()} checks` : 'No changes', cls: 'crate-history-unchanged' });
     }
 }

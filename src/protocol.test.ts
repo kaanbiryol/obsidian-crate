@@ -40,3 +40,12 @@ describe('Crate protocol contract', () => {
 		)).toBe(true);
 	});
 });
+
+it('preserves valid server identity while ignoring malformed optional version fields', () => {
+	const base = { service: 'crate', serverVersion: 'crate', protocol: CRATE_PLUGIN_PROTOCOL, capabilities: [] };
+	expect(parseCrateServerInfo({ ...base, serverRevision: 43, deploymentFingerprint: 'a'.repeat(64) }))
+		.toMatchObject({ serverRevision: 43, deploymentFingerprint: 'a'.repeat(64) });
+	const invalid = parseCrateServerInfo({ ...base, serverRevision: -1, deploymentFingerprint: 'private data' });
+	expect(invalid?.serverRevision).toBeUndefined();
+	expect(invalid?.deploymentFingerprint).toBeUndefined();
+});

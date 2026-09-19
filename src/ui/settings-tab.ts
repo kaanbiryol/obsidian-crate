@@ -5,7 +5,7 @@
 import { createSettingsDisclosure, createSettingsSectionHeading } from './settings/section-helpers';
 import { renderUsageSection } from './settings/usage-section';
 import { renderConnectionStatus } from './settings/connection-status';
-import { App, PluginSettingTab } from 'obsidian';
+import { App, PluginSettingTab, Setting } from 'obsidian';
 import type CratePlugin from '../main';
 import { renderForgetServerSetting } from './settings/server-selection-setting';
 import { renderConfigSection, renderServerSection, renderServerUpdateNotice } from './settings/config-section';
@@ -43,6 +43,7 @@ export class CrateSettingTab extends PluginSettingTab {
 		renderServerUpdateNotice({ containerEl, plugin: this.plugin, rerender: () => this.update() });
 
 		if (!isConfigured) {
+			new Setting(containerEl).setName('Plugin version').setDesc(this.plugin.manifest.version);
 			renderConfigSection({ containerEl, plugin: this.plugin, rerender: () => this.update() });
 			renderForgetServerSetting({ containerEl, plugin: this.plugin, rerender: () => this.update() });
 		}

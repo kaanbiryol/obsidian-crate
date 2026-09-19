@@ -1,3 +1,5 @@
+import serverRelease from '../cloudflare/server-release.json';
+import type { CrateServerInfo } from '../protocol';
 import { CRATE_PLUGIN_PROTOCOL } from '../protocol';
 import { normalizeSyncTimings } from './timings';
 import { MAX_SYNC_HISTORY, type CrateSettings } from '../plugin/settings-types';
@@ -10,11 +12,15 @@ function timestamp(value: unknown): string | null {
 }
 
 /** Explicitly select safe fields; raw settings, filenames and errors stay local. */
-export function buildDiagnosticExport(settings: CrateSettings, state: SyncState, version: string, requests?: RequestDiagnostics): string {
+export function buildDiagnosticExport(settings: CrateSettings, state: SyncState, version: string, requests?: RequestDiagnostics, server?: CrateServerInfo): string {
 	return JSON.stringify({
 		format: 'crate-sync-diagnostics', version: 1, exportedAt: new Date().toISOString(),
 		pluginVersion: /^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(version) ? version : 'unknown',
 		protocol: CRATE_PLUGIN_PROTOCOL.current,
+		bundledServerRevision: serverRelease.revision,
+		serverWebAppBuild: typeof server?.pwaAssetVersion === 'string' && /^[a-zA-Z0-9._-]{1,128}$/.test(server.pwaAssetVersion) ? server.pwaAssetVersion : null,
+		serverRevision: count(server?.serverRevision) || null,
+		serverFingerprint: typeof server?.deploymentFingerprint === 'string' && /^[a-f0-9]{64}$/.test(server.deploymentFingerprint) ? server.deploymentFingerprint : null,
 		configured: Boolean(settings.workerUrl),
 		status: ['idle', 'syncing', 'offline', 'error'].includes(state.status) ? state.status : 'unknown',
 		lastSync: timestamp(state.lastSync), lastSeq: count(settings.lastSeq),

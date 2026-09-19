@@ -11,7 +11,7 @@ import { obsidianHttpTransport } from './http';
 import { configureCloudflareAuthorizedDevice } from '../sync/plugin-integration';
 import { generateSecureToken, hashToken } from '../sync/device-token';
 import { getCurrentDeviceName, getCurrentPlatformCode } from '../plugin/deviceInfo';
-import { openCloudflareDeploymentModal } from '../ui/cloudflare-deployment-modal';
+import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../ui/cloudflare-deployment-modal';
 import { selectCloudflareServer } from '../ui/cloudflare-server-picker-modal';
 import {
 	CLOUDFLARE_OAUTH_CLIENT_ID,
@@ -64,6 +64,7 @@ export function createCloudflareDeploymentService(plugin: CratePlugin): Cloudfla
 export async function startCloudflareDeployment(plugin: CratePlugin, intent?: 'switch' | 'create' | 'update' | 'reset' | 'delete'): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;
+	if (revealCloudflareOperation(plugin.app, plugin.getSettingsDocument())) return;
 	if (!isCloudflareOAuthConfigured()) {
 		new Notice('This build has no Cloudflare deployment client configured');
 		return;
@@ -106,6 +107,7 @@ async function runCloudflareOperation(
 ): Promise<void> {
 	const signal = getPluginLifecycleSignal(plugin);
 	if (signal.aborted) return;
+	if (revealCloudflareOperation(plugin.app, plugin.getSettingsDocument())) return;
     if (plugin.cloudflareDeploymentService.isBusy) {
         new Notice('A Cloudflare operation is still running. Wait for its result before starting another.');
         return;
@@ -120,6 +122,7 @@ async function runCloudflareOperation(
 		plugin.app,
 		shouldConnectDevice ? 'setup' : 'update',
 		plugin.getSettingsDocument(),
+		signal,
 	);
 	if (isDelete) progress.setWorking('Deleting Crate server', 'Verifying this server, then removing its remote data and Worker. Keep Obsidian open.');
 	if (isReset) progress.setWorking('Rebuilding Crate server', 'Verifying this deployment, then erasing its remote data and rebuilding. Keep Obsidian open.');
@@ -147,7 +150,7 @@ async function runCloudflareOperation(
 		if (savedIntent && error instanceof CloudflareReauthorizationRequired) {
 			try {
 				await plugin.cloudflareDeploymentService.startDeployment(savedIntent);
-				if (!signal.aborted) progress.close();
+				if (!signal.aborted) progress.dismiss();
 			} catch (authorizationError) {
 				if (!signal.aborted) progress.fail('Could not connect to Cloudflare', deploymentErrorMessage(authorizationError), ['Try again from Crate settings.']);
 			}

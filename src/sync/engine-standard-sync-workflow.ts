@@ -115,6 +115,9 @@ export async function runSyncWorkflow(
 			errors,
 		} = plan;
 		result.errors.push(...errors);
+		for (const [path, entry] of Object.entries(localFiles)) {
+			if (entry.hash === getPathEntry(remoteManifest.files, path)?.hash) result.settledPaths.push(path);
+		}
 
 		const conflictDiffs = diffs.filter(diff => diff.action === 'conflict');
 		const deleteDiffs = diffs.filter(diff => diff.action === 'delete');

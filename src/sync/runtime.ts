@@ -1,3 +1,4 @@
+import type { CrateServerInfo } from '../protocol';
 import { createConflictReview } from './conflict-review';
 import { loadPendingDiff } from './pending-diff';
 import type { SyncActivityProgress } from './types';
@@ -103,8 +104,26 @@ export class SyncRuntime {
 		return preview;
 	}
 
+	private versionInfo?: { client: SyncApiClient; info: CrateServerInfo };
+	private versionRequest?: { client: SyncApiClient; promise: Promise<CrateServerInfo> };
+
+	async getVersionInfo(): Promise<CrateServerInfo> {
+		const client = this.apiClient;
+		if (!client) throw new Error('Not connected');
+		if (this.versionRequest?.client === client) return this.versionRequest.promise;
+		this.versionInfo = undefined;
+		const promise = client.getServerInfo().then(info => {
+			if (this.apiClient !== client) throw new Error('Server changed');
+			this.versionInfo = { client, info };
+			return info;
+		});
+		this.versionRequest = { client, promise };
+		try { return await promise; }
+		finally { if (this.versionRequest?.promise === promise) this.versionRequest = undefined; }
+	}
+
 	exportDiagnostics(): string {
-		return buildDiagnosticExport(this.settings, this.getState(), this.plugin.manifest.version, this.apiClient?.getRequestDiagnostics());
+		return buildDiagnosticExport(this.settings, this.getState(), this.plugin.manifest.version, this.apiClient?.getRequestDiagnostics(), this.versionInfo?.client === this.apiClient ? this.versionInfo?.info : undefined);
 	}
 
 	async previewIgnoredRemoteFiles(): Promise<string[]> {

@@ -1,7 +1,7 @@
 import { Notice } from 'obsidian';
 import type CratePlugin from '../plugin/CratePlugin';
 import { getPluginLifecycleSignal } from '../plugin/lifecycle-state';
-import { openCloudflareDeploymentModal } from '../ui/cloudflare-deployment-modal';
+import { openCloudflareDeploymentModal, revealCloudflareOperation } from '../ui/cloudflare-deployment-modal';
 import { startCloudflareDeployment } from './plugin-integration';
 import { CloudflareReauthorizationRequired } from './oauth-client';
 import { DeploymentRecoveryRequiredError } from './deployment-fence';
@@ -9,11 +9,12 @@ import { DeploymentRecoveryRequiredError } from './deployment-fence';
 export async function checkAndRecoverUpdate(plugin: CratePlugin): Promise<void> {
     const signal = getPluginLifecycleSignal(plugin);
     if (signal.aborted) return;
+    if (revealCloudflareOperation(plugin.app, plugin.getSettingsDocument())) return;
     if (plugin.cloudflareDeploymentService.isBusy) {
         new Notice('A Cloudflare operation is still running. Wait for its result before checking recovery.');
         return;
     }
-    const progress = openCloudflareDeploymentModal(plugin.app, 'update');
+    const progress = openCloudflareDeploymentModal(plugin.app, 'update', plugin.getSettingsDocument(), signal);
     progress.setWorking('Checking server update', 'Checking Cloudflare and the interrupted operation. Keep Obsidian open until this check finishes.');
     try {
         const result = await plugin.cloudflareDeploymentService.recoverUpdate(

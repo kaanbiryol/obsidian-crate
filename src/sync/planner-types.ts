@@ -34,6 +34,7 @@ interface PlannerApi {
 }
 
 export interface LocalDiffPlannerContext {
+  pendingPaths?: ReadonlySet<string>;
   plannedContent?: PlannedContent;
   vault: Vault;
   localManifest: PlannerManifest;
@@ -53,7 +54,7 @@ export interface IncrementalSyncPlannerContext {
   api: PlannerApi;
   localManifest: PlannerManifest;
   shouldIgnore(path: string): boolean;
-  getLocalChanges(): Promise<{ path: string; hash: string }[]>;
+  getLocalChanges(onUnchanged?: (path: string) => void): Promise<{ path: string; hash: string }[]>;
   getLocalDeletes(): Promise<string[]>;
   parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void>;
   processDiff(

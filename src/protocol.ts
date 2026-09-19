@@ -11,6 +11,9 @@ export interface CrateServerInfo {
 	readonly protocol: CrateProtocolRange;
 	readonly capabilities: readonly string[];
 	readonly reminderOperationDay?: number;
+	readonly serverRevision?: number;
+	readonly pwaAssetVersion?: string;
+	readonly deploymentFingerprint?: string;
 }
 
 /**
@@ -68,6 +71,9 @@ export function parseCrateServerInfo(value: unknown): CrateServerInfo | null {
 			oldestCompatible: info.protocol.oldestCompatible,
 		},
 		capabilities: [...info.capabilities],
+		...(typeof info.pwaAssetVersion === 'string' && /^[a-zA-Z0-9._-]{1,128}$/.test(info.pwaAssetVersion) ? { pwaAssetVersion: info.pwaAssetVersion } : {}),
+		...(isPositiveInteger(info.serverRevision) ? { serverRevision: info.serverRevision } : {}),
+		...(typeof info.deploymentFingerprint === 'string' && /^[a-f0-9]{64}$/.test(info.deploymentFingerprint) ? { deploymentFingerprint: info.deploymentFingerprint } : {}),
 		...(isPositiveInteger(info.reminderOperationDay) ? { reminderOperationDay: info.reminderOperationDay } : {}),
 	};
 }

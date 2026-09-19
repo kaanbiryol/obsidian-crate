@@ -23,6 +23,7 @@ export async function getLocalDeletes(
 export async function getLocalChanges(
   context: LocalDiffPlannerContext,
   prepareConcurrency: number,
+  onUnchanged?: (path: string) => void,
 ): Promise<Array<{ path: string; hash: string }>> {
   const changes: Array<{ path: string; hash: string }> = [];
   const allFiles = await getAllVaultFiles(context.vault, context.shouldIgnore.bind(context));
@@ -35,6 +36,7 @@ export async function getLocalChanges(
   const candidates = allFiles.filter((file) => {
     if (file.size > MAX_FILE_SIZE_BYTES) return false;
 
+    if (context.pendingPaths?.has(file.path)) return true;
     const existing = context.localManifest.getEntry(file.path);
     if (!existing) return true;
     if (existing.size !== file.size) return true;
@@ -57,6 +59,7 @@ export async function getLocalChanges(
       size: file.size,
       modified: new Date(file.mtime).toISOString(),
     });
+    onUnchanged?.(file.path);
     return null;
   });
 

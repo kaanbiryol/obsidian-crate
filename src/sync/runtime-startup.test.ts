@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncEngine } from './engine';
+import { buildPersistedCrateSettings, normalizeCrateSettings } from '../plugin/settings';
+
+vi.mock('react-dom/client', () => ({
+	createRoot: () => ({ render: vi.fn(), unmount: vi.fn() }),
+}));
 import { SyncQueueController } from './queue-controller';
 import { createEmptySyncResult } from './sync-result';
 import { SyncRuntime } from './runtime';
@@ -28,6 +33,21 @@ describe('SyncRuntime startup event handling', () => {
 		startupSync.resolve(createEmptySyncResult());
 		await flushMicrotasks();
 		vi.restoreAllMocks();
+	});
+
+	it('keeps automatic sync off after saving settings and restarting', async () => {
+		const saved = buildPersistedCrateSettings(normalizeCrateSettings({
+			automaticSync: false, syncOnStartup: true, syncOnResume: true, syncInterval: 300,
+		}, '.vault-config'));
+		const reloaded = normalizeCrateSettings(JSON.parse(JSON.stringify(saved)) as typeof saved, '.vault-config');
+		const { runtime } = createRuntimeHarness(reloaded);
+		const sync = vi.spyOn(SyncEngine.prototype, 'sync');
+		try {
+			await runtime.initialize();
+			expect(await runtime.waitForStartupSync()).toBe(false);
+			expect(sync).not.toHaveBeenCalled();
+			expect(isAcceptingEvents(runtime)).toBe(true);
+		} finally { runtime.destroy(); }
 	});
 
 	it('ignores vault discovery before layout readiness and keeps manual sync available', async () => {
