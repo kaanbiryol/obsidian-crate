@@ -103,6 +103,9 @@ button:disabled{cursor:not-allowed;opacity:.55}
 .settings-theme-option:hover{background:rgba(255,255,255,.045);color:var(--text-normal)}
 .settings-theme-option.is-active{background:rgba(255,255,255,.08);color:var(--text-normal);box-shadow:none}
 .settings-action-button{min-width:64px;min-height:44px;padding:0 11px;border:1px solid rgba(var(--accent-rgb),.28);border-radius:8px;background:rgba(var(--accent-rgb),.12);color:#bda7ff;font-size:var(--pwa-font-control);font-weight:650;white-space:nowrap}
+.settings-row--diagnostics{align-items:stretch;flex-direction:column;gap:12px}
+.settings-row--diagnostics .settings-action-button{align-self:flex-start;flex:none;max-width:100%;padding:10px 12px;white-space:normal;overflow-wrap:anywhere}
+.settings-diagnostics-text{width:100%;min-height:160px;font-size:16px;user-select:text;-webkit-user-select:text}
 .settings-row--storage{align-items:stretch;flex-direction:column;gap:12px}
 .settings-row--storage .settings-action-button{align-self:flex-start;flex:none;max-width:100%;padding:10px 12px;white-space:normal;overflow-wrap:anywhere}
 .settings-status{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;color:var(--text-faint);font-size:var(--pwa-font-caption);font-weight:560;line-height:1;white-space:nowrap}
