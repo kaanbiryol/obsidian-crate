@@ -29,7 +29,7 @@ interface SyncEngineContextDependencies {
 	runConcurrent: <T>(tasks: (() => Promise<T>)[], concurrency: number) => Promise<T[]>;
 	retryWithBackoff: <T>(fn: () => Promise<T>) => Promise<T>;
 	getModifiedIso: (path: string, fallbackMtime?: number) => Promise<string>;
-	getLocalChanges: () => Promise<{ path: string; hash: string }[]>;
+	getLocalChanges: (onUnchanged?: (path: string) => void) => Promise<{ path: string; hash: string }[]>;
 	verifyContent: (files: VaultFile[]) => Promise<boolean>;
 	getLocalDeletes: () => Promise<string[]>;
 	incrementalSync: (progressCallback?: (current: number, total: number) => void) => Promise<SyncResult | null>;

@@ -1,3 +1,4 @@
+import { PWA_ASSET_VERSION } from './pwa-version';
 import release from '../server-release.json';
 import type { Env } from './types';
 import { BATCH_ASSET_UPLOAD_CAPABILITY, BULK_NEW_UPLOAD_CAPABILITY } from '../../protocol/sync-limits';
@@ -19,6 +20,7 @@ const CRATE_SERVER_VERSION =
 export const CRATE_SERVER_INFO: CrateServerInfo = Object.freeze({
 	service: CRATE_SERVICE_ID,
 	serverVersion: CRATE_SERVER_VERSION,
+	pwaAssetVersion: PWA_ASSET_VERSION,
 	protocol: CRATE_PLUGIN_PROTOCOL,
 	capabilities: Object.freeze([
     INITIAL_IMPORT_CAPABILITY,

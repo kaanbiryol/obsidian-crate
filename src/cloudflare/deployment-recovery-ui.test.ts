@@ -2,10 +2,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
     modal: { setWorking: vi.fn(), fail: vi.fn(), succeed: vi.fn() },
     start: vi.fn(),
+    reveal: vi.fn(() => false),
     copy: vi.fn(async (_text: string) => {}),
 }));
 vi.mock('obsidian', () => ({ Notice: class {} }));
-vi.mock('../ui/cloudflare-deployment-modal', () => ({ openCloudflareDeploymentModal: () => mocks.modal }));
+vi.mock('../ui/cloudflare-deployment-modal', () => ({ openCloudflareDeploymentModal: () => mocks.modal, revealCloudflareOperation: mocks.reveal }));
 vi.mock('./plugin-integration', () => ({ startCloudflareDeployment: mocks.start }));
 import { checkAndRecoverUpdate } from './deployment-recovery-ui';
 import { DeploymentRecoveryRequiredError } from './deployment-fence';
@@ -14,6 +15,7 @@ afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
 function plugin(status: 'blocked' | 'recovered') {
     return {
         app: {},
+        getSettingsDocument: () => undefined,
         refreshSettingsTab: vi.fn(),
         cloudflareUsageConnection: { withAuthorization: vi.fn() },
         cloudflareDeploymentService: {
@@ -46,4 +48,12 @@ it('explains a retained verification lock without misreporting it as a network f
     await checkAndRecoverUpdate(instance as never);
     expect(mocks.modal.fail).toHaveBeenCalledWith('Could not check the server', expect.stringContaining('lock remains held'), undefined,
         { technicalDetails: 'Public fingerprint mismatch' });
+});
+
+
+it('reveals a running operation instead of starting recovery concurrently', async () => {
+    const instance = plugin('recovered');
+    mocks.reveal.mockReturnValueOnce(true);
+    await checkAndRecoverUpdate(instance as never);
+    expect(instance.cloudflareDeploymentService.recoverUpdate).not.toHaveBeenCalled();
 });

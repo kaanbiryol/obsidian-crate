@@ -1,3 +1,4 @@
+import { findStartupPendingPaths } from './startup-pending';
 import { SyncTimingRecorder } from './timings';
 /**
  * Core sync engine - orchestrates synchronization between local vault and remote storage
@@ -84,6 +85,7 @@ export class SyncEngine {
 	private rawEventRevisions = new Map<string, object>();
 	private patternCache = new Map<string, RegExp>();
 	private ignoredDirPrefixes: string[] = [];
+	private syncActivityRevision = 0;
 	private conflictRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(
@@ -185,7 +187,7 @@ export class SyncEngine {
 			runConcurrent: this.runConcurrent.bind(this),
 			retryWithBackoff: this.retryWithBackoff.bind(this),
 			getModifiedIso: this.getModifiedIso.bind(this),
-			getLocalChanges: () => this.getLocalChanges(),
+			getLocalChanges: (onUnchanged) => this.getLocalChanges(onUnchanged),
 			verifyContent: files => this.verifyContent(files),
 			getLocalDeletes: () => this.getLocalDeletes(),
 			incrementalSync: (progressCallback) => this.incrementalSync(progressCallback),
@@ -214,6 +216,7 @@ export class SyncEngine {
 		logger.info('Engine initialized');
 		this.plugin.app.workspace.onLayoutReady(() => {
 			this.scheduleConflictRecovery();
+			if (!this.settings.automaticSync) this.restoreStartupPendingChanges();
 		});
 		this.seedMarkdownBaseCacheInBackground();
 
@@ -361,6 +364,7 @@ export class SyncEngine {
 	private updateState(updates: Partial<SyncState>): void {
 		if (this.lifecycle?.isDestroyed) return;
 		if (updates.status === 'syncing' && this.state.status !== 'syncing') {
+			this.syncActivityRevision++;
 			this.timingRecorder.start(); this.api.resetRequestTimings?.();
 		}
 		this.timingRecorder.change(updates.work);
@@ -390,6 +394,29 @@ export class SyncEngine {
 			...settings.ignorePatterns.filter(p => p.endsWith('/')),
 			this.markdownBaseCache.getIgnoredPrefix(),
 		])];
+	}
+
+	private restoreStartupPendingChanges(): void {
+		if (this.lifecycle.isDestroyed || this.state.status === 'syncing') return;
+		const revision = this.syncActivityRevision;
+		void this.trackWork(async () => {
+			try {
+				const paths = await findStartupPendingPaths({
+					vault: this.vault,
+					baseline: this.localManifest.getManifest().files,
+					shouldIgnore: path => this.shouldIgnore(path),
+					throwIfDestroyed: () => this.lifecycle.throwIfDestroyed(),
+					runConcurrent: this.runConcurrent.bind(this),
+				}, PREPARE_CONCURRENCY);
+				if (revision === this.syncActivityRevision && !this.settings.automaticSync) {
+					this.queueController.restorePendingPaths(paths);
+				}
+			} catch (error) {
+				if (!this.isAbortError(error) && revision === this.syncActivityRevision) {
+					this.updateState({ status: 'error', lastError: `Could not check local changes: ${errorMessage(error)}` });
+				}
+			}
+		});
 	}
 
 	private seedMarkdownBaseCacheInBackground(): void {
@@ -517,8 +544,11 @@ export class SyncEngine {
 		});
 	}
 
-	private async getLocalChanges(): Promise<{ path: string; hash: string }[]> {
-		return planLocalChanges(this.contexts.localDiffPlanner(), PREPARE_CONCURRENCY);
+	private async getLocalChanges(onUnchanged?: (path: string) => void): Promise<{ path: string; hash: string }[]> {
+		return planLocalChanges({
+			...this.contexts.localDiffPlanner(),
+			pendingPaths: new Set(this.queueController.getPendingPaths()),
+		}, PREPARE_CONCURRENCY, onUnchanged);
 	}
 
 	private async parallelDownloadAndSaveFiles(requests: DownloadRequest[], result: SyncResult, onProcessed?: () => void): Promise<void> {

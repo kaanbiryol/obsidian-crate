@@ -98,7 +98,7 @@ it('renders a collapsed no-change row with its latest time', () => {
     const history = [14, 13, 12].map(hour => ({ ...entry, uploaded: 0, uploadedPaths: [],
         timestamp: new Date(2026, 8, 19, hour, 15).toISOString() }));
     renderHistoryPanel(container as unknown as HTMLElement, history);
-    expect(container.collectText()).toContain('No changes · 3 syncs');
+    expect(container.collectText()).toContain('No changes · 3 checks');
     expect(find(container, 'crate-history-time')?.collectText()).toBe('14:15');
     expect(find(container, 'crate-history-details')).toBeUndefined();
 });

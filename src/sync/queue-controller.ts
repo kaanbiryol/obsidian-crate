@@ -60,6 +60,18 @@ export class SyncQueueController {
 		return this.pendingPaths.size;
 	}
 
+	restorePendingPaths(paths: string[]): void {
+		for (const key of paths) {
+			const path = key.startsWith('delete:') ? key.substring(7) : key;
+			// Live events take precedence over the startup snapshot.
+			if (this.pendingPaths.has(path) || this.pendingPaths.has(`delete:${path}`)) continue;
+			if (this.context.shouldIgnore(path)) continue;
+			this.pendingPaths.add(key);
+			this.pendingRevisions.set(key, ++this.nextRevision);
+		}
+		this.context.updateState({ pendingChanges: this.pendingPaths.size });
+	}
+
 	onFileChange(file: Pick<TAbstractFile, 'path'>): void {
 		queueOnFileChange(this.getQueueEventContext(), file);
 	}

@@ -147,3 +147,49 @@ it('shows the saved vault name in the setup picker', async () => {
 	modal.close();
 	await expect(selected).resolves.toBeNull();
 });
+
+
+it('blocks dismissal while working, but allows closing success and failure results', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { openCloudflareDeploymentModal } = await import('./cloudflare-deployment-modal');
+	const modal = openCloudflareDeploymentModal({} as never, 'update');
+	modal.close();
+	expect(unmount).not.toHaveBeenCalled();
+	expect(MockModal.instances[0]!.contentEl.collectText()).toContain('disabled=""');
+	modal.setWorking('Still updating', 'Uploading the Worker');
+	expect(MockModal.instances[0]!.titleEl.textContent).toBe('Still updating');
+	modal.succeed('Updated', 'Finished');
+	modal.close();
+	expect(unmount).toHaveBeenCalledOnce();
+});
+
+it('reopens the same progress in a new settings document without losing its state', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { openCloudflareDeploymentModal, revealCloudflareOperation } = await import('./cloudflare-deployment-modal');
+	const app = {} as never;
+	const modal = openCloudflareDeploymentModal(app, 'update');
+	modal.setWorking('Uploading', 'Uploading the Worker');
+	// The detached host window may disappear independently of Modal.close().
+	modal.onClose();
+	const container = { querySelector: () => null };
+	Object.defineProperty(modal, 'containerEl', { value: container });
+	const host = { body: { appendChild: vi.fn() }, defaultView: { focus: vi.fn() } };
+	expect(revealCloudflareOperation(app, host as never)).toBe(true);
+	expect(host.body.appendChild).toHaveBeenCalledWith(container);
+	expect(MockModal.instances.at(-1)).toBe(modal);
+	expect(modal.titleEl.textContent).toBe('Uploading');
+	modal.succeed('Updated', 'Finished');
+	expect(revealCloudflareOperation(app, host as never)).toBe(false);
+	modal.close();
+});
+
+it('closes active progress and clears it when the plugin unloads', async () => {
+	vi.doMock('obsidian', () => createObsidianUiModule());
+	const { openCloudflareDeploymentModal, revealCloudflareOperation } = await import('./cloudflare-deployment-modal');
+	const app = {} as never;
+	const controller = new AbortController();
+	openCloudflareDeploymentModal(app, 'update', undefined, controller.signal);
+	controller.abort();
+	expect(unmount).toHaveBeenCalledOnce();
+	expect(revealCloudflareOperation(app)).toBe(false);
+});

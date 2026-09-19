@@ -60,8 +60,12 @@ export function renderInfrastructureManagementSection(context: InfrastructureSec
 			.setDesc('Review and copy a sync report to share with support.')
 			.addButton(button => button
 				.setButtonText('Export')
-				.onClick(() => {
-					new SyncDiagnosticsModal(plugin.app, plugin.syncRuntime.exportDiagnostics()).open();
+				.onClick(async () => {
+					button.setDisabled(true).setButtonText('Checking versions…');
+					try {
+						await plugin.syncRuntime.getVersionInfo().catch(() => undefined);
+						new SyncDiagnosticsModal(plugin.app, plugin.syncRuntime.exportDiagnostics()).open();
+					} finally { button.setDisabled(false).setButtonText('Export'); }
 				}));
 
 	}

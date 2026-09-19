@@ -59,9 +59,9 @@ describe('renderConfigSection integration', () => {
 
 		renderConfigSection({
 			containerEl: new FakeElement('div') as never,
-			plugin: {
+			plugin: { manifest: { version: '0.2.0' },
 				settings: { cloudflareDeployment: null },
-				syncRuntime: { isConfigured: vi.fn(() => false) },
+				syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: vi.fn(() => false) },
 			} as never,
 			rerender: vi.fn(),
 		});
@@ -78,9 +78,9 @@ describe('renderConfigSection integration', () => {
 
 	it('offers reconnect for a remembered server on a disconnected device', async () => {
 		const { renderConfigSection } = await loadConfigSectionModule();
-		const plugin = {
+		const plugin = { manifest: { version: '0.2.0' },
 			settings: { cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } },
-			syncRuntime: { isConfigured: () => false },
+			syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => false },
 		};
 		renderConfigSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
 		expect(MockSetting.instances.map(setting => setting.nameEl.textContent)).toEqual(['Reconnect']);
@@ -94,11 +94,11 @@ describe('renderConfigSection integration', () => {
 		await loadConfigSectionModule();
 		const { renderForgetServerSetting } = await import('./server-selection-setting');
 		const saved = { accountId: 'account', d1DatabaseId: 'database' };
-		const plugin = {
+		const plugin = { manifest: { version: '0.2.0' },
 			app: {}, settings: { cloudflareDeployment: saved as typeof saved | null },
 			cloudflareDeploymentService: { cancelPendingDeployment: vi.fn() },
 			clearSettingsUiState: vi.fn(),
-			syncRuntime: { isConfigured: () => false, clearSyncConfiguration: vi.fn(async () => {}) },
+			syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => false, clearSyncConfiguration: vi.fn(async () => {}) },
 			writeSettings: vi.fn(async (update: { cloudflareDeployment: null }) => { Object.assign(plugin.settings, update); }),
 		};
 		const rerender = vi.fn();
@@ -123,11 +123,11 @@ describe('renderConfigSection integration', () => {
 		const clearSyncConfiguration = vi.fn(async () => {});
 		const rerender = vi.fn();
 		openConfirmationModal.mockResolvedValue(true);
-		const plugin = {
+		const plugin = { manifest: { version: '0.2.0' },
 			app: {},
 			settings: { cloudflareDeployment: null },
 			clearSettingsUiState: vi.fn(),
-			syncRuntime: {
+			syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })),
 				isConfigured: vi.fn(() => true),
 				clearSyncConfiguration,
 			},
@@ -152,7 +152,7 @@ describe('renderConfigSection integration', () => {
 		const { renderServerUpdateNotice } = await loadConfigSectionModule();
 		renderServerUpdateNotice({
 			containerEl: new FakeElement('div') as never,
-			plugin: {
+			plugin: { manifest: { version: '0.2.0' },
 				settings: {
 					cloudflareDeployment: {
 						deploymentId: '0123456789abcdef',
@@ -160,7 +160,7 @@ describe('renderConfigSection integration', () => {
 						lastDeployedFingerprint: 'a'.repeat(64),
 					},
 				},
-				syncRuntime: { isConfigured: vi.fn(() => true) },
+				syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: vi.fn(() => true) },
 			} as never,
 			rerender: vi.fn(),
 		});
@@ -173,7 +173,7 @@ describe('renderConfigSection integration', () => {
 		const { renderServerSection } = await loadConfigSectionModule();
 		renderServerSection({
 			containerEl: new FakeElement('div') as never,
-			plugin: {
+			plugin: { manifest: { version: '0.2.0' },
 				settings: {
 					cloudflareDeployment: {
 						deploymentId: '0123456789abcdef',
@@ -181,13 +181,14 @@ describe('renderConfigSection integration', () => {
 						lastDeployedFingerprint: embeddedArtifact.fingerprint,
 					},
 				},
-				syncRuntime: { isConfigured: vi.fn(() => true) },
+				syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: vi.fn(() => true) },
 			} as never,
 			rerender: vi.fn(),
 		});
 
-		const serverSetting = getSettingByName('Cloudflare server');
-		expect(serverSetting.descEl.textContent).toBe('Version 0.1.0. Your server software and reminders web app are up to date.');
+		await flushMicrotasks();
+		const serverSetting = getSettingByName('Connected server');
+		expect(serverSetting.descEl.textContent).toBe('Revision 7 · Matches the bundled server.');
 		expect(serverSetting.buttons).toHaveLength(0);
 	});
 });
@@ -196,12 +197,12 @@ it.each([true, false])('hides the top notice when no update is actionable (conne
     const { renderServerUpdateNotice } = await loadConfigSectionModule();
     renderServerUpdateNotice({
         containerEl: new FakeElement('div') as never,
-        plugin: {
+        plugin: { manifest: { version: '0.2.0' },
             settings: { cloudflareDeployment: {
                 lastDeployedVersion: embeddedArtifact.version,
                 lastDeployedFingerprint: embeddedArtifact.fingerprint,
             } },
-            syncRuntime: { isConfigured: () => connected },
+            syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => connected },
         } as never,
         rerender: vi.fn(),
     });
@@ -212,17 +213,18 @@ it('keeps the installed version in the server section without duplicating the up
     const { renderServerSection } = await loadConfigSectionModule();
     renderServerSection({
         containerEl: new FakeElement('div') as never,
-        plugin: {
+        plugin: { manifest: { version: '0.2.0' },
             settings: { cloudflareDeployment: {
                 lastDeployedVersion: '0.0.9',
                 lastDeployedFingerprint: 'old',
             } },
-            syncRuntime: { isConfigured: () => true },
+            syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => true },
         } as never,
         rerender: vi.fn(),
     });
-    const server = getSettingByName('Cloudflare server');
-    expect(server.descEl.textContent).toContain('Version 0.0.9.');
+    await flushMicrotasks();
+    const server = getSettingByName('Connected server');
+    expect(server.descEl.textContent).toContain('Revision 7');
     expect(server.buttons).toHaveLength(0);
     expect(MockSetting.instances.some(setting => setting.nameEl.textContent === 'Cloudflare update available')).toBe(false);
 });
@@ -230,9 +232,9 @@ it('keeps the installed version in the server section without duplicating the up
 
 it('lets an older server save its vault name through an explicit update', async () => {
 	const { renderServerSection } = await loadConfigSectionModule();
-	const plugin = {
+	const plugin = { manifest: { version: '0.2.0' },
 		settings: { workerUrl: 'https://crate.example', cloudflareDeployment: { accountId: 'account', d1DatabaseId: 'database' } },
-		syncRuntime: { isConfigured: () => true },
+		syncRuntime: { getVersionInfo: vi.fn(async () => ({ serverRevision: 7, deploymentFingerprint: embeddedArtifact.fingerprint })), isConfigured: () => true },
 	};
 	renderServerSection({ containerEl: new FakeElement('div') as never, plugin: plugin as never, rerender: vi.fn() });
 	const setting = getSettingByName('Vault name');

@@ -1,3 +1,4 @@
+import { renderVersionSettings, renderUpdateVersions } from './version-settings';
 import { checkAndRecoverUpdate } from '../../cloudflare/deployment-recovery-ui';
 import { Notice, Setting } from 'obsidian';
 import { EMBEDDED_CLOUDFLARE_ARTIFACT } from '../../cloudflare/embedded-artifacts';
@@ -38,29 +39,20 @@ export function renderServerUpdateNotice(context: ConfigSectionContext): void {
     if (!plugin.syncRuntime.isConfigured() || !deployment
         || !isCloudflareServerUpdateAvailable(deployment, EMBEDDED_CLOUDFLARE_ARTIFACT)) return;
 
-    new Setting(containerEl)
+    const update = new Setting(containerEl)
         .setName('Cloudflare update available')
         .setDesc('Update your sync server and reminders web app to the version included with this Crate plugin.')
         .addButton(button => button
             .setButtonText('Update server')
             .setCta()
             .onClick(() => { void startCloudflareDeployment(plugin); }));
+    renderUpdateVersions(update, plugin);
 }
 
 export function renderServerSection(context: ConfigSectionContext): void {
     const { containerEl, plugin } = context;
     const deployment = plugin.settings.cloudflareDeployment;
-    if (plugin.syncRuntime.isConfigured() && deployment) {
-        const updateAvailable = isCloudflareServerUpdateAvailable(deployment, EMBEDDED_CLOUDFLARE_ARTIFACT);
-        const version = deployment.lastDeployedVersion
-            ? `Version ${deployment.lastDeployedVersion}.`
-            : 'Installed version unknown.';
-        new Setting(containerEl)
-            .setName('Cloudflare server')
-            .setDesc(`${version} ${updateAvailable
-                ? 'An update is available at the top of these settings.'
-                : 'Your server software and reminders web app are up to date.'}`);
-    }
+    renderVersionSettings(containerEl, plugin);
     if (plugin.syncRuntime.isConfigured() && deployment?.accountId && !deployment.vaultName) {
         new Setting(containerEl).setName('Vault name')
             .setDesc('Save this vault’s name so you can recognize its server on other devices. This updates the Cloudflare server.')

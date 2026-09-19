@@ -1,3 +1,4 @@
+import { VersionSettings } from './VersionSettings';
 import { Toggle } from '@base-ui/react/toggle';
 import React, { useRef, useState } from 'react';
 import type { PwaPreferences } from '../preferences';
@@ -190,6 +191,8 @@ export function SettingsSheet({
 							</div>
 						</div>
 					</section>
+
+					<VersionSettings />
 
 					<Button className="settings-logout-button" type="button" data-action="logout" isDisabled={loggingOut} onClick={onLogout}>
 						<LogOut size={16} /> {loggingOut ? 'Logging out...' : 'Log out'}
