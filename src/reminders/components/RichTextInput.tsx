@@ -79,7 +79,7 @@ export const RichTextInput = forwardRef<RichTextInputHandle, RichTextInputProps>
     const unregister = mergeRegister(
       registerPlainText(editor),
       registerHistory(editor, history, 300, Date.now, undefined, 100),
-      registerReminderEditing(editor, () => latest.current.knownProjects ?? [], () => latest.current.markers !== false),
+      registerReminderEditing(editor, () => latest.current.knownProjects ?? [], () => latest.current.markers !== false, () => latest.current.resolvePageTitle),
       editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves, tags }) => {
         if (editor.isComposing() || tags.has('external-value') || (!dirtyElements.size && !dirtyLeaves.size && !tags.has(COMPOSITION_END_TAG))) return;
         const { text, offsets } = editorState.read(() => ({ text: $readReminder(), offsets: $selectionOffsets(true) }));

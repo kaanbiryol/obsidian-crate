@@ -66,7 +66,8 @@
 		"test:editor-compat": "node scripts/editor-contract-compare.mjs",
 		"test:editor-contract": "node scripts/editor-contract-compare.mjs current",
 		"typecheck:editor-contract": "tsc -p tests/editor-contract/tsconfig.json",
-		"test:lexical": "vitest run src/reminders/components/lexical/reminderDocument.test.ts && playwright test tests/visual/lexical-trial.spec.ts --workers=2 && playwright test --config tests/editor-contract/playwright.config.ts && node scripts/pwa-editor-contract-test.mjs && node scripts/pwa-editor-selection-test.mjs && node scripts/pwa-ui-performance-test.mjs && node scripts/pwa-focus-test.mjs && node scripts/pwa-draft-recovery-test.mjs && node scripts/pwa-update-test.mjs"
+		"test:page-titles": "npm run build && vitest run src/cloudflare/worker/link-title.test.ts src/sync/page-title.test.ts src/pwa/page-title-api.test.ts && vitest run --config vitest.cloudflare.config.ts src/cloudflare/worker/link-title.integration.ts && playwright test tests/visual/page-titles.spec.ts tests/visual/lexical-trial.spec.ts --workers=2",
+		"test:lexical": "vitest run src/reminders/components/lexical/reminderDocument.test.ts && playwright test tests/visual/lexical-trial.spec.ts tests/visual/page-titles.spec.ts --workers=2 && playwright test --config tests/editor-contract/playwright.config.ts && node scripts/pwa-editor-contract-test.mjs && node scripts/pwa-editor-selection-test.mjs && node scripts/pwa-ui-performance-test.mjs && node scripts/pwa-focus-test.mjs && node scripts/pwa-draft-recovery-test.mjs && node scripts/pwa-update-test.mjs"
 	},
 	"keywords": [
 		"obsidian",

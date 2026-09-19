@@ -10,11 +10,13 @@ import type { Env } from './types';
 import type { AuthPrincipal } from './auth/index';
 import { corsResponse } from './cors';
 import { mutationAuditContext } from './request-diagnostics';
+import { handleLinkTitle } from './link-title';
 
 export { handlePublicRoute };
 
 const REMINDERS_SCOPE_ROUTES = new Set([
 	'GET /health',
+	'POST /links/title',
 	'GET /reminders/list',
 	'POST /reminders/create',
 	'POST /reminders/update',
@@ -58,6 +60,12 @@ export async function handleAuthenticatedRoute(
 	const db = env.DB;
 	const limited = await limitNotificationAction(request, db, principal.tokenId);
 	if (limited) return limited;
+	if (path === '/links/title' && method === 'POST') {
+		if (env.NOTIFICATION_REQUEST_LIMITER && !(await env.NOTIFICATION_REQUEST_LIMITER.limit({ key: `link-titles:${principal.tokenId}` })).success) {
+			return corsResponse({ title: null }, 429, { 'Retry-After': '60' });
+		}
+		return handleLinkTitle(request);
+	}
 
 	return await handleSyncRoute(request, env, path, method, mutationAuditContext(request, principal, requestId))
 		?? await handleAuthRoute(request, env, path, method)

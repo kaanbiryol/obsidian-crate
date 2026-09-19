@@ -1,25 +1,7 @@
-import { chromium, webkit, expect, test, type Browser, type Page, type Locator } from '@playwright/test';
+import { selectRange } from './editor-helpers';
+import { chromium, webkit, expect, test, type Browser, type Page } from '@playwright/test';
 
 
-async function selectRange(editor: Locator, anchor: number, focus: number) {
-  await editor.evaluate((element, offsets) => {
-    (element as HTMLElement).focus();
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-    const nodes: Text[] = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode as Text);
-    const resolve = (offset: number): [Text, number] => {
-      for (const node of nodes) {
-        if (offset <= node.length) return [node, offset];
-        offset -= node.length;
-      }
-      throw new Error('Selection outside document');
-    };
-    const [a, ao] = resolve(offsets.anchor);
-    const [f, fo] = resolve(offsets.focus);
-    document.getSelection()!.setBaseAndExtent(a, ao, f, fo);
-    document.dispatchEvent(new Event('selectionchange'));
-  }, { anchor, focus });
-}
 
 for (const browserName of ['chromium', 'webkit'] as const) {
   for (const host of ['pwa', 'plugin']) {
@@ -32,8 +14,8 @@ for (const browserName of ['chromium', 'webkit'] as const) {
       });
       test.afterEach(async () => { await browser?.close(); });
 
-      async function load(value: string) {
-        await page.goto(`/?scene=lexical&host=${host}&theme=dark`);
+      async function load(value: string, titles = false) {
+        await page.goto(`/?scene=lexical&host=${host}&theme=dark${titles ? "&titles" : ""}`);
         await page.getByRole('textbox', { name: 'Sample reminder' }).fill(value);
         await page.getByRole('button', { name: 'Load reminder' }).click();
         const editor = page.getByRole('textbox', { name: 'Lexical reminder', exact: true });
@@ -148,6 +130,131 @@ for (const browserName of ['chromium', 'webkit'] as const) {
         await expect(output).toHaveJSProperty('textContent', 'alpha\nomega');
         await page.keyboard.type('middle');
         await expect(output).toHaveJSProperty('textContent', 'alpha\nmiddleomega');
+      });
+
+      test('uses fetched page titles and preserves one-step undo and redo', async () => {
+        await page.route('**/__test/page-title', route => route.fulfill({ json: { title: 'An &amp; article [today] $&' } }));
+        const { editor, output } = await load('', true);
+        await editor.focus();
+        await editor.evaluate(element => {
+          const data = new DataTransfer(); data.setData('text/plain', 'https://example.com');
+          element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+        });
+        await expect(output).toHaveText('[An & article ［today］ $&](https://example.com)');
+        await editor.press('ControlOrMeta+z');
+        await expect(output).toHaveText('');
+        await editor.press('ControlOrMeta+Shift+z');
+        await expect(output).toHaveText('[An & article ［today］ $&](https://example.com)');
+      });
+
+      test('keeps a selected label without requesting the page title', async () => {
+        let requests = 0;
+        await page.route('**/__test/page-title', route => { requests++; return route.fulfill({ json: { title: 'Unwanted title' } }); });
+        const { editor, output } = await load('Read docs', true);
+        await selectRange(editor, 5, 9);
+        await editor.evaluate(element => {
+          const data = new DataTransfer(); data.setData('text/plain', 'https://example.com');
+          element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+        });
+        await expect(output).toHaveText('Read [docs](https://example.com)');
+        expect(requests).toBe(0);
+      });
+
+      test('ignores a late page title after typing or undo', async () => {
+        for (const action of ['type', 'undo']) {
+          let release!: () => void;
+          const gate = new Promise<void>(resolve => { release = resolve; });
+          await page.route('**/__test/page-title', async route => { await gate; await route.fulfill({ json: { title: 'Late title' } }); });
+          const { editor, output } = await load('', true);
+          await editor.focus();
+          const requested = page.waitForRequest('**/__test/page-title');
+          await editor.evaluate(element => {
+            const data = new DataTransfer(); data.setData('text/plain', 'https://example.com');
+            element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+          });
+          await requested;
+          if (action === 'type') await page.keyboard.type(' more');
+          else await editor.press('ControlOrMeta+z');
+          const response = page.waitForResponse('**/__test/page-title');
+          release();
+          await (await response).finished();
+          await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+          await expect(output).toHaveText(action === 'type' ? '[https://example.com](https://example.com) more' : '');
+          await page.unroute('**/__test/page-title');
+        }
+      });
+
+      test('fetches description titles automatically and retains URLs on failure', async () => {
+        let requests = 0;
+        await page.route('**/__test/page-title', route => {
+          requests++;
+          return route.fulfill({ json: { title: requests === 1 ? 'Example article' : null } });
+        });
+        await page.goto(`/?scene=editor&host=${host}&theme=dark&titles`);
+        const description = page.getByRole('textbox', { name: 'Reminder description' });
+        const paste = async () => {
+          await description.focus(); await description.press('ControlOrMeta+a'); await description.press('Backspace');
+          await description.evaluate(element => {
+            const data = new DataTransfer(); data.setData('text/plain', 'https://example.com');
+            element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+          });
+        };
+        await paste();
+        await expect(description).toHaveText('[Example article](https://example.com)');
+        const response = page.waitForResponse('**/__test/page-title');
+        await paste(); await response;
+        await expect(description).toHaveText('[https://example.com](https://example.com)');
+        expect(requests).toBe(2);
+      });
+
+      test('converts pasted URLs to Markdown links with selection labels and undo', async () => {
+        const { editor, output } = await load('Read docs now');
+        const paste = async (text: string) => editor.evaluate((element, value) => {
+          const data = new DataTransfer();
+          data.setData('text/plain', value);
+          element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+        }, text);
+        await selectRange(editor, 5, 9);
+        await paste('https://example.com/a(b)#Work');
+        await expect(output).toHaveText('Read [docs](https://example.com/a%28b%29#Work) now');
+        await editor.press('ControlOrMeta+z');
+        await expect(output).toHaveText('Read docs now');
+        await editor.press('ControlOrMeta+Shift+z');
+        await expect(output).toHaveText('Read [docs](https://example.com/a%28b%29#Work) now');
+        await selectRange(editor, 0, 0);
+        await paste('https://example.org');
+        await expect(output).toHaveText('[https://example.org](https://example.org)Read [docs](https://example.com/a%28b%29#Work) now');
+        await page.getByRole('textbox', { name: 'Sample reminder' }).focus();
+        await expect(editor.locator('a')).toHaveCount(2);
+      });
+
+      test('converts description URL pastes while preserving ordinary and Markdown clipboard text', async () => {
+        await page.goto(`/?scene=editor&host=${host}&theme=dark`);
+        const description = page.getByRole('textbox', { name: 'Reminder description' });
+        for (const value of ['https://example.com', '[docs](https://example.org)', 'javascript:alert(1)', 'Read https://example.com tomorrow']) {
+          await description.focus();
+          await description.press('ControlOrMeta+a');
+          await description.press('Backspace');
+          await description.evaluate((element, text) => {
+            const data = new DataTransfer();
+            data.setData('text/plain', text);
+            element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+          }, value);
+          await expect(description).toHaveText(value === 'https://example.com' ? `[${value}](${value})` : value);
+        }
+      });
+
+      test('pastes a destination into existing Markdown without nesting links', async () => {
+        const { editor, output } = await load('[docs](https://example.com)');
+        await selectRange(editor, 2, 2);
+        await expect(editor).toHaveText('[docs](https://example.com)');
+        await selectRange(editor, 7, 26);
+        await editor.evaluate(element => {
+          const data = new DataTransfer();
+          data.setData('text/plain', 'https://example.org');
+          element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+        });
+        await expect(output).toHaveText('[docs](https://example.org)');
       });
 
       test('normalizes clipboard line endings and supports replacing the entire document', async () => {

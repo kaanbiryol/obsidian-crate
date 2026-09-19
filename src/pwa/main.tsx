@@ -1,4 +1,5 @@
 import { PWA_ASSET_VERSION } from '@/cloudflare/worker/pwa-version';
+import { PageTitleContext } from '@/reminders/components/lexical/pageTitles';
 import React, { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -111,6 +112,12 @@ function App() {
 		[authSession],
 	);
 	const reminderSync = useReminderSync({ apiFetch, authToken, bootstrapped, config, setSelectedProject });
+	const resolvePageTitle = useCallback(async (url: string) => {
+		const response = await apiFetch('/links/title', { method: 'POST', body: JSON.stringify({ url }), signal: AbortSignal.timeout(7000) });
+		if (!response.ok) return null;
+		const result = await response.json() as { title?: unknown };
+		return typeof result.title === 'string' ? result.title : null;
+	}, [apiFetch]);
 	const {
 		push,
 		initialCheckComplete,
@@ -466,19 +473,21 @@ function App() {
 					/>
 				)}
 				{modal && (
-					<ReminderSheet
-						key={`${modal.mode}-${modal.reminderId ?? 'new'}-${modal.operationId ?? ''}`}
-						colorScheme={colorScheme}
-						modal={modal}
-						folderPath={config.folderPath}
-						projects={visibleProjects}
-						saving={saving}
-						isClosing={modalTransition.isClosing}
-						onClose={closeModal}
-						onClosed={modalTransition.finishClose}
-						onSave={saveReminder}
-						onDelete={deleteReminder}
-					/>
+					<PageTitleContext.Provider value={resolvePageTitle}>
+						<ReminderSheet
+							key={`${modal.mode}-${modal.reminderId ?? 'new'}-${modal.operationId ?? ''}`}
+							colorScheme={colorScheme}
+							modal={modal}
+							folderPath={config.folderPath}
+							projects={visibleProjects}
+							saving={saving}
+							isClosing={modalTransition.isClosing}
+							onClose={closeModal}
+							onClosed={modalTransition.finishClose}
+							onSave={saveReminder}
+							onDelete={deleteReminder}
+						/>
+					</PageTitleContext.Provider>
 				)}
 				{toast && (
 					<div

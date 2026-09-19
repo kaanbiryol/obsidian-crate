@@ -14,6 +14,7 @@ export interface RichTextInputHandle {
 }
 
 export interface RichTextInputProps {
+    resolvePageTitle?: import('./pageTitles').PageTitleResolver;
     /** Descriptions support links without interpreting reminder metadata. */
     markers?: boolean;
     value: string;

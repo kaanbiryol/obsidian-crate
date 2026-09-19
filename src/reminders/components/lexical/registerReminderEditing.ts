@@ -2,13 +2,19 @@ import { $addUpdateTag, HISTORY_MERGE_TAG, $getRoot, $getSelection, $isRangeSele
 import { mergeRegister } from '@lexical/utils';
 import { commitReminderMarkers } from '../../utils/reminderEditorEdits';
 import { findLinkMatches } from '../../utils/richTextMatchers';
+import { isSafeUrl } from '../../utils/markdownLinks';
 import { $decorateReminder, $readReminder, $writeReminder } from './reminderDocument';
 import { $restoreOffsets, $selectionOffsets } from './selection';
+import { normalizePageTitle, type PageTitleResolver } from './pageTitles';
 
-export function registerReminderEditing(editor: LexicalEditor, projects: () => string[], markers: () => boolean = () => true) {
+export function registerReminderEditing(editor: LexicalEditor, projects: () => string[], markers: () => boolean = () => true, titleResolver: () => PageTitleResolver | undefined = () => undefined) {
   let committed = editor.getEditorState().read($readReminder);
   let pasting = false;
   let revealedLink: number | undefined;
+  let pendingTitle: { url: string; markdown: string; start: number; resolve: PageTitleResolver } | undefined;
+  let revision = 0;
+  let lastText = committed;
+  let disposed = false;
   const refreshLinks = (text: string, nextOffsets: ReturnType<typeof $selectionOffsets>) => {
     const root = editor.getRootElement();
     const focused = editor.isEditable() && root && (root.getRootNode() as Document | ShadowRoot).activeElement === root;
@@ -41,6 +47,7 @@ export function registerReminderEditing(editor: LexicalEditor, projects: () => s
     }
   };
   return mergeRegister(
+    () => { disposed = true; revision++; },
     editor.registerCommand(SELECTION_CHANGE_COMMAND, () => {
       if (!editor.isComposing()) refreshLinks($readReminder(), $selectionOffsets(true));
       return false;
@@ -54,12 +61,30 @@ export function registerReminderEditing(editor: LexicalEditor, projects: () => s
       return false;
     }, COMMAND_PRIORITY_HIGH),
     editor.registerCommand(PASTE_COMMAND, event => {
-      if (!event || !('clipboardData' in event) || !event.clipboardData) return false;
+      if (!editor.isEditable() || !event || !('clipboardData' in event) || !event.clipboardData) return false;
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       event.preventDefault();
       pasting = true;
-      selection.insertRawText(event.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n'));
+      let text = event.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
+      const url = text.trim();
+      const offsets = $selectionOffsets(true);
+      const start = offsets ? Math.min(offsets.anchor, offsets.focus) : 0;
+      const end = offsets ? Math.max(offsets.anchor, offsets.focus) : 0;
+      // Leave partial link edits alone so pasting a destination never nests links.
+      const insideLink = offsets && findLinkMatches($readReminder()).some(link =>
+        start === end ? start > link.index && start < link.index + link.length
+          : start < link.index + link.length && end > link.index);
+      const label = selection.isCollapsed() ? url : selection.getTextContent();
+      if (!insideLink && /^https?:\/\/[^\s<>]+$/i.test(url) && isSafeUrl(url)
+        && label && !/[[\]\\\n]/.test(label)) {
+        // The shared Markdown parser uses closing parentheses as delimiters.
+        const destination = url.replace(/\(/g, '%28').replace(/\)/g, '%29');
+        text = `[${label}](${destination})`;
+        const resolve = titleResolver();
+        if (selection.isCollapsed() && resolve) pendingTitle = { url, markdown: text, start, resolve };
+      }
+      selection.insertRawText(text);
       return true;
     }, COMMAND_PRIORITY_HIGH),
     editor.registerNodeTransform(RootNode, () => {
@@ -82,6 +107,29 @@ export function registerReminderEditing(editor: LexicalEditor, projects: () => s
     }),
     editor.registerUpdateListener(({ editorState, tags }) => {
       if (tags.has('external-value') || tags.has('historic')) committed = editorState.read($readReminder);
+      const text = editorState.read($readReminder);
+      if (text !== lastText || tags.has('external-value') || tags.has('historic')) revision++;
+      lastText = text;
+      const pending = pendingTitle;
+      pendingTitle = undefined;
+      if (!pending || text.slice(pending.start, pending.start + pending.markdown.length) !== pending.markdown) return;
+      const requestedRevision = revision;
+      void Promise.resolve().then(() => disposed || revision !== requestedRevision || titleResolver() !== pending.resolve
+        ? null : pending.resolve(pending.url)).then(rawTitle => {
+        const root = editor.getRootElement();
+        if (!root || disposed || !editor.isEditable() || editor.isComposing() || revision !== requestedRevision || titleResolver() !== pending.resolve || !rawTitle) return;
+        const title = normalizePageTitle(rawTitle, root.ownerDocument);
+        if (!title) return;
+        editor.update(() => {
+          if ($readReminder() !== text) return;
+          const replacement = pending.markdown.replace(/^\[[\s\S]*?\]\(/, () => `[${title}](`);
+          const offsets = $selectionOffsets(true);
+          const end = pending.start + pending.markdown.length;
+          const shift = (offset: number) => offset >= end ? offset + replacement.length - pending.markdown.length
+            : offset > pending.start ? pending.start + Math.min(offset - pending.start, title.length + 1) : offset;
+          refreshLinks(text.slice(0, pending.start) + replacement + text.slice(end), offsets ? { anchor: shift(offsets.anchor), focus: shift(offsets.focus) } : null);
+        }, { tag: HISTORY_MERGE_TAG });
+      }).catch(() => undefined);
     }),
   );
 }

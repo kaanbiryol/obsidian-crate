@@ -16,6 +16,7 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 |---|---|---|
 | `GET` | `/.well-known/crate` | Public service, version, protocol range, and capability metadata |
 | `GET` | `/health` | Health check, returns `{ status, timestamp }` |
+| `POST` | `/links/title` | Authenticated page-title lookup `{ url }`, returns `{ title: string \| null }`; allowed for vault and reminder tokens |
 | `GET` | `/sync/check?since=<seq>` | Lightweight check: are there changes since this sequence? |
 | `GET` | `/sync/changes?since=<seq>` | Paginated changelog entries (limit 5000 per page) |
 | `GET` | `/sync/manifest?limit=<n>&after=<path>&snapshotSeq=<seq>` | Stable, cursor-paginated remote manifest |
@@ -63,6 +64,10 @@ Vault device tokens are registered only through a temporary Cloudflare OAuth aut
 | `POST` | `/notifications/reminders-exchange` | Exchanges a one-time web enrollment token for a PWA auth token |
 
 ## Request/Response Details
+
+### Page titles
+
+`POST /links/title` is a read operation and does not require mutation protocol negotiation. Pasting a standalone web URL automatically uses it. It accepts public HTTP(S) DNS names on standard ports, excludes credentials and fragments, validates each redirect (maximum three), and reads at most 256 KiB of HTML within five seconds. It returns the HTML title as text with entities retained; clients decode entities as text. Missing titles, unsupported responses, and network failures return `title: null`. Invalid destinations return 400; the edge request limiter can return 429. No page scripts execute, no caller credentials are forwarded, and responses are not cached. Older servers return an error and clients retain the URL label.
 
 ### PUT /sync/upload
 

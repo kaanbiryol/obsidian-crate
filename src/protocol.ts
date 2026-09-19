@@ -85,5 +85,5 @@ export function isCompatibleCrateServer(info: CrateServerInfo): boolean {
 export const CRATE_PROTOCOL_HEADER = 'X-Crate-Protocol';
 export function isCrateMutation(path: string, method = 'GET'): boolean {
   return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())
-    && !['/sync/metadata', '/sync/batch-download'].includes(path.split('?')[0] ?? path);
+    && !['/sync/metadata', '/sync/batch-download', '/links/title'].includes(path.split('?')[0] ?? path);
 }

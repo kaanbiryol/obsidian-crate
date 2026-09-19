@@ -16,6 +16,7 @@ describe('authenticated route scopes', () => {
 		expect(isAuthenticatedRouteAllowed(principal, '/reminders/update', 'POST')).toBe(true);
 		expect(isAuthenticatedRouteAllowed(principal, '/notifications/subscribe', 'POST')).toBe(true);
 		expect(isAuthenticatedRouteAllowed(principal, '/auth/session', 'DELETE')).toBe(true);
+		expect(isAuthenticatedRouteAllowed(principal, '/links/title', 'POST')).toBe(true);
 	});
 
 	it('blocks reminder PWA tokens from vault and device-management APIs', () => {
